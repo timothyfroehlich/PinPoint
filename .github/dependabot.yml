@@ -6,15 +6,28 @@ updates:
     schedule:
       interval: "daily"
     target-branch: "main"
-    pull-request-branch-name:
-      separator: "-"
     groups:
       minor-patch-updates:
         applies-to: version-updates
-        auto-merge: true
         update-types:
           - "minor"
           - "patch"
-        # You can add a prefix to the branch name for this group
-        pull-request-branch-name:
-          prefix: "dependabot-minor-patch"
+    # Auto-merge for all npm updates (minor, patch, and major)
+    auto-merge: true
+    # Add labels for better organization
+    labels:
+      - "dependencies"
+      - "npm"
+      - "automerge"
+
+  # Configuration for GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly" # Check for updates weekly
+    # Auto-merge for all GitHub Actions updates
+    auto-merge: true
+    labels:
+      - "dependencies"
+      - "github-actions"
+      - "automerge"
