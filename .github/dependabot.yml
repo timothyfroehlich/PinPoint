@@ -4,5 +4,30 @@ updates:
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "daily"
     target-branch: "main"
+    groups:
+      minor-patch-updates:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
+    # Auto-merge for all npm updates (minor, patch, and major)
+    auto-merge: true
+    # Add labels for better organization
+    labels:
+      - "dependencies"
+      - "npm"
+      - "automerge"
+
+  # Configuration for GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly" # Check for updates weekly
+    # Auto-merge for all GitHub Actions updates
+    auto-merge: true
+    labels:
+      - "dependencies"
+      - "github-actions"
+      - "automerge"
