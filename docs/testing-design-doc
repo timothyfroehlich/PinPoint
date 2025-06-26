@@ -10,7 +10,7 @@ Our strategy follows the classic testing pyramid, prioritizing fast, isolated te
   * **Test-Driven Development (TDD):** For backend logic and critical UI components, tests will be written *before* the implementation code. This ensures that all code is written with testability in mind and meets requirements from the start.
   * **Code Quality:** TypeScript will be used for static type checking across the entire codebase. ESLint and Prettier will be enforced through pre-commit hooks to maintain a consistent and high-quality code style.
 * **Technology Stack:**
-  * **Unit & Integration Testing:** **Jest** will serve as the primary test runner, combined with **React Testing Library** for testing React components and **Supertest** for testing Next.js API endpoints directly.
+  * **Unit & Integration Testing:** **Jest** will serve as the primary test runner, combined with **React Testing Library** for testing React components. For testing tRPC procedures, we will call them directly, which is faster and more efficient than testing via HTTP requests.
   * **End-to-End (E2E) Testing:** **Playwright** will be used for automated browser testing to simulate real user workflows from start to finish.
   * **Mocking:** Jest's built-in mocking capabilities will be used for isolating units of code. For external services, tools like **Mock Service Worker (MSW)** or specific API mocks (e.g., for Cloudinary, email services) will be used.
 
@@ -25,8 +25,8 @@ The testing focus will evolve with each development milestone, building a compre
   * Test individual utility functions and helper classes in isolation.
   * Test NextAuth.js configuration and authentication callback logic, mocking database and provider dependencies.
 * **Integration Tests:**
-  * **API Endpoint Testing (Critical):** Write tests for all authentication endpoints (`/api/auth/*`) to validate user creation, login, and session handling.
-  * **Multi-Tenancy Validation (Highest Priority):** Create a dedicated test suite to rigorously verify data segregation. These tests will seed a test database with data for multiple organizations and assert that API requests authenticated for `Organization A` can **never** read, update, or delete data belonging to `Organization B`.
+  * **API Procedure Testing (Critical):** Write tests for all authentication-related tRPC procedures to validate user creation, login, and session handling.
+  * **Multi-Tenancy Validation (Highest Priority):** Create a dedicated test suite to rigorously verify data segregation. These tests will seed a test database with data for multiple organizations and assert that tRPC procedures called with the context of `Organization A` can **never** read, update, or delete data belonging to `Organization B`.
 
 #### **Tests for Milestone 2: MVP**
 
@@ -35,8 +35,8 @@ The testing focus will evolve with each development milestone, building a compre
   * Test individual UI components to ensure they render correctly based on props (e.g., `<IssueCard>`, `<SubmissionForm>`).
   * Test client-side form validation and state management logic.
 * **Integration Tests:**
-  * Test the full data flow from the UI to the database. For example, a test will simulate filling out and submitting the issue form, mocking the API call to verify the correct payload is sent, and asserting the UI updates accordingly.
-  * Write integration tests for all new CRUD API endpoints related to `GameInstances` and `Issues`.
+  * Test the full data flow from the UI to the database. For example, a test will simulate filling out and submitting the issue form, mocking the tRPC procedure call to verify the correct payload is sent, and asserting the UI updates accordingly.
+  * Write integration tests for all new CRUD tRPC procedures related to `GameInstances` and `Issues`.
 * **End-to-End Tests (Playwright):**
   * **Public User Flow:** Automate a browser to navigate to the site, view the public issue dashboard, select a game, submit a new issue, and verify that the new issue appears on the dashboard and the game's status page.
   * **Admin User Flow:** Automate a login as an `Admin`, navigate to the admin panel, create a new `GameInstance`, find a submitted issue, and update its status. The test will then assert that the change is correctly reflected in the UI and the audit log.
@@ -48,7 +48,7 @@ The testing focus will evolve with each development milestone, building a compre
   * Test the business logic for merging duplicate issues in isolation.
   * Test the state changes and interactions of the "Me Too" button component.
 * **Integration Tests:**
-  * Test the API endpoints for merging issues and upvoting, ensuring they correctly modify the database and handle edge cases.
+  * Test the tRPC procedures for merging issues and upvoting, ensuring they correctly modify the database and handle edge cases.
   * Test the image upload feature by mocking the Cloudinary API. The test will verify that the frontend correctly prepares the file and that the backend attempts to upload it to the external service.
 * **End-to-End Tests:**
   * **Merge Flow:** Automate a `Member` logging in, finding two similar issues, executing a merge, and verifying that the UI correctly reflects the new canonical issue and its updated audit log.

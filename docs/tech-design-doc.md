@@ -89,20 +89,20 @@ This proposed schema is designed for the future inventory module. It is structur
 
 ### **API Specification**
 
-The backend API will be implemented using Next.js API Routes. All endpoints will be protected and scoped by the multi-tenant middleware.
+The backend API will be implemented using **tRPC** on top of Next.js API Routes. This provides end-to-end type safety between the client and server. All tRPC procedures will be protected and scoped by the multi-tenant middleware.
 
-#### **Core CRUD Endpoints**
+#### **Core CRUD Procedures**
 
-The system will expose standard RESTful or tRPC endpoints for managing core entities like GameInstances, Issues, Comments, etc. All of these will be automatically scoped by the organization\_id present in the request context.
+The system will expose standard tRPC procedures for managing core entities like `GameInstances`, `Issues`, `Comments`, etc. These will be organized into routers (e.g., `game.router`, `issue.router`) and automatically scoped by the `organization_id` present in the request context.
 
-#### **Kanban Board API Endpoints**
+#### **Kanban Board Procedures**
 
-To support the interactive Kanban board, two key endpoints are required:
+To support the interactive Kanban board, two key procedures are required within an `issue` router:
 
-* GET /api/organizations/{orgId}/board: This is a read-only endpoint designed to fetch all data required to render the Kanban board in a single, efficient network request. The payload will be structured to facilitate easy rendering on the frontend, containing lists of issues pre-grouped by their status, a list of all configurable statuses for the organization, and a list of all members available for assignment.
-* PATCH /api/issues/{issueId}: This is the workhorse endpoint for all drag-and-drop interactions. It will accept a partial update to the Issue resource. This single endpoint can handle changes to status, assignee, or any other field that might become draggable in the future.
-  * Example Body for Status Change: { "statusId": "new-status-uuid" }
-  * Example Body for Assignee Change: { "assigneeId": "user-uuid" }
+*   **`issue.getBoardData`**: This is a read-only query procedure designed to fetch all data required to render the Kanban board in a single, efficient network request. The payload will be a fully-typed object containing lists of issues pre-grouped by their status, a list of all configurable statuses for the organization, and a list of all members available for assignment.
+*   **`issue.update`**: This is the workhorse mutation procedure for all drag-and-drop interactions. It will accept a partial, type-safe input object to update the `Issue` resource. This single procedure can handle changes to status, assignee, or any other field.
+    *   Example Input for Status Change: `{ issueId: "some-uuid", statusId": "new-status-uuid" }`
+    *   Example Input for Assignee Change: `{ issueId: "some-uuid", assigneeId": "user-uuid" }`
 
 ### **Frontend Architecture**
 
