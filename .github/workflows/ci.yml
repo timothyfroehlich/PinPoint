@@ -10,6 +10,9 @@ on:
 jobs:
   lint:
     runs-on: ubuntu-latest
+    env:
+      AUTH_SECRET: "temp_secret_value" # Temporary value, replace with GitHub Secret later
+      DATABASE_URL: "sqlite://temp_db.sqlite" # Temporary value, replace with GitHub Secret later
     steps:
       - uses: actions/checkout@v4
       - name: Set up Node.js
