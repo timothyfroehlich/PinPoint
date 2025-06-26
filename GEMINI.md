@@ -1,4 +1,5 @@
 
+* **API:** tRPC
 * **Language:** TypeScript
 * **Full-Stack Framework:** Next.js (with React)
 * **UI Component Library:** Material UI (MUI)
@@ -25,7 +26,7 @@
 
 * **TypeScript First:** Use TypeScript for all new code. Leverage its static typing capabilities to ensure code quality and prevent runtime errors.
 * **Code Quality:** Adhere to the project's ESLint and Prettier configurations for consistent code style.
-* **API Routes:** Backend logic should be implemented using Next.js API Routes.
+* **API:** Backend logic should be implemented using tRPC, built upon Next.js API Routes.
 * **Component Structure:** Follow existing patterns for React component structure and state management.
 * **Prisma Schema:** When modifying the database, update the `schema.prisma` file. All tenant-specific tables must include the `organization_id` foreign key.
 * **Write Tests First:** For new backend logic and critical UI components, write failing tests before writing the implementation code.
