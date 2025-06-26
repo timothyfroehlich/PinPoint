@@ -1,0 +1,66 @@
+## **Testing Design Document**
+
+This document outlines the comprehensive testing strategy for the PinPoint platform. The approach is rooted in Test-Driven Development (TDD) principles to ensure high code quality, maintainability, and confidence in the application's stability at every stage of the development roadmap.
+
+### **1\. Testing Philosophy & Tools**
+
+Our strategy follows the classic testing pyramid, prioritizing fast, isolated tests while ensuring full coverage through integrated and end-to-end scenarios.
+
+* **Guiding Principles:**
+  * **Test-Driven Development (TDD):** For backend logic and critical UI components, tests will be written *before* the implementation code. This ensures that all code is written with testability in mind and meets requirements from the start.
+  * **Code Quality:** TypeScript will be used for static type checking across the entire codebase. ESLint and Prettier will be enforced through pre-commit hooks to maintain a consistent and high-quality code style.
+* **Technology Stack:**
+  * **Unit & Integration Testing:** **Jest** will serve as the primary test runner, combined with **React Testing Library** for testing React components and **Supertest** for testing Next.js API endpoints directly.
+  * **End-to-End (E2E) Testing:** **Playwright** will be used for automated browser testing to simulate real user workflows from start to finish.
+  * **Mocking:** Jest's built-in mocking capabilities will be used for isolating units of code. For external services, tools like **Mock Service Worker (MSW)** or specific API mocks (e.g., for Cloudinary, email services) will be used.
+
+### **2\. Testing Strategy by Milestone**
+
+The testing focus will evolve with each development milestone, building a comprehensive suite of tests that validate the application's functionality and stability.
+
+#### **Tests for Milestone 1: Foundational Backend**
+
+* **Focus:** Backend logic, database integrity, and security.
+* **Unit Tests:**
+  * Test individual utility functions and helper classes in isolation.
+  * Test NextAuth.js configuration and authentication callback logic, mocking database and provider dependencies.
+* **Integration Tests:**
+  * **API Endpoint Testing (Critical):** Write tests for all authentication endpoints (`/api/auth/*`) to validate user creation, login, and session handling.
+  * **Multi-Tenancy Validation (Highest Priority):** Create a dedicated test suite to rigorously verify data segregation. These tests will seed a test database with data for multiple organizations and assert that API requests authenticated for `Organization A` can **never** read, update, or delete data belonging to `Organization B`.
+
+#### **Tests for Milestone 2: MVP**
+
+* **Focus:** Core user workflows and the interaction between the frontend and backend.
+* **Unit Tests (React Testing Library):**
+  * Test individual UI components to ensure they render correctly based on props (e.g., `<IssueCard>`, `<SubmissionForm>`).
+  * Test client-side form validation and state management logic.
+* **Integration Tests:**
+  * Test the full data flow from the UI to the database. For example, a test will simulate filling out and submitting the issue form, mocking the API call to verify the correct payload is sent, and asserting the UI updates accordingly.
+  * Write integration tests for all new CRUD API endpoints related to `GameInstances` and `Issues`.
+* **End-to-End Tests (Playwright):**
+  * **Public User Flow:** Automate a browser to navigate to the site, view the public issue dashboard, select a game, submit a new issue, and verify that the new issue appears on the dashboard and the game's status page.
+  * **Admin User Flow:** Automate a login as an `Admin`, navigate to the admin panel, create a new `GameInstance`, find a submitted issue, and update its status. The test will then assert that the change is correctly reflected in the UI and the audit log.
+
+#### **Tests for Milestone 3: Advanced Tooling**
+
+* **Focus:** Validating the logic of new, complex features and integrations.
+* **Unit Tests:**
+  * Test the business logic for merging duplicate issues in isolation.
+  * Test the state changes and interactions of the "Me Too" button component.
+* **Integration Tests:**
+  * Test the API endpoints for merging issues and upvoting, ensuring they correctly modify the database and handle edge cases.
+  * Test the image upload feature by mocking the Cloudinary API. The test will verify that the frontend correctly prepares the file and that the backend attempts to upload it to the external service.
+* **End-to-End Tests:**
+  * **Merge Flow:** Automate a `Member` logging in, finding two similar issues, executing a merge, and verifying that the UI correctly reflects the new canonical issue and its updated audit log.
+  * **Image Upload Flow:** Extend the public submission E2E test to include uploading an image and verifying it appears on the issue page.
+
+#### **Tests for Milestone 4: Full Notification System**
+
+* **Focus:** Ensuring reliable, event-driven communication and final system stability.
+* **Unit Tests:**
+  * Test the notification-triggering logic to ensure that the correct conditions (e.g., issue status change to "Resolved") trigger the correct notification type for the correct users.
+* **Integration Tests:**
+  * Test the integration with the transactional email service. These tests will **not** send real emails. Instead, they will mock the email service's API and assert that when an action occurs (like closing an issue), the application makes the correct API call to the service with the appropriate recipient, subject, and content.
+* **End-to-End Tests:**
+  * **Notification Flow:** Automate the full anonymous user flow: submit an issue with an email, have an admin resolve it, and then check a mock email inbox (using a tool like MailHog or a similar testing utility) to verify the closure email was "sent."
+  * **Full Regression Suite:** Before the v1.0 release, execute the entire suite of E2E tests to ensure that no feature has inadvertently broken existing functionality. This serves as the final quality gate.
