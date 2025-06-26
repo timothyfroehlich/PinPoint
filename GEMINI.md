@@ -36,3 +36,4 @@
   * **Integration Tests:** For API endpoints and component interactions.
   * **E2E Tests:** For critical user workflows (e.g., submitting an issue, managing a game).
 * **Multi-Tenancy Tests:** It is absolutely critical to have integration tests that verify data segregation between different organizations.
+* **Temporary Files:** When a temporary file is needed to complete a task (e.g., to pass a complex string as a command-line argument), it should be created inside a `/tmp` directory at the root of the project. This directory should be added to the `.gitignore` file.
