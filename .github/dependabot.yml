@@ -4,5 +4,17 @@ updates:
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "daily"
     target-branch: "main"
+    pull-request-branch-name:
+      separator: "-"
+    groups:
+      minor-patch-updates:
+        applies-to: version-updates
+        auto-merge: true
+        update-types:
+          - "minor"
+          - "patch"
+        # You can add a prefix to the branch name for this group
+        pull-request-branch-name:
+          prefix: "dependabot-minor-patch"
