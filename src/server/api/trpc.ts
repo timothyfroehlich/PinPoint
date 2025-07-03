@@ -29,9 +29,20 @@ import { db } from "~/server/db";
 export const createTRPCContext = async (opts: { headers: Headers }) => {
   const session = await auth();
 
+  // For now, we'll hardcode the organization. In the future, this will be
+  // derived from the subdomain of the request.
+  const organization = await db.organization.findFirst();
+  if (!organization) {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "No organization found.",
+    });
+  }
+
   return {
     db,
     session,
+    organization,
     ...opts,
   };
 };
@@ -131,3 +142,31 @@ export const protectedProcedure = t.procedure
       },
     });
   });
+
+/**
+ * Organization-scoped procedure
+ *
+ * This procedure ensures that the user is a member of the organization they are trying to access.
+ * It also adds the membership to the context.
+ */
+export const organizationProcedure = protectedProcedure.use(
+  async ({ ctx, next }) => {
+    const membership = await ctx.db.membership.findFirst({
+      where: {
+        organizationId: ctx.organization.id,
+        userId: ctx.session.user.id,
+      },
+    });
+
+    if (!membership) {
+      throw new TRPCError({ code: "FORBIDDEN" });
+    }
+
+    return next({
+      ctx: {
+        ...ctx,
+        membership,
+      },
+    });
+  },
+);

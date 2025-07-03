@@ -7,41 +7,137 @@ generator client {
 
 datasource db {
     provider = "postgresql"
-    // NOTE: When using mysql or sqlserver, uncomment the @db.Text annotations in model Account below
-    // Further reading:
-    // https://next-auth.js.org/adapters/prisma#create-the-prisma-schema
-    // https://www.prisma.io/docs/reference/api-reference/prisma-schema-reference#string
     url      = env("DATABASE_URL")
 }
 
-model Post {
-    id        Int      @id @default(autoincrement())
-    name      String
+enum Role {
+    admin
+    member
+}
+
+model User {
+    id            String       @id @default(cuid())
+    name          String?
+    email         String?      @unique
+    password      String?
+    emailVerified DateTime?
+    image         String?
+    accounts      Account[]
+    sessions      Session[]
+    memberships   Membership[]
+    issues        Issue[]
+    comments      Comment[]
+}
+
+model Organization {
+    id           String       @id @default(cuid())
+    name         String
+    subdomain    String       @unique
+    memberships  Membership[]
+    issueStatues IssueStatus[]
+    issues       Issue[]
+    locations    Location[]
+    gameTitles   GameTitle[]
+    attachments  Attachment[]
+}
+
+model Membership {
+    id             String       @id @default(cuid())
+    role           Role
+    user           User         @relation(fields: [userId], references: [id])
+    userId         String
+    organization   Organization @relation(fields: [organizationId], references: [id])
+    organizationId String
+
+    @@unique([userId, organizationId])
+}
+
+model IssueStatus {
+    id             String       @id @default(cuid())
+    name           String
+    order          Int
+    organization   Organization @relation(fields: [organizationId], references: [id])
+    organizationId String
+    issues         Issue[]
+}
+
+model Issue {
+    id             String       @id @default(cuid())
+    title          String
+    description    String?
+    status         IssueStatus  @relation(fields: [statusId], references: [id])
+    statusId       String
+    assignee       User?        @relation(fields: [assigneeId], references: [id])
+    assigneeId     String?
+    reporterEmail  String?
+    gameInstance   GameInstance @relation(fields: [gameInstanceId], references: [id])
+    gameInstanceId String
+    organization   Organization @relation(fields: [organizationId], references: [id])
+    organizationId String
+    comments       Comment[]
+    attachments    Attachment[]
+}
+
+model Location {
+    id             String         @id @default(cuid())
+    name           String
+    organization   Organization   @relation(fields: [organizationId], references: [id])
+    organizationId String
+    gameInstances  GameInstance[]
+}
+
+model GameTitle {
+    id             String         @id @default(cuid())
+    name           String
+    organization   Organization   @relation(fields: [organizationId], references: [id])
+    organizationId String
+    gameInstances  GameInstance[]
+}
+
+model GameInstance {
+    id           String    @id @default(cuid())
+    name         String
+    gameTitle    GameTitle @relation(fields: [gameTitleId], references: [id])
+    gameTitleId  String
+    location     Location  @relation(fields: [locationId], references: [id])
+    locationId   String
+    issues       Issue[]
+}
+
+model Comment {
+    id        String   @id @default(cuid())
+    content   String
+    issue     Issue    @relation(fields: [issueId], references: [id])
+    issueId   String
+    author    User     @relation(fields: [authorId], references: [id])
+    authorId  String
     createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+}
 
-    createdBy   User   @relation(fields: [createdById], references: [id])
-    createdById String
-
-    @@index([name])
+model Attachment {
+    id             String       @id @default(cuid())
+    url            String
+    issue          Issue        @relation(fields: [issueId], references: [id])
+    issueId        String
+    organization   Organization @relation(fields: [organizationId], references: [id])
+    organizationId String
 }
 
 // Necessary for Next auth
 model Account {
-    id                       String  @id @default(cuid())
-    userId                   String
-    type                     String
-    provider                 String
-    providerAccountId        String
-    refresh_token            String? // @db.Text
-    access_token             String? // @db.Text
-    expires_at               Int?
-    token_type               String?
-    scope                    String?
-    id_token                 String? // @db.Text
-    session_state            String?
-    user                     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-    refresh_token_expires_in Int?
+    id                String  @id @default(cuid())
+    userId            String
+    type              String
+    provider          String
+    providerAccountId String
+    refresh_token     String? @db.Text
+    access_token      String? @db.Text
+    expires_at        Int?
+    token_type        String?
+    scope             String?
+    id_token          String? @db.Text
+    session_state     String?
+    user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
     @@unique([provider, providerAccountId])
 }
@@ -54,30 +150,10 @@ model Session {
     user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-model User {
-    id            String    @id @default(cuid())
-    name          String?
-    email         String?   @unique
-    emailVerified DateTime?
-    image         String?
-    accounts      Account[]
-    sessions      Session[]
-    posts         Post[]
-}
-
 model VerificationToken {
     identifier String
     token      String   @unique
     expires    DateTime
 
     @@unique([identifier, token])
-}
-
-model Game {
-    id        String   @id @default(cuid())
-    title     String
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-
-    @@index([title])
 }
