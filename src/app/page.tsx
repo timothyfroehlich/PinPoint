@@ -4,14 +4,14 @@ import { Container, Typography, Card, CardContent, Chip, Box, Paper, CircularPro
 import { api } from "~/trpc/react";
 
 export default function Home() {
-  const { data: games, isLoading, error } = api.game.getAll.useQuery();
+  const { data: gameTitles, isLoading, error } = api.gameTitle.getAll.useQuery();
 
   if (isLoading) {
     return (
       <Container maxWidth="md" sx={{ py: 4, textAlign: 'center' }}>
         <CircularProgress />
         <Typography variant="h6" sx={{ mt: 2 }}>
-          Loading games...
+          Loading game titles...
         </Typography>
       </Container>
     );
@@ -21,13 +21,13 @@ export default function Home() {
     return (
       <Container maxWidth="md" sx={{ py: 4 }}>
         <Typography variant="h4" color="error">
-          Error loading games: {error.message}
+          Error loading game titles: {error.message}
         </Typography>
       </Container>
     );
   }
 
-  const gameCount = games?.length || 0;
+  const gameTitleCount = gameTitles?.length || 0;
   
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
@@ -36,7 +36,7 @@ export default function Home() {
           PinPoint
         </Typography>
         <Typography variant="h6" color="text.secondary">
-          Game Database Status
+          Game Title Database Status
         </Typography>
       </Box>
 
@@ -47,29 +47,29 @@ export default function Home() {
               Database Summary
             </Typography>
             <Chip 
-              label={`${gameCount} games`} 
+              label={`${gameTitleCount} game titles`} 
               color="primary" 
               variant="outlined"
             />
           </Box>
           
-          {gameCount > 0 ? (
+          {gameTitleCount > 0 ? (
             <Typography variant="body1" color="text.secondary">
-              Found {gameCount} game{gameCount !== 1 ? 's' : ''} in the database
+              Found {gameTitleCount} game title{gameTitleCount !== 1 ? 's' : ''} in the database
             </Typography>
           ) : (
             <Typography variant="body1" color="text.secondary">
-              No games found in the database yet
+              No game titles found in the database yet
             </Typography>
           )}
         </CardContent>
       </Card>
 
-      {gameCount > 0 && games && (
+      {gameTitleCount > 0 && gameTitles && (
         <Card elevation={1}>
           <CardContent>
             <Typography variant="h6" gutterBottom>
-              Raw Game Data
+              Raw Game Title Data
             </Typography>
             <Paper 
               sx={{ 
@@ -89,7 +89,7 @@ export default function Home() {
                   margin: 0
                 }}
               >
-                {JSON.stringify(games, null, 2)}
+                {JSON.stringify(gameTitles, null, 2)}
               </Typography>
             </Paper>
           </CardContent>

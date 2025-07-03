@@ -1,7 +1,9 @@
 import { type Metadata } from "next";
-import { Geist } from "next/font/google";
-import { MaterialUIProvider } from "./providers";
+import { Inter } from "next/font/google";
+import { AppProviders } from "./providers";
 import { TRPCReactProvider } from "~/trpc/react";
+import { AppBar, Toolbar, Typography } from "@mui/material";
+import { AuthButton } from "./_components/auth-button";
 
 export const metadata: Metadata = {
   title: "PinPoint",
@@ -9,20 +11,30 @@ export const metadata: Metadata = {
   icons: [{ rel: "icon", url: "/favicon.ico" }],
 };
 
-const geist = Geist({
+const inter = Inter({
   subsets: ["latin"],
-  variable: "--font-geist-sans",
+  variable: "--font-sans",
 });
 
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${geist.variable}`}>
+    <html lang="en" className={`${inter.variable}`}>
       <body>
-        <MaterialUIProvider>
-          <TRPCReactProvider>{children}</TRPCReactProvider>
-        </MaterialUIProvider>
+        <TRPCReactProvider>
+          <AppProviders>
+            <AppBar position="static">
+              <Toolbar>
+                <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+                  PinPoint
+                </Typography>
+                <AuthButton />
+              </Toolbar>
+            </AppBar>
+            {children}
+          </AppProviders>
+        </TRPCReactProvider>
       </body>
     </html>
   );

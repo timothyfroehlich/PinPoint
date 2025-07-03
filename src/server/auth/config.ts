@@ -1,5 +1,7 @@
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { type DefaultSession, type NextAuthConfig } from "next-auth";
+import Credentials from "next-auth/providers/credentials";
+import { compare } from "bcrypt";
 
 import { db } from "~/server/db";
 
@@ -31,6 +33,44 @@ declare module "next-auth" {
  */
 export const authConfig = {
   providers: [
+    Credentials({
+      name: "Credentials",
+      credentials: {
+        email: { label: "Email", type: "text" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials.password) {
+          return null;
+        }
+
+        // Use findFirst to avoid type issues with Auth.js adapter
+        const user = await db.user.findFirst({
+          where: { email: credentials.email as string },
+        });
+
+        if (!user || !(user as any).password) {
+          return null;
+        }
+
+        const isValid = await compare(
+          credentials.password as string, 
+          (user as any).password
+        );
+
+        if (isValid) {
+          return {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            emailVerified: user.emailVerified,
+            image: user.image,
+          };
+        }
+
+        return null;
+      },
+    }),
     /**
      * ...add more providers here.
      *
