@@ -27,7 +27,7 @@ export default function Home() {
     );
   }
 
-  const gameTitleCount = gameTitles?.length || 0;
+  const gameTitleCount = gameTitles?.length ?? 0;
   
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
