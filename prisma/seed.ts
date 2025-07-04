@@ -1,12 +1,9 @@
 import { PrismaClient, Role } from "@prisma/client";
-import { hash } from "bcrypt";
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log("Seeding database...");
-
-  const passwordHash = await hash("password", 10);
 
   // 1. Create a default Organization
   const organization = await prisma.organization.upsert({
@@ -19,22 +16,30 @@ async function main() {
   });
   console.log(`Created organization: ${organization.name}`);
 
-  // 2. Create a default Admin User
+  // 2. Create a test Admin User
   const adminUser = await prisma.user.upsert({
-    where: { email: "testadmin@gmail.com" },
-    update: {
-      password: passwordHash,
-    },
+    where: { email: "testdev-admin@fake.com" },
+    update: {},
     create: {
       name: "Test Admin",
-      email: "testadmin@gmail.com",
-      password: passwordHash,
+      email: "testdev-admin@fake.com",
     },
   });
   console.log(`Created admin user: ${adminUser.name}`);
 
-  // 3. Create a Membership to link the User to the Organization
-  const membership = await prisma.membership.upsert({
+  // 3. Create a test Member User
+  const memberUser = await prisma.user.upsert({
+    where: { email: "testdev-member@fake.com" },
+    update: {},
+    create: {
+      name: "Test Member",
+      email: "testdev-member@fake.com",
+    },
+  });
+  console.log(`Created member user: ${memberUser.name}`);
+
+  // 4. Create Memberships to link Users to the Organization
+  await prisma.membership.upsert({
     where: {
       userId_organizationId: {
         userId: adminUser.id,
@@ -52,6 +57,24 @@ async function main() {
     `Created admin membership for ${adminUser.name} in ${organization.name}`,
   );
 
+  await prisma.membership.upsert({
+    where: {
+      userId_organizationId: {
+        userId: memberUser.id,
+        organizationId: organization.id,
+      },
+    },
+    update: {},
+    create: {
+      role: Role.member,
+      userId: memberUser.id,
+      organizationId: organization.id,
+    },
+  });
+  console.log(
+    `Created member membership for ${memberUser.name} in ${organization.name}`,
+  );
+
   console.log("Seeding complete.");
 }
 
@@ -63,4 +86,3 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
-

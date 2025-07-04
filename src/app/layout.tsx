@@ -4,6 +4,7 @@ import { AppProviders } from "./providers";
 import { TRPCReactProvider } from "~/trpc/react";
 import { AppBar, Toolbar, Typography } from "@mui/material";
 import { AuthButton } from "./_components/auth-button";
+import { ImpersonationMenu } from "./_components/dev/impersonation-menu";
 
 export const metadata: Metadata = {
   title: "PinPoint",
@@ -33,6 +34,7 @@ export default function RootLayout({
               </Toolbar>
             </AppBar>
             {children}
+            {process.env.NODE_ENV === "development" && <ImpersonationMenu />}
           </AppProviders>
         </TRPCReactProvider>
       </body>
