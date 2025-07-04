@@ -1,10 +1,47 @@
 "use client";
 
-import { Container, Typography, Card, CardContent, Chip, Box, Paper, CircularProgress } from "@mui/material";
+import { 
+  Container, 
+  Typography, 
+  Card, 
+  CardContent, 
+  Box, 
+  TextField,
+  Button,
+  List,
+  ListItem,
+  ListItemText,
+  CircularProgress,
+  Alert,
+  Grid,
+  Divider
+} from "@mui/material";
+import { useState } from "react";
 import { api } from "~/trpc/react";
 
 export default function Home() {
-  const { data: gameTitles, isLoading, error } = api.gameTitle.getAll.useQuery();
+  const [newGameName, setNewGameName] = useState("");
+  
+  const { 
+    data: gameTitles, 
+    isLoading, 
+    error,
+    refetch 
+  } = api.gameTitle.getAll.useQuery();
+  
+  const createGameTitle = api.gameTitle.create.useMutation({
+    onSuccess: () => {
+      setNewGameName("");
+      void refetch();
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newGameName.trim()) {
+      createGameTitle.mutate({ name: newGameName.trim() });
+    }
+  };
 
   if (isLoading) {
     return (
@@ -20,9 +57,9 @@ export default function Home() {
   if (error) {
     return (
       <Container maxWidth="md" sx={{ py: 4 }}>
-        <Typography variant="h4" color="error">
+        <Alert severity="error">
           Error loading game titles: {error.message}
-        </Typography>
+        </Alert>
       </Container>
     );
   }
@@ -36,65 +73,74 @@ export default function Home() {
           PinPoint
         </Typography>
         <Typography variant="h6" color="text.secondary">
-          Game Title Database Status
+          Game Management
         </Typography>
       </Box>
 
-      <Card elevation={2} sx={{ mb: 3 }}>
-        <CardContent>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-            <Typography variant="h5" component="h2">
-              Database Summary
-            </Typography>
-            <Chip 
-              label={`${gameTitleCount} game titles`} 
-              color="primary" 
-              variant="outlined"
-            />
-          </Box>
-          
-          {gameTitleCount > 0 ? (
-            <Typography variant="body1" color="text.secondary">
-              Found {gameTitleCount} game title{gameTitleCount !== 1 ? 's' : ''} in the database
-            </Typography>
-          ) : (
-            <Typography variant="body1" color="text.secondary">
-              No game titles found in the database yet
-            </Typography>
-          )}
-        </CardContent>
-      </Card>
-
-      {gameTitleCount > 0 && gameTitles && (
-        <Card elevation={1}>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>
-              Raw Game Title Data
-            </Typography>
-            <Paper 
-              sx={{ 
-                p: 2, 
-                backgroundColor: 'grey.50',
-                overflow: 'auto',
-                maxHeight: 400
-              }}
-            >
-              <Typography 
-                component="pre" 
-                variant="body2" 
-                sx={{ 
-                  fontFamily: 'monospace',
-                  fontSize: '0.875rem',
-                  whiteSpace: 'pre-wrap',
-                  margin: 0
-                }}
-              >
-                {JSON.stringify(gameTitles, null, 2)}
+      <Grid container spacing={3}>
+        {/* Add New Game Form */}
+        <Grid item xs={12}>
+          <Card elevation={2}>
+            <CardContent>
+              <Typography variant="h5" component="h2" gutterBottom>
+                Add New Game
               </Typography>
-            </Paper>
-          </CardContent>
-        </Card>
-      )}
+              <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
+                <TextField
+                  fullWidth
+                  label="Game Title"
+                  value={newGameName}
+                  onChange={(e) => setNewGameName(e.target.value)}
+                  placeholder="e.g., Medieval Madness, Attack from Mars"
+                  disabled={createGameTitle.isPending}
+                />
+                <Button
+                  type="submit"
+                  variant="contained"
+                  disabled={!newGameName.trim() || createGameTitle.isPending}
+                  sx={{ minWidth: 100 }}
+                >
+                  {createGameTitle.isPending ? <CircularProgress size={24} /> : 'Add'}
+                </Button>
+              </Box>
+              {createGameTitle.error && (
+                <Alert severity="error" sx={{ mt: 2 }}>
+                  Error adding game: {createGameTitle.error.message}
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Game List */}
+        <Grid item xs={12}>
+          <Card elevation={1}>
+            <CardContent>
+              <Typography variant="h5" component="h2" gutterBottom>
+                Game Titles ({gameTitleCount})
+              </Typography>
+              <Divider sx={{ mb: 2 }} />
+              
+              {gameTitleCount === 0 ? (
+                <Typography variant="body1" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
+                  No games added yet. Use the form above to add your first game!
+                </Typography>
+              ) : (
+                <List>
+                  {gameTitles?.map((game) => (
+                    <ListItem key={game.id} sx={{ px: 0 }}>
+                      <ListItemText
+                        primary={game.name}
+                        secondary={`Added: ${new Date(game.id.slice(0, 8)).toLocaleDateString()}`}
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
     </Container>
   );
 }
