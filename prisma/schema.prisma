@@ -19,14 +19,19 @@ model User {
     id            String       @id @default(cuid())
     name          String?
     email         String?      @unique
+    bio           String?      // User biography/description
+    profilePicture String?     // Path to profile picture
+    joinDate      DateTime     @default(now()) // Account creation date
     
     emailVerified DateTime?
     image         String?
     accounts      Account[]
     sessions      Session[]
     memberships   Membership[]
-    issues        Issue[]
+    issues        Issue[]      // Issues assigned to user
+    reportedIssues Issue[]     @relation("IssueReporter") // Issues reported by user
     comments      Comment[]
+    ownedGameInstances GameInstance[] @relation("GameOwner") // Games owned by user
 }
 
 model Organization {
@@ -65,15 +70,20 @@ model Issue {
     id             String       @id @default(cuid())
     title          String
     description    String?
+    severity       String?      // Optional severity level (Low, Medium, High, Critical)
     status         IssueStatus  @relation(fields: [statusId], references: [id])
     statusId       String
     assignee       User?        @relation(fields: [assigneeId], references: [id])
     assigneeId     String?
-    reporterEmail  String?
+    reporter       User?        @relation("IssueReporter", fields: [reporterId], references: [id])
+    reporterId     String?      // User ID if logged-in user reported
+    reporterEmail  String?      // Email if anonymous user reported
     gameInstance   GameInstance @relation(fields: [gameInstanceId], references: [id])
     gameInstanceId String
     organization   Organization @relation(fields: [organizationId], references: [id])
     organizationId String
+    createdAt      DateTime     @default(now())
+    updatedAt      DateTime     @updatedAt
     comments       Comment[]
     attachments    Attachment[]
 }
@@ -81,6 +91,7 @@ model Issue {
 model Location {
     id             String         @id @default(cuid())
     name           String
+    notes          String?        // Optional notes for the location
     organization   Organization   @relation(fields: [organizationId], references: [id])
     organizationId String
     gameInstances  GameInstance[]
@@ -101,6 +112,8 @@ model GameInstance {
     gameTitleId  String
     location     Location  @relation(fields: [locationId], references: [id])
     locationId   String
+    owner        User?     @relation("GameOwner", fields: [ownerId], references: [id]) // Game owner
+    ownerId      String?   // Optional owner
     issues       Issue[]
 }
 

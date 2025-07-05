@@ -11,6 +11,7 @@
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "dev": "next dev --turbo",
+    "dev:safe": "npm run validate && npm run dev",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,mdx}\" --cache",
     "format:write": "prettier --write \"**/*.{ts,tsx,js,jsx,mdx}\" --cache",
     "postinstall": "prisma generate",
@@ -19,7 +20,18 @@
     "preview": "next build && next start",
     "seed": "tsx prisma/seed.ts",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "validate": "npm run typecheck && npm run lint && npm run format:check",
+    "validate:fix": "npm run typecheck && npm run lint:fix && npm run format:write",
+    "pre-commit": "npm run validate:fix && npm run smoke-test",
+    "smoke-test": "npm run build --silent && echo 'Build successful - basic smoke test passed'",
+    "health-check": "curl -f http://localhost:3000/api/health || echo 'Health check failed'",
+    "deps:check": "npm audit --audit-level=high",
+    "deps:fix": "npm audit fix",
+    "deps:update": "npm update && npm audit",
+    "clean": "rm -rf .next node_modules/.cache .turbo && npm install",
+    "reset": "npm run clean && npm run db:push && npm run seed",
+    "prepare": "husky"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -28,8 +40,8 @@
     "@auth/prisma-adapter": "^2.7.2",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
-    "@mui/icons-material": "^7.2.0",
-    "@mui/material": "^7.2.0",
+    "@mui/icons-material": "7.2.0",
+    "@mui/material": "7.2.0",
     "@prisma/client": "^6.5.0",
     "@t3-oss/env-nextjs": "^0.13.8",
     "@tanstack/react-query": "^5.69.0",
@@ -37,10 +49,10 @@
     "@trpc/react-query": "^11.0.0",
     "@trpc/server": "^11.0.0",
     "bcrypt": "^6.0.0",
-    "next": "^15.2.3",
+    "next": "15.3.5",
     "next-auth": "5.0.0-beta.29",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
     "server-only": "^0.0.1",
     "superjson": "^2.2.1",
     "zod": "^3.24.2"
@@ -53,6 +65,8 @@
     "@types/react-dom": "^19.0.0",
     "eslint": "^9.23.0",
     "eslint-config-next": "^15.2.3",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.1.2",
     "postcss": "^8.5.3",
     "prettier": "^3.5.3",
     "prisma": "^6.5.0",
@@ -63,5 +77,14 @@
   "ct3aMetadata": {
     "initVersion": "7.39.3"
   },
-  "packageManager": "npm@11.3.0"
+  "packageManager": "npm@11.3.0",
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,mdx}": [
+      "prettier --write"
+    ]
+  }
 }

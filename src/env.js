@@ -15,12 +15,14 @@ export const env = createEnv({
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),
-    GOOGLE_CLIENT_ID: process.env.NODE_ENV === "development" 
-      ? z.string().optional() 
-      : z.string(),
-    GOOGLE_CLIENT_SECRET: process.env.NODE_ENV === "development" 
-      ? z.string().optional() 
-      : z.string(),
+    GOOGLE_CLIENT_ID:
+      process.env.NODE_ENV === "development"
+        ? z.string().optional()
+        : z.string(),
+    GOOGLE_CLIENT_SECRET:
+      process.env.NODE_ENV === "development"
+        ? z.string().optional()
+        : z.string(),
   },
 
   /**

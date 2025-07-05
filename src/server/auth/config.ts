@@ -45,7 +45,7 @@ export const authConfig = {
           }),
         ]
       : []),
-    
+
     /**
      * ...add more providers here.
      *
@@ -59,10 +59,7 @@ export const authConfig = {
   adapter: PrismaAdapter(db),
   callbacks: {
     session: async ({ session, user }) => {
-      if (
-        process.env.NODE_ENV === "development" &&
-        session?.user
-      ) {
+      if (process.env.NODE_ENV === "development" && session?.user) {
         const impersonatedUserId = (await cookies()).get(
           "next-auth.session-token.impersonated",
         )?.value;

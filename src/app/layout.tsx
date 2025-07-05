@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import { AppProviders } from "./providers";
 import { TRPCReactProvider } from "~/trpc/react";
 import { AppBar, Toolbar, Typography } from "@mui/material";
+import Link from "next/link";
 import { AuthButton } from "./_components/auth-button";
 import { ImpersonationMenu } from "./_components/dev/impersonation-menu";
 
@@ -27,7 +28,20 @@ export default function RootLayout({
           <AppProviders>
             <AppBar position="static">
               <Toolbar>
-                <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+                <Typography
+                  variant="h6"
+                  component={Link}
+                  href="/"
+                  sx={{
+                    flexGrow: 1,
+                    textDecoration: "none",
+                    color: "inherit",
+                    cursor: "pointer",
+                    "&:hover": {
+                      opacity: 0.8,
+                    },
+                  }}
+                >
                   PinPoint
                 </Typography>
                 <AuthButton />
