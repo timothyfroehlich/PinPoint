@@ -306,4 +306,57 @@ export const issueRouter = createTRPCRouter({
         },
       });
     }),
+
+  // Add comment to an issue (for members/admins)
+  addComment: organizationProcedure
+    .input(
+      z.object({
+        issueId: z.string(),
+        content: z.string().min(1).max(1000),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Verify the issue belongs to this organization
+      const existingIssue = await ctx.db.issue.findFirst({
+        where: {
+          id: input.issueId,
+          organizationId: ctx.organization.id,
+        },
+      });
+
+      if (!existingIssue) {
+        throw new Error("Issue not found");
+      }
+
+      // Verify the user is a member of this organization
+      const membership = await ctx.db.membership.findUnique({
+        where: {
+          userId_organizationId: {
+            userId: ctx.session.user.id,
+            organizationId: ctx.organization.id,
+          },
+        },
+      });
+
+      if (!membership) {
+        throw new Error("User is not a member of this organization");
+      }
+
+      return ctx.db.comment.create({
+        data: {
+          content: input.content,
+          issueId: input.issueId,
+          authorId: ctx.session.user.id,
+        },
+        include: {
+          author: {
+            select: {
+              id: true,
+              name: true,
+              profilePicture: true,
+            },
+          },
+        },
+      });
+    }),
 });
