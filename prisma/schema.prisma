@@ -22,7 +22,7 @@ model User {
     bio           String?      // User biography/description
     profilePicture String?     // Path to profile picture
     joinDate      DateTime     @default(now()) // Account creation date
-    
+
     emailVerified DateTime?
     image         String?
     accounts      Account[]
@@ -100,9 +100,17 @@ model Location {
 model GameTitle {
     id             String         @id @default(cuid())
     name           String
+    opdbId         String         // OPDB identifier (e.g., "G43W4-MrRpw") - Required
+    manufacturer   String?        // Sourced from OPDB
+    releaseDate    DateTime?      // Sourced from OPDB
+    imageUrl       String?        // OPDB image URL
+    description    String?        // Game description from OPDB
+    lastSynced     DateTime?      // When data was last synced from OPDB
     organization   Organization   @relation(fields: [organizationId], references: [id])
     organizationId String
     gameInstances  GameInstance[]
+
+    @@unique([opdbId, organizationId]) // One GameTitle per OPDB game per org
 }
 
 model GameInstance {
