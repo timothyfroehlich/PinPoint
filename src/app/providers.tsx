@@ -6,15 +6,16 @@ import { SessionProvider } from "next-auth/react";
 
 const theme = createTheme({
   typography: {
-    fontFamily: 'var(--font-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily:
+      'var(--font-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   palette: {
-    mode: 'light',
+    mode: "light",
     primary: {
-      main: '#2563eb',
+      main: "#2563eb",
     },
     secondary: {
-      main: '#7c3aed',
+      main: "#7c3aed",
     },
   },
 });

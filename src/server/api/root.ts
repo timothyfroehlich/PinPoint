@@ -1,5 +1,10 @@
 import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
 import { gameTitleRouter } from "~/server/api/routers/gameTitle";
+import { locationRouter } from "~/server/api/routers/location";
+import { gameInstanceRouter } from "~/server/api/routers/gameInstance";
+import { userRouter } from "~/server/api/routers/user";
+import { issueRouter } from "~/server/api/routers/issue";
+import { issueStatusRouter } from "~/server/api/routers/issueStatus";
 
 /**
  * This is the primary router for your server.
@@ -8,6 +13,11 @@ import { gameTitleRouter } from "~/server/api/routers/gameTitle";
  */
 export const appRouter = createTRPCRouter({
   gameTitle: gameTitleRouter,
+  location: locationRouter,
+  gameInstance: gameInstanceRouter,
+  user: userRouter,
+  issue: issueRouter,
+  issueStatus: issueStatusRouter,
 });
 
 // export type definition of API

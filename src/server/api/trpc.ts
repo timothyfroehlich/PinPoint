@@ -33,13 +33,15 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
   // In development, check for impersonation when no real session exists
   if (!session && process.env.NODE_ENV === "development") {
     const cookieStore = await cookies();
-    const impersonatedUserId = cookieStore.get("next-auth.session-token.impersonated")?.value;
-    
+    const impersonatedUserId = cookieStore.get(
+      "next-auth.session-token.impersonated",
+    )?.value;
+
     if (impersonatedUserId) {
       const impersonatedUser = await db.user.findUnique({
         where: { id: impersonatedUserId },
       });
-      
+
       if (impersonatedUser) {
         // Create a fake session object for development
         session = {

@@ -13,13 +13,12 @@ export const gameTitleRouter = createTRPCRouter({
       });
     }),
 
-  getAll: organizationProcedure
-    .query(async ({ ctx }) => {
-      return ctx.db.gameTitle.findMany({
-        where: {
-          organizationId: ctx.organization.id,
-        },
-        orderBy: { name: "asc" },
-      });
-    }),
+  getAll: organizationProcedure.query(async ({ ctx }) => {
+    return ctx.db.gameTitle.findMany({
+      where: {
+        organizationId: ctx.organization.id,
+      },
+      orderBy: { name: "asc" },
+    });
+  }),
 });
