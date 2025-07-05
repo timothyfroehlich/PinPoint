@@ -2,7 +2,7 @@ import { type Metadata } from "next";
 import { Inter } from "next/font/google";
 import { AppProviders } from "./providers";
 import { TRPCReactProvider } from "~/trpc/react";
-import { AppBar, Toolbar, Typography } from "@mui/material";
+import { AppBar, Toolbar, Typography, Box } from "@mui/material";
 import Link from "next/link";
 import { AuthButton } from "./_components/auth-button";
 import { ImpersonationMenu } from "./_components/dev/impersonation-menu";
@@ -44,6 +44,23 @@ export default function RootLayout({
                 >
                   PinPoint
                 </Typography>
+                <Box
+                  sx={{ display: "flex", alignItems: "center", gap: 2, mr: 2 }}
+                >
+                  <Typography
+                    component={Link}
+                    href="/issues"
+                    sx={{
+                      textDecoration: "none",
+                      color: "inherit",
+                      "&:hover": {
+                        opacity: 0.8,
+                      },
+                    }}
+                  >
+                    Issues
+                  </Typography>
+                </Box>
                 <AuthButton />
               </Toolbar>
             </AppBar>
