@@ -5,7 +5,7 @@
  */
 
 // Export main client
-export { OPDBClient, opdbClient } from './client';
+export { OPDBClient, opdbClient } from "./client";
 
 // Export all types
 export type {
@@ -14,9 +14,8 @@ export type {
   OPDBMachineDetails,
   OPDBParsedId,
   OPDBAPIResponse,
-  OPDBSearchResponse,
   OPDBExportResponse,
-} from './types';
+} from "./types";
 
 // Export utilities
 export {
@@ -29,4 +28,4 @@ export {
   normalizeDescription,
   generateCacheKey,
   isDataStale,
-} from './utils';
+} from "./utils";

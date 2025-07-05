@@ -5,26 +5,29 @@
  * Handles rate limiting, caching, and error handling
  */
 
-import { env } from '~/env';
+import { env } from "~/env";
 import type {
   OPDBSearchResult,
   OPDBMachine,
   OPDBMachineDetails,
   OPDBAPIResponse,
-  OPDBSearchResponse,
-  OPDBExportResponse
-} from './types';
-import { generateCacheKey, isValidOPDBId, parseOPDBId } from './utils';
+  OPDBExportResponse,
+} from "./types";
+import { generateCacheKey, isValidOPDBId } from "./utils";
 
 export class OPDBClient {
   private apiToken: string;
   private baseUrl: string;
-  private cache: Map<string, { data: any; timestamp: number }> = new Map();
-  private rateLimit: { lastRequest: number; requests: number } = { lastRequest: 0, requests: 0 };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private cache = new Map<string, { data: any; timestamp: number }>();
+  private rateLimit: { lastRequest: number; requests: number } = {
+    lastRequest: 0,
+    requests: 0,
+  };
 
   constructor(apiToken?: string, baseUrl?: string) {
-    this.apiToken = apiToken || env.OPDB_API_TOKEN;
-    this.baseUrl = baseUrl || env.OPDB_API_URL;
+    this.apiToken = apiToken ?? env.OPDB_API_TOKEN;
+    this.baseUrl = baseUrl ?? env.OPDB_API_URL;
   }
 
   /**
@@ -38,7 +41,7 @@ export class OPDBClient {
       // Reset counter every second
       if (this.rateLimit.requests >= 10) {
         const waitTime = 1000 - timeSinceLastRequest;
-        await new Promise(resolve => setTimeout(resolve, waitTime));
+        await new Promise((resolve) => setTimeout(resolve, waitTime));
         this.rateLimit.requests = 0;
       }
     } else {
@@ -54,7 +57,7 @@ export class OPDBClient {
    */
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
   ): Promise<OPDBAPIResponse<T>> {
     try {
       await this.enforceRateLimit();
@@ -63,30 +66,32 @@ export class OPDBClient {
       const response = await fetch(url, {
         ...options,
         headers: {
-          'Authorization': `Bearer ${this.apiToken}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
+          Authorization: `Bearer ${this.apiToken}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
           ...options.headers,
         },
       });
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`OPDB API error: ${response.status} ${response.statusText} - ${errorText}`);
+        throw new Error(
+          `OPDB API error: ${response.status} ${response.statusText} - ${errorText}`,
+        );
       }
 
-      const data = await response.json() as T;
+      const data = (await response.json()) as T;
 
       return {
         data,
         success: true,
       };
     } catch (error) {
-      console.error('OPDB API request failed:', error);
+      console.error("OPDB API request failed:", error);
       return {
         data: null as T,
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? error.message : "Unknown error",
       };
     }
   }
@@ -97,13 +102,14 @@ export class OPDBClient {
   private async getCachedOrFetch<T>(
     cacheKey: string,
     fetcher: () => Promise<OPDBAPIResponse<T>>,
-    ttlMinutes: number = 60
+    ttlMinutes = 60,
   ): Promise<OPDBAPIResponse<T>> {
     const cached = this.cache.get(cacheKey);
     const now = Date.now();
 
-    if (cached && (now - cached.timestamp) < (ttlMinutes * 60 * 1000)) {
+    if (cached && now - cached.timestamp < ttlMinutes * 60 * 1000) {
       return {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         data: cached.data,
         success: true,
       };
@@ -127,20 +133,23 @@ export class OPDBClient {
   async searchMachines(query: string): Promise<OPDBSearchResult[]> {
     if (!query.trim()) return [];
 
-    const cacheKey = generateCacheKey('search', { q: query });
+    const cacheKey = generateCacheKey("search", { q: query });
 
     const result = await this.getCachedOrFetch(
       cacheKey,
-      () => this.request<OPDBSearchResponse>(`/search?q=${encodeURIComponent(query)}`),
-      15 // Cache search results for 15 minutes
+      () =>
+        this.request<OPDBSearchResult[]>(
+          `/search/typeahead?q=${encodeURIComponent(query)}`,
+        ),
+      15, // Cache search results for 15 minutes
     );
 
     if (!result.success) {
-      console.warn('OPDB search failed:', result.error);
+      console.warn("OPDB search failed:", result.error);
       return [];
     }
 
-    return result.data.results || [];
+    return Array.isArray(result.data) ? result.data : [];
   }
 
   /**
@@ -151,12 +160,12 @@ export class OPDBClient {
       throw new Error(`Invalid OPDB ID format: ${opdbId}`);
     }
 
-    const cacheKey = generateCacheKey('machine', { id: opdbId });
+    const cacheKey = generateCacheKey("machine", { id: opdbId });
 
     const result = await this.getCachedOrFetch(
       cacheKey,
       () => this.request<OPDBMachineDetails>(`/machines/${opdbId}`),
-      240 // Cache machine details for 4 hours
+      240, // Cache machine details for 4 hours
     );
 
     if (!result.success) {
@@ -167,56 +176,60 @@ export class OPDBClient {
     return result.data;
   }
 
-    /**
+  /**
    * Get multiple machines by OPDB IDs
    */
   async getMachinesByIds(opdbIds: string[]): Promise<OPDBMachineDetails[]> {
-    const validIds = opdbIds.filter(id => isValidOPDBId(id));
+    const validIds = opdbIds.filter((id) => isValidOPDBId(id));
 
     if (validIds.length === 0) return [];
 
     // Fetch machines in parallel
-    const promises = validIds.map(id => this.getMachineById(id));
+    const promises = validIds.map((id) => this.getMachineById(id));
     const results = await Promise.allSettled(promises);
 
     return results
-      .filter((result): result is PromiseFulfilledResult<OPDBMachineDetails> =>
-        result.status === 'fulfilled' && result.value !== null
+      .filter(
+        (result): result is PromiseFulfilledResult<OPDBMachineDetails> =>
+          result.status === "fulfilled" && result.value !== null,
       )
-      .map(result => result.value);
+      .map((result) => result.value);
   }
 
   /**
    * Export machines (bulk fetch with pagination)
    * NOTE: This is rate-limited to 1 request per hour by OPDB
    */
-  async exportMachines(page: number = 1, perPage: number = 100): Promise<OPDBMachine[]> {
-    const cacheKey = generateCacheKey('export', { page, per_page: perPage });
+  async exportMachines(page = 1, perPage = 100): Promise<OPDBMachine[]> {
+    const cacheKey = generateCacheKey("export", { page, per_page: perPage });
 
     const result = await this.getCachedOrFetch(
       cacheKey,
-      () => this.request<OPDBExportResponse>(`/export?page=${page}&per_page=${perPage}`),
-      60 // Cache export results for 1 hour (matching OPDB rate limit)
+      () =>
+        this.request<OPDBExportResponse>(
+          `/export?page=${page}&per_page=${perPage}`,
+        ),
+      60, // Cache export results for 1 hour (matching OPDB rate limit)
     );
 
     if (!result.success) {
-      console.warn('OPDB export failed:', result.error);
+      console.warn("OPDB export failed:", result.error);
       return [];
     }
 
-    return result.data.machines || [];
+    return result.data.machines ?? [];
   }
 
   /**
    * Get machines by group ID (all variants of a game)
    */
   async getMachinesByGroupId(groupId: string): Promise<OPDBMachine[]> {
-    const cacheKey = generateCacheKey('group', { id: groupId });
+    const cacheKey = generateCacheKey("group", { id: groupId });
 
     const result = await this.getCachedOrFetch(
       cacheKey,
       () => this.request<OPDBMachine[]>(`/groups/${groupId}/machines`),
-      120 // Cache group results for 2 hours
+      120, // Cache group results for 2 hours
     );
 
     if (!result.success) {
@@ -224,7 +237,7 @@ export class OPDBClient {
       return [];
     }
 
-    return result.data || [];
+    return result.data ?? [];
   }
 
   /**
@@ -249,10 +262,10 @@ export class OPDBClient {
    */
   async validateConnection(): Promise<boolean> {
     try {
-      const result = await this.request<{ status: string }>('/health');
+      const result = await this.request<{ status: string }>("/health");
       return result.success;
     } catch (error) {
-      console.error('OPDB connection validation failed:', error);
+      console.error("OPDB connection validation failed:", error);
       return false;
     }
   }
