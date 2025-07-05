@@ -92,27 +92,41 @@ export function getPreferredImageUrl(machine: OPDBMachine): string | null {
 export function formatMachineName(machine: OPDBMachine): string {
   let name = machine.name;
 
-  // Handle year field - extract numeric year if it's an object
-  const getYearValue = (year: unknown): string | null => {
-    if (typeof year === "number") return year.toString();
-    if (typeof year === "string") return year;
-    if (typeof year === "object" && year !== null) {
-      // Handle cases where year might be an object with a value property
-      const yearObj = year as {
-        value?: number | string;
-        year?: number | string;
-      };
-      return yearObj.value?.toString() ?? yearObj.year?.toString() ?? null;
+  // Extract manufacturer name - handle both string and object formats
+  const getManufacturerName = (manufacturer: unknown): string | null => {
+    if (typeof manufacturer === "string") return manufacturer;
+    if (typeof manufacturer === "object" && manufacturer !== null) {
+      const mfgObj = manufacturer as { name?: string; full_name?: string };
+      return mfgObj.name ?? mfgObj.full_name ?? null;
     }
     return null;
   };
 
-  const yearValue = getYearValue(machine.year);
+  // Extract year - handle both year field and manufacture_date
+  const getYearValue = (machine: OPDBMachine): string | null => {
+    // Try the year field first
+    if (typeof machine.year === "number") return machine.year.toString();
+    if (typeof machine.year === "string") return machine.year;
 
-  if (machine.manufacturer && yearValue) {
-    name += ` (${machine.manufacturer}, ${yearValue})`;
-  } else if (machine.manufacturer) {
-    name += ` (${machine.manufacturer})`;
+    // Try manufacture_date field (OPDB format: "2012-01-01")
+    const machineWithDate = machine as OPDBMachine & {
+      manufacture_date?: string;
+    };
+    if (machineWithDate.manufacture_date) {
+      const year = machineWithDate.manufacture_date.split("-")[0];
+      return year ?? null;
+    }
+
+    return null;
+  };
+
+  const manufacturerName = getManufacturerName(machine.manufacturer);
+  const yearValue = getYearValue(machine);
+
+  if (manufacturerName && yearValue) {
+    name += ` (${manufacturerName}, ${yearValue})`;
+  } else if (manufacturerName) {
+    name += ` (${manufacturerName})`;
   } else if (yearValue) {
     name += ` (${yearValue})`;
   }
