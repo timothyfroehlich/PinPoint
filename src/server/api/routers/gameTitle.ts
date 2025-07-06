@@ -16,16 +16,15 @@ export const gameTitleRouter = createTRPCRouter({
   createFromOPDB: organizationProcedure
     .input(z.object({ opdbId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      // Check if this OPDB game already exists for this organization
-      const existingGame = await ctx.db.gameTitle.findFirst({
+      // Check if this OPDB game already exists globally
+      const existingGame = await ctx.db.gameTitle.findUnique({
         where: {
           opdbId: input.opdbId,
-          organizationId: ctx.organization.id,
         },
       });
 
       if (existingGame) {
-        throw new Error("This game already exists in your organization");
+        throw new Error("This game already exists in the system");
       }
 
       // Fetch full data from OPDB
@@ -36,7 +35,8 @@ export const gameTitleRouter = createTRPCRouter({
         throw new Error("Game not found in OPDB");
       }
 
-      // Create local GameTitle record with OPDB data
+      // Create global GameTitle record with OPDB data
+      // OPDB games are shared across all organizations
       return ctx.db.gameTitle.create({
         data: {
           name: machineData.name,
@@ -48,21 +48,30 @@ export const gameTitleRouter = createTRPCRouter({
           imageUrl: machineData.playfield_image ?? machineData.images?.[0],
           description: machineData.description,
           lastSynced: new Date(),
-          organizationId: ctx.organization.id,
+          // organizationId is null for global OPDB games
         },
       });
     }),
 
   // Sync existing titles with OPDB
   syncWithOPDB: organizationProcedure.mutation(async ({ ctx }) => {
-    const existingTitles = await ctx.db.gameTitle.findMany({
+    // Find all OPDB games that have game instances in this organization
+    const gameInstancesInOrg = await ctx.db.gameInstance.findMany({
       where: {
-        organizationId: ctx.organization.id,
-        opdbId: { not: { startsWith: "custom-" } },
+        room: {
+          organizationId: ctx.organization.id,
+        },
+      },
+      include: {
+        gameTitle: true,
       },
     });
 
-    if (existingTitles.length === 0) {
+    const opdbGamesToSync = gameInstancesInOrg
+      .map(gi => gi.gameTitle)
+      .filter(gt => gt.opdbId && !gt.opdbId.startsWith("custom-"));
+
+    if (opdbGamesToSync.length === 0) {
       return { synced: 0, message: "No OPDB-linked games found to sync" };
     }
 
@@ -70,8 +79,10 @@ export const gameTitleRouter = createTRPCRouter({
     let syncedCount = 0;
 
     // Sync each title with OPDB data
-    for (const title of existingTitles) {
+    for (const title of opdbGamesToSync) {
       try {
+        if (!title.opdbId) continue; // Type guard
+
         const machineData = await opdbClient.getMachineById(title.opdbId);
 
         if (machineData) {
@@ -97,22 +108,47 @@ export const gameTitleRouter = createTRPCRouter({
 
     return {
       synced: syncedCount,
-      total: existingTitles.length,
-      message: `Synced ${syncedCount} of ${existingTitles.length} games`,
+      total: opdbGamesToSync.length,
+      message: `Synced ${syncedCount} of ${opdbGamesToSync.length} games`,
     };
   }),
 
   // Enhanced getAll with OPDB metadata
   getAll: organizationProcedure.query(async ({ ctx }) => {
+    // Get all game titles that are either:
+    // 1. Custom games belonging to this organization
+    // 2. Global OPDB games that have instances in this organization
     return ctx.db.gameTitle.findMany({
       where: {
-        organizationId: ctx.organization.id,
+        OR: [
+          // Custom games for this organization
+          {
+            organizationId: ctx.organization.id,
+          },
+          // Global OPDB games with instances in this organization
+          {
+            organizationId: null,
+            gameInstances: {
+              some: {
+                room: {
+                  organizationId: ctx.organization.id,
+                },
+              },
+            },
+          },
+        ],
       },
       orderBy: { name: "asc" },
       include: {
         _count: {
           select: {
-            gameInstances: true,
+            gameInstances: {
+              where: {
+                room: {
+                  organizationId: ctx.organization.id,
+                },
+              },
+            },
           },
         },
       },
@@ -126,12 +162,34 @@ export const gameTitleRouter = createTRPCRouter({
       const gameTitle = await ctx.db.gameTitle.findFirst({
         where: {
           id: input.id,
-          organizationId: ctx.organization.id,
+          OR: [
+            // Custom games for this organization
+            {
+              organizationId: ctx.organization.id,
+            },
+            // Global OPDB games with instances in this organization
+            {
+              organizationId: null,
+              gameInstances: {
+                some: {
+                  room: {
+                    organizationId: ctx.organization.id,
+                  },
+                },
+              },
+            },
+          ],
         },
         include: {
           _count: {
             select: {
-              gameInstances: true,
+              gameInstances: {
+                where: {
+                  room: {
+                    organizationId: ctx.organization.id,
+                  },
+                },
+              },
             },
           },
         },
@@ -149,16 +207,38 @@ export const gameTitleRouter = createTRPCRouter({
   delete: organizationProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      // Verify the game title belongs to this organization
+      // Verify the game title belongs to this organization or is a global OPDB game
       const gameTitle = await ctx.db.gameTitle.findFirst({
         where: {
           id: input.id,
-          organizationId: ctx.organization.id,
+          OR: [
+            // Custom games for this organization (can be deleted)
+            {
+              organizationId: ctx.organization.id,
+            },
+            // Global OPDB games (cannot be deleted, only instances can be removed)
+            {
+              organizationId: null,
+              gameInstances: {
+                some: {
+                  room: {
+                    organizationId: ctx.organization.id,
+                  },
+                },
+              },
+            },
+          ],
         },
         include: {
           _count: {
             select: {
-              gameInstances: true,
+              gameInstances: {
+                where: {
+                  room: {
+                    organizationId: ctx.organization.id,
+                  },
+                },
+              },
             },
           },
         },
@@ -166,6 +246,11 @@ export const gameTitleRouter = createTRPCRouter({
 
       if (!gameTitle) {
         throw new Error("Game title not found");
+      }
+
+      // Don't allow deleting global OPDB games
+      if (gameTitle.organizationId === null) {
+        throw new Error("Cannot delete global OPDB games. Remove game instances instead.");
       }
 
       if (gameTitle._count.gameInstances > 0) {

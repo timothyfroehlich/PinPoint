@@ -201,7 +201,7 @@ export default function LocationProfilePage({
     if (selectedGameInstanceId && targetLocationId) {
       moveGameMutation.mutate({
         gameInstanceId: selectedGameInstanceId,
-        locationId: targetLocationId,
+        roomId: targetLocationId, // This should be roomId now
       });
     }
   };

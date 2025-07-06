@@ -1,11 +1,9 @@
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { type DefaultSession, type NextAuthConfig } from "next-auth";
-import Google from "next-auth/providers/google";
-
-import { cookies } from "next/headers";
+import Credentials from "next-auth/providers/credentials";
+import { compare } from "bcrypt";
 
 import { db } from "~/server/db";
-import { env } from "~/env";
 
 /**
  * Module augmentation for `next-auth` types. Allows us to add custom properties to the `session`
@@ -34,18 +32,45 @@ declare module "next-auth" {
  * @see https://next-auth.js.org/configuration/options
  */
 export const authConfig = {
-  debug: process.env.NODE_ENV === "development",
   providers: [
-    // Only include Google provider if credentials are available
-    ...(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
-      ? [
-          Google({
-            clientId: env.GOOGLE_CLIENT_ID,
-            clientSecret: env.GOOGLE_CLIENT_SECRET,
-          }),
-        ]
-      : []),
+    Credentials({
+      name: "Credentials",
+      credentials: {
+        email: { label: "Email", type: "text" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials.password) {
+          return null;
+        }
 
+        // Use findFirst to avoid type issues with Auth.js adapter
+        const user = await db.user.findFirst({
+          where: { email: credentials.email as string },
+        });
+
+        if (!user || !(user as any).password) {
+          return null;
+        }
+
+        const isValid = await compare(
+          credentials.password as string,
+          (user as any).password
+        );
+
+        if (isValid) {
+          return {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            emailVerified: user.emailVerified,
+            image: user.image,
+          };
+        }
+
+        return null;
+      },
+    }),
     /**
      * ...add more providers here.
      *
@@ -58,35 +83,12 @@ export const authConfig = {
   ],
   adapter: PrismaAdapter(db),
   callbacks: {
-    session: async ({ session, user }) => {
-      if (process.env.NODE_ENV === "development" && session?.user) {
-        const impersonatedUserId = (await cookies()).get(
-          "next-auth.session-token.impersonated",
-        )?.value;
-
-        if (impersonatedUserId) {
-          const impersonatedUser = await db.user.findUnique({
-            where: { id: impersonatedUserId },
-          });
-          if (impersonatedUser) {
-            return {
-              ...session,
-              user: {
-                ...session.user,
-                ...impersonatedUser,
-                id: impersonatedUser.id,
-              },
-            };
-          }
-        }
-      }
-      return {
-        ...session,
-        user: {
-          ...session.user,
-          id: user.id,
-        },
-      };
-    },
+    session: ({ session, user }) => ({
+      ...session,
+      user: {
+        ...session.user,
+        id: user.id,
+      },
+    }),
   },
 } satisfies NextAuthConfig;
