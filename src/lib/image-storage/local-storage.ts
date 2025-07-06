@@ -2,7 +2,7 @@ import { writeFile, unlink, mkdir } from "fs/promises";
 import { existsSync } from "fs";
 import path from "path";
 import type { ImageStorageProvider } from "./index";
-import { IMAGE_CONSTRAINTS } from "./index";
+import { IMAGE_CONSTRAINTS, ISSUE_ATTACHMENT_CONSTRAINTS } from "./index";
 
 export class LocalImageStorage implements ImageStorageProvider {
   private basePath = "public/uploads/images";
@@ -19,15 +19,15 @@ export class LocalImageStorage implements ImageStorageProvider {
     }
   }
 
-  async validateImage(file: File): Promise<boolean> {
+  async validateImage(file: File, constraints = IMAGE_CONSTRAINTS): Promise<boolean> {
     // Check file size
-    if (file.size > IMAGE_CONSTRAINTS.maxSizeBytes) {
+    if (file.size > constraints.maxSizeBytes) {
       return false;
     }
 
     // Check file type
     if (
-      !IMAGE_CONSTRAINTS.allowedTypes.includes(
+      !constraints.allowedTypes.includes(
         file.type as "image/jpeg" | "image/png" | "image/webp",
       )
     ) {
@@ -37,10 +37,10 @@ export class LocalImageStorage implements ImageStorageProvider {
     return true;
   }
 
-  async uploadImage(file: File, relativePath: string): Promise<string> {
+  async uploadImage(file: File, relativePath: string, constraints = IMAGE_CONSTRAINTS): Promise<string> {
     await this.ensureDirectoryExists();
 
-    if (!(await this.validateImage(file))) {
+    if (!(await this.validateImage(file, constraints))) {
       throw new Error("Invalid image file");
     }
 
@@ -79,6 +79,15 @@ export class LocalImageStorage implements ImageStorageProvider {
 
     // Otherwise, construct the URL
     return `${this.baseUrl}/${imagePath}`;
+  }
+
+  // Specialized method for issue attachments
+  async uploadIssueAttachment(file: File, issueId: string): Promise<string> {
+    return this.uploadImage(file, `issue-${issueId}`, ISSUE_ATTACHMENT_CONSTRAINTS);
+  }
+
+  async validateIssueAttachment(file: File): Promise<boolean> {
+    return this.validateImage(file, ISSUE_ATTACHMENT_CONSTRAINTS);
   }
 }
 

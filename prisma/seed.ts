@@ -25,63 +25,27 @@ async function main() {
   // 2. Create test users
   const testUsers = [
     {
-      name: "Test Admin",
-      email: "testdev-admin@fake.com",
-      bio: "System administrator and pinball enthusiast",
+      name: "Roger Sharpe",
+      email: "roger.sharpe@example.com",
+      bio: "Pinball ambassador and historian.",
       role: Role.admin,
     },
     {
-      name: "Test Member",
-      email: "testdev-member@fake.com",
-      bio: "Regular member with a passion for pinball",
+      name: "Gary Stern",
+      email: "gary.stern@example.com",
+      bio: "Founder of Stern Pinball.",
       role: Role.member,
     },
     {
-      name: "Alice Cooper",
-      email: "testdev-alice@fake.com",
-      bio: "Pinball wizard since 1975",
+      name: "George Gomez",
+      email: "george.gomez@example.com",
+      bio: "Legendary pinball designer.",
       role: Role.member,
     },
     {
-      name: "Bob Dylan",
-      email: "testdev-bob@fake.com",
-      bio: "Rolling down the line",
-      role: Role.member,
-    },
-    {
-      name: "Charlie Parker",
-      email: "testdev-charlie@fake.com",
-      bio: "Jazz hands on silver balls",
-      role: Role.member,
-    },
-    {
-      name: "Diana Ross",
-      email: "testdev-diana@fake.com",
-      bio: "Supreme flipper skills",
-      role: Role.member,
-    },
-    {
-      name: "Elvis Presley",
-      email: "testdev-elvis@fake.com",
-      bio: "King of the arcade",
-      role: Role.member,
-    },
-    {
-      name: "Freddie Mercury",
-      email: "testdev-freddie@fake.com",
-      bio: "We will rock you... and tilt",
-      role: Role.member,
-    },
-    {
-      name: "Grace Hopper",
-      email: "testdev-grace@fake.com",
-      bio: "Debugging pinball code since 1940",
-      role: Role.admin,
-    },
-    {
-      name: "Hendrix Jimi",
-      email: "testdev-hendrix@fake.com",
-      bio: "Purple haze on the playfield",
+      name: "Harry Williams",
+      email: "harry.williams@example.com",
+      bio: "The father of pinball.",
       role: Role.member,
     },
   ];
@@ -101,13 +65,6 @@ async function main() {
     console.log(`Created user: ${user.name}`);
     createdUsers.push({ ...user, role: userData.role });
   }
-
-  // const adminUser = createdUsers.find(
-  //   (u) => u.email === "testdev-admin@fake.com",
-  // )!;
-  // const memberUser = createdUsers.find(
-  //   (u) => u.email === "testdev-member@fake.com",
-  // )!;
 
   // 3. Create Memberships for all users
   for (const userData of createdUsers) {
@@ -168,99 +125,86 @@ async function main() {
     }
   }
 
-  // 5. Create some test game titles (only if they don't exist)
-  const testGameTitles = [
-    "Medieval Madness",
-    "Attack from Mars",
-    "The Twilight Zone",
-    "Theatre of Magic",
-    "Monster Bash",
+  // 5. Create test game titles
+  const gameTitlesData = [
+    { name: "Cactus Canyon (Remake)", opdbId: "G4835-M2YPK" },
+    { name: "Labyrinth", opdbId: "vBn8" },
+    { name: "Godzilla (Premium)", opdbId: "GODZILLA_PREMIUM" },
+    { name: "Led Zeppelin (Premium)", opdbId: "Gweel-ME0pP-AR0N5" },
+    { name: "The Addams Family", opdbId: "G4ODR-MDXEy" },
+    { name: "Twilight Zone", opdbId: "GrXzD-MjBPX" },
+    { name: "Deadpool (Premium)", opdbId: "6lnq" },
+    { name: "Iron Maiden: Legacy of the Beast (Premium)", opdbId: "4dOQ" },
+    { name: "Jaws (Premium)", opdbId: "GLWll-MXr4N" },
+    { name: "Foo Fighters (Premium)", opdbId: "peoL" },
   ];
 
   const createdGameTitles = [];
-  for (const titleName of testGameTitles) {
-    const existingTitle = await prisma.gameTitle.findFirst({
+  for (const titleData of gameTitlesData) {
+    const gameTitle = await prisma.gameTitle.upsert({
       where: {
-        name: titleName,
+        opdbId_organizationId: {
+          opdbId: titleData.opdbId,
+          organizationId: organization.id,
+        },
+      },
+      update: { name: titleData.name },
+      create: {
+        name: titleData.name,
+        opdbId: titleData.opdbId,
         organizationId: organization.id,
       },
     });
-
-    if (!existingTitle) {
-      const gameTitle = await prisma.gameTitle.create({
-        data: {
-          name: titleName,
-          organizationId: organization.id,
-        },
-      });
-      console.log(`Created game title: ${gameTitle.name}`);
-      createdGameTitles.push(gameTitle);
-    } else {
-      console.log(`Game title already exists: ${existingTitle.name}`);
-      createdGameTitles.push(existingTitle);
-    }
+    console.log(`Created/Updated game title: ${gameTitle.name}`);
+    createdGameTitles.push(gameTitle);
   }
 
-  // 6. Create some test game instances with owners (only if they don't exist)
-  const gameInstances = [
-    {
-      name: "MM #1",
-      gameTitleIndex: 0,
-      locationIndex: 0,
-      ownerEmail: "testdev-alice@fake.com",
-    },
-    {
-      name: "MM #2",
-      gameTitleIndex: 0,
-      locationIndex: 1,
-      ownerEmail: "testdev-bob@fake.com",
-    },
-    {
-      name: "AFM Premium",
-      gameTitleIndex: 1,
-      locationIndex: 0,
-      ownerEmail: "testdev-charlie@fake.com",
-    },
-    {
-      name: "TZ Black",
-      gameTitleIndex: 2,
-      locationIndex: 2,
-      ownerEmail: "testdev-diana@fake.com",
-    },
-    { name: "TOM Red", gameTitleIndex: 3, locationIndex: 1, ownerEmail: null },
-    {
-      name: "Monster Bash LE",
-      gameTitleIndex: 4,
-      locationIndex: 0,
-      ownerEmail: "testdev-elvis@fake.com",
-    },
+  // 6. Create test game instances
+  const gameInstancesData = [
+    { name: "Cactus Canyon", gameTitleName: "Cactus Canyon (Remake)", ownerEmail: "roger.sharpe@example.com", locationIndex: 0 },
+    { name: "Left Labyrinth", gameTitleName: "Labyrinth", ownerEmail: "gary.stern@example.com", locationIndex: 0 },
+    { name: "Right Labyrinth", gameTitleName: "Labyrinth", ownerEmail: "george.gomez@example.com", locationIndex: 0 },
+    { name: "Godzilla", gameTitleName: "Godzilla (Premium)", ownerEmail: "harry.williams@example.com", locationIndex: 1 },
+    { name: "Led Zeppelin", gameTitleName: "Led Zeppelin (Premium)", ownerEmail: "roger.sharpe@example.com", locationIndex: 1 },
+    { name: "The Addams Family", gameTitleName: "The Addams Family", ownerEmail: "gary.stern@example.com", locationIndex: 1 },
+    { name: "Twilight Zone", gameTitleName: "Twilight Zone", ownerEmail: "george.gomez@example.com", locationIndex: 2 },
+    { name: "Deadpool", gameTitleName: "Deadpool (Premium)", ownerEmail: "harry.williams@example.com", locationIndex: 2 },
+    { name: "Iron Maiden", gameTitleName: "Iron Maiden: Legacy of the Beast (Premium)", ownerEmail: "roger.sharpe@example.com", locationIndex: 2 },
+    { name: "Jaws", gameTitleName: "Jaws (Premium)", ownerEmail: "gary.stern@example.com", locationIndex: 0 },
   ];
 
-  for (const instanceData of gameInstances) {
-    const existingInstance = await prisma.gameInstance.findFirst({
+  for (const instanceData of gameInstancesData) {
+    const gameTitle = createdGameTitles.find(gt => gt.name === instanceData.gameTitleName);
+    if (!gameTitle) {
+      console.error(`Game title not found for instance: ${instanceData.name}`);
+      continue;
+    }
+    
+    const owner = createdUsers.find(u => u.email === instanceData.ownerEmail);
+    if (!owner) {
+      console.error(`Owner not found for instance: ${instanceData.name}`);
+      continue;
+    }
+
+    await prisma.gameInstance.upsert({
       where: {
+        name_gameTitleId: {
+          name: instanceData.name,
+          gameTitleId: gameTitle.id,
+        },
+      },
+      update: {
+        locationId: createdLocations[instanceData.locationIndex]!.id,
+        ownerId: owner.id,
+      },
+      create: {
         name: instanceData.name,
-        gameTitleId: createdGameTitles[instanceData.gameTitleIndex]!.id,
+        gameTitleId: gameTitle.id,
+        locationId: createdLocations[instanceData.locationIndex]!.id,
+        ownerId: owner.id,
       },
     });
-
-    if (!existingInstance) {
-      const owner = instanceData.ownerEmail
-        ? createdUsers.find((u) => u.email === instanceData.ownerEmail)
-        : null;
-
-      const gameInstance = await prisma.gameInstance.create({
-        data: {
-          name: instanceData.name,
-          gameTitleId: createdGameTitles[instanceData.gameTitleIndex]!.id,
-          locationId: createdLocations[instanceData.locationIndex]!.id,
-          ownerId: owner?.id ?? null,
-        },
-      });
-      console.log(`Created game instance: ${gameInstance.name}`);
-    } else {
-      console.log(`Game instance already exists: ${existingInstance.name}`);
-    }
+    console.log(`Created/Updated game instance: ${instanceData.name}`);
   }
 
   // 7. Create default issue statuses for workflow (only if they don't exist)
@@ -281,14 +225,14 @@ async function main() {
     });
 
     if (!existingStatus) {
-      const issueStatus = await prisma.issueStatus.create({
+      await prisma.issueStatus.create({
         data: {
           name: statusData.name,
           order: statusData.order,
           organizationId: organization.id,
         },
       });
-      console.log(`Created issue status: ${issueStatus.name}`);
+      console.log(`Created issue status: ${statusData.name}`);
     } else {
       console.log(`Issue status already exists: ${existingStatus.name}`);
     }

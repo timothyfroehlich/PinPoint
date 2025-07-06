@@ -123,6 +123,8 @@ model GameInstance {
     owner        User?     @relation("GameOwner", fields: [ownerId], references: [id]) // Game owner
     ownerId      String?   // Optional owner
     issues       Issue[]
+
+    @@unique([name, gameTitleId])
 }
 
 model Comment {

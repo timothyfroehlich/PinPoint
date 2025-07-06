@@ -43,6 +43,7 @@ import Link from "next/link";
 import { UserAvatar } from "~/app/_components/user-avatar";
 import { useCurrentUser } from "~/lib/hooks/use-current-user";
 import { api } from "~/trpc/react";
+import { IssueImageUpload, type IssueAttachment } from "~/app/_components/issue-image-upload";
 
 interface LocationProfilePageProps {
   params: Promise<{
@@ -78,6 +79,7 @@ export default function LocationProfilePage({
     description: "",
     reporterEmail: "",
   });
+  const [issueAttachments, setIssueAttachments] = useState<IssueAttachment[]>([]);
 
   const { user, isAuthenticated } = useCurrentUser();
 
@@ -110,7 +112,29 @@ export default function LocationProfilePage({
   });
 
   const createIssueMutation = api.issue.create.useMutation({
-    onSuccess: () => {
+    onSuccess: async (newIssue) => {
+      // Upload any attachments to the new issue
+      if (issueAttachments.length > 0) {
+        try {
+          for (const attachment of issueAttachments) {
+            if (attachment.file) {
+              const formData = new FormData();
+              formData.append("file", attachment.file);
+              formData.append("issueId", newIssue.id);
+
+              await fetch("/api/upload/issue", {
+                method: "POST",
+                body: formData,
+              });
+            }
+          }
+        } catch (error) {
+          console.error("Error uploading attachments:", error);
+          // Don't fail the whole operation, just log the error
+        }
+      }
+
+      // Clear form and attachments
       setIssueForm({
         gameInstanceId: "",
         title: "",
@@ -118,6 +142,7 @@ export default function LocationProfilePage({
         description: "",
         reporterEmail: "",
       });
+      setIssueAttachments([]);
       void refetch();
     },
   });
@@ -486,6 +511,22 @@ export default function LocationProfilePage({
                     helperText={`${issueForm.description.length}/1000 characters`}
                   />
 
+                  {/* Issue Images */}
+                  <Box>
+                    <Typography variant="subtitle1" gutterBottom>
+                      Add Photos (Optional)
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                      Upload up to 3 photos to help illustrate the issue
+                    </Typography>
+                    <IssueImageUpload
+                      attachments={issueAttachments}
+                      onAttachmentsChange={setIssueAttachments}
+                      maxAttachments={3}
+                      disabled={createIssueMutation.isPending}
+                    />
+                  </Box>
+
                   {/* Reporter Information */}
                   {isAuthenticated ? (
                     <Alert
@@ -541,15 +582,16 @@ export default function LocationProfilePage({
                     <Button
                       type="button"
                       variant="outlined"
-                      onClick={() =>
+                      onClick={() => {
                         setIssueForm({
                           gameInstanceId: "",
                           title: "",
                           severity: "",
                           description: "",
                           reporterEmail: "",
-                        })
-                      }
+                        });
+                        setIssueAttachments([]);
+                      }}
                       disabled={createIssueMutation.isPending}
                     >
                       Clear Form

@@ -28,6 +28,7 @@ import {
   CheckCircle,
   RadioButtonUnchecked,
   Comment,
+  CameraAlt,
 } from "@mui/icons-material";
 import { useState } from "react";
 import Link from "next/link";
@@ -493,6 +494,27 @@ export default function IssuesPage() {
                                 color="text.secondary"
                               >
                                 {issue._count.comments}
+                              </Typography>
+                            </Box>
+                          )}
+
+                          {/* Attachment Count */}
+                          {issue._count.attachments > 0 && (
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 0.5,
+                              }}
+                            >
+                              <CameraAlt
+                                sx={{ fontSize: 14, color: "text.secondary" }}
+                              />
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                              >
+                                {issue._count.attachments}
                               </Typography>
                             </Box>
                           )}

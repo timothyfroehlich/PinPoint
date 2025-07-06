@@ -37,7 +37,15 @@ export const gameInstanceRouter = createTRPCRouter({
           locationId: input.locationId,
         },
         include: {
-          gameTitle: true,
+          gameTitle: {
+            include: {
+              _count: {
+                select: {
+                  gameInstances: true,
+                },
+              },
+            },
+          },
           location: true,
           owner: {
             select: {
@@ -58,7 +66,15 @@ export const gameInstanceRouter = createTRPCRouter({
         },
       },
       include: {
-        gameTitle: true,
+        gameTitle: {
+          include: {
+            _count: {
+              select: {
+                gameInstances: true,
+              },
+            },
+          },
+        },
         location: true,
         owner: {
           select: {
@@ -71,6 +87,44 @@ export const gameInstanceRouter = createTRPCRouter({
       orderBy: { name: "asc" },
     });
   }),
+
+  getById: organizationProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const gameInstance = await ctx.db.gameInstance.findFirst({
+        where: {
+          id: input.id,
+          gameTitle: {
+            organizationId: ctx.organization.id,
+          },
+        },
+        include: {
+          gameTitle: {
+            include: {
+              _count: {
+                select: {
+                  gameInstances: true,
+                },
+              },
+            },
+          },
+          location: true,
+          owner: {
+            select: {
+              id: true,
+              name: true,
+              profilePicture: true,
+            },
+          },
+        },
+      });
+
+      if (!gameInstance) {
+        throw new Error("Game instance not found");
+      }
+
+      return gameInstance;
+    }),
 
   update: organizationProcedure
     .input(
@@ -129,7 +183,15 @@ export const gameInstanceRouter = createTRPCRouter({
           ...(input.locationId && { locationId: input.locationId }),
         },
         include: {
-          gameTitle: true,
+          gameTitle: {
+            include: {
+              _count: {
+                select: {
+                  gameInstances: true,
+                },
+              },
+            },
+          },
           location: true,
           owner: {
             select: {
@@ -205,7 +267,15 @@ export const gameInstanceRouter = createTRPCRouter({
           locationId: input.locationId,
         },
         include: {
-          gameTitle: true,
+          gameTitle: {
+            include: {
+              _count: {
+                select: {
+                  gameInstances: true,
+                },
+              },
+            },
+          },
           location: true,
           owner: {
             select: {
@@ -263,7 +333,15 @@ export const gameInstanceRouter = createTRPCRouter({
           ownerId: input.ownerId ?? null,
         },
         include: {
-          gameTitle: true,
+          gameTitle: {
+            include: {
+              _count: {
+                select: {
+                  gameInstances: true,
+                },
+              },
+            },
+          },
           location: true,
           owner: {
             select: {

@@ -25,6 +25,8 @@ import {
 import { useState } from "react";
 import Link from "next/link";
 import { api } from "~/trpc/react";
+import { OPDBGameSearch } from "~/app/_components/opdb-game-search";
+import type { OPDBSearchResult } from "~/lib/opdb";
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -50,11 +52,14 @@ function TabPanel(props: TabPanelProps) {
 
 export default function Home() {
   const [tabValue, setTabValue] = useState(0);
-  const [newGameName, setNewGameName] = useState("");
   const [newLocationName, setNewLocationName] = useState("");
   const [newInstanceName, setNewInstanceName] = useState("");
   const [selectedGameTitleId, setSelectedGameTitleId] = useState("");
   const [selectedLocationId, setSelectedLocationId] = useState("");
+  const [selectedOPDBGame, setSelectedOPDBGame] = useState<{
+    opdbId: string;
+    gameData: OPDBSearchResult;
+  } | null>(null);
 
   // API queries
   const {
@@ -79,9 +84,11 @@ export default function Home() {
   } = api.gameInstance.getAll.useQuery();
 
   // Mutations
-  const createGameTitle = api.gameTitle.create.useMutation({
-    onSuccess: () => {
-      setNewGameName("");
+
+  const createGameFromOPDB = api.gameTitle.createFromOPDB.useMutation({
+    onSuccess: (newGameTitle) => {
+      setSelectedOPDBGame(null);
+      setSelectedGameTitleId(newGameTitle.id); // Auto-select the new game
       void refetchGames();
     },
   });
@@ -98,16 +105,11 @@ export default function Home() {
       setNewInstanceName("");
       setSelectedGameTitleId("");
       setSelectedLocationId("");
+      setSelectedOPDBGame(null);
       void refetchInstances();
     },
   });
 
-  const handleGameSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newGameName.trim()) {
-      createGameTitle.mutate({ name: newGameName.trim() });
-    }
-  };
 
   const handleLocationSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -116,12 +118,37 @@ export default function Home() {
     }
   };
 
-  const handleInstanceSubmit = (e: React.FormEvent) => {
+  const handleOPDBGameSelect = (opdbId: string, gameData: OPDBSearchResult) => {
+    setSelectedOPDBGame({ opdbId, gameData });
+    setSelectedGameTitleId(""); // Clear any existing game title selection
+  };
+
+  const handleInstanceSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newInstanceName.trim() && selectedGameTitleId && selectedLocationId) {
+    
+    if (!newInstanceName.trim() || !selectedLocationId) {
+      return;
+    }
+
+    let gameTitleId = selectedGameTitleId;
+
+    // If an OPDB game is selected but no local game title, create it first
+    if (selectedOPDBGame && !selectedGameTitleId) {
+      try {
+        const newGameTitle = await createGameFromOPDB.mutateAsync({
+          opdbId: selectedOPDBGame.opdbId,
+        });
+        gameTitleId = newGameTitle.id;
+      } catch (error) {
+        // Error will be handled by the mutation's error state
+        return;
+      }
+    }
+
+    if (gameTitleId) {
       createGameInstance.mutate({
         name: newInstanceName.trim(),
-        gameTitleId: selectedGameTitleId,
+        gameTitleId,
         locationId: selectedLocationId,
       });
     }
@@ -185,39 +212,47 @@ export default function Home() {
             <Card elevation={2}>
               <CardContent>
                 <Typography variant="h5" component="h2" gutterBottom>
-                  Add New Game Title
+                  Add New Game Title from OPDB
                 </Typography>
-                <Box
-                  component="form"
-                  onSubmit={handleGameSubmit}
-                  sx={{ display: "flex", gap: 2, alignItems: "flex-start" }}
-                >
-                  <TextField
-                    fullWidth
-                    label="Game Title"
-                    value={newGameName}
-                    onChange={(e) => setNewGameName(e.target.value)}
-                    placeholder="e.g., Medieval Madness, Attack from Mars"
-                    disabled={createGameTitle.isPending}
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                  Search the Open Pinball Database for games to add to your collection.
+                </Typography>
+                
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                  <OPDBGameSearch
+                    onGameSelect={handleOPDBGameSelect}
+                    disabled={createGameFromOPDB.isPending}
+                    placeholder="Search for pinball machines in OPDB..."
                   />
-                  <Button
-                    type="submit"
-                    variant="contained"
-                    disabled={!newGameName.trim() || createGameTitle.isPending}
-                    sx={{ minWidth: 100 }}
-                  >
-                    {createGameTitle.isPending ? (
-                      <CircularProgress size={24} />
-                    ) : (
-                      "Add"
-                    )}
-                  </Button>
+                  
+                  {selectedOPDBGame && (
+                    <Button
+                      variant="contained"
+                      onClick={() => {
+                        if (selectedOPDBGame) {
+                          createGameFromOPDB.mutate({
+                            opdbId: selectedOPDBGame.opdbId,
+                          });
+                        }
+                      }}
+                      disabled={createGameFromOPDB.isPending}
+                      sx={{ alignSelf: "flex-start", minWidth: 120 }}
+                    >
+                      {createGameFromOPDB.isPending ? (
+                        <CircularProgress size={24} />
+                      ) : (
+                        "Add Game"
+                      )}
+                    </Button>
+                  )}
                 </Box>
-                {createGameTitle.error && (
+                
+                {createGameFromOPDB.error && (
                   <Alert severity="error" sx={{ mt: 2 }}>
-                    Error adding game: {createGameTitle.error.message}
+                    Error adding game: {createGameFromOPDB.error.message}
                   </Alert>
                 )}
+                
               </CardContent>
             </Card>
           </Grid>
@@ -371,10 +406,9 @@ export default function Home() {
                 <Typography variant="h5" component="h2" gutterBottom>
                   Add New Game Instance
                 </Typography>
-                {gameTitleCount === 0 || locationCount === 0 ? (
+{locationCount === 0 ? (
                   <Alert severity="info">
-                    You need to add at least one game title and one location
-                    before creating game instances.
+                    You need to add at least one location before creating game instances.
                   </Alert>
                 ) : (
                   <Box
@@ -390,24 +424,53 @@ export default function Home() {
                       placeholder="e.g., MM #1, Medieval Madness (Left Side)"
                       disabled={createGameInstance.isPending}
                     />
-                    <Box sx={{ display: "flex", gap: 2 }}>
-                      <FormControl fullWidth>
-                        <InputLabel>Game Title</InputLabel>
-                        <Select
-                          value={selectedGameTitleId}
-                          onChange={(e) =>
-                            setSelectedGameTitleId(e.target.value)
-                          }
-                          label="Game Title"
-                          disabled={createGameInstance.isPending}
-                        >
-                          {gameTitles?.map((game) => (
-                            <MenuItem key={game.id} value={game.id}>
-                              {game.name}
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
+                    
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                      <Typography variant="h6" component="h3">
+                        Select or Search for Game
+                      </Typography>
+                      
+                      {gameTitleCount > 0 && (
+                        <FormControl fullWidth>
+                          <InputLabel>Existing Game Titles</InputLabel>
+                          <Select
+                            value={selectedGameTitleId}
+                            onChange={(e) => {
+                              setSelectedGameTitleId(e.target.value);
+                              setSelectedOPDBGame(null); // Clear OPDB selection
+                            }}
+                            label="Existing Game Titles"
+                            disabled={createGameInstance.isPending}
+                          >
+                            {gameTitles?.map((game) => (
+                              <MenuItem key={game.id} value={game.id}>
+                                {game.name}
+                                {game.manufacturer && game.releaseDate && (
+                                  <Typography
+                                    variant="caption"
+                                    color="text.secondary"
+                                    sx={{ ml: 1 }}
+                                  >
+                                    ({game.manufacturer}, {game.releaseDate.getFullYear()})
+                                  </Typography>
+                                )}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                      )}
+                      
+                      <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center" }}>
+                        — OR —
+                      </Typography>
+                      
+                      <OPDBGameSearch
+                        onGameSelect={handleOPDBGameSelect}
+                        disabled={createGameInstance.isPending || createGameFromOPDB.isPending}
+                        placeholder="Search OPDB for new games..."
+                        label="Search OPDB Games"
+                      />
+                      
                       <FormControl fullWidth>
                         <InputLabel>Location</InputLabel>
                         <Select
@@ -426,18 +489,20 @@ export default function Home() {
                         </Select>
                       </FormControl>
                     </Box>
+                    
                     <Button
                       type="submit"
                       variant="contained"
                       disabled={
                         !newInstanceName.trim() ||
-                        !selectedGameTitleId ||
+                        (!selectedGameTitleId && !selectedOPDBGame) ||
                         !selectedLocationId ||
-                        createGameInstance.isPending
+                        createGameInstance.isPending ||
+                        createGameFromOPDB.isPending
                       }
-                      sx={{ alignSelf: "flex-start", minWidth: 100 }}
+                      sx={{ alignSelf: "flex-start", minWidth: 120 }}
                     >
-                      {createGameInstance.isPending ? (
+                      {createGameInstance.isPending || createGameFromOPDB.isPending ? (
                         <CircularProgress size={24} />
                       ) : (
                         "Add Instance"
