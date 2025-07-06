@@ -198,3 +198,27 @@ export const organizationProcedure = protectedProcedure.use(
     });
   },
 );
+
+/**
+ * Admin-only procedure
+ *
+ * This procedure ensures that the user is an admin of the organization.
+ * It builds on the organization procedure and adds admin role validation.
+ */
+export const adminProcedure = organizationProcedure.use(
+  async ({ ctx, next }) => {
+    if (ctx.membership.role !== "admin") {
+      throw new TRPCError({ 
+        code: "FORBIDDEN", 
+        message: "Admin access required" 
+      });
+    }
+
+    return next({
+      ctx: {
+        ...ctx,
+        // membership is already available from organizationProcedure
+      },
+    });
+  },
+);

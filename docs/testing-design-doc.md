@@ -1,22 +1,59 @@
 ## **Testing Design Document**
 
-This document outlines the comprehensive testing strategy for the PinPoint platform. The approach is rooted in Test-Driven Development (TDD) principles to ensure high code quality, maintainability, and confidence in the application's stability at every stage of the development roadmap.
+**CURRENT PHASE: Unit Tests Only - Rapid Iteration Mode**
 
-### **1\. Testing Philosophy & Tools**
+This document outlines our testing strategy during the current rapid iteration phase. We are focusing exclusively on **unit tests** for business logic while deferring integration and end-to-end tests until the core functionality stabilizes.
 
-Our strategy follows the classic testing pyramid, prioritizing fast, isolated tests while ensuring full coverage through integrated and end-to-end scenarios.
+### **1\. Current Testing Philosophy**
+
+During rapid development, we prioritize fast feedback and quick iteration:
 
 * **Guiding Principles:**
-  * **Test-Driven Development (TDD):** For backend logic and critical UI components, tests will be written *before* the implementation code. This ensures that all code is written with testability in mind and meets requirements from the start.
-  * **Code Quality:** TypeScript will be used for static type checking across the entire codebase. ESLint and Prettier will be enforced through pre-commit hooks to maintain a consistent and high-quality code style.
-* **Technology Stack:**
-  * **Unit & Integration Testing:** **Jest** will serve as the primary test runner, combined with **React Testing Library** for testing React components. For testing tRPC procedures, we will call them directly, which is faster and more efficient than testing via HTTP requests.
-  * **End-to-End (E2E) Testing:** **Playwright** will be used for automated browser testing to simulate real user workflows from start to finish.
-  * **Mocking:** Jest's built-in mocking capabilities will be used for isolating units of code. For external services, tools like **Mock Service Worker (MSW)** or specific API mocks (e.g., for Cloudinary, email services) will be used.
+  * **Unit Tests Only:** Focus on testing business logic in isolation with mocked dependencies
+  * **Fast Feedback:** Tests must be fast (no real I/O, databases, or network calls)
+  * **Business Logic First:** Test the core logic that drives the application
+  * **Multi-Tenancy Critical:** Always verify organization isolation in business logic
+  * **Code Quality:** TypeScript for static type checking, ESLint and Prettier enforced through pre-commit hooks
 
-### **2\. Testing Strategy by Milestone**
+* **Current Technology Stack:**
+  * **Unit Testing:** **Jest** as test runner for service layer and utility functions
+  * **Mocking:** Jest's built-in mocking with custom utilities (e.g., `PinballMapAPIMocker`)
+  * **Fixtures:** Static test data to ensure consistent test scenarios
 
-The testing focus will evolve with each development milestone, building a comprehensive suite of tests that validate the application's functionality and stability.
+* **Future Technology Stack (Deferred):**
+  * **Integration Testing:** React Testing Library for components, direct tRPC procedure calls
+  * **End-to-End Testing:** Playwright for browser automation
+  * **Service Mocking:** Mock Service Worker (MSW) for API simulation
+
+### **2\. What We Test Now vs Later**
+
+#### **✅ CURRENT: Unit Tests Only**
+
+**Service Layer (`src/server/services/`)**
+- Business logic functions (PinballMap sync, data processing)
+- Data transformation and validation
+- Multi-tenancy isolation logic  
+- Error handling and edge cases
+- API client libraries with mocked responses
+
+**Examples of Current Tests:**
+- `src/server/services/__tests__/pinballmapService.test.ts` - Core sync business logic
+- `src/lib/pinballmap/__tests__/client.test.ts` - API client with fixture data
+
+#### **❌ DEFERRED: Integration & E2E Tests**
+
+**Integration Tests (Coming Later):**
+- tRPC procedure end-to-end behavior
+- Database integration with real connections  
+- Authentication and authorization flows
+- Multi-step workflows
+
+**End-to-End Tests (Coming Later):**
+- Full user workflows through the UI
+- Cross-browser compatibility
+- Performance testing
+
+### **3\. Testing Strategy by Development Phase**
 
 #### **Tests for Milestone 1: Foundational Backend**
 

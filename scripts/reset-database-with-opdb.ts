@@ -167,7 +167,7 @@ async function main() {
 
     console.log("✅ Created test locations");
 
-    // Seed OPDB GameTitles
+    // Seed OPDB GameTitles (Global)
     console.log("🎮 Seeding OPDB GameTitles...");
 
     const gameTitles = [];
@@ -181,7 +181,7 @@ async function main() {
           imageUrl: game.imageUrl,
           description: game.description,
           lastSynced: new Date(),
-          organizationId: testOrg.id,
+          // organizationId is null for global OPDB games
         },
       });
       gameTitles.push(gameTitle);
@@ -196,37 +196,37 @@ async function main() {
       {
         name: "AC/DC Premium #1",
         gameTitleId: gameTitles[0]!.id,
-        locationId: mainFloor.id,
+        roomId: mainFloor.id,
         ownerId: testUser1.id,
       },
       {
         name: "AC/DC Premium #2",
         gameTitleId: gameTitles[0]!.id,
-        locationId: backRoom.id,
+        roomId: backRoom.id,
         ownerId: testUser1.id,
       },
       {
         name: "Medieval Madness",
         gameTitleId: gameTitles[1]!.id,
-        locationId: mainFloor.id,
+        roomId: mainFloor.id,
         ownerId: testUser2.id,
       },
       {
         name: "The Addams Family",
         gameTitleId: gameTitles[2]!.id,
-        locationId: mainFloor.id,
+        roomId: mainFloor.id,
         ownerId: testUser1.id,
       },
       {
         name: "Twilight Zone",
         gameTitleId: gameTitles[3]!.id,
-        locationId: backRoom.id,
+        roomId: backRoom.id,
         ownerId: testUser2.id,
       },
       {
         name: "Attack from Mars",
         gameTitleId: gameTitles[4]!.id,
-        locationId: mainFloor.id,
+        roomId: mainFloor.id,
         ownerId: testUser1.id,
       },
     ];

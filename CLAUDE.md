@@ -81,10 +81,21 @@
 
 ### **Testing Requirements**
 
-- **New Features**: Must include unit tests for business logic
-- **API Endpoints**: Must include integration tests for tRPC procedures
-- **Critical Paths**: Must include E2E tests for user workflows
-- **Multi-Tenancy**: Must verify data isolation between organizations
+**CURRENT PHASE: Unit Tests Only**
+- **New Features**: Must include unit tests for business logic (service layer, utilities, pure functions)
+- **No Integration Tests**: We're iterating quickly and not ready for client-server integration tests yet
+- **No E2E Tests**: End-to-end tests will come in a later phase
+- **Multi-Tenancy**: Unit test business logic to verify data isolation between organizations
+
+**FUTURE PHASES: Integration & E2E Testing**
+- **API Endpoints**: Integration tests for tRPC procedures (coming later)
+- **Critical Paths**: E2E tests for user workflows (coming later)
+
+## **Database Handling**
+
+- **Very Pre-Production**: We will be making frequent changes to the database schema
+- **Well-structured Seed**: We'll make good use of @prisma/seed.ts to populate test data
+- **No migrations**: We'll handle changes by resetting the database
 
 ## **Troubleshooting Guide**
 

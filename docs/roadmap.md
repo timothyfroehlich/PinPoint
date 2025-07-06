@@ -72,6 +72,10 @@ This section outlines major features and modules planned for future releases bey
   - Support for custom game images and descriptions
   - Validation to prevent conflicts with OPDB data
 
+### **PinballMap management**
+
+**Goal:** Allow organizations to manage their PinballMap locations directly from the client.
+
 ### **Multi-Organization Management**
 
 **Goal:** Transition from single-organization to full multi-tenant functionality with organization switching and management.

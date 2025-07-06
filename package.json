@@ -35,6 +35,7 @@
     "deps:update": "npm update && npm audit",
     "clean": "rm -rf .next node_modules/.cache .turbo && npm install",
     "reset": "npm run clean && npm run db:push && npm run seed",
+    "pinballmap:update-fixture": "curl -o src/lib/pinballmap/__tests__/fixtures/api_responses/locations/location_26454_machine_details.json https://pinballmap.com/api/v1/locations/26454/machine_details.json",
     "prepare": "husky"
   },
   "prisma": {
@@ -53,6 +54,7 @@
     "@trpc/react-query": "^11.0.0",
     "@trpc/server": "^11.0.0",
     "bcrypt": "^6.0.0",
+    "csv-parser": "^3.2.0",
     "next": "15.3.5",
     "next-auth": "5.0.0-beta.29",
     "react": "19.1.0",
