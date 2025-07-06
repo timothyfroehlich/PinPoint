@@ -221,16 +221,18 @@ async function main() {
     console.log(`Created/Updated game instance: ${gameTitle.name} (Owner: ${owner.name})`);
   }
 
-  // 8. Create default issue statuses for workflow (only if they don't exist)
-  const defaultStatuses = [
-    { name: "Open", order: 1 },
-    { name: "Acknowledged", order: 2 },
-    { name: "In Progress", order: 3 },
-    { name: "Resolved", order: 4 },
-    { name: "Closed", order: 5 },
+  // 8. Create issue statuses from CSV data (only if they don't exist)
+  const csvStatuses = [
+    { name: "New", order: 1 },
+    { name: "In Progress", order: 2 },
+    { name: "Needs expert help", order: 3 },
+    { name: "Needs Parts", order: 4 },
+    { name: "Fixed", order: 5 },
+    { name: "Not to be Fixed", order: 6 },
+    { name: "Not Reproducible", order: 7 },
   ];
 
-  for (const statusData of defaultStatuses) {
+  for (const statusData of csvStatuses) {
     const existingStatus = await prisma.issueStatus.findFirst({
       where: {
         name: statusData.name,
@@ -249,6 +251,111 @@ async function main() {
       console.log(`Created issue status: ${statusData.name}`);
     } else {
       console.log(`Issue status already exists: ${existingStatus.name}`);
+    }
+  }
+
+  // 9. Create sample issues from CSV data
+  const sampleIssues = [
+    {
+      title: "Ultraman: Kaiju figures on left ramp are not responding",
+      description: "Kaiju figures on left ramp are not responding",
+      severity: "Low", // Cosmetic -> Low
+      consistency: "Every game",
+      status: "New",
+      gameTitle: "Ultraman: Kaiju Rumble (Blood Sucker Edition)",
+      reporterEmail: "roger.sharpe@example.com",
+      createdAt: new Date("2025-06-21T13:40:02Z"),
+      updatedAt: new Date("2025-07-01T19:09:30Z"),
+    },
+    {
+      title: "Xenon: Loud buzzing noise then crashes",
+      description: "Loud buzzing noise then crashes",
+      severity: "Critical", // Severe -> Critical
+      consistency: "Always",
+      status: "Needs expert help",
+      gameTitle: "Xenon",
+      reporterEmail: "roger.sharpe@example.com",
+      createdAt: new Date("2025-06-27T19:05:40Z"),
+      updatedAt: new Date("2025-07-06T10:27:36Z"),
+    },
+    {
+      title: "Cleopatra: Left top rollover target not responding",
+      description: "Left top rollover target not responding",
+      severity: "Medium", // Minor -> Medium
+      consistency: "Every game",
+      status: "New",
+      gameTitle: "Cleopatra",
+      reporterEmail: "roger.sharpe@example.com",
+      createdAt: new Date("2025-06-27T20:12:44Z"),
+      updatedAt: new Date("2025-07-01T19:10:53Z"),
+    },
+    {
+      title: "Cleopatra: Center pop bumper is out",
+      description: "Center pop bumper is out",
+      severity: "Medium", // Minor -> Medium
+      consistency: "Every game",
+      status: "New",
+      gameTitle: "Cleopatra",
+      reporterEmail: "roger.sharpe@example.com",
+      createdAt: new Date("2025-06-27T20:13:27Z"),
+      updatedAt: new Date("2025-07-01T19:10:58Z"),
+    },
+    {
+      title: "Lord of the Rings: Balrog figure not working",
+      description: "Balrog figure not working properly during multiball",
+      severity: "Medium",
+      consistency: "Occasionally",
+      status: "New",
+      gameTitle: "Lord of the Rings",
+      reporterEmail: "gary.stern@example.com",
+      createdAt: new Date("2025-06-25T10:00:00Z"),
+      updatedAt: new Date("2025-06-25T10:00:00Z"),
+    },
+  ];
+
+  // Create the issues
+  for (const issueData of sampleIssues) {
+    // Find the game instance
+    const gameInstance = await prisma.gameInstance.findFirst({
+      where: {
+        gameTitle: {
+          name: issueData.gameTitle,
+        },
+      },
+    });
+
+    if (gameInstance) {
+      // Find the reporter
+      const reporter = createdUsers.find(u => u.email === issueData.reporterEmail);
+      
+      // Find the status
+      const status = await prisma.issueStatus.findFirst({
+        where: {
+          name: issueData.status,
+          organizationId: organization.id,
+        },
+      });
+
+      if (reporter && status) {
+        await prisma.issue.create({
+          data: {
+            title: issueData.title,
+            description: issueData.description,
+            severity: issueData.severity,
+            reporterId: reporter.id,
+            gameInstanceId: gameInstance.id,
+            statusId: status.id,
+            organizationId: organization.id,
+            createdAt: issueData.createdAt,
+            updatedAt: issueData.updatedAt,
+          },
+        });
+        console.log(`Created issue: ${issueData.title}`);
+      } else {
+        console.log(`Skipped issue ${issueData.title} - missing reporter or status`);
+      }
+    } else {
+      console.log(`Skipped issue ${issueData.title} - game not found: ${issueData.gameTitle}`);
     }
   }
 
