@@ -449,7 +449,7 @@ export default function IssuesPage() {
                                 variant="caption"
                                 color="text.secondary"
                               >
-                                {issue.gameInstance.location.name}
+                                {issue.gameInstance.room.location.name}
                               </Typography>
                             </Box>
                           </Box>

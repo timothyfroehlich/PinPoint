@@ -119,7 +119,7 @@ export default function GameTitlesAdminPage() {
   }
 
   const gameTitleCount = gameTitles?.length ?? 0;
-  const opdbGameCount = gameTitles?.filter(game => !game.opdbId.startsWith('custom-')).length ?? 0;
+  const opdbGameCount = gameTitles?.filter(game => game.opdbId && !game.opdbId.startsWith('custom-')).length ?? 0;
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
@@ -255,7 +255,7 @@ export default function GameTitlesAdminPage() {
                             <Typography variant="h6" component="span">
                               {game.name}
                             </Typography>
-                            {game.opdbId.startsWith('custom-') ? (
+                            {game.opdbId && game.opdbId.startsWith('custom-') ? (
                               <Chip label="Custom" size="small" color="secondary" />
                             ) : (
                               <Chip 

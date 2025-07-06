@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { createTRPCRouter, organizationProcedure } from "~/server/api/trpc";
+import { createTRPCRouter, organizationProcedure, adminProcedure } from "~/server/api/trpc";
+import { syncLocationGames } from "~/server/services/pinballmapService";
 
 export const locationRouter = createTRPCRouter({
   create: organizationProcedure
@@ -25,9 +26,13 @@ export const locationRouter = createTRPCRouter({
         organizationId: ctx.organization.id,
       },
       include: {
-        _count: {
-          select: {
-            gameInstances: true,
+        rooms: {
+          include: {
+            _count: {
+              select: {
+                gameInstances: true,
+              },
+            },
           },
         },
       },
@@ -66,23 +71,28 @@ export const locationRouter = createTRPCRouter({
           organizationId: ctx.organization.id,
         },
         include: {
-          gameInstances: {
+          rooms: {
             include: {
-              gameTitle: true,
-              owner: {
+              gameInstances: {
+                include: {
+                  gameTitle: true,
+                  owner: {
+                    select: {
+                      id: true,
+                      name: true,
+                      profilePicture: true,
+                    },
+                  },
+                },
+                orderBy: { name: "asc" },
+              },
+              _count: {
                 select: {
-                  id: true,
-                  name: true,
-                  profilePicture: true,
+                  gameInstances: true,
                 },
               },
             },
             orderBy: { name: "asc" },
-          },
-          _count: {
-            select: {
-              gameInstances: true,
-            },
           },
         },
       });
@@ -103,5 +113,37 @@ export const locationRouter = createTRPCRouter({
           organizationId: ctx.organization.id, // Ensure user can only delete their org's locations
         },
       });
+    }),
+
+  // Admin-only PinballMap sync operations
+  setPinballMapId: adminProcedure
+    .input(
+      z.object({
+        locationId: z.string(),
+        pinballMapId: z.number().int().positive(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      return ctx.db.location.update({
+        where: {
+          id: input.locationId,
+          organizationId: ctx.organization.id,
+        },
+        data: {
+          pinballMapId: input.pinballMapId,
+        },
+      });
+    }),
+
+  syncWithPinballMap: adminProcedure
+    .input(z.object({ locationId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const result = await syncLocationGames(ctx.db, input.locationId);
+      
+      if (!result.success) {
+        throw new Error(result.error || "Sync failed");
+      }
+      
+      return result;
     }),
 });
