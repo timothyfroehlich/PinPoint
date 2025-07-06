@@ -42,6 +42,7 @@ model Organization {
     issueStatues IssueStatus[]
     issues       Issue[]
     locations    Location[]
+    rooms        Room[]
     gameTitles   GameTitle[]
     attachments  Attachment[]
 }
@@ -92,25 +93,41 @@ model Location {
     id             String         @id @default(cuid())
     name           String
     notes          String?        // Optional notes for the location
+    pinballMapId   Int?           @unique // PinballMap.com Location ID
     organization   Organization   @relation(fields: [organizationId], references: [id])
     organizationId String
-    gameInstances  GameInstance[]
+    rooms          Room[]
 }
 
 model GameTitle {
     id             String         @id @default(cuid())
     name           String
-    opdbId         String         // OPDB identifier (e.g., "G43W4-MrRpw") - Required
+    opdbId         String?        @unique // OPDB identifier (e.g., "G43W4-MrRpw") - Global unique when present
     manufacturer   String?        // Sourced from OPDB
     releaseDate    DateTime?      // Sourced from OPDB
     imageUrl       String?        // OPDB image URL
     description    String?        // Game description from OPDB
     lastSynced     DateTime?      // When data was last synced from OPDB
+    organization   Organization?  @relation(fields: [organizationId], references: [id])
+    organizationId String?        // Null for global OPDB games, set for custom games
+    gameInstances  GameInstance[]
+
+    // Custom games (no opdbId) must be unique per org
+    @@unique([name, organizationId], name: "unique_custom_game_per_org")
+    @@index([organizationId]) // For querying org-specific games
+}
+
+model Room {
+    id             String         @id @default(cuid())
+    name           String
+    description    String?        // User-updatable description
+    location       Location       @relation(fields: [locationId], references: [id])
+    locationId     String
     organization   Organization   @relation(fields: [organizationId], references: [id])
     organizationId String
     gameInstances  GameInstance[]
 
-    @@unique([opdbId, organizationId]) // One GameTitle per OPDB game per org
+    @@unique([name, locationId])
 }
 
 model GameInstance {
@@ -118,13 +135,15 @@ model GameInstance {
     name         String
     gameTitle    GameTitle @relation(fields: [gameTitleId], references: [id])
     gameTitleId  String
-    location     Location  @relation(fields: [locationId], references: [id])
-    locationId   String
+    room         Room      @relation(fields: [roomId], references: [id])
+    roomId       String
     owner        User?     @relation("GameOwner", fields: [ownerId], references: [id]) // Game owner
     ownerId      String?   // Optional owner
     issues       Issue[]
 
-    @@unique([name, gameTitleId])
+    // Game instances must be unique per game title within an organization
+    // We derive the organizationId through the room hierarchy
+    @@unique([name, gameTitleId, roomId], name: "unique_game_instance_per_room")
 }
 
 model Comment {

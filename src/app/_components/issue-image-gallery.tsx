@@ -85,7 +85,7 @@ export function IssueImageGallery({ attachments, title = "Issue Photos" }: Issue
 
         <Grid container spacing={2}>
           {attachments.map((attachment, index) => (
-            <Grid xs={12} sm={6} md={4} key={attachment.id}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }} key={attachment.id}>
               <Card
                 sx={{
                   cursor: "pointer",

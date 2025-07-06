@@ -488,7 +488,7 @@ export default function IssueDetailPage({ params }: IssueDetailPageProps) {
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <LocationOn sx={{ fontSize: 16, color: "text.secondary" }} />
                   <Typography variant="body2">
-                    {issue.gameInstance.location.name}
+                    {issue.gameInstance.room.location.name}
                   </Typography>
                 </Box>
               </Box>

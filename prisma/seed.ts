@@ -94,10 +94,13 @@ async function main() {
       notes: "Primary gaming area with most popular machines",
     },
     {
-      name: "Upstairs Loft",
-      notes: "Quieter area for classic games and tournaments",
+      name: "The Museum",
+      notes: "Our collection of classic and historical pinball machines",
     },
-    { name: "Basement Arcade", notes: "Retro games and repair workshop" },
+    {
+      name: "The Back Room",
+      notes: "Games in need of some TLC or restoration",
+    },
   ];
 
   const createdLocations = [];
@@ -125,89 +128,100 @@ async function main() {
     }
   }
 
-  // 5. Create test game titles
-  const gameTitlesData = [
-    { name: "Cactus Canyon (Remake)", opdbId: "G4835-M2YPK" },
-    { name: "Labyrinth", opdbId: "vBn8" },
-    { name: "Godzilla (Premium)", opdbId: "GODZILLA_PREMIUM" },
-    { name: "Led Zeppelin (Premium)", opdbId: "Gweel-ME0pP-AR0N5" },
-    { name: "The Addams Family", opdbId: "G4ODR-MDXEy" },
-    { name: "Twilight Zone", opdbId: "GrXzD-MjBPX" },
-    { name: "Deadpool (Premium)", opdbId: "6lnq" },
-    { name: "Iron Maiden: Legacy of the Beast (Premium)", opdbId: "4dOQ" },
-    { name: "Jaws (Premium)", opdbId: "GLWll-MXr4N" },
-    { name: "Foo Fighters (Premium)", opdbId: "peoL" },
-  ];
-
+  // 5. Create game titles from PinballMap fixture data
+  const fixtureData = await import("../src/lib/pinballmap/__tests__/fixtures/api_responses/locations/location_26454_machine_details.json");
+  
   const createdGameTitles = [];
-  for (const titleData of gameTitlesData) {
+  for (const machine of fixtureData.machines) {
     const gameTitle = await prisma.gameTitle.upsert({
       where: {
-        opdbId_organizationId: {
-          opdbId: titleData.opdbId,
-          organizationId: organization.id,
-        },
+        opdbId: machine.opdb_id,
       },
-      update: { name: titleData.name },
+      update: { name: machine.name },
       create: {
-        name: titleData.name,
-        opdbId: titleData.opdbId,
-        organizationId: organization.id,
+        name: machine.name,
+        opdbId: machine.opdb_id,
+        // OPDB games are global, so no organizationId
       },
     });
     console.log(`Created/Updated game title: ${gameTitle.name}`);
     createdGameTitles.push(gameTitle);
   }
 
-  // 6. Create test game instances
-  const gameInstancesData = [
-    { name: "Cactus Canyon", gameTitleName: "Cactus Canyon (Remake)", ownerEmail: "roger.sharpe@example.com", locationIndex: 0 },
-    { name: "Left Labyrinth", gameTitleName: "Labyrinth", ownerEmail: "gary.stern@example.com", locationIndex: 0 },
-    { name: "Right Labyrinth", gameTitleName: "Labyrinth", ownerEmail: "george.gomez@example.com", locationIndex: 0 },
-    { name: "Godzilla", gameTitleName: "Godzilla (Premium)", ownerEmail: "harry.williams@example.com", locationIndex: 1 },
-    { name: "Led Zeppelin", gameTitleName: "Led Zeppelin (Premium)", ownerEmail: "roger.sharpe@example.com", locationIndex: 1 },
-    { name: "The Addams Family", gameTitleName: "The Addams Family", ownerEmail: "gary.stern@example.com", locationIndex: 1 },
-    { name: "Twilight Zone", gameTitleName: "Twilight Zone", ownerEmail: "george.gomez@example.com", locationIndex: 2 },
-    { name: "Deadpool", gameTitleName: "Deadpool (Premium)", ownerEmail: "harry.williams@example.com", locationIndex: 2 },
-    { name: "Iron Maiden", gameTitleName: "Iron Maiden: Legacy of the Beast (Premium)", ownerEmail: "roger.sharpe@example.com", locationIndex: 2 },
-    { name: "Jaws", gameTitleName: "Jaws (Premium)", ownerEmail: "gary.stern@example.com", locationIndex: 0 },
-  ];
+  // 6. Create rooms for each location
+  const createdRooms = [];
+  for (const location of createdLocations) {
+    const room = await prisma.room.upsert({
+      where: {
+        name_locationId: {
+          name: "Main Floor",
+          locationId: location.id,
+        },
+      },
+      update: {},
+      create: {
+        name: "Main Floor",
+        description: "Primary gaming area",
+        locationId: location.id,
+        organizationId: organization.id,
+      },
+    });
+    console.log(`Created/Updated room: ${room.name} at ${location.name}`);
+    createdRooms.push(room);
+  }
 
-  for (const instanceData of gameInstancesData) {
-    const gameTitle = createdGameTitles.find(gt => gt.name === instanceData.gameTitleName);
-    if (!gameTitle) {
-      console.error(`Game title not found for instance: ${instanceData.name}`);
+  // 7. Create game instances from fixture data in the Main Floor
+  const mainFloorRoom = createdRooms[0]; // Main Floor at "Main Floor" location
+  if (!mainFloorRoom) {
+    console.error('Main Floor room not found');
+    return;
+  }
+
+  for (let i = 0; i < Math.min(fixtureData.machines.length, 10); i++) {
+    const machine = fixtureData.machines[i];
+    if (!machine) {
+      console.error(`Machine at index ${i} is undefined`);
       continue;
     }
     
-    const owner = createdUsers.find(u => u.email === instanceData.ownerEmail);
+    const gameTitle = createdGameTitles.find(
+      (gt) => gt.opdbId === machine.opdb_id,
+    );
+    
+    if (!gameTitle) {
+      console.error(`Game title not found for machine: ${machine.name}`);
+      continue;
+    }
+
+    const owner = createdUsers[i % createdUsers.length]; // Rotate through users
+
     if (!owner) {
-      console.error(`Owner not found for instance: ${instanceData.name}`);
+      console.error(`No owner found for index ${i}`);
       continue;
     }
 
     await prisma.gameInstance.upsert({
       where: {
-        name_gameTitleId: {
-          name: instanceData.name,
+        unique_game_instance_per_room: {
+          name: gameTitle.name,
           gameTitleId: gameTitle.id,
+          roomId: mainFloorRoom.id,
         },
       },
       update: {
-        locationId: createdLocations[instanceData.locationIndex]!.id,
         ownerId: owner.id,
       },
       create: {
-        name: instanceData.name,
+        name: gameTitle.name,
         gameTitleId: gameTitle.id,
-        locationId: createdLocations[instanceData.locationIndex]!.id,
+        roomId: mainFloorRoom.id,
         ownerId: owner.id,
       },
     });
-    console.log(`Created/Updated game instance: ${instanceData.name}`);
+    console.log(`Created/Updated game instance: ${gameTitle.name} (Owner: ${owner.name})`);
   }
 
-  // 7. Create default issue statuses for workflow (only if they don't exist)
+  // 8. Create default issue statuses for workflow (only if they don't exist)
   const defaultStatuses = [
     { name: "Open", order: 1 },
     { name: "Acknowledged", order: 2 },

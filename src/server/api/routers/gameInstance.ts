@@ -7,34 +7,37 @@ export const gameInstanceRouter = createTRPCRouter({
       z.object({
         name: z.string().min(1),
         gameTitleId: z.string(),
-        locationId: z.string(),
+        roomId: z.string(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Verify that the gameTitle and location belong to the same organization
+      // Verify that the gameTitle and room belong to the same organization
       const gameTitle = await ctx.db.gameTitle.findFirst({
         where: {
           id: input.gameTitleId,
-          organizationId: ctx.organization.id,
+          OR: [
+            { organizationId: ctx.organization.id }, // Organization-specific games
+            { organizationId: null }, // Global OPDB games
+          ],
         },
       });
 
-      const location = await ctx.db.location.findFirst({
+      const room = await ctx.db.room.findFirst({
         where: {
-          id: input.locationId,
+          id: input.roomId,
           organizationId: ctx.organization.id,
         },
       });
 
-      if (!gameTitle || !location) {
-        throw new Error("Invalid game title or location");
+      if (!gameTitle || !room) {
+        throw new Error("Invalid game title or room");
       }
 
       return ctx.db.gameInstance.create({
         data: {
           name: input.name,
           gameTitleId: input.gameTitleId,
-          locationId: input.locationId,
+          roomId: input.roomId,
         },
         include: {
           gameTitle: {
@@ -46,7 +49,11 @@ export const gameInstanceRouter = createTRPCRouter({
               },
             },
           },
-          location: true,
+          room: {
+            include: {
+              location: true,
+            },
+          },
           owner: {
             select: {
               id: true,
@@ -75,7 +82,11 @@ export const gameInstanceRouter = createTRPCRouter({
             },
           },
         },
-        location: true,
+        room: {
+          include: {
+            location: true,
+          },
+        },
         owner: {
           select: {
             id: true,
@@ -108,7 +119,11 @@ export const gameInstanceRouter = createTRPCRouter({
               },
             },
           },
-          location: true,
+          room: {
+            include: {
+              location: true,
+            },
+          },
           owner: {
             select: {
               id: true,
@@ -192,7 +207,11 @@ export const gameInstanceRouter = createTRPCRouter({
               },
             },
           },
-          location: true,
+          room: {
+            include: {
+              location: true,
+            },
+          },
           owner: {
             select: {
               id: true,
@@ -231,7 +250,7 @@ export const gameInstanceRouter = createTRPCRouter({
     .input(
       z.object({
         gameInstanceId: z.string(),
-        locationId: z.string(),
+        roomId: z.string(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -249,22 +268,22 @@ export const gameInstanceRouter = createTRPCRouter({
         throw new Error("Game instance not found");
       }
 
-      // Verify the target location belongs to this organization
-      const location = await ctx.db.location.findFirst({
+      // Verify the target room belongs to this organization
+      const room = await ctx.db.room.findFirst({
         where: {
-          id: input.locationId,
+          id: input.roomId,
           organizationId: ctx.organization.id,
         },
       });
 
-      if (!location) {
-        throw new Error("Target location not found");
+      if (!room) {
+        throw new Error("Target room not found");
       }
 
       return ctx.db.gameInstance.update({
         where: { id: input.gameInstanceId },
         data: {
-          locationId: input.locationId,
+          roomId: input.roomId,
         },
         include: {
           gameTitle: {
@@ -276,7 +295,11 @@ export const gameInstanceRouter = createTRPCRouter({
               },
             },
           },
-          location: true,
+          room: {
+            include: {
+              location: true,
+            },
+          },
           owner: {
             select: {
               id: true,
@@ -342,7 +365,11 @@ export const gameInstanceRouter = createTRPCRouter({
               },
             },
           },
-          location: true,
+          room: {
+            include: {
+              location: true,
+            },
+          },
           owner: {
             select: {
               id: true,

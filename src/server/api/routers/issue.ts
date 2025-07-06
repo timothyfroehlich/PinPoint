@@ -88,7 +88,11 @@ export const issueRouter = createTRPCRouter({
           gameInstance: {
             include: {
               gameTitle: true,
-              location: true,
+              room: {
+                include: {
+                  location: true,
+                },
+              },
             },
           },
         },
@@ -109,7 +113,7 @@ export const issueRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const whereClause: {
         organizationId: string;
-        gameInstance?: { locationId: string };
+        gameInstance?: { room: { locationId: string } };
         gameInstanceId?: string;
         statusId?: string;
       } = {
@@ -118,7 +122,7 @@ export const issueRouter = createTRPCRouter({
 
       if (input?.locationId) {
         whereClause.gameInstance = {
-          locationId: input.locationId,
+          room: { locationId: input.locationId },
         };
       }
 
@@ -151,7 +155,11 @@ export const issueRouter = createTRPCRouter({
           gameInstance: {
             include: {
               gameTitle: true,
-              location: true,
+              room: {
+                include: {
+                  location: true,
+                },
+              },
             },
           },
           _count: {
@@ -193,7 +201,11 @@ export const issueRouter = createTRPCRouter({
           gameInstance: {
             include: {
               gameTitle: true,
-              location: true,
+              room: {
+                include: {
+                  location: true,
+                },
+              },
             },
           },
           comments: {
@@ -304,7 +316,11 @@ export const issueRouter = createTRPCRouter({
           gameInstance: {
             include: {
               gameTitle: true,
-              location: true,
+              room: {
+                include: {
+                  location: true,
+                },
+              },
             },
           },
         },
