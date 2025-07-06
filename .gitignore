@@ -17,6 +17,7 @@ db.sqlite
 /.next/
 /out/
 next-env.d.ts
+/public/uploads
 
 # production
 /build
@@ -47,3 +48,4 @@ yarn-error.log*
 
 # Temporary files
 /tmp
+.recycle_bin/

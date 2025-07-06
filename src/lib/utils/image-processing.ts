@@ -1,4 +1,4 @@
-import { IMAGE_CONSTRAINTS } from "../image-storage";
+import { IMAGE_CONSTRAINTS, ISSUE_ATTACHMENT_CONSTRAINTS } from "../image-storage";
 
 export interface ImageProcessingResult {
   success: boolean;
@@ -116,6 +116,95 @@ function calculateDimensions(
     const height = Math.min(originalHeight, maxHeight);
     const width = height * aspectRatio;
     return { width: Math.round(width), height: Math.round(height) };
+  }
+}
+
+// Process image files for issue attachments with higher quality
+export async function processIssueImageFile(
+  file: File,
+): Promise<ImageProcessingResult> {
+  try {
+    // Validate file type
+    if (
+      !ISSUE_ATTACHMENT_CONSTRAINTS.allowedTypes.includes(
+        file.type as "image/jpeg" | "image/png" | "image/webp",
+      )
+    ) {
+      return {
+        success: false,
+        error: "Invalid file type. Please upload a JPEG, PNG, or WebP image.",
+      };
+    }
+
+    // Validate file size
+    if (file.size > ISSUE_ATTACHMENT_CONSTRAINTS.maxSizeBytes) {
+      return {
+        success: false,
+        error: `File too large. Maximum size is ${Math.round(ISSUE_ATTACHMENT_CONSTRAINTS.maxSizeBytes / (1024 * 1024))}MB.`,
+      };
+    }
+
+    // Create canvas for image processing
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      throw new Error("Could not get canvas context");
+    }
+
+    // Load image
+    const img = new Image();
+    const imageLoaded = new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error("Failed to load image"));
+    });
+
+    img.src = URL.createObjectURL(file);
+    await imageLoaded;
+
+    // Calculate new dimensions while maintaining aspect ratio
+    const { width: newWidth, height: newHeight } = calculateDimensions(
+      img.width,
+      img.height,
+      ISSUE_ATTACHMENT_CONSTRAINTS.maxWidth,
+      ISSUE_ATTACHMENT_CONSTRAINTS.maxHeight,
+    );
+
+    // Set canvas size
+    canvas.width = newWidth;
+    canvas.height = newHeight;
+
+    // Draw and resize image
+    ctx.drawImage(img, 0, 0, newWidth, newHeight);
+
+    // Convert to WebP blob with higher quality for issue attachments
+    const blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(resolve, "image/webp", 0.95); // Higher quality than profile pictures
+    });
+
+    if (!blob) {
+      throw new Error("Failed to process image");
+    }
+
+    // Create new File from blob
+    const processedFile = new File([blob], `processed-${file.name}.webp`, {
+      type: "image/webp",
+    });
+
+    // Clean up
+    URL.revokeObjectURL(img.src);
+
+    return {
+      success: true,
+      file: processedFile,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Unknown error processing image",
+    };
   }
 }
 

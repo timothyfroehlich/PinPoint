@@ -42,6 +42,8 @@ import { useRouter } from "next/navigation";
 import { UserAvatar } from "~/app/_components/user-avatar";
 import { useCurrentUser } from "~/lib/hooks/use-current-user";
 import { api } from "~/trpc/react";
+import { IssueImageGallery } from "~/app/_components/issue-image-gallery";
+import { IssueImageUpload, type IssueAttachment } from "~/app/_components/issue-image-upload";
 import React from "react";
 
 interface IssueDetailPageProps {
@@ -102,6 +104,12 @@ export default function IssueDetailPage({ params }: IssueDetailPageProps) {
     },
   });
 
+  const deleteAttachmentMutation = api.issue.deleteAttachment.useMutation({
+    onSuccess: () => {
+      void refetch();
+    },
+  });
+
   if (!resolvedParams || isLoadingIssue) {
     return (
       <Container maxWidth="lg" sx={{ py: 4, textAlign: "center" }}>
@@ -150,6 +158,17 @@ export default function IssueDetailPage({ params }: IssueDetailPageProps) {
         content: commentForm.trim(),
       });
     }
+  };
+
+  const handleAttachmentUploadSuccess = (attachment: IssueAttachment) => {
+    // Refresh issue data to show new attachment
+    void refetch();
+  };
+
+  const handleAttachmentDeleteSuccess = (attachmentId: string) => {
+    deleteAttachmentMutation.mutate({
+      attachmentId,
+    });
   };
 
   const getSeverityColor = (severity: string | null) => {
@@ -308,6 +327,14 @@ export default function IssueDetailPage({ params }: IssueDetailPageProps) {
             </CardContent>
           </Card>
 
+          {/* Issue Attachments */}
+          {issue.attachments && issue.attachments.length > 0 && (
+            <IssueImageGallery 
+              attachments={issue.attachments}
+              title="Issue Photos"
+            />
+          )}
+
           {/* Comments */}
           <Box sx={{ mb: 3 }}>
             {issue.comments.map((comment) => (
@@ -362,22 +389,28 @@ export default function IssueDetailPage({ params }: IssueDetailPageProps) {
                   sx={{ mb: 2 }}
                 />
                 <Box
-                  sx={{ display: "flex", justifyContent: "flex-end", gap: 2 }}
+                  sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 2 }}
                 >
-                  <Button
-                    onClick={() => setCommentForm("")}
-                    disabled={!commentForm.trim()}
-                  >
-                    Cancel
-                  </Button>
+                  {/* Image Upload */}
+                  <Box sx={{ flexGrow: 1 }}>
+                    <IssueImageUpload
+                      issueId={issue.id}
+                      onUploadSuccess={handleAttachmentUploadSuccess}
+                      onDeleteSuccess={handleAttachmentDeleteSuccess}
+                      maxAttachments={3}
+                    />
+                  </Box>
+                  
+                  {/* Submit Button */}
                   <Button
                     variant="contained"
                     onClick={handleAddComment}
                     disabled={
                       !commentForm.trim() || addCommentMutation.isPending
                     }
+                    sx={{ minWidth: 100 }}
                   >
-                    {addCommentMutation.isPending ? "Adding..." : "Comment"}
+                    {addCommentMutation.isPending ? "Adding..." : "Submit"}
                   </Button>
                 </Box>
               </CardContent>

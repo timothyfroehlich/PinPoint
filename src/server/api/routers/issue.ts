@@ -157,6 +157,7 @@ export const issueRouter = createTRPCRouter({
           _count: {
             select: {
               comments: true,
+              attachments: true,
             },
           },
         },
@@ -206,6 +207,9 @@ export const issueRouter = createTRPCRouter({
               },
             },
             orderBy: { createdAt: "asc" },
+          },
+          attachments: {
+            orderBy: { id: "asc" },
           },
         },
       });
@@ -357,6 +361,81 @@ export const issueRouter = createTRPCRouter({
             },
           },
         },
+      });
+    }),
+
+  // Create attachment record after file upload (called by upload API)
+  createAttachment: organizationProcedure
+    .input(
+      z.object({
+        issueId: z.string(),
+        url: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Verify the issue belongs to this organization
+      const existingIssue = await ctx.db.issue.findFirst({
+        where: {
+          id: input.issueId,
+          organizationId: ctx.organization.id,
+        },
+      });
+
+      if (!existingIssue) {
+        throw new Error("Issue not found");
+      }
+
+      // Check attachment count limit
+      const existingAttachments = await ctx.db.attachment.count({
+        where: {
+          issueId: input.issueId,
+        },
+      });
+
+      if (existingAttachments >= 3) {
+        throw new Error("Maximum of 3 attachments allowed per issue");
+      }
+
+      // Create attachment record
+      return ctx.db.attachment.create({
+        data: {
+          url: input.url,
+          issueId: input.issueId,
+          organizationId: ctx.organization.id,
+        },
+      });
+    }),
+
+  // Delete attachment from an issue
+  deleteAttachment: organizationProcedure
+    .input(
+      z.object({
+        attachmentId: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Find the attachment and verify it belongs to this organization
+      const attachment = await ctx.db.attachment.findFirst({
+        where: {
+          id: input.attachmentId,
+          organizationId: ctx.organization.id,
+        },
+      });
+
+      if (!attachment) {
+        throw new Error("Attachment not found");
+      }
+
+      // TODO: Add proper authorization logic
+      // For now, allow organization members to delete attachments
+
+      // Delete the file from storage
+      const { imageStorage } = await import("~/lib/image-storage/local-storage");
+      await imageStorage.deleteImage(attachment.url);
+
+      // Delete the attachment record
+      return ctx.db.attachment.delete({
+        where: { id: input.attachmentId },
       });
     }),
 });

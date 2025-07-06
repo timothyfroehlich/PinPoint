@@ -1,8 +1,8 @@
 export interface ImageStorageProvider {
-  uploadImage(file: File, path: string): Promise<string>;
+  uploadImage(file: File, path: string, constraints?: any): Promise<string>;
   deleteImage(path: string): Promise<void>;
   getImageUrl(path: string): string;
-  validateImage(file: File): Promise<boolean>;
+  validateImage(file: File, constraints?: any): Promise<boolean>;
 }
 
 export interface ImageUploadResult {
@@ -17,4 +17,14 @@ export const IMAGE_CONSTRAINTS = {
   maxHeight: 400,
   allowedTypes: ["image/jpeg", "image/png", "image/webp"] as const,
   outputFormat: "webp" as const,
+} as const;
+
+// Higher quality constraints for issue attachments
+export const ISSUE_ATTACHMENT_CONSTRAINTS = {
+  maxSizeBytes: 5 * 1024 * 1024, // 5MB
+  maxWidth: 1200,
+  maxHeight: 1200,
+  allowedTypes: ["image/jpeg", "image/png", "image/webp"] as const,
+  outputFormat: "webp" as const,
+  maxAttachments: 3, // Maximum 3 attachments per issue
 } as const;

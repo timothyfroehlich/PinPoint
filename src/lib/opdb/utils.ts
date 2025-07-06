@@ -13,7 +13,7 @@ import type { OPDBParsedId, OPDBMachine } from "./types";
  * - A1B7O = Alias ID (optional, starts with 'A')
  */
 export function parseOPDBId(opdbId: string): OPDBParsedId | null {
-  const regex = /^G([a-zA-Z0-9]+)(?:-([a-zA-Z0-9]+)(?:-([a-zA-Z0-9]+))?)?$/;
+  const regex = /^G([a-zA-Z0-9]+)(?:-M([a-zA-Z0-9]+)(?:-A([a-zA-Z0-9]+))?)?$/;
   const match = regex.exec(opdbId);
 
   if (!match) return null;
