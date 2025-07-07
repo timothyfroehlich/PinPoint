@@ -35,6 +35,7 @@
     "deps:update": "npm update && npm audit",
     "clean": "rm -rf .next node_modules/.cache .turbo && npm install",
     "reset": "npm run clean && npm run db:push && npm run seed",
+    "db:reset": "rm -rf prisma/migrations && npx prisma db push --force-reset && npm run seed",
     "pinballmap:update-fixture": "curl -o src/lib/pinballmap/__tests__/fixtures/api_responses/locations/location_26454_machine_details.json https://pinballmap.com/api/v1/locations/26454/machine_details.json",
     "prepare": "husky"
   },
@@ -53,7 +54,6 @@
     "@trpc/client": "^11.0.0",
     "@trpc/react-query": "^11.0.0",
     "@trpc/server": "^11.0.0",
-    "bcrypt": "^6.0.0",
     "csv-parser": "^3.2.0",
     "next": "15.3.5",
     "next-auth": "5.0.0-beta.29",
@@ -66,7 +66,6 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
     "@testing-library/jest-dom": "^6.6.3",
-    "@types/bcrypt": "^5.0.2",
     "@types/jest": "^30.0.0",
     "@types/node": "^24.0.7",
     "@types/react": "^19.0.0",

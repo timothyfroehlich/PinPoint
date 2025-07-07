@@ -38,7 +38,6 @@ import {
 } from "@mui/icons-material";
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { UserAvatar } from "~/app/_components/user-avatar";
 import { useCurrentUser } from "~/lib/hooks/use-current-user";
 import { api } from "~/trpc/react";
@@ -160,7 +159,7 @@ export default function IssueDetailPage({ params }: IssueDetailPageProps) {
     }
   };
 
-  const handleAttachmentUploadSuccess = (attachment: IssueAttachment) => {
+  const handleAttachmentUploadSuccess = (_attachment: IssueAttachment) => {
     // Refresh issue data to show new attachment
     void refetch();
   };
@@ -329,7 +328,7 @@ export default function IssueDetailPage({ params }: IssueDetailPageProps) {
 
           {/* Issue Attachments */}
           {issue.attachments && issue.attachments.length > 0 && (
-            <IssueImageGallery 
+            <IssueImageGallery
               attachments={issue.attachments}
               title="Issue Photos"
             />
@@ -400,7 +399,7 @@ export default function IssueDetailPage({ params }: IssueDetailPageProps) {
                       maxAttachments={3}
                     />
                   </Box>
-                  
+
                   {/* Submit Button */}
                   <Button
                     variant="contained"

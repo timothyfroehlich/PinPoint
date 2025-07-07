@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
   try {
     // Check authentication - for now allow both authenticated and unauthenticated users
     // since issue submission can be public
-    const session = await auth();
+    await auth();
 
     const formData = await req.formData();
     const file = formData.get("file") as File;

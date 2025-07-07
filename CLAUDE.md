@@ -96,6 +96,7 @@
 - **Very Pre-Production**: We will be making frequent changes to the database schema
 - **Well-structured Seed**: We'll make good use of @prisma/seed.ts to populate test data
 - **No migrations**: We'll handle changes by resetting the database
+- **Complete Reset**: Use `npm run db:reset` to completely wipe migrations, reset database, and reseed
 
 ## **Troubleshooting Guide**
 
@@ -129,9 +130,15 @@
 **Problem**: Prisma schema out of sync
 **Solutions**:
 
-1. Run `npx prisma db push` to sync schema
-2. Regenerate client: `npx prisma generate`
-3. If migration needed: `npx prisma migrate dev`
+1. **Quick fix**: Run `npx prisma db push` to sync schema
+2. **Complete reset**: Run `npm run db:reset` to wipe everything and start fresh
+3. Regenerate client: `npx prisma generate`
+
+**Problem**: Database has old/inconsistent data
+**Solutions**:
+
+1. **Recommended**: Run `npm run db:reset` for clean slate
+2. Manual cleanup: Run `npm run seed` to add fresh data (preserves existing data)
 
 ## **Emergency Procedures**
 
@@ -159,6 +166,12 @@
 - `npm run validate:fix` - Runs validation and fixes issues automatically
 - `npm run pre-commit` - Full validation plus build check
 - `npm run smoke-test` - Verifies server health
+
+### **Database Scripts**
+
+- `npm run db:reset` - **Complete database reset**: Removes all migrations, force-resets database to match schema, and reseeds with fresh data
+- `npm run db:push` - Syncs current schema to database (for incremental changes)
+- `npm run seed` - Runs seed script only (assumes database schema is current)
 
 ### **Dependency Management**
 

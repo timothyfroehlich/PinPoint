@@ -139,11 +139,11 @@ export const locationRouter = createTRPCRouter({
     .input(z.object({ locationId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const result = await syncLocationGames(ctx.db, input.locationId);
-      
+
       if (!result.success) {
-        throw new Error(result.error || "Sync failed");
+        throw new Error(result.error ?? "Sync failed");
       }
-      
+
       return result;
     }),
 });
