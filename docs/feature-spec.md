@@ -15,15 +15,16 @@ Created with Gemini. There may be some small inconsistencies or odd jargon. I'll
   - member: Can manage issues and add comments for their organization.
   - admin: Can manage locations, game instances, users, and content for their organization.
 
-### **1.1 OPDB Integration**
+### **1.1 OPDB and PinballMap Integration**
 
-**PinPoint integrates with the Open Pinball Database (OPDB) to provide authoritative game data:**
+**PinPoint integrates with the Open Pinball Database (OPDB) and PinballMap.com to provide authoritative game data and streamline game management:**
 
 - **Data Source:** All Game Title information is sourced from OPDB's comprehensive database of pinball machines
 - **Rich Metadata:** Game Titles include manufacturer, release date, images, and standardized naming
 - **Search Integration:** Admins can search OPDB directly when adding new Game Instances
 - **Automatic Updates:** The system can refresh game data from OPDB to stay current
 - **Fallback Support:** Custom titles can be created for rare or homebrew machines not in OPDB
+- **PinballMap Sync:** Game lists can be synced with PinballMap.com to automate adding and removing game instances.
 
 ### **2\. Minimum Viable Product (MVP) Features**
 

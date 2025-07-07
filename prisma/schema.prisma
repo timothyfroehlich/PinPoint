@@ -13,6 +13,7 @@ datasource db {
 enum Role {
     admin
     member
+    player
 }
 
 model User {

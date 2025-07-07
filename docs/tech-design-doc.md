@@ -4,14 +4,15 @@
 
 The system will be architected as a **multi-tenant web application** utilizing a **shared database with row-level security**. This model is chosen for its cost-effectiveness, ease of maintenance, and its native ability to support global user accounts that can belong to multiple, fully isolated Organization workspaces. Data segregation is the highest priority; a mandatory organization_id column will be present on nearly every table, and every database query executed through the ORM will be strictly scoped by the organization_id derived from the request's context (e.g., subdomain), ensuring tenants can only ever access their own data.1
 
-#### **External Data Integration: OPDB**
+#### **External Data Integration: OPDB and PinballMap**
 
-PinPoint integrates with the Open Pinball Database (OPDB) to provide authoritative game data instead of manual entry:
+PinPoint integrates with the Open Pinball Database (OPDB) and PinballMap.com to provide authoritative game data and streamline game management:
 
 - **Hybrid Data Model:** Game Titles are sourced from OPDB but cached locally for performance and offline capability
 - **API Integration:** Server-side integration with OPDB's REST API for searching, fetching, and syncing game data
 - **Data Synchronization:** Periodic sync processes to keep local game data up-to-date with OPDB
 - **Fallback Strategy:** Support for custom game titles when OPDB data is unavailable or incomplete
+- **PinballMap Sync:** Game lists can be synced with PinballMap.com to automate adding and removing game instances.
 
 #### **Technology Stack**
 
@@ -109,14 +110,15 @@ This proposed schema is designed for the future inventory module. It is structur
 
 The backend API will be implemented using **tRPC** on top of Next.js API Routes. This provides end-to-end type safety between the client and server. All tRPC procedures will be protected and scoped by the multi-tenant middleware.
 
-#### **OPDB Integration API**
+#### **OPDB and PinballMap Integration API**
 
-The system will integrate with the Open Pinball Database (OPDB) API to provide authoritative game data:
+The system will integrate with the Open Pinball Database (OPDB) and PinballMap.com APIs to provide authoritative game data:
 
 - **Authentication:** OPDB API requires authentication via API token
 - **Search Integration:** Real-time search of OPDB games during Game Instance creation
 - **Data Synchronization:** Periodic sync processes to update local game data
 - **Caching Strategy:** Local caching of OPDB data for performance and offline capability
+- **PinballMap Sync:** Sync game lists with PinballMap.com to automate adding and removing game instances. The sync is performed by a tRPC mutation that is only available to admin users. The sync process will add and remove `GameInstance` records based on the real-world machine list at a venue.
 
 #### **Core CRUD Procedures**
 
