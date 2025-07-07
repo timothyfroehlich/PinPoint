@@ -9,10 +9,6 @@ import {
   Box,
   Grid,
   Chip,
-  List,
-  ListItem,
-  ListItemText,
-  Divider,
   Alert,
   CircularProgress,
   Button,
@@ -29,43 +25,62 @@ import {
   BugReport,
   Comment,
 } from "@mui/icons-material";
-import Grid2 from "@mui/material/Grid2";
 import { api } from "~/trpc/react";
 import { UserAvatar } from "~/app/_components/user-avatar";
 import { ProfilePictureUpload } from "~/app/_components/profile-picture-upload";
+import type { Role } from "@prisma/client";
 
 // Type definitions for the profile data structure
 type UserProfileData = {
   id: string;
   name: string | null;
-  email: string;
+  email: string | null;
   bio: string | null;
   profilePicture: string | null;
-  joinDate: Date | null;
+  joinDate: Date;
+  emailVerified: Date | null;
+  image: string | null;
   ownedGameInstances: {
     id: string;
     name: string;
+    gameTitleId: string;
+    roomId: string;
+    ownerId: string | null;
     gameTitle: {
       id: string;
       name: string;
+      opdbId: string | null;
       manufacturer: string | null;
       releaseDate: Date | null;
+      imageUrl: string | null;
+      description: string | null;
+      lastSynced: Date | null;
+      organizationId: string | null;
     };
     room: {
       id: string;
       name: string;
+      organizationId: string;
+      description: string | null;
+      locationId: string;
       location: {
         id: string;
         name: string;
+        organizationId: string;
+        notes: string | null;
+        pinballMapId: number | null;
       };
     };
   }[];
   memberships: {
     id: string;
-    role: string;
+    userId: string;
+    role: Role;
+    organizationId: string;
     organization: {
       id: string;
       name: string;
+      subdomain: string;
     };
   }[];
   _count: {
@@ -272,7 +287,9 @@ export default function ProfilePage() {
                     <Chip
                       key={membership.id}
                       label={`${membership.organization.name} (${membership.role})`}
-                      color={membership.role === "admin" ? "primary" : "default"}
+                      color={
+                        membership.role === "admin" ? "primary" : "default"
+                      }
                       variant="outlined"
                     />
                   ))}
@@ -314,11 +331,15 @@ export default function ProfilePage() {
                           <> • {gameInstance.gameTitle.manufacturer}</>
                         )}
                         {gameInstance.gameTitle.releaseDate && (
-                          <> • {gameInstance.gameTitle.releaseDate.getFullYear()}</>
+                          <>
+                            {" "}
+                            • {gameInstance.gameTitle.releaseDate.getFullYear()}
+                          </>
                         )}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        Location: {gameInstance.room.location.name} - {gameInstance.room.name}
+                        Location: {gameInstance.room.location.name} -{" "}
+                        {gameInstance.room.name}
                       </Typography>
                     </Box>
                   ))}

@@ -3,51 +3,58 @@
  * Following TDD approach - tests first, implementation second
  */
 
-import { PrismaClient } from '@prisma/client';
-import { PinballMapAPIMocker } from '../../../lib/pinballmap/__tests__/apiMocker';
+import { PrismaClient } from "@prisma/client";
+import type { Location, Room, GameInstance, GameTitle } from "@prisma/client";
+import { PinballMapAPIMocker } from "../../../lib/pinballmap/__tests__/apiMocker";
 import {
   syncLocationGames,
   processFixtureData,
   reconcileGameInstances,
   createOrUpdateGameTitle,
-} from '../pinballmapService';
+} from "../pinballmapService";
 
 // Mock Prisma
-jest.mock('@prisma/client');
-const MockedPrismaClient = PrismaClient as jest.MockedClass<typeof PrismaClient>;
+jest.mock("@prisma/client");
+const MockedPrismaClient = PrismaClient as jest.MockedClass<
+  typeof PrismaClient
+>;
 
-describe('PinballMapService', () => {
+describe("PinballMapService", () => {
   let mockPrisma: jest.Mocked<PrismaClient>;
   let apiMocker: PinballMapAPIMocker;
 
+  let findUniqueLocationMock: jest.Mock;
+  let findFirstRoomMock: jest.Mock;
+  let findUniqueGameTitleMock: jest.Mock;
+  let createGameTitleMock: jest.Mock;
+  let updateGameTitleMock: jest.Mock;
+  let upsertGameTitleMock: jest.Mock;
+  let findManyGameInstanceMock: jest.Mock;
+  let deleteManyGameInstanceMock: jest.Mock;
+  let createGameInstanceMock: jest.Mock;
+
   beforeEach(() => {
-    // Create mock Prisma instance
     mockPrisma = new MockedPrismaClient() as jest.Mocked<PrismaClient>;
+    findUniqueLocationMock = jest.fn();
+    findFirstRoomMock = jest.fn();
+    findUniqueGameTitleMock = jest.fn();
+    createGameTitleMock = jest.fn();
+    updateGameTitleMock = jest.fn();
+    upsertGameTitleMock = jest.fn();
+    findManyGameInstanceMock = jest.fn();
+    deleteManyGameInstanceMock = jest.fn();
+    createGameInstanceMock = jest.fn();
 
-    // Mock Prisma methods
-    mockPrisma.location = {
-      findUnique: jest.fn(),
-    } as any;
-
-    mockPrisma.room = {
-      findFirst: jest.fn(),
-      create: jest.fn(),
-    } as any;
-
-    mockPrisma.gameTitle = {
-      findUnique: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
-      upsert: jest.fn(),
-    } as any;
-
-    mockPrisma.gameInstance = {
-      findMany: jest.fn(),
-      deleteMany: jest.fn(),
-      create: jest.fn(),
-    } as any;
-
-    // Set up API mocker
+    // Assign the jest.fn() mocks to the actual mockPrisma methods
+    mockPrisma.location.findUnique = findUniqueLocationMock;
+    mockPrisma.room.findFirst = findFirstRoomMock;
+    mockPrisma.gameTitle.findUnique = findUniqueGameTitleMock;
+    mockPrisma.gameTitle.create = createGameTitleMock;
+    mockPrisma.gameTitle.update = updateGameTitleMock;
+    mockPrisma.gameTitle.upsert = upsertGameTitleMock;
+    mockPrisma.gameInstance.findMany = findManyGameInstanceMock;
+    mockPrisma.gameInstance.deleteMany = deleteManyGameInstanceMock;
+    mockPrisma.gameInstance.create = createGameInstanceMock;
     apiMocker = new PinballMapAPIMocker();
     apiMocker.start();
   });
@@ -57,216 +64,160 @@ describe('PinballMapService', () => {
     jest.clearAllMocks();
   });
 
-  describe('syncLocationGames', () => {
-    const mockLocation = {
-      id: 'location-1',
-      name: 'Austin Pinball Collective',
+  describe("syncLocationGames", () => {
+    const mockLocation: Location = {
+      id: "location-1",
+      name: "Austin Pinball Collective",
       pinballMapId: 26454,
-      organizationId: 'org-1',
+      organizationId: "org-1",
+      notes: null,
     };
-
-    const mockRoom = {
-      id: 'room-1',
-      name: 'Main Floor',
-      locationId: 'location-1',
-      organizationId: 'org-1',
+    const mockRoom: Room = {
+      id: "room-1",
+      name: "Main Floor",
+      locationId: "location-1",
+      organizationId: "org-1",
+      description: null,
     };
-
     beforeEach(() => {
-      mockPrisma.location.findUnique.mockResolvedValue(mockLocation as any);
-      mockPrisma.room.findFirst.mockResolvedValue(mockRoom as any);
+      findUniqueLocationMock.mockResolvedValue(mockLocation);
+      findFirstRoomMock.mockResolvedValue(mockRoom);
     });
-
-    it('should return error result if location not found', async () => {
-      // SETUP: Make the database return null when looking for a location
-      // This simulates a location that doesn't exist in the database
-      mockPrisma.location.findUnique.mockResolvedValue(null);
-
-      // TEST: Try to sync games for a non-existent location
-      const result = await syncLocationGames(mockPrisma, 'invalid-location');
-
-      // EXPECT: Should return error result, not throw
+    it("should return error result if location not found", async () => {
+      findUniqueLocationMock.mockResolvedValue(null);
+      const result = await syncLocationGames(mockPrisma, "invalid-location");
       expect(result.success).toBe(false);
-      expect(result.error).toBe('Location not found');
+      expect(result.error).toBe("Location not found");
       expect(result.added).toBe(0);
       expect(result.removed).toBe(0);
     });
-
-    it('should return error result if location has no PinballMap ID', async () => {
-      // SETUP: Make the database return a location that exists, but has no PinballMap ID
-      // This simulates a location that hasn't been connected to the PinballMap API yet
-      mockPrisma.location.findUnique.mockResolvedValue({
+    it("should return error result if location has no PinballMap ID", async () => {
+      findUniqueLocationMock.mockResolvedValue({
         ...mockLocation,
-        pinballMapId: null, // The key difference - no PinballMap ID
-      } as any);
-
-      // TEST: Try to sync games for a location without PinballMap integration
-      const result = await syncLocationGames(mockPrisma, 'location-1');
-
-      // EXPECT: Should return error result about missing PinballMap ID
+        pinballMapId: null,
+      } as Location);
+      const result = await syncLocationGames(mockPrisma, "location-1");
       expect(result.success).toBe(false);
-      expect(result.error).toBe('Location does not have a PinballMap ID configured');
+      expect(result.error).toBe(
+        "Location does not have a PinballMap ID configured",
+      );
       expect(result.added).toBe(0);
       expect(result.removed).toBe(0);
     });
-
-    it('should return error result if location has no Main Floor room', async () => {
-      // SETUP: Make the database return null when looking for a "Main Floor" room
-      // This simulates a location that exists but doesn't have the required room setup
-      mockPrisma.room.findFirst.mockResolvedValue(null);
-
-      // TEST: Try to sync games for a location without a Main Floor room
-      const result = await syncLocationGames(mockPrisma, 'location-1');
-
-      // EXPECT: Should return error result about missing Main Floor room
+    it("should return error result if location has no Main Floor room", async () => {
+      findFirstRoomMock.mockResolvedValue(null);
+      const result = await syncLocationGames(mockPrisma, "location-1");
       expect(result.success).toBe(false);
-      expect(result.error).toBe('Main Floor room not found for location');
+      expect(result.error).toBe("Main Floor room not found for location");
       expect(result.added).toBe(0);
       expect(result.removed).toBe(0);
     });
-
-    it('should successfully sync games from PinballMap', async () => {
-      // SETUP: Simulate a successful first-time sync scenario
-      // 1. No existing games in the database (empty array)
-      mockPrisma.gameInstance.findMany.mockResolvedValue([]);
-
-      // 2. Mock successful game title creation for OPDB games
-      mockPrisma.gameTitle.findUnique.mockResolvedValue(null); // Game doesn't exist yet
-      mockPrisma.gameTitle.create.mockImplementation(({ data }) =>
-        Promise.resolve({ id: `title-${data.opdbId}`, ...data } as any)
+    it("should successfully sync games from PinballMap", async () => {
+      findManyGameInstanceMock.mockResolvedValue([]);
+      findUniqueGameTitleMock.mockResolvedValue(null);
+      createGameTitleMock.mockImplementation(
+        ({ data }: { data: { opdbId: string } }) =>
+          Promise.resolve({ id: `title-${data.opdbId}`, ...data } as GameTitle),
       );
-
-      // 3. Mock successful game instance creation - when we create a game instance, return it with an ID
-      mockPrisma.gameInstance.create.mockImplementation(({ data }) =>
-        Promise.resolve({ id: 'game-instance-1', ...data } as any)
+      createGameInstanceMock.mockImplementation(({ data }) =>
+        Promise.resolve({ id: "game-instance-1", ...data } as GameInstance),
       );
-
-      // TEST: Run the sync function
-      const result = await syncLocationGames(mockPrisma, 'location-1');
-
-      // ASSERTIONS: Verify the sync was successful
-      expect(result.success).toBe(true);           // Should report success
-      expect(result.added).toBeGreaterThan(0);     // Should have added some games
-      expect(result.removed).toBe(0);              // Should not have removed any games (first sync)
-
-      // ASSERTION: Verify the function called the PinballMap API
+      const result = await syncLocationGames(mockPrisma, "location-1");
+      expect(result.success).toBe(true);
+      expect(result.added).toBeGreaterThan(0);
+      expect(result.removed).toBe(0);
       expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/locations/26454/machine_details.json')
+        expect.stringContaining("/locations/26454/machine_details.json"),
       );
     });
-
-    it('should remove games not in PinballMap anymore', async () => {
-      // SETUP: Simulate a scenario where we have a game in our database that's no longer on PinballMap
-      // This happens when an arcade removes a machine but we haven't synced yet
-      const existingGame = {
-        id: 'game-instance-old',
-        name: 'Old Game',
-        gameTitle: {
-          id: 'game-title-old',
-          opdbId: 'OLD-OPDB-ID',        // This OPDB ID won't be in the PinballMap response
-          name: 'Old Game'
-        },
+    it("should remove games not in PinballMap anymore", async () => {
+      const existingGame: Partial<GameInstance> = {
+        id: "game-instance-old",
+        name: "Old Game",
+        gameTitleId: "game-title-old",
       };
-
-      // 1. Mock that we have this old game in our database
-      mockPrisma.gameInstance.findMany.mockResolvedValue([existingGame] as any);
-      // 2. Mock that the deletion operation works and removes 1 game
-      mockPrisma.gameInstance.deleteMany.mockResolvedValue({ count: 1 } as any);
-
-      // 3. Mock game title creation for any new games (there should be some from fixture)
-      mockPrisma.gameTitle.findUnique.mockResolvedValue(null);
-      mockPrisma.gameTitle.create.mockImplementation(({ data }) =>
-        Promise.resolve({ id: `title-${data.opdbId}`, ...data } as any)
+      findManyGameInstanceMock.mockResolvedValue([
+        existingGame as GameInstance,
+      ]);
+      deleteManyGameInstanceMock.mockResolvedValue({ count: 1 });
+      findUniqueGameTitleMock.mockResolvedValue(null);
+      createGameTitleMock.mockImplementation(
+        ({ data }: { data: { opdbId: string } }) =>
+          Promise.resolve({ id: `title-${data.opdbId}`, ...data } as GameTitle),
       );
-      mockPrisma.gameInstance.create.mockImplementation(({ data }) =>
-        Promise.resolve({ id: 'new-instance', ...data } as any)
+      createGameInstanceMock.mockImplementation(({ data }) =>
+        Promise.resolve({ id: "new-instance", ...data } as GameInstance),
       );
-
-      // TEST: Run the sync function
-      const result = await syncLocationGames(mockPrisma, 'location-1');
-
-      // ASSERTIONS: Verify the old game was removed
-      expect(mockPrisma.gameInstance.deleteMany).toHaveBeenCalledWith({
-        where: { id: { in: ['game-instance-old'] } },  // Should delete the specific old game
+      const result = await syncLocationGames(mockPrisma, "location-1");
+      expect(deleteManyGameInstanceMock).toHaveBeenCalledWith({
+        where: { id: { in: ["game-instance-old"] } },
       });
-
-      expect(result.removed).toBeGreaterThan(0);        // Should report that games were removed
+      expect(result.removed).toBeGreaterThan(0);
     });
-
-    it('should preserve existing games that are still in PinballMap', async () => {
-      // SETUP: Simulate a scenario where we have a game that exists both in our database AND on PinballMap
-      // This should NOT be deleted - it should be preserved
-
-      // 1. Get real fixture data from our test API mocker
+    it("should preserve existing games that are still in PinballMap", async () => {
       const fixtureData = PinballMapAPIMocker.getFixtureData();
       const firstMachine = fixtureData.machines[0];
-
-      // 2. Create a mock existing game that matches a game in the PinballMap response
-      const existingGame = {
-        id: 'game-instance-existing',
+      if (!firstMachine) throw new Error("Fixture data is empty");
+      const existingGame: Partial<GameInstance> = {
+        id: "game-instance-existing",
         name: firstMachine.name,
-        gameTitle: {
-          id: 'game-title-existing',
-          opdbId: firstMachine.opdb_id,    // Same OPDB ID as in the fixture data
-          name: firstMachine.name
-        },
+        gameTitleId: "game-title-existing",
+        roomId: mockRoom.id,
+        ownerId: null,
       };
-
-      // 3. Mock that this existing game is in our database
-      mockPrisma.gameInstance.findMany.mockResolvedValue([existingGame] as any);
-
-      // 4. Mock game title creation for new games
-      mockPrisma.gameTitle.findUnique.mockResolvedValue(null);
-      mockPrisma.gameTitle.create.mockImplementation(({ data }) =>
-        Promise.resolve({ id: `title-${data.opdbId}`, ...data } as any)
+      findManyGameInstanceMock.mockResolvedValue([
+        existingGame as GameInstance,
+      ]);
+      findUniqueGameTitleMock.mockResolvedValue(null);
+      createGameTitleMock.mockImplementation(
+        ({ data }: { data: { opdbId: string } }) =>
+          Promise.resolve({ id: `title-${data.opdbId}`, ...data } as GameTitle),
       );
-      mockPrisma.gameInstance.create.mockImplementation(({ data }) =>
-        Promise.resolve({ id: 'new-instance', ...data } as any)
+      createGameInstanceMock.mockImplementation(({ data }) =>
+        Promise.resolve({ id: "new-instance", ...data } as GameInstance),
       );
-
-      // TEST: Run the sync function
-      const result = await syncLocationGames(mockPrisma, 'location-1');
-
-      // ASSERTIONS: Verify the existing game was preserved
-      expect(mockPrisma.gameInstance.deleteMany).toHaveBeenCalledWith({
-        where: { id: { in: [] } }, // Empty array means no games to delete
+      const result = await syncLocationGames(mockPrisma, "location-1");
+      expect(deleteManyGameInstanceMock).toHaveBeenCalledWith({
+        where: { id: { in: [] } },
       });
-
-      // Should add new games from PinballMap, but subtract the 1 existing game we already have
       expect(result.added).toBe(fixtureData.machines.length - 1);
-      expect(result.removed).toBe(0);              // No games should be removed
+      expect(result.removed).toBe(0);
     });
   });
 
-  describe('createOrUpdateGameTitle', () => {
+  describe("createOrUpdateGameTitle", () => {
     // Mock machine data that represents what comes from PinballMap API
     const mockMachine = {
       id: 123,
-      name: 'Test Game',
-      opdb_id: 'TEST-OPDB-ID',
-      manufacturer: 'Test Manufacturer',
+      name: "Test Game",
+      opdb_id: "TEST-OPDB-ID",
+      manufacturer: "Test Manufacturer",
       year: 2023,
     };
 
-    it('should create global game title for OPDB games', async () => {
+    it("should create global game title for OPDB games", async () => {
       // SETUP: Mock that the game title doesn't exist yet (global OPDB game)
-      mockPrisma.gameTitle.findUnique.mockResolvedValue(null);
-      mockPrisma.gameTitle.create.mockResolvedValue({
-        id: 'new-game-title',
+      findUniqueGameTitleMock.mockResolvedValue(null);
+      createGameTitleMock.mockResolvedValue({
+        id: "new-game-title",
         name: mockMachine.name,
         opdbId: mockMachine.opdb_id,
         organizationId: null, // Global games have no organization
-      } as any);
+      } as GameTitle);
 
       // TEST: Try to create or update a game title for OPDB game
-      const result = await createOrUpdateGameTitle(mockPrisma, mockMachine, 'org-1');
+      const result = await createOrUpdateGameTitle(
+        mockPrisma,
+        mockMachine,
+        "org-1",
+      );
 
       // ASSERTIONS: Verify global game title creation
-      expect(mockPrisma.gameTitle.findUnique).toHaveBeenCalledWith({
+      expect(findUniqueGameTitleMock).toHaveBeenCalledWith({
         where: { opdbId: mockMachine.opdb_id },
       });
 
-      expect(mockPrisma.gameTitle.create).toHaveBeenCalledWith({
+      expect(createGameTitleMock).toHaveBeenCalledWith({
         data: {
           name: mockMachine.name,
           opdbId: mockMachine.opdb_id,
@@ -275,29 +226,29 @@ describe('PinballMapService', () => {
       });
 
       // Verify the function returned the created game title
-      expect(result.id).toBe('new-game-title');
+      expect(result.id).toBe("new-game-title");
     });
 
-    it('should update existing global game title for OPDB games', async () => {
+    it("should update existing global game title for OPDB games", async () => {
       // SETUP: Mock that the game title already exists (global OPDB game)
       const existingGameTitle = {
-        id: 'existing-game-title',
-        name: 'Old Name',
+        id: "existing-game-title",
+        name: "Old Name",
         opdbId: mockMachine.opdb_id,
         organizationId: null,
       };
 
-      mockPrisma.gameTitle.findUnique.mockResolvedValue(existingGameTitle as any);
-      mockPrisma.gameTitle.update.mockResolvedValue({
+      findUniqueGameTitleMock.mockResolvedValue(existingGameTitle as GameTitle);
+      updateGameTitleMock.mockResolvedValue({
         ...existingGameTitle,
         name: mockMachine.name, // Updated name
-      } as any);
+      } as GameTitle);
 
       // TEST: Try to update existing game title
-      const result = await createOrUpdateGameTitle(mockPrisma, mockMachine, 'org-1');
+      await createOrUpdateGameTitle(mockPrisma, mockMachine, "org-1");
 
       // ASSERTIONS: Verify global game title update
-      expect(mockPrisma.gameTitle.update).toHaveBeenCalledWith({
+      expect(updateGameTitleMock).toHaveBeenCalledWith({
         where: { opdbId: mockMachine.opdb_id },
         data: {
           name: mockMachine.name,
@@ -305,31 +256,31 @@ describe('PinballMapService', () => {
       });
     });
 
-    it('should create organization-specific game title for custom games', async () => {
+    it("should create organization-specific game title for custom games", async () => {
       // SETUP: Some machines on PinballMap don't have OPDB IDs (older or custom machines)
       // Our system needs to handle this as organization-specific games
       const machineWithoutOpdb = {
         ...mockMachine,
-        opdb_id: null,      // This machine has no OPDB ID
+        opdb_id: null, // This machine has no OPDB ID
       };
 
       // Mock that the upsert operation succeeds
-      mockPrisma.gameTitle.upsert.mockResolvedValue({
-        id: 'custom-game-title',
+      upsertGameTitleMock.mockResolvedValue({
+        id: "custom-game-title",
         name: machineWithoutOpdb.name,
         opdbId: null,
-        organizationId: 'org-1',
-      } as any);
+        organizationId: "org-1",
+      } as GameTitle);
 
       // TEST: Try to create a game title for a machine without OPDB ID
-      const result = await createOrUpdateGameTitle(mockPrisma, machineWithoutOpdb, 'org-1');
+      await createOrUpdateGameTitle(mockPrisma, machineWithoutOpdb, "org-1");
 
       // ASSERTIONS: Verify organization-specific game title creation
-      expect(mockPrisma.gameTitle.upsert).toHaveBeenCalledWith({
+      expect(upsertGameTitleMock).toHaveBeenCalledWith({
         where: {
           unique_custom_game_per_org: {
             name: machineWithoutOpdb.name,
-            organizationId: 'org-1',
+            organizationId: "org-1",
           },
         },
         update: {
@@ -338,251 +289,256 @@ describe('PinballMapService', () => {
         create: {
           name: machineWithoutOpdb.name,
           opdbId: null,
-          organizationId: 'org-1',
+          organizationId: "org-1",
         },
       });
     });
   });
 
-  describe('processFixtureData', () => {
-    it('should process fixture data correctly for seeding', async () => {
+  describe("processFixtureData", () => {
+    it("should process fixture data correctly for seeding", async () => {
       // SETUP: This test uses fixture data to seed the database with sample games
       // This is useful for development and testing environments
       const fixtureData = PinballMapAPIMocker.getFixtureData();
-      const mockRoomId = 'room-1';
+      const mockRoomId = "room-1";
 
       // Mock that both OPDB games and custom games can be created
       // For OPDB games (findUnique returns null, then create)
-      mockPrisma.gameTitle.findUnique.mockResolvedValue(null);
-      mockPrisma.gameTitle.create.mockImplementation(({ data }) =>
-        Promise.resolve({ id: `title-${data.name}`, ...data } as any)
+      findUniqueGameTitleMock.mockResolvedValue(null);
+      createGameTitleMock.mockImplementation(
+        ({ data }: { data: { name: string } }) =>
+          Promise.resolve({ id: `title-${data.name}`, ...data } as GameTitle),
       );
 
       // For custom games (upsert)
-      mockPrisma.gameTitle.upsert.mockImplementation(({ create }) =>
-        Promise.resolve({ id: `title-${create.name}`, ...create } as any)
+      upsertGameTitleMock.mockImplementation(
+        ({ create }: { create: { name: string } }) =>
+          Promise.resolve({
+            id: `title-${create.name}`,
+            ...create,
+          } as GameTitle),
       );
 
       // Mock that game instance creation succeeds for each machine
-      mockPrisma.gameInstance.create.mockImplementation(({ data }) =>
-        Promise.resolve({ id: `instance-${data.name}`, ...data } as any)
+      createGameInstanceMock.mockImplementation(
+        ({ data }: { data: { name: string } }) =>
+          Promise.resolve({
+            id: `instance-${data.name}`,
+            ...data,
+          } as GameInstance),
       );
 
       // TEST: Process the fixture data to create games
-      const result = await processFixtureData(mockPrisma, fixtureData, mockRoomId, 'org-1');
+      const result = await processFixtureData(
+        mockPrisma,
+        fixtureData,
+        mockRoomId,
+        "org-1",
+      );
 
       // ASSERTIONS: Verify all games were created
-      expect(result.created).toBe(fixtureData.machines.length);  // Should create all machines
-      expect(mockPrisma.gameInstance.create).toHaveBeenCalledTimes(fixtureData.machines.length);
+      expect(result.created).toBe(fixtureData.machines.length); // Should create all machines
+      expect(createGameInstanceMock).toHaveBeenCalledTimes(
+        fixtureData.machines.length,
+      );
     });
   });
 
-  describe('reconcileGameInstances', () => {
-    it('should identify games to add and remove correctly', async () => {
-      // SETUP: This test simulates the complex logic of figuring out which games to add/remove
-      // when syncing with PinballMap
+  describe("reconcileGameInstances", () => {
+    it("should identify games to add and remove correctly", async () => {
       const fixtureData = PinballMapAPIMocker.getFixtureData();
-      const remoteMachines = fixtureData.machines.slice(0, 3); // Use only first 3 machines from API
-
+      const remoteMachines = fixtureData.machines.slice(0, 3);
       // Mock existing games in our database - mix of games to keep and remove
       const existingGames = [
         {
-          id: 'keep-this',
-          gameTitle: { opdbId: remoteMachines[0].opdb_id }, // This one exists in remote - should KEEP
+          id: "keep-this",
+          name: "Keep Game",
+          gameTitleId: "game-title-keep",
+          roomId: "room-1",
+          ownerId: null,
         },
         {
-          id: 'remove-this',
-          gameTitle: { opdbId: 'OLD-GAME-NOT-IN-REMOTE' }, // This one doesn't exist in remote - should REMOVE
+          id: "remove-this",
+          name: "Remove Game",
+          gameTitleId: "game-title-remove",
+          roomId: "room-1",
+          ownerId: null,
         },
-      ];
-
-      // Mock database responses
-      mockPrisma.gameInstance.findMany.mockResolvedValue(existingGames as any);
-      mockPrisma.gameInstance.deleteMany.mockResolvedValue({ count: 1 } as any);
-
-      // Mock game title creation for new machines
-      mockPrisma.gameTitle.findUnique.mockResolvedValue(null);
-      mockPrisma.gameTitle.create.mockImplementation(({ data }) =>
-        Promise.resolve({ id: `title-${data.opdbId}`, ...data } as any)
+      ] as unknown as GameInstance[];
+      findManyGameInstanceMock.mockResolvedValue(existingGames);
+      deleteManyGameInstanceMock.mockResolvedValue({ count: 1 });
+      findUniqueGameTitleMock.mockResolvedValue(null);
+      createGameTitleMock.mockImplementation(
+        ({ data }: { data: { opdbId: string } }) =>
+          Promise.resolve({ id: `title-${data.opdbId}`, ...data } as GameTitle),
       );
-
-      // Mock game instance creation
-      mockPrisma.gameInstance.create.mockImplementation(({ data }) =>
-        Promise.resolve({ id: `instance-${data.name}`, ...data } as any)
+      createGameInstanceMock.mockImplementation(
+        ({ data }: { data: { name: string } }) =>
+          Promise.resolve({
+            id: `instance-${data.name}`,
+            ...data,
+          } as GameInstance),
       );
-
-      // TEST: Run the reconciliation logic
       const result = await reconcileGameInstances(
         mockPrisma,
-        'room-1',
-        'org-1',
-        remoteMachines
+        "room-1",
+        "org-1",
+        remoteMachines,
       );
-
-      // ASSERTIONS: Verify the reconciliation worked correctly
-      expect(result.removed).toBe(1);     // Should remove 1 game (the old one)
-      expect(result.added).toBe(2);       // Should add 2 new games (3 total from remote - 1 existing = 2 new)
-
-      // Verify that the correct game was marked for deletion
-      expect(mockPrisma.gameInstance.deleteMany).toHaveBeenCalledWith({
-        where: { id: { in: ['remove-this'] } },
+      expect(result.removed).toBe(1);
+      expect(result.added).toBe(2);
+      expect(deleteManyGameInstanceMock).toHaveBeenCalledWith({
+        where: { id: { in: ["remove-this"] } },
       });
     });
   });
 
-  describe('Multi-tenancy and Organization Isolation', () => {
-    it('should only sync games within the same organization', async () => {
+  describe("Multi-tenancy and Organization Isolation", () => {
+    it("should only sync games within the same organization", async () => {
       // SETUP: Create locations from different organizations
       const org1Location = {
-        id: 'location-org1',
-        name: 'Org 1 Location',
+        id: "location-org1",
+        name: "Org 1 Location",
         pinballMapId: 26454,
-        organizationId: 'org-1',
+        organizationId: "org-1",
       };
 
       const org1Room = {
-        id: 'room-org1',
-        name: 'Main Floor',
-        locationId: 'location-org1',
-        organizationId: 'org-1',
+        id: "room-org1",
+        name: "Main Floor",
+        locationId: "location-org1",
+        organizationId: "org-1",
       };
 
       // Mock existing games from a different organization
-      const org2Games = [
-        {
-          id: 'org2-game-instance',
-          name: 'Org 2 Game',
-          gameTitle: { 
-            id: 'org2-game-title',
-            opdbId: 'SOME-OPDB-ID',
-            organizationId: 'org-2'
-          },
-        },
-      ];
+      // (not needed for this test - we only care about the current org)
 
-      mockPrisma.location.findUnique.mockResolvedValue(org1Location as any);
-      mockPrisma.room.findFirst.mockResolvedValue(org1Room as any);
-      
+      findUniqueLocationMock.mockResolvedValue(org1Location as Location);
+      findFirstRoomMock.mockResolvedValue(org1Room as Room);
+
       // Mock that we only find games from the current organization's room
-      mockPrisma.gameInstance.findMany.mockResolvedValue([]); // No games in org-1's room
+      findManyGameInstanceMock.mockResolvedValue([] as GameInstance[]); // No games in org-1's room
 
       // Mock game title and instance creation
-      mockPrisma.gameTitle.findUnique.mockResolvedValue(null);
-      mockPrisma.gameTitle.create.mockImplementation(({ data }) => 
-        Promise.resolve({ id: 'new-title', ...data } as any)
+      findUniqueGameTitleMock.mockResolvedValue(null);
+      createGameTitleMock.mockImplementation(({ data }) =>
+        Promise.resolve({ id: "new-title", ...data } as GameTitle),
       );
-      mockPrisma.gameInstance.create.mockImplementation(({ data }) => 
-        Promise.resolve({ id: 'new-instance', ...data } as any)
+      createGameInstanceMock.mockImplementation(({ data }) =>
+        Promise.resolve({ id: "new-instance", ...data } as GameInstance),
       );
 
       // TEST: Sync games for org-1 location
-      const result = await syncLocationGames(mockPrisma, 'location-org1');
+      const result = await syncLocationGames(mockPrisma, "location-org1");
 
       // ASSERTIONS: Verify org isolation
       expect(result.success).toBe(true);
-      
+
       // Should only query games from the specific room (which is org-specific)
-      expect(mockPrisma.gameInstance.findMany).toHaveBeenCalledWith({
-        where: { roomId: 'room-org1' },
+      expect(findManyGameInstanceMock).toHaveBeenCalledWith({
+        where: { roomId: "room-org1" },
         include: { gameTitle: true },
       });
 
       // Should not affect games from other organizations
-      expect(mockPrisma.gameInstance.deleteMany).toHaveBeenCalledWith({
+      expect(deleteManyGameInstanceMock).toHaveBeenCalledWith({
         where: { id: { in: [] } }, // No cross-org games to delete
       });
     });
 
-    it('should prevent cross-organization data leakage', async () => {
+    it("should prevent cross-organization data leakage", async () => {
       // SETUP: Verify that the query structure prevents cross-org access
       const mockLocation = {
-        id: 'location-1',
-        organizationId: 'org-1',
+        id: "location-1",
+        organizationId: "org-1",
         pinballMapId: 26454,
-      };
+      } as Location;
 
       const mockRoom = {
-        id: 'room-1',
-        locationId: 'location-1',
-        organizationId: 'org-1',
-      };
+        id: "room-1",
+        locationId: "location-1",
+        organizationId: "org-1",
+      } as Room;
 
-      mockPrisma.location.findUnique.mockResolvedValue(mockLocation as any);
-      mockPrisma.room.findFirst.mockResolvedValue(mockRoom as any);
-      mockPrisma.gameInstance.findMany.mockResolvedValue([]);
+      findUniqueLocationMock.mockResolvedValue(mockLocation);
+      findFirstRoomMock.mockResolvedValue(mockRoom);
+      findManyGameInstanceMock.mockResolvedValue([] as GameInstance[]);
 
       // TEST: Run sync
-      await syncLocationGames(mockPrisma, 'location-1');
+      await syncLocationGames(mockPrisma, "location-1");
 
       // ASSERTIONS: Verify queries are scoped correctly
-      expect(mockPrisma.room.findFirst).toHaveBeenCalledWith({
+      expect(findFirstRoomMock).toHaveBeenCalledWith({
         where: {
           locationId: mockLocation.id,
-          name: 'Main Floor',
+          name: "Main Floor",
         },
       });
 
-      expect(mockPrisma.gameInstance.findMany).toHaveBeenCalledWith({
+      expect(findManyGameInstanceMock).toHaveBeenCalledWith({
         where: { roomId: mockRoom.id }, // Room inherently scopes to organization
         include: { gameTitle: true },
       });
     });
   });
 
-  describe('Error Handling and Edge Cases', () => {
+  describe("Error Handling and Edge Cases", () => {
     const mockLocation = {
-      id: 'location-1',
+      id: "location-1",
       pinballMapId: 26454,
-      organizationId: 'org-1',
-    };
+      organizationId: "org-1",
+    } as Location;
 
     const mockRoom = {
-      id: 'room-1',
-      name: 'Main Floor',
-      locationId: 'location-1',
-      organizationId: 'org-1',
-    };
+      id: "room-1",
+      name: "Main Floor",
+      locationId: "location-1",
+      organizationId: "org-1",
+    } as Room;
 
     beforeEach(() => {
-      mockPrisma.location.findUnique.mockResolvedValue(mockLocation as any);
-      mockPrisma.room.findFirst.mockResolvedValue(mockRoom as any);
+      findUniqueLocationMock.mockResolvedValue(mockLocation);
+      findFirstRoomMock.mockResolvedValue(mockRoom);
     });
 
-    it('should handle PinballMap API being down', async () => {
+    it("should handle PinballMap API being down", async () => {
       // SETUP: Mock fetch to simulate network failure
-      global.fetch = jest.fn().mockRejectedValue(new Error('Network error'));
+      global.fetch = jest.fn().mockRejectedValue(new Error("Network error"));
 
       // TEST: Try to sync when API is down
-      const result = await syncLocationGames(mockPrisma, 'location-1');
+      const result = await syncLocationGames(mockPrisma, "location-1");
 
       // ASSERTIONS: Should return friendly error message about API being down
       expect(result.success).toBe(false);
-      expect(result.error).toBe('PinballMap API is currently unavailable. Please try again later.');
+      expect(result.error).toBe(
+        "PinballMap API is currently unavailable. Please try again later.",
+      );
       expect(result.added).toBe(0);
       expect(result.removed).toBe(0);
     });
 
-    it('should handle malformed PinballMap data', async () => {
+    it("should handle malformed PinballMap data", async () => {
       // SETUP: Mock fetch to return malformed JSON
       global.fetch = jest.fn().mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({ invalid: 'data', missing_machines: true }),
-      } as any);
+        json: () =>
+          Promise.resolve({ invalid: "data", missing_machines: true }),
+      } as Response);
 
       // TEST: Try to sync with malformed data
-      const result = await syncLocationGames(mockPrisma, 'location-1');
+      const result = await syncLocationGames(mockPrisma, "location-1");
 
       // ASSERTIONS: Should handle gracefully
       expect(result.success).toBe(false);
       expect(result.error).toBeDefined();
     });
 
-    it('should handle duplicate machine names correctly', async () => {
+    it("should handle duplicate machine names correctly", async () => {
       // SETUP: Test how we handle machines with the same name but different IDs
       // This tests the assumption that duplicate names = same machine type
       const duplicateMachines = [
-        { id: 1, name: 'Medieval Madness', opdb_id: 'MM-OPDB-1' },
-        { id: 2, name: 'Medieval Madness', opdb_id: 'MM-OPDB-2' }, // Different OPDB ID
+        { id: 1, name: "Medieval Madness", opdb_id: "MM-OPDB-1" },
+        { id: 2, name: "Medieval Madness", opdb_id: "MM-OPDB-2" }, // Different OPDB ID
       ];
 
       // Mock the API to return duplicate names
@@ -590,85 +546,91 @@ describe('PinballMapService', () => {
       global.fetch = jest.fn().mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ machines: duplicateMachines }),
-      } as any);
+      } as Response);
 
-      mockPrisma.gameInstance.findMany.mockResolvedValue([]);
-      mockPrisma.gameTitle.findUnique.mockResolvedValue(null);
-      mockPrisma.gameTitle.create.mockImplementation(({ data }) => 
-        Promise.resolve({ id: `title-${data.opdbId}`, ...data } as any)
+      findManyGameInstanceMock.mockResolvedValue([] as GameInstance[]);
+      findUniqueGameTitleMock.mockResolvedValue(null);
+      createGameTitleMock.mockImplementation(
+        ({ data }: { data: { opdbId: string } }) =>
+          Promise.resolve({ id: `title-${data.opdbId}`, ...data } as GameTitle),
       );
-      mockPrisma.gameInstance.create.mockImplementation(({ data }) => 
-        Promise.resolve({ id: `instance-${data.name}`, ...data } as any)
+      createGameInstanceMock.mockImplementation(
+        ({ data }: { data: { name: string } }) =>
+          Promise.resolve({
+            id: `instance-${data.name}`,
+            ...data,
+          } as GameInstance),
       );
 
       // TEST: Sync with duplicate machine names
-      const result = await syncLocationGames(mockPrisma, 'location-1');
+      const result = await syncLocationGames(mockPrisma, "location-1");
 
       // ASSERTIONS: Should create separate GameInstances for each machine
       expect(result.success).toBe(true);
       expect(result.added).toBe(2); // Both machines should be added
-      expect(mockPrisma.gameTitle.create).toHaveBeenCalledTimes(2); // Separate titles
-      expect(mockPrisma.gameInstance.create).toHaveBeenCalledTimes(2); // Separate instances
+      expect(createGameTitleMock).toHaveBeenCalledTimes(2); // Separate titles
+      expect(createGameInstanceMock).toHaveBeenCalledTimes(2); // Separate instances
     });
 
-    it('should handle machines without OPDB IDs', async () => {
+    it("should handle machines without OPDB IDs", async () => {
       // SETUP: Some older machines might not have OPDB IDs
       const machinesWithoutOpdb = [
-        { id: 1, name: 'Custom Machine 1', opdb_id: null },
-        { id: 2, name: 'Custom Machine 2', opdb_id: null },
+        { id: 1, name: "Custom Machine 1", opdb_id: null },
+        { id: 2, name: "Custom Machine 2", opdb_id: null },
       ];
 
       apiMocker.stop();
       global.fetch = jest.fn().mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ machines: machinesWithoutOpdb }),
-      } as any);
+      } as Response);
 
-      mockPrisma.gameInstance.findMany.mockResolvedValue([]);
-      
-      // Mock for custom games (no OPDB ID) - use upsert
-      mockPrisma.gameTitle.upsert.mockImplementation(({ create }) => 
-        Promise.resolve({ id: 'custom-title', ...create } as any)
+      // All required fields for GameInstance
+      const emptyGameInstances: GameInstance[] = [];
+      (mockPrisma.gameInstance.findMany as jest.Mock).mockResolvedValue(
+        emptyGameInstances,
       );
-      
-      mockPrisma.gameInstance.create.mockImplementation(({ data }) => 
-        Promise.resolve({ id: 'custom-instance', ...data } as any)
+      (mockPrisma.gameTitle.upsert as jest.Mock).mockImplementation(
+        ({ create }: { create: { name: string } }) =>
+          Promise.resolve({ id: "custom-title", ...create } as GameTitle),
+      );
+      (mockPrisma.gameInstance.create as jest.Mock).mockImplementation(
+        ({ data }: { data: { name: string } }) =>
+          Promise.resolve({ id: "custom-instance", ...data } as GameInstance),
       );
 
       // TEST: Sync machines without OPDB IDs
-      const result = await syncLocationGames(mockPrisma, 'location-1');
+      const result = await syncLocationGames(mockPrisma, "location-1");
 
       // ASSERTIONS: Should handle custom machines correctly
       expect(result.success).toBe(true);
       expect(result.added).toBe(2);
-      
-      // Should use organization-specific game titles for custom machines
-      expect(mockPrisma.gameTitle.upsert).toHaveBeenCalledTimes(2);
+      expect(upsertGameTitleMock).toHaveBeenCalledTimes(2);
     });
   });
 
-  describe('Global vs Organization-Specific Game Titles', () => {
-    it('should create global game titles for OPDB games', async () => {
+  describe("Global vs Organization-Specific Game Titles", () => {
+    it("should create global game titles for OPDB games", async () => {
       const opdbMachine = {
         id: 123,
-        name: 'Medieval Madness',
-        opdb_id: 'MM-OPDB-123',
+        name: "Medieval Madness",
+        opdb_id: "MM-OPDB-123",
       };
 
       // Mock that the game title doesn't exist yet
-      mockPrisma.gameTitle.findUnique.mockResolvedValue(null);
-      mockPrisma.gameTitle.create.mockResolvedValue({
-        id: 'global-title',
+      findUniqueGameTitleMock.mockResolvedValue(null);
+      createGameTitleMock.mockResolvedValue({
+        id: "global-title",
         name: opdbMachine.name,
         opdbId: opdbMachine.opdb_id,
         organizationId: null, // Global
-      } as any);
+      } as GameTitle);
 
       // TEST: Create game title for OPDB game
-      const result = await createOrUpdateGameTitle(mockPrisma, opdbMachine, 'org-1');
+      await createOrUpdateGameTitle(mockPrisma, opdbMachine, "org-1");
 
       // ASSERTIONS: Should create global game title
-      expect(mockPrisma.gameTitle.create).toHaveBeenCalledWith({
+      expect(createGameTitleMock).toHaveBeenCalledWith({
         data: {
           name: opdbMachine.name,
           opdbId: opdbMachine.opdb_id,
@@ -677,29 +639,29 @@ describe('PinballMapService', () => {
       });
     });
 
-    it('should create organization-specific game titles for custom games', async () => {
+    it("should create organization-specific game titles for custom games", async () => {
       const customMachine = {
         id: 456,
-        name: 'Custom House Game',
+        name: "Custom House Game",
         opdb_id: null,
       };
 
-      mockPrisma.gameTitle.upsert.mockResolvedValue({
-        id: 'org-specific-title',
+      upsertGameTitleMock.mockResolvedValue({
+        id: "org-specific-title",
         name: customMachine.name,
         opdbId: null,
-        organizationId: 'org-1',
-      } as any);
+        organizationId: "org-1",
+      } as GameTitle);
 
       // TEST: Create game title for custom game
-      const result = await createOrUpdateGameTitle(mockPrisma, customMachine, 'org-1');
+      await createOrUpdateGameTitle(mockPrisma, customMachine, "org-1");
 
       // ASSERTIONS: Should create org-specific game title
-      expect(mockPrisma.gameTitle.upsert).toHaveBeenCalledWith({
+      expect(upsertGameTitleMock).toHaveBeenCalledWith({
         where: {
           unique_custom_game_per_org: {
             name: customMachine.name,
-            organizationId: 'org-1',
+            organizationId: "org-1",
           },
         },
         update: {
@@ -708,7 +670,7 @@ describe('PinballMapService', () => {
         create: {
           name: customMachine.name,
           opdbId: null,
-          organizationId: 'org-1',
+          organizationId: "org-1",
         },
       });
     });

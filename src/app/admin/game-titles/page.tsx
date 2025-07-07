@@ -75,7 +75,10 @@ export default function GameTitlesAdminPage() {
     setSelectedOPDBGame({ opdbId, gameData });
   };
 
-  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, gameId: string) => {
+  const handleMenuOpen = (
+    event: React.MouseEvent<HTMLElement>,
+    gameId: string,
+  ) => {
     setMenuAnchor(event.currentTarget);
     setSelectedGameId(gameId);
   };
@@ -119,7 +122,10 @@ export default function GameTitlesAdminPage() {
   }
 
   const gameTitleCount = gameTitles?.length ?? 0;
-  const opdbGameCount = gameTitles?.filter(game => game.opdbId && !game.opdbId.startsWith('custom-')).length ?? 0;
+  const opdbGameCount =
+    gameTitles?.filter(
+      (game) => game.opdbId && !game.opdbId.startsWith("custom-"),
+    ).length ?? 0;
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
@@ -136,7 +142,14 @@ export default function GameTitlesAdminPage() {
         <Grid size={12}>
           <Card elevation={2}>
             <CardContent>
-              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  mb: 2,
+                }}
+              >
                 <Typography variant="h5" component="h2">
                   Add Game from OPDB
                 </Typography>
@@ -155,7 +168,8 @@ export default function GameTitlesAdminPage() {
               </Box>
 
               <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                Search the Open Pinball Database to add new games to your collection.
+                Search the Open Pinball Database to add new games to your
+                collection.
               </Typography>
 
               <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -215,7 +229,8 @@ export default function GameTitlesAdminPage() {
                 Game Collection ({gameTitleCount})
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                {opdbGameCount} from OPDB • {gameTitleCount - opdbGameCount} custom
+                {opdbGameCount} from OPDB • {gameTitleCount - opdbGameCount}{" "}
+                custom
               </Typography>
               <Divider sx={{ mb: 2 }} />
 
@@ -244,27 +259,43 @@ export default function GameTitlesAdminPage() {
                       <ListItemAvatar>
                         <Avatar
                           src={game.imageUrl ?? undefined}
-                          sx={{ bgcolor: "primary.main", width: 56, height: 56 }}
+                          sx={{
+                            bgcolor: "primary.main",
+                            width: 56,
+                            height: 56,
+                          }}
                         >
                           {!game.imageUrl && <Games />}
                         </Avatar>
                       </ListItemAvatar>
                       <ListItemText
                         primary={
-                          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1,
+                            }}
+                          >
                             <Typography variant="h6" component="span">
                               {game.name}
                             </Typography>
-                            {game.opdbId?.startsWith('custom-') ? (
-                              <Chip label="Custom" size="small" color="secondary" />
+                            {game.opdbId?.startsWith("custom-") ? (
+                              <Chip
+                                label="Custom"
+                                size="small"
+                                color="secondary"
+                              />
                             ) : (
                               <Chip
                                 label="OPDB"
                                 size="small"
                                 color="primary"
                                 sx={{
-                                  bgcolor: isDataStale(game.lastSynced) ? 'warning.main' : 'primary.main',
-                                  color: 'white'
+                                  bgcolor: isDataStale(game.lastSynced)
+                                    ? "warning.main"
+                                    : "primary.main",
+                                  color: "white",
                                 }}
                               />
                             )}
@@ -273,15 +304,36 @@ export default function GameTitlesAdminPage() {
                         secondary={
                           <Box sx={{ mt: 1 }}>
                             {game.manufacturer && (
-                              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 0.5 }}>
-                                <Business sx={{ fontSize: 16, color: "text.secondary" }} />
-                                <Typography variant="body2" color="text.secondary">
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 0.5,
+                                  mb: 0.5,
+                                }}
+                              >
+                                <Business
+                                  sx={{ fontSize: 16, color: "text.secondary" }}
+                                />
+                                <Typography
+                                  variant="body2"
+                                  color="text.secondary"
+                                >
                                   {game.manufacturer}
                                 </Typography>
                                 {game.releaseDate && (
                                   <>
-                                    <CalendarToday sx={{ fontSize: 16, color: "text.secondary", ml: 1 }} />
-                                    <Typography variant="body2" color="text.secondary">
+                                    <CalendarToday
+                                      sx={{
+                                        fontSize: 16,
+                                        color: "text.secondary",
+                                        ml: 1,
+                                      }}
+                                    />
+                                    <Typography
+                                      variant="body2"
+                                      color="text.secondary"
+                                    >
                                       {game.releaseDate.getFullYear()}
                                     </Typography>
                                   </>
@@ -302,13 +354,30 @@ export default function GameTitlesAdminPage() {
                                 {game.description}
                               </Typography>
                             )}
-                            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}>
-                              <Typography variant="caption" color="text.secondary">
-                                {game._count.gameInstances} instance{game._count.gameInstances !== 1 ? 's' : ''}
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                                mt: 1,
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                              >
+                                {game._count.gameInstances} instance
+                                {game._count.gameInstances !== 1 ? "s" : ""}
                               </Typography>
                               {game.lastSynced && (
-                                <Typography variant="caption" color="text.secondary">
-                                  • Synced {new Date(game.lastSynced).toLocaleDateString()}
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
+                                >
+                                  • Synced{" "}
+                                  {new Date(
+                                    game.lastSynced,
+                                  ).toLocaleDateString()}
                                 </Typography>
                               )}
                             </Box>

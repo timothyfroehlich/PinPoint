@@ -111,7 +111,7 @@ export function AuthButton() {
   }
 
   return (
-    <Button component={Link} href="/login" color="inherit">
+    <Button component={Link} href="/api/auth/signin" color="inherit">
       Sign In
     </Button>
   );

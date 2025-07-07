@@ -10,7 +10,6 @@
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
-import { cookies } from "next/headers";
 
 import { auth } from "~/server/auth";
 import { db } from "~/server/db";
@@ -28,34 +27,7 @@ import { db } from "~/server/db";
  * @see https://trpc.io/docs/server/context
  */
 export const createTRPCContext = async (opts: { headers: Headers }) => {
-  let session = await auth();
-
-  // In development, check for impersonation when no real session exists
-  if (!session && process.env.NODE_ENV === "development") {
-    const cookieStore = await cookies();
-    const impersonatedUserId = cookieStore.get(
-      "next-auth.session-token.impersonated",
-    )?.value;
-
-    if (impersonatedUserId) {
-      const impersonatedUser = await db.user.findUnique({
-        where: { id: impersonatedUserId },
-      });
-
-      if (impersonatedUser) {
-        // Create a fake session object for development
-        session = {
-          user: {
-            id: impersonatedUser.id,
-            name: impersonatedUser.name,
-            email: impersonatedUser.email,
-            image: impersonatedUser.image,
-          },
-          expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours from now
-        };
-      }
-    }
-  }
+  const session = await auth();
 
   // For now, we'll hardcode the organization. In the future, this will be
   // derived from the subdomain of the request.
@@ -210,7 +182,7 @@ export const adminProcedure = organizationProcedure.use(
     if (ctx.membership.role !== "admin") {
       throw new TRPCError({
         code: "FORBIDDEN",
-        message: "Admin access required"
+        message: "Admin access required",
       });
     }
 

@@ -446,7 +446,9 @@ export const issueRouter = createTRPCRouter({
       // For now, allow organization members to delete attachments
 
       // Delete the file from storage
-      const { imageStorage } = await import("~/lib/image-storage/local-storage");
+      const { imageStorage } = await import(
+        "~/lib/image-storage/local-storage"
+      );
       await imageStorage.deleteImage(attachment.url);
 
       // Delete the attachment record

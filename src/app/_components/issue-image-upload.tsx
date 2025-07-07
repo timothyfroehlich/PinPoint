@@ -74,14 +74,14 @@ export function IssueImageUpload({
 
     for (const file of filesToProcess) {
       const fileId = `${Date.now()}-${Math.random()}`; // Temporary ID for tracking
-      setUploadingFiles(prev => new Set(prev).add(fileId));
+      setUploadingFiles((prev) => new Set(prev).add(fileId));
 
       try {
         // Process image with higher quality constraints for issues
         const result = await processIssueImageFile(file);
         if (!result.success) {
           setUploadError(result.error!);
-          setUploadingFiles(prev => {
+          setUploadingFiles((prev) => {
             const newSet = new Set(prev);
             newSet.delete(fileId);
             return newSet;
@@ -103,7 +103,7 @@ export function IssueImageUpload({
           const newAttachments = [...attachments, newAttachment];
           onAttachmentsChange?.(newAttachments);
 
-          setUploadingFiles(prev => {
+          setUploadingFiles((prev) => {
             const newSet = new Set(prev);
             newSet.delete(fileId);
             return newSet;
@@ -112,7 +112,7 @@ export function IssueImageUpload({
       } catch (error) {
         console.error("Error processing image:", error);
         setUploadError("Failed to process image");
-        setUploadingFiles(prev => {
+        setUploadingFiles((prev) => {
           const newSet = new Set(prev);
           newSet.delete(fileId);
           return newSet;
@@ -121,7 +121,11 @@ export function IssueImageUpload({
     }
   };
 
-  const uploadToServer = async (file: File, targetIssueId: string, fileId: string) => {
+  const uploadToServer = async (
+    file: File,
+    targetIssueId: string,
+    fileId: string,
+  ) => {
     try {
       const formData = new FormData();
       formData.append("file", file);
@@ -137,7 +141,12 @@ export function IssueImageUpload({
         let errorMessage = "Upload failed";
 
         // Type guard for error response
-        if (errorData && typeof errorData === 'object' && 'error' in errorData && typeof (errorData as UploadErrorResponse).error === 'string') {
+        if (
+          errorData &&
+          typeof errorData === "object" &&
+          "error" in errorData &&
+          typeof (errorData as UploadErrorResponse).error === "string"
+        ) {
           errorMessage = (errorData as UploadErrorResponse).error;
         }
 
@@ -147,7 +156,7 @@ export function IssueImageUpload({
       const result: unknown = await response.json();
 
       // Type guard for success response
-      if (!result || typeof result !== 'object' || !('attachment' in result)) {
+      if (!result || typeof result !== "object" || !("attachment" in result)) {
         throw new Error("Invalid response format");
       }
 
@@ -158,7 +167,7 @@ export function IssueImageUpload({
       };
 
       onUploadSuccess?.(newAttachment);
-      setUploadingFiles(prev => {
+      setUploadingFiles((prev) => {
         const newSet = new Set(prev);
         newSet.delete(fileId);
         return newSet;
@@ -166,7 +175,7 @@ export function IssueImageUpload({
     } catch (error) {
       console.error("Upload error:", error);
       setUploadError(error instanceof Error ? error.message : "Upload failed");
-      setUploadingFiles(prev => {
+      setUploadingFiles((prev) => {
         const newSet = new Set(prev);
         newSet.delete(fileId);
         return newSet;
@@ -203,8 +212,8 @@ export function IssueImageUpload({
 
     if (disabled) return;
 
-    const files = Array.from(e.dataTransfer.files).filter(file =>
-      file.type.startsWith("image/")
+    const files = Array.from(e.dataTransfer.files).filter((file) =>
+      file.type.startsWith("image/"),
     );
 
     if (files.length > 0) {
@@ -247,7 +256,7 @@ export function IssueImageUpload({
   // Clean up object URLs when component unmounts
   React.useEffect(() => {
     return () => {
-      attachments.forEach(attachment => {
+      attachments.forEach((attachment) => {
         if (attachment.url.startsWith("blob:")) {
           URL.revokeObjectURL(attachment.url);
         }
@@ -387,8 +396,13 @@ export function IssueImageUpload({
 
       {/* Compact Alert (when at capacity) */}
       {!canAddMore && !disabled && (
-        <Typography variant="caption" color="text.secondary" sx={{ fontStyle: "italic" }}>
-          Maximum of {maxAttachments} images reached. Delete an image to add more.
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ fontStyle: "italic" }}
+        >
+          Maximum of {maxAttachments} images reached. Delete an image to add
+          more.
         </Typography>
       )}
 
