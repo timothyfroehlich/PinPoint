@@ -2,13 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { signIn } from "next-auth/react";
-import { type User } from "@prisma/client";
+import { type User, type Role } from "@prisma/client";
 import { useCurrentUser } from "~/lib/hooks/use-current-user";
-import { Box, Button, Typography, Paper } from "@mui/material";
+import { Box, Button, Typography, Paper, Chip } from "@mui/material";
+
+type UserWithRole = User & { role: Role | null };
 
 export function DevLogin() {
   const { user, isAuthenticated } = useCurrentUser();
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<UserWithRole[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -23,7 +25,7 @@ export function DevLogin() {
           );
           return;
         }
-        const { users } = (await res.json()) as { users: User[] };
+        const { users } = (await res.json()) as { users: UserWithRole[] };
         setUsers(users);
       } catch (error) {
         console.error("Error fetching dev users:", error);
@@ -45,6 +47,28 @@ export function DevLogin() {
       console.error("Login failed:", error);
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  function getRoleColor(
+    role: Role | null,
+  ):
+    | "default"
+    | "primary"
+    | "secondary"
+    | "error"
+    | "info"
+    | "success"
+    | "warning" {
+    switch (role) {
+      case "admin":
+        return "error";
+      case "member":
+        return "primary";
+      case "player":
+        return "success";
+      default:
+        return "default";
     }
   }
 
@@ -97,20 +121,33 @@ export function DevLogin() {
 
       <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
         {users.map((testUser) => (
-          <Button
+          <Box
             key={testUser.id}
-            variant="contained"
-            size="small"
-            disabled={isLoading}
-            onClick={() => void handleLogin(testUser.email ?? "")}
-            sx={{
-              justifyContent: "flex-start",
-              textTransform: "none",
-              fontSize: "0.75rem",
-            }}
+            sx={{ display: "flex", alignItems: "center", gap: 1 }}
           >
-            {testUser.name}
-          </Button>
+            <Button
+              variant="contained"
+              size="small"
+              disabled={isLoading}
+              onClick={() => void handleLogin(testUser.email ?? "")}
+              sx={{
+                justifyContent: "flex-start",
+                textTransform: "none",
+                fontSize: "0.75rem",
+                flex: 1,
+              }}
+            >
+              {testUser.name}
+            </Button>
+            {testUser.role && (
+              <Chip
+                label={testUser.role.toUpperCase()}
+                size="small"
+                color={getRoleColor(testUser.role)}
+                sx={{ fontSize: "0.6rem", height: "20px" }}
+              />
+            )}
+          </Box>
         ))}
 
         {users.length === 0 && (

@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { createTRPCRouter, organizationProcedure } from "~/server/api/trpc";
+import {
+  createTRPCRouter,
+  organizationProcedure,
+  publicProcedure,
+} from "~/server/api/trpc";
 
 export const gameInstanceRouter = createTRPCRouter({
   create: organizationProcedure
@@ -92,6 +96,33 @@ export const gameInstanceRouter = createTRPCRouter({
             id: true,
             name: true,
             profilePicture: true,
+          },
+        },
+      },
+      orderBy: { name: "asc" },
+    });
+  }),
+
+  // Public endpoint for issue reporting - returns minimal data needed for issue form
+  getAllForIssues: publicProcedure.query(async ({ ctx }) => {
+    // Get the hardcoded organization (for MVP)
+    const organization = await ctx.db.organization.findFirst();
+    if (!organization) {
+      throw new Error("No organization found");
+    }
+
+    return ctx.db.gameInstance.findMany({
+      where: {
+        room: {
+          organizationId: organization.id,
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        gameTitle: {
+          select: {
+            name: true,
           },
         },
       },
