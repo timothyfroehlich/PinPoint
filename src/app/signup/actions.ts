@@ -3,7 +3,10 @@
 import { redirect } from "next/navigation";
 import { db } from "~/server/db";
 
-export async function signup(prevState: string | undefined, formData: FormData) {
+export async function signup(
+  prevState: string | undefined,
+  formData: FormData,
+) {
   const name = formData.get("name") as string;
   const email = formData.get("email") as string;
 

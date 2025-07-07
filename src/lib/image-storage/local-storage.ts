@@ -19,7 +19,10 @@ export class LocalImageStorage implements ImageStorageProvider {
     }
   }
 
-  async validateImage(file: File, constraints = IMAGE_CONSTRAINTS): Promise<boolean> {
+  async validateImage(
+    file: File,
+    constraints = IMAGE_CONSTRAINTS,
+  ): Promise<boolean> {
     // Check file size
     if (file.size > constraints.maxSizeBytes) {
       return false;
@@ -37,7 +40,11 @@ export class LocalImageStorage implements ImageStorageProvider {
     return true;
   }
 
-  async uploadImage(file: File, relativePath: string, constraints = IMAGE_CONSTRAINTS): Promise<string> {
+  async uploadImage(
+    file: File,
+    relativePath: string,
+    constraints = IMAGE_CONSTRAINTS,
+  ): Promise<string> {
     await this.ensureDirectoryExists();
 
     if (!(await this.validateImage(file, constraints))) {

@@ -36,11 +36,13 @@ export function OPDBGameSearch({
   helperText,
 }: OPDBGameSearchProps) {
   const [inputValue, setInputValue] = useState("");
-  const [selectedGame, setSelectedGame] = useState<OPDBSearchResult | null>(null);
-  
+  const [selectedGame, setSelectedGame] = useState<OPDBSearchResult | null>(
+    null,
+  );
+
   // Debounce search input to avoid excessive API calls
   const debouncedQuery = useDebounce(inputValue, 300);
-  
+
   // OPDB search query
   const {
     data: searchResults = [],
@@ -51,7 +53,7 @@ export function OPDBGameSearch({
     {
       enabled: debouncedQuery.length >= 2, // Only search with 2+ characters
       staleTime: 5 * 60 * 1000, // Cache results for 5 minutes
-    }
+    },
   );
 
   const handleGameSelection = useCallback(
@@ -61,7 +63,7 @@ export function OPDBGameSearch({
         onGameSelect(game.id, game);
       }
     },
-    [onGameSelect]
+    [onGameSelect],
   );
 
   const handleInputChange = useCallback(
@@ -72,13 +74,13 @@ export function OPDBGameSearch({
         setSelectedGame(null);
       }
     },
-    [selectedGame]
+    [selectedGame],
   );
 
   // Format game display text with manufacturer and year if available
   const formatGameText = (game: OPDBSearchResult): string => {
     const text = game.text;
-    
+
     // Extract additional info from OPDB search result
     // OPDB search results often include manufacturer/year in the text
     return text;
@@ -102,8 +104,8 @@ export function OPDBGameSearch({
           debouncedQuery.length < 2
             ? "Type at least 2 characters to search..."
             : isSearching
-            ? "Searching..."
-            : "No games found"
+              ? "Searching..."
+              : "No games found"
         }
         renderInput={(params) => (
           <TextField
@@ -121,7 +123,9 @@ export function OPDBGameSearch({
               ),
               endAdornment: (
                 <>
-                  {isSearching && <CircularProgress color="inherit" size={20} />}
+                  {isSearching && (
+                    <CircularProgress color="inherit" size={20} />
+                  )}
                   {params.InputProps.endAdornment}
                 </>
               ),
@@ -130,7 +134,14 @@ export function OPDBGameSearch({
         )}
         renderOption={(props, option) => (
           <Box component="li" {...props}>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 2, width: "100%" }}>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 2,
+                width: "100%",
+              }}
+            >
               <Avatar sx={{ bgcolor: "primary.main", width: 40, height: 40 }}>
                 <Games />
               </Avatar>
@@ -151,13 +162,13 @@ export function OPDBGameSearch({
           },
         }}
       />
-      
+
       {searchError && (
         <Alert severity="error" sx={{ mt: 1 }}>
           Search failed: {searchError.message}
         </Alert>
       )}
-      
+
       {selectedGame && (
         <Box sx={{ mt: 2 }}>
           <Chip

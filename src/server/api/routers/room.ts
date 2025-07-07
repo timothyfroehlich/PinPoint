@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { createTRPCRouter, organizationProcedure, adminProcedure } from "~/server/api/trpc";
+import {
+  createTRPCRouter,
+  organizationProcedure,
+  adminProcedure,
+} from "~/server/api/trpc";
 
 export const roomRouter = createTRPCRouter({
   // Get all rooms for an organization
@@ -21,10 +25,7 @@ export const roomRouter = createTRPCRouter({
           },
         },
       },
-      orderBy: [
-        { location: { name: "asc" } },
-        { name: "asc" },
-      ],
+      orderBy: [{ location: { name: "asc" } }, { name: "asc" }],
     });
   }),
 

@@ -43,7 +43,10 @@ import Link from "next/link";
 import { UserAvatar } from "~/app/_components/user-avatar";
 import { useCurrentUser } from "~/lib/hooks/use-current-user";
 import { api } from "~/trpc/react";
-import { IssueImageUpload, type IssueAttachment } from "~/app/_components/issue-image-upload";
+import {
+  IssueImageUpload,
+  type IssueAttachment,
+} from "~/app/_components/issue-image-upload";
 
 interface LocationProfilePageProps {
   params: Promise<{
@@ -79,7 +82,9 @@ export default function LocationProfilePage({
     description: "",
     reporterEmail: "",
   });
-  const [issueAttachments, setIssueAttachments] = useState<IssueAttachment[]>([]);
+  const [issueAttachments, setIssueAttachments] = useState<IssueAttachment[]>(
+    [],
+  );
   const [pinballMapDialogOpen, setPinballMapDialogOpen] = useState(false);
   const [pinballMapId, setPinballMapId] = useState<number | null>(null);
 
@@ -157,13 +162,16 @@ export default function LocationProfilePage({
     },
   });
 
-  const syncWithPinballMapMutation = api.location.syncWithPinballMap.useMutation({
-    onSuccess: (result) => {
-      // Show success message with sync results
-      console.log(`Sync completed: ${result.added} added, ${result.removed} removed`);
-      void refetch();
-    },
-  });
+  const syncWithPinballMapMutation =
+    api.location.syncWithPinballMap.useMutation({
+      onSuccess: (result) => {
+        // Show success message with sync results
+        console.log(
+          `Sync completed: ${result.added} added, ${result.removed} removed`,
+        );
+        void refetch();
+      },
+    });
 
   // Get user profile with membership information - MOVED BEFORE EARLY RETURNS
   const { data: userProfile } = api.user.getProfile.useQuery(undefined, {
@@ -192,10 +200,13 @@ export default function LocationProfilePage({
   }
 
   // NEW: Flatten all game instances from all rooms
-  const allGameInstances = location.rooms.flatMap(room => room.gameInstances);
+  const allGameInstances = location.rooms.flatMap((room) => room.gameInstances);
 
-    // Check if user is admin
-  const isAdmin = userProfile?.memberships?.some(membership => membership.role === 'admin') ?? false;
+  // Check if user is admin
+  const isAdmin =
+    userProfile?.memberships?.some(
+      (membership) => membership.role === "admin",
+    ) ?? false;
 
   const handleEditLocation = () => {
     setEditForm({
@@ -345,7 +356,9 @@ export default function LocationProfilePage({
                         disabled={setPinballMapIdMutation.isPending}
                         size="small"
                       >
-                        {location.pinballMapId ? "Update PinballMap ID" : "Set PinballMap ID"}
+                        {location.pinballMapId
+                          ? "Update PinballMap ID"
+                          : "Set PinballMap ID"}
                       </Button>
                       {location.pinballMapId && (
                         <Button
@@ -355,7 +368,9 @@ export default function LocationProfilePage({
                           disabled={syncWithPinballMapMutation.isPending}
                           size="small"
                         >
-                          {syncWithPinballMapMutation.isPending ? "Syncing..." : "Sync with PinballMap"}
+                          {syncWithPinballMapMutation.isPending
+                            ? "Syncing..."
+                            : "Sync with PinballMap"}
                         </Button>
                       )}
                     </>
@@ -592,7 +607,11 @@ export default function LocationProfilePage({
                     <Typography variant="subtitle1" gutterBottom>
                       Add Photos (Optional)
                     </Typography>
-                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      gutterBottom
+                    >
                       Upload up to 3 photos to help illustrate the issue
                     </Typography>
                     <IssueImageUpload
@@ -775,7 +794,12 @@ export default function LocationProfilePage({
               >
                 {otherLocations.map((loc) => (
                   <MenuItem key={loc.id} value={loc.id}>
-                    {loc.name} ({(loc.rooms?.reduce((sum, room) => sum + (room._count?.gameInstances ?? 0), 0) ?? 0)} games)
+                    {loc.name} (
+                    {loc.rooms?.reduce(
+                      (sum, room) => sum + (room._count?.gameInstances ?? 0),
+                      0,
+                    ) ?? 0}{" "}
+                    games)
                   </MenuItem>
                 ))}
               </Select>
@@ -807,15 +831,17 @@ export default function LocationProfilePage({
         <DialogContent>
           <Box sx={{ pt: 1 }}>
             <Alert severity="info" sx={{ mb: 2 }}>
-              Enter the PinballMap.com location ID to enable syncing with their database.
-              You can find this ID in the URL when viewing your location on PinballMap.com
-              (e.g., pinballmap.com/locations/26454).
+              Enter the PinballMap.com location ID to enable syncing with their
+              database. You can find this ID in the URL when viewing your
+              location on PinballMap.com (e.g., pinballmap.com/locations/26454).
             </Alert>
             <TextField
               label="PinballMap Location ID"
               type="number"
               value={pinballMapId ?? ""}
-              onChange={(e) => setPinballMapId(parseInt(e.target.value) || null)}
+              onChange={(e) =>
+                setPinballMapId(parseInt(e.target.value) || null)
+              }
               fullWidth
               placeholder="e.g., 26454"
               helperText={`Current ID: ${location.pinballMapId ?? "Not set"}`}
@@ -827,7 +853,11 @@ export default function LocationProfilePage({
           <Button
             onClick={handlePinballMapSave}
             variant="contained"
-            disabled={setPinballMapIdMutation.isPending || !pinballMapId || pinballMapId <= 0}
+            disabled={
+              setPinballMapIdMutation.isPending ||
+              !pinballMapId ||
+              pinballMapId <= 0
+            }
           >
             {setPinballMapIdMutation.isPending ? "Saving..." : "Save ID"}
           </Button>

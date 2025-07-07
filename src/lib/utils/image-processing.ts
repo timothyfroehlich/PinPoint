@@ -1,4 +1,7 @@
-import { IMAGE_CONSTRAINTS, ISSUE_ATTACHMENT_CONSTRAINTS } from "../image-storage";
+import {
+  IMAGE_CONSTRAINTS,
+  ISSUE_ATTACHMENT_CONSTRAINTS,
+} from "../image-storage";
 
 export interface ImageProcessingResult {
   success: boolean;

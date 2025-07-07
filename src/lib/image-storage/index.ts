@@ -8,7 +8,11 @@ export interface ImageConstraints {
 }
 
 export interface ImageStorageProvider {
-  uploadImage(file: File, path: string, constraints?: ImageConstraints): Promise<string>;
+  uploadImage(
+    file: File,
+    path: string,
+    constraints?: ImageConstraints,
+  ): Promise<string>;
   deleteImage(path: string): Promise<void>;
   getImageUrl(path: string): string;
   validateImage(file: File, constraints?: ImageConstraints): Promise<boolean>;
