@@ -26,27 +26,33 @@ async function main() {
   const testUsers = [
     {
       name: "Roger Sharpe",
-      email: "roger.sharpe@example.com",
+      email: "roger.sharpe@testaccount.dev",
       bio: "Pinball ambassador and historian.",
       role: Role.admin,
     },
     {
       name: "Gary Stern",
-      email: "gary.stern@example.com",
+      email: "gary.stern@testaccount.dev",
       bio: "Founder of Stern Pinball.",
       role: Role.member,
     },
     {
       name: "George Gomez",
-      email: "george.gomez@example.com",
+      email: "george.gomez@testaccount.dev",
       bio: "Legendary pinball designer.",
       role: Role.member,
     },
     {
       name: "Harry Williams",
-      email: "harry.williams@example.com",
+      email: "harry.williams@testaccount.dev",
       bio: "The father of pinball.",
       role: Role.member,
+    },
+    {
+      name: "Tim Froehlich",
+      email: "phoenixavatar2@gmail.com",
+      bio: "Project owner.",
+      role: Role.admin,
     },
   ];
 
@@ -87,91 +93,63 @@ async function main() {
     );
   }
 
-  // 4. Create some test locations (only if they don't exist)
-  const testLocations = [
-    {
-      name: "Main Floor",
-      notes: "Primary gaming area with most popular machines",
+  // 4. Create the Austin Pinball Collective location (only if it doesn't exist)
+  const austinPinballLocation = await prisma.location.upsert({
+    where: {
+      pinballMapId: 26454, // Use the unique pinballMapId as the key
     },
-    {
-      name: "The Museum",
-      notes: "Our collection of classic and historical pinball machines",
+    update: {},
+    create: {
+      name: "Austin Pinball Collective",
+      notes: "Home of the Austin Pinball Collective - a community-driven pinball arcade",
+      pinballMapId: 26454, // Set the PinballMap ID for sync functionality
+      organizationId: organization.id,
     },
-    {
-      name: "The Back Room",
-      notes: "Games in need of some TLC or restoration",
-    },
-  ];
+  });
+  console.log(`Created/Updated location: ${austinPinballLocation.name}`);
 
-  const createdLocations = [];
-  for (const locationData of testLocations) {
-    const existingLocation = await prisma.location.findFirst({
-      where: {
-        name: locationData.name,
-        organizationId: organization.id,
-      },
-    });
-
-    if (!existingLocation) {
-      const location = await prisma.location.create({
-        data: {
-          name: locationData.name,
-          notes: locationData.notes,
-          organizationId: organization.id,
-        },
-      });
-      console.log(`Created location: ${location.name}`);
-      createdLocations.push(location);
-    } else {
-      console.log(`Location already exists: ${existingLocation.name}`);
-      createdLocations.push(existingLocation);
-    }
-  }
+  const createdLocations = [austinPinballLocation];
 
   // 5. Create game titles from PinballMap fixture data
   const fixtureData = await import("../src/lib/pinballmap/__tests__/fixtures/api_responses/locations/location_26454_machine_details.json");
-  
+
   const createdGameTitles = [];
   for (const machine of fixtureData.machines) {
+    // All fixture games are OPDB games, so opdbId is globally unique and organizationId is omitted
     const gameTitle = await prisma.gameTitle.upsert({
-      where: {
-        opdbId: machine.opdb_id,
-      },
+      where: { opdbId: machine.opdb_id },
       update: { name: machine.name },
       create: {
         name: machine.name,
         opdbId: machine.opdb_id,
-        // OPDB games are global, so no organizationId
+        // Do NOT set organizationId for OPDB games (global)
       },
     });
     console.log(`Created/Updated game title: ${gameTitle.name}`);
     createdGameTitles.push(gameTitle);
   }
 
-  // 6. Create rooms for each location
-  const createdRooms = [];
-  for (const location of createdLocations) {
-    const room = await prisma.room.upsert({
-      where: {
-        name_locationId: {
-          name: "Main Floor",
-          locationId: location.id,
-        },
-      },
-      update: {},
-      create: {
+  // 6. Create the Main Floor room for Austin Pinball Collective
+  const mainFloorRoom = await prisma.room.upsert({
+    where: {
+      name_locationId: {
         name: "Main Floor",
-        description: "Primary gaming area",
-        locationId: location.id,
-        organizationId: organization.id,
+        locationId: austinPinballLocation.id,
       },
-    });
-    console.log(`Created/Updated room: ${room.name} at ${location.name}`);
-    createdRooms.push(room);
-  }
+    },
+    update: {},
+    create: {
+      name: "Main Floor",
+      description: "Primary gaming area with most popular machines",
+      locationId: austinPinballLocation.id,
+      organizationId: organization.id,
+    },
+  });
+  console.log(`Created/Updated room: ${mainFloorRoom.name} at ${austinPinballLocation.name}`);
+
+  const createdRooms = [mainFloorRoom];
 
   // 7. Create game instances from fixture data in the Main Floor
-  const mainFloorRoom = createdRooms[0]; // Main Floor at "Main Floor" location
   if (!mainFloorRoom) {
     console.error('Main Floor room not found');
     return;
@@ -183,11 +161,11 @@ async function main() {
       console.error(`Machine at index ${i} is undefined`);
       continue;
     }
-    
+
     const gameTitle = createdGameTitles.find(
       (gt) => gt.opdbId === machine.opdb_id,
     );
-    
+
     if (!gameTitle) {
       console.error(`Game title not found for machine: ${machine.name}`);
       continue;
@@ -263,7 +241,7 @@ async function main() {
       consistency: "Every game",
       status: "New",
       gameTitle: "Ultraman: Kaiju Rumble (Blood Sucker Edition)",
-      reporterEmail: "roger.sharpe@example.com",
+      reporterEmail: "roger.sharpe@testaccount.dev",
       createdAt: new Date("2025-06-21T13:40:02Z"),
       updatedAt: new Date("2025-07-01T19:09:30Z"),
     },
@@ -274,7 +252,7 @@ async function main() {
       consistency: "Always",
       status: "Needs expert help",
       gameTitle: "Xenon",
-      reporterEmail: "roger.sharpe@example.com",
+      reporterEmail: "gary.stern@testaccount.dev",
       createdAt: new Date("2025-06-27T19:05:40Z"),
       updatedAt: new Date("2025-07-06T10:27:36Z"),
     },
@@ -285,7 +263,7 @@ async function main() {
       consistency: "Every game",
       status: "New",
       gameTitle: "Cleopatra",
-      reporterEmail: "roger.sharpe@example.com",
+      reporterEmail: "george.gomez@testaccount.dev",
       createdAt: new Date("2025-06-27T20:12:44Z"),
       updatedAt: new Date("2025-07-01T19:10:53Z"),
     },
@@ -296,7 +274,7 @@ async function main() {
       consistency: "Every game",
       status: "New",
       gameTitle: "Cleopatra",
-      reporterEmail: "roger.sharpe@example.com",
+      reporterEmail: "harry.williams@testaccount.dev",
       createdAt: new Date("2025-06-27T20:13:27Z"),
       updatedAt: new Date("2025-07-01T19:10:58Z"),
     },
@@ -307,7 +285,7 @@ async function main() {
       consistency: "Occasionally",
       status: "New",
       gameTitle: "Lord of the Rings",
-      reporterEmail: "gary.stern@example.com",
+      reporterEmail: "phoenixavatar2@gmail.com",
       createdAt: new Date("2025-06-25T10:00:00Z"),
       updatedAt: new Date("2025-06-25T10:00:00Z"),
     },
@@ -327,7 +305,7 @@ async function main() {
     if (gameInstance) {
       // Find the reporter
       const reporter = createdUsers.find(u => u.email === issueData.reporterEmail);
-      
+
       // Find the status
       const status = await prisma.issueStatus.findFirst({
         where: {

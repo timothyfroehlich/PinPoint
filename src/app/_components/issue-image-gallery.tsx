@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Image from "next/image";
 import {
   Box,
   Grid,
@@ -102,7 +103,7 @@ export function IssueImageGallery({ attachments, title = "Issue Photos" }: Issue
                   height="200"
                   image={attachment.url}
                   alt={`Issue photo ${index + 1}`}
-                  sx={{ 
+                  sx={{
                     objectFit: "cover",
                     backgroundColor: "grey.100",
                   }}
@@ -221,9 +222,11 @@ export function IssueImageGallery({ attachments, title = "Issue Photos" }: Issue
               }}
               onClick={(e) => e.stopPropagation()}
             >
-              <img
+              <Image
                 src={selectedImage}
                 alt="Full size"
+                width={800}
+                height={600}
                 style={{
                   maxWidth: "100%",
                   maxHeight: "100%",

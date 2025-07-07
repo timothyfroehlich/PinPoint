@@ -80,6 +80,8 @@ export default function LocationProfilePage({
     reporterEmail: "",
   });
   const [issueAttachments, setIssueAttachments] = useState<IssueAttachment[]>([]);
+  const [pinballMapDialogOpen, setPinballMapDialogOpen] = useState(false);
+  const [pinballMapId, setPinballMapId] = useState<number | null>(null);
 
   const { user, isAuthenticated } = useCurrentUser();
 
@@ -147,6 +149,27 @@ export default function LocationProfilePage({
     },
   });
 
+  const setPinballMapIdMutation = api.location.setPinballMapId.useMutation({
+    onSuccess: () => {
+      setPinballMapDialogOpen(false);
+      setPinballMapId(null);
+      void refetch();
+    },
+  });
+
+  const syncWithPinballMapMutation = api.location.syncWithPinballMap.useMutation({
+    onSuccess: (result) => {
+      // Show success message with sync results
+      console.log(`Sync completed: ${result.added} added, ${result.removed} removed`);
+      void refetch();
+    },
+  });
+
+  // Get user profile with membership information - MOVED BEFORE EARLY RETURNS
+  const { data: userProfile } = api.user.getProfile.useQuery(undefined, {
+    enabled: isAuthenticated,
+  });
+
   if (!resolvedParams || isLoading) {
     return (
       <Container maxWidth="lg" sx={{ py: 4, textAlign: "center" }}>
@@ -167,6 +190,12 @@ export default function LocationProfilePage({
       </Container>
     );
   }
+
+  // NEW: Flatten all game instances from all rooms
+  const allGameInstances = location.rooms.flatMap(room => room.gameInstances);
+
+    // Check if user is admin
+  const isAdmin = userProfile?.memberships?.some(membership => membership.role === 'admin') ?? false;
 
   const handleEditLocation = () => {
     setEditForm({
@@ -197,6 +226,26 @@ export default function LocationProfilePage({
     setMoveDialogOpen(true);
   };
 
+  const handlePinballMapSetup = () => {
+    setPinballMapId(location.pinballMapId ?? null);
+    setPinballMapDialogOpen(true);
+  };
+
+  const handlePinballMapSave = () => {
+    if (pinballMapId && pinballMapId > 0) {
+      setPinballMapIdMutation.mutate({
+        locationId: location.id,
+        pinballMapId: pinballMapId,
+      });
+    }
+  };
+
+  const handlePinballMapSync = () => {
+    syncWithPinballMapMutation.mutate({
+      locationId: location.id,
+    });
+  };
+
   const handleConfirmMove = () => {
     if (selectedGameInstanceId && targetLocationId) {
       moveGameMutation.mutate({
@@ -223,7 +272,8 @@ export default function LocationProfilePage({
 
   const otherLocations =
     allLocations?.filter((loc) => loc.id !== location.id) ?? [];
-  const selectedGame = location.gameInstances.find(
+  // Update selectedGame to use allGameInstances
+  const selectedGame = allGameInstances.find(
     (gi) => gi.id === selectedGameInstanceId,
   );
 
@@ -280,19 +330,45 @@ export default function LocationProfilePage({
                   <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
                     <Chip
                       icon={<Games />}
-                      label={`${location.gameInstances.length} games`}
+                      label={`${allGameInstances.length} games`}
                       variant="outlined"
                     />
                   </Box>
                 </Box>
-                <Button
-                  variant="outlined"
-                  startIcon={<Edit />}
-                  onClick={handleEditLocation}
-                  disabled={updateLocationMutation.isPending}
-                >
-                  Edit Location
-                </Button>
+                <Box sx={{ display: "flex", gap: 1 }}>
+                  {isAdmin && (
+                    <>
+                      <Button
+                        variant="outlined"
+                        color="secondary"
+                        onClick={handlePinballMapSetup}
+                        disabled={setPinballMapIdMutation.isPending}
+                        size="small"
+                      >
+                        {location.pinballMapId ? "Update PinballMap ID" : "Set PinballMap ID"}
+                      </Button>
+                      {location.pinballMapId && (
+                        <Button
+                          variant="contained"
+                          color="primary"
+                          onClick={handlePinballMapSync}
+                          disabled={syncWithPinballMapMutation.isPending}
+                          size="small"
+                        >
+                          {syncWithPinballMapMutation.isPending ? "Syncing..." : "Sync with PinballMap"}
+                        </Button>
+                      )}
+                    </>
+                  )}
+                  <Button
+                    variant="outlined"
+                    startIcon={<Edit />}
+                    onClick={handleEditLocation}
+                    disabled={updateLocationMutation.isPending}
+                  >
+                    Edit Location
+                  </Button>
+                </Box>
               </Box>
             </CardContent>
           </Card>
@@ -303,11 +379,11 @@ export default function LocationProfilePage({
           <Card>
             <CardContent>
               <Typography variant="h6" gutterBottom>
-                Games at this Location ({location.gameInstances.length})
+                Games at this Location ({allGameInstances.length})
               </Typography>
               <Divider sx={{ mb: 2 }} />
 
-              {location.gameInstances.length === 0 ? (
+              {allGameInstances.length === 0 ? (
                 <Box sx={{ textAlign: "center", py: 4 }}>
                   <Games
                     sx={{ fontSize: 64, color: "text.secondary", mb: 2 }}
@@ -321,7 +397,7 @@ export default function LocationProfilePage({
                 </Box>
               ) : (
                 <List>
-                  {location.gameInstances.map((gameInstance) => (
+                  {allGameInstances.map((gameInstance) => (
                     <ListItem
                       key={gameInstance.id}
                       sx={{
@@ -400,7 +476,7 @@ export default function LocationProfilePage({
               </Box>
               <Divider sx={{ mb: 3 }} />
 
-              {location.gameInstances.length === 0 ? (
+              {allGameInstances.length === 0 ? (
                 <Alert severity="info">
                   No games available at this location to report issues for.
                 </Alert>
@@ -427,7 +503,7 @@ export default function LocationProfilePage({
                       <MenuItem value="">
                         <em>Select a game...</em>
                       </MenuItem>
-                      {location.gameInstances.map((instance) => (
+                      {allGameInstances.map((instance) => (
                         <MenuItem key={instance.id} value={instance.id}>
                           {instance.name} ({instance.gameTitle.name})
                         </MenuItem>
@@ -699,7 +775,7 @@ export default function LocationProfilePage({
               >
                 {otherLocations.map((loc) => (
                   <MenuItem key={loc.id} value={loc.id}>
-                    {loc.name} ({loc._count.gameInstances} games)
+                    {loc.name} ({(loc.rooms?.reduce((sum, room) => sum + (room._count?.gameInstances ?? 0), 0) ?? 0)} games)
                   </MenuItem>
                 ))}
               </Select>
@@ -714,6 +790,46 @@ export default function LocationProfilePage({
             disabled={moveGameMutation.isPending || !targetLocationId}
           >
             {moveGameMutation.isPending ? "Moving..." : "Move Game"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* PinballMap Setup Dialog */}
+      <Dialog
+        open={pinballMapDialogOpen}
+        onClose={() => setPinballMapDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          {location.pinballMapId ? "Update PinballMap ID" : "Set PinballMap ID"}
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ pt: 1 }}>
+            <Alert severity="info" sx={{ mb: 2 }}>
+              Enter the PinballMap.com location ID to enable syncing with their database.
+              You can find this ID in the URL when viewing your location on PinballMap.com
+              (e.g., pinballmap.com/locations/26454).
+            </Alert>
+            <TextField
+              label="PinballMap Location ID"
+              type="number"
+              value={pinballMapId ?? ""}
+              onChange={(e) => setPinballMapId(parseInt(e.target.value) || null)}
+              fullWidth
+              placeholder="e.g., 26454"
+              helperText={`Current ID: ${location.pinballMapId ?? "Not set"}`}
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPinballMapDialogOpen(false)}>Cancel</Button>
+          <Button
+            onClick={handlePinballMapSave}
+            variant="contained"
+            disabled={setPinballMapIdMutation.isPending || !pinballMapId || pinballMapId <= 0}
+          >
+            {setPinballMapIdMutation.isPending ? "Saving..." : "Save ID"}
           </Button>
         </DialogActions>
       </Dialog>

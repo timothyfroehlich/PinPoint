@@ -2,7 +2,7 @@ import { writeFile, unlink, mkdir } from "fs/promises";
 import { existsSync } from "fs";
 import path from "path";
 import type { ImageStorageProvider } from "./index";
-import { IMAGE_CONSTRAINTS, ISSUE_ATTACHMENT_CONSTRAINTS } from "./index";
+import { IMAGE_CONSTRAINTS } from "./index";
 
 export class LocalImageStorage implements ImageStorageProvider {
   private basePath = "public/uploads/images";
@@ -83,13 +83,22 @@ export class LocalImageStorage implements ImageStorageProvider {
 
   // Specialized method for issue attachments
   async uploadIssueAttachment(file: File, issueId: string): Promise<string> {
-    return this.uploadImage(file, `issue-${issueId}`, ISSUE_ATTACHMENT_CONSTRAINTS);
+    return this.uploadImage(file, `issue-${issueId}`);
   }
 
   async validateIssueAttachment(file: File): Promise<boolean> {
-    return this.validateImage(file, ISSUE_ATTACHMENT_CONSTRAINTS);
+    return this.validateImage(file);
   }
 }
 
 // Export singleton instance
 export const imageStorage = new LocalImageStorage();
+
+export const ISSUE_ATTACHMENT_CONSTRAINTS = {
+  maxSizeBytes: 5 * 1024 * 1024,
+  maxWidth: 400 as const, // TEMPORARY: literal type to satisfy function signature
+  maxHeight: 400 as const, // TEMPORARY: literal type to satisfy function signature
+  allowedTypes: ["image/jpeg", "image/png", "image/webp"] as const,
+  outputFormat: "webp" as const,
+  maxAttachments: 3,
+};

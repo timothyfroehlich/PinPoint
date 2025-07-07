@@ -16,7 +16,11 @@ export const userRouter = createTRPCRouter({
         ownedGameInstances: {
           include: {
             gameTitle: true,
-            location: true,
+            room: {
+              include: {
+                location: true,
+              },
+            },
           },
         },
         memberships: {

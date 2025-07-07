@@ -1,7 +1,6 @@
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { type DefaultSession, type NextAuthConfig } from "next-auth";
-import Credentials from "next-auth/providers/credentials";
-import { compare } from "bcrypt";
+import Google from "next-auth/providers/google";
 
 import { db } from "~/server/db";
 
@@ -33,53 +32,10 @@ declare module "next-auth" {
  */
 export const authConfig = {
   providers: [
-    Credentials({
-      name: "Credentials",
-      credentials: {
-        email: { label: "Email", type: "text" },
-        password: { label: "Password", type: "password" },
-      },
-      async authorize(credentials) {
-        if (!credentials?.email || !credentials.password) {
-          return null;
-        }
-
-        // Use findFirst to avoid type issues with Auth.js adapter
-        const user = await db.user.findFirst({
-          where: { email: credentials.email as string },
-        });
-
-        if (!user || !(user as any).password) {
-          return null;
-        }
-
-        const isValid = await compare(
-          credentials.password as string,
-          (user as any).password
-        );
-
-        if (isValid) {
-          return {
-            id: user.id,
-            name: user.name,
-            email: user.email,
-            emailVerified: user.emailVerified,
-            image: user.image,
-          };
-        }
-
-        return null;
-      },
+    Google({
+      clientId: process.env.AUTH_GOOGLE_ID!,
+      clientSecret: process.env.AUTH_GOOGLE_SECRET!,
     }),
-    /**
-     * ...add more providers here.
-     *
-     * Most other providers require a bit more work than the Discord provider. For example, the
-     * GitHub provider requires you to add the `refresh_token_expires_in` field to the Account
-     * model. Refer to the NextAuth.js docs for the provider you want to use. Example:
-     *
-     * @see https://next-auth.js.org/providers/github
-     */
   ],
   adapter: PrismaAdapter(db),
   callbacks: {
