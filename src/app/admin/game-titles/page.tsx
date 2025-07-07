@@ -153,18 +153,18 @@ export default function GameTitlesAdminPage() {
                   )}
                 </Button>
               </Box>
-              
+
               <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
                 Search the Open Pinball Database to add new games to your collection.
               </Typography>
-              
+
               <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 <OPDBGameSearch
                   onGameSelect={handleOPDBGameSelect}
                   disabled={createGameFromOPDB.isPending}
                   placeholder="Search for pinball machines in OPDB..."
                 />
-                
+
                 {selectedOPDBGame && (
                   <Button
                     variant="contained"
@@ -186,19 +186,19 @@ export default function GameTitlesAdminPage() {
                   </Button>
                 )}
               </Box>
-              
+
               {createGameFromOPDB.error && (
                 <Alert severity="error" sx={{ mt: 2 }}>
                   Error adding game: {createGameFromOPDB.error.message}
                 </Alert>
               )}
-              
+
               {syncWithOPDB.error && (
                 <Alert severity="error" sx={{ mt: 2 }}>
                   Sync failed: {syncWithOPDB.error.message}
                 </Alert>
               )}
-              
+
               {syncWithOPDB.data && (
                 <Alert severity="success" sx={{ mt: 2 }}>
                   {syncWithOPDB.data.message}
@@ -255,14 +255,14 @@ export default function GameTitlesAdminPage() {
                             <Typography variant="h6" component="span">
                               {game.name}
                             </Typography>
-                            {game.opdbId && game.opdbId.startsWith('custom-') ? (
+                            {game.opdbId?.startsWith('custom-') ? (
                               <Chip label="Custom" size="small" color="secondary" />
                             ) : (
-                              <Chip 
-                                label="OPDB" 
-                                size="small" 
+                              <Chip
+                                label="OPDB"
+                                size="small"
                                 color="primary"
-                                sx={{ 
+                                sx={{
                                   bgcolor: isDataStale(game.lastSynced) ? 'warning.main' : 'primary.main',
                                   color: 'white'
                                 }}
@@ -289,10 +289,10 @@ export default function GameTitlesAdminPage() {
                               </Box>
                             )}
                             {game.description && (
-                              <Typography 
-                                variant="caption" 
+                              <Typography
+                                variant="caption"
                                 color="text.secondary"
-                                sx={{ 
+                                sx={{
                                   display: "-webkit-box",
                                   WebkitLineClamp: 2,
                                   WebkitBoxOrient: "vertical",

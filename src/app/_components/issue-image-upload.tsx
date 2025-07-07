@@ -7,18 +7,14 @@ import {
   CircularProgress,
   Alert,
   Typography,
-  Paper,
   IconButton,
-  Grid,
   Card,
   CardMedia,
-  CardActions,
 } from "@mui/material";
 import {
   CloudUpload,
   PhotoCamera,
   Delete,
-  Add,
   CameraAlt,
 } from "@mui/icons-material";
 import { processIssueImageFile } from "~/lib/utils/image-processing";
@@ -27,6 +23,17 @@ export interface IssueAttachment {
   id?: string;
   url: string;
   file?: File; // For new uploads before save
+}
+
+interface UploadErrorResponse {
+  error: string;
+}
+
+interface UploadSuccessResponse {
+  attachment: {
+    id: string;
+    url: string;
+  };
 }
 
 interface IssueImageUploadProps {
@@ -92,10 +99,10 @@ export function IssueImageUpload({
             url: previewUrl,
             file: result.file!,
           };
-          
+
           const newAttachments = [...attachments, newAttachment];
           onAttachmentsChange?.(newAttachments);
-          
+
           setUploadingFiles(prev => {
             const newSet = new Set(prev);
             newSet.delete(fileId);
@@ -126,14 +133,28 @@ export function IssueImageUpload({
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Upload failed");
+        const errorData: unknown = await response.json();
+        let errorMessage = "Upload failed";
+
+        // Type guard for error response
+        if (errorData && typeof errorData === 'object' && 'error' in errorData && typeof (errorData as UploadErrorResponse).error === 'string') {
+          errorMessage = (errorData as UploadErrorResponse).error;
+        }
+
+        throw new Error(errorMessage);
       }
 
-      const result = await response.json();
+      const result: unknown = await response.json();
+
+      // Type guard for success response
+      if (!result || typeof result !== 'object' || !('attachment' in result)) {
+        throw new Error("Invalid response format");
+      }
+
+      const successResult = result as UploadSuccessResponse;
       const newAttachment: IssueAttachment = {
-        id: result.attachment.id,
-        url: result.attachment.url,
+        id: successResult.attachment.id,
+        url: successResult.attachment.url,
       };
 
       onUploadSuccess?.(newAttachment);
@@ -168,7 +189,7 @@ export function IssueImageUpload({
       // Remove from local state
       const newAttachments = attachments.filter((_, i) => i !== index);
       onAttachmentsChange?.(newAttachments);
-      
+
       // Clean up object URL if it's a temporary preview
       if (attachment.url.startsWith("blob:")) {
         URL.revokeObjectURL(attachment.url);
@@ -185,7 +206,7 @@ export function IssueImageUpload({
     const files = Array.from(e.dataTransfer.files).filter(file =>
       file.type.startsWith("image/")
     );
-    
+
     if (files.length > 0) {
       void handleFileSelect(files);
     }
@@ -232,7 +253,7 @@ export function IssueImageUpload({
         }
       });
     };
-  }, []);
+  }, [attachments]);
 
   const isUploading = uploadingFiles.size > 0;
 
@@ -242,7 +263,7 @@ export function IssueImageUpload({
       {attachments.length > 0 && (
         <Box sx={{ display: "flex", gap: 1, mb: 2, flexWrap: "wrap" }}>
           {attachments.map((attachment, index) => (
-            <Box key={attachment.id || index} sx={{ position: "relative" }}>
+            <Box key={attachment.id ?? index} sx={{ position: "relative" }}>
               <Card sx={{ width: 80, height: 80 }}>
                 <CardMedia
                   component="img"
@@ -324,7 +345,7 @@ export function IssueImageUpload({
               color: (theme) => theme.palette.text.secondary,
             }}
           />
-          
+
           <Box sx={{ flexGrow: 1 }}>
             <Typography variant="body2" sx={{ fontWeight: 500 }}>
               Add photos (up to {maxAttachments - attachments.length} more)

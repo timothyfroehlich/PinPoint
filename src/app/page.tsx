@@ -1,5 +1,12 @@
 "use client";
 
+import React, { useState } from "react";
+import Link from "next/link";
+import { api } from "~/trpc/react";
+import { useCurrentUser } from "~/lib/hooks/use-current-user";
+import { OPDBGameSearch } from "~/app/_components/opdb-game-search";
+import type { OPDBSearchResult } from "~/lib/opdb/types";
+
 import {
   Container,
   Typography,
@@ -22,11 +29,70 @@ import {
   Tabs,
   Tab,
 } from "@mui/material";
-import { useState } from "react";
-import Link from "next/link";
-import { api } from "~/trpc/react";
-import { OPDBGameSearch } from "~/app/_components/opdb-game-search";
-import type { OPDBSearchResult } from "~/lib/opdb";
+import Grid2 from "@mui/material/Grid2";
+
+// Type definitions for tRPC return types
+type LocationWithRooms = {
+  id: string;
+  name: string;
+  notes?: string | null;
+  organizationId: string;
+  pinballMapId?: number | null;
+  rooms: {
+    id: string;
+    name: string;
+    organizationId: string;
+    description?: string | null;
+    locationId: string;
+    _count: {
+      gameInstances: number;
+    };
+  }[];
+};
+
+type GameTitleWithCount = {
+  id: string;
+  name: string;
+  manufacturer?: string | null;
+  releaseDate?: Date | null;
+  imageUrl?: string | null;
+  description?: string | null;
+  opdbId?: string | null;
+  organizationId?: string | null;
+  lastSynced?: Date | null;
+  _count: {
+    gameInstances: number;
+  };
+};
+
+type GameInstanceWithDetails = {
+  id: string;
+  name: string;
+  gameTitle: {
+    id: string;
+    name: string;
+    manufacturer?: string | null;
+    releaseDate?: Date | null;
+    imageUrl?: string | null;
+    description?: string | null;
+    opdbId?: string | null;
+    organizationId?: string | null;
+    lastSynced?: Date | null;
+  };
+  room?: {
+    id: string;
+    name: string;
+    location?: {
+      id: string;
+      name: string;
+    } | null;
+  } | null;
+  owner?: {
+    id: string;
+    name: string | null;
+    profilePicture?: string | null;
+  } | null;
+};
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -51,15 +117,13 @@ function TabPanel(props: TabPanelProps) {
 }
 
 export default function Home() {
+  const { user, isAuthenticated } = useCurrentUser();
   const [tabValue, setTabValue] = useState(0);
   const [newLocationName, setNewLocationName] = useState("");
   const [newInstanceName, setNewInstanceName] = useState("");
   const [selectedGameTitleId, setSelectedGameTitleId] = useState("");
   const [selectedLocationId, setSelectedLocationId] = useState("");
-  const [selectedOPDBGame, setSelectedOPDBGame] = useState<{
-    opdbId: string;
-    gameData: OPDBSearchResult;
-  } | null>(null);
+  const [selectedOPDBGame, setSelectedOPDBGame] = useState<OPDBSearchResult | null>(null);
 
   // API queries
   const {
@@ -67,14 +131,14 @@ export default function Home() {
     isLoading: isLoadingGames,
     error: gameError,
     refetch: refetchGames,
-  } = api.gameTitle.getAll.useQuery();
+  } = api.gameTitle.getAll.useQuery<GameTitleWithCount[]>();
 
   const {
     data: locations,
     isLoading: isLoadingLocations,
     error: locationError,
     refetch: refetchLocations,
-  } = api.location.getAll.useQuery();
+  } = api.location.getAll.useQuery<LocationWithRooms[]>();
 
   const {
     data: gameInstances,
@@ -86,27 +150,26 @@ export default function Home() {
   // Mutations
 
   const createGameFromOPDB = api.gameTitle.createFromOPDB.useMutation({
-    onSuccess: (newGameTitle) => {
-      setSelectedOPDBGame(null);
-      setSelectedGameTitleId(newGameTitle.id); // Auto-select the new game
-      void refetchGames();
+    onSuccess: () => {
+      void api.useUtils().gameTitle.getAll.invalidate();
     },
   });
 
   const createLocation = api.location.create.useMutation({
     onSuccess: () => {
       setNewLocationName("");
-      void refetchLocations();
+      void api.useUtils().location.getAll.invalidate();
+      void api.useUtils().room.getAll.invalidate();
     },
   });
 
   const createGameInstance = api.gameInstance.create.useMutation({
     onSuccess: () => {
       setNewInstanceName("");
-      setSelectedGameTitleId("");
       setSelectedLocationId("");
       setSelectedOPDBGame(null);
-      void refetchInstances();
+      void api.useUtils().location.getAll.invalidate();
+      void api.useUtils().gameInstance.getAll.invalidate();
     },
   });
 
@@ -119,16 +182,12 @@ export default function Home() {
   };
 
   const handleOPDBGameSelect = (opdbId: string, gameData: OPDBSearchResult) => {
-    setSelectedOPDBGame({ opdbId, gameData });
-    setSelectedGameTitleId(""); // Clear any existing game title selection
+    setSelectedOPDBGame(gameData);
+    setSelectedGameTitleId(""); // Clear local game selection
   };
 
   const handleInstanceSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!newInstanceName.trim() || !selectedLocationId) {
-      return;
-    }
 
     let gameTitleId = selectedGameTitleId;
 
@@ -136,20 +195,20 @@ export default function Home() {
     if (selectedOPDBGame && !selectedGameTitleId) {
       try {
         const newGameTitle = await createGameFromOPDB.mutateAsync({
-          opdbId: selectedOPDBGame.opdbId,
+          opdbId: selectedOPDBGame.id, // Use id instead of opdbId
         });
         gameTitleId = newGameTitle.id;
-      } catch (error) {
+      } catch {
         // Error will be handled by the mutation's error state
         return;
       }
     }
 
-    if (gameTitleId) {
+    if (newInstanceName.trim() && selectedLocationId && gameTitleId) {
       createGameInstance.mutate({
         name: newInstanceName.trim(),
+        roomId: selectedLocationId,
         gameTitleId,
-        locationId: selectedLocationId,
       });
     }
   };
@@ -217,21 +276,21 @@ export default function Home() {
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
                   Search the Open Pinball Database for games to add to your collection.
                 </Typography>
-                
+
                 <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
                   <OPDBGameSearch
                     onGameSelect={handleOPDBGameSelect}
                     disabled={createGameFromOPDB.isPending}
                     placeholder="Search for pinball machines in OPDB..."
                   />
-                  
+
                   {selectedOPDBGame && (
                     <Button
                       variant="contained"
                       onClick={() => {
                         if (selectedOPDBGame) {
                           createGameFromOPDB.mutate({
-                            opdbId: selectedOPDBGame.opdbId,
+                            opdbId: selectedOPDBGame.id,
                           });
                         }
                       }}
@@ -246,13 +305,13 @@ export default function Home() {
                     </Button>
                   )}
                 </Box>
-                
+
                 {createGameFromOPDB.error && (
                   <Alert severity="error" sx={{ mt: 2 }}>
                     Error adding game: {createGameFromOPDB.error.message}
                   </Alert>
                 )}
-                
+
               </CardContent>
             </Card>
           </Grid>
@@ -276,7 +335,7 @@ export default function Home() {
                   </Typography>
                 ) : (
                   <List>
-                    {gameTitles?.map((game) => (
+                    {gameTitles?.map((game: GameTitleWithCount) => (
                       <ListItem key={game.id} sx={{ px: 0 }}>
                         <ListItemText primary={game.name} />
                       </ListItem>
@@ -352,45 +411,47 @@ export default function Home() {
                   </Typography>
                 ) : (
                   <List>
-                    {locations?.map((location) => (
-                      <ListItem
-                        key={location.id}
-                        sx={{
-                          px: 0,
-                          "&:hover": {
-                            backgroundColor: "action.hover",
-                          },
-                        }}
-                      >
-                        <ListItemText
-                          primary={
-                            <Typography
-                              component={Link}
-                              href={`/location/${location.id}`}
-                              sx={{
-                                textDecoration: "none",
-                                color: "primary.main",
-                                "&:hover": {
-                                  textDecoration: "underline",
-                                },
-                              }}
-                            >
-                              {location.name}
-                            </Typography>
-                          }
-                          secondary={
-                            location._count?.gameInstances !== undefined && (
+                    {locations?.map((location: LocationWithRooms) => {
+                      // Sum game instances across all rooms
+                      const gameCount = location.rooms?.reduce((sum: number, room) => sum + (room._count?.gameInstances ?? 0), 0) ?? 0;
+                      return (
+                        <ListItem
+                          key={location.id}
+                          sx={{
+                            px: 0,
+                            "&:hover": {
+                              backgroundColor: "action.hover",
+                            },
+                          }}
+                        >
+                          <ListItemText
+                            primary={
+                              <Typography
+                                component={Link}
+                                href={`/location/${location.id}`}
+                                sx={{
+                                  textDecoration: "none",
+                                  color: "primary.main",
+                                  "&:hover": {
+                                    textDecoration: "underline",
+                                  },
+                                }}
+                              >
+                                {location.name}
+                              </Typography>
+                            }
+                            secondary={
                               <Typography
                                 variant="caption"
                                 color="text.secondary"
                               >
-                                {location._count.gameInstances} games
+                                {gameCount} games
                               </Typography>
-                            )
-                          }
-                        />
-                      </ListItem>
-                    ))}
+                            }
+                          />
+                        </ListItem>
+                      );
+                    })}
                   </List>
                 )}
               </CardContent>
@@ -406,7 +467,7 @@ export default function Home() {
                 <Typography variant="h5" component="h2" gutterBottom>
                   Add New Game Instance
                 </Typography>
-{locationCount === 0 ? (
+                {locationCount === 0 ? (
                   <Alert severity="info">
                     You need to add at least one location before creating game instances.
                   </Alert>
@@ -424,12 +485,12 @@ export default function Home() {
                       placeholder="e.g., MM #1, Medieval Madness (Left Side)"
                       disabled={createGameInstance.isPending}
                     />
-                    
+
                     <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
                       <Typography variant="h6" component="h3">
                         Select or Search for Game
                       </Typography>
-                      
+
                       {gameTitleCount > 0 && (
                         <FormControl fullWidth>
                           <InputLabel>Existing Game Titles</InputLabel>
@@ -442,7 +503,7 @@ export default function Home() {
                             label="Existing Game Titles"
                             disabled={createGameInstance.isPending}
                           >
-                            {gameTitles?.map((game) => (
+                            {gameTitles?.map((game: GameTitleWithCount) => (
                               <MenuItem key={game.id} value={game.id}>
                                 {game.name}
                                 {game.manufacturer && game.releaseDate && (
@@ -459,18 +520,18 @@ export default function Home() {
                           </Select>
                         </FormControl>
                       )}
-                      
+
                       <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center" }}>
                         — OR —
                       </Typography>
-                      
+
                       <OPDBGameSearch
                         onGameSelect={handleOPDBGameSelect}
                         disabled={createGameInstance.isPending || createGameFromOPDB.isPending}
                         placeholder="Search OPDB for new games..."
                         label="Search OPDB Games"
                       />
-                      
+
                       <FormControl fullWidth>
                         <InputLabel>Location</InputLabel>
                         <Select
@@ -481,7 +542,7 @@ export default function Home() {
                           label="Location"
                           disabled={createGameInstance.isPending}
                         >
-                          {locations?.map((location) => (
+                          {locations?.map((location: LocationWithRooms) => (
                             <MenuItem key={location.id} value={location.id}>
                               {location.name}
                             </MenuItem>
@@ -489,7 +550,7 @@ export default function Home() {
                         </Select>
                       </FormControl>
                     </Box>
-                    
+
                     <Button
                       type="submit"
                       variant="contained"
@@ -539,7 +600,7 @@ export default function Home() {
                   </Typography>
                 ) : (
                   <List>
-                    {gameInstances?.map((instance) => (
+                    {gameInstances?.map((instance: GameInstanceWithDetails) => (
                       <ListItem key={instance.id} sx={{ px: 0 }}>
                         <ListItemText
                           primary={instance.name}
@@ -556,10 +617,9 @@ export default function Home() {
                                 variant="body2"
                                 color="text.secondary"
                               >
-                                {instance.gameTitle.name} at{" "}
-                                {instance.location.name}
+                                {instance.gameTitle.name} at {instance.room?.location?.name ?? "Unknown Location"}
                               </Typography>
-                              {instance.owner && (
+                              {instance.owner && instance.owner.name && (
                                 <Box
                                   sx={{
                                     display: "flex",

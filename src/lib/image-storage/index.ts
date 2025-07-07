@@ -1,8 +1,17 @@
+export interface ImageConstraints {
+  maxSizeBytes?: number;
+  maxWidth?: number;
+  maxHeight?: number;
+  allowedTypes?: readonly string[];
+  outputFormat?: string;
+  maxAttachments?: number;
+}
+
 export interface ImageStorageProvider {
-  uploadImage(file: File, path: string, constraints?: any): Promise<string>;
+  uploadImage(file: File, path: string, constraints?: ImageConstraints): Promise<string>;
   deleteImage(path: string): Promise<void>;
   getImageUrl(path: string): string;
-  validateImage(file: File, constraints?: any): Promise<boolean>;
+  validateImage(file: File, constraints?: ImageConstraints): Promise<boolean>;
 }
 
 export interface ImageUploadResult {

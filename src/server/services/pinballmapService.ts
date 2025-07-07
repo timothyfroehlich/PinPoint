@@ -8,7 +8,7 @@
  * - GameInstances: Always organization-specific through room hierarchy
  */
 
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { fetchLocationMachineDetails } from '../../lib/pinballmap/client';
 import type {
   PinballMapMachine,

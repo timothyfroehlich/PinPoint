@@ -42,14 +42,13 @@ export default function IssuesPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [showFilters, setShowFilters] = useState(false);
 
-  const { user, isAuthenticated } = useCurrentUser();
+  const { isAuthenticated } = useCurrentUser();
 
   // Get all issues with current filters
   const {
     data: issues,
     isLoading: isLoadingIssues,
     error: issueError,
-    refetch,
   } = api.issue.getAll.useQuery({
     locationId: locationFilter || undefined,
     statusId: statusFilter || undefined,

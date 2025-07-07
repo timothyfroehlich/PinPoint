@@ -208,9 +208,9 @@ export const organizationProcedure = protectedProcedure.use(
 export const adminProcedure = organizationProcedure.use(
   async ({ ctx, next }) => {
     if (ctx.membership.role !== "admin") {
-      throw new TRPCError({ 
-        code: "FORBIDDEN", 
-        message: "Admin access required" 
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Admin access required"
       });
     }
 

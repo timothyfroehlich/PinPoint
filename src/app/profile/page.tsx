@@ -1,5 +1,6 @@
 "use client";
 
+import React, { useState } from "react";
 import {
   Container,
   Typography,
@@ -28,10 +29,51 @@ import {
   BugReport,
   Comment,
 } from "@mui/icons-material";
-import { useState } from "react";
+import Grid2 from "@mui/material/Grid2";
+import { api } from "~/trpc/react";
 import { UserAvatar } from "~/app/_components/user-avatar";
 import { ProfilePictureUpload } from "~/app/_components/profile-picture-upload";
-import { api } from "~/trpc/react";
+
+// Type definitions for the profile data structure
+type UserProfileData = {
+  id: string;
+  name: string | null;
+  email: string;
+  bio: string | null;
+  profilePicture: string | null;
+  joinDate: Date | null;
+  ownedGameInstances: {
+    id: string;
+    name: string;
+    gameTitle: {
+      id: string;
+      name: string;
+      manufacturer: string | null;
+      releaseDate: Date | null;
+    };
+    room: {
+      id: string;
+      name: string;
+      location: {
+        id: string;
+        name: string;
+      };
+    };
+  }[];
+  memberships: {
+    id: string;
+    role: string;
+    organization: {
+      id: string;
+      name: string;
+    };
+  }[];
+  _count: {
+    issues: number;
+    comments: number;
+    ownedGameInstances: number;
+  };
+};
 
 export default function ProfilePage() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -43,7 +85,7 @@ export default function ProfilePage() {
     isLoading,
     error,
     refetch,
-  } = api.user.getProfile.useQuery();
+  } = api.user.getProfile.useQuery<UserProfileData>();
 
   const updateProfileMutation = api.user.updateProfile.useMutation({
     onSuccess: () => {
@@ -101,6 +143,10 @@ export default function ProfilePage() {
     month: "long",
     day: "numeric",
   });
+
+  const _count = userProfile._count;
+  const memberships = userProfile.memberships;
+  const ownedGameInstances = userProfile.ownedGameInstances;
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
@@ -184,19 +230,19 @@ export default function ProfilePage() {
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <Games color="primary" />
                   <Typography variant="body2">
-                    {userProfile._count.ownedGameInstances} games owned
+                    {_count.ownedGameInstances} games owned
                   </Typography>
                 </Box>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <BugReport color="secondary" />
                   <Typography variant="body2">
-                    {userProfile._count.issues} issues reported
+                    {_count.issues} issues reported
                   </Typography>
                 </Box>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <Comment color="action" />
                   <Typography variant="body2">
-                    {userProfile._count.comments} comments posted
+                    {_count.comments} comments posted
                   </Typography>
                 </Box>
               </Box>
@@ -216,19 +262,17 @@ export default function ProfilePage() {
               <Typography variant="h6" gutterBottom>
                 Organizations
               </Typography>
-              {userProfile.memberships.length === 0 ? (
+              {memberships.length === 0 ? (
                 <Typography variant="body2" color="text.secondary">
                   Not a member of any organizations
                 </Typography>
               ) : (
                 <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-                  {userProfile.memberships.map((membership) => (
+                  {memberships.map((membership) => (
                     <Chip
                       key={membership.id}
                       label={`${membership.organization.name} (${membership.role})`}
-                      color={
-                        membership.role === "admin" ? "primary" : "default"
-                      }
+                      color={membership.role === "admin" ? "primary" : "default"}
                       variant="outlined"
                     />
                   ))}
@@ -243,28 +287,42 @@ export default function ProfilePage() {
           <Card>
             <CardContent>
               <Typography variant="h6" gutterBottom>
-                Owned Games ({userProfile.ownedGameInstances.length})
+                Owned Games ({ownedGameInstances.length})
               </Typography>
-              <Divider sx={{ mb: 2 }} />
-              {userProfile.ownedGameInstances.length === 0 ? (
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ textAlign: "center", py: 4 }}
-                >
+              {ownedGameInstances.length === 0 ? (
+                <Typography variant="body2" color="text.secondary">
                   No games owned yet
                 </Typography>
               ) : (
-                <List>
-                  {userProfile.ownedGameInstances.map((gameInstance) => (
-                    <ListItem key={gameInstance.id} sx={{ px: 0 }}>
-                      <ListItemText
-                        primary={gameInstance.name}
-                        secondary={`${gameInstance.gameTitle.name} at ${gameInstance.location.name}`}
-                      />
-                    </ListItem>
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                  {ownedGameInstances.map((gameInstance) => (
+                    <Box
+                      key={gameInstance.id}
+                      sx={{
+                        p: 2,
+                        border: 1,
+                        borderColor: "divider",
+                        borderRadius: 1,
+                      }}
+                    >
+                      <Typography variant="subtitle1" fontWeight="bold">
+                        {gameInstance.name}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {gameInstance.gameTitle.name}
+                        {gameInstance.gameTitle.manufacturer && (
+                          <> • {gameInstance.gameTitle.manufacturer}</>
+                        )}
+                        {gameInstance.gameTitle.releaseDate && (
+                          <> • {gameInstance.gameTitle.releaseDate.getFullYear()}</>
+                        )}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Location: {gameInstance.room.location.name} - {gameInstance.room.name}
+                      </Typography>
+                    </Box>
                   ))}
-                </List>
+                </Box>
               )}
             </CardContent>
           </Card>
