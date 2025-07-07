@@ -37,10 +37,10 @@ async function main() {
       role: Role.member,
     },
     {
-      name: "George Gomez",
-      email: "george.gomez@testaccount.dev",
-      bio: "Legendary pinball designer.",
-      role: Role.member,
+      name: "Escher Lefkoff",
+      email: "escher.lefkoff@testaccount.dev",
+      bio: "World champion competitive pinball player.",
+      role: Role.player,
     },
     {
       name: "Harry Williams",
@@ -101,17 +101,18 @@ async function main() {
     update: {},
     create: {
       name: "Austin Pinball Collective",
-      notes: "Home of the Austin Pinball Collective - a community-driven pinball arcade",
+      notes:
+        "Home of the Austin Pinball Collective - a community-driven pinball arcade",
       pinballMapId: 26454, // Set the PinballMap ID for sync functionality
       organizationId: organization.id,
     },
   });
   console.log(`Created/Updated location: ${austinPinballLocation.name}`);
 
-  const createdLocations = [austinPinballLocation];
-
   // 5. Create game titles from PinballMap fixture data
-  const fixtureData = await import("../src/lib/pinballmap/__tests__/fixtures/api_responses/locations/location_26454_machine_details.json");
+  const fixtureData = await import(
+    "../src/lib/pinballmap/__tests__/fixtures/api_responses/locations/location_26454_machine_details.json"
+  );
 
   const createdGameTitles = [];
   for (const machine of fixtureData.machines) {
@@ -145,13 +146,13 @@ async function main() {
       organizationId: organization.id,
     },
   });
-  console.log(`Created/Updated room: ${mainFloorRoom.name} at ${austinPinballLocation.name}`);
-
-  const createdRooms = [mainFloorRoom];
+  console.log(
+    `Created/Updated room: ${mainFloorRoom.name} at ${austinPinballLocation.name}`,
+  );
 
   // 7. Create game instances from fixture data in the Main Floor
   if (!mainFloorRoom) {
-    console.error('Main Floor room not found');
+    console.error("Main Floor room not found");
     return;
   }
 
@@ -196,7 +197,9 @@ async function main() {
         ownerId: owner.id,
       },
     });
-    console.log(`Created/Updated game instance: ${gameTitle.name} (Owner: ${owner.name})`);
+    console.log(
+      `Created/Updated game instance: ${gameTitle.name} (Owner: ${owner.name})`,
+    );
   }
 
   // 8. Create issue statuses from CSV data (only if they don't exist)
@@ -304,7 +307,9 @@ async function main() {
 
     if (gameInstance) {
       // Find the reporter
-      const reporter = createdUsers.find(u => u.email === issueData.reporterEmail);
+      const reporter = createdUsers.find(
+        (u) => u.email === issueData.reporterEmail,
+      );
 
       // Find the status
       const status = await prisma.issueStatus.findFirst({
@@ -330,10 +335,14 @@ async function main() {
         });
         console.log(`Created issue: ${issueData.title}`);
       } else {
-        console.log(`Skipped issue ${issueData.title} - missing reporter or status`);
+        console.log(
+          `Skipped issue ${issueData.title} - missing reporter or status`,
+        );
       }
     } else {
-      console.log(`Skipped issue ${issueData.title} - game not found: ${issueData.gameTitle}`);
+      console.log(
+        `Skipped issue ${issueData.title} - game not found: ${issueData.gameTitle}`,
+      );
     }
   }
 
