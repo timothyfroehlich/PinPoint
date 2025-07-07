@@ -4,8 +4,8 @@ This document outlines the phased development plan for the PinPoint platform, br
 
 ### **Milestone 1: Foundational Backend & Core Architecture**
 
-**Goal:** To establish the complete technical foundation of the application. This non-UI milestone focuses on creating a robust, secure, and scalable backend architecture ready to support all future features.
-
+- **Status:** ✅ **Complete**
+- **Goal:** To establish the complete technical foundation of the application. This non-UI milestone focuses on creating a robust, secure, and scalable backend architecture ready to support all future features.
 - **Key Features & Tasks:**
   - **Project Initialization:** Set up the Next.js project with TypeScript, ESLint, and Prettier for code quality and consistency.
   - **Database Schema:** Define and implement the complete v1.0 PostgreSQL schema using Prisma ORM. This includes tables for `User`, `Organization`, `Membership`, `Location`, `GameTitle` (enhanced with OPDB fields), `GameInstance`, `Issue`, `IssueStatus`, `Comment`, and `Attachment`.
@@ -15,8 +15,8 @@ This document outlines the phased development plan for the PinPoint platform, br
 
 ### **Milestone 2: Minimum Viable Product (MVP) with OPDB Integration**
 
-**Goal:** To deliver the first usable version of PinPoint, focusing on the core functionality for a single, hardcoded organization. This milestone makes the platform functional for both public users and internal team members, with enhanced Game Title management powered by OPDB.
-
+- **Status:** ✅ **Complete**
+- **Goal:** To deliver the first usable version of PinPoint, focusing on the core functionality for a single, hardcoded organization. This milestone makes the platform functional for both public users and internal team members, with enhanced Game Title management powered by OPDB.
 - **Key Features & Tasks:**
   - **OPDB Integration:** Implement integration with the Open Pinball Database (OPDB) to provide authoritative game data instead of manual Game Title entry
   - **Enhanced Game Title Management:** Replace manual Game Title creation with OPDB search and selection, including rich metadata like manufacturer, release date, and images
@@ -33,8 +33,8 @@ This document outlines the phased development plan for the PinPoint platform, br
 
 ### **Milestone 3: Advanced Tooling & User Experience**
 
-**Goal:** To enhance the MVP with advanced features that improve workflow efficiency for the internal team and enrich the experience for all users.
-
+- **Status:** 🌗 **Partially Complete**
+- **Goal:** To enhance the MVP with advanced features that improve workflow efficiency for the internal team and enrich the experience for all users.
 - **Key Features & Tasks:**
   - **Advanced Issue Tools:**
     - Implement the "Me Too" / upvote feature for registered users to help prioritize issues.
@@ -47,8 +47,8 @@ This document outlines the phased development plan for the PinPoint platform, br
 
 ### **Milestone 4: Full Notification System & Release Polish (v1.0)**
 
-**Goal:** To complete the v1.0 feature set by implementing a comprehensive notification system and conducting a final round of polishing and optimization, making the platform ready for its official launch.
-
+- **Status:** ❌ **Not Started**
+- **Goal:** To complete the v1.0 feature set by implementing a comprehensive notification system and conducting a final round of polishing and optimization, making the platform ready for its official launch.
 - **Key Features & Tasks:**
   - **Email Integration:** Integrate a transactional email service (e.g., Resend, Postmark) into the backend.
   - **Notification Logic:**
@@ -61,10 +61,15 @@ This document outlines the phased development plan for the PinPoint platform, br
 
 This section outlines major features and modules planned for future releases beyond v1.0. These features are designed to enhance the platform's capabilities without disrupting the core functionality.
 
+### **PinballMap management**
+
+- **Status:** ✅ **Complete**
+- **Goal:** Allow organizations to manage their PinballMap locations directly from the client.
+
 ### **Custom Game Title Support**
 
-**Goal:** Allow organizations to create custom game titles for machines not found in OPDB, such as homebrew games, prototypes, or rare machines.
-
+- **Status:** 🌗 **Partially Complete**
+- **Goal:** Allow organizations to create custom game titles for machines not found in OPDB, such as homebrew games, prototypes, or rare machines.
 - **Key Features:**
   - Custom GameTitle creation with manual metadata entry
   - Flag to distinguish custom vs OPDB-sourced games
@@ -72,14 +77,10 @@ This section outlines major features and modules planned for future releases bey
   - Support for custom game images and descriptions
   - Validation to prevent conflicts with OPDB data
 
-### **PinballMap management**
-
-**Goal:** Allow organizations to manage their PinballMap locations directly from the client.
-
 ### **Multi-Organization Management**
 
-**Goal:** Transition from single-organization to full multi-tenant functionality with organization switching and management.
-
+- **Status:** 🌗 **Partially Complete**
+- **Goal:** Transition from single-organization to full multi-tenant functionality with organization switching and management.
 - **Key Features:**
   - Organization creation and management UI
   - User ability to switch between organizations
@@ -88,8 +89,8 @@ This section outlines major features and modules planned for future releases bey
 
 ### **Advanced Analytics & Reporting**
 
-**Goal:** Provide insights into machine performance, maintenance costs, and operational efficiency.
-
+- **Status:** ❌ **Not Started**
+- **Goal:** Provide insights into machine performance, maintenance costs, and operational efficiency.
 - **Key Features:**
   - Issue trend analysis and reporting
   - Machine uptime and reliability metrics

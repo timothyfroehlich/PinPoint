@@ -30,6 +30,7 @@
 - **Prisma Schema:** When modifying the database, update the `schema.prisma` file. All tenant-specific tables must include the `organization_id` foreign key.
 - **Write Tests First:** For new backend logic and critical UI components, write failing tests before writing the implementation code.
 - **Testing Stack:** Use Jest for the test runner, React Testing Library for components, and Playwright for End-to-End (E2E) tests.
+- **Playwright MCP:** Playwright is available as an MCP server for browser automation and E2E testing.
 - **Coverage:** Ensure new features have adequate test coverage, including:
   - **Unit Tests:** For individual functions and components.
   - **Integration Tests:** For API endpoints and component interactions.
@@ -82,12 +83,14 @@
 ### **Testing Requirements**
 
 **CURRENT PHASE: Unit Tests Only**
+
 - **New Features**: Must include unit tests for business logic (service layer, utilities, pure functions)
 - **No Integration Tests**: We're iterating quickly and not ready for client-server integration tests yet
 - **No E2E Tests**: End-to-end tests will come in a later phase
 - **Multi-Tenancy**: Unit test business logic to verify data isolation between organizations
 
 **FUTURE PHASES: Integration & E2E Testing**
+
 - **API Endpoints**: Integration tests for tRPC procedures (coming later)
 - **Critical Paths**: E2E tests for user workflows (coming later)
 
@@ -183,3 +186,28 @@
 - `npm run typecheck` - TypeScript compilation check
 - `npm run build` - Production build verification
 - `npm run test` - Run all tests (when implemented)
+
+## **Playwright MCP Server Usage**
+
+The Playwright MCP server provides browser automation capabilities for E2E testing and manual testing workflows. Key capabilities:
+
+### **Browser Navigation & Control**
+
+- `mcp__playwright__browser_navigate` - Navigate to URLs
+- `mcp__playwright__browser_take_screenshot` - Capture visual state
+- `mcp__playwright__browser_snapshot` - Get accessibility tree (better than screenshots for actions)
+- `mcp__playwright__browser_resize` - Adjust browser window size
+
+### **Element Interaction**
+
+- `mcp__playwright__browser_click` - Click elements using ref from snapshots
+- `mcp__playwright__browser_type` - Type text into form fields
+- `mcp__playwright__browser_select_option` - Select dropdown options
+- `mcp__playwright__browser_hover` - Hover over elements
+
+### **Testing Workflows**
+
+1. **Manual Testing**: Use Playwright to navigate through user flows and verify Google login works
+2. **Screenshot Documentation**: Capture visual state for debugging or documentation
+3. **Form Testing**: Interact with forms, buttons, and UI elements
+4. **Multi-tenant Testing**: Verify organization isolation by logging in as different users
