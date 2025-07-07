@@ -42,7 +42,10 @@ import { UserAvatar } from "~/app/_components/user-avatar";
 import { useCurrentUser } from "~/lib/hooks/use-current-user";
 import { api } from "~/trpc/react";
 import { IssueImageGallery } from "~/app/_components/issue-image-gallery";
-import { IssueImageUpload, type IssueAttachment } from "~/app/_components/issue-image-upload";
+import {
+  IssueImageUpload,
+  type IssueAttachment,
+} from "~/app/_components/issue-image-upload";
 import React from "react";
 
 interface IssueDetailPageProps {
@@ -388,7 +391,12 @@ export default function IssueDetailPage({ params }: IssueDetailPageProps) {
                   sx={{ mb: 2 }}
                 />
                 <Box
-                  sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 2 }}
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: 2,
+                  }}
                 >
                   {/* Image Upload */}
                   <Box sx={{ flexGrow: 1 }}>

@@ -3,7 +3,6 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { api } from "~/trpc/react";
-import { useCurrentUser } from "~/lib/hooks/use-current-user";
 import { OPDBGameSearch } from "~/app/_components/opdb-game-search";
 import type { OPDBSearchResult } from "~/lib/opdb/types";
 
@@ -29,20 +28,19 @@ import {
   Tabs,
   Tab,
 } from "@mui/material";
-import Grid2 from "@mui/material/Grid2";
 
 // Type definitions for tRPC return types
 type LocationWithRooms = {
   id: string;
   name: string;
-  notes?: string | null;
+  notes: string | null;
   organizationId: string;
-  pinballMapId?: number | null;
+  pinballMapId: number | null;
   rooms: {
     id: string;
     name: string;
     organizationId: string;
-    description?: string | null;
+    description: string | null;
     locationId: string;
     _count: {
       gameInstances: number;
@@ -53,13 +51,13 @@ type LocationWithRooms = {
 type GameTitleWithCount = {
   id: string;
   name: string;
-  manufacturer?: string | null;
-  releaseDate?: Date | null;
-  imageUrl?: string | null;
-  description?: string | null;
-  opdbId?: string | null;
-  organizationId?: string | null;
-  lastSynced?: Date | null;
+  manufacturer: string | null;
+  releaseDate: Date | null;
+  imageUrl: string | null;
+  description: string | null;
+  opdbId: string | null;
+  organizationId: string | null;
+  lastSynced: Date | null;
   _count: {
     gameInstances: number;
   };
@@ -117,34 +115,31 @@ function TabPanel(props: TabPanelProps) {
 }
 
 export default function Home() {
-  const { user, isAuthenticated } = useCurrentUser();
   const [tabValue, setTabValue] = useState(0);
   const [newLocationName, setNewLocationName] = useState("");
   const [newInstanceName, setNewInstanceName] = useState("");
   const [selectedGameTitleId, setSelectedGameTitleId] = useState("");
   const [selectedLocationId, setSelectedLocationId] = useState("");
-  const [selectedOPDBGame, setSelectedOPDBGame] = useState<OPDBSearchResult | null>(null);
+  const [selectedOPDBGame, setSelectedOPDBGame] =
+    useState<OPDBSearchResult | null>(null);
 
   // API queries
   const {
     data: gameTitles,
     isLoading: isLoadingGames,
     error: gameError,
-    refetch: refetchGames,
   } = api.gameTitle.getAll.useQuery<GameTitleWithCount[]>();
 
   const {
     data: locations,
     isLoading: isLoadingLocations,
     error: locationError,
-    refetch: refetchLocations,
   } = api.location.getAll.useQuery<LocationWithRooms[]>();
 
   const {
     data: gameInstances,
     isLoading: isLoadingInstances,
     error: instanceError,
-    refetch: refetchInstances,
   } = api.gameInstance.getAll.useQuery();
 
   // Mutations
@@ -172,7 +167,6 @@ export default function Home() {
       void api.useUtils().gameInstance.getAll.invalidate();
     },
   });
-
 
   const handleLocationSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -273,8 +267,13 @@ export default function Home() {
                 <Typography variant="h5" component="h2" gutterBottom>
                   Add New Game Title from OPDB
                 </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                  Search the Open Pinball Database for games to add to your collection.
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mb: 3 }}
+                >
+                  Search the Open Pinball Database for games to add to your
+                  collection.
                 </Typography>
 
                 <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -311,7 +310,6 @@ export default function Home() {
                     Error adding game: {createGameFromOPDB.error.message}
                   </Alert>
                 )}
-
               </CardContent>
             </Card>
           </Grid>
@@ -413,7 +411,12 @@ export default function Home() {
                   <List>
                     {locations?.map((location: LocationWithRooms) => {
                       // Sum game instances across all rooms
-                      const gameCount = location.rooms?.reduce((sum: number, room) => sum + (room._count?.gameInstances ?? 0), 0) ?? 0;
+                      const gameCount =
+                        location.rooms?.reduce(
+                          (sum: number, room) =>
+                            sum + (room._count?.gameInstances ?? 0),
+                          0,
+                        ) ?? 0;
                       return (
                         <ListItem
                           key={location.id}
@@ -469,7 +472,8 @@ export default function Home() {
                 </Typography>
                 {locationCount === 0 ? (
                   <Alert severity="info">
-                    You need to add at least one location before creating game instances.
+                    You need to add at least one location before creating game
+                    instances.
                   </Alert>
                 ) : (
                   <Box
@@ -486,7 +490,9 @@ export default function Home() {
                       disabled={createGameInstance.isPending}
                     />
 
-                    <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    <Box
+                      sx={{ display: "flex", flexDirection: "column", gap: 2 }}
+                    >
                       <Typography variant="h6" component="h3">
                         Select or Search for Game
                       </Typography>
@@ -512,7 +518,8 @@ export default function Home() {
                                     color="text.secondary"
                                     sx={{ ml: 1 }}
                                   >
-                                    ({game.manufacturer}, {game.releaseDate.getFullYear()})
+                                    ({game.manufacturer},{" "}
+                                    {game.releaseDate.getFullYear()})
                                   </Typography>
                                 )}
                               </MenuItem>
@@ -521,13 +528,20 @@ export default function Home() {
                         </FormControl>
                       )}
 
-                      <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center" }}>
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ textAlign: "center" }}
+                      >
                         — OR —
                       </Typography>
 
                       <OPDBGameSearch
                         onGameSelect={handleOPDBGameSelect}
-                        disabled={createGameInstance.isPending || createGameFromOPDB.isPending}
+                        disabled={
+                          createGameInstance.isPending ||
+                          createGameFromOPDB.isPending
+                        }
                         placeholder="Search OPDB for new games..."
                         label="Search OPDB Games"
                       />
@@ -563,7 +577,8 @@ export default function Home() {
                       }
                       sx={{ alignSelf: "flex-start", minWidth: 120 }}
                     >
-                      {createGameInstance.isPending || createGameFromOPDB.isPending ? (
+                      {createGameInstance.isPending ||
+                      createGameFromOPDB.isPending ? (
                         <CircularProgress size={24} />
                       ) : (
                         "Add Instance"
@@ -617,9 +632,11 @@ export default function Home() {
                                 variant="body2"
                                 color="text.secondary"
                               >
-                                {instance.gameTitle.name} at {instance.room?.location?.name ?? "Unknown Location"}
+                                {instance.gameTitle?.name} at{" "}
+                                {instance.room?.location?.name ??
+                                  "Unknown Location"}
                               </Typography>
-                              {instance.owner && instance.owner.name && (
+                              {instance.owner?.name && (
                                 <Box
                                   sx={{
                                     display: "flex",

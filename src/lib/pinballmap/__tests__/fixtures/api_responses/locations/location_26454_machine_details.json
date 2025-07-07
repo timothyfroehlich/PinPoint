@@ -1,1 +1,414 @@
-{"machines":[{"id":3267,"name":"Avengers: Infinity Quest (Pro)","year":2020,"manufacturer":"Stern","ipdb_link":"https://www.ipdb.org/machine.cgi?id=6754","ipdb_id":6754,"kineticist_url":"https://www.kineticist.com/pinball-machines/avengers-infinity-quest-2020","opdb_id":"Gj66P-M3dxn"},{"id":730,"name":"Big Game","year":1980,"manufacturer":"Stern Electronics","ipdb_link":"https://www.ipdb.org/machine.cgi?id=249","ipdb_id":249,"kineticist_url":"https://www.kineticist.com/pinball-machines/big-game-1980","opdb_id":"G4jQw-MJ5rl"},{"id":1055,"name":"Black Knight","year":1980,"manufacturer":"Williams","ipdb_link":"https://www.ipdb.org/machine.cgi?id=310","ipdb_id":310,"kineticist_url":"https://www.kineticist.com/pinball-machines/black-knight-1980","opdb_id":"GrO7w-M9R03"},{"id":732,"name":"Black Rose","year":1992,"manufacturer":"Bally","ipdb_link":"https://www.ipdb.org/machine.cgi?id=313","ipdb_id":313,"kineticist_url":"https://www.kineticist.com/pinball-machines/black-rose-1992","opdb_id":"G5vZd-MQpWZ"},{"id":3422,"name":"Cactus Canyon (Remake Special)","year":2021,"manufacturer":"Chicago Gaming","ipdb_link":null,"ipdb_id":null,"kineticist_url":"https://www.kineticist.com/pinball-machines/cactus-canyon-1998","opdb_id":"G4835-M2YPK-AR5ln"},{"id":1455,"name":"Cleopatra","year":1977,"manufacturer":"Gottlieb","ipdb_link":"https://www.ipdb.org/machine.cgi?id=532","ipdb_id":532,"kineticist_url":"https://www.kineticist.com/pinball-machines/cleopatra-1977","opdb_id":"GrknN-MQrdv"},{"id":3023,"name":"Deadpool (Premium)","year":2018,"manufacturer":"Stern","ipdb_link":"https://www.ipdb.org/machine.cgi?id=6559","ipdb_id":6559,"kineticist_url":"https://www.kineticist.com/pinball-machines/deadpool-2018","opdb_id":"G6lnq-MRj7Z"},{"id":2042,"name":"Domino","year":1968,"manufacturer":"Gottlieb","ipdb_link":"https://www.ipdb.org/machine.cgi?id=701","ipdb_id":701,"kineticist_url":"https://www.kineticist.com/pinball-machines/domino--playmates-1968","opdb_id":"G4j8k-MJK5K"},{"id":741,"name":"Eight Ball Deluxe","year":1981,"manufacturer":"Bally","ipdb_link":"https://www.ipdb.org/machine.cgi?id=762","ipdb_id":762,"kineticist_url":"https://www.kineticist.com/pinball-machines/eight-ball-deluxe-1981","opdb_id":"G5KXk-MLB9V"},{"id":937,"name":"Flight 2000","year":1980,"manufacturer":"Stern Electronics","ipdb_link":"https://www.ipdb.org/machine.cgi?id=887","ipdb_id":887,"kineticist_url":"https://www.kineticist.com/pinball-machines/flight-2000-1980","opdb_id":"G48kY-MDxRV"},{"id":703,"name":"Funhouse","year":1990,"manufacturer":"Williams","ipdb_link":"https://www.ipdb.org/machine.cgi?id=966","ipdb_id":966,"kineticist_url":"https://www.kineticist.com/pinball-machines/funhouse-1990","opdb_id":"G5Dz7-Mq139"},{"id":2441,"name":"Game of Thrones (Pro)","year":2015,"manufacturer":"Stern","ipdb_link":"https://www.ipdb.org/machine.cgi?id=6307","ipdb_id":6307,"kineticist_url":"https://www.kineticist.com/pinball-machines/game-of-thrones-2015","opdb_id":"G41d5-MKNwX"},{"id":3408,"name":"Halloween (CE)","year":2021,"manufacturer":"Spooky","ipdb_link":null,"ipdb_id":null,"kineticist_url":"https://www.kineticist.com/pinball-machines/halloween-2021","opdb_id":"Gj66Z-Mp4BN-A9Y6n"},{"id":795,"name":"High Hand","year":1973,"manufacturer":"Gottlieb","ipdb_link":"https://www.ipdb.org/machine.cgi?id=1173","ipdb_id":1173,"kineticist_url":"https://www.kineticist.com/pinball-machines/high-hand--capt-card-1973","opdb_id":"GRYbJ-MnKex"},{"id":794,"name":"Hokus Pokus","year":1975,"manufacturer":"Bally","ipdb_link":"https://www.ipdb.org/machine.cgi?id=1206","ipdb_id":1206,"kineticist_url":"https://www.kineticist.com/pinball-machines/hokus-pokus-1975","opdb_id":"GRwBN-MJ5ln"},{"id":1158,"name":"Hot Tip","year":1977,"manufacturer":"Williams","ipdb_link":"https://www.ipdb.org/machine.cgi?id=3163","ipdb_id":3163,"kineticist_url":"https://www.kineticist.com/pinball-machines/hot-tip-1977","opdb_id":"Grep0-MQYN4"},{"id":2923,"name":"Iron Maiden: Legacy of the Beast (Pro)","year":2018,"manufacturer":"Stern","ipdb_link":"https://www.ipdb.org/machine.cgi?id=6555","ipdb_id":6555,"kineticist_url":"https://www.kineticist.com/pinball-machines/iron-maiden-legacy-of-the-beast-2018","opdb_id":"G4dOQ-MyNbb"},{"id":3784,"name":"Jim Henson’s Labyrinth","year":2023,"manufacturer":"Barrels of Fun","ipdb_link":null,"ipdb_id":null,"kineticist_url":"https://www.kineticist.com/pinball-machines/jim-hensons-labyrinth-2023","opdb_id":"GvBn8-Mz291"},{"id":3419,"name":"Jurassic Park (Home Edition)","year":2021,"manufacturer":"Stern","ipdb_link":null,"ipdb_id":null,"kineticist_url":"https://www.kineticist.com/pinball-machines/jurassic-park-home-edition-2021","opdb_id":"GxvvB-MOEKX"},{"id":662,"name":"Lord of the Rings","year":2003,"manufacturer":"Stern","ipdb_link":"https://www.ipdb.org/machine.cgi?id=4858","ipdb_id":4858,"kineticist_url":"https://www.kineticist.com/pinball-machines/lord-of-the-rings-2003","opdb_id":"GrqZX-MD15w"},{"id":851,"name":"Meteor","year":1979,"manufacturer":"Stern Electronics","ipdb_link":"https://www.ipdb.org/machine.cgi?id=1580","ipdb_id":1580,"kineticist_url":"https://www.kineticist.com/pinball-machines/meteor-1979","opdb_id":"G5b38-MDqkx"},{"id":698,"name":"Monopoly","year":2001,"manufacturer":"Stern","ipdb_link":"https://www.ipdb.org/machine.cgi?id=4505","ipdb_id":4505,"kineticist_url":"https://www.kineticist.com/pinball-machines/monopoly-2001","opdb_id":"G48w3-Mq1Zk"},{"id":897,"name":"Paragon","year":1979,"manufacturer":"Bally","ipdb_link":"https://www.ipdb.org/machine.cgi?id=1755","ipdb_id":1755,"kineticist_url":"https://www.kineticist.com/pinball-machines/paragon-1979","opdb_id":"GrXy3-ML0Ey"},{"id":678,"name":"Revenge from Mars","year":1999,"manufacturer":"Bally","ipdb_link":"https://www.ipdb.org/machine.cgi?id=4446","ipdb_id":4446,"kineticist_url":"https://www.kineticist.com/pinball-machines/revenge-from-mars-1999","opdb_id":"G50Wr-MLeZP"},{"id":3224,"name":"Rick and Morty (SE)","year":2019,"manufacturer":"Spooky","ipdb_link":"https://www.ipdb.org/machine.cgi?id=6640","ipdb_id":6640,"kineticist_url":"https://www.kineticist.com/pinball-machines/rick-and-morty-2019","opdb_id":"GQKb2-MYek0"},{"id":3670,"name":"Scooby-Doo (CE)","year":2023,"manufacturer":"Spooky","ipdb_link":null,"ipdb_id":null,"kineticist_url":"https://www.kineticist.com/pinball-machines/scooby-doo-2023","opdb_id":"GllPz-MBRrV-A9vWL"},{"id":1783,"name":"Sea Ray","year":1970,"manufacturer":"Bally","ipdb_link":"https://www.ipdb.org/machine.cgi?id=2085","ipdb_id":2085,"kineticist_url":"https://www.kineticist.com/pinball-machines/mariner--sea-ray-1971","opdb_id":"G4jBk-MLB1w"},{"id":908,"name":"Space Invaders","year":1979,"manufacturer":"Bally","ipdb_link":"https://www.ipdb.org/machine.cgi?id=2252","ipdb_id":2252,"kineticist_url":"https://www.kineticist.com/pinball-machines/space-invaders-1980","opdb_id":"G42PX-MyNXo"},{"id":944,"name":"Split Second","year":1981,"manufacturer":"Stern Electronics","ipdb_link":"https://www.ipdb.org/machine.cgi?id=2297","ipdb_id":2297,"kineticist_url":"https://www.kineticist.com/pinball-machines/split-second-1981","opdb_id":"GRLbz-MDnxo"},{"id":684,"name":"Star Trek: The Next Generation","year":1993,"manufacturer":"Williams","ipdb_link":"https://www.ipdb.org/machine.cgi?id=2357","ipdb_id":2357,"kineticist_url":"https://www.kineticist.com/pinball-machines/star-trek-the-next-generation-1993","opdb_id":"GR6d8-M1rZd"},{"id":685,"name":"Stargate","year":1995,"manufacturer":"Gottlieb","ipdb_link":"https://www.ipdb.org/machine.cgi?id=2847","ipdb_id":2847,"kineticist_url":"https://www.kineticist.com/pinball-machines/stargate-1995","opdb_id":"G50pv-MdE6R"},{"id":855,"name":"Stars","year":1978,"manufacturer":"Stern Electronics","ipdb_link":"https://www.ipdb.org/machine.cgi?id=2366","ipdb_id":2366,"kineticist_url":"https://www.kineticist.com/pinball-machines/stars-1978","opdb_id":"GrXEW-MDEwr"},{"id":1997,"name":"Stingray","year":1977,"manufacturer":"Stern Electronics","ipdb_link":"https://www.ipdb.org/machine.cgi?id=2377","ipdb_id":2377,"kineticist_url":"https://www.kineticist.com/pinball-machines/stingray-1977","opdb_id":"G57lj-MJwxY"},{"id":1782,"name":"Super Soccer","year":1975,"manufacturer":"Gottlieb","ipdb_link":"https://www.ipdb.org/machine.cgi?id=2443","ipdb_id":2443,"kineticist_url":"https://www.kineticist.com/pinball-machines/soccer--super-soccer-1975","opdb_id":"GRn8D-MQd21"},{"id":3833,"name":"The Princess Bride (CE)","year":2024,"manufacturer":"Multimorphic","ipdb_link":null,"ipdb_id":null,"kineticist_url":"https://www.kineticist.com/pinball-machines/the-princess-bride-2024","opdb_id":"GkBnQ-MBRxV-A96qp"},{"id":1582,"name":"Top Score","year":1975,"manufacturer":"Gottlieb","ipdb_link":"https://www.ipdb.org/machine.cgi?id=2589","ipdb_id":2589,"kineticist_url":"https://www.kineticist.com/pinball-machines/300--top-score-1975","opdb_id":"G5W1w-MQVkq"},{"id":1278,"name":"Transporter the Rescue","year":1989,"manufacturer":"Bally","ipdb_link":"https://www.ipdb.org/machine.cgi?id=2630","ipdb_id":2630,"kineticist_url":"https://www.kineticist.com/pinball-machines/transporter-the-rescue-1989","opdb_id":"G5n2D-MLn85"},{"id":3414,"name":"Ultraman: Kaiju Rumble (Blood Sucker Edition)","year":2021,"manufacturer":"Spooky","ipdb_link":null,"ipdb_id":null,"kineticist_url":"https://www.kineticist.com/pinball-machines/ultraman-kaiju-rumble-2021","opdb_id":"GBLLd-MdEON-A94po"},{"id":707,"name":"World Cup Soccer","year":1994,"manufacturer":"Bally","ipdb_link":"https://www.ipdb.org/machine.cgi?id=2811","ipdb_id":2811,"kineticist_url":"https://www.kineticist.com/pinball-machines/world-cup-soccer-1994","opdb_id":"G42E2-MQP9e"},{"id":1335,"name":"X-Men Wolverine (LE)","year":2012,"manufacturer":"Stern","ipdb_link":"https://www.ipdb.org/machine.cgi?id=5824","ipdb_id":5824,"kineticist_url":"https://www.kineticist.com/pinball-machines/x-men-2012","opdb_id":"Grj6X-MJNV1-AO209"},{"id":726,"name":"Xenon","year":1979,"manufacturer":"Bally","ipdb_link":"https://www.ipdb.org/machine.cgi?id=2821","ipdb_id":2821,"kineticist_url":"https://www.kineticist.com/pinball-machines/xenon-1980","opdb_id":"G42Pk-MZe2e"}]}
+{
+  "machines": [
+    {
+      "id": 3267,
+      "name": "Avengers: Infinity Quest (Pro)",
+      "year": 2020,
+      "manufacturer": "Stern",
+      "ipdb_link": "https://www.ipdb.org/machine.cgi?id=6754",
+      "ipdb_id": 6754,
+      "kineticist_url": "https://www.kineticist.com/pinball-machines/avengers-infinity-quest-2020",
+      "opdb_id": "Gj66P-M3dxn"
+    },
+    {
+      "id": 730,
+      "name": "Big Game",
+      "year": 1980,
+      "manufacturer": "Stern Electronics",
+      "ipdb_link": "https://www.ipdb.org/machine.cgi?id=249",
+      "ipdb_id": 249,
+      "kineticist_url": "https://www.kineticist.com/pinball-machines/big-game-1980",
+      "opdb_id": "G4jQw-MJ5rl"
+    },
+    {
+      "id": 1055,
+      "name": "Black Knight",
+      "year": 1980,
+      "manufacturer": "Williams",
+      "ipdb_link": "https://www.ipdb.org/machine.cgi?id=310",
+      "ipdb_id": 310,
+      "kineticist_url": "https://www.kineticist.com/pinball-machines/black-knight-1980",
+      "opdb_id": "GrO7w-M9R03"
+    },
+    {
+      "id": 732,
+      "name": "Black Rose",
+      "year": 1992,
+      "manufacturer": "Bally",
+      "ipdb_link": "https://www.ipdb.org/machine.cgi?id=313",
+      "ipdb_id": 313,
+      "kineticist_url": "https://www.kineticist.com/pinball-machines/black-rose-1992",
+      "opdb_id": "G5vZd-MQpWZ"
+    },
+    {
+      "id": 3422,
+      "name": "Cactus Canyon (Remake Special)",
+      "year": 2021,
+      "manufacturer": "Chicago Gaming",
+      "ipdb_link": null,
+      "ipdb_id": null,
+      "kineticist_url": "https://www.kineticist.com/pinball-machines/cactus-canyon-1998",
+      "opdb_id": "G4835-M2YPK-AR5ln"
+    },
+    {
+      "id": 1455,
+      "name": "Cleopatra",
+      "year": 1977,
+      "manufacturer": "Gottlieb",
+      "ipdb_link": "https://www.ipdb.org/machine.cgi?id=532",
+      "ipdb_id": 532,
+      "kineticist_url": "https://www.kineticist.com/pinball-machines/cleopatra-1977",
+      "opdb_id": "GrknN-MQrdv"
+    },
+    {
+      "id": 3023,
+      "name": "Deadpool (Premium)",
+      "year": 2018,
+      "manufacturer": "Stern",
+      "ipdb_link": "https://www.ipdb.org/machine.cgi?id=6559",
+      "ipdb_id": 6559,
+      "kineticist_url": "https://www.kineticist.com/pinball-machines/deadpool-2018",
+      "opdb_id": "G6lnq-MRj7Z"
+    },
+    {
+      "id": 2042,
+      "name": "Domino",
+      "year": 1968,
+      "manufacturer": "Gottlieb",
+      "ipdb_link": "https://www.ipdb.org/machine.cgi?id=701",
+      "ipdb_id": 701,
+      "kineticist_url": "https://www.kineticist.com/pinball-machines/domino--playmates-1968",
+      "opdb_id": "G4j8k-MJK5K"
+    },
+    {
+      "id": 741,
+      "name": "Eight Ball Deluxe",
+      "year": 1981,
+      "manufacturer": "Bally",
+      "ipdb_link": "https://www.ipdb.org/machine.cgi?id=762",
+      "ipdb_id": 762,
+      "kineticist_url": "https://www.kineticist.com/pinball-machines/eight-ball-deluxe-1981",
+      "opdb_id": "G5KXk-MLB9V"
+    },
+    {
+      "id": 937,
+      "name": "Flight 2000",
+      "year": 1980,
+      "manufacturer": "Stern Electronics",
+      "ipdb_link": "https://www.ipdb.org/machine.cgi?id=887",
+      "ipdb_id": 887,
+      "kineticist_url": "https://www.kineticist.com/pinball-machines/flight-2000-1980",
+      "opdb_id": "G48kY-MDxRV"
+    },
+    {
+      "id": 703,
+      "name": "Funhouse",
+      "year": 1990,
+      "manufacturer": "Williams",
+      "ipdb_link": "https://www.ipdb.org/machine.cgi?id=966",
+      "ipdb_id": 966,
+      "kineticist_url": "https://www.kineticist.com/pinball-machines/funhouse-1990",
+      "opdb_id": "G5Dz7-Mq139"
+    },
+    {
+      "id": 2441,
+      "name": "Game of Thrones (Pro)",
+      "year": 2015,
+      "manufacturer": "Stern",
+      "ipdb_link": "https://www.ipdb.org/machine.cgi?id=6307",
+      "ipdb_id": 6307,
+      "kineticist_url": "https://www.kineticist.com/pinball-machines/game-of-thrones-2015",
+      "opdb_id": "G41d5-MKNwX"
+    },
+    {
+      "id": 3408,
+      "name": "Halloween (CE)",
+      "year": 2021,
+      "manufacturer": "Spooky",
+      "ipdb_link": null,
+      "ipdb_id": null,
+      "kineticist_url": "https://www.kineticist.com/pinball-machines/halloween-2021",
+      "opdb_id": "Gj66Z-Mp4BN-A9Y6n"
+    },
+    {
+      "id": 795,
+      "name": "High Hand",
+      "year": 1973,
+      "manufacturer": "Gottlieb",
+      "ipdb_link": "https://www.ipdb.org/machine.cgi?id=1173",
+      "ipdb_id": 1173,
+      "kineticist_url": "https://www.kineticist.com/pinball-machines/high-hand--capt-card-1973",
+      "opdb_id": "GRYbJ-MnKex"
+    },
+    {
+      "id": 794,
+      "name": "Hokus Pokus",
+      "year": 1975,
+      "manufacturer": "Bally",
+      "ipdb_link": "https://www.ipdb.org/machine.cgi?id=1206",
+      "ipdb_id": 1206,
+      "kineticist_url": "https://www.kineticist.com/pinball-machines/hokus-pokus-1975",
+      "opdb_id": "GRwBN-MJ5ln"
+    },
+    {
+      "id": 1158,
+      "name": "Hot Tip",
+      "year": 1977,
+      "manufacturer": "Williams",
+      "ipdb_link": "https://www.ipdb.org/machine.cgi?id=3163",
+      "ipdb_id": 3163,
+      "kineticist_url": "https://www.kineticist.com/pinball-machines/hot-tip-1977",
+      "opdb_id": "Grep0-MQYN4"
+    },
+    {
+      "id": 2923,
+      "name": "Iron Maiden: Legacy of the Beast (Pro)",
+      "year": 2018,
+      "manufacturer": "Stern",
+      "ipdb_link": "https://www.ipdb.org/machine.cgi?id=6555",
+      "ipdb_id": 6555,
+      "kineticist_url": "https://www.kineticist.com/pinball-machines/iron-maiden-legacy-of-the-beast-2018",
+      "opdb_id": "G4dOQ-MyNbb"
+    },
+    {
+      "id": 3784,
+      "name": "Jim Henson’s Labyrinth",
+      "year": 2023,
+      "manufacturer": "Barrels of Fun",
+      "ipdb_link": null,
+      "ipdb_id": null,
+      "kineticist_url": "https://www.kineticist.com/pinball-machines/jim-hensons-labyrinth-2023",
+      "opdb_id": "GvBn8-Mz291"
+    },
+    {
+      "id": 3419,
+      "name": "Jurassic Park (Home Edition)",
+      "year": 2021,
+      "manufacturer": "Stern",
+      "ipdb_link": null,
+      "ipdb_id": null,
+      "kineticist_url": "https://www.kineticist.com/pinball-machines/jurassic-park-home-edition-2021",
+      "opdb_id": "GxvvB-MOEKX"
+    },
+    {
+      "id": 662,
+      "name": "Lord of the Rings",
+      "year": 2003,
+      "manufacturer": "Stern",
+      "ipdb_link": "https://www.ipdb.org/machine.cgi?id=4858",
+      "ipdb_id": 4858,
+      "kineticist_url": "https://www.kineticist.com/pinball-machines/lord-of-the-rings-2003",
+      "opdb_id": "GrqZX-MD15w"
+    },
+    {
+      "id": 851,
+      "name": "Meteor",
+      "year": 1979,
+      "manufacturer": "Stern Electronics",
+      "ipdb_link": "https://www.ipdb.org/machine.cgi?id=1580",
+      "ipdb_id": 1580,
+      "kineticist_url": "https://www.kineticist.com/pinball-machines/meteor-1979",
+      "opdb_id": "G5b38-MDqkx"
+    },
+    {
+      "id": 698,
+      "name": "Monopoly",
+      "year": 2001,
+      "manufacturer": "Stern",
+      "ipdb_link": "https://www.ipdb.org/machine.cgi?id=4505",
+      "ipdb_id": 4505,
+      "kineticist_url": "https://www.kineticist.com/pinball-machines/monopoly-2001",
+      "opdb_id": "G48w3-Mq1Zk"
+    },
+    {
+      "id": 897,
+      "name": "Paragon",
+      "year": 1979,
+      "manufacturer": "Bally",
+      "ipdb_link": "https://www.ipdb.org/machine.cgi?id=1755",
+      "ipdb_id": 1755,
+      "kineticist_url": "https://www.kineticist.com/pinball-machines/paragon-1979",
+      "opdb_id": "GrXy3-ML0Ey"
+    },
+    {
+      "id": 678,
+      "name": "Revenge from Mars",
+      "year": 1999,
+      "manufacturer": "Bally",
+      "ipdb_link": "https://www.ipdb.org/machine.cgi?id=4446",
+      "ipdb_id": 4446,
+      "kineticist_url": "https://www.kineticist.com/pinball-machines/revenge-from-mars-1999",
+      "opdb_id": "G50Wr-MLeZP"
+    },
+    {
+      "id": 3224,
+      "name": "Rick and Morty (SE)",
+      "year": 2019,
+      "manufacturer": "Spooky",
+      "ipdb_link": "https://www.ipdb.org/machine.cgi?id=6640",
+      "ipdb_id": 6640,
+      "kineticist_url": "https://www.kineticist.com/pinball-machines/rick-and-morty-2019",
+      "opdb_id": "GQKb2-MYek0"
+    },
+    {
+      "id": 3670,
+      "name": "Scooby-Doo (CE)",
+      "year": 2023,
+      "manufacturer": "Spooky",
+      "ipdb_link": null,
+      "ipdb_id": null,
+      "kineticist_url": "https://www.kineticist.com/pinball-machines/scooby-doo-2023",
+      "opdb_id": "GllPz-MBRrV-A9vWL"
+    },
+    {
+      "id": 1783,
+      "name": "Sea Ray",
+      "year": 1970,
+      "manufacturer": "Bally",
+      "ipdb_link": "https://www.ipdb.org/machine.cgi?id=2085",
+      "ipdb_id": 2085,
+      "kineticist_url": "https://www.kineticist.com/pinball-machines/mariner--sea-ray-1971",
+      "opdb_id": "G4jBk-MLB1w"
+    },
+    {
+      "id": 908,
+      "name": "Space Invaders",
+      "year": 1979,
+      "manufacturer": "Bally",
+      "ipdb_link": "https://www.ipdb.org/machine.cgi?id=2252",
+      "ipdb_id": 2252,
+      "kineticist_url": "https://www.kineticist.com/pinball-machines/space-invaders-1980",
+      "opdb_id": "G42PX-MyNXo"
+    },
+    {
+      "id": 944,
+      "name": "Split Second",
+      "year": 1981,
+      "manufacturer": "Stern Electronics",
+      "ipdb_link": "https://www.ipdb.org/machine.cgi?id=2297",
+      "ipdb_id": 2297,
+      "kineticist_url": "https://www.kineticist.com/pinball-machines/split-second-1981",
+      "opdb_id": "GRLbz-MDnxo"
+    },
+    {
+      "id": 684,
+      "name": "Star Trek: The Next Generation",
+      "year": 1993,
+      "manufacturer": "Williams",
+      "ipdb_link": "https://www.ipdb.org/machine.cgi?id=2357",
+      "ipdb_id": 2357,
+      "kineticist_url": "https://www.kineticist.com/pinball-machines/star-trek-the-next-generation-1993",
+      "opdb_id": "GR6d8-M1rZd"
+    },
+    {
+      "id": 685,
+      "name": "Stargate",
+      "year": 1995,
+      "manufacturer": "Gottlieb",
+      "ipdb_link": "https://www.ipdb.org/machine.cgi?id=2847",
+      "ipdb_id": 2847,
+      "kineticist_url": "https://www.kineticist.com/pinball-machines/stargate-1995",
+      "opdb_id": "G50pv-MdE6R"
+    },
+    {
+      "id": 855,
+      "name": "Stars",
+      "year": 1978,
+      "manufacturer": "Stern Electronics",
+      "ipdb_link": "https://www.ipdb.org/machine.cgi?id=2366",
+      "ipdb_id": 2366,
+      "kineticist_url": "https://www.kineticist.com/pinball-machines/stars-1978",
+      "opdb_id": "GrXEW-MDEwr"
+    },
+    {
+      "id": 1997,
+      "name": "Stingray",
+      "year": 1977,
+      "manufacturer": "Stern Electronics",
+      "ipdb_link": "https://www.ipdb.org/machine.cgi?id=2377",
+      "ipdb_id": 2377,
+      "kineticist_url": "https://www.kineticist.com/pinball-machines/stingray-1977",
+      "opdb_id": "G57lj-MJwxY"
+    },
+    {
+      "id": 1782,
+      "name": "Super Soccer",
+      "year": 1975,
+      "manufacturer": "Gottlieb",
+      "ipdb_link": "https://www.ipdb.org/machine.cgi?id=2443",
+      "ipdb_id": 2443,
+      "kineticist_url": "https://www.kineticist.com/pinball-machines/soccer--super-soccer-1975",
+      "opdb_id": "GRn8D-MQd21"
+    },
+    {
+      "id": 3833,
+      "name": "The Princess Bride (CE)",
+      "year": 2024,
+      "manufacturer": "Multimorphic",
+      "ipdb_link": null,
+      "ipdb_id": null,
+      "kineticist_url": "https://www.kineticist.com/pinball-machines/the-princess-bride-2024",
+      "opdb_id": "GkBnQ-MBRxV-A96qp"
+    },
+    {
+      "id": 1582,
+      "name": "Top Score",
+      "year": 1975,
+      "manufacturer": "Gottlieb",
+      "ipdb_link": "https://www.ipdb.org/machine.cgi?id=2589",
+      "ipdb_id": 2589,
+      "kineticist_url": "https://www.kineticist.com/pinball-machines/300--top-score-1975",
+      "opdb_id": "G5W1w-MQVkq"
+    },
+    {
+      "id": 1278,
+      "name": "Transporter the Rescue",
+      "year": 1989,
+      "manufacturer": "Bally",
+      "ipdb_link": "https://www.ipdb.org/machine.cgi?id=2630",
+      "ipdb_id": 2630,
+      "kineticist_url": "https://www.kineticist.com/pinball-machines/transporter-the-rescue-1989",
+      "opdb_id": "G5n2D-MLn85"
+    },
+    {
+      "id": 3414,
+      "name": "Ultraman: Kaiju Rumble (Blood Sucker Edition)",
+      "year": 2021,
+      "manufacturer": "Spooky",
+      "ipdb_link": null,
+      "ipdb_id": null,
+      "kineticist_url": "https://www.kineticist.com/pinball-machines/ultraman-kaiju-rumble-2021",
+      "opdb_id": "GBLLd-MdEON-A94po"
+    },
+    {
+      "id": 707,
+      "name": "World Cup Soccer",
+      "year": 1994,
+      "manufacturer": "Bally",
+      "ipdb_link": "https://www.ipdb.org/machine.cgi?id=2811",
+      "ipdb_id": 2811,
+      "kineticist_url": "https://www.kineticist.com/pinball-machines/world-cup-soccer-1994",
+      "opdb_id": "G42E2-MQP9e"
+    },
+    {
+      "id": 1335,
+      "name": "X-Men Wolverine (LE)",
+      "year": 2012,
+      "manufacturer": "Stern",
+      "ipdb_link": "https://www.ipdb.org/machine.cgi?id=5824",
+      "ipdb_id": 5824,
+      "kineticist_url": "https://www.kineticist.com/pinball-machines/x-men-2012",
+      "opdb_id": "Grj6X-MJNV1-AO209"
+    },
+    {
+      "id": 726,
+      "name": "Xenon",
+      "year": 1979,
+      "manufacturer": "Bally",
+      "ipdb_link": "https://www.ipdb.org/machine.cgi?id=2821",
+      "ipdb_id": 2821,
+      "kineticist_url": "https://www.kineticist.com/pinball-machines/xenon-1980",
+      "opdb_id": "G42Pk-MZe2e"
+    }
+  ]
+}

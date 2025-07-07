@@ -1,6 +1,7 @@
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { type DefaultSession, type NextAuthConfig } from "next-auth";
 import Google from "next-auth/providers/google";
+import Credentials from "next-auth/providers/credentials";
 
 import { db } from "~/server/db";
 
@@ -33,9 +34,48 @@ declare module "next-auth" {
 export const authConfig = {
   providers: [
     Google({
-      clientId: process.env.AUTH_GOOGLE_ID!,
-      clientSecret: process.env.AUTH_GOOGLE_SECRET!,
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
+    // Development-only Credentials provider for test accounts
+    ...(process.env.NODE_ENV === "development"
+      ? [
+          Credentials({
+            name: "Development Test Users",
+            credentials: {
+              email: { label: "Email", type: "email" },
+            },
+            async authorize(credentials) {
+              if (process.env.NODE_ENV !== "development") {
+                return null;
+              }
+
+              if (
+                !credentials?.email ||
+                typeof credentials.email !== "string"
+              ) {
+                return null;
+              }
+
+              // Find user in database by email
+              const user = await db.user.findUnique({
+                where: { email: credentials.email },
+              });
+
+              if (user) {
+                return {
+                  id: user.id,
+                  name: user.name ?? "",
+                  email: user.email ?? "",
+                  image: user.profilePicture ?? null,
+                };
+              }
+
+              return null;
+            },
+          }),
+        ]
+      : []),
   ],
   adapter: PrismaAdapter(db),
   callbacks: {
