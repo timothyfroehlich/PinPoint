@@ -5,7 +5,7 @@ import { TRPCReactProvider } from "~/trpc/react";
 import { AppBar, Toolbar, Typography, Box } from "@mui/material";
 import Link from "next/link";
 import { AuthButton } from "./_components/auth-button";
-import { DevLogin } from "./_components/dev/dev-login";
+import { DevLoginCompact } from "./_components/dev/dev-login-compact";
 
 export const metadata: Metadata = {
   title: "PinPoint",
@@ -65,7 +65,7 @@ export default function RootLayout({
               </Toolbar>
             </AppBar>
             {children}
-            <DevLogin />
+            <DevLoginCompact />
           </AppProviders>
         </TRPCReactProvider>
       </body>

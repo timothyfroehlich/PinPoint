@@ -10,6 +10,15 @@ export async function GET() {
   try {
     const session = await auth();
 
+    // Get the organization to fetch memberships
+    const organization = await db.organization.findFirst();
+    if (!organization) {
+      return NextResponse.json(
+        { error: "No organization found" },
+        { status: 500 },
+      );
+    }
+
     const users = await db.user.findMany({
       where: {
         OR: [
@@ -17,9 +26,25 @@ export async function GET() {
           { email: "phoenixavatar2@gmail.com" },
         ],
       },
+      include: {
+        memberships: {
+          where: {
+            organizationId: organization.id,
+          },
+        },
+      },
     });
 
-    return NextResponse.json({ users, currentUser: session?.user });
+    // Transform users to include role information
+    const usersWithRoles = users.map((user) => ({
+      ...user,
+      role: user.memberships[0]?.role ?? null,
+    }));
+
+    return NextResponse.json({
+      users: usersWithRoles,
+      currentUser: session?.user,
+    });
   } catch (error) {
     console.error("Error fetching dev users:", error);
     return NextResponse.json(

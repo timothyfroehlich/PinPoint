@@ -34,7 +34,6 @@ import {
   LocationOn,
   MoveUp,
   Person,
-  BugReport,
 } from "@mui/icons-material";
 import { useState } from "react";
 import React from "react";
@@ -43,10 +42,7 @@ import Link from "next/link";
 import { UserAvatar } from "~/app/_components/user-avatar";
 import { useCurrentUser } from "~/lib/hooks/use-current-user";
 import { api } from "~/trpc/react";
-import {
-  IssueImageUpload,
-  type IssueAttachment,
-} from "~/app/_components/issue-image-upload";
+import { IssueSubmissionForm } from "~/app/_components/issue-submission-form";
 
 interface LocationProfilePageProps {
   params: Promise<{
@@ -75,20 +71,10 @@ export default function LocationProfilePage({
     null,
   );
   const [editForm, setEditForm] = useState({ name: "", notes: "" });
-  const [issueForm, setIssueForm] = useState({
-    gameInstanceId: "",
-    title: "",
-    severity: "" as "Low" | "Medium" | "High" | "Critical" | "",
-    description: "",
-    reporterEmail: "",
-  });
-  const [issueAttachments, setIssueAttachments] = useState<IssueAttachment[]>(
-    [],
-  );
   const [pinballMapDialogOpen, setPinballMapDialogOpen] = useState(false);
   const [pinballMapId, setPinballMapId] = useState<number | null>(null);
 
-  const { user, isAuthenticated } = useCurrentUser();
+  const { isAuthenticated } = useCurrentUser();
 
   const {
     data: location,
@@ -114,42 +100,6 @@ export default function LocationProfilePage({
       setMoveDialogOpen(false);
       setSelectedGameInstanceId(null);
       setTargetLocationId("");
-      void refetch();
-    },
-  });
-
-  const createIssueMutation = api.issue.create.useMutation({
-    onSuccess: async (newIssue) => {
-      // Upload any attachments to the new issue
-      if (issueAttachments.length > 0) {
-        try {
-          for (const attachment of issueAttachments) {
-            if (attachment.file) {
-              const formData = new FormData();
-              formData.append("file", attachment.file);
-              formData.append("issueId", newIssue.id);
-
-              await fetch("/api/upload/issue", {
-                method: "POST",
-                body: formData,
-              });
-            }
-          }
-        } catch (error) {
-          console.error("Error uploading attachments:", error);
-          // Don't fail the whole operation, just log the error
-        }
-      }
-
-      // Clear form and attachments
-      setIssueForm({
-        gameInstanceId: "",
-        title: "",
-        severity: "",
-        description: "",
-        reporterEmail: "",
-      });
-      setIssueAttachments([]);
       void refetch();
     },
   });
@@ -264,21 +214,6 @@ export default function LocationProfilePage({
         roomId: targetLocationId, // This should be roomId now
       });
     }
-  };
-
-  const handleIssueSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!issueForm.gameInstanceId || !issueForm.title.trim()) return;
-
-    createIssueMutation.mutate({
-      title: issueForm.title.trim(),
-      description: issueForm.description.trim() || undefined,
-      severity: issueForm.severity || undefined,
-      reporterEmail: !isAuthenticated
-        ? issueForm.reporterEmail.trim() || undefined
-        : undefined,
-      gameInstanceId: issueForm.gameInstanceId,
-    });
   };
 
   const otherLocations =
@@ -481,236 +416,10 @@ export default function LocationProfilePage({
 
         {/* Issue Submission Form */}
         <Grid size={12}>
-          <Card>
-            <CardContent>
-              <Box
-                sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}
-              >
-                <BugReport color="primary" />
-                <Typography variant="h6">Report an Issue</Typography>
-              </Box>
-              <Divider sx={{ mb: 3 }} />
-
-              {allGameInstances.length === 0 ? (
-                <Alert severity="info">
-                  No games available at this location to report issues for.
-                </Alert>
-              ) : (
-                <Box
-                  component="form"
-                  onSubmit={handleIssueSubmit}
-                  sx={{ display: "flex", flexDirection: "column", gap: 3 }}
-                >
-                  {/* Game Selection */}
-                  <FormControl fullWidth>
-                    <InputLabel>Game *</InputLabel>
-                    <Select
-                      value={issueForm.gameInstanceId}
-                      onChange={(e) =>
-                        setIssueForm({
-                          ...issueForm,
-                          gameInstanceId: e.target.value,
-                        })
-                      }
-                      label="Game *"
-                      required
-                    >
-                      <MenuItem value="">
-                        <em>Select a game...</em>
-                      </MenuItem>
-                      {allGameInstances.map((instance) => (
-                        <MenuItem key={instance.id} value={instance.id}>
-                          {instance.name} ({instance.gameTitle.name})
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-
-                  <Grid container spacing={2}>
-                    {/* Title */}
-                    <Grid
-                      size={{
-                        xs: 12,
-                        md: 8,
-                      }}
-                    >
-                      <TextField
-                        fullWidth
-                        label="Issue Title *"
-                        value={issueForm.title}
-                        onChange={(e) =>
-                          setIssueForm({ ...issueForm, title: e.target.value })
-                        }
-                        placeholder="Brief description of the problem"
-                        inputProps={{ maxLength: 255 }}
-                        helperText={`${issueForm.title.length}/255 characters`}
-                        required
-                      />
-                    </Grid>
-
-                    {/* Severity */}
-                    <Grid
-                      size={{
-                        xs: 12,
-                        md: 4,
-                      }}
-                    >
-                      <FormControl fullWidth>
-                        <InputLabel>Severity</InputLabel>
-                        <Select
-                          value={issueForm.severity}
-                          onChange={(e) =>
-                            setIssueForm({
-                              ...issueForm,
-                              severity: e.target.value as
-                                | "Low"
-                                | "Medium"
-                                | "High"
-                                | "Critical"
-                                | "",
-                            })
-                          }
-                          label="Severity"
-                        >
-                          <MenuItem value="">
-                            <em>Select severity...</em>
-                          </MenuItem>
-                          <MenuItem value="Low">Low</MenuItem>
-                          <MenuItem value="Medium">Medium</MenuItem>
-                          <MenuItem value="High">High</MenuItem>
-                          <MenuItem value="Critical">Critical</MenuItem>
-                        </Select>
-                      </FormControl>
-                    </Grid>
-                  </Grid>
-
-                  {/* Description */}
-                  <TextField
-                    fullWidth
-                    label="Description"
-                    value={issueForm.description}
-                    onChange={(e) =>
-                      setIssueForm({
-                        ...issueForm,
-                        description: e.target.value,
-                      })
-                    }
-                    placeholder="Detailed description of the issue..."
-                    multiline
-                    rows={3}
-                    inputProps={{ maxLength: 1000 }}
-                    helperText={`${issueForm.description.length}/1000 characters`}
-                  />
-
-                  {/* Issue Images */}
-                  <Box>
-                    <Typography variant="subtitle1" gutterBottom>
-                      Add Photos (Optional)
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      gutterBottom
-                    >
-                      Upload up to 3 photos to help illustrate the issue
-                    </Typography>
-                    <IssueImageUpload
-                      attachments={issueAttachments}
-                      onAttachmentsChange={setIssueAttachments}
-                      maxAttachments={3}
-                      disabled={createIssueMutation.isPending}
-                    />
-                  </Box>
-
-                  {/* Reporter Information */}
-                  {isAuthenticated ? (
-                    <Alert
-                      severity="info"
-                      sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                    >
-                      <Person />
-                      Reporting as:{" "}
-                      {user?.name ?? user?.email ?? "Authenticated User"}
-                    </Alert>
-                  ) : (
-                    <TextField
-                      fullWidth
-                      label="Get notified for updates? (Optional)"
-                      type="email"
-                      value={issueForm.reporterEmail}
-                      onChange={(e) =>
-                        setIssueForm({
-                          ...issueForm,
-                          reporterEmail: e.target.value,
-                        })
-                      }
-                      placeholder="Email address"
-                      helperText="Leave blank to report anonymously"
-                    />
-                  )}
-
-                  {/* Submit Button */}
-                  <Box
-                    sx={{
-                      display: "flex",
-                      gap: 2,
-                      justifyContent: "flex-start",
-                    }}
-                  >
-                    <Button
-                      type="submit"
-                      variant="contained"
-                      disabled={
-                        !issueForm.gameInstanceId ||
-                        !issueForm.title.trim() ||
-                        createIssueMutation.isPending
-                      }
-                      sx={{ minWidth: 140 }}
-                    >
-                      {createIssueMutation.isPending ? (
-                        <CircularProgress size={24} />
-                      ) : (
-                        "Submit Issue"
-                      )}
-                    </Button>
-
-                    <Button
-                      type="button"
-                      variant="outlined"
-                      onClick={() => {
-                        setIssueForm({
-                          gameInstanceId: "",
-                          title: "",
-                          severity: "",
-                          description: "",
-                          reporterEmail: "",
-                        });
-                        setIssueAttachments([]);
-                      }}
-                      disabled={createIssueMutation.isPending}
-                    >
-                      Clear Form
-                    </Button>
-                  </Box>
-
-                  {/* Success/Error Messages */}
-                  {createIssueMutation.isSuccess && (
-                    <Alert severity="success">
-                      Issue submitted successfully! It will be reviewed by the
-                      staff.
-                    </Alert>
-                  )}
-
-                  {createIssueMutation.error && (
-                    <Alert severity="error">
-                      Error submitting issue:{" "}
-                      {createIssueMutation.error.message}
-                    </Alert>
-                  )}
-                </Box>
-              )}
-            </CardContent>
-          </Card>
+          <IssueSubmissionForm
+            gameInstances={allGameInstances}
+            onSuccess={() => refetch()}
+          />
         </Grid>
       </Grid>
       {/* Edit Location Dialog */}
