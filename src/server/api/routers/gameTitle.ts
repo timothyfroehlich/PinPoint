@@ -68,8 +68,8 @@ export const gameTitleRouter = createTRPCRouter({
     });
 
     const opdbGamesToSync = gameInstancesInOrg
-      .map(gi => gi.gameTitle)
-      .filter(gt => gt.opdbId && !gt.opdbId.startsWith("custom-"));
+      .map((gi) => gi.gameTitle)
+      .filter((gt) => gt.opdbId && !gt.opdbId.startsWith("custom-"));
 
     if (opdbGamesToSync.length === 0) {
       return { synced: 0, message: "No OPDB-linked games found to sync" };
@@ -202,7 +202,6 @@ export const gameTitleRouter = createTRPCRouter({
       return gameTitle;
     }),
 
-
   // Delete game title (only if no game instances exist)
   delete: organizationProcedure
     .input(z.object({ id: z.string() }))
@@ -250,7 +249,9 @@ export const gameTitleRouter = createTRPCRouter({
 
       // Don't allow deleting global OPDB games
       if (gameTitle.organizationId === null) {
-        throw new Error("Cannot delete global OPDB games. Remove game instances instead.");
+        throw new Error(
+          "Cannot delete global OPDB games. Remove game instances instead.",
+        );
       }
 
       if (gameTitle._count.gameInstances > 0) {

@@ -31,7 +31,10 @@ interface IssueImageGalleryProps {
   title?: string;
 }
 
-export function IssueImageGallery({ attachments, title = "Issue Photos" }: IssueImageGalleryProps) {
+export function IssueImageGallery({
+  attachments,
+  title = "Issue Photos",
+}: IssueImageGalleryProps) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
@@ -56,19 +59,19 @@ export function IssueImageGallery({ attachments, title = "Issue Photos" }: Issue
   };
 
   const handleZoomIn = () => {
-    setZoom(prev => Math.min(prev + 0.25, 3));
+    setZoom((prev) => Math.min(prev + 0.25, 3));
   };
 
   const handleZoomOut = () => {
-    setZoom(prev => Math.max(prev - 0.25, 0.25));
+    setZoom((prev) => Math.max(prev - 0.25, 0.25));
   };
 
   const handleRotateLeft = () => {
-    setRotation(prev => prev - 90);
+    setRotation((prev) => prev - 90);
   };
 
   const handleRotateRight = () => {
-    setRotation(prev => prev + 90);
+    setRotation((prev) => prev + 90);
   };
 
   return (
@@ -80,7 +83,8 @@ export function IssueImageGallery({ attachments, title = "Issue Photos" }: Issue
             {title}
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            ({attachments.length} {attachments.length === 1 ? "photo" : "photos"})
+            ({attachments.length}{" "}
+            {attachments.length === 1 ? "photo" : "photos"})
           </Typography>
         </Box>
 

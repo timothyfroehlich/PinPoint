@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { createTRPCRouter, organizationProcedure, adminProcedure } from "~/server/api/trpc";
+import {
+  createTRPCRouter,
+  organizationProcedure,
+  adminProcedure,
+} from "~/server/api/trpc";
 import { syncLocationGames } from "~/server/services/pinballmapService";
 
 export const locationRouter = createTRPCRouter({

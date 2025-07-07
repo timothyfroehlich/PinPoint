@@ -18,7 +18,10 @@ export async function POST(req: NextRequest) {
     }
 
     if (!issueId) {
-      return NextResponse.json({ error: "No issue ID provided" }, { status: 400 });
+      return NextResponse.json(
+        { error: "No issue ID provided" },
+        { status: 400 },
+      );
     }
 
     // Validate the issue exists and get its organization
