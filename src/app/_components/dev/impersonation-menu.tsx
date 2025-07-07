@@ -33,7 +33,10 @@ export function ImpersonationMenu() {
   }, []);
 
   async function handleImpersonate(userId: string) {
+    console.log("handleImpersonate called with userId:", userId);
+
     if (userId === "logout") {
+      console.log("Logging out impersonation");
       await fetch("/api/dev/impersonate/logout", {
         method: "POST",
         headers: {
@@ -45,6 +48,7 @@ export function ImpersonationMenu() {
       return;
     }
 
+    console.log("Making impersonate request with userId:", userId);
     const response = await fetch("/api/dev/impersonate", {
       method: "POST",
       headers: {
@@ -53,11 +57,15 @@ export function ImpersonationMenu() {
       body: JSON.stringify({ userId }),
     });
 
+    console.log("Impersonate response status:", response.status);
     if (response.ok) {
+      console.log("Impersonation successful, reloading page");
       // Force a full page reload to pick up the new impersonation
       window.location.reload();
     } else {
       console.error("Failed to impersonate user");
+      const errorText = await response.text();
+      console.error("Error response:", errorText);
     }
   }
 

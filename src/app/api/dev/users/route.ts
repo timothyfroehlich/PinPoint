@@ -12,9 +12,10 @@ export async function GET() {
 
     const users = await db.user.findMany({
       where: {
-        email: {
-          startsWith: "testdev-",
-        },
+        OR: [
+          { email: { endsWith: "testaccount.dev" } },
+          { email: "email9@example.com" },
+        ],
       },
     });
 

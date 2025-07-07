@@ -68,7 +68,7 @@ export const gameInstanceRouter = createTRPCRouter({
   getAll: organizationProcedure.query(async ({ ctx }) => {
     return ctx.db.gameInstance.findMany({
       where: {
-        gameTitle: {
+        room: {
           organizationId: ctx.organization.id,
         },
       },
@@ -105,7 +105,7 @@ export const gameInstanceRouter = createTRPCRouter({
       const gameInstance = await ctx.db.gameInstance.findFirst({
         where: {
           id: input.id,
-          gameTitle: {
+          room: {
             organizationId: ctx.organization.id,
           },
         },
@@ -155,7 +155,7 @@ export const gameInstanceRouter = createTRPCRouter({
       const existingInstance = await ctx.db.gameInstance.findFirst({
         where: {
           id: input.id,
-          gameTitle: {
+          room: {
             organizationId: ctx.organization.id,
           },
         },
@@ -230,7 +230,7 @@ export const gameInstanceRouter = createTRPCRouter({
       const existingInstance = await ctx.db.gameInstance.findFirst({
         where: {
           id: input.id,
-          gameTitle: {
+          room: {
             organizationId: ctx.organization.id,
           },
         },
@@ -258,7 +258,7 @@ export const gameInstanceRouter = createTRPCRouter({
       const existingInstance = await ctx.db.gameInstance.findFirst({
         where: {
           id: input.gameInstanceId,
-          gameTitle: {
+          room: {
             organizationId: ctx.organization.id,
           },
         },
@@ -324,7 +324,7 @@ export const gameInstanceRouter = createTRPCRouter({
       const existingInstance = await ctx.db.gameInstance.findFirst({
         where: {
           id: input.gameInstanceId,
-          gameTitle: {
+          room: {
             organizationId: ctx.organization.id,
           },
         },
