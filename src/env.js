@@ -25,6 +25,7 @@ export const env = createEnv({
         : z.string(),
     OPDB_API_TOKEN: z.string(),
     OPDB_API_URL: z.string().url().default("https://opdb.org/api"),
+    DEFAULT_ORG_SUBDOMAIN: z.string().default("apc"),
   },
 
   /**
@@ -48,6 +49,7 @@ export const env = createEnv({
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
     OPDB_API_TOKEN: process.env.OPDB_API_TOKEN,
     OPDB_API_URL: process.env.OPDB_API_URL,
+    DEFAULT_ORG_SUBDOMAIN: process.env.DEFAULT_ORG_SUBDOMAIN,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially
