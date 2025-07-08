@@ -81,6 +81,7 @@ model IssueStatus {
     name           String
     order          Int
     category       IssueStatusCategory // Add category field
+    isDefault      Boolean             @default(false) // Add isDefault flag
     organization   Organization        @relation(fields: [organizationId], references: [id])
     organizationId String
     issues         Issue[]
@@ -90,7 +91,7 @@ model IssueStatus {
 
 model Issue {
     id             String       @id @default(cuid())
-    number         Int          // Monotonically increasing issue number per organization
+    number         Int          @default(autoincrement()) // Monotonically increasing issue number per organization
     title          String
     description    String?
     severity       String?      // Optional severity level (Low, Medium, High, Critical)
