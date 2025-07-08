@@ -18,6 +18,7 @@ import {
   Paper,
   TextField,
   InputAdornment,
+  Autocomplete,
 } from "@mui/material";
 import {
   BugReport,
@@ -29,17 +30,27 @@ import {
   RadioButtonUnchecked,
   Comment,
   CameraAlt,
+  SwapVert,
+  FiberNew,
 } from "@mui/icons-material";
 import { useState } from "react";
 import Link from "next/link";
 import { UserAvatar } from "~/app/_components/user-avatar";
 import { useCurrentUser } from "~/lib/hooks/use-current-user";
 import { api } from "~/trpc/react";
+import { IssueStatusCategory } from "@prisma/client";
 
 export default function IssuesPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [locationFilter, setLocationFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [gameFilter, setGameFilter] = useState("");
+  const [statusCategoryFilter, setStatusCategoryFilter] =
+    useState<IssueStatusCategory | null>(null);
+  const [sortBy, setSortBy] = useState<
+    "created" | "updated" | "status" | "severity" | "game"
+  >("created");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [showFilters, setShowFilters] = useState(false);
 
   const { isAuthenticated } = useCurrentUser();
@@ -52,7 +63,14 @@ export default function IssuesPage() {
   } = api.issue.getAll.useQuery({
     locationId: locationFilter || undefined,
     statusId: statusFilter || undefined,
+    gameTitleId: gameFilter || undefined,
+    statusCategory: statusCategoryFilter ?? undefined,
+    sortBy,
+    sortOrder,
   });
+
+  // Get status counts
+  const { data: statusCounts } = api.issue.getStatusCounts.useQuery();
 
   // Get locations for filter dropdown
   const { data: locations } = api.location.getAll.useQuery();
@@ -60,10 +78,32 @@ export default function IssuesPage() {
   // Get issue statuses for filter dropdown
   const { data: issueStatuses } = api.issueStatus.getAll.useQuery();
 
+  // Get game titles for game filter
+  const { data: gameTitles } = api.gameTitle.getAll.useQuery();
+
   const handleClearFilters = () => {
     setLocationFilter("");
     setStatusFilter("");
+    setGameFilter("");
     setSearchTerm("");
+    setStatusCategoryFilter(null);
+  };
+
+  const handleSortChange = (newSortBy: typeof sortBy) => {
+    if (newSortBy === sortBy) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortBy(newSortBy);
+      setSortOrder("desc");
+    }
+  };
+
+  const handleCategoryFilterClick = (category: IssueStatusCategory) => {
+    if (statusCategoryFilter === category) {
+      setStatusCategoryFilter(null); // Toggle off if already selected
+    } else {
+      setStatusCategoryFilter(category);
+    }
   };
 
   const getSeverityColor = (severity: string | null) => {
@@ -89,15 +129,6 @@ export default function IssuesPage() {
         issue.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         issue.description?.toLowerCase().includes(searchTerm.toLowerCase()),
     ) ?? [];
-
-  const openIssues = filteredIssues.filter(
-    (status) =>
-      status.status.name !== "Resolved" && status.status.name !== "Closed",
-  );
-  const closedIssues = filteredIssues.filter(
-    (status) =>
-      status.status.name === "Resolved" || status.status.name === "Closed",
-  );
 
   if (isLoadingIssues) {
     return (
@@ -153,7 +184,16 @@ export default function IssuesPage() {
 
         {/* Search and Filters */}
         <Box sx={{ mb: 3 }}>
-          <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
+          {/* Search and Filter Controls Row */}
+          <Box
+            sx={{
+              display: "flex",
+              gap: 2,
+              mb: 2,
+              alignItems: "center",
+              flexWrap: "wrap",
+            }}
+          >
             <TextField
               placeholder="Search all issues"
               variant="outlined"
@@ -169,13 +209,78 @@ export default function IssuesPage() {
                 ),
               }}
             />
+
+            {/* Game Filter - Separate and Prominent */}
+            <Autocomplete
+              options={gameTitles ?? []}
+              getOptionLabel={(option) => option.name}
+              value={gameTitles?.find((g) => g.id === gameFilter) ?? null}
+              onChange={(_, newValue) => setGameFilter(newValue?.id ?? "")}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  placeholder="Filter by game"
+                  size="small"
+                  InputProps={{
+                    ...params.InputProps,
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Games sx={{ color: "text.secondary" }} />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+              )}
+              sx={{ minWidth: 200 }}
+              clearOnEscape
+            />
+
+            {/* Sort Controls */}
+            <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+              <FormControl size="small" sx={{ minWidth: 120 }}>
+                <InputLabel>Sort by</InputLabel>
+                <Select
+                  value={sortBy}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (
+                      value === "created" ||
+                      value === "updated" ||
+                      value === "status" ||
+                      value === "severity" ||
+                      value === "game"
+                    ) {
+                      handleSortChange(value);
+                    }
+                  }}
+                  label="Sort by"
+                >
+                  <MenuItem value="created">Created</MenuItem>
+                  <MenuItem value="updated">Updated</MenuItem>
+                  <MenuItem value="status">Status</MenuItem>
+                  <MenuItem value="severity">Severity</MenuItem>
+                  <MenuItem value="game">Game</MenuItem>
+                </Select>
+              </FormControl>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() =>
+                  setSortOrder(sortOrder === "asc" ? "desc" : "asc")
+                }
+                sx={{ minWidth: "auto", px: 1 }}
+              >
+                <SwapVert sx={{ fontSize: 18 }} />
+              </Button>
+            </Box>
+
             <Button
               variant="outlined"
               startIcon={<FilterList />}
               onClick={() => setShowFilters(!showFilters)}
               size="small"
             >
-              Filters
+              More Filters
             </Button>
           </Box>
 
@@ -232,20 +337,53 @@ export default function IssuesPage() {
 
         {/* Issue Count Tabs */}
         <Box sx={{ display: "flex", gap: 3, mb: 2 }}>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <RadioButtonUnchecked
-              sx={{ fontSize: 16, color: "text.secondary" }}
-            />
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>
-              {openIssues.length} Open
-            </Typography>
-          </Box>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <CheckCircle sx={{ fontSize: 16, color: "text.secondary" }} />
-            <Typography variant="body2" color="text.secondary">
-              {closedIssues.length} Closed
-            </Typography>
-          </Box>
+          <Button
+            startIcon={<FiberNew />}
+            onClick={() => handleCategoryFilterClick(IssueStatusCategory.NEW)}
+            color={
+              statusCategoryFilter === IssueStatusCategory.NEW
+                ? "primary"
+                : "inherit"
+            }
+            sx={{
+              fontWeight:
+                statusCategoryFilter === IssueStatusCategory.NEW ? 700 : 400,
+            }}
+          >
+            {statusCounts?.NEW ?? 0} New
+          </Button>
+          <Button
+            startIcon={<RadioButtonUnchecked />}
+            onClick={() => handleCategoryFilterClick(IssueStatusCategory.OPEN)}
+            color={
+              statusCategoryFilter === IssueStatusCategory.OPEN
+                ? "primary"
+                : "inherit"
+            }
+            sx={{
+              fontWeight:
+                statusCategoryFilter === IssueStatusCategory.OPEN ? 700 : 400,
+            }}
+          >
+            {statusCounts?.OPEN ?? 0} Open
+          </Button>
+          <Button
+            startIcon={<CheckCircle />}
+            onClick={() =>
+              handleCategoryFilterClick(IssueStatusCategory.CLOSED)
+            }
+            color={
+              statusCategoryFilter === IssueStatusCategory.CLOSED
+                ? "primary"
+                : "inherit"
+            }
+            sx={{
+              fontWeight:
+                statusCategoryFilter === IssueStatusCategory.CLOSED ? 700 : 400,
+            }}
+          >
+            {statusCounts?.CLOSED ?? 0} Closed
+          </Button>
         </Box>
       </Box>
 
@@ -266,9 +404,8 @@ export default function IssuesPage() {
         ) : (
           <List sx={{ p: 0 }}>
             {filteredIssues.map((issue, index) => {
-              const isOpen =
-                issue.status.name !== "Resolved" &&
-                issue.status.name !== "Closed";
+              const isClosed =
+                issue.status.category === IssueStatusCategory.CLOSED;
 
               return (
                 <Box key={issue.id}>
@@ -293,28 +430,53 @@ export default function IssuesPage() {
                       >
                         {/* Status Icon */}
                         <Box sx={{ mt: 0.5 }}>
-                          {isOpen ? (
-                            <RadioButtonUnchecked
-                              sx={{ fontSize: 16, color: "success.main" }}
-                            />
-                          ) : (
+                          {isClosed ? (
                             <CheckCircle
                               sx={{ fontSize: 16, color: "primary.main" }}
+                            />
+                          ) : (
+                            <RadioButtonUnchecked
+                              sx={{ fontSize: 16, color: "success.main" }}
                             />
                           )}
                         </Box>
 
                         {/* Issue Content */}
                         <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-                          {/* Title and Labels */}
+                          {/* Game Name - Prominent Display */}
+                          <Box sx={{ mb: 1 }}>
+                            <Typography
+                              variant="h6"
+                              sx={{
+                                fontWeight: 700,
+                                color: "primary.main",
+                                fontSize: "1.1rem",
+                                lineHeight: 1.2,
+                              }}
+                            >
+                              {issue.gameInstance.gameTitle.name}
+                            </Typography>
+                          </Box>
+
+                          {/* Issue Number and Title */}
                           <Box
                             sx={{
                               display: "flex",
-                              alignItems: "center",
+                              alignItems: "flex-start",
                               gap: 1,
                               mb: 0.5,
                             }}
                           >
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                fontWeight: 600,
+                                color: "text.secondary",
+                                flexShrink: 0,
+                              }}
+                            >
+                              #{issue.number}
+                            </Typography>
                             <Typography
                               component={Link}
                               href={`/issues/${issue.id}`}
@@ -323,6 +485,7 @@ export default function IssuesPage() {
                                 fontWeight: 600,
                                 color: "text.primary",
                                 textDecoration: "none",
+                                flexGrow: 1,
                                 "&:hover": {
                                   color: "primary.main",
                                 },
@@ -337,6 +500,7 @@ export default function IssuesPage() {
                                 display: "flex",
                                 gap: 0.5,
                                 flexWrap: "wrap",
+                                flexShrink: 0,
                               }}
                             >
                               <Chip
@@ -345,9 +509,9 @@ export default function IssuesPage() {
                                 sx={{
                                   height: 20,
                                   fontSize: "0.75rem",
-                                  backgroundColor: isOpen
-                                    ? "success.main"
-                                    : "primary.main",
+                                  backgroundColor: isClosed
+                                    ? "primary.main"
+                                    : "success.main",
                                   color: "white",
                                 }}
                               />
@@ -399,7 +563,7 @@ export default function IssuesPage() {
                               variant="caption"
                               color="text.secondary"
                             >
-                              #{issue.id.substring(0, 7)} opened{" "}
+                              Opened{" "}
                               {new Date(issue.createdAt).toLocaleDateString()}{" "}
                               by{" "}
                               {issue.reporter ? (
@@ -415,24 +579,6 @@ export default function IssuesPage() {
                                 </Box>
                               )}
                             </Typography>
-
-                            <Box
-                              sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 1,
-                              }}
-                            >
-                              <Games
-                                sx={{ fontSize: 14, color: "text.secondary" }}
-                              />
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                              >
-                                {issue.gameInstance.name}
-                              </Typography>
-                            </Box>
 
                             <Box
                               sx={{

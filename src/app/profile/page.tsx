@@ -28,67 +28,6 @@ import {
 import { api } from "~/trpc/react";
 import { UserAvatar } from "~/app/_components/user-avatar";
 import { ProfilePictureUpload } from "~/app/_components/profile-picture-upload";
-import type { Role } from "@prisma/client";
-
-// Type definitions for the profile data structure
-type UserProfileData = {
-  id: string;
-  name: string | null;
-  email: string | null;
-  bio: string | null;
-  profilePicture: string | null;
-  joinDate: Date;
-  emailVerified: Date | null;
-  image: string | null;
-  ownedGameInstances: {
-    id: string;
-    name: string;
-    gameTitleId: string;
-    roomId: string;
-    ownerId: string | null;
-    gameTitle: {
-      id: string;
-      name: string;
-      opdbId: string | null;
-      manufacturer: string | null;
-      releaseDate: Date | null;
-      imageUrl: string | null;
-      description: string | null;
-      lastSynced: Date | null;
-      organizationId: string | null;
-    };
-    room: {
-      id: string;
-      name: string;
-      organizationId: string;
-      description: string | null;
-      locationId: string;
-      location: {
-        id: string;
-        name: string;
-        organizationId: string;
-        notes: string | null;
-        pinballMapId: number | null;
-      };
-    };
-  }[];
-  memberships: {
-    id: string;
-    userId: string;
-    role: Role;
-    organizationId: string;
-    organization: {
-      id: string;
-      name: string;
-      subdomain: string;
-    };
-  }[];
-  _count: {
-    issues: number;
-    comments: number;
-    ownedGameInstances: number;
-  };
-};
 
 export default function ProfilePage() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -100,7 +39,7 @@ export default function ProfilePage() {
     isLoading,
     error,
     refetch,
-  } = api.user.getProfile.useQuery<UserProfileData>();
+  } = api.user.getProfile.useQuery();
 
   const updateProfileMutation = api.user.updateProfile.useMutation({
     onSuccess: () => {

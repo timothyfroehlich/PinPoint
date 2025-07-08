@@ -1,6 +1,4 @@
-#!/usr/bin/env tsx
-
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, IssueStatusCategory } from "@prisma/client";
 import { env } from "../src/env";
 
 const prisma = new PrismaClient();
@@ -137,10 +135,30 @@ async function main() {
 
     const issueStatuses = await prisma.issueStatus.createMany({
       data: [
-        { name: "Open", order: 1, organizationId: testOrg.id },
-        { name: "In Progress", order: 2, organizationId: testOrg.id },
-        { name: "Resolved", order: 3, organizationId: testOrg.id },
-        { name: "Closed", order: 4, organizationId: testOrg.id },
+        {
+          name: "Open",
+          order: 1,
+          organizationId: testOrg.id,
+          category: IssueStatusCategory.OPEN,
+        },
+        {
+          name: "In Progress",
+          order: 2,
+          organizationId: testOrg.id,
+          category: IssueStatusCategory.OPEN,
+        },
+        {
+          name: "Resolved",
+          order: 3,
+          organizationId: testOrg.id,
+          category: IssueStatusCategory.CLOSED,
+        },
+        {
+          name: "Closed",
+          order: 4,
+          organizationId: testOrg.id,
+          category: IssueStatusCategory.CLOSED,
+        },
       ],
     });
 

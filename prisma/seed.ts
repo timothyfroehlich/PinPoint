@@ -1,4 +1,4 @@
-import { PrismaClient, Role } from "@prisma/client";
+import { PrismaClient, Role, IssueStatusCategory } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
@@ -14,10 +14,14 @@ async function main() {
   // 1. Create a default Organization
   const organization = await prisma.organization.upsert({
     where: { subdomain: "apc" },
-    update: {},
+    update: {
+      name: "Austin Pinball Collective",
+      logoUrl: "/images/logos/austinpinballcollective-logo-outline.png",
+    },
     create: {
       name: "Austin Pinball Collective",
       subdomain: "apc",
+      logoUrl: "/images/logos/austinpinballcollective-logo-outline.png",
     },
   });
   console.log(`Created organization: ${organization.name}`);
@@ -156,7 +160,7 @@ async function main() {
     return;
   }
 
-  for (let i = 0; i < Math.min(fixtureData.machines.length, 10); i++) {
+  for (let i = 0; i < fixtureData.machines.length; i++) {
     const machine = fixtureData.machines[i];
     if (!machine) {
       console.error(`Machine at index ${i} is undefined`);
@@ -203,104 +207,56 @@ async function main() {
   }
 
   // 8. Create issue statuses from CSV data (only if they don't exist)
-  const csvStatuses = [
-    { name: "New", order: 1 },
-    { name: "In Progress", order: 2 },
-    { name: "Needs expert help", order: 3 },
-    { name: "Needs Parts", order: 4 },
-    { name: "Fixed", order: 5 },
-    { name: "Not to be Fixed", order: 6 },
-    { name: "Not Reproducible", order: 7 },
+  const statusesToUpsert = [
+    { name: "New", order: 1, category: IssueStatusCategory.NEW },
+    { name: "In Progress", order: 2, category: IssueStatusCategory.OPEN },
+    { name: "Needs expert help", order: 3, category: IssueStatusCategory.OPEN },
+    { name: "Needs Parts", order: 4, category: IssueStatusCategory.OPEN },
+    { name: "Fixed", order: 5, category: IssueStatusCategory.CLOSED },
+    { name: "Not to be Fixed", order: 6, category: IssueStatusCategory.CLOSED },
+    {
+      name: "Not Reproducible",
+      order: 7,
+      category: IssueStatusCategory.CLOSED,
+    },
   ];
 
-  for (const statusData of csvStatuses) {
-    const existingStatus = await prisma.issueStatus.findFirst({
+  for (const statusData of statusesToUpsert) {
+    await prisma.issueStatus.upsert({
       where: {
+        // A unique constraint is required for upsert.
+        // Assuming name and organizationId are unique together.
+        name_organizationId: {
+          name: statusData.name,
+          organizationId: organization.id,
+        },
+      },
+      update: {
+        order: statusData.order,
+        category: statusData.category,
+      },
+      create: {
         name: statusData.name,
+        order: statusData.order,
+        category: statusData.category,
         organizationId: organization.id,
       },
     });
-
-    if (!existingStatus) {
-      await prisma.issueStatus.create({
-        data: {
-          name: statusData.name,
-          order: statusData.order,
-          organizationId: organization.id,
-        },
-      });
-      console.log(`Created issue status: ${statusData.name}`);
-    } else {
-      console.log(`Issue status already exists: ${existingStatus.name}`);
-    }
+    console.log(`Upserted issue status: ${statusData.name}`);
   }
 
-  // 9. Create sample issues from CSV data
-  const sampleIssues = [
-    {
-      title: "Ultraman: Kaiju figures on left ramp are not responding",
-      description: "Kaiju figures on left ramp are not responding",
-      severity: "Low", // Cosmetic -> Low
-      consistency: "Every game",
-      status: "New",
-      gameTitle: "Ultraman: Kaiju Rumble (Blood Sucker Edition)",
-      reporterEmail: "roger.sharpe@testaccount.dev",
-      createdAt: new Date("2025-06-21T13:40:02Z"),
-      updatedAt: new Date("2025-07-01T19:09:30Z"),
-    },
-    {
-      title: "Xenon: Loud buzzing noise then crashes",
-      description: "Loud buzzing noise then crashes",
-      severity: "Critical", // Severe -> Critical
-      consistency: "Always",
-      status: "Needs expert help",
-      gameTitle: "Xenon",
-      reporterEmail: "gary.stern@testaccount.dev",
-      createdAt: new Date("2025-06-27T19:05:40Z"),
-      updatedAt: new Date("2025-07-06T10:27:36Z"),
-    },
-    {
-      title: "Cleopatra: Left top rollover target not responding",
-      description: "Left top rollover target not responding",
-      severity: "Medium", // Minor -> Medium
-      consistency: "Every game",
-      status: "New",
-      gameTitle: "Cleopatra",
-      reporterEmail: "george.gomez@testaccount.dev",
-      createdAt: new Date("2025-06-27T20:12:44Z"),
-      updatedAt: new Date("2025-07-01T19:10:53Z"),
-    },
-    {
-      title: "Cleopatra: Center pop bumper is out",
-      description: "Center pop bumper is out",
-      severity: "Medium", // Minor -> Medium
-      consistency: "Every game",
-      status: "New",
-      gameTitle: "Cleopatra",
-      reporterEmail: "harry.williams@testaccount.dev",
-      createdAt: new Date("2025-06-27T20:13:27Z"),
-      updatedAt: new Date("2025-07-01T19:10:58Z"),
-    },
-    {
-      title: "Lord of the Rings: Balrog figure not working",
-      description: "Balrog figure not working properly during multiball",
-      severity: "Medium",
-      consistency: "Occasionally",
-      status: "New",
-      gameTitle: "Lord of the Rings",
-      reporterEmail: "email9@example.com",
-      createdAt: new Date("2025-06-25T10:00:00Z"),
-      updatedAt: new Date("2025-06-25T10:00:00Z"),
-    },
-  ];
+  // 9. Load sample issues from JSON file
+  const sampleIssuesData = await import("./seeds/sample-issues.json");
+  const sampleIssues = sampleIssuesData.default;
 
   // Create the issues
+  let issueNumber = 1;
   for (const issueData of sampleIssues) {
-    // Find the game instance
+    // Find the game instance by OPDB ID
     const gameInstance = await prisma.gameInstance.findFirst({
       where: {
         gameTitle: {
-          name: issueData.gameTitle,
+          opdbId: issueData.gameOpdbId,
         },
       },
     });
@@ -322,6 +278,7 @@ async function main() {
       if (reporter && status) {
         await prisma.issue.create({
           data: {
+            number: issueNumber++,
             title: issueData.title,
             description: issueData.description,
             severity: issueData.severity,
@@ -329,11 +286,11 @@ async function main() {
             gameInstanceId: gameInstance.id,
             statusId: status.id,
             organizationId: organization.id,
-            createdAt: issueData.createdAt,
-            updatedAt: issueData.updatedAt,
+            createdAt: new Date(issueData.createdAt),
+            updatedAt: new Date(issueData.updatedAt),
           },
         });
-        console.log(`Created issue: ${issueData.title}`);
+        console.log(`Created issue #${issueNumber - 1}: ${issueData.title}`);
       } else {
         console.log(
           `Skipped issue ${issueData.title} - missing reporter or status`,
@@ -341,7 +298,7 @@ async function main() {
       }
     } else {
       console.log(
-        `Skipped issue ${issueData.title} - game not found: ${issueData.gameTitle}`,
+        `Skipped issue ${issueData.title} - game not found with OPDB ID: ${issueData.gameOpdbId}`,
       );
     }
   }
