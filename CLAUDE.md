@@ -51,10 +51,11 @@
 
 ### **During Development**
 
-1. **Incremental Validation**: Run `npm run typecheck` after each significant change
-2. **Test Immediately**: Verify functionality works before moving to next task
-3. **Small Commits**: Commit working states frequently with descriptive messages
-4. **Server Health Checks**: Regularly verify `http://localhost:3000/api/health` responds
+1. **Check Running Server**: Always check if development server is already running before starting (`npm run dev:check` or `curl http://localhost:3000/api/health`)
+2. **Incremental Validation**: Run `npm run typecheck` after each significant change
+3. **Test Immediately**: Verify functionality works before moving to next task
+4. **Small Commits**: Commit working states frequently with descriptive messages
+5. **Server Health Checks**: Regularly verify `http://localhost:3000/api/health` responds
 
 ### **Before Committing (Mandatory)**
 
@@ -164,28 +165,67 @@
 
 ### **Development Scripts**
 
+- `npm run dev` - Start Next.js development server with Turbo
 - `npm run dev:safe` - Validates before starting development server
-- `npm run validate` - Runs typecheck, lint, and format check
-- `npm run validate:fix` - Runs validation and fixes issues automatically
-- `npm run pre-commit` - Full validation plus build check
-- `npm run smoke-test` - Verifies server health
+- `npm run dev:check` - Check if development server is running properly
+- `npm run start` - Start production server (requires build first)
+- `npm run preview` - Build and start production server for testing
 
 ### **Database Scripts**
 
 - `npm run db:reset` - **Complete database reset**: Removes all migrations, force-resets database to match schema, and reseeds with fresh data
 - `npm run db:push` - Syncs current schema to database (for incremental changes)
+- `npm run db:generate` - Generate Prisma migrations during development
+- `npm run db:migrate` - Deploy Prisma migrations to production
+- `npm run db:studio` - Open Prisma Studio for database exploration
 - `npm run seed` - Runs seed script only (assumes database schema is current)
+
+### **Quality Assurance Scripts**
+
+- `npm run validate` - Runs typecheck, lint, and format check
+- `npm run validate:fix` - Runs validation and fixes issues automatically
+- `npm run validate:test` - Runs validation plus all tests
+- `npm run pre-commit` - **Mandatory before commits**: Full validation with fixes plus smoke test
+- `npm run smoke-test` - Build verification to ensure basic functionality
+- `npm run health-check` - Test server health endpoint
+
+### **Code Quality Scripts**
+
+- `npm run typecheck` - TypeScript compilation check (strict mode)
+- `npm run lint` - ESLint code quality checks
+- `npm run lint:fix` - ESLint with automatic fixes
+- `npm run format:check` - Prettier formatting verification
+- `npm run format:write` - Prettier automatic formatting
+- `npm run build` - Production build verification
+
+### **Testing Scripts**
+
+- `npm run test` - Run all tests with Jest
+- `npm run test:watch` - Run tests in watch mode for development
+- `npm run test:coverage` - Run tests with coverage reporting
 
 ### **Dependency Management**
 
-- `npm run deps:check` - Shows available updates
-- `npm run deps:audit` - Security and outdated package audit
+- `npm run deps:check` - Audit for high-severity security vulnerabilities
+- `npm run deps:fix` - Automatically fix security vulnerabilities
+- `npm run deps:update` - Update dependencies and run audit
 
-### **Quality Assurance**
+### **Utility Scripts**
 
-- `npm run typecheck` - TypeScript compilation check
-- `npm run build` - Production build verification
-- `npm run test` - Run all tests (when implemented)
+- `npm run clean` - Clean build artifacts and reinstall dependencies
+- `npm run reset` - Full environment reset: clean, database push, and seed
+- `npm run pinballmap:update-fixture` - Update test fixtures from PinballMap API
+- `npm run prepare` - Setup husky for Git hooks (runs automatically)
+
+### **Comment Management**
+
+- **Soft Delete**: Comments are soft-deleted (marked with `deletedAt`) when deleted
+- **Auto-Cleanup**: Soft-deleted comments are automatically removed after 90 days
+- **Manual Cleanup**: Admins can run `api.issue.cleanupDeletedComments.mutate()` to manually clean up old deleted comments
+- **Permissions**:
+  - Users can edit/delete their own comments
+  - Admins can delete any comment but can only edit their own
+  - Comment edits show "edited X time ago" timestamp
 
 ## **Playwright MCP Server Usage**
 
