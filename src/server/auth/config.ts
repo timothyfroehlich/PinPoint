@@ -84,7 +84,7 @@ export const authConfig = {
     signIn: "/sign-in",
   },
   session: {
-    strategy: "jwt",
+    strategy: process.env.NODE_ENV === "development" ? "database" : "jwt",
   },
   callbacks: {
     jwt: async ({ token, user }) => {
@@ -117,14 +117,57 @@ export const authConfig = {
       }
       return token;
     },
-    session: ({ session, token }) => ({
-      ...session,
-      user: {
-        ...session.user,
-        id: token.id as string,
-        role: token.role,
-        organizationId: token.organizationId,
-      },
-    }),
+    session: async ({ session, token, user }) => {
+      // For JWT sessions, get data from token
+      if (token) {
+        return {
+          ...session,
+          user: {
+            ...session.user,
+            id: token.id as string,
+            role: token.role,
+            organizationId: token.organizationId,
+          },
+        };
+      }
+
+      // For database sessions, get membership data from database
+      if (user) {
+        const organization = await db.organization.findUnique({
+          where: { subdomain: "apc" },
+        });
+
+        let role = undefined;
+        let organizationId = undefined;
+
+        if (organization) {
+          const membership = await db.membership.findUnique({
+            where: {
+              userId_organizationId: {
+                userId: user.id,
+                organizationId: organization.id,
+              },
+            },
+          });
+
+          if (membership) {
+            role = membership.role;
+            organizationId = organization.id;
+          }
+        }
+
+        return {
+          ...session,
+          user: {
+            ...session.user,
+            id: user.id,
+            role,
+            organizationId,
+          },
+        };
+      }
+
+      return session;
+    },
   },
 } satisfies NextAuthConfig;
