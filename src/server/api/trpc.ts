@@ -13,6 +13,7 @@ import { ZodError } from "zod";
 
 import { auth } from "~/server/auth";
 import { db } from "~/server/db";
+import { env } from "~/env";
 
 /**
  * 1. CONTEXT
@@ -39,9 +40,10 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
   }
 
   // Extract subdomain from headers (set by middleware)
-  const subdomain = opts.headers.get("x-subdomain") ?? "apc";
+  const subdomain =
+    opts.headers.get("x-subdomain") ?? env.DEFAULT_ORG_SUBDOMAIN;
 
-  // Fallback to organization based on subdomain (defaults to APC for backwards compatibility)
+  // Fallback to organization based on subdomain
   organization ??= await db.organization.findUnique({
     where: { subdomain },
   });

@@ -105,11 +105,8 @@ export const gameInstanceRouter = createTRPCRouter({
 
   // Public endpoint for issue reporting - returns minimal data needed for issue form
   getAllForIssues: publicProcedure.query(async ({ ctx }) => {
-    // Get the hardcoded organization (for MVP)
-    const organization = await ctx.db.organization.findFirst();
-    if (!organization) {
-      throw new Error("No organization found");
-    }
+    // Use the organization resolved from subdomain context
+    const organization = ctx.organization;
 
     return ctx.db.gameInstance.findMany({
       where: {
