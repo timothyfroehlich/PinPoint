@@ -29,13 +29,27 @@ import { db } from "~/server/db";
 export const createTRPCContext = async (opts: { headers: Headers }) => {
   const session = await auth();
 
-  // For now, we'll hardcode the organization. In the future, this will be
-  // derived from the subdomain of the request.
-  const organization = await db.organization.findFirst();
+  let organization;
+
+  // If user is authenticated and has organization context, use that
+  if (session?.user?.organizationId) {
+    organization = await db.organization.findUnique({
+      where: { id: session.user.organizationId },
+    });
+  }
+
+  // Extract subdomain from headers (set by middleware)
+  const subdomain = opts.headers.get("x-subdomain") ?? "apc";
+
+  // Fallback to organization based on subdomain (defaults to APC for backwards compatibility)
+  organization ??= await db.organization.findUnique({
+    where: { subdomain },
+  });
+
   if (!organization) {
     throw new TRPCError({
       code: "INTERNAL_SERVER_ERROR",
-      message: "No organization found.",
+      message: `Organization with subdomain "${subdomain}" not found.`,
     });
   }
 
