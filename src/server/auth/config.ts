@@ -2,6 +2,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { type DefaultSession, type NextAuthConfig } from "next-auth";
 import Google from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
+import { type Role } from "@prisma/client";
 
 import { db } from "~/server/db";
 
@@ -15,15 +16,16 @@ declare module "next-auth" {
   interface Session extends DefaultSession {
     user: {
       id: string;
-      // ...other properties
-      // role: UserRole;
+      role?: Role;
+      organizationId?: string;
     } & DefaultSession["user"];
   }
 
-  // interface User {
-  //   // ...other properties
-  //   // role: UserRole;
-  // }
+  interface JWT {
+    id: string;
+    role?: Role;
+    organizationId?: string;
+  }
 }
 
 /**
@@ -85,9 +87,33 @@ export const authConfig = {
     strategy: "jwt",
   },
   callbacks: {
-    jwt: ({ token, user }) => {
-      if (user) {
+    jwt: async ({ token, user }) => {
+      if (user?.id) {
         token.id = user.id;
+
+        // Get the user's membership in the current organization
+        // Note: In JWT callback, we don't have access to request headers/subdomain,
+        // so we default to APC. The organization context will be properly resolved
+        // in tRPC context based on subdomain.
+        const organization = await db.organization.findUnique({
+          where: { subdomain: "apc" },
+        });
+
+        if (organization) {
+          const membership = await db.membership.findUnique({
+            where: {
+              userId_organizationId: {
+                userId: user.id,
+                organizationId: organization.id,
+              },
+            },
+          });
+
+          if (membership) {
+            token.role = membership.role;
+            token.organizationId = organization.id;
+          }
+        }
       }
       return token;
     },
@@ -96,6 +122,8 @@ export const authConfig = {
       user: {
         ...session.user,
         id: token.id as string,
+        role: token.role,
+        organizationId: token.organizationId,
       },
     }),
   },

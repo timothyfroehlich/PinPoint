@@ -96,10 +96,40 @@ export class LocalImageStorage implements ImageStorageProvider {
   async validateIssueAttachment(file: File): Promise<boolean> {
     return this.validateImage(file);
   }
+  // Specialized method for profile pictures
+  async uploadProfilePicture(file: File, userId: string): Promise<string> {
+    return this.uploadImage(
+      file,
+      `user-${userId}`,
+      PROFILE_PICTURE_CONSTRAINTS,
+    );
+  }
+
+  async validateProfilePicture(file: File): Promise<boolean> {
+    return this.validateImage(file, PROFILE_PICTURE_CONSTRAINTS);
+  }
+
+  // Specialized method for organization logos
+  async uploadOrganizationLogo(file: File, subdomain: string): Promise<string> {
+    // Use profile picture constraints for logos for now
+    return this.uploadImage(
+      file,
+      `org-logo-${subdomain}`,
+      PROFILE_PICTURE_CONSTRAINTS,
+    );
+  }
 }
 
 // Export singleton instance
 export const imageStorage = new LocalImageStorage();
+
+export const PROFILE_PICTURE_CONSTRAINTS = {
+  maxSizeBytes: 2 * 1024 * 1024, // 2MB
+  maxWidth: 400 as const,
+  maxHeight: 400 as const,
+  allowedTypes: ["image/jpeg", "image/png", "image/webp"] as const,
+  outputFormat: "webp" as const,
+};
 
 export const ISSUE_ATTACHMENT_CONSTRAINTS = {
   maxSizeBytes: 5 * 1024 * 1024,

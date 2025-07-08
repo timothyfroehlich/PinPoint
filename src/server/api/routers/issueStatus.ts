@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { createTRPCRouter, organizationProcedure } from "~/server/api/trpc";
+import { IssueStatusCategory } from "@prisma/client";
 
 export const issueStatusRouter = createTRPCRouter({
   getAll: organizationProcedure.query(async ({ ctx }) => {
@@ -16,6 +17,7 @@ export const issueStatusRouter = createTRPCRouter({
       z.object({
         name: z.string().min(1).max(50),
         order: z.number().int().min(1),
+        category: z.nativeEnum(IssueStatusCategory),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -23,6 +25,7 @@ export const issueStatusRouter = createTRPCRouter({
         data: {
           name: input.name,
           order: input.order,
+          category: input.category,
           organizationId: ctx.organization.id,
         },
       });
@@ -34,6 +37,7 @@ export const issueStatusRouter = createTRPCRouter({
         id: z.string(),
         name: z.string().min(1).max(50).optional(),
         order: z.number().int().min(1).optional(),
+        category: z.nativeEnum(IssueStatusCategory).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -45,6 +49,7 @@ export const issueStatusRouter = createTRPCRouter({
         data: {
           ...(input.name && { name: input.name }),
           ...(input.order && { order: input.order }),
+          ...(input.category && { category: input.category }),
         },
       });
     }),

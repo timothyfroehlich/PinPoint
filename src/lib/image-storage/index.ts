@@ -16,6 +16,9 @@ export interface ImageStorageProvider {
   deleteImage(path: string): Promise<void>;
   getImageUrl(path: string): string;
   validateImage(file: File, constraints?: ImageConstraints): Promise<boolean>;
+  uploadProfilePicture(file: File, userId: string): Promise<string>;
+  validateProfilePicture(file: File): Promise<boolean>;
+  uploadOrganizationLogo(file: File, subdomain: string): Promise<string>;
 }
 
 export interface ImageUploadResult {

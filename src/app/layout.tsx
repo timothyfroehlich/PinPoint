@@ -4,8 +4,11 @@ import { AppProviders } from "./providers";
 import { TRPCReactProvider } from "~/trpc/react";
 import { AppBar, Toolbar, Typography, Box } from "@mui/material";
 import Link from "next/link";
+import Image from "next/image";
 import { AuthButton } from "./_components/auth-button";
+import { NavigationLinks } from "./_components/navigation-links";
 import { DevLoginCompact } from "./_components/dev/dev-login-compact";
+import { api } from "~/trpc/server";
 
 export const metadata: Metadata = {
   title: "PinPoint",
@@ -18,9 +21,11 @@ const inter = Inter({
   variable: "--font-sans",
 });
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  const organization = await api.organization.getCurrent();
+
   return (
     <html lang="en" className={`${inter.variable}`}>
       <body>
@@ -28,39 +33,34 @@ export default function RootLayout({
           <AppProviders>
             <AppBar position="static">
               <Toolbar>
-                <Typography
-                  variant="h6"
+                <Box
                   component={Link}
                   href="/"
                   sx={{
-                    flexGrow: 1,
+                    display: "flex",
+                    alignItems: "center",
                     textDecoration: "none",
                     color: "inherit",
-                    cursor: "pointer",
                     "&:hover": {
                       opacity: 0.8,
                     },
                   }}
                 >
-                  PinPoint
-                </Typography>
-                <Box
-                  sx={{ display: "flex", alignItems: "center", gap: 2, mr: 2 }}
-                >
-                  <Typography
-                    component={Link}
-                    href="/issues"
-                    sx={{
-                      textDecoration: "none",
-                      color: "inherit",
-                      "&:hover": {
-                        opacity: 0.8,
-                      },
-                    }}
-                  >
-                    Issues
+                  {organization?.logoUrl && (
+                    <Image
+                      src={organization.logoUrl}
+                      alt={`${organization.name} Logo`}
+                      width={40}
+                      height={40}
+                      style={{ marginRight: "10px" }}
+                    />
+                  )}
+                  <Typography variant="h6" component="div">
+                    PinPoint
                   </Typography>
                 </Box>
+                <Box sx={{ flexGrow: 1 }} />
+                <NavigationLinks />
                 <AuthButton />
               </Toolbar>
             </AppBar>

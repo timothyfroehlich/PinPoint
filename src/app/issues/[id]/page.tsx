@@ -46,6 +46,7 @@ import {
   IssueImageUpload,
   type IssueAttachment,
 } from "~/app/_components/issue-image-upload";
+import { IssueTimeline } from "~/app/_components/issue-timeline";
 import React from "react";
 
 interface IssueDetailPageProps {
@@ -91,11 +92,19 @@ export default function IssueDetailPage({ params }: IssueDetailPageProps) {
   // Get organization members for assignee dropdown
   const { data: members } = api.user.getAllInOrganization.useQuery();
 
+  // Get issue timeline (comments + activities)
+  const { data: timeline, refetch: refetchTimeline } =
+    api.issue.getTimeline.useQuery(
+      { issueId: resolvedParams?.id ?? "" },
+      { enabled: !!resolvedParams?.id },
+    );
+
   // Mutations
   const updateIssueMutation = api.issue.update.useMutation({
     onSuccess: () => {
       setEditDialogOpen(false);
       void refetch();
+      void refetchTimeline();
     },
   });
 
@@ -103,6 +112,7 @@ export default function IssueDetailPage({ params }: IssueDetailPageProps) {
     onSuccess: () => {
       setCommentForm("");
       void refetch();
+      void refetchTimeline();
     },
   });
 
@@ -173,6 +183,13 @@ export default function IssueDetailPage({ params }: IssueDetailPageProps) {
     });
   };
 
+  const handleToggleActivity = () => {
+    updateIssueMutation.mutate({
+      id: issue.id,
+      showActivity: !issue.showActivity,
+    });
+  };
+
   const getSeverityColor = (severity: string | null) => {
     switch (severity) {
       case "Critical":
@@ -202,9 +219,7 @@ export default function IssueDetailPage({ params }: IssueDetailPageProps) {
         >
           <Typography color="text.primary">Issues</Typography>
         </Link>
-        <Typography color="text.secondary">
-          #{issue.id.substring(0, 7)}
-        </Typography>
+        <Typography color="text.secondary">#{issue.number}</Typography>
       </Breadcrumbs>
 
       {/* Header */}
@@ -218,7 +233,7 @@ export default function IssueDetailPage({ params }: IssueDetailPageProps) {
             {issue.title}
           </Typography>
           <Typography variant="h6" color="text.secondary">
-            #{issue.id.substring(0, 7)}
+            #{issue.number}
           </Typography>
         </Box>
 
@@ -268,8 +283,14 @@ export default function IssueDetailPage({ params }: IssueDetailPageProps) {
                 {new Date(issue.createdAt).toLocaleDateString()}
               </>
             )}
-            • {issue.comments.length} comment
-            {issue.comments.length !== 1 ? "s" : ""}
+            •{" "}
+            {timeline?.filter((item) => item.itemType === "comment").length ??
+              0}{" "}
+            comment
+            {(timeline?.filter((item) => item.itemType === "comment").length ??
+              0) !== 1
+              ? "s"
+              : ""}
           </Typography>
         </Box>
       </Box>
@@ -337,41 +358,17 @@ export default function IssueDetailPage({ params }: IssueDetailPageProps) {
             />
           )}
 
-          {/* Comments */}
+          {/* Timeline (Comments + Activities) */}
           <Box sx={{ mb: 3 }}>
-            {issue.comments.map((comment) => (
-              <Card
-                key={comment.id}
-                sx={{ mb: 2, border: "1px solid", borderColor: "divider" }}
-              >
-                <CardContent sx={{ p: 3 }}>
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 2,
-                      mb: 2,
-                    }}
-                  >
-                    <UserAvatar user={comment.author} size="medium" />
-                    <Box>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                        {comment.author.name ?? "Unknown"}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {new Date(comment.createdAt).toLocaleString()}
-                      </Typography>
-                    </Box>
-                  </Box>
-                  <Typography
-                    variant="body1"
-                    sx={{ whiteSpace: "pre-wrap", lineHeight: 1.6 }}
-                  >
-                    {comment.content}
-                  </Typography>
-                </CardContent>
-              </Card>
-            ))}
+            {timeline && (
+              <IssueTimeline
+                timeline={timeline}
+                showActivity={issue.showActivity}
+                onToggleActivity={handleToggleActivity}
+                canToggleActivity={canEdit}
+                issueId={issue.id}
+              />
+            )}
           </Box>
 
           {/* Add Comment */}

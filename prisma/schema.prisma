@@ -16,6 +16,13 @@ enum Role {
     player
 }
 
+enum ActivityType {
+    created
+    status_change
+    assignment
+    field_update
+}
+
 model User {
     id            String       @id @default(cuid())
     name          String?
@@ -32,13 +39,16 @@ model User {
     issues        Issue[]      // Issues assigned to user
     reportedIssues Issue[]     @relation("IssueReporter") // Issues reported by user
     comments      Comment[]
+    deletedComments Comment[] @relation("CommentDeleter") // Comments deleted by user
     ownedGameInstances GameInstance[] @relation("GameOwner") // Games owned by user
+    issueActivities IssueActivity[] // Issue activities performed by user
 }
 
 model Organization {
     id           String       @id @default(cuid())
     name         String
     subdomain    String       @unique
+    logoUrl      String?
     memberships  Membership[]
     issueStatues IssueStatus[]
     issues       Issue[]
@@ -46,6 +56,7 @@ model Organization {
     rooms        Room[]
     gameTitles   GameTitle[]
     attachments  Attachment[]
+    issueActivities IssueActivity[] // Issue activities within organization
 }
 
 model Membership {
@@ -59,17 +70,27 @@ model Membership {
     @@unique([userId, organizationId])
 }
 
+enum IssueStatusCategory {
+    NEW
+    OPEN
+    CLOSED
+}
+
 model IssueStatus {
-    id             String       @id @default(cuid())
+    id             String              @id @default(cuid())
     name           String
     order          Int
-    organization   Organization @relation(fields: [organizationId], references: [id])
+    category       IssueStatusCategory // Add category field
+    organization   Organization        @relation(fields: [organizationId], references: [id])
     organizationId String
     issues         Issue[]
+
+    @@unique([name, organizationId])
 }
 
 model Issue {
     id             String       @id @default(cuid())
+    number         Int          // Monotonically increasing issue number per organization
     title          String
     description    String?
     severity       String?      // Optional severity level (Low, Medium, High, Critical)
@@ -86,8 +107,12 @@ model Issue {
     organizationId String
     createdAt      DateTime     @default(now())
     updatedAt      DateTime     @updatedAt
+    showActivity   Boolean      @default(false) // Toggle to show/hide issue activity
     comments       Comment[]
     attachments    Attachment[]
+    activities     IssueActivity[] // Issue activity entries
+    
+    @@unique([number, organizationId]) // Ensure unique issue numbers per organization
 }
 
 model Location {
@@ -155,6 +180,29 @@ model Comment {
     author    User     @relation(fields: [authorId], references: [id])
     authorId  String
     createdAt DateTime @default(now())
+    editedAt  DateTime? // Timestamp when comment was last edited
+    edited    Boolean  @default(false) // Flag to indicate if comment was edited
+    deletedAt DateTime? // Timestamp when comment was soft deleted
+    deletedBy User?    @relation("CommentDeleter", fields: [deletedById], references: [id])
+    deletedById String? // User who deleted the comment
+}
+
+model IssueActivity {
+    id             String       @id @default(cuid())
+    type           ActivityType
+    issue          Issue        @relation(fields: [issueId], references: [id])
+    issueId        String
+    actor          User?        @relation(fields: [actorId], references: [id]) // User who performed the action
+    actorId        String?      // Null for system actions
+    fieldName      String?      // Field that was changed (e.g., "status", "assignee")
+    oldValue       String?      // Previous value (JSON string for complex values)
+    newValue       String?      // New value (JSON string for complex values)
+    description    String?      // Human-readable description of the change
+    organization   Organization @relation(fields: [organizationId], references: [id])
+    organizationId String
+    createdAt      DateTime     @default(now())
+    
+    @@index([issueId, createdAt]) // For efficient issue activity queries
 }
 
 model Attachment {
