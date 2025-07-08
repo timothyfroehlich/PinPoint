@@ -21,11 +21,8 @@ export const issueRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Get the hardcoded organization (for MVP)
-      const organization = await ctx.db.organization.findFirst();
-      if (!organization) {
-        throw new Error("No organization found");
-      }
+      // Use the organization resolved from subdomain context
+      const organization = ctx.organization;
 
       // Verify that the game instance belongs to the organization
       const gameInstance = await ctx.db.gameInstance.findFirst({
