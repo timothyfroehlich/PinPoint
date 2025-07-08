@@ -50,7 +50,7 @@ export const issueRouter = createTRPCRouter({
       // Get the default "New" status for this organization
       const newStatus = await ctx.db.issueStatus.findFirst({
         where: {
-          name: "New",
+          isDefault: true,
           organizationId: organization.id,
         },
       });
@@ -65,18 +65,9 @@ export const issueRouter = createTRPCRouter({
       const reporterId = ctx.session?.user?.id ?? null;
       const reporterEmail = reporterId ? null : (input.reporterEmail ?? null);
 
-      // Get the next issue number for this organization
-      const lastIssue = await ctx.db.issue.findFirst({
-        where: { organizationId: organization.id },
-        orderBy: { number: "desc" },
-        select: { number: true },
-      });
-      const nextIssueNumber = (lastIssue?.number ?? 0) + 1;
-
       // Create the issue
       const issue = await ctx.db.issue.create({
         data: {
-          number: nextIssueNumber,
           title: input.title,
           description: input.description,
           severity: input.severity,

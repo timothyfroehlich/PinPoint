@@ -79,6 +79,8 @@ To test with multiple organizations:
 - User sessions still work across subdomains
 - Organization context is resolved per request
 - Users can potentially access multiple organizations (future feature)
+- **Development**: Uses database sessions - sessions automatically clear when running `npm run db:reset`
+- **Production**: Uses JWT sessions for better performance - sessions persist across server restarts
 
 ## Production Deployment
 
