@@ -2,12 +2,16 @@
 
 import { Box, Typography } from "@mui/material";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { api } from "~/trpc/react";
 
 export function NavigationLinks() {
+  const { data: session, status } = useSession();
+
   const { data: membership } = api.user.getCurrentMembership.useQuery(
     undefined,
     {
+      enabled: status === "authenticated" && !!session?.user,
       retry: false,
     },
   );

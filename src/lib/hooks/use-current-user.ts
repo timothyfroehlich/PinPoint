@@ -12,7 +12,7 @@ export function useCurrentUser() {
   // Try to get the current user profile through tRPC, which handles impersonation
   const { data: userProfile, isLoading: isProfileLoading } =
     api.user.getProfile.useQuery(undefined, {
-      enabled: status !== "loading",
+      enabled: status === "authenticated" && !!session?.user,
       retry: false,
     });
 
