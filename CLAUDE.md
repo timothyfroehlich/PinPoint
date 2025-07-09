@@ -38,30 +38,64 @@
 - **Multi-Tenancy Tests:** It is absolutely critical to have integration tests that verify data segregation between different organizations.
 - **Temporary Files:** When a temporary file is needed to complete a task (e.g., to pass a complex string as a command-line argument), it should be created inside a `/tmp` directory at the root of the project. This directory should be added to the `.gitignore` file.
 
-# Development Workflow & Quality Assurance
+# Modern Development Workflow & Quality Assurance
 
-## **Mandatory Development Workflow**
+## **Intelligent Development Server Management**
+
+### **Primary Development Commands**
+
+- `npm run dev:full` - **RECOMMENDED**: Start all development services with intelligent monitoring
+- `npm run dev:clean` - Start with complete environment cleanup and fresh state
+- `npm run dev:status` - Check health and status of all development services
+- `npm run dev` - Legacy single-server start (still supported)
+- `npm run dev:safe` - Legacy safe start with validation (still supported)
+
+### **Enhanced Development Architecture**
+
+**Service Orchestration:**
+- **Concurrently** manages multiple processes with colored, labeled output
+- **Nodemon** provides intelligent file watching with selective restart rules
+- **Health monitoring** verifies services are responsive, not just running
+- **Graceful shutdowns** prevent port conflicts and zombie processes
+
+**Automatic Process Management:**
+- **Database sessions** automatically clear on `npm run db:reset`
+- **Selective restarts** - only restart affected services when files change
+- **Port conflict resolution** - automatic cleanup and retry
+- **Process health monitoring** - detect and recover from zombie processes
 
 ### **Before Starting Any Work**
 
-1. **Validate Environment**: Run `npm run validate` to ensure clean starting state
-2. **Check Dependencies**: Run `npm run deps:audit` to identify potential issues
-3. **Start Server Safely**: Use `npm run dev:safe` instead of `npm run dev`
-4. **Verify Server Health**: Run `npm run smoke-test` to confirm server responds
+1. **Environment Status Check**: Run `npm run dev:status` to see what's running
+2. **Validate Environment**: Run `npm run validate` to ensure clean starting state
+3. **Start Development Environment**:
+   - **Recommended**: `npm run dev:full` (starts all services with monitoring)
+   - **Fresh start**: `npm run dev:clean` (cleanup + start)
+   - **Legacy**: `npm run dev:safe` (still supported)
+4. **Verify All Services**: Automatic health checks confirm all services respond
+
+### **Development Environment Services**
+
+When running `npm run dev:full`, these services start automatically:
+- **Next.js Server** (localhost:3000) - Main application with Turbo
+- **Prisma Studio** (localhost:5555) - Database exploration and editing
+- **TypeScript Watcher** - Continuous type checking with file watching
+- **Health Monitor** - Automatic service health verification
 
 ### **During Development**
 
-1. **Check Running Server**: Always check if development server is already running before starting (`npm run dev:check` or `curl http://localhost:3000/api/health`)
-2. **Incremental Validation**: Run `npm run typecheck` after each significant change
-3. **Test Immediately**: Verify functionality works before moving to next task
-4. **Small Commits**: Commit working states frequently with descriptive messages
-5. **Server Health Checks**: Regularly verify `http://localhost:3000/api/health` responds
+1. **Intelligent Restarts**: File changes trigger selective service restarts automatically
+2. **Visual Feedback**: Colored, labeled output shows which service restarted and why
+3. **Health Monitoring**: Services are verified as responsive, not just running
+4. **Incremental Validation**: Run `npm run typecheck` after each significant change
+5. **Test Immediately**: Verify functionality works before moving to next task
+6. **Small Commits**: Commit working states frequently with descriptive messages
 
 ### **Before Committing (Mandatory)**
 
 1. **Full Validation**: Run `npm run pre-commit` (includes typecheck, lint, build)
 2. **Manual Testing**: Test the specific feature you implemented
-3. **Server Verification**: Ensure development server starts and responds
+3. **Service Verification**: Run `npm run dev:status` to ensure all services healthy
 4. **Database Check**: If schema changed, run `npx prisma db push` and verify
 
 ### **Dependency Management Protocol**
@@ -144,30 +178,107 @@
 1. **Recommended**: Run `npm run db:reset` for clean slate
 2. Manual cleanup: Run `npm run seed` to add fresh data (preserves existing data)
 
-## **Emergency Procedures**
+## **Intelligent Development Features**
 
-### **If Development is Completely Broken**
+### **Selective Restart Logic**
 
+**File Change Detection:**
+- **Schema changes** (`prisma/schema.prisma`) → Full restart + Prisma regeneration
+- **Environment changes** (`.env`) → Full restart with validation
+- **Server code changes** (`src/server/`) → Graceful server restart only
+- **Frontend changes** (`src/app/`) → No restart (Next.js HMR handles it)
+- **Configuration changes** (`*.config.js`) → Full restart
+
+### **Automatic Session Management**
+
+**Development Sessions:**
+- **Database strategy** used in development for automatic session clearing
+- **Sessions clear automatically** when running `npm run db:reset`
+- **No manual session management** required during development
+- **Fresh login required** after database resets (intentional for testing)
+
+### **Process Health Monitoring**
+
+**Automatic Health Checks:**
+- **HTTP health endpoint** verification (localhost:3000/api/health)
+- **Prisma Studio** connectivity check (localhost:5555)
+- **Database** connection verification
+- **File watchers** active status monitoring
+
+**Recovery Procedures:**
+- **Zombie process detection** and automatic cleanup
+- **Port conflict resolution** with automatic retry
+- **Graceful restart** on service failure
+- **Exponential backoff** for repeated failures
+
+## **Enhanced Emergency Procedures**
+
+### **Modern Development Server Issues**
+
+**Problem**: Development environment not responding
+**Solutions**:
+1. **Check status**: `npm run dev:status` (shows health of all services)
+2. **Graceful restart**: `npm run dev:clean` (cleanup + fresh start)
+3. **Emergency stop**: `npm run kill:all` (intelligent process cleanup)
+4. **Port cleanup**: `npm run port:free` (free stuck ports: 3000, 5555)
+
+**Problem**: Services starting but not responding
+**Solutions**:
+1. **Health check**: `npm run health` (detailed service diagnostics)
+2. **Fresh environment**: `npm run dev:clean` (complete reset)
+3. **Manual verification**: Check individual service logs in colored output
+
+**Problem**: Database sessions not clearing
+**Solutions**:
+1. **Database reset**: `npm run db:reset` (clears all sessions automatically)
+2. **Verify strategy**: Check that development uses database session strategy
+3. **Manual check**: Verify `Session` table is empty after reset
+
+### **Legacy Emergency Procedures (Fallback)**
+
+If modern tools fail, these legacy procedures still work:
+
+**If Development is Completely Broken**
 1. **Check Git Status**: `git status` to see what changed
 2. **Revert Recent Changes**: `git checkout -- .` to discard unstaged changes
 3. **Clean Install**: Delete `node_modules` and `package-lock.json`, run `npm install`
 4. **Database Reset**: If needed, reset database and run `npm run seed`
 5. **Validate Clean State**: Run `npm run validate` and `npm run build`
 
-### **If Dependencies Are Broken**
-
+**If Dependencies Are Broken**
 1. **Check for Breaking Changes**: Review package changelogs
 2. **Pin to Previous Version**: Update package.json to last known working version
 3. **Clean Reinstall**: `rm -rf node_modules package-lock.json && npm install`
 4. **Document the Issue**: Add notes to this file about problematic versions
 
+**Legacy Manual Procedures**
+1. **Manual process kill**: `pkill -f node` then restart
+2. **Port checking**: `netstat -tlnp | grep :3000`
+3. **Clean install**: Delete `node_modules`, run `npm install`
+
 ## **Required Scripts & Commands**
 
-### **Development Scripts**
+### **Enhanced Development Scripts**
 
+**Primary Development Commands:**
+- `npm run dev:full` - **RECOMMENDED**: Start all services with intelligent monitoring
+- `npm run dev:clean` - Fresh start with complete environment cleanup
+- `npm run dev:status` - Check health and status of all development services
+- `npm run health` - Detailed health diagnostics for all services
+- `npm run kill:all` - Intelligent cleanup of all development processes
+- `npm run port:free` - Free stuck development ports (3000, 5555)
+
+**Legacy Development Scripts (Still Supported):**
 - `npm run dev` - Start Next.js development server with Turbo
 - `npm run dev:safe` - Validates before starting development server
 - `npm run dev:check` - Check if development server is running properly
+
+**Service-Specific Scripts:**
+- `npm run dev:server` - Start only Next.js server with intelligent restart
+- `npm run dev:db` - Start only Prisma Studio (localhost:5555)
+- `npm run dev:typecheck` - Start only TypeScript watcher
+
+**Production Scripts:**
 - `npm run start` - Start production server (requires build first)
 - `npm run preview` - Build and start production server for testing
 
@@ -216,6 +327,47 @@
 - `npm run reset` - Full environment reset: clean, database push, and seed
 - `npm run pinballmap:update-fixture` - Update test fixtures from PinballMap API
 - `npm run prepare` - Setup husky for Git hooks (runs automatically)
+
+## **Development Session Management**
+
+### **Automatic Session Clearing**
+
+**Database Session Strategy:**
+- **Development environment** uses database sessions for automatic clearing
+- **Sessions stored** in database `Session` table, not encrypted JWT tokens
+- **Automatic cleanup** when running `npm run db:reset`
+- **Fresh login required** after database resets (intentional for testing)
+
+**Session Behavior:**
+- **Development**: Sessions clear on database reset, fresh login required
+- **Production**: Uses JWT sessions for persistence across server restarts
+- **Testing**: Database sessions provide clean state for each test run
+
+### **When Sessions Clear Automatically**
+
+1. **Database reset** (`npm run db:reset`) - All sessions cleared
+2. **Fresh environment start** (`npm run dev:clean`) - Option to reset database
+3. **Schema changes** that trigger database regeneration
+4. **Manual session cleanup** via Prisma Studio (localhost:5555)
+
+### **Development Workflow Integration**
+
+**Normal Flow:**
+1. `npm run dev:full` starts all services via concurrently
+2. Nodemon watches server files and restarts intelligently
+3. Health checks verify everything is responsive
+4. Graceful shutdowns prevent port conflicts
+5. Session persistence works via database strategy
+
+**Restart Scenarios:**
+- **File change detected** → Nodemon runs pre-restart script → Graceful shutdown → Restart → Health check
+- **Manual restart** → Same flow triggered manually
+- **Port conflict** → Cleanup script frees ports → Restart
+
+**Error Recovery:**
+- **Process crash** → Concurrently restarts with exponential backoff
+- **Port stuck** → Auto-cleanup and retry
+- **Health check fails** → Diagnostic information logged
 
 ### **Comment Management**
 
