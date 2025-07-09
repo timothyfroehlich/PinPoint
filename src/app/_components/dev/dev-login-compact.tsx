@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { signIn } from "next-auth/react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { type User, type Role } from "@prisma/client";
 import { useCurrentUser } from "~/lib/hooks/use-current-user";
 import {
@@ -21,6 +21,7 @@ type UserWithRole = User & { role: Role | null };
 export function DevLoginCompact() {
   const { user, isAuthenticated } = useCurrentUser();
   const pathname = usePathname();
+  const router = useRouter();
   const [users, setUsers] = useState<UserWithRole[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -55,14 +56,13 @@ export function DevLoginCompact() {
         redirect: false,
       });
 
-      console.log("Sign-in result:", result);
-
       if (result?.ok) {
-        // Redirect manually on success
-        window.location.href = "/";
+        router.refresh();
       } else {
         console.error("Sign-in failed:", result?.error);
       }
+      // The session will be refetched automatically by NextAuth's SessionProvider.
+      // The useCurrentUser hook will then update, and the component will re-render.
     } catch (error) {
       console.error("Login failed:", error);
     } finally {
