@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { auth } from "~/server/auth";
 import { db } from "~/server/db";
+import { env } from "~/env.js";
 
 export async function GET() {
-  if (process.env.NODE_ENV !== "development") {
+  if (env.NODE_ENV !== "development") {
     return new NextResponse(null, { status: 404 });
   }
 

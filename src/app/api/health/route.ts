@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "~/server/db";
+import { env } from "~/env.js";
 
 export async function GET() {
   try {
@@ -10,7 +11,7 @@ export async function GET() {
       status: "healthy",
       timestamp: new Date().toISOString(),
       database: "connected",
-      version: process.env.npm_package_version ?? "unknown",
+      version: env.npm_package_version ?? "unknown",
     });
   } catch (error) {
     console.error("Health check failed:", error);
