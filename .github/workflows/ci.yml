@@ -26,6 +26,8 @@ jobs:
         run: npm install
       - name: Run lint and format checks
         run: npm run check && npm run format:check
+      - name: Validate GitHub workflows
+        uses: raven-actions/actionlint@v2
       - name: Run dependency audit
         run: npm audit --audit-level=high
 
