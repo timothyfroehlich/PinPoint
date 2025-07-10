@@ -1,4 +1,4 @@
-export default {
+const config = {
   preset: "ts-jest/presets/default-esm",
   extensionsToTreatAsEsm: [".ts", ".tsx"],
   projects: [
@@ -19,7 +19,9 @@ export default {
           },
         ],
       },
-      transformIgnorePatterns: ["node_modules/(?!(superjson|@trpc|@t3-oss|next-auth|@auth))"],
+      transformIgnorePatterns: [
+        "node_modules/(?!(superjson|@trpc|@t3-oss|next-auth|@auth))",
+      ],
       moduleNameMapper: {
         "^~/(.*)$": "<rootDir>/src/$1",
       },
@@ -40,7 +42,9 @@ export default {
           },
         ],
       },
-      transformIgnorePatterns: ["node_modules/(?!(superjson|@trpc|@t3-oss|next-auth|@auth))"],
+      transformIgnorePatterns: [
+        "node_modules/(?!(superjson|@trpc|@t3-oss|next-auth|@auth))",
+      ],
       moduleNameMapper: {
         "^~/(.*)$": "<rootDir>/src/$1",
       },
@@ -55,3 +59,5 @@ export default {
   moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json"],
   testTimeout: 10000,
 };
+
+export default config;
