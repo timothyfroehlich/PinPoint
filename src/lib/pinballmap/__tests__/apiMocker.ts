@@ -3,8 +3,9 @@
  * Similar to DisPinMap's APIMocker pattern
  */
 
-import type { PinballMapMachineDetailsResponse } from "../types";
 import fixtureData from "./fixtures/api_responses/locations/location_26454_machine_details.json";
+
+import type { PinballMapMachineDetailsResponse } from "../types";
 
 export class PinballMapAPIMocker {
   private originalFetch: typeof global.fetch;

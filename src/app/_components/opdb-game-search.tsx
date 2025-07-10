@@ -1,5 +1,6 @@
 "use client";
 
+import { Games, Search } from "@mui/icons-material";
 import {
   Autocomplete,
   TextField,
@@ -10,11 +11,12 @@ import {
   CircularProgress,
   Alert,
 } from "@mui/material";
-import { Games, Search } from "@mui/icons-material";
 import { useState, useCallback } from "react";
+
+import type { OPDBSearchResult } from "~/lib/opdb";
+
 import { useDebounce } from "~/lib/hooks/use-debounce";
 import { api } from "~/trpc/react";
-import type { OPDBSearchResult } from "~/lib/opdb";
 
 interface OPDBGameSearchProps {
   onGameSelect: (opdbId: string, gameData: OPDBSearchResult) => void;

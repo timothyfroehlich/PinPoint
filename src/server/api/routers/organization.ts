@@ -1,9 +1,10 @@
+import { z } from "zod";
+
 import {
   createTRPCRouter,
   publicProcedure,
   adminProcedure,
 } from "~/server/api/trpc";
-import { z } from "zod";
 
 export const organizationRouter = createTRPCRouter({
   getCurrent: publicProcedure.query(async ({ ctx }) => {

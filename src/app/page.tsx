@@ -1,10 +1,10 @@
 "use client";
 
-import React from "react";
-import { api } from "~/trpc/react";
-import { IssueSubmissionForm } from "~/app/_components/issue-submission-form";
-
 import { Container, Typography, CircularProgress, Alert } from "@mui/material";
+import React from "react";
+
+import { IssueSubmissionForm } from "~/app/_components/issue-submission-form";
+import { api } from "~/trpc/react";
 
 // Simplified homepage - only shows issue submission form
 

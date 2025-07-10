@@ -3,6 +3,7 @@
  */
 
 import { PinballMapClient, PinballMapError } from "../client";
+
 import { PinballMapAPIMocker } from "./apiMocker";
 
 describe("PinballMapClient", () => {

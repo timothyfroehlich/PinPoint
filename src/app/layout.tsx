@@ -1,13 +1,15 @@
+import { AppBar, Toolbar, Typography, Box } from "@mui/material";
 import { type Metadata } from "next";
 import { Inter } from "next/font/google";
-import { AppProviders } from "./providers";
-import { TRPCReactProvider } from "~/trpc/react";
-import { AppBar, Toolbar, Typography, Box } from "@mui/material";
-import Link from "next/link";
 import Image from "next/image";
+import Link from "next/link";
+
 import { AuthButton } from "./_components/auth-button";
-import { NavigationLinks } from "./_components/navigation-links";
 import { DevLoginCompact } from "./_components/dev/dev-login-compact";
+import { NavigationLinks } from "./_components/navigation-links";
+import { AppProviders } from "./providers";
+
+import { TRPCReactProvider } from "~/trpc/react";
 import { api } from "~/trpc/server";
 
 export const metadata: Metadata = {

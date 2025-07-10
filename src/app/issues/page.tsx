@@ -1,6 +1,19 @@
 "use client";
 
 import {
+  BugReport,
+  LocationOn,
+  Games,
+  FilterList,
+  Search,
+  CheckCircle,
+  RadioButtonUnchecked,
+  Comment,
+  CameraAlt,
+  SwapVert,
+  FiberNew,
+} from "@mui/icons-material";
+import {
   Container,
   Typography,
   Box,
@@ -20,25 +33,13 @@ import {
   InputAdornment,
   Autocomplete,
 } from "@mui/material";
-import {
-  BugReport,
-  LocationOn,
-  Games,
-  FilterList,
-  Search,
-  CheckCircle,
-  RadioButtonUnchecked,
-  Comment,
-  CameraAlt,
-  SwapVert,
-  FiberNew,
-} from "@mui/icons-material";
-import { useState } from "react";
+import { IssueStatusCategory } from "@prisma/client";
 import Link from "next/link";
+import { useState } from "react";
+
 import { UserAvatar } from "~/app/_components/user-avatar";
 import { useCurrentUser } from "~/lib/hooks/use-current-user";
 import { api } from "~/trpc/react";
-import { IssueStatusCategory } from "@prisma/client";
 
 export default function IssuesPage() {
   const [searchTerm, setSearchTerm] = useState("");

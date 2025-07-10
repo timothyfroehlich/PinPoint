@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import { CloudUpload, PhotoCamera } from "@mui/icons-material";
 import {
   Box,
   Button,
@@ -9,8 +9,10 @@ import {
   Typography,
   Paper,
 } from "@mui/material";
-import { CloudUpload, PhotoCamera } from "@mui/icons-material";
+import React, { useState, useRef } from "react";
+
 import { UserAvatar } from "./user-avatar";
+
 import { processImageFile } from "~/lib/utils/image-processing";
 import { api } from "~/trpc/react";
 

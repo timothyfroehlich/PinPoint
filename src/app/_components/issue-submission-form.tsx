@@ -1,5 +1,6 @@
 "use client";
 
+import { Person, BugReport } from "@mui/icons-material";
 import {
   Typography,
   Card,
@@ -16,23 +17,23 @@ import {
   MenuItem,
   Divider,
 } from "@mui/material";
-import { Person, BugReport } from "@mui/icons-material";
 import { useState } from "react";
 import React from "react";
-import { useCurrentUser } from "~/lib/hooks/use-current-user";
-import { api } from "~/trpc/react";
+
 import {
   IssueImageUpload,
   type IssueAttachment,
 } from "~/app/_components/issue-image-upload";
+import { useCurrentUser } from "~/lib/hooks/use-current-user";
+import { api } from "~/trpc/react";
 
-type GameInstance = {
+interface GameInstance {
   id: string;
   name: string;
   gameTitle: {
     name: string;
   };
-};
+}
 
 interface IssueSubmissionFormProps {
   gameInstances: GameInstance[];

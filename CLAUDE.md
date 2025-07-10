@@ -58,6 +58,7 @@ npm run typecheck       # TypeScript validation only
 
 ## Development Workflow
 
+0. **Branching**: Always begin new tasks on a new branch
 1. **Start**: `npm run validate` → `npm run dev:full`
 2. **During**: Fix lint/type errors immediately as they appear
 3. **Before commit**: `npm run pre-commit` must pass
@@ -82,6 +83,7 @@ npm run typecheck       # TypeScript validation only
 - **Repo**: timothyfroehlich/PinPoint
 - **Troubleshooting**: See `docs/troubleshooting.md`
 - **Design Docs**: Available in Notion workspace (`/PinPoint/`)
+- **Protected Main**: Never commit to main, all changes require PRs.
 
 ## Critical Notes
 

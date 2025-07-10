@@ -1,5 +1,6 @@
-import { GET } from "../users/route";
 import { type Role } from "@prisma/client";
+
+import { GET } from "../users/route";
 
 // Mock the database with proper typing
 const mockUserFindMany = jest.fn();
@@ -123,14 +124,14 @@ describe("/api/dev/users", () => {
       expect(response.status).toBe(200);
 
       const data = (await response.json()) as {
-        users: Array<{
+        users: {
           id: string;
           name: string;
           email: string;
           bio: string | null;
           profilePicture: string | null;
           role: Role;
-        }>;
+        }[];
       };
       expect(data.users).toHaveLength(2);
       expect(data.users[0]).toEqual({
@@ -175,7 +176,7 @@ describe("/api/dev/users", () => {
       expect(response.status).toBe(200);
 
       const data = (await response.json()) as {
-        users: Array<{ email: string }>;
+        users: { email: string }[];
       };
       // Should only return test account users
       const emails = data.users.map((u) => u.email);
@@ -202,7 +203,7 @@ describe("/api/dev/users", () => {
       expect(response.status).toBe(200);
 
       const data = (await response.json()) as {
-        users: Array<Record<string, unknown>>;
+        users: Record<string, unknown>[];
       };
       const user = data.users[0];
 

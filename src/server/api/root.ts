@@ -1,12 +1,13 @@
-import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
-import { gameTitleRouter } from "~/server/api/routers/gameTitle";
-import { locationRouter } from "~/server/api/routers/location";
+import { organizationRouter } from "./routers/organization";
+
 import { gameInstanceRouter } from "~/server/api/routers/gameInstance";
-import { userRouter } from "~/server/api/routers/user";
+import { gameTitleRouter } from "~/server/api/routers/gameTitle";
 import { issueRouter } from "~/server/api/routers/issue";
 import { issueStatusRouter } from "~/server/api/routers/issueStatus";
+import { locationRouter } from "~/server/api/routers/location";
 import { roomRouter } from "~/server/api/routers/room";
-import { organizationRouter } from "./routers/organization";
+import { userRouter } from "~/server/api/routers/user";
+import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
 
 /**
  * This is the primary router for your server.
