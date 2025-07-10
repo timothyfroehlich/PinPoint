@@ -3,44 +3,54 @@ import { TRPCError } from "@trpc/server";
 import { type Role } from "@prisma/client";
 import { createCallerFactory } from "~/server/api/trpc";
 import { appRouter } from "~/server/api/root";
+import { auth } from "~/server/auth";
 import { db } from "~/server/db";
+
+// Create properly typed mock functions
+const mockOrganizationFindUnique = jest.fn();
+const mockMembershipFindUnique = jest.fn();
+const mockIssueFindMany = jest.fn();
+const mockIssueFindUnique = jest.fn();
+const mockIssueCreate = jest.fn();
+const mockIssueUpdate = jest.fn();
+const mockIssueDelete = jest.fn();
+const mockGameInstanceFindMany = jest.fn();
+const mockLocationFindMany = jest.fn();
+const mockIssueStatusFindMany = jest.fn();
 
 // Mock the database
 jest.mock("~/server/db", () => ({
   db: {
     organization: {
-      findUnique: jest.fn(),
+      findUnique: mockOrganizationFindUnique,
     },
     membership: {
-      findUnique: jest.fn(),
+      findUnique: mockMembershipFindUnique,
     },
     issue: {
-      findMany: jest.fn(),
-      findUnique: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
+      findMany: mockIssueFindMany,
+      findUnique: mockIssueFindUnique,
+      create: mockIssueCreate,
+      update: mockIssueUpdate,
+      delete: mockIssueDelete,
     },
     gameInstance: {
-      findMany: jest.fn(),
+      findMany: mockGameInstanceFindMany,
     },
     location: {
-      findMany: jest.fn(),
+      findMany: mockLocationFindMany,
     },
     issueStatus: {
-      findMany: jest.fn(),
+      findMany: mockIssueStatusFindMany,
     },
   },
 }));
-
-const mockDb = db as jest.Mocked<typeof db>;
 
 // Mock NextAuth
 jest.mock("~/server/auth", () => ({
   auth: jest.fn(),
 }));
 
-const { auth } = require("~/server/auth");
 const mockAuth = auth as jest.Mock;
 
 describe("Multi-Tenant Security Tests", () => {
@@ -55,6 +65,7 @@ describe("Multi-Tenant Security Tests", () => {
     id: "org-a",
     name: "Organization A",
     subdomain: "org-a",
+    logoUrl: null,
   };
 
   const userAMember = {
@@ -65,7 +76,7 @@ describe("Multi-Tenant Security Tests", () => {
   };
 
   const userAAdmin = {
-    id: "user-a-admin", 
+    id: "user-a-admin",
     role: "admin" as Role,
     userId: "user-a-admin-id",
     organizationId: "org-a",
@@ -74,8 +85,9 @@ describe("Multi-Tenant Security Tests", () => {
   // Test data for Organization B
   const organizationB = {
     id: "org-b",
-    name: "Organization B", 
+    name: "Organization B",
     subdomain: "org-b",
+    logoUrl: null,
   };
 
   const userBMember = {
@@ -94,7 +106,7 @@ describe("Multi-Tenant Security Tests", () => {
       gameInstanceId: "game-a-1",
     },
     {
-      id: "issue-a-2", 
+      id: "issue-a-2",
       title: "Issue A2",
       organizationId: "org-a",
       gameInstanceId: "game-a-2",
@@ -104,7 +116,7 @@ describe("Multi-Tenant Security Tests", () => {
   const issuesOrgB = [
     {
       id: "issue-b-1",
-      title: "Issue B1", 
+      title: "Issue B1",
       organizationId: "org-b",
       gameInstanceId: "game-b-1",
     },
@@ -125,24 +137,26 @@ describe("Multi-Tenant Security Tests", () => {
       };
 
       mockAuth.mockResolvedValue(sessionA);
-      mockDb.organization.findUnique.mockResolvedValue(organizationA);
-      mockDb.membership.findUnique.mockResolvedValue(userAMember);
+      mockOrganizationFindUnique.mockResolvedValue(organizationA);
+      mockMembershipFindUnique.mockResolvedValue(userAMember);
 
       // Mock issue data - should only return Organization A's issues
-      mockDb.issue.findMany.mockResolvedValue(issuesOrgA);
+      mockIssueFindMany.mockResolvedValue(issuesOrgA);
 
       const callerA = createCaller({
+        db,
         session: sessionA,
+        organization: organizationA,
         headers: new Headers({
           host: "org-a.localhost:3000",
         }),
       });
 
       const result = await callerA.issue.getAll({
-        locationId: null,
-        statusId: null,
-        gameTitleId: null,
-        statusCategory: null,
+        locationId: undefined,
+        statusId: undefined,
+        gameTitleId: undefined,
+        statusCategory: undefined,
         sortBy: "created",
         sortOrder: "desc",
       });
@@ -150,12 +164,13 @@ describe("Multi-Tenant Security Tests", () => {
       expect(result).toEqual(issuesOrgA);
 
       // Verify that the query included organization filter
-      expect(mockDb.issue.findMany).toHaveBeenCalledWith(
+      expect(mockIssueFindMany).toHaveBeenCalledWith(
         expect.objectContaining({
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           where: expect.objectContaining({
             organizationId: "org-a",
           }),
-        })
+        }) as unknown,
       );
     });
 
@@ -164,7 +179,7 @@ describe("Multi-Tenant Security Tests", () => {
       const sessionA: Session = {
         user: {
           id: "user-a",
-          name: "User A", 
+          name: "User A",
           email: "user-a@example.com",
           role: "member",
           organizationId: "org-a",
@@ -174,12 +189,14 @@ describe("Multi-Tenant Security Tests", () => {
 
       mockAuth.mockResolvedValue(sessionA);
       // Return Organization B when subdomain is org-b
-      mockDb.organization.findUnique.mockResolvedValue(organizationB);
+      mockOrganizationFindUnique.mockResolvedValue(organizationB);
       // User A has no membership in Organization B
-      mockDb.membership.findUnique.mockResolvedValue(null);
+      mockMembershipFindUnique.mockResolvedValue(null);
 
       const callerA = createCaller({
+        db,
         session: sessionA,
+        organization: organizationB,
         headers: new Headers({
           host: "org-b.localhost:3000", // User A trying to access org B
         }),
@@ -187,30 +204,30 @@ describe("Multi-Tenant Security Tests", () => {
 
       await expect(
         callerA.issue.getAll({
-          locationId: null,
-          statusId: null,
-          gameTitleId: null,
-          statusCategory: null,
+          locationId: undefined,
+          statusId: undefined,
+          gameTitleId: undefined,
+          statusCategory: undefined,
           sortBy: "created",
           sortOrder: "desc",
-        })
+        }),
       ).rejects.toThrow(
         new TRPCError({
           code: "FORBIDDEN",
           message: "You don't have permission to access this organization",
-        })
+        }),
       );
     });
 
     it("should isolate data between organizations completely", async () => {
       // Test both organizations simultaneously
-      
+
       // Setup for Organization A
       const sessionA: Session = {
         user: {
           id: "user-a",
           name: "User A",
-          email: "user-a@example.com", 
+          email: "user-a@example.com",
           role: "member",
           organizationId: "org-a",
         },
@@ -223,7 +240,7 @@ describe("Multi-Tenant Security Tests", () => {
           id: "user-b",
           name: "User B",
           email: "user-b@example.com",
-          role: "member", 
+          role: "member",
           organizationId: "org-b",
         },
         expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
@@ -231,22 +248,24 @@ describe("Multi-Tenant Security Tests", () => {
 
       // Test Organization A access
       mockAuth.mockResolvedValue(sessionA);
-      mockDb.organization.findUnique.mockResolvedValue(organizationA);
-      mockDb.membership.findUnique.mockResolvedValue(userAMember);
-      mockDb.issue.findMany.mockResolvedValue(issuesOrgA);
+      mockOrganizationFindUnique.mockResolvedValue(organizationA);
+      mockMembershipFindUnique.mockResolvedValue(userAMember);
+      mockIssueFindMany.mockResolvedValue(issuesOrgA);
 
       const callerA = createCaller({
+        db,
         session: sessionA,
+        organization: organizationA,
         headers: new Headers({
           host: "org-a.localhost:3000",
         }),
       });
 
       const resultA = await callerA.issue.getAll({
-        locationId: null,
-        statusId: null,
-        gameTitleId: null,
-        statusCategory: null,
+        locationId: undefined,
+        statusId: undefined,
+        gameTitleId: undefined,
+        statusCategory: undefined,
         sortBy: "created",
         sortOrder: "desc",
       });
@@ -256,22 +275,24 @@ describe("Multi-Tenant Security Tests", () => {
       // Reset mocks and test Organization B access
       jest.clearAllMocks();
       mockAuth.mockResolvedValue(sessionB);
-      mockDb.organization.findUnique.mockResolvedValue(organizationB);
-      mockDb.membership.findUnique.mockResolvedValue(userBMember);
-      mockDb.issue.findMany.mockResolvedValue(issuesOrgB);
+      mockOrganizationFindUnique.mockResolvedValue(organizationB);
+      mockMembershipFindUnique.mockResolvedValue(userBMember);
+      mockIssueFindMany.mockResolvedValue(issuesOrgB);
 
       const callerB = createCaller({
+        db,
         session: sessionB,
+        organization: organizationB,
         headers: new Headers({
           host: "org-b.localhost:3000",
         }),
       });
 
       const resultB = await callerB.issue.getAll({
-        locationId: null,
-        statusId: null,
-        gameTitleId: null,
-        statusCategory: null,
+        locationId: undefined,
+        statusId: undefined,
+        gameTitleId: undefined,
+        statusCategory: undefined,
         sortBy: "created",
         sortOrder: "desc",
       });
@@ -279,12 +300,13 @@ describe("Multi-Tenant Security Tests", () => {
       expect(resultB).toEqual(issuesOrgB);
 
       // Verify Organization B query had correct filter
-      expect(mockDb.issue.findMany).toHaveBeenCalledWith(
+      expect(mockIssueFindMany).toHaveBeenCalledWith(
         expect.objectContaining({
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           where: expect.objectContaining({
             organizationId: "org-b",
           }),
-        })
+        }) as unknown,
       );
     });
   });
@@ -303,11 +325,11 @@ describe("Multi-Tenant Security Tests", () => {
       };
 
       mockAuth.mockResolvedValue(sessionA);
-      mockDb.organization.findUnique.mockResolvedValue(organizationA);
-      mockDb.membership.findUnique.mockResolvedValue(userAAdmin);
-      
+      mockOrganizationFindUnique.mockResolvedValue(organizationA);
+      mockMembershipFindUnique.mockResolvedValue(userAAdmin);
+
       // Try to return an issue from Organization B
-      mockDb.issue.findUnique.mockResolvedValue({
+      mockIssueFindUnique.mockResolvedValue({
         id: "issue-b-1",
         title: "Issue B1",
         organizationId: "org-b", // Different organization!
@@ -315,20 +337,20 @@ describe("Multi-Tenant Security Tests", () => {
       });
 
       const callerA = createCaller({
+        db,
         session: sessionA,
+        organization: organizationA,
         headers: new Headers({
           host: "org-a.localhost:3000",
         }),
       });
 
       // This should fail because the issue belongs to a different organization
-      await expect(
-        callerA.issue.getById({ id: "issue-b-1" })
-      ).rejects.toThrow(
+      await expect(callerA.issue.getById({ id: "issue-b-1" })).rejects.toThrow(
         new TRPCError({
           code: "NOT_FOUND",
           message: "Issue not found",
-        })
+        }),
       );
     });
 
@@ -345,11 +367,13 @@ describe("Multi-Tenant Security Tests", () => {
       };
 
       mockAuth.mockResolvedValue(sessionA);
-      mockDb.organization.findUnique.mockResolvedValue(organizationA);
-      mockDb.membership.findUnique.mockResolvedValue(userAMember);
+      mockOrganizationFindUnique.mockResolvedValue(organizationA);
+      mockMembershipFindUnique.mockResolvedValue(userAMember);
 
       const callerA = createCaller({
+        db,
         session: sessionA,
+        organization: organizationA,
         headers: new Headers({
           host: "org-a.localhost:3000",
         }),
@@ -361,11 +385,11 @@ describe("Multi-Tenant Security Tests", () => {
         description: "Test Description",
         gameInstanceId: "game-a-1",
         statusId: "status-1",
-        severity: "Medium",
+        severity: "Medium" as const,
       };
 
       // Mock successful creation
-      mockDb.issue.create.mockResolvedValue({
+      mockIssueCreate.mockResolvedValue({
         id: "new-issue",
         ...createData,
         organizationId: "org-a", // Should be automatically set
@@ -374,11 +398,11 @@ describe("Multi-Tenant Security Tests", () => {
       await callerA.issue.create(createData);
 
       // Verify that organizationId was automatically added
-      expect(mockDb.issue.create).toHaveBeenCalledWith({
+      expect(mockIssueCreate).toHaveBeenCalledWith({
         data: expect.objectContaining({
           ...createData,
           organizationId: "org-a",
-        }),
+        }) as unknown,
       });
     });
 
@@ -395,11 +419,11 @@ describe("Multi-Tenant Security Tests", () => {
       };
 
       mockAuth.mockResolvedValue(sessionA);
-      mockDb.organization.findUnique.mockResolvedValue(organizationA);
-      mockDb.membership.findUnique.mockResolvedValue(userAAdmin);
+      mockOrganizationFindUnique.mockResolvedValue(organizationA);
+      mockMembershipFindUnique.mockResolvedValue(userAAdmin);
 
       // Mock finding an issue from Organization B
-      mockDb.issue.findUnique.mockResolvedValue({
+      mockIssueFindUnique.mockResolvedValue({
         id: "issue-b-1",
         title: "Issue B1",
         organizationId: "org-b", // Different organization
@@ -407,7 +431,9 @@ describe("Multi-Tenant Security Tests", () => {
       });
 
       const callerA = createCaller({
+        db,
         session: sessionA,
+        organization: organizationA,
         headers: new Headers({
           host: "org-a.localhost:3000",
         }),
@@ -418,12 +444,12 @@ describe("Multi-Tenant Security Tests", () => {
         callerA.issue.update({
           id: "issue-b-1",
           title: "Updated Title",
-        })
+        }),
       ).rejects.toThrow(
         new TRPCError({
           code: "NOT_FOUND",
           message: "Issue not found",
-        })
+        }),
       );
     });
   });
@@ -442,23 +468,25 @@ describe("Multi-Tenant Security Tests", () => {
       };
 
       mockAuth.mockResolvedValue(memberSession);
-      mockDb.organization.findUnique.mockResolvedValue(organizationA);
-      mockDb.membership.findUnique.mockResolvedValue(userAMember);
+      mockOrganizationFindUnique.mockResolvedValue(organizationA);
+      mockMembershipFindUnique.mockResolvedValue(userAMember);
 
       const memberCaller = createCaller({
+        db,
         session: memberSession,
+        organization: organizationA,
         headers: new Headers({
           host: "org-a.localhost:3000",
         }),
       });
 
       // Member should be able to access organization data
-      mockDb.issue.findMany.mockResolvedValue(issuesOrgA);
+      mockIssueFindMany.mockResolvedValue(issuesOrgA);
       const result = await memberCaller.issue.getAll({
-        locationId: null,
-        statusId: null,
-        gameTitleId: null,
-        statusCategory: null,
+        locationId: undefined,
+        statusId: undefined,
+        gameTitleId: undefined,
+        statusCategory: undefined,
         sortBy: "created",
         sortOrder: "desc",
       });
@@ -474,7 +502,7 @@ describe("Multi-Tenant Security Tests", () => {
         user: {
           id: "user-a-admin-id",
           name: "Admin User",
-          email: "admin@example.com", 
+          email: "admin@example.com",
           role: "admin",
           organizationId: "org-a",
         },
@@ -482,36 +510,39 @@ describe("Multi-Tenant Security Tests", () => {
       };
 
       mockAuth.mockResolvedValue(adminSession);
-      mockDb.organization.findUnique.mockResolvedValue(organizationA);
-      mockDb.membership.findUnique.mockResolvedValue(userAAdmin);
+      mockOrganizationFindUnique.mockResolvedValue(organizationA);
+      mockMembershipFindUnique.mockResolvedValue(userAAdmin);
 
       const adminCaller = createCaller({
+        db,
         session: adminSession,
+        organization: organizationA,
         headers: new Headers({
           host: "org-a.localhost:3000",
         }),
       });
 
       // Admin should have access to organization data
-      mockDb.issue.findMany.mockResolvedValue(issuesOrgA);
+      mockIssueFindMany.mockResolvedValue(issuesOrgA);
       const result = await adminCaller.issue.getAll({
-        locationId: null,
-        statusId: null,
-        gameTitleId: null,
-        statusCategory: null,
+        locationId: undefined,
+        statusId: undefined,
+        gameTitleId: undefined,
+        statusCategory: undefined,
         sortBy: "created",
         sortOrder: "desc",
       });
 
       expect(result).toEqual(issuesOrgA);
-      
+
       // Verify admin can only access their organization's data
-      expect(mockDb.issue.findMany).toHaveBeenCalledWith(
+      expect(mockIssueFindMany).toHaveBeenCalledWith(
         expect.objectContaining({
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           where: expect.objectContaining({
             organizationId: "org-a",
           }),
-        })
+        }) as unknown,
       );
     });
   });
@@ -530,11 +561,13 @@ describe("Multi-Tenant Security Tests", () => {
       };
 
       mockAuth.mockResolvedValue(session);
-      mockDb.organization.findUnique.mockResolvedValue(organizationA);
-      mockDb.membership.findUnique.mockResolvedValue(userAMember);
+      mockOrganizationFindUnique.mockResolvedValue(organizationA);
+      mockMembershipFindUnique.mockResolvedValue(userAMember);
 
       const caller = createCaller({
+        db,
         session: session,
+        organization: organizationA,
         headers: new Headers({
           host: "org-a.localhost:3000",
         }),
@@ -543,7 +576,7 @@ describe("Multi-Tenant Security Tests", () => {
       await caller.user.getCurrentMembership();
 
       // Verify correct subdomain was used for organization lookup
-      expect(mockDb.organization.findUnique).toHaveBeenCalledWith({
+      expect(mockOrganizationFindUnique).toHaveBeenCalledWith({
         where: { subdomain: "org-a" },
       });
     });
@@ -562,11 +595,13 @@ describe("Multi-Tenant Security Tests", () => {
       };
 
       mockAuth.mockResolvedValue(session);
-      mockDb.organization.findUnique.mockResolvedValue(organizationB); // But subdomain resolves to org-b
-      mockDb.membership.findUnique.mockResolvedValue(null); // No membership in org-b
+      mockOrganizationFindUnique.mockResolvedValue(organizationB); // But subdomain resolves to org-b
+      mockMembershipFindUnique.mockResolvedValue(null); // No membership in org-b
 
       const caller = createCaller({
+        db,
         session: session,
+        organization: organizationB,
         headers: new Headers({
           host: "org-b.localhost:3000", // Spoofed subdomain
         }),
@@ -576,7 +611,7 @@ describe("Multi-Tenant Security Tests", () => {
         new TRPCError({
           code: "FORBIDDEN",
           message: "You don't have permission to access this organization",
-        })
+        }),
       );
     });
   });

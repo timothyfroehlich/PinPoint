@@ -54,7 +54,7 @@ describe("Authentication Core Logic", () => {
         "harry.williams@testaccount.dev",
         "email9@example.com",
       ];
-      
+
       expect(testUsers).toContain("roger.sharpe@testaccount.dev");
       expect(testUsers).toContain("gary.stern@testaccount.dev");
       expect(testUsers).toContain("email9@example.com");

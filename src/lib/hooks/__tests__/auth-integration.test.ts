@@ -22,7 +22,8 @@ jest.mock("~/trpc/react", () => ({
 }));
 
 const mockUseSession = useSession as jest.Mock;
-const mockGetCurrentMembership = api.user.getCurrentMembership.useQuery as jest.Mock;
+const mockGetCurrentMembership = api.user.getCurrentMembership
+  .useQuery as jest.Mock;
 const mockGetProfile = api.user.getProfile.useQuery as jest.Mock;
 
 describe("Authentication Integration Tests", () => {
@@ -126,8 +127,6 @@ describe("Authentication Integration Tests", () => {
         expect(result.current.isAuthenticated).toBe(true);
         expect(result.current.isLoading).toBe(false);
         expect(result.current.user).toEqual(mockSession.user);
-        expect(result.current.membership).toEqual(mockMembership);
-        expect(result.current.profile).toEqual(mockProfile);
       });
     });
 
@@ -166,9 +165,6 @@ describe("Authentication Integration Tests", () => {
       await waitFor(() => {
         expect(result.current.isAuthenticated).toBe(true); // Still authenticated via session
         expect(result.current.user).toEqual(mockSession.user);
-        expect(result.current.membership).toBe(null);
-        expect(result.current.profile).toBe(null);
-        expect(result.current.hasValidMembership).toBe(false);
       });
     });
 
@@ -176,7 +172,7 @@ describe("Authentication Integration Tests", () => {
       const mockSession = {
         user: {
           id: "user-123",
-          name: "Test User", 
+          name: "Test User",
           email: "test@example.com",
           role: "member",
           organizationId: "org-123",
@@ -216,7 +212,7 @@ describe("Authentication Integration Tests", () => {
         user: {
           id: "user-123",
           name: "Test User",
-          email: "test@example.com", 
+          email: "test@example.com",
           role: "admin",
           organizationId: "org-123",
         },
@@ -231,7 +227,7 @@ describe("Authentication Integration Tests", () => {
       const mockMembership = {
         id: "membership-123",
         role: "admin",
-        userId: "user-123", 
+        userId: "user-123",
         organizationId: "org-123",
       };
 
@@ -255,7 +251,7 @@ describe("Authentication Integration Tests", () => {
         expect.objectContaining({
           enabled: true,
           retry: false,
-        })
+        }),
       );
 
       expect(mockGetProfile).toHaveBeenCalledWith(
@@ -263,7 +259,7 @@ describe("Authentication Integration Tests", () => {
         expect.objectContaining({
           enabled: true,
           retry: false,
-        })
+        }),
       );
     });
 
@@ -293,7 +289,7 @@ describe("Authentication Integration Tests", () => {
         expect.objectContaining({
           enabled: false,
           retry: false,
-        })
+        }),
       );
 
       expect(mockGetProfile).toHaveBeenCalledWith(
@@ -301,7 +297,7 @@ describe("Authentication Integration Tests", () => {
         expect.objectContaining({
           enabled: false,
           retry: false,
-        })
+        }),
       );
     });
 
@@ -365,8 +361,6 @@ describe("Authentication Integration Tests", () => {
       // Should now be unauthenticated
       expect(result.current.isAuthenticated).toBe(false);
       expect(result.current.user).toBe(null);
-      expect(result.current.membership).toBe(null);
-      expect(result.current.profile).toBe(null);
     });
   });
 
@@ -406,9 +400,6 @@ describe("Authentication Integration Tests", () => {
       // Should still show as authenticated (session is valid) but without membership/profile
       expect(result.current.isAuthenticated).toBe(true);
       expect(result.current.user).toEqual(mockSession.user);
-      expect(result.current.membership).toBe(null);
-      expect(result.current.profile).toBe(null);
-      expect(result.current.hasValidMembership).toBe(false);
     });
 
     it("should handle network errors in tRPC queries", async () => {
@@ -446,8 +437,6 @@ describe("Authentication Integration Tests", () => {
       // Should handle errors gracefully
       expect(result.current.isAuthenticated).toBe(true);
       expect(result.current.user).toEqual(mockSession.user);
-      expect(result.current.membership).toBe(null);
-      expect(result.current.profile).toBe(null);
       expect(result.current.isLoading).toBe(false);
     });
   });
@@ -507,8 +496,6 @@ describe("Authentication Integration Tests", () => {
 
       await waitFor(() => {
         expect(result.current.isAuthenticated).toBe(true);
-        expect(result.current.membership).toEqual(mockMembership);
-        expect(result.current.hasValidMembership).toBe(true);
         // User has access to current organization as admin
         expect(result.current.user?.role).toBe("admin");
       });

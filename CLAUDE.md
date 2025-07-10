@@ -15,6 +15,7 @@
 - **Issue:** A reported problem or task for a Game Instance.
 - **User:** A global account holder.
 - **Member:** A User associated with an Organization with a specific role (`admin` or `member`).
+- **Repo** timothyfroehlich/PinPoint
 
 1. **Multi-Tenancy:** The application is a multi-tenant system using a shared database with row-level security. Nearly every database table containing tenant-specific data must have a non-nullable `organization_id` column. All database queries must be strictly scoped by this `organization_id` to ensure data isolation.
 2. **Global Users:** User accounts are global. A `Membership` junction table links a `User` to an `Organization` and defines their role.
@@ -28,6 +29,52 @@
 - **API:** Backend logic should be implemented using tRPC, built upon Next.js API Routes.
 - **Component Structure:** Follow existing patterns for React component structure and state management.
 - **Prisma Schema:** When modifying the database, update the `schema.prisma` file. All tenant-specific tables must include the `organization_id` foreign key.
+
+## **CRITICAL: Code Quality & Linting Workflow**
+
+### **Mandatory Quality Checks During Development**
+
+**🚨 ALWAYS run lints and formatters frequently while working on files - do NOT accumulate lint debt!**
+
+1. **Before Starting Work**: Run `npm run validate` to ensure clean starting state
+2. **During Development**: Run quality checks after each significant change:
+   - `npm run typecheck` - Fix TypeScript errors immediately
+   - `npm run lint` - Fix ESLint errors immediately
+   - `npm run format:write` - Auto-fix formatting issues
+3. **Before Every Commit**: Run `npm run pre-commit` - this is MANDATORY and must pass
+4. **Test Code Quality**: Test files must follow the same quality standards as production code
+
+### **Quality Standards (Zero Tolerance)**
+
+- **0 TypeScript compilation errors** - Fix immediately, never commit with TS errors
+- **0 ESLint errors** - Warnings acceptable with justification, but no errors
+- **0 Prettier formatting issues** - Code must be consistently formatted
+- **Proper typing** - No `any` types, no unsafe operations, use proper interfaces
+- **Clean imports** - Use ES modules, avoid `require()`, properly type all imports
+- **Modern Jest patterns** - Use `jest.fn<T>()` not `jest.Mocked<T>`, avoid `any` in test mocks
+- **Test file quality** - Test files must meet same standards as production code
+
+### **Quality Commands Reference**
+
+- `npm run validate` - **Run before starting work** - Full validation suite
+- `npm run validate:fix` - **Run during development** - Auto-fix issues
+- `npm run pre-commit` - **Run before commits** - Mandatory quality gate
+- `npm run typecheck` - TypeScript compilation check
+- `npm run lint` - ESLint code quality check
+- `npm run lint:fix` - Auto-fix ESLint issues
+- `npm run format:check` - Check Prettier formatting
+- `npm run format:write` - Auto-fix formatting issues
+
+### **Test Code Quality Requirements**
+
+Test files must meet the same standards as production code:
+
+- **Proper TypeScript typing** - Mock objects, test data, and assertions must be fully typed
+- **No unsafe operations** - Use typed mocks instead of `any` types
+- **Clean test structure** - Descriptive test names, proper setup/teardown, focused assertions
+- **Modern Jest patterns** - Use `jest.fn<ReturnType, Parameters>()` for typed mocks instead of `jest.Mocked<T>`
+- **ES module imports** - Always use `import()` for dynamic imports, never `require()` in test files
+- **NextAuth v5 compatibility** - Use proper typing for Auth.js v5 session objects and providers
 - **Write Tests First:** For new backend logic and critical UI components, write failing tests before writing the implementation code.
 - **Testing Stack:** Use Jest for the test runner, React Testing Library for components, and Playwright for End-to-End (E2E) tests.
 - **Playwright MCP:** Playwright is available as an MCP server for browser automation and E2E testing.
@@ -53,12 +100,14 @@
 ### **Enhanced Development Architecture**
 
 **Service Orchestration:**
+
 - **Concurrently** manages multiple processes with colored, labeled output
 - **Nodemon** provides intelligent file watching with selective restart rules
 - **Health monitoring** verifies services are responsive, not just running
 - **Graceful shutdowns** prevent port conflicts and zombie processes
 
 **Automatic Process Management:**
+
 - **Database sessions** automatically clear on `npm run db:reset`
 - **Selective restarts** - only restart affected services when files change
 - **Port conflict resolution** - automatic cleanup and retry
@@ -77,6 +126,7 @@
 ### **Development Environment Services**
 
 When running `npm run dev:full`, these services start automatically:
+
 - **Next.js Server** (localhost:3000) - Main application with Turbo
 - **Prisma Studio** (localhost:5555) - Database exploration and editing
 - **TypeScript Watcher** - Continuous type checking with file watching
@@ -183,6 +233,7 @@ When running `npm run dev:full`, these services start automatically:
 ### **Selective Restart Logic**
 
 **File Change Detection:**
+
 - **Schema changes** (`prisma/schema.prisma`) → Full restart + Prisma regeneration
 - **Environment changes** (`.env`) → Full restart with validation
 - **Server code changes** (`src/server/`) → Graceful server restart only
@@ -192,6 +243,7 @@ When running `npm run dev:full`, these services start automatically:
 ### **Automatic Session Management**
 
 **Development Sessions:**
+
 - **Database strategy** used in development for automatic session clearing
 - **Sessions clear automatically** when running `npm run db:reset`
 - **No manual session management** required during development
@@ -200,12 +252,14 @@ When running `npm run dev:full`, these services start automatically:
 ### **Process Health Monitoring**
 
 **Automatic Health Checks:**
+
 - **HTTP health endpoint** verification (localhost:3000/api/health)
 - **Prisma Studio** connectivity check (localhost:5555)
 - **Database** connection verification
 - **File watchers** active status monitoring
 
 **Recovery Procedures:**
+
 - **Zombie process detection** and automatic cleanup
 - **Port conflict resolution** with automatic retry
 - **Graceful restart** on service failure
@@ -217,6 +271,7 @@ When running `npm run dev:full`, these services start automatically:
 
 **Problem**: Development environment not responding
 **Solutions**:
+
 1. **Check status**: `npm run dev:status` (shows health of all services)
 2. **Graceful restart**: `npm run dev:clean` (cleanup + fresh start)
 3. **Emergency stop**: `npm run kill:all` (intelligent process cleanup)
@@ -224,12 +279,14 @@ When running `npm run dev:full`, these services start automatically:
 
 **Problem**: Services starting but not responding
 **Solutions**:
+
 1. **Health check**: `npm run health` (detailed service diagnostics)
 2. **Fresh environment**: `npm run dev:clean` (complete reset)
 3. **Manual verification**: Check individual service logs in colored output
 
 **Problem**: Database sessions not clearing
 **Solutions**:
+
 1. **Database reset**: `npm run db:reset` (clears all sessions automatically)
 2. **Verify strategy**: Check that development uses database session strategy
 3. **Manual check**: Verify `Session` table is empty after reset
@@ -239,6 +296,7 @@ When running `npm run dev:full`, these services start automatically:
 If modern tools fail, these legacy procedures still work:
 
 **If Development is Completely Broken**
+
 1. **Check Git Status**: `git status` to see what changed
 2. **Revert Recent Changes**: `git checkout -- .` to discard unstaged changes
 3. **Clean Install**: Delete `node_modules` and `package-lock.json`, run `npm install`
@@ -246,12 +304,14 @@ If modern tools fail, these legacy procedures still work:
 5. **Validate Clean State**: Run `npm run validate` and `npm run build`
 
 **If Dependencies Are Broken**
+
 1. **Check for Breaking Changes**: Review package changelogs
 2. **Pin to Previous Version**: Update package.json to last known working version
 3. **Clean Reinstall**: `rm -rf node_modules package-lock.json && npm install`
 4. **Document the Issue**: Add notes to this file about problematic versions
 
 **Legacy Manual Procedures**
+
 1. **Manual process kill**: `pkill -f node` then restart
 2. **Port checking**: `netstat -tlnp | grep :3000`
 3. **Clean install**: Delete `node_modules`, run `npm install`
@@ -261,6 +321,7 @@ If modern tools fail, these legacy procedures still work:
 ### **Enhanced Development Scripts**
 
 **Primary Development Commands:**
+
 - `npm run dev:full` - **RECOMMENDED**: Start all services with intelligent monitoring
 - `npm run dev:clean` - Fresh start with complete environment cleanup
 - `npm run dev:status` - Check health and status of all development services
@@ -269,16 +330,19 @@ If modern tools fail, these legacy procedures still work:
 - `npm run port:free` - Free stuck development ports (3000, 5555)
 
 **Legacy Development Scripts (Still Supported):**
+
 - `npm run dev` - Start Next.js development server with Turbo
 - `npm run dev:safe` - Validates before starting development server
 - `npm run dev:check` - Check if development server is running properly
 
 **Service-Specific Scripts:**
+
 - `npm run dev:server` - Start only Next.js server with intelligent restart
 - `npm run dev:db` - Start only Prisma Studio (localhost:5555)
 - `npm run dev:typecheck` - Start only TypeScript watcher
 
 **Production Scripts:**
+
 - `npm run start` - Start production server (requires build first)
 - `npm run preview` - Build and start production server for testing
 
@@ -333,12 +397,14 @@ If modern tools fail, these legacy procedures still work:
 ### **Automatic Session Clearing**
 
 **Database Session Strategy:**
+
 - **Development environment** uses database sessions for automatic clearing
 - **Sessions stored** in database `Session` table, not encrypted JWT tokens
 - **Automatic cleanup** when running `npm run db:reset`
 - **Fresh login required** after database resets (intentional for testing)
 
 **Session Behavior:**
+
 - **Development**: Sessions clear on database reset, fresh login required
 - **Production**: Uses JWT sessions for persistence across server restarts
 - **Testing**: Database sessions provide clean state for each test run
@@ -353,6 +419,7 @@ If modern tools fail, these legacy procedures still work:
 ### **Development Workflow Integration**
 
 **Normal Flow:**
+
 1. `npm run dev:full` starts all services via concurrently
 2. Nodemon watches server files and restarts intelligently
 3. Health checks verify everything is responsive
@@ -360,11 +427,13 @@ If modern tools fail, these legacy procedures still work:
 5. Session persistence works via database strategy
 
 **Restart Scenarios:**
+
 - **File change detected** → Nodemon runs pre-restart script → Graceful shutdown → Restart → Health check
 - **Manual restart** → Same flow triggered manually
 - **Port conflict** → Cleanup script frees ports → Restart
 
 **Error Recovery:**
+
 - **Process crash** → Concurrently restarts with exponential backoff
 - **Port stuck** → Auto-cleanup and retry
 - **Health check fails** → Diagnostic information logged
@@ -403,3 +472,191 @@ The Playwright MCP server provides browser automation capabilities for E2E testi
 2. **Screenshot Documentation**: Capture visual state for debugging or documentation
 3. **Form Testing**: Interact with forms, buttons, and UI elements
 4. **Multi-tenant Testing**: Verify organization isolation by logging in as different users
+
+## **Critical Lessons Learned: ESLint Debt Prevention**
+
+### **🚨 Never Accumulate Lint Debt - Fix Issues Immediately**
+
+**Key Principle**: Fix linting issues as soon as they appear, not in bulk cleanup sessions.
+
+### **Common Pitfalls That Lead to Lint Debt**
+
+1. **Unsafe Mock Patterns**:
+
+   ```typescript
+   // ❌ BAD - Creates unsafe any types
+   const mockDb = db as jest.Mocked<typeof db>;
+   mockDb.user.findMany.mockResolvedValue(users); // Unsafe call
+
+   // ✅ GOOD - Individual typed mocks
+   const mockUserFindMany = jest.fn<Promise<User[]>, [any]>();
+   mockUserFindMany.mockResolvedValue(users);
+   ```
+
+2. **Legacy require() Imports**:
+
+   ```typescript
+   // ❌ BAD - Forbidden in modern codebases
+   const { authConfig } = require("../config");
+
+   // ✅ GOOD - Modern ES module imports
+   const configModule = await import("../config");
+   const authConfig = configModule.authConfig;
+   ```
+
+3. **Untyped expect.objectContaining()**:
+
+   ```typescript
+   // ❌ BAD - Unsafe assignment
+   where: expect.objectContaining({ id: "123" });
+
+   // ✅ GOOD - Properly typed or disabled
+   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+   where: expect.objectContaining({ id: "123" }) as unknown;
+   ```
+
+### **Modern Jest & NextAuth v5 Patterns**
+
+**Jest Mock Best Practices**:
+
+- Use `jest.fn<ReturnType, Parameters>()` for typed mocks
+- Avoid `jest.Mocked<T>` patterns that create unsafe types
+- Create individual mock functions instead of mocking entire modules
+- Use `unknown` type instead of `any` where possible
+
+**NextAuth v5 Test Patterns**:
+
+- Dynamic imports for config files that change based on NODE_ENV
+- Proper typing for provider objects and authorize functions
+- ESLint disable directives for unavoidable dynamic typing scenarios
+
+### **ESLint Rule Management**
+
+**When to Disable Rules**:
+
+- **Targeted disables**: Use `// eslint-disable-next-line` for specific unavoidable cases
+- **Test-specific patterns**: Jest `expect` matchers that return `any` types
+- **Dynamic imports**: NextAuth config loading based on environment
+
+**Never Disable Rules**:
+
+- **File-level disables**: Never disable rules for entire files
+- **Core safety rules**: `no-unsafe-*` rules should only be disabled with justification
+- **TypeScript strict rules**: Keep strict mode enabled always
+
+### **Workflow Integration**
+
+**During Development**:
+
+1. **Real-time feedback**: Configure IDE to show ESLint errors immediately
+2. **Incremental fixes**: Fix lint issues in the file you're currently working on
+3. **Test quality**: Apply same standards to test files as production code
+4. **Modern patterns**: Use latest Jest and NextAuth patterns from day one
+5. **Documentation first**: Check Context7 for current library patterns before implementing fixes
+
+**Before Committing**:
+
+1. **Zero tolerance**: `npm run lint` must show 0 errors
+2. **Full validation**: `npm run pre-commit` must pass completely
+3. **Test coverage**: New tests must be properly typed and lint-clean
+
+### **Prevention Strategies**
+
+1. **IDE Configuration**: Set up ESLint to show errors inline while coding
+2. **Git Hooks**: Pre-commit hooks prevent committing lint errors
+3. **Modern Dependencies**: Keep Jest, NextAuth, and ESLint updated
+4. **Knowledge Sharing**: Document patterns that work, avoid patterns that don't
+5. **Regular Audits**: Monthly review of common lint issues across the codebase
+6. **🔍 Use Context7 for Latest Documentation**: Always check current library patterns before implementing fixes
+
+### **Critical: Always Check Latest Documentation with Context7**
+
+**Before implementing fixes for library-specific issues, ALWAYS use Context7 to get the most current documentation**:
+
+```
+// Example workflow for Jest/NextAuth issues:
+1. Identify the problematic library (Jest, NextAuth, React Testing Library, etc.)
+2. Use Context7 to resolve the library ID: mcp__context7__resolve-library-id
+3. Get current documentation: mcp__context7__get-library-docs
+4. Focus on relevant topics: "testing mocks jest nextauth v5"
+5. Apply the latest patterns, not outdated Stack Overflow solutions
+```
+
+**Why This Matters**:
+
+- **NextAuth v4 → v5**: Massive API changes, old patterns cause lint errors
+- **Jest v28 → v29**: New mock patterns, `jest.Mocked<T>` issues
+- **React Testing Library**: Evolving best practices for component testing
+- **TypeScript**: Stricter rules in newer versions
+
+**Context7 Usage Examples**:
+
+- `jest` → `/facebook/jest` for latest Jest patterns
+- `nextauth` → `/nextauthjs/next-auth` for Auth.js v5 patterns
+- `@testing-library/react` → Latest component testing practices
+- `typescript` → Current TypeScript strict mode recommendations
+
+**When to Use Context7**:
+
+- Before refactoring test files with lint errors
+- When upgrading major dependencies
+- When ESLint rules change and require new patterns
+- Before implementing new testing strategies
+
+**Remember**: The goal is to never again have a "big pile of failing lints" - fix issues immediately as they appear during development, using the most current library documentation.
+
+## **PinPoint Design Documentation (Notion)**
+
+Key design documents are available in Notion workspace:
+
+### **Planning Documents** (`/PinPoint/Planning/`)
+
+- **Project Overview**: High-level project vision, user groups, basic architecture plan, cost estimates, future expansion plans
+- **Feature Spec**: Detailed feature breakdown by development phase, core concepts, OPDB/PinballMap integration, MVP through post-1.0 features
+- **Roadmap**: Milestone-based development plan from foundational backend through v1.0 release, current milestone status, future roadmap
+- **Production Readiness Tasks**: Pre-deployment checklist and production preparation requirements
+
+### **Core Architecture Documents** (`/PinPoint/Design Docs/`)
+
+- **Technical Design Document**: Multi-tenant architecture, OPDB/PinballMap integration, technology stack decisions, database schema, API specifications, Kanban board implementation details
+- **Testing Design Document**: Current unit-test-only approach, future integration/E2E testing strategy, test requirements by development milestone
+- **Product Specification**: Complete feature requirements, user roles/permissions matrix, release 1.0 scope, post-1.0 Kanban board specifications
+
+### **Implementation Guides** (`/PinPoint/Design Docs/`)
+
+- **Subdomain Development Setup**: Multi-tenant subdomain routing, local development configuration, production deployment considerations
+- **User Profile & Image System Implementation Plan**: Profile management and image handling architecture
+
+These documents provide the definitive reference for project planning, architectural decisions, feature requirements, and implementation patterns. Consult them when making design decisions or implementing new features.
+
+## **Notion MCP Server Integration**
+
+The Notion MCP server provides comprehensive workspace management capabilities:
+
+### **Document Management**
+
+- `mcp__notion-mcp__API-post-search` - Search across workspace content
+- `mcp__notion-mcp__API-retrieve-a-page` - Get specific page content
+- `mcp__notion-mcp__API-get-block-children` - Read page content blocks
+- `mcp__notion-mcp__API-post-page` - Create new pages
+- `mcp__notion-mcp__API-patch-page` - Update page properties
+- `mcp__notion-mcp__API-patch-block-children` - Add/modify page content
+
+### **Database Operations**
+
+- `mcp__notion-mcp__API-post-database-query` - Query databases with filters
+- `mcp__notion-mcp__API-create-a-database` - Create new databases
+- `mcp__notion-mcp__API-retrieve-a-database` - Get database schema
+
+### **Collaboration Features**
+
+- `mcp__notion-mcp__API-create-a-comment` - Add comments to pages
+- `mcp__notion-mcp__API-retrieve-a-comment` - Read page comments
+
+### **Use Cases for PinPoint Development**
+
+1. **Design Documentation**: Access and update technical specifications during development
+2. **Feature Planning**: Reference product specifications when implementing new features
+3. **Architecture Decisions**: Consult technical design document for implementation patterns
+4. **Testing Strategy**: Follow testing design document guidelines for test development
+5. **Documentation Updates**: Keep design docs synchronized with code changes
