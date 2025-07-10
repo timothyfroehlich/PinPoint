@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import {
   Container,
   Typography,
@@ -10,11 +9,14 @@ import {
   CircularProgress,
   Alert,
 } from "@mui/material";
-import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { api } from "~/trpc/react";
-import { OrganizationLogoUpload } from "~/app/_components/organization-logo-upload";
+import { useSession } from "next-auth/react";
+import { useState, useEffect } from "react";
+
 import type { Organization } from "@prisma/client";
+
+import { OrganizationLogoUpload } from "~/app/_components/organization-logo-upload";
+import { api } from "~/trpc/react";
 
 export default function OrganizationAdminPage() {
   const router = useRouter();

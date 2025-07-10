@@ -1,4 +1,5 @@
 import { authConfig } from "../config";
+
 import { db } from "~/server/db";
 
 // Add this helper at the top of the file
@@ -327,7 +328,7 @@ describe("NextAuth Configuration", () => {
       const devConfig = configModule.authConfig;
       const credentialsProvider = devConfig.providers[1];
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const result = await (credentialsProvider as any).authorize({
         email: "test@testaccount.dev",
       });
@@ -351,7 +352,7 @@ describe("NextAuth Configuration", () => {
       );
 
       if (credentialsProvider) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const result = await (credentialsProvider as any).authorize({
           email: "test@testaccount.dev",
         });
@@ -369,7 +370,7 @@ describe("NextAuth Configuration", () => {
       const devConfig = configModule.authConfig;
       const credentialsProvider = devConfig.providers[1];
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const result = await (credentialsProvider as any).authorize({
         email: "",
       });
@@ -386,7 +387,7 @@ describe("NextAuth Configuration", () => {
       const devConfig = configModule.authConfig;
       const credentialsProvider = devConfig.providers[1];
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const result = await (credentialsProvider as any).authorize({
         email: "nonexistent@testaccount.dev",
       });

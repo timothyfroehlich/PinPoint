@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
-import { Box, CircularProgress, Alert, Typography, Paper } from "@mui/material";
 import { CloudUpload } from "@mui/icons-material";
+import { Box, CircularProgress, Alert, Typography, Paper } from "@mui/material";
 import Image from "next/image";
+import React, { useState, useRef, useEffect } from "react";
+
 import { processImageFile } from "~/lib/utils/image-processing";
 
 interface OrganizationLogoUploadProps {

@@ -1,6 +1,11 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import {
+  CloudUpload,
+  PhotoCamera,
+  Delete,
+  CameraAlt,
+} from "@mui/icons-material";
 import {
   Box,
   Button,
@@ -11,12 +16,8 @@ import {
   Card,
   CardMedia,
 } from "@mui/material";
-import {
-  CloudUpload,
-  PhotoCamera,
-  Delete,
-  CameraAlt,
-} from "@mui/icons-material";
+import React, { useState, useRef } from "react";
+
 import { processIssueImageFile } from "~/lib/utils/image-processing";
 
 export interface IssueAttachment {

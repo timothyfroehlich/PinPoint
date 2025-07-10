@@ -1,8 +1,10 @@
-import { writeFile, unlink, mkdir } from "fs/promises";
 import { existsSync } from "fs";
+import { writeFile, unlink, mkdir } from "fs/promises";
 import path from "path";
-import type { ImageStorageProvider } from "./index";
+
 import { IMAGE_CONSTRAINTS } from "./index";
+
+import type { ImageStorageProvider } from "./index";
 
 export class LocalImageStorage implements ImageStorageProvider {
   private basePath = "public/uploads/images";

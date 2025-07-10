@@ -70,14 +70,14 @@ describe("/api/dev/users (simplified)", () => {
 
     it("should define expected API response structure", () => {
       interface DevUsersResponse {
-        users: Array<{
+        users: {
           id: string;
           name: string;
           email: string;
           bio?: string | null;
           profilePicture?: string | null;
           role: "admin" | "member" | "player";
-        }>;
+        }[];
       }
 
       const mockResponse: DevUsersResponse = {

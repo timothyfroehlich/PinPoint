@@ -1,6 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import {
+  History,
+  VisibilityOff,
+  Visibility,
+  MoreVert,
+  Edit,
+  Delete,
+} from "@mui/icons-material";
 import {
   Box,
   Card,
@@ -18,15 +25,10 @@ import {
   DialogContent,
   DialogActions,
 } from "@mui/material";
-import {
-  History,
-  VisibilityOff,
-  Visibility,
-  MoreVert,
-  Edit,
-  Delete,
-} from "@mui/icons-material";
+import React, { useState } from "react";
+
 import { UserAvatar } from "./user-avatar";
+
 import { useCommentPermissions } from "~/lib/hooks/use-comment-permissions";
 import { api } from "~/trpc/react";
 
