@@ -1,10 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { signIn } from "next-auth/react";
-import { usePathname, useRouter } from "next/navigation";
-import { type User, type Role } from "@prisma/client";
-import { useCurrentUser } from "~/lib/hooks/use-current-user";
+import { ExpandMore, ExpandLess } from "@mui/icons-material";
 import {
   Box,
   Button,
@@ -14,8 +10,13 @@ import {
   Collapse,
   IconButton,
 } from "@mui/material";
-import { ExpandMore, ExpandLess } from "@mui/icons-material";
+import { type User, type Role } from "@prisma/client";
+import { usePathname, useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
+import { useEffect, useState } from "react";
+
 import { env } from "~/env.js";
+import { useCurrentUser } from "~/lib/hooks/use-current-user";
 
 type UserWithRole = User & { role: Role | null };
 

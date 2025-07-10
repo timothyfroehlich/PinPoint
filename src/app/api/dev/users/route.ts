@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
+
+import { env } from "~/env.js";
 import { auth } from "~/server/auth";
 import { db } from "~/server/db";
-import { env } from "~/env.js";
 
 export async function GET() {
   if (env.NODE_ENV !== "development") {

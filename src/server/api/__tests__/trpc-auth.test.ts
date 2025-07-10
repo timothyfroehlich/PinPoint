@@ -1,8 +1,9 @@
-import { type Session } from "next-auth";
-import { TRPCError } from "@trpc/server";
 import { type Role } from "@prisma/client";
-import { createCallerFactory } from "~/server/api/trpc";
+import { TRPCError } from "@trpc/server";
+import { type Session } from "next-auth";
+
 import { appRouter } from "~/server/api/root";
+import { createCallerFactory } from "~/server/api/trpc";
 import { auth } from "~/server/auth";
 import { db } from "~/server/db";
 

@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { auth } from "~/server/auth";
+
 import { imageStorage } from "~/lib/image-storage/local-storage";
+import { auth } from "~/server/auth";
 import { db } from "~/server/db";
 
 export async function POST(req: NextRequest) {

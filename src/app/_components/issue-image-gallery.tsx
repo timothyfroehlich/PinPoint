@@ -1,7 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
-import Image from "next/image";
+import {
+  Close,
+  ZoomIn,
+  ZoomOut,
+  RotateLeft,
+  RotateRight,
+  CameraAlt,
+} from "@mui/icons-material";
 import {
   Box,
   Grid,
@@ -12,14 +18,8 @@ import {
   Typography,
   Paper,
 } from "@mui/material";
-import {
-  Close,
-  ZoomIn,
-  ZoomOut,
-  RotateLeft,
-  RotateRight,
-  CameraAlt,
-} from "@mui/icons-material";
+import Image from "next/image";
+import React, { useState } from "react";
 
 interface Attachment {
   id: string;

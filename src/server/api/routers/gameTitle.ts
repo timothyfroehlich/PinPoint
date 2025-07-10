@@ -1,7 +1,8 @@
 import { z } from "zod";
-import { createTRPCRouter, organizationProcedure } from "~/server/api/trpc";
-import { OPDBClient } from "~/lib/opdb/client";
+
 import { env } from "~/env";
+import { OPDBClient } from "~/lib/opdb/client";
+import { createTRPCRouter, organizationProcedure } from "~/server/api/trpc";
 
 export const gameTitleRouter = createTRPCRouter({
   // Search OPDB games for typeahead
