@@ -26,7 +26,7 @@ export class OPDBClient {
   };
 
   constructor(apiToken?: string, baseUrl?: string) {
-    this.apiToken = apiToken ?? env.OPDB_API_TOKEN;
+    this.apiToken = apiToken ?? env.OPDB_API_TOKEN ?? "";
     this.baseUrl = baseUrl ?? env.OPDB_API_URL;
   }
 
