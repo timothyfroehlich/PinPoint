@@ -25,18 +25,11 @@ import {
   type IssueAttachment,
 } from "~/app/_components/issue-image-upload";
 import { useCurrentUser } from "~/lib/hooks/use-current-user";
+import { type GameInstanceForIssues } from "~/lib/types/gameInstance";
 import { api } from "~/trpc/react";
 
-interface GameInstance {
-  id: string;
-  name: string;
-  gameTitle: {
-    name: string;
-  };
-}
-
 interface IssueSubmissionFormProps {
-  gameInstances: GameInstance[];
+  gameInstances: GameInstanceForIssues[];
   onSuccess?: () => void;
 }
 

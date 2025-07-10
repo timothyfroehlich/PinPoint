@@ -33,7 +33,7 @@ export default tseslint.config(
           object: "process",
           property: "env",
           message:
-            "Use the 'env' object from '~/env.js' instead of 'process.env'. It is validated and type-safe.",
+            "Use the 'env' object from '~/env.js' instead of 'process.env'. It is validated and type-safe. See src/env.js for available variables and T3 Env documentation: https://env.t3.gg/docs/introduction",
         },
       ],
 
