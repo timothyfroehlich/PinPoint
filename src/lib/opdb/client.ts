@@ -5,7 +5,8 @@
  * Handles rate limiting, caching, and error handling
  */
 
-import { env } from "~/env";
+import { generateCacheKey, isValidOPDBId } from "./utils";
+
 import type {
   OPDBSearchResult,
   OPDBMachine,
@@ -13,7 +14,8 @@ import type {
   OPDBAPIResponse,
   OPDBExportResponse,
 } from "./types";
-import { generateCacheKey, isValidOPDBId } from "./utils";
+
+import { env } from "~/env";
 
 export class OPDBClient {
   private apiToken: string;
@@ -109,7 +111,6 @@ export class OPDBClient {
 
     if (cached && now - cached.timestamp < ttlMinutes * 60 * 1000) {
       return {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         data: cached.data,
         success: true,
       };

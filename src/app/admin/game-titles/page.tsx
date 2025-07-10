@@ -1,6 +1,14 @@
 "use client";
 
 import {
+  Games,
+  Sync,
+  MoreVert,
+  Delete,
+  CalendarToday,
+  Business,
+} from "@mui/icons-material";
+import {
   Container,
   Typography,
   Card,
@@ -21,18 +29,12 @@ import {
   Menu,
   MenuItem,
 } from "@mui/material";
-import {
-  Games,
-  Sync,
-  MoreVert,
-  Delete,
-  CalendarToday,
-  Business,
-} from "@mui/icons-material";
 import { useState } from "react";
-import { api } from "~/trpc/react";
-import { OPDBGameSearch } from "~/app/_components/opdb-game-search";
+
 import type { OPDBSearchResult } from "~/lib/opdb";
+
+import { OPDBGameSearch } from "~/app/_components/opdb-game-search";
+import { api } from "~/trpc/react";
 
 export default function GameTitlesAdminPage() {
   const [selectedOPDBGame, setSelectedOPDBGame] = useState<{

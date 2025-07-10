@@ -1,6 +1,7 @@
-import { z } from "zod";
-import { createTRPCRouter, organizationProcedure } from "~/server/api/trpc";
 import { IssueStatusCategory } from "@prisma/client";
+import { z } from "zod";
+
+import { createTRPCRouter, organizationProcedure } from "~/server/api/trpc";
 
 export const issueStatusRouter = createTRPCRouter({
   getAll: organizationProcedure.query(async ({ ctx }) => {
