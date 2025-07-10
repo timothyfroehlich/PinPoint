@@ -15,6 +15,7 @@ import {
   IconButton,
 } from "@mui/material";
 import { ExpandMore, ExpandLess } from "@mui/icons-material";
+import { env } from "~/env.js";
 
 type UserWithRole = User & { role: Role | null };
 
@@ -92,7 +93,7 @@ export function DevLoginCompact() {
     }
   }
 
-  if (process.env.NODE_ENV !== "development" || pathname === "/sign-in") {
+  if (env.NEXT_PUBLIC_NODE_ENV !== "development" || pathname === "/sign-in") {
     return null;
   }
 

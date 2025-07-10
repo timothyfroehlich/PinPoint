@@ -5,6 +5,7 @@ import Credentials from "next-auth/providers/credentials";
 import { type Role } from "@prisma/client";
 
 import { db } from "~/server/db";
+import { env } from "~/env.js";
 
 /**
  * Module augmentation for `next-auth` types. Allows us to add custom properties to the `session`
@@ -36,11 +37,11 @@ declare module "next-auth" {
 export const authConfig = {
   providers: [
     Google({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      clientId: env.GOOGLE_CLIENT_ID!,
+      clientSecret: env.GOOGLE_CLIENT_SECRET!,
     }),
     // Development-only Credentials provider for test accounts
-    ...(process.env.NODE_ENV === "development"
+    ...(env.NODE_ENV === "development"
       ? [
           Credentials({
             name: "Development Test Users",
@@ -48,7 +49,7 @@ export const authConfig = {
               email: { label: "Email", type: "email" },
             },
             async authorize(credentials) {
-              if (process.env.NODE_ENV !== "development") {
+              if (env.NODE_ENV !== "development") {
                 return null;
               }
 
