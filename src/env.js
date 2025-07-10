@@ -23,9 +23,18 @@ export const env = createEnv({
       process.env.NODE_ENV === "development"
         ? z.string().optional()
         : z.string(),
-    OPDB_API_TOKEN: z.string(),
+    OPDB_API_TOKEN: z.string().default(""),
     OPDB_API_URL: z.string().url().default("https://opdb.org/api"),
     DEFAULT_ORG_SUBDOMAIN: z.string().default("apc"),
+    // Additional environment variables that were accessed directly via process.env
+    VERCEL_URL: z.string().optional(),
+    PORT: z.string().optional(),
+    // Future API keys mentioned in the issue (optional for now)
+    PINBALL_MAP_API_KEY: z.string().optional(),
+    OPDB_API_KEY: z.string().optional(),
+    // Image storage configuration
+    IMAGE_STORAGE_PROVIDER: z.enum(["local", "vercel-blob"]).default("local"),
+    BLOB_READ_WRITE_TOKEN: z.string().optional(),
   },
 
   /**
@@ -34,7 +43,9 @@ export const env = createEnv({
    * `NEXT_PUBLIC_`.
    */
   client: {
-    // NEXT_PUBLIC_CLIENTVAR: z.string(),
+    NEXT_PUBLIC_NODE_ENV: z
+      .enum(["development", "test", "production"])
+      .default("development"),
   },
 
   /**
@@ -50,6 +61,14 @@ export const env = createEnv({
     OPDB_API_TOKEN: process.env.OPDB_API_TOKEN,
     OPDB_API_URL: process.env.OPDB_API_URL,
     DEFAULT_ORG_SUBDOMAIN: process.env.DEFAULT_ORG_SUBDOMAIN,
+    VERCEL_URL: process.env.VERCEL_URL,
+    PORT: process.env.PORT,
+    PINBALL_MAP_API_KEY: process.env.PINBALL_MAP_API_KEY,
+    OPDB_API_KEY: process.env.OPDB_API_KEY,
+    IMAGE_STORAGE_PROVIDER: process.env.IMAGE_STORAGE_PROVIDER,
+    BLOB_READ_WRITE_TOKEN: process.env.BLOB_READ_WRITE_TOKEN,
+    // Client-side environment variables
+    NEXT_PUBLIC_NODE_ENV: process.env.NODE_ENV,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially

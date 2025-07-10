@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { env } from "~/env.js";
 
 export function middleware(request: NextRequest) {
   const url = request.nextUrl.clone();
@@ -14,7 +15,7 @@ export function middleware(request: NextRequest) {
   // If no subdomain, redirect to apc subdomain (default organization)
   if (!subdomain) {
     const redirectHost =
-      process.env.NODE_ENV === "development"
+      env.NODE_ENV === "development"
         ? `apc.localhost:3000`
         : `apc.${getBaseDomain(host)}`;
 
@@ -38,7 +39,7 @@ function getSubdomain(host: string): string | null {
 
   if (!hostWithoutPort) return null;
 
-  if (process.env.NODE_ENV === "development") {
+  if (env.NODE_ENV === "development") {
     // In development, expect format: subdomain.localhost
     if (hostWithoutPort === "localhost") return null;
     const parts = hostWithoutPort.split(".");
@@ -62,7 +63,7 @@ function getBaseDomain(host: string): string {
 
   if (!hostWithoutPort) return host;
 
-  if (process.env.NODE_ENV === "development") {
+  if (env.NODE_ENV === "development") {
     return "localhost:3000";
   } else {
     // Extract base domain (e.g., "example.com" from "sub.example.com")

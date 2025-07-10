@@ -16,6 +16,7 @@ import {
   Divider,
 } from "@mui/material";
 import { Google } from "@mui/icons-material";
+import { env } from "~/env.js";
 
 type UserWithRole = User & { role: Role | null };
 
@@ -44,7 +45,7 @@ export default function SignInPage() {
   }, [isAuthenticated, router]);
 
   useEffect(() => {
-    if (process.env.NODE_ENV === "development") {
+    if (env.NEXT_PUBLIC_NODE_ENV === "development") {
       async function fetchTestUsers() {
         setIsLoadingUsers(true);
         try {
@@ -161,7 +162,7 @@ export default function SignInPage() {
             </Button>
           )}
 
-          {process.env.NODE_ENV === "development" && (
+          {env.NEXT_PUBLIC_NODE_ENV === "development" && (
             <>
               <Divider sx={{ my: 3 }}>
                 <Typography variant="body2" color="text.secondary">
