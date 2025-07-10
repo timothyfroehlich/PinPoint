@@ -35,8 +35,6 @@ export const env = createEnv({
     // Image storage configuration
     IMAGE_STORAGE_PROVIDER: z.enum(["local", "vercel-blob"]).default("local"),
     BLOB_READ_WRITE_TOKEN: z.string().optional(),
-    // Package version for health checks
-    npm_package_version: z.string().optional(),
   },
 
   /**
@@ -67,7 +65,6 @@ export const env = createEnv({
     OPDB_API_KEY: process.env.OPDB_API_KEY,
     IMAGE_STORAGE_PROVIDER: process.env.IMAGE_STORAGE_PROVIDER,
     BLOB_READ_WRITE_TOKEN: process.env.BLOB_READ_WRITE_TOKEN,
-    npm_package_version: process.env.npm_package_version,
     // Client-side environment variables
     NEXT_PUBLIC_NODE_ENV: process.env.NODE_ENV,
   },
