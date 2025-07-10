@@ -5,6 +5,7 @@ import { signIn } from "next-auth/react";
 import { type User, type Role } from "@prisma/client";
 import { useCurrentUser } from "~/lib/hooks/use-current-user";
 import { Box, Button, Typography, Paper, Chip } from "@mui/material";
+import { env } from "~/env.js";
 
 type UserWithRole = User & { role: Role | null };
 
@@ -72,7 +73,7 @@ export function DevLogin() {
     }
   }
 
-  if (process.env.NODE_ENV !== "development") {
+  if (env.NEXT_PUBLIC_NODE_ENV !== "development") {
     return null;
   }
 
