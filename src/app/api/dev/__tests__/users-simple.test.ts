@@ -2,13 +2,22 @@
  * Simplified dev users API tests that avoid NextAuth imports
  */
 
+function setNodeEnv(value: string) {
+  Object.defineProperty(process.env, "NODE_ENV", {
+    value,
+    configurable: true,
+    writable: true,
+    enumerable: true,
+  });
+}
+
 describe("/api/dev/users (simplified)", () => {
   beforeEach(() => {
-    process.env.NODE_ENV = "development";
+    setNodeEnv("development");
   });
 
   afterEach(() => {
-    process.env.NODE_ENV = "test";
+    setNodeEnv("test");
   });
 
   describe("Development Environment", () => {
@@ -49,7 +58,7 @@ describe("/api/dev/users (simplified)", () => {
         "harry.williams@testaccount.dev",
       ];
 
-      testAccountEmails.forEach(email => {
+      testAccountEmails.forEach((email) => {
         expect(email).toContain("@testaccount.dev");
       });
     });
@@ -92,12 +101,12 @@ describe("/api/dev/users (simplified)", () => {
 
   describe("Production Environment", () => {
     it("should not be available in production", () => {
-      process.env.NODE_ENV = "production";
+      setNodeEnv("production");
       expect(process.env.NODE_ENV).toBe("production");
     });
 
     it("should return 404 in production", () => {
-      process.env.NODE_ENV = "production";
+      setNodeEnv("production");
       const expectedResponse = {
         error: "Not found",
       };
@@ -107,11 +116,6 @@ describe("/api/dev/users (simplified)", () => {
 
   describe("Security", () => {
     it("should only return test account users", () => {
-      const allowedEmailPatterns = [
-        "@testaccount.dev",
-        "phoenixavatar2@gmail.com",
-      ];
-
       const testEmail1 = "roger.sharpe@testaccount.dev";
       const testEmail2 = "phoenixavatar2@gmail.com";
       const regularEmail = "user@example.com";
@@ -125,7 +129,7 @@ describe("/api/dev/users (simplified)", () => {
     it("should not expose sensitive user data", () => {
       const exposedFields = [
         "id",
-        "name", 
+        "name",
         "email",
         "bio",
         "profilePicture",
