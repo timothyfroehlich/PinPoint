@@ -12,6 +12,9 @@ jobs:
     env:
       AUTH_SECRET: "temp_secret_value" # Temporary value, replace with GitHub Secret later
       DATABASE_URL: "sqlite://temp_db.sqlite" # Temporary value, replace with GitHub Secret later
+      OPDB_API_TOKEN: "temp_opdb_token" # Temporary value for CI
+      DEFAULT_ORG_SUBDOMAIN: "apc"
+      NODE_ENV: "development"
     steps:
       - uses: actions/checkout@v4
       - name: Set up Node.js
@@ -25,6 +28,12 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    env:
+      AUTH_SECRET: "temp_secret_value" # Temporary value for CI
+      DATABASE_URL: "sqlite://temp_db.sqlite" # Temporary value for CI
+      OPDB_API_TOKEN: "temp_opdb_token" # Temporary value for CI
+      DEFAULT_ORG_SUBDOMAIN: "apc"
+      NODE_ENV: "test"
     steps:
       - uses: actions/checkout@v4
       - name: Set up Node.js

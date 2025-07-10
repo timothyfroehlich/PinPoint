@@ -23,7 +23,10 @@ export const env = createEnv({
       process.env.NODE_ENV === "development"
         ? z.string().optional()
         : z.string(),
-    OPDB_API_TOKEN: z.string(),
+    OPDB_API_TOKEN:
+      process.env.NODE_ENV === "production"
+        ? z.string()
+        : z.string().optional(),
     OPDB_API_URL: z.string().url().default("https://opdb.org/api"),
     DEFAULT_ORG_SUBDOMAIN: z.string().default("apc"),
     // Additional environment variables that were accessed directly via process.env
