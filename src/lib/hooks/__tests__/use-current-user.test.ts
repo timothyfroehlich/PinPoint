@@ -7,6 +7,7 @@ describe("useCurrentUser", () => {
     mockUseSession.mockReturnValue({
       data: null,
       status: "loading",
+      update: jest.fn(),
     });
 
     const { result } = renderHook(() => useCurrentUser());
@@ -20,6 +21,7 @@ describe("useCurrentUser", () => {
     mockUseSession.mockReturnValue({
       data: null,
       status: "unauthenticated",
+      update: jest.fn(),
     });
 
     const { result } = renderHook(() => useCurrentUser());
@@ -37,11 +39,13 @@ describe("useCurrentUser", () => {
         email: "test@example.com",
         image: "/test.jpg",
       },
+      expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     };
 
     mockUseSession.mockReturnValue({
       data: session,
       status: "authenticated",
+      update: jest.fn(),
     });
 
     const { result } = renderHook(() => useCurrentUser());
