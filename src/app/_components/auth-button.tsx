@@ -1,5 +1,6 @@
 "use client";
 
+import { AccountCircle, Settings, ExitToApp } from "@mui/icons-material";
 import {
   Button,
   Box,
@@ -9,12 +10,13 @@ import {
   IconButton,
   Divider,
 } from "@mui/material";
-import { AccountCircle, Settings, ExitToApp } from "@mui/icons-material";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
+
 import { UserAvatar } from "./user-avatar";
+
 import { useCurrentUser } from "~/lib/hooks/use-current-user";
 
 export function AuthButton() {

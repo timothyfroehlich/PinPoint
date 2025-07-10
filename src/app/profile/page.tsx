@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
+import {
+  Edit,
+  CalendarToday,
+  Games,
+  BugReport,
+  Comment,
+} from "@mui/icons-material";
 import {
   Container,
   Typography,
@@ -18,16 +24,11 @@ import {
   TextField,
   DialogActions,
 } from "@mui/material";
-import {
-  Edit,
-  CalendarToday,
-  Games,
-  BugReport,
-  Comment,
-} from "@mui/icons-material";
-import { api } from "~/trpc/react";
-import { UserAvatar } from "~/app/_components/user-avatar";
+import React, { useState } from "react";
+
 import { ProfilePictureUpload } from "~/app/_components/profile-picture-upload";
+import { UserAvatar } from "~/app/_components/user-avatar";
+import { api } from "~/trpc/react";
 
 export default function ProfilePage() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);

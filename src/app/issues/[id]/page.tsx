@@ -1,6 +1,19 @@
 "use client";
 
 import {
+  LocationOn,
+  Games,
+  Person,
+  Schedule,
+  Edit,
+  Save,
+  Cancel,
+  Flag,
+  CheckCircle,
+  RadioButtonUnchecked,
+  Settings,
+} from "@mui/icons-material";
+import {
   Container,
   Typography,
   Card,
@@ -23,31 +36,19 @@ import {
   IconButton,
   Breadcrumbs,
 } from "@mui/material";
-import {
-  LocationOn,
-  Games,
-  Person,
-  Schedule,
-  Edit,
-  Save,
-  Cancel,
-  Flag,
-  CheckCircle,
-  RadioButtonUnchecked,
-  Settings,
-} from "@mui/icons-material";
-import { useState, useEffect } from "react";
 import Link from "next/link";
-import { UserAvatar } from "~/app/_components/user-avatar";
-import { useCurrentUser } from "~/lib/hooks/use-current-user";
-import { api } from "~/trpc/react";
+import { useState, useEffect } from "react";
+import React from "react";
+
 import { IssueImageGallery } from "~/app/_components/issue-image-gallery";
 import {
   IssueImageUpload,
   type IssueAttachment,
 } from "~/app/_components/issue-image-upload";
 import { IssueTimeline } from "~/app/_components/issue-timeline";
-import React from "react";
+import { UserAvatar } from "~/app/_components/user-avatar";
+import { useCurrentUser } from "~/lib/hooks/use-current-user";
+import { api } from "~/trpc/react";
 
 interface IssueDetailPageProps {
   params: Promise<{

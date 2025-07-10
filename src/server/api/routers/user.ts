@@ -1,11 +1,12 @@
 import { z } from "zod";
+
+import { imageStorage } from "~/lib/image-storage/local-storage";
+import { getDefaultAvatarUrl } from "~/lib/utils/image-processing";
 import {
   createTRPCRouter,
   protectedProcedure,
   organizationProcedure,
 } from "~/server/api/trpc";
-import { imageStorage } from "~/lib/image-storage/local-storage";
-import { getDefaultAvatarUrl } from "~/lib/utils/image-processing";
 
 export const userRouter = createTRPCRouter({
   // Get current user's profile

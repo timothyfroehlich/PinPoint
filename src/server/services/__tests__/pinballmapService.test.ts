@@ -4,7 +4,7 @@
  */
 
 import { PrismaClient } from "@prisma/client";
-import type { Location, Room, GameInstance, GameTitle } from "@prisma/client";
+
 import { PinballMapAPIMocker } from "../../../lib/pinballmap/__tests__/apiMocker";
 import {
   syncLocationGames,
@@ -12,6 +12,8 @@ import {
   reconcileGameInstances,
   createOrUpdateGameTitle,
 } from "../pinballmapService";
+
+import type { Location, Room, GameInstance, GameTitle } from "@prisma/client";
 
 // Mock Prisma
 jest.mock("@prisma/client");

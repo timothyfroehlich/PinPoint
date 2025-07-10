@@ -1,6 +1,8 @@
 import { renderHook, waitFor } from "@testing-library/react";
 import { useSession } from "next-auth/react";
+
 import { useCurrentUser } from "../use-current-user";
+
 import { api } from "~/trpc/react";
 
 // Mock dependencies

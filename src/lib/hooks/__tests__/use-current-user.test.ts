@@ -1,5 +1,7 @@
 import { renderHook } from "@testing-library/react";
+
 import { useCurrentUser } from "../use-current-user";
+
 import { mockUseSession } from "./auth-test-helpers";
 
 describe("useCurrentUser", () => {

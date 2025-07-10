@@ -1,12 +1,13 @@
+import { IssueStatusCategory } from "@prisma/client";
 import { z } from "zod";
+
 import {
   createTRPCRouter,
   organizationProcedure,
   publicProcedure,
 } from "~/server/api/trpc";
-import { IssueActivityService } from "~/server/services/issueActivityService";
 import { CommentCleanupService } from "~/server/services/commentCleanupService";
-import { IssueStatusCategory } from "@prisma/client";
+import { IssueActivityService } from "~/server/services/issueActivityService";
 
 export const issueRouter = createTRPCRouter({
   // Public submission - anyone can report an issue

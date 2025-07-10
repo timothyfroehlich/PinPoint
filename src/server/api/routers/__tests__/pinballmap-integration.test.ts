@@ -4,9 +4,11 @@
  */
 
 import { PrismaClient } from "@prisma/client";
-import type { Location, Room, GameInstance, GameTitle } from "@prisma/client";
-import { syncLocationGames } from "../../../services/pinballmapService";
+
 import { PinballMapAPIMocker } from "../../../../lib/pinballmap/__tests__/apiMocker";
+import { syncLocationGames } from "../../../services/pinballmapService";
+
+import type { Location, Room, GameInstance, GameTitle } from "@prisma/client";
 
 jest.mock("@prisma/client");
 const MockedPrismaClient = PrismaClient as jest.MockedClass<

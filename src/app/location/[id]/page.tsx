@@ -1,6 +1,14 @@
 "use client";
 
 import {
+  Edit,
+  MoreVert,
+  Games,
+  LocationOn,
+  MoveUp,
+  Person,
+} from "@mui/icons-material";
+import {
   Container,
   Typography,
   Card,
@@ -27,22 +35,15 @@ import {
   InputLabel,
   Select,
 } from "@mui/material";
-import {
-  Edit,
-  MoreVert,
-  Games,
-  LocationOn,
-  MoveUp,
-  Person,
-} from "@mui/icons-material";
+import Link from "next/link";
 import { useState } from "react";
 import React from "react";
 // import { useRouter } from "next/navigation";
-import Link from "next/link";
+
+import { IssueSubmissionForm } from "~/app/_components/issue-submission-form";
 import { UserAvatar } from "~/app/_components/user-avatar";
 import { useCurrentUser } from "~/lib/hooks/use-current-user";
 import { api } from "~/trpc/react";
-import { IssueSubmissionForm } from "~/app/_components/issue-submission-form";
 
 interface LocationProfilePageProps {
   params: Promise<{
