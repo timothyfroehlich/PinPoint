@@ -14,7 +14,7 @@
     "dev:full": "concurrently -n 'server,db-studio,typecheck' -c 'blue,green,yellow' --kill-others 'npm run dev:server' 'npm run dev:db' 'npm run dev:typecheck'",
     "dev:clean": "node scripts/cleanup-dev.cjs && npm run dev:full",
     "dev:server": "nodemon --config nodemon.server.json",
-    "dev:db": "prisma studio --port 5555",
+    "dev:db": "prisma studio --port ${PRISMA_STUDIO_PORT:-5555}",
     "dev:typecheck": "tsc --noEmit --watch --preserveWatchOutput",
     "dev:status": "concurrently 'npm run health' 'node scripts/port-status.cjs'",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,mdx}\" --cache",
@@ -49,6 +49,7 @@
     "deps:update": "npm update && npm audit",
     "clean": "rm -rf .next node_modules/.cache .turbo && npm install",
     "reset": "npm run clean && npm run db:push && npm run seed",
+    "setup:worktree": "bash scripts/setup-worktree.sh",
     "db:reset": "rm -rf prisma/migrations && npx prisma db push --force-reset && npm run seed",
     "pinballmap:update-fixture": "curl -o src/lib/pinballmap/__tests__/fixtures/api_responses/locations/location_26454_machine_details.json https://pinballmap.com/api/v1/locations/26454/machine_details.json",
     "prepare": "husky"
