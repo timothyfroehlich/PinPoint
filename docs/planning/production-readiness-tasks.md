@@ -18,6 +18,7 @@ This pipeline should:
    - `VERCEL_PROJECT_ID`: Your PinPoint project ID on Vercel.
    - `VERCEL_TOKEN`: An authentication token generated from your Vercel account settings.
 5. **Update \*\***`ci.yml`\***\*:** Modify the GitHub Actions workflow to use dependent jobs. This ensures that the `deploy` job will only run if the `test-and-lint` job completes successfully.
+
    ```plain text
 
    ```
@@ -80,6 +81,7 @@ This will scan the code for common vulnerabilities (e.g., SQL injection, cross-s
 
 1. **Create a new workflow file:** Add a file at `.github/workflows/codeql.yml`.
 2. **Add the CodeQL configuration:**
+
    ```plain text
 
    ```
@@ -143,6 +145,7 @@ The project's dependencies can be a source of security vulnerabilities. We shoul
 **Actionable Steps:**
 
 1. **Update \*\***`ci.yml`\***\*:** Add a step to the `test-and-lint` job that runs `npm audit`. To prevent the build from failing on low-severity issues in a development context, we can set a threshold.
+
    ```plain text
 
    ```
@@ -171,16 +174,20 @@ The development login bar (dev-login-compact.tsx and dev-login.tsx) is a signifi
 **Actionable Steps:**
 
 1.  **Conditionally Render the Component:** In `src/app/layout.tsx` (or wherever the dev login bar is rendered), wrap its inclusion in a check against `process.env.NODE_ENV`.
-    ```plain text
+
+    ````plain text
     // src/app/layout.tsx
     {process.env.NODE_ENV === 'development' && <DevLoginCompact />}
 
         ```
 
+    ````
+
 2.  **Conditionally Exclude API Route:** While Next.js is good at tree-shaking server-side code not used by pages, for API routes, we should add a runtime check to prevent them from being used in production.
     ```plain text
     // src/app/api/dev/users/route.ts
     import { NextResponse } from 'next/server';
+    ```
 
 export async function GET() {
 if (process.env.NODE_ENV === 'production') {
@@ -205,7 +212,8 @@ To improve security and maintainability, all environment variable access should 
 **Actionable Steps:**
 
 1.  **Update \*\***`src/env.js`\***\*:** Add all server-side and client-side environment variables to the schema.
-    ```plain text
+
+    ````plain text
     // src/env.js
     export const env = createEnv({
     // ...
@@ -229,6 +237,8 @@ To improve security and maintainability, all environment variable access should 
 
         ```
 
+    ````
+
 2.  **Refactor Code:** Search the codebase for `process.env.PINBALL_MAP_API_KEY` and other direct access patterns. Replace them with `env.PINBALL_MAP_API_KEY` by importing from `~/env.js`.
 3.  **Update \*\***`.env.example`\***\*:** Ensure the `.env.example` file is updated with all the required variables.
     **Further Reading:**
@@ -248,10 +258,13 @@ The current ESLint configuration is a good start. We can make it more robust by 
     This helps maintain code quality, prevent common bugs, and ensure environment variables are always accessed in a safe, validated manner.
     **Actionable Steps:\*\*
 3.  **Install New Plugins:**
-    ```plain text
+
+    ````plain text
     npm install -D eslint-plugin-import eslint-plugin-promise eslint-plugin-unused-imports
 
         ```
+
+    ````
 
 4.  **Update \*\***`eslint.config.js`\***\*:** Replace the contents of your `eslint.config.js` with the following comprehensive configuration. It integrates the new rules and correctly scopes them to prevent direct `process.env` access anywhere except the file that defines it.
     ```plain text
@@ -261,6 +274,7 @@ The current ESLint configuration is a good start. We can make it more robust by 
     import importPlugin from "eslint-plugin-import";
     import promisePlugin from "eslint-plugin-promise";
     import unusedImportsPlugin from "eslint-plugin-unused-imports";
+    ```
 
 export default tseslint.config(
 ...tseslint.configs.recommended,
@@ -355,7 +369,8 @@ To optimize for cost and performance, all images should be resized and compresse
 **Actionable Steps:**
 
 1.  **Implement Client-Side Image Resizing:** - Install a library like `browser-image-compression`.
-    ```plain text
+
+    ````plain text
     npm install browser-image-compression
 
         	```
@@ -363,6 +378,7 @@ To optimize for cost and performance, all images should be resized and compresse
         	```plain text
 
     import imageCompression from 'browser-image-compression';
+    ````
 
 const handleImageChange = async (event) => {
 const imageFile = event.target.files[0];
@@ -405,16 +421,22 @@ While Vercel provides high-level analytics, Sentry provides deep, code-level dia
 
 1.  **Sign up for Sentry** and create a new project. The free tier is generous and suitable for early-stage applications.
 2.  **Install Sentry SDKs:**
-    ```plain text
+
+    ````plain text
     npm install --save @sentry/nextjs
 
         ```
 
+    ````
+
 3.  **Run the Sentry Wizard:** The wizard will automatically configure your Next.js application.
-    ```plain text
+
+    ````plain text
     npx @sentry/wizard@latest -i nextjs
 
         ```
+
+    ````
 
 4.  **Wrap tRPC Procedures:** Use Sentry's utilities to wrap tRPC procedures for more detailed error reporting.
 5.  **Configure GitHub Integration:** In the Sentry dashboard, navigate to **Settings \> Integrations \> GitHub**. Follow the instructions to connect your Sentry project to your PinPoint repository. This will allow you to create GitHub Issues directly from Sentry errors, linking the diagnostic data to the work item.
@@ -433,7 +455,8 @@ To ensure code quality and testing rigor, we should set up code coverage reporti
 **Actionable Steps:**
 
 1.  **Configure Jest for Coverage:** - Modify your `jest.config.js` file to enable coverage collection and specify which files to include.
-    ```plain text
+
+    ````plain text
     // jest.config.js
     module.exports = {
     // ... existing config
@@ -451,8 +474,11 @@ To ensure code quality and testing rigor, we should set up code coverage reporti
 
         	```
 
+    ````
+
 2.  **Add a Coverage Script:** - In your `package.json`, add a new script to run tests with coverage enabled.
-    ```plain text
+
+    ````plain text
     // package.json
     "scripts": {
     // ...
@@ -461,11 +487,14 @@ To ensure code quality and testing rigor, we should set up code coverage reporti
 
         	```
 
+    ````
+
 3.  **Integrate with Codecov:**
     - Sign up for Codecov with your GitHub account and link the PinPoint repository.
     - Add the `CODECOV_TOKEN` to your GitHub repository secrets. You can find this token on your repository's page in Codecov.
 4.  **Update CI Workflow:**
     - Modify the `test-and-lint` job in `.github/workflows/ci.yml` to generate the coverage report and upload it to Codecov.
+
       ```plain text
 
       ```

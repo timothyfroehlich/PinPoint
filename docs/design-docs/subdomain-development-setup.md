@@ -11,10 +11,13 @@ PinPoint now supports multi-tenant subdomain routing! This means:
 The easiest way is to just visit `apc.localhost:3000` directly in your browser. Most modern browsers support this automatically.
 
 1.  Start the development server:
-    ```shell
+
+    ````shell
     npm run dev
 
         ```
+
+    ````
 
 2.  Visit `http://apc.localhost:3000` in your browser
 3.  If visiting `http://localhost:3000`, you'll automatically be redirected to `apc.localhost:3000`
@@ -50,11 +53,14 @@ Add these lines:
 To test with multiple organizations:
 
 1.  Create a new organization in the database:
-    ```sql
+
+    ````sql
     INSERT INTO "Organization" (id, name, subdomain)
     VALUES ('test-org-id', 'Test Organization', 'test');
 
         ```
+
+    ````
 
 2.  Visit `http://test.localhost:3000`
 
