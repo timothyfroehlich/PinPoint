@@ -21,8 +21,8 @@ Remove existing Playwright E2E tests since the frontend will be completely rebui
 
 ## Status
 
-- [ ] In Progress
-- [ ] Completed
+- [x] In Progress
+- [x] Completed (via Task 01 frontend archival)
 
 ## Implementation Steps
 
@@ -122,25 +122,30 @@ npm run typecheck
 
 ### Implementation Decisions Made:
 
--
+- **TASK COMPLETED BY TASK 01**: Playwright tests were automatically archived during frontend archival
+- All E2E tests moved to `src/_archived_frontend/tests/` along with config files
+- No separate deletion needed as tests are excluded from compilation by archive
 
 ### Unexpected Complexity:
 
--
+- Task became redundant due to comprehensive frontend archival approach in Task 01
+- Playwright configuration also archived, removing need for manual cleanup
 
 ### Dependencies to Remove:
 
--
+- Playwright dependencies could be removed from package.json but kept for potential future use
+- Dependencies preserved since they're not causing build issues when tests are archived
 
 ### CI/CD Changes Made:
 
--
+- No CI/CD changes needed as archived tests are excluded from lint/build processes
+- ESLint ignores prevent linting of archived Playwright configs
 
 ### Notes for Later Tasks:
 
-- New E2E testing strategy will be needed for rebuilt frontend
-- Consider different testing framework for new architecture
--
+- New E2E testing strategy will be needed for rebuilt frontend (Phase 1B)
+- All original Playwright tests preserved in archive for reference
+- Consider modern testing framework for new architecture (Playwright, or alternatives)
 
 ## Rollback Procedure
 
