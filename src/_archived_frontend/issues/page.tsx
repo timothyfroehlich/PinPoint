@@ -64,7 +64,7 @@ export default function IssuesPage() {
   } = api.issue.getAll.useQuery({
     locationId: locationFilter || undefined,
     statusId: statusFilter || undefined,
-    gameTitleId: gameFilter || undefined,
+    modelId: gameFilter || undefined,
     statusCategory: statusCategoryFilter ?? undefined,
     sortBy,
     sortOrder,
@@ -80,7 +80,7 @@ export default function IssuesPage() {
   const { data: issueStatuses } = api.issueStatus.getAll.useQuery();
 
   // Get game titles for game filter
-  const { data: gameTitles } = api.gameTitle.getAll.useQuery();
+  const { data: models } = api.model.getAll.useQuery();
 
   const handleClearFilters = () => {
     setLocationFilter("");
@@ -213,9 +213,9 @@ export default function IssuesPage() {
 
             {/* Game Filter - Separate and Prominent */}
             <Autocomplete
-              options={gameTitles ?? []}
+              options={models ?? []}
               getOptionLabel={(option) => option.name}
-              value={gameTitles?.find((g) => g.id === gameFilter) ?? null}
+              value={models?.find((g) => g.id === gameFilter) ?? null}
               onChange={(_, newValue) => setGameFilter(newValue?.id ?? "")}
               renderInput={(params) => (
                 <TextField
@@ -455,7 +455,7 @@ export default function IssuesPage() {
                                 lineHeight: 1.2,
                               }}
                             >
-                              {issue.gameInstance.gameTitle.name}
+                              {issue.machine.model.name}
                             </Typography>
                           </Box>
 
@@ -595,7 +595,7 @@ export default function IssuesPage() {
                                 variant="caption"
                                 color="text.secondary"
                               >
-                                {issue.gameInstance.room.location.name}
+                                {issue.machine.room.location.name}
                               </Typography>
                             </Box>
                           </Box>

@@ -36,7 +36,7 @@ import type { OPDBSearchResult } from "~/lib/opdb";
 import { OPDBGameSearch } from "~/app/_components/opdb-game-search";
 import { api } from "~/trpc/react";
 
-export default function GameTitlesAdminPage() {
+export default function ModelsAdminPage() {
   const [selectedOPDBGame, setSelectedOPDBGame] = useState<{
     opdbId: string;
     gameData: OPDBSearchResult;
@@ -46,27 +46,27 @@ export default function GameTitlesAdminPage() {
 
   // Queries
   const {
-    data: gameTitles,
+    data: models,
     isLoading: isLoadingGames,
     error: gameError,
     refetch: refetchGames,
-  } = api.gameTitle.getAll.useQuery();
+  } = api.model.getAll.useQuery();
 
   // Mutations
-  const createGameFromOPDB = api.gameTitle.createFromOPDB.useMutation({
+  const createGameFromOPDB = api.model.createFromOPDB.useMutation({
     onSuccess: () => {
       setSelectedOPDBGame(null);
       void refetchGames();
     },
   });
 
-  const syncWithOPDB = api.gameTitle.syncWithOPDB.useMutation({
+  const syncWithOPDB = api.model.syncWithOPDB.useMutation({
     onSuccess: () => {
       void refetchGames();
     },
   });
 
-  const deleteGameTitle = api.gameTitle.delete.useMutation({
+  const deleteModel = api.model.delete.useMutation({
     onSuccess: () => {
       void refetchGames();
       handleMenuClose();
@@ -92,7 +92,7 @@ export default function GameTitlesAdminPage() {
 
   const handleDeleteGame = () => {
     if (selectedGameId) {
-      deleteGameTitle.mutate({ id: selectedGameId });
+      deleteModel.mutate({ id: selectedGameId });
     }
   };
 
@@ -123,11 +123,10 @@ export default function GameTitlesAdminPage() {
     );
   }
 
-  const gameTitleCount = gameTitles?.length ?? 0;
+  const modelCount = models?.length ?? 0;
   const opdbGameCount =
-    gameTitles?.filter(
-      (game) => game.opdbId && !game.opdbId.startsWith("custom-"),
-    ).length ?? 0;
+    models?.filter((game) => game.opdbId && !game.opdbId.startsWith("custom-"))
+      .length ?? 0;
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
@@ -228,15 +227,14 @@ export default function GameTitlesAdminPage() {
           <Card elevation={1}>
             <CardContent>
               <Typography variant="h5" component="h2" gutterBottom>
-                Game Collection ({gameTitleCount})
+                Game Collection ({modelCount})
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                {opdbGameCount} from OPDB • {gameTitleCount - opdbGameCount}{" "}
-                custom
+                {opdbGameCount} from OPDB • {modelCount - opdbGameCount} custom
               </Typography>
               <Divider sx={{ mb: 2 }} />
 
-              {gameTitleCount === 0 ? (
+              {modelCount === 0 ? (
                 <Box sx={{ textAlign: "center", py: 6 }}>
                   <Games sx={{ fontSize: 60, color: "text.disabled", mb: 2 }} />
                   <Typography variant="h6" color="text.secondary" gutterBottom>
@@ -248,7 +246,7 @@ export default function GameTitlesAdminPage() {
                 </Box>
               ) : (
                 <List>
-                  {gameTitles?.map((game) => (
+                  {models?.map((game) => (
                     <ListItem
                       key={game.id}
                       sx={{
@@ -368,8 +366,8 @@ export default function GameTitlesAdminPage() {
                                 variant="caption"
                                 color="text.secondary"
                               >
-                                {game._count.gameInstances} instance
-                                {game._count.gameInstances !== 1 ? "s" : ""}
+                                {game._count.machines} instance
+                                {game._count.machines !== 1 ? "s" : ""}
                               </Typography>
                               {game.lastSynced && (
                                 <Typography
@@ -388,7 +386,7 @@ export default function GameTitlesAdminPage() {
                       />
                       <IconButton
                         onClick={(e) => handleMenuOpen(e, game.id)}
-                        disabled={deleteGameTitle.isPending}
+                        disabled={deleteModel.isPending}
                       >
                         <MoreVert />
                       </IconButton>

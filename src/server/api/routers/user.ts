@@ -14,9 +14,9 @@ export const userRouter = createTRPCRouter({
     const user = await ctx.db.user.findUnique({
       where: { id: ctx.session.user.id },
       include: {
-        ownedGameInstances: {
+        ownedMachines: {
           include: {
-            gameTitle: true,
+            model: true,
             room: {
               include: {
                 location: true,
@@ -33,7 +33,7 @@ export const userRouter = createTRPCRouter({
           select: {
             issues: true,
             comments: true,
-            ownedGameInstances: true,
+            ownedMachines: true,
           },
         },
       },
@@ -149,7 +149,7 @@ export const userRouter = createTRPCRouter({
               joinDate: true,
               _count: {
                 select: {
-                  ownedGameInstances: true,
+                  ownedMachines: true,
                   issues: true,
                   comments: true,
                 },
@@ -180,7 +180,7 @@ export const userRouter = createTRPCRouter({
             joinDate: true,
             _count: {
               select: {
-                ownedGameInstances: true,
+                ownedMachines: true,
                 issues: true,
                 comments: true,
               },

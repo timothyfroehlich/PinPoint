@@ -1,4 +1,3 @@
-import { type Role } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { type Session } from "next-auth";
 

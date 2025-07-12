@@ -50,7 +50,7 @@ export function OPDBGameSearch({
     data: searchResults = [],
     isLoading: isSearching,
     error: searchError,
-  } = api.gameTitle.searchOPDB.useQuery(
+  } = api.model.searchOPDB.useQuery(
     { query: debouncedQuery },
     {
       enabled: debouncedQuery.length >= 2, // Only search with 2+ characters

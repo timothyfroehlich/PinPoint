@@ -35,7 +35,7 @@ export const locationRouter = createTRPCRouter({
           include: {
             _count: {
               select: {
-                gameInstances: true,
+                machines: true,
               },
             },
           },
@@ -78,9 +78,9 @@ export const locationRouter = createTRPCRouter({
         include: {
           rooms: {
             include: {
-              gameInstances: {
+              machines: {
                 include: {
-                  gameTitle: true,
+                  model: true,
                   owner: {
                     select: {
                       id: true,
@@ -93,7 +93,7 @@ export const locationRouter = createTRPCRouter({
               },
               _count: {
                 select: {
-                  gameInstances: true,
+                  machines: true,
                 },
               },
             },

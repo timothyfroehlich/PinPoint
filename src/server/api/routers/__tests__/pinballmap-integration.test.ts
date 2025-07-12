@@ -8,7 +8,7 @@ import { PrismaClient } from "@prisma/client";
 import { PinballMapAPIMocker } from "../../../../lib/pinballmap/__tests__/apiMocker";
 import { syncLocationGames } from "../../../services/pinballmapService";
 
-import type { Location, Room, GameInstance, GameTitle } from "@prisma/client";
+import type { Location, Room, Machine, Model } from "@prisma/client";
 
 jest.mock("@prisma/client");
 const MockedPrismaClient = PrismaClient as jest.MockedClass<
@@ -86,18 +86,18 @@ describe("PinballMap Integration Tests", () => {
         mockLocation,
       );
       (mockPrisma.room.findFirst as jest.Mock).mockResolvedValue(mockRoom);
-      (mockPrisma.gameInstance.findMany as jest.Mock).mockResolvedValue([]);
-      (mockPrisma.gameTitle.findUnique as jest.Mock).mockResolvedValue(null);
-      (mockPrisma.gameTitle.create as jest.Mock).mockImplementation(
+      (mockPrisma.machine.findMany as jest.Mock).mockResolvedValue([]);
+      (mockPrisma.model.findUnique as jest.Mock).mockResolvedValue(null);
+      (mockPrisma.model.create as jest.Mock).mockImplementation(
         ({ data }: { data: { name: string } }) =>
-          Promise.resolve({ id: `title-${data.name}`, ...data } as GameTitle),
+          Promise.resolve({ id: `title-${data.name}`, ...data } as Model),
       );
-      (mockPrisma.gameInstance.create as jest.Mock).mockImplementation(
+      (mockPrisma.machine.create as jest.Mock).mockImplementation(
         ({ data }: { data: { name: string } }) =>
           Promise.resolve({
             id: `instance-${data.name}`,
             ...data,
-          } as GameInstance),
+          } as Machine),
       );
     });
 
@@ -178,9 +178,9 @@ describe("PinballMap Integration Tests", () => {
       expect(roomQuery.locationId).toBeTruthy();
 
       // Game instances are scoped through room hierarchy
-      const gameQuery = { roomId: "room-1" };
+      const gameQuery = { locationId: "room-1" };
       // Note: organizationId is enforced through room -> location relationship
-      expect(gameQuery.roomId).toBeTruthy();
+      expect(gameQuery.locationId).toBeTruthy();
     });
   });
 });

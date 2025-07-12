@@ -106,7 +106,7 @@ describe("Authentication Integration Tests", () => {
         _count: {
           issues: 5,
           comments: 10,
-          ownedGameInstances: 3,
+          ownedMachines: 3,
         },
       };
 

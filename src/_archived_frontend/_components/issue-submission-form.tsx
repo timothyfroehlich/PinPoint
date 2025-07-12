@@ -25,20 +25,20 @@ import {
   type IssueAttachment,
 } from "~/app/_components/issue-image-upload";
 import { useCurrentUser } from "~/lib/hooks/use-current-user";
-import { type GameInstanceForIssues } from "~/lib/types/gameInstance";
+import { type MachineForIssues } from "~/lib/types/machine";
 import { api } from "~/trpc/react";
 
 interface IssueSubmissionFormProps {
-  gameInstances: GameInstanceForIssues[];
+  machines: MachineForIssues[];
   onSuccess?: () => void;
 }
 
 export function IssueSubmissionForm({
-  gameInstances,
+  machines,
   onSuccess,
 }: IssueSubmissionFormProps) {
   const [issueForm, setIssueForm] = useState({
-    gameInstanceId: "",
+    machineId: "",
     title: "",
     severity: "" as "Low" | "Medium" | "High" | "Critical" | "",
     description: "",
@@ -72,7 +72,7 @@ export function IssueSubmissionForm({
       }
 
       setIssueForm({
-        gameInstanceId: "",
+        machineId: "",
         title: "",
         severity: "",
         description: "",
@@ -85,7 +85,7 @@ export function IssueSubmissionForm({
 
   const handleIssueSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!issueForm.gameInstanceId || !issueForm.title.trim()) return;
+    if (!issueForm.machineId || !issueForm.title.trim()) return;
 
     createIssueMutation.mutate({
       title: issueForm.title.trim(),
@@ -94,7 +94,7 @@ export function IssueSubmissionForm({
       reporterEmail: !isAuthenticated
         ? issueForm.reporterEmail.trim() || undefined
         : undefined,
-      gameInstanceId: issueForm.gameInstanceId,
+      machineId: issueForm.machineId,
     });
   };
 
@@ -107,7 +107,7 @@ export function IssueSubmissionForm({
         </Box>
         <Divider sx={{ mb: 3 }} />
 
-        {gameInstances.length === 0 ? (
+        {machines.length === 0 ? (
           <Alert severity="info">
             No games available to report issues for.
           </Alert>
@@ -120,11 +120,11 @@ export function IssueSubmissionForm({
             <FormControl fullWidth>
               <InputLabel>Game *</InputLabel>
               <Select
-                value={issueForm.gameInstanceId}
+                value={issueForm.machineId}
                 onChange={(e) =>
                   setIssueForm({
                     ...issueForm,
-                    gameInstanceId: e.target.value,
+                    machineId: e.target.value,
                   })
                 }
                 label="Game *"
@@ -133,9 +133,9 @@ export function IssueSubmissionForm({
                 <MenuItem value="">
                   <em>Select a game...</em>
                 </MenuItem>
-                {gameInstances.map((instance) => (
+                {machines.map((instance) => (
                   <MenuItem key={instance.id} value={instance.id}>
-                    {instance.name} ({instance.gameTitle.name})
+                    {instance.name} ({instance.model.name})
                   </MenuItem>
                 ))}
               </Select>
@@ -255,7 +255,7 @@ export function IssueSubmissionForm({
                 type="submit"
                 variant="contained"
                 disabled={
-                  !issueForm.gameInstanceId ||
+                  !issueForm.machineId ||
                   !issueForm.title.trim() ||
                   createIssueMutation.isPending
                 }
@@ -273,7 +273,7 @@ export function IssueSubmissionForm({
                 variant="outlined"
                 onClick={() => {
                   setIssueForm({
-                    gameInstanceId: "",
+                    machineId: "",
                     title: "",
                     severity: "",
                     description: "",
