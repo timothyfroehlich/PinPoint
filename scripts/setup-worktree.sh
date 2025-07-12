@@ -14,7 +14,7 @@ if [[ -f .env && "$OVERWRITE" == "false" ]]; then
 fi
 
 # Find main worktree and copy .env
-MAIN_WORKTREE=$(git worktree list | head -1 | awk '{print $1}')
+MAIN_WORKTREE=$(git worktree list --porcelain | awk '/^worktree/ {worktree=$2} /branch main/ {print worktree; exit}')
 cp "$MAIN_WORKTREE/.env" .env
 
 # Configure unique ports for this worktree
@@ -35,7 +35,6 @@ if npx tsx scripts/port-utils.ts check "$CURRENT_PATH" | grep -q "Is worktree: t
 else
     echo "Using default ports (not a worktree environment)"
 fi
-
 # Create symlink for .env.local (remove existing first)
 rm -f .env.local
 ln -sf .env .env.local
