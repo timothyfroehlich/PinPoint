@@ -1,0 +1,15 @@
+name: "Default CodeQL config with Actions"
+paths:
+  - .
+paths-ignore:
+  - node_modules/
+  - dist/
+  - build/
+packs:
+  javascript:
+    - codeql/javascript-queries
+    - codeql/javascript-experimental-atm-queries
+    - github/codeql/javascript-queries
+    - githubsecuritylab/codeql-js-actions
+queries:
+  - uses: security-extended
