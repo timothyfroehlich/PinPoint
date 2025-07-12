@@ -1,4 +1,3 @@
-import { type } from "@prisma/client";
 
 import { GET } from "../users/route";
 
