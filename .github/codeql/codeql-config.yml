@@ -8,8 +8,5 @@ paths-ignore:
 packs:
   javascript:
     - codeql/javascript-queries
-    - codeql/javascript-experimental-atm-queries
-    - github/codeql/javascript-queries
-    - githubsecuritylab/codeql-js-actions
 queries:
   - uses: security-extended
