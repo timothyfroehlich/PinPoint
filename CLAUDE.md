@@ -33,6 +33,7 @@
 # Development (RECOMMENDED)
 npm run dev:full        # Start all services with monitoring
 npm run dev:clean       # Fresh start with cleanup
+npm run setup:worktree  # Setup new worktree environment
 
 # Quality Assurance (MANDATORY)
 npm run validate        # Before starting work
