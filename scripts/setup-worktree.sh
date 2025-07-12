@@ -7,6 +7,21 @@ if [[ "$1" == "--overwrite" ]]; then
     OVERWRITE=true
 fi
 
+# Safety check: warn if running from main repository
+CURRENT_PATH=$(pwd)
+if ! npx tsx scripts/port-utils.ts check "$CURRENT_PATH" | grep -q "Is worktree: true"; then
+    echo "⚠️  Warning: This script is designed for Git worktrees."
+    echo "   You appear to be in the main repository."
+    echo "   Running this may overwrite your .env.local and affect your main development setup."
+    echo ""
+    read -p "Continue anyway? (y/N): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Aborted."
+        exit 0
+    fi
+fi
+
 # Check if .env exists and exit unless overwrite
 if [[ -f .env && "$OVERWRITE" == "false" ]]; then
     echo ".env already exists. Use --overwrite flag to replace it."

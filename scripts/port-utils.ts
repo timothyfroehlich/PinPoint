@@ -8,9 +8,6 @@
 
 import { createHash } from "crypto";
 import path from "path";
-import { fileURLToPath } from "url";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 interface PortConfiguration {
   nextPort?: number;
@@ -38,16 +35,34 @@ function hashWorkspacePath(workspacePath: string): number {
 }
 
 /**
+ * Check if the given path is in a Git worktree
+ * Worktrees have a .git file (not directory) that points to the actual git directory
+ */
+function isGitWorktree(workspacePath: string): boolean {
+  try {
+    const fs = require("fs");
+    const gitPath = path.join(workspacePath, ".git");
+
+    // Check if .git exists and if it's a file (worktree) vs directory (main repo)
+    if (fs.existsSync(gitPath)) {
+      const stats = fs.statSync(gitPath);
+      return stats.isFile(); // Worktrees have .git as a file, main repo has it as directory
+    }
+
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Calculate unique ports for a workspace
  */
 function calculatePorts(
   workspacePath: string = process.cwd(),
 ): PortConfiguration {
-  // Check if we're in a worktree environment by looking for multiple worktrees
-  const isWorktreeEnv =
-    workspacePath.includes("-") &&
-    (workspacePath.includes("PinPoint-") ||
-      workspacePath.includes("pinpoint-"));
+  // Check if we're in a worktree environment using git commands
+  const isWorktreeEnv = isGitWorktree(workspacePath);
 
   if (!isWorktreeEnv) {
     // Default behavior for main workspace, CI, or non-worktree environments
@@ -102,7 +117,15 @@ function generateEnvVars(
   ) {
     envVars.PORT = ports.nextPort.toString();
     envVars.PRISMA_STUDIO_PORT = ports.prismaStudioPort.toString();
-    envVars.DATABASE_URL = `postgresql://postgres:password@localhost:${ports.databasePort}/${ports.databaseName}`;
+
+    // Use environment variables for database credentials, with development defaults
+    const dbUser = process.env.DB_USER || "postgres";
+    const dbPassword = process.env.DB_PASSWORD
+      ? `:${process.env.DB_PASSWORD}`
+      : "";
+    const dbHost = process.env.DB_HOST || "localhost";
+
+    envVars.DATABASE_URL = `postgresql://${dbUser}${dbPassword}@${dbHost}:${ports.databasePort}/${ports.databaseName}`;
   }
 
   return envVars;
