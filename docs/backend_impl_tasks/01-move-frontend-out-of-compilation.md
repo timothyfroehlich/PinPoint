@@ -21,8 +21,8 @@ Move existing frontend components and pages out of the compilation path to preve
 
 ## Status
 
-- [ ] In Progress
-- [ ] Completed
+- [x] In Progress
+- [x] Completed
 
 ## Implementation Steps
 
@@ -32,38 +32,81 @@ Move existing frontend components and pages out of the compilation path to preve
 mkdir -p src/_archived_frontend
 ```
 
-### 2. Move Frontend Components (Batch Operation)
+### 2. Move Frontend GUI Components (Batch Operation)
 
 ```bash
-# Move all components except core infrastructure
-find src/app -name "*.tsx" -not -path "*/layout.tsx" -not -path "*/loading.tsx" -not -path "*/error.tsx" | xargs -I {} mv {} src/_archived_frontend/
-find src/components -type f | xargs -I {} mv {} src/_archived_frontend/
+# Move React components directory (all GUI components)
+mv src/app/_components src/_archived_frontend/
 ```
 
-### 3. Move Pages and Routes
+### 3. Move GUI Pages and Core Layout Files
 
 ```bash
-# Move app router pages but preserve core layout
-find src/app -type d -mindepth 1 -not -name "_*" | while read dir; do
-  if [ -f "$dir/page.tsx" ]; then
-    mv "$dir" src/_archived_frontend/
-  fi
-done
+# Move GUI page directories and core layout files
+mv src/app/admin src/_archived_frontend/
+mv src/app/issues src/_archived_frontend/
+mv src/app/location src/_archived_frontend/
+mv src/app/profile src/_archived_frontend/
+mv src/app/sign-in src/_archived_frontend/
+mv src/app/signup src/_archived_frontend/
+mv src/app/layout.tsx src/_archived_frontend/
+mv src/app/page.tsx src/_archived_frontend/
+mv src/app/providers.tsx src/_archived_frontend/
 ```
 
-### 4. Update TypeScript Configuration
+### 4. Move Frontend-Specific Libraries and Config
+
+```bash
+# Move frontend-specific libraries (PRESERVE backend libraries like OPDB, PinballMap)
+mv src/lib/hooks src/_archived_frontend/
+mv src/trpc/react.tsx src/_archived_frontend/
+mv src/trpc/query-client.ts src/_archived_frontend/
+mv src/styles src/_archived_frontend/
+
+# Move frontend config and tests
+mv tests src/_archived_frontend/
+mv playwright.config.ts src/_archived_frontend/
+mv next.config.js src/_archived_frontend/
+mv postcss.config.js src/_archived_frontend/
+
+# Restore server-side query-client (needed for SSR)
+cp src/_archived_frontend/query-client.ts src/trpc/query-client.ts
+```
+
+### 5. Update TypeScript Configuration
 
 Edit `tsconfig.json` to exclude archived frontend:
 
 ```json
 {
-  "exclude": ["node_modules", ".next", "src/_archived_frontend/**/*"]
+  "exclude": ["node_modules", "scripts/**/*.cjs", "src/_archived_frontend/**/*"]
 }
 ```
 
-### 5. Create Minimal Layout
+### 6. Update ESLint Configuration
 
-Create a new minimal `src/app/layout.tsx`:
+Add archive directory to ESLint ignores in `eslint.config.js`:
+
+```js
+{
+  // Global ignores
+  ignores: [
+    ".next/",
+    "node_modules/",
+    "drizzle/",
+    "src/_archived_frontend/**/*",  // <- Add this line
+    "eslint.config.js",
+    "prettier.config.js",
+    "next.config.js",
+    "postcss.config.js",
+    "tailwind.config.ts",
+  ],
+}
+```
+
+### 7. Create Minimal Replacement Frontend
+
+Create new minimal `src/app/layout.tsx`:
 
 ```tsx
 export default function RootLayout({
@@ -82,9 +125,7 @@ export default function RootLayout({
 }
 ```
 
-### 6. Create Placeholder Page
-
-Create `src/app/page.tsx`:
+Create new `src/app/page.tsx`:
 
 ```tsx
 export default function HomePage() {
@@ -94,6 +135,16 @@ export default function HomePage() {
       <p>Frontend being rebuilt. Check back soon!</p>
     </main>
   );
+}
+```
+
+Create minimal `src/app/providers.tsx`:
+
+```tsx
+import { type ReactNode } from "react";
+
+export default function Providers({ children }: { children: ReactNode }) {
+  return <>{children}</>;
 }
 ```
 
@@ -124,15 +175,23 @@ ls -la src/_archived_frontend/
 
 ### Implementation Decisions Made:
 
--
+- Preserved OPDB and PinballMap libraries in `src/lib/` as these are backend integrations, not frontend-specific
+- Restored `src/trpc/query-client.ts` from archive as it's needed for server-side rendering
+- Updated ESLint config to exclude archived files from linting to prevent build warnings
+- Created minimal replacement files rather than empty files to maintain Next.js structure
 
 ### Unexpected Complexity:
 
--
+- Query client was needed for both client and server, required restoration for SSR functionality
+- ESLint flat config required updating ignores pattern to exclude archived frontend files
+- Next.js cache needed clearing after moving files to prevent stale references
 
 ### Notes for Later Tasks:
 
--
+- All frontend GUI components preserved in `src/_archived_frontend/` for reference during rebuild
+- Backend APIs, database, and external service integrations (OPDB, PinballMap) remain fully functional
+- Playwright tests archived with frontend - Task 02 may be automatically completed
+- TypeScript and build validation passing - ready for schema refactor tasks
 
 ## Rollback Procedure
 
