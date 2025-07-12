@@ -1,4 +1,4 @@
-import { type Role } from "@prisma/client";
+import { type } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { type Session } from "next-auth";
 
@@ -15,7 +15,7 @@ const mockIssueFindUnique = jest.fn();
 const mockIssueCreate = jest.fn();
 const mockIssueUpdate = jest.fn();
 const mockIssueDelete = jest.fn();
-const mockGameInstanceFindMany = jest.fn();
+const mockMachineFindMany = jest.fn();
 const mockLocationFindMany = jest.fn();
 const mockIssueStatusFindMany = jest.fn();
 
@@ -35,8 +35,8 @@ jest.mock("~/server/db", () => ({
       update: mockIssueUpdate,
       delete: mockIssueDelete,
     },
-    gameInstance: {
-      findMany: mockGameInstanceFindMany,
+    machine: {
+      findMany: mockMachineFindMany,
     },
     location: {
       findMany: mockLocationFindMany,
@@ -104,13 +104,13 @@ describe("Multi-Tenant Security Tests", () => {
       id: "issue-a-1",
       title: "Issue A1",
       organizationId: "org-a",
-      gameInstanceId: "game-a-1",
+      machineId: "game-a-1",
     },
     {
       id: "issue-a-2",
       title: "Issue A2",
       organizationId: "org-a",
-      gameInstanceId: "game-a-2",
+      machineId: "game-a-2",
     },
   ];
 
@@ -119,7 +119,7 @@ describe("Multi-Tenant Security Tests", () => {
       id: "issue-b-1",
       title: "Issue B1",
       organizationId: "org-b",
-      gameInstanceId: "game-b-1",
+      machineId: "game-b-1",
     },
   ];
 
@@ -156,7 +156,7 @@ describe("Multi-Tenant Security Tests", () => {
       const result = await callerA.issue.getAll({
         locationId: undefined,
         statusId: undefined,
-        gameTitleId: undefined,
+        modelId: undefined,
         statusCategory: undefined,
         sortBy: "created",
         sortOrder: "desc",
@@ -206,7 +206,7 @@ describe("Multi-Tenant Security Tests", () => {
         callerA.issue.getAll({
           locationId: undefined,
           statusId: undefined,
-          gameTitleId: undefined,
+          modelId: undefined,
           statusCategory: undefined,
           sortBy: "created",
           sortOrder: "desc",
@@ -264,7 +264,7 @@ describe("Multi-Tenant Security Tests", () => {
       const resultA = await callerA.issue.getAll({
         locationId: undefined,
         statusId: undefined,
-        gameTitleId: undefined,
+        modelId: undefined,
         statusCategory: undefined,
         sortBy: "created",
         sortOrder: "desc",
@@ -291,7 +291,7 @@ describe("Multi-Tenant Security Tests", () => {
       const resultB = await callerB.issue.getAll({
         locationId: undefined,
         statusId: undefined,
-        gameTitleId: undefined,
+        modelId: undefined,
         statusCategory: undefined,
         sortBy: "created",
         sortOrder: "desc",
@@ -332,7 +332,7 @@ describe("Multi-Tenant Security Tests", () => {
         id: "issue-b-1",
         title: "Issue B1",
         organizationId: "org-b", // Different organization!
-        gameInstanceId: "game-b-1",
+        machineId: "game-b-1",
       });
 
       const callerA = createCaller({
@@ -382,7 +382,7 @@ describe("Multi-Tenant Security Tests", () => {
       const createData = {
         title: "Test Issue",
         description: "Test Description",
-        gameInstanceId: "game-a-1",
+        machineId: "game-a-1",
         statusId: "status-1",
         severity: "Medium" as const,
       };
@@ -426,7 +426,7 @@ describe("Multi-Tenant Security Tests", () => {
         id: "issue-b-1",
         title: "Issue B1",
         organizationId: "org-b", // Different organization
-        gameInstanceId: "game-b-1",
+        machineId: "game-b-1",
       });
 
       const callerA = createCaller({
@@ -484,7 +484,7 @@ describe("Multi-Tenant Security Tests", () => {
       const result = await memberCaller.issue.getAll({
         locationId: undefined,
         statusId: undefined,
-        gameTitleId: undefined,
+        modelId: undefined,
         statusCategory: undefined,
         sortBy: "created",
         sortOrder: "desc",
@@ -526,7 +526,7 @@ describe("Multi-Tenant Security Tests", () => {
       const result = await adminCaller.issue.getAll({
         locationId: undefined,
         statusId: undefined,
-        gameTitleId: undefined,
+        modelId: undefined,
         statusCategory: undefined,
         sortBy: "created",
         sortOrder: "desc",

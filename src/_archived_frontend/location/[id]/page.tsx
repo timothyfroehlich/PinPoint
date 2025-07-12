@@ -64,9 +64,9 @@ export default function LocationProfilePage({
   }, [params]);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [moveDialogOpen, setMoveDialogOpen] = useState(false);
-  const [selectedGameInstanceId, setSelectedGameInstanceId] = useState<
-    string | null
-  >(null);
+  const [selectedMachineId, setSelectedMachineId] = useState<string | null>(
+    null,
+  );
   const [targetLocationId, setTargetLocationId] = useState("");
   const [gameMenuAnchor, setGameMenuAnchor] = useState<null | HTMLElement>(
     null,
@@ -96,10 +96,10 @@ export default function LocationProfilePage({
     },
   });
 
-  const moveGameMutation = api.gameInstance.moveToLocation.useMutation({
+  const moveGameMutation = api.machine.moveToLocation.useMutation({
     onSuccess: () => {
       setMoveDialogOpen(false);
-      setSelectedGameInstanceId(null);
+      setSelectedMachineId(null);
       setTargetLocationId("");
       void refetch();
     },
@@ -151,7 +151,7 @@ export default function LocationProfilePage({
   }
 
   // NEW: Flatten all game instances from all rooms
-  const allGameInstances = location.rooms.flatMap((room) => room.gameInstances);
+  const allMachines = location.rooms.flatMap((room) => room.machines);
 
   // Check if user is admin
   const isAdmin =
@@ -177,9 +177,9 @@ export default function LocationProfilePage({
 
   const handleGameMenu = (
     event: React.MouseEvent<HTMLElement>,
-    gameInstanceId: string,
+    machineId: string,
   ) => {
-    setSelectedGameInstanceId(gameInstanceId);
+    setSelectedMachineId(machineId);
     setGameMenuAnchor(event.currentTarget);
   };
 
@@ -209,20 +209,18 @@ export default function LocationProfilePage({
   };
 
   const handleConfirmMove = () => {
-    if (selectedGameInstanceId && targetLocationId) {
+    if (selectedMachineId && targetLocationId) {
       moveGameMutation.mutate({
-        gameInstanceId: selectedGameInstanceId,
-        roomId: targetLocationId, // This should be roomId now
+        machineId: selectedMachineId,
+        locationId: targetLocationId, // This should be locationId now
       });
     }
   };
 
   const otherLocations =
     allLocations?.filter((loc) => loc.id !== location.id) ?? [];
-  // Update selectedGame to use allGameInstances
-  const selectedGame = allGameInstances.find(
-    (gi) => gi.id === selectedGameInstanceId,
-  );
+  // Update selectedGame to use allMachines
+  const selectedGame = allMachines.find((gi) => gi.id === selectedMachineId);
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
@@ -277,7 +275,7 @@ export default function LocationProfilePage({
                   <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
                     <Chip
                       icon={<Games />}
-                      label={`${allGameInstances.length} games`}
+                      label={`${allMachines.length} games`}
                       variant="outlined"
                     />
                   </Box>
@@ -330,11 +328,11 @@ export default function LocationProfilePage({
           <Card>
             <CardContent>
               <Typography variant="h6" gutterBottom>
-                Games at this Location ({allGameInstances.length})
+                Games at this Location ({allMachines.length})
               </Typography>
               <Divider sx={{ mb: 2 }} />
 
-              {allGameInstances.length === 0 ? (
+              {allMachines.length === 0 ? (
                 <Box sx={{ textAlign: "center", py: 4 }}>
                   <Games
                     sx={{ fontSize: 64, color: "text.secondary", mb: 2 }}
@@ -348,9 +346,9 @@ export default function LocationProfilePage({
                 </Box>
               ) : (
                 <List>
-                  {allGameInstances.map((gameInstance) => (
+                  {allMachines.map((machine) => (
                     <ListItem
-                      key={gameInstance.id}
+                      key={machine.id}
                       sx={{
                         px: 0,
                         py: 1,
@@ -369,15 +367,15 @@ export default function LocationProfilePage({
                             }}
                           >
                             <Typography variant="subtitle1" fontWeight="medium">
-                              {gameInstance.name}
+                              {machine.name}
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
-                              ({gameInstance.gameTitle.name})
+                              ({machine.model.name})
                             </Typography>
                           </Box>
                         }
                         secondary={
-                          gameInstance.owner && (
+                          machine.owner && (
                             <Box
                               sx={{
                                 display: "flex",
@@ -387,22 +385,19 @@ export default function LocationProfilePage({
                               }}
                             >
                               <Person fontSize="small" color="action" />
-                              <UserAvatar
-                                user={gameInstance.owner}
-                                size="small"
-                              />
+                              <UserAvatar user={machine.owner} size="small" />
                               <Typography
                                 variant="caption"
                                 color="text.secondary"
                               >
-                                Owned by {gameInstance.owner.name}
+                                Owned by {machine.owner.name}
                               </Typography>
                             </Box>
                           )
                         }
                       />
                       <IconButton
-                        onClick={(e) => handleGameMenu(e, gameInstance.id)}
+                        onClick={(e) => handleGameMenu(e, machine.id)}
                         size="small"
                       >
                         <MoreVert />
@@ -418,7 +413,7 @@ export default function LocationProfilePage({
         {/* Issue Submission Form */}
         <Grid size={12}>
           <IssueSubmissionForm
-            gameInstances={allGameInstances}
+            machines={allMachines}
             onSuccess={() => refetch()}
           />
         </Grid>
@@ -492,7 +487,7 @@ export default function LocationProfilePage({
             {selectedGame && (
               <Alert severity="info" sx={{ mb: 2 }}>
                 Moving <strong>{selectedGame.name}</strong> (
-                {selectedGame.gameTitle.name})
+                {selectedGame.model.name})
               </Alert>
             )}
             <FormControl fullWidth>
@@ -506,7 +501,7 @@ export default function LocationProfilePage({
                   <MenuItem key={loc.id} value={loc.id}>
                     {loc.name} (
                     {loc.rooms?.reduce(
-                      (sum, room) => sum + (room._count?.gameInstances ?? 0),
+                      (sum, room) => sum + (room._count?.machines ?? 0),
                       0,
                     ) ?? 0}{" "}
                     games)

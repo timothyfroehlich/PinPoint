@@ -101,7 +101,7 @@ export default function ProfilePage() {
 
   const _count = userProfile._count;
   const memberships = userProfile.memberships;
-  const ownedGameInstances = userProfile.ownedGameInstances;
+  const ownedMachines = userProfile.ownedMachines;
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
@@ -185,7 +185,7 @@ export default function ProfilePage() {
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <Games color="primary" />
                   <Typography variant="body2">
-                    {_count.ownedGameInstances} games owned
+                    {_count.ownedMachines} games owned
                   </Typography>
                 </Box>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -244,17 +244,17 @@ export default function ProfilePage() {
           <Card>
             <CardContent>
               <Typography variant="h6" gutterBottom>
-                Owned Games ({ownedGameInstances.length})
+                Owned Games ({ownedMachines.length})
               </Typography>
-              {ownedGameInstances.length === 0 ? (
+              {ownedMachines.length === 0 ? (
                 <Typography variant="body2" color="text.secondary">
                   No games owned yet
                 </Typography>
               ) : (
                 <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                  {ownedGameInstances.map((gameInstance) => (
+                  {ownedMachines.map((machine) => (
                     <Box
-                      key={gameInstance.id}
+                      key={machine.id}
                       sx={{
                         p: 2,
                         border: 1,
@@ -263,23 +263,20 @@ export default function ProfilePage() {
                       }}
                     >
                       <Typography variant="subtitle1" fontWeight="bold">
-                        {gameInstance.name}
+                        {machine.name}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        {gameInstance.gameTitle.name}
-                        {gameInstance.gameTitle.manufacturer && (
-                          <> • {gameInstance.gameTitle.manufacturer}</>
+                        {machine.model.name}
+                        {machine.model.manufacturer && (
+                          <> • {machine.model.manufacturer}</>
                         )}
-                        {gameInstance.gameTitle.releaseDate && (
-                          <>
-                            {" "}
-                            • {gameInstance.gameTitle.releaseDate.getFullYear()}
-                          </>
+                        {machine.model.releaseDate && (
+                          <> • {machine.model.releaseDate.getFullYear()}</>
                         )}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        Location: {gameInstance.room.location.name} -{" "}
-                        {gameInstance.room.name}
+                        Location: {machine.room.location.name} -{" "}
+                        {machine.room.name}
                       </Typography>
                     </Box>
                   ))}

@@ -6,20 +6,20 @@ import {
   publicProcedure,
 } from "~/server/api/trpc";
 
-export const gameInstanceRouter = createTRPCRouter({
+export const machineRouter = createTRPCRouter({
   create: organizationProcedure
     .input(
       z.object({
         name: z.string().min(1),
-        gameTitleId: z.string(),
-        roomId: z.string(),
+        modelId: z.string(),
+        locationId: z.string(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Verify that the gameTitle and room belong to the same organization
-      const gameTitle = await ctx.db.gameTitle.findFirst({
+      // Verify that the model and room belong to the same organization
+      const model = await ctx.db.model.findFirst({
         where: {
-          id: input.gameTitleId,
+          id: input.modelId,
           OR: [
             { organizationId: ctx.organization.id }, // Organization-specific games
             { organizationId: null }, // Global OPDB games
@@ -29,27 +29,27 @@ export const gameInstanceRouter = createTRPCRouter({
 
       const room = await ctx.db.room.findFirst({
         where: {
-          id: input.roomId,
+          id: input.locationId,
           organizationId: ctx.organization.id,
         },
       });
 
-      if (!gameTitle || !room) {
+      if (!model || !room) {
         throw new Error("Invalid game title or room");
       }
 
-      return ctx.db.gameInstance.create({
+      return ctx.db.machine.create({
         data: {
           name: input.name,
-          gameTitleId: input.gameTitleId,
-          roomId: input.roomId,
+          modelId: input.modelId,
+          locationId: input.locationId,
         },
         include: {
-          gameTitle: {
+          model: {
             include: {
               _count: {
                 select: {
-                  gameInstances: true,
+                  machines: true,
                 },
               },
             },
@@ -71,18 +71,18 @@ export const gameInstanceRouter = createTRPCRouter({
     }),
 
   getAll: organizationProcedure.query(async ({ ctx }) => {
-    return ctx.db.gameInstance.findMany({
+    return ctx.db.machine.findMany({
       where: {
         room: {
           organizationId: ctx.organization.id,
         },
       },
       include: {
-        gameTitle: {
+        model: {
           include: {
             _count: {
               select: {
-                gameInstances: true,
+                machines: true,
               },
             },
           },
@@ -109,7 +109,7 @@ export const gameInstanceRouter = createTRPCRouter({
     // Use the organization resolved from subdomain context
     const organization = ctx.organization;
 
-    return ctx.db.gameInstance.findMany({
+    return ctx.db.machine.findMany({
       where: {
         room: {
           organizationId: organization.id,
@@ -118,7 +118,7 @@ export const gameInstanceRouter = createTRPCRouter({
       select: {
         id: true,
         name: true,
-        gameTitle: {
+        model: {
           select: {
             name: true,
           },
@@ -131,7 +131,7 @@ export const gameInstanceRouter = createTRPCRouter({
   getById: organizationProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
-      const gameInstance = await ctx.db.gameInstance.findFirst({
+      const machine = await ctx.db.machine.findFirst({
         where: {
           id: input.id,
           room: {
@@ -139,11 +139,11 @@ export const gameInstanceRouter = createTRPCRouter({
           },
         },
         include: {
-          gameTitle: {
+          model: {
             include: {
               _count: {
                 select: {
-                  gameInstances: true,
+                  machines: true,
                 },
               },
             },
@@ -163,11 +163,11 @@ export const gameInstanceRouter = createTRPCRouter({
         },
       });
 
-      if (!gameInstance) {
+      if (!machine) {
         throw new Error("Game instance not found");
       }
 
-      return gameInstance;
+      return machine;
     }),
 
   update: organizationProcedure
@@ -175,13 +175,13 @@ export const gameInstanceRouter = createTRPCRouter({
       z.object({
         id: z.string(),
         name: z.string().min(1),
-        gameTitleId: z.string().optional(),
+        modelId: z.string().optional(),
         locationId: z.string().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       // First verify the game instance belongs to this organization
-      const existingInstance = await ctx.db.gameInstance.findFirst({
+      const existingInstance = await ctx.db.machine.findFirst({
         where: {
           id: input.id,
           room: {
@@ -194,15 +194,15 @@ export const gameInstanceRouter = createTRPCRouter({
         throw new Error("Game instance not found");
       }
 
-      // If updating gameTitle or location, verify they belong to the organization
-      if (input.gameTitleId) {
-        const gameTitle = await ctx.db.gameTitle.findFirst({
+      // If updating model or location, verify they belong to the organization
+      if (input.modelId) {
+        const model = await ctx.db.model.findFirst({
           where: {
-            id: input.gameTitleId,
+            id: input.modelId,
             organizationId: ctx.organization.id,
           },
         });
-        if (!gameTitle) {
+        if (!model) {
           throw new Error("Invalid game title");
         }
       }
@@ -219,19 +219,19 @@ export const gameInstanceRouter = createTRPCRouter({
         }
       }
 
-      return ctx.db.gameInstance.update({
+      return ctx.db.machine.update({
         where: { id: input.id },
         data: {
           name: input.name,
-          ...(input.gameTitleId && { gameTitleId: input.gameTitleId }),
+          ...(input.modelId && { modelId: input.modelId }),
           ...(input.locationId && { locationId: input.locationId }),
         },
         include: {
-          gameTitle: {
+          model: {
             include: {
               _count: {
                 select: {
-                  gameInstances: true,
+                  machines: true,
                 },
               },
             },
@@ -256,7 +256,7 @@ export const gameInstanceRouter = createTRPCRouter({
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       // Verify the game instance belongs to this organization
-      const existingInstance = await ctx.db.gameInstance.findFirst({
+      const existingInstance = await ctx.db.machine.findFirst({
         where: {
           id: input.id,
           room: {
@@ -269,7 +269,7 @@ export const gameInstanceRouter = createTRPCRouter({
         throw new Error("Game instance not found");
       }
 
-      return ctx.db.gameInstance.delete({
+      return ctx.db.machine.delete({
         where: { id: input.id },
       });
     }),
@@ -278,15 +278,15 @@ export const gameInstanceRouter = createTRPCRouter({
   moveToLocation: organizationProcedure
     .input(
       z.object({
-        gameInstanceId: z.string(),
-        roomId: z.string(),
+        machineId: z.string(),
+        locationId: z.string(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       // Verify the game instance belongs to this organization
-      const existingInstance = await ctx.db.gameInstance.findFirst({
+      const existingInstance = await ctx.db.machine.findFirst({
         where: {
-          id: input.gameInstanceId,
+          id: input.machineId,
           room: {
             organizationId: ctx.organization.id,
           },
@@ -300,7 +300,7 @@ export const gameInstanceRouter = createTRPCRouter({
       // Verify the target room belongs to this organization
       const room = await ctx.db.room.findFirst({
         where: {
-          id: input.roomId,
+          id: input.locationId,
           organizationId: ctx.organization.id,
         },
       });
@@ -309,17 +309,17 @@ export const gameInstanceRouter = createTRPCRouter({
         throw new Error("Target room not found");
       }
 
-      return ctx.db.gameInstance.update({
-        where: { id: input.gameInstanceId },
+      return ctx.db.machine.update({
+        where: { id: input.machineId },
         data: {
-          roomId: input.roomId,
+          locationId: input.locationId,
         },
         include: {
-          gameTitle: {
+          model: {
             include: {
               _count: {
                 select: {
-                  gameInstances: true,
+                  machines: true,
                 },
               },
             },
@@ -344,15 +344,15 @@ export const gameInstanceRouter = createTRPCRouter({
   assignOwner: organizationProcedure
     .input(
       z.object({
-        gameInstanceId: z.string(),
+        machineId: z.string(),
         ownerId: z.string().optional(), // null/undefined to remove owner
       }),
     )
     .mutation(async ({ ctx, input }) => {
       // Verify the game instance belongs to this organization
-      const existingInstance = await ctx.db.gameInstance.findFirst({
+      const existingInstance = await ctx.db.machine.findFirst({
         where: {
-          id: input.gameInstanceId,
+          id: input.machineId,
           room: {
             organizationId: ctx.organization.id,
           },
@@ -379,17 +379,17 @@ export const gameInstanceRouter = createTRPCRouter({
         }
       }
 
-      return ctx.db.gameInstance.update({
-        where: { id: input.gameInstanceId },
+      return ctx.db.machine.update({
+        where: { id: input.machineId },
         data: {
           ownerId: input.ownerId ?? null,
         },
         include: {
-          gameTitle: {
+          model: {
             include: {
               _count: {
                 select: {
-                  gameInstances: true,
+                  machines: true,
                 },
               },
             },

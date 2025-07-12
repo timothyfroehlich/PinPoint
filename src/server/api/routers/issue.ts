@@ -18,7 +18,7 @@ export const issueRouter = createTRPCRouter({
         description: z.string().optional(),
         severity: z.enum(["Low", "Medium", "High", "Critical"]).optional(),
         reporterEmail: z.string().email().optional(),
-        gameInstanceId: z.string(),
+        machineId: z.string(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -26,9 +26,9 @@ export const issueRouter = createTRPCRouter({
       const organization = ctx.organization;
 
       // Verify that the game instance belongs to the organization
-      const gameInstance = await ctx.db.gameInstance.findFirst({
+      const machine = await ctx.db.machine.findFirst({
         where: {
-          id: input.gameInstanceId,
+          id: input.machineId,
         },
         include: {
           room: {
@@ -39,10 +39,7 @@ export const issueRouter = createTRPCRouter({
         },
       });
 
-      if (
-        !gameInstance ||
-        gameInstance.room.organizationId !== organization.id
-      ) {
+      if (!machine || machine.room.organizationId !== organization.id) {
         throw new Error(
           "Game instance not found or does not belong to this organization",
         );
@@ -74,7 +71,7 @@ export const issueRouter = createTRPCRouter({
           severity: input.severity,
           reporterId,
           reporterEmail,
-          gameInstanceId: input.gameInstanceId,
+          machineId: input.machineId,
           organizationId: organization.id,
           statusId: newStatus.id,
         },
@@ -87,9 +84,9 @@ export const issueRouter = createTRPCRouter({
               profilePicture: true,
             },
           },
-          gameInstance: {
+          machine: {
             include: {
-              gameTitle: true,
+              model: true,
               room: {
                 include: {
                   location: true,
@@ -119,9 +116,9 @@ export const issueRouter = createTRPCRouter({
       z
         .object({
           locationId: z.string().optional(),
-          gameInstanceId: z.string().optional(),
+          machineId: z.string().optional(),
           statusId: z.string().optional(),
-          gameTitleId: z.string().optional(),
+          modelId: z.string().optional(),
           statusCategory: z
             .enum([
               IssueStatusCategory.NEW,
@@ -139,11 +136,11 @@ export const issueRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const whereClause: {
         organizationId: string;
-        gameInstance?: {
+        machine?: {
           room?: { locationId: string };
-          gameTitleId?: string;
+          modelId?: string;
         };
-        gameInstanceId?: string;
+        machineId?: string;
         statusId?: string;
         status?: {
           category: IssueStatusCategory;
@@ -153,20 +150,20 @@ export const issueRouter = createTRPCRouter({
       };
 
       if (input?.locationId) {
-        whereClause.gameInstance = {
-          ...whereClause.gameInstance,
+        whereClause.machine = {
+          ...whereClause.machine,
           room: { locationId: input.locationId },
         };
       }
 
-      if (input?.gameInstanceId) {
-        whereClause.gameInstanceId = input.gameInstanceId;
+      if (input?.machineId) {
+        whereClause.machineId = input.machineId;
       }
 
-      if (input?.gameTitleId) {
-        whereClause.gameInstance = {
-          ...whereClause.gameInstance,
-          gameTitleId: input.gameTitleId,
+      if (input?.modelId) {
+        whereClause.machine = {
+          ...whereClause.machine,
+          modelId: input.modelId,
         };
       }
 
@@ -195,7 +192,7 @@ export const issueRouter = createTRPCRouter({
           case "severity":
             return { severity: sortOrder };
           case "game":
-            return { gameInstance: { gameTitle: { name: sortOrder } } };
+            return { machine: { model: { name: sortOrder } } };
           default:
             return { createdAt: "desc" as const };
         }
@@ -219,9 +216,9 @@ export const issueRouter = createTRPCRouter({
               profilePicture: true,
             },
           },
-          gameInstance: {
+          machine: {
             include: {
-              gameTitle: true,
+              model: true,
               room: {
                 include: {
                   location: true,
@@ -301,9 +298,9 @@ export const issueRouter = createTRPCRouter({
               profilePicture: true,
             },
           },
-          gameInstance: {
+          machine: {
             include: {
-              gameTitle: true,
+              model: true,
               room: {
                 include: {
                   location: true,
@@ -441,9 +438,9 @@ export const issueRouter = createTRPCRouter({
               profilePicture: true,
             },
           },
-          gameInstance: {
+          machine: {
             include: {
-              gameTitle: true,
+              model: true,
               room: {
                 include: {
                   location: true,

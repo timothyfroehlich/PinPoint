@@ -5,7 +5,7 @@
  * Game Title Logic:
  * - OPDB games (with opdbId): Global records shared across all organizations
  * - Custom games (no opdbId): Per-organization records, unique by name + organizationId
- * - GameInstances: Always organization-specific through room hierarchy
+ * - Machines: Always organization-specific through room hierarchy
  */
 
 import { fetchLocationMachineDetails } from "../../lib/pinballmap/client";
@@ -93,7 +93,7 @@ export async function syncLocationGames(
     }
 
     // 5. Reconcile the games
-    const result = await reconcileGameInstances(
+    const result = await reconcileMachines(
       prisma,
       mainFloorRoom.id,
       location.organizationId,
@@ -142,7 +142,7 @@ export async function syncLocationGames(
 export async function processFixtureData(
   prisma: PrismaClient,
   fixtureData: PinballMapMachineDetailsResponse,
-  roomId: string,
+  locationId: string,
   organizationId: string,
 ): Promise<ProcessResult> {
   try {
@@ -150,18 +150,14 @@ export async function processFixtureData(
 
     for (const machine of fixtureData.machines) {
       // Create or update game title
-      const gameTitle = await createOrUpdateGameTitle(
-        prisma,
-        machine,
-        organizationId,
-      );
+      const model = await createOrUpdateModel(prisma, machine, organizationId);
 
       // Create game instance
-      await prisma.gameInstance.create({
+      await prisma.machine.create({
         data: {
-          name: gameTitle.name,
-          gameTitleId: gameTitle.id,
-          roomId: roomId,
+          name: model.name,
+          modelId: model.id,
+          locationId: locationId,
         },
       });
 
@@ -180,16 +176,16 @@ export async function processFixtureData(
 /**
  * Reconcile game instances - add new games, remove old ones
  */
-export async function reconcileGameInstances(
+export async function reconcileMachines(
   prisma: PrismaClient,
-  roomId: string,
+  locationId: string,
   organizationId: string,
   remoteMachines: PinballMapMachine[],
 ): Promise<{ added: number; removed: number }> {
   // Get current game instances in the room
-  const localGames = await prisma.gameInstance.findMany({
-    where: { roomId },
-    include: { gameTitle: true },
+  const localGames = await prisma.machine.findMany({
+    where: { locationId },
+    include: { model: true },
   });
 
   // Create sets of OPDB IDs for comparison
@@ -199,18 +195,18 @@ export async function reconcileGameInstances(
 
   // For local games, we need to check OPDB games
   const localOpdbIds = new Set(
-    localGames.filter((g) => g.gameTitle.opdbId).map((g) => g.gameTitle.opdbId),
+    localGames.filter((g) => g.model.opdbId).map((g) => g.model.opdbId),
   );
 
   // Determine which games to remove
   // Remove games that have OPDB IDs but are not in the remote list
   const gamesToRemove = localGames.filter((lg) => {
-    if (!lg.gameTitle.opdbId) return false; // Don't remove custom games automatically
-    return !remoteOpdbIds.has(lg.gameTitle.opdbId);
+    if (!lg.model.opdbId) return false; // Don't remove custom games automatically
+    return !remoteOpdbIds.has(lg.model.opdbId);
   });
 
   // Remove obsolete games
-  await prisma.gameInstance.deleteMany({
+  await prisma.machine.deleteMany({
     where: { id: { in: gamesToRemove.map((g) => g.id) } },
   });
 
@@ -223,18 +219,14 @@ export async function reconcileGameInstances(
   let addedCount = 0;
   for (const machine of machinesToAdd) {
     // Create or update game title
-    const gameTitle = await createOrUpdateGameTitle(
-      prisma,
-      machine,
-      organizationId,
-    );
+    const model = await createOrUpdateModel(prisma, machine, organizationId);
 
     // Create game instance
-    await prisma.gameInstance.create({
+    await prisma.machine.create({
       data: {
-        name: gameTitle.name,
-        gameTitleId: gameTitle.id,
-        roomId: roomId,
+        name: model.name,
+        modelId: model.id,
+        locationId: locationId,
       },
     });
 
@@ -250,7 +242,7 @@ export async function reconcileGameInstances(
 /**
  * Create or update a game title from PinballMap machine data
  */
-export async function createOrUpdateGameTitle(
+export async function createOrUpdateModel(
   prisma: PrismaClient,
   machine: PinballMapMachine,
   organizationId: string,
@@ -258,13 +250,13 @@ export async function createOrUpdateGameTitle(
   // Handle OPDB games vs custom games differently
   if (machine.opdb_id) {
     // OPDB games are global - check if it exists first
-    const existingGameTitle = await prisma.gameTitle.findUnique({
+    const existingModel = await prisma.model.findUnique({
       where: { opdbId: machine.opdb_id },
     });
 
-    if (existingGameTitle) {
+    if (existingModel) {
       // Update existing global OPDB game
-      return await prisma.gameTitle.update({
+      return await prisma.model.update({
         where: { opdbId: machine.opdb_id },
         data: {
           name: machine.name,
@@ -273,7 +265,7 @@ export async function createOrUpdateGameTitle(
       });
     } else {
       // Create new global OPDB game
-      return await prisma.gameTitle.create({
+      return await prisma.model.create({
         data: {
           name: machine.name,
           opdbId: machine.opdb_id,
@@ -284,7 +276,7 @@ export async function createOrUpdateGameTitle(
     }
   } else {
     // Custom games are per-organization - use the compound unique constraint
-    return await prisma.gameTitle.upsert({
+    return await prisma.model.upsert({
       where: {
         unique_custom_game_per_org: {
           name: machine.name,

@@ -1,0 +1,251 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+enum Role {
+    admin
+    member
+    player
+}
+
+enum ActivityType {
+    created
+    status_change
+    assignment
+    field_update
+}
+
+model User {
+    id            String       @id @default(cuid())
+    name          String?
+    email         String?      @unique
+    bio           String?      // User biography/description
+    profilePicture String?     // Path to profile picture
+    joinDate      DateTime     @default(now()) // Account creation date
+
+    emailVerified DateTime?
+    image         String?
+    accounts      Account[]
+    sessions      Session[]
+    memberships   Membership[]
+    issues        Issue[]      // Issues assigned to user
+    reportedIssues Issue[]     @relation("IssueReporter") // Issues reported by user
+    comments      Comment[]
+    deletedComments Comment[] @relation("CommentDeleter") // Comments deleted by user
+    ownedGameInstances GameInstance[] @relation("GameOwner") // Games owned by user
+    issueActivities IssueActivity[] // Issue activities performed by user
+}
+
+model Organization {
+    id           String       @id @default(cuid())
+    name         String
+    subdomain    String       @unique
+    logoUrl      String?
+    memberships  Membership[]
+    issueStatues IssueStatus[]
+    issues       Issue[]
+    locations    Location[]
+    rooms        Room[]
+    gameTitles   GameTitle[]
+    attachments  Attachment[]
+    issueActivities IssueActivity[] // Issue activities within organization
+}
+
+model Membership {
+    id             String       @id @default(cuid())
+    role           Role
+    user           User         @relation(fields: [userId], references: [id])
+    userId         String
+    organization   Organization @relation(fields: [organizationId], references: [id])
+    organizationId String
+
+    @@unique([userId, organizationId])
+}
+
+enum IssueStatusCategory {
+    NEW
+    OPEN
+    CLOSED
+}
+
+model IssueStatus {
+    id             String              @id @default(cuid())
+    name           String
+    order          Int
+    category       IssueStatusCategory // Add category field
+    isDefault      Boolean             @default(false) // Add isDefault flag
+    organization   Organization        @relation(fields: [organizationId], references: [id])
+    organizationId String
+    issues         Issue[]
+
+    @@unique([name, organizationId])
+}
+
+model Issue {
+    id             String       @id @default(cuid())
+    number         Int          @default(autoincrement()) // Monotonically increasing issue number per organization
+    title          String
+    description    String?
+    severity       String?      // Optional severity level (Low, Medium, High, Critical)
+    status         IssueStatus  @relation(fields: [statusId], references: [id])
+    statusId       String
+    assignee       User?        @relation(fields: [assigneeId], references: [id])
+    assigneeId     String?
+    reporter       User?        @relation("IssueReporter", fields: [reporterId], references: [id])
+    reporterId     String?      // User ID if logged-in user reported
+    reporterEmail  String?      // Email if anonymous user reported
+    gameInstance   GameInstance @relation(fields: [gameInstanceId], references: [id])
+    gameInstanceId String
+    organization   Organization @relation(fields: [organizationId], references: [id])
+    organizationId String
+    createdAt      DateTime     @default(now())
+    updatedAt      DateTime     @updatedAt
+    showActivity   Boolean      @default(false) // Toggle to show/hide issue activity
+    comments       Comment[]
+    attachments    Attachment[]
+    activities     IssueActivity[] // Issue activity entries
+    
+    @@unique([number, organizationId]) // Ensure unique issue numbers per organization
+}
+
+model Location {
+    id             String         @id @default(cuid())
+    name           String
+    notes          String?        // Optional notes for the location
+    pinballMapId   Int?           @unique // PinballMap.com Location ID
+    organization   Organization   @relation(fields: [organizationId], references: [id])
+    organizationId String
+    rooms          Room[]
+}
+
+model GameTitle {
+    id             String         @id @default(cuid())
+    name           String
+    opdbId         String?        @unique // OPDB identifier (e.g., "G43W4-MrRpw") - Global unique when present
+    manufacturer   String?        // Sourced from OPDB
+    releaseDate    DateTime?      // Sourced from OPDB
+    imageUrl       String?        // OPDB image URL
+    description    String?        // Game description from OPDB
+    lastSynced     DateTime?      // When data was last synced from OPDB
+    organization   Organization?  @relation(fields: [organizationId], references: [id])
+    organizationId String?        // Null for global OPDB games, set for custom games
+    gameInstances  GameInstance[]
+
+    // Custom games (no opdbId) must be unique per org
+    @@unique([name, organizationId], name: "unique_custom_game_per_org")
+    @@index([organizationId]) // For querying org-specific games
+}
+
+model Room {
+    id             String         @id @default(cuid())
+    name           String
+    description    String?        // User-updatable description
+    location       Location       @relation(fields: [locationId], references: [id])
+    locationId     String
+    organization   Organization   @relation(fields: [organizationId], references: [id])
+    organizationId String
+    gameInstances  GameInstance[]
+
+    @@unique([name, locationId])
+}
+
+model GameInstance {
+    id           String    @id @default(cuid())
+    name         String
+    gameTitle    GameTitle @relation(fields: [gameTitleId], references: [id])
+    gameTitleId  String
+    room         Room      @relation(fields: [roomId], references: [id])
+    roomId       String
+    owner        User?     @relation("GameOwner", fields: [ownerId], references: [id]) // Game owner
+    ownerId      String?   // Optional owner
+    issues       Issue[]
+
+    // Game instances must be unique per game title within an organization
+    // We derive the organizationId through the room hierarchy
+    @@unique([name, gameTitleId, roomId], name: "unique_game_instance_per_room")
+}
+
+model Comment {
+    id        String   @id @default(cuid())
+    content   String
+    issue     Issue    @relation(fields: [issueId], references: [id])
+    issueId   String
+    author    User     @relation(fields: [authorId], references: [id])
+    authorId  String
+    createdAt DateTime @default(now())
+    editedAt  DateTime? // Timestamp when comment was last edited
+    edited    Boolean  @default(false) // Flag to indicate if comment was edited
+    deletedAt DateTime? // Timestamp when comment was soft deleted
+    deletedBy User?    @relation("CommentDeleter", fields: [deletedById], references: [id])
+    deletedById String? // User who deleted the comment
+}
+
+model IssueActivity {
+    id             String       @id @default(cuid())
+    type           ActivityType
+    issue          Issue        @relation(fields: [issueId], references: [id])
+    issueId        String
+    actor          User?        @relation(fields: [actorId], references: [id]) // User who performed the action
+    actorId        String?      // Null for system actions
+    fieldName      String?      // Field that was changed (e.g., "status", "assignee")
+    oldValue       String?      // Previous value (JSON string for complex values)
+    newValue       String?      // New value (JSON string for complex values)
+    description    String?      // Human-readable description of the change
+    organization   Organization @relation(fields: [organizationId], references: [id])
+    organizationId String
+    createdAt      DateTime     @default(now())
+    
+    @@index([issueId, createdAt]) // For efficient issue activity queries
+}
+
+model Attachment {
+    id             String       @id @default(cuid())
+    url            String
+    issue          Issue        @relation(fields: [issueId], references: [id])
+    issueId        String
+    organization   Organization @relation(fields: [organizationId], references: [id])
+    organizationId String
+}
+
+// Necessary for Next auth
+model Account {
+    id                String  @id @default(cuid())
+    userId            String
+    type              String
+    provider          String
+    providerAccountId String
+    refresh_token     String? @db.Text
+    access_token      String? @db.Text
+    expires_at        Int?
+    token_type        String?
+    scope             String?
+    id_token          String? @db.Text
+    session_state     String?
+    user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([provider, providerAccountId])
+}
+
+model Session {
+    id           String   @id @default(cuid())
+    sessionToken String   @unique
+    userId       String
+    expires      DateTime
+    user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+    identifier String
+    token      String   @unique
+    expires    DateTime
+
+    @@unique([identifier, token])
+}

@@ -4,7 +4,7 @@ import { env } from "~/env";
 import { OPDBClient } from "~/lib/opdb/client";
 import { createTRPCRouter, organizationProcedure } from "~/server/api/trpc";
 
-export const gameTitleRouter = createTRPCRouter({
+export const modelRouter = createTRPCRouter({
   // Search OPDB games for typeahead
   searchOPDB: organizationProcedure
     .input(z.object({ query: z.string().min(1) }))
@@ -13,12 +13,12 @@ export const gameTitleRouter = createTRPCRouter({
       return await opdbClient.searchMachines(input.query);
     }),
 
-  // Create GameTitle from OPDB data
+  // Create Model from OPDB data
   createFromOPDB: organizationProcedure
     .input(z.object({ opdbId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       // Check if this OPDB game already exists globally
-      const existingGame = await ctx.db.gameTitle.findUnique({
+      const existingGame = await ctx.db.model.findUnique({
         where: {
           opdbId: input.opdbId,
         },
@@ -36,9 +36,9 @@ export const gameTitleRouter = createTRPCRouter({
         throw new Error("Game not found in OPDB");
       }
 
-      // Create global GameTitle record with OPDB data
+      // Create global Model record with OPDB data
       // OPDB games are shared across all organizations
-      return ctx.db.gameTitle.create({
+      return ctx.db.model.create({
         data: {
           name: machineData.name,
           opdbId: input.opdbId,
@@ -57,19 +57,19 @@ export const gameTitleRouter = createTRPCRouter({
   // Sync existing titles with OPDB
   syncWithOPDB: organizationProcedure.mutation(async ({ ctx }) => {
     // Find all OPDB games that have game instances in this organization
-    const gameInstancesInOrg = await ctx.db.gameInstance.findMany({
+    const machinesInOrg = await ctx.db.machine.findMany({
       where: {
         room: {
           organizationId: ctx.organization.id,
         },
       },
       include: {
-        gameTitle: true,
+        model: true,
       },
     });
 
-    const opdbGamesToSync = gameInstancesInOrg
-      .map((gi) => gi.gameTitle)
+    const opdbGamesToSync = machinesInOrg
+      .map((gi) => gi.model)
       .filter((gt) => gt.opdbId && !gt.opdbId.startsWith("custom-"));
 
     if (opdbGamesToSync.length === 0) {
@@ -87,7 +87,7 @@ export const gameTitleRouter = createTRPCRouter({
         const machineData = await opdbClient.getMachineById(title.opdbId);
 
         if (machineData) {
-          await ctx.db.gameTitle.update({
+          await ctx.db.model.update({
             where: { id: title.id },
             data: {
               name: machineData.name,
@@ -119,7 +119,7 @@ export const gameTitleRouter = createTRPCRouter({
     // Get all game titles that are either:
     // 1. Custom games belonging to this organization
     // 2. Global OPDB games that have instances in this organization
-    return ctx.db.gameTitle.findMany({
+    return ctx.db.model.findMany({
       where: {
         OR: [
           // Custom games for this organization
@@ -129,7 +129,7 @@ export const gameTitleRouter = createTRPCRouter({
           // Global OPDB games with instances in this organization
           {
             organizationId: null,
-            gameInstances: {
+            machines: {
               some: {
                 room: {
                   organizationId: ctx.organization.id,
@@ -143,7 +143,7 @@ export const gameTitleRouter = createTRPCRouter({
       include: {
         _count: {
           select: {
-            gameInstances: {
+            machines: {
               where: {
                 room: {
                   organizationId: ctx.organization.id,
@@ -160,7 +160,7 @@ export const gameTitleRouter = createTRPCRouter({
   getById: organizationProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
-      const gameTitle = await ctx.db.gameTitle.findFirst({
+      const model = await ctx.db.model.findFirst({
         where: {
           id: input.id,
           OR: [
@@ -171,7 +171,7 @@ export const gameTitleRouter = createTRPCRouter({
             // Global OPDB games with instances in this organization
             {
               organizationId: null,
-              gameInstances: {
+              machines: {
                 some: {
                   room: {
                     organizationId: ctx.organization.id,
@@ -184,7 +184,7 @@ export const gameTitleRouter = createTRPCRouter({
         include: {
           _count: {
             select: {
-              gameInstances: {
+              machines: {
                 where: {
                   room: {
                     organizationId: ctx.organization.id,
@@ -196,11 +196,11 @@ export const gameTitleRouter = createTRPCRouter({
         },
       });
 
-      if (!gameTitle) {
+      if (!model) {
         throw new Error("Game title not found");
       }
 
-      return gameTitle;
+      return model;
     }),
 
   // Delete game title (only if no game instances exist)
@@ -208,7 +208,7 @@ export const gameTitleRouter = createTRPCRouter({
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       // Verify the game title belongs to this organization or is a global OPDB game
-      const gameTitle = await ctx.db.gameTitle.findFirst({
+      const model = await ctx.db.model.findFirst({
         where: {
           id: input.id,
           OR: [
@@ -219,7 +219,7 @@ export const gameTitleRouter = createTRPCRouter({
             // Global OPDB games (cannot be deleted, only instances can be removed)
             {
               organizationId: null,
-              gameInstances: {
+              machines: {
                 some: {
                   room: {
                     organizationId: ctx.organization.id,
@@ -232,7 +232,7 @@ export const gameTitleRouter = createTRPCRouter({
         include: {
           _count: {
             select: {
-              gameInstances: {
+              machines: {
                 where: {
                   room: {
                     organizationId: ctx.organization.id,
@@ -244,22 +244,22 @@ export const gameTitleRouter = createTRPCRouter({
         },
       });
 
-      if (!gameTitle) {
+      if (!model) {
         throw new Error("Game title not found");
       }
 
       // Don't allow deleting global OPDB games
-      if (gameTitle.organizationId === null) {
+      if (model.organizationId === null) {
         throw new Error(
           "Cannot delete global OPDB games. Remove game instances instead.",
         );
       }
 
-      if (gameTitle._count.gameInstances > 0) {
+      if (model._count.machines > 0) {
         throw new Error("Cannot delete game title that has game instances");
       }
 
-      return ctx.db.gameTitle.delete({
+      return ctx.db.model.delete({
         where: { id: input.id },
       });
     }),

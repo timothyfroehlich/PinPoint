@@ -22,7 +22,7 @@ export const roomRouter = createTRPCRouter({
         },
         _count: {
           select: {
-            gameInstances: true,
+            machines: true,
           },
         },
       },
@@ -42,7 +42,7 @@ export const roomRouter = createTRPCRouter({
         include: {
           _count: {
             select: {
-              gameInstances: true,
+              machines: true,
             },
           },
         },
@@ -54,14 +54,14 @@ export const roomRouter = createTRPCRouter({
   updateDescription: adminProcedure
     .input(
       z.object({
-        roomId: z.string(),
+        locationId: z.string(),
         description: z.string().nullable(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       return ctx.db.room.update({
         where: {
-          id: input.roomId,
+          id: input.locationId,
           organizationId: ctx.organization.id,
         },
         data: {

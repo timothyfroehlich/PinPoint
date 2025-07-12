@@ -3,7 +3,7 @@
  * without importing NextAuth directly (to avoid Jest ES module issues)
  */
 
-import { type Role } from "@prisma/client";
+import { type } from "@prisma/client";
 
 describe("Authentication Core Logic", () => {
   describe("JWT vs Database Session Strategy", () => {

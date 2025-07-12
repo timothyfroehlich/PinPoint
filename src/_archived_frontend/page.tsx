@@ -11,10 +11,10 @@ import { api } from "~/trpc/react";
 export default function Home() {
   // API queries - only need game instances for the issue form (public endpoint)
   const {
-    data: gameInstances,
+    data: machines,
     isLoading: isLoadingInstances,
     error: instanceError,
-  } = api.gameInstance.getAllForIssues.useQuery();
+  } = api.machine.getAllForIssues.useQuery();
 
   // No mutations needed for the public issue form
 
@@ -45,7 +45,7 @@ export default function Home() {
   // Only show the issue submission form (besides the top bar)
   return (
     <Container maxWidth="sm" sx={{ py: 6 }}>
-      <IssueSubmissionForm gameInstances={gameInstances ?? []} />
+      <IssueSubmissionForm machines={machines ?? []} />
     </Container>
   );
 }

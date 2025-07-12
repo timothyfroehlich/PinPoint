@@ -475,9 +475,7 @@ export default function IssueDetailPage({ params }: IssueDetailPageProps) {
                   sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}
                 >
                   <Games sx={{ fontSize: 16, color: "text.secondary" }} />
-                  <Typography variant="body2">
-                    {issue.gameInstance.name}
-                  </Typography>
+                  <Typography variant="body2">{issue.machine.name}</Typography>
                 </Box>
                 <Box
                   sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}
@@ -487,13 +485,13 @@ export default function IssueDetailPage({ params }: IssueDetailPageProps) {
                     color="text.secondary"
                     sx={{ ml: "20px" }}
                   >
-                    ({issue.gameInstance.gameTitle.name})
+                    ({issue.machine.model.name})
                   </Typography>
                 </Box>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <LocationOn sx={{ fontSize: 16, color: "text.secondary" }} />
                   <Typography variant="body2">
-                    {issue.gameInstance.room.location.name}
+                    {issue.machine.room.location.name}
                   </Typography>
                 </Box>
               </Box>
