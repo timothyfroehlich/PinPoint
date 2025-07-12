@@ -106,7 +106,7 @@ No additional environment variables needed. The middleware automatically detects
 
 ## Troubleshooting
 
-### Browser Not Resolving \\\*.localhost
+### Browser Not Resolving \..localhost
 
 - Try Chrome or Firefox (better localhost subdomain support)
 - Use the hosts file method above

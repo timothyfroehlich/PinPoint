@@ -1,8 +1,8 @@
 This report outlines key recommendations to prepare the PinPoint application for a production launch. The issues are categorized by area of concern and are formatted for easy transfer to GitHub Issues.
 
-## **1. CI/CD and Deployment**
+## 1. CI/CD and Deployment
 
-### **Issue: Implement Comprehensive CI/CD Pipeline for Vercel**
+### Issue: Implement Comprehensive CI/CD Pipeline for Vercel
 
 **Title:** `feat(ci): Implement Production and Preview Deployment Pipeline to Vercel`
 Description:
@@ -69,9 +69,9 @@ run: npm install --global vercel@latest
 - [Vercel for GitHub Actions](https://www.google.com/search?q=https://vercel.com/docs/deployments/ci-cd/github-actions)
 - [Jobs dependencies in GitHub Actions](https://www.google.com/search?q=https://docs.github.com/en/actions/using-jobs/using-jobs-in-a-workflow%23defining-prerequisite-jobs)
 
-## **2. Security**
+## 2. Security
 
-### **Issue: Integrate Automated Security Scanning with CodeQL**
+### Issue: Integrate Automated Security Scanning with CodeQL
 
 **Title:** `chore(security): Integrate CodeQL for Automated Security Analysis`
 Description:
@@ -137,7 +137,7 @@ security-events: write
 
 - [Configuring CodeQL analysis](https://www.google.com/search?q=https://docs.github.com/en/code-security/code-scanning/configuring-code-scanning/configuring-code-scanning-for-a-compiled-language)
 
-### **Issue: Add Dependency Vulnerability Scanning**
+### Issue: Add Dependency Vulnerability Scanning
 
 **Title:** `chore(security): Add npm audit to CI Pipeline`
 Description:
@@ -164,9 +164,9 @@ The project's dependencies can be a source of security vulnerabilities. We shoul
 
 - [npm audit documentation](https://docs.npmjs.com/cli/v10/commands/npm-audit)
 
-## **3. Environment and Secrets Management**
+## 3. Environment and Secrets Management
 
-### **Issue: Securely Disable Development Login in Production**
+### Issue: Securely Disable Development Login in Production
 
 **Title:** `refactor(auth): Remove Development Login Components from Production Build`
 Description:
@@ -203,7 +203,7 @@ return new NextResponse('Not found', { status: 404 });
 
 - [Next.js Environment Variables](https://nextjs.org/docs/app/building-your-application/configuring/environment-variables)
 
-### **Issue: Centralize and Validate Environment Variables**
+### Issue: Centralize and Validate Environment Variables
 
 **Title:** `refactor(env): Replace env.js with T3 Env for Type-Safe Variables`
 Description:
@@ -245,9 +245,9 @@ To improve security and maintainability, all environment variable access should 
 
 - [T3 Env Documentation](https://env.t3.gg/)
 
-## **4. Linting and Code Quality**
+## 4. Linting and Code Quality
 
-### **Issue: Enhance ESLint Config to Enforce Best Practices**
+### Issue: Enhance ESLint Config to Enforce Best Practices
 
 **Title:** `chore(lint): Enhance ESLint Config to Enforce Best Practices`
 Description:
@@ -358,9 +358,9 @@ ignores: [
 - [`eslint-plugin-promise`](<https://www.google.com/search?q=%5Bhttps://github.com/eslint-community/eslint-plugin-promise%5D(https://github.com/eslint-community/eslint-plugin-promise)>)
 - [`eslint-plugin-unused-imports`](<https://www.google.com/search?q=%5Bhttps://github.com/sweepline/eslint-plugin-unused-imports%5D(https://github.com/sweepline/eslint-plugin-unused-imports)>)
 
-## **5. General Production Considerations**
+## 5. General Production Considerations
 
-### **Issue: Implement Production Image Storage with Client-Side Resizing**
+### Issue: Implement Production Image Storage with Client-Side Resizing
 
 **Title:** `feat(images): Implement Production Image Storage with Client-Side Resizing`
 Description:
@@ -411,7 +411,7 @@ console.error(error);
 - [Vercel Blob Documentation](https://vercel.com/docs/storage/vercel-blob)
 - [`browser-image-compression`](<https://www.google.com/search?q=%5Bhttps://github.com/Donaldcwl/browser-image-compression%5D(https://github.com/Donaldcwl/browser-image-compression)>)[ library](<https://www.google.com/search?q=%5Bhttps://github.com/Donaldcwl/browser-image-compression%5D(https://github.com/Donaldcwl/browser-image-compression)>)
 
-### **Issue: Implement Structured Logging and Error Monitoring**
+### Issue: Implement Structured Logging and Error Monitoring
 
 **Title:** `feat(ops): Implement a Structured Logging and Error Monitoring Service`
 Description:
@@ -447,7 +447,7 @@ While Vercel provides high-level analytics, Sentry provides deep, code-level dia
 - [Sentry for tRPC](https://www.google.com/search?q=https://docs.sentry.io/platforms/javascript/guides/nextjs/integrations/trpc/)
 - [Sentry's GitHub Integration](https://docs.sentry.io/product/integrations/source-code-mgmt/github/)
 
-### **Issue: Implement Code Coverage Reporting**
+### Issue: Implement Code Coverage Reporting
 
 **Title:** `feat(testing): Implement Code Coverage Reporting`
 Description:

@@ -1,7 +1,7 @@
 **CURRENT PHASE: Unit Tests Only - Rapid Iteration Mode**
 This document outlines our testing strategy during the current rapid iteration phase. We are focusing exclusively on **unit tests** for business logic while deferring integration and end-to-end tests until the core functionality stabilizes.
 
-### **1\\. Current Testing Philosophy**
+### 1\\. Current Testing Philosophy
 
 During rapid development, we prioritize fast feedback and quick iteration:
 
@@ -20,9 +20,9 @@ During rapid development, we prioritize fast feedback and quick iteration:
   - **End-to-End Testing:** Playwright for browser automation
   - **Service Mocking:** Mock Service Worker (MSW) for API simulation
 
-### **2\\. What We Test Now vs Later**
+### 2\\. What We Test Now vs Later
 
-### **✅ CURRENT: Unit Tests Only**
+### ✅ CURRENT: Unit Tests Only
 
 **Service Layer (\*\***`src/server/services/`\***\*)**
 
@@ -37,7 +37,7 @@ During rapid development, we prioritize fast feedback and quick iteration:
 - `src/server/services/__tests__/pinballmapService.test.ts` - Core sync business logic
 - `src/lib/pinballmap/__tests__/client.test.ts` - API client with fixture data
 
-### **❌ DEFERRED: Integration & E2E Tests**
+### ❌ DEFERRED: Integration & E2E Tests
 
 **Integration Tests (Coming Later):**
 
@@ -52,9 +52,9 @@ During rapid development, we prioritize fast feedback and quick iteration:
 - Cross-browser compatibility
 - Performance testing
 
-### **3\\. Testing Strategy by Development Phase**
+### 3\\. Testing Strategy by Development Phase
 
-### **Tests for Milestone 1: Foundational Backend**
+### Tests for Milestone 1: Foundational Backend
 
 - **Focus:** Backend logic, database integrity, and security.
 - **Unit Tests:**
@@ -64,7 +64,7 @@ During rapid development, we prioritize fast feedback and quick iteration:
   - **API Procedure Testing (Critical):** Write tests for all authentication-related tRPC procedures to validate user creation, login, and session handling.
   - **Multi-Tenancy Validation (Highest Priority):** Create a dedicated test suite to rigorously verify data segregation. These tests will seed a test database with data for multiple organizations and assert that tRPC procedures called with the context of `Organization A` can **never** read, update, or delete data belonging to `Organization B`.
 
-### **Tests for Milestone 2: MVP**
+### Tests for Milestone 2: MVP
 
 - **Focus:** Core user workflows and the interaction between the frontend and backend.
 - **Unit Tests (React Testing Library):**
@@ -77,7 +77,7 @@ During rapid development, we prioritize fast feedback and quick iteration:
   - **Public User Flow:** Automate a browser to navigate to the site, view the public issue dashboard, select a game, submit a new issue, and verify that the new issue appears on the dashboard and the game's status page.
   - **Admin User Flow:** Automate a login as an `Admin`, navigate to the admin panel, create a new `GameInstance`, find a submitted issue, and update its status. The test will then assert that the change is correctly reflected in the UI and the audit log.
 
-### **Tests for Milestone 3: Advanced Tooling**
+### Tests for Milestone 3: Advanced Tooling
 
 - **Focus:** Validating the logic of new, complex features and integrations.
 - **Unit Tests:**
@@ -90,7 +90,7 @@ During rapid development, we prioritize fast feedback and quick iteration:
   - **Merge Flow:** Automate a `Member` logging in, finding two similar issues, executing a merge, and verifying that the UI correctly reflects the new canonical issue and its updated audit log.
   - **Image Upload Flow:** Extend the public submission E2E test to include uploading an image and verifying it appears on the issue page.
 
-### **Tests for Milestone 4: Full Notification System**
+### Tests for Milestone 4: Full Notification System
 
 - **Focus:** Ensuring reliable, event-driven communication and final system stability.
 - **Unit Tests:**

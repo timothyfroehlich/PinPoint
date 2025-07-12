@@ -1,23 +1,23 @@
-# **Pinpoint Detailed Feature Specifications (Phased Development Plan)**
+# Pinpoint Detailed Feature Specifications (Phased Development Plan)
 
 Audience: Project Lead / Developer
 Purpose: To provide a detailed, comprehensive breakdown of all planned features for PinPoint, organized by development phase.
 Created with Gemini. There may be some small inconsistencies or odd jargon. I'll try to do one more re-read to clean up issues soon
 
-### **1\\. Core Concepts & Terminology**
+### 1. Core Concepts & Terminology
 
 - **Organization:** The top-level tenant. This represents an entire collective or an arcade chain (e.g., "Austin Pinball Collective," "Pinballz"). Each organization has its own subdomain.
-- **Location:** A physical venue belonging to an Organization (e.g., "Pinballz \\- The Original," "Pinballz \\- Lake Creek"). An organization can have one or more locations.
+- **Location:** A physical venue belonging to an Organization (e.g., "Pinballz - The Original," "Pinballz - Lake Creek"). An organization can have one or more locations.
 - **Game Title:** The generic name of a pinball machine (e.g., "Godzilla (Premium)", "Twilight Zone"). **Game Titles are now sourced from the Open Pinball Database (OPDB) rather than being manually entered.** This ensures consistency, accuracy, and provides rich metadata including images, manufacturer information, and release dates.
-- **Game Instance:** A specific, physical machine at a location. This allows for handling multiple copies of the same game (e.g., "Godzilla \\#1," "Godzilla \\#2"). Issues are tied to a GameInstance.
+- **Game Instance:** A specific, physical machine at a location. This allows for handling multiple copies of the same game (e.g., "Godzilla #1," "Godzilla #2"). Issues are tied to a GameInstance.
 - **User Roles (per Organization):**
   - basic: A registered user who is not a member or admin of the current organization.
   - member: Can manage issues and add comments for their organization.
   - admin: Can manage locations, game instances, users, and content for their organization.
 
-### **1.1 OPDB and PinballMap Integration**
+### 1.1 OPDB and PinballMap Integration
 
-**PinPoint integrates with the Open Pinball Database (OPDB) and **[**PinballMap.com**](http://pinballmap.com/)** to provide authoritative game data and streamline game management:**
+PinPoint integrates with the Open Pinball Database (OPDB) and [PinballMap.com](http://pinballmap.com/) to provide authoritative game data and streamline game management:
 
 - **Data Source:** All Game Title information is sourced from OPDB's comprehensive database of pinball machines
 - **Rich Metadata:** Game Titles include manufacturer, release date, images, and standardized naming
@@ -26,7 +26,7 @@ Created with Gemini. There may be some small inconsistencies or odd jargon. I'll
 - **Fallback Support:** Custom titles can be created for rare or homebrew machines not in OPDB
 - **PinballMap Sync:** Game lists can be synced with [PinballMap.com](http://pinballmap.com/) to automate adding and removing game instances.
 
-### **2\\. Minimum Viable Product (MVP) Features**
+### 2. Minimum Viable Product (MVP) Features
 
 This is the baseline set of features required to launch a functional and useful system, architected for multi-tenancy from day one.
 
@@ -35,7 +35,7 @@ This is the baseline set of features required to launch a functional and useful 
 - **User Authentication & Global Accounts:**
   - Secure user signup and login with both Google and email/password. A user's account is global and can be associated with multiple organizations.
 - **Core Game & Issue Views (for a single, hardcoded Organization):**
-  - **Admin Game Management:** An interface for admins to define Game Titles (e.g., "Medieval Madness") and then create one or more Game Instances of those titles at their location. Each instance can have a unique identifier (e.g., "\\#1", "By the bar").
+  - **Admin Game Management:** An interface for admins to define Game Titles (e.g., "Medieval Madness") and then create one or more Game Instances of those titles at their location. Each instance can have a unique identifier (e.g., "#1", "By the bar").
   - **Instance-Specific Status Pages:** A unique, public URL for each GameInstance, intended to be linked from a QR code.
   - **Main Issue Dashboard:** A public page listing all currently open issues for the organization's location.
 - **Basic Issue Submission & Management:**
@@ -44,7 +44,7 @@ This is the baseline set of features required to launch a functional and useful 
 - **Issue History / Audit Log:**
   - Every issue page will display a chronological log of all actions taken.
 
-### **3\\. Core Features ("Version 1.0" Release)**
+### 3. Core Features ("Version 1.0" Release)
 
 These features build on the MVP to create a complete, robust, and user-friendly application.
 
@@ -63,7 +63,7 @@ These features build on the MVP to create a complete, robust, and user-friendly 
   - **User Profile & Settings Page:** A global settings page for users to manage their profile, passwords, and all subscriptions across all their organizations.
   - **Admin Content Management:** A dashboard for organization admins to manage their Quick Report templates, Severity Levels, and Issue Status options.
 
-### **4\\. Post-1.0 Enhancements**
+### 4. Post-1.0 Enhancements
 
 These features unlock the full multi-tenant potential and add significant value.
 

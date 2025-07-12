@@ -1,8 +1,8 @@
 This document outlines the phased development plan for the PinPoint platform, breaking down the path to the "Version 1.0" release into four distinct, sequential milestones. Each milestone represents a significant stage of completion, resulting in a functional and testable version of the application that builds upon the last.
 
-### **Milestone 1: Foundational Backend & Core Architecture**
+### Milestone 1: Foundational Backend & Core Architecture
 
-- **Status:** ✅ **Complete**
+- **Status:** ✅ Complete
 - **Goal:** To establish the complete technical foundation of the application. This non-UI milestone focuses on creating a robust, secure, and scalable backend architecture ready to support all future features.
 - **Key Features & Tasks:**
   - **Project Initialization:** Set up the Next.js project with TypeScript, ESLint, and Prettier for code quality and consistency.
@@ -11,9 +11,9 @@ This document outlines the phased development plan for the PinPoint platform, br
   - **Authentication Service:** Configure NextAuth.js to handle global user accounts. Implement secure signup, login, and session management for both email/password and Google social providers.
 - **State at Completion:** A fully configured backend with a defined database schema and working authentication. The system is ready for API endpoint development but has no user-facing interface.
 
-### **Milestone 2: Minimum Viable Product (MVP) with OPDB Integration**
+### Milestone 2: Minimum Viable Product (MVP) with OPDB Integration
 
-- **Status:** ✅ **Complete**
+- **Status:** ✅ Complete
 - **Goal:** To deliver the first usable version of PinPoint, focusing on the core functionality for a single, hardcoded organization. This milestone makes the platform functional for both public users and internal team members, with enhanced Game Title management powered by OPDB.
 - **Key Features & Tasks:**
   - **OPDB Integration:** Implement integration with the Open Pinball Database (OPDB) to provide authoritative game data instead of manual Game Title entry
@@ -29,9 +29,9 @@ This document outlines the phased development plan for the PinPoint platform, br
   - **Audit Trail:** Implement the backend logic and frontend display for the immutable issue history log, tracking all changes and comments.
 - **State at Completion:** A functional application that fulfills the core promise of the platform for a single organization. The system can be used for daily operations: admins can manage their game fleet, and the public can report and track issues.
 
-### **Milestone 3: Advanced Tooling & User Experience**
+### Milestone 3: Advanced Tooling & User Experience
 
-- **Status:** 🌗 **Partially Complete**
+- **Status:** 🌗 Partially Complete
 - **Goal:** To enhance the MVP with advanced features that improve workflow efficiency for the internal team and enrich the experience for all users.
 - **Key Features & Tasks:**
   - **Advanced Issue Tools:**
@@ -43,9 +43,9 @@ This document outlines the phased development plan for the PinPoint platform, br
     - Develop the admin content management dashboard, allowing `Admins` to customize organization-specific data like `Issue Statuses` and severity levels.
 - **State at Completion:** A mature and powerful issue tracking system. Internal teams are equipped with tools to handle complex scenarios efficiently, and the overall user experience is more interactive and customizable.
 
-### **Milestone 4: Full Notification System & Release Polish (v1.0)**
+### Milestone 4: Full Notification System & Release Polish (v1.0)
 
-- **Status:** ❌ **Not Started**
+- **Status:** ❌ Not Started
 - **Goal:** To complete the v1.0 feature set by implementing a comprehensive notification system and conducting a final round of polishing and optimization, making the platform ready for its official launch.
 - **Key Features & Tasks:**
   - **Email Integration:** Integrate a transactional email service (e.g., Resend, Postmark) into the backend.
@@ -55,18 +55,18 @@ This document outlines the phased development plan for the PinPoint platform, br
   - **Final Polish:** Conduct a full application review, focusing on UI/UX consistency, performance optimization, accessibility improvements, and resolving any remaining bugs.
 - **State at Completion:** The complete PinPoint v1.0 platform. All specified features are implemented, tested, and polished. The application is robust, user-friendly, and ready for production deployment.
 
-## **Post-1.0 Features & Future Roadmap**
+## Post-1.0 Features & Future Roadmap
 
 This section outlines major features and modules planned for future releases beyond v1.0. These features are designed to enhance the platform's capabilities without disrupting the core functionality.
 
-### **PinballMap management**
+### PinballMap management
 
-- **Status:** ✅ **Complete**
+- **Status:** ✅ Complete
 - **Goal:** Allow organizations to manage their PinballMap locations directly from the client.
 
-### **Custom Game Title Support**
+### Custom Game Title Support
 
-- **Status:** 🌗 **Partially Complete**
+- **Status:** 🌗 Partially Complete
 - **Goal:** Allow organizations to create custom game titles for machines not found in OPDB, such as homebrew games, prototypes, or rare machines.
 - **Key Features:**
   - Custom GameTitle creation with manual metadata entry
@@ -75,9 +75,9 @@ This section outlines major features and modules planned for future releases bey
   - Support for custom game images and descriptions
   - Validation to prevent conflicts with OPDB data
 
-### **Multi-Organization Management**
+### Multi-Organization Management
 
-- **Status:** 🌗 **Partially Complete**
+- **Status:** 🌗 Partially Complete
 - **Goal:** Transition from single-organization to full multi-tenant functionality with organization switching and management.
 - **Key Features:**
   - Organization creation and management UI
@@ -85,9 +85,9 @@ This section outlines major features and modules planned for future releases bey
   - Organization-specific branding and customization
   - Cross-organization user management
 
-### **Advanced Analytics & Reporting**
+### Advanced Analytics & Reporting
 
-- **Status:** ❌ **Not Started**
+- **Status:** ❌ Not Started
 - **Goal:** Provide insights into machine performance, maintenance costs, and operational efficiency.
 - **Key Features:**
   - Issue trend analysis and reporting
