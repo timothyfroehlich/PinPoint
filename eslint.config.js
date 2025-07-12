@@ -14,7 +14,7 @@ export default tseslint.config(
   ...tseslint.configs.stylistic,
   {
     // Main configuration for all TS/TSX files
-    files: ["src/**/*.{ts,tsx}", "scripts/**/*.ts"],
+    files: ["src/**/*.{ts,tsx}"],
     plugins: {
       "@next/next": nextPlugin,
       import: importPlugin,
@@ -96,6 +96,31 @@ export default tseslint.config(
     files: ["**/__tests__/**", "**/*.test.ts", "**/*.test.tsx", "**/test/**"],
     rules: {
       "no-restricted-properties": "off",
+    },
+  },
+  {
+    // Configuration for scripts - more relaxed rules for build/utility scripts
+    files: ["scripts/**/*.ts"],
+    plugins: {
+      "unused-imports": unusedImportsPlugin,
+    },
+    rules: {
+      // Allow require() in scripts
+      "@typescript-eslint/no-require-imports": "off",
+      // Allow process.env in scripts (build/utility scripts need direct env access)
+      "no-restricted-properties": "off",
+      // Keep unused imports checking but allow unused vars in catch blocks
+      "unused-imports/no-unused-imports": "error",
+      "unused-imports/no-unused-vars": [
+        "warn",
+        {
+          vars: "all",
+          varsIgnorePattern: "^_",
+          args: "after-used",
+          argsIgnorePattern: "^_",
+          caughtErrors: "none", // Allow unused error variables in catch blocks
+        },
+      ],
     },
   },
   {
