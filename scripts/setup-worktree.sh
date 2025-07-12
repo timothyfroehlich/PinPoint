@@ -14,7 +14,7 @@ if [[ -f .env && "$OVERWRITE" == "false" ]]; then
 fi
 
 # Find main worktree and copy .env
-MAIN_WORKTREE=$(git worktree list | head -1 | awk '{print $1}')
+MAIN_WORKTREE=$(git worktree list --porcelain | awk '/^worktree/ {worktree=$2} /branch main/ {print worktree; exit}')
 cp "$MAIN_WORKTREE/.env" .env
 
 # Create symlink for .env.local (remove existing first)
