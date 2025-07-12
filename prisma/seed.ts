@@ -1,4 +1,4 @@
-import { PrismaClient, Role, IssueStatusCategory } from "@prisma/client";
+import { PrismaClient, StatusCategory } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
@@ -8,55 +8,197 @@ function getRandomDefaultAvatar(): string {
   return `/images/default-avatars/default-avatar-${avatarNumber}.webp`;
 }
 
+// Create global permissions
+async function createGlobalPermissions() {
+  const permissions = [
+    "issue:create",
+    "issue:edit",
+    "issue:delete",
+    "issue:assign",
+    "machine:edit",
+    "machine:delete",
+    "location:edit",
+    "location:delete",
+    "organization:manage",
+    "role:manage",
+    "user:manage",
+  ];
+
+  for (const permName of permissions) {
+    await prisma.permission.upsert({
+      where: { name: permName },
+      update: {},
+      create: { name: permName },
+    });
+  }
+
+  console.log(`Created ${permissions.length} global permissions`);
+}
+
+// Create organization with automatic default roles
+async function createOrganizationWithRoles(orgData: {
+  name: string;
+  subdomain: string;
+  logoUrl?: string;
+}) {
+  // Create organization
+  const organization = await prisma.organization.upsert({
+    where: { subdomain: orgData.subdomain },
+    update: orgData,
+    create: orgData,
+  });
+
+  // Create default roles for this organization
+  const defaultRoles = [
+    {
+      name: "Admin",
+      permissions: [
+        "issue:create",
+        "issue:edit",
+        "issue:delete",
+        "issue:assign",
+        "machine:edit",
+        "machine:delete",
+        "location:edit",
+        "location:delete",
+        "organization:manage",
+        "role:manage",
+        "user:manage",
+      ],
+    },
+    {
+      name: "Player",
+      permissions: ["issue:create"], // Minimal permissions - equivalent to unauthenticated
+    },
+  ];
+
+  for (const roleData of defaultRoles) {
+    const role = await prisma.role.upsert({
+      where: {
+        name_organizationId: {
+          name: roleData.name,
+          organizationId: organization.id,
+        },
+      },
+      update: {},
+      create: {
+        name: roleData.name,
+        organizationId: organization.id,
+        isDefault: true,
+      },
+    });
+
+    // Connect permissions to role
+    const permissions = await prisma.permission.findMany({
+      where: { name: { in: roleData.permissions } },
+    });
+
+    await prisma.role.update({
+      where: { id: role.id },
+      data: {
+        permissions: {
+          connect: permissions.map((p) => ({ id: p.id })),
+        },
+      },
+    });
+
+    console.log(
+      `Created role: ${roleData.name} with ${roleData.permissions.length} permissions`,
+    );
+  }
+
+  return organization;
+}
+
+// Create default priorities for organization
+async function createDefaultPriorities(organizationId: string) {
+  const priorities = [
+    { name: "Low", order: 1 },
+    { name: "Medium", order: 2 },
+    { name: "High", order: 3 },
+    { name: "Critical", order: 4 },
+  ];
+
+  for (const priorityData of priorities) {
+    await prisma.priority.upsert({
+      where: {
+        name_organizationId: {
+          name: priorityData.name,
+          organizationId: organizationId,
+        },
+      },
+      update: {},
+      create: {
+        ...priorityData,
+        organizationId: organizationId,
+        isDefault: true,
+      },
+    });
+  }
+
+  console.log(`Created ${priorities.length} default priorities`);
+}
+
 async function main() {
   console.log("Seeding database...");
 
-  // 1. Create a default Organization
-  const organization = await prisma.organization.upsert({
-    where: { subdomain: "apc" },
-    update: {
-      name: "Austin Pinball Collective",
-      logoUrl: "/images/logos/austinpinballcollective-logo-outline.png",
-    },
-    create: {
-      name: "Austin Pinball Collective",
-      subdomain: "apc",
-      logoUrl: "/images/logos/austinpinballcollective-logo-outline.png",
-    },
+  // 1. Create global permissions first
+  await createGlobalPermissions();
+
+  // 2. Create organization with automatic roles
+  const organization = await createOrganizationWithRoles({
+    name: "Austin Pinball Collective",
+    subdomain: "apc",
+    logoUrl: "/images/logos/austinpinballcollective-logo-outline.png",
   });
   console.log(`Created organization: ${organization.name}`);
 
-  // 2. Create test users
+  // 3. Create default priorities for organization
+  await createDefaultPriorities(organization.id);
+
+  // 4. Get the created roles for membership assignment
+  const adminRole = await prisma.role.findFirst({
+    where: { name: "Admin", organizationId: organization.id },
+  });
+  const playerRole = await prisma.role.findFirst({
+    where: { name: "Player", organizationId: organization.id },
+  });
+
+  if (!adminRole || !playerRole) {
+    throw new Error("Default roles not found after creation");
+  }
+
+  // 5. Create test users
   const testUsers = [
     {
       name: "Roger Sharpe",
       email: "roger.sharpe@testaccount.dev",
       bio: "Pinball ambassador and historian.",
-      role: Role.admin,
+      roleId: adminRole.id,
     },
     {
       name: "Gary Stern",
       email: "gary.stern@testaccount.dev",
       bio: "Founder of Stern Pinball.",
-      role: Role.member,
+      roleId: playerRole.id,
     },
     {
       name: "Escher Lefkoff",
       email: "escher.lefkoff@testaccount.dev",
       bio: "World champion competitive pinball player.",
-      role: Role.player,
+      roleId: playerRole.id,
     },
     {
       name: "Harry Williams",
       email: "harry.williams@testaccount.dev",
       bio: "The father of pinball.",
-      role: Role.member,
+      roleId: playerRole.id,
     },
     {
       name: "Tim Froehlich",
       email: "phoenixavatar2@gmail.com",
       bio: "Project owner.",
-      role: Role.admin,
+      roleId: adminRole.id,
     },
   ];
 
@@ -73,10 +215,10 @@ async function main() {
       },
     });
     console.log(`Created user: ${user.name}`);
-    createdUsers.push({ ...user, role: userData.role });
+    createdUsers.push({ ...user, roleId: userData.roleId });
   }
 
-  // 3. Create Memberships for all users
+  // 6. Create role-based memberships for all users
   for (const userData of createdUsers) {
     await prisma.membership.upsert({
       where: {
@@ -87,79 +229,61 @@ async function main() {
       },
       update: {},
       create: {
-        role: userData.role,
+        roleId: userData.roleId, // Use Role model instead of enum
         userId: userData.id,
         organizationId: organization.id,
       },
     });
+
+    const role = await prisma.role.findUnique({
+      where: { id: userData.roleId },
+    });
     console.log(
-      `Created ${userData.role} membership for ${userData.name} in ${organization.name}`,
+      `Created ${role?.name} membership for ${userData.name} in ${organization.name}`,
     );
   }
 
-  // 4. Create the Austin Pinball Collective location (only if it doesn't exist)
-  const austinPinballLocation = await prisma.location.upsert({
+  // 7. Create the Austin Pinball Collective location (replacing room concept)
+  // Since Location doesn't have a unique constraint, we'll use findFirst + create pattern
+  let austinPinballLocation = await prisma.location.findFirst({
     where: {
-      pinballMapId: 26454, // Use the unique pinballMapId as the key
-    },
-    update: {},
-    create: {
       name: "Austin Pinball Collective",
-      notes:
-        "Home of the Austin Pinball Collective - a community-driven pinball arcade",
-      pinballMapId: 26454, // Set the PinballMap ID for sync functionality
       organizationId: organization.id,
     },
   });
+
+  if (!austinPinballLocation) {
+    austinPinballLocation = await prisma.location.create({
+      data: {
+        name: "Austin Pinball Collective",
+        organizationId: organization.id,
+      },
+    });
+  }
   console.log(`Created/Updated location: ${austinPinballLocation.name}`);
 
-  // 5. Create game titles from PinballMap fixture data
+  // 8. Create models (formerly GameTitles) from PinballMap fixture data
   const fixtureData = await import(
     "../src/lib/pinballmap/__tests__/fixtures/api_responses/locations/location_26454_machine_details.json"
   );
 
-  const createdGameTitles = [];
+  const createdModels = [];
   for (const machine of fixtureData.machines) {
     // All fixture games are OPDB games, so opdbId is globally unique and organizationId is omitted
-    const gameTitle = await prisma.gameTitle.upsert({
+    const model = await prisma.model.upsert({
       where: { opdbId: machine.opdb_id },
       update: { name: machine.name },
       create: {
         name: machine.name,
         opdbId: machine.opdb_id,
-        // Do NOT set organizationId for OPDB games (global)
+        // Do NOT set organizationId for OPDB models (global)
       },
     });
-    console.log(`Created/Updated game title: ${gameTitle.name}`);
-    createdGameTitles.push(gameTitle);
+    console.log(`Created/Updated model: ${model.name}`);
+    createdModels.push(model);
   }
 
-  // 6. Create the Main Floor room for Austin Pinball Collective
-  const mainFloorRoom = await prisma.room.upsert({
-    where: {
-      name_locationId: {
-        name: "Main Floor",
-        locationId: austinPinballLocation.id,
-      },
-    },
-    update: {},
-    create: {
-      name: "Main Floor",
-      description: "Primary gaming area with most popular machines",
-      locationId: austinPinballLocation.id,
-      organizationId: organization.id,
-    },
-  });
-  console.log(
-    `Created/Updated room: ${mainFloorRoom.name} at ${austinPinballLocation.name}`,
-  );
-
-  // 7. Create game instances from fixture data in the Main Floor
-  if (!mainFloorRoom) {
-    console.error("Main Floor room not found");
-    return;
-  }
-
+  // 9. Create machines (formerly GameInstances) in the location
   for (let i = 0; i < fixtureData.machines.length; i++) {
     const machine = fixtureData.machines[i];
     if (!machine) {
@@ -167,12 +291,10 @@ async function main() {
       continue;
     }
 
-    const gameTitle = createdGameTitles.find(
-      (gt) => gt.opdbId === machine.opdb_id,
-    );
+    const model = createdModels.find((m) => m.opdbId === machine.opdb_id);
 
-    if (!gameTitle) {
-      console.error(`Game title not found for machine: ${machine.name}`);
+    if (!model) {
+      console.error(`Model not found for machine: ${machine.name}`);
       continue;
     }
 
@@ -183,87 +305,95 @@ async function main() {
       continue;
     }
 
-    await prisma.gameInstance.upsert({
+    // Since Machine doesn't have a unique constraint, use findFirst + create/update pattern
+    const existingMachine = await prisma.machine.findFirst({
       where: {
-        unique_game_instance_per_room: {
-          name: gameTitle.name,
-          gameTitleId: gameTitle.id,
-          roomId: mainFloorRoom.id,
-        },
-      },
-      update: {
-        ownerId: owner.id,
-      },
-      create: {
-        name: gameTitle.name,
-        gameTitleId: gameTitle.id,
-        roomId: mainFloorRoom.id,
-        ownerId: owner.id,
+        organizationId: organization.id,
+        locationId: austinPinballLocation.id,
+        modelId: model.id,
       },
     });
+
+    if (existingMachine) {
+      await prisma.machine.update({
+        where: { id: existingMachine.id },
+        data: { ownerId: owner.id },
+      });
+    } else {
+      await prisma.machine.create({
+        data: {
+          organizationId: organization.id,
+          locationId: austinPinballLocation.id,
+          modelId: model.id,
+          ownerId: owner.id,
+        },
+      });
+    }
     console.log(
-      `Created/Updated game instance: ${gameTitle.name} (Owner: ${owner.name})`,
+      `Created/Updated machine: ${model.name} (Owner: ${owner.name})`,
     );
   }
 
-  // 8. Create issue statuses from CSV data (only if they don't exist)
+  // 10. Create issue statuses (updated categories)
   const statusesToUpsert = [
-    { name: "New", order: 1, category: IssueStatusCategory.NEW },
-    { name: "In Progress", order: 2, category: IssueStatusCategory.OPEN },
-    { name: "Needs expert help", order: 3, category: IssueStatusCategory.OPEN },
-    { name: "Needs Parts", order: 4, category: IssueStatusCategory.OPEN },
-    { name: "Fixed", order: 5, category: IssueStatusCategory.CLOSED },
-    { name: "Not to be Fixed", order: 6, category: IssueStatusCategory.CLOSED },
-    {
-      name: "Not Reproducible",
-      order: 7,
-      category: IssueStatusCategory.CLOSED,
-    },
+    { name: "New", category: StatusCategory.NEW },
+    { name: "In Progress", category: StatusCategory.IN_PROGRESS },
+    { name: "Needs expert help", category: StatusCategory.IN_PROGRESS },
+    { name: "Needs Parts", category: StatusCategory.IN_PROGRESS },
+    { name: "Fixed", category: StatusCategory.RESOLVED },
+    { name: "Not to be Fixed", category: StatusCategory.RESOLVED },
+    { name: "Not Reproducible", category: StatusCategory.RESOLVED },
   ];
 
   for (const statusData of statusesToUpsert) {
     await prisma.issueStatus.upsert({
       where: {
-        // A unique constraint is required for upsert.
-        // Assuming name and organizationId are unique together.
         name_organizationId: {
           name: statusData.name,
           organizationId: organization.id,
         },
       },
       update: {
-        order: statusData.order,
         category: statusData.category,
       },
       create: {
         name: statusData.name,
-        order: statusData.order,
         category: statusData.category,
         organizationId: organization.id,
+        isDefault: true,
       },
     });
     console.log(`Upserted issue status: ${statusData.name}`);
   }
 
-  // 9. Load sample issues from JSON file
+  // 11. Get default priority for issues
+  const defaultPriority = await prisma.priority.findFirst({
+    where: { name: "Medium", organizationId: organization.id },
+  });
+
+  if (!defaultPriority) {
+    throw new Error("Default priority not found");
+  }
+
+  // 12. Load sample issues from JSON file
   const sampleIssuesData = await import("./seeds/sample-issues.json");
   const sampleIssues = sampleIssuesData.default;
 
-  // Create the issues
-  let issueNumber = 1;
+  // Create the issues with updated schema
   for (const issueData of sampleIssues) {
-    // Find the game instance by OPDB ID
-    const gameInstance = await prisma.gameInstance.findFirst({
+    // Find the machine by OPDB ID
+    const machine = await prisma.machine.findFirst({
       where: {
-        gameTitle: {
+        model: {
           opdbId: issueData.gameOpdbId,
         },
+        organizationId: organization.id,
       },
     });
 
-    if (gameInstance) {
-      // Find the reporter
-      const reporter = createdUsers.find(
+    if (machine) {
+      // Find the creator (formerly reporter)
+      const creator = createdUsers.find(
         (u) => u.email === issueData.reporterEmail,
       );
 
@@ -275,30 +405,30 @@ async function main() {
         },
       });
 
-      if (reporter && status) {
+      if (creator && status) {
         await prisma.issue.create({
           data: {
-            number: issueNumber++,
             title: issueData.title,
             description: issueData.description,
-            severity: issueData.severity,
-            reporterId: reporter.id,
-            gameInstanceId: gameInstance.id,
+            consistency: issueData.consistency,
+            createdById: creator.id, // Updated field name
+            machineId: machine.id, // Updated field name
             statusId: status.id,
+            priorityId: defaultPriority.id, // Required field
             organizationId: organization.id,
             createdAt: new Date(issueData.createdAt),
             updatedAt: new Date(issueData.updatedAt),
           },
         });
-        console.log(`Created issue #${issueNumber - 1}: ${issueData.title}`);
+        console.log(`Created issue: ${issueData.title}`);
       } else {
         console.log(
-          `Skipped issue ${issueData.title} - missing reporter or status`,
+          `Skipped issue ${issueData.title} - missing creator or status`,
         );
       }
     } else {
       console.log(
-        `Skipped issue ${issueData.title} - game not found with OPDB ID: ${issueData.gameOpdbId}`,
+        `Skipped issue ${issueData.title} - machine not found with OPDB ID: ${issueData.gameOpdbId}`,
       );
     }
   }

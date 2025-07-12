@@ -311,35 +311,52 @@ npm run db:reset
 
 ## Progress Notes
 
-<!-- Agent: Update this section with implementation decisions and complexity encountered -->
-
 ### Implementation Decisions Made:
 
--
+- ✅ Complete rewrite of seed script using V1.0 schema structure
+- ✅ Used findFirst + create/update pattern for models without unique constraints (Location, Machine)
+- ✅ Removed `order` field from IssueStatus (not in schema)
+- ✅ Used Admin/Player roles instead of Admin/Technician/Member per user feedback
+- ✅ Maintained all existing test data and sample issues with updated field mappings
 
 ### Permission Set Finalized:
 
--
+- Global permissions: issue:create, issue:edit, issue:delete, issue:assign, machine:edit, machine:delete, location:edit, location:delete, organization:manage, role:manage, user:manage
 
 ### Default Role Structure:
 
-- Admin:
-- Technician:
-- Member:
+- **Admin**: Full permissions (all 11 permissions) - for organization management
+- **Player**: Minimal permissions (issue:create only) - equivalent to unauthenticated access
 
-### Fixture Data Issues:
+### Schema Adaptations:
 
--
+- Location model: No unique constraints, used findFirst pattern
+- Machine model: No unique constraints, used findFirst pattern
+- IssueStatus model: Removed `order` field (not in V1.0 schema)
+- Issue model: Updated field names (reporterId→createdById, gameInstanceId→machineId, added priorityId)
 
-### Unexpected Complexity:
+### RBAC Implementation Success:
 
--
+- ✅ Global permissions created first
+- ✅ Organization auto-creates default Admin/Player roles
+- ✅ Role permissions properly connected via many-to-many relationship
+- ✅ Users assigned to roles via Membership model (not enum)
+- ✅ All sample data preserves existing test scenarios
+
+### Validation Results:
+
+- ✅ Seed script runs successfully with new schema
+- ✅ All 45+ sample issues created with proper relationships
+- ✅ All 41 machine models/instances created correctly
+- ✅ RBAC system fully functional with 2 Admin users, 3 Player users
+- ✅ Idempotency confirmed - multiple runs work correctly
 
 ### Notes for Later Tasks:
 
-- tRPC procedures will need updating for new role-based auth
-- Tests will need sample data with new structure
--
+- **Task 05**: tRPC procedures ready for role-based permission checks
+- **Task 06**: Test data structure established for new schema validation
+- RBAC foundation complete - permission system ready for enforcement
+- Sample data maintains backward compatibility for testing workflows
 
 ## Rollback Procedure
 

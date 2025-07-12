@@ -1,4 +1,3 @@
-
 import { GET } from "../users/route";
 
 // Mock the database with proper typing
