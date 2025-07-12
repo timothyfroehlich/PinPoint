@@ -3,7 +3,6 @@
  * without importing NextAuth directly (to avoid Jest ES module issues)
  */
 
-
 describe("Authentication Core Logic", () => {
   describe("JWT vs Database Session Strategy", () => {
     it("should use JWT strategy for authentication", () => {
