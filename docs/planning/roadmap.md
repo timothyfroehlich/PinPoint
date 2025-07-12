@@ -1,96 +1,95 @@
-This document outlines the phased development plan for the PinPoint platform, breaking down the path to the "Version 1.0" release into four distinct, sequential milestones. Each milestone represents a significant stage of completion, resulting in a functional and testable version of the application that builds upon the last.
+# **PinPoint Release Plan**
 
-### Milestone 1: Foundational Backend & Core Architecture
+This document categorizes the features and capabilities from the PRD outline into a phased release schedule.
 
-- **Status:** ✅ Complete
-- **Goal:** To establish the complete technical foundation of the application. This non-UI milestone focuses on creating a robust, secure, and scalable backend architecture ready to support all future features.
-- **Key Features & Tasks:**
-  - **Project Initialization:** Set up the Next.js project with TypeScript, ESLint, and Prettier for code quality and consistency.
-  - **Database Schema:** Define and implement the complete v1.0 PostgreSQL schema using Prisma ORM. This includes tables for `User`, `Organization`, `Membership`, `Location`, `GameTitle` (enhanced with OPDB fields), `GameInstance`, `Issue`, `IssueStatus`, `Comment`, and `Attachment`.
-  - **Multi-Tenant Logic:** Implement the core multi-tenant architecture. All database queries via Prisma will be architected to enforce row-level security, ensuring that data is strictly segregated by `organization_id`.
-  - **Authentication Service:** Configure NextAuth.js to handle global user accounts. Implement secure signup, login, and session management for both email/password and Google social providers.
-- **State at Completion:** A fully configured backend with a defined database schema and working authentication. The system is ready for API endpoint development but has no user-facing interface.
+## **Beta**
 
-### Milestone 2: Minimum Viable Product (MVP) with OPDB Integration
+_The goal of the Beta is to prove the core value proposition with a single, trusted organization (e.g., a collective like APC). The application must be stable and the primary issue-tracking loop must be seamless._
 
-- **Status:** ✅ Complete
-- **Goal:** To deliver the first usable version of PinPoint, focusing on the core functionality for a single, hardcoded organization. This milestone makes the platform functional for both public users and internal team members, with enhanced Game Title management powered by OPDB.
-- **Key Features & Tasks:**
-  - **OPDB Integration:** Implement integration with the Open Pinball Database (OPDB) to provide authoritative game data instead of manual Game Title entry
-  - **Enhanced Game Title Management:** Replace manual Game Title creation with OPDB search and selection, including rich metadata like manufacturer, release date, and images
-  - **Admin Game Management:** Build the admin-only UI for searching and selecting `Game Titles` from OPDB and creating `Game Instances` (the physical machines)
-  - **Public Views:**
-    - Create the public issue submission form, allowing anyone to report a problem against a specific `Game Instance`.
-    - Develop the main public dashboard that lists all open issues for the organization.
-    - Implement the dynamic, instance-specific status pages, designed to be linked from QR codes on physical machines.
-  - **Internal Issue Management:**
-    - Build the private dashboard for `Members` and `Admins` to view, filter, and manage issues.
-    - Implement form-based functionality for updating an issue's status, assignee, and details.
-  - **Audit Trail:** Implement the backend logic and frontend display for the immutable issue history log, tracking all changes and comments.
-- **State at Completion:** A functional application that fulfills the core promise of the platform for a single organization. The system can be used for daily operations: admins can manage their game fleet, and the public can report and track issues.
+### **Core Capabilities**
 
-### Milestone 3: Advanced Tooling & User Experience
+- **Machine & Issue Lifecycle:**
+  - **Fleet Management:** Integration with OPDB for Model data, support for custom/homebrew Machines, the machine-centric history view.
+  - **QR Codes & Status Pages:** Generation of QR codes that link to public, read-only status pages for issue reporting.
+  - **Issue Tracking:** All core functionality including public submission, all issue fields (Title, Status, Priority, etc.), rich content with image attachments, and the Consistency field.
+  - **Workflow:** Categorized statuses (New, In Progress, Resolved), re-opening issues, immutable history, and re-assigning issues between machines.
+- **Organization & User Management:**
+  - **User Profiles & Identity:** Comprehensive user profiles and all specified authentication methods (Magic Link, Google, Facebook).
+- **Asset & Data Organization:**
+  - **Location Management:** Ability to create and manage locations.
+  - **Collection System:** Manual collections, collection types, and the special UI for "Rooms" must be functional. Includes the onboarding UX for adding the first collection.
+  - **Search & Filtering:** A basic list view for issues with the critical "filter by Machine" capability.
+- **Communication & Collaboration:**
+  - **Owner Notifications:** The critical email notification to a Machine owner when a new issue is reported.
+  - **Comment Editing & Deletion:** Users can edit or delete their own comments on an issue.
 
-- **Status:** 🌗 Partially Complete
-- **Goal:** To enhance the MVP with advanced features that improve workflow efficiency for the internal team and enrich the experience for all users.
-- **Key Features & Tasks:**
-  - **Advanced Issue Tools:**
-    - Implement the "Me Too" / upvote feature for registered users to help prioritize issues.
-    - Build the UI and API logic for `Members` to merge duplicate issue reports into a single canonical issue.
-  - **Rich Content:** Integrate with Cloudinary to allow users to upload images when submitting issues or adding comments.
-  - **User & Admin Dashboards:**
-    - Create the global user profile page where users can manage their account details and notification settings.
-    - Develop the admin content management dashboard, allowing `Admins` to customize organization-specific data like `Issue Statuses` and severity levels.
-- **State at Completion:** A mature and powerful issue tracking system. Internal teams are equipped with tools to handle complex scenarios efficiently, and the overall user experience is more interactive and customizable.
+### **Technical Principles**
 
-### Milestone 4: Full Notification System & Release Polish (v1.0)
+- All specified **Data Model** and **Development & Operations** principles must be implemented from the start. This includes using UIDs, having a unified schema, setting up the CI/CD pipeline, security scanning, error monitoring, and client-side image resizing. These are foundational to a healthy codebase.
 
-- **Status:** ❌ Not Started
-- **Goal:** To complete the v1.0 feature set by implementing a comprehensive notification system and conducting a final round of polishing and optimization, making the platform ready for its official launch.
-- **Key Features & Tasks:**
-  - **Email Integration:** Integrate a transactional email service (e.g., Resend, Postmark) into the backend.
-  - **Notification Logic:**
-    - Implement automated email notifications for game owners and subscribed users upon key issue events (e.g., new comment, status change).
-    - Implement the one-time closure notification for anonymous reporters who provide an email address.
-  - **Final Polish:** Conduct a full application review, focusing on UI/UX consistency, performance optimization, accessibility improvements, and resolving any remaining bugs.
-- **State at Completion:** The complete PinPoint v1.0 platform. All specified features are implemented, tested, and polished. The application is robust, user-friendly, and ready for production deployment.
+## **Version 1.0**
 
-## Post-1.0 Features & Future Roadmap
+_The goal of 1.0 is the first public, multi-tenant release. The platform should feel polished, complete, and ready for any organization to adopt. This release is defined by robust multi-organization support._
 
-This section outlines major features and modules planned for future releases beyond v1.0. These features are designed to enhance the platform's capabilities without disrupting the core functionality.
+### **Core Capabilities**
 
-### PinballMap management
+- **Organization & User Management:**
+  - **Multi-Organization Architecture:** Full support for users belonging to and switching between multiple organizations, including org-level branding.
+  - **Subdomain Support:** Organizations can operate on their own subdomain.
+  - **Flexible RBAC:** The complete configurable roles and permissions system.
+- **Asset & Data Organization:**
+  - **Scoped Collections:** Org-level and Location-level scoping for Collections.
+  - **Advanced Filtering:** Robust filtering by all other metadata (beyond just by machine).
+- **Communication & Collaboration:**
+  - **Full Notification System:** In-app notifications and comprehensive email alerts for all key events (@mentions, assignments, etc.), with user-configurable settings.
+  - **Community Collaboration:** "Me Too" / Upvote feature on issues.
+- **Workflow & Resolution:**
+  - **Merge Duplicate Issues:** The tool for cleaning up redundant issue reports.
+  - **Sub-tasks / Checklists:** Ability to add a simple checklist within an issue's description to track the smaller steps of a complex repair.
 
-- **Status:** ✅ Complete
-- **Goal:** Allow organizations to manage their PinballMap locations directly from the client.
+## **Version 1.x**
 
-### Custom Game Title Support
+_This phase includes incremental features and quality-of-life improvements that build upon the stable 1.0 platform, making the application more powerful and enjoyable to use._
 
-- **Status:** 🌗 Partially Complete
-- **Goal:** Allow organizations to create custom game titles for machines not found in OPDB, such as homebrew games, prototypes, or rare machines.
-- **Key Features:**
-  - Custom GameTitle creation with manual metadata entry
-  - Flag to distinguish custom vs OPDB-sourced games
-  - Ability to later "upgrade" custom games to OPDB games if they become available
-  - Support for custom game images and descriptions
-  - Validation to prevent conflicts with OPDB data
+### **Core Capabilities**
 
-### Multi-Organization Management
+- **Asset & Data Organization:**
+  - **Smart Collections:** Automatically generate collections based on machine attributes.
+  - **Kanban View:** Add a Kanban board as an alternative view for the issue list.
+  - **Drag-and-Drop UI:** A polished drag-and-drop interface for managing collections.
+- **Organization & User Management:**
+  - **Advanced Org Management:** Self-serve creation of new organizations and user invitation tools.
+- **Integrations:**
+  - **PinballMap Integration:** The full two-way sync for machine lists and alerts for new comments.
+- **Issue Management:**
+  - **Custom Fields:** The ability for organizations to add their own structured data fields to issues (e.g., "Part Number Needed", "Date Part Ordered").
+  - **Issue Templates:** Building on Custom Fields, allow users to create templates for common jobs (e.g., "Flipper Rebuild") that pre-populate fields and add checklists.
+  - **Advanced Issue Tools:** Linking related issues and the "Create Similar Issue" feature.
+- **Knowledge Base (Private):** Ability for users within an organization to add structured notes (Tournament Setup, General Maintenance) to a Machine. These notes are private to the organization.
 
-- **Status:** 🌗 Partially Complete
-- **Goal:** Transition from single-organization to full multi-tenant functionality with organization switching and management.
-- **Key Features:**
-  - Organization creation and management UI
-  - User ability to switch between organizations
-  - Organization-specific branding and customization
-  - Cross-organization user management
+## **Version 2.0**
 
-### Advanced Analytics & Reporting
+_A major evolution of the platform, introducing powerful new ways to derive value from the collected data and community._
 
-- **Status:** ❌ Not Started
-- **Goal:** Provide insights into machine performance, maintenance costs, and operational efficiency.
-- **Key Features:**
-  - Issue trend analysis and reporting
-  - Machine uptime and reliability metrics
-  - Cost tracking and analysis
-  - Maintenance scheduling and predictions
+### **Core Capabilities**
+
+- **Advanced Analytics & Reporting:** The full dashboard for machine performance, cost tracking, and operational efficiency metrics.
+- **Community Knowledge Base (Public Sharing):** Introduce the mechanism to share, review, and promote private notes to a global, community-curated knowledge base for each Model.
+
+## **Version 3.0**
+
+_A long-term, transformative vision to expand PinPoint beyond its initial niche._
+
+### **Core Capabilities**
+
+- **General Arcade & Asset Tracking:** Expand the platform to track and manage non-pinball assets like classic arcade cabinets, integrating with other databases like MAME.
+
+#### **Inventory Tracking\***
+
+- **User Problem:** Technicians lack a centralized system to track spare parts and supplies used for repairs. This leads to preventable stockouts, last-minute emergency purchases, and an inability to accurately calculate the true maintenance cost of a given machine.
+- **High-Level Goal:** To integrate a lightweight but powerful inventory management module into PinPoint, allowing organizations to track parts, manage stock levels across multiple locations, and associate part consumption with specific repair issues.
+- **Key User Stories (Epics):**
+  - **Part Catalog Management:** As an Admin, I want to create and manage a catalog of all parts and supplies (e.g., flipper coils, rubbers, light bulbs), including details like a unique name/ID, SKU, supplier information, and cost.8
+  - **Stock Level Management:** As a Member, I want to view the current quantity on hand for any part at my Location and receive automated low-stock alerts to prevent stockouts and trigger reordering.11
+  - **Inventory Transaction Logging:** As a Member, I want to log when I use a part for a repair (Consumption), when new stock arrives (Receipt), or when a physical count reveals a discrepancy (Adjustment), so that our inventory records are always accurate and auditable.12
+  - **Cost & Usage Reporting:** As an Admin, I want to run reports to see which parts are used most frequently and what the total parts cost is for a specific Game Instance over time, so I can make better data-driven decisions about maintenance, game profitability, and future acquisitions.
