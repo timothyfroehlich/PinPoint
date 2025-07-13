@@ -1,4 +1,4 @@
-import { type PrismaClient } from "@prisma/client";
+import { type PrismaClient, type Comment } from "@prisma/client";
 
 export class CommentCleanupService {
   constructor(private prisma: PrismaClient) {}
@@ -10,16 +10,13 @@ export class CommentCleanupService {
     const ninetyDaysAgo = new Date();
     ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
-    // TODO: Comment model doesn't have deletedAt field in new schema
-    // Need to redesign soft delete functionality
-    const result = { count: 0 };
-    // const result = await this.prisma.comment.deleteMany({
-    //   where: {
-    //     deletedAt: {
-    //       lte: ninetyDaysAgo,
-    //     },
-    //   },
-    // });
+    const result = await this.prisma.comment.deleteMany({
+      where: {
+        deletedAt: {
+          lte: ninetyDaysAgo,
+        },
+      },
+    });
 
     return result.count;
   }
@@ -31,15 +28,78 @@ export class CommentCleanupService {
     const ninetyDaysAgo = new Date();
     ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
-    // TODO: Comment model doesn't have deletedAt field in new schema
-    // Need to redesign soft delete functionality
-    return 0;
-    // return this.prisma.comment.count({
-    //   where: {
-    //     deletedAt: {
-    //       lte: ninetyDaysAgo,
-    //     },
-    //   },
-    // });
+    return this.prisma.comment.count({
+      where: {
+        deletedAt: {
+          lte: ninetyDaysAgo,
+        },
+      },
+    });
+  }
+
+  /**
+   * Soft delete a comment (mark as deleted without removing from database)
+   */
+  async softDeleteComment(
+    commentId: string,
+    deletedById: string,
+  ): Promise<void> {
+    await this.prisma.comment.update({
+      where: { id: commentId },
+      data: {
+        deletedAt: new Date(),
+        deletedBy: deletedById,
+      },
+    });
+  }
+
+  /**
+   * Restore a soft-deleted comment
+   */
+  async restoreComment(commentId: string): Promise<void> {
+    await this.prisma.comment.update({
+      where: { id: commentId },
+      data: {
+        deletedAt: null,
+        deletedBy: null,
+      },
+    });
+  }
+
+  /**
+   * Get all soft-deleted comments for an organization (admin view)
+   */
+  async getDeletedComments(organizationId: string): Promise<Comment[]> {
+    return this.prisma.comment.findMany({
+      where: {
+        deletedAt: { not: null },
+        issue: {
+          organizationId,
+        },
+      },
+      include: {
+        author: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        deleter: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        issue: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
+      },
+      orderBy: {
+        deletedAt: "desc",
+      },
+    });
   }
 }

@@ -35,6 +35,7 @@ model User {
   issuesCreated  Issue[]   @relation("CreatedBy")
   issuesAssigned Issue[]   @relation("AssignedTo")
   comments       Comment[]
+  deletedComments Comment[] @relation("CommentDeleter")
   upvotes        Upvote[]
 }
 
@@ -245,11 +246,18 @@ model Comment {
   content   String   @db.Text
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Soft delete fields
+  deletedAt DateTime? // Null = not deleted, Date = soft deleted
+  deletedBy String?   // Who deleted the comment (for audit trail)
+
+  // Relations
   issueId   String
   authorId  String
 
-  issue  Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
-  author User  @relation(fields: [authorId], references: [id])
+  issue   Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  author  User  @relation(fields: [authorId], references: [id])
+  deleter User? @relation("CommentDeleter", fields: [deletedBy], references: [id])
 }
 
 model Attachment {
