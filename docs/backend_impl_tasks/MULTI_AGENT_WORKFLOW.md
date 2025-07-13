@@ -32,16 +32,23 @@ epic/backend-refactor (main coordination branch)
 
 ## Agent Working Environment
 
-### Your Working Directory
+### Initial Setup
 
-Your worktree environment has been pre-configured for you:
+Your worktree environment has been pre-configured, but you need to set up the development environment:
 
 ```bash
-# Your isolated working directory
+# Navigate to your isolated working directory
 cd ~/Code/PinPoint-worktrees/task-##-your-task
 
-# This is a complete git repository with your task branch checked out
-# All your work should happen here
+# Run the setup script to configure your environment
+# This will:
+# - Copy .env from main repo
+# - Configure unique ports for your worktree
+# - Install dependencies
+# - Sync database schema
+./scripts/setup-worktree.sh
+
+# Your environment is now ready for development
 ```
 
 ### Daily Sync Workflow
@@ -112,9 +119,10 @@ Based on the README.md task documentation:
 ### Before Starting Your Task
 
 1. **Read Prerequisites**: Always start with `docs/planning/backend_impl_plan.md`
-2. **Check Dependencies**: Verify prerequisite tasks are completed
-3. **Sync Environment**: Follow daily sync workflow above
-4. **Validate Setup**: Run `npm run validate` to ensure clean starting state
+2. **Setup Environment**: Run `./scripts/setup-worktree.sh` (first time only)
+3. **Check Dependencies**: Verify prerequisite tasks are completed
+4. **Sync Environment**: Follow daily sync workflow above
+5. **Validate Setup**: Run `npm run validate` to ensure clean starting state
 
 ### During Implementation
 
