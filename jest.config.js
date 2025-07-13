@@ -1,6 +1,14 @@
 const config = {
   preset: "ts-jest/presets/default-esm",
   extensionsToTreatAsEsm: [".ts", ".tsx"],
+  globals: {
+    "ts-jest": {
+      useESM: true,
+    },
+  },
+  transformIgnorePatterns: [
+    "node_modules/(?!(superjson|@trpc|@t3-oss|next-auth|@auth|@prisma))",
+  ],
   projects: [
     {
       displayName: "node",
@@ -18,9 +26,15 @@ const config = {
             useESM: true,
           },
         ],
+        "^.+\\.js$": [
+          "ts-jest",
+          {
+            useESM: true,
+          },
+        ],
       },
       transformIgnorePatterns: [
-        "node_modules/(?!(superjson|@trpc|@t3-oss|next-auth|@auth))",
+        "node_modules/(?!(superjson|@trpc|@t3-oss|next-auth|@auth|@prisma))",
       ],
       moduleNameMapper: {
         "^~/(.*)$": "<rootDir>/src/$1",
@@ -41,9 +55,15 @@ const config = {
             useESM: true,
           },
         ],
+        "^.+\\.js$": [
+          "ts-jest",
+          {
+            useESM: true,
+          },
+        ],
       },
       transformIgnorePatterns: [
-        "node_modules/(?!(superjson|@trpc|@t3-oss|next-auth|@auth))",
+        "node_modules/(?!(superjson|@trpc|@t3-oss|next-auth|@auth|@prisma))",
       ],
       moduleNameMapper: {
         "^~/(.*)$": "<rootDir>/src/$1",

@@ -47,6 +47,9 @@ npm run db:push         # Sync schema changes
 npm run quick           # Fast typecheck + lint
 npm run fix             # Auto-fix lint + format issues
 npm run typecheck       # TypeScript validation only
+
+# Testing
+npm run test:coverage   # Generate coverage reports (50% global minimum)
 ```
 
 ## Quality Standards (Zero Tolerance)
@@ -56,6 +59,7 @@ npm run typecheck       # TypeScript validation only
 - **Consistent formatting** - Auto-formatted with Prettier
 - **Modern patterns** - ES modules, typed mocks (`jest.fn<T>()`), no `any` types
 - **Test quality** - Same standards as production code
+- **Coverage thresholds** - 50% global, 60% server/, 70% lib/ (configured in jest.config.js)
 
 ## Development Workflow
 
@@ -91,3 +95,5 @@ npm run typecheck       # TypeScript validation only
 - Database strategy in development: sessions clear on `db:reset`
 - Pre-production: frequent schema changes, no migrations
 - OPDB games: global (no organizationId), custom games: organization-scoped
+- **ESM modules**: Project uses `"type": "module"` - some packages (superjson, @auth/prisma-adapter) are ESM-only and may need transformIgnorePatterns updates in Jest
+- **Jest ESM**: Current config uses `ts-jest/presets/default-esm` - avoid changing without understanding ESM implications
