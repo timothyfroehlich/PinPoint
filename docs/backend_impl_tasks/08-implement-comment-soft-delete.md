@@ -1,8 +1,14 @@
 # Task 08: Implement Comment Soft Delete System
 
+## Agent Context
+
+You are a backend development agent assigned to implement Task 08: Implement Comment Soft Delete System. You are working in a coordinated multi-agent environment where multiple agents work in parallel on different backend tasks. Your Mission: Implement soft delete functionality for comments to enable comment cleanup service and proper comment deletion tracking.
+
 ## Prerequisites
 
 **REQUIRED**: Read and understand `docs/planning/backend_impl_plan.md` before starting this task.
+
+**FIRST TIME SETUP**: You must run `./scripts/setup-worktree.sh` in your worktree to configure your development environment.
 
 **Multi-Agent Coordination**: This task is part of Phase 3A parallel development. See @MULTI_AGENT_WORKFLOW.md for complete worktree setup, sync procedures, and coordination guidelines.
 

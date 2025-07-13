@@ -1,10 +1,18 @@
 # Task 07: Fix IssueHistory Model Schema
 
+## Agent Context
+
+**You are a backend development agent** assigned to implement Task 07: Fix IssueHistory Model Schema. You are working in a coordinated multi-agent environment where multiple agents work in parallel on different backend tasks.
+
+**Your Mission**: Fix the IssueHistory model to include missing fields required for proper issue activity tracking and multi-tenancy. Your work will enable Task 16 (Issue Merging) to begin.
+
 ## Prerequisites
 
 **REQUIRED**: Read and understand `docs/planning/backend_impl_plan.md` before starting this task.
 
 **Multi-Agent Coordination**: This task is part of Phase 3A parallel development. See @MULTI_AGENT_WORKFLOW.md for complete worktree setup, sync procedures, and coordination guidelines.
+
+**FIRST TIME SETUP**: You must run `./scripts/setup-worktree.sh` in your worktree to configure your development environment.
 
 ## Workflow
 
