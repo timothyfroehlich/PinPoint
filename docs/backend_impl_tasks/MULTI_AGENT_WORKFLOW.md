@@ -30,27 +30,18 @@ epic/backend-refactor (main coordination branch)
 └── ...
 ```
 
-## Worktree Setup for Agents
+## Agent Working Environment
 
-### Initial Worktree Creation
+### Your Working Directory
+
+Your worktree environment has been pre-configured for you:
 
 ```bash
-# Create worktree directory if it doesn't exist
-mkdir -p ~/Code/PinPoint-worktrees
+# Your isolated working directory
+cd ~/Code/PinPoint-worktrees/task-##-your-task
 
-# Navigate to main repo
-cd ~/Code/PinPoint
-
-# Ensure epic branch is current
-git checkout epic/backend-refactor
-git fetch origin
-git merge origin/epic/backend-refactor
-
-# Create worktree for your task
-git worktree add ~/Code/PinPoint-worktrees/task-##-descriptive-name task/##-descriptive-name
-
-# Navigate to your isolated environment
-cd ~/Code/PinPoint-worktrees/task-##-descriptive-name
+# This is a complete git repository with your task branch checked out
+# All your work should happen here
 ```
 
 ### Daily Sync Workflow
@@ -217,39 +208,21 @@ npm run validate
 
 ### Post-Merge Cleanup
 
-```bash
-# After your PR is merged to epic/backend-refactor
-cd ~/Code/PinPoint
+After your PR is merged, the software manager will handle:
 
-# Switch to epic branch and update
-git checkout epic/backend-refactor
-git pull origin epic/backend-refactor
-
-# Remove your worktree
-git worktree remove ~/Code/PinPoint-worktrees/task-##-your-task
-
-# Delete remote branch
-git push origin --delete task/##-your-descriptive-name
-
-# Delete local branch reference
-git branch -d task/##-your-descriptive-name
-```
+- Updating the epic branch with your changes
+- Removing your worktree environment
+- Cleaning up task branches
+- Coordinating with other agents about dependency completions
 
 ## Emergency Procedures
 
 ### If Worktree Becomes Corrupted
 
 ```bash
-# Remove corrupted worktree
-git worktree remove --force ~/Code/PinPoint-worktrees/task-##-your-task
-
-# Recreate from latest epic state
-cd ~/Code/PinPoint
-git checkout epic/backend-refactor
-git pull origin epic/backend-refactor
-git worktree add ~/Code/PinPoint-worktrees/task-##-your-task task/##-your-task
-
-# You may need to re-implement uncommitted changes
+# If your worktree becomes corrupted, notify the software manager
+# They will recreate your worktree environment from the latest epic state
+# You may need to re-implement any uncommitted changes
 ```
 
 ### If Epic Branch Has Breaking Changes
@@ -280,4 +253,5 @@ git reset --hard origin/epic/backend-refactor
 - ✅ Sequential dependencies properly coordinated
 - ✅ Clean worktree management throughout process
 
-This workflow enables maximum parallel development velocity while maintaining code quality and proper coordination between agents.
+This workflow enables maximum parallel development velocity while maintaining code
+quality and proper coordination between agents.
