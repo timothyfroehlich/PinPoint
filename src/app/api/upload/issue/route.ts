@@ -1,46 +1,16 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { env } from "~/env";
 import { imageStorage } from "~/lib/image-storage/local-storage";
-import { auth } from "~/server/auth";
+import {
+  getUploadAuthContext,
+  requireUploadPermission,
+} from "~/server/auth/uploadAuth";
 import { db } from "~/server/db";
 
 export async function POST(req: NextRequest) {
   try {
-    // Check authentication - require authenticated user for uploads
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Resolve organization context from subdomain (similar to tRPC context)
-    const subdomain =
-      req.headers.get("x-subdomain") ?? env.DEFAULT_ORG_SUBDOMAIN;
-    const organization = await db.organization.findUnique({
-      where: { subdomain },
-    });
-
-    if (!organization) {
-      return NextResponse.json(
-        { error: "Organization not found" },
-        { status: 404 },
-      );
-    }
-
-    // Validate user is a member of the organization
-    const membership = await db.membership.findFirst({
-      where: {
-        organizationId: organization.id,
-        userId: session.user.id,
-      },
-    });
-
-    if (!membership) {
-      return NextResponse.json(
-        { error: "Access denied - user not a member of organization" },
-        { status: 403 },
-      );
-    }
+    // Get authenticated context
+    const ctx = await getUploadAuthContext(req);
 
     const formData = await req.formData();
     const file = formData.get("file") as File;
@@ -51,33 +21,45 @@ export async function POST(req: NextRequest) {
     }
 
     if (!issueId) {
-      return NextResponse.json(
-        { error: "No issue ID provided" },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "Issue ID required" }, { status: 400 });
     }
 
-    // Validate the issue exists and belongs to the user's organization
+    // Verify issue exists and belongs to organization
     const issue = await db.issue.findUnique({
-      where: {
-        id: issueId,
-        organizationId: organization.id, // Ensure issue belongs to user's organization
+      where: { id: issueId },
+      select: {
+        id: true,
+        organizationId: true,
+        machine: {
+          select: {
+            id: true,
+            model: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
       },
-      select: { organizationId: true },
     });
 
     if (!issue) {
+      return NextResponse.json({ error: "Issue not found" }, { status: 404 });
+    }
+
+    if (issue.organizationId !== ctx.organization.id) {
       return NextResponse.json(
-        {
-          error: "Issue not found or access denied",
-        },
-        { status: 404 },
+        { error: "Issue not in organization" },
+        { status: 403 },
       );
     }
 
+    // Check if user has permission to attach files
+    await requireUploadPermission(ctx, "attachment:create");
+
     // Check attachment count limit
     const existingAttachments = await db.attachment.count({
-      where: { issueId },
+      where: { issueId, organizationId: ctx.organization.id },
     });
 
     if (existingAttachments >= 3) {
@@ -87,23 +69,25 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Validate image file
-    if (!(await imageStorage.validateIssueAttachment(file))) {
+    // Validate file size (max 10MB for attachments)
+    if (file.size > 10 * 1024 * 1024) {
       return NextResponse.json(
-        { error: "Invalid image file. Must be JPEG, PNG, or WebP under 5MB" },
+        { error: "File size must be less than 10MB" },
         { status: 400 },
       );
     }
 
-    // Upload image with high quality settings
-    const imagePath = await imageStorage.uploadIssueAttachment(file, issueId);
+    // Upload file
+    const filePath = await imageStorage.uploadImage(file, `issue-${issueId}`);
 
-    // Create attachment record
+    // Create attachment record with organizationId
     const attachment = await db.attachment.create({
       data: {
-        url: imagePath,
-        issueId,
-        // TODO: Attachment model no longer has organizationId in new schema
+        url: filePath,
+        fileName: file.name,
+        fileType: file.type,
+        issueId: issueId,
+        organizationId: ctx.organization.id, // Now properly supported
       },
     });
 
@@ -112,12 +96,53 @@ export async function POST(req: NextRequest) {
       attachment: {
         id: attachment.id,
         url: attachment.url,
+        fileName: attachment.fileName,
+        fileType: attachment.fileType,
       },
     });
   } catch (error) {
     console.error("Issue attachment upload error:", error);
+
+    // Handle TRPCError with proper status code mapping
+    if (error && typeof error === "object" && "code" in error) {
+      const trpcError = error as { code: string; message: string };
+
+      switch (trpcError.code) {
+        case "UNAUTHORIZED":
+          return NextResponse.json(
+            { error: trpcError.message },
+            { status: 401 },
+          );
+        case "FORBIDDEN":
+          return NextResponse.json(
+            { error: trpcError.message },
+            { status: 403 },
+          );
+        case "NOT_FOUND":
+          return NextResponse.json(
+            { error: trpcError.message },
+            { status: 404 },
+          );
+        case "BAD_REQUEST":
+          return NextResponse.json(
+            { error: trpcError.message },
+            { status: 400 },
+          );
+        default:
+          return NextResponse.json(
+            { error: trpcError.message },
+            { status: 500 },
+          );
+      }
+    }
+
+    // Fallback for other error types
+    if (error instanceof Error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
     return NextResponse.json(
-      { error: "Failed to upload attachment" },
+      { error: "Internal server error" },
       { status: 500 },
     );
   }

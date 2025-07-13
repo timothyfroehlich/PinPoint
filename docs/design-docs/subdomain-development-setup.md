@@ -76,8 +76,8 @@ To test with multiple organizations:
 ### Organization Resolution
 
 - tRPC context reads the `x-subdomain` header
-- Looks up organization by subdomain in database
-- Falls back to "apc" if no subdomain detected
+- Looks up the organization by subdomain in the database
+- Falls back to the organization specified by the `DEFAULT_ORG_SUBDOMAIN` environment variable (which defaults to "apc") if no subdomain is detected
 - All subsequent API calls use the correct organization context
 
 ### Authentication

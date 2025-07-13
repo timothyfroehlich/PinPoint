@@ -28,7 +28,7 @@ The technology stack outlined in the initial plan remains the ideal choice, offe
 | Authentication        | **NextAuth.js (Auth.js v5)** | A full-featured authentication solution for Next.js that seamlessly handles social and password-based logins, session management, and the global user model required by the platform.1                           |
 | External API Client   | **Fetch API / Axios**        | For integration with OPDB API, handling authentication, rate limiting, and error recovery                                                                                                                        |
 | Drag-and-Drop Library | **dnd-kit**                  | A modern, lightweight, performant, and accessible toolkit for building drag-and-drop interfaces. Its flexibility makes it the ideal choice for the Kanban board.14                                               |
-| Image Storage         | **Cloudinary**               | A third-party service specializing in asset management. It can easily handle image uploads, transformations, and delivery for multiple tenants, offloading complexity from the application server.1              |
+| Image Storage         | **Vercel Blob**              | For production, Vercel Blob provides a simple and cost-effective solution for storing user-uploaded images, integrated directly into the deployment platform. Local storage is used for development.1            |
 | Deployment            | **Vercel & Vercel Postgres** | Vercel offers first-class support for Next.js and, crucially, for the wildcard subdomains essential for the multi-tenant architecture. This provides a seamless and scalable deployment pipeline.1               |
 
 ### Data Model & Database Schema
@@ -39,43 +39,47 @@ The database schema is the foundation of the application. The following sections
 
 This schema supports all features for the v1.0 release, including user management, game and issue tracking, and the necessary structures for the Kanban board.
 
-| Table Name                                                                            | Column           | Type                    | Constraints/Notes                                |
-| ------------------------------------------------------------------------------------- | ---------------- | ----------------------- | ------------------------------------------------ |
-| **User**                                                                              | id               | UUID                    | Primary Key                                      |
-|                                                                                       | name             | TEXT                    | Nullable                                         |
-|                                                                                       | email            | TEXT                    | Unique, Not Null                                 |
-|                                                                                       | emailVerified    | TIMESTAMPTZ             | Nullable                                         |
-|                                                                                       | image            | TEXT                    | Nullable                                         |
-| **Organization**                                                                      | id               | UUID                    | Primary Key                                      |
-|                                                                                       | name             | TEXT                    | Not Null                                         |
-|                                                                                       | subdomain        | TEXT                    | Unique, Not Null. Used for routing.              |
-| **Membership**                                                                        | id               | UUID                    | Primary Key                                      |
-|                                                                                       | role             | ENUM('admin', 'member') | Not Null                                         |
-|                                                                                       | user_id          | UUID                    | FK to [User.id](http://user.id/)                 |
-|                                                                                       | organization_id  | UUID                    | FK to [Organization.id](http://organization.id/) |
-| **IssueStatus**                                                                       | id               | UUID                    | Primary Key                                      |
-|                                                                                       | name             | TEXT                    | Not Null                                         |
-|                                                                                       | order            | INTEGER                 | For defining column order on Kanban board.       |
-|                                                                                       | organization_id  | UUID                    | FK to [Organization.id](http://organization.id/) |
-| **Issue**                                                                             | id               | UUID                    | Primary Key                                      |
-|                                                                                       | title            | TEXT                    | Not Null                                         |
-|                                                                                       | description      | TEXT                    | Nullable                                         |
-|                                                                                       | status_id        | UUID                    | FK to [IssueStatus.id](http://issuestatus.id/)   |
-|                                                                                       | assignee_id      | UUID                    | FK to [User.id](http://user.id/), Nullable       |
-|                                                                                       | reporter_email   | TEXT                    | Nullable, for anonymous reports.                 |
-|                                                                                       | game_instance_id | UUID                    | FK to [GameInstance.id](http://gameinstance.id/) |
-|                                                                                       | organization_id  | UUID                    | FK to [Organization.id](http://organization.id/) |
-| **GameTitle**                                                                         | id               | UUID                    | Primary Key                                      |
-|                                                                                       | name             | TEXT                    | Not Null                                         |
-|                                                                                       | opdb_id          | TEXT                    | Nullable, OPDB identifier (e.g., "G123-M456")    |
-|                                                                                       | manufacturer     | TEXT                    | Nullable, sourced from OPDB                      |
-|                                                                                       | release_date     | DATE                    | Nullable, sourced from OPDB                      |
-|                                                                                       | image_url        | TEXT                    | Nullable, OPDB image URL                         |
-|                                                                                       | description      | TEXT                    | Nullable, game description from OPDB             |
-|                                                                                       | is_custom        | BOOLEAN                 | Default false, true for non-OPDB games           |
-|                                                                                       | last_synced      | TIMESTAMPTZ             | Nullable, when data was last synced from OPDB    |
-|                                                                                       | organization_id  | UUID                    | FK to [Organization.id](http://organization.id/) |
-| _(Other tables like Location, GameInstance, Comment, Attachment as per initial plan)_ | ...              | ...                     | ...                                              |
+| Table Name                                                                            | Column           | Type        | Constraints/Notes                                |
+| ------------------------------------------------------------------------------------- | ---------------- | ----------- | ------------------------------------------------ |
+| **User**                                                                              | id               | UUID        | Primary Key                                      |
+|                                                                                       | name             | TEXT        | Nullable                                         |
+|                                                                                       | email            | TEXT        | Unique, Not Null                                 |
+|                                                                                       | emailVerified    | TIMESTAMPTZ | Nullable                                         |
+|                                                                                       | image            | TEXT        | Nullable                                         |
+| **Organization**                                                                      | id               | UUID        | Primary Key                                      |
+|                                                                                       | name             | TEXT        | Not Null                                         |
+|                                                                                       | subdomain        | TEXT        | Unique, Not Null. Used for routing.              |
+| **Membership**                                                                        | id               | UUID        | Primary Key                                      |
+|                                                                                       | role_id          | UUID        | FK to Role.id. Defines user's permissions.       |
+|                                                                                       | user_id          | UUID        | FK to [User.id](http://user.id/)                 |
+|                                                                                       | organization_id  | UUID        | FK to [Organization.id](http://organization.id/) |
+| **Role**                                                                              | id               | UUID        | Primary Key                                      |
+|                                                                                       | name             | TEXT        | e.g., "Admin", "Player". Unique per org.         |
+|                                                                                       | organization_id  | UUID        | FK to [Organization.id](http://organization.id/) |
+| **Permission**                                                                        | id               | UUID        | Primary Key                                      |
+|                                                                                       | name             | TEXT        | e.g., "issue:create". Globally unique.           |
+| **IssueStatus**                                                                       | id               | UUID        | Primary Key                                      |
+|                                                                                       | name             | TEXT        | Not Null                                         |
+|                                                                                       | order            | INTEGER     | For defining column order on Kanban board.       |
+|                                                                                       | organization_id  | UUID        | FK to [Organization.id](http://organization.id/) |
+| **Issue**                                                                             | id               | UUID        | Primary Key                                      |
+|                                                                                       | title            | TEXT        | Not Null                                         |
+|                                                                                       | description      | TEXT        | Nullable                                         |
+|                                                                                       | status_id        | UUID        | FK to [IssueStatus.id](http://issuestatus.id/)   |
+|                                                                                       | created_by_id    | UUID        | FK to User.id. Reporter must be authenticated.   |
+|                                                                                       | assignee_id      | UUID        | FK to [User.id](http://user.id/), Nullable       |
+|                                                                                       | game_instance_id | UUID        | FK to [GameInstance.id](http://gameinstance.id/) |
+|                                                                                       | organization_id  | UUID        | FK to [Organization.id](http://organization.id/) |
+| **GameTitle**                                                                         | id               | UUID        | Primary Key                                      |
+|                                                                                       | name             | TEXT        | Not Null                                         |
+|                                                                                       | opdb_id          | TEXT        | Nullable, OPDB identifier (e.g., "G123-M456")    |
+|                                                                                       | manufacturer     | TEXT        | Nullable, sourced from OPDB                      |
+|                                                                                       | release_date     | DATE        | Nullable, sourced from OPDB                      |
+|                                                                                       | image_url        | TEXT        | Nullable, OPDB image URL                         |
+|                                                                                       | description      | TEXT        | Nullable, game description from OPDB             |
+|                                                                                       | is_custom        | BOOLEAN     | Default false, true for non-OPDB games           |
+|                                                                                       | last_synced      | TIMESTAMPTZ | Nullable, when data was last synced from OPDB    |
+| _(Other tables like Location, GameInstance, Comment, Attachment as per initial plan)_ | ...              | ...         | ...                                              |
 
 ### Inventory Management Schema (v2.0)
 

@@ -96,6 +96,7 @@ model Organization {
   issueStatuses   IssueStatus[]
   collectionTypes CollectionType[]
   issueHistory    IssueHistory[]
+  attachments     Attachment[]
 }
 
 model Membership {
@@ -268,14 +269,19 @@ model Comment {
 }
 
 model Attachment {
-  id        String   @id @default(cuid())
-  url       String
-  fileName  String
-  fileType  String
-  createdAt DateTime @default(now())
-  issueId   String
+  id             String   @id @default(cuid())
+  url            String
+  fileName       String
+  fileType       String
+  createdAt      DateTime @default(now())
 
-  issue Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  // Add multi-tenancy
+  organizationId String
+
+  // Relations
+  issueId        String
+  issue          Issue        @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 }
 
 model IssueHistory {

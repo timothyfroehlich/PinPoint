@@ -22,6 +22,7 @@ async function createGlobalPermissions() {
     "organization:manage",
     "role:manage",
     "user:manage",
+    "attachment:create",
   ];
 
   for (const permName of permissions) {
@@ -64,11 +65,12 @@ async function createOrganizationWithRoles(orgData: {
         "organization:manage",
         "role:manage",
         "user:manage",
+        "attachment:create",
       ],
     },
     {
       name: "Player",
-      permissions: ["issue:create"], // Minimal permissions - equivalent to unauthenticated
+      permissions: ["issue:create", "attachment:create"], // Base role for authenticated members with minimal permissions
     },
   ];
 
