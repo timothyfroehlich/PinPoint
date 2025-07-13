@@ -35,7 +35,9 @@ model User {
   issuesCreated  Issue[]   @relation("CreatedBy")
   issuesAssigned Issue[]   @relation("AssignedTo")
   comments       Comment[]
+  deletedComments Comment[] @relation("CommentDeleter")
   upvotes        Upvote[]
+  activityHistory IssueHistory[] @relation("ActivityActor")
 }
 
 model Account {
@@ -94,6 +96,8 @@ model Organization {
   priorities      Priority[]
   issueStatuses   IssueStatus[]
   collectionTypes CollectionType[]
+  issueHistory    IssueHistory[]
+  attachments     Attachment[]
 }
 
 model Membership {
@@ -240,38 +244,72 @@ enum StatusCategory {
   RESOLVED
 }
 
+enum ActivityType {
+  CREATED         // Issue created
+  STATUS_CHANGED  // Status updated
+  ASSIGNED        // Assignee changed
+  PRIORITY_CHANGED // Priority updated
+  COMMENTED       // Comment added
+  COMMENT_DELETED // Comment deleted
+  ATTACHMENT_ADDED // File attached
+  MERGED          // Issue merged (V1.0)
+  RESOLVED        // Issue resolved
+  REOPENED        // Issue reopened
+  SYSTEM          // System-generated activity
+}
+
 model Comment {
   id        String   @id @default(cuid())
   content   String   @db.Text
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Soft delete fields
+  deletedAt DateTime? // Null = not deleted, Date = soft deleted
+  deletedBy String?   // Who deleted the comment (for audit trail)
+
+  // Relations
   issueId   String
   authorId  String
 
-  issue  Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
-  author User  @relation(fields: [authorId], references: [id])
+  issue   Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  author  User  @relation(fields: [authorId], references: [id])
+  deleter User? @relation("CommentDeleter", fields: [deletedBy], references: [id])
 }
 
 model Attachment {
-  id        String   @id @default(cuid())
-  url       String
-  fileName  String
-  fileType  String
-  createdAt DateTime @default(now())
-  issueId   String
+  id             String   @id @default(cuid())
+  url            String
+  fileName       String
+  fileType       String
+  createdAt      DateTime @default(now())
 
-  issue Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  // Add multi-tenancy
+  organizationId String
+
+  // Relations
+  issueId        String
+  issue          Issue        @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 }
 
 model IssueHistory {
-  id        String   @id @default(cuid())
-  field     String   // e.g., "status", "assignee"
-  oldValue  String?
-  newValue  String?
-  changedAt DateTime @default(now())
-  issueId   String
+  id             String   @id @default(cuid())
+  field          String   // e.g., "status", "assignee", "priority"
+  oldValue       String?
+  newValue       String?
+  changedAt      DateTime @default(now())
 
-  issue Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  // Add missing fields
+  organizationId String   // For multi-tenancy
+  actorId        String?  // Who performed the action (null for system actions)
+  type           ActivityType // Replace string with proper enum
+
+  // Relations
+  issueId        String
+  issue          Issue        @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actor          User?        @relation("ActivityActor", fields: [actorId], references: [id])
 }
 
 model Upvote {
