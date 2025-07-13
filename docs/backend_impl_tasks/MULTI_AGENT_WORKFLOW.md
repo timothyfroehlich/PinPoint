@@ -4,6 +4,17 @@
 
 This document defines the coordinated workflow for multiple Claude agents working in parallel on PinPoint backend tasks using git worktrees. Each agent operates in an isolated worktree while maintaining synchronization with the main epic branch.
 
+## Agent Context
+
+**You are a backend development agent** working on a specific task in the PinPoint project. You are part of a coordinated multi-agent environment where multiple agents work in parallel on different backend tasks using git worktrees to maximize development velocity while maintaining code quality.
+
+**Your Role:**
+
+- Implement your assigned task completely and independently
+- Work in your dedicated worktree environment
+- Follow coordination guidelines to avoid conflicts with other agents
+- Maintain strict quality standards throughout development
+
 ## Architecture
 
 ### Directory Structure
@@ -34,7 +45,7 @@ epic/backend-refactor (main coordination branch)
 
 ### Initial Setup
 
-Your worktree environment has been pre-configured, but you need to set up the development environment:
+**FIRST TIME SETUP REQUIRED** - Your worktree environment has been pre-configured, but you need to set up the development environment:
 
 ```bash
 # Navigate to your isolated working directory
@@ -43,13 +54,19 @@ cd ~/Code/PinPoint-worktrees/task-##-your-task
 # Run the setup script to configure your environment
 # This will:
 # - Copy .env from main repo
-# - Configure unique ports for your worktree
+# - Configure unique ports for your worktree (no conflicts with other agents)
 # - Install dependencies
 # - Sync database schema
 ./scripts/setup-worktree.sh
 
 # Your environment is now ready for development
 ```
+
+**Important Notes:**
+
+- Each agent gets unique ports automatically to avoid conflicts
+- Your database will be shared with other agents (use organizationId properly!)
+- Only run setup once when you first start working
 
 ### Daily Sync Workflow
 
