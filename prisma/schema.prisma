@@ -249,6 +249,7 @@ enum ActivityType {
   ASSIGNED        // Assignee changed
   PRIORITY_CHANGED // Priority updated
   COMMENTED       // Comment added
+  COMMENT_DELETED // Comment deleted
   ATTACHMENT_ADDED // File attached
   MERGED          // Issue merged (V1.0)
   RESOLVED        // Issue resolved

@@ -104,16 +104,18 @@ export class IssueActivityService {
     });
   }
 
-  async recordCommentDeletion(
+  async recordCommentDeleted(
     issueId: string,
     organizationId: string,
     actorId: string,
-    isAdminDelete: boolean,
+    commentId: string,
   ): Promise<void> {
     await this.recordActivity(issueId, organizationId, {
-      type: ActivityType.SYSTEM,
+      type: ActivityType.COMMENT_DELETED,
       actorId,
       fieldName: "comment",
+      oldValue: commentId,
+      description: "Comment deleted",
     });
   }
 
@@ -122,8 +124,7 @@ export class IssueActivityService {
       this.prisma.comment.findMany({
         where: {
           issueId,
-          // TODO: Comment model doesn't have deletedAt field in new schema
-          // Need to implement soft delete differently
+          deletedAt: null, // Exclude soft-deleted comments
         },
         include: {
           author: {
