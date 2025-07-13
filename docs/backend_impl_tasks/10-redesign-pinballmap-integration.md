@@ -1,10 +1,18 @@
 # Task 10: Redesign PinballMap Integration for New Schema
 
+## Agent Context
+
+**You are a backend development agent** assigned to implement Task 10: Redesign PinballMap Integration for New Schema. You are working in a coordinated multi-agent environment where multiple agents work in parallel on different backend tasks.
+
+**Your Mission**: Completely redesign the PinballMap integration service with comprehensive schema enhancements based on PinballMap API analysis. This includes geographic data support, cross-database references (IPDB/OPDB), and modern integration architecture.
+
 ## Prerequisites
 
 **REQUIRED**: Read and understand `docs/planning/backend_impl_plan.md` before starting this task.
 
 **Multi-Agent Coordination**: This task is part of Phase 3B development. See @MULTI_AGENT_WORKFLOW.md for complete worktree setup, sync procedures, and coordination guidelines.
+
+**FIRST TIME SETUP**: You must run `./scripts/setup-worktree.sh` in your worktree to configure your development environment.
 
 ## Workflow
 
@@ -21,6 +29,8 @@
 ## Objective
 
 Completely redesign the PinballMap integration service to work with the new V1.0 schema. The current service is non-functional due to schema changes that removed the `pinballMapId` field from Location model and renamed GameTitle/GameInstance to Model/Machine.
+
+**Enhanced Scope**: Based on PinballMap API analysis, this task now includes comprehensive schema enhancements to support full PinballMap integration with geographic data, machine metadata, and proper cross-database references (IPDB/OPDB).
 
 ## Status
 
@@ -62,9 +72,9 @@ Service still references old model names:
 
 ## Implementation Steps
 
-### 1. Update Location Model for PinballMap Integration
+### 1. Enhanced Location Model for PinballMap Integration
 
-Add optional PinballMap integration to Location:
+Based on PinballMap API analysis, enhance Location with geographic and contact data:
 
 ```prisma
 model Location {
@@ -72,17 +82,62 @@ model Location {
   name           String
   organizationId String
 
-  // Add PinballMap integration (optional)
-  pinballMapId   Int?    // PinballMap location ID
+  // Geographic and Contact Information (from PinballMap API analysis)
+  street         String?
+  city           String?
+  state          String?
+  zip            String?
+  phone          String?
+  website        String?
+  latitude       Float?
+  longitude      Float?
+  description    String? @db.Text
+
+  // PinballMap Integration (optional)
+  pinballMapId   Int?      // PinballMap location ID
+  regionId       String?   // PinballMap region ("austin", "portland", etc.)
   lastSyncAt     DateTime? // When was last sync performed
-  syncEnabled    Boolean @default(false) // Enable/disable sync for this location
+  syncEnabled    Boolean   @default(false) // Enable/disable sync for this location
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   machines     Machine[]
 }
 ```
 
-### 2. Create PinballMap Configuration Model
+### 2. Enhanced Model for Cross-Database Support
+
+Based on PinballMap API analysis, enhance Model with IPDB/OPDB cross-references and machine metadata:
+
+```prisma
+model Model {
+  id           String  @id @default(cuid())
+  name         String
+  manufacturer String?
+  year         Int?
+
+  // Cross-Database References (both IPDB and OPDB from PinballMap)
+  ipdbId       String? @unique     // Internet Pinball Database ID
+  opdbId       String? @unique     // Open Pinball Database ID
+
+  // Machine Technical Details (from PinballMap API)
+  machineType    String?           // "em", "ss", "digital"
+  machineDisplay String?           // "reels", "dmd", "lcd", "alphanumeric"
+  isActive       Boolean @default(true)
+
+  // Metadata and Links
+  ipdbLink       String?           // Direct link to IPDB entry
+  opdbImgUrl     String?           // Image from OPDB
+  kineticistUrl  String?           // Link to additional machine information
+
+  // PinPoint-specific
+  isCustom       Boolean @default(false) // Flag for custom/homebrew models
+
+  // Relations
+  machines Machine[]
+}
+```
+
+### 3. Create PinballMap Configuration Model
 
 Add configuration model for PinballMap integration:
 
@@ -108,7 +163,38 @@ model PinballMapConfig {
 }
 ```
 
-### 3. Update Organization Model
+### 4. Optional: Machine Condition Tracking (Future Enhancement)
+
+Based on PinballMap's user submission system, consider adding machine condition tracking:
+
+```prisma
+model MachineCondition {
+  id        String   @id @default(cuid())
+  machineId String
+  condition String   @db.Text  // User-reported condition
+  createdAt DateTime @default(now())
+  userId    String?
+
+  machine Machine @relation(fields: [machineId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id])
+}
+
+// Add to Machine model:
+model Machine {
+  // ... existing fields
+  conditions MachineCondition[]
+}
+
+// Add to User model:
+model User {
+  // ... existing fields
+  machineConditions MachineCondition[]
+}
+```
+
+**Note**: This is optional for V1.0 but aligns with PinballMap's condition tracking feature.
+
+### 5. Update Organization Model
 
 Add PinballMap config relation:
 
@@ -129,7 +215,7 @@ model Organization {
 }
 ```
 
-### 4. Redesign PinballMapService
+### 6. Redesign PinballMapService
 
 Complete rewrite of `src/server/services/pinballmapService.ts`:
 
@@ -417,7 +503,22 @@ export class PinballMapService {
           name: pmMachine.machine_name,
           manufacturer: pmMachine.manufacturer || null,
           year: pmMachine.year || null,
+
+          // Cross-database references
           opdbId: pmMachine.opdb_id,
+          ipdbId: pmMachine.ipdb_id || null,
+
+          // Technical details
+          machineType: pmMachine.machine_type || null,
+          machineDisplay: pmMachine.machine_display || null,
+          isActive: pmMachine.is_active ?? true,
+
+          // Metadata and links
+          ipdbLink: pmMachine.ipdb_link || null,
+          opdbImgUrl: pmMachine.opdb_img || null,
+          kineticistUrl: pmMachine.kineticist_url || null,
+
+          // PinPoint-specific
           isCustom: false, // OPDB games are not custom
         },
       });
@@ -501,7 +602,7 @@ export class PinballMapService {
 }
 ```
 
-### 5. Create PinballMap tRPC Router
+### 7. Create PinballMap tRPC Router
 
 Create `src/server/api/routers/pinballMap.ts`:
 
@@ -566,7 +667,7 @@ export const pinballMapRouter = createTRPCRouter({
 });
 ```
 
-### 6. Update Main tRPC Router
+### 8. Update Main tRPC Router
 
 Add PinballMap router to `src/server/api/root.ts`:
 
@@ -579,7 +680,7 @@ export const appRouter = createTRPCRouter({
 });
 ```
 
-### 7. Database Migration
+### 9. Database Migration
 
 ```bash
 # Push schema changes
@@ -626,24 +727,28 @@ Test tRPC endpoints:
 
 ### Implementation Decisions Made:
 
-- Added optional PinballMap fields to Location model
-- Created separate PinballMapConfig for organization-level settings
-- Used global Model table for OPDB games (no organizationId)
-- Added proper error handling and sync status tracking
+- **Enhanced Location Model**: Added geographic/contact fields based on PinballMap API analysis
+- **Enhanced Model Schema**: Added IPDB/OPDB cross-references and machine technical metadata
+- **Comprehensive Integration**: Support for both Internet Pinball Database and Open Pinball Database
+- **Optional Condition Tracking**: Framework for machine condition reporting (future enhancement)
+- **Created separate PinballMapConfig**: Organization-level settings with flexible sync options
+- **Global Model Strategy**: OPDB games remain global (no organizationId) for cross-organization sharing
+- **Proper Error Handling**: Graceful API failures and duplicate key handling
 
 ### Architecture Changes:
 
-- Service class pattern for better testability
-- Separate configuration model for flexibility
-- Optional sync per location
-- Graceful handling of API failures
+- **Service Class Pattern**: Better testability and dependency injection
+- **Cross-Database Support**: Handle both IPDB and OPDB references from PinballMap
+- **Geographic Integration**: Support for location mapping and regional organization
+- **Optional Per-Location Sync**: Flexible configuration per location
+- **Rich Metadata Storage**: Technical details, images, and external links
 
-### Data Model:
+### Data Model Enhancements:
 
-- Location.pinballMapId (optional linking)
-- PinballMapConfig for organization settings
-- Model table remains global for OPDB games
-- Machine table organization-scoped as before
+- **Location**: Geographic fields (lat/lng, address), PinballMap integration (regionId, pinballMapId)
+- **Model**: Cross-database IDs (ipdbId, opdbId), technical specs (machineType, machineDisplay), metadata (images, links)
+- **PinballMapConfig**: Organization-level integration settings and sync preferences
+- **Optional MachineCondition**: User-reported condition tracking (future enhancement)
 
 ## Rollback Procedure
 
