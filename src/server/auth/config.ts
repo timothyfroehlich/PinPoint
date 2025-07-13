@@ -16,14 +16,14 @@ declare module "next-auth" {
   interface Session extends DefaultSession {
     user: {
       id: string;
-      role?: Role;
+      role?: string;
       organizationId?: string;
     } & DefaultSession["user"];
   }
 
   interface JWT {
     id: string;
-    role?: Role;
+    role?: string;
     organizationId?: string;
   }
 }
@@ -107,10 +107,13 @@ export const authConfig = {
                 organizationId: organization.id,
               },
             },
+            include: {
+              role: true,
+            },
           });
 
           if (membership) {
-            token.role = membership.role;
+            token.role = membership.role.name;
             token.organizationId = organization.id;
           }
         }

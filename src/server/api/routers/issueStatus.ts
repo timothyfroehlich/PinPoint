@@ -1,7 +1,11 @@
 import { IssueStatusCategory } from "@prisma/client";
 import { z } from "zod";
 
-import { createTRPCRouter, organizationProcedure } from "~/server/api/trpc";
+import {
+  createTRPCRouter,
+  organizationProcedure,
+  organizationManageProcedure,
+} from "~/server/api/trpc";
 
 export const issueStatusRouter = createTRPCRouter({
   getAll: organizationProcedure.query(async ({ ctx }) => {
@@ -13,7 +17,7 @@ export const issueStatusRouter = createTRPCRouter({
     });
   }),
 
-  create: organizationProcedure
+  create: organizationManageProcedure
     .input(
       z.object({
         name: z.string().min(1).max(50),
@@ -32,7 +36,7 @@ export const issueStatusRouter = createTRPCRouter({
       });
     }),
 
-  update: organizationProcedure
+  update: organizationManageProcedure
     .input(
       z.object({
         id: z.string(),
@@ -55,7 +59,7 @@ export const issueStatusRouter = createTRPCRouter({
       });
     }),
 
-  delete: organizationProcedure
+  delete: organizationManageProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       // Check if any issues are using this status

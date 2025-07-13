@@ -3,12 +3,14 @@ import { z } from "zod";
 import {
   createTRPCRouter,
   organizationProcedure,
-  adminProcedure,
+  locationEditProcedure,
+  locationDeleteProcedure,
+  organizationManageProcedure,
 } from "~/server/api/trpc";
 import { syncLocationGames } from "~/server/services/pinballmapService";
 
 export const locationRouter = createTRPCRouter({
-  create: organizationProcedure
+  create: locationEditProcedure
     .input(
       z.object({
         name: z.string().min(1),
@@ -45,7 +47,7 @@ export const locationRouter = createTRPCRouter({
     });
   }),
 
-  update: organizationProcedure
+  update: locationEditProcedure
     .input(
       z.object({
         id: z.string(),
@@ -109,7 +111,7 @@ export const locationRouter = createTRPCRouter({
       return location;
     }),
 
-  delete: organizationProcedure
+  delete: locationDeleteProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       return ctx.db.location.delete({
@@ -121,7 +123,7 @@ export const locationRouter = createTRPCRouter({
     }),
 
   // Admin-only PinballMap sync operations
-  setPinballMapId: adminProcedure
+  setPinballMapId: organizationManageProcedure
     .input(
       z.object({
         locationId: z.string(),
@@ -140,7 +142,7 @@ export const locationRouter = createTRPCRouter({
       });
     }),
 
-  syncWithPinballMap: adminProcedure
+  syncWithPinballMap: organizationManageProcedure
     .input(z.object({ locationId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const result = await syncLocationGames(ctx.db, input.locationId);

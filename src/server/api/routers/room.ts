@@ -3,7 +3,7 @@ import { z } from "zod";
 import {
   createTRPCRouter,
   organizationProcedure,
-  adminProcedure,
+  locationEditProcedure,
 } from "~/server/api/trpc";
 
 export const roomRouter = createTRPCRouter({
@@ -51,7 +51,7 @@ export const roomRouter = createTRPCRouter({
     }),
 
   // Admin-only: Update room description
-  updateDescription: adminProcedure
+  updateDescription: locationEditProcedure
     .input(
       z.object({
         locationId: z.string(),
@@ -71,7 +71,7 @@ export const roomRouter = createTRPCRouter({
     }),
 
   // Admin-only: Create new room
-  create: adminProcedure
+  create: locationEditProcedure
     .input(
       z.object({
         name: z.string().min(1),

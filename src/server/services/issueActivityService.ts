@@ -1,8 +1,8 @@
-import { type PrismaClient, type ActivityType } from "@prisma/client";
+import { type PrismaClient } from "@prisma/client";
 import { type User, type IssueStatus } from "@prisma/client";
 
 export interface ActivityData {
-  type: ActivityType;
+  type: string; // TODO: Define proper activity types for new schema
   actorId?: string;
   fieldName?: string;
   oldValue?: string;
@@ -18,7 +18,7 @@ export class IssueActivityService {
     organizationId: string,
     activityData: ActivityData,
   ): Promise<void> {
-    await this.prisma.issueActivity.create({
+    await this.prisma.issueHistory.create({
       data: {
         issueId,
         organizationId,
@@ -125,7 +125,8 @@ export class IssueActivityService {
       this.prisma.comment.findMany({
         where: {
           issueId,
-          deletedAt: null, // Only show non-deleted comments
+          // TODO: Comment model doesn't have deletedAt field in new schema
+          // Need to implement soft delete differently
         },
         include: {
           author: {
@@ -138,7 +139,7 @@ export class IssueActivityService {
         },
         orderBy: { createdAt: "asc" },
       }),
-      this.prisma.issueActivity.findMany({
+      this.prisma.issueHistory.findMany({
         where: { issueId, organizationId },
         include: {
           actor: {

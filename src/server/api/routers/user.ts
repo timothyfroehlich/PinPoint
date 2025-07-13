@@ -50,8 +50,9 @@ export const userRouter = createTRPCRouter({
   getCurrentMembership: organizationProcedure.query(async ({ ctx }) => {
     return {
       userId: ctx.membership.userId,
-      role: ctx.membership.role,
+      role: ctx.membership.role.name,
       organizationId: ctx.membership.organizationId,
+      permissions: ctx.userPermissions,
     };
   }),
 
@@ -171,6 +172,7 @@ export const userRouter = createTRPCRouter({
     const memberships = await ctx.db.membership.findMany({
       where: { organizationId: ctx.membership.organizationId },
       include: {
+        role: true,
         user: {
           select: {
             id: true,
@@ -197,7 +199,7 @@ export const userRouter = createTRPCRouter({
 
     return memberships.map((m) => ({
       ...m.user,
-      role: m.role,
+      role: m.role.name,
     }));
   }),
 

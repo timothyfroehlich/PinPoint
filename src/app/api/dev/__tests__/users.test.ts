@@ -33,7 +33,7 @@ interface TestUser {
 interface TestMembership {
   userId: string;
   organizationId: string;
-  role: Role;
+  role: string;
 }
 
 interface TestOrganization {
@@ -128,7 +128,7 @@ describe("/api/dev/users", () => {
           email: string;
           bio: string | null;
           profilePicture: string | null;
-          role: Role;
+          role: string;
         }[];
       };
       expect(data.users).toHaveLength(2);
