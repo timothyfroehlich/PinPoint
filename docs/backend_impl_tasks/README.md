@@ -175,6 +175,24 @@ Phase 3D (After Phase 3C):
 2. **Priority 2** (Feature Enablement): Tasks 10, 11
 3. **Priority 3** (User Experience): Task 12
 
+## Current Task Status
+
+### ✅ Completed Tasks (Phase 3A)
+
+**Located in:** `completed/`
+
+- **Task 07**: Fix Issue History Model → PR #66 ✅
+- **Task 08**: Comment Soft Delete → PR #68 ✅
+- **Task 09**: Upload Authorization → PR #67 ✅
+
+### 📋 V1.0 Features (Migrated to GitHub Issues)
+
+The following tasks have been migrated to GitHub issues for V1.0 implementation:
+
+- **Issue #69**: V1.0 Feature - Private Locations System
+- **Issue #70**: V1.0 Feature - Internal-Only Issues System
+- **Issue #71**: V1.0 Feature - Issue Merging System
+
 ## Task File Structure
 
 Each task file includes:

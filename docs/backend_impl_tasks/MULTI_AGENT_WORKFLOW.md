@@ -197,11 +197,33 @@ git push -u origin task/##-your-descriptive-name
 
 **Every PR must include:**
 
+- ✅ Task file moved to `docs/backend_impl_tasks/completed/` folder
 - ✅ Updated task file with completed Progress Notes
 - ✅ All validation steps passed
 - ✅ Clear description of changes made
 - ✅ Any architectural decisions documented
 - ✅ Notes for subsequent task dependencies
+
+### Task Completion Process
+
+When your task is complete:
+
+1. **Move Task File**: Move your task file from `docs/backend_impl_tasks/` to `docs/backend_impl_tasks/completed/` as part of your PR
+2. **Run Quality Checks**: Execute `npm run pre-commit` to ensure all standards pass
+3. **Create Pull Request**: Target `epic/backend-refactor` branch (NOT main)
+4. **Update Task Documentation**: Mark your task as completed in the moved task file
+5. **Notify Coordination**: Your PR will be reviewed and merged by the orchestrating manager
+
+#### Example Task Completion
+
+```bash
+# Move completed task file
+git mv docs/backend_impl_tasks/10-my-task.md docs/backend_impl_tasks/completed/
+
+# Update status in moved file, then commit
+git add docs/backend_impl_tasks/completed/10-my-task.md
+git commit -m "feat: Complete Task 10 - My Feature Implementation"
+```
 
 ## Conflict Resolution
 
