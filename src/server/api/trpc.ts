@@ -163,7 +163,7 @@ export const protectedProcedure = t.procedure
  * Organization-scoped procedure
  *
  * This procedure ensures that the user is a member of the organization they are trying to access.
- * It also adds the membership to the context.
+ * It also adds the membership and user permissions to the context.
  */
 export const organizationProcedure = protectedProcedure.use(
   async ({ ctx, next }) => {
@@ -171,6 +171,13 @@ export const organizationProcedure = protectedProcedure.use(
       where: {
         organizationId: ctx.organization.id,
         userId: ctx.session.user.id,
+      },
+      include: {
+        role: {
+          include: {
+            permissions: true,
+          },
+        },
       },
     });
 
@@ -182,31 +189,48 @@ export const organizationProcedure = protectedProcedure.use(
       ctx: {
         ...ctx,
         membership,
+        userPermissions: membership.role.permissions.map((p) => p.name),
       },
     });
   },
 );
 
 /**
- * Admin-only procedure
+ * Permission-based procedure factory
  *
- * This procedure ensures that the user is an admin of the organization.
- * It builds on the organization procedure and adds admin role validation.
+ * Creates a procedure that requires a specific permission to be present in the user's role.
+ * This replaces the old adminProcedure with a more granular permission system.
  */
-export const adminProcedure = organizationProcedure.use(
-  async ({ ctx, next }) => {
-    if (ctx.membership.role !== "admin") {
+export function requirePermission(permission: string) {
+  return organizationProcedure.use(async ({ ctx, next }) => {
+    if (!ctx.userPermissions.includes(permission)) {
       throw new TRPCError({
         code: "FORBIDDEN",
-        message: "Admin access required",
+        message: `Permission required: ${permission}`,
       });
     }
 
-    return next({
-      ctx: {
-        ...ctx,
-        // membership is already available from organizationProcedure
-      },
-    });
-  },
+    return next({ ctx });
+  });
+}
+
+// Specific permission procedures for common actions
+export const issueCreateProcedure = requirePermission("issue:create");
+export const issueEditProcedure = requirePermission("issue:edit");
+export const issueDeleteProcedure = requirePermission("issue:delete");
+export const issueAssignProcedure = requirePermission("issue:assign");
+export const machineEditProcedure = requirePermission("machine:edit");
+export const machineDeleteProcedure = requirePermission("machine:delete");
+export const locationEditProcedure = requirePermission("location:edit");
+export const locationDeleteProcedure = requirePermission("location:delete");
+export const organizationManageProcedure = requirePermission(
+  "organization:manage",
 );
+export const roleManageProcedure = requirePermission("role:manage");
+export const userManageProcedure = requirePermission("user:manage");
+
+/**
+ * @deprecated Use specific permission procedures instead
+ * Legacy adminProcedure - kept for backward compatibility during migration
+ */
+export const adminProcedure = organizationManageProcedure;

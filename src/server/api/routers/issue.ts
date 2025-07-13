@@ -5,6 +5,9 @@ import {
   createTRPCRouter,
   organizationProcedure,
   publicProcedure,
+  organizationManageProcedure,
+  issueCreateProcedure,
+  issueEditProcedure,
 } from "~/server/api/trpc";
 import { CommentCleanupService } from "~/server/services/commentCleanupService";
 import { IssueActivityService } from "~/server/services/issueActivityService";
@@ -334,7 +337,7 @@ export const issueRouter = createTRPCRouter({
     }),
 
   // Update issue (for members/admins)
-  update: organizationProcedure
+  update: issueEditProcedure
     .input(
       z.object({
         id: z.string(),
@@ -504,7 +507,7 @@ export const issueRouter = createTRPCRouter({
     }),
 
   // Add comment to an issue (for members/admins)
-  addComment: organizationProcedure
+  addComment: issueCreateProcedure
     .input(
       z.object({
         issueId: z.string(),
@@ -559,7 +562,7 @@ export const issueRouter = createTRPCRouter({
     }),
 
   // Edit comment (users can only edit their own comments)
-  editComment: organizationProcedure
+  editComment: issueEditProcedure
     .input(
       z.object({
         commentId: z.string(),
@@ -661,7 +664,8 @@ export const issueRouter = createTRPCRouter({
       }
 
       const canDelete =
-        comment.authorId === ctx.session.user.id || membership.role === "admin";
+        comment.authorId === ctx.session.user.id ||
+        ctx.userPermissions.includes("issue:delete");
 
       if (!canDelete) {
         throw new Error("You can only delete your own comments");
@@ -689,29 +693,17 @@ export const issueRouter = createTRPCRouter({
     }),
 
   // Cleanup old deleted comments (admin only)
-  cleanupDeletedComments: organizationProcedure.mutation(async ({ ctx }) => {
-    // Check if user is admin
-    const membership = await ctx.db.membership.findUnique({
-      where: {
-        userId_organizationId: {
-          userId: ctx.session.user.id,
-          organizationId: ctx.organization.id,
-        },
-      },
-    });
+  cleanupDeletedComments: organizationManageProcedure.mutation(
+    async ({ ctx }) => {
+      const cleanupService = new CommentCleanupService(ctx.db);
+      const deletedCount = await cleanupService.cleanupOldDeletedComments();
 
-    if (!membership || membership.role !== "admin") {
-      throw new Error("Only admins can run comment cleanup");
-    }
-
-    const cleanupService = new CommentCleanupService(ctx.db);
-    const deletedCount = await cleanupService.cleanupOldDeletedComments();
-
-    return {
-      deletedCount,
-      message: `Successfully deleted ${deletedCount} old comments`,
-    };
-  }),
+      return {
+        deletedCount,
+        message: `Successfully deleted ${deletedCount} old comments`,
+      };
+    },
+  ),
 
   // Get issue timeline (comments + activities)
   getTimeline: organizationProcedure

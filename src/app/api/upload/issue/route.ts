@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
       data: {
         url: imagePath,
         issueId,
-        organizationId: issue.organizationId,
+        // TODO: Attachment model no longer has organizationId in new schema
       },
     });
 

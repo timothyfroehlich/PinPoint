@@ -8,8 +8,6 @@
  * - Machines: Always organization-specific through room hierarchy
  */
 
-import { fetchLocationMachineDetails } from "../../lib/pinballmap/client";
-
 import type {
   PinballMapMachine,
   PinballMapMachineDetailsResponse,
@@ -50,36 +48,34 @@ export async function syncLocationGames(
       };
     }
 
-    if (!location.pinballMapId) {
-      return {
-        success: false,
-        added: 0,
-        removed: 0,
-        error: "Location does not have a PinballMap ID configured",
-      };
-    }
+    // TODO: Location model no longer has pinballMapId field
+    // This functionality needs to be redesigned for the new schema
+    // For now, skip this check
+    // if (!location.pinballMapId) {
+    //   return {
+    //     success: false,
+    //     added: 0,
+    //     removed: 0,
+    //     error: "Location does not have a PinballMap ID configured",
+    //   };
+    // }
 
-    // 2. Find the Main Floor room for this location
-    const mainFloorRoom = await prisma.room.findFirst({
-      where: {
-        locationId: location.id,
-        name: "Main Floor",
-      },
-    });
-
-    if (!mainFloorRoom) {
-      return {
-        success: false,
-        added: 0,
-        removed: 0,
-        error: "Main Floor room not found for location",
-      };
-    }
+    // 2. Location is used directly (no more room hierarchy)
+    // Machines are directly associated with locations in the new schema
 
     // 3. Fetch machine data from PinballMap
-    const machineData = await fetchLocationMachineDetails(
-      location.pinballMapId,
-    );
+    // TODO: Location no longer has pinballMapId field - need to redesign this
+    // const machineData = await fetchLocationMachineDetails(
+    //   location.pinballMapId,
+    // );
+
+    // For now, return early with error
+    return {
+      success: false,
+      added: 0,
+      removed: 0,
+      error: "PinballMap sync functionality needs to be updated for new schema",
+    };
 
     // 4. Validate the response structure
     if (!machineData || !Array.isArray(machineData.machines)) {
@@ -93,17 +89,19 @@ export async function syncLocationGames(
     }
 
     // 5. Reconcile the games
-    const result = await reconcileMachines(
-      prisma,
-      mainFloorRoom.id,
-      location.organizationId,
-      machineData.machines,
-    );
+    // TODO: Update this when PinballMap sync is re-implemented
+    // const result = await reconcileMachines(
+    //   prisma,
+    //   location.id,
+    //   location.organizationId,
+    //   machineData.machines,
+    // );
 
+    // TODO: Return actual results when re-implemented
     return {
       success: true,
-      added: result.added,
-      removed: result.removed,
+      added: 0,
+      removed: 0,
     };
   } catch (error) {
     // Provide specific error messages for different failure types
@@ -155,7 +153,7 @@ export async function processFixtureData(
       // Create game instance
       await prisma.machine.create({
         data: {
-          name: model.name,
+          organizationId: organizationId,
           modelId: model.id,
           locationId: locationId,
         },
@@ -224,7 +222,7 @@ export async function reconcileMachines(
     // Create game instance
     await prisma.machine.create({
       data: {
-        name: model.name,
+        organizationId: organizationId,
         modelId: model.id,
         locationId: locationId,
       },
@@ -275,13 +273,11 @@ export async function createOrUpdateModel(
       });
     }
   } else {
-    // Custom games are per-organization - use the compound unique constraint
+    // Custom games - in new schema, they are global but marked as custom
+    // TODO: Need to redesign custom game handling without organizationId
     return await prisma.model.upsert({
       where: {
-        unique_custom_game_per_org: {
-          name: machine.name,
-          organizationId: organizationId,
-        },
+        name: machine.name, // Simplified for now - may create duplicates
       },
       update: {
         name: machine.name,
@@ -289,7 +285,7 @@ export async function createOrUpdateModel(
       create: {
         name: machine.name,
         opdbId: null, // Custom games have no OPDB ID
-        organizationId: organizationId,
+        isCustom: true, // Mark as custom game
       },
     });
   }

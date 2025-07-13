@@ -4,10 +4,12 @@ import {
   createTRPCRouter,
   organizationProcedure,
   publicProcedure,
+  machineEditProcedure,
+  machineDeleteProcedure,
 } from "~/server/api/trpc";
 
 export const machineRouter = createTRPCRouter({
-  create: organizationProcedure
+  create: machineEditProcedure
     .input(
       z.object({
         name: z.string().min(1),
@@ -170,7 +172,7 @@ export const machineRouter = createTRPCRouter({
       return machine;
     }),
 
-  update: organizationProcedure
+  update: machineEditProcedure
     .input(
       z.object({
         id: z.string(),
@@ -252,7 +254,7 @@ export const machineRouter = createTRPCRouter({
       });
     }),
 
-  delete: organizationProcedure
+  delete: machineDeleteProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       // Verify the game instance belongs to this organization
@@ -275,7 +277,7 @@ export const machineRouter = createTRPCRouter({
     }),
 
   // Move a game instance to a different location
-  moveToLocation: organizationProcedure
+  moveToLocation: machineEditProcedure
     .input(
       z.object({
         machineId: z.string(),
@@ -341,7 +343,7 @@ export const machineRouter = createTRPCRouter({
     }),
 
   // Assign or remove owner from a game instance
-  assignOwner: organizationProcedure
+  assignOwner: machineEditProcedure
     .input(
       z.object({
         machineId: z.string(),

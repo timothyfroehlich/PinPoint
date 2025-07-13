@@ -2,7 +2,11 @@ import { z } from "zod";
 
 import { env } from "~/env";
 import { OPDBClient } from "~/lib/opdb/client";
-import { createTRPCRouter, organizationProcedure } from "~/server/api/trpc";
+import {
+  createTRPCRouter,
+  organizationProcedure,
+  organizationManageProcedure,
+} from "~/server/api/trpc";
 
 export const modelRouter = createTRPCRouter({
   // Search OPDB games for typeahead
@@ -14,7 +18,7 @@ export const modelRouter = createTRPCRouter({
     }),
 
   // Create Model from OPDB data
-  createFromOPDB: organizationProcedure
+  createFromOPDB: organizationManageProcedure
     .input(z.object({ opdbId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       // Check if this OPDB game already exists globally
@@ -55,7 +59,7 @@ export const modelRouter = createTRPCRouter({
     }),
 
   // Sync existing titles with OPDB
-  syncWithOPDB: organizationProcedure.mutation(async ({ ctx }) => {
+  syncWithOPDB: organizationManageProcedure.mutation(async ({ ctx }) => {
     // Find all OPDB games that have game instances in this organization
     const machinesInOrg = await ctx.db.machine.findMany({
       where: {
@@ -204,7 +208,7 @@ export const modelRouter = createTRPCRouter({
     }),
 
   // Delete game title (only if no game instances exist)
-  delete: organizationProcedure
+  delete: organizationManageProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       // Verify the game title belongs to this organization or is a global OPDB game

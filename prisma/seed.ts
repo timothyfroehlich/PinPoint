@@ -262,12 +262,45 @@ async function main() {
   }
   console.log(`Created/Updated location: ${austinPinballLocation.name}`);
 
-  // 8. Create models (formerly GameTitles) from PinballMap fixture data
+  // 8. Create models (formerly GameTitles) from PinballMap fixture data and additional OPDB games
   const fixtureData = await import(
     "../src/lib/pinballmap/__tests__/fixtures/api_responses/locations/location_26454_machine_details.json"
   );
 
+  // Additional OPDB test games for more comprehensive seeding
+  const additionalOPDBGames = [
+    {
+      opdb_id: "G43W4-MrRpw",
+      name: "AC/DC (Premium)",
+      manufacturer: "Stern",
+      releaseDate: new Date("2012-03-01"),
+      imageUrl: "https://opdb.org/images/games/acdc-premium.jpg",
+      description:
+        "AC/DC Premium pinball machine by Stern Pinball, featuring the legendary rock band's music and imagery.",
+    },
+    {
+      opdb_id: "G5K2X-N8vQs",
+      name: "Medieval Madness",
+      manufacturer: "Williams",
+      releaseDate: new Date("1997-06-01"),
+      imageUrl: "https://opdb.org/images/games/medieval-madness.jpg",
+      description:
+        "Medieval Madness is a medieval themed pinball machine designed by Brian Eddy and manufactured by Williams.",
+    },
+    {
+      opdb_id: "G7R9P-L3mYt",
+      name: "The Addams Family",
+      manufacturer: "Bally",
+      releaseDate: new Date("1992-02-01"),
+      imageUrl: "https://opdb.org/images/games/addams-family.jpg",
+      description:
+        "The Addams Family is a pinball machine based on the 1991 film of the same name.",
+    },
+  ];
+
   const createdModels = [];
+
+  // Create models from fixture data
   for (const machine of fixtureData.machines) {
     // All fixture games are OPDB games, so opdbId is globally unique and organizationId is omitted
     const model = await prisma.model.upsert({
@@ -280,6 +313,33 @@ async function main() {
       },
     });
     console.log(`Created/Updated model: ${model.name}`);
+    createdModels.push(model);
+  }
+
+  // Create models from additional OPDB games
+  for (const game of additionalOPDBGames) {
+    const model = await prisma.model.upsert({
+      where: { opdbId: game.opdb_id },
+      update: {
+        name: game.name,
+        manufacturer: game.manufacturer,
+        releaseDate: game.releaseDate,
+        imageUrl: game.imageUrl,
+        description: game.description,
+        lastSynced: new Date(),
+      },
+      create: {
+        name: game.name,
+        opdbId: game.opdb_id,
+        manufacturer: game.manufacturer,
+        releaseDate: game.releaseDate,
+        imageUrl: game.imageUrl,
+        description: game.description,
+        lastSynced: new Date(),
+        // Do NOT set organizationId for OPDB models (global)
+      },
+    });
+    console.log(`Created/Updated additional OPDB model: ${model.name}`);
     createdModels.push(model);
   }
 

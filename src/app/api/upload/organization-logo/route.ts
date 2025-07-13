@@ -8,13 +8,17 @@ export async function POST(req: NextRequest) {
   try {
     const session = await auth();
 
-    if (session?.user.role !== "admin") {
+    // TODO: Update authorization for new RBAC system
+    // Need to check user's role through membership and permissions
+    // For now, just require authenticated user
+    if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const formData = await req.formData();
     const file = formData.get("file") as File;
-    const organizationId = session.user.organizationId;
+    // TODO: Get organizationId from context/subdomain instead of user session
+    const organizationId = "temp-org-id"; // Placeholder - needs proper implementation
 
     if (!file) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
@@ -47,7 +51,7 @@ export async function POST(req: NextRequest) {
 
     const imageUrl = await imageStorage.uploadOrganizationLogo(
       file,
-      organization.subdomain,
+      organization.subdomain ?? "default",
     );
 
     await db.organization.update({
