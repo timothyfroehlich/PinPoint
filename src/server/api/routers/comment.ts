@@ -7,6 +7,7 @@ import {
   issueDeleteProcedure,
   organizationManageProcedure,
 } from "~/server/api/trpc";
+import { COMMENT_CLEANUP_CONFIG } from "~/server/constants/cleanup";
 import { CommentCleanupService } from "~/server/services/commentCleanupService";
 import { IssueActivityService } from "~/server/services/issueActivityService";
 
@@ -105,7 +106,7 @@ export const commentRouter = createTRPCRouter({
 
     return {
       candidateCount,
-      cleanupThresholdDays: 90,
+      cleanupThresholdDays: COMMENT_CLEANUP_CONFIG.RETENTION_DAYS,
     };
   }),
 });
