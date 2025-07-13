@@ -4,11 +4,14 @@
 
 **REQUIRED**: Read and understand `docs/planning/backend_impl_plan.md` before starting this task.
 
+**Multi-Agent Coordination**: This task is part of Phase 3B development. See @MULTI_AGENT_WORKFLOW.md for complete worktree setup, sync procedures, and coordination guidelines.
+
 ## Workflow
 
 - **Base Branch**: `epic/backend-refactor`
 - **Task Branch**: `task/10-redesign-pinballmap-integration`
 - **PR Target**: `epic/backend-refactor` (NOT main)
+- **Worktree**: `~/Code/PinPoint-worktrees/task-10-redesign-pinballmap-integration/`
 
 ## Dependencies
 
