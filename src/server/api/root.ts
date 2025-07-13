@@ -1,5 +1,6 @@
 import { organizationRouter } from "./routers/organization";
 
+import { commentRouter } from "~/server/api/routers/comment";
 import { issueRouter } from "~/server/api/routers/issue";
 import { issueStatusRouter } from "~/server/api/routers/issueStatus";
 import { locationRouter } from "~/server/api/routers/location";
@@ -15,6 +16,7 @@ import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
  * All routers added in /api/routers should be manually added here.
  */
 export const appRouter = createTRPCRouter({
+  comment: commentRouter,
   model: modelRouter,
   location: locationRouter,
   machine: machineRouter,

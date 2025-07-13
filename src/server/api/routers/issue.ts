@@ -345,7 +345,6 @@ export const issueRouter = createTRPCRouter({
         description: z.string().optional(),
         statusId: z.string().optional(),
         assigneeId: z.string().optional(),
-        showActivity: z.boolean().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -420,9 +419,6 @@ export const issueRouter = createTRPCRouter({
           ...(input.statusId && { statusId: input.statusId }),
           ...(input.assigneeId !== undefined && {
             assigneeId: input.assigneeId || null,
-          }),
-          ...(input.showActivity !== undefined && {
-            showActivity: input.showActivity,
           }),
         },
         include: {
@@ -602,8 +598,6 @@ export const issueRouter = createTRPCRouter({
         where: { id: input.commentId },
         data: {
           content: input.content,
-          editedAt: new Date(),
-          edited: true,
         },
         include: {
           author: {
@@ -676,17 +670,17 @@ export const issueRouter = createTRPCRouter({
         where: { id: input.commentId },
         data: {
           deletedAt: new Date(),
-          deletedById: ctx.session.user.id,
+          deletedBy: ctx.session.user.id,
         },
       });
 
       // Record deletion activity
       const activityService = new IssueActivityService(ctx.db);
-      await activityService.recordCommentDeletion(
+      await activityService.recordCommentDeleted(
         comment.issue.id,
         ctx.organization.id,
         ctx.session.user.id,
-        comment.authorId !== ctx.session.user.id, // isAdminDelete
+        input.commentId,
       );
 
       return deletedComment;
@@ -716,7 +710,7 @@ export const issueRouter = createTRPCRouter({
           organizationId: ctx.organization.id,
         },
         select: {
-          showActivity: true,
+          id: true,
         },
       });
 
