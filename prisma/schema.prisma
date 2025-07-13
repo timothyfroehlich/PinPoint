@@ -37,6 +37,7 @@ model User {
   comments       Comment[]
   deletedComments Comment[] @relation("CommentDeleter")
   upvotes        Upvote[]
+  activityHistory IssueHistory[] @relation("ActivityActor")
 }
 
 model Account {
@@ -95,6 +96,7 @@ model Organization {
   priorities      Priority[]
   issueStatuses   IssueStatus[]
   collectionTypes CollectionType[]
+  issueHistory    IssueHistory[]
 }
 
 model Membership {
@@ -241,6 +243,19 @@ enum StatusCategory {
   RESOLVED
 }
 
+enum ActivityType {
+  CREATED         // Issue created
+  STATUS_CHANGED  // Status updated
+  ASSIGNED        // Assignee changed
+  PRIORITY_CHANGED // Priority updated
+  COMMENTED       // Comment added
+  ATTACHMENT_ADDED // File attached
+  MERGED          // Issue merged (V1.0)
+  RESOLVED        // Issue resolved
+  REOPENED        // Issue reopened
+  SYSTEM          // System-generated activity
+}
+
 model Comment {
   id        String   @id @default(cuid())
   content   String   @db.Text
@@ -272,14 +287,22 @@ model Attachment {
 }
 
 model IssueHistory {
-  id        String   @id @default(cuid())
-  field     String   // e.g., "status", "assignee"
-  oldValue  String?
-  newValue  String?
-  changedAt DateTime @default(now())
-  issueId   String
+  id             String   @id @default(cuid())
+  field          String   // e.g., "status", "assignee", "priority"
+  oldValue       String?
+  newValue       String?
+  changedAt      DateTime @default(now())
 
-  issue Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  // Add missing fields
+  organizationId String   // For multi-tenancy
+  actorId        String?  // Who performed the action (null for system actions)
+  type           ActivityType // Replace string with proper enum
+
+  // Relations
+  issueId        String
+  issue          Issue        @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actor          User?        @relation("ActivityActor", fields: [actorId], references: [id])
 }
 
 model Upvote {
