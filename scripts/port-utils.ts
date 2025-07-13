@@ -8,6 +8,7 @@
 
 import { createHash } from "crypto";
 import path from "path";
+import fs from "fs";
 
 interface PortConfiguration {
   nextPort?: number;
@@ -40,7 +41,6 @@ function hashWorkspacePath(workspacePath: string): number {
  */
 function isGitWorktree(workspacePath: string): boolean {
   try {
-    const fs = require("fs");
     const gitPath = path.join(workspacePath, ".git");
 
     // Check if .git exists and if it's a file (worktree) vs directory (main repo)
@@ -120,12 +120,10 @@ function generateEnvVars(
 
     // Use environment variables for database credentials, with development defaults
     const dbUser = process.env.DB_USER || "postgres";
-    const dbPassword = process.env.DB_PASSWORD
-      ? `:${process.env.DB_PASSWORD}`
-      : "";
+    const dbPassword = process.env.DB_PASSWORD || "password"; // Default to 'password' for consistency
     const dbHost = process.env.DB_HOST || "localhost";
 
-    envVars.DATABASE_URL = `postgresql://${dbUser}${dbPassword}@${dbHost}:${ports.databasePort}/${ports.databaseName}`;
+    envVars.DATABASE_URL = `postgresql://${dbUser}:${dbPassword}@${dbHost}:${ports.databasePort}/${ports.databaseName}`;
   }
 
   return envVars;
