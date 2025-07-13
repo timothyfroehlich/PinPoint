@@ -375,9 +375,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Check if user has permission to attach files
-    // For now, anyone who can create issues can attach files
-    // Later this could be more granular with "attachment:create" permission
-    await requireUploadPermission(ctx, "issue:create");
+    // Using attachment:create permission for granular control
+    await requireUploadPermission(ctx, "attachment:create");
 
     // Validate file size (max 10MB for attachments)
     if (file.size > 10 * 1024 * 1024) {

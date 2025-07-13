@@ -48,9 +48,11 @@ export async function syncLocationGames(
       };
     }
 
-    // TODO: Location model no longer has pinballMapId field
-    // This functionality needs to be redesigned for the new schema
-    // For now, skip this check
+    // IMPORTANT: PinballMap integration is currently non-functional due to V1.0 schema changes
+    // The Location model no longer has pinballMapId field required for PinballMap sync
+    // This entire service will be completely redesigned in Task 10: Redesign PinballMap Integration
+    // See: docs/backend_impl_tasks/10-redesign-pinballmap-integration.md
+    // Until then, this function returns an error to prevent silent failures
     // if (!location.pinballMapId) {
     //   return {
     //     success: false,

@@ -220,8 +220,8 @@ To improve security and maintainability, all environment variable access should 
     server: {
     DATABASE_URL: z.string().url(),
     NODE_ENV: z.enum(["development", "test", "production"]),
-    NEXTAUTH_SECRET: process.env.NODE_ENV === "production" ? z.string().min(1) : z.string().min(1).optional(),
-    NEXTAUTH_URL: z.preprocess(
+    AUTH_SECRET: process.env.NODE_ENV === "production" ? z.string().min(1) : z.string().min(1).optional(), // Use AUTH_SECRET for Auth.js v5
+    AUTH_URL: z.preprocess( // Auth
     (str) => process.env.VERCEL_URL ?? str,
     process.env.VERCEL ? z.string().min(1) : z.string().url()
     ),
