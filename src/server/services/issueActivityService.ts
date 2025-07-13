@@ -96,7 +96,7 @@ export class IssueActivityService {
     newValue: string,
   ): Promise<void> {
     await this.recordActivity(issueId, organizationId, {
-      type: "field_update",
+      type: ActivityType.SYSTEM,
       actorId,
       fieldName,
       oldValue,
@@ -134,7 +134,7 @@ export class IssueActivityService {
             },
           },
         },
-        orderBy: { changedAt: "asc" },
+        orderBy: { createdAt: "asc" },
       }),
       this.prisma.issueHistory.findMany({
         where: { issueId, organizationId },
