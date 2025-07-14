@@ -46,3 +46,10 @@ next-env.d.ts
 # Temporary files
 /tmp
 .recycle_bin/
+
+# Playwright
+node_modules/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
