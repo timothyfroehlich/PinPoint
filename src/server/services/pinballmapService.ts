@@ -205,6 +205,7 @@ export class PinballMapService {
           // Create new machine
           await this.prisma.machine.create({
             data: {
+              name: model.name, // Use model name as default instance name
               organizationId,
               locationId,
               modelId: model.id,
@@ -414,6 +415,7 @@ export async function processFixtureData(
         // Create machine instance
         await prisma.machine.create({
           data: {
+            name: model.name, // Use model name as default instance name
             organizationId: organizationId,
             modelId: model.id,
             locationId: locationId,

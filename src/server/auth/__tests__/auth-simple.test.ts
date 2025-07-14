@@ -22,17 +22,17 @@ describe("Authentication Core Logic", () => {
 
   describe("User Role Types", () => {
     it("should support admin role", () => {
-      const adminRole: Role = "admin";
+      const adminRole = "admin";
       expect(adminRole).toBe("admin");
     });
 
     it("should support member role", () => {
-      const memberRole: Role = "member";
+      const memberRole = "member";
       expect(memberRole).toBe("member");
     });
 
     it("should support player role", () => {
-      const playerRole: Role = "player";
+      const playerRole = "player";
       expect(playerRole).toBe("player");
     });
   });
@@ -66,7 +66,7 @@ describe("Authentication Core Logic", () => {
         name?: string | null;
         email?: string | null;
         image?: string | null;
-        role?: Role;
+        role?: string;
         organizationId?: string;
       }
 
@@ -90,7 +90,7 @@ describe("Authentication Core Logic", () => {
           name?: string | null;
           email?: string | null;
           image?: string | null;
-          role?: Role;
+          role?: string;
           organizationId?: string;
         };
         expires: string;

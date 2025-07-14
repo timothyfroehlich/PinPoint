@@ -14,14 +14,12 @@ export const locationRouter = createTRPCRouter({
     .input(
       z.object({
         name: z.string().min(1),
-        notes: z.string().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       return ctx.db.location.create({
         data: {
           name: input.name,
-          notes: input.notes,
           organizationId: ctx.organization.id,
         },
       });
@@ -33,11 +31,11 @@ export const locationRouter = createTRPCRouter({
         organizationId: ctx.organization.id,
       },
       include: {
-        rooms: {
+        machines: {
           include: {
             _count: {
               select: {
-                machines: true,
+                issues: true,
               },
             },
           },
@@ -52,7 +50,6 @@ export const locationRouter = createTRPCRouter({
       z.object({
         id: z.string(),
         name: z.string().min(1).optional(),
-        notes: z.string().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -63,7 +60,6 @@ export const locationRouter = createTRPCRouter({
         },
         data: {
           ...(input.name && { name: input.name }),
-          ...(input.notes !== undefined && { notes: input.notes }),
         },
       });
     }),
@@ -78,28 +74,17 @@ export const locationRouter = createTRPCRouter({
           organizationId: ctx.organization.id,
         },
         include: {
-          rooms: {
+          machines: {
             include: {
-              machines: {
-                include: {
-                  model: true,
-                  owner: {
-                    select: {
-                      id: true,
-                      name: true,
-                      profilePicture: true,
-                    },
-                  },
-                },
-                orderBy: { name: "asc" },
-              },
-              _count: {
+              model: true,
+              owner: {
                 select: {
-                  machines: true,
+                  id: true,
+                  name: true,
+                  image: true,
                 },
               },
             },
-            orderBy: { name: "asc" },
           },
         },
       });

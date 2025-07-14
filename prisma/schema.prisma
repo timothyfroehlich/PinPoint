@@ -196,6 +196,7 @@ model Model {
 // Replaces GameInstance
 model Machine {
   id             String  @id @default(cuid())
+  name           String  // Instance-specific name (e.g., "Medieval Madness #1")
   organizationId String
   locationId     String
   modelId        String

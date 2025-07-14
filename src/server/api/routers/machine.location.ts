@@ -16,9 +16,7 @@ export const machineLocationRouter = createTRPCRouter({
       const existingInstance = await ctx.db.machine.findFirst({
         where: {
           id: input.machineId,
-          room: {
-            organizationId: ctx.organization.id,
-          },
+          organizationId: ctx.organization.id,
         },
       });
 
@@ -26,16 +24,16 @@ export const machineLocationRouter = createTRPCRouter({
         throw new Error("Game instance not found");
       }
 
-      // Verify the target room belongs to this organization
-      const room = await ctx.db.room.findFirst({
+      // Verify the target location belongs to this organization
+      const location = await ctx.db.location.findFirst({
         where: {
           id: input.locationId,
           organizationId: ctx.organization.id,
         },
       });
 
-      if (!room) {
-        throw new Error("Target room not found");
+      if (!location) {
+        throw new Error("Target location not found");
       }
 
       return ctx.db.machine.update({
@@ -44,25 +42,13 @@ export const machineLocationRouter = createTRPCRouter({
           locationId: input.locationId,
         },
         include: {
-          model: {
-            include: {
-              _count: {
-                select: {
-                  machines: true,
-                },
-              },
-            },
-          },
-          room: {
-            include: {
-              location: true,
-            },
-          },
+          model: true,
+          location: true,
           owner: {
             select: {
               id: true,
               name: true,
-              profilePicture: true,
+              image: true,
             },
           },
         },
