@@ -325,19 +325,18 @@ async function main() {
       update: {
         name: game.name,
         manufacturer: game.manufacturer,
-        releaseDate: game.releaseDate,
-        imageUrl: game.imageUrl,
-        description: game.description,
-        lastSynced: new Date(),
+        year: game.releaseDate
+          ? new Date(game.releaseDate).getFullYear()
+          : null,
       },
       create: {
         name: game.name,
         opdbId: game.opdb_id,
         manufacturer: game.manufacturer,
-        releaseDate: game.releaseDate,
-        imageUrl: game.imageUrl,
-        description: game.description,
-        lastSynced: new Date(),
+        year: game.releaseDate
+          ? new Date(game.releaseDate).getFullYear()
+          : null,
+        isCustom: false, // OPDB games are not custom
         // Do NOT set organizationId for OPDB models (global)
       },
     });

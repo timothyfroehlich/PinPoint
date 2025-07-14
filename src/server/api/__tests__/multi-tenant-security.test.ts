@@ -6,6 +6,13 @@ import { createCallerFactory } from "~/server/api/trpc";
 import { auth } from "~/server/auth";
 import { db } from "~/server/db";
 
+// Temporary enum for testing with the new schema
+enum Role {
+  ADMIN = "admin",
+  MEMBER = "member",
+  TECHNICIAN = "technician",
+}
+
 // Create properly typed mock functions
 const mockOrganizationFindUnique = jest.fn();
 const mockMembershipFindUnique = jest.fn();
@@ -56,6 +63,38 @@ const mockAuth = auth as jest.Mock;
 describe("Multi-Tenant Security Tests", () => {
   const createCaller = createCallerFactory(appRouter);
 
+  // Type helper to properly type the caller with issue procedures
+  interface IssueGetAllInput {
+    locationId?: string;
+    statusId?: string;
+    modelId?: string;
+    statusCategory?: "NEW" | "OPEN" | "CLOSED";
+    sortBy?: "created" | "updated" | "status" | "severity" | "game";
+    sortOrder?: "asc" | "desc";
+  }
+
+  interface IssueCreateInput {
+    title: string;
+    description?: string;
+    severity?: "Low" | "Medium" | "High" | "Critical";
+    machineId: string;
+    statusId: string;
+  }
+
+  interface IssueUpdateInput {
+    id: string;
+    title?: string;
+  }
+
+  type CallerType = ReturnType<typeof createCaller> & {
+    issue: {
+      getAll: (input?: IssueGetAllInput) => Promise<unknown>;
+      getById: (input: { id: string }) => Promise<unknown>;
+      create: (input: IssueCreateInput) => Promise<unknown>;
+      update: (input: IssueUpdateInput) => Promise<unknown>;
+    };
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -66,6 +105,8 @@ describe("Multi-Tenant Security Tests", () => {
     name: "Organization A",
     subdomain: "org-a",
     logoUrl: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
   };
 
   const userAMember = {
@@ -88,6 +129,8 @@ describe("Multi-Tenant Security Tests", () => {
     name: "Organization B",
     subdomain: "org-b",
     logoUrl: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
   };
 
   const userBMember = {
@@ -150,7 +193,7 @@ describe("Multi-Tenant Security Tests", () => {
         headers: new Headers({
           host: "org-a.localhost:3000",
         }),
-      });
+      }) as CallerType;
 
       const result = await callerA.issue.getAll({
         locationId: undefined,
@@ -199,7 +242,7 @@ describe("Multi-Tenant Security Tests", () => {
         headers: new Headers({
           host: "org-b.localhost:3000", // User A trying to access org B
         }),
-      });
+      }) as CallerType;
 
       await expect(
         callerA.issue.getAll({
@@ -258,7 +301,7 @@ describe("Multi-Tenant Security Tests", () => {
         headers: new Headers({
           host: "org-a.localhost:3000",
         }),
-      });
+      }) as CallerType;
 
       const resultA = await callerA.issue.getAll({
         locationId: undefined,
@@ -285,7 +328,7 @@ describe("Multi-Tenant Security Tests", () => {
         headers: new Headers({
           host: "org-b.localhost:3000",
         }),
-      });
+      }) as CallerType;
 
       const resultB = await callerB.issue.getAll({
         locationId: undefined,
@@ -341,7 +384,7 @@ describe("Multi-Tenant Security Tests", () => {
         headers: new Headers({
           host: "org-a.localhost:3000",
         }),
-      });
+      }) as CallerType;
 
       // This should fail because the issue belongs to a different organization
       await expect(callerA.issue.getById({ id: "issue-b-1" })).rejects.toThrow(
@@ -375,7 +418,7 @@ describe("Multi-Tenant Security Tests", () => {
         headers: new Headers({
           host: "org-a.localhost:3000",
         }),
-      });
+      }) as CallerType;
 
       // The create mutation should automatically add the correct organizationId
       const createData = {
@@ -435,7 +478,7 @@ describe("Multi-Tenant Security Tests", () => {
         headers: new Headers({
           host: "org-a.localhost:3000",
         }),
-      });
+      }) as CallerType;
 
       // Should fail to update issue from different organization
       await expect(
@@ -476,7 +519,7 @@ describe("Multi-Tenant Security Tests", () => {
         headers: new Headers({
           host: "org-a.localhost:3000",
         }),
-      });
+      }) as CallerType;
 
       // Member should be able to access organization data
       mockIssueFindMany.mockResolvedValue(issuesOrgA);
@@ -518,7 +561,7 @@ describe("Multi-Tenant Security Tests", () => {
         headers: new Headers({
           host: "org-a.localhost:3000",
         }),
-      });
+      }) as CallerType;
 
       // Admin should have access to organization data
       mockIssueFindMany.mockResolvedValue(issuesOrgA);
@@ -568,7 +611,7 @@ describe("Multi-Tenant Security Tests", () => {
         headers: new Headers({
           host: "org-a.localhost:3000",
         }),
-      });
+      }) as CallerType;
 
       await caller.user.getCurrentMembership();
 
@@ -602,7 +645,7 @@ describe("Multi-Tenant Security Tests", () => {
         headers: new Headers({
           host: "org-b.localhost:3000", // Spoofed subdomain
         }),
-      });
+      }) as CallerType;
 
       await expect(caller.user.getCurrentMembership()).rejects.toThrow(
         new TRPCError({

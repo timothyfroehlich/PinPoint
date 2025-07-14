@@ -5,12 +5,19 @@
 export interface PinballMapMachine {
   id: number;
   name: string;
+  machine_name: string; // Actual display name
   year?: number;
   manufacturer?: string;
   ipdb_link?: string | null;
-  ipdb_id?: number | null;
+  ipdb_id?: string | null; // Change to string to match IPDB format
   kineticist_url?: string;
   opdb_id?: string | null;
+
+  // Enhanced fields from PinballMap API analysis
+  machine_type?: string; // "em", "ss", "digital"
+  machine_display?: string; // "reels", "dmd", "lcd", "alphanumeric"
+  is_active?: boolean;
+  opdb_img?: string; // Image URL from OPDB
 }
 
 export interface PinballMapMachineDetailsResponse {
