@@ -14,23 +14,11 @@ export const modelCoreRouter = createTRPCRouter({
     // 2. Global OPDB games that have instances in this organization
     return ctx.db.model.findMany({
       where: {
-        OR: [
-          // Custom games for this organization
-          {
+        machines: {
+          some: {
             organizationId: ctx.organization.id,
           },
-          // Global OPDB games with instances in this organization
-          {
-            organizationId: null,
-            machines: {
-              some: {
-                room: {
-                  organizationId: ctx.organization.id,
-                },
-              },
-            },
-          },
-        ],
+        },
       },
       orderBy: { name: "asc" },
       include: {
@@ -38,9 +26,7 @@ export const modelCoreRouter = createTRPCRouter({
           select: {
             machines: {
               where: {
-                room: {
-                  organizationId: ctx.organization.id,
-                },
+                organizationId: ctx.organization.id,
               },
             },
           },
@@ -56,32 +42,18 @@ export const modelCoreRouter = createTRPCRouter({
       const model = await ctx.db.model.findFirst({
         where: {
           id: input.id,
-          OR: [
-            // Custom games for this organization
-            {
+          machines: {
+            some: {
               organizationId: ctx.organization.id,
             },
-            // Global OPDB games with instances in this organization
-            {
-              organizationId: null,
-              machines: {
-                some: {
-                  room: {
-                    organizationId: ctx.organization.id,
-                  },
-                },
-              },
-            },
-          ],
+          },
         },
         include: {
           _count: {
             select: {
               machines: {
                 where: {
-                  room: {
-                    organizationId: ctx.organization.id,
-                  },
+                  organizationId: ctx.organization.id,
                 },
               },
             },
@@ -104,32 +76,18 @@ export const modelCoreRouter = createTRPCRouter({
       const model = await ctx.db.model.findFirst({
         where: {
           id: input.id,
-          OR: [
-            // Custom games for this organization (can be deleted)
-            {
+          machines: {
+            some: {
               organizationId: ctx.organization.id,
             },
-            // Global OPDB games (cannot be deleted, only instances can be removed)
-            {
-              organizationId: null,
-              machines: {
-                some: {
-                  room: {
-                    organizationId: ctx.organization.id,
-                  },
-                },
-              },
-            },
-          ],
+          },
         },
         include: {
           _count: {
             select: {
               machines: {
                 where: {
-                  room: {
-                    organizationId: ctx.organization.id,
-                  },
+                  organizationId: ctx.organization.id,
                 },
               },
             },
@@ -141,10 +99,9 @@ export const modelCoreRouter = createTRPCRouter({
         throw new Error("Game title not found");
       }
 
-      // Don't allow deleting global OPDB games
-      if (model.organizationId === null) {
+      if (model.isCustom) {
         throw new Error(
-          "Cannot delete global OPDB games. Remove game instances instead.",
+          "Cannot delete custom games. Remove game instances instead.",
         );
       }
 

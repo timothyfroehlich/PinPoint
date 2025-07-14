@@ -765,3 +765,761 @@ git checkout HEAD -- prisma/schema.prisma
 # Reset database
 npm run db:reset
 ```
+
+---
+
+# Testing Requirements for PinballMap Integration
+
+> **GitHub Issue**: [#73 - Implement Comprehensive Test Suite for Redesigned PinballMap Integration](https://github.com/timothyfroehlich/PinPoint/issues/73)
+
+## Overview
+
+The redesigned PinballMap integration requires comprehensive testing to ensure reliability, security, and proper functionality. This section outlines the testing strategy, expected behaviors, and specific test cases needed for beta release and beyond.
+
+## Background: PinballMap Integration Business Logic
+
+### Core Workflow Understanding
+
+The PinballMap integration follows this essential workflow:
+
+1. **Organization Setup**: Admin enables PinballMap integration for their organization
+2. **Location Configuration**: Admin links a PinPoint location to a PinballMap location ID
+3. **Machine Synchronization**: System fetches machine data from PinballMap and reconciles with local database
+4. **Data Management**: System handles machine additions, updates, and removals based on configuration
+
+### Critical Business Rules
+
+#### **Machine Reconciliation Logic**
+
+The core business logic centers around reconciling PinballMap machine data with local PinPoint data:
+
+- **Addition**: If a machine exists on PinballMap but not locally, create a new Machine record
+- **Preservation**: If a machine exists both places, keep the local Machine record (mark as "found")
+- **Removal Decision**: If a machine exists locally but not on PinballMap:
+  - **With Issues**: NEVER remove machines that have associated Issue records (data protection)
+  - **Without Issues**: Remove based on `updateExistingData` configuration setting
+  - **Configuration Control**: Organizations can choose to "keep removed games" or "remove missing games"
+
+#### **Model (Game Title) Management**
+
+Models represent pinball machine types (e.g., "Medieval Madness", "Twilight Zone"):
+
+- **Global OPDB Models**: Games with OPDB IDs are shared across all organizations (global records)
+- **Cross-Database Priority**: OPDB ID lookup → IPDB ID lookup → create new Model
+- **Custom Games**: Games without OPDB/IPDB IDs become organization-specific Models
+- **Deduplication**: Prevent duplicate Models through unique constraints on opdbId/ipdbId
+
+#### **Multi-Tenancy & Security**
+
+Organization isolation is critical throughout the sync process:
+
+- **Scoped Queries**: All database queries must include organization filtering
+- **Configuration Inheritance**: Location sync settings inherit from organization PinballMapConfig
+- **Access Control**: Only organization admins can configure and trigger syncs
+- **Data Isolation**: Cross-organization data access must be impossible
+
+#### **Error Handling & Resilience**
+
+The system must gracefully handle various failure scenarios:
+
+- **API Failures**: PinballMap API downtime or rate limiting
+- **Partial Failures**: Some machines succeed, others fail during sync
+- **Concurrent Operations**: Multiple syncs or overlapping operations
+- **Data Integrity**: Maintain database consistency despite external API issues
+
+## Testing Strategy
+
+### Priority 1: Beta-Critical Tests
+
+These tests are essential for beta release and must be implemented first:
+
+#### **1. Core PinballMapService Class Tests**
+
+**File**: `src/server/services/__tests__/pinballmapService.test.ts`
+
+##### Constructor & Basic Setup
+
+```typescript
+describe("PinballMapService", () => {
+  describe("constructor", () => {
+    it("should instantiate with Prisma client dependency injection", () => {
+      const service = new PinballMapService(mockPrisma);
+      expect(service).toBeInstanceOf(PinballMapService);
+    });
+  });
+});
+```
+
+##### enableIntegration() Method
+
+```typescript
+describe("enableIntegration", () => {
+  it("should create PinballMapConfig for new organization", async () => {
+    mockPrisma.pinballMapConfig.upsert.mockResolvedValue(mockConfig);
+
+    await service.enableIntegration("org-123");
+
+    expect(mockPrisma.pinballMapConfig.upsert).toHaveBeenCalledWith({
+      where: { organizationId: "org-123" },
+      create: {
+        organizationId: "org-123",
+        apiEnabled: true,
+        autoSyncEnabled: false,
+      },
+      update: { apiEnabled: true },
+    });
+  });
+
+  it("should update existing PinballMapConfig to enabled", async () => {
+    // Test that re-enabling updates existing config
+  });
+});
+```
+
+##### configureLocationSync() Method
+
+```typescript
+describe("configureLocationSync", () => {
+  it("should require PinballMap integration to be enabled", async () => {
+    mockPrisma.pinballMapConfig.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.configureLocationSync("loc-123", 26454, "org-123"),
+    ).rejects.toThrow("PinballMap integration not enabled for organization");
+  });
+
+  it("should update location with PinballMap ID and enable sync", async () => {
+    mockPrisma.pinballMapConfig.findUnique.mockResolvedValue({
+      apiEnabled: true,
+    });
+
+    await service.configureLocationSync("loc-123", 26454, "org-123");
+
+    expect(mockPrisma.location.update).toHaveBeenCalledWith({
+      where: { id: "loc-123" },
+      data: {
+        pinballMapId: 26454,
+        syncEnabled: true,
+      },
+    });
+  });
+});
+```
+
+##### syncLocation() Method - Core Sync Logic
+
+This is the most critical method requiring extensive testing:
+
+```typescript
+describe("syncLocation", () => {
+  beforeEach(() => {
+    setupMockLocation();
+    setupMockPinballMapAPI();
+  });
+
+  it("should return error if location not found", async () => {
+    mockPrisma.location.findUnique.mockResolvedValue(null);
+
+    const result = await service.syncLocation("invalid-location");
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("Location not found");
+    expect(result.added).toBe(0);
+    expect(result.removed).toBe(0);
+  });
+
+  it("should return error if location lacks PinballMap ID", async () => {
+    mockPrisma.location.findUnique.mockResolvedValue({
+      ...mockLocation,
+      pinballMapId: null,
+    });
+
+    const result = await service.syncLocation("loc-123");
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("Location not configured for PinballMap sync");
+  });
+
+  it("should return error if organization has integration disabled", async () => {
+    mockPrisma.location.findUnique.mockResolvedValue({
+      ...mockLocation,
+      organization: {
+        pinballMapConfig: { apiEnabled: false },
+      },
+    });
+
+    const result = await service.syncLocation("loc-123");
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("PinballMap integration not enabled");
+  });
+
+  it("should successfully sync machines from PinballMap", async () => {
+    setupSuccessfulSync();
+
+    const result = await service.syncLocation("loc-123");
+
+    expect(result.success).toBe(true);
+    expect(result.added).toBeGreaterThan(0);
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/locations/26454/machine_details.json"),
+    );
+  });
+
+  it("should update lastSyncAt timestamp on successful sync", async () => {
+    setupSuccessfulSync();
+    const beforeSync = new Date();
+
+    await service.syncLocation("loc-123");
+
+    expect(mockPrisma.location.update).toHaveBeenCalledWith({
+      where: { id: "loc-123" },
+      data: { lastSyncAt: expect.any(Date) },
+    });
+  });
+});
+```
+
+#### **2. Machine Reconciliation Logic Tests**
+
+**Critical Business Logic**: The heart of the PinballMap integration
+
+```typescript
+describe("reconcileMachines", () => {
+  const mockConfig = {
+    createMissingModels: true,
+    updateExistingData: false,
+  };
+
+  it("should add machines that exist on PinballMap but not locally", async () => {
+    const pinballMapMachines = [
+      { opdb_id: "MM-001", machine_name: "Medieval Madness" },
+      { opdb_id: "TZ-001", machine_name: "Twilight Zone" },
+    ];
+    mockPrisma.machine.findMany.mockResolvedValue([]); // No existing machines
+    setupModelCreation();
+
+    const result = await service.reconcileMachines(
+      "loc-123",
+      "org-123",
+      pinballMapMachines,
+      mockConfig,
+    );
+
+    expect(result.added).toBe(2);
+    expect(result.removed).toBe(0);
+    expect(mockPrisma.machine.create).toHaveBeenCalledTimes(2);
+  });
+
+  it("should preserve existing machines found on PinballMap", async () => {
+    const existingMachine = {
+      id: "machine-existing",
+      modelId: "model-mm",
+      model: { opdbId: "MM-001" },
+    };
+    const pinballMapMachines = [
+      { opdb_id: "MM-001", machine_name: "Medieval Madness" },
+    ];
+    mockPrisma.machine.findMany.mockResolvedValue([existingMachine]);
+    setupExistingModel("MM-001", "model-mm");
+
+    const result = await service.reconcileMachines(
+      "loc-123",
+      "org-123",
+      pinballMapMachines,
+      mockConfig,
+    );
+
+    expect(result.added).toBe(0);
+    expect(result.removed).toBe(0);
+    expect(mockPrisma.machine.delete).not.toHaveBeenCalled();
+  });
+
+  it("should NEVER remove machines with associated issues", async () => {
+    const machineWithIssues = {
+      id: "machine-with-issues",
+      modelId: "model-old",
+      model: { opdbId: "OLD-001" },
+    };
+    mockPrisma.machine.findMany.mockResolvedValue([machineWithIssues]);
+    mockPrisma.issue.count.mockResolvedValue(3); // Machine has 3 issues
+    // PinballMap returns empty (machine removed from location)
+
+    const result = await service.reconcileMachines(
+      "loc-123",
+      "org-123",
+      [],
+      mockConfig,
+    );
+
+    expect(result.removed).toBe(0);
+    expect(mockPrisma.machine.delete).not.toHaveBeenCalled();
+    expect(mockPrisma.issue.count).toHaveBeenCalledWith({
+      where: { machineId: "machine-with-issues" },
+    });
+  });
+
+  it("should remove machines without issues when missing from PinballMap", async () => {
+    const machineWithoutIssues = {
+      id: "machine-no-issues",
+      modelId: "model-old",
+      model: { opdbId: "OLD-001" },
+    };
+    mockPrisma.machine.findMany.mockResolvedValue([machineWithoutIssues]);
+    mockPrisma.issue.count.mockResolvedValue(0); // No issues
+    // PinballMap returns empty (machine removed from location)
+
+    const result = await service.reconcileMachines(
+      "loc-123",
+      "org-123",
+      [],
+      mockConfig,
+    );
+
+    expect(result.removed).toBe(1);
+    expect(mockPrisma.machine.delete).toHaveBeenCalledWith({
+      where: { id: "machine-no-issues" },
+    });
+  });
+
+  it("should respect createMissingModels configuration", async () => {
+    const configNoCreate = { ...mockConfig, createMissingModels: false };
+    const unknownMachine = {
+      opdb_id: "UNKNOWN-001",
+      machine_name: "Unknown Game",
+    };
+    mockPrisma.model.findUnique.mockResolvedValue(null); // Model doesn't exist
+
+    const result = await service.reconcileMachines(
+      "loc-123",
+      "org-123",
+      [unknownMachine],
+      configNoCreate,
+    );
+
+    expect(result.added).toBe(0);
+    expect(mockPrisma.model.create).not.toHaveBeenCalled();
+    expect(mockPrisma.machine.create).not.toHaveBeenCalled();
+  });
+});
+```
+
+#### **3. Cross-Database Model Lookup Tests**
+
+**Critical Business Logic**: OPDB → IPDB → create new priority chain
+
+```typescript
+describe("findOrCreateModel", () => {
+  it("should find existing Model by OPDB ID first", async () => {
+    const existingModel = {
+      id: "model-123",
+      name: "Medieval Madness",
+      opdbId: "MM-001",
+    };
+    mockPrisma.model.findUnique
+      .mockResolvedValueOnce(existingModel) // OPDB lookup succeeds
+      .mockResolvedValueOnce(null); // IPDB lookup not called
+
+    const result = await service.findOrCreateModel(
+      { opdb_id: "MM-001", ipdb_id: "1234", machine_name: "Medieval Madness" },
+      true,
+    );
+
+    expect(result).toEqual(existingModel);
+    expect(mockPrisma.model.findUnique).toHaveBeenCalledWith({
+      where: { opdbId: "MM-001" },
+    });
+    expect(mockPrisma.model.findUnique).toHaveBeenCalledTimes(1); // Only OPDB lookup
+  });
+
+  it("should fallback to IPDB ID if OPDB ID not found", async () => {
+    const existingModel = {
+      id: "model-456",
+      name: "Twilight Zone",
+      ipdbId: "1234",
+    };
+    mockPrisma.model.findUnique
+      .mockResolvedValueOnce(null) // OPDB lookup fails
+      .mockResolvedValueOnce(existingModel); // IPDB lookup succeeds
+
+    const result = await service.findOrCreateModel(
+      { opdb_id: "TZ-001", ipdb_id: "1234", machine_name: "Twilight Zone" },
+      true,
+    );
+
+    expect(result).toEqual(existingModel);
+    expect(mockPrisma.model.findUnique).toHaveBeenCalledWith({
+      where: { opdbId: "TZ-001" },
+    });
+    expect(mockPrisma.model.findUnique).toHaveBeenCalledWith({
+      where: { ipdbId: "1234" },
+    });
+  });
+
+  it("should create new Model if neither OPDB nor IPDB found", async () => {
+    const newModel = { id: "model-new", name: "New Game" };
+    mockPrisma.model.findUnique.mockResolvedValue(null); // Both lookups fail
+    mockPrisma.model.create.mockResolvedValue(newModel);
+
+    const result = await service.findOrCreateModel(
+      {
+        opdb_id: "NEW-001",
+        ipdb_id: "5678",
+        machine_name: "New Game",
+        manufacturer: "Stern",
+        year: 2023,
+        machine_type: "ss",
+        machine_display: "dmd",
+        is_active: true,
+        ipdb_link: "http://ipdb.org/5678",
+        opdb_img: "http://opdb.org/new-001.jpg",
+        kineticist_url: "http://kineticist.com/new-001",
+      },
+      true,
+    );
+
+    expect(result).toEqual(newModel);
+    expect(mockPrisma.model.create).toHaveBeenCalledWith({
+      data: {
+        name: "New Game",
+        manufacturer: "Stern",
+        year: 2023,
+        opdbId: "NEW-001",
+        ipdbId: "5678",
+        machineType: "ss",
+        machineDisplay: "dmd",
+        isActive: true,
+        ipdbLink: "http://ipdb.org/5678",
+        opdbImgUrl: "http://opdb.org/new-001.jpg",
+        kineticistUrl: "http://kineticist.com/new-001",
+        isCustom: false,
+      },
+    });
+  });
+
+  it("should handle duplicate key errors gracefully", async () => {
+    const existingModel = { id: "model-existing", name: "Existing Game" };
+    mockPrisma.model.findUnique.mockResolvedValue(null); // Initial lookup fails
+    mockPrisma.model.create.mockRejectedValue(
+      new Error("Unique constraint failed on the fields: (`opdbId`)"),
+    );
+    mockPrisma.model.findUnique.mockResolvedValue(existingModel); // Retry lookup succeeds
+
+    const result = await service.findOrCreateModel(
+      { opdb_id: "DUPLICATE-001", machine_name: "Duplicate Game" },
+      true,
+    );
+
+    expect(result).toEqual(existingModel);
+    expect(mockPrisma.model.findUnique).toHaveBeenCalledTimes(2); // Initial + retry
+  });
+});
+```
+
+#### **4. Organization Isolation Tests**
+
+**Critical Security**: Prevent cross-tenant data access
+
+```typescript
+describe("Organization Isolation", () => {
+  it("should only access locations within the organization", async () => {
+    const org1Location = {
+      id: "loc-org1",
+      organizationId: "org-1",
+      pinballMapId: 26454,
+      organization: {
+        pinballMapConfig: { apiEnabled: true },
+      },
+    };
+    mockPrisma.location.findUnique.mockResolvedValue(org1Location);
+
+    await service.syncLocation("loc-org1");
+
+    expect(mockPrisma.location.findUnique).toHaveBeenCalledWith({
+      where: { id: "loc-org1" },
+      include: {
+        organization: {
+          include: { pinballMapConfig: true },
+        },
+      },
+    });
+  });
+
+  it("should only access machines within the location", async () => {
+    setupSuccessfulSync();
+
+    await service.syncLocation("loc-123");
+
+    expect(mockPrisma.machine.findMany).toHaveBeenCalledWith({
+      where: { locationId: "loc-123" },
+      include: { model: true },
+    });
+  });
+
+  it("should scope getOrganizationSyncStatus to organization", async () => {
+    await service.getOrganizationSyncStatus("org-123");
+
+    expect(mockPrisma.pinballMapConfig.findUnique).toHaveBeenCalledWith({
+      where: { organizationId: "org-123" },
+    });
+    expect(mockPrisma.location.findMany).toHaveBeenCalledWith({
+      where: { organizationId: "org-123" },
+      include: { _count: { select: { machines: true } } },
+    });
+  });
+});
+```
+
+#### **5. API Error Handling Tests**
+
+**Resilience**: Graceful handling of external API failures
+
+```typescript
+describe("API Error Handling", () => {
+  it("should handle PinballMap API being unavailable", async () => {
+    setupMockLocation();
+    global.fetch = jest.fn().mockRejectedValue(new Error("Network error"));
+
+    const result = await service.syncLocation("loc-123");
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("Network error");
+    expect(result.added).toBe(0);
+    expect(result.removed).toBe(0);
+  });
+
+  it("should handle HTTP error responses from PinballMap", async () => {
+    setupMockLocation();
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+    });
+
+    const result = await service.syncLocation("loc-123");
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("PinballMap API error: 404");
+  });
+
+  it("should handle malformed JSON responses", async () => {
+    setupMockLocation();
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ invalid: "data" }),
+    });
+
+    const result = await service.syncLocation("loc-123");
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("No machine data returned from PinballMap");
+  });
+});
+```
+
+### Priority 2: tRPC Router Tests
+
+**File**: `src/server/api/routers/__tests__/pinballMap.test.ts` (new file)
+
+#### Authentication & Authorization
+
+```typescript
+describe("pinballMapRouter", () => {
+  const createCaller = createCallerFactory(appRouter);
+
+  describe("Authentication", () => {
+    it("should require organizationManageProcedure for all endpoints", async () => {
+      const caller = createCaller({
+        db: mockPrisma,
+        session: null, // No session
+      });
+
+      await expect(caller.pinballMap.enableIntegration()).rejects.toThrow(
+        "UNAUTHORIZED",
+      );
+      await expect(caller.pinballMap.getSyncStatus()).rejects.toThrow(
+        "UNAUTHORIZED",
+      );
+    });
+
+    it("should allow organization admin access", async () => {
+      const caller = createCaller({
+        db: mockPrisma,
+        session: mockAdminSession,
+        organization: mockOrganization,
+      });
+
+      // Should not throw authorization errors
+      await expect(caller.pinballMap.getSyncStatus()).resolves.toBeDefined();
+    });
+  });
+
+  describe("enableIntegration", () => {
+    it("should call PinballMapService.enableIntegration", async () => {
+      const mockService = jest
+        .spyOn(PinballMapService.prototype, "enableIntegration")
+        .mockResolvedValue(undefined);
+
+      const caller = createCaller({
+        db: mockPrisma,
+        session: mockAdminSession,
+        organization: mockOrganization,
+      });
+
+      const result = await caller.pinballMap.enableIntegration();
+
+      expect(mockService).toHaveBeenCalledWith(mockOrganization.id);
+      expect(result).toEqual({ success: true });
+    });
+  });
+
+  describe("syncLocation", () => {
+    it("should propagate service success results", async () => {
+      const mockSyncResult = {
+        success: true,
+        added: 5,
+        updated: 2,
+        removed: 1,
+      };
+      jest
+        .spyOn(PinballMapService.prototype, "syncLocation")
+        .mockResolvedValue(mockSyncResult);
+
+      const caller = createCaller({
+        db: mockPrisma,
+        session: mockAdminSession,
+        organization: mockOrganization,
+      });
+
+      const result = await caller.pinballMap.syncLocation({
+        locationId: "loc-123",
+      });
+
+      expect(result).toEqual(mockSyncResult);
+    });
+
+    it("should convert service failures to TRPCError", async () => {
+      const mockSyncResult = {
+        success: false,
+        added: 0,
+        updated: 0,
+        removed: 0,
+        error: "PinballMap API error: 500",
+      };
+      jest
+        .spyOn(PinballMapService.prototype, "syncLocation")
+        .mockResolvedValue(mockSyncResult);
+
+      const caller = createCaller({
+        db: mockPrisma,
+        session: mockAdminSession,
+        organization: mockOrganization,
+      });
+
+      await expect(
+        caller.pinballMap.syncLocation({ locationId: "loc-123" }),
+      ).rejects.toThrow("PinballMap API error: 500");
+    });
+  });
+});
+```
+
+### Priority 3: Integration Tests
+
+**File**: `src/server/api/routers/__tests__/pinballmap-integration.test.ts` (update existing)
+
+#### End-to-End Workflow Tests
+
+```typescript
+describe("PinballMap Integration End-to-End", () => {
+  it("should complete full setup and sync workflow", async () => {
+    const caller = createCaller({
+      db: mockPrisma,
+      session: mockAdminSession,
+      organization: mockOrganization,
+    });
+
+    // Step 1: Enable integration
+    await caller.pinballMap.enableIntegration();
+    expect(mockPrisma.pinballMapConfig.upsert).toHaveBeenCalled();
+
+    // Step 2: Configure location
+    await caller.pinballMap.configureLocation({
+      locationId: "loc-123",
+      pinballMapId: 26454,
+    });
+    expect(mockPrisma.location.update).toHaveBeenCalledWith({
+      where: { id: "loc-123" },
+      data: { pinballMapId: 26454, syncEnabled: true },
+    });
+
+    // Step 3: Sync location
+    setupSuccessfulSync();
+    const syncResult = await caller.pinballMap.syncLocation({
+      locationId: "loc-123",
+    });
+    expect(syncResult.success).toBe(true);
+    expect(syncResult.added).toBeGreaterThan(0);
+
+    // Step 4: Check status
+    const status = await caller.pinballMap.getSyncStatus();
+    expect(status.configEnabled).toBe(true);
+    expect(status.locations).toHaveLength(1);
+  });
+});
+```
+
+## Expected Behaviors Reference
+
+### Sync Configuration Behaviors
+
+- Organizations start with PinballMap integration **disabled**
+- Locations start with sync **disabled** even when organization has integration enabled
+- Each location must be individually configured with a PinballMap location ID
+- Invalid PinballMap location IDs should be handled gracefully (API will return 404)
+
+### Machine Reconciliation Behaviors
+
+- **New Machines**: Always added when found on PinballMap
+- **Existing Machines**: Preserved and marked as "found" (not duplicated)
+- **Missing Machines**: Only removed if they have zero associated Issue records
+- **Model Creation**: OPDB games create global Models, custom games remain organization-specific
+- **Conflict Resolution**: Duplicate key errors handled through retry logic
+
+### Error Recovery Behaviors
+
+- **API Timeouts**: Return user-friendly error messages
+- **Partial Failures**: Continue processing remaining machines after individual failures
+- **Rate Limiting**: Respect PinballMap API limits (future enhancement)
+- **Data Integrity**: Never leave database in inconsistent state
+
+### Security Behaviors
+
+- **Organization Isolation**: Impossible to access other organization's data
+- **Permission Checks**: Only organization admins can configure or sync
+- **Input Validation**: All user inputs validated through Zod schemas
+- **Audit Trail**: Sync timestamps recorded for tracking
+
+## Test Implementation Notes
+
+### Mocking Strategy
+
+- **Prisma**: Use jest.Mock for all database operations
+- **PinballMap API**: Mock global.fetch with realistic response data
+- **Time**: Mock Date.now() for consistent timestamp testing
+- **Error Scenarios**: Mock various failure conditions systematically
+
+### Test Data Requirements
+
+- **Realistic PinballMap Data**: Use actual Austin Pinball Collective machine data structure
+- **Edge Cases**: Include machines without OPDB IDs, malformed data, empty responses
+- **Large Datasets**: Test with 100+ machines for performance validation
+- **Duplicate Scenarios**: Test concurrent sync operations and race conditions
+
+### Coverage Goals
+
+- **Service Layer**: 90%+ coverage for PinballMapService class
+- **Router Layer**: 85%+ coverage for tRPC endpoints
+- **Integration**: 75%+ coverage for end-to-end workflows
+- **Error Paths**: 100% coverage for error handling code paths
+
+This comprehensive testing strategy ensures the PinballMap integration is robust, secure, and ready for production use while maintaining the high code quality standards expected in the PinPoint codebase.

@@ -31,7 +31,7 @@ export const issueCoreRouter = createTRPCRouter({
           id: input.machineId,
         },
         include: {
-          room: {
+          location: {
             select: {
               organizationId: true,
             },
@@ -39,7 +39,7 @@ export const issueCoreRouter = createTRPCRouter({
         },
       });
 
-      if (!machine || machine.room.organizationId !== organization.id) {
+      if (!machine || machine.location.organizationId !== organization.id) {
         throw new Error(
           "Game instance not found or does not belong to this organization",
         );
@@ -59,51 +59,62 @@ export const issueCoreRouter = createTRPCRouter({
         );
       }
 
+      const defaultPriority = await ctx.db.priority.findFirst({
+        where: {
+          isDefault: true,
+          organizationId: organization.id,
+        },
+      });
+
+      if (!defaultPriority) {
+        throw new Error(
+          "Default priority not found. Please contact an administrator.",
+        );
+      }
+
       // Determine reporter: use session user if available, otherwise use email or null
-      const reporterId = ctx.session?.user?.id ?? null;
-      const reporterEmail = reporterId ? null : (input.reporterEmail ?? null);
+      const createdById = ctx.session?.user?.id;
+
+      if (!createdById) {
+        throw new Error("User not found");
+      }
 
       // Create the issue
       const issue = await ctx.db.issue.create({
         data: {
           title: input.title,
           description: input.description,
-          severity: input.severity,
-          reporterId,
-          reporterEmail,
+          createdById,
           machineId: input.machineId,
           organizationId: organization.id,
           statusId: newStatus.id,
+          priorityId: defaultPriority.id,
         },
         include: {
           status: true,
-          reporter: {
+          createdBy: {
             select: {
               id: true,
               name: true,
-              profilePicture: true,
+              image: true,
             },
           },
           machine: {
             include: {
               model: true,
-              room: {
-                include: {
-                  location: true,
-                },
-              },
+              location: true,
             },
           },
         },
       });
 
       // Record the issue creation activity if user is logged in
-      if (reporterId) {
+      if (createdById) {
         const activityService = new IssueActivityService(ctx.db);
         await activityService.recordIssueCreated(
           issue.id,
           organization.id,
-          reporterId,
+          createdById,
         );
       }
 
@@ -126,7 +137,7 @@ export const issueCoreRouter = createTRPCRouter({
           machineId: z.string().optional(),
           statusId: z.string().optional(),
           modelId: z.string().optional(),
-          statusCategory: z.enum(["NEW", "OPEN", "CLOSED"]).optional(),
+          statusCategory: z.enum(["NEW", "IN_PROGRESS", "RESOLVED"]).optional(),
           sortBy: z
             .enum(["created", "updated", "status", "severity", "game"])
             .optional(),
@@ -138,13 +149,13 @@ export const issueCoreRouter = createTRPCRouter({
       const whereClause: {
         organizationId: string;
         machine?: {
-          room?: { locationId: string };
+          location?: { id: string };
           modelId?: string;
         };
         machineId?: string;
         statusId?: string;
         status?: {
-          category: "NEW" | "OPEN" | "CLOSED";
+          category: "NEW" | "IN_PROGRESS" | "RESOLVED";
         };
       } = {
         organizationId: ctx.organization.id,
@@ -153,7 +164,7 @@ export const issueCoreRouter = createTRPCRouter({
       if (input?.locationId) {
         whereClause.machine = {
           ...whereClause.machine,
-          room: { locationId: input.locationId },
+          location: { id: input.locationId },
         };
       }
 
@@ -189,9 +200,9 @@ export const issueCoreRouter = createTRPCRouter({
           case "updated":
             return { updatedAt: sortOrder };
           case "status":
-            return { status: { order: sortOrder } };
+            return { status: { name: sortOrder } };
           case "severity":
-            return { severity: sortOrder };
+            return { priority: { order: sortOrder } };
           case "game":
             return { machine: { model: { name: sortOrder } } };
           default:
@@ -203,28 +214,24 @@ export const issueCoreRouter = createTRPCRouter({
         where: whereClause,
         include: {
           status: true,
-          assignee: {
+          assignedTo: {
             select: {
               id: true,
               name: true,
-              profilePicture: true,
+              image: true,
             },
           },
-          reporter: {
+          createdBy: {
             select: {
               id: true,
               name: true,
-              profilePicture: true,
+              image: true,
             },
           },
           machine: {
             include: {
               model: true,
-              room: {
-                include: {
-                  location: true,
-                },
-              },
+              location: true,
             },
           },
           _count: {
@@ -249,28 +256,24 @@ export const issueCoreRouter = createTRPCRouter({
         },
         include: {
           status: true,
-          assignee: {
+          assignedTo: {
             select: {
               id: true,
               name: true,
-              profilePicture: true,
+              image: true,
             },
           },
-          reporter: {
+          createdBy: {
             select: {
               id: true,
               name: true,
-              profilePicture: true,
+              image: true,
             },
           },
           machine: {
             include: {
               model: true,
-              room: {
-                include: {
-                  location: true,
-                },
-              },
+              location: true,
             },
           },
           comments: {
@@ -279,7 +282,7 @@ export const issueCoreRouter = createTRPCRouter({
                 select: {
                   id: true,
                   name: true,
-                  profilePicture: true,
+                  image: true,
                 },
               },
             },
@@ -306,7 +309,7 @@ export const issueCoreRouter = createTRPCRouter({
         title: z.string().min(1).max(255).optional(),
         description: z.string().optional(),
         statusId: z.string().optional(),
-        assigneeId: z.string().optional(),
+        assignedToId: z.string().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -318,7 +321,7 @@ export const issueCoreRouter = createTRPCRouter({
         },
         include: {
           status: true,
-          assignee: true,
+          assignedTo: true,
         },
       });
 
@@ -332,7 +335,7 @@ export const issueCoreRouter = createTRPCRouter({
 
       // Prepare data for tracking changes
       let newStatus = existingIssue.status;
-      let newAssignee = existingIssue.assignee;
+      let newAssignedTo = existingIssue.assignedTo;
 
       // If updating status, verify it belongs to the organization
       if (input.statusId) {
@@ -349,12 +352,12 @@ export const issueCoreRouter = createTRPCRouter({
       }
 
       // If updating assignee, verify they are a member of this organization
-      if (input.assigneeId !== undefined) {
-        if (input.assigneeId) {
+      if (input.assignedToId !== undefined) {
+        if (input.assignedToId) {
           const membership = await ctx.db.membership.findUnique({
             where: {
               userId_organizationId: {
-                userId: input.assigneeId,
+                userId: input.assignedToId,
                 organizationId: ctx.organization.id,
               },
             },
@@ -365,9 +368,9 @@ export const issueCoreRouter = createTRPCRouter({
           if (!membership) {
             throw new Error("User is not a member of this organization");
           }
-          newAssignee = membership.user;
+          newAssignedTo = membership.user;
         } else {
-          newAssignee = null;
+          newAssignedTo = null;
         }
       }
 
@@ -380,34 +383,30 @@ export const issueCoreRouter = createTRPCRouter({
             description: input.description,
           }),
           ...(input.statusId && { statusId: input.statusId }),
-          ...(input.assigneeId !== undefined && {
-            assigneeId: input.assigneeId || null,
+          ...(input.assignedToId !== undefined && {
+            assignedToId: input.assignedToId || null,
           }),
         },
         include: {
           status: true,
-          assignee: {
+          assignedTo: {
             select: {
               id: true,
               name: true,
-              profilePicture: true,
+              image: true,
             },
           },
-          reporter: {
+          createdBy: {
             select: {
               id: true,
               name: true,
-              profilePicture: true,
+              image: true,
             },
           },
           machine: {
             include: {
               model: true,
-              room: {
-                include: {
-                  location: true,
-                },
-              },
+              location: true,
             },
           },
         },
@@ -432,15 +431,15 @@ export const issueCoreRouter = createTRPCRouter({
       }
 
       if (
-        input.assigneeId !== undefined &&
-        existingIssue.assigneeId !== input.assigneeId
+        input.assignedToId !== undefined &&
+        existingIssue.assignedToId !== input.assignedToId
       ) {
         await activityService.recordAssignmentChange(
           input.id,
           ctx.organization.id,
           userId,
-          existingIssue.assignee,
-          newAssignee,
+          existingIssue.assignedTo,
+          newAssignedTo,
         );
 
         // Send assignment notifications
