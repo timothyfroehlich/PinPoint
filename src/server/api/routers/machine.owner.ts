@@ -16,9 +16,7 @@ export const machineOwnerRouter = createTRPCRouter({
       const existingInstance = await ctx.db.machine.findFirst({
         where: {
           id: input.machineId,
-          room: {
-            organizationId: ctx.organization.id,
-          },
+          organizationId: ctx.organization.id,
         },
       });
 
@@ -48,25 +46,13 @@ export const machineOwnerRouter = createTRPCRouter({
           ownerId: input.ownerId ?? null,
         },
         include: {
-          model: {
-            include: {
-              _count: {
-                select: {
-                  machines: true,
-                },
-              },
-            },
-          },
-          room: {
-            include: {
-              location: true,
-            },
-          },
+          model: true,
+          location: true,
           owner: {
             select: {
               id: true,
               name: true,
-              profilePicture: true,
+              image: true,
             },
           },
         },

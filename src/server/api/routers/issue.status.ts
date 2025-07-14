@@ -1,4 +1,4 @@
-import { IssueStatusCategory } from "@prisma/client";
+import { StatusCategory } from "@prisma/client";
 
 import { createTRPCRouter, organizationProcedure } from "~/server/api/trpc";
 
@@ -24,9 +24,9 @@ export const issueStatusRouter = createTRPCRouter({
     const statusMap = new Map(statuses.map((s) => [s.id, s.category]));
 
     const categoryCounts = {
-      [IssueStatusCategory.NEW]: 0,
-      [IssueStatusCategory.OPEN]: 0,
-      [IssueStatusCategory.CLOSED]: 0,
+      [StatusCategory.NEW]: 0,
+      [StatusCategory.IN_PROGRESS]: 0,
+      [StatusCategory.RESOLVED]: 0,
     };
 
     for (const group of counts) {

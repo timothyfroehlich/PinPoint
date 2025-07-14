@@ -13,7 +13,7 @@ export const modelOpdbRouter = createTRPCRouter({
   searchOPDB: organizationProcedure
     .input(z.object({ query: z.string().min(1) }))
     .query(async ({ input }) => {
-      const opdbClient = new OPDBClient(env.OPDB_API_TOKEN, env.OPDB_API_URL);
+      const opdbClient = new OPDBClient(env.OPDB_API_KEY, env.OPDB_API_URL);
       return await opdbClient.searchMachines(input.query);
     }),
 
@@ -33,7 +33,7 @@ export const modelOpdbRouter = createTRPCRouter({
       }
 
       // Fetch full data from OPDB
-      const opdbClient = new OPDBClient(env.OPDB_API_TOKEN, env.OPDB_API_URL);
+      const opdbClient = new OPDBClient(env.OPDB_API_KEY, env.OPDB_API_URL);
       const machineData = await opdbClient.getMachineById(input.opdbId);
 
       if (!machineData) {
@@ -47,13 +47,9 @@ export const modelOpdbRouter = createTRPCRouter({
           name: machineData.name,
           opdbId: input.opdbId,
           manufacturer: machineData.manufacturer,
-          releaseDate: machineData.year
-            ? new Date(machineData.year, 0, 1)
-            : null,
-          imageUrl: machineData.playfield_image ?? machineData.images?.[0],
-          description: machineData.description,
-          lastSynced: new Date(),
-          // organizationId is null for global OPDB games
+          year: machineData.year,
+          opdbImgUrl: machineData.playfield_image,
+          machineType: machineData.type,
         },
       });
     }),
@@ -63,9 +59,7 @@ export const modelOpdbRouter = createTRPCRouter({
     // Find all OPDB games that have game instances in this organization
     const machinesInOrg = await ctx.db.machine.findMany({
       where: {
-        room: {
-          organizationId: ctx.organization.id,
-        },
+        organizationId: ctx.organization.id,
       },
       include: {
         model: true,
@@ -80,7 +74,7 @@ export const modelOpdbRouter = createTRPCRouter({
       return { synced: 0, message: "No OPDB-linked games found to sync" };
     }
 
-    const opdbClient = new OPDBClient(env.OPDB_API_TOKEN, env.OPDB_API_URL);
+    const opdbClient = new OPDBClient(env.OPDB_API_KEY, env.OPDB_API_URL);
     let syncedCount = 0;
 
     // Sync each title with OPDB data
@@ -96,12 +90,9 @@ export const modelOpdbRouter = createTRPCRouter({
             data: {
               name: machineData.name,
               manufacturer: machineData.manufacturer,
-              releaseDate: machineData.year
-                ? new Date(machineData.year, 0, 1)
-                : null,
-              imageUrl: machineData.playfield_image ?? machineData.images?.[0],
-              description: machineData.description,
-              lastSynced: new Date(),
+              year: machineData.year,
+              opdbImgUrl: machineData.playfield_image,
+              machineType: machineData.type,
             },
           });
           syncedCount++;

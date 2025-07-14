@@ -14,6 +14,8 @@ export const issueAttachmentRouter = createTRPCRouter({
       z.object({
         issueId: z.string(),
         url: z.string().url("Must be a valid URL"),
+        fileName: z.string(),
+        fileType: z.string(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -50,6 +52,8 @@ export const issueAttachmentRouter = createTRPCRouter({
       return ctx.db.attachment.create({
         data: {
           url: input.url,
+          fileName: input.fileName,
+          fileType: input.fileType,
           issueId: input.issueId,
           organizationId: ctx.organization.id,
         },

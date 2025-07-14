@@ -17,11 +17,7 @@ export const userRouter = createTRPCRouter({
         ownedMachines: {
           include: {
             model: true,
-            room: {
-              include: {
-                location: true,
-              },
-            },
+            location: true,
           },
         },
         memberships: {
@@ -31,7 +27,7 @@ export const userRouter = createTRPCRouter({
         },
         _count: {
           select: {
-            issues: true,
+            issuesCreated: true,
             comments: true,
             ownedMachines: true,
           },
@@ -147,11 +143,11 @@ export const userRouter = createTRPCRouter({
               name: true,
               bio: true,
               profilePicture: true,
-              joinDate: true,
+              createdAt: true,
               _count: {
                 select: {
                   ownedMachines: true,
-                  issues: true,
+                  issuesCreated: true,
                   comments: true,
                 },
               },
@@ -179,11 +175,11 @@ export const userRouter = createTRPCRouter({
             name: true,
             bio: true,
             profilePicture: true,
-            joinDate: true,
+            createdAt: true,
             _count: {
               select: {
                 ownedMachines: true,
-                issues: true,
+                issuesCreated: true,
                 comments: true,
               },
             },
@@ -198,7 +194,7 @@ export const userRouter = createTRPCRouter({
     });
 
     return memberships.map((m) => ({
-      ...m.user,
+      ...(m.user ?? {}),
       role: m.role.name,
     }));
   }),

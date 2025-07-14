@@ -8,7 +8,7 @@ import { PrismaClient } from "@prisma/client";
 import { PinballMapAPIMocker } from "../../../../lib/pinballmap/__tests__/apiMocker";
 import { syncLocationGames } from "../../../services/pinballmapService";
 
-import type { Location, Room, Machine, Model } from "@prisma/client";
+import type { Location, Machine, Model } from "@prisma/client";
 
 jest.mock("@prisma/client");
 const MockedPrismaClient = PrismaClient as jest.MockedClass<
@@ -70,22 +70,24 @@ describe("PinballMap Integration Tests", () => {
       name: "Test Location",
       pinballMapId: 26454,
       organizationId: "org-1",
-      notes: null,
-    };
-
-    const mockRoom: Room = {
-      id: "room-1",
-      name: "Main Floor",
-      locationId: "location-1",
-      organizationId: "org-1",
+      street: null,
+      city: null,
+      state: null,
+      zip: null,
+      phone: null,
+      website: null,
+      latitude: null,
+      longitude: null,
       description: null,
+      regionId: null,
+      lastSyncAt: null,
+      syncEnabled: false,
     };
 
     beforeEach(() => {
       (mockPrisma.location.findUnique as jest.Mock).mockResolvedValue(
         mockLocation,
       );
-      (mockPrisma.room.findFirst as jest.Mock).mockResolvedValue(mockRoom);
       (mockPrisma.machine.findMany as jest.Mock).mockResolvedValue([]);
       (mockPrisma.model.findUnique as jest.Mock).mockResolvedValue(null);
       (mockPrisma.model.create as jest.Mock).mockImplementation(
@@ -93,10 +95,20 @@ describe("PinballMap Integration Tests", () => {
           Promise.resolve({ id: `title-${data.name}`, ...data } as Model),
       );
       (mockPrisma.machine.create as jest.Mock).mockImplementation(
-        ({ data }: { data: { name: string } }) =>
+        ({
+          data,
+        }: {
+          data: {
+            name: string;
+            organizationId: string;
+            locationId: string;
+            modelId: string;
+          };
+        }) =>
           Promise.resolve({
             id: `instance-${data.name}`,
             ...data,
+            ownerId: null,
           } as Machine),
       );
     });
@@ -152,7 +164,7 @@ describe("PinballMap Integration Tests", () => {
       expect(1.5).not.toBe(Math.floor(1.5));
     });
 
-    it("should validate room description format", () => {
+    it("should validate location description format", () => {
       // Valid descriptions
       expect("Main gaming area").toBeTruthy();
       expect("").toBe(""); // Empty string allowed
@@ -172,15 +184,10 @@ describe("PinballMap Integration Tests", () => {
       const locationQuery = { id: "location-1", organizationId: orgId };
       expect(locationQuery.organizationId).toBe(orgId);
 
-      // Room queries inherit organization through location relationship
-      const roomQuery = { locationId: "location-1" };
+      // Machine queries inherit organization through location relationship
+      const machineQuery = { locationId: "location-1" };
       // Note: organizationId is enforced through the location relationship
-      expect(roomQuery.locationId).toBeTruthy();
-
-      // Game instances are scoped through room hierarchy
-      const gameQuery = { locationId: "room-1" };
-      // Note: organizationId is enforced through room -> location relationship
-      expect(gameQuery.locationId).toBeTruthy();
+      expect(machineQuery.locationId).toBeTruthy();
     });
   });
 });
