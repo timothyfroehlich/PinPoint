@@ -17,13 +17,6 @@ export interface SyncResult {
   error?: string;
 }
 
-export interface SyncSummary {
-  locationsProcessed: number;
-  totalMachines: number;
-  newModels: number;
-  errors: string[];
-}
-
 export class PinballMapService {
   constructor(private prisma: PrismaClient) {}
 
