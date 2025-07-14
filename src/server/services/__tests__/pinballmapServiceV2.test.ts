@@ -74,7 +74,7 @@ describe("PinballMapService", () => {
 
   describe("enableIntegration", () => {
     it("should create PinballMapConfig for new organization", async () => {
-      mockPinballMapConfigUpsert.mockResolvedValue({});
+      mockPinballMapConfigUpsert.mockResolvedValue({} as never);
       await service.enableIntegration("org-123");
       expect(mockPrisma.pinballMapConfig.upsert).toHaveBeenCalledWith({
         where: { organizationId: "org-123" },
@@ -87,7 +87,7 @@ describe("PinballMapService", () => {
       });
     });
     it("should update existing PinballMapConfig to enabled", async () => {
-      mockPinballMapConfigUpsert.mockResolvedValue({});
+      mockPinballMapConfigUpsert.mockResolvedValue({} as never);
       await service.enableIntegration("org-123");
       expect(mockPrisma.pinballMapConfig.upsert).toHaveBeenCalledWith(
         expect.objectContaining({ update: { apiEnabled: true } }),
@@ -97,15 +97,15 @@ describe("PinballMapService", () => {
 
   describe("configureLocationSync", () => {
     it("should require PinballMap integration to be enabled", async () => {
-      mockPrisma.pinballMapConfig.findUnique.mockResolvedValue(null);
+      mockPinballMapConfigFindUnique.mockResolvedValue(null);
       await expect(
         service.configureLocationSync("loc-123", 26454, "org-123"),
       ).rejects.toThrow("PinballMap integration not enabled for organization");
     });
     it("should update location with PinballMap ID and enable sync", async () => {
-      mockPrisma.pinballMapConfig.findUnique.mockResolvedValue({
+      mockPinballMapConfigFindUnique.mockResolvedValue({
         apiEnabled: true,
-      });
+      } as never);
       await service.configureLocationSync("loc-123", 26454, "org-123");
       expect(mockPrisma.location.update).toHaveBeenCalledWith({
         where: { id: "loc-123" },
@@ -119,13 +119,13 @@ describe("PinballMapService", () => {
 
   describe("syncLocation", () => {
     function setupMockLocation(overrides = {}) {
-      mockPrisma.location.findUnique.mockResolvedValue({
+      mockLocationFindUnique.mockResolvedValue({
         id: "loc-123",
         pinballMapId: 26454,
         organizationId: "org-123",
         organization: { pinballMapConfig: { apiEnabled: true } },
         ...overrides,
-      });
+      } as never);
     }
     function setupMockPinballMapAPI(
       machines = [{ opdb_id: "MM-001", machine_name: "Medieval Madness" }],
@@ -136,7 +136,7 @@ describe("PinballMapService", () => {
       });
     }
     it("should return error if location not found", async () => {
-      mockPrisma.location.findUnique.mockResolvedValue(null);
+      mockLocationFindUnique.mockResolvedValue(null);
       const result = await service.syncLocation("invalid-location");
       expect(result.success).toBe(false);
       expect(result.error).toBe("Location not found");
@@ -160,13 +160,13 @@ describe("PinballMapService", () => {
     it("should successfully sync machines from PinballMap", async () => {
       setupMockLocation();
       setupMockPinballMapAPI();
-      mockPrisma.machine.findMany.mockResolvedValue([]);
-      mockPrisma.model.findUnique.mockResolvedValue({
+      mockMachineFindMany.mockResolvedValue([]);
+      mockModelFindUnique.mockResolvedValue({
         id: "model-1",
         name: "Medieval Madness",
-      });
-      mockPrisma.machine.create.mockResolvedValue({});
-      mockPrisma.location.update.mockResolvedValue({});
+      } as never);
+      mockMachineCreate.mockResolvedValue({} as never);
+      mockLocationUpdate.mockResolvedValue({} as never);
       const result = await service.syncLocation("loc-123");
       expect(result.success).toBe(true);
       expect(result.added).toBeGreaterThan(0);
@@ -177,13 +177,13 @@ describe("PinballMapService", () => {
     it("should update lastSyncAt timestamp on successful sync", async () => {
       setupMockLocation();
       setupMockPinballMapAPI();
-      mockPrisma.machine.findMany.mockResolvedValue([]);
-      mockPrisma.model.findUnique.mockResolvedValue({
+      mockMachineFindMany.mockResolvedValue([]);
+      mockModelFindUnique.mockResolvedValue({
         id: "model-1",
         name: "Medieval Madness",
-      });
-      mockPrisma.machine.create.mockResolvedValue({});
-      mockPrisma.location.update.mockResolvedValue({});
+      } as never);
+      mockMachineCreate.mockResolvedValue({} as never);
+      mockLocationUpdate.mockResolvedValue({} as never);
       await service.syncLocation("loc-123");
       expect(mockPrisma.location.update).toHaveBeenCalledWith({
         where: { id: "loc-123" },
@@ -195,12 +195,12 @@ describe("PinballMapService", () => {
   describe("reconcileMachines", () => {
     const mockConfig = { createMissingModels: true, updateExistingData: false };
     it("should add machines that exist on PinballMap but not locally", async () => {
-      mockPrisma.machine.findMany.mockResolvedValue([]);
-      mockPrisma.model.findUnique.mockResolvedValue({
+      mockMachineFindMany.mockResolvedValue([]);
+      mockModelFindUnique.mockResolvedValue({
         id: "model-1",
         name: "Medieval Madness",
-      });
-      mockPrisma.machine.create.mockResolvedValue({});
+      } as never);
+      mockMachineCreate.mockResolvedValue({} as never);
       const pinballMapMachines = [
         { opdb_id: "MM-001", machine_name: "Medieval Madness" },
         { opdb_id: "TZ-001", machine_name: "Twilight Zone" },
@@ -221,11 +221,11 @@ describe("PinballMapService", () => {
         modelId: "model-mm",
         model: { opdbId: "MM-001" },
       };
-      mockPrisma.machine.findMany.mockResolvedValue([existingMachine]);
-      mockPrisma.model.findUnique.mockResolvedValue({
+      mockMachineFindMany.mockResolvedValue([existingMachine] as never);
+      mockModelFindUnique.mockResolvedValue({
         id: "model-mm",
         name: "Medieval Madness",
-      });
+      } as never);
       const pinballMapMachines = [
         { opdb_id: "MM-001", machine_name: "Medieval Madness" },
       ];
@@ -245,8 +245,8 @@ describe("PinballMapService", () => {
         modelId: "model-old",
         model: { opdbId: "OLD-001" },
       };
-      mockPrisma.machine.findMany.mockResolvedValue([machineWithIssues]);
-      mockPrisma.issue.count.mockResolvedValue(3);
+      mockMachineFindMany.mockResolvedValue([machineWithIssues] as never);
+      mockIssueCount.mockResolvedValue(3);
       const result = await servicePrivate.reconcileMachines(
         "loc-123",
         "org-123",
@@ -265,8 +265,8 @@ describe("PinballMapService", () => {
         modelId: "model-old",
         model: { opdbId: "OLD-001" },
       };
-      mockPrisma.machine.findMany.mockResolvedValue([machineWithoutIssues]);
-      mockPrisma.issue.count.mockResolvedValue(0);
+      mockMachineFindMany.mockResolvedValue([machineWithoutIssues] as never);
+      mockIssueCount.mockResolvedValue(0);
       const result = await servicePrivate.reconcileMachines(
         "loc-123",
         "org-123",
@@ -280,8 +280,8 @@ describe("PinballMapService", () => {
     });
     it("should respect createMissingModels configuration", async () => {
       const configNoCreate = { ...mockConfig, createMissingModels: false };
-      mockPrisma.machine.findMany.mockResolvedValue([]); // No existing machines
-      mockPrisma.model.findUnique.mockResolvedValue(null); // Model doesn't exist
+      mockMachineFindMany.mockResolvedValue([]); // No existing machines
+      mockModelFindUnique.mockResolvedValue(null); // Model doesn't exist
       const unknownMachine = {
         opdb_id: "UNKNOWN-001",
         machine_name: "Unknown Game",
@@ -305,9 +305,7 @@ describe("PinballMapService", () => {
         name: "Medieval Madness",
         opdbId: "MM-001",
       };
-      mockPrisma.model.findUnique
-        .mockResolvedValueOnce(existingModel)
-        .mockResolvedValueOnce(null);
+      mockModelFindUnique.mockResolvedValueOnce(existingModel as never);
       const result = await servicePrivate.findOrCreateModel(
         {
           opdb_id: "MM-001",
@@ -328,9 +326,9 @@ describe("PinballMapService", () => {
         name: "Twilight Zone",
         ipdbId: "1234",
       };
-      mockPrisma.model.findUnique
+      mockModelFindUnique
         .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(existingModel);
+        .mockResolvedValueOnce(existingModel as never);
       const result = await servicePrivate.findOrCreateModel(
         { opdb_id: "TZ-001", ipdb_id: "1234", machine_name: "Twilight Zone" },
         true,
@@ -345,8 +343,8 @@ describe("PinballMapService", () => {
     });
     it("should create new Model if neither OPDB nor IPDB found", async () => {
       const newModel = { id: "model-new", name: "New Game" };
-      mockPrisma.model.findUnique.mockResolvedValue(null);
-      mockPrisma.model.create.mockResolvedValue(newModel);
+      mockModelFindUnique.mockResolvedValue(null);
+      mockModelCreate.mockResolvedValue(newModel as never);
       const result = await servicePrivate.findOrCreateModel(
         {
           opdb_id: "NEW-001",
@@ -382,7 +380,7 @@ describe("PinballMapService", () => {
       });
     });
     it("should return null when createMissingModels is false and model not found", async () => {
-      mockPrisma.model.findUnique.mockResolvedValue(null);
+      mockModelFindUnique.mockResolvedValue(null);
 
       const result = await servicePrivate.findOrCreateModel(
         { opdb_id: "UNKNOWN-001", machine_name: "Unknown Game" },
@@ -405,7 +403,7 @@ describe("PinballMapService", () => {
         pinballMapId: 26454,
         organization: { pinballMapConfig: { apiEnabled: true } },
       };
-      mockPrisma.location.findUnique.mockResolvedValue(org1Location);
+      mockLocationFindUnique.mockResolvedValue(org1Location as never);
       await service.syncLocation("loc-org1");
       expect(mockPrisma.location.findUnique).toHaveBeenCalledWith({
         where: { id: "loc-org1" },
@@ -413,7 +411,7 @@ describe("PinballMapService", () => {
       });
     });
     it("should only access machines within the location", async () => {
-      mockPrisma.machine.findMany.mockResolvedValue([]);
+      mockMachineFindMany.mockResolvedValue([]);
       await servicePrivate.reconcileMachines("loc-123", "org-123", [], {
         createMissingModels: true,
         updateExistingData: false,
@@ -425,10 +423,10 @@ describe("PinballMapService", () => {
     });
     it("should scope getOrganizationSyncStatus to organization", async () => {
       // Mock the required data
-      mockPrisma.pinballMapConfig.findUnique.mockResolvedValue({
+      mockPinballMapConfigFindUnique.mockResolvedValue({
         apiEnabled: true,
-      });
-      mockPrisma.location.findMany.mockResolvedValue([
+      } as never);
+      mockLocationFindMany.mockResolvedValue([
         {
           id: "loc-1",
           name: "Test Location",
@@ -437,7 +435,7 @@ describe("PinballMapService", () => {
           lastSyncAt: null,
           _count: { machines: 2 },
         },
-      ]);
+      ] as never);
 
       await service.getOrganizationSyncStatus("org-123");
       expect(mockPrisma.pinballMapConfig.findUnique).toHaveBeenCalledWith({
@@ -452,12 +450,12 @@ describe("PinballMapService", () => {
 
   describe("API Error Handling", () => {
     function setupMockLocation() {
-      mockPrisma.location.findUnique.mockResolvedValue({
+      mockLocationFindUnique.mockResolvedValue({
         id: "loc-123",
         pinballMapId: 26454,
         organizationId: "org-123",
         organization: { pinballMapConfig: { apiEnabled: true } },
-      });
+      } as never);
     }
     it("should handle PinballMap API being unavailable", async () => {
       setupMockLocation();

@@ -12,7 +12,6 @@ export const machineCoreRouter = createTRPCRouter({
   create: machineEditProcedure
     .input(
       z.object({
-        name: z.string().min(1),
         modelId: z.string(),
         locationId: z.string(),
       }),
@@ -22,29 +21,25 @@ export const machineCoreRouter = createTRPCRouter({
       const model = await ctx.db.model.findFirst({
         where: {
           id: input.modelId,
-          OR: [
-            { organizationId: ctx.organization.id }, // Organization-specific games
-            { organizationId: null }, // Global OPDB games
-          ],
         },
       });
 
-      const room = await ctx.db.room.findFirst({
+      const location = await ctx.db.location.findFirst({
         where: {
           id: input.locationId,
           organizationId: ctx.organization.id,
         },
       });
 
-      if (!model || !room) {
-        throw new Error("Invalid game title or room");
+      if (!model || !location) {
+        throw new Error("Invalid game title or location");
       }
 
       return ctx.db.machine.create({
         data: {
-          name: input.name,
           modelId: input.modelId,
           locationId: input.locationId,
+          organizationId: ctx.organization.id,
         },
         include: {
           model: {
@@ -56,16 +51,12 @@ export const machineCoreRouter = createTRPCRouter({
               },
             },
           },
-          room: {
-            include: {
-              location: true,
-            },
-          },
+          location: true,
           owner: {
             select: {
               id: true,
               name: true,
-              profilePicture: true,
+              image: true,
             },
           },
         },
@@ -75,34 +66,20 @@ export const machineCoreRouter = createTRPCRouter({
   getAll: organizationProcedure.query(async ({ ctx }) => {
     return ctx.db.machine.findMany({
       where: {
-        room: {
-          organizationId: ctx.organization.id,
-        },
+        organizationId: ctx.organization.id,
       },
       include: {
-        model: {
-          include: {
-            _count: {
-              select: {
-                machines: true,
-              },
-            },
-          },
-        },
-        room: {
-          include: {
-            location: true,
-          },
-        },
+        model: true,
+        location: true,
         owner: {
           select: {
             id: true,
             name: true,
-            profilePicture: true,
+            image: true,
           },
         },
       },
-      orderBy: { name: "asc" },
+      orderBy: { model: { name: "asc" } },
     });
   }),
 
@@ -113,20 +90,17 @@ export const machineCoreRouter = createTRPCRouter({
 
     return ctx.db.machine.findMany({
       where: {
-        room: {
-          organizationId: organization.id,
-        },
+        organizationId: organization.id,
       },
       select: {
         id: true,
-        name: true,
         model: {
           select: {
             name: true,
           },
         },
       },
-      orderBy: { name: "asc" },
+      orderBy: { model: { name: "asc" } },
     });
   }),
 
@@ -136,9 +110,7 @@ export const machineCoreRouter = createTRPCRouter({
       const machine = await ctx.db.machine.findFirst({
         where: {
           id: input.id,
-          room: {
-            organizationId: ctx.organization.id,
-          },
+          organizationId: ctx.organization.id,
         },
         include: {
           model: {
@@ -150,16 +122,12 @@ export const machineCoreRouter = createTRPCRouter({
               },
             },
           },
-          room: {
-            include: {
-              location: true,
-            },
-          },
+          location: true,
           owner: {
             select: {
               id: true,
               name: true,
-              profilePicture: true,
+              image: true,
             },
           },
         },
@@ -176,7 +144,6 @@ export const machineCoreRouter = createTRPCRouter({
     .input(
       z.object({
         id: z.string(),
-        name: z.string().min(1),
         modelId: z.string().optional(),
         locationId: z.string().optional(),
       }),
@@ -186,9 +153,7 @@ export const machineCoreRouter = createTRPCRouter({
       const existingInstance = await ctx.db.machine.findFirst({
         where: {
           id: input.id,
-          room: {
-            organizationId: ctx.organization.id,
-          },
+          organizationId: ctx.organization.id,
         },
       });
 
@@ -201,7 +166,6 @@ export const machineCoreRouter = createTRPCRouter({
         const model = await ctx.db.model.findFirst({
           where: {
             id: input.modelId,
-            organizationId: ctx.organization.id,
           },
         });
         if (!model) {
@@ -224,7 +188,6 @@ export const machineCoreRouter = createTRPCRouter({
       return ctx.db.machine.update({
         where: { id: input.id },
         data: {
-          name: input.name,
           ...(input.modelId && { modelId: input.modelId }),
           ...(input.locationId && { locationId: input.locationId }),
         },
@@ -238,16 +201,12 @@ export const machineCoreRouter = createTRPCRouter({
               },
             },
           },
-          room: {
-            include: {
-              location: true,
-            },
-          },
+          location: true,
           owner: {
             select: {
               id: true,
               name: true,
-              profilePicture: true,
+              image: true,
             },
           },
         },
@@ -261,9 +220,7 @@ export const machineCoreRouter = createTRPCRouter({
       const existingInstance = await ctx.db.machine.findFirst({
         where: {
           id: input.id,
-          room: {
-            organizationId: ctx.organization.id,
-          },
+          organizationId: ctx.organization.id,
         },
       });
 
