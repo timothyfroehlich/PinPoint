@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 
-import { organizationProcedure } from "./trpc";
+import { organizationProcedure } from "./trpc.base";
 
 /**
  * Permission-based procedure factory
@@ -27,6 +27,7 @@ export const issueEditProcedure = requirePermission("issue:edit");
 export const issueDeleteProcedure = requirePermission("issue:delete");
 export const issueAssignProcedure = requirePermission("issue:assign");
 export const attachmentCreateProcedure = requirePermission("attachment:create");
+export const attachmentDeleteProcedure = requirePermission("attachment:delete");
 export const machineEditProcedure = requirePermission("machine:edit");
 export const machineDeleteProcedure = requirePermission("machine:delete");
 export const locationEditProcedure = requirePermission("location:edit");

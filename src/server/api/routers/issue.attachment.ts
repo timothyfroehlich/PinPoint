@@ -1,14 +1,19 @@
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
-import { createTRPCRouter, organizationProcedure } from "~/server/api/trpc";
+import { createTRPCRouter } from "~/server/api/trpc";
+import {
+  attachmentCreateProcedure,
+  attachmentDeleteProcedure,
+} from "~/server/api/trpc.permission";
 
 export const issueAttachmentRouter = createTRPCRouter({
   // Create attachment record after file upload (called by upload API)
-  createAttachment: organizationProcedure
+  createAttachment: attachmentCreateProcedure
     .input(
       z.object({
         issueId: z.string(),
-        url: z.string(),
+        url: z.string().url("Must be a valid URL"),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -21,7 +26,10 @@ export const issueAttachmentRouter = createTRPCRouter({
       });
 
       if (!existingIssue) {
-        throw new Error("Issue not found");
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Issue not found",
+        });
       }
 
       // Check attachment count limit
@@ -32,7 +40,10 @@ export const issueAttachmentRouter = createTRPCRouter({
       });
 
       if (existingAttachments >= 3) {
-        throw new Error("Maximum of 3 attachments allowed per issue");
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Maximum of 3 attachments allowed per issue",
+        });
       }
 
       // Create attachment record
@@ -46,7 +57,7 @@ export const issueAttachmentRouter = createTRPCRouter({
     }),
 
   // Delete attachment from an issue
-  deleteAttachment: organizationProcedure
+  deleteAttachment: attachmentDeleteProcedure
     .input(
       z.object({
         attachmentId: z.string(),
@@ -62,11 +73,13 @@ export const issueAttachmentRouter = createTRPCRouter({
       });
 
       if (!attachment) {
-        throw new Error("Attachment not found");
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Attachment not found",
+        });
       }
 
-      // TODO: Add proper authorization logic
-      // For now, allow organization members to delete attachments
+      // Authorization is now handled by attachmentDeleteProcedure
 
       // Delete the file from storage
       const { imageStorage } = await import(
