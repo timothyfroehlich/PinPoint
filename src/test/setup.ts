@@ -1,7 +1,11 @@
 import "@testing-library/jest-dom";
 
 // Mock environment variables for testing
-Object.defineProperty(process.env, "NODE_ENV", { value: "test" });
+Object.defineProperty(process.env, "NODE_ENV", {
+  value: "test",
+  writable: true,
+  configurable: true,
+});
 process.env.AUTH_SECRET = "test-auth-secret";
 process.env.DATABASE_URL = "postgres://test:test@localhost:5432/test_db";
 process.env.GOOGLE_CLIENT_ID = "test-google-client-id";

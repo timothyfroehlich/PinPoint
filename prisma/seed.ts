@@ -383,6 +383,7 @@ async function main() {
     } else {
       await prisma.machine.create({
         data: {
+          name: model.name, // Use model name as default instance name
           organizationId: organization.id,
           locationId: austinPinballLocation.id,
           modelId: model.id,

@@ -12,6 +12,7 @@ export const machineCoreRouter = createTRPCRouter({
   create: machineEditProcedure
     .input(
       z.object({
+        name: z.string().min(1, "Name is required"),
         modelId: z.string(),
         locationId: z.string(),
       }),
@@ -37,6 +38,7 @@ export const machineCoreRouter = createTRPCRouter({
 
       return ctx.db.machine.create({
         data: {
+          name: input.name,
           modelId: input.modelId,
           locationId: input.locationId,
           organizationId: ctx.organization.id,
