@@ -27,6 +27,11 @@ model User {
   bio            String? @db.Text
   profilePicture String? // Path to uploaded avatar
 
+  // Global notification preferences
+  emailNotificationsEnabled Boolean @default(true)
+  pushNotificationsEnabled  Boolean @default(false) // For future mobile app
+  notificationFrequency     NotificationFrequency @default(IMMEDIATE)
+
   // Relations
   accounts       Account[]
   sessions       Session[]
@@ -38,6 +43,7 @@ model User {
   deletedComments Comment[] @relation("CommentDeleter")
   upvotes        Upvote[]
   activityHistory IssueHistory[] @relation("ActivityActor")
+  notifications  Notification[] // Add notification relation
 }
 
 model Account {
@@ -169,6 +175,12 @@ model Machine {
   locationId     String
   modelId        String
   ownerId        String?
+
+  // Add notification preferences for owner
+  ownerNotificationsEnabled Boolean @default(true) // Toggle for all notifications
+  notifyOnNewIssues        Boolean @default(true) // Notify when new issues created
+  notifyOnStatusChanges    Boolean @default(true) // Notify when issue status changes
+  notifyOnComments         Boolean @default(false) // Notify on new comments
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   location     Location     @relation(fields: [locationId], references: [id])
@@ -352,5 +364,40 @@ model Notification {
   message   String
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
-  // Recipient, related entity, etc.
+
+  // Enhanced fields
+  userId     String              // Who receives this notification
+  type       NotificationType    // Category of notification
+  entityType NotificationEntity? // What kind of entity (issue, machine, etc.)
+  entityId   String?             // ID of the related entity
+  actionUrl  String?             // URL to navigate to when clicked
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
+}
+
+enum NotificationType {
+  ISSUE_CREATED       // New issue on owned machine
+  ISSUE_UPDATED       // Issue status changed
+  ISSUE_ASSIGNED      // Issue assigned to user
+  ISSUE_COMMENTED     // New comment on issue
+  MACHINE_ASSIGNED    // Machine ownership assigned
+  SYSTEM_ANNOUNCEMENT // System-wide announcements
+}
+
+enum NotificationEntity {
+  ISSUE
+  MACHINE
+  COMMENT
+  ORGANIZATION
+}
+
+enum NotificationFrequency {
+  IMMEDIATE // Send immediately
+  DAILY     // Daily digest
+  WEEKLY    // Weekly digest
+  DISABLED  // No notifications
 }
