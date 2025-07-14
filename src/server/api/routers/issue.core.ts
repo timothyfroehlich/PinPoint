@@ -7,6 +7,7 @@ import {
   issueEditProcedure,
 } from "~/server/api/trpc";
 import { IssueActivityService } from "~/server/services/issueActivityService";
+import { NotificationService } from "~/server/services/notificationService";
 
 export const issueCoreRouter = createTRPCRouter({
   // Public submission - anyone can report an issue
@@ -116,6 +117,13 @@ export const issueCoreRouter = createTRPCRouter({
           createdById,
         );
       }
+
+      // Send notifications for new issue
+      const notificationService = new NotificationService(ctx.db);
+      await notificationService.notifyMachineOwnerOfIssue(
+        issue.id,
+        input.machineId,
+      );
 
       return issue;
     }),
@@ -322,6 +330,7 @@ export const issueCoreRouter = createTRPCRouter({
       }
 
       const activityService = new IssueActivityService(ctx.db);
+      const notificationService = new NotificationService(ctx.db);
       const userId = ctx.session.user.id;
 
       // Prepare data for tracking changes
@@ -412,6 +421,13 @@ export const issueCoreRouter = createTRPCRouter({
           existingIssue.status,
           newStatus,
         );
+
+        // Send status change notifications
+        await notificationService.notifyMachineOwnerOfStatusChange(
+          input.id,
+          existingIssue.status.name,
+          newStatus.name,
+        );
       }
 
       if (
@@ -425,6 +441,14 @@ export const issueCoreRouter = createTRPCRouter({
           existingIssue.assignedTo,
           newAssignedTo,
         );
+
+        // Send assignment notifications
+        if (newAssignee) {
+          await notificationService.notifyUserOfAssignment(
+            input.id,
+            newAssignee.id,
+          );
+        }
       }
 
       if (input.title && existingIssue.title !== input.title) {
