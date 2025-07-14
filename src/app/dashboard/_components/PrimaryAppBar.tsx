@@ -27,7 +27,7 @@ const PrimaryAppBar = () => {
   };
 
   return (
-    <AppBar position="static" sx={{ bgcolor: "background.paper" }}>
+    <AppBar position="fixed" sx={{ bgcolor: "background.paper" }}>
       <Toolbar sx={{ justifyContent: "space-between" }}>
         {/* Logo & Branding */}
         <Box
