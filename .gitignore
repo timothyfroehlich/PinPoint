@@ -53,3 +53,7 @@ node_modules/
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# Orchestrator multi-agent system
+.claude/SUBAGENT_TASK.md
+.claude/ORCHESTRATOR_NOTES.md

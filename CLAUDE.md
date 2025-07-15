@@ -40,21 +40,22 @@ npm run validate        # Before starting work
 npm run pre-commit      # Before every commit (MUST PASS)
 
 # Database
-npm run db:reset        # Complete reset + reseed
-npm run db:push         # Sync schema changes
+npm run db:reset
+npm run db:push
 
 # Quick Checks
 npm run quick           # Fast typecheck + lint
 npm run fix             # Auto-fix lint + format issues
-npm run typecheck       # TypeScript validation only
+npm run typecheck
 
 # Testing
-npm run test:coverage   # Generate coverage reports (50% global minimum)
+npm run test:coverage
 ```
 
 ## Quality Standards (Zero Tolerance)
 
 - **0 TypeScript errors** - Fix immediately, never commit with TS errors
+- **0 usage of `any`**: Never use an `any` tye, even in test code. If you don't know the type then go look for it.
 - **0 ESLint errors** - Warnings acceptable with justification
 - **Consistent formatting** - Auto-formatted with Prettier
 - **Modern patterns** - ES modules, typed mocks (`jest.fn<T>()`), no `any` types
@@ -63,7 +64,6 @@ npm run test:coverage   # Generate coverage reports (50% global minimum)
 
 ## Development Workflow
 
-0. **Branching**: Always begin new tasks on a new branch
 1. **Start**: `npm run validate` → `npm run dev:full`
 2. **During**: Fix lint/type errors immediately as they appear
 3. **Before commit**: `npm run pre-commit` must pass
@@ -74,12 +74,11 @@ npm run test:coverage   # Generate coverage reports (50% global minimum)
 - **TypeScript First**: Strict typing, no unsafe operations
 - **Optimistic UI**: Immediate updates, background API calls, revert on failure
 - **Future-Ready**: Design for Kanban board (post-1.0) and inventory (v2.0)
-- **Testing**: Unit tests for business logic, integration tests coming later
+- **Testing**: Unit tests with mocked dependencies only - database tests require exceptional justification
 
 ## MCP Tools Available
 
 - **GitHub**: Repository management, PRs, issues
-- **Notion**: Design documentation, planning documents
 - **Playwright**: Browser automation, E2E testing
 - **Context7**: Library documentation lookup
 

@@ -13,18 +13,18 @@ PinPoint is a multi-tenant issue tracking system for pinball arcade operators, b
 
 ## Technology Stack (As Implemented)
 
-| Component          | Technology                       | Status         |
-| ------------------ | -------------------------------- | -------------- |
-| **Language**       | TypeScript                       | ✅ Implemented |
-| **Framework**      | Next.js 14 (App Router)          | ✅ Implemented |
-| **UI Library**     | Material UI (MUI)                | ✅ Implemented |
-| **Database**       | PostgreSQL                       | ✅ Implemented |
-| **ORM**            | Prisma with extensions           | ✅ Implemented |
-| **Authentication** | NextAuth.js (Auth.js v5)         | ✅ Implemented |
-| **API Layer**      | tRPC                             | ✅ Implemented |
-| **File Storage**   | Local (dev) / Vercel Blob (prod) | ✅ Implemented |
-| **External APIs**  | OPDB, PinballMap                 | 🔄 In Progress |
-| **Deployment**     | Vercel                           | ✅ Implemented |
+| Component          | Technology                                | Status         |
+| ------------------ | ----------------------------------------- | -------------- |
+| **Language**       | TypeScript                                | ✅ Implemented |
+| **Framework**      | Next.js 14 (App Router)                   | ✅ Implemented |
+| **UI Library**     | Material UI (MUI) v7 (yes, it's released) | ✅ Implemented |
+| **Database**       | PostgreSQL                                | ✅ Implemented |
+| **ORM**            | Prisma with extensions                    | ✅ Implemented |
+| **Authentication** | NextAuth.js (Auth.js v5)                  | ✅ Implemented |
+| **API Layer**      | tRPC                                      | ✅ Implemented |
+| **File Storage**   | Local (dev) / Vercel Blob (prod)          | ✅ Implemented |
+| **External APIs**  | OPDB, PinballMap                          | 🔄 In Progress |
+| **Deployment**     | Vercel                                    | ✅ Implemented |
 
 ## Multi-Tenancy Architecture
 
@@ -222,7 +222,7 @@ npm run test:coverage # Run tests with coverage report
 
 ## References
 
-- [Backend Implementation Plan](../planning/backend_impl_plan.md) - Original design
+- [Backend Implementation Plan](../planning/backend_impl_plan.md) - Updated plan for the backend
 - [Technical Design Document](../design-docs/technical-design-document.md) - Detailed specifications
 - [Backend Implementation Tasks](../backend_impl_tasks/) - Task breakdown
 - [Roadmap](../planning/roadmap.md) - Release planning
