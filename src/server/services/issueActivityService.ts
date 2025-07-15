@@ -1,5 +1,9 @@
-import { type PrismaClient, ActivityType } from "@prisma/client";
-import { type User, type IssueStatus } from "@prisma/client";
+import {
+  type PrismaClient,
+  type User,
+  type IssueStatus,
+  ActivityType,
+} from "@prisma/client";
 
 export interface ActivityData {
   type: ActivityType; // Use enum instead of string

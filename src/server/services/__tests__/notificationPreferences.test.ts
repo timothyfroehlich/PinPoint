@@ -1,13 +1,15 @@
-import { PrismaClient, type User, type Machine } from "@prisma/client";
+import { type User, type Machine } from "@prisma/client";
+
+import { createTestContext } from "~/test/context";
 
 describe("Notification preference logic", () => {
-  let prisma: PrismaClient;
+  let ctx: Awaited<ReturnType<typeof createTestContext>>;
   let user: User;
   let machine: Machine;
 
   beforeAll(async () => {
-    prisma = new PrismaClient();
-    user = await prisma.user.create({
+    ctx = await createTestContext();
+    user = await ctx.prisma.user.create({
       data: {
         email: "preferencetest@example.com",
         name: "Preference Test",
@@ -16,8 +18,9 @@ describe("Notification preference logic", () => {
         notificationFrequency: "IMMEDIATE",
       },
     });
-    machine = await prisma.machine.create({
+    machine = await ctx.prisma.machine.create({
       data: {
+        name: "Test Machine",
         organizationId: "org1",
         locationId: "loc1",
         modelId: "model1",
@@ -31,18 +34,18 @@ describe("Notification preference logic", () => {
   });
 
   afterAll(async () => {
-    await prisma.machine.deleteMany();
-    await prisma.user.deleteMany();
-    await prisma.$disconnect();
+    await ctx.prisma.machine.deleteMany();
+    await ctx.prisma.user.deleteMany();
+    await ctx.prisma.$disconnect();
   });
 
   it("respects machine-level notification toggles", async () => {
     // Disable all notifications for machine
-    await prisma.machine.update({
+    await ctx.prisma.machine.update({
       where: { id: machine.id },
       data: { ownerNotificationsEnabled: false },
     });
-    const updated = await prisma.machine.findUnique({
+    const updated = await ctx.prisma.machine.findUnique({
       where: { id: machine.id },
     });
     expect(updated?.ownerNotificationsEnabled).toBe(false);
@@ -50,38 +53,43 @@ describe("Notification preference logic", () => {
 
   it("respects user-level notification settings", async () => {
     // Disable all notifications for user
-    await prisma.user.update({
+    await ctx.prisma.user.update({
       where: { id: user.id },
       data: { emailNotificationsEnabled: false },
     });
-    const updated = await prisma.user.findUnique({ where: { id: user.id } });
+    const updated = await ctx.prisma.user.findUnique({
+      where: { id: user.id },
+    });
     expect(updated?.emailNotificationsEnabled).toBe(false);
   });
 
   it("applies preference hierarchy", async () => {
     // Machine notifications enabled, user notifications disabled
-    await prisma.machine.update({
+    await ctx.prisma.machine.update({
       where: { id: machine.id },
       data: { ownerNotificationsEnabled: true },
     });
-    await prisma.user.update({
+    await ctx.prisma.user.update({
       where: { id: user.id },
       data: { emailNotificationsEnabled: false },
     });
-    const machinePref = await prisma.machine.findUnique({
+    const machinePref = await ctx.prisma.machine.findUnique({
       where: { id: machine.id },
     });
-    const userPref = await prisma.user.findUnique({ where: { id: user.id } });
+    const userPref = await ctx.prisma.user.findUnique({
+      where: { id: user.id },
+    });
     expect(machinePref?.ownerNotificationsEnabled).toBe(true);
     expect(userPref?.emailNotificationsEnabled).toBe(false);
   });
 
   it("sets correct defaults for new users and machines", async () => {
-    const newUser = await prisma.user.create({
+    const newUser = await ctx.prisma.user.create({
       data: { email: "defaultuser@example.com", name: "Default User" },
     });
-    const newMachine = await prisma.machine.create({
+    const newMachine = await ctx.prisma.machine.create({
       data: {
+        name: "Test Machine 2",
         organizationId: "org1",
         locationId: "loc1",
         modelId: "model1",

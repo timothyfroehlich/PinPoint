@@ -41,14 +41,18 @@ describe("PinballMapService", () => {
     createMachineMock = jest.fn();
 
     // Assign the jest.fn() mocks to the actual mockPrisma methods
-    mockPrisma.location.findUnique = findUniqueLocationMock;
-    mockPrisma.model.findUnique = findUniqueModelMock;
-    mockPrisma.model.create = createModelMock;
-    mockPrisma.model.update = updateModelMock;
-    mockPrisma.model.upsert = upsertModelMock;
-    mockPrisma.machine.findMany = findManyMachineMock;
-    mockPrisma.machine.deleteMany = deleteManyMachineMock;
-    mockPrisma.machine.create = createMachineMock;
+    mockPrisma.location = { findUnique: findUniqueLocationMock } as any;
+    mockPrisma.model = {
+      findUnique: findUniqueModelMock,
+      create: createModelMock,
+      update: updateModelMock,
+      upsert: upsertModelMock,
+    } as any;
+    mockPrisma.machine = {
+      findMany: findManyMachineMock,
+      deleteMany: deleteManyMachineMock,
+      create: createMachineMock,
+    } as any;
     apiMocker = new PinballMapAPIMocker();
     apiMocker.start();
   });
@@ -76,10 +80,22 @@ describe("PinballMapService", () => {
       lastSyncAt: null,
       syncEnabled: true,
       regionId: null,
-    };
+      organization: {
+        pinballMapConfig: {
+          apiEnabled: true,
+        },
+      },
+    } as any;
 
     beforeEach(() => {
       findUniqueLocationMock.mockResolvedValue(mockLocation);
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            machines: PinballMapAPIMocker.getFixtureData().machines,
+          }),
+      } as Response);
     });
     it("should return error result if location not found", async () => {
       findUniqueLocationMock.mockResolvedValue(null);
@@ -96,9 +112,7 @@ describe("PinballMapService", () => {
       } as Location);
       const result = await syncLocationGames(mockPrisma, "location-1");
       expect(result.success).toBe(false);
-      expect(result.error).toBe(
-        "Location does not have a PinballMap ID configured",
-      );
+      expect(result.error).toBe("Location not configured for PinballMap sync");
       expect(result.added).toBe(0);
       expect(result.removed).toBe(0);
     });
@@ -234,6 +248,11 @@ describe("PinballMapService", () => {
         name: "Org 1 Location",
         pinballMapId: 26454,
         organizationId: "org-1",
+        organization: {
+          pinballMapConfig: {
+            apiEnabled: true,
+          },
+        },
       };
 
       // Mock existing games from a different organization
@@ -277,7 +296,12 @@ describe("PinballMapService", () => {
         id: "location-1",
         organizationId: "org-1",
         pinballMapId: 26454,
-      } as Location;
+        organization: {
+          pinballMapConfig: {
+            apiEnabled: true,
+          },
+        },
+      } as any;
 
       findUniqueLocationMock.mockResolvedValue(mockLocation);
       findManyMachineMock.mockResolvedValue([] as Machine[]);
@@ -304,7 +328,12 @@ describe("PinballMapService", () => {
       id: "location-1",
       pinballMapId: 26454,
       organizationId: "org-1",
-    } as Location;
+      organization: {
+        pinballMapConfig: {
+          apiEnabled: true,
+        },
+      },
+    } as any;
 
     beforeEach(() => {
       findUniqueLocationMock.mockResolvedValue(mockLocation);
