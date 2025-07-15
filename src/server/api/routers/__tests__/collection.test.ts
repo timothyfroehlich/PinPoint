@@ -66,14 +66,39 @@ describe("Collection Router Integration", () => {
 
       expect(result).toHaveProperty("manual");
       expect(result).toHaveProperty("auto");
-      expect(mockPrisma.collectionType.findMany).toHaveBeenCalledWith({
+      expect(mockPrisma.collection.findMany).toHaveBeenCalledWith({
         where: {
-          organizationId: "valid-org-id",
-          isEnabled: true,
+          OR: [
+            { locationId: "valid-loc-id" },
+            { locationId: null, isManual: false },
+          ],
+          type: {
+            organizationId: "valid-org-id",
+            isEnabled: true,
+          },
         },
-        orderBy: {
-          sortOrder: "asc",
+        include: {
+          type: true,
+          _count: {
+            select: {
+              machines: {
+                where: {
+                  locationId: "valid-loc-id",
+                },
+              },
+            },
+          },
         },
+        orderBy: [
+          {
+            type: {
+              sortOrder: "asc",
+            },
+          },
+          {
+            sortOrder: "asc",
+          },
+        ],
       });
     });
 

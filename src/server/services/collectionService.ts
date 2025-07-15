@@ -4,13 +4,11 @@ import {
   type CollectionType,
 } from "@prisma/client";
 
-export interface CreateCollectionData {
+export interface CreateManualCollectionData {
   name: string;
   typeId: string;
   locationId?: string;
   description?: string;
-  isManual: boolean;
-  filterCriteria?: Record<string, unknown>;
 }
 
 export interface CollectionWithMachines {
@@ -44,47 +42,44 @@ export class CollectionService {
     manual: CollectionWithMachines[];
     auto: CollectionWithMachines[];
   }> {
-    // Get enabled collection types for organization
-    const enabledTypes = await this.prisma.collectionType.findMany({
+    // Get all collections in one query to avoid N+1 pattern
+    const collections = await this.prisma.collection.findMany({
       where: {
-        organizationId,
-        isEnabled: true,
-      },
-      orderBy: {
-        sortOrder: "asc",
-      },
-    });
-
-    const manual: CollectionWithMachines[] = [];
-    const auto: CollectionWithMachines[] = [];
-
-    for (const type of enabledTypes) {
-      const collections = await this.prisma.collection.findMany({
-        where: {
-          typeId: type.id,
-          OR: [
-            { locationId }, // Location-specific collections
-            { locationId: null, isManual: false }, // Organization-wide auto-collections
-          ],
+        OR: [
+          { locationId }, // Location-specific collections
+          { locationId: null, isManual: false }, // Organization-wide auto-collections
+        ],
+        type: {
+          organizationId,
+          isEnabled: true,
         },
-        include: {
-          type: true,
-          _count: {
-            select: {
-              machines: {
-                where: {
-                  locationId, // Only count machines at this location
-                },
+      },
+      include: {
+        type: true,
+        _count: {
+          select: {
+            machines: {
+              where: {
+                locationId, // Only count machines at this location
               },
             },
           },
         },
-        orderBy: {
+      },
+      orderBy: [
+        {
+          type: {
+            sortOrder: "asc",
+          },
+        },
+        {
           sortOrder: "asc",
         },
-      });
+      ],
+    });
 
-      for (const collection of collections) {
+    const { manual, auto } = collections.reduce(
+      (acc, collection) => {
         const collectionData: CollectionWithMachines = {
           id: collection.id,
           name: collection.name,
@@ -97,12 +92,18 @@ export class CollectionService {
         };
 
         if (collection.isManual) {
-          manual.push(collectionData);
+          acc.manual.push(collectionData);
         } else {
-          auto.push(collectionData);
+          acc.auto.push(collectionData);
         }
-      }
-    }
+
+        return acc;
+      },
+      {
+        manual: [] as CollectionWithMachines[],
+        auto: [] as CollectionWithMachines[],
+      },
+    );
 
     return { manual, auto };
   }
@@ -148,7 +149,7 @@ export class CollectionService {
    */
   async createManualCollection(
     organizationId: string,
-    data: CreateCollectionData,
+    data: CreateManualCollectionData,
   ): Promise<Collection> {
     return this.prisma.collection.create({
       data: {

@@ -53,57 +53,11 @@ export async function syncLocationGames(
     // This entire service will be completely redesigned in Task 10: Redesign PinballMap Integration
     // See: docs/backend_impl_tasks/10-redesign-pinballmap-integration.md
     // Until then, this function returns an error to prevent silent failures
-    // if (!location.pinballMapId) {
-    //   return {
-    //     success: false,
-    //     added: 0,
-    //     removed: 0,
-    //     error: "Location does not have a PinballMap ID configured",
-    //   };
-    // }
-
-    // 2. Location is used directly (no more room hierarchy)
-    // Machines are directly associated with locations in the new schema
-
-    // 3. Fetch machine data from PinballMap
-    // TODO: Location no longer has pinballMapId field - need to redesign this
-    // const machineData = await fetchLocationMachineDetails(
-    //   location.pinballMapId,
-    // );
-
-    // For now, return early with error
     return {
       success: false,
       added: 0,
       removed: 0,
       error: "PinballMap sync functionality needs to be updated for new schema",
-    };
-
-    // 4. Validate the response structure
-    if (!machineData || !Array.isArray(machineData.machines)) {
-      return {
-        success: false,
-        added: 0,
-        removed: 0,
-        error:
-          "PinballMap API returned invalid data. Please contact support if this persists.",
-      };
-    }
-
-    // 5. Reconcile the games
-    // TODO: Update this when PinballMap sync is re-implemented
-    // const result = await reconcileMachines(
-    //   prisma,
-    //   location.id,
-    //   location.organizationId,
-    //   machineData.machines,
-    // );
-
-    // TODO: Return actual results when re-implemented
-    return {
-      success: true,
-      added: 0,
-      removed: 0,
     };
   } catch (error) {
     // Provide specific error messages for different failure types
@@ -174,7 +128,7 @@ export async function processFixtureData(
 }
 
 /**
- * Reconcile game instances - add new games, remove old ones
+ * Reconcile machines - add new machines, remove old ones
  */
 export async function reconcileMachines(
   prisma: PrismaClient,

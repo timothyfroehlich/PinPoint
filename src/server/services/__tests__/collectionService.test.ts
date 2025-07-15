@@ -65,12 +65,9 @@ describe("CollectionService", () => {
         },
       ];
 
-      (mockPrisma.collectionType.findMany as jest.Mock).mockResolvedValue(
-        mockCollectionTypes,
+      (mockPrisma.collection.findMany as jest.Mock).mockResolvedValue(
+        mockCollections,
       );
-      (mockPrisma.collection.findMany as jest.Mock)
-        .mockResolvedValueOnce([mockCollections[0]!]) // First call for type1
-        .mockResolvedValueOnce([mockCollections[1]!]); // Second call for type2
 
       const result = await service.getLocationCollections("loc1", "org1");
 
@@ -81,19 +78,43 @@ describe("CollectionService", () => {
     });
 
     it("should only return enabled collection types", async () => {
-      (mockPrisma.collectionType.findMany as jest.Mock).mockResolvedValue([]);
       (mockPrisma.collection.findMany as jest.Mock).mockResolvedValue([]);
 
       await service.getLocationCollections("loc1", "org1");
 
-      expect(mockPrisma.collectionType.findMany).toHaveBeenCalledWith({
+      expect(mockPrisma.collection.findMany).toHaveBeenCalledWith({
         where: {
-          organizationId: "org1",
-          isEnabled: true,
+          OR: [
+            { locationId: "loc1" }, // Location-specific collections
+            { locationId: null, isManual: false }, // Organization-wide auto-collections
+          ],
+          type: {
+            organizationId: "org1",
+            isEnabled: true,
+          },
         },
-        orderBy: {
-          sortOrder: "asc",
+        include: {
+          type: true,
+          _count: {
+            select: {
+              machines: {
+                where: {
+                  locationId: "loc1", // Only count machines at this location
+                },
+              },
+            },
+          },
         },
+        orderBy: [
+          {
+            type: {
+              sortOrder: "asc",
+            },
+          },
+          {
+            sortOrder: "asc",
+          },
+        ],
       });
     });
   });

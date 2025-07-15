@@ -59,7 +59,6 @@ export const collectionRouter = createTRPCRouter({
         typeId: input.typeId,
         locationId: input.locationId,
         description: input.description,
-        isManual: true,
       });
     }),
 
