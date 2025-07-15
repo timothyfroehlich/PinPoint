@@ -170,12 +170,25 @@ model Machine {
   modelId        String
   ownerId        String?
 
+  // Machine ownership notification preferences
+  ownerNotificationsEnabled Boolean @default(true)
+  notifyOnNewIssues        Boolean @default(true)
+  notifyOnStatusChanges    Boolean @default(true)
+  notifyOnComments         Boolean @default(false)
+
+  // QR Code system
+  qrCodeId       String   @unique @default(cuid()) // Unique identifier for QR code
+  qrCodeUrl      String?  // URL to QR code image file
+  qrCodeGeneratedAt DateTime? // When QR code was last generated
+
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   location     Location     @relation(fields: [locationId], references: [id])
   model        Model        @relation(fields: [modelId], references: [id])
   owner        User?        @relation("MachineOwner", fields: [ownerId], references: [id])
   issues       Issue[]
   collections  Collection[]
+
+  @@index([qrCodeId])
 }
 
 model Issue {
