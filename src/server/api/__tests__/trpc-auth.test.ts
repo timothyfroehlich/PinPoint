@@ -6,6 +6,13 @@ import { createCallerFactory } from "~/server/api/trpc";
 import { auth } from "~/server/auth";
 import { db } from "~/server/db";
 
+// Temporary enum for testing with the new schema
+enum Role {
+  ADMIN = "admin",
+  MEMBER = "member",
+  TECHNICIAN = "technician",
+}
+
 // Create properly typed mock functions
 const mockOrganizationFindUnique = jest.fn<Promise<unknown>, [unknown]>();
 const mockMembershipFindUnique = jest.fn<Promise<unknown>, [unknown]>();
@@ -32,6 +39,9 @@ const mockAuth = auth as jest.Mock;
 describe("tRPC Authentication Middleware", () => {
   const createCaller = createCallerFactory(appRouter);
 
+  // Type helper to properly type the caller
+  type CallerType = ReturnType<typeof createCaller>;
+
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -41,6 +51,8 @@ describe("tRPC Authentication Middleware", () => {
     name: "Test Organization",
     subdomain: "test",
     logoUrl: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
   };
 
   const mockMembership = {
@@ -80,7 +92,7 @@ describe("tRPC Authentication Middleware", () => {
         headers: new Headers({
           host: "test.localhost:3000",
         }),
-      });
+      }) as CallerType;
 
       // Test with a protected procedure - using user.getCurrentMembership as example
       mockMembershipFindUnique.mockResolvedValue(mockMembership);
@@ -100,7 +112,7 @@ describe("tRPC Authentication Middleware", () => {
         headers: new Headers({
           host: "test.localhost:3000",
         }),
-      });
+      }) as CallerType;
 
       await expect(caller.user.getCurrentMembership()).rejects.toThrow(
         new TRPCError({
@@ -124,7 +136,7 @@ describe("tRPC Authentication Middleware", () => {
         headers: new Headers({
           host: "test.localhost:3000",
         }),
-      });
+      }) as CallerType;
 
       await expect(caller.user.getCurrentMembership()).rejects.toThrow(
         new TRPCError({
@@ -158,7 +170,7 @@ describe("tRPC Authentication Middleware", () => {
         headers: new Headers({
           host: "test.localhost:3000",
         }),
-      });
+      }) as CallerType;
 
       // Test with an organization procedure - using issue.getAll as example
       const result = await caller.user.getCurrentMembership();
@@ -197,7 +209,7 @@ describe("tRPC Authentication Middleware", () => {
         headers: new Headers({
           host: "test.localhost:3000",
         }),
-      });
+      }) as CallerType;
 
       await expect(caller.user.getCurrentMembership()).rejects.toThrow(
         new TRPCError({
@@ -229,7 +241,7 @@ describe("tRPC Authentication Middleware", () => {
         headers: new Headers({
           host: "test.localhost:3000",
         }),
-      });
+      }) as CallerType;
 
       await expect(caller.user.getCurrentMembership()).rejects.toThrow(
         new TRPCError({
@@ -259,6 +271,8 @@ describe("tRPC Authentication Middleware", () => {
         name: "Different Organization",
         subdomain: "different",
         logoUrl: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
       };
 
       mockAuth.mockResolvedValue(mockSession);
@@ -272,7 +286,7 @@ describe("tRPC Authentication Middleware", () => {
         headers: new Headers({
           host: "different.localhost:3000", // Different subdomain
         }),
-      });
+      }) as CallerType;
 
       await expect(caller.user.getCurrentMembership()).rejects.toThrow(
         new TRPCError({
@@ -305,7 +319,7 @@ describe("tRPC Authentication Middleware", () => {
         headers: new Headers({
           host: "test.localhost:3000",
         }),
-      });
+      }) as CallerType;
 
       const result = await caller.user.getCurrentMembership();
 
@@ -337,7 +351,7 @@ describe("tRPC Authentication Middleware", () => {
         headers: new Headers({
           host: "test.localhost:3000",
         }),
-      });
+      }) as CallerType;
 
       // This should work for admin users
       const result = await caller.user.getCurrentMembership();
@@ -367,7 +381,7 @@ describe("tRPC Authentication Middleware", () => {
         headers: new Headers({
           host: "test.localhost:3000",
         }),
-      });
+      }) as CallerType;
 
       // Note: We would need an actual admin-only procedure to test this
       // For now, we're testing that the organization middleware works correctly
@@ -400,7 +414,7 @@ describe("tRPC Authentication Middleware", () => {
         headers: new Headers({
           host: "test.localhost:3000",
         }),
-      });
+      }) as CallerType;
 
       await caller.user.getCurrentMembership();
 
@@ -432,7 +446,7 @@ describe("tRPC Authentication Middleware", () => {
         headers: new Headers({
           host: "localhost:3000",
         }),
-      });
+      }) as CallerType;
 
       await caller.user.getCurrentMembership();
 

@@ -8,24 +8,20 @@ import {
   machineDeleteProcedure,
 } from "~/server/api/trpc";
 
-export const machineRouter = createTRPCRouter({
+export const machineCoreRouter = createTRPCRouter({
   create: machineEditProcedure
     .input(
       z.object({
-        name: z.string().min(1),
+        name: z.string().min(1, "Name is required"),
         modelId: z.string(),
         locationId: z.string(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Verify that the model and location belong to the same organization
+      // Verify that the model and room belong to the same organization
       const model = await ctx.db.model.findFirst({
         where: {
           id: input.modelId,
-          OR: [
-            { organizationId: ctx.organization.id }, // Organization-specific games
-            { organizationId: null }, // Global OPDB games
-          ],
         },
       });
 
@@ -62,7 +58,7 @@ export const machineRouter = createTRPCRouter({
             select: {
               id: true,
               name: true,
-              profilePicture: true,
+              image: true,
             },
           },
         },
@@ -75,25 +71,17 @@ export const machineRouter = createTRPCRouter({
         organizationId: ctx.organization.id,
       },
       include: {
-        model: {
-          include: {
-            _count: {
-              select: {
-                machines: true,
-              },
-            },
-          },
-        },
+        model: true,
         location: true,
         owner: {
           select: {
             id: true,
             name: true,
-            profilePicture: true,
+            image: true,
           },
         },
       },
-      orderBy: { name: "asc" },
+      orderBy: { model: { name: "asc" } },
     });
   }),
 
@@ -108,14 +96,13 @@ export const machineRouter = createTRPCRouter({
       },
       select: {
         id: true,
-        name: true,
         model: {
           select: {
             name: true,
           },
         },
       },
-      orderBy: { name: "asc" },
+      orderBy: { model: { name: "asc" } },
     });
   }),
 
@@ -142,7 +129,7 @@ export const machineRouter = createTRPCRouter({
             select: {
               id: true,
               name: true,
-              profilePicture: true,
+              image: true,
             },
           },
         },
@@ -159,7 +146,6 @@ export const machineRouter = createTRPCRouter({
     .input(
       z.object({
         id: z.string(),
-        name: z.string().min(1),
         modelId: z.string().optional(),
         locationId: z.string().optional(),
       }),
@@ -182,7 +168,6 @@ export const machineRouter = createTRPCRouter({
         const model = await ctx.db.model.findFirst({
           where: {
             id: input.modelId,
-            organizationId: ctx.organization.id,
           },
         });
         if (!model) {
@@ -205,7 +190,6 @@ export const machineRouter = createTRPCRouter({
       return ctx.db.machine.update({
         where: { id: input.id },
         data: {
-          name: input.name,
           ...(input.modelId && { modelId: input.modelId }),
           ...(input.locationId && { locationId: input.locationId }),
         },
@@ -224,7 +208,7 @@ export const machineRouter = createTRPCRouter({
             select: {
               id: true,
               name: true,
-              profilePicture: true,
+              image: true,
             },
           },
         },
@@ -248,130 +232,6 @@ export const machineRouter = createTRPCRouter({
 
       return ctx.db.machine.delete({
         where: { id: input.id },
-      });
-    }),
-
-  // Move a game instance to a different location
-  moveToLocation: machineEditProcedure
-    .input(
-      z.object({
-        machineId: z.string(),
-        locationId: z.string(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      // Verify the game instance belongs to this organization
-      const existingInstance = await ctx.db.machine.findFirst({
-        where: {
-          id: input.machineId,
-          organizationId: ctx.organization.id,
-        },
-      });
-
-      if (!existingInstance) {
-        throw new Error("Game instance not found");
-      }
-
-      // Verify the target location belongs to this organization
-      const location = await ctx.db.location.findFirst({
-        where: {
-          id: input.locationId,
-          organizationId: ctx.organization.id,
-        },
-      });
-
-      if (!location) {
-        throw new Error("Target location not found");
-      }
-
-      return ctx.db.machine.update({
-        where: { id: input.machineId },
-        data: {
-          locationId: input.locationId,
-        },
-        include: {
-          model: {
-            include: {
-              _count: {
-                select: {
-                  machines: true,
-                },
-              },
-            },
-          },
-          location: true,
-          owner: {
-            select: {
-              id: true,
-              name: true,
-              profilePicture: true,
-            },
-          },
-        },
-      });
-    }),
-
-  // Assign or remove owner from a game instance
-  assignOwner: machineEditProcedure
-    .input(
-      z.object({
-        machineId: z.string(),
-        ownerId: z.string().optional(), // null/undefined to remove owner
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      // Verify the game instance belongs to this organization
-      const existingInstance = await ctx.db.machine.findFirst({
-        where: {
-          id: input.machineId,
-          organizationId: ctx.organization.id,
-        },
-      });
-
-      if (!existingInstance) {
-        throw new Error("Game instance not found");
-      }
-
-      // If setting an owner, verify the user is a member of this organization
-      if (input.ownerId) {
-        const membership = await ctx.db.membership.findUnique({
-          where: {
-            userId_organizationId: {
-              userId: input.ownerId,
-              organizationId: ctx.organization.id,
-            },
-          },
-        });
-
-        if (!membership) {
-          throw new Error("User is not a member of this organization");
-        }
-      }
-
-      return ctx.db.machine.update({
-        where: { id: input.machineId },
-        data: {
-          ownerId: input.ownerId ?? null,
-        },
-        include: {
-          model: {
-            include: {
-              _count: {
-                select: {
-                  machines: true,
-                },
-              },
-            },
-          },
-          location: true,
-          owner: {
-            select: {
-              id: true,
-              name: true,
-              profilePicture: true,
-            },
-          },
-        },
       });
     }),
 });

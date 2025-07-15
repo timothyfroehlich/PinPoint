@@ -365,13 +365,18 @@ async function main() {
       update: {
         name: game.name,
         manufacturer: game.manufacturer,
-        year: game.year,
+        year: game.releaseDate
+          ? new Date(game.releaseDate).getFullYear()
+          : null,
       },
       create: {
         name: game.name,
         opdbId: game.opdb_id,
         manufacturer: game.manufacturer,
-        year: game.year,
+        year: game.releaseDate
+          ? new Date(game.releaseDate).getFullYear()
+          : null,
+        isCustom: false, // OPDB games are not custom
         // Do NOT set organizationId for OPDB models (global)
       },
     });
@@ -418,6 +423,7 @@ async function main() {
     } else {
       await prisma.machine.create({
         data: {
+          name: model.name, // Use model name as default instance name
           organizationId: organization.id,
           locationId: austinPinballLocation.id,
           modelId: model.id,

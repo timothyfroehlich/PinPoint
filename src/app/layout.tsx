@@ -1,3 +1,6 @@
+import { AuthenticatedLayout } from "./_components/AuthenticatedLayout";
+import Providers from "./providers";
+
 export default function RootLayout({
   children,
 }: {
@@ -5,9 +8,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        <title>PinPoint</title>
+      </head>
       <body>
-        <div>Backend Refactor In Progress</div>
-        {children}
+        <Providers>
+          <AuthenticatedLayout>{children}</AuthenticatedLayout>
+        </Providers>
       </body>
     </html>
   );

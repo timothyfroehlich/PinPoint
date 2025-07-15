@@ -1,3 +1,15 @@
+---
+status: archived
+last-updated: 2025-01-14
+superseded-by: ../roadmap.md
+---
+
+# ARCHIVED: Initial Project Overview
+
+> **Note**: This document represents the initial pitch to Austin Pinball Collective and has been superseded by the current [roadmap.md](../roadmap.md) and [backend_impl_plan.md](../backend_impl_plan.md). The terminology has evolved (GameTitle → Model, GameInstance → Machine) and the architecture has been significantly refined.
+
+---
+
 Audience: Austin Pinball Collective Members & Stakeholders
 Purpose: To provide a high-level overview of the proposed issue-tracking system for review and approval.
 Created with Gemini. There may be some small inconsistencies or odd jargon. I'll try to do one more re-read to clean up issues soon.

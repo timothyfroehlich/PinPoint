@@ -3,11 +3,10 @@ import { organizationRouter } from "./routers/organization";
 import { collectionRouter } from "~/server/api/routers/collection";
 import { commentRouter } from "~/server/api/routers/comment";
 import { issueRouter } from "~/server/api/routers/issue";
-import { issueStatusRouter } from "~/server/api/routers/issueStatus";
 import { locationRouter } from "~/server/api/routers/location";
 import { machineRouter } from "~/server/api/routers/machine";
 import { modelRouter } from "~/server/api/routers/model";
-import { roomRouter } from "~/server/api/routers/room";
+import { notificationRouter } from "~/server/api/routers/notification";
 import { userRouter } from "~/server/api/routers/user";
 import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
 
@@ -24,9 +23,8 @@ export const appRouter = createTRPCRouter({
   machine: machineRouter,
   user: userRouter,
   issue: issueRouter,
-  issueStatus: issueStatusRouter,
-  room: roomRouter,
   organization: organizationRouter,
+  notification: notificationRouter,
 });
 
 // export type definition of API

@@ -1,3 +1,10 @@
+---
+status: current
+last-updated: 2025-01-14
+---
+
+# Technical Design Document
+
 ## System Architecture
 
 ### Architectural Model
@@ -180,3 +187,95 @@ The future inventory module will be developed as a logically separate feature wi
 ### Scalability & Deployment
 
 The proposed deployment strategy on Vercel is well-suited for the application's lifecycle. The stateless nature of Next.js serverless functions allows the application layer to scale horizontally and automatically in response to traffic. The PostgreSQL database, whether hosted on Vercel Postgres or a dedicated provider like AWS RDS, can be scaled vertically (by increasing resources) or horizontally (with read replicas for analytics) independently of the application, ensuring that the data layer does not become a bottleneck as the platform grows.1
+
+## Development Workflow & Standards
+
+### Code Quality Standards
+
+The project maintains strict quality standards to ensure maintainability and reliability:
+
+- **0 TypeScript errors** - Fix immediately, never commit with TS errors
+- **0 ESLint errors** - Warnings acceptable only with justification
+- **Consistent formatting** - Auto-formatted with Prettier
+- **Modern patterns** - ES modules, typed mocks (`jest.fn<T>()`), no `any` types
+- **Test quality** - Test code must meet the same standards as production code
+- **Coverage thresholds** - 50% global, 60% server/, 70% lib/ (configured in jest.config.js)
+
+### Development Commands
+
+```bash
+# Development (RECOMMENDED)
+npm run dev:full        # Start all services with monitoring
+npm run dev:clean       # Fresh start with cleanup
+npm run setup:worktree  # Setup new worktree environment
+
+# Quality Assurance (MANDATORY)
+npm run validate        # Before starting work
+npm run pre-commit      # Before every commit (MUST PASS)
+
+# Database
+npm run db:reset        # Complete reset + reseed
+npm run db:push         # Sync schema changes
+
+# Quick Checks
+npm run quick           # Fast typecheck + lint
+npm run fix             # Auto-fix lint + format issues
+npm run typecheck       # TypeScript validation only
+
+# Testing
+npm run test:coverage   # Generate coverage reports
+```
+
+### ESM Module Configuration
+
+The project uses ES modules (`"type": "module"` in package.json), which requires special consideration:
+
+- **Import statements** - Always use ES module syntax
+- **File extensions** - May need explicit `.js` extensions in imports
+- **Jest configuration** - Uses `ts-jest/presets/default-esm` preset
+- **ESM-only packages** - Some packages (superjson, @auth/prisma-adapter) are ESM-only
+- **Transform configuration** - May need `transformIgnorePatterns` updates in Jest for new packages
+
+### Pre-Production Phase Considerations
+
+During the pre-production phase, the following practices apply:
+
+- **Database strategy** - Frequent schema changes, no migrations
+- **Sessions** - Clear on `db:reset` (expected behavior)
+- **Schema evolution** - Use `npm run db:reset` for clean state
+- **OPDB games** - Global (no organizationId)
+- **Custom games** - Organization-scoped
+
+## API Design with tRPC
+
+### Router Structure
+
+The API is organized into logical routers based on the data model:
+
+- `issue.router.ts` - Issue management operations
+- `machine.router.ts` - Machine/game instance operations
+- `organization.router.ts` - Organization settings
+- `user.router.ts` - User profile management
+- `location.router.ts` - Location management
+
+### Procedure Types
+
+- **`protectedProcedure`** - Requires authenticated user session
+- **`organizationProcedure`** - Requires organization membership with specific permissions
+- **`publicProcedure`** - No authentication required (limited use)
+
+### Input Validation
+
+All procedure inputs are strictly validated using Zod schemas, ensuring:
+
+- Type safety at runtime
+- Clear error messages for invalid data
+- Prevention of malformed data reaching the database
+
+### Multi-Tenant Data Access
+
+Every database query is automatically scoped by organization using Prisma extensions:
+
+- Global query filters ensure data isolation
+- Organization context derived from subdomain
+- Row-level security enforced at the ORM level

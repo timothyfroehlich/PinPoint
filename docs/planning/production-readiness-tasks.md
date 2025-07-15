@@ -1,8 +1,27 @@
+---
+status: current
+last-updated: 2025-01-14
+---
+
+# Production Readiness Tasks
+
 This report outlines key recommendations to prepare the PinPoint application for a production launch. The issues are categorized by area of concern and are formatted for easy transfer to GitHub Issues.
+
+> **Note**: Some tasks have been completed or are in progress. Task status is marked with ✅ (completed), 🔄 (in progress), or 📋 (pending).
+
+## Current Development Standards
+
+The project maintains strict quality standards as documented in [CLAUDE.md](../../CLAUDE.md):
+
+- **0 TypeScript errors** - Fix immediately, never commit with TS errors
+- **0 ESLint errors** - Warnings acceptable with justification
+- **Test Coverage** - 50% global, 60% server/, 70% lib/
+- **Pre-commit** - `npm run pre-commit` must pass before every commit
+- **Development** - Use `npm run dev:full` for comprehensive monitoring
 
 ## 1. CI/CD and Deployment
 
-### Issue: Implement Comprehensive CI/CD Pipeline for Vercel
+### 📋 Issue: Implement Comprehensive CI/CD Pipeline for Vercel
 
 **Title:** `feat(ci): Implement Production and Preview Deployment Pipeline to Vercel`
 Description:
@@ -71,7 +90,7 @@ run: npm install --global vercel@latest
 
 ## 2. Security
 
-### Issue: Integrate Automated Security Scanning with CodeQL
+### 📋 Issue: Integrate Automated Security Scanning with CodeQL
 
 **Title:** `chore(security): Integrate CodeQL for Automated Security Analysis`
 Description:
@@ -137,7 +156,7 @@ security-events: write
 
 - [Configuring CodeQL analysis](https://www.google.com/search?q=https://docs.github.com/en/code-security/code-scanning/configuring-code-scanning/configuring-code-scanning-for-a-compiled-language)
 
-### Issue: Add Dependency Vulnerability Scanning
+### 📋 Issue: Add Dependency Vulnerability Scanning
 
 **Title:** `chore(security): Add npm audit to CI Pipeline`
 Description:
@@ -166,7 +185,7 @@ The project's dependencies can be a source of security vulnerabilities. We shoul
 
 ## 3. Environment and Secrets Management
 
-### Issue: Securely Disable Development Login in Production
+### 📋 Issue: Securely Disable Development Login in Production
 
 **Title:** `refactor(auth): Remove Development Login Components from Production Build`
 Description:
@@ -203,7 +222,9 @@ return new NextResponse('Not found', { status: 404 });
 
 - [Next.js Environment Variables](https://nextjs.org/docs/app/building-your-application/configuring/environment-variables)
 
-### Issue: Centralize and Validate Environment Variables
+### ✅ Issue: Centralize and Validate Environment Variables
+
+> **Status**: COMPLETED - The project uses T3 Env with comprehensive validation
 
 **Title:** `refactor(env): Replace env.js with T3 Env for Type-Safe Variables`
 Description:
@@ -247,7 +268,9 @@ To improve security and maintainability, all environment variable access should 
 
 ## 4. Linting and Code Quality
 
-### Issue: Enhance ESLint Config to Enforce Best Practices
+### ✅ Issue: Enhance ESLint Config to Enforce Best Practices
+
+> **Status**: COMPLETED - The project has comprehensive ESLint configuration with 0 errors tolerance
 
 **Title:** `chore(lint): Enhance ESLint Config to Enforce Best Practices`
 Description:
@@ -360,7 +383,9 @@ ignores: [
 
 ## 5. General Production Considerations
 
-### Issue: Implement Production Image Storage with Client-Side Resizing
+### 🔄 Issue: Implement Production Image Storage with Client-Side Resizing
+
+> **Status**: IN PROGRESS - See [video-upload-strategy.md](../ideas/video-upload-strategy.md) for related work
 
 **Title:** `feat(images): Implement Production Image Storage with Client-Side Resizing`
 Description:
@@ -411,7 +436,7 @@ console.error(error);
 - [Vercel Blob Documentation](https://vercel.com/docs/storage/vercel-blob)
 - [`browser-image-compression`](<https://www.google.com/search?q=%5Bhttps://github.com/Donaldcwl/browser-image-compression%5D(https://github.com/Donaldcwl/browser-image-compression)>)[ library](<https://www.google.com/search?q=%5Bhttps://github.com/Donaldcwl/browser-image-compression%5D(https://github.com/Donaldcwl/browser-image-compression)>)
 
-### Issue: Implement Structured Logging and Error Monitoring
+### 📋 Issue: Implement Structured Logging and Error Monitoring
 
 **Title:** `feat(ops): Implement a Structured Logging and Error Monitoring Service`
 Description:
@@ -447,7 +472,13 @@ While Vercel provides high-level analytics, Sentry provides deep, code-level dia
 - [Sentry for tRPC](https://www.google.com/search?q=https://docs.sentry.io/platforms/javascript/guides/nextjs/integrations/trpc/)
 - [Sentry's GitHub Integration](https://docs.sentry.io/product/integrations/source-code-mgmt/github/)
 
-### Issue: Implement Code Coverage Reporting
+### ✅ Issue: Implement Code Coverage Reporting
+
+> **Status**: COMPLETED - See [coverage-setup.md](../coverage-setup.md) for implementation details
+>
+> - Coverage thresholds configured: 50% global, 60% server/, 70% lib/
+> - GitHub Actions integration with Codecov
+> - `npm run test:coverage` command available
 
 **Title:** `feat(testing): Implement Code Coverage Reporting`
 Description:
