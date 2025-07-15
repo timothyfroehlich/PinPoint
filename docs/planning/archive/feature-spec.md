@@ -1,3 +1,15 @@
+---
+status: archived
+last-updated: 2025-01-14
+superseded-by: ../roadmap.md
+---
+
+# ARCHIVED: Initial Feature Specifications
+
+> **Note**: This document represents the early feature specifications and has been superseded by the current [roadmap.md](../roadmap.md). The terminology has evolved (GameTitle → Model, GameInstance → Machine) and the feature organization has been refined for the Beta, V1.0, and future releases.
+
+---
+
 # Pinpoint Detailed Feature Specifications (Phased Development Plan)
 
 Audience: Project Lead / Developer

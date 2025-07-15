@@ -1,3 +1,21 @@
+---
+status: archived
+last-updated: 2025-01-14
+superseded-by: ../planning/roadmap.md
+---
+
+# ARCHIVED: Product Specification
+
+> **Note**: This document represents the original product specification and has been superseded by the current [roadmap.md](../planning/roadmap.md) and [backend_impl_plan.md](../planning/backend_impl_plan.md). The terminology has evolved (GameTitle → Model, GameInstance → Machine) and the feature roadmap has been reorganized into Beta, V1.0, and future releases.
+>
+> This document is preserved for historical reference. For current feature planning and specifications, please refer to:
+>
+> - [Roadmap](../planning/roadmap.md) - Current release planning
+> - [UI Architecture Plan](../design-docs/ui-architecture-plan.md) - Current UI specifications
+> - [Critical User Journeys](../design-docs/cujs-list.md) - Current user workflows
+
+---
+
 ### Introduction & System Overview
 
 This document provides the single source of truth for all functional and non-functional requirements of the PinPoint platform. It is intended to guide the development team by defining the scope, features, and user experience of the application.
