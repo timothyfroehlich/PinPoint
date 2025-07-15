@@ -67,15 +67,15 @@ export class IssueActivityService {
     oldAssignee: User | null,
     newAssignee: User | null,
   ): Promise<void> {
-    let description: string;
+    let _description: string;
     if (oldAssignee && newAssignee) {
-      description = `Reassigned from ${oldAssignee.name} to ${newAssignee.name}`;
+      _description = `Reassigned from ${oldAssignee.name} to ${newAssignee.name}`;
     } else if (newAssignee) {
-      description = `Assigned to ${newAssignee.name}`;
+      _description = `Assigned to ${newAssignee.name}`;
     } else if (oldAssignee) {
-      description = `Unassigned from ${oldAssignee.name}`;
+      _description = `Unassigned from ${oldAssignee.name}`;
     } else {
-      description = "Assignment changed";
+      _description = "Assignment changed";
     }
 
     await this.recordActivity(issueId, organizationId, {

@@ -88,7 +88,9 @@ const timingMiddleware = t.middleware(async ({ next, path }) => {
   const result = await next();
 
   const end = Date.now();
-  console.log(`[TRPC] ${path} took ${end - start}ms to execute`);
+  if (env.NODE_ENV !== "test") {
+    console.log(`[TRPC] ${path} took ${end - start}ms to execute`);
+  }
 
   return result;
 });
@@ -114,6 +116,13 @@ export const protectedProcedure = t.procedure
 
 export const organizationProcedure = protectedProcedure.use(
   async ({ ctx, next }) => {
+    if (!ctx.organization) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Organization not found",
+      });
+    }
+
     const membership = await ctx.db.membership.findFirst({
       where: {
         organizationId: ctx.organization.id,
@@ -129,7 +138,10 @@ export const organizationProcedure = protectedProcedure.use(
     });
 
     if (!membership) {
-      throw new TRPCError({ code: "FORBIDDEN" });
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "You don't have permission to access this organization",
+      });
     }
 
     return next({

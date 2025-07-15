@@ -3,7 +3,7 @@ import { PrismaClient, NotificationType } from "@prisma/client";
 describe("Notification schema integration", () => {
   let prisma: PrismaClient;
   let userId: string;
-  let notificationId: string;
+  let _notificationId: string;
 
   beforeAll(async () => {
     prisma = new PrismaClient();
@@ -37,7 +37,7 @@ describe("Notification schema integration", () => {
         message: "Valid notification",
       },
     });
-    notificationId = notification.id;
+    _notificationId = notification.id;
     expect(notification.userId).toBe(userId);
   });
 
