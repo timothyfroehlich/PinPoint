@@ -14,7 +14,7 @@
     "dev:full": "concurrently -n 'server,db-studio,typecheck' -c 'blue,green,yellow' --kill-others 'npm run dev:server' 'npm run dev:db' 'npm run dev:typecheck'",
     "dev:clean": "node scripts/cleanup-dev.cjs && npm run dev:full",
     "dev:server": "nodemon --config nodemon.server.json",
-    "dev:db": "dotenv -- prisma studio",
+    "dev:db": "dotenv -- sh -c 'prisma studio --port ${PRISMA_STUDIO_PORT:-5555}'",
     "dev:typecheck": "tsc --noEmit --watch --preserveWatchOutput",
     "dev:status": "concurrently 'npm run health' 'node scripts/port-status.cjs'",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,mdx}\" --cache",
