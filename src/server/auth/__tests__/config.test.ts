@@ -1,5 +1,3 @@
-import { authConfig } from "../config";
-
 // Add this helper at the top of the file
 function setNodeEnv(value: string) {
   Object.defineProperty(process.env, "NODE_ENV", {
@@ -19,27 +17,35 @@ const mockUserFindUnique = jest.fn<Promise<unknown>, [unknown]>();
 jest.mock("~/server/db", () => ({
   db: {
     organization: {
-      findUnique: mockOrganizationFindUnique,
+      findUnique: jest.fn(),
     },
     membership: {
-      findUnique: mockMembershipFindUnique,
+      findUnique: jest.fn(),
     },
     user: {
-      findUnique: mockUserFindUnique,
+      findUnique: jest.fn(),
     },
   },
 }));
+
+import { authConfig } from "../config";
+
+import { db } from "~/server/db";
 
 describe("NextAuth Configuration", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     // Reset environment
     setNodeEnv("test");
+    // Assign the mock functions to the imported mocks
+    (db.organization.findUnique as jest.Mock) = mockOrganizationFindUnique;
+    (db.membership.findUnique as jest.Mock) = mockMembershipFindUnique;
+    (db.user.findUnique as jest.Mock) = mockUserFindUnique;
   });
 
   describe("Provider Configuration", () => {
     it("should include Google provider", () => {
-      expect(authConfig.providers).toHaveLength(2);
+      expect(authConfig.providers).toHaveLength(1);
       const googleProvider = authConfig.providers[0];
       expect(googleProvider).toBeDefined();
       expect(googleProvider!.id).toBe("google");

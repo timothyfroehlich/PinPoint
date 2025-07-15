@@ -443,10 +443,10 @@ export const issueCoreRouter = createTRPCRouter({
         );
 
         // Send assignment notifications
-        if (newAssignee) {
+        if (newAssignedTo) {
           await notificationService.notifyUserOfAssignment(
             input.id,
-            newAssignee.id,
+            newAssignedTo.id,
           );
         }
       }

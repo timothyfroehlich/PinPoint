@@ -1,23 +1,20 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Tests for PinballMap service layer
  * Following TDD approach - tests first, implementation second
  */
 
-import { PrismaClient } from "@prisma/client";
-
 import { PinballMapAPIMocker } from "../../../lib/pinballmap/__tests__/apiMocker";
+import { createMockContext, type MockContext } from "../../../test/mockContext";
 import { syncLocationGames, processFixtureData } from "../pinballmapService";
 
 import type { Location, Machine, Model } from "@prisma/client";
 
 // Mock Prisma
 jest.mock("@prisma/client");
-const MockedPrismaClient = PrismaClient as jest.MockedClass<
-  typeof PrismaClient
->;
 
 describe("PinballMapService", () => {
-  let mockPrisma: jest.Mocked<PrismaClient>;
+  let ctx: MockContext;
   let apiMocker: PinballMapAPIMocker;
 
   let findUniqueLocationMock: jest.Mock;
@@ -30,7 +27,9 @@ describe("PinballMapService", () => {
   let createMachineMock: jest.Mock;
 
   beforeEach(() => {
-    mockPrisma = new MockedPrismaClient() as jest.Mocked<PrismaClient>;
+    // Use the centralized mock context helper
+    ctx = createMockContext();
+
     findUniqueLocationMock = jest.fn();
     findUniqueModelMock = jest.fn();
     createModelMock = jest.fn();
@@ -40,15 +39,15 @@ describe("PinballMapService", () => {
     deleteManyMachineMock = jest.fn();
     createMachineMock = jest.fn();
 
-    // Assign the jest.fn() mocks to the actual mockPrisma methods
-    mockPrisma.location.findUnique = findUniqueLocationMock;
-    mockPrisma.model.findUnique = findUniqueModelMock;
-    mockPrisma.model.create = createModelMock;
-    mockPrisma.model.update = updateModelMock;
-    mockPrisma.model.upsert = upsertModelMock;
-    mockPrisma.machine.findMany = findManyMachineMock;
-    mockPrisma.machine.deleteMany = deleteManyMachineMock;
-    mockPrisma.machine.create = createMachineMock;
+    // Assign the jest.fn() mocks to the actual ctx.db methods
+    (ctx.db.location.findUnique as any) = findUniqueLocationMock;
+    (ctx.db.model.findUnique as any) = findUniqueModelMock;
+    (ctx.db.model.create as any) = createModelMock;
+    (ctx.db.model.update as any) = updateModelMock;
+    (ctx.db.model.upsert as any) = upsertModelMock;
+    (ctx.db.machine.findMany as any) = findManyMachineMock;
+    (ctx.db.machine.deleteMany as any) = deleteManyMachineMock;
+    (ctx.db.machine.create as any) = createMachineMock;
     apiMocker = new PinballMapAPIMocker();
     apiMocker.start();
   });
@@ -79,11 +78,31 @@ describe("PinballMapService", () => {
     };
 
     beforeEach(() => {
-      findUniqueLocationMock.mockResolvedValue(mockLocation);
+      findUniqueLocationMock.mockResolvedValue({
+        ...mockLocation,
+        organization: {
+          id: "org-1",
+          name: "Test Organization",
+          subdomain: "test-org",
+          logoUrl: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          pinballMapConfig: {
+            id: "config-1",
+            organizationId: "org-1",
+            apiEnabled: true,
+            apiKey: "test-api-key",
+            autoSync: false,
+            syncInterval: 24,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        },
+      });
     });
     it("should return error result if location not found", async () => {
       findUniqueLocationMock.mockResolvedValue(null);
-      const result = await syncLocationGames(mockPrisma, "invalid-location");
+      const result = await syncLocationGames(ctx.db, "invalid-location");
       expect(result.success).toBe(false);
       expect(result.error).toBe("Location not found");
       expect(result.added).toBe(0);
@@ -94,17 +113,15 @@ describe("PinballMapService", () => {
         ...mockLocation,
         pinballMapId: null,
       } as Location);
-      const result = await syncLocationGames(mockPrisma, "location-1");
+      const result = await syncLocationGames(ctx.db, "location-1");
       expect(result.success).toBe(false);
-      expect(result.error).toBe(
-        "Location does not have a PinballMap ID configured",
-      );
+      expect(result.error).toBe("Location not configured for PinballMap sync");
       expect(result.added).toBe(0);
       expect(result.removed).toBe(0);
     });
     it("should return error result if location is not found", async () => {
       findUniqueLocationMock.mockResolvedValue(null);
-      const result = await syncLocationGames(mockPrisma, "location-1");
+      const result = await syncLocationGames(ctx.db, "location-1");
       expect(result.success).toBe(false);
       expect(result.error).toBe("Location not found");
       expect(result.added).toBe(0);
@@ -120,7 +137,7 @@ describe("PinballMapService", () => {
       createMachineMock.mockImplementation(({ data }) =>
         Promise.resolve({ id: "game-instance-1", ...data } as Machine),
       );
-      const result = await syncLocationGames(mockPrisma, "location-1");
+      const result = await syncLocationGames(ctx.db, "location-1");
       expect(result.success).toBe(true);
       expect(result.added).toBeGreaterThan(0);
       expect(result.removed).toBe(0);
@@ -143,7 +160,7 @@ describe("PinballMapService", () => {
       createMachineMock.mockImplementation(({ data }) =>
         Promise.resolve({ id: "new-instance", ...data } as Machine),
       );
-      const result = await syncLocationGames(mockPrisma, "location-1");
+      const result = await syncLocationGames(ctx.db, "location-1");
       expect(deleteManyMachineMock).toHaveBeenCalledWith({
         where: { id: { in: ["game-instance-old"] } },
       });
@@ -168,7 +185,7 @@ describe("PinballMapService", () => {
       createMachineMock.mockImplementation(({ data }) =>
         Promise.resolve({ id: "new-instance", ...data } as Machine),
       );
-      const result = await syncLocationGames(mockPrisma, "location-1");
+      const result = await syncLocationGames(ctx.db, "location-1");
       expect(deleteManyMachineMock).toHaveBeenCalledWith({
         where: { id: { in: [] } },
       });
@@ -212,7 +229,7 @@ describe("PinballMapService", () => {
 
       // TEST: Process the fixture data to create games
       const result = await processFixtureData(
-        mockPrisma,
+        ctx.db,
         fixtureData,
         mockLocationId,
         "org-1",
@@ -239,7 +256,41 @@ describe("PinballMapService", () => {
       // Mock existing games from a different organization
       // (not needed for this test - we only care about the current org)
 
-      findUniqueLocationMock.mockResolvedValue(org1Location as Location);
+      findUniqueLocationMock.mockResolvedValue({
+        ...org1Location,
+        street: "123 Main St",
+        city: "Austin",
+        state: "TX",
+        zip: "78701",
+        phone: "512-555-1234",
+        website: "https://austinpinball.com",
+        latitude: 30.2672,
+        longitude: -97.7431,
+        description: "A great place to play pinball",
+        lastSyncAt: null,
+        syncEnabled: true,
+        regionId: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        organization: {
+          id: "org-1",
+          name: "Test Organization",
+          subdomain: "test-org",
+          logoUrl: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          pinballMapConfig: {
+            id: "config-1",
+            organizationId: "org-1",
+            apiEnabled: true,
+            apiKey: "test-api-key",
+            autoSync: false,
+            syncInterval: 24,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        },
+      } as any);
 
       // Mock that we only find games from the current organization's room
       findManyMachineMock.mockResolvedValue([] as Machine[]); // No games in org-1's room
@@ -254,7 +305,7 @@ describe("PinballMapService", () => {
       );
 
       // TEST: Sync games for org-1 location
-      const result = await syncLocationGames(mockPrisma, "location-org1");
+      const result = await syncLocationGames(ctx.db, "location-org1");
 
       // ASSERTIONS: Verify org isolation
       expect(result.success).toBe(true);
@@ -279,16 +330,43 @@ describe("PinballMapService", () => {
         pinballMapId: 26454,
       } as Location;
 
-      findUniqueLocationMock.mockResolvedValue(mockLocation);
+      findUniqueLocationMock.mockResolvedValue({
+        ...mockLocation,
+        organization: {
+          id: "org-1",
+          name: "Test Organization",
+          subdomain: "test-org",
+          logoUrl: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          pinballMapConfig: {
+            id: "config-1",
+            organizationId: "org-1",
+            apiEnabled: true,
+            apiKey: "test-api-key",
+            autoSync: false,
+            syncInterval: 24,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        },
+      });
       findManyMachineMock.mockResolvedValue([] as Machine[]);
 
       // TEST: Run sync
-      await syncLocationGames(mockPrisma, "location-1");
+      await syncLocationGames(ctx.db, "location-1");
 
       // ASSERTIONS: Verify queries are scoped correctly
       expect(findUniqueLocationMock).toHaveBeenCalledWith({
         where: {
           id: mockLocation.id,
+        },
+        include: {
+          organization: {
+            include: {
+              pinballMapConfig: true,
+            },
+          },
         },
       });
 
@@ -307,7 +385,27 @@ describe("PinballMapService", () => {
     } as Location;
 
     beforeEach(() => {
-      findUniqueLocationMock.mockResolvedValue(mockLocation);
+      findUniqueLocationMock.mockResolvedValue({
+        ...mockLocation,
+        organization: {
+          id: "org-1",
+          name: "Test Organization",
+          subdomain: "test-org",
+          logoUrl: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          pinballMapConfig: {
+            id: "config-1",
+            organizationId: "org-1",
+            apiEnabled: true,
+            apiKey: "test-api-key",
+            autoSync: false,
+            syncInterval: 24,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        },
+      });
     });
 
     it("should handle PinballMap API being down", async () => {
@@ -315,7 +413,7 @@ describe("PinballMapService", () => {
       global.fetch = jest.fn().mockRejectedValue(new Error("Network error"));
 
       // TEST: Try to sync when API is down
-      const result = await syncLocationGames(mockPrisma, "location-1");
+      const result = await syncLocationGames(ctx.db, "location-1");
 
       // ASSERTIONS: Should return friendly error message about API being down
       expect(result.success).toBe(false);
@@ -335,7 +433,7 @@ describe("PinballMapService", () => {
       } as Response);
 
       // TEST: Try to sync with malformed data
-      const result = await syncLocationGames(mockPrisma, "location-1");
+      const result = await syncLocationGames(ctx.db, "location-1");
 
       // ASSERTIONS: Should handle gracefully
       expect(result.success).toBe(false);
@@ -372,7 +470,7 @@ describe("PinballMapService", () => {
       );
 
       // TEST: Sync with duplicate machine names
-      const result = await syncLocationGames(mockPrisma, "location-1");
+      const result = await syncLocationGames(ctx.db, "location-1");
 
       // ASSERTIONS: Should create separate Machines for each machine
       expect(result.success).toBe(true);
@@ -396,20 +494,18 @@ describe("PinballMapService", () => {
 
       // All required fields for Machine
       const emptyMachines: Machine[] = [];
-      (mockPrisma.machine.findMany as jest.Mock).mockResolvedValue(
-        emptyMachines,
-      );
-      (mockPrisma.model.upsert as jest.Mock).mockImplementation(
+      (ctx.db.machine.findMany as jest.Mock).mockResolvedValue(emptyMachines);
+      (ctx.db.model.upsert as jest.Mock).mockImplementation(
         ({ create }: { create: { name: string } }) =>
           Promise.resolve({ id: "custom-title", ...create } as Model),
       );
-      (mockPrisma.machine.create as jest.Mock).mockImplementation(
+      (ctx.db.machine.create as jest.Mock).mockImplementation(
         ({ data }: { data: { modelId: string } }) =>
           Promise.resolve({ id: "custom-instance", ...data } as Machine),
       );
 
       // TEST: Sync machines without OPDB IDs
-      const result = await syncLocationGames(mockPrisma, "location-1");
+      const result = await syncLocationGames(ctx.db, "location-1");
 
       // ASSERTIONS: Should handle custom machines correctly
       expect(result.success).toBe(true);

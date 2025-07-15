@@ -29,26 +29,26 @@ const mockIssueStatusFindMany = jest.fn();
 jest.mock("~/server/db", () => ({
   db: {
     organization: {
-      findUnique: mockOrganizationFindUnique,
+      findUnique: jest.fn(),
     },
     membership: {
-      findUnique: mockMembershipFindUnique,
+      findUnique: jest.fn(),
     },
     issue: {
-      findMany: mockIssueFindMany,
-      findUnique: mockIssueFindUnique,
-      create: mockIssueCreate,
-      update: mockIssueUpdate,
-      delete: mockIssueDelete,
+      findMany: jest.fn(),
+      findUnique: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
     },
     machine: {
-      findMany: mockMachineFindMany,
+      findMany: jest.fn(),
     },
     location: {
-      findMany: mockLocationFindMany,
+      findMany: jest.fn(),
     },
     issueStatus: {
-      findMany: mockIssueStatusFindMany,
+      findMany: jest.fn(),
     },
   },
 }));
@@ -97,6 +97,17 @@ describe("Multi-Tenant Security Tests", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    // Assign the mock functions to the imported mocks
+    (db.organization.findUnique as jest.Mock) = mockOrganizationFindUnique;
+    (db.membership.findUnique as jest.Mock) = mockMembershipFindUnique;
+    (db.issue.findMany as jest.Mock) = mockIssueFindMany;
+    (db.issue.findUnique as jest.Mock) = mockIssueFindUnique;
+    (db.issue.create as jest.Mock) = mockIssueCreate;
+    (db.issue.update as jest.Mock) = mockIssueUpdate;
+    (db.issue.delete as jest.Mock) = mockIssueDelete;
+    (db.machine.findMany as jest.Mock) = mockMachineFindMany;
+    (db.location.findMany as jest.Mock) = mockLocationFindMany;
+    (db.issueStatus.findMany as jest.Mock) = mockIssueStatusFindMany;
   });
 
   // Test data for Organization A
@@ -195,7 +206,7 @@ describe("Multi-Tenant Security Tests", () => {
         }),
       }) as CallerType;
 
-      const result = await callerA.issue.getAll({
+      const result = await callerA.issue.core.getAll({
         locationId: undefined,
         statusId: undefined,
         modelId: undefined,
@@ -245,7 +256,7 @@ describe("Multi-Tenant Security Tests", () => {
       }) as CallerType;
 
       await expect(
-        callerA.issue.getAll({
+        callerA.issue.core.getAll({
           locationId: undefined,
           statusId: undefined,
           modelId: undefined,
@@ -303,7 +314,7 @@ describe("Multi-Tenant Security Tests", () => {
         }),
       }) as CallerType;
 
-      const resultA = await callerA.issue.getAll({
+      const resultA = await callerA.issue.core.getAll({
         locationId: undefined,
         statusId: undefined,
         modelId: undefined,
@@ -330,7 +341,7 @@ describe("Multi-Tenant Security Tests", () => {
         }),
       }) as CallerType;
 
-      const resultB = await callerB.issue.getAll({
+      const resultB = await callerB.issue.core.getAll({
         locationId: undefined,
         statusId: undefined,
         modelId: undefined,
@@ -387,7 +398,9 @@ describe("Multi-Tenant Security Tests", () => {
       }) as CallerType;
 
       // This should fail because the issue belongs to a different organization
-      await expect(callerA.issue.getById({ id: "issue-b-1" })).rejects.toThrow(
+      await expect(
+        callerA.issue.core.getById({ id: "issue-b-1" }),
+      ).rejects.toThrow(
         new TRPCError({
           code: "NOT_FOUND",
           message: "Issue not found",
@@ -436,7 +449,7 @@ describe("Multi-Tenant Security Tests", () => {
         organizationId: "org-a", // Should be automatically set
       });
 
-      await callerA.issue.create(createData);
+      await callerA.issue.core.create(createData);
 
       // Verify that organizationId was automatically added
       expect(mockIssueCreate).toHaveBeenCalledWith({
@@ -523,7 +536,7 @@ describe("Multi-Tenant Security Tests", () => {
 
       // Member should be able to access organization data
       mockIssueFindMany.mockResolvedValue(issuesOrgA);
-      const result = await memberCaller.issue.getAll({
+      const result = await memberCaller.issue.core.getAll({
         locationId: undefined,
         statusId: undefined,
         modelId: undefined,
@@ -565,7 +578,7 @@ describe("Multi-Tenant Security Tests", () => {
 
       // Admin should have access to organization data
       mockIssueFindMany.mockResolvedValue(issuesOrgA);
-      const result = await adminCaller.issue.getAll({
+      const result = await adminCaller.issue.core.getAll({
         locationId: undefined,
         statusId: undefined,
         modelId: undefined,

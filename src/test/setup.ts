@@ -18,6 +18,16 @@ process.env.IMAGE_STORAGE_PROVIDER = "local";
 // Mock fetch globally for tests
 global.fetch = jest.fn();
 
+// Mock NextAuth first to avoid import issues
+jest.mock("next-auth", () => {
+  return jest.fn().mockImplementation(() => ({
+    auth: jest.fn(),
+    handlers: { GET: jest.fn(), POST: jest.fn() },
+    signIn: jest.fn(),
+    signOut: jest.fn(),
+  }));
+});
+
 // Mock Next.js server APIs for tests
 global.Request = jest.fn().mockImplementation((input, init) => ({
   url: input,
@@ -31,7 +41,6 @@ global.Response = {
   json: jest.fn().mockResolvedValue({}),
   error: jest.fn(),
   redirect: jest.fn(),
-  prototype: Response.prototype,
   new: jest.fn().mockImplementation((body, init) => ({
     ok: true,
     status: init?.status || 200,

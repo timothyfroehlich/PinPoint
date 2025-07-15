@@ -1,102 +1,99 @@
-import { NotificationType, type User, type Notification } from "@prisma/client";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { NotificationType } from "@prisma/client";
 
-import { createTestContext } from "../../../../test/context";
+// Mock NextAuth first to avoid import issues
+jest.mock("next-auth", () => {
+  return jest.fn().mockImplementation(() => ({
+    auth: jest.fn(),
+    handlers: { GET: jest.fn(), POST: jest.fn() },
+    signIn: jest.fn(),
+    signOut: jest.fn(),
+  }));
+});
+
+import {
+  createMockContext,
+  mockUser,
+  type MockContext,
+} from "../../../../test/mockContext";
 import { appRouter } from "../../root";
 
-type TestContext = Awaited<ReturnType<typeof createTestContext>>;
-
 describe("notificationRouter", () => {
-  let ctx: TestContext;
-  let user: User;
-  let notificationId: string;
+  let ctx: MockContext;
+  const notificationId = "notification-1";
 
-  beforeAll(async () => {
-    ctx = await createTestContext();
-    user = await ctx.prisma.user.create({
-      data: { email: "routertest@example.com", name: "Router Test" },
-    });
-    // Create a notification for the user
-    const notification = await ctx.prisma.notification.create({
-      data: {
-        userId: user.id,
-        type: NotificationType.ISSUE_CREATED,
-        message: "Router test notification",
-      },
-    });
-    notificationId = notification.id;
-    ctx.session = { user: { id: user.id } };
-  });
-
-  afterAll(async () => {
-    await ctx.prisma.notification.deleteMany();
-    await ctx.prisma.user.deleteMany();
-    await ctx.prisma.$disconnect();
+  beforeEach(() => {
+    ctx = createMockContext();
+    ctx.session = {
+      user: { id: mockUser.id },
+      expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    };
   });
 
   it("gets notifications for user", async () => {
-    const caller = appRouter.createCaller({
-      ...ctx,
-      session: { user: { id: user.id } },
-    });
+    const mockNotification = {
+      id: notificationId,
+      userId: mockUser.id,
+      type: NotificationType.ISSUE_CREATED,
+      message: "Test notification",
+      read: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      entityId: null,
+      entityType: null,
+      actionUrl: null,
+    };
+
+    ctx.db.notification.findMany.mockResolvedValue([mockNotification]);
+
+    const caller = appRouter.createCaller(ctx as any);
     const result = await caller.notification.getNotifications({});
+
     expect(Array.isArray(result)).toBe(true);
-    expect(result.some((n: Notification) => n.id === notificationId)).toBe(
-      true,
-    );
+    expect(result.some((n) => n.id === notificationId)).toBe(true);
   });
 
   it("gets unread count", async () => {
-    const caller = appRouter.createCaller({
-      ...ctx,
-      session: { user: { id: user.id } },
-    });
+    ctx.db.notification.count.mockResolvedValue(3);
+
+    const caller = appRouter.createCaller(ctx as any);
     const count = await caller.notification.getUnreadCount();
+
     expect(typeof count).toBe("number");
-    expect(count).toBeGreaterThanOrEqual(0);
+    expect(count).toBe(3);
   });
 
   it("marks notification as read", async () => {
-    const caller = appRouter.createCaller({
-      ...ctx,
-      session: { user: { id: user.id } },
-    });
+    ctx.db.notification.updateMany.mockResolvedValue({ count: 1 });
+
+    const caller = appRouter.createCaller(ctx as any);
     await caller.notification.markAsRead({ notificationId });
-    const updated = await ctx.prisma.notification.findUnique({
-      where: { id: notificationId },
+
+    expect(ctx.db.notification.updateMany).toHaveBeenCalledWith({
+      where: { id: notificationId, userId: mockUser.id },
+      data: { read: true },
     });
-    expect(updated?.read).toBe(true);
   });
 
   it("marks all as read", async () => {
-    // Create another unread notification
-    await ctx.prisma.notification.create({
-      data: {
-        userId: user.id,
-        type: NotificationType.ISSUE_CREATED,
-        message: "Bulk mark as read",
-      },
-    });
-    const caller = appRouter.createCaller({
-      ...ctx,
-      session: { user: { id: user.id } },
-    });
+    ctx.db.notification.updateMany.mockResolvedValue({ count: 2 });
+
+    const caller = appRouter.createCaller(ctx as any);
     await caller.notification.markAllAsRead();
-    const unread = await ctx.prisma.notification.count({
-      where: { userId: user.id, read: false },
+
+    expect(ctx.db.notification.updateMany).toHaveBeenCalledWith({
+      where: { userId: mockUser.id, read: false },
+      data: { read: true },
     });
-    expect(unread).toBe(0);
   });
 
   it("requires authentication", async () => {
-    const caller = appRouter.createCaller({ ...ctx, session: undefined });
+    const caller = appRouter.createCaller({ ...ctx, session: null } as any);
     await expect(caller.notification.getNotifications({})).rejects.toThrow();
   });
 
   it("validates input", async () => {
-    const caller = appRouter.createCaller({
-      ...ctx,
-      session: { user: { id: user.id } },
-    });
+    const caller = appRouter.createCaller(ctx as any);
     // notificationId is required
     await expect(
       caller.notification.markAsRead({} as { notificationId: string }),
@@ -104,29 +101,36 @@ describe("notificationRouter", () => {
   });
 
   it("enforces multi-tenancy", async () => {
-    // Create a notification for another user
-    const otherUser = await ctx.prisma.user.create({
-      data: { email: "otheruser@example.com", name: "Other User" },
-    });
-    const notification = await ctx.prisma.notification.create({
-      data: {
-        userId: otherUser.id,
+    const otherUserId = "other-user-1";
+    const mockNotifications = [
+      {
+        id: "notification-1",
+        userId: mockUser.id,
         type: NotificationType.ISSUE_CREATED,
-        message: "Other user notification",
+        message: "My notification",
+        read: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        entityId: null,
+        entityType: null,
+        actionUrl: null,
       },
-    });
-    const caller = appRouter.createCaller({
-      ...ctx,
-      session: { user: { id: user.id } },
-    });
-    // Should not be able to mark another user's notification as read
-    await expect(
-      caller.notification.markAsRead({ notificationId: notification.id }),
-    ).resolves.toBeUndefined();
+    ];
+
+    ctx.db.notification.findMany.mockResolvedValue(mockNotifications);
+    ctx.db.notification.update.mockResolvedValue(undefined as any);
+
+    const caller = appRouter.createCaller(ctx as any);
+
     // Should not see other user's notifications
     const result = await caller.notification.getNotifications({});
-    expect(result.some((n: Notification) => n.userId === otherUser.id)).toBe(
-      false,
+    expect(result.some((n) => n.userId === otherUserId)).toBe(false);
+
+    // Should only query for current user's notifications
+    expect(ctx.db.notification.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ userId: mockUser.id }),
+      }),
     );
   });
 });
