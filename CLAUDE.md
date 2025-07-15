@@ -97,3 +97,8 @@ npm run test:coverage   # Generate coverage reports (50% global minimum)
 - OPDB games: global (no organizationId), custom games: organization-scoped
 - **ESM modules**: Project uses `"type": "module"` - some packages (superjson, @auth/prisma-adapter) are ESM-only and may need transformIgnorePatterns updates in Jest
 - **Jest ESM**: Current config uses `ts-jest/presets/default-esm` - avoid changing without understanding ESM implications
+
+## Frontend Development Notes
+
+- **MUI Version**: Currently using MUI v7.2.0 - always check Context7 for latest MUI documentation before making changes
+- **Grid Components**: In MUI v7, use `import Grid from "@mui/material/Grid"` and `size={{ xs: 12, lg: 8 }}` syntax (no `item` prop needed)
