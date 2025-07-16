@@ -17,7 +17,7 @@ usage() {
     echo ""
     echo "Example:"
     echo "  $0 fix-issue-history-model"
-    echo "  $0 implement-notifications epic/backend-refactor"
+    echo "  $0 implement-notifications main"
     echo ""
     exit 1
 }

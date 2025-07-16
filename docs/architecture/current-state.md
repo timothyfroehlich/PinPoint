@@ -5,7 +5,7 @@ last-updated: 2025-01-14
 
 # PinPoint Architecture: Current State
 
-This document describes the current implementation state of the PinPoint architecture following the backend refactor. It serves as the authoritative reference for the actual system as built.
+This document describes the current implementation state of the PinPoint architecture. It serves as the authoritative reference for the actual system as built.
 
 ## Overview
 

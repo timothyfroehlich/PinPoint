@@ -12,7 +12,7 @@
 
 - **Tech Stack**: Next.js + React + TypeScript, PostgreSQL + Prisma, tRPC, MUI v7.2.0
 - **Multi-tenancy**: Shared database with row-level security, all tenant tables require `organization_id`
-- **Current Branch**: `epic/backend-refactor` (transitioning to main-based workflow)
+- **Current Branch**: `main` (main-based development workflow)
 - **Development Phase**: Pre-production (frequent schema changes, no migrations)
 
 ### Relevant Files
