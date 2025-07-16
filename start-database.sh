@@ -64,14 +64,22 @@ fi
 
 if [ "$DB_PASSWORD" = "password" ]; then
   echo "You are using the default database password"
-  read -p "Should we generate a random password for you? [y/N]: " -r REPLY
+  
+  # Check if we're being called from setup-worktree.sh (non-interactive)
+  if [ "$1" = "--auto-password" ] || [ -n "$SETUP_WORKTREE_RUNNING" ]; then
+    echo "Auto-generating secure password for worktree development..."
+    REPLY="y"
+  else
+    read -p "Should we generate a random password for you? [y/N]: " -r REPLY
+  fi
+  
   if ! [[ $REPLY =~ ^[Yy]$ ]]; then
     echo "Please change the default password in the .env file and try again"
     exit 1
   fi
   # Generate a random URL-safe password
   DB_PASSWORD=$(openssl rand -base64 12 | tr '+/' '-_')
-  sed -i '' "s#:password@#:$DB_PASSWORD@#" .env
+  sed -i "s#:password@#:$DB_PASSWORD@#" .env
 fi
 
 $DOCKER_CMD run -d \

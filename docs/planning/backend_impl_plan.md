@@ -21,7 +21,7 @@ This system will handle user identity and control what actions they can perform.
 - **Authentication Provider:** NextAuth.js will manage the sign-in process.
   - **Providers:** We will implement support for Magic Link (Email), Google, and Facebook as planned for V1.0.
   - **Session Management:** Standard session management will be handled by NextAuth, providing user context to both server components and the tRPC API.
-- **Authorization (RBAC):** The configurable roles system is a cornerstone of V1.0.
+- **Authorization (RBAC):** The roles system will use default roles for Beta, becoming fully configurable in V1.0.
   - **Database:** The Role, Permission, and Membership models in the Prisma schema will store the relationships between users, their roles, and what those roles are permitted to do.
   - **tRPC Middleware:** Authorization checks will be implemented as a reusable tRPC middleware. Before a procedure's logic is executed, this middleware will:
     1. Verify the user is authenticated.
@@ -377,181 +377,89 @@ createdAt DateTime @default(now())
 // Recipient, related entity, etc.
 }
 
-## **6\. Migration Strategy: Incremental Evolution**
+## **6\. Implementation Strategy: Major Refactor**
 
-**Important:** After analysis of the existing codebase, implementing the above schema as a wholesale replacement would require refactoring 47+ files and rewriting core authorization logic. To minimize risk and accelerate beta delivery, we recommend a **phased migration approach** that preserves existing functionality while adding new capabilities.
+**Decision:** Based on pre-production status and the need for rapid iteration toward beta, we will implement the complete V1.0 schema as a **major refactor** rather than incremental migration.
 
-### **Current State Analysis**
+### **Refactor Approach Benefits**
 
-The existing codebase has:
+- **Clean Architecture:** Start with the final V1.0 schema without legacy technical debt
+- **Faster Development:** No dual-system complexity or migration overhead
+- **Better Testing:** Single system to test and validate
+- **Simplified Codebase:** No backward compatibility code to maintain
+- **Rapid Iteration:** Frontend can be rebuilt from scratch with modern patterns
 
-- Strong multi-tenancy patterns with `organizationId` scoping
-- Simple but effective RBAC via enum (`admin | member | player`)
-- Comprehensive test coverage for security
-- Well-established model relationships (`GameTitle/GameInstance`, `Room`, `IssueActivity`)
-- Working tRPC routers and UI components
+### **Implementation Strategy**
 
-### **Phase 1: Additive Changes (Beta → V1.0)**
+**Pre-Production Advantages:**
 
-**Objective:** Add new V1.0 capabilities without breaking existing functionality.
+- No existing user data to preserve
+- No production dependencies to maintain
+- Frontend can be completely rebuilt
+- Database can be recreated from scratch
 
-**Schema Changes:**
+**Breaking Changes Approach:**
 
-```prisma
-// ADD new RBAC models alongside existing enum
-model Role {
-  id             String       @id @default(cuid())
-  name           String       // "Admin", "Technician", "Manager"
-  organizationId String
-  isDefault      Boolean      @default(false)
-
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  memberships    Membership[]
-  permissions    Permission[] @relation("RolePermissions")
-
-  @@unique([name, organizationId])
-}
-
-model Permission {
-  id   String @id @default(cuid())
-  name String @unique // "issue:create", "machine:delete", "role:manage"
-  roles Role[] @relation("RolePermissions")
-}
-
-// EXTEND existing Membership to support both systems
-model Membership {
-  id             String       @id @default(cuid())
-  role           Role         // Keep existing enum
-  userId         String
-  organizationId String
-
-  // NEW: Optional advanced RBAC
-  advancedRoleId String?      // Optional during transition
-  advancedRole   Role?        @relation(fields: [advancedRoleId], references: [id])
-
-  user           User         @relation(fields: [userId], references: [id])
-  organization   Organization @relation(fields: [organizationId], references: [id])
-
-  @@unique([userId, organizationId])
-}
-
-// ADD Priority model while keeping existing severity field
-model Priority {
-  id             String       @id @default(cuid())
-  name           String       // "Low", "Medium", "High", "Critical"
-  order          Int          // For sorting
-  organizationId String
-  isDefault      Boolean      @default(false)
-
-  organization   Organization @relation(fields: [organizationId], references: [id])
-  issues         Issue[]
-
-  @@unique([name, organizationId])
-}
-
-// EXTEND Issue to support both priority systems
-model Issue {
-  // ... existing fields including severity, number, showActivity ...
-
-  // NEW: Optional structured priority + checklist
-  priorityId     String?     // Optional during transition
-  priority       Priority?   @relation(fields: [priorityId], references: [id])
-  consistency    String?     // "Always", "Occasionally", "Intermittent"
-  checklist      Json?       // [{ text: "Check flippers", completed: false }]
-
-  // ... rest of existing relations ...
-}
-```
-
-**Implementation Benefits:**
-
-- **Zero Breaking Changes:** All existing code continues working
-- **Gradual Adoption:** Organizations can opt into advanced RBAC
-- **Feature Complete:** Supports all roadmap requirements
-- **Backward Compatible:** Simple roles still work for basic organizations
-
-### **Phase 2: Model Refinement (Post-V1.0)**
-
-**Objective:** Streamline models after advanced features are stable.
-
-**Optional Future Changes:**
-
-- Rename `GameTitle` → `Model`, `GameInstance` → `Machine` (requires codebase-wide refactor)
-- Consolidate priority systems (remove `severity` field once `Priority` is adopted)
-- Migrate all organizations to advanced RBAC (remove enum-based roles)
+1. **Database:** Replace entire schema with V1.0 design
+2. **Models:** Rename GameTitle → Model, GameInstance → Machine
+3. **Authorization:** Replace enum-based roles with full RBAC system (default roles for Beta)
+4. **Frontend:** Move existing UI out of compilation, rebuild from scratch
+5. **API:** Rebuild tRPC routers with new permission-based authorization
 
 ### **Implementation Timeline**
 
-**Pre-Beta (Phase 1A):**
+**Phase 1A: Backend Foundation (Current Sprint)**
 
-1. Add `Role`, `Permission`, `Priority` models
-2. Extend `Membership` and `Issue` with optional fields
-3. Create migration scripts with default data
-4. Update tRPC procedures to support both auth systems
+1. Move existing frontend code out of compilation path
+2. Delete Playwright tests (frontend will be rebuilt)
+3. Replace schema.prisma with complete V1.0 schema
+4. Update seed.ts for new schema (default roles created automatically on org creation)
+5. Rebuild tRPC authorization middleware for permission-based system
+6. Update existing backend tests for new schema
 
-**Beta → V1.0 (Phase 1B):**
+**Phase 1B: New Frontend (Beta Sprint)**
 
-1. Build RBAC management UI
-2. Add priority management interfaces
-3. Implement checklist functionality
-4. Create organization upgrade path
+1. Design and implement new UI components
+2. Build issue management with checklists
+3. Implement new machine/location management
+4. Add comprehensive E2E testing
 
-**Post-V1.0 (Phase 2):**
+**Phase 1C: V1.0 Features**
 
-1. Evaluate model rename necessity based on developer feedback
-2. Plan consolidation of dual systems if needed
-3. Consider breaking changes only with major version releases
+1. Add configurable RBAC management interfaces
+2. Advanced permission management
+3. Custom role creation and assignment
+
+### **Beta vs V1.0 RBAC Differences**
+
+**Beta Implementation:**
+
+- Fixed default roles: Admin, Technician, Member
+- Predefined permissions assigned to roles
+- Roles automatically created on organization creation
+- No UI for role management
+
+**V1.0 Enhancement:**
+
+- Configurable roles and permissions
+- Custom role creation
+- Permission assignment UI
+- Role management interfaces
 
 ### **Risk Mitigation**
 
 **Technical Risks:**
 
-- **Schema Conflicts:** Careful field naming prevents conflicts
-- **Data Migration:** Comprehensive seed data for new models
-- **Performance Impact:** Minimal - new fields are optional
+- **Frontend Rebuild:** Acceptable - existing UI was placeholder for beta
+- **Backend Breaking Changes:** Mitigated by comprehensive test suite
+- **Data Loss:** Not applicable - no production data exists
+- **Timeline Risk:** Reduced by eliminating migration complexity
 
-**Business Risks:**
+**Implementation Safeguards:**
 
-- **Feature Parity:** All roadmap features achievable with hybrid approach
-- **User Experience:** Seamless transition - users see gradual improvements
-- **Timeline Risk:** Dramatically reduced compared to wholesale replacement
+- Current state preserved in main branch
+- Comprehensive test coverage before frontend rebuild
+- Incremental validation at each step
+- Simple rollback: create new branch from main if needed
 
-### **Migration Scripts Required**
-
-```sql
--- Create default roles for all existing organizations
-INSERT INTO "Role" (id, name, "organizationId", "isDefault")
-SELECT
-  gen_random_uuid(),
-  unnest(ARRAY['Admin', 'Technician', 'Member']),
-  id,
-  true
-FROM "Organization";
-
--- Create default priorities for all existing organizations
-INSERT INTO "Priority" (id, name, "order", "organizationId", "isDefault")
-SELECT
-  gen_random_uuid(),
-  priority_name,
-  priority_order,
-  org_id,
-  true
-FROM (
-  SELECT
-    id as org_id,
-    unnest(ARRAY['Low', 'Medium', 'High', 'Critical']) as priority_name,
-    unnest(ARRAY[1, 2, 3, 4]) as priority_order
-  FROM "Organization"
-) priorities;
-
--- Create standard permissions
-INSERT INTO "Permission" (id, name) VALUES
-  (gen_random_uuid(), 'issue:create'),
-  (gen_random_uuid(), 'issue:edit'),
-  (gen_random_uuid(), 'issue:delete'),
-  (gen_random_uuid(), 'machine:edit'),
-  (gen_random_uuid(), 'organization:manage'),
-  (gen_random_uuid(), 'role:manage');
-```
-
-This migration strategy ensures **rapid beta delivery** while building toward the **comprehensive V1.0 vision** with minimal technical debt and maximum stability.
+This refactor approach maximizes development velocity and code quality for beta delivery while establishing a solid foundation for V1.0 and beyond.

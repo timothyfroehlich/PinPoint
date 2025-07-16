@@ -3,23 +3,23 @@ import { z } from "zod";
 import {
   createTRPCRouter,
   organizationProcedure,
-  adminProcedure,
+  locationEditProcedure,
+  locationDeleteProcedure,
+  organizationManageProcedure,
 } from "~/server/api/trpc";
 import { syncLocationGames } from "~/server/services/pinballmapService";
 
 export const locationRouter = createTRPCRouter({
-  create: organizationProcedure
+  create: locationEditProcedure
     .input(
       z.object({
         name: z.string().min(1),
-        notes: z.string().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       return ctx.db.location.create({
         data: {
           name: input.name,
-          notes: input.notes,
           organizationId: ctx.organization.id,
         },
       });
@@ -31,11 +31,11 @@ export const locationRouter = createTRPCRouter({
         organizationId: ctx.organization.id,
       },
       include: {
-        rooms: {
+        machines: {
           include: {
             _count: {
               select: {
-                gameInstances: true,
+                issues: true,
               },
             },
           },
@@ -45,12 +45,11 @@ export const locationRouter = createTRPCRouter({
     });
   }),
 
-  update: organizationProcedure
+  update: locationEditProcedure
     .input(
       z.object({
         id: z.string(),
         name: z.string().min(1).optional(),
-        notes: z.string().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -61,7 +60,6 @@ export const locationRouter = createTRPCRouter({
         },
         data: {
           ...(input.name && { name: input.name }),
-          ...(input.notes !== undefined && { notes: input.notes }),
         },
       });
     }),
@@ -76,28 +74,17 @@ export const locationRouter = createTRPCRouter({
           organizationId: ctx.organization.id,
         },
         include: {
-          rooms: {
+          machines: {
             include: {
-              gameInstances: {
-                include: {
-                  gameTitle: true,
-                  owner: {
-                    select: {
-                      id: true,
-                      name: true,
-                      profilePicture: true,
-                    },
-                  },
-                },
-                orderBy: { name: "asc" },
-              },
-              _count: {
+              model: true,
+              owner: {
                 select: {
-                  gameInstances: true,
+                  id: true,
+                  name: true,
+                  image: true,
                 },
               },
             },
-            orderBy: { name: "asc" },
           },
         },
       });
@@ -109,7 +96,7 @@ export const locationRouter = createTRPCRouter({
       return location;
     }),
 
-  delete: organizationProcedure
+  delete: locationDeleteProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       return ctx.db.location.delete({
@@ -121,7 +108,7 @@ export const locationRouter = createTRPCRouter({
     }),
 
   // Admin-only PinballMap sync operations
-  setPinballMapId: adminProcedure
+  setPinballMapId: organizationManageProcedure
     .input(
       z.object({
         locationId: z.string(),
@@ -140,7 +127,7 @@ export const locationRouter = createTRPCRouter({
       });
     }),
 
-  syncWithPinballMap: adminProcedure
+  syncWithPinballMap: organizationManageProcedure
     .input(z.object({ locationId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const result = await syncLocationGames(ctx.db, input.locationId);

@@ -3,7 +3,7 @@ import { z } from "zod";
 import {
   createTRPCRouter,
   publicProcedure,
-  adminProcedure,
+  organizationManageProcedure,
 } from "~/server/api/trpc";
 
 export const organizationRouter = createTRPCRouter({
@@ -12,7 +12,7 @@ export const organizationRouter = createTRPCRouter({
     return ctx.organization;
   }),
 
-  update: adminProcedure
+  update: organizationManageProcedure
     .input(
       z.object({
         name: z.string().min(1),

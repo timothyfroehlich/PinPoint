@@ -1,7 +1,11 @@
-import { IssueStatusCategory } from "@prisma/client";
+import { StatusCategory } from "@prisma/client";
 import { z } from "zod";
 
-import { createTRPCRouter, organizationProcedure } from "~/server/api/trpc";
+import {
+  createTRPCRouter,
+  organizationProcedure,
+  organizationManageProcedure,
+} from "~/server/api/trpc";
 
 export const issueStatusRouter = createTRPCRouter({
   getAll: organizationProcedure.query(async ({ ctx }) => {
@@ -9,36 +13,33 @@ export const issueStatusRouter = createTRPCRouter({
       where: {
         organizationId: ctx.organization.id,
       },
-      orderBy: { order: "asc" },
+      orderBy: { name: "asc" },
     });
   }),
 
-  create: organizationProcedure
+  create: organizationManageProcedure
     .input(
       z.object({
         name: z.string().min(1).max(50),
-        order: z.number().int().min(1),
-        category: z.nativeEnum(IssueStatusCategory),
+        category: z.nativeEnum(StatusCategory),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       return ctx.db.issueStatus.create({
         data: {
           name: input.name,
-          order: input.order,
           category: input.category,
           organizationId: ctx.organization.id,
         },
       });
     }),
 
-  update: organizationProcedure
+  update: organizationManageProcedure
     .input(
       z.object({
         id: z.string(),
         name: z.string().min(1).max(50).optional(),
-        order: z.number().int().min(1).optional(),
-        category: z.nativeEnum(IssueStatusCategory).optional(),
+        category: z.nativeEnum(StatusCategory).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -49,13 +50,12 @@ export const issueStatusRouter = createTRPCRouter({
         },
         data: {
           ...(input.name && { name: input.name }),
-          ...(input.order && { order: input.order }),
           ...(input.category && { category: input.category }),
         },
       });
     }),
 
-  delete: organizationProcedure
+  delete: organizationManageProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       // Check if any issues are using this status

@@ -1,51 +1,40 @@
 "use client";
 
-import { Container, Typography, CircularProgress, Alert } from "@mui/material";
-import React from "react";
+import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
 
-import { IssueSubmissionForm } from "~/app/_components/issue-submission-form";
-import { api } from "~/trpc/react";
+import { DevLoginCompact } from "./_components/DevLoginCompact";
+import LoginModal from "./_components/LoginModal";
 
-// Simplified homepage - only shows issue submission form
+export default function HomePage() {
+  const router = useRouter();
+  // For now, we'll use a simple state to simulate login.
+  // In a real app, this would be determined by `useSession` from next-auth.
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-export default function Home() {
-  // API queries - only need game instances for the issue form (public endpoint)
-  const {
-    data: gameInstances,
-    isLoading: isLoadingInstances,
-    error: instanceError,
-  } = api.gameInstance.getAllForIssues.useQuery();
+  // A simple way to "log in" for demonstration purposes.
+  // In the real app, the magic link flow will handle this.
+  const handleLogin = () => {
+    setIsLoggedIn(true);
+  };
 
-  // No mutations needed for the public issue form
+  // Redirect to dashboard when logged in
+  useEffect(() => {
+    if (isLoggedIn) {
+      router.push("/dashboard");
+    }
+  }, [isLoggedIn, router]);
 
-  const isLoading = isLoadingInstances;
-  const hasError = instanceError;
-
-  if (isLoading) {
+  // This is a temporary hack to allow the login modal to "work"
+  if (!isLoggedIn) {
     return (
-      <Container maxWidth="lg" sx={{ py: 4, textAlign: "center" }}>
-        <CircularProgress />
-        <Typography variant="h6" sx={{ mt: 2 }}>
-          Loading...
-        </Typography>
-      </Container>
+      <>
+        <LoginModal onLogin={handleLogin} />
+        <DevLoginCompact onLogin={handleLogin} />
+      </>
     );
   }
 
-  if (hasError) {
-    return (
-      <Container maxWidth="lg" sx={{ py: 4 }}>
-        <Alert severity="error">
-          Error loading data: {instanceError?.message}
-        </Alert>
-      </Container>
-    );
-  }
-
-  // Only show the issue submission form (besides the top bar)
-  return (
-    <Container maxWidth="sm" sx={{ py: 6 }}>
-      <IssueSubmissionForm gameInstances={gameInstances ?? []} />
-    </Container>
-  );
+  // Show loading state while redirecting
+  return null;
 }

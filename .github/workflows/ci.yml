@@ -4,7 +4,6 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
 
 jobs:
   lint:
@@ -41,11 +40,22 @@ jobs:
       NODE_ENV: "test"
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch full history for better coverage diff
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "24"
       - name: Install dependencies
         run: npm install
-      - name: Run tests
-        run: echo "No tests yet"
+      - name: Run tests with coverage
+        run: npm run test:coverage
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@18283e04ce6e62d37312384ff67231eb8fd56d24 # v5.4.3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/lcov.info
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: true
+          verbose: true
