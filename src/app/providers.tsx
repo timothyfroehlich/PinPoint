@@ -1,38 +1,17 @@
 "use client";
 
 import CssBaseline from "@mui/material/CssBaseline";
-import { ThemeProvider, createTheme } from "@mui/material/styles";
-import { SessionProvider } from "next-auth/react";
+import { ThemeProvider } from "@mui/material/styles";
+import { type ReactNode } from "react";
 
-const theme = createTheme({
-  typography: {
-    fontFamily:
-      'var(--font-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  },
-  palette: {
-    mode: "light",
-    primary: {
-      main: "#2563eb",
-    },
-    secondary: {
-      main: "#7c3aed",
-    },
-  },
-});
+import theme from "./theme";
 
-function MaterialUIProvider({ children }: { children: React.ReactNode }) {
+export default function Providers({ children }: { children: ReactNode }) {
   return (
     <ThemeProvider theme={theme}>
+      {/* CssBaseline kickstart an elegant, consistent, and simple baseline to build upon. */}
       <CssBaseline />
       {children}
     </ThemeProvider>
-  );
-}
-
-export function AppProviders({ children }: { children: React.ReactNode }) {
-  return (
-    <SessionProvider>
-      <MaterialUIProvider>{children}</MaterialUIProvider>
-    </SessionProvider>
   );
 }

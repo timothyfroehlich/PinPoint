@@ -3,27 +3,28 @@
  * Tests the service layer integration with tRPC endpoints
  */
 
-import { PrismaClient } from "@prisma/client";
-
 import { PinballMapAPIMocker } from "../../../../lib/pinballmap/__tests__/apiMocker";
+import {
+  createMockContext,
+  mockLocationWithOrganization,
+  type MockContext,
+} from "../../../../test/mockContext";
 import { syncLocationGames } from "../../../services/pinballmapService";
 
-import type { Location, Room, GameInstance, GameTitle } from "@prisma/client";
+import type { Location, Machine, Model } from "@prisma/client";
 
-jest.mock("@prisma/client");
-const MockedPrismaClient = PrismaClient as jest.MockedClass<
-  typeof PrismaClient
->;
+// Use centralized mock context
 
 describe("PinballMap Integration Tests", () => {
-  let mockPrisma: jest.Mocked<PrismaClient>;
+  let ctx: MockContext;
   let apiMocker: PinballMapAPIMocker;
-  let findUniqueLocationMock: jest.Mock;
 
   beforeEach(() => {
-    mockPrisma = new MockedPrismaClient() as jest.Mocked<PrismaClient>;
-    findUniqueLocationMock = jest.fn();
-    mockPrisma.location.findUnique = findUniqueLocationMock;
+    ctx = createMockContext();
+
+    // Set up location mock to return location with organization relation
+    ctx.db.location.findUnique.mockResolvedValue(mockLocationWithOrganization);
+
     apiMocker = new PinballMapAPIMocker();
     apiMocker.start();
   });
@@ -70,64 +71,83 @@ describe("PinballMap Integration Tests", () => {
       name: "Test Location",
       pinballMapId: 26454,
       organizationId: "org-1",
-      notes: null,
-    };
-
-    const mockRoom: Room = {
-      id: "room-1",
-      name: "Main Floor",
-      locationId: "location-1",
-      organizationId: "org-1",
+      street: null,
+      city: null,
+      state: null,
+      zip: null,
+      phone: null,
+      website: null,
+      latitude: null,
+      longitude: null,
       description: null,
+      regionId: null,
+      lastSyncAt: null,
+      syncEnabled: false,
     };
 
     beforeEach(() => {
-      (mockPrisma.location.findUnique as jest.Mock).mockResolvedValue(
-        mockLocation,
+      (ctx.db.location.findUnique as jest.Mock).mockResolvedValue(
+        mockLocationWithOrganization,
       );
-      (mockPrisma.room.findFirst as jest.Mock).mockResolvedValue(mockRoom);
-      (mockPrisma.gameInstance.findMany as jest.Mock).mockResolvedValue([]);
-      (mockPrisma.gameTitle.findUnique as jest.Mock).mockResolvedValue(null);
-      (mockPrisma.gameTitle.create as jest.Mock).mockImplementation(
+      (ctx.db.machine.findMany as jest.Mock).mockResolvedValue([]);
+      (ctx.db.model.findUnique as jest.Mock).mockResolvedValue(null);
+      (ctx.db.model.create as jest.Mock).mockImplementation(
         ({ data }: { data: { name: string } }) =>
-          Promise.resolve({ id: `title-${data.name}`, ...data } as GameTitle),
+          Promise.resolve({ id: `title-${data.name}`, ...data } as Model),
       );
-      (mockPrisma.gameInstance.create as jest.Mock).mockImplementation(
-        ({ data }: { data: { name: string } }) =>
+      (ctx.db.machine.create as jest.Mock).mockImplementation(
+        ({
+          data,
+        }: {
+          data: {
+            name: string;
+            organizationId: string;
+            locationId: string;
+            modelId: string;
+          };
+        }) =>
           Promise.resolve({
             id: `instance-${data.name}`,
             ...data,
-          } as GameInstance),
+            ownerId: null,
+          } as Machine),
       );
     });
 
     it("should successfully sync games when all conditions are met", async () => {
       // TEST: Full sync operation (this is what tRPC endpoints call)
-      await syncLocationGames(mockPrisma, "location-1");
+      await syncLocationGames(ctx.db, "location-1");
 
       // Verify the service was called with correct parameters
-      expect(findUniqueLocationMock).toHaveBeenCalledWith({
+      expect(ctx.db.location.findUnique).toHaveBeenCalledWith({
         where: { id: "location-1" },
+        include: {
+          organization: {
+            include: {
+              pinballMapConfig: true,
+            },
+          },
+        },
       });
     });
 
     it("should handle location not found errors", async () => {
       // SETUP: Location doesn't exist
-      (mockPrisma.location.findUnique as jest.Mock).mockResolvedValue(null);
+      (ctx.db.location.findUnique as jest.Mock).mockResolvedValue(null);
 
       // TEST: Sync with non-existent location
-      await syncLocationGames(mockPrisma, "non-existent");
+      await syncLocationGames(ctx.db, "non-existent");
     });
 
     it("should handle missing PinballMap ID", async () => {
       // SETUP: Location exists but has no PinballMap ID
-      (mockPrisma.location.findUnique as jest.Mock).mockResolvedValue({
+      (ctx.db.location.findUnique as jest.Mock).mockResolvedValue({
         ...mockLocation,
         pinballMapId: null,
       } as Location);
 
       // TEST: Sync location without PinballMap ID
-      await syncLocationGames(mockPrisma, "location-1");
+      await syncLocationGames(ctx.db, "location-1");
     });
 
     it("should handle API errors gracefully", async () => {
@@ -136,7 +156,7 @@ describe("PinballMap Integration Tests", () => {
       global.fetch = jest.fn().mockRejectedValue(new Error("Network error"));
 
       // TEST: Sync with API down
-      await syncLocationGames(mockPrisma, "location-1");
+      await syncLocationGames(ctx.db, "location-1");
     });
   });
 
@@ -152,7 +172,7 @@ describe("PinballMap Integration Tests", () => {
       expect(1.5).not.toBe(Math.floor(1.5));
     });
 
-    it("should validate room description format", () => {
+    it("should validate location description format", () => {
       // Valid descriptions
       expect("Main gaming area").toBeTruthy();
       expect("").toBe(""); // Empty string allowed
@@ -172,15 +192,10 @@ describe("PinballMap Integration Tests", () => {
       const locationQuery = { id: "location-1", organizationId: orgId };
       expect(locationQuery.organizationId).toBe(orgId);
 
-      // Room queries inherit organization through location relationship
-      const roomQuery = { locationId: "location-1" };
+      // Machine queries inherit organization through location relationship
+      const machineQuery = { locationId: "location-1" };
       // Note: organizationId is enforced through the location relationship
-      expect(roomQuery.locationId).toBeTruthy();
-
-      // Game instances are scoped through room hierarchy
-      const gameQuery = { roomId: "room-1" };
-      // Note: organizationId is enforced through room -> location relationship
-      expect(gameQuery.roomId).toBeTruthy();
+      expect(machineQuery.locationId).toBeTruthy();
     });
   });
 });

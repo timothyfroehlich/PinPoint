@@ -129,6 +129,7 @@ export default tseslint.config(
       ".next/",
       "node_modules/",
       "drizzle/",
+      "src/_archived_frontend/**/*",
       "eslint.config.js",
       "prettier.config.js",
       "next.config.js",

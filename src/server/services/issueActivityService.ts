@@ -1,8 +1,8 @@
-import { type PrismaClient, type ActivityType } from "@prisma/client";
+import { type PrismaClient, ActivityType } from "@prisma/client";
 import { type User, type IssueStatus } from "@prisma/client";
 
 export interface ActivityData {
-  type: ActivityType;
+  type: ActivityType; // Use enum instead of string
   actorId?: string;
   fieldName?: string;
   oldValue?: string;
@@ -18,11 +18,15 @@ export class IssueActivityService {
     organizationId: string,
     activityData: ActivityData,
   ): Promise<void> {
-    await this.prisma.issueActivity.create({
+    await this.prisma.issueHistory.create({
       data: {
         issueId,
-        organizationId,
-        ...activityData,
+        organizationId, // Now properly supported
+        type: activityData.type,
+        actorId: activityData.actorId,
+        field: activityData.fieldName || "",
+        oldValue: activityData.oldValue,
+        newValue: activityData.newValue,
       },
     });
   }
@@ -33,9 +37,10 @@ export class IssueActivityService {
     actorId: string,
   ): Promise<void> {
     await this.recordActivity(issueId, organizationId, {
-      type: "created",
+      type: ActivityType.CREATED,
       actorId,
-      description: "Issue created",
+      fieldName: "status",
+      newValue: "created",
     });
   }
 
@@ -47,12 +52,11 @@ export class IssueActivityService {
     newStatus: IssueStatus,
   ): Promise<void> {
     await this.recordActivity(issueId, organizationId, {
-      type: "status_change",
+      type: ActivityType.STATUS_CHANGED,
       actorId,
       fieldName: "status",
       oldValue: oldStatus.name,
       newValue: newStatus.name,
-      description: `Status changed from "${oldStatus.name}" to "${newStatus.name}"`,
     });
   }
 
@@ -63,24 +67,23 @@ export class IssueActivityService {
     oldAssignee: User | null,
     newAssignee: User | null,
   ): Promise<void> {
-    let description: string;
+    let _description: string;
     if (oldAssignee && newAssignee) {
-      description = `Reassigned from ${oldAssignee.name} to ${newAssignee.name}`;
+      _description = `Reassigned from ${oldAssignee.name} to ${newAssignee.name}`;
     } else if (newAssignee) {
-      description = `Assigned to ${newAssignee.name}`;
+      _description = `Assigned to ${newAssignee.name}`;
     } else if (oldAssignee) {
-      description = `Unassigned from ${oldAssignee.name}`;
+      _description = `Unassigned from ${oldAssignee.name}`;
     } else {
-      description = "Assignment changed";
+      _description = "Assignment changed";
     }
 
     await this.recordActivity(issueId, organizationId, {
-      type: "assignment",
+      type: ActivityType.ASSIGNED,
       actorId,
       fieldName: "assignee",
       oldValue: oldAssignee?.name ?? undefined,
       newValue: newAssignee?.name ?? undefined,
-      description,
     });
   }
 
@@ -93,30 +96,26 @@ export class IssueActivityService {
     newValue: string,
   ): Promise<void> {
     await this.recordActivity(issueId, organizationId, {
-      type: "field_update",
+      type: ActivityType.SYSTEM,
       actorId,
       fieldName,
       oldValue,
       newValue,
-      description: `Updated ${fieldName} from "${oldValue}" to "${newValue}"`,
     });
   }
 
-  async recordCommentDeletion(
+  async recordCommentDeleted(
     issueId: string,
     organizationId: string,
     actorId: string,
-    isAdminDelete: boolean,
+    commentId: string,
   ): Promise<void> {
-    const description = isAdminDelete
-      ? "Comment deleted by admin"
-      : "Comment deleted";
-
     await this.recordActivity(issueId, organizationId, {
-      type: "field_update",
+      type: ActivityType.COMMENT_DELETED,
       actorId,
       fieldName: "comment",
-      description,
+      oldValue: commentId,
+      description: "Comment deleted",
     });
   }
 
@@ -125,7 +124,7 @@ export class IssueActivityService {
       this.prisma.comment.findMany({
         where: {
           issueId,
-          deletedAt: null, // Only show non-deleted comments
+          deletedAt: null, // Exclude soft-deleted comments
         },
         include: {
           author: {
@@ -138,7 +137,7 @@ export class IssueActivityService {
         },
         orderBy: { createdAt: "asc" },
       }),
-      this.prisma.issueActivity.findMany({
+      this.prisma.issueHistory.findMany({
         where: { issueId, organizationId },
         include: {
           actor: {
@@ -149,7 +148,7 @@ export class IssueActivityService {
             },
           },
         },
-        orderBy: { createdAt: "asc" },
+        orderBy: { changedAt: "asc" },
       }),
     ]);
 
@@ -163,7 +162,7 @@ export class IssueActivityService {
       ...activities.map((activity) => ({
         ...activity,
         itemType: "activity" as const,
-        timestamp: activity.createdAt,
+        timestamp: activity.changedAt,
       })),
     ].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
 

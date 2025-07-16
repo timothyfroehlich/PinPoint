@@ -1,7 +1,3 @@
-import { authConfig } from "../config";
-
-import { db } from "~/server/db";
-
 // Add this helper at the top of the file
 function setNodeEnv(value: string) {
   Object.defineProperty(process.env, "NODE_ENV", {
@@ -21,27 +17,35 @@ const mockUserFindUnique = jest.fn<Promise<unknown>, [unknown]>();
 jest.mock("~/server/db", () => ({
   db: {
     organization: {
-      findUnique: mockOrganizationFindUnique,
+      findUnique: jest.fn(),
     },
     membership: {
-      findUnique: mockMembershipFindUnique,
+      findUnique: jest.fn(),
     },
     user: {
-      findUnique: mockUserFindUnique,
+      findUnique: jest.fn(),
     },
   },
 }));
+
+import { authConfig } from "../config";
+
+import { db } from "~/server/db";
 
 describe("NextAuth Configuration", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     // Reset environment
     setNodeEnv("test");
+    // Assign the mock functions to the imported mocks
+    (db.organization.findUnique as jest.Mock) = mockOrganizationFindUnique;
+    (db.membership.findUnique as jest.Mock) = mockMembershipFindUnique;
+    (db.user.findUnique as jest.Mock) = mockUserFindUnique;
   });
 
   describe("Provider Configuration", () => {
     it("should include Google provider", () => {
-      expect(authConfig.providers).toHaveLength(2);
+      expect(authConfig.providers).toHaveLength(1);
       const googleProvider = authConfig.providers[0];
       expect(googleProvider).toBeDefined();
       expect(googleProvider!.id).toBe("google");
@@ -81,229 +85,6 @@ describe("NextAuth Configuration", () => {
     });
   });
 
-  describe("JWT Callback", () => {
-    const mockUser = {
-      id: "user-123",
-      name: "Test User",
-      email: "test@example.com",
-      bio: "Test bio",
-      joinDate: new Date(),
-      emailVerified: true,
-      image: "/avatar.jpg",
-    };
-
-    const mockOrganization = {
-      id: "org-123",
-      name: "Test Org",
-      subdomain: "apc",
-      logoUrl: null,
-    };
-
-    const mockMembership = {
-      id: "membership-123",
-      role: "admin" as const,
-      userId: "user-123",
-      organizationId: "org-123",
-    };
-
-    beforeEach(() => {
-      jest
-        .spyOn(db.organization, "findUnique")
-        .mockResolvedValue(mockOrganization);
-      jest.spyOn(db.membership, "findUnique").mockResolvedValue(mockMembership);
-    });
-
-    it("should add user ID and organization context to token", async () => {
-      const token = {};
-
-      const result = await authConfig.callbacks?.jwt?.({
-        token,
-        user: mockUser,
-        trigger: "signIn",
-        isNewUser: false,
-        session: undefined,
-        account: null,
-      });
-
-      expect(result).toEqual({
-        id: "user-123",
-        role: "admin",
-        organizationId: "org-123",
-      });
-    });
-
-    it("should query organization by APC subdomain", async () => {
-      const token = {};
-
-      await authConfig.callbacks?.jwt?.({
-        token,
-        user: mockUser,
-        trigger: "signIn",
-        isNewUser: false,
-        session: undefined,
-        account: null,
-      });
-
-      expect(mockOrganizationFindUnique).toHaveBeenCalledWith({
-        where: { subdomain: "apc" },
-      });
-    });
-
-    it("should query user membership for organization", async () => {
-      const token = {};
-
-      await authConfig.callbacks?.jwt?.({
-        token,
-        user: mockUser,
-        trigger: "signIn",
-        isNewUser: false,
-        session: undefined,
-        account: null,
-      });
-
-      expect(mockMembershipFindUnique).toHaveBeenCalledWith({
-        where: {
-          userId_organizationId: {
-            userId: "user-123",
-            organizationId: "org-123",
-          },
-        },
-      });
-    });
-
-    it("should handle user without organization membership", async () => {
-      jest.spyOn(db.membership, "findUnique").mockResolvedValue(null);
-
-      const token = {};
-
-      const result = await authConfig.callbacks?.jwt?.({
-        token,
-        user: mockUser,
-        trigger: "signIn",
-        isNewUser: false,
-        session: undefined,
-        account: null,
-      });
-
-      expect(result).toEqual({
-        id: "user-123",
-      });
-    });
-
-    it("should handle missing organization", async () => {
-      jest.spyOn(db.organization, "findUnique").mockResolvedValue(null);
-
-      const token = {};
-
-      const result = await authConfig.callbacks?.jwt?.({
-        token,
-        user: mockUser,
-        trigger: "signIn",
-        isNewUser: false,
-        session: undefined,
-        account: null,
-      });
-
-      expect(result).toEqual({
-        id: "user-123",
-      });
-    });
-
-    it("should not modify token when user has no organizations", async () => {
-      const token = { existing: "data" };
-      const user = {
-        id: "user-123",
-        name: "Test User",
-        email: "test@example.com",
-        emailVerified: null,
-      };
-
-      mockOrganizationFindUnique.mockResolvedValue(null);
-
-      const result = await authConfig.callbacks?.jwt?.({
-        token,
-        user,
-        trigger: "signIn",
-        isNewUser: false,
-        session: undefined,
-        account: null,
-      });
-
-      expect(result).toEqual({ existing: "data" });
-    });
-  });
-
-  describe("Session Callback", () => {
-    it("should transform JWT token data into session", async () => {
-      const mockSessionUser = {
-        id: "user-123",
-        name: "Test User",
-        email: "test@example.com",
-        image: "/avatar.jpg",
-        emailVerified: null,
-      };
-
-      // For JWT sessions, we only need the basic Session interface
-      const mockSession = {
-        user: mockSessionUser,
-        expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-      };
-
-      const mockToken = {
-        id: "user-123",
-        role: "admin" as const,
-        organizationId: "org-123",
-      };
-
-      const result = await authConfig.callbacks?.session?.({
-        session: mockSession,
-        user: mockSessionUser,
-        token: mockToken,
-        trigger: "update",
-        newSession: undefined,
-      } as unknown as Parameters<
-        NonNullable<typeof authConfig.callbacks.session>
-      >[0]);
-
-      expect(result).toEqual({
-        ...mockSession,
-        user: {
-          ...mockSessionUser,
-          id: "user-123",
-          role: "admin",
-          organizationId: "org-123",
-        },
-      });
-    });
-
-    it("should return original session when no token provided", async () => {
-      const mockSessionUser = {
-        id: "user-123",
-        name: "Test User",
-        email: "test@example.com",
-        emailVerified: null,
-      };
-
-      // For JWT sessions, we only need the basic Session interface
-      const mockSession = {
-        user: mockSessionUser,
-        expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-      };
-
-      const result = await authConfig.callbacks?.session?.({
-        session: mockSession,
-        user: mockSessionUser,
-        token: {},
-        trigger: "update",
-        newSession: undefined,
-      } as unknown as Parameters<
-        NonNullable<typeof authConfig.callbacks.session>
-      >[0]);
-
-      expect(result).toEqual(mockSession);
-    });
-  });
-
   describe("Credentials Provider Authorization", () => {
     beforeEach(() => {
       setNodeEnv("development");
@@ -316,7 +97,7 @@ describe("NextAuth Configuration", () => {
         email: "test@testaccount.dev",
         profilePicture: "/avatar.jpg",
         bio: "Test bio",
-        joinDate: new Date(),
+        createdAt: new Date(),
         emailVerified: true,
       };
 

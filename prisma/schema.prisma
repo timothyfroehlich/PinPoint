@@ -2,250 +2,481 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-    provider = "prisma-client-js"
+  provider = "prisma-client-js"
 }
 
 datasource db {
-    provider = "postgresql"
-    url      = env("DATABASE_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
-enum Role {
-    admin
-    member
-    player
-}
-
-enum ActivityType {
-    created
-    status_change
-    assignment
-    field_update
-}
+// =================================
+// AUTH & USER MODELS
+// =================================
 
 model User {
-    id            String       @id @default(cuid())
-    name          String?
-    email         String?      @unique
-    bio           String?      // User biography/description
-    profilePicture String?     // Path to profile picture
-    joinDate      DateTime     @default(now()) // Account creation date
+  id            String @id @default(cuid())
+  name          String?
+  email         String? @unique
+  emailVerified DateTime?
+  image         String? // From provider
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-    emailVerified DateTime?
-    image         String?
-    accounts      Account[]
-    sessions      Session[]
-    memberships   Membership[]
-    issues        Issue[]      // Issues assigned to user
-    reportedIssues Issue[]     @relation("IssueReporter") // Issues reported by user
-    comments      Comment[]
-    deletedComments Comment[] @relation("CommentDeleter") // Comments deleted by user
-    ownedGameInstances GameInstance[] @relation("GameOwner") // Games owned by user
-    issueActivities IssueActivity[] // Issue activities performed by user
+  // PinPoint Specific Profile
+  bio            String? @db.Text
+  profilePicture String? // Path to uploaded avatar
+
+  // Global notification preferences
+  emailNotificationsEnabled Boolean @default(true)
+  pushNotificationsEnabled  Boolean @default(false) // For future mobile app
+  notificationFrequency     NotificationFrequency @default(IMMEDIATE)
+
+  // Relations
+  accounts       Account[]
+  sessions       Session[]
+  memberships    Membership[]
+  ownedMachines  Machine[] @relation("MachineOwner")
+  issuesCreated  Issue[]   @relation("CreatedBy")
+  issuesAssigned Issue[]   @relation("AssignedTo")
+  comments       Comment[]
+  deletedComments Comment[] @relation("CommentDeleter")
+  upvotes        Upvote[]
+  activityHistory IssueHistory[] @relation("ActivityActor")
+  notifications  Notification[] // Add notification relation
 }
 
-model Organization {
-    id           String       @id @default(cuid())
-    name         String
-    subdomain    String       @unique
-    logoUrl      String?
-    memberships  Membership[]
-    issueStatues IssueStatus[]
-    issues       Issue[]
-    locations    Location[]
-    rooms        Room[]
-    gameTitles   GameTitle[]
-    attachments  Attachment[]
-    issueActivities IssueActivity[] // Issue activities within organization
-}
-
-model Membership {
-    id             String       @id @default(cuid())
-    role           Role
-    user           User         @relation(fields: [userId], references: [id])
-    userId         String
-    organization   Organization @relation(fields: [organizationId], references: [id])
-    organizationId String
-
-    @@unique([userId, organizationId])
-}
-
-enum IssueStatusCategory {
-    NEW
-    OPEN
-    CLOSED
-}
-
-model IssueStatus {
-    id             String              @id @default(cuid())
-    name           String
-    order          Int
-    category       IssueStatusCategory // Add category field
-    isDefault      Boolean             @default(false) // Add isDefault flag
-    organization   Organization        @relation(fields: [organizationId], references: [id])
-    organizationId String
-    issues         Issue[]
-
-    @@unique([name, organizationId])
-}
-
-model Issue {
-    id             String       @id @default(cuid())
-    number         Int          @default(autoincrement()) // Monotonically increasing issue number per organization
-    title          String
-    description    String?
-    severity       String?      // Optional severity level (Low, Medium, High, Critical)
-    status         IssueStatus  @relation(fields: [statusId], references: [id])
-    statusId       String
-    assignee       User?        @relation(fields: [assigneeId], references: [id])
-    assigneeId     String?
-    reporter       User?        @relation("IssueReporter", fields: [reporterId], references: [id])
-    reporterId     String?      // User ID if logged-in user reported
-    reporterEmail  String?      // Email if anonymous user reported
-    gameInstance   GameInstance @relation(fields: [gameInstanceId], references: [id])
-    gameInstanceId String
-    organization   Organization @relation(fields: [organizationId], references: [id])
-    organizationId String
-    createdAt      DateTime     @default(now())
-    updatedAt      DateTime     @updatedAt
-    showActivity   Boolean      @default(false) // Toggle to show/hide issue activity
-    comments       Comment[]
-    attachments    Attachment[]
-    activities     IssueActivity[] // Issue activity entries
-    
-    @@unique([number, organizationId]) // Ensure unique issue numbers per organization
-}
-
-model Location {
-    id             String         @id @default(cuid())
-    name           String
-    notes          String?        // Optional notes for the location
-    pinballMapId   Int?           @unique // PinballMap.com Location ID
-    organization   Organization   @relation(fields: [organizationId], references: [id])
-    organizationId String
-    rooms          Room[]
-}
-
-model GameTitle {
-    id             String         @id @default(cuid())
-    name           String
-    opdbId         String?        @unique // OPDB identifier (e.g., "G43W4-MrRpw") - Global unique when present
-    manufacturer   String?        // Sourced from OPDB
-    releaseDate    DateTime?      // Sourced from OPDB
-    imageUrl       String?        // OPDB image URL
-    description    String?        // Game description from OPDB
-    lastSynced     DateTime?      // When data was last synced from OPDB
-    organization   Organization?  @relation(fields: [organizationId], references: [id])
-    organizationId String?        // Null for global OPDB games, set for custom games
-    gameInstances  GameInstance[]
-
-    // Custom games (no opdbId) must be unique per org
-    @@unique([name, organizationId], name: "unique_custom_game_per_org")
-    @@index([organizationId]) // For querying org-specific games
-}
-
-model Room {
-    id             String         @id @default(cuid())
-    name           String
-    description    String?        // User-updatable description
-    location       Location       @relation(fields: [locationId], references: [id])
-    locationId     String
-    organization   Organization   @relation(fields: [organizationId], references: [id])
-    organizationId String
-    gameInstances  GameInstance[]
-
-    @@unique([name, locationId])
-}
-
-model GameInstance {
-    id           String    @id @default(cuid())
-    name         String
-    gameTitle    GameTitle @relation(fields: [gameTitleId], references: [id])
-    gameTitleId  String
-    room         Room      @relation(fields: [roomId], references: [id])
-    roomId       String
-    owner        User?     @relation("GameOwner", fields: [ownerId], references: [id]) // Game owner
-    ownerId      String?   // Optional owner
-    issues       Issue[]
-
-    // Game instances must be unique per game title within an organization
-    // We derive the organizationId through the room hierarchy
-    @@unique([name, gameTitleId, roomId], name: "unique_game_instance_per_room")
-}
-
-model Comment {
-    id        String   @id @default(cuid())
-    content   String
-    issue     Issue    @relation(fields: [issueId], references: [id])
-    issueId   String
-    author    User     @relation(fields: [authorId], references: [id])
-    authorId  String
-    createdAt DateTime @default(now())
-    editedAt  DateTime? // Timestamp when comment was last edited
-    edited    Boolean  @default(false) // Flag to indicate if comment was edited
-    deletedAt DateTime? // Timestamp when comment was soft deleted
-    deletedBy User?    @relation("CommentDeleter", fields: [deletedById], references: [id])
-    deletedById String? // User who deleted the comment
-}
-
-model IssueActivity {
-    id             String       @id @default(cuid())
-    type           ActivityType
-    issue          Issue        @relation(fields: [issueId], references: [id])
-    issueId        String
-    actor          User?        @relation(fields: [actorId], references: [id]) // User who performed the action
-    actorId        String?      // Null for system actions
-    fieldName      String?      // Field that was changed (e.g., "status", "assignee")
-    oldValue       String?      // Previous value (JSON string for complex values)
-    newValue       String?      // New value (JSON string for complex values)
-    description    String?      // Human-readable description of the change
-    organization   Organization @relation(fields: [organizationId], references: [id])
-    organizationId String
-    createdAt      DateTime     @default(now())
-    
-    @@index([issueId, createdAt]) // For efficient issue activity queries
-}
-
-model Attachment {
-    id             String       @id @default(cuid())
-    url            String
-    issue          Issue        @relation(fields: [issueId], references: [id])
-    issueId        String
-    organization   Organization @relation(fields: [organizationId], references: [id])
-    organizationId String
-}
-
-// Necessary for Next auth
 model Account {
-    id                String  @id @default(cuid())
-    userId            String
-    type              String
-    provider          String
-    providerAccountId String
-    refresh_token     String? @db.Text
-    access_token      String? @db.Text
-    expires_at        Int?
-    token_type        String?
-    scope             String?
-    id_token          String? @db.Text
-    session_state     String?
-    user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
 
-    @@unique([provider, providerAccountId])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
 }
 
 model Session {
-    id           String   @id @default(cuid())
-    sessionToken String   @unique
-    userId       String
-    expires      DateTime
-    user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model VerificationToken {
-    identifier String
-    token      String   @unique
-    expires    DateTime
+  identifier String
+  token      String   @unique
+  expires    DateTime
 
-    @@unique([identifier, token])
+  @@unique([identifier, token])
+}
+
+// =================================
+// ORGANIZATION & TENANCY MODELS
+// =================================
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  subdomain String?  @unique // For V1.0 subdomain feature
+  logoUrl   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  memberships      Membership[]
+  locations        Location[]
+  roles            Role[]
+  machines         Machine[]
+  issues           Issue[]
+  priorities       Priority[]
+  issueStatuses    IssueStatus[]
+  collectionTypes  CollectionType[]
+  issueHistory     IssueHistory[]
+  attachments      Attachment[]
+  pinballMapConfig PinballMapConfig?
+}
+
+model Membership {
+  id             String @id @default(cuid())
+  userId         String
+  organizationId String
+  roleId         String
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  role         Role         @relation(fields: [roleId], references: [id])
+
+  @@unique([userId, organizationId])
+}
+
+// Models for V1.0 Configurable RBAC
+model Role {
+  id             String  @id @default(cuid())
+  name           String  // e.g., "Admin", "Technician", "Manager"
+  organizationId String
+  isDefault      Boolean @default(false) // To identify system-default roles
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  memberships  Membership[]
+  permissions  Permission[] @relation("RolePermissions")
+
+  @@unique([name, organizationId])
+}
+
+model Permission {
+  id   String @id @default(cuid())
+  name String @unique // e.g., "issue:create", "machine:delete", "role:manage"
+
+  roles Role[] @relation("RolePermissions")
+}
+
+// =================================
+// CORE ASSET & ISSUE MODELS
+// =================================
+
+model Location {
+  id             String @id @default(cuid())
+  name           String
+  organizationId String
+
+  // Geographic and Contact Information (from PinballMap API analysis)
+  street         String?
+  city           String?
+  state          String?
+  zip            String?
+  phone          String?
+  website        String?
+  latitude       Float?
+  longitude      Float?
+  description    String? @db.Text
+
+  // PinballMap Integration (optional)
+  pinballMapId   Int?      // PinballMap location ID
+  regionId       String?   // PinballMap region ("austin", "portland", etc.)
+  lastSyncAt     DateTime? // When was last sync performed
+  syncEnabled    Boolean   @default(false) // Enable/disable sync for this location
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  machines     Machine[]
+  collections  Collection[] // Manual collections specific to this location
+}
+
+// Replaces GameTitle
+model Model {
+  id           String  @id @default(cuid())
+  name         String
+  manufacturer String?
+  year         Int?
+
+  // Cross-Database References (both IPDB and OPDB from PinballMap)
+  ipdbId       String? @unique     // Internet Pinball Database ID
+  opdbId       String? @unique     // Open Pinball Database ID
+
+  // Machine Technical Details (from PinballMap API)
+  machineType    String?           // "em", "ss", "digital"
+  machineDisplay String?           // "reels", "dmd", "lcd", "alphanumeric"
+  isActive       Boolean @default(true)
+
+  // Metadata and Links
+  ipdbLink       String?           // Direct link to IPDB entry
+  opdbImgUrl     String?           // Image from OPDB
+  kineticistUrl  String?           // Link to additional machine information
+
+  // PinPoint-specific
+  isCustom       Boolean @default(false) // Flag for custom/homebrew models
+
+  // Relations
+  machines Machine[]
+}
+
+// Replaces GameInstance
+model Machine {
+  id             String  @id @default(cuid())
+  name           String  // Instance-specific name (e.g., "Medieval Madness #1")
+  organizationId String
+  locationId     String
+  modelId        String
+  ownerId        String?
+
+  // Add notification preferences for owner
+  ownerNotificationsEnabled Boolean @default(true) // Toggle for all notifications
+  notifyOnNewIssues        Boolean @default(true) // Notify when new issues created
+  notifyOnStatusChanges    Boolean @default(true) // Notify when issue status changes
+  notifyOnComments         Boolean @default(false) // Notify on new comments
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  location     Location     @relation(fields: [locationId], references: [id])
+  model        Model        @relation(fields: [modelId], references: [id])
+  owner        User?        @relation("MachineOwner", fields: [ownerId], references: [id])
+  issues       Issue[]
+  collections  Collection[]
+}
+
+model Issue {
+  id          String @id @default(cuid())
+  title       String
+  description String? @db.Text
+  consistency String? // e.g., "Always", "Occasionally"
+
+  // For V1.0 checklists
+  checklist Json? // Store checklist items as JSON: [{ text: "...", completed: false }]
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  resolvedAt DateTime?
+
+  // Relations
+  organizationId String
+  machineId      String
+  statusId       String
+  priorityId     String
+  createdById    String
+  assignedToId   String?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  machine      Machine      @relation(fields: [machineId], references: [id])
+  priority     Priority     @relation(fields: [priorityId], references: [id])
+  status       IssueStatus  @relation(fields: [statusId], references: [id])
+  createdBy    User         @relation("CreatedBy", fields: [createdById], references: [id])
+  assignedTo   User?        @relation("AssignedTo", fields: [assignedToId], references: [id])
+
+  comments    Comment[]
+  attachments Attachment[]
+  history     IssueHistory[]
+  upvotes     Upvote[]
+}
+
+model Priority {
+  id             String  @id @default(cuid())
+  name           String  // e.g., "Low", "Medium", "High"
+  order          Int     // For sorting purposes
+  organizationId String
+  isDefault      Boolean @default(false)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  issues       Issue[]
+
+  @@unique([name, organizationId])
+}
+
+model IssueStatus {
+  id             String         @id @default(cuid())
+  name           String         // e.g., "Reported", "Diagnosing", "Awaiting Parts", "Fixed"
+  category       StatusCategory // "NEW", "IN_PROGRESS", "RESOLVED"
+  organizationId String
+  isDefault      Boolean        @default(false)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  issues       Issue[]
+
+  @@unique([name, organizationId])
+}
+
+enum StatusCategory {
+  NEW
+  IN_PROGRESS
+  RESOLVED
+}
+
+enum ActivityType {
+  CREATED         // Issue created
+  STATUS_CHANGED  // Status updated
+  ASSIGNED        // Assignee changed
+  PRIORITY_CHANGED // Priority updated
+  COMMENTED       // Comment added
+  COMMENT_DELETED // Comment deleted
+  ATTACHMENT_ADDED // File attached
+  MERGED          // Issue merged (V1.0)
+  RESOLVED        // Issue resolved
+  REOPENED        // Issue reopened
+  SYSTEM          // System-generated activity
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Soft delete fields
+  deletedAt DateTime? // Null = not deleted, Date = soft deleted
+  deletedBy String?   // Who deleted the comment (for audit trail)
+
+  // Relations
+  issueId   String
+  authorId  String
+
+  issue   Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  author  User  @relation(fields: [authorId], references: [id])
+  deleter User? @relation("CommentDeleter", fields: [deletedBy], references: [id])
+}
+
+model Attachment {
+  id             String   @id @default(cuid())
+  url            String
+  fileName       String
+  fileType       String
+  createdAt      DateTime @default(now())
+
+  // Add multi-tenancy
+  organizationId String
+
+  // Relations
+  issueId        String
+  issue          Issue        @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+model IssueHistory {
+  id             String   @id @default(cuid())
+  field          String   // e.g., "status", "assignee", "priority"
+  oldValue       String?
+  newValue       String?
+  changedAt      DateTime @default(now())
+
+  // Add missing fields
+  organizationId String   // For multi-tenancy
+  actorId        String?  // Who performed the action (null for system actions)
+  type           ActivityType // Replace string with proper enum
+
+  // Relations
+  issueId        String
+  issue          Issue        @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actor          User?        @relation("ActivityActor", fields: [actorId], references: [id])
+}
+
+model Upvote {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  issueId   String
+  userId    String
+
+  issue Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id])
+
+  @@unique([issueId, userId])
+}
+
+// =================================
+// COLLECTION & NOTIFICATION MODELS
+// =================================
+
+model Collection {
+  id        String   @id @default(cuid())
+  name      String   // e.g., "Front Room", "Bally", "1980s"
+  typeId    String
+  locationId String? // null for auto-collections (organization-wide)
+  isSmart   Boolean  @default(false) // For 1.x Smart Collections
+  isManual  Boolean  @default(true)  // Manual vs auto-generated
+
+  // Manual collection fields
+  description String? // Optional description
+  sortOrder   Int     @default(0) // For custom ordering
+
+  // Auto-collection fields
+  filterCriteria Json? // Criteria for auto-collections: { "manufacturer": "Bally" }
+
+  type     CollectionType @relation(fields: [typeId], references: [id], onDelete: Cascade)
+  location Location?      @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  machines Machine[]
+
+  @@unique([name, typeId, locationId]) // Prevent duplicate names within type/location
+  @@index([locationId, typeId])
+}
+
+model CollectionType {
+  id             String @id @default(cuid())
+  name           String // e.g., "Rooms", "Manufacturer", "Era", "Genre"
+  organizationId String
+  isAutoGenerated Boolean @default(false) // Auto vs manual collection type
+  isEnabled       Boolean @default(true)   // Can be disabled in org settings
+
+  // Auto-generation settings
+  sourceField     String? // Field to generate from: "manufacturer", "year", etc.
+  generationRules Json?   // Rules for auto-generation
+
+  // Display settings
+  displayName     String? // Human-readable name for UI
+  description     String? // Description for admin interface
+  sortOrder       Int     @default(0) // Order on location pages
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  collections  Collection[]
+
+  @@unique([name, organizationId])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  // Enhanced fields
+  userId     String              // Who receives this notification
+  type       NotificationType    // Category of notification
+  entityType NotificationEntity? // What kind of entity (issue, machine, etc.)
+  entityId   String?             // ID of the related entity
+  actionUrl  String?             // URL to navigate to when clicked
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
+}
+
+enum NotificationType {
+  ISSUE_CREATED       // New issue on owned machine
+  ISSUE_UPDATED       // Issue status changed
+  ISSUE_ASSIGNED      // Issue assigned to user
+  ISSUE_COMMENTED     // New comment on issue
+  MACHINE_ASSIGNED    // Machine ownership assigned
+  SYSTEM_ANNOUNCEMENT // System-wide announcements
+}
+
+enum NotificationEntity {
+  ISSUE
+  MACHINE
+  COMMENT
+  ORGANIZATION
+}
+
+enum NotificationFrequency {
+  IMMEDIATE // Send immediately
+  DAILY     // Daily digest
+  WEEKLY    // Weekly digest
+  DISABLED  // No notifications
+}
+
+model PinballMapConfig {
+  id             String   @id @default(cuid())
+  organizationId String   @unique
+
+  // API Configuration
+  apiEnabled     Boolean  @default(false)
+  apiKey         String?  // If PinballMap requires API key in future
+
+  // Sync Settings
+  autoSyncEnabled Boolean @default(false)
+  syncIntervalHours Int   @default(24)
+  lastGlobalSync DateTime?
+
+  // Data Preferences
+  createMissingModels Boolean @default(true) // Create Model records for unknown OPDB games
+  updateExistingData  Boolean @default(false) // Whether to update existing machine data
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 }

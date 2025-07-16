@@ -1,4 +1,3 @@
-import { type Role } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { type Session } from "next-auth";
 
@@ -6,6 +5,13 @@ import { appRouter } from "~/server/api/root";
 import { createCallerFactory } from "~/server/api/trpc";
 import { auth } from "~/server/auth";
 import { db } from "~/server/db";
+
+// Temporary enum for testing with the new schema
+enum Role {
+  ADMIN = "admin",
+  MEMBER = "member",
+  TECHNICIAN = "technician",
+}
 
 // Create properly typed mock functions
 const mockOrganizationFindUnique = jest.fn();
@@ -15,7 +21,7 @@ const mockIssueFindUnique = jest.fn();
 const mockIssueCreate = jest.fn();
 const mockIssueUpdate = jest.fn();
 const mockIssueDelete = jest.fn();
-const mockGameInstanceFindMany = jest.fn();
+const mockMachineFindMany = jest.fn();
 const mockLocationFindMany = jest.fn();
 const mockIssueStatusFindMany = jest.fn();
 
@@ -23,26 +29,26 @@ const mockIssueStatusFindMany = jest.fn();
 jest.mock("~/server/db", () => ({
   db: {
     organization: {
-      findUnique: mockOrganizationFindUnique,
+      findUnique: jest.fn(),
     },
     membership: {
-      findUnique: mockMembershipFindUnique,
+      findUnique: jest.fn(),
     },
     issue: {
-      findMany: mockIssueFindMany,
-      findUnique: mockIssueFindUnique,
-      create: mockIssueCreate,
-      update: mockIssueUpdate,
-      delete: mockIssueDelete,
+      findMany: jest.fn(),
+      findUnique: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
     },
-    gameInstance: {
-      findMany: mockGameInstanceFindMany,
+    machine: {
+      findMany: jest.fn(),
     },
     location: {
-      findMany: mockLocationFindMany,
+      findMany: jest.fn(),
     },
     issueStatus: {
-      findMany: mockIssueStatusFindMany,
+      findMany: jest.fn(),
     },
   },
 }));
@@ -57,8 +63,51 @@ const mockAuth = auth as jest.Mock;
 describe("Multi-Tenant Security Tests", () => {
   const createCaller = createCallerFactory(appRouter);
 
+  // Type helper to properly type the caller with issue procedures
+  interface IssueGetAllInput {
+    locationId?: string;
+    statusId?: string;
+    modelId?: string;
+    statusCategory?: "NEW" | "OPEN" | "CLOSED";
+    sortBy?: "created" | "updated" | "status" | "severity" | "game";
+    sortOrder?: "asc" | "desc";
+  }
+
+  interface IssueCreateInput {
+    title: string;
+    description?: string;
+    severity?: "Low" | "Medium" | "High" | "Critical";
+    machineId: string;
+    statusId: string;
+  }
+
+  interface IssueUpdateInput {
+    id: string;
+    title?: string;
+  }
+
+  type CallerType = ReturnType<typeof createCaller> & {
+    issue: {
+      getAll: (input?: IssueGetAllInput) => Promise<unknown>;
+      getById: (input: { id: string }) => Promise<unknown>;
+      create: (input: IssueCreateInput) => Promise<unknown>;
+      update: (input: IssueUpdateInput) => Promise<unknown>;
+    };
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
+    // Assign the mock functions to the imported mocks
+    (db.organization.findUnique as jest.Mock) = mockOrganizationFindUnique;
+    (db.membership.findUnique as jest.Mock) = mockMembershipFindUnique;
+    (db.issue.findMany as jest.Mock) = mockIssueFindMany;
+    (db.issue.findUnique as jest.Mock) = mockIssueFindUnique;
+    (db.issue.create as jest.Mock) = mockIssueCreate;
+    (db.issue.update as jest.Mock) = mockIssueUpdate;
+    (db.issue.delete as jest.Mock) = mockIssueDelete;
+    (db.machine.findMany as jest.Mock) = mockMachineFindMany;
+    (db.location.findMany as jest.Mock) = mockLocationFindMany;
+    (db.issueStatus.findMany as jest.Mock) = mockIssueStatusFindMany;
   });
 
   // Test data for Organization A
@@ -67,6 +116,8 @@ describe("Multi-Tenant Security Tests", () => {
     name: "Organization A",
     subdomain: "org-a",
     logoUrl: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
   };
 
   const userAMember = {
@@ -89,6 +140,8 @@ describe("Multi-Tenant Security Tests", () => {
     name: "Organization B",
     subdomain: "org-b",
     logoUrl: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
   };
 
   const userBMember = {
@@ -104,13 +157,13 @@ describe("Multi-Tenant Security Tests", () => {
       id: "issue-a-1",
       title: "Issue A1",
       organizationId: "org-a",
-      gameInstanceId: "game-a-1",
+      machineId: "game-a-1",
     },
     {
       id: "issue-a-2",
       title: "Issue A2",
       organizationId: "org-a",
-      gameInstanceId: "game-a-2",
+      machineId: "game-a-2",
     },
   ];
 
@@ -119,7 +172,7 @@ describe("Multi-Tenant Security Tests", () => {
       id: "issue-b-1",
       title: "Issue B1",
       organizationId: "org-b",
-      gameInstanceId: "game-b-1",
+      machineId: "game-b-1",
     },
   ];
 
@@ -151,12 +204,12 @@ describe("Multi-Tenant Security Tests", () => {
         headers: new Headers({
           host: "org-a.localhost:3000",
         }),
-      });
+      }) as CallerType;
 
-      const result = await callerA.issue.getAll({
+      const result = await callerA.issue.core.getAll({
         locationId: undefined,
         statusId: undefined,
-        gameTitleId: undefined,
+        modelId: undefined,
         statusCategory: undefined,
         sortBy: "created",
         sortOrder: "desc",
@@ -200,13 +253,13 @@ describe("Multi-Tenant Security Tests", () => {
         headers: new Headers({
           host: "org-b.localhost:3000", // User A trying to access org B
         }),
-      });
+      }) as CallerType;
 
       await expect(
-        callerA.issue.getAll({
+        callerA.issue.core.getAll({
           locationId: undefined,
           statusId: undefined,
-          gameTitleId: undefined,
+          modelId: undefined,
           statusCategory: undefined,
           sortBy: "created",
           sortOrder: "desc",
@@ -259,12 +312,12 @@ describe("Multi-Tenant Security Tests", () => {
         headers: new Headers({
           host: "org-a.localhost:3000",
         }),
-      });
+      }) as CallerType;
 
-      const resultA = await callerA.issue.getAll({
+      const resultA = await callerA.issue.core.getAll({
         locationId: undefined,
         statusId: undefined,
-        gameTitleId: undefined,
+        modelId: undefined,
         statusCategory: undefined,
         sortBy: "created",
         sortOrder: "desc",
@@ -286,12 +339,12 @@ describe("Multi-Tenant Security Tests", () => {
         headers: new Headers({
           host: "org-b.localhost:3000",
         }),
-      });
+      }) as CallerType;
 
-      const resultB = await callerB.issue.getAll({
+      const resultB = await callerB.issue.core.getAll({
         locationId: undefined,
         statusId: undefined,
-        gameTitleId: undefined,
+        modelId: undefined,
         statusCategory: undefined,
         sortBy: "created",
         sortOrder: "desc",
@@ -332,7 +385,7 @@ describe("Multi-Tenant Security Tests", () => {
         id: "issue-b-1",
         title: "Issue B1",
         organizationId: "org-b", // Different organization!
-        gameInstanceId: "game-b-1",
+        machineId: "game-b-1",
       });
 
       const callerA = createCaller({
@@ -342,10 +395,12 @@ describe("Multi-Tenant Security Tests", () => {
         headers: new Headers({
           host: "org-a.localhost:3000",
         }),
-      });
+      }) as CallerType;
 
       // This should fail because the issue belongs to a different organization
-      await expect(callerA.issue.getById({ id: "issue-b-1" })).rejects.toThrow(
+      await expect(
+        callerA.issue.core.getById({ id: "issue-b-1" }),
+      ).rejects.toThrow(
         new TRPCError({
           code: "NOT_FOUND",
           message: "Issue not found",
@@ -376,13 +431,13 @@ describe("Multi-Tenant Security Tests", () => {
         headers: new Headers({
           host: "org-a.localhost:3000",
         }),
-      });
+      }) as CallerType;
 
       // The create mutation should automatically add the correct organizationId
       const createData = {
         title: "Test Issue",
         description: "Test Description",
-        gameInstanceId: "game-a-1",
+        machineId: "game-a-1",
         statusId: "status-1",
         severity: "Medium" as const,
       };
@@ -394,7 +449,7 @@ describe("Multi-Tenant Security Tests", () => {
         organizationId: "org-a", // Should be automatically set
       });
 
-      await callerA.issue.create(createData);
+      await callerA.issue.core.create(createData);
 
       // Verify that organizationId was automatically added
       expect(mockIssueCreate).toHaveBeenCalledWith({
@@ -426,7 +481,7 @@ describe("Multi-Tenant Security Tests", () => {
         id: "issue-b-1",
         title: "Issue B1",
         organizationId: "org-b", // Different organization
-        gameInstanceId: "game-b-1",
+        machineId: "game-b-1",
       });
 
       const callerA = createCaller({
@@ -436,7 +491,7 @@ describe("Multi-Tenant Security Tests", () => {
         headers: new Headers({
           host: "org-a.localhost:3000",
         }),
-      });
+      }) as CallerType;
 
       // Should fail to update issue from different organization
       await expect(
@@ -477,14 +532,14 @@ describe("Multi-Tenant Security Tests", () => {
         headers: new Headers({
           host: "org-a.localhost:3000",
         }),
-      });
+      }) as CallerType;
 
       // Member should be able to access organization data
       mockIssueFindMany.mockResolvedValue(issuesOrgA);
-      const result = await memberCaller.issue.getAll({
+      const result = await memberCaller.issue.core.getAll({
         locationId: undefined,
         statusId: undefined,
-        gameTitleId: undefined,
+        modelId: undefined,
         statusCategory: undefined,
         sortBy: "created",
         sortOrder: "desc",
@@ -519,14 +574,14 @@ describe("Multi-Tenant Security Tests", () => {
         headers: new Headers({
           host: "org-a.localhost:3000",
         }),
-      });
+      }) as CallerType;
 
       // Admin should have access to organization data
       mockIssueFindMany.mockResolvedValue(issuesOrgA);
-      const result = await adminCaller.issue.getAll({
+      const result = await adminCaller.issue.core.getAll({
         locationId: undefined,
         statusId: undefined,
-        gameTitleId: undefined,
+        modelId: undefined,
         statusCategory: undefined,
         sortBy: "created",
         sortOrder: "desc",
@@ -569,7 +624,7 @@ describe("Multi-Tenant Security Tests", () => {
         headers: new Headers({
           host: "org-a.localhost:3000",
         }),
-      });
+      }) as CallerType;
 
       await caller.user.getCurrentMembership();
 
@@ -603,7 +658,7 @@ describe("Multi-Tenant Security Tests", () => {
         headers: new Headers({
           host: "org-b.localhost:3000", // Spoofed subdomain
         }),
-      });
+      }) as CallerType;
 
       await expect(caller.user.getCurrentMembership()).rejects.toThrow(
         new TRPCError({

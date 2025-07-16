@@ -12,7 +12,7 @@ const mockIssueFindUnique = jest.fn();
 const mockAttachmentCount = jest.fn();
 const mockAttachmentCreate = jest.fn();
 const mockValidateIssueAttachment = jest.fn();
-const mockUploadIssueAttachment = jest.fn();
+const mockUploadImage = jest.fn();
 
 jest.mock("~/server/auth", () => ({
   auth: mockAuth,
@@ -39,13 +39,13 @@ jest.mock("~/server/db", () => ({
 jest.mock("~/lib/image-storage/local-storage", () => ({
   imageStorage: {
     validateIssueAttachment: mockValidateIssueAttachment,
-    uploadIssueAttachment: mockUploadIssueAttachment,
+    uploadImage: mockUploadImage,
   },
 }));
 
 jest.mock("~/env", () => ({
   env: {
-    DEFAULT_ORG_SUBDOMAIN: "apc",
+    DEFAULT_ORG_SUBDOMAIN: "test-default-org",
   },
 }));
 
@@ -84,9 +84,15 @@ describe("Upload Security Tests", () => {
   };
 
   const mockMembership = {
+    id: "membership-1",
     userId: "user-1",
     organizationId: "org-1",
-    role: "member",
+    roleId: "role-1",
+    role: {
+      id: "role-1",
+      name: "member",
+      permissions: [{ name: "issue:create" }, { name: "attachment:create" }],
+    },
   };
 
   const mockIssue = {
@@ -111,7 +117,7 @@ describe("Upload Security Tests", () => {
     mockIssueFindUnique.mockResolvedValue(mockIssue);
     mockAttachmentCount.mockResolvedValue(0);
     mockValidateIssueAttachment.mockResolvedValue(true);
-    mockUploadIssueAttachment.mockResolvedValue("/uploads/test.jpg");
+    mockUploadImage.mockResolvedValue("/uploads/test.jpg");
     mockAttachmentCreate.mockResolvedValue({
       id: "attachment-1",
       url: "/uploads/test.jpg",
@@ -131,7 +137,7 @@ describe("Upload Security Tests", () => {
 
       expect(response.status).toBe(401);
       const data = await response.json();
-      expect(data.error).toBe("Unauthorized");
+      expect(data.error).toBe("Authentication required");
     });
 
     it("should reject users without session", async () => {
@@ -146,7 +152,7 @@ describe("Upload Security Tests", () => {
 
       expect(response.status).toBe(401);
       const data = await response.json();
-      expect(data.error).toBe("Unauthorized");
+      expect(data.error).toBe("Authentication required");
     });
   });
 
@@ -164,7 +170,9 @@ describe("Upload Security Tests", () => {
 
       expect(response.status).toBe(404);
       const data = await response.json();
-      expect(data.error).toBe("Organization not found");
+      expect(data.error).toBe(
+        'Organization with subdomain "nonexistent" not found',
+      );
     });
 
     it("should use default subdomain when header missing", async () => {
@@ -176,7 +184,7 @@ describe("Upload Security Tests", () => {
       await POST(request);
 
       expect(mockOrganizationFindUnique).toHaveBeenCalledWith({
-        where: { subdomain: "apc" },
+        where: { subdomain: "test-default-org" },
       });
     });
   });
@@ -195,9 +203,7 @@ describe("Upload Security Tests", () => {
 
       expect(response.status).toBe(403);
       const data = await response.json();
-      expect(data.error).toBe(
-        "Access denied - user not a member of organization",
-      );
+      expect(data.error).toBe("User is not a member of this organization");
     });
 
     it("should reject access to issues from other organizations", async () => {
@@ -214,7 +220,7 @@ describe("Upload Security Tests", () => {
 
       expect(response.status).toBe(404);
       const data = await response.json();
-      expect(data.error).toBe("Issue not found or access denied");
+      expect(data.error).toBe("Issue not found");
     });
 
     it("should validate issue belongs to user's organization", async () => {
@@ -227,11 +233,21 @@ describe("Upload Security Tests", () => {
       await POST(request);
 
       expect(mockIssueFindUnique).toHaveBeenCalledWith({
-        where: {
-          id: "issue-1",
-          organizationId: "org-1",
+        where: { id: "issue-1" },
+        select: {
+          id: true,
+          organizationId: true,
+          machine: {
+            select: {
+              id: true,
+              model: {
+                select: {
+                  name: true,
+                },
+              },
+            },
+          },
         },
-        select: { organizationId: true },
       });
     });
   });
@@ -255,9 +271,18 @@ describe("Upload Security Tests", () => {
       };
 
       const membershipA = {
+        id: "membership-A",
         userId: "user-orgA",
         organizationId: "org-A",
-        role: "member",
+        roleId: "role-A",
+        role: {
+          id: "role-A",
+          name: "member",
+          permissions: [
+            { name: "issue:create" },
+            { name: "attachment:create" },
+          ],
+        },
       };
 
       // Issue belongs to org-B, but user is from org-A
@@ -283,7 +308,7 @@ describe("Upload Security Tests", () => {
 
       expect(response.status).toBe(404);
       const data = await response.json();
-      expect(data.error).toBe("Issue not found or access denied");
+      expect(data.error).toBe("Issue not found");
     });
 
     it("should allow valid uploads within same organization", async () => {
@@ -337,7 +362,7 @@ describe("Upload Security Tests", () => {
 
       expect(response.status).toBe(400);
       const data = await response.json();
-      expect(data.error).toBe("No issue ID provided");
+      expect(data.error).toBe("Issue ID required");
     });
   });
 
@@ -356,6 +381,13 @@ describe("Upload Security Tests", () => {
           organizationId: "org-1",
           userId: "user-1",
         },
+        include: {
+          role: {
+            include: {
+              permissions: true,
+            },
+          },
+        },
       });
     });
 
@@ -369,11 +401,21 @@ describe("Upload Security Tests", () => {
       await POST(request);
 
       expect(mockIssueFindUnique).toHaveBeenCalledWith({
-        where: {
-          id: "issue-1",
-          organizationId: "org-1",
+        where: { id: "issue-1" },
+        select: {
+          id: true,
+          organizationId: true,
+          machine: {
+            select: {
+              id: true,
+              model: {
+                select: {
+                  name: true,
+                },
+              },
+            },
+          },
         },
-        select: { organizationId: true },
       });
     });
 
@@ -389,6 +431,8 @@ describe("Upload Security Tests", () => {
       expect(mockAttachmentCreate).toHaveBeenCalledWith({
         data: {
           url: "/uploads/test.jpg",
+          fileName: "test.jpg",
+          fileType: "image/jpeg",
           issueId: "issue-1",
           organizationId: "org-1",
         },

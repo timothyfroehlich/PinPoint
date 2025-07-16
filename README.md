@@ -49,3 +49,16 @@ PinPoint is designed to evolve. Key features planned for future releases include
 - **Parts & Inventory Tracking (v2.0):** A comprehensive module to manage spare parts and supplies. This will allow organizations to track stock levels, associate part consumption with specific repairs, and analyze the true maintenance cost of each game.
 
 This roadmap ensures that PinPoint will grow from a powerful issue tracker into a complete operational management tool for any arcade or collective.
+
+## Multi-Agent Development Workflow
+
+PinPoint uses a coordinated multi-agent development approach for backend implementation tasks. Multiple Claude agents work in parallel using git worktrees to maximize development velocity while maintaining code quality.
+
+**For developers working on backend tasks**: See `docs/backend_impl_tasks/MULTI_AGENT_WORKFLOW.md` for complete coordination guidelines, worktree setup, and synchronization procedures.
+
+Key features:
+
+- **Parallel Development**: Multiple agents work simultaneously on independent tasks
+- **Git Worktrees**: Isolated environments prevent conflicts between agents
+- **Dependency Management**: Clear coordination for sequential task dependencies
+- **Quality Standards**: All agents maintain strict TypeScript and testing requirements
