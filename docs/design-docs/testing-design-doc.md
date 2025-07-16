@@ -1,5 +1,23 @@
+---
+status: current
+last-updated: 2025-01-14
+---
+
+# Testing Design Document
+
 **CURRENT PHASE: Unit Tests Only - Rapid Iteration Mode**
+
 This document outlines our testing strategy during the current rapid iteration phase. We are focusing exclusively on **unit tests** for business logic while deferring integration and end-to-end tests until the core functionality stabilizes.
+
+## Code Coverage Requirements
+
+The project enforces the following minimum coverage thresholds:
+
+- **Global**: 50% minimum coverage
+- **server/**: 60% minimum coverage
+- **lib/**: 70% minimum coverage
+
+Coverage is tracked via Codecov integration with GitHub Actions. See [coverage-setup.md](../coverage-setup.md) for implementation details.
 
 ### 1\\. Current Testing Philosophy
 
@@ -11,10 +29,14 @@ During rapid development, we prioritize fast feedback and quick iteration:
   - **Business Logic First:** Test the core logic that drives the application
   - **Multi-Tenancy Critical:** Always verify organization isolation in business logic
   - **Code Quality:** TypeScript for static type checking, ESLint and Prettier enforced through pre-commit hooks
+  - **Test Quality:** Test code must meet the same quality standards as production code
+  - **No `any` Types:** Tests should use proper TypeScript types, including typed mocks
 - **Current Technology Stack:**
   - **Unit Testing:** **Jest** as test runner for service layer and utility functions
-  - **Mocking:** Jest's built-in mocking with custom utilities (e.g., `PinballMapAPIMocker`)
+  - **Mocking:** Jest's built-in mocking with typed mocks (`jest.fn<T>()`) and custom utilities
   - **Fixtures:** Static test data to ensure consistent test scenarios
+  - **ESM Support:** Uses `ts-jest/presets/default-esm` preset for ES module compatibility
+  - **Coverage:** Jest with v8 provider for accurate coverage metrics
 - **Future Technology Stack (Deferred):**
   - **Integration Testing:** React Testing Library for components, direct tRPC procedure calls
   - **End-to-End Testing:** Playwright for browser automation
@@ -23,6 +45,8 @@ During rapid development, we prioritize fast feedback and quick iteration:
 ### 2\\. What We Test Now vs Later
 
 ### ✅ CURRENT: Unit Tests Only
+
+> **Note**: All test files must use ESM syntax and may require special handling for ESM-only packages like `superjson` or `@auth/prisma-adapter`.
 
 **Service Layer (\*\***`src/server/services/`\***\*)**
 
@@ -36,6 +60,23 @@ During rapid development, we prioritize fast feedback and quick iteration:
 
 - `src/server/services/__tests__/pinballmapService.test.ts` - Core sync business logic
 - `src/lib/pinballmap/__tests__/client.test.ts` - API client with fixture data
+- `src/server/api/__tests__/` - tRPC procedure tests with mocked Prisma client
+
+### Running Tests
+
+```bash
+# Run all tests
+npm test
+
+# Run tests with coverage
+npm run test:coverage
+
+# Run tests in watch mode
+npm run test:watch
+
+# Run tests for CI (with coverage)
+npm run test:ci
+```
 
 ### ❌ DEFERRED: Integration & E2E Tests
 
@@ -100,3 +141,43 @@ During rapid development, we prioritize fast feedback and quick iteration:
 - **End-to-End Tests:**
   - **Notification Flow:** Automate the full anonymous user flow: submit an issue with an email, have an admin resolve it, and then check a mock email inbox (using a tool like MailHog or a similar testing utility) to verify the closure email was "sent."
   - **Full Regression Suite:** Before the v1.0 release, execute the entire suite of E2E tests to ensure that no feature has inadvertently broken existing functionality. This serves as the final quality gate.
+
+## Testing Best Practices
+
+### Mocking Patterns
+
+```typescript
+// Use typed mocks for better type safety
+const mockPrisma = {
+  issue: {
+    findMany: jest.fn<typeof prisma.issue.findMany>(),
+    create: jest.fn<typeof prisma.issue.create>(),
+  },
+};
+
+// Mock ES modules
+jest.mock("~/server/db", () => ({
+  prisma: mockPrisma,
+}));
+```
+
+### ESM Considerations
+
+- Import test utilities using ES module syntax
+- Add `.js` extensions if needed for local imports
+- Update `transformIgnorePatterns` in jest.config.js for problematic packages
+- Use dynamic imports for ESM-only packages in tests
+
+### Organization Isolation Testing
+
+```typescript
+// Always test multi-tenancy isolation
+it("should not access data from other organizations", async () => {
+  const orgA = "org-a-id";
+  const orgB = "org-b-id";
+
+  // Create test data for both organizations
+  // Attempt to access orgB data with orgA context
+  // Assert access is denied
+});
+```

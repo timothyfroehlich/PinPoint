@@ -1,0 +1,57 @@
+coverage:
+  status:
+    project:
+      default:
+        target: 60%
+        threshold: 2%
+        base: auto
+      server:
+        target: 65%
+        threshold: 2%
+        paths:
+          - "src/server/"
+      lib:
+        target: 70%
+        threshold: 2%
+        paths:
+          - "src/lib/"
+    patch:
+      default:
+        target: 50%
+        threshold: 5%
+        if_ci_failed: error
+
+comment:
+  layout: "header,diff,flags,tree,footer"
+  behavior: default
+  require_changes: false
+  require_base: true
+  require_head: true
+  show_carryforward_flags: false
+
+flags:
+  unittests:
+    paths:
+      - src/
+    carryforward: false
+
+ignore:
+  - "src/**/*.d.ts"
+  - "src/**/__tests__/**"
+  - "src/test/**"
+  - "src/_archived_frontend/**"
+  - "src/app/**/page.tsx"
+  - "src/app/**/layout.tsx"
+  - "src/app/**/loading.tsx"
+  - "src/app/**/error.tsx"
+  - "src/app/**/not-found.tsx"
+  - "src/middleware.ts"
+  - "src/env.js"
+  - "scripts/**"
+  - "prisma/**"
+  - "public/**"
+  - "docs/**"
+  - "*.config.js"
+  - "*.config.ts"
+  - "jest.config.js"
+  - "next.config.js"

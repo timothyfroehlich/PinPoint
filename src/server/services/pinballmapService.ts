@@ -1,14 +1,7 @@
 /**
- * PinballMap synchronization service
- * Core business logic for syncing games between PinballMap and our database
- *
- * Game Title Logic:
- * - OPDB games (with opdbId): Global records shared across all organizations
- * - Custom games (no opdbId): Per-organization records, unique by name + organizationId
- * - GameInstances: Always organization-specific through room hierarchy
+ * PinballMap synchronization service for V1.0 schema
+ * Handles syncing machine data between PinballMap and PinPoint
  */
-
-import { fetchLocationMachineDetails } from "../../lib/pinballmap/client";
 
 import type {
   PinballMapMachine,
@@ -19,32 +12,78 @@ import type { PrismaClient } from "@prisma/client";
 export interface SyncResult {
   success: boolean;
   added: number;
+  updated: number;
   removed: number;
   error?: string;
 }
 
-export interface ProcessResult {
-  created: number;
-  error?: string;
-}
+export class PinballMapService {
+  constructor(private prisma: PrismaClient) {}
 
-/**
- * Main sync function - syncs a location's games with PinballMap data
- */
-export async function syncLocationGames(
-  prisma: PrismaClient,
-  locationId: string,
-): Promise<SyncResult> {
-  try {
-    // 1. Find the location and validate it has a PinballMap ID
-    const location = await prisma.location.findUnique({
+  /**
+   * Enable PinballMap integration for an organization
+   */
+  async enableIntegration(organizationId: string): Promise<void> {
+    await this.prisma.pinballMapConfig.upsert({
+      where: { organizationId },
+      create: {
+        organizationId,
+        apiEnabled: true,
+        autoSyncEnabled: false, // Start with manual sync
+      },
+      update: {
+        apiEnabled: true,
+      },
+    });
+  }
+
+  /**
+   * Configure a location for PinballMap sync
+   */
+  async configureLocationSync(
+    locationId: string,
+    pinballMapId: number,
+    organizationId: string,
+  ): Promise<void> {
+    // Verify organization has PinballMap enabled
+    const config = await this.prisma.pinballMapConfig.findUnique({
+      where: { organizationId },
+    });
+
+    if (!config?.apiEnabled) {
+      throw new Error("PinballMap integration not enabled for organization");
+    }
+
+    // Update location with PinballMap configuration
+    await this.prisma.location.update({
       where: { id: locationId },
+      data: {
+        pinballMapId,
+        syncEnabled: true,
+      },
+    });
+  }
+
+  /**
+   * Sync a specific location with PinballMap
+   */
+  async syncLocation(locationId: string): Promise<SyncResult> {
+    const location = await this.prisma.location.findUnique({
+      where: { id: locationId },
+      include: {
+        organization: {
+          include: {
+            pinballMapConfig: true,
+          },
+        },
+      },
     });
 
     if (!location) {
       return {
         success: false,
         added: 0,
+        updated: 0,
         removed: 0,
         error: "Location not found",
       };
@@ -54,118 +93,336 @@ export async function syncLocationGames(
       return {
         success: false,
         added: 0,
+        updated: 0,
         removed: 0,
-        error: "Location does not have a PinballMap ID configured",
+        error: "Location not configured for PinballMap sync",
       };
     }
 
-    // 2. Find the Main Floor room for this location
-    const mainFloorRoom = await prisma.room.findFirst({
-      where: {
-        locationId: location.id,
-        name: "Main Floor",
+    if (!location.organization.pinballMapConfig?.apiEnabled) {
+      return {
+        success: false,
+        added: 0,
+        updated: 0,
+        removed: 0,
+        error: "PinballMap integration not enabled",
+      };
+    }
+
+    try {
+      // Fetch machine data from PinballMap
+      const machineData = await this.fetchLocationMachines(
+        location.pinballMapId,
+      );
+
+      if (!machineData?.machines) {
+        return {
+          success: false,
+          added: 0,
+          updated: 0,
+          removed: 0,
+          error: "No machine data returned from PinballMap",
+        };
+      }
+
+      // Process the machines
+      const result = await this.reconcileMachines(
+        location.id,
+        location.organizationId,
+        machineData.machines,
+        location.organization.pinballMapConfig,
+      );
+
+      // Update last sync time
+      await this.prisma.location.update({
+        where: { id: locationId },
+        data: { lastSyncAt: new Date() },
+      });
+
+      return result;
+    } catch (error) {
+      return {
+        success: false,
+        added: 0,
+        updated: 0,
+        removed: 0,
+        error: error instanceof Error ? error.message : "Unknown sync error",
+      };
+    }
+  }
+
+  /**
+   * Reconcile PinballMap machines with local database
+   */
+  private async reconcileMachines(
+    locationId: string,
+    organizationId: string,
+    pinballMapMachines: PinballMapMachine[],
+    config: { createMissingModels: boolean; updateExistingData: boolean },
+  ): Promise<SyncResult> {
+    let added = 0;
+    let updated = 0;
+    let removed = 0;
+
+    // Get current machines at this location
+    const currentMachines = await this.prisma.machine.findMany({
+      where: { locationId },
+      include: {
+        model: true,
       },
     });
 
-    if (!mainFloorRoom) {
-      return {
-        success: false,
-        added: 0,
-        removed: 0,
-        error: "Main Floor room not found for location",
-      };
+    // Track which machines we found on PinballMap
+    const foundMachineIds = new Set<string>();
+
+    for (const pmMachine of pinballMapMachines) {
+      try {
+        // Find or create the Model record
+        const model = await this.findOrCreateModel(
+          pmMachine,
+          config.createMissingModels,
+        );
+
+        if (!model) {
+          continue; // Skip if model creation is disabled and model doesn't exist
+        }
+
+        // Find existing machine by model and location
+        const existingMachine = currentMachines.find(
+          (m) => m.modelId === model!.id,
+        );
+
+        if (existingMachine) {
+          foundMachineIds.add(existingMachine.id);
+
+          if (config.updateExistingData) {
+            // Update existing machine if needed
+            // For now, machines don't have updatable fields from PinballMap
+            // This could be expanded for condition, notes, etc.
+            updated++;
+          }
+        } else {
+          // Create new machine
+          await this.prisma.machine.create({
+            data: {
+              name: model.name, // Use model name as default instance name
+              organizationId,
+              locationId,
+              modelId: model.id,
+              // ownerId will be null initially
+            },
+          });
+          added++;
+        }
+      } catch (error) {
+        console.error(`Error processing machine ${pmMachine.opdb_id}:`, error);
+        // Continue processing other machines
+      }
     }
 
-    // 3. Fetch machine data from PinballMap
-    const machineData = await fetchLocationMachineDetails(
-      location.pinballMapId,
+    // Remove machines that are no longer on PinballMap
+    const machinesToRemove = currentMachines.filter(
+      (m) => !foundMachineIds.has(m.id),
     );
 
-    // 4. Validate the response structure
-    if (!machineData || !Array.isArray(machineData.machines)) {
-      return {
-        success: false,
-        added: 0,
-        removed: 0,
-        error:
-          "PinballMap API returned invalid data. Please contact support if this persists.",
-      };
-    }
+    for (const machine of machinesToRemove) {
+      // Check if machine has issues before removing
+      const issueCount = await this.prisma.issue.count({
+        where: { machineId: machine.id },
+      });
 
-    // 5. Reconcile the games
-    const result = await reconcileGameInstances(
-      prisma,
-      mainFloorRoom.id,
-      location.organizationId,
-      machineData.machines,
-    );
-
-    return {
-      success: true,
-      added: result.added,
-      removed: result.removed,
-    };
-  } catch (error) {
-    // Provide specific error messages for different failure types
-    let errorMessage = "Unknown error occurred during sync";
-
-    if (error instanceof Error) {
-      if (
-        error.message.includes("fetch") ||
-        error.message.includes("Network")
-      ) {
-        errorMessage =
-          "PinballMap API is currently unavailable. Please try again later.";
-      } else if (
-        error.message.includes("Invalid response") ||
-        error.message.includes("malformed")
-      ) {
-        errorMessage =
-          "PinballMap API returned invalid data. Please contact support if this persists.";
-      } else {
-        errorMessage = error.message;
+      if (issueCount === 0) {
+        // Only remove machines with no issues
+        await this.prisma.machine.delete({
+          where: { id: machine.id },
+        });
+        removed++;
       }
     }
 
     return {
-      success: false,
-      added: 0,
-      removed: 0,
-      error: errorMessage,
+      success: true,
+      added,
+      updated,
+      removed,
+    };
+  }
+
+  /**
+   * Find existing Model or create new one from PinballMap data
+   */
+  private async findOrCreateModel(
+    pmMachine: PinballMapMachine,
+    createMissingModels: boolean,
+  ): Promise<{ id: string; name: string } | null> {
+    // Look for existing model by OPDB ID
+    let model = pmMachine.opdb_id
+      ? await this.prisma.model.findUnique({
+          where: { opdbId: pmMachine.opdb_id },
+        })
+      : null;
+
+    if (model) {
+      return model;
+    }
+
+    // Look for existing model by IPDB ID if available
+    if (pmMachine.ipdb_id) {
+      model = await this.prisma.model.findUnique({
+        where: { ipdbId: pmMachine.ipdb_id },
+      });
+
+      if (model) {
+        return model;
+      }
+    }
+
+    if (!createMissingModels) {
+      return null;
+    }
+
+    // Create new global model from PinballMap data
+    try {
+      model = await this.prisma.model.create({
+        data: {
+          name: pmMachine.machine_name || pmMachine.name,
+          manufacturer: pmMachine.manufacturer || null,
+          year: pmMachine.year || null,
+
+          // Cross-database references
+          opdbId: pmMachine.opdb_id,
+          ipdbId: pmMachine.ipdb_id || null,
+
+          // Technical details
+          machineType: pmMachine.machine_type || null,
+          machineDisplay: pmMachine.machine_display || null,
+          isActive: pmMachine.is_active ?? true,
+
+          // Metadata and links
+          ipdbLink: pmMachine.ipdb_link || null,
+          opdbImgUrl: pmMachine.opdb_img || null,
+          kineticistUrl: pmMachine.kineticist_url || null,
+
+          // PinPoint-specific
+          isCustom: false, // OPDB games are not custom
+        },
+      });
+
+      return model;
+    } catch (error) {
+      // Handle duplicate key errors gracefully
+      if (error instanceof Error && error.message.includes("unique")) {
+        // Another sync might have created this model
+        return pmMachine.opdb_id
+          ? this.prisma.model.findUnique({
+              where: { opdbId: pmMachine.opdb_id },
+            })
+          : null;
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Fetch machine data from PinballMap API
+   */
+  private async fetchLocationMachines(
+    pinballMapId: number,
+  ): Promise<PinballMapMachineDetailsResponse | null> {
+    try {
+      const response = await fetch(
+        `https://pinballmap.com/api/v1/locations/${pinballMapId}/machine_details.json`,
+      );
+
+      if (!response.ok) {
+        throw new Error(`PinballMap API error: ${response.status}`);
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error("Failed to fetch PinballMap data:", error);
+      return null;
+    }
+  }
+
+  /**
+   * Get sync status for all locations in an organization
+   */
+  async getOrganizationSyncStatus(organizationId: string): Promise<{
+    configEnabled: boolean;
+    locations: {
+      id: string;
+      name: string;
+      pinballMapId: number | null;
+      syncEnabled: boolean;
+      lastSyncAt: Date | null;
+      machineCount: number;
+    }[];
+  }> {
+    const config = await this.prisma.pinballMapConfig.findUnique({
+      where: { organizationId },
+    });
+
+    const locations = await this.prisma.location.findMany({
+      where: { organizationId },
+      include: {
+        _count: {
+          select: {
+            machines: true,
+          },
+        },
+      },
+    });
+
+    return {
+      configEnabled: config?.apiEnabled ?? false,
+      locations: locations.map((location) => ({
+        id: location.id,
+        name: location.name,
+        pinballMapId: location.pinballMapId,
+        syncEnabled: location.syncEnabled,
+        lastSyncAt: location.lastSyncAt,
+        machineCount: location._count.machines,
+      })),
     };
   }
 }
 
-/**
- * Process fixture data for seeding (instead of calling live API)
- */
+// Export legacy functions for backward compatibility during transition
+export async function syncLocationGames(
+  prisma: PrismaClient,
+  locationId: string,
+): Promise<SyncResult> {
+  const service = new PinballMapService(prisma);
+  return service.syncLocation(locationId);
+}
+
 export async function processFixtureData(
   prisma: PrismaClient,
   fixtureData: PinballMapMachineDetailsResponse,
-  roomId: string,
+  locationId: string,
   organizationId: string,
-): Promise<ProcessResult> {
+): Promise<{ created: number; error?: string }> {
   try {
     let created = 0;
+    const service = new PinballMapService(prisma);
 
     for (const machine of fixtureData.machines) {
-      // Create or update game title
-      const gameTitle = await createOrUpdateGameTitle(
-        prisma,
-        machine,
-        organizationId,
-      );
+      // Create or update model
+      const model = await service["findOrCreateModel"](machine, true);
 
-      // Create game instance
-      await prisma.gameInstance.create({
-        data: {
-          name: gameTitle.name,
-          gameTitleId: gameTitle.id,
-          roomId: roomId,
-        },
-      });
-
-      created++;
+      if (model) {
+        // Create machine instance
+        await prisma.machine.create({
+          data: {
+            name: model.name, // Use model name as default instance name
+            organizationId: organizationId,
+            modelId: model.id,
+            locationId: locationId,
+          },
+        });
+        created++;
+      }
     }
 
     return { created };
@@ -174,131 +431,5 @@ export async function processFixtureData(
       created: 0,
       error: error instanceof Error ? error.message : "Unknown error",
     };
-  }
-}
-
-/**
- * Reconcile game instances - add new games, remove old ones
- */
-export async function reconcileGameInstances(
-  prisma: PrismaClient,
-  roomId: string,
-  organizationId: string,
-  remoteMachines: PinballMapMachine[],
-): Promise<{ added: number; removed: number }> {
-  // Get current game instances in the room
-  const localGames = await prisma.gameInstance.findMany({
-    where: { roomId },
-    include: { gameTitle: true },
-  });
-
-  // Create sets of OPDB IDs for comparison
-  const remoteOpdbIds = new Set(
-    remoteMachines.map((m) => m.opdb_id).filter(Boolean), // Remove null/undefined values
-  );
-
-  // For local games, we need to check OPDB games
-  const localOpdbIds = new Set(
-    localGames.filter((g) => g.gameTitle.opdbId).map((g) => g.gameTitle.opdbId),
-  );
-
-  // Determine which games to remove
-  // Remove games that have OPDB IDs but are not in the remote list
-  const gamesToRemove = localGames.filter((lg) => {
-    if (!lg.gameTitle.opdbId) return false; // Don't remove custom games automatically
-    return !remoteOpdbIds.has(lg.gameTitle.opdbId);
-  });
-
-  // Remove obsolete games
-  await prisma.gameInstance.deleteMany({
-    where: { id: { in: gamesToRemove.map((g) => g.id) } },
-  });
-
-  // Determine which games to add (remote games not in local)
-  const machinesToAdd = remoteMachines.filter(
-    (rm) => !rm.opdb_id || !localOpdbIds.has(rm.opdb_id),
-  );
-
-  // Add new games
-  let addedCount = 0;
-  for (const machine of machinesToAdd) {
-    // Create or update game title
-    const gameTitle = await createOrUpdateGameTitle(
-      prisma,
-      machine,
-      organizationId,
-    );
-
-    // Create game instance
-    await prisma.gameInstance.create({
-      data: {
-        name: gameTitle.name,
-        gameTitleId: gameTitle.id,
-        roomId: roomId,
-      },
-    });
-
-    addedCount++;
-  }
-
-  return {
-    added: addedCount,
-    removed: gamesToRemove.length,
-  };
-}
-
-/**
- * Create or update a game title from PinballMap machine data
- */
-export async function createOrUpdateGameTitle(
-  prisma: PrismaClient,
-  machine: PinballMapMachine,
-  organizationId: string,
-) {
-  // Handle OPDB games vs custom games differently
-  if (machine.opdb_id) {
-    // OPDB games are global - check if it exists first
-    const existingGameTitle = await prisma.gameTitle.findUnique({
-      where: { opdbId: machine.opdb_id },
-    });
-
-    if (existingGameTitle) {
-      // Update existing global OPDB game
-      return await prisma.gameTitle.update({
-        where: { opdbId: machine.opdb_id },
-        data: {
-          name: machine.name,
-          // Update other OPDB fields if needed
-        },
-      });
-    } else {
-      // Create new global OPDB game
-      return await prisma.gameTitle.create({
-        data: {
-          name: machine.name,
-          opdbId: machine.opdb_id,
-          // Global OPDB games have no organization (null)
-          // Could add more fields like manufacturer, year if needed
-        },
-      });
-    }
-  } else {
-    // Custom games are per-organization - use the compound unique constraint
-    return await prisma.gameTitle.upsert({
-      where: {
-        unique_custom_game_per_org: {
-          name: machine.name,
-          organizationId: organizationId,
-        },
-      },
-      update: {
-        name: machine.name,
-      },
-      create: {
-        name: machine.name,
-        opdbId: null, // Custom games have no OPDB ID
-        organizationId: organizationId,
-      },
-    });
   }
 }
