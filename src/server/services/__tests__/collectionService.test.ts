@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 import { CollectionService } from "../collectionService";
@@ -19,7 +20,7 @@ const mockPrisma = {
   machine: {
     findMany: jest.fn(),
   },
-} as unknown as PrismaClient;
+} as unknown as jest.Mocked<PrismaClient>;
 
 describe("CollectionService", () => {
   let service: CollectionService;
@@ -65,7 +66,7 @@ describe("CollectionService", () => {
         },
       ];
 
-      (mockPrisma.collection.findMany as jest.Mock).mockResolvedValue(
+      (mockPrisma.collection.findMany as jest.Mock<any>).mockResolvedValue(
         mockCollections,
       );
 
@@ -78,7 +79,7 @@ describe("CollectionService", () => {
     });
 
     it("should only return enabled collection types", async () => {
-      (mockPrisma.collection.findMany as jest.Mock).mockResolvedValue([]);
+      (mockPrisma.collection.findMany as jest.Mock<any>).mockResolvedValue([]);
 
       await service.getLocationCollections("loc1", "org1");
 
@@ -132,7 +133,7 @@ describe("CollectionService", () => {
         },
       ];
 
-      (mockPrisma.machine.findMany as jest.Mock).mockResolvedValue(
+      (mockPrisma.machine.findMany as jest.Mock<any>).mockResolvedValue(
         mockMachines,
       );
 
@@ -170,7 +171,7 @@ describe("CollectionService", () => {
         isManual: true,
       };
 
-      (mockPrisma.collection.create as jest.Mock).mockResolvedValue(
+      (mockPrisma.collection.create as jest.Mock<any>).mockResolvedValue(
         mockCollection,
       );
 
@@ -179,7 +180,6 @@ describe("CollectionService", () => {
         typeId: "type1",
         locationId: "loc1",
         description: "Main playing area",
-        isManual: true,
       });
 
       expect(result).toEqual(mockCollection);
@@ -198,7 +198,7 @@ describe("CollectionService", () => {
 
   describe("addMachinesToCollection", () => {
     it("should add machines to a collection", async () => {
-      (mockPrisma.collection.update as jest.Mock).mockResolvedValue({});
+      (mockPrisma.collection.update as jest.Mock<any>).mockResolvedValue({});
 
       await service.addMachinesToCollection("coll1", ["machine1", "machine2"]);
 
@@ -215,7 +215,9 @@ describe("CollectionService", () => {
 
   describe("toggleCollectionType", () => {
     it("should enable/disable a collection type", async () => {
-      (mockPrisma.collectionType.update as jest.Mock).mockResolvedValue({});
+      (mockPrisma.collectionType.update as jest.Mock<any>).mockResolvedValue(
+        {},
+      );
 
       await service.toggleCollectionType("type1", false);
 
@@ -239,7 +241,7 @@ describe("CollectionService", () => {
         },
       ];
 
-      (mockPrisma.collectionType.findMany as jest.Mock).mockResolvedValue(
+      (mockPrisma.collectionType.findMany as jest.Mock<any>).mockResolvedValue(
         mockTypes,
       );
 
@@ -260,7 +262,9 @@ describe("CollectionService", () => {
 
   describe("generateAutoCollections", () => {
     it("should return empty counts when no auto types enabled", async () => {
-      (mockPrisma.collectionType.findMany as jest.Mock).mockResolvedValue([]);
+      (mockPrisma.collectionType.findMany as jest.Mock<any>).mockResolvedValue(
+        [],
+      );
 
       const result = await service.generateAutoCollections("org1");
 
