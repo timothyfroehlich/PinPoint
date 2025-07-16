@@ -1,68 +1,93 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { imageStorage } from "~/lib/image-storage/local-storage";
-import { auth } from "~/server/auth";
+import {
+  getUploadAuthContext,
+  requireUploadPermission,
+} from "~/server/auth/uploadAuth";
 import { db } from "~/server/db";
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await auth();
+    // Get authenticated context with organization resolution
+    const ctx = await getUploadAuthContext(req);
 
-    if (session?.user.role !== "admin") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Require organization management permission
+    await requireUploadPermission(ctx, "organization:manage");
 
     const formData = await req.formData();
     const file = formData.get("file") as File;
-    const organizationId = session.user.organizationId;
 
     if (!file) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
-    if (!organizationId) {
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
       return NextResponse.json(
-        { error: "No organization ID found in session" },
+        { error: "Only image files are allowed" },
         { status: 400 },
       );
     }
 
-    const organization = await db.organization.findUnique({
-      where: { id: organizationId },
-    });
-
-    if (!organization) {
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
       return NextResponse.json(
-        { error: "Organization not found" },
-        { status: 404 },
-      );
-    }
-
-    if (!(await imageStorage.validateProfilePicture(file))) {
-      return NextResponse.json(
-        { error: "Invalid image file. Must be JPEG, PNG, or WebP under 2MB" },
+        { error: "File size must be less than 5MB" },
         { status: 400 },
       );
     }
 
-    const imageUrl = await imageStorage.uploadOrganizationLogo(
+    // Upload image
+    const imagePath = await imageStorage.uploadImage(
       file,
-      organization.subdomain,
+      `organization-${ctx.organization.id}`,
     );
 
-    await db.organization.update({
-      where: { id: organizationId },
-      data: { logoUrl: imageUrl },
+    // Delete old logo if it exists
+    const currentOrg = await db.organization.findUnique({
+      where: { id: ctx.organization.id },
+      select: { logoUrl: true },
+    });
+
+    if (currentOrg?.logoUrl) {
+      try {
+        await imageStorage.deleteImage(currentOrg.logoUrl);
+      } catch (error) {
+        // Ignore deletion errors for old files
+        console.warn("Failed to delete old logo:", error);
+      }
+    }
+
+    // Update organization logo
+    const updatedOrganization = await db.organization.update({
+      where: { id: ctx.organization.id },
+      data: { logoUrl: imagePath },
     });
 
     return NextResponse.json({
       success: true,
-      imageUrl,
+      logoUrl: updatedOrganization.logoUrl,
     });
   } catch (error) {
     console.error("Organization logo upload error:", error);
+
+    if (
+      error instanceof Error &&
+      error.message.includes("Permission required")
+    ) {
+      return NextResponse.json({ error: error.message }, { status: 403 });
+    }
+
+    if (
+      error instanceof Error &&
+      error.message.includes("Authentication required")
+    ) {
+      return NextResponse.json({ error: error.message }, { status: 401 });
+    }
+
     return NextResponse.json(
-      { error: "Failed to upload logo" },
+      { error: "Internal server error" },
       { status: 500 },
     );
   }

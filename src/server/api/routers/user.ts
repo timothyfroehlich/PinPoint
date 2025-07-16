@@ -14,14 +14,10 @@ export const userRouter = createTRPCRouter({
     const user = await ctx.db.user.findUnique({
       where: { id: ctx.session.user.id },
       include: {
-        ownedGameInstances: {
+        ownedMachines: {
           include: {
-            gameTitle: true,
-            room: {
-              include: {
-                location: true,
-              },
-            },
+            model: true,
+            location: true,
           },
         },
         memberships: {
@@ -31,9 +27,9 @@ export const userRouter = createTRPCRouter({
         },
         _count: {
           select: {
-            issues: true,
+            issuesCreated: true,
             comments: true,
-            ownedGameInstances: true,
+            ownedMachines: true,
           },
         },
       },
@@ -50,8 +46,9 @@ export const userRouter = createTRPCRouter({
   getCurrentMembership: organizationProcedure.query(async ({ ctx }) => {
     return {
       userId: ctx.membership.userId,
-      role: ctx.membership.role,
+      role: ctx.membership.role.name,
       organizationId: ctx.membership.organizationId,
+      permissions: ctx.userPermissions,
     };
   }),
 
@@ -146,11 +143,11 @@ export const userRouter = createTRPCRouter({
               name: true,
               bio: true,
               profilePicture: true,
-              joinDate: true,
+              createdAt: true,
               _count: {
                 select: {
-                  ownedGameInstances: true,
-                  issues: true,
+                  ownedMachines: true,
+                  issuesCreated: true,
                   comments: true,
                 },
               },
@@ -171,17 +168,18 @@ export const userRouter = createTRPCRouter({
     const memberships = await ctx.db.membership.findMany({
       where: { organizationId: ctx.membership.organizationId },
       include: {
+        role: true,
         user: {
           select: {
             id: true,
             name: true,
             bio: true,
             profilePicture: true,
-            joinDate: true,
+            createdAt: true,
             _count: {
               select: {
-                ownedGameInstances: true,
-                issues: true,
+                ownedMachines: true,
+                issuesCreated: true,
                 comments: true,
               },
             },
@@ -196,8 +194,8 @@ export const userRouter = createTRPCRouter({
     });
 
     return memberships.map((m) => ({
-      ...m.user,
-      role: m.role,
+      ...(m.user ?? {}),
+      role: m.role.name,
     }));
   }),
 

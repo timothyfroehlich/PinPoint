@@ -33,6 +33,9 @@ export async function GET() {
           where: {
             organizationId: organization.id,
           },
+          include: {
+            role: true,
+          },
         },
       },
     });
@@ -40,7 +43,7 @@ export async function GET() {
     // Transform users to include role information
     const usersWithRoles = users.map((user) => ({
       ...user,
-      role: user.memberships[0]?.role ?? null,
+      role: user.memberships[0]?.role?.name ?? null,
     }));
 
     return NextResponse.json({

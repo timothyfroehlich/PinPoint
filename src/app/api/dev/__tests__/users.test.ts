@@ -1,7 +1,4 @@
-import { type Role } from "@prisma/client";
-
-import { GET } from "../users/route";
-
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // Mock the database with proper typing
 const mockUserFindMany = jest.fn();
 const mockMembershipFindMany = jest.fn();
@@ -10,16 +7,44 @@ const mockOrganizationFindMany = jest.fn();
 jest.mock("~/server/db", () => ({
   db: {
     organization: {
-      findMany: mockOrganizationFindMany,
+      findMany: jest.fn(),
     },
     user: {
-      findMany: mockUserFindMany,
+      findMany: jest.fn(),
     },
     membership: {
-      findMany: mockMembershipFindMany,
+      findMany: jest.fn(),
     },
   },
 }));
+
+// Mock NextResponse
+const mockNextResponseInstance = {
+  json: jest.fn().mockImplementation(function (this: any) {
+    return Promise.resolve(this.data);
+  }),
+  status: 200,
+};
+
+const mockNextResponse = jest.fn().mockImplementation((body, options) => ({
+  ...mockNextResponseInstance,
+  data: body,
+  status: options?.status || 200,
+}));
+
+(mockNextResponse as any).json = jest.fn((data, options) => ({
+  ...mockNextResponseInstance,
+  data,
+  status: options?.status || 200,
+}));
+
+jest.mock("next/server", () => ({
+  NextResponse: mockNextResponse,
+}));
+
+import { GET } from "../users/route";
+
+import { db } from "~/server/db";
 
 interface TestUser {
   id: string;
@@ -35,7 +60,7 @@ interface TestUser {
 interface TestMembership {
   userId: string;
   organizationId: string;
-  role: Role;
+  role: string;
 }
 
 interface TestOrganization {
@@ -47,24 +72,29 @@ interface TestOrganization {
 
 // Helper to mock NODE_ENV safely
 function setTestEnv(env: string): void {
-  const originalEnv = process.env.NODE_ENV;
   Object.defineProperty(process.env, "NODE_ENV", {
     value: env,
     configurable: true,
   });
-  // Restore after test
+}
+
+describe("/api/dev/users", () => {
+  const originalEnv = process.env.NODE_ENV;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    setTestEnv("development");
+    // Assign the mock functions to the imported mocks
+    (db.organization.findMany as jest.Mock) = mockOrganizationFindMany;
+    (db.user.findMany as jest.Mock) = mockUserFindMany;
+    (db.membership.findMany as jest.Mock) = mockMembershipFindMany;
+  });
+
   afterEach(() => {
     Object.defineProperty(process.env, "NODE_ENV", {
       value: originalEnv,
       configurable: true,
     });
-  });
-}
-
-describe("/api/dev/users", () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    setTestEnv("development");
   });
 
   const mockOrganizations: TestOrganization[] = [
@@ -130,7 +160,7 @@ describe("/api/dev/users", () => {
           email: string;
           bio: string | null;
           profilePicture: string | null;
-          role: Role;
+          role: string;
         }[];
       };
       expect(data.users).toHaveLength(2);
