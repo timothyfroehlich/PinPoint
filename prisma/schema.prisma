@@ -215,12 +215,19 @@ model Machine {
   notifyOnStatusChanges    Boolean @default(true) // Notify when issue status changes
   notifyOnComments         Boolean @default(false) // Notify on new comments
 
+  // QR Code system
+  qrCodeId            String   @unique @default(cuid())
+  qrCodeUrl           String?  
+  qrCodeGeneratedAt   DateTime?
+
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   location     Location     @relation(fields: [locationId], references: [id])
   model        Model        @relation(fields: [modelId], references: [id])
   owner        User?        @relation("MachineOwner", fields: [ownerId], references: [id])
   issues       Issue[]
   collections  Collection[]
+
+  @@index([qrCodeId])
 }
 
 model Issue {
