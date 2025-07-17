@@ -142,7 +142,6 @@ describe("PinballMapService", () => {
         ({ data }: { data: { opdbId: string; name: string } }) =>
           Promise.resolve({
             id: `title-${data.opdbId}`,
-            name: data.name,
             ...data,
           } as Model),
       );
@@ -170,7 +169,6 @@ describe("PinballMapService", () => {
         ({ data }: { data: { opdbId: string; name: string } }) =>
           Promise.resolve({
             id: `title-${data.opdbId}`,
-            name: data.name,
             ...data,
           } as Model),
       );
@@ -219,7 +217,6 @@ describe("PinballMapService", () => {
         ({ data }: { data: { opdbId: string; name: string } }) =>
           Promise.resolve({
             id: `title-${data.opdbId}`,
-            name: data.name,
             ...data,
           } as Model),
       );
@@ -506,7 +503,6 @@ describe("PinballMapService", () => {
         ({ data }: { data: { opdbId: string; name: string } }) =>
           Promise.resolve({
             id: `title-${data.opdbId}`,
-            name: data.name,
             ...data,
           } as Model),
       );
@@ -553,7 +549,6 @@ describe("PinballMapService", () => {
         ({ data }: { data: { name: string } }) =>
           Promise.resolve({
             id: `custom-title-${data.name}`,
-            name: data.name,
             ...data,
           } as Model),
       );
