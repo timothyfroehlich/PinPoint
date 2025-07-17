@@ -40,7 +40,7 @@ export const authConfig = {
       clientSecret: env.GOOGLE_CLIENT_SECRET!,
     }),
     // Development-only Credentials provider for test accounts
-    ...(env.NODE_ENV === "development"
+    ...(env.NODE_ENV === "development" || env.NODE_ENV === "test"
       ? [
           Credentials({
             name: "Development Test Users",
@@ -48,7 +48,7 @@ export const authConfig = {
               email: { label: "Email", type: "email" },
             },
             async authorize(credentials) {
-              if (env.NODE_ENV !== "development") {
+              if (env.NODE_ENV !== "development" && env.NODE_ENV !== "test") {
                 return null;
               }
 
