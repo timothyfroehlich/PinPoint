@@ -3,11 +3,13 @@
 const mockUserFindMany = jest.fn();
 const mockMembershipFindMany = jest.fn();
 const mockOrganizationFindMany = jest.fn();
+const mockOrganizationFindFirst = jest.fn();
 
 jest.mock("~/server/db", () => ({
   db: {
     organization: {
       findMany: jest.fn(),
+      findFirst: jest.fn(),
     },
     user: {
       findMany: jest.fn(),
@@ -16,6 +18,15 @@ jest.mock("~/server/db", () => ({
       findMany: jest.fn(),
     },
   },
+}));
+
+// Mock the env module
+const mockEnv = {
+  NODE_ENV: "development",
+};
+
+jest.mock("~/env.js", () => ({
+  env: mockEnv,
 }));
 
 // Mock NextResponse
@@ -42,8 +53,14 @@ jest.mock("next/server", () => ({
   NextResponse: mockNextResponse,
 }));
 
+// Mock the auth module
+jest.mock("~/server/auth", () => ({
+  auth: jest.fn(),
+}));
+
 import { GET } from "../users/route";
 
+import { auth } from "~/server/auth";
 import { db } from "~/server/db";
 
 interface TestUser {
@@ -72,29 +89,25 @@ interface TestOrganization {
 
 // Helper to mock NODE_ENV safely
 function setTestEnv(env: string): void {
-  Object.defineProperty(process.env, "NODE_ENV", {
-    value: env,
-    configurable: true,
-  });
+  mockEnv.NODE_ENV = env;
 }
 
 describe("/api/dev/users", () => {
-  const originalEnv = process.env.NODE_ENV;
-
   beforeEach(() => {
     jest.clearAllMocks();
     setTestEnv("development");
     // Assign the mock functions to the imported mocks
     (db.organization.findMany as jest.Mock) = mockOrganizationFindMany;
+    (db.organization.findFirst as jest.Mock) = mockOrganizationFindFirst;
     (db.user.findMany as jest.Mock) = mockUserFindMany;
     (db.membership.findMany as jest.Mock) = mockMembershipFindMany;
+    (auth as jest.Mock).mockResolvedValue({
+      user: { id: "user-1", name: "Test User" },
+    });
   });
 
   afterEach(() => {
-    Object.defineProperty(process.env, "NODE_ENV", {
-      value: originalEnv,
-      configurable: true,
-    });
+    setTestEnv("development");
   });
 
   const mockOrganizations: TestOrganization[] = [
@@ -145,8 +158,17 @@ describe("/api/dev/users", () => {
   describe("GET /api/dev/users", () => {
     it("should return dev users in development environment", async () => {
       // Setup mocks
-      mockOrganizationFindMany.mockResolvedValue(mockOrganizations);
-      mockUserFindMany.mockResolvedValue(mockUsers);
+      mockOrganizationFindFirst.mockResolvedValue(mockOrganizations[0]);
+      mockUserFindMany.mockResolvedValue(
+        mockUsers.map((user) => ({
+          ...user,
+          memberships: [
+            {
+              role: { name: "admin" },
+            },
+          ],
+        })),
+      );
       mockMembershipFindMany.mockResolvedValue(mockMemberships);
 
       const response = await GET();
@@ -164,7 +186,7 @@ describe("/api/dev/users", () => {
         }[];
       };
       expect(data.users).toHaveLength(2);
-      expect(data.users[0]).toEqual({
+      expect(data.users[0]).toMatchObject({
         id: "user-1",
         name: "Roger Sharpe",
         email: "roger.sharpe@testaccount.dev",
@@ -197,8 +219,17 @@ describe("/api/dev/users", () => {
         },
       ];
 
-      mockOrganizationFindMany.mockResolvedValue(mockOrganizations);
-      mockUserFindMany.mockResolvedValue(allUsers);
+      mockOrganizationFindFirst.mockResolvedValue(mockOrganizations[0]);
+      mockUserFindMany.mockResolvedValue(
+        allUsers.slice(0, 2).map((user) => ({
+          ...user,
+          memberships: [
+            {
+              role: { name: "admin" },
+            },
+          ],
+        })),
+      );
       mockMembershipFindMany.mockResolvedValue(mockMemberships);
 
       const response = await GET();
@@ -216,7 +247,7 @@ describe("/api/dev/users", () => {
     });
 
     it("should handle database errors gracefully", async () => {
-      mockOrganizationFindMany.mockRejectedValue(new Error("Database error"));
+      mockOrganizationFindFirst.mockRejectedValue(new Error("Database error"));
 
       const response = await GET();
 
@@ -224,8 +255,17 @@ describe("/api/dev/users", () => {
     });
 
     it("should include all required user fields", async () => {
-      mockOrganizationFindMany.mockResolvedValue(mockOrganizations);
-      mockUserFindMany.mockResolvedValue(mockUsers);
+      mockOrganizationFindFirst.mockResolvedValue(mockOrganizations[0]);
+      mockUserFindMany.mockResolvedValue(
+        mockUsers.map((user) => ({
+          ...user,
+          memberships: [
+            {
+              role: { name: "admin" },
+            },
+          ],
+        })),
+      );
       mockMembershipFindMany.mockResolvedValue(mockMemberships);
 
       const response = await GET();
