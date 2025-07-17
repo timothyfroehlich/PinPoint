@@ -7,7 +7,8 @@ Object.defineProperty(process.env, "NODE_ENV", {
   configurable: true,
 });
 process.env.AUTH_SECRET = "test-auth-secret";
-process.env.DATABASE_URL = "postgres://test:test@localhost:5432/test_db";
+process.env.DATABASE_URL =
+  process.env.DATABASE_URL || "postgres://test:test@localhost:5432/test_db";
 process.env.GOOGLE_CLIENT_ID = "test-google-client-id";
 process.env.GOOGLE_CLIENT_SECRET = "test-google-client-secret";
 process.env.OPDB_API_URL = "https://opdb.org/api";
