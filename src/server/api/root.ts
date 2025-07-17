@@ -7,6 +7,7 @@ import { locationRouter } from "~/server/api/routers/location";
 import { machineRouter } from "~/server/api/routers/machine";
 import { modelRouter } from "~/server/api/routers/model";
 import { notificationRouter } from "~/server/api/routers/notification";
+import { qrCodeRouter } from "~/server/api/routers/qrCode";
 import { userRouter } from "~/server/api/routers/user";
 import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
 
@@ -25,6 +26,7 @@ export const appRouter = createTRPCRouter({
   issue: issueRouter,
   organization: organizationRouter,
   notification: notificationRouter,
+  qrCode: qrCodeRouter,
 });
 
 // export type definition of API
