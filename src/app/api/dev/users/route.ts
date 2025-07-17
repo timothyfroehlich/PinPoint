@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import type { Prisma } from "@prisma/client";
+
 import { env } from "~/env.js";
 import { auth } from "~/server/auth";
 import { db } from "~/server/db";
@@ -21,7 +23,17 @@ export async function GET() {
       );
     }
 
-    const users = await db.user.findMany({
+    type UserWithMemberships = Prisma.UserGetPayload<{
+      include: {
+        memberships: {
+          include: {
+            role: true;
+          };
+        };
+      };
+    }>;
+
+    const users = (await db.user.findMany({
       where: {
         OR: [
           { email: { endsWith: "testaccount.dev" } },
@@ -38,7 +50,7 @@ export async function GET() {
           },
         },
       },
-    });
+    })) as UserWithMemberships[];
 
     // Transform users to include role information
     const usersWithRoles = users.map((user) => ({

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 import { CollectionService } from "../collectionService";
 
-import type { PrismaClient } from "@prisma/client";
+import type { ExtendedPrismaClient } from "~/server/db";
 
 // Mock Prisma Client
 const mockPrisma = {
@@ -20,7 +20,11 @@ const mockPrisma = {
   machine: {
     findMany: jest.fn(),
   },
-} as unknown as jest.Mocked<PrismaClient>;
+  $accelerate: {
+    invalidate: jest.fn(),
+    ttl: jest.fn(),
+  },
+} as unknown as jest.Mocked<ExtendedPrismaClient>;
 
 describe("CollectionService", () => {
   let service: CollectionService;
@@ -95,7 +99,13 @@ describe("CollectionService", () => {
           },
         },
         include: {
-          type: true,
+          type: {
+            select: {
+              id: true,
+              name: true,
+              displayName: true,
+            },
+          },
           _count: {
             select: {
               machines: {

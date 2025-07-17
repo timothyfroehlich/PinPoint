@@ -14,8 +14,11 @@ const createPrismaClient = () => {
   return baseClient.$extends(withAccelerate());
 };
 
+// Type alias for the extended Prisma client used throughout the application
+export type ExtendedPrismaClient = ReturnType<typeof createPrismaClient>;
+
 const globalForPrisma = globalThis as unknown as {
-  prisma: ReturnType<typeof createPrismaClient> | undefined;
+  prisma: ExtendedPrismaClient | undefined;
 };
 
 export const db = globalForPrisma.prisma ?? createPrismaClient();

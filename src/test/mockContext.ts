@@ -1,10 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { PrismaClient } from "@prisma/client";
 import { mockDeep, mockReset, type DeepMockProxy } from "jest-mock-extended";
 
+import type { ExtendedPrismaClient } from "~/server/db";
+
 export interface MockContext {
-  db: DeepMockProxy<PrismaClient>;
-  prisma?: DeepMockProxy<PrismaClient>; // Keep for backwards compatibility
+  db: DeepMockProxy<ExtendedPrismaClient>;
+  prisma?: DeepMockProxy<ExtendedPrismaClient>; // Keep for backwards compatibility
   session: {
     user: {
       id: string;
@@ -22,7 +23,13 @@ export interface MockContext {
 }
 
 export function createMockContext(): MockContext {
-  const mockDb = mockDeep<PrismaClient>();
+  const mockDb = mockDeep<ExtendedPrismaClient>();
+
+  // Mock the $accelerate property that comes from Prisma Accelerate extension
+  (mockDb as any).$accelerate = {
+    invalidate: jest.fn(),
+    ttl: jest.fn(),
+  };
 
   // Set up default membership mock - can be overridden in individual tests
   mockDb.membership.findFirst.mockResolvedValue(mockMembership as any);

@@ -1,7 +1,7 @@
 // Comprehensive tests for redesigned PinballMapService (Task 10)
 import { PinballMapService } from "../pinballmapService";
 
-import type { PrismaClient } from "@prisma/client";
+import type { ExtendedPrismaClient } from "~/server/db";
 
 // Mock fetch globally for all tests
 global.fetch = jest.fn();
@@ -41,7 +41,11 @@ const mockPrisma = {
   issue: {
     count: mockIssueCount,
   },
-} as unknown as PrismaClient;
+  $accelerate: {
+    invalidate: jest.fn(),
+    ttl: jest.fn(),
+  },
+} as unknown as ExtendedPrismaClient;
 
 const service = new PinballMapService(mockPrisma);
 
