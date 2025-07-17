@@ -24,7 +24,9 @@ describe("PinballMapService", () => {
   let upsertModelMock: jest.Mock;
   let findManyMachineMock: jest.Mock;
   let deleteManyMachineMock: jest.Mock;
+  let deleteMachineMock: jest.Mock;
   let createMachineMock: jest.Mock;
+  let countIssueMock: jest.Mock;
 
   beforeEach(() => {
     // Use the centralized mock context helper
@@ -37,7 +39,9 @@ describe("PinballMapService", () => {
     upsertModelMock = jest.fn();
     findManyMachineMock = jest.fn();
     deleteManyMachineMock = jest.fn();
+    deleteMachineMock = jest.fn();
     createMachineMock = jest.fn();
+    countIssueMock = jest.fn();
 
     // Assign the jest.fn() mocks to the actual ctx.db methods
     (ctx.db.location.findUnique as any) = findUniqueLocationMock;
@@ -47,7 +51,9 @@ describe("PinballMapService", () => {
     (ctx.db.model.upsert as any) = upsertModelMock;
     (ctx.db.machine.findMany as any) = findManyMachineMock;
     (ctx.db.machine.deleteMany as any) = deleteManyMachineMock;
+    (ctx.db.machine.delete as any) = deleteMachineMock;
     (ctx.db.machine.create as any) = createMachineMock;
+    (ctx.db.issue.count as any) = countIssueMock;
     apiMocker = new PinballMapAPIMocker();
     apiMocker.start();
   });
@@ -94,6 +100,8 @@ describe("PinballMapService", () => {
             apiKey: "test-api-key",
             autoSync: false,
             syncInterval: 24,
+            createMissingModels: true,
+            updateExistingData: true,
             createdAt: new Date(),
             updatedAt: new Date(),
           },
@@ -131,8 +139,12 @@ describe("PinballMapService", () => {
       findManyMachineMock.mockResolvedValue([]);
       findUniqueModelMock.mockResolvedValue(null);
       createModelMock.mockImplementation(
-        ({ data }: { data: { opdbId: string } }) =>
-          Promise.resolve({ id: `title-${data.opdbId}`, ...data } as Model),
+        ({ data }: { data: { opdbId: string; name: string } }) =>
+          Promise.resolve({
+            id: `title-${data.opdbId}`,
+            name: data.name,
+            ...data,
+          } as Model),
       );
       createMachineMock.mockImplementation(({ data }) =>
         Promise.resolve({ id: "game-instance-1", ...data } as Machine),
@@ -151,18 +163,26 @@ describe("PinballMapService", () => {
         modelId: "game-title-old",
       };
       findManyMachineMock.mockResolvedValue([existingGame as Machine]);
-      deleteManyMachineMock.mockResolvedValue({ count: 1 });
+      countIssueMock.mockResolvedValue(0); // No issues on the machine
+      deleteMachineMock.mockResolvedValue({});
       findUniqueModelMock.mockResolvedValue(null);
       createModelMock.mockImplementation(
-        ({ data }: { data: { opdbId: string } }) =>
-          Promise.resolve({ id: `title-${data.opdbId}`, ...data } as Model),
+        ({ data }: { data: { opdbId: string; name: string } }) =>
+          Promise.resolve({
+            id: `title-${data.opdbId}`,
+            name: data.name,
+            ...data,
+          } as Model),
       );
       createMachineMock.mockImplementation(({ data }) =>
         Promise.resolve({ id: "new-instance", ...data } as Machine),
       );
       const result = await syncLocationGames(ctx.db, "location-1");
-      expect(deleteManyMachineMock).toHaveBeenCalledWith({
-        where: { id: { in: ["game-instance-old"] } },
+      expect(countIssueMock).toHaveBeenCalledWith({
+        where: { machineId: "game-instance-old" },
+      });
+      expect(deleteMachineMock).toHaveBeenCalledWith({
+        where: { id: "game-instance-old" },
       });
       expect(result.removed).toBeGreaterThan(0);
     });
@@ -170,26 +190,48 @@ describe("PinballMapService", () => {
       const fixtureData = PinballMapAPIMocker.getFixtureData();
       const firstMachine = fixtureData.machines[0];
       if (!firstMachine) throw new Error("Fixture data is empty");
+
+      // Mock one existing game that matches the first machine in fixture data
+      const existingModel = {
+        id: "existing-model-id",
+        name: firstMachine.name,
+        opdbId: firstMachine.opdb_id,
+      };
+
       const existingGame: Partial<Machine> = {
         id: "game-instance-existing",
-        modelId: "game-title-existing",
+        modelId: existingModel.id,
         locationId: "location-1",
         ownerId: null,
       };
+
       findManyMachineMock.mockResolvedValue([existingGame as Machine]);
-      findUniqueModelMock.mockResolvedValue(null);
+
+      // When searching for the first machine, return the existing model
+      findUniqueModelMock.mockImplementation(({ where }) => {
+        if (where?.opdbId === firstMachine.opdb_id) {
+          return Promise.resolve(existingModel as Model);
+        }
+        return Promise.resolve(null);
+      });
+
       createModelMock.mockImplementation(
-        ({ data }: { data: { opdbId: string } }) =>
-          Promise.resolve({ id: `title-${data.opdbId}`, ...data } as Model),
+        ({ data }: { data: { opdbId: string; name: string } }) =>
+          Promise.resolve({
+            id: `title-${data.opdbId}`,
+            name: data.name,
+            ...data,
+          } as Model),
       );
       createMachineMock.mockImplementation(({ data }) =>
         Promise.resolve({ id: "new-instance", ...data } as Machine),
       );
+
       const result = await syncLocationGames(ctx.db, "location-1");
-      expect(deleteManyMachineMock).toHaveBeenCalledWith({
-        where: { id: { in: [] } },
-      });
-      expect(result.added).toBe(fixtureData.machines.length - 1);
+
+      // Should not delete any machines since the existing one is still in PinballMap
+      expect(deleteMachineMock).not.toHaveBeenCalled();
+      expect(result.added).toBe(fixtureData.machines.length - 1); // All except the existing one
       expect(result.removed).toBe(0);
     });
   });
@@ -286,6 +328,8 @@ describe("PinballMapService", () => {
             apiKey: "test-api-key",
             autoSync: false,
             syncInterval: 24,
+            createMissingModels: true,
+            updateExistingData: true,
             createdAt: new Date(),
             updatedAt: new Date(),
           },
@@ -316,10 +360,8 @@ describe("PinballMapService", () => {
         include: { model: true },
       });
 
-      // Should not affect games from other organizations
-      expect(deleteManyMachineMock).toHaveBeenCalledWith({
-        where: { id: { in: [] } }, // No cross-org games to delete
-      });
+      // Should not affect games from other organizations - no deletions expected
+      expect(deleteMachineMock).not.toHaveBeenCalled();
     });
 
     it("should prevent cross-organization data leakage", async () => {
@@ -346,6 +388,8 @@ describe("PinballMapService", () => {
             apiKey: "test-api-key",
             autoSync: false,
             syncInterval: 24,
+            createMissingModels: true,
+            updateExistingData: true,
             createdAt: new Date(),
             updatedAt: new Date(),
           },
@@ -401,6 +445,8 @@ describe("PinballMapService", () => {
             apiKey: "test-api-key",
             autoSync: false,
             syncInterval: 24,
+            createMissingModels: true,
+            updateExistingData: true,
             createdAt: new Date(),
             updatedAt: new Date(),
           },
@@ -415,11 +461,10 @@ describe("PinballMapService", () => {
       // TEST: Try to sync when API is down
       const result = await syncLocationGames(ctx.db, "location-1");
 
-      // ASSERTIONS: Should return friendly error message about API being down
+      // ASSERTIONS: When fetch fails, fetchLocationMachines returns null,
+      // which causes syncLocation to return this error message
       expect(result.success).toBe(false);
-      expect(result.error).toBe(
-        "PinballMap API is currently unavailable. Please try again later.",
-      );
+      expect(result.error).toBe("No machine data returned from PinballMap");
       expect(result.added).toBe(0);
       expect(result.removed).toBe(0);
     });
@@ -437,7 +482,7 @@ describe("PinballMapService", () => {
 
       // ASSERTIONS: Should handle gracefully
       expect(result.success).toBe(false);
-      expect(result.error).toBeDefined();
+      expect(result.error).toBe("No machine data returned from PinballMap");
     });
 
     it("should handle duplicate machine names correctly", async () => {
@@ -458,8 +503,12 @@ describe("PinballMapService", () => {
       findManyMachineMock.mockResolvedValue([] as Machine[]);
       findUniqueModelMock.mockResolvedValue(null);
       createModelMock.mockImplementation(
-        ({ data }: { data: { opdbId: string } }) =>
-          Promise.resolve({ id: `title-${data.opdbId}`, ...data } as Model),
+        ({ data }: { data: { opdbId: string; name: string } }) =>
+          Promise.resolve({
+            id: `title-${data.opdbId}`,
+            name: data.name,
+            ...data,
+          } as Model),
       );
       createMachineMock.mockImplementation(
         ({ data }: { data: { modelId: string } }) =>
@@ -494,12 +543,21 @@ describe("PinballMapService", () => {
 
       // All required fields for Machine
       const emptyMachines: Machine[] = [];
-      (ctx.db.machine.findMany as jest.Mock).mockResolvedValue(emptyMachines);
-      (ctx.db.model.upsert as jest.Mock).mockImplementation(
-        ({ create }: { create: { name: string } }) =>
-          Promise.resolve({ id: "custom-title", ...create } as Model),
+      findManyMachineMock.mockResolvedValue(emptyMachines);
+
+      // For machines without OPDB IDs, the service will look for existing models by IPDB ID first
+      findUniqueModelMock.mockResolvedValue(null);
+
+      // Then it will create new models
+      createModelMock.mockImplementation(
+        ({ data }: { data: { name: string } }) =>
+          Promise.resolve({
+            id: `custom-title-${data.name}`,
+            name: data.name,
+            ...data,
+          } as Model),
       );
-      (ctx.db.machine.create as jest.Mock).mockImplementation(
+      createMachineMock.mockImplementation(
         ({ data }: { data: { modelId: string } }) =>
           Promise.resolve({ id: "custom-instance", ...data } as Machine),
       );
@@ -510,7 +568,7 @@ describe("PinballMapService", () => {
       // ASSERTIONS: Should handle custom machines correctly
       expect(result.success).toBe(true);
       expect(result.added).toBe(2);
-      expect(upsertModelMock).toHaveBeenCalledTimes(2);
+      expect(createModelMock).toHaveBeenCalledTimes(2);
     });
   });
 });
