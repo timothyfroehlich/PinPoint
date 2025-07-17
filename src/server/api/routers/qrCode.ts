@@ -16,18 +16,7 @@ export const qrCodeRouter = createTRPCRouter({
   generate: machineEditProcedure
     .input(z.object({ machineId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      // Verify machine belongs to organization
-      const machine = await ctx.db.machine.findFirst({
-        where: {
-          id: input.machineId,
-          organizationId: ctx.organization.id,
-        },
-      });
-
-      if (!machine) {
-        throw new Error("Machine not found");
-      }
-
+      // The machineEditProcedure already validates machine access
       const qrCodeService = new QRCodeService(ctx.db);
       return qrCodeService.generateQRCode(input.machineId);
     }),
@@ -39,7 +28,7 @@ export const qrCodeRouter = createTRPCRouter({
     .input(z.object({ machineId: z.string() }))
     .query(async ({ ctx, input }) => {
       // Verify machine belongs to organization
-      const machine = await ctx.db.machine.findFirst({
+      const machine = await ctx.db.machine.findUnique({
         where: {
           id: input.machineId,
           organizationId: ctx.organization.id,
@@ -60,18 +49,7 @@ export const qrCodeRouter = createTRPCRouter({
   regenerate: machineEditProcedure
     .input(z.object({ machineId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      // Verify machine belongs to organization
-      const machine = await ctx.db.machine.findFirst({
-        where: {
-          id: input.machineId,
-          organizationId: ctx.organization.id,
-        },
-      });
-
-      if (!machine) {
-        throw new Error("Machine not found");
-      }
-
+      // The machineEditProcedure already validates machine access
       const qrCodeService = new QRCodeService(ctx.db);
       return qrCodeService.regenerateQRCode(input.machineId);
     }),

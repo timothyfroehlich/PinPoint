@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { db } from "~/server/db";
 import { QRCodeService } from "~/server/services/qrCodeService";
+import { constructReportUrl } from "~/server/utils/qrCodeUtils";
 
 export async function GET(
   request: NextRequest,
@@ -28,9 +29,7 @@ export async function GET(
     }
 
     // Construct the report issue URL
-    const reportUrl = machine.organization.subdomain
-      ? `https://${machine.organization.subdomain}.pinpoint.app/machines/${machine.id}/report-issue`
-      : `https://app.pinpoint.app/machines/${machine.id}/report-issue`;
+    const reportUrl = constructReportUrl(machine);
 
     // Redirect to the machine's report issue page
     return NextResponse.redirect(reportUrl);

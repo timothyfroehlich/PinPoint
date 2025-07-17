@@ -1,7 +1,8 @@
 import { type PrismaClient, type Machine } from "@prisma/client";
-import QRCode from "qrcode";
+import * as QRCode from "qrcode";
 
 import { imageStorage } from "../../lib/image-storage/local-storage";
+import { constructReportUrl } from "../utils/qrCodeUtils";
 
 export interface QRCodeInfo {
   id: string;
@@ -68,15 +69,10 @@ export class QRCodeService {
       },
     });
 
-    // Create a File object from buffer for the image storage
-    const qrCodeFile = new File([qrCodeBuffer], `qr-code-${machine.id}.png`, {
-      type: "image/png",
-    });
-
-    // Upload QR code image
-    const qrCodeUrl = await imageStorage.uploadImage(
-      qrCodeFile,
-      `qr-codes/machine-${machine.id}`,
+    // Upload QR code image directly from buffer
+    const qrCodeUrl = await imageStorage.uploadQRCode(
+      qrCodeBuffer,
+      `qr-codes/machine-${machine.id}/qr-code-${machine.id}`,
     );
 
     // Update machine with QR code information
@@ -85,6 +81,11 @@ export class QRCodeService {
       data: {
         qrCodeUrl,
         qrCodeGeneratedAt: new Date(),
+      },
+      select: {
+        qrCodeId: true,
+        qrCodeUrl: true,
+        qrCodeGeneratedAt: true,
       },
     });
 
@@ -265,13 +266,7 @@ export class QRCodeService {
   private generateQRCodeContent(
     machine: Machine & { organization: { subdomain: string | null } },
   ): string {
-    // Use subdomain if available, otherwise fall back to main domain
-    const domain = machine.organization.subdomain
-      ? `${machine.organization.subdomain}.pinpoint.app`
-      : "app.pinpoint.app";
-
-    // QR code points to the machine's report issue page
-    return `https://${domain}/machines/${machine.id}/report-issue`;
+    return constructReportUrl(machine);
   }
 
   /**
