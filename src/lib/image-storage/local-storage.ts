@@ -98,6 +98,24 @@ export class LocalImageStorage implements ImageStorageProvider {
   async validateIssueAttachment(file: File): Promise<boolean> {
     return this.validateImage(file);
   }
+
+  // Specialized method for QR codes (works with buffers directly)
+  async uploadQRCode(buffer: Buffer, relativePath: string): Promise<string> {
+    await this.ensureDirectoryExists();
+
+    // Generate unique filename
+    const timestamp = Date.now();
+    const extension = "webp";
+    const filename = `${relativePath}-${timestamp}.${extension}`;
+    const fullPath = path.join(this.basePath, filename);
+
+    // Write buffer directly
+    await writeFile(fullPath, buffer);
+
+    // Return public URL
+    return `${this.baseUrl}/${filename}`;
+  }
+
   // Specialized method for profile pictures
   async uploadProfilePicture(file: File, userId: string): Promise<string> {
     return this.uploadImage(

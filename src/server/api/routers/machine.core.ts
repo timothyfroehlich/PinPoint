@@ -7,6 +7,7 @@ import {
   machineEditProcedure,
   machineDeleteProcedure,
 } from "~/server/api/trpc";
+import { QRCodeService } from "~/server/services/qrCodeService";
 
 export const machineCoreRouter = createTRPCRouter({
   create: machineEditProcedure
@@ -36,7 +37,7 @@ export const machineCoreRouter = createTRPCRouter({
         throw new Error("Invalid game title or location");
       }
 
-      return ctx.db.machine.create({
+      const machine = await ctx.db.machine.create({
         data: {
           name: input.name,
           modelId: input.modelId,
@@ -63,6 +64,20 @@ export const machineCoreRouter = createTRPCRouter({
           },
         },
       });
+
+      // Auto-generate QR code for the new machine
+      try {
+        const qrCodeService = new QRCodeService(ctx.db);
+        await qrCodeService.generateQRCode(machine.id);
+      } catch (error) {
+        // Log error but don't fail machine creation
+        console.warn(
+          `Failed to generate QR code for machine ${machine.id}:`,
+          error,
+        );
+      }
+
+      return machine;
     }),
 
   getAll: organizationProcedure.query(async ({ ctx }) => {
