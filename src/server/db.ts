@@ -1,12 +1,21 @@
 import { PrismaClient } from "@prisma/client";
+import { withAccelerate } from "@prisma/extension-accelerate";
 
 import { env } from "~/env";
 
-const createPrismaClient = () =>
-  new PrismaClient({
+const createPrismaClient = () => {
+  const baseClient = new PrismaClient({
     log:
       env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
   });
+
+  // Use Accelerate only in production
+  if (env.NODE_ENV === "production") {
+    return baseClient.$extends(withAccelerate());
+  }
+
+  return baseClient;
+};
 
 const globalForPrisma = globalThis as unknown as {
   prisma: ReturnType<typeof createPrismaClient> | undefined;
