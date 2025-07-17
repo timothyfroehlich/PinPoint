@@ -4,13 +4,15 @@ import type { Prisma } from "@prisma/client";
 
 import { env } from "~/env.js";
 import { auth } from "~/server/auth";
-import { db } from "~/server/db";
+import { getGlobalDatabaseProvider } from "~/server/db/provider";
 
 export async function GET() {
   if (env.NODE_ENV !== "development") {
     return new NextResponse(null, { status: 404 });
   }
 
+  const dbProvider = getGlobalDatabaseProvider();
+  const db = dbProvider.getClient();
   try {
     const session = await auth();
 
@@ -68,5 +70,7 @@ export async function GET() {
       { error: "Internal server error" },
       { status: 500 },
     );
+  } finally {
+    await dbProvider.disconnect();
   }
 }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { db } from "~/server/db";
+import { getGlobalDatabaseProvider } from "~/server/db/provider";
 import { QRCodeService } from "~/server/services/qrCodeService";
 import { constructReportUrl } from "~/server/utils/qrCodeUtils";
 
@@ -8,6 +8,8 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { qrCodeId: string } },
 ) {
+  const dbProvider = getGlobalDatabaseProvider();
+  const db = dbProvider.getClient();
   try {
     const { qrCodeId } = params;
 
@@ -43,6 +45,8 @@ export async function GET(
       },
       { status: 500 },
     );
+  } finally {
+    await dbProvider.disconnect();
   }
 }
 
@@ -51,6 +55,8 @@ export async function HEAD(
   request: NextRequest,
   { params }: { params: { qrCodeId: string } },
 ) {
+  const dbProvider = getGlobalDatabaseProvider();
+  const db = dbProvider.getClient();
   try {
     const { qrCodeId } = params;
 
@@ -69,5 +75,7 @@ export async function HEAD(
   } catch (error) {
     console.error("QR code HEAD check failed:", error);
     return new NextResponse(null, { status: 500 });
+  } finally {
+    await dbProvider.disconnect();
   }
 }

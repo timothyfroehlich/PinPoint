@@ -1,58 +1,19 @@
-// Add this helper at the top of the file
-function setNodeEnv(value: string) {
-  Object.defineProperty(process.env, "NODE_ENV", {
-    value,
-    configurable: true,
-    writable: true,
-    enumerable: true,
-  });
-}
+import { DeepMockProxy } from "jest-mock-extended";
 
-// Create properly typed mock functions
-const mockOrganizationFindUnique = jest.fn<Promise<unknown>, [unknown]>();
-const mockMembershipFindUnique = jest.fn<Promise<unknown>, [unknown]>();
-const mockUserFindUnique = jest.fn<Promise<unknown>, [unknown]>();
-
-// Mock the database
-jest.mock("~/server/db", () => ({
-  db: {
-    organization: {
-      findUnique: jest.fn(),
-    },
-    membership: {
-      findUnique: jest.fn(),
-    },
-    user: {
-      findUnique: jest.fn(),
-    },
-  },
-}));
-
-// Mock the env module
-const mockEnv = {
-  NODE_ENV: "test" as string,
-  GOOGLE_CLIENT_ID: "test-client-id",
-  GOOGLE_CLIENT_SECRET: "test-client-secret",
-};
-
-jest.mock("~/env.js", () => ({
-  env: mockEnv,
-}));
-
-import { authConfig } from "../config";
-
-import { db } from "~/server/db";
+import { ExtendedPrismaClient } from "~/server/db";
+import { createMockContext, resetMockContext } from "~/test/mockContext";
 
 describe("NextAuth Configuration", () => {
+  let ctx: ReturnType<typeof createMockContext>;
+  let db: DeepMockProxy<ExtendedPrismaClient>;
+
   beforeEach(() => {
-    jest.clearAllMocks();
-    // Reset environment
-    setNodeEnv("test");
-    mockEnv.NODE_ENV = "test";
-    // Assign the mock functions to the imported mocks
-    (db.organization.findUnique as jest.Mock) = mockOrganizationFindUnique;
-    (db.membership.findUnique as jest.Mock) = mockMembershipFindUnique;
-    (db.user.findUnique as jest.Mock) = mockUserFindUnique;
+    ctx = createMockContext();
+    db = ctx.db;
+  });
+
+  afterEach(() => {
+    resetMockContext(ctx);
   });
 
   describe("Provider Configuration", () => {

@@ -2,10 +2,35 @@
 import { mockDeep, mockReset, type DeepMockProxy } from "jest-mock-extended";
 
 import type { ExtendedPrismaClient } from "~/server/db";
+import type { ServiceFactory } from "~/server/services/factory";
+
+// Mock individual services
+const mockNotificationService = {
+  createNotification: jest.fn(),
+  // ... other methods
+};
+
+const mockCollectionService = {
+  // ... methods
+};
+
+// ... other mock services
+
+// Mock service factory
+const createMockServiceFactory = (): DeepMockProxy<ServiceFactory> => {
+  return {
+    createNotificationService: jest.fn(() => mockNotificationService),
+    createCollectionService: jest.fn(() => mockCollectionService),
+    createPinballMapService: jest.fn(() => ({}) as any),
+    createIssueActivityService: jest.fn(() => ({}) as any),
+    createCommentCleanupService: jest.fn(() => ({}) as any),
+    createQRCodeService: jest.fn(() => ({}) as any),
+  } as any;
+};
 
 export interface MockContext {
   db: DeepMockProxy<ExtendedPrismaClient>;
-  prisma?: DeepMockProxy<ExtendedPrismaClient>; // Keep for backwards compatibility
+  services: DeepMockProxy<ServiceFactory>;
   session: {
     user: {
       id: string;
@@ -24,6 +49,7 @@ export interface MockContext {
 
 export function createMockContext(): MockContext {
   const mockDb = mockDeep<ExtendedPrismaClient>();
+  const mockServices = createMockServiceFactory();
 
   // Mock the $accelerate property that comes from Prisma Accelerate extension
   (mockDb as any).$accelerate = {
@@ -71,7 +97,7 @@ export function createMockContext(): MockContext {
 
   return {
     db: mockDb,
-    prisma: mockDb, // Keep for backwards compatibility
+    services: mockServices,
     session: null,
     organization: undefined,
     headers: new Headers(),
@@ -80,9 +106,7 @@ export function createMockContext(): MockContext {
 
 export function resetMockContext(ctx: MockContext) {
   mockReset(ctx.db);
-  if (ctx.prisma) {
-    mockReset(ctx.prisma);
-  }
+  mockReset(ctx.services);
 }
 
 // Common mock data for testing

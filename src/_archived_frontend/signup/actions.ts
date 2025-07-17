@@ -1,8 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-
-import { db } from "~/server/db";
+import { getGlobalDatabaseProvider } from "~/server/db/provider";
 
 export async function signup(
   prevState: string | undefined,
@@ -21,6 +20,8 @@ export async function signup(
     return "Please enter a valid email address.";
   }
 
+  const dbProvider = getGlobalDatabaseProvider();
+  const db = dbProvider.getClient();
   try {
     // Check if user already exists
     const existingUser = await db.user.findUnique({
@@ -46,5 +47,7 @@ export async function signup(
   } catch (error) {
     console.error("Signup error:", error);
     return "An error occurred during signup. Please try again.";
+  } finally {
+    await dbProvider.disconnect();
   }
 }
