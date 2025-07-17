@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "next build",
+    "build": "prisma migrate deploy && next build",
     "check": "npm run validate",
     "db:generate": "prisma migrate dev",
     "db:migrate": "prisma migrate deploy",
@@ -68,6 +68,7 @@
     "@prisma/client": "^6.12.0",
     "@prisma/extension-accelerate": "^2.0.2",
     "@t3-oss/env-nextjs": "^0.13.8",
+    "prisma": "^6.12.0",
     "@tanstack/react-query": "^5.83.0",
     "@trpc/client": "^11.0.0",
     "@trpc/react-query": "^11.0.0",
@@ -79,6 +80,7 @@
     "react-dom": "19.1.0",
     "server-only": "^0.0.1",
     "superjson": "^2.2.1",
+    "vercel": "^25.2.0",
     "zod": "^4.0.5"
   },
   "devDependencies": {
@@ -106,7 +108,6 @@
     "nodemon": "^3.1.10",
     "postcss": "^8.5.3",
     "prettier": "^3.5.3",
-    "prisma": "^6.12.0",
     "ts-jest": "^29.4.0",
     "tsx": "^4.20.3",
     "typescript": "^5.8.2",

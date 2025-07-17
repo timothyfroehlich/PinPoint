@@ -9,12 +9,9 @@ const createPrismaClient = () => {
       env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
   });
 
-  // Use Accelerate only in production
-  if (env.NODE_ENV === "production") {
-    return baseClient.$extends(withAccelerate());
-  }
-
-  return baseClient;
+  // Always extend with Accelerate for consistent typing
+  // In development, Accelerate operations will fall back to regular Prisma
+  return baseClient.$extends(withAccelerate());
 };
 
 const globalForPrisma = globalThis as unknown as {
