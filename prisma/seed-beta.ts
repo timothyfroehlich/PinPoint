@@ -1,5 +1,7 @@
 import { PrismaClient, StatusCategory } from "@prisma/client";
 
+import { env } from "../src/env.js";
+
 const prisma = new PrismaClient();
 
 // Helper function to get random default avatar
@@ -259,9 +261,8 @@ async function main() {
 
     if (adminRole) {
       // Pre-create admin user from environment variables (fallback to defaults for local dev)
-      const adminEmail =
-        process.env.SEED_ADMIN_EMAIL ?? "phoenixavatar2@gmail.com";
-      const adminName = process.env.SEED_ADMIN_NAME ?? "Tim Froehlich";
+      const adminEmail = env.SEED_ADMIN_EMAIL ?? "phoenixavatar2@gmail.com";
+      const adminName = env.SEED_ADMIN_NAME ?? "Tim Froehlich";
 
       const adminUser = await prisma.user.upsert({
         where: { email: adminEmail },

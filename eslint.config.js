@@ -99,6 +99,15 @@ export default tseslint.config(
     },
   },
   {
+    // Override: Allow env import in prisma files (documented exception)
+    // Prisma files need environment access for seeding and migrations
+    // Should use validated env object from ~/env.js when possible
+    files: ["prisma/**/*.ts"],
+    rules: {
+      "no-restricted-properties": "off",
+    },
+  },
+  {
     // Configuration for scripts - more relaxed rules for build/utility scripts
     files: ["scripts/**/*.ts"],
     plugins: {
