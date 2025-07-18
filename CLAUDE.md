@@ -35,18 +35,24 @@ npm run dev:full        # Start all services with monitoring
 npm run dev:clean       # Fresh start with cleanup
 npm run setup:worktree  # Setup new worktree environment
 
-# Quality Assurance (MANDATORY)
-npm run validate        # Before starting work
-npm run pre-commit      # Before every commit (MUST PASS)
+# Agent Validation Protocol (MANDATORY)
+npm run quick:agent        # Development checks + auto-fix (after code changes)
+npm run validate:agent     # Pre-commit validation + auto-fix (MUST PASS)
+npm run validate:full:agent # Pre-PR validation (MUST PASS)
+
+# Legacy Commands (Still Available)
+npm run validate        # Standard validation
+npm run pre-commit      # CI lint + workflow check
 
 # Database
 npm run db:reset
 npm run db:push
 
-# Quick Checks
-npm run quick           # Fast typecheck + lint
+# Quick Fixes & Debug
 npm run fix             # Auto-fix lint + format issues
-npm run typecheck
+npm run debug:typecheck # Full TypeScript output
+npm run debug:test      # Verbose test output
+npm run debug:lint      # Detailed lint output
 
 # Testing
 npm run test:coverage
@@ -65,9 +71,17 @@ npm run test:coverage
 ## Development Workflow
 
 1. **Start**: `npm run validate` → `npm run dev:full`
-2. **During**: Fix lint/type errors immediately as they appear
-3. **Before commit**: `npm run pre-commit` must pass
-4. **Database changes**: Use `npm run db:reset` (pre-production phase)
+2. **During**: Run `npm run quick:agent` after significant code changes
+3. **Before commit**: `npm run validate:agent` must pass (MANDATORY)
+4. **Before PR**: `npm run validate:full:agent` must pass (MANDATORY)
+5. **Database changes**: Use `npm run db:reset` (pre-production phase)
+
+### Agent Protocol Benefits
+
+- **Context preservation**: ~3-5 lines output vs 100+ lines
+- **Auto-fix capability**: Automatically fixes lint/format issues
+- **Early detection**: Catch issues during development, not CI
+- **Consistent format**: ✓ Success messages, ✗ Error summaries
 
 ## Architecture Principles
 

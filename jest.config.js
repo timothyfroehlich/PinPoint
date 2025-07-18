@@ -112,4 +112,17 @@ const config = {
   collectCoverage: false, // Only when explicitly running with --coverage
 };
 
+// Agent mode configuration for minimal output
+if (process.env.AGENT_MODE) {
+  config.reporters = [
+    [
+      "jest-silent-reporter",
+      {
+        showPaths: true,
+        useDots: false, // Keep minimal for context preservation
+      },
+    ],
+  ];
+}
+
 export default config;
