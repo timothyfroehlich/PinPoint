@@ -184,16 +184,12 @@ npm run test:coverage # Run tests with coverage report
 ### Multi-Agent Development
 
 - Git worktrees for parallel development
-- Shared database with careful scoping
-- See: [MULTI_AGENT_WORKFLOW.md](../backend_impl_tasks/MULTI_AGENT_WORKFLOW.md)
+- Test-Driven Development workflow with specialized agents
+- See: [Orchestrator System](../orchestrator-system/) for agent coordination
 
 ## Quality Standards
 
-- **0 TypeScript errors** - Enforced
-- **0 ESLint errors** - Enforced
-- **Test Coverage** - 50% global, 60% server/, 70% lib/
-- **Pre-commit hooks** - Must pass
-- **Code formatting** - Prettier enforced
+See `CLAUDE.md` for complete quality standards and development guidelines.
 
 ## Current Limitations & Planned Improvements
 
@@ -224,5 +220,7 @@ npm run test:coverage # Run tests with coverage report
 
 - [Backend Implementation Plan](../planning/backend_impl_plan.md) - Updated plan for the backend
 - [Technical Design Document](../design-docs/technical-design-document.md) - Detailed specifications
-- [Backend Implementation Tasks](../backend_impl_tasks/) - Task breakdown
+- [Orchestrator System](../orchestrator-system/) - Multi-agent coordination system
+- [Source Map](source-map.md) - File organization by feature
+- [Test Map](test-map.md) - Test file relationships
 - [Roadmap](../planning/roadmap.md) - Release planning
