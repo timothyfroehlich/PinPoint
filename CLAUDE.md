@@ -42,7 +42,7 @@ npm run validate:full:agent # Pre-PR validation (MUST PASS)
 
 # Legacy Commands (Still Available)
 npm run validate        # Standard validation
-npm run pre-commit      # CI lint + workflow check
+npm run pre-commit      # Full validation + workflow check + build test
 
 # Database
 npm run db:reset

@@ -52,7 +52,7 @@
     "debug:lint": "eslint src/ --format detailed",
     "debug:format": "prettier --check \"**/*.{ts,tsx,js,jsx,mdx}\" --cache",
     "workflow:lint": "actionlint .github/workflows/*.yml",
-    "pre-commit": "npm run ci:lint && npm run workflow:lint && npm run smoke-test",
+    "pre-commit": "npm run validate && npm run workflow:lint && npm run smoke-test",
     "smoke-test": "npm run build --silent && echo 'Build successful - basic smoke test passed'",
     "health": "node scripts/health-check.cjs",
     "kill:all": "node scripts/kill-dev-processes.cjs",
