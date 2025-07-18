@@ -68,10 +68,10 @@ get_worktree_status() {
     fi
 }
 
-# Function to check if .claude/SUBAGENT_TASK.md exists
+# Function to check if agent_workspace/SUBAGENT_TASK.md exists
 check_task_file() {
     local worktree_path=$1
-    if [ -f "$worktree_path/.claude/SUBAGENT_TASK.md" ]; then
+    if [ -f "$worktree_path/agent_workspace/SUBAGENT_TASK.md" ]; then
         echo -e "${GREEN}✓ Task file exists${NC}"
     else
         echo -e "${RED}✗ No task file${NC}"
@@ -140,7 +140,7 @@ for worktree in $WORKTREES; do
         fi
         
         # Check if worktree is clean and has no task file
-        if ! [ -f "$worktree/.claude/SUBAGENT_TASK.md" ]; then
+        if ! [ -f "$worktree/agent_workspace/SUBAGENT_TASK.md" ]; then
             echo -e "  ${YELLOW}•${NC} $worktree - No task file found"
         fi
     fi
