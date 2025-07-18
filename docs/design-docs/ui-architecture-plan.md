@@ -1,130 +1,298 @@
 # **PinPoint UI/UX Architecture Plan (Revised for Beta)**
 
-This document outlines the necessary pages and high-level components for the PinPoint application, based on the Beta and V1.0 roadmap, with revisions to focus on a single-tenant public experience and refined user interaction flows.
+This document outlines the necessary pages and high-level components for the PinPoint application, based on the Beta and V1.0 roadmap. Pages are organized by their functional purpose, with each page showing different components based on user authentication and permissions.
 
-## **0\. Global Components**
+## **0. Global Components**
 
 ### **Universal Header / Top Navigation Bar**
 
-- **Purpose:** A persistent header present on all pages.
+- **Purpose:** A persistent header present on all pages providing primary navigation.
 - **Key Components:**
-  - Organization Logo.
+  - **Organization Logo:** Links to dashboard (for authenticated users) or organization homepage (for public users).
+  - **Navigation Menu:**
+    - **Dashboard** (authenticated only)
+    - **Locations** - Shows organization page with all locations, includes accordion-style dropdown listing all locations for quick navigation
+    - **Games** - Shows all games across the organization
+    - **Issues** - Shows all issues across the organization
   - **Authentication Component:**
     - **Logged Out State:** A single "Login / Sign Up" button. Clicking it opens the Authentication Modal.
     - **Logged In State:** The button is replaced with the user's avatar and name. Clicking this opens a dropdown with links to "/profile" and a "Logout" action.
+- **Mobile Navigation:**
+  - Navigation menu becomes a hamburger menu
+  - Location dropdown uses accordion-style expansion within the mobile menu for better touch interaction
 
 ### **Authentication Modal**
 
-- **Purpose:** A single, unified modal for handling both sign-up and login, triggered from the Universal Header.
+- **Purpose:** A single modal for handling authentication, triggered from the Universal Header.
 - **Key Components:**
-  - Magic Link (email) input field.
-  - Social sign-in buttons (Google, Facebook).
-  - Brief text explaining that entering an email will either log in an existing user or create a new account.
+  - **Mode Selection:** Separate "Login" and "Sign Up" buttons within the modal to switch between modes
+  - **Email Field:** Magic Link (email) input field
+  - **Social Sign-in:** Buttons for Google, Facebook authentication
+  - **Mode-Specific Behavior:**
+    - Login mode: Standard authentication flow
+    - Sign Up mode: Shows error message if email already exists
+  - **Visual Indication:** Clear indication of which mode (login/signup) is currently active
 
-## **1\. Public-Facing Pages (Beta)**
+## **1. Organization & Location Pages**
 
-### **/ (Public Organization Homepage)**
+### **/ (Organization Homepage)**
 
-- **Purpose:** To serve as the main landing page for the organization. It will list all of the organization's public locations.
-- **Routing Logic:**
-  - **Multi-Location:** Displays a list or grid of all available locations.
-  - **Single-Location (Auto-Redirect):** Automatically redirects to /locations/{locationId}.
-- **Key Components (for multi-location view):**
-  - Organization Name and Logo.
-  - A simple grid or list of links to each location page.
+- **Purpose:** Main landing page showing organization info and locations.
+- **Public View:**
+  - Organization Name and Logo
+  - Grid/list of all public locations
+  - Basic organization information
+- **Authenticated View (Additional Components):**
+  - **"Add Location" button:**
+    - Hidden for unauthenticated users
+    - Visible but disabled for users without permission (tooltip: "Requires create_location permission")
+    - Enabled for users with appropriate permissions
+  - Location management quick actions (edit/delete) with permission-based visibility
 
-### **/locations/{locationId} (Public Location Page)**
+### **/locations/{locationId} (Location Page)**
 
-- **Purpose:** A public-facing view of all the machines at a specific location.
-- **Key Components:**
-  - **Header:** Location Name and Address.
-  - **Game Filters:**
-    - A free-text search bar to instantly filter the list of games by name.
-  - **"Report an Issue" Button:** A prominent call-to-action that opens a modal.
-  - **Game Grid:** A responsive grid of cards for each machine, updated by the filters.
-  - **View All Issues Link:** A link to /locations/{locationId}/issues.
+- **Purpose:** Display all machines at a specific location.
+- **Public View:**
+  - Location Name and Address
+  - Free-text search bar for filtering games
+  - "Report an Issue" button (opens modal)
+  - Game Grid with machine cards
+  - "View All Issues" link to /locations/{locationId}/issues
+- **Authenticated View (Additional Components):**
+  - **"Add Machine" button:** Permission-based visibility (tooltip: "Requires create_machine permission")
+  - Machine management actions (edit/move/delete): Permission-based
+  - Internal issue indicators on machine cards
+  - Collection management tools (V1.0)
 
-### **/machines/{machineId} (Public Machine Page)**
+## **2. Machine Pages**
 
-- **Purpose:** A public, read-only detail page for a specific machine.
-- **Key Components:**
-  - Machine Identification, Current Status Indicator, Simplified Issue List.
-  - **Primary Action:** A "Report an Issue on this Machine" button linking to /machines/{machineId}/report-issue.
-  - **View Full History Link:** A link to /machines/{machineId}/issues.
+### **/machines (All Machines Page)**
+
+- **Purpose:** Organization-wide machine inventory view.
+- **Public View:**
+  - Search and filter controls
+  - Machine list/grid with basic information
+  - Status indicators
+- **Authenticated View (Additional Components):**
+  - **"Add Machine" button:** Permission-based visibility
+  - Bulk actions for staff (move, update status)
+  - Advanced filters (location, owner, status)
+  - Export functionality
+
+### **/machines/{machineId} (Machine Detail Page)**
+
+- **Purpose:** Detailed view of a specific machine.
+- **Public View:**
+  - Machine identification and photos
+  - Current status indicator
+  - Recent public issues list
+  - "Report an Issue" button
+  - "View Full History" link
+- **Authenticated View (Additional Components):**
+  - **Edit Machine:** Permission-based (tooltip: "Requires edit_machine permission")
+  - **Move Machine:** Permission-based (tooltip: "Requires move_machine permission")
+  - Internal issues (marked with lock icon)
+  - Owner information and notification settings
+  - Maintenance history (staff only)
+
+### **/machines/{machineId}/report-issue**
+
+- **Purpose:** Dedicated issue reporting page.
+- **Components:**
+  - Pre-filled machine information
+  - Issue type selection
+  - Description field
+  - Photo upload
+  - **"Internal Only" checkbox:** Visible only to authenticated staff with appropriate permissions
+
+## **3. Issue Management Pages**
+
+### **/issues (Issues List)**
+
+- **Purpose:** Central issue tracking across organization.
+- **Public View:**
+  - List of public issues with basic filters
+  - Status indicators
+  - Machine and location information
+- **Authenticated View (Additional Components):**
+  - Internal issues (with privacy badges)
+  - Advanced filters (assignee, priority, internal/public)
+  - Bulk actions: Permission-based (tooltip: "Requires bulk_manage_issues permission")
+  - Issue assignment controls
+
+### **/issues/{issueId} (Issue Detail)**
+
+- **Purpose:** Detailed issue view and management.
+- **Public View:**
+  - Issue description and status
+  - Public comments/updates
+  - Machine and location context
+- **Authenticated View (Additional Components):**
+  - **Edit Issue:** Permission-based (tooltip: "Requires edit_issue permission")
+  - **Close Issue:** Permission-based (tooltip: "Requires close_issue permission")
+  - Internal notes section
+  - Assignment controls
+  - Status change history
+  - Priority management
 
 ### **/locations/{locationId}/issues & /machines/{machineId}/issues**
 
-- **Purpose:** To display the main issues list, pre-filtered for a specific location or machine.
+- **Purpose:** Pre-filtered issue views for specific contexts.
+- **Components:** Same as /issues but with active location or machine filters
 
-### **/machines/{machineId}/report-issue (Dedicated Issue Reporting Page)**
+## **4. Dashboard (Authenticated Only)**
 
-- **Purpose:** A dedicated, shareable page for reporting an issue on a specific machine.
+### **/dashboard**
 
-## **2\. Authenticated Pages (Beta Core Application)**
+- **Purpose:** Personalized overview for authenticated users.
+- **Components:**
+  - Issues assigned to current user
+  - Recent activity on owned machines
+  - Organization statistics (filtered by user's permissions)
+  - Quick action buttons based on user's permissions
+  - Recent updates across the organization
 
-### **/dashboard, /issues, /issues/{issueId}, /machines & /machines/{machineId}**
-
-- These pages and their core functionality remain as previously defined, focused on the issue management lifecycle. The "Add/Edit Machine" form will include fields for "Owner" and an integrated OPDB/custom title search.
-
-## **3\. Settings & Administration (Beta)**
+## **5. User & Admin Pages**
 
 ### **/profile**
 
-- **Purpose:** Allow any logged-in user to manage their profile and owned machines.
-- **Key Components:**
-  - Edit name, profile picture, and general notification preferences.
-  - **My Owned Machines:** A dedicated section listing machines owned by the user, with a link to the machine's history page and a toggle for issue notifications.
+- **Purpose:** User profile management.
+- **Components:**
+  - Edit name, avatar, email preferences
+  - Notification preferences (global and per-machine)
+  - **My Owned Machines:**
+    - List of owned machines with direct links
+    - Per-machine notification toggles
+  - Activity history
+  - Connected social accounts
 
 ### **/admin/organization**
 
-- **Purpose:** For Admins to manage top-level organization settings.
-- **Key Components:**
-  - Edit Organization Name and Logo.
-  - Configure the single-location redirect setting.
+- **Purpose:** Organization settings (Admin only).
+- **Components:**
+  - Organization name and logo management
+  - Default notification settings
+  - Collection group toggles (V1.0)
+  - Member invitation controls
+  - API key management
 
 ### **/admin/locations**
 
-- **Purpose:** To manage physical locations.
-- **Key Components:**
-  - A list of all current locations, with options to "Edit" or "Add New Location".
-  - **Location Detail/Management View:**
-    - Edit Location Name and Address.
+- **Purpose:** Location management (Admin only).
+- **Components:**
+  - Location list with add/edit/delete controls
+  - **Add Location:** Full permission required
+  - Per-location settings:
+    - Name, address, contact info
+    - Public/Private visibility (V1.0)
+    - Operating hours
+    - Manual collection management (V1.0)
 
 ### **/admin/users**
 
-- **Purpose:** For Admins to manage user roles.
-- **Key Components:**
-  - List of all signed-up users.
-  - Ability to change a user's role.
+- **Purpose:** User role management (Admin only).
+- **Components:**
+  - User list with search/filter
+  - Role assignment interface
+  - Permission matrix view
+  - Activity logs per user
+  - Bulk role updates with confirmation
 
-## **4\. V1.0 & Future Pages**
+## **Permission-Based UI Patterns**
 
-### **Multi-Tenancy / Organization Creation**
+Throughout the application, use these consistent patterns:
 
-- **Purpose:** To allow new organizations to sign up for the service.
-- **Key Components:**
-  - **Public Marketing Homepage:** A new public-facing homepage will be created to market the product to potential new customers.
-  - **Sign-Up Flow:** A dedicated sign-up page where a user can create a new account and a new organization simultaneously.
+1. **Hidden:** Component not rendered for users without any access
+2. **Disabled:** Component visible but grayed out with tooltip
+3. **Enabled:** Full functionality for users with appropriate permissions
+
+**Tooltip Format:** "Requires {permission_name} permission"
+
+- Permission names are dynamically inserted
+- Prevents message drift when permissions change
+- Consider adding "Contact an admin to request access" as second line
+
+Example Implementation:
+
+```tsx
+<Button
+  disabled={!hasPermission("create_location")}
+  title={
+    !hasPermission("create_location")
+      ? `Requires ${getPermissionName("create_location")} permission`
+      : ""
+  }
+>
+  Add Location
+</Button>
+```
+
+## **Mobile Navigation Design**
+
+1. **Hamburger Menu:**
+   - Collapse main navigation on mobile
+   - Full-height slide-out drawer
+
+2. **Location Selection:**
+   - Accordion-style expansion within mobile menu
+   - Tapping "Locations" expands to show:
+     - "All Locations" link
+     - Individual location links
+
+3. **Touch Targets:**
+   - Minimum 44x44px touch targets
+   - Adequate spacing between interactive elements
+
+4. **Progressive Disclosure:**
+   - Complex forms use expandable sections
+   - Multi-step flows for lengthy processes
+
+## **Games Page Structure**
+
+### **/games (All Games Page)**
+
+- **Purpose:** Organization-wide view of all game titles.
+- **Public View:**
+  - Searchable list of all game titles in the organization
+  - Filter by manufacturer, era, location
+  - Count of instances per title
+- **Authenticated View (Additional Components):**
+  - Add custom game title (permission-based)
+  - Edit game metadata
+  - Bulk operations
+
+## **V1.0 Enhancements**
+
+### **Multi-Tenancy**
+
+- Public marketing homepage at root domain
+- Organization signup flow with subdomain selection
+- Tenant switching UI for users in multiple organizations
 
 ### **Advanced Asset Management**
 
-- **Purpose:** To support complex operational workflows like managing repair shops and moving machines.
-- **Key Components:**
-  - **Private Locations:** A new "Visibility" setting (Public/Private) will be added to the /admin/locations page. Private locations will not appear on the public homepage but will be available as destinations for machine moves.
-  - **Machine Movement:** A "Move Machine" function will be added to the authenticated /machines/{machineId} page, allowing staff to transfer a machine to any other location, including private ones.
-  - **Internal-Only Issues:**
-    - When creating an issue, staff will see an "Internal Only" checkbox.
-    - On issue lists and detail pages, internal issues will be marked with a "Private" badge (e.g., a lock icon) to distinguish them from public-facing reports.
+- **Private Locations:**
+  - Repair shops, storage facilities
+  - Not shown on public pages
+  - Available as destinations for moves
+- **Machine Movement Workflows:**
+  - Multi-step process with confirmation
+  - Reason for move tracking
+  - History of all movements
+- **Internal-Only Issues:**
+  - Checkbox on creation
+  - Lock icon indicator
+  - Filtered from public views
 
 ### **Collection System**
 
-- **Purpose:** To introduce a powerful, multi-layered filtering system on the public location pages.
-- **Key Components:**
-  - **/locations/{locationId} (V1.0 Enhancement):**
-    - **Collection Groups:** A series of expandable/collapsible drawers will be added below the search bar.
-      - **Drawer Types:** Each drawer will represent a group (e.g., the manual "Rooms" group, or auto-generated groups like "Manufacturer" and "Era").
-      - **Interaction:** Expanding a drawer will reveal the specific collections within it (e.g., "Front Room", "Back Bar" or "Bally", "Williams"). Clicking a collection name will filter the game grid.
-  - **/admin/organization (V1.0 Enhancement):**
-    - **Collection Group Management:** A new section will be added to manage the visibility of auto-generated collection groups. This will be a list of potential groups (e.g., "Manufacturer", "Era") with a toggle to enable or disable them across all public location pages.
-  - **/admin/locations (V1.0 Enhancement):**
-    - **Manual Collection Management:** The Location Detail/Management View will be enhanced with a dedicated UI section for managing that location's manual collections within the "Rooms" group. This will allow an admin to add, rename, or delete collections like "Front Room" or "On The Wall".
+- **Auto-Generated Collections:**
+  - By manufacturer, era, theme
+  - Configurable at organization level
+- **Manual Collections:**
+  - "Rooms" or custom groupings
+  - Per-location configuration
+- **UI Implementation:**
+  - Expandable filter drawers
+  - Multi-selection support
+  - Visual collection badges on machines
