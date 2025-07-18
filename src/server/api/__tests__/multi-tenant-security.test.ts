@@ -3,13 +3,25 @@ import { type Session } from "next-auth";
 
 import { appRouter } from "~/server/api/root";
 import { createCallerFactory } from "~/server/api/trpc";
+import { auth } from "~/server/auth";
 import { createMockContext, type MockContext } from "~/test/mockContext";
+
+// Mock auth function
+jest.mock("~/server/auth", () => ({
+  auth: jest.fn(),
+}));
 
 // Create properly typed mock functions
 const mockOrganizationFindUnique = jest.fn();
 const mockMembershipFindUnique = jest.fn();
 const mockMembershipFindFirst = jest.fn();
-const mockAuth = jest.fn();
+const mockAuth = auth as jest.MockedFunction<typeof auth>;
+const mockIssueFindUnique = jest.fn();
+const mockMachineFindFirst = jest.fn();
+const mockMachineFindUnique = jest.fn();
+const mockIssueStatusFindFirst = jest.fn();
+const mockPriorityFindFirst = jest.fn();
+const mockIssueCreate = jest.fn();
 
 // Create caller factory
 const createCaller = createCallerFactory(appRouter);
@@ -239,12 +251,15 @@ describe("Multi-Tenant Security Tests", () => {
       mockAuth.mockResolvedValue(sessionA);
       // Return Organization B when subdomain is org-b
       mockOrganizationFindUnique.mockResolvedValue(organizationB);
+
+      // Setup context with proper mocks for no membership in Organization B
+      const ctx = createMockContext();
       // User A has no membership in Organization B
-      mockMembershipFindUnique.mockResolvedValue(null);
-      mockMembershipFindFirst.mockResolvedValue(null);
+      ctx.db.membership.findFirst.mockResolvedValue(null);
+      ctx.db.membership.findUnique.mockResolvedValue(null);
 
       const callerA = createCaller({
-        ...createMockContext(),
+        ...ctx,
         session: sessionA,
         organization: organizationB,
         headers: new Headers({
@@ -670,19 +685,18 @@ describe("Multi-Tenant Security Tests", () => {
       mockMembershipFindUnique.mockResolvedValue(userAAdmin);
       mockMembershipFindFirst.mockResolvedValue(userAAdmin);
 
+      // Configure the context's mock database to return the specific test data
+      const ctxAdmin = createMockContext();
+      ctxAdmin.db.issue.findMany.mockResolvedValue(issuesOrgA);
+
       const adminCaller = createCaller({
-        ...createMockContext(),
+        ...ctxAdmin,
         session: adminSession,
         organization: organizationA,
         headers: new Headers({
           host: "org-a.localhost:3000",
         }),
       }) as CallerType;
-
-      // Admin should have access to organization data
-      // Configure the context's mock database to return the specific test data
-      const ctxAdmin = createMockContext();
-      ctxAdmin.db.issue.findMany.mockResolvedValue(issuesOrgA);
 
       const result = await adminCaller.issue.core.getAll({
         locationId: undefined,
