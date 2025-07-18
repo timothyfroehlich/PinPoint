@@ -61,6 +61,12 @@ npm run db:reset      # Reset database
 - `docs/design-docs/cujs-list.md` - User journeys
 - `docs/architecture/current-state.md` - Current state
 
+## Task File Organization
+
+- Task files are placed in `agent_workspace/` directory in each worktree
+- See `@docs/orchestrator-system/agent-workspace.md` for details
+- Orchestrator creates specialized task files for each agent type
+
 ## Post-Completion Tasks
 
 1. Update `docs/architecture/source-map.md` and `docs/architecture/test-map.md`
