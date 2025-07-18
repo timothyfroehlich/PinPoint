@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 import type { PrismaClient } from "@prisma/client";
@@ -24,7 +25,7 @@ describe("Collection Router Integration", () => {
       machine: {
         findMany: jest.fn(),
       },
-    } as jest.Mocked<PrismaClient>;
+    } as unknown as jest.Mocked<PrismaClient>;
 
     service = new CollectionService(mockPrisma);
     jest.clearAllMocks();
@@ -52,10 +53,10 @@ describe("Collection Router Integration", () => {
         },
       ];
 
-      (mockPrisma.collectionType.findMany as jest.Mock).mockResolvedValue(
+      (mockPrisma.collectionType.findMany as jest.Mock<any>).mockResolvedValue(
         mockTypes,
       );
-      (mockPrisma.collection.findMany as jest.Mock).mockResolvedValue(
+      (mockPrisma.collection.findMany as jest.Mock<any>).mockResolvedValue(
         mockCollections,
       );
 
@@ -111,7 +112,7 @@ describe("Collection Router Integration", () => {
         isManual: true,
       };
 
-      (mockPrisma.collection.create as jest.Mock).mockResolvedValue(
+      (mockPrisma.collection.create as jest.Mock<any>).mockResolvedValue(
         mockCollection,
       );
 
@@ -120,7 +121,6 @@ describe("Collection Router Integration", () => {
         typeId: "type1",
         locationId: "loc1",
         description: "Test description",
-        isManual: true,
       });
 
       expect(result).toEqual(mockCollection);
@@ -137,7 +137,9 @@ describe("Collection Router Integration", () => {
     });
 
     it("should handle toggleCollectionType operations", async () => {
-      (mockPrisma.collectionType.update as jest.Mock).mockResolvedValue({});
+      (mockPrisma.collectionType.update as jest.Mock<any>).mockResolvedValue(
+        {},
+      );
 
       await service.toggleCollectionType("type1", false);
 
@@ -159,7 +161,7 @@ describe("Collection Router Integration", () => {
         },
       ];
 
-      (mockPrisma.collectionType.findMany as jest.Mock).mockResolvedValue(
+      (mockPrisma.collectionType.findMany as jest.Mock<any>).mockResolvedValue(
         mockTypes,
       );
 
