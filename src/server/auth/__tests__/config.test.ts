@@ -1,15 +1,43 @@
-import { DeepMockProxy } from "jest-mock-extended";
+import { type DeepMockProxy } from "jest-mock-extended";
 
-import { ExtendedPrismaClient } from "~/server/db";
+// Mock environment variables FIRST
+const mockEnv = {
+  NODE_ENV: "development",
+  GOOGLE_CLIENT_ID: "test-google-client-id",
+  GOOGLE_CLIENT_SECRET: "test-google-client-secret",
+  AUTH_SECRET: "test-secret",
+  NEXTAUTH_SECRET: "test-secret",
+  NEXTAUTH_URL: "http://localhost:3000",
+  DATABASE_URL: "postgresql://test:test@localhost:5432/test",
+  OPDB_API_URL: "https://opdb.org/api",
+  DEFAULT_ORG_SUBDOMAIN: "apc",
+};
+
+// Mock functions to set environment
+function setNodeEnv(env: string): void {
+  mockEnv.NODE_ENV = env;
+}
+
+// Mock user for auth callbacks
+const mockUserFindUnique = jest.fn();
+
+jest.mock("~/env.js", () => ({
+  env: mockEnv,
+}));
+
+import { createAuthConfig } from "~/server/auth/config";
+import { type ExtendedPrismaClient } from "~/server/db";
 import { createMockContext, resetMockContext } from "~/test/mockContext";
 
 describe("NextAuth Configuration", () => {
   let ctx: ReturnType<typeof createMockContext>;
   let db: DeepMockProxy<ExtendedPrismaClient>;
+  let authConfig: ReturnType<typeof createAuthConfig>;
 
   beforeEach(() => {
     ctx = createMockContext();
     db = ctx.db;
+    authConfig = createAuthConfig(db);
   });
 
   afterEach(() => {
@@ -20,7 +48,8 @@ describe("NextAuth Configuration", () => {
     it("should include Google provider", () => {
       expect(authConfig.providers.length).toBeGreaterThanOrEqual(1);
       const googleProvider = authConfig.providers.find(
-        (p) => p.id === "google",
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (p: any) => p.id === "google",
       );
       expect(googleProvider).toBeDefined();
       expect(googleProvider!.id).toBe("google");
@@ -34,7 +63,7 @@ describe("NextAuth Configuration", () => {
       jest.resetModules();
 
       const configModule = await import("../config");
-      const devConfig = configModule.authConfig;
+      const devConfig = configModule.createAuthConfig(db);
 
       expect(devConfig.providers).toHaveLength(2);
       const credentialsProvider = devConfig.providers[1];
@@ -53,7 +82,7 @@ describe("NextAuth Configuration", () => {
 
       jest.resetModules();
       const configModule = await import("../config");
-      const prodConfig = configModule.authConfig;
+      const prodConfig = configModule.createAuthConfig(db);
 
       expect(prodConfig.providers).toHaveLength(1);
       expect(prodConfig.providers[0]).toBeDefined();
@@ -80,7 +109,7 @@ describe("NextAuth Configuration", () => {
 
       jest.resetModules();
       const configModule = await import("../config");
-      const devConfig = configModule.authConfig;
+      const devConfig = configModule.createAuthConfig(db);
       const credentialsProvider = devConfig.providers[1];
 
       expect(credentialsProvider).toBeDefined();
@@ -98,7 +127,7 @@ describe("NextAuth Configuration", () => {
 
       jest.resetModules();
       const configModule = await import("../config");
-      const prodConfig = configModule.authConfig;
+      const prodConfig = configModule.createAuthConfig(db);
       const credentialsProvider = prodConfig.providers.find(
         (p: { id: string }) => p.id === "credentials",
       );
@@ -112,7 +141,7 @@ describe("NextAuth Configuration", () => {
 
       jest.resetModules();
       const configModule = await import("../config");
-      const devConfig = configModule.authConfig;
+      const devConfig = configModule.createAuthConfig(db);
       const credentialsProvider = devConfig.providers[1];
 
       const result = await (
@@ -133,7 +162,7 @@ describe("NextAuth Configuration", () => {
 
       jest.resetModules();
       const configModule = await import("../config");
-      const devConfig = configModule.authConfig;
+      const devConfig = configModule.createAuthConfig(db);
       const credentialsProvider = devConfig.providers[1];
 
       const result = await (

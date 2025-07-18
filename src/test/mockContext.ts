@@ -4,27 +4,53 @@ import { mockDeep, mockReset, type DeepMockProxy } from "jest-mock-extended";
 import type { ExtendedPrismaClient } from "~/server/db";
 import type { ServiceFactory } from "~/server/services/factory";
 
-// Mock individual services
+// Mock individual services with all methods
 const mockNotificationService = {
-  createNotification: jest.fn(),
-  // ... other methods
+  createNotification: jest.fn().mockResolvedValue(undefined),
+  getUserNotifications: jest.fn().mockResolvedValue([]),
+  getUnreadCount: jest.fn().mockResolvedValue(0),
+  markAsRead: jest.fn().mockResolvedValue(undefined),
+  markAllAsRead: jest.fn().mockResolvedValue(undefined),
+  notifyMachineOwnerOfIssue: jest.fn().mockResolvedValue(undefined),
+  notifyMachineOwnerOfStatusChange: jest.fn().mockResolvedValue(undefined),
+  notifyUserOfAssignment: jest.fn().mockResolvedValue(undefined),
 };
 
 const mockCollectionService = {
-  // ... methods
+  // Add collection service methods here when needed
 };
 
-// ... other mock services
+const mockIssueActivityService = {
+  recordActivity: jest.fn().mockResolvedValue(undefined),
+  recordIssueCreated: jest.fn().mockResolvedValue(undefined),
+  recordStatusChange: jest.fn().mockResolvedValue(undefined),
+  recordAssignmentChange: jest.fn().mockResolvedValue(undefined),
+  recordFieldUpdate: jest.fn().mockResolvedValue(undefined),
+  recordCommentDeleted: jest.fn().mockResolvedValue(undefined),
+  getIssueTimeline: jest.fn().mockResolvedValue([]),
+};
+
+const mockPinballMapService = {
+  // Add pinball map service methods here when needed
+};
+
+const mockCommentCleanupService = {
+  // Add comment cleanup service methods here when needed
+};
+
+const mockQRCodeService = {
+  // Add QR code service methods here when needed
+};
 
 // Mock service factory
 const createMockServiceFactory = (): DeepMockProxy<ServiceFactory> => {
   return {
     createNotificationService: jest.fn(() => mockNotificationService),
     createCollectionService: jest.fn(() => mockCollectionService),
-    createPinballMapService: jest.fn(() => ({}) as any),
-    createIssueActivityService: jest.fn(() => ({}) as any),
-    createCommentCleanupService: jest.fn(() => ({}) as any),
-    createQRCodeService: jest.fn(() => ({}) as any),
+    createPinballMapService: jest.fn(() => mockPinballMapService),
+    createIssueActivityService: jest.fn(() => mockIssueActivityService),
+    createCommentCleanupService: jest.fn(() => mockCommentCleanupService),
+    createQRCodeService: jest.fn(() => mockQRCodeService),
   } as any;
 };
 
@@ -106,8 +132,28 @@ export function createMockContext(): MockContext {
 
 export function resetMockContext(ctx: MockContext) {
   mockReset(ctx.db);
-  mockReset(ctx.services);
+  // Reset all service mocks
+  Object.values(mockNotificationService).forEach((method) => {
+    if (typeof method === "function" && method.mockReset) {
+      method.mockReset();
+    }
+  });
+  Object.values(mockIssueActivityService).forEach((method) => {
+    if (typeof method === "function" && method.mockReset) {
+      method.mockReset();
+    }
+  });
 }
+
+// Export individual service mocks for direct access in tests
+export {
+  mockNotificationService,
+  mockCollectionService,
+  mockIssueActivityService,
+  mockPinballMapService,
+  mockCommentCleanupService,
+  mockQRCodeService,
+};
 
 // Common mock data for testing
 export const mockUser = {

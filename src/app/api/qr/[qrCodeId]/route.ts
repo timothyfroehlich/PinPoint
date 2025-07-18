@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { getGlobalDatabaseProvider } from "~/server/db/provider";
-import { QRCodeService } from "~/server/services/qrCodeService";
+import { ServiceFactory } from "~/server/services/factory";
 import { constructReportUrl } from "~/server/utils/qrCodeUtils";
 
 export async function GET(
@@ -20,8 +20,9 @@ export async function GET(
       );
     }
 
-    // Initialize QR code service
-    const qrCodeService = new QRCodeService(db);
+    // Initialize services
+    const services = new ServiceFactory(db);
+    const qrCodeService = services.createQRCodeService();
 
     // Resolve machine information from QR code
     const machine = await qrCodeService.resolveMachineFromQR(qrCodeId);
@@ -64,7 +65,8 @@ export async function HEAD(
       return new NextResponse(null, { status: 400 });
     }
 
-    const qrCodeService = new QRCodeService(db);
+    const services = new ServiceFactory(db);
+    const qrCodeService = services.createQRCodeService();
     const machine = await qrCodeService.resolveMachineFromQR(qrCodeId);
 
     if (!machine) {

@@ -1,4 +1,4 @@
-import { createPrismaClient, type ExtendedPrismaClient } from "../db";
+import { createPrismaClient, type ExtendedPrismaClient } from "~/server/db";
 
 export class DatabaseProvider {
   private instance?: ExtendedPrismaClient;
