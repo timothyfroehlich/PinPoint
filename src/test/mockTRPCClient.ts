@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { createTRPCMsw } from 'msw-trpc';
-import { type AppRouter } from '~/server/api/root';
+import { type AppRouter } from "~/server/api/root";
+import { type IssueWithDetails, type Comment, type User } from "~/types/issue";
 
 export type MockTRPCClient = {
   [K in keyof AppRouter]: {
@@ -10,7 +10,9 @@ export type MockTRPCClient = {
   };
 };
 
-export function createMockTRPCClient(mockImplementations: Partial<MockTRPCClient> = {}): any {
+export function createMockTRPCClient(
+  mockImplementations: Partial<MockTRPCClient> = {},
+): any {
   const defaultMock = {
     issue: {
       core: {
@@ -65,28 +67,34 @@ export function createMockTRPCClient(mockImplementations: Partial<MockTRPCClient
 
 function deepMerge(target: any, source: any): any {
   const result = { ...target };
-  
+
   for (const key in source) {
-    if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
+    if (
+      source[key] &&
+      typeof source[key] === "object" &&
+      !Array.isArray(source[key])
+    ) {
       result[key] = deepMerge(result[key] || {}, source[key]);
     } else {
       result[key] = source[key];
     }
   }
-  
+
   return result;
 }
 
 // Mock tRPC hooks for React components
-export const createMockTRPCHooks = (mockClient: ReturnType<typeof createMockTRPCClient>) => ({
+export const createMockTRPCHooks = (
+  mockClient: ReturnType<typeof createMockTRPCClient>,
+) => ({
   useQuery: jest.fn<any, [any]>((procedure: string, input?: any) => {
-    const keys = procedure.split('.');
+    const keys = procedure.split(".");
     let handler = mockClient;
-    
+
     for (const key of keys) {
       handler = handler[key];
     }
-    
+
     return {
       data: undefined,
       error: null,
@@ -96,15 +104,15 @@ export const createMockTRPCHooks = (mockClient: ReturnType<typeof createMockTRPC
       refetch: jest.fn(),
     };
   }),
-  
+
   useMutation: jest.fn<any, [any]>((procedure: string) => {
-    const keys = procedure.split('.');
+    const keys = procedure.split(".");
     let handler = mockClient;
-    
+
     for (const key of keys) {
       handler = handler[key];
     }
-    
+
     return {
       mutate: handler,
       mutateAsync: handler,
@@ -116,7 +124,7 @@ export const createMockTRPCHooks = (mockClient: ReturnType<typeof createMockTRPC
       reset: jest.fn(),
     };
   }),
-  
+
   useUtils: jest.fn(() => ({
     invalidate: jest.fn(),
     setData: jest.fn(),
@@ -125,31 +133,33 @@ export const createMockTRPCHooks = (mockClient: ReturnType<typeof createMockTRPC
 });
 
 // Helper to create issue data factory
-export const createMockIssue = (overrides: Partial<any> = {}) => ({
-  id: 'test-issue-1',
-  title: 'Test Issue',
-  description: 'Test description',
-  status: { id: 'status-1', name: 'Open', color: '#ff0000' },
-  priority: { id: 'priority-1', name: 'Medium', color: '#ffa500' },
+export const createMockIssue = (
+  overrides: Partial<IssueWithDetails> = {},
+): IssueWithDetails => ({
+  id: "test-issue-1",
+  title: "Test Issue",
+  description: "Test description",
+  status: { id: "status-1", name: "Open", color: "#ff0000" },
+  priority: { id: "priority-1", name: "Medium", color: "#ffa500" },
   machine: {
-    id: 'machine-1',
-    serialNumber: 'TEST123',
+    id: "machine-1",
+    serialNumber: "TEST123",
     model: {
-      name: 'Test Game',
-      manufacturer: 'Test Manufacturer',
+      name: "Test Game",
+      manufacturer: "Test Manufacturer",
     },
     location: {
-      name: 'Test Location',
+      name: "Test Location",
     },
   },
   createdBy: {
-    id: 'user-1',
-    name: 'Test User',
-    email: 'test@example.com',
+    id: "user-1",
+    name: "Test User",
+    email: "test@example.com",
   },
   assignedTo: null,
-  createdAt: new Date('2024-01-01T00:00:00Z'),
-  updatedAt: new Date('2024-01-01T00:00:00Z'),
+  createdAt: new Date("2024-01-01T00:00:00Z"),
+  updatedAt: new Date("2024-01-01T00:00:00Z"),
   resolvedAt: null,
   comments: [],
   attachments: [],
@@ -157,37 +167,51 @@ export const createMockIssue = (overrides: Partial<any> = {}) => ({
   ...overrides,
 });
 
-// Helper to create comment data factory  
-export const createMockComment = (overrides: Partial<any> = {}) => ({
-  id: 'comment-1',
-  content: 'Test comment',
+// Helper to create comment data factory
+export const createMockComment = (
+  overrides: Partial<Comment> = {},
+): Comment => ({
+  id: "comment-1",
+  content: "Test comment",
   isInternal: false,
   createdBy: {
-    id: 'user-1',
-    name: 'Test User',
+    id: "user-1",
+    name: "Test User",
   },
-  createdAt: new Date('2024-01-01T00:00:00Z'),
-  updatedAt: new Date('2024-01-01T00:00:00Z'),
+  createdAt: new Date("2024-01-01T00:00:00Z"),
+  updatedAt: new Date("2024-01-01T00:00:00Z"),
   ...overrides,
 });
 
 // Helper to create user data factory
-export const createMockUser = (overrides: Partial<any> = {}) => ({
-  id: 'user-1',
-  name: 'Test User',
-  email: 'test@example.com',
+export const createMockUser = (
+  overrides: Partial<
+    User & {
+      permissions: string[];
+      role: { id: string; name: string; permissions: string[] };
+    }
+  > = {},
+) => ({
+  id: "user-1",
+  name: "Test User",
+  email: "test@example.com",
   image: null,
   permissions: [],
   role: {
-    id: 'role-1',
-    name: 'Member',
+    id: "role-1",
+    name: "Member",
     permissions: [],
   },
   ...overrides,
 });
 
 // Helper to create session data factory
-export const createMockSession = (overrides: Partial<any> = {}) => ({
+export const createMockSession = (
+  overrides: Partial<{
+    user: User & { permissions: string[] };
+    expires: string;
+  }> = {},
+) => ({
   user: createMockUser(),
   expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
   ...overrides,

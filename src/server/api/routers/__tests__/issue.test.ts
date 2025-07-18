@@ -11,7 +11,6 @@ jest.mock("next-auth", () => {
   }));
 });
 
-import { createInnerTRPCContext } from "~/server/api/trpc";
 import { appRouter } from "~/server/api/root";
 import {
   createMockContext,
@@ -38,12 +37,9 @@ describe("issueRouter - Issue Detail Page", () => {
       expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     };
     ctx.organization = mockOrganization;
-    
-    const trpcContext = createInnerTRPCContext({
-      session: ctx.session,
-      headers: ctx.headers,
-    });
-    caller = appRouter.createCaller({ ...trpcContext, db: ctx.db });
+
+    // Create caller with mock context directly
+    caller = appRouter.createCaller(ctx);
   });
 
   describe("Public Issue Detail Access", () => {
@@ -72,7 +68,9 @@ describe("issueRouter - Issue Detail Page", () => {
 
       ctx.db.issue.findUnique.mockResolvedValue(issueWithDetails as any);
 
-      const result = await publicCaller.issue.core.getById({ id: mockIssue.id });
+      const result = await publicCaller.issue.core.getById({
+        id: mockIssue.id,
+      });
       expect(result).toBeTruthy();
       expect(result.id).toBe(mockIssue.id);
       expect(result.title).toBe(mockIssue.title);
@@ -101,7 +99,7 @@ describe("issueRouter - Issue Detail Page", () => {
             createdAt: new Date(),
           },
           {
-            id: "comment-2", 
+            id: "comment-2",
             content: "Public comment",
             isInternal: false,
             createdBy: mockUser,
@@ -112,8 +110,10 @@ describe("issueRouter - Issue Detail Page", () => {
 
       ctx.db.issue.findUnique.mockResolvedValue(issueWithSensitiveData as any);
 
-      const result = await publicCaller.issue.core.getById({ id: mockIssue.id });
-      
+      const result = await publicCaller.issue.core.getById({
+        id: mockIssue.id,
+      });
+
       // Should only see public comments
       expect(result.comments).toHaveLength(1);
       expect(result.comments[0].content).toBe("Public comment");
@@ -129,7 +129,7 @@ describe("issueRouter - Issue Detail Page", () => {
       ctx.db.issue.findUnique.mockResolvedValue(null);
 
       await expect(
-        publicCaller.issue.core.getById({ id: "non-existent" })
+        publicCaller.issue.core.getById({ id: "non-existent" }),
       ).rejects.toThrow(TRPCError);
     });
   });
@@ -137,7 +137,7 @@ describe("issueRouter - Issue Detail Page", () => {
   describe("Authenticated Issue Detail Access", () => {
     it("should allow authenticated users to view all issue details", async () => {
       ctx.db.membership.findFirst.mockResolvedValue(mockMembership as any);
-      
+
       const issueWithDetails = {
         ...mockIssue,
         machine: mockMachine,
@@ -155,7 +155,7 @@ describe("issueRouter - Issue Detail Page", () => {
           },
           {
             id: "comment-2",
-            content: "Public comment", 
+            content: "Public comment",
             isInternal: false,
             createdBy: mockUser,
             createdAt: new Date(),
@@ -166,7 +166,7 @@ describe("issueRouter - Issue Detail Page", () => {
       ctx.db.issue.findUnique.mockResolvedValue(issueWithDetails as any);
 
       const result = await caller.issue.core.getById({ id: mockIssue.id });
-      
+
       // Should see all comments
       expect(result.comments).toHaveLength(2);
       expect(result.assignedTo).toBeTruthy();
@@ -182,7 +182,7 @@ describe("issueRouter - Issue Detail Page", () => {
       ctx.db.issue.findUnique.mockResolvedValue(otherOrgIssue as any);
 
       await expect(
-        caller.issue.core.getById({ id: mockIssue.id })
+        caller.issue.core.getById({ id: mockIssue.id }),
       ).rejects.toThrow("Issue not found");
     });
   });
@@ -191,9 +191,7 @@ describe("issueRouter - Issue Detail Page", () => {
     it("should allow users with edit permissions to update issues", async () => {
       const editPermissionRole = {
         ...mockRole,
-        permissions: [
-          { name: "issues:edit", description: "Edit issues" },
-        ],
+        permissions: [{ name: "issues:edit", description: "Edit issues" }],
       };
 
       ctx.db.membership.findFirst.mockResolvedValue({
@@ -222,9 +220,7 @@ describe("issueRouter - Issue Detail Page", () => {
     it("should deny users without edit permissions from updating issues", async () => {
       const readOnlyRole = {
         ...mockRole,
-        permissions: [
-          { name: "issues:read", description: "Read issues" },
-        ],
+        permissions: [{ name: "issues:read", description: "Read issues" }],
       };
 
       ctx.db.membership.findFirst.mockResolvedValue({
@@ -236,16 +232,14 @@ describe("issueRouter - Issue Detail Page", () => {
         caller.issue.core.update({
           id: mockIssue.id,
           title: "Updated Title",
-        })
+        }),
       ).rejects.toThrow("UNAUTHORIZED");
     });
 
     it("should allow users with close permissions to close issues", async () => {
       const closePermissionRole = {
         ...mockRole,
-        permissions: [
-          { name: "issues:close", description: "Close issues" },
-        ],
+        permissions: [{ name: "issues:close", description: "Close issues" }],
       };
 
       ctx.db.membership.findFirst.mockResolvedValue({
@@ -273,9 +267,7 @@ describe("issueRouter - Issue Detail Page", () => {
     it("should allow users with assign permissions to assign issues", async () => {
       const assignPermissionRole = {
         ...mockRole,
-        permissions: [
-          { name: "issues:assign", description: "Assign issues" },
-        ],
+        permissions: [{ name: "issues:assign", description: "Assign issues" }],
       };
 
       ctx.db.membership.findFirst.mockResolvedValue({
@@ -306,9 +298,7 @@ describe("issueRouter - Issue Detail Page", () => {
     it("should allow status changes with proper validation", async () => {
       const statusChangeRole = {
         ...mockRole,
-        permissions: [
-          { name: "issues:edit", description: "Edit issues" },
-        ],
+        permissions: [{ name: "issues:edit", description: "Edit issues" }],
       };
 
       ctx.db.membership.findFirst.mockResolvedValue({
@@ -316,8 +306,12 @@ describe("issueRouter - Issue Detail Page", () => {
         role: statusChangeRole,
       } as any);
 
-      const newStatus = { ...mockStatus, id: "status-in-progress", name: "In Progress" };
-      
+      const newStatus = {
+        ...mockStatus,
+        id: "status-in-progress",
+        name: "In Progress",
+      };
+
       ctx.db.issue.findUnique.mockResolvedValue(mockIssue as any);
       ctx.db.issueStatus.findUnique.mockResolvedValue(newStatus as any);
       ctx.db.issue.update.mockResolvedValue({
@@ -336,9 +330,7 @@ describe("issueRouter - Issue Detail Page", () => {
     it("should validate status belongs to same organization", async () => {
       const statusChangeRole = {
         ...mockRole,
-        permissions: [
-          { name: "issues:edit", description: "Edit issues" },
-        ],
+        permissions: [{ name: "issues:edit", description: "Edit issues" }],
       };
 
       ctx.db.membership.findFirst.mockResolvedValue({
@@ -347,7 +339,7 @@ describe("issueRouter - Issue Detail Page", () => {
       } as any);
 
       const otherOrgStatus = { ...mockStatus, organizationId: "other-org" };
-      
+
       ctx.db.issue.findUnique.mockResolvedValue(mockIssue as any);
       ctx.db.issueStatus.findUnique.mockResolvedValue(otherOrgStatus as any);
 
@@ -355,7 +347,7 @@ describe("issueRouter - Issue Detail Page", () => {
         caller.issue.core.updateStatus({
           id: mockIssue.id,
           statusId: otherOrgStatus.id,
-        })
+        }),
       ).rejects.toThrow("Status not found");
     });
   });
@@ -438,30 +430,34 @@ describe("issueRouter - Issue Detail Page", () => {
           issueId: mockIssue.id,
           content: "Internal note",
           isInternal: true,
-        })
+        }),
       ).rejects.toThrow("UNAUTHORIZED");
     });
   });
 
   describe("Loading States and Error Handling", () => {
     it("should handle database connection errors gracefully", async () => {
-      ctx.db.issue.findUnique.mockRejectedValue(new Error("Database connection failed"));
+      ctx.db.issue.findUnique.mockRejectedValue(
+        new Error("Database connection failed"),
+      );
 
       await expect(
-        caller.issue.core.getById({ id: mockIssue.id })
+        caller.issue.core.getById({ id: mockIssue.id }),
       ).rejects.toThrow("Database connection failed");
     });
 
     it("should handle concurrent access scenarios", async () => {
       // Simulate optimistic locking scenario
       ctx.db.issue.findUnique.mockResolvedValue(mockIssue as any);
-      ctx.db.issue.update.mockRejectedValue(new Error("Concurrent modification"));
+      ctx.db.issue.update.mockRejectedValue(
+        new Error("Concurrent modification"),
+      );
 
       await expect(
         caller.issue.core.update({
           id: mockIssue.id,
           title: "Updated Title",
-        })
+        }),
       ).rejects.toThrow("Concurrent modification");
     });
   });
