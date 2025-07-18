@@ -46,9 +46,9 @@ describe("notificationRouter", () => {
 
     // Mock the service method to return the expected data
     const mockNotificationService = ctx.services.createNotificationService();
-    mockNotificationService.getUserNotifications.mockResolvedValue([
-      mockNotification,
-    ]);
+    (
+      mockNotificationService.getUserNotifications as jest.MockedFunction<any>
+    ).mockResolvedValue([mockNotification]);
 
     const caller = appRouter.createCaller(ctx as any);
     const result = await caller.notification.getNotifications({});
@@ -59,7 +59,9 @@ describe("notificationRouter", () => {
 
   it("gets unread count", async () => {
     const mockNotificationService = ctx.services.createNotificationService();
-    mockNotificationService.getUnreadCount.mockResolvedValue(3);
+    (
+      mockNotificationService.getUnreadCount as jest.MockedFunction<any>
+    ).mockResolvedValue(3);
 
     const caller = appRouter.createCaller(ctx as any);
     const count = await caller.notification.getUnreadCount();
@@ -70,7 +72,9 @@ describe("notificationRouter", () => {
 
   it("marks notification as read", async () => {
     const mockNotificationService = ctx.services.createNotificationService();
-    mockNotificationService.markAsRead.mockResolvedValue(undefined);
+    (
+      mockNotificationService.markAsRead as jest.MockedFunction<any>
+    ).mockResolvedValue(undefined);
 
     const caller = appRouter.createCaller(ctx as any);
     await caller.notification.markAsRead({ notificationId });
@@ -83,7 +87,9 @@ describe("notificationRouter", () => {
 
   it("marks all as read", async () => {
     const mockNotificationService = ctx.services.createNotificationService();
-    mockNotificationService.markAllAsRead.mockResolvedValue(undefined);
+    (
+      mockNotificationService.markAllAsRead as jest.MockedFunction<any>
+    ).mockResolvedValue(undefined);
 
     const caller = appRouter.createCaller(ctx as any);
     await caller.notification.markAllAsRead();
@@ -124,9 +130,9 @@ describe("notificationRouter", () => {
     ];
 
     const mockNotificationService = ctx.services.createNotificationService();
-    mockNotificationService.getUserNotifications.mockResolvedValue(
-      mockNotifications,
-    );
+    (
+      mockNotificationService.getUserNotifications as jest.MockedFunction<any>
+    ).mockResolvedValue(mockNotifications);
 
     const caller = appRouter.createCaller(ctx as any);
 

@@ -15,7 +15,8 @@ jest.mock("~/server/auth", () => ({
 const mockOrganizationFindUnique = jest.fn();
 const mockMembershipFindUnique = jest.fn();
 const mockMembershipFindFirst = jest.fn();
-const mockAuth = auth as jest.MockedFunction<typeof auth>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockAuth = auth as jest.MockedFunction<any>;
 const mockIssueFindUnique = jest.fn();
 const mockMachineFindFirst = jest.fn();
 const mockMachineFindUnique = jest.fn();
@@ -524,8 +525,15 @@ describe("Multi-Tenant Security Tests", () => {
         description: "Test Description",
         machineId: "game-a-1",
         statusId: "status-1",
-        severity: "Medium",
         organizationId: "org-a", // Should be automatically set
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        priorityId: "priority-1",
+        createdById: "user-a",
+        assignedToId: null,
+        resolvedAt: null,
+        consistency: null,
+        checklist: null,
       });
 
       const callerA = createCaller({
@@ -543,7 +551,6 @@ describe("Multi-Tenant Security Tests", () => {
         description: "Test Description",
         machineId: "game-a-1",
         statusId: "status-1",
-        severity: "Medium" as const,
       };
 
       // Mock successful creation

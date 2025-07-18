@@ -52,7 +52,8 @@ describe("NextAuth Configuration", () => {
         (p: any) => p.id === "google",
       );
       expect(googleProvider).toBeDefined();
-      expect(googleProvider!.id).toBe("google");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect((googleProvider as any)!.id).toBe("google");
     });
 
     it("should include credentials provider in development", async () => {
@@ -68,7 +69,8 @@ describe("NextAuth Configuration", () => {
       expect(devConfig.providers).toHaveLength(2);
       const credentialsProvider = devConfig.providers[1];
       expect(credentialsProvider).toBeDefined();
-      expect(credentialsProvider!.id).toBe("credentials");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect((credentialsProvider as any)!.id).toBe("credentials");
 
       // Check the custom name in options
       expect(
@@ -86,7 +88,8 @@ describe("NextAuth Configuration", () => {
 
       expect(prodConfig.providers).toHaveLength(1);
       expect(prodConfig.providers[0]).toBeDefined();
-      expect(prodConfig.providers[0]!.id).toBe("google");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect((prodConfig.providers[0] as any)!.id).toBe("google");
     });
   });
 
@@ -113,7 +116,8 @@ describe("NextAuth Configuration", () => {
       const credentialsProvider = devConfig.providers[1];
 
       expect(credentialsProvider).toBeDefined();
-      expect(credentialsProvider!.id).toBe("credentials");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect((credentialsProvider as any)!.id).toBe("credentials");
       expect(
         (credentialsProvider as { authorize?: () => unknown }).authorize,
       ).toBeInstanceOf(Function);
@@ -129,7 +133,8 @@ describe("NextAuth Configuration", () => {
       const configModule = await import("../config");
       const prodConfig = configModule.createAuthConfig(db);
       const credentialsProvider = prodConfig.providers.find(
-        (p: { id: string }) => p.id === "credentials",
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (p: any) => p.id === "credentials",
       );
 
       // Credentials provider should not exist in production
