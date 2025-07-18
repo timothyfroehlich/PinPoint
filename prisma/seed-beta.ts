@@ -25,13 +25,15 @@ async function createGlobalPermissions() {
     "attachment:create",
   ];
 
-  for (const permName of permissions) {
-    await prisma.permission.upsert({
-      where: { name: permName },
-      update: {},
-      create: { name: permName },
-    });
-  }
+  await Promise.all(
+    permissions.map((permName) =>
+      prisma.permission.upsert({
+        where: { name: permName },
+        update: {},
+        create: { name: permName },
+      }),
+    ),
+  );
 
   console.log(`✓ Created ${permissions.length} global permissions`);
 }
@@ -256,13 +258,17 @@ async function main() {
     });
 
     if (adminRole) {
-      // Pre-create your admin user so first Google login gets admin rights
+      // Pre-create admin user from environment variables (fallback to defaults for local dev)
+      const adminEmail =
+        process.env.SEED_ADMIN_EMAIL ?? "phoenixavatar2@gmail.com";
+      const adminName = process.env.SEED_ADMIN_NAME ?? "Tim Froehlich";
+
       const adminUser = await prisma.user.upsert({
-        where: { email: "phoenixavatar2@gmail.com" },
+        where: { email: adminEmail },
         update: {},
         create: {
-          email: "phoenixavatar2@gmail.com",
-          name: "Tim Froehlich",
+          email: adminEmail,
+          name: adminName,
           profilePicture: getRandomDefaultAvatar(),
         },
       });
