@@ -1,129 +1,148 @@
 # **PinPoint UI/UX Architecture Plan (Updated for Frontend Rebuild)**
 
-This document outlines the necessary pages and high-level components for the PinPoint application, updated to reflect the modern Next.js App Router implementation approach and phase-based development strategy.
+This document outlines the necessary pages and high-level components for the PinPoint application, based on the Beta and V1.0 roadmap. Pages are organized by their functional purpose, with each page showing different components based on user authentication and permissions.
 
-## **Implementation Status**
+## **0. Global Components**
 
-The PinPoint frontend is being rebuilt in phases to deliver core functionality incrementally while maintaining the appealing visual design established in the current dashboard implementation.
-
-### **Phase-Based Implementation**
-
-- **Phase 1**: Authentication Foundation (3-5 days)
-- **Phase 2**: Core Issue Management (7-10 days)
-- **Phase 3**: Dashboard Enhancement (3-5 days)
-- **Phase 4**: User & Organization Features (5-7 days)
-
-See detailed phase documentation:
-
-- [Frontend Rebuild Roadmap](./frontend-rebuild-roadmap.md)
-- [Phase 1: Authentication Foundation](./frontend-phase-1-authentication.md)
-- [Phase 2: Core Issue Management](./frontend-phase-2-issue-management.md)
-- [Phase 3: Dashboard Enhancement](./frontend-phase-3-dashboard-enhancement.md)
-- [Phase 4: User & Organization Features](./frontend-phase-4-user-organization.md)
-
-## **Current Implementation Approach**
-
-### **Modern Next.js App Router Structure**
-
-The frontend uses Next.js 14 App Router with the following structure:
-
-```
-src/app/
-├── (auth)/              # Authentication pages (Phase 1)
-├── dashboard/           # Main dashboard (Phase 3)
-├── issues/             # Issue management (Phase 2)
-├── machines/           # Machine management (Phase 4)
-├── locations/          # Location management (Phase 4)
-├── profile/            # User profile (Phase 4)
-└── admin/              # Admin interfaces (Phase 4)
-```
-
-### **Component Architecture**
-
-- **Material UI v7**: Modern component library with updated Grid syntax
-- **tRPC Integration**: Type-safe API communication throughout
-- **Role-based Access**: Permission-based component rendering
-- **Optimistic Updates**: Real-time UI updates with fallback handling
-
-## **0\. Global Components (Updated Implementation)**
-
-### **PrimaryAppBar Component**
-
-- **Purpose:** A persistent header present on all pages with modern authentication integration.
-- **Current Implementation:** Already styled with dark theme (`#1a1a2e`) and purple accents (`#667eea`)
+- **Purpose:** A persistent header present on all pages providing primary navigation.
 - **Key Components:**
-  - Organization Logo (navigates to dashboard)
-  - **Authentication Integration (Phase 1):**
-    - **Logged Out State:** "Sign In" button with NextAuth.js integration
-    - **Logged In State:** User avatar and name with dropdown menu
-    - **Dropdown Actions:** Profile, Settings, Logout
-  - **Navigation Links:** Dashboard, Issues, Machines, Locations (role-based visibility)
+  - **Organization Logo:** Links to dashboard (for authenticated users) or organization homepage (for public users).
+  - **Navigation Menu:**
+    - **Dashboard** (authenticated only)
+    - **Locations** - Shows organization page with all locations, includes accordion-style dropdown listing all locations for quick navigation
+    - **Games** - Shows all games across the organization
+    - **Issues** - Shows all issues across the organization
+  - **Authentication Component:**
+    - **Logged Out State:** A single "Login / Sign Up" button. Clicking it opens the Authentication Modal.
+    - **Logged In State:** The button is replaced with the user's avatar and name. Clicking this opens a dropdown with links to "/profile" and a "Logout" action.
+- **Mobile Navigation:**
+  - Navigation menu becomes a hamburger menu
+  - Location dropdown uses accordion-style expansion within the mobile menu for better touch interaction
 
-### **Authentication System (Phase 1)**
+### **Authentication Modal**
 
-- **NextAuth.js Integration:** Complete OAuth and magic link authentication
-- **Session Management:** Persistent sessions with organization context
-- **Multi-tenant Support:** Subdomain-based organization routing
-- **Key Features:**
-  - Google OAuth integration
-  - Magic link authentication
-  - Development impersonation
-  - Session persistence across page reloads
-
-## **1\. Core Application Pages (Phase-Based Implementation)**
-
-### **Dashboard Page (Phase 3)**
-
-- **Route:** `/dashboard`
-- **Purpose:** Main landing page for authenticated users with real-time statistics
-- **Current Status:** Visual design complete, mock data needs replacement
-- **Phase 3 Implementation:**
-  - Replace mock data with tRPC API calls
-  - Add real-time updates for issue statistics
-  - Implement functional navigation to all major sections
-  - Add loading states and error handling
+- **Purpose:** A single modal for handling authentication, triggered from the Universal Header.
 - **Key Components:**
-  - Issue statistics cards with real data
-  - Assigned issues list with priority indicators
-  - Recent activity feed
-  - Quick action buttons (Create Issue, View All Issues)
+  - **Mode Selection:** Separate "Login" and "Sign Up" buttons within the modal to switch between modes
+  - **Email Field:** Magic Link (email) input field
+  - **Social Sign-in:** Buttons for Google, Facebook authentication
+  - **Mode-Specific Behavior:**
+    - Login mode: Standard authentication flow
+    - Sign Up mode: Shows error message if email already exists
+  - **Visual Indication:** Clear indication of which mode (login/signup) is currently active
 
-### **Issues Management (Phase 2)**
+## **1. Organization & Location Pages**
 
-- **Routes:** `/issues`, `/issues/[id]`, `/issues/new`
-- **Purpose:** Complete issue management workflow
-- **Implementation Strategy:** Leverage archived frontend patterns
-- **Key Pages:**
-  - **Issues List:** Filtering, sorting, pagination with current card styling
-  - **Issue Detail:** Timeline, comments, image gallery, real-time updates
-  - **Issue Creation:** Machine selection, image upload, form validation
+### **/ (Organization Homepage)**
 
-### **/locations/{locationId} (Public Location Page)**
+- **Purpose:** Main landing page showing organization info and locations.
+- **Public View:**
+  - Organization Name and Logo
+  - Grid/list of all public locations
+  - Basic organization information
+- **Authenticated View (Additional Components):**
+  - **"Add Location" button:**
+    - Hidden for unauthenticated users
+    - Visible but disabled for users without permission (tooltip: "Requires create_location permission")
+    - Enabled for users with appropriate permissions
+  - Location management quick actions (edit/delete) with permission-based visibility
 
-- **Purpose:** A public-facing view of all the machines at a specific location.
-- **Key Components:**
-  - **Header:** Location Name and Address.
-  - **Game Filters:**
-    - A free-text search bar to instantly filter the list of games by name.
-  - **"Report an Issue" Button:** A prominent call-to-action that opens a modal.
-  - **Game Grid:** A responsive grid of cards for each machine, updated by the filters.
-  - **View All Issues Link:** A link to /locations/{locationId}/issues.
+### **/locations/{locationId} (Location Page)**
 
-### **/machines/{machineId} (Public Machine Page)**
+- **Purpose:** Display all machines at a specific location.
+- **Public View:**
+  - Location Name and Address
+  - Free-text search bar for filtering games
+  - "Report an Issue" button (opens modal)
+  - Game Grid with machine cards
+  - "View All Issues" link to /locations/{locationId}/issues
+- **Authenticated View (Additional Components):**
+  - **"Add Machine" button:** Permission-based visibility (tooltip: "Requires create_machine permission")
+  - Machine management actions (edit/move/delete): Permission-based
+  - Internal issue indicators on machine cards
+  - Collection management tools (V1.0)
 
-- **Purpose:** A public, read-only detail page for a specific machine.
-- **Key Components:**
-  - Machine Identification, Current Status Indicator, Simplified Issue List.
-  - **Primary Action:** A "Report an Issue on this Machine" button linking to /machines/{machineId}/report-issue.
-  - **View Full History Link:** A link to /machines/{machineId}/issues.
+## **2. Machine Pages**
+
+### **/machines (All Machines Page)**
+
+- **Purpose:** Organization-wide machine inventory view.
+- **Public View:**
+  - Search and filter controls
+  - Machine list/grid with basic information
+  - Status indicators
+- **Authenticated View (Additional Components):**
+  - **"Add Machine" button:** Permission-based visibility
+  - Bulk actions for staff (move, update status)
+  - Advanced filters (location, owner, status)
+  - Export functionality
+
+### **/machines/{machineId} (Machine Detail Page)**
+
+- **Purpose:** Detailed view of a specific machine.
+- **Public View:**
+  - Machine identification and photos
+  - Current status indicator
+  - Recent public issues list
+  - "Report an Issue" button
+  - "View Full History" link
+- **Authenticated View (Additional Components):**
+  - **Edit Machine:** Permission-based (tooltip: "Requires edit_machine permission")
+  - **Move Machine:** Permission-based (tooltip: "Requires move_machine permission")
+  - Internal issues (marked with lock icon)
+  - Owner information and notification settings
+  - Maintenance history (staff only)
+
+### **/machines/{machineId}/report-issue**
+
+- **Purpose:** Dedicated issue reporting page.
+- **Components:**
+  - Pre-filled machine information
+  - Issue type selection
+  - Description field
+  - Photo upload
+  - **"Internal Only" checkbox:** Visible only to authenticated staff with appropriate permissions
+
+## **3. Issue Management Pages**
+
+### **/issues (Issues List)**
+
+- **Purpose:** Central issue tracking across organization.
+- **Public View:**
+  - List of public issues with basic filters
+  - Status indicators
+  - Machine and location information
+- **Authenticated View (Additional Components):**
+  - Internal issues (with privacy badges)
+  - Advanced filters (assignee, priority, internal/public)
+  - Bulk actions: Permission-based (tooltip: "Requires bulk_manage_issues permission")
+  - Issue assignment controls
+
+### **/issues/{issueId} (Issue Detail)**
+
+- **Purpose:** Detailed issue view and management.
+- **Public View:**
+  - Issue description and status
+  - Public comments/updates
+  - Machine and location context
+- **Authenticated View (Additional Components):**
+  - **Edit Issue:** Permission-based (tooltip: "Requires edit_issue permission")
+  - **Close Issue:** Permission-based (tooltip: "Requires close_issue permission")
+  - Internal notes section
+  - Assignment controls
+  - Status change history
+  - Priority management
 
 ### **/locations/{locationId}/issues & /machines/{machineId}/issues**
 
-- **Purpose:** To display the main issues list, pre-filtered for a specific location or machine.
+- **Purpose:** Pre-filtered issue views for specific contexts.
+- **Components:** Same as /issues but with active location or machine filters
 
-### **/machines/{machineId}/report-issue (Dedicated Issue Reporting Page)**
+## **4. Dashboard (Authenticated Only)**
 
-- **Purpose:** A dedicated, shareable page for reporting an issue on a specific machine.
+### **/dashboard**
+
+<<<<<<< HEAD
 
 ## **2\. Administrative Features (Phase 4)**
 
@@ -144,6 +163,18 @@ src/app/
 
 ### **Organization Administration**
 
+=======
+
+- **Purpose:** Personalized overview for authenticated users.
+- **Components:**
+  - Issues assigned to current user
+  - Recent activity on owned machines
+  - Organization statistics (filtered by user's permissions)
+  - Quick action buttons based on user's permissions
+  - Recent updates across the organization
+
+## **5. User & Admin Pages**
+
 - **Route:** `/admin/organization`
 - **Purpose:** Complete organization management for administrators
 - **Access Control:** Admin role required
@@ -154,7 +185,21 @@ src/app/
   - Organization statistics dashboard
   - Bulk user operations
 
+<<<<<<< HEAD
+
 ### **Machine Management**
+
+=======
+
+- **Purpose:** User profile management.
+- **Components:**
+  - Edit name, avatar, email preferences
+  - Notification preferences (global and per-machine)
+  - **My Owned Machines:**
+    - List of owned machines with direct links
+    - Per-machine notification toggles
+  - Activity history
+  - Connected social accounts
 
 - **Routes:** `/machines`, `/machines/[id]`, `/machines/new`
 - **Purpose:** Complete machine lifecycle management
@@ -166,7 +211,19 @@ src/app/
   - Ownership assignment
   - Location management integration
 
+<<<<<<< HEAD
+
 ### **Location Management**
+
+=======
+
+- **Purpose:** Organization settings (Admin only).
+- **Components:**
+  - Organization name and logo management
+  - Default notification settings
+  - Collection group toggles (V1.0)
+  - Member invitation controls
+  - API key management
 
 - **Routes:** `/locations`, `/locations/[id]`
 - **Purpose:** Physical location management
@@ -177,23 +234,102 @@ src/app/
   - Location statistics and analytics
   - Address and contact management
 
+<<<<<<< HEAD
+
 ## **3\. Technical Implementation Details**
 
-### **Design System Preservation**
+=======
 
-- **Visual Identity:** Dark theme (`#1a1a2e`) with purple accents (`#667eea`) maintained throughout all phases
-- **Component Consistency:** All new components follow established patterns from current dashboard
-- **Material UI v7:** Modern component library with updated Grid syntax and theming
-- **Responsive Design:** Mobile-first approach with proper breakpoints
+- **Purpose:** Location management (Admin only).
+- **Components:**
+  - Location list with add/edit/delete controls
+  - **Add Location:** Full permission required
+  - Per-location settings:
+    - Name, address, contact info
+    - Public/Private visibility (V1.0)
+    - Operating hours
+    - Manual collection management (V1.0)
 
-### **Performance Optimization**
+### **/admin/users**
 
-- **Data Loading:** Parallel API calls, intelligent caching, pagination
-- **Real-time Updates:** Optimistic UI with fallback handling
-- **Image Handling:** Client-side compression, lazy loading, CDN delivery
-- **Bundle Optimization:** Code splitting and tree shaking
+- **Purpose:** User role management (Admin only).
+- **Components:**
+  - User list with search/filter
+  - Role assignment interface
+  - Permission matrix view
+  - Activity logs per user
+  - Bulk role updates with confirmation
 
-### **Quality Standards**
+## **Permission-Based UI Patterns**
+
+Throughout the application, use these consistent patterns:
+
+1. **Hidden:** Component not rendered for users without any access
+2. **Disabled:** Component visible but grayed out with tooltip
+3. **Enabled:** Full functionality for users with appropriate permissions
+
+**Tooltip Format:** "Requires {permission_name} permission"
+
+- Permission names are dynamically inserted
+- Prevents message drift when permissions change
+- Consider adding "Contact an admin to request access" as second line
+
+Example Implementation:
+
+```tsx
+<Button
+  disabled={!hasPermission("create_location")}
+  title={
+    !hasPermission("create_location")
+      ? `Requires ${getPermissionName("create_location")} permission`
+      : ""
+  }
+>
+  Add Location
+</Button>
+```
+
+## **Mobile Navigation Design**
+
+1. **Hamburger Menu:**
+   - Collapse main navigation on mobile
+   - Full-height slide-out drawer
+
+2. **Location Selection:**
+   - Accordion-style expansion within mobile menu
+   - Tapping "Locations" expands to show:
+     - "All Locations" link
+     - Individual location links
+
+3. **Touch Targets:**
+   - Minimum 44x44px touch targets
+   - Adequate spacing between interactive elements
+
+4. **Progressive Disclosure:**
+   - Complex forms use expandable sections
+   - Multi-step flows for lengthy processes
+
+## **Games Page Structure**
+
+### **/games (All Games Page)**
+
+- **Purpose:** Organization-wide view of all game titles.
+- **Public View:**
+  - Searchable list of all game titles in the organization
+  - Filter by manufacturer, era, location
+  - Count of instances per title
+- **Authenticated View (Additional Components):**
+  - Add custom game title (permission-based)
+  - Edit game metadata
+  - Bulk operations
+
+## **V1.0 Enhancements**
+
+### **Multi-Tenancy**
+
+- Public marketing homepage at root domain
+- Organization signup flow with subdomain selection
+- Tenant switching UI for users in multiple organizations
 
 - **Zero TypeScript Errors:** Strict typing enforced throughout
 - **ESLint Compliance:** Consistent code style and best practices
@@ -201,64 +337,34 @@ src/app/
 - **Test Coverage:** Unit, integration, and E2E tests for all phases
 - **Performance:** Lighthouse scores >90 for all pages
 
+<<<<<<< HEAD
+
 ## **4\. Future Enhancements (Post-Phase 4)**
 
-### **Real-time Collaboration**
+=======
 
-- **WebSocket Integration:** Live updates for issue changes and comments
-- **Presence Indicators:** Show who's currently viewing/editing issues
-- **Live Activity Feed:** Real-time notifications for all user actions
-- **Conflict Resolution:** Handle concurrent edits gracefully
+- **Private Locations:**
+  - Repair shops, storage facilities
+  - Not shown on public pages
+  - Available as destinations for moves
+- **Machine Movement Workflows:**
+  - Multi-step process with confirmation
+  - Reason for move tracking
+  - History of all movements
+- **Internal-Only Issues:**
+  - Checkbox on creation
+  - Lock icon indicator
+  - Filtered from public views
 
-### **Advanced Features**
+### **Collection Features**
 
-- **Kanban Board:** Drag-and-drop issue management interface
-- **Advanced Analytics:** Issue trends, performance metrics, reporting
-- **Bulk Operations:** Multi-select actions for efficient management
-- **API Webhooks:** Third-party system integration capabilities
-
-### **Public-Facing Features**
-
-- **QR Code System:** Machine-specific QR codes for easy issue reporting
-- **Public Issue Reporting:** Anonymous issue submission with email notifications
-- **Location Discovery:** Public-facing organization and location pages
-- **Collection System:** Advanced filtering and categorization for public users
-
-### **Enterprise Features**
-
-- **Multi-organization Support:** Users managing multiple organizations
-- **Advanced RBAC:** Custom role creation and granular permissions
-- **Audit Logging:** Comprehensive action tracking and reporting
-- **White-label Support:** Custom branding and domain configuration
-
-## **5\. Migration Strategy**
-
-### **From Current State**
-
-1. **Preserve Visual Design:** Maintain exact styling and component structure
-2. **Incremental Replacement:** Replace mock data with real API calls
-3. **Component Reuse:** Leverage existing component patterns where possible
-4. **Gradual Enhancement:** Add features without disrupting existing functionality
-
-### **From Archived Frontend**
-
-1. **Pattern Extraction:** Reuse proven patterns from archived issue management
-2. **Modernization:** Update to Next.js App Router and latest React patterns
-3. **API Integration:** Connect to new tRPC endpoints instead of legacy APIs
-4. **Design Alignment:** Adapt archived functionality to current visual design
-
-## **6\. Success Metrics**
-
-### **Phase Completion Criteria**
-
-- **Phase 1:** Real authentication, session persistence, user context
-- **Phase 2:** Complete issue management workflow with real-time updates
-- **Phase 3:** Dashboard with real data and functional navigation
-- **Phase 4:** Full administrative capabilities and user management
-
-### **Overall Success**
-
-- **User Experience:** Smooth, intuitive interface with consistent design
-- **Performance:** Fast loading times and responsive interactions
-- **Reliability:** Robust error handling and offline capabilities
-- **Scalability:** Architecture ready for future feature additions
+- **Auto-Generated Collections:**
+  - By manufacturer, era, theme
+  - Configurable at organization level
+- **Manual Collections:**
+  - "Rooms" or custom groupings
+  - Per-location configuration
+- **UI Implementation:**
+  - Expandable filter drawers
+  - Multi-selection support
+  - Visual collection badges on machines
