@@ -14,7 +14,6 @@ export const commentRouter = createTRPCRouter({
   getForIssue: organizationProcedure
     .input(z.object({ issueId: z.string() }))
     .query(({ ctx, input }) => {
-
       return ctx.db.comment.findMany({
         where: {
           issueId: input.issueId,
@@ -39,7 +38,6 @@ export const commentRouter = createTRPCRouter({
   delete: issueDeleteProcedure
     .input(z.object({ commentId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-
       const comment = await ctx.db.comment.findUnique({
         where: { id: input.commentId },
         include: {
@@ -76,7 +74,6 @@ export const commentRouter = createTRPCRouter({
       // Record the deletion activity
       const activityService = ctx.services.createIssueActivityService();
       await activityService.recordCommentDeleted(
-
         comment.issueId,
         ctx.organization.id,
         ctx.session.user.id,

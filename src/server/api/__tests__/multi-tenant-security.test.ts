@@ -1,18 +1,10 @@
 import { TRPCError } from "@trpc/server";
 import { type Session } from "next-auth";
-import { type DeepMockProxy } from "jest-mock-extended";
 
 import { appRouter } from "~/server/api/root";
 import { createCallerFactory } from "~/server/api/trpc";
 import { auth } from "~/server/auth";
-import { createMockContext } from "~/test/mockContext";
-import {
-  type Organization,
-  type Issue,
-  type Machine,
-  type Priority,
-  type Status,
-} from "@prisma/client";
+import { createMockContext, type MockContext } from "~/test/mockContext";
 
 // Mock auth function
 jest.mock("~/server/auth", () => ({
@@ -40,7 +32,7 @@ describe("Multi-Tenant Security Tests", () => {
   });
 
   // Test data for Organization A
-  const organizationA: Organization = {
+  const organizationA = {
     id: "org-a",
     name: "Organization A",
     subdomain: "org-a",
@@ -57,26 +49,11 @@ describe("Multi-Tenant Security Tests", () => {
       id: "role-member-a",
       name: "member",
       organizationId: "org-a",
-      isDefault: false,
-      createdAt: new Date(),
-      updatedAt: new Date(),
       permissions: [
-        {
-          id: "perm-1",
-          name: "issues:read",
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-        {
-          id: "perm-2",
-          name: "issues:write",
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
+        { id: "perm-1", name: "issues:read" },
+        { id: "perm-2", name: "issues:write" },
       ],
     },
-    createdAt: new Date(),
-    updatedAt: new Date(),
   };
 
   const userAAdmin = {
@@ -87,42 +64,17 @@ describe("Multi-Tenant Security Tests", () => {
       id: "role-admin",
       name: "admin",
       organizationId: "org-a",
-      isDefault: false,
-      createdAt: new Date(),
-      updatedAt: new Date(),
       permissions: [
-        {
-          id: "perm-1",
-          name: "issues:read",
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-        {
-          id: "perm-2",
-          name: "issues:write",
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-        {
-          id: "perm-3",
-          name: "issue:edit",
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-        {
-          id: "perm-4",
-          name: "admin:manage",
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
+        { id: "perm-1", name: "issues:read" },
+        { id: "perm-2", name: "issues:write" },
+        { id: "perm-3", name: "issue:edit" },
+        { id: "perm-4", name: "admin:manage" },
       ],
     },
-    createdAt: new Date(),
-    updatedAt: new Date(),
   };
 
   // Test data for Organization B
-  const organizationB: Organization = {
+  const organizationB = {
     id: "org-b",
     name: "Organization B",
     subdomain: "org-b",
@@ -139,30 +91,15 @@ describe("Multi-Tenant Security Tests", () => {
       id: "role-member-b",
       name: "member",
       organizationId: "org-b",
-      isDefault: false,
-      createdAt: new Date(),
-      updatedAt: new Date(),
       permissions: [
-        {
-          id: "perm-1",
-          name: "issues:read",
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-        {
-          id: "perm-2",
-          name: "issues:write",
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
+        { id: "perm-1", name: "issues:read" },
+        { id: "perm-2", name: "issues:write" },
       ],
     },
-    createdAt: new Date(),
-    updatedAt: new Date(),
   };
 
   // Sample issues for each organization
-  const issuesOrgA: Issue[] = [
+  const issuesOrgA = [
     {
       id: "issue-a-1",
       title: "Issue A1",
@@ -176,12 +113,12 @@ describe("Multi-Tenant Security Tests", () => {
       updatedAt: new Date(),
       resolvedAt: null,
       consistency: null,
-      checklist: [],
+      checklist: null,
       description: "Test description",
     },
   ];
 
-  const issuesOrgB: Issue[] = [
+  const issuesOrgB = [
     {
       id: "issue-b-1",
       title: "Issue B1",
@@ -195,10 +132,42 @@ describe("Multi-Tenant Security Tests", () => {
       updatedAt: new Date(),
       resolvedAt: null,
       consistency: null,
-      checklist: [],
+      checklist: null,
       description: "Test description",
     },
   ];
+
+  // Type helper to properly type the caller with issue procedures
+  interface IssueGetAllInput {
+    locationId?: string;
+    statusId?: string;
+    modelId?: string;
+    statusCategory?: "NEW" | "OPEN" | "CLOSED";
+    sortBy?: "created" | "updated" | "status" | "severity" | "game";
+    sortOrder?: "asc" | "desc";
+  }
+
+  interface IssueCreateInput {
+    title: string;
+    description?: string;
+    severity?: "Low" | "Medium" | "High" | "Critical";
+    machineId: string;
+    statusId: string;
+  }
+
+  interface IssueUpdateInput {
+    id: string;
+    title?: string;
+  }
+
+  type CallerType = ReturnType<typeof createCaller> & {
+    issue: {
+      getAll: (input?: IssueGetAllInput) => Promise<unknown>;
+      getById: (input: { id: string }) => Promise<unknown>;
+      create: (input: IssueCreateInput) => Promise<unknown>;
+      update: (input: IssueUpdateInput) => Promise<unknown>;
+    };
+  };
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -218,7 +187,7 @@ describe("Multi-Tenant Security Tests", () => {
         expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       };
 
-      (mockAuth as jest.Mock).mockResolvedValue(sessionA);
+      mockAuth.mockResolvedValue(sessionA);
       mockOrganizationFindUnique.mockResolvedValue(organizationA);
       mockMembershipFindUnique.mockResolvedValue(userAMember);
       mockMembershipFindFirst.mockResolvedValue(userAMember);
@@ -229,12 +198,11 @@ describe("Multi-Tenant Security Tests", () => {
 
       const callerA = createCaller({
         ...ctx,
-        session: sessionA,
         organization: organizationA,
         headers: new Headers({
           host: "org-a.localhost:3000",
         }),
-      });
+      }) as CallerType;
 
       const result = await callerA.issue.core.getAll({
         locationId: undefined,
@@ -271,7 +239,7 @@ describe("Multi-Tenant Security Tests", () => {
         expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       };
 
-      (mockAuth as jest.Mock).mockResolvedValue(sessionA);
+      mockAuth.mockResolvedValue(sessionA);
       // Return Organization B when subdomain is org-b
       mockOrganizationFindUnique.mockResolvedValue(organizationB);
 
@@ -283,12 +251,11 @@ describe("Multi-Tenant Security Tests", () => {
 
       const callerA = createCaller({
         ...ctx,
-        session: sessionA,
         organization: organizationB,
         headers: new Headers({
           host: "org-b.localhost:3000", // User A trying to access org B
         }),
-      });
+      }) as CallerType;
 
       await expect(
         callerA.issue.core.getAll({
@@ -335,7 +302,7 @@ describe("Multi-Tenant Security Tests", () => {
       };
 
       // Test Organization A access
-      (mockAuth as jest.Mock).mockResolvedValue(sessionA);
+      mockAuth.mockResolvedValue(sessionA);
       mockOrganizationFindUnique.mockResolvedValue(organizationA);
       mockMembershipFindUnique.mockResolvedValue(userAMember);
       mockMembershipFindFirst.mockResolvedValue(userAMember);
@@ -345,12 +312,11 @@ describe("Multi-Tenant Security Tests", () => {
 
       const callerA = createCaller({
         ...ctx,
-        session: sessionA,
         organization: organizationA,
         headers: new Headers({
           host: "org-a.localhost:3000",
         }),
-      });
+      }) as CallerType;
 
       const resultA = await callerA.issue.core.getAll({
         locationId: undefined,
@@ -365,7 +331,7 @@ describe("Multi-Tenant Security Tests", () => {
 
       // Reset mocks and test Organization B access
       jest.clearAllMocks();
-      (mockAuth as jest.Mock).mockResolvedValue(sessionB);
+      mockAuth.mockResolvedValue(sessionB);
       mockOrganizationFindUnique.mockResolvedValue(organizationB);
       mockMembershipFindUnique.mockResolvedValue(userBMember);
       mockMembershipFindFirst.mockResolvedValue(userBMember);
@@ -375,12 +341,11 @@ describe("Multi-Tenant Security Tests", () => {
 
       const callerB = createCaller({
         ...ctxB,
-        session: sessionB,
         organization: organizationB,
         headers: new Headers({
           host: "org-b.localhost:3000",
         }),
-      });
+      }) as CallerType;
 
       const resultB = await callerB.issue.core.getAll({
         locationId: undefined,
@@ -418,45 +383,34 @@ describe("Multi-Tenant Security Tests", () => {
         expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       };
 
-      (mockAuth as jest.Mock).mockResolvedValue(sessionA);
+      mockAuth.mockResolvedValue(sessionA);
       mockOrganizationFindUnique.mockResolvedValue(organizationA);
       mockMembershipFindUnique.mockResolvedValue(userAAdmin);
       mockMembershipFindFirst.mockResolvedValue(userAAdmin);
 
       // Try to return an issue from Organization B
-      const issueFromOrgB: Issue = {
+      mockIssueFindUnique.mockResolvedValue({
         id: "issue-b-1",
         title: "Issue B1",
         organizationId: "org-b", // Different organization!
         machineId: "game-b-1",
-        statusId: "status-b-1",
-        priorityId: "priority-b-1",
-        createdById: "user-b",
-        assignedToId: null,
-        description: null,
-        resolvedAt: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        consistency: null,
-        checklist: [],
-      };
-      mockIssueFindUnique.mockResolvedValue(issueFromOrgB);
+      });
 
       const ctx = createMockContext();
-      (
-        ctx.db.issue.findUnique as DeepMockProxy<
-          typeof ctx.db.issue.findUnique
-        >
-      ).mockResolvedValue(issueFromOrgB);
+      ctx.db.issue.findUnique.mockResolvedValue({
+        id: "issue-b-1",
+        title: "Issue B1",
+        organizationId: "org-b",
+        machineId: "game-b-1",
+      });
 
       const callerA = createCaller({
         ...ctx,
-        session: sessionA,
         organization: organizationA,
         headers: new Headers({
           host: "org-a.localhost:3000",
         }),
-      });
+      }) as CallerType;
 
       // This should fail because the issue belongs to a different organization
       await expect(
@@ -476,108 +430,83 @@ describe("Multi-Tenant Security Tests", () => {
         expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       };
 
-      (mockAuth as jest.Mock).mockResolvedValue(sessionA);
+      mockAuth.mockResolvedValue(sessionA);
       mockOrganizationFindUnique.mockResolvedValue(organizationA);
       mockMembershipFindUnique.mockResolvedValue(userAMember);
       mockMembershipFindFirst.mockResolvedValue(userAMember);
 
       // Mock machine lookup to return a machine belonging to org-a
-      const machineOrgA: Machine = {
+      mockMachineFindFirst.mockResolvedValue({
         id: "game-a-1",
-        name: "Test Machine A",
-        organizationId: "org-a",
-        locationId: "loc-a",
-        modelId: "model-a",
-        ownerId: null,
-        ownerNotificationsEnabled: false,
-        notifyOnNewIssues: false,
-        notifyOnStatusChanges: false,
-        notifyOnComments: false,
-        qrCodeId: "qr-a",
-        qrCodeUrl: null,
-        qrCodeGeneratedAt: null,
-      };
-
-      const machineWithLocation = {
-        ...machineOrgA,
         location: {
-          id: "loc-a",
-          name: "Location A",
           organizationId: "org-a",
-          createdAt: new Date(),
-          updatedAt: new Date(),
         },
-      };
-
-      mockMachineFindFirst.mockResolvedValue(machineWithLocation);
+      });
 
       // Mock machine findUnique for notification service
-      const machineWithOwner = {
-        ...machineOrgA,
+      mockMachineFindUnique.mockResolvedValue({
+        id: "game-a-1",
         owner: {
           id: "user-a",
           name: "User A",
           email: "user-a@example.com",
-          emailVerified: null,
-          image: null,
-          createdAt: new Date(),
-          updatedAt: new Date(),
         },
-      };
-      mockMachineFindUnique.mockResolvedValue(machineWithOwner);
+      });
 
       // Mock issue status lookup (for default "New" status)
-      const statusNew: Status = {
+      mockIssueStatusFindFirst.mockResolvedValue({
         id: "status-1",
         name: "New",
         organizationId: "org-a",
         isDefault: true,
-        category: "NEW",
-      };
-      mockIssueStatusFindFirst.mockResolvedValue(statusNew);
+      });
 
       // Mock priority lookup (for default priority)
-      const priorityMedium: Priority = {
+      mockPriorityFindFirst.mockResolvedValue({
         id: "priority-1",
         name: "Medium",
         organizationId: "org-a",
         isDefault: true,
-        order: 2,
-      };
-      mockPriorityFindFirst.mockResolvedValue(priorityMedium);
+      });
 
       const ctx = createMockContext();
 
       // Mock machine lookup to return a machine belonging to org-a
-      (
-        ctx.db.machine.findFirst as DeepMockProxy<
-          typeof ctx.db.machine.findFirst
-        >
-      ).mockResolvedValue(machineWithLocation);
+      ctx.db.machine.findFirst.mockResolvedValue({
+        id: "game-a-1",
+        location: {
+          organizationId: "org-a",
+        },
+      });
 
       // Mock machine findUnique for notification service
-      (
-        ctx.db.machine.findUnique as DeepMockProxy<
-          typeof ctx.db.machine.findUnique
-        >
-      ).mockResolvedValue(machineWithOwner);
+      ctx.db.machine.findUnique.mockResolvedValue({
+        id: "game-a-1",
+        owner: {
+          id: "user-a",
+          name: "User A",
+          email: "user-a@example.com",
+        },
+      });
 
       // Mock issue status lookup (for default "New" status)
-      (
-        ctx.db.issueStatus.findFirst as DeepMockProxy<
-          typeof ctx.db.issueStatus.findFirst
-        >
-      ).mockResolvedValue(statusNew);
+      ctx.db.issueStatus.findFirst.mockResolvedValue({
+        id: "status-1",
+        name: "New",
+        organizationId: "org-a",
+        isDefault: true,
+      });
 
       // Mock priority lookup (for default priority)
-      (
-        ctx.db.priority.findFirst as DeepMockProxy<
-          typeof ctx.db.priority.findFirst
-        >
-      ).mockResolvedValue(priorityMedium);
+      ctx.db.priority.findFirst.mockResolvedValue({
+        id: "priority-1",
+        name: "Medium",
+        organizationId: "org-a",
+        isDefault: true,
+      });
 
       // Mock successful creation
-      const newIssue: Issue = {
+      ctx.db.issue.create.mockResolvedValue({
         id: "new-issue",
         title: "Test Issue",
         description: "Test Description",
@@ -591,20 +520,16 @@ describe("Multi-Tenant Security Tests", () => {
         assignedToId: null,
         resolvedAt: null,
         consistency: null,
-        checklist: [],
-      };
-      (ctx.db.issue.create as DeepMockProxy<typeof ctx.db.issue.create>).mockResolvedValue(
-        newIssue,
-      );
+        checklist: null,
+      });
 
       const callerA = createCaller({
         ...ctx,
-        session: sessionA,
         organization: organizationA,
         headers: new Headers({
           host: "org-a.localhost:3000",
         }),
-      });
+      }) as CallerType;
 
       // The create mutation should automatically add the correct organizationId
       const createData = {
@@ -619,14 +544,6 @@ describe("Multi-Tenant Security Tests", () => {
         id: "new-issue",
         ...createData,
         organizationId: "org-a", // Should be automatically set
-        createdById: "user-a",
-        priorityId: "priority-1",
-        assignedToId: null,
-        resolvedAt: null,
-        consistency: null,
-        checklist: [],
-        createdAt: new Date(),
-        updatedAt: new Date(),
       });
 
       await callerA.issue.core.create(createData);
@@ -657,47 +574,36 @@ describe("Multi-Tenant Security Tests", () => {
         expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       };
 
-      (mockAuth as jest.Mock).mockResolvedValue(sessionA);
+      mockAuth.mockResolvedValue(sessionA);
       mockOrganizationFindUnique.mockResolvedValue(organizationA);
       mockMembershipFindUnique.mockResolvedValue(userAAdmin);
       mockMembershipFindFirst.mockResolvedValue(userAAdmin);
 
       // Mock finding an issue from Organization B
-      const issueFromOrgB: Issue = {
+      mockIssueFindUnique.mockResolvedValue({
         id: "issue-b-1",
         title: "Issue B1",
         organizationId: "org-b", // Different organization
         machineId: "game-b-1",
-        statusId: "status-b-1",
-        priorityId: "priority-b-1",
-        createdById: "user-b",
-        assignedToId: null,
-        description: null,
-        resolvedAt: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        consistency: null,
-        checklist: [],
-      };
-      mockIssueFindUnique.mockResolvedValue(issueFromOrgB);
+      });
 
       const ctx = createMockContext();
 
       // Mock finding an issue from Organization B
-      (
-        ctx.db.issue.findUnique as DeepMockProxy<
-          typeof ctx.db.issue.findUnique
-        >
-      ).mockResolvedValue(issueFromOrgB);
+      ctx.db.issue.findUnique.mockResolvedValue({
+        id: "issue-b-1",
+        title: "Issue B1",
+        organizationId: "org-b", // Different organization
+        machineId: "game-b-1",
+      });
 
       const callerA = createCaller({
         ...ctx,
-        session: sessionA,
         organization: organizationA,
         headers: new Headers({
           host: "org-a.localhost:3000",
         }),
-      });
+      }) as CallerType;
 
       // Should fail to update issue from different organization
       await expect(
@@ -722,7 +628,7 @@ describe("Multi-Tenant Security Tests", () => {
         expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       };
 
-      (mockAuth as jest.Mock).mockResolvedValue(memberSession);
+      mockAuth.mockResolvedValue(memberSession);
       mockOrganizationFindUnique.mockResolvedValue(organizationA);
       mockMembershipFindUnique.mockResolvedValue(userAMember);
       mockMembershipFindFirst.mockResolvedValue(userAMember);
@@ -732,12 +638,11 @@ describe("Multi-Tenant Security Tests", () => {
 
       const memberCaller = createCaller({
         ...ctx,
-        session: memberSession,
         organization: organizationA,
         headers: new Headers({
           host: "org-a.localhost:3000",
         }),
-      });
+      }) as CallerType;
 
       // Member should be able to access organization data
       const result = await memberCaller.issue.core.getAll({
@@ -767,7 +672,7 @@ describe("Multi-Tenant Security Tests", () => {
         expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       };
 
-      (mockAuth as jest.Mock).mockResolvedValue(adminSession);
+      mockAuth.mockResolvedValue(adminSession);
       mockOrganizationFindUnique.mockResolvedValue(organizationA);
       mockMembershipFindUnique.mockResolvedValue(userAAdmin);
       mockMembershipFindFirst.mockResolvedValue(userAAdmin);
@@ -778,12 +683,11 @@ describe("Multi-Tenant Security Tests", () => {
 
       const adminCaller = createCaller({
         ...ctxAdmin,
-        session: adminSession,
         organization: organizationA,
         headers: new Headers({
           host: "org-a.localhost:3000",
         }),
-      });
+      }) as CallerType;
 
       const result = await adminCaller.issue.core.getAll({
         locationId: undefined,
@@ -811,7 +715,7 @@ describe("Multi-Tenant Security Tests", () => {
   });
 
   describe("Subdomain Resolution Security", () => {
-    it("should correctly resolve organization from subdomain", async () => {
+    it("should correctly resolve organization from subdomain", () => {
       const session: Session = {
         user: {
           id: "user-a",
@@ -823,7 +727,7 @@ describe("Multi-Tenant Security Tests", () => {
         expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       };
 
-      (mockAuth as jest.Mock).mockResolvedValue(session);
+      mockAuth.mockResolvedValue(session);
 
       // Mock organization lookup by both ID and subdomain
       mockOrganizationFindUnique.mockImplementation((query) => {
@@ -860,7 +764,7 @@ describe("Multi-Tenant Security Tests", () => {
         expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       };
 
-      (mockAuth as jest.Mock).mockResolvedValue(session);
+      mockAuth.mockResolvedValue(session);
       mockOrganizationFindUnique.mockResolvedValue(organizationB); // But subdomain resolves to org-b
       mockMembershipFindUnique.mockResolvedValue(null);
       mockMembershipFindFirst.mockResolvedValue(null); // No membership in org-b
@@ -871,12 +775,11 @@ describe("Multi-Tenant Security Tests", () => {
 
       const caller = createCaller({
         ...ctx,
-        session: session,
         organization: organizationB,
         headers: new Headers({
           host: "org-b.localhost:3000", // Spoofed subdomain
         }),
-      });
+      }) as CallerType;
 
       await expect(caller.user.getCurrentMembership()).rejects.toThrow(
         new TRPCError({

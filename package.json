@@ -85,6 +85,7 @@
     "@trpc/react-query": "^11.0.0",
     "@trpc/server": "^11.0.0",
     "@types/qrcode": "^1.5.5",
+    "actionlint": "^2.0.6",
     "csv-parser": "^3.2.0",
     "next": "15.3.5",
     "next-auth": "5.0.0-beta.29",
@@ -127,7 +128,7 @@
     "prettier": "^3.5.3",
     "ts-jest": "^29.4.0",
     "tsx": "^4.20.3",
-    "typescript": "^5.8.3",
+    "typescript": "^5.8.2",
     "typescript-eslint": "^8.36.0"
   },
   "ct3aMetadata": {

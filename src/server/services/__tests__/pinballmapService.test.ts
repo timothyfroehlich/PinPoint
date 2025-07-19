@@ -43,16 +43,16 @@ describe("PinballMapService", () => {
     countIssueMock = jest.fn();
 
     // Assign the jest.fn() mocks to the actual ctx.db methods
-    (ctx.db.location.findUnique as any) = findUniqueLocationMock;
-    (ctx.db.model.findUnique as any) = findUniqueModelMock;
-    (ctx.db.model.create as any) = createModelMock;
-    (ctx.db.model.update as any) = updateModelMock;
-    (ctx.db.model.upsert as any) = upsertModelMock;
-    (ctx.db.machine.findMany as any) = findManyMachineMock;
-    (ctx.db.machine.deleteMany as any) = deleteManyMachineMock;
-    (ctx.db.machine.delete as any) = deleteMachineMock;
-    (ctx.db.machine.create as any) = createMachineMock;
-    (ctx.db.issue.count as any) = countIssueMock;
+    ctx.db.location.findUnique = findUniqueLocationMock;
+    ctx.db.model.findUnique = findUniqueModelMock;
+    ctx.db.model.create = createModelMock;
+    ctx.db.model.update = updateModelMock;
+    ctx.db.model.upsert = upsertModelMock;
+    ctx.db.machine.findMany = findManyMachineMock;
+    ctx.db.machine.deleteMany = deleteManyMachineMock;
+    ctx.db.machine.delete = deleteMachineMock;
+    ctx.db.machine.create = createMachineMock;
+    ctx.db.issue.count = countIssueMock;
     apiMocker = new PinballMapAPIMocker();
     apiMocker.start();
   });
@@ -185,7 +185,10 @@ describe("PinballMapService", () => {
     });
     it("should preserve existing games that are still in PinballMap", async () => {
       const fixtureData = PinballMapAPIMocker.getFixtureData();
-      const firstMachine = fixtureData.machines[0];
+      const firstMachine = fixtureData.machines[0] as {
+        name: string;
+        opdb_id: string;
+      };
       if (!firstMachine) throw new Error("Fixture data is empty");
 
       // Mock one existing game that matches the first machine in fixture data

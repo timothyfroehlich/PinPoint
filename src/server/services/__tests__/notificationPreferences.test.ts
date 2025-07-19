@@ -169,7 +169,7 @@ describe("Notification preference logic", () => {
     });
     const createdMachine = await mockPrisma.machine.create({
       data: {
-        name: "Test Machine",
+        serialNumber: "Test Machine",
         organizationId: "org-1",
         locationId: "location-1",
         modelId: "model-1",
