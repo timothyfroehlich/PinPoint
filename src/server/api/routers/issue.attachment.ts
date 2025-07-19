@@ -13,7 +13,7 @@ export const issueAttachmentRouter = createTRPCRouter({
     .input(
       z.object({
         issueId: z.string(),
-        url: z.url(),
+        url: z.string().url(),
         fileName: z.string(),
         fileType: z.string(),
       }),

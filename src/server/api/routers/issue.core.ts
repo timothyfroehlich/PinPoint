@@ -208,7 +208,7 @@ export const issueCoreRouter = createTRPCRouter({
         }
       })();
 
-      return ctx.db.issue.findMany({
+      const issues = await ctx.db.issue.findMany({
         where: whereClause,
         include: {
           status: true,
@@ -241,6 +241,7 @@ export const issueCoreRouter = createTRPCRouter({
         },
         orderBy,
       });
+      return issues;
     }),
 
   // Get a single issue by ID
