@@ -1,7 +1,6 @@
 import { z } from "zod";
 
 import { createTRPCRouter, organizationProcedure } from "~/server/api/trpc";
-import { IssueActivityService } from "~/server/services/issueActivityService";
 
 export const issueTimelineRouter = createTRPCRouter({
   // Get issue timeline (comments + activities)
@@ -23,7 +22,7 @@ export const issueTimelineRouter = createTRPCRouter({
         throw new Error("Issue not found");
       }
 
-      const activityService = new IssueActivityService(ctx.db);
+      const activityService = ctx.services.createIssueActivityService();
       return activityService.getIssueTimeline(
         input.issueId,
         ctx.organization.id,

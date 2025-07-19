@@ -3,8 +3,9 @@ import { type DefaultSession, type NextAuthConfig } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
 
+import type { ExtendedPrismaClient } from "~/server/db";
+
 import { env } from "~/env.js";
-import { db } from "~/server/db";
 
 /**
  * Module augmentation for `next-auth` types. Allows us to add custom properties to the `session`
@@ -33,7 +34,8 @@ declare module "next-auth" {
  *
  * @see https://next-auth.js.org/configuration/options
  */
-export const authConfig = {
+export const createAuthConfig = (db: ExtendedPrismaClient): NextAuthConfig => ({
+  adapter: PrismaAdapter(db),
   providers: [
     Google({
       clientId: env.GOOGLE_CLIENT_ID!,
@@ -79,7 +81,6 @@ export const authConfig = {
         ]
       : []),
   ],
-  adapter: PrismaAdapter(db),
   pages: {
     signIn: "/sign-in",
   },
@@ -137,4 +138,4 @@ export const authConfig = {
       return session;
     },
   },
-} satisfies NextAuthConfig;
+});

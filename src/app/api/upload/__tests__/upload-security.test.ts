@@ -18,22 +18,29 @@ jest.mock("~/server/auth", () => ({
   auth: mockAuth,
 }));
 
-jest.mock("~/server/db", () => ({
-  db: {
-    organization: {
-      findUnique: mockOrganizationFindUnique,
-    },
-    membership: {
-      findFirst: mockMembershipFindFirst,
-    },
-    issue: {
-      findUnique: mockIssueFindUnique,
-    },
-    attachment: {
-      count: mockAttachmentCount,
-      create: mockAttachmentCreate,
-    },
+// Mock database provider
+const mockDb = {
+  organization: {
+    findUnique: mockOrganizationFindUnique,
   },
+  membership: {
+    findFirst: mockMembershipFindFirst,
+  },
+  issue: {
+    findUnique: mockIssueFindUnique,
+  },
+  attachment: {
+    count: mockAttachmentCount,
+    create: mockAttachmentCreate,
+  },
+};
+
+jest.mock("~/server/db/provider", () => ({
+  getGlobalDatabaseProvider: jest.fn().mockReturnValue({
+    getClient: jest.fn().mockReturnValue(mockDb),
+    disconnect: jest.fn(),
+    reset: jest.fn(),
+  }),
 }));
 
 jest.mock("~/lib/image-storage/local-storage", () => ({

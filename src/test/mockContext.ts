@@ -1,10 +1,62 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { PrismaClient } from "@prisma/client";
 import { mockDeep, mockReset, type DeepMockProxy } from "jest-mock-extended";
 
+import type { ExtendedPrismaClient } from "~/server/db";
+import type { ServiceFactory } from "~/server/services/factory";
+
+// Mock individual services with all methods
+const mockNotificationService = {
+  createNotification: jest.fn().mockResolvedValue(undefined),
+  getUserNotifications: jest.fn().mockResolvedValue([]),
+  getUnreadCount: jest.fn().mockResolvedValue(0),
+  markAsRead: jest.fn().mockResolvedValue(undefined),
+  markAllAsRead: jest.fn().mockResolvedValue(undefined),
+  notifyMachineOwnerOfIssue: jest.fn().mockResolvedValue(undefined),
+  notifyMachineOwnerOfStatusChange: jest.fn().mockResolvedValue(undefined),
+  notifyUserOfAssignment: jest.fn().mockResolvedValue(undefined),
+};
+
+const mockCollectionService = {
+  // Add collection service methods here when needed
+};
+
+const mockIssueActivityService = {
+  recordActivity: jest.fn().mockResolvedValue(undefined),
+  recordIssueCreated: jest.fn().mockResolvedValue(undefined),
+  recordStatusChange: jest.fn().mockResolvedValue(undefined),
+  recordAssignmentChange: jest.fn().mockResolvedValue(undefined),
+  recordFieldUpdate: jest.fn().mockResolvedValue(undefined),
+  recordCommentDeleted: jest.fn().mockResolvedValue(undefined),
+  getIssueTimeline: jest.fn().mockResolvedValue([]),
+};
+
+const mockPinballMapService = {
+  // Add pinball map service methods here when needed
+};
+
+const mockCommentCleanupService = {
+  // Add comment cleanup service methods here when needed
+};
+
+const mockQRCodeService = {
+  // Add QR code service methods here when needed
+};
+
+// Mock service factory
+const createMockServiceFactory = (): DeepMockProxy<ServiceFactory> => {
+  return {
+    createNotificationService: jest.fn(() => mockNotificationService),
+    createCollectionService: jest.fn(() => mockCollectionService),
+    createPinballMapService: jest.fn(() => mockPinballMapService),
+    createIssueActivityService: jest.fn(() => mockIssueActivityService),
+    createCommentCleanupService: jest.fn(() => mockCommentCleanupService),
+    createQRCodeService: jest.fn(() => mockQRCodeService),
+  } as any;
+};
+
 export interface MockContext {
-  db: DeepMockProxy<PrismaClient>;
-  prisma?: DeepMockProxy<PrismaClient>; // Keep for backwards compatibility
+  db: DeepMockProxy<ExtendedPrismaClient>;
+  services: DeepMockProxy<ServiceFactory>;
   session: {
     user: {
       id: string;
@@ -22,7 +74,14 @@ export interface MockContext {
 }
 
 export function createMockContext(): MockContext {
-  const mockDb = mockDeep<PrismaClient>();
+  const mockDb = mockDeep<ExtendedPrismaClient>();
+  const mockServices = createMockServiceFactory();
+
+  // Mock the $accelerate property that comes from Prisma Accelerate extension
+  (mockDb as any).$accelerate = {
+    invalidate: jest.fn(),
+    ttl: jest.fn(),
+  };
 
   // Set up default membership mock - can be overridden in individual tests
   mockDb.membership.findFirst.mockResolvedValue(mockMembership as any);
@@ -64,7 +123,7 @@ export function createMockContext(): MockContext {
 
   return {
     db: mockDb,
-    prisma: mockDb, // Keep for backwards compatibility
+    services: mockServices,
     session: null,
     organization: undefined,
     headers: new Headers(),
@@ -73,10 +132,28 @@ export function createMockContext(): MockContext {
 
 export function resetMockContext(ctx: MockContext) {
   mockReset(ctx.db);
-  if (ctx.prisma) {
-    mockReset(ctx.prisma);
-  }
+  // Reset all service mocks
+  Object.values(mockNotificationService).forEach((method) => {
+    if (typeof method === "function" && method.mockReset) {
+      method.mockReset();
+    }
+  });
+  Object.values(mockIssueActivityService).forEach((method) => {
+    if (typeof method === "function" && method.mockReset) {
+      method.mockReset();
+    }
+  });
 }
+
+// Export individual service mocks for direct access in tests
+export {
+  mockNotificationService,
+  mockCollectionService,
+  mockIssueActivityService,
+  mockPinballMapService,
+  mockCommentCleanupService,
+  mockQRCodeService,
+};
 
 // Common mock data for testing
 export const mockUser = {

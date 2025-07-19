@@ -7,7 +7,6 @@ import {
   machineEditProcedure,
   machineDeleteProcedure,
 } from "~/server/api/trpc";
-import { QRCodeService } from "~/server/services/qrCodeService";
 
 export const machineCoreRouter = createTRPCRouter({
   create: machineEditProcedure
@@ -67,7 +66,7 @@ export const machineCoreRouter = createTRPCRouter({
 
       // Auto-generate QR code for the new machine
       try {
-        const qrCodeService = new QRCodeService(ctx.db);
+        const qrCodeService = ctx.services.createQRCodeService();
         await qrCodeService.generateQRCode(machine.id);
       } catch (error) {
         // Log error but don't fail machine creation

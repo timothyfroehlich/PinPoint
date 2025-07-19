@@ -1,7 +1,6 @@
 import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { NotificationService } from "~/server/services/notificationService";
 
 export const notificationRouter = createTRPCRouter({
   // Get user's notifications
@@ -14,13 +13,13 @@ export const notificationRouter = createTRPCRouter({
       }),
     )
     .query(async ({ ctx, input }) => {
-      const service = new NotificationService(ctx.db);
+      const service = ctx.services.createNotificationService();
       return service.getUserNotifications(ctx.session.user.id, input);
     }),
 
   // Get unread count
   getUnreadCount: protectedProcedure.query(async ({ ctx }) => {
-    const service = new NotificationService(ctx.db);
+    const service = ctx.services.createNotificationService();
     return service.getUnreadCount(ctx.session.user.id);
   }),
 
@@ -28,14 +27,14 @@ export const notificationRouter = createTRPCRouter({
   markAsRead: protectedProcedure
     .input(z.object({ notificationId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      const service = new NotificationService(ctx.db);
+      const service = ctx.services.createNotificationService();
       await service.markAsRead(input.notificationId, ctx.session.user.id);
       return { success: true };
     }),
 
   // Mark all as read
   markAllAsRead: protectedProcedure.mutation(async ({ ctx }) => {
-    const service = new NotificationService(ctx.db);
+    const service = ctx.services.createNotificationService();
     await service.markAllAsRead(ctx.session.user.id);
     return { success: true };
   }),

@@ -5,12 +5,11 @@ import {
   createTRPCRouter,
   organizationManageProcedure,
 } from "~/server/api/trpc";
-import { PinballMapService } from "~/server/services/pinballmapService";
 
 export const pinballMapRouter = createTRPCRouter({
   // Enable PinballMap integration for organization
   enableIntegration: organizationManageProcedure.mutation(async ({ ctx }) => {
-    const service = new PinballMapService(ctx.db);
+    const service = ctx.services.createPinballMapService();
     await service.enableIntegration(ctx.organization.id);
     return { success: true };
   }),
@@ -24,7 +23,7 @@ export const pinballMapRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const service = new PinballMapService(ctx.db);
+      const service = ctx.services.createPinballMapService();
       await service.configureLocationSync(
         input.locationId,
         input.pinballMapId,
@@ -37,7 +36,7 @@ export const pinballMapRouter = createTRPCRouter({
   syncLocation: organizationManageProcedure
     .input(z.object({ locationId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      const service = new PinballMapService(ctx.db);
+      const service = ctx.services.createPinballMapService();
       const result = await service.syncLocation(input.locationId);
 
       if (!result.success) {
@@ -52,7 +51,7 @@ export const pinballMapRouter = createTRPCRouter({
 
   // Get sync status for organization
   getSyncStatus: organizationManageProcedure.query(async ({ ctx }) => {
-    const service = new PinballMapService(ctx.db);
+    const service = ctx.services.createPinballMapService();
     return service.getOrganizationSyncStatus(ctx.organization.id);
   }),
 });

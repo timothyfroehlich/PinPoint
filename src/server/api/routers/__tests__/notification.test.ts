@@ -44,7 +44,11 @@ describe("notificationRouter", () => {
       actionUrl: null,
     };
 
-    ctx.db.notification.findMany.mockResolvedValue([mockNotification]);
+    // Mock the service method to return the expected data
+    const mockNotificationService = ctx.services.createNotificationService();
+    (
+      mockNotificationService.getUserNotifications as jest.MockedFunction<any>
+    ).mockResolvedValue([mockNotification]);
 
     const caller = appRouter.createCaller(ctx as any);
     const result = await caller.notification.getNotifications({});
@@ -54,7 +58,10 @@ describe("notificationRouter", () => {
   });
 
   it("gets unread count", async () => {
-    ctx.db.notification.count.mockResolvedValue(3);
+    const mockNotificationService = ctx.services.createNotificationService();
+    (
+      mockNotificationService.getUnreadCount as jest.MockedFunction<any>
+    ).mockResolvedValue(3);
 
     const caller = appRouter.createCaller(ctx as any);
     const count = await caller.notification.getUnreadCount();
@@ -64,27 +71,32 @@ describe("notificationRouter", () => {
   });
 
   it("marks notification as read", async () => {
-    ctx.db.notification.updateMany.mockResolvedValue({ count: 1 });
+    const mockNotificationService = ctx.services.createNotificationService();
+    (
+      mockNotificationService.markAsRead as jest.MockedFunction<any>
+    ).mockResolvedValue(undefined);
 
     const caller = appRouter.createCaller(ctx as any);
     await caller.notification.markAsRead({ notificationId });
 
-    expect(ctx.db.notification.updateMany).toHaveBeenCalledWith({
-      where: { id: notificationId, userId: mockUser.id },
-      data: { read: true },
-    });
+    expect(mockNotificationService.markAsRead).toHaveBeenCalledWith(
+      notificationId,
+      mockUser.id,
+    );
   });
 
   it("marks all as read", async () => {
-    ctx.db.notification.updateMany.mockResolvedValue({ count: 2 });
+    const mockNotificationService = ctx.services.createNotificationService();
+    (
+      mockNotificationService.markAllAsRead as jest.MockedFunction<any>
+    ).mockResolvedValue(undefined);
 
     const caller = appRouter.createCaller(ctx as any);
     await caller.notification.markAllAsRead();
 
-    expect(ctx.db.notification.updateMany).toHaveBeenCalledWith({
-      where: { userId: mockUser.id, read: false },
-      data: { read: true },
-    });
+    expect(mockNotificationService.markAllAsRead).toHaveBeenCalledWith(
+      mockUser.id,
+    );
   });
 
   it("requires authentication", async () => {
@@ -117,8 +129,10 @@ describe("notificationRouter", () => {
       },
     ];
 
-    ctx.db.notification.findMany.mockResolvedValue(mockNotifications);
-    ctx.db.notification.update.mockResolvedValue(undefined as any);
+    const mockNotificationService = ctx.services.createNotificationService();
+    (
+      mockNotificationService.getUserNotifications as jest.MockedFunction<any>
+    ).mockResolvedValue(mockNotifications);
 
     const caller = appRouter.createCaller(ctx as any);
 
@@ -127,10 +141,9 @@ describe("notificationRouter", () => {
     expect(result.some((n) => n.userId === otherUserId)).toBe(false);
 
     // Should only query for current user's notifications
-    expect(ctx.db.notification.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({ userId: mockUser.id }),
-      }),
+    expect(mockNotificationService.getUserNotifications).toHaveBeenCalledWith(
+      mockUser.id,
+      {},
     );
   });
 });
