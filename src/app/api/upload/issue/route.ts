@@ -1,33 +1,55 @@
 import { type NextRequest, NextResponse } from "next/server";
 
+import type { ExtendedPrismaClient } from "~/server/db";
+
 import { imageStorage } from "~/lib/image-storage/local-storage";
 import {
   getUploadAuthContext,
   requireUploadPermission,
+  type UploadAuthContext,
 } from "~/server/auth/uploadAuth";
 import { getGlobalDatabaseProvider } from "~/server/db/provider";
 
-export async function POST(req: NextRequest) {
+// Database query result interfaces
+interface IssueWithMachine {
+  id: string;
+  organizationId: string;
+  machine: {
+    id: string;
+    model: {
+      name: string;
+    };
+  };
+}
+
+interface AttachmentResult {
+  id: string;
+  url: string;
+  fileName: string;
+  fileType: string;
+}
+
+export async function POST(req: NextRequest): Promise<NextResponse> {
   const dbProvider = getGlobalDatabaseProvider();
-  const db = dbProvider.getClient();
+  const db: ExtendedPrismaClient = dbProvider.getClient();
   try {
     // Get authenticated context
-    const ctx = await getUploadAuthContext(req, db);
+    const ctx: UploadAuthContext = await getUploadAuthContext(req, db);
 
     const formData = await req.formData();
-    const file = formData.get("file") as File;
-    const issueId = formData.get("issueId") as string;
+    const file = formData.get("file");
+    const issueId = formData.get("issueId");
 
-    if (!file) {
+    if (!file || !(file instanceof File)) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
-    if (!issueId) {
+    if (!issueId || typeof issueId !== "string") {
       return NextResponse.json({ error: "Issue ID required" }, { status: 400 });
     }
 
     // Verify issue exists and belongs to organization
-    const issue = await db.issue.findUnique({
+    const issue: IssueWithMachine | null = await db.issue.findUnique({
       where: { id: issueId },
       select: {
         id: true,
@@ -60,7 +82,7 @@ export async function POST(req: NextRequest) {
     await requireUploadPermission(ctx, "attachment:create");
 
     // Check attachment count limit
-    const existingAttachments = await db.attachment.count({
+    const existingAttachments: number = await db.attachment.count({
       where: { issueId, organizationId: ctx.organization.id },
     });
 
@@ -83,7 +105,7 @@ export async function POST(req: NextRequest) {
     const filePath = await imageStorage.uploadImage(file, `issue-${issueId}`);
 
     // Create attachment record with organizationId
-    const attachment = await db.attachment.create({
+    const attachment: AttachmentResult = await db.attachment.create({
       data: {
         url: filePath,
         fileName: file.name,

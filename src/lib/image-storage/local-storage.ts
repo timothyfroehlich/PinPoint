@@ -21,10 +21,10 @@ export class LocalImageStorage implements ImageStorageProvider {
     }
   }
 
-  async validateImage(
+  validateImage(
     file: File,
     constraints = IMAGE_CONSTRAINTS,
-  ): Promise<boolean> {
+  ): boolean {
     // Check file size
     if (file.size > constraints.maxSizeBytes) {
       return false;
@@ -49,14 +49,14 @@ export class LocalImageStorage implements ImageStorageProvider {
   ): Promise<string> {
     await this.ensureDirectoryExists();
 
-    if (!(await this.validateImage(file, constraints))) {
+    if (!this.validateImage(file, constraints)) {
       throw new Error("Invalid image file");
     }
 
     // Generate unique filename
     const timestamp = Date.now();
     const extension = "webp"; // Always convert to WebP
-    const filename = `${relativePath}-${timestamp}.${extension}`;
+    const filename = `${relativePath}-${timestamp.toString()}.${extension}`;
     const fullPath = path.join(this.basePath, filename);
 
     // Convert file to buffer
@@ -95,7 +95,7 @@ export class LocalImageStorage implements ImageStorageProvider {
     return this.uploadImage(file, `issue-${issueId}`);
   }
 
-  async validateIssueAttachment(file: File): Promise<boolean> {
+  validateIssueAttachment(file: File): boolean {
     return this.validateImage(file);
   }
 
@@ -106,7 +106,7 @@ export class LocalImageStorage implements ImageStorageProvider {
     // Generate unique filename
     const timestamp = Date.now();
     const extension = "webp";
-    const filename = `${relativePath}-${timestamp}.${extension}`;
+    const filename = `${relativePath}-${timestamp.toString()}.${extension}`;
     const fullPath = path.join(this.basePath, filename);
 
     // Write buffer directly
@@ -125,7 +125,7 @@ export class LocalImageStorage implements ImageStorageProvider {
     );
   }
 
-  async validateProfilePicture(file: File): Promise<boolean> {
+  validateProfilePicture(file: File): boolean {
     return this.validateImage(file, PROFILE_PICTURE_CONSTRAINTS);
   }
 

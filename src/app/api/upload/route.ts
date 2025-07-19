@@ -3,7 +3,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { imageStorage } from "~/lib/image-storage/local-storage";
 import { auth } from "~/server/auth";
 
-export async function POST(req: NextRequest) {
+export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
     // Check authentication
     const session = await auth();
@@ -12,9 +12,9 @@ export async function POST(req: NextRequest) {
     }
 
     const formData = await req.formData();
-    const file = formData.get("file") as File;
+    const file = formData.get("file");
 
-    if (!file) {
+    if (!file || !(file instanceof File)) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
