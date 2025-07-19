@@ -68,12 +68,17 @@ export class IssueActivityService {
     newAssignee: { name?: string } | null,
   ): Promise<void> {
     let _description: string;
+    const oldAssigneeName = oldAssignee?.name ?? "unassigned";
+    const newAssigneeName = newAssignee?.name ?? "unassigned";
+
     if (oldAssignee?.name && newAssignee?.name) {
-      _description = `Reassigned from ${oldAssignee.name} to ${newAssignee.name}`;
+      _description = `Reassigned from ${String(oldAssigneeName)} to ${String(
+        newAssigneeName,
+      )}`;
     } else if (newAssignee?.name) {
-      _description = `Assigned to ${newAssignee.name}`;
+      _description = `Assigned to ${String(newAssigneeName)}`;
     } else if (oldAssignee?.name) {
-      _description = `Unassigned from ${oldAssignee.name}`;
+      _description = `Unassigned from ${String(oldAssigneeName)}`;
     } else {
       _description = "Assignment changed";
     }

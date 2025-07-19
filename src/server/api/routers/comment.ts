@@ -1,4 +1,3 @@
-import { type Comment, type User } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
@@ -9,22 +8,13 @@ import {
   organizationManageProcedure,
 } from "~/server/api/trpc";
 import { COMMENT_CLEANUP_CONFIG } from "~/server/constants/cleanup";
-import { type DeletedComment } from "~/server/services/CommentCleanupService";
-
-type CommentWithAuthor = Comment & {
-  author: Pick<User, "id" | "name" | "profilePicture"> | null;
-};
-
-type CleanupStats = {
-  candidateCount: number;
-  cleanupThresholdDays: number;
-};
 
 export const commentRouter = createTRPCRouter({
   // Get comments for an issue (excludes deleted)
   getForIssue: organizationProcedure
     .input(z.object({ issueId: z.string() }))
-    .query(({ ctx, input }): Promise<CommentWithAuthor[]> => {
+    .query(({ ctx, input }) => {
+
       return ctx.db.comment.findMany({
         where: {
           issueId: input.issueId,
@@ -42,13 +32,14 @@ export const commentRouter = createTRPCRouter({
         orderBy: {
           createdAt: "asc",
         },
-      }) as unknown as Promise<CommentWithAuthor[]>;
+      });
     }),
 
   // Soft delete a comment
   delete: issueDeleteProcedure
     .input(z.object({ commentId: z.string() }))
-    .mutation(async ({ ctx, input }): Promise<{ success: boolean }> => {
+    .mutation(async ({ ctx, input }) => {
+
       const comment = await ctx.db.comment.findUnique({
         where: { id: input.commentId },
         include: {
@@ -68,6 +59,7 @@ export const commentRouter = createTRPCRouter({
       }
 
       // Verify comment belongs to user's organization
+
       if (comment.issue.organizationId !== ctx.organization.id) {
         throw new TRPCError({
           code: "FORBIDDEN",
@@ -84,6 +76,7 @@ export const commentRouter = createTRPCRouter({
       // Record the deletion activity
       const activityService = ctx.services.createIssueActivityService();
       await activityService.recordCommentDeleted(
+
         comment.issueId,
         ctx.organization.id,
         ctx.session.user.id,
@@ -94,32 +87,28 @@ export const commentRouter = createTRPCRouter({
     }),
 
   // Admin: Get deleted comments
-  getDeleted: organizationManageProcedure.query(
-    ({ ctx }): Promise<DeletedComment[]> => {
-      const cleanupService = ctx.services.createCommentCleanupService();
-      return cleanupService.getDeletedComments(ctx.organization.id);
-    },
-  ),
+  getDeleted: organizationManageProcedure.query(({ ctx }) => {
+    const cleanupService = ctx.services.createCommentCleanupService();
+    return cleanupService.getDeletedComments(ctx.organization.id);
+  }),
 
   // Admin: Restore deleted comment
   restore: organizationManageProcedure
     .input(z.object({ commentId: z.string() }))
-    .mutation(async ({ ctx, input }): Promise<{ success: boolean }> => {
+    .mutation(async ({ ctx, input }) => {
       const cleanupService = ctx.services.createCommentCleanupService();
       await cleanupService.restoreComment(input.commentId);
       return { success: true };
     }),
 
   // Admin: Get cleanup statistics
-  getCleanupStats: organizationManageProcedure.query(
-    async ({ ctx }): Promise<CleanupStats> => {
-      const cleanupService = ctx.services.createCommentCleanupService();
-      const candidateCount = await cleanupService.getCleanupCandidateCount();
+  getCleanupStats: organizationManageProcedure.query(async ({ ctx }) => {
+    const cleanupService = ctx.services.createCommentCleanupService();
+    const candidateCount = await cleanupService.getCleanupCandidateCount();
 
-      return {
-        candidateCount,
-        cleanupThresholdDays: COMMENT_CLEANUP_CONFIG.RETENTION_DAYS,
-      };
-    },
-  ),
+    return {
+      candidateCount,
+      cleanupThresholdDays: COMMENT_CLEANUP_CONFIG.RETENTION_DAYS,
+    };
+  }),
 });

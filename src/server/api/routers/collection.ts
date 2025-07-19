@@ -1,9 +1,3 @@
-import {
-  type Collection,
-  type CollectionType,
-  type Machine,
-  type Model,
-} from "@prisma/client";
 import { z } from "zod";
 
 import {
@@ -13,9 +7,6 @@ import {
   organizationManageProcedure,
   locationEditProcedure,
 } from "~/server/api/trpc";
-import { type AutoCollectionResult } from "~/server/services/collectionService";
-
-type MachineWithModel = Machine & { model: Model | null };
 
 export const collectionRouter = createTRPCRouter({
   // Public: Get collections for location filtering
@@ -26,7 +17,7 @@ export const collectionRouter = createTRPCRouter({
         organizationId: z.string(),
       }),
     )
-    .query(async ({ ctx, input }): Promise<Collection[]> => {
+    .query(async ({ ctx, input }) => {
       const service = ctx.services.createCollectionService();
       return service.getLocationCollections(
         input.locationId,
@@ -42,7 +33,7 @@ export const collectionRouter = createTRPCRouter({
         locationId: z.string(),
       }),
     )
-    .query(async ({ ctx, input }): Promise<MachineWithModel[]> => {
+    .query(async ({ ctx, input }) => {
       const service = ctx.services.createCollectionService();
       return service.getCollectionMachines(
         input.collectionId,
@@ -60,8 +51,9 @@ export const collectionRouter = createTRPCRouter({
         description: z.string().optional(),
       }),
     )
-    .mutation(async ({ ctx, input }): Promise<Collection> => {
+    .mutation(async ({ ctx, input }) => {
       const service = ctx.services.createCollectionService();
+
       return service.createManualCollection(ctx.organization.id, {
         name: input.name,
         typeId: input.typeId,
@@ -78,7 +70,7 @@ export const collectionRouter = createTRPCRouter({
         machineIds: z.array(z.string()),
       }),
     )
-    .mutation(async ({ ctx, input }): Promise<{ success: boolean }> => {
+    .mutation(async ({ ctx, input }) => {
       const service = ctx.services.createCollectionService();
       await service.addMachinesToCollection(
         input.collectionId,
@@ -88,20 +80,16 @@ export const collectionRouter = createTRPCRouter({
     }),
 
   // Generate auto-collections
-  generateAuto: organizationManageProcedure.mutation(
-    async ({ ctx }): Promise<AutoCollectionResult> => {
-      const service = ctx.services.createCollectionService();
-      return service.generateAutoCollections(ctx.organization.id);
-    },
-  ),
+  generateAuto: organizationManageProcedure.mutation(async ({ ctx }) => {
+    const service = ctx.services.createCollectionService();
+    return service.generateAutoCollections(ctx.organization.id);
+  }),
 
   // Get organization collection types for admin
-  getTypes: organizationProcedure.query(
-    async ({ ctx }): Promise<CollectionType[]> => {
-      const service = ctx.services.createCollectionService();
-      return service.getOrganizationCollectionTypes(ctx.organization.id);
-    },
-  ),
+  getTypes: organizationProcedure.query(async ({ ctx }) => {
+    const service = ctx.services.createCollectionService();
+    return service.getOrganizationCollectionTypes(ctx.organization.id);
+  }),
 
   // Toggle collection type
   toggleType: organizationManageProcedure
@@ -111,7 +99,7 @@ export const collectionRouter = createTRPCRouter({
         enabled: z.boolean(),
       }),
     )
-    .mutation(async ({ ctx, input }): Promise<{ success: boolean }> => {
+    .mutation(async ({ ctx, input }) => {
       const service = ctx.services.createCollectionService();
       await service.toggleCollectionType(input.collectionTypeId, input.enabled);
       return { success: true };

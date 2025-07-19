@@ -56,7 +56,7 @@ interface Role {
  * Membership type for context
  */
 interface Membership {
-  id: string;
+  id:string;
   organizationId: string;
   userId: string;
   role: Role;
@@ -209,13 +209,6 @@ export const protectedProcedure = t.procedure
 
 export const organizationProcedure = protectedProcedure.use(
   async ({ ctx, next }) => {
-    if (!ctx.organization) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Organization not found",
-      });
-    }
-     
     const membership = await ctx.db.membership.findFirst({
       where: {
         organizationId: ctx.organization.id,

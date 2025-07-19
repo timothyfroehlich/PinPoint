@@ -23,6 +23,7 @@ describe("PinballMap Integration Tests", () => {
     ctx = createMockContext();
 
     // Set up location mock to return location with organization relation
+    // eslint-disable-next-line @typescript-eslint/unbound-method
     ctx.db.location.findUnique.mockResolvedValue(mockLocationWithOrganization);
 
     apiMocker = new PinballMapAPIMocker();
@@ -86,15 +87,20 @@ describe("PinballMap Integration Tests", () => {
     };
 
     beforeEach(() => {
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       (ctx.db.location.findUnique as jest.Mock).mockResolvedValue(
         mockLocationWithOrganization,
       );
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       (ctx.db.machine.findMany as jest.Mock).mockResolvedValue([]);
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       (ctx.db.model.findUnique as jest.Mock).mockResolvedValue(null);
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       (ctx.db.model.create as jest.Mock).mockImplementation(
         ({ data }: { data: { name: string } }) =>
           Promise.resolve({ id: `title-${data.name}`, ...data } as Model),
       );
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       (ctx.db.machine.create as jest.Mock).mockImplementation(
         ({
           data,
@@ -119,6 +125,7 @@ describe("PinballMap Integration Tests", () => {
       await syncLocationGames(ctx.db, "location-1");
 
       // Verify the service was called with correct parameters
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(ctx.db.location.findUnique).toHaveBeenCalledWith({
         where: { id: "location-1" },
         include: {
@@ -133,6 +140,7 @@ describe("PinballMap Integration Tests", () => {
 
     it("should handle location not found errors", async () => {
       // SETUP: Location doesn't exist
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       (ctx.db.location.findUnique as jest.Mock).mockResolvedValue(null);
 
       // TEST: Sync with non-existent location
@@ -141,6 +149,7 @@ describe("PinballMap Integration Tests", () => {
 
     it("should handle missing PinballMap ID", async () => {
       // SETUP: Location exists but has no PinballMap ID
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       (ctx.db.location.findUnique as jest.Mock).mockResolvedValue({
         ...mockLocation,
         pinballMapId: null,

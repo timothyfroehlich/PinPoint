@@ -4,9 +4,7 @@ export class DatabaseProvider {
   private instance?: ExtendedPrismaClient;
 
   getClient(): ExtendedPrismaClient {
-    if (!this.instance) {
-      this.instance = createPrismaClient();
-    }
+    this.instance ??= createPrismaClient();
     return this.instance;
   }
 
@@ -27,8 +25,6 @@ export class DatabaseProvider {
 let globalProvider: DatabaseProvider | undefined;
 
 export function getGlobalDatabaseProvider(): DatabaseProvider {
-  if (!globalProvider) {
-    globalProvider = new DatabaseProvider();
-  }
+  globalProvider ??= new DatabaseProvider();
   return globalProvider;
 }

@@ -44,7 +44,9 @@ describe("Notification preference logic", () => {
       ownerNotificationsEnabled: false,
     };
 
+    // eslint-disable-next-line @typescript-eslint/unbound-method
     (mockPrisma.machine.update).mockResolvedValue(updatedMachine);
+    // eslint-disable-next-line @typescript-eslint/unbound-method
     (mockPrisma.machine.findUnique).mockResolvedValue(updatedMachine);
 
     // Test disabling all notifications for machine
@@ -58,6 +60,7 @@ describe("Notification preference logic", () => {
     });
 
     expect(updated?.ownerNotificationsEnabled).toBe(false);
+    // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(mockPrisma.machine.update).toHaveBeenCalledWith({
       where: { id: mockMachine.id },
       data: { ownerNotificationsEnabled: false },
@@ -70,7 +73,9 @@ describe("Notification preference logic", () => {
       emailNotificationsEnabled: false,
     };
 
+    // eslint-disable-next-line @typescript-eslint/unbound-method
     (mockPrisma.user.update).mockResolvedValue(updatedUser);
+    // eslint-disable-next-line @typescript-eslint/unbound-method
     (mockPrisma.user.findUnique).mockResolvedValue(updatedUser);
 
     // Test disabling all notifications for user
@@ -84,6 +89,7 @@ describe("Notification preference logic", () => {
     });
 
     expect(updated?.emailNotificationsEnabled).toBe(false);
+    // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(mockPrisma.user.update).toHaveBeenCalledWith({
       where: { id: mockUser.id },
       data: { emailNotificationsEnabled: false },
@@ -100,9 +106,13 @@ describe("Notification preference logic", () => {
       emailNotificationsEnabled: false,
     };
 
+    // eslint-disable-next-line @typescript-eslint/unbound-method
     (mockPrisma.machine.update).mockResolvedValue(updatedMachine);
+    // eslint-disable-next-line @typescript-eslint/unbound-method
     (mockPrisma.machine.findUnique).mockResolvedValue(updatedMachine);
+    // eslint-disable-next-line @typescript-eslint/unbound-method
     (mockPrisma.user.update).mockResolvedValue(updatedUser);
+    // eslint-disable-next-line @typescript-eslint/unbound-method
     (mockPrisma.user.findUnique).mockResolvedValue(updatedUser);
 
     // Machine notifications enabled, user notifications disabled
@@ -157,7 +167,9 @@ describe("Notification preference logic", () => {
       updatedAt: new Date(),
     };
 
+    // eslint-disable-next-line @typescript-eslint/unbound-method
     (mockPrisma.user.create).mockResolvedValue(newUser);
+    // eslint-disable-next-line @typescript-eslint/unbound-method
     (mockPrisma.machine.create).mockResolvedValue(newMachine);
 
     const createdUser = await mockPrisma.user.create({
