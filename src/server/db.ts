@@ -3,7 +3,7 @@ import { withAccelerate } from "@prisma/extension-accelerate";
 
 import { env } from "~/env";
 
-export const createPrismaClient = () => {
+function createPrismaClientInternal(): ReturnType<typeof PrismaClient.prototype.$extends> {
   const baseClient = new PrismaClient({
     log:
       env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
@@ -12,7 +12,11 @@ export const createPrismaClient = () => {
   // Always extend with Accelerate for consistent typing
   // In development, Accelerate operations will fall back to regular Prisma
   return baseClient.$extends(withAccelerate());
-};
+}
 
 // Type alias for the extended Prisma client used throughout the application
-export type ExtendedPrismaClient = ReturnType<typeof createPrismaClient>;
+export type ExtendedPrismaClient = ReturnType<typeof createPrismaClientInternal>;
+
+export const createPrismaClient = (): ExtendedPrismaClient => {
+  return createPrismaClientInternal();
+};
