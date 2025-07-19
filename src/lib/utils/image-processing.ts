@@ -29,7 +29,7 @@ export async function processImageFile(
     if (file.size > IMAGE_CONSTRAINTS.maxSizeBytes) {
       return {
         success: false,
-        error: `File too large. Maximum size is ${Math.round(IMAGE_CONSTRAINTS.maxSizeBytes / (1024 * 1024))}MB.`,
+        error: `File too large. Maximum size is ${Math.round(IMAGE_CONSTRAINTS.maxSizeBytes / (1024 * 1024)).toString()}MB.`,
       };
     }
 
@@ -143,7 +143,7 @@ export async function processIssueImageFile(
     if (file.size > ISSUE_ATTACHMENT_CONSTRAINTS.maxSizeBytes) {
       return {
         success: false,
-        error: `File too large. Maximum size is ${Math.round(ISSUE_ATTACHMENT_CONSTRAINTS.maxSizeBytes / (1024 * 1024))}MB.`,
+        error: `File too large. Maximum size is ${Math.round(ISSUE_ATTACHMENT_CONSTRAINTS.maxSizeBytes / (1024 * 1024)).toString()}MB.`,
       };
     }
 
@@ -214,5 +214,5 @@ export async function processIssueImageFile(
 export function getDefaultAvatarUrl(): string {
   // Randomly select from 1-10 default avatars
   const avatarNumber = Math.floor(Math.random() * 10) + 1;
-  return `/images/default-avatars/default-avatar-${avatarNumber}.webp`;
+  return `/images/default-avatars/default-avatar-${avatarNumber.toString()}.webp`;
 }

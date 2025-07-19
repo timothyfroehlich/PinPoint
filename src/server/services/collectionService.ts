@@ -466,7 +466,7 @@ export class CollectionService {
   /**
    * Get organization's collection types for admin management
    */
-  async getOrganizationCollectionTypes(organizationId: string): Promise<
+  getOrganizationCollectionTypes(organizationId: string): Promise<
     {
       id: string;
       name: string;
