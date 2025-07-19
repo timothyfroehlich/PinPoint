@@ -3,7 +3,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { imageStorage } from "~/lib/image-storage/local-storage";
 import { auth } from "~/server/auth";
 
-export async function POST(req: NextRequest) {
+export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
     // Check authentication
     const session = await auth();

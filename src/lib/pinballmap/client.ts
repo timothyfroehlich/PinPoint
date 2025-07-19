@@ -92,8 +92,8 @@ export class PinballMapClient {
 export const pinballMapClient = new PinballMapClient();
 
 // Convenience functions using the default client
-export const fetchLocationDetails = (locationId: number) =>
+export const fetchLocationDetails = (locationId: number): Promise<PinballMapLocation> =>
   pinballMapClient.fetchLocationDetails(locationId);
 
-export const fetchLocationMachineDetails = (locationId: number) =>
+export const fetchLocationMachineDetails = (locationId: number): Promise<PinballMapMachineDetailsResponse> =>
   pinballMapClient.fetchLocationMachineDetails(locationId);

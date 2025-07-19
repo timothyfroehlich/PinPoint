@@ -28,7 +28,7 @@ export interface OPDBParsedId {
 }
 
 export interface OPDBAPIResponse<T> {
-  data: T;
+  data: T | null;
   success: boolean;
   error?: string;
 }

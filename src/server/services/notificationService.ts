@@ -2,9 +2,8 @@ import {
   NotificationType,
   NotificationEntity,
   type Notification,
-} from "@prisma/client";
-
-import type { ExtendedPrismaClient } from "~/server/db";
+  type ExtendedPrismaClient,
+} from "./types";
 
 export interface NotificationData {
   userId: string;

@@ -20,8 +20,7 @@ import { env } from "~/env";
 export class OPDBClient {
   private apiToken: string;
   private baseUrl: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private cache = new Map<string, { data: any; timestamp: number }>();
+  private cache = new Map<string, { data: unknown; timestamp: number }>();
   private rateLimit: { lastRequest: number; requests: number } = {
     lastRequest: 0,
     requests: 0,
@@ -65,16 +64,30 @@ export class OPDBClient {
       await this.enforceRateLimit();
 
       const url = `${this.baseUrl}${endpoint}`;
+      const baseHeaders = {
+        Authorization: `Bearer ${this.apiToken}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      };
+
+      let headers: HeadersInit = baseHeaders;
+      if (options.headers) {
+        if (options.headers instanceof Headers) {
+          headers = new Headers(baseHeaders);
+          options.headers.forEach((value, key) => {
+            (headers as Headers).set(key, value);
+          });
+        } else if (typeof options.headers === "object" && !Array.isArray(options.headers)) {
+          headers = { ...baseHeaders, ...options.headers };
+        } else {
+          // Handle array format if needed
+          headers = baseHeaders;
+        }
+      }
+
       const response = await fetch(url, {
         ...options,
-        headers: {
-          Authorization: `Bearer ${this.apiToken}`,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          ...(options.headers instanceof Headers 
-            ? Object.fromEntries(options.headers.entries())
-            : options.headers ?? {}),
-        },
+        headers,
       });
 
       if (!response.ok) {
@@ -113,7 +126,7 @@ export class OPDBClient {
 
     if (cached && now - cached.timestamp < ttlMinutes * 60 * 1000) {
       return {
-        data: cached.data,
+        data: cached.data as T,
         success: true,
       };
     }
@@ -215,7 +228,7 @@ export class OPDBClient {
       60, // Cache export results for 1 hour (matching OPDB rate limit)
     );
 
-    if (!result.success) {
+    if (!result.success || !result.data) {
       console.warn("OPDB export failed:", result.error);
       return [];
     }
@@ -235,7 +248,7 @@ export class OPDBClient {
       120, // Cache group results for 2 hours
     );
 
-    if (!result.success) {
+    if (!result.success || !result.data) {
       console.warn(`OPDB group fetch failed for ${groupId}:`, result.error);
       return [];
     }

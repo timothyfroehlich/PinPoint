@@ -59,18 +59,33 @@ jest.mock("~/env", () => ({
 // Import after mocking
 import { POST } from "../issue/route";
 
+// Response types for type safety
+interface ErrorResponse {
+  error: string;
+}
+
+interface SuccessResponse {
+  success: boolean;
+  attachment?: {
+    id: string;
+    url: string;
+    fileName: string;
+    fileType: string;
+  };
+}
+
 // Mock NextRequest for testing
 function createMockRequest(
   url: string,
   init?: { method?: string; body?: FormData; headers?: Record<string, string> },
-) {
+): NextRequest {
   const headersMap = new Map(Object.entries(init?.headers ?? {}));
   return {
     method: init?.method ?? "GET",
     headers: {
-      get: (name: string) => headersMap.get(name) ?? null,
+      get: (name: string): string | null => headersMap.get(name) ?? null,
     },
-    formData: (): Promise<FormData> => Promise.resolve(init?.body ?? new FormData()),
+    formData: (): FormData => init?.body ?? new FormData(),
   } as unknown as NextRequest;
 }
 
@@ -143,7 +158,7 @@ describe("Upload Security Tests", () => {
       const response = await POST(request);
 
       expect(response.status).toBe(401);
-      const data = await response.json();
+      const data = (await response.json()) as ErrorResponse;
       expect(data.error).toBe("Authentication required");
     });
 
@@ -158,7 +173,7 @@ describe("Upload Security Tests", () => {
       const response = await POST(request);
 
       expect(response.status).toBe(401);
-      const data = await response.json();
+      const data = (await response.json()) as ErrorResponse;
       expect(data.error).toBe("Authentication required");
     });
   });
@@ -176,7 +191,7 @@ describe("Upload Security Tests", () => {
       const response = await POST(request);
 
       expect(response.status).toBe(404);
-      const data = await response.json();
+      const data = (await response.json()) as ErrorResponse;
       expect(data.error).toBe(
         'Organization with subdomain "nonexistent" not found',
       );
@@ -209,7 +224,7 @@ describe("Upload Security Tests", () => {
       const response = await POST(request);
 
       expect(response.status).toBe(403);
-      const data = await response.json();
+      const data = (await response.json()) as ErrorResponse;
       expect(data.error).toBe("User is not a member of this organization");
     });
 
@@ -226,7 +241,7 @@ describe("Upload Security Tests", () => {
       const response = await POST(request);
 
       expect(response.status).toBe(404);
-      const data = await response.json();
+      const data = (await response.json()) as ErrorResponse;
       expect(data.error).toBe("Issue not found");
     });
 
@@ -314,7 +329,7 @@ describe("Upload Security Tests", () => {
       const response = await POST(request);
 
       expect(response.status).toBe(404);
-      const data = await response.json();
+      const data = (await response.json()) as ErrorResponse;
       expect(data.error).toBe("Issue not found");
     });
 
@@ -328,7 +343,7 @@ describe("Upload Security Tests", () => {
       const response = await POST(request);
 
       expect(response.status).toBe(200);
-      const data = await response.json();
+      const data = (await response.json()) as SuccessResponse;
       expect(data.success).toBe(true);
       expect(data.attachment).toBeDefined();
     });
@@ -348,7 +363,7 @@ describe("Upload Security Tests", () => {
       const response = await POST(request);
 
       expect(response.status).toBe(400);
-      const data = await response.json();
+      const data = (await response.json()) as ErrorResponse;
       expect(data.error).toBe("No file provided");
     });
 
@@ -368,7 +383,7 @@ describe("Upload Security Tests", () => {
       const response = await POST(request);
 
       expect(response.status).toBe(400);
-      const data = await response.json();
+      const data = (await response.json()) as ErrorResponse;
       expect(data.error).toBe("Issue ID required");
     });
   });

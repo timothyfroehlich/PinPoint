@@ -1,6 +1,4 @@
-import { type Comment } from "@prisma/client";
-
-import type { ExtendedPrismaClient } from "~/server/db";
+import { type Comment, type ExtendedPrismaClient } from "./types";
 
 import { COMMENT_CLEANUP_CONFIG } from "~/server/constants/cleanup";
 
@@ -16,7 +14,7 @@ export class CommentCleanupService {
       retentionCutoff.getDate() - COMMENT_CLEANUP_CONFIG.RETENTION_DAYS,
     );
 
-    const result = await this.prisma.comment.deleteMany({
+    const result: { count: number } = await this.prisma.comment.deleteMany({
       where: {
         deletedAt: {
           lte: retentionCutoff,
