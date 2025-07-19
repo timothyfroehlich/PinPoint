@@ -1,3 +1,9 @@
+import {
+  type Location,
+  type Machine,
+  type Model,
+  type User,
+} from "@prisma/client";
 import { z } from "zod";
 
 import {
@@ -8,6 +14,24 @@ import {
   machineDeleteProcedure,
 } from "~/server/api/trpc";
 
+type MachineWithDetails = Machine & {
+  model:
+    | (Model & {
+        _count: {
+          machines: number;
+        };
+      })
+    | null;
+  location: Location | null;
+  owner: Pick<User, "id" | "name" | "image"> | null;
+};
+
+type MachineForIssue = Pick<Machine, "id"> & {
+  model: {
+    name: string;
+  } | null;
+};
+
 export const machineCoreRouter = createTRPCRouter({
   create: machineEditProcedure
     .input(
@@ -17,16 +41,14 @@ export const machineCoreRouter = createTRPCRouter({
         locationId: z.string(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }): Promise<MachineWithDetails> => {
       // Verify that the model and room belong to the same organization
-       
       const model = await ctx.db.model.findFirst({
         where: {
           id: input.modelId,
         },
       });
 
-       
       const location = await ctx.db.location.findFirst({
         where: {
           id: input.locationId,
@@ -38,7 +60,6 @@ export const machineCoreRouter = createTRPCRouter({
         throw new Error("Invalid game title or location");
       }
 
-       
       const machine = await ctx.db.machine.create({
         data: {
           name: input.name,
@@ -70,68 +91,70 @@ export const machineCoreRouter = createTRPCRouter({
       // Auto-generate QR code for the new machine
       try {
         const qrCodeService = ctx.services.createQRCodeService();
-         
         await qrCodeService.generateQRCode(machine.id);
       } catch (error) {
         // Log error but don't fail machine creation
         console.warn(
-           
           `Failed to generate QR code for machine ${machine.id}:`,
           error,
         );
       }
 
-       
-      return machine;
+      return machine as MachineWithDetails;
     }),
 
-  getAll: organizationProcedure.query(({ ctx }) => {
-
-    return ctx.db.machine.findMany({
-      where: {
-        organizationId: ctx.organization.id,
-      },
-      include: {
-        model: true,
-        location: true,
-        owner: {
-          select: {
-            id: true,
-            name: true,
-            image: true,
+  getAll: organizationProcedure.query(
+    ({ ctx }): Promise<MachineWithDetails[]> => {
+      return ctx.db.machine.findMany({
+        where: {
+          organizationId: ctx.organization.id,
+        },
+        include: {
+          model: true,
+          location: true,
+          owner: {
+            select: {
+              id: true,
+              name: true,
+              image: true,
+            },
           },
         },
-      },
-      orderBy: { model: { name: "asc" } },
-    });
-  }),
+        orderBy: { model: { name: "asc" } },
+      }) as unknown as Promise<MachineWithDetails[]>;
+    },
+  ),
 
   // Public endpoint for issue reporting - returns minimal data needed for issue form
-  getAllForIssues: publicProcedure.query(({ ctx }) => {
-    // Use the organization resolved from subdomain context
-    const organization = ctx.organization;
+  getAllForIssues: publicProcedure.query(
+    ({ ctx }): Promise<MachineForIssue[]> => {
+      // Use the organization resolved from subdomain context
+      const organization = ctx.organization;
 
+      if (!organization) {
+        return Promise.resolve([]);
+      }
 
-    return ctx.db.machine.findMany({
-      where: {
-        organizationId: organization.id,
-      },
-      select: {
-        id: true,
-        model: {
-          select: {
-            name: true,
+      return ctx.db.machine.findMany({
+        where: {
+          organizationId: organization.id,
+        },
+        select: {
+          id: true,
+          model: {
+            select: {
+              name: true,
+            },
           },
         },
-      },
-      orderBy: { model: { name: "asc" } },
-    });
-  }),
+        orderBy: { model: { name: "asc" } },
+      }) as unknown as Promise<MachineForIssue[]>;
+    },
+  ),
 
   getById: organizationProcedure
     .input(z.object({ id: z.string() }))
-    .query(async ({ ctx, input }) => {
-       
+    .query(async ({ ctx, input }): Promise<MachineWithDetails> => {
       const machine = await ctx.db.machine.findFirst({
         where: {
           id: input.id,
@@ -162,8 +185,7 @@ export const machineCoreRouter = createTRPCRouter({
         throw new Error("Game instance not found");
       }
 
-       
-      return machine;
+      return machine as MachineWithDetails;
     }),
 
   update: machineEditProcedure
@@ -174,9 +196,8 @@ export const machineCoreRouter = createTRPCRouter({
         locationId: z.string().optional(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }): Promise<MachineWithDetails> => {
       // First verify the game instance belongs to this organization
-       
       const existingInstance = await ctx.db.machine.findFirst({
         where: {
           id: input.id,
@@ -190,7 +211,6 @@ export const machineCoreRouter = createTRPCRouter({
 
       // If updating model or location, verify they belong to the organization
       if (input.modelId) {
-         
         const model = await ctx.db.model.findFirst({
           where: {
             id: input.modelId,
@@ -202,7 +222,6 @@ export const machineCoreRouter = createTRPCRouter({
       }
 
       if (input.locationId) {
-         
         const location = await ctx.db.location.findFirst({
           where: {
             id: input.locationId,
@@ -214,7 +233,6 @@ export const machineCoreRouter = createTRPCRouter({
         }
       }
 
-       
       return ctx.db.machine.update({
         where: { id: input.id },
         data: {
@@ -240,14 +258,13 @@ export const machineCoreRouter = createTRPCRouter({
             },
           },
         },
-      });
+      }) as unknown as Promise<MachineWithDetails>;
     }),
 
   delete: machineDeleteProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }): Promise<Machine> => {
       // Verify the game instance belongs to this organization
-       
       const existingInstance = await ctx.db.machine.findFirst({
         where: {
           id: input.id,
@@ -259,7 +276,6 @@ export const machineCoreRouter = createTRPCRouter({
         throw new Error("Game instance not found");
       }
 
-       
       return ctx.db.machine.delete({
         where: { id: input.id },
       });

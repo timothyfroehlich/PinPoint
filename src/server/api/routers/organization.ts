@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { type Organization } from "@prisma/client";
 
 import {
   createTRPCRouter,
@@ -7,7 +8,7 @@ import {
 } from "~/server/api/trpc";
 
 export const organizationRouter = createTRPCRouter({
-  getCurrent: publicProcedure.query(async ({ ctx }) => {
+  getCurrent: publicProcedure.query(({ ctx }): Organization | null => {
     // Return the organization from context (resolved based on subdomain)
     return ctx.organization;
   }),
@@ -19,7 +20,7 @@ export const organizationRouter = createTRPCRouter({
         logoUrl: z.string().url().optional(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }): Promise<Organization> => {
       const organization = await ctx.db.organization.update({
         where: {
           id: ctx.organization.id,

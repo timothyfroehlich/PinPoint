@@ -91,7 +91,7 @@ export class QRCodeService {
     });
 
     return {
-      id: updatedMachine.qrCodeId ?? "",
+      id: updatedMachine.qrCodeId,
       url: updatedMachine.qrCodeUrl,
       generatedAt: updatedMachine.qrCodeGeneratedAt,
     };
@@ -114,7 +114,7 @@ export class QRCodeService {
       throw new Error("Machine not found");
     }
 
-    if (!machine.qrCodeUrl || !machine.qrCodeGeneratedAt || !machine.qrCodeId) {
+    if (!machine.qrCodeUrl || !machine.qrCodeGeneratedAt) {
       return null;
     }
 

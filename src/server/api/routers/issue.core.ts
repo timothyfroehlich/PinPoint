@@ -1,3 +1,13 @@
+import {
+  type Issue,
+  type IssueStatus,
+  type User,
+  type Machine,
+  type Model,
+  type Location,
+  type Comment,
+  type Attachment,
+} from "@prisma/client";
 import { z } from "zod";
 
 import {
@@ -6,6 +16,34 @@ import {
   publicProcedure,
   issueEditProcedure,
 } from "~/server/api/trpc";
+
+type IssueWithDetails = Issue & {
+  status: IssueStatus | null;
+  createdBy: Pick<User, "id" | "name" | "image"> | null;
+  machine: (Machine & { model: Model | null; location: Location | null }) | null;
+};
+
+type IssueWithAllDetails = Issue & {
+  status: IssueStatus | null;
+  assignedTo: Pick<User, "id" | "name" | "image"> | null;
+  createdBy: Pick<User, "id" | "name" | "image"> | null;
+  machine: (Machine & { model: Model | null; location: Location | null }) | null;
+  comments: (Comment & {
+    author: Pick<User, "id" | "name" | "image"> | null;
+  })[];
+  attachments: Attachment[];
+};
+
+type IssueForList = Issue & {
+  status: IssueStatus | null;
+  assignedTo: Pick<User, "id" | "name" | "image"> | null;
+  createdBy: Pick<User, "id" | "name" | "image"> | null;
+  machine: (Machine & { model: Model | null; location: Location | null }) | null;
+  _count: {
+    comments: number;
+    attachments: number;
+  };
+};
 
 export const issueCoreRouter = createTRPCRouter({
   // Public submission - anyone can report an issue
@@ -19,9 +57,13 @@ export const issueCoreRouter = createTRPCRouter({
         machineId: z.string(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }): Promise<IssueWithDetails> => {
       // Use the organization resolved from subdomain context
       const organization = ctx.organization;
+
+      if (!organization) {
+        throw new Error("Organization not found");
+      }
 
       // Verify that the game instance belongs to the organization
       const machine = await ctx.db.machine.findFirst({
@@ -37,7 +79,10 @@ export const issueCoreRouter = createTRPCRouter({
         },
       });
 
-      if (!machine || machine.location.organizationId !== organization.id) {
+      if (
+        !machine?.location?.organizationId ||
+        machine.location.organizationId !== organization.id
+      ) {
         throw new Error(
           "Game instance not found or does not belong to this organization",
         );
@@ -71,7 +116,7 @@ export const issueCoreRouter = createTRPCRouter({
       }
 
       // Determine reporter: use session user if available, otherwise use email or null
-      const createdById = ctx.session.user.id;
+      const createdById = ctx.session?.user.id;
 
       if (!createdById) {
         throw new Error("User not found");
@@ -123,7 +168,7 @@ export const issueCoreRouter = createTRPCRouter({
         input.machineId,
       );
 
-      return issue;
+      return issue as IssueWithDetails;
     }),
 
   // Get all issues for an organization
@@ -143,7 +188,7 @@ export const issueCoreRouter = createTRPCRouter({
         })
         .optional(),
     )
-    .query(async ({ ctx, input }) => {
+    .query(async ({ ctx, input }): Promise<IssueForList[]> => {
       const whereClause: {
         organizationId: string;
         machine?: {
@@ -208,7 +253,7 @@ export const issueCoreRouter = createTRPCRouter({
         }
       })();
 
-      return ctx.db.issue.findMany({
+      const issues = await ctx.db.issue.findMany({
         where: whereClause,
         include: {
           status: true,
@@ -241,12 +286,13 @@ export const issueCoreRouter = createTRPCRouter({
         },
         orderBy,
       });
+      return issues as unknown as IssueForList[];
     }),
 
   // Get a single issue by ID
   getById: organizationProcedure
     .input(z.object({ id: z.string() }))
-    .query(async ({ ctx, input }) => {
+    .query(async ({ ctx, input }): Promise<IssueWithAllDetails> => {
       const issue = await ctx.db.issue.findFirst({
         where: {
           id: input.id,
@@ -296,7 +342,7 @@ export const issueCoreRouter = createTRPCRouter({
         throw new Error("Issue not found");
       }
 
-      return issue;
+      return issue as unknown as IssueWithAllDetails;
     }),
 
   // Update issue (for members/admins)
@@ -310,7 +356,7 @@ export const issueCoreRouter = createTRPCRouter({
         assignedToId: z.string().optional(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }): Promise<IssueWithDetails> => {
       // Verify the issue belongs to this organization
       const existingIssue = await ctx.db.issue.findFirst({
         where: {
@@ -323,7 +369,7 @@ export const issueCoreRouter = createTRPCRouter({
         },
       });
 
-      if (!existingIssue) {
+      if (!existingIssue?.status) {
         throw new Error("Issue not found");
       }
 
@@ -332,8 +378,8 @@ export const issueCoreRouter = createTRPCRouter({
       const userId = ctx.session.user.id;
 
       // Prepare data for tracking changes
-      let newStatus = existingIssue.status;
-      let newAssignedTo = existingIssue.assignedTo;
+      let newStatus: IssueStatus = existingIssue.status;
+      let newAssignedTo: User | null = existingIssue.assignedTo;
 
       // If updating status, verify it belongs to the organization
       if (input.statusId) {
@@ -474,6 +520,6 @@ export const issueCoreRouter = createTRPCRouter({
         );
       }
 
-      return updatedIssue;
+      return updatedIssue as IssueWithDetails;
     }),
 });

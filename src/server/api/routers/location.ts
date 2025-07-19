@@ -1,5 +1,10 @@
 import { z } from "zod";
-
+import {
+  type Location,
+  type Machine,
+  type Model,
+  type User,
+} from "@prisma/client";
 import {
   createTRPCRouter,
   organizationProcedure,
@@ -7,6 +12,22 @@ import {
   locationDeleteProcedure,
   organizationManageProcedure,
 } from "~/server/api/trpc";
+import { type LocationSyncResult } from "~/server/services/PinballMapService";
+
+type LocationWithMachines = Location & {
+  machines: (Machine & {
+    _count: {
+      issues: number;
+    };
+  })[];
+};
+
+type LocationWithDetailedMachines = Location & {
+  machines: (Machine & {
+    model: Model | null;
+    owner: Pick<User, "id" | "name" | "image"> | null;
+  })[];
+};
 
 export const locationRouter = createTRPCRouter({
   create: locationEditProcedure
@@ -15,8 +36,7 @@ export const locationRouter = createTRPCRouter({
         name: z.string().min(1),
       }),
     )
-    .mutation(({ ctx, input }) => {
-       
+    .mutation(({ ctx, input }): Promise<Location> => {
       return ctx.db.location.create({
         data: {
           name: input.name,
@@ -25,26 +45,27 @@ export const locationRouter = createTRPCRouter({
       });
     }),
 
-  getAll: organizationProcedure.query(({ ctx }) => {
-     
-    return ctx.db.location.findMany({
-      where: {
-        organizationId: ctx.organization.id,
-      },
-      include: {
-        machines: {
-          include: {
-            _count: {
-              select: {
-                issues: true,
+  getAll: organizationProcedure.query(
+    ({ ctx }): Promise<LocationWithMachines[]> => {
+      return ctx.db.location.findMany({
+        where: {
+          organizationId: ctx.organization.id,
+        },
+        include: {
+          machines: {
+            include: {
+              _count: {
+                select: {
+                  issues: true,
+                },
               },
             },
           },
         },
-      },
-      orderBy: { name: "asc" },
-    });
-  }),
+        orderBy: { name: "asc" },
+      });
+    },
+  ),
 
   update: locationEditProcedure
     .input(
@@ -53,8 +74,7 @@ export const locationRouter = createTRPCRouter({
         name: z.string().min(1).optional(),
       }),
     )
-    .mutation(({ ctx, input }) => {
-       
+    .mutation(({ ctx, input }): Promise<Location> => {
       return ctx.db.location.update({
         where: {
           id: input.id,
@@ -69,8 +89,7 @@ export const locationRouter = createTRPCRouter({
   // Get a single location with detailed info
   getById: organizationProcedure
     .input(z.object({ id: z.string() }))
-    .query(async ({ ctx, input }) => {
-       
+    .query(async ({ ctx, input }): Promise<LocationWithDetailedMachines> => {
       const location = await ctx.db.location.findFirst({
         where: {
           id: input.id,
@@ -96,14 +115,12 @@ export const locationRouter = createTRPCRouter({
         throw new Error("Location not found");
       }
 
-       
-      return location;
+      return location as LocationWithDetailedMachines;
     }),
 
   delete: locationDeleteProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(({ ctx, input }) => {
-       
+    .mutation(({ ctx, input }): Promise<Location> => {
       return ctx.db.location.delete({
         where: {
           id: input.id,
@@ -120,8 +137,7 @@ export const locationRouter = createTRPCRouter({
         pinballMapId: z.number().int().positive(),
       }),
     )
-    .mutation(({ ctx, input }) => {
-       
+    .mutation(({ ctx, input }): Promise<Location> => {
       return ctx.db.location.update({
         where: {
           id: input.locationId,
@@ -135,7 +151,7 @@ export const locationRouter = createTRPCRouter({
 
   syncWithPinballMap: organizationManageProcedure
     .input(z.object({ locationId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }): Promise<LocationSyncResult> => {
       const pinballMapService = ctx.services.createPinballMapService();
       const result = await pinballMapService.syncLocation(input.locationId);
 

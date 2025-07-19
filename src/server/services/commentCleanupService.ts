@@ -28,20 +28,19 @@ export class CommentCleanupService {
   /**
    * Get count of comments that will be cleaned up (for monitoring/reporting)
    */
-  async getCleanupCandidateCount(): Promise<number> {
+  getCleanupCandidateCount(): Promise<number> {
     const retentionCutoff = new Date();
     retentionCutoff.setDate(
       retentionCutoff.getDate() - COMMENT_CLEANUP_CONFIG.RETENTION_DAYS,
     );
 
-    const count = await this.prisma.comment.count({
+    return this.prisma.comment.count({
       where: {
         deletedAt: {
           lte: retentionCutoff,
         },
       },
     });
-    return count;
   }
 
   /**
@@ -76,8 +75,8 @@ export class CommentCleanupService {
   /**
    * Get all soft-deleted comments for an organization (admin view)
    */
-  async getDeletedComments(organizationId: string): Promise<Comment[]> {
-    const comments = await this.prisma.comment.findMany({
+  getDeletedComments(organizationId: string): Promise<Comment[]> {
+    return this.prisma.comment.findMany({
       where: {
         deletedAt: { not: null },
         issue: {
@@ -108,6 +107,5 @@ export class CommentCleanupService {
         deletedAt: "desc",
       },
     });
-    return comments;
   }
 }

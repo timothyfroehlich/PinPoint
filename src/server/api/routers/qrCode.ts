@@ -1,5 +1,5 @@
 import { z } from "zod";
-
+import { type Machine, type QRCode } from "@prisma/client";
 import {
   createTRPCRouter,
   organizationProcedure,
@@ -7,6 +7,7 @@ import {
   machineEditProcedure,
   organizationManageProcedure,
 } from "~/server/api/trpc";
+import { type QRCodeInfo } from "~/server/services/QRCodeService";
 
 export const qrCodeRouter = createTRPCRouter({
   /**
@@ -14,7 +15,7 @@ export const qrCodeRouter = createTRPCRouter({
    */
   generate: machineEditProcedure
     .input(z.object({ machineId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }): Promise<QRCode> => {
       // The machineEditProcedure already validates machine access
       const qrCodeService = ctx.services.createQRCodeService();
       return qrCodeService.generateQRCode(input.machineId);
@@ -25,9 +26,8 @@ export const qrCodeRouter = createTRPCRouter({
    */
   getInfo: organizationProcedure
     .input(z.object({ machineId: z.string() }))
-    .query(async ({ ctx, input }) => {
+    .query(async ({ ctx, input }): Promise<QRCodeInfo | null> => {
       // Verify machine belongs to organization
-       
       const machine = await ctx.db.machine.findUnique({
         where: {
           id: input.machineId,
@@ -48,7 +48,7 @@ export const qrCodeRouter = createTRPCRouter({
    */
   regenerate: machineEditProcedure
     .input(z.object({ machineId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }): Promise<QRCode> => {
       // The machineEditProcedure already validates machine access
       const qrCodeService = ctx.services.createQRCodeService();
       return qrCodeService.regenerateQRCode(input.machineId);
@@ -84,7 +84,7 @@ export const qrCodeRouter = createTRPCRouter({
    */
   resolve: publicProcedure
     .input(z.object({ qrCodeId: z.string() }))
-    .query(async ({ ctx, input }) => {
+    .query(async ({ ctx, input }): Promise<Machine> => {
       const qrCodeService = ctx.services.createQRCodeService();
       const machine = await qrCodeService.resolveMachineFromQR(input.qrCodeId);
 

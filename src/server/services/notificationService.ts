@@ -146,7 +146,7 @@ export class NotificationService {
   /**
    * Get user's notifications
    */
-  async getUserNotifications(
+  getUserNotifications(
     userId: string,
     options: {
       unreadOnly?: boolean;
@@ -154,7 +154,7 @@ export class NotificationService {
       offset?: number;
     } = {},
   ): Promise<Notification[]> {
-    const notifications = await this.prisma.notification.findMany({
+    return this.prisma.notification.findMany({
       where: {
         userId,
         ...(options.unreadOnly && { read: false }),
@@ -165,7 +165,6 @@ export class NotificationService {
       take: options.limit ?? 50,
       skip: options.offset ?? 0,
     });
-    return notifications;
   }
 
   /**
@@ -201,13 +200,12 @@ export class NotificationService {
   /**
    * Get unread notification count
    */
-  async getUnreadCount(userId: string): Promise<number> {
-    const count = await this.prisma.notification.count({
+  getUnreadCount(userId: string): Promise<number> {
+    return this.prisma.notification.count({
       where: {
         userId,
         read: false,
       },
     });
-    return count;
   }
 }
