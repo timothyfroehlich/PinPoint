@@ -156,7 +156,7 @@ export class CollectionService {
   /**
    * Get machines in a collection at a specific location
    */
-  getCollectionMachines(
+  async getCollectionMachines(
     collectionId: string,
     locationId: string,
   ): Promise<
@@ -169,7 +169,7 @@ export class CollectionService {
       };
     }[]
   > {
-    return this.prisma.machine.findMany({
+    const machines = await this.prisma.machine.findMany({
       where: {
         locationId,
         collections: {
@@ -187,16 +187,17 @@ export class CollectionService {
         },
       },
     });
+    return machines;
   }
 
   /**
    * Create a manual collection
    */
-  createManualCollection(
+  async createManualCollection(
     organizationId: string,
     data: CreateManualCollectionData,
   ): Promise<Collection> {
-    return this.prisma.collection.create({
+    const collection = await this.prisma.collection.create({
       data: {
         name: data.name,
         typeId: data.typeId,
@@ -206,6 +207,7 @@ export class CollectionService {
         isSmart: false,
       },
     });
+    return collection;
   }
 
   /**

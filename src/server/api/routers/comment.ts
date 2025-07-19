@@ -13,9 +13,8 @@ export const commentRouter = createTRPCRouter({
   // Get comments for an issue (excludes deleted)
   getForIssue: organizationProcedure
     .input(z.object({ issueId: z.string() }))
-    .query(({ ctx, input }) => {
-       
-      return ctx.db.comment.findMany({
+    .query(async ({ ctx, input }) => {
+      const comments = await ctx.db.comment.findMany({
         where: {
           issueId: input.issueId,
           deletedAt: null,
@@ -33,13 +32,13 @@ export const commentRouter = createTRPCRouter({
           createdAt: "asc",
         },
       });
+      return comments;
     }),
 
   // Soft delete a comment
   delete: issueDeleteProcedure
     .input(z.object({ commentId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-       
       const comment = await ctx.db.comment.findUnique({
         where: { id: input.commentId },
         include: {
@@ -59,7 +58,6 @@ export const commentRouter = createTRPCRouter({
       }
 
       // Verify comment belongs to user's organization
-       
       if (comment.issue.organizationId !== ctx.organization.id) {
         throw new TRPCError({
           code: "FORBIDDEN",
@@ -76,7 +74,6 @@ export const commentRouter = createTRPCRouter({
       // Record the deletion activity
       const activityService = ctx.services.createIssueActivityService();
       await activityService.recordCommentDeleted(
-         
         comment.issueId,
         ctx.organization.id,
         ctx.session.user.id,
@@ -87,9 +84,12 @@ export const commentRouter = createTRPCRouter({
     }),
 
   // Admin: Get deleted comments
-  getDeleted: organizationManageProcedure.query(({ ctx }) => {
+  getDeleted: organizationManageProcedure.query(async ({ ctx }) => {
     const cleanupService = ctx.services.createCommentCleanupService();
-    return cleanupService.getDeletedComments(ctx.organization.id);
+    const deletedComments = await cleanupService.getDeletedComments(
+      ctx.organization.id,
+    );
+    return deletedComments;
   }),
 
   // Admin: Restore deleted comment
