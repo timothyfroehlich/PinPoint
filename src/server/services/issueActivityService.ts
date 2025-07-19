@@ -64,8 +64,8 @@ export class IssueActivityService {
     issueId: string,
     organizationId: string,
     actorId: string,
-    oldAssignee: { name?: string } | null,
-    newAssignee: { name?: string } | null,
+    oldAssignee: { name?: string | null } | null,
+    newAssignee: { name?: string | null } | null,
   ): Promise<void> {
     let _description: string;
     if (oldAssignee?.name && newAssignee?.name) {
@@ -82,8 +82,8 @@ export class IssueActivityService {
       type: ActivityType.ASSIGNED,
       actorId,
       fieldName: "assignee",
-      oldValue: oldAssignee?.name,
-      newValue: newAssignee?.name,
+      oldValue: oldAssignee?.name ?? undefined,
+      newValue: newAssignee?.name ?? undefined,
     });
   }
 

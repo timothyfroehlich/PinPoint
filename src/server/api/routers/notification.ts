@@ -14,18 +14,13 @@ export const notificationRouter = createTRPCRouter({
     )
     .query(async ({ ctx, input }) => {
       const service = ctx.services.createNotificationService();
-      const notifications = await service.getUserNotifications(
-        ctx.session.user.id,
-        input,
-      );
-      return notifications;
+      return service.getUserNotifications(ctx.session.user.id, input);
     }),
 
   // Get unread count
   getUnreadCount: protectedProcedure.query(async ({ ctx }) => {
     const service = ctx.services.createNotificationService();
-    const count = await service.getUnreadCount(ctx.session.user.id);
-    return count;
+    return service.getUnreadCount(ctx.session.user.id);
   }),
 
   // Mark notification as read
