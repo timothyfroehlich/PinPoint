@@ -189,7 +189,7 @@ export class PinballMapService {
 
         // Find existing machine by model and location
         const existingMachine = currentMachines.find(
-          (m) => m.modelId === model!.id,
+          (m) => m.modelId === model.id,
         );
 
         if (existingMachine) {
@@ -215,7 +215,7 @@ export class PinballMapService {
           added++;
         }
       } catch (error) {
-        console.error(`Error processing machine ${pmMachine.opdb_id}:`, error);
+        console.error(`Error processing machine ${pmMachine.opdb_id ? String(pmMachine.opdb_id) : 'unknown'}:`, error);
         // Continue processing other machines
       }
     }
@@ -285,23 +285,23 @@ export class PinballMapService {
     try {
       model = await this.prisma.model.create({
         data: {
-          name: pmMachine.machine_name || pmMachine.name,
-          manufacturer: pmMachine.manufacturer || null,
-          year: pmMachine.year || null,
+          name: pmMachine.machine_name ?? pmMachine.name,
+          manufacturer: pmMachine.manufacturer ?? null,
+          year: pmMachine.year ?? null,
 
           // Cross-database references
           opdbId: pmMachine.opdb_id,
-          ipdbId: pmMachine.ipdb_id || null,
+          ipdbId: pmMachine.ipdb_id ?? null,
 
           // Technical details
-          machineType: pmMachine.machine_type || null,
-          machineDisplay: pmMachine.machine_display || null,
+          machineType: pmMachine.machine_type ?? null,
+          machineDisplay: pmMachine.machine_display ?? null,
           isActive: pmMachine.is_active ?? true,
 
           // Metadata and links
-          ipdbLink: pmMachine.ipdb_link || null,
-          opdbImgUrl: pmMachine.opdb_img || null,
-          kineticistUrl: pmMachine.kineticist_url || null,
+          ipdbLink: pmMachine.ipdb_link ?? null,
+          opdbImgUrl: pmMachine.opdb_img ?? null,
+          kineticistUrl: pmMachine.kineticist_url ?? null,
 
           // PinPoint-specific
           isCustom: false, // OPDB games are not custom
@@ -331,14 +331,14 @@ export class PinballMapService {
   ): Promise<PinballMapMachineDetailsResponse | null> {
     try {
       const response = await fetch(
-        `https://pinballmap.com/api/v1/locations/${pinballMapId}/machine_details.json`,
+        `https://pinballmap.com/api/v1/locations/${pinballMapId.toString()}/machine_details.json`,
       );
 
       if (!response.ok) {
-        throw new Error(`PinballMap API error: ${response.status}`);
+        throw new Error(`PinballMap API error: ${response.status.toString()}`);
       }
 
-      return response.json();
+      return await response.json();
     } catch (error) {
       console.error("Failed to fetch PinballMap data:", error);
       return null;
@@ -409,7 +409,7 @@ export async function processFixtureData(
 
     for (const machine of fixtureData.machines) {
       // Create or update model
-      const model = await service["findOrCreateModel"](machine, true);
+      const model = await service.findOrCreateModel(machine, true);
 
       if (model) {
         // Create machine instance
