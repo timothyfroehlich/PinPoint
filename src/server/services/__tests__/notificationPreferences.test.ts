@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { PrismaClient } from "@prisma/client";
 import { mockDeep } from "jest-mock-extended";
 
@@ -45,8 +44,8 @@ describe("Notification preference logic", () => {
       ownerNotificationsEnabled: false,
     };
 
-    (mockPrisma.machine.update as any).mockResolvedValue(updatedMachine);
-    (mockPrisma.machine.findUnique as any).mockResolvedValue(updatedMachine);
+    (mockPrisma.machine.update).mockResolvedValue(updatedMachine);
+    (mockPrisma.machine.findUnique).mockResolvedValue(updatedMachine);
 
     // Test disabling all notifications for machine
     await mockPrisma.machine.update({
@@ -71,8 +70,8 @@ describe("Notification preference logic", () => {
       emailNotificationsEnabled: false,
     };
 
-    (mockPrisma.user.update as any).mockResolvedValue(updatedUser);
-    (mockPrisma.user.findUnique as any).mockResolvedValue(updatedUser);
+    (mockPrisma.user.update).mockResolvedValue(updatedUser);
+    (mockPrisma.user.findUnique).mockResolvedValue(updatedUser);
 
     // Test disabling all notifications for user
     await mockPrisma.user.update({
@@ -101,10 +100,10 @@ describe("Notification preference logic", () => {
       emailNotificationsEnabled: false,
     };
 
-    (mockPrisma.machine.update as any).mockResolvedValue(updatedMachine);
-    (mockPrisma.machine.findUnique as any).mockResolvedValue(updatedMachine);
-    (mockPrisma.user.update as any).mockResolvedValue(updatedUser);
-    (mockPrisma.user.findUnique as any).mockResolvedValue(updatedUser);
+    (mockPrisma.machine.update).mockResolvedValue(updatedMachine);
+    (mockPrisma.machine.findUnique).mockResolvedValue(updatedMachine);
+    (mockPrisma.user.update).mockResolvedValue(updatedUser);
+    (mockPrisma.user.findUnique).mockResolvedValue(updatedUser);
 
     // Machine notifications enabled, user notifications disabled
     await mockPrisma.machine.update({
@@ -158,8 +157,8 @@ describe("Notification preference logic", () => {
       updatedAt: new Date(),
     };
 
-    (mockPrisma.user.create as any).mockResolvedValue(newUser);
-    (mockPrisma.machine.create as any).mockResolvedValue(newMachine);
+    (mockPrisma.user.create).mockResolvedValue(newUser);
+    (mockPrisma.machine.create).mockResolvedValue(newMachine);
 
     const createdUser = await mockPrisma.user.create({
       data: { email: "defaultuser@example.com", name: "Default User" },
