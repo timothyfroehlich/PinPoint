@@ -162,8 +162,8 @@ export class NotificationService {
       orderBy: {
         createdAt: "desc",
       },
-      take: options.limit || 50,
-      skip: options.offset || 0,
+      take: options.limit ?? 50,
+      skip: options.offset ?? 0,
     });
   }
 
