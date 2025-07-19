@@ -61,8 +61,9 @@ npm run test:coverage
 ## Quality Standards (Zero Tolerance)
 
 - **0 TypeScript errors** - Fix immediately, never commit with TS errors
-- **0 usage of `any`**: Never use an `any` tye, even in test code. If you don't know the type then go look for it.
+- **0 usage of `any`**: Never use an `any` type, even in test code. If you don't know the type then go look for it.
 - **0 ESLint errors** - Warnings acceptable with justification
+- **Strict type-aware linting** - Project uses `@tsconfig/strictest` + type-aware ESLint rules to enforce type safety
 - **Consistent formatting** - Auto-formatted with Prettier
 - **Modern patterns** - ES modules, typed mocks (`jest.fn<T>()`), no `any` types
 - **Test quality** - Same standards as production code
@@ -110,6 +111,7 @@ npm run test:coverage
 - OPDB games: global (no organizationId), custom games: organization-scoped
 - **ESM modules**: Project uses `"type": "module"` - some packages (superjson, @auth/prisma-adapter) are ESM-only and may need transformIgnorePatterns updates in Jest
 - **Jest ESM**: Current config uses `ts-jest/presets/default-esm` - avoid changing without understanding ESM implications
+- **Type Safety**: Project enforces strictest TypeScript + type-aware ESLint rules. All `@typescript-eslint/no-unsafe-*` and `no-explicit-any` violations must be fixed
 
 ## Frontend Development Notes
 
