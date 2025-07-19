@@ -75,7 +75,7 @@ export class CommentCleanupService {
   /**
    * Get all soft-deleted comments for an organization (admin view)
    */
-  async getDeletedComments(organizationId: string): Promise<Comment[]> {
+  getDeletedComments(organizationId: string): Promise<Comment[]> {
     return this.prisma.comment.findMany({
       where: {
         deletedAt: { not: null },
