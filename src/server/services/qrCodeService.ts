@@ -1,8 +1,8 @@
-import { type Machine } from "@prisma/client";
 import * as QRCode from "qrcode";
 
+import { type Machine, type ExtendedPrismaClient } from "./types";
+
 import { imageStorage } from "~/lib/image-storage/local-storage";
-import { type ExtendedPrismaClient } from "~/server/db";
 import { constructReportUrl } from "~/server/utils/qrCodeUtils";
 
 export interface QRCodeInfo {
