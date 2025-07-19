@@ -1,4 +1,4 @@
-const config = {
+let config = {
   preset: "ts-jest/presets/default-esm",
   extensionsToTreatAsEsm: [".ts", ".tsx"],
   globals: {
