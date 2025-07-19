@@ -77,7 +77,7 @@ describe("tRPC Authentication Middleware", () => {
       // Set up mock context
       ctx.session = mockSession;
       ctx.organization = mockOrganization;
-      ctx.db.membership.findFirst.mockResolvedValue(mockMembership);
+      (ctx.db.membership.findFirst as jest.Mock).mockResolvedValue(mockMembership);
 
       const caller = appRouter.createCaller(ctx);
 
@@ -147,7 +147,7 @@ describe("tRPC Authentication Middleware", () => {
       // Set up mock context
       ctx.session = mockSession;
       ctx.organization = mockOrganization;
-      ctx.db.membership.findFirst.mockResolvedValue(mockMembership);
+      (ctx.db.membership.findFirst as jest.Mock).mockResolvedValue(mockMembership);
 
       const caller = appRouter.createCaller(ctx);
 
@@ -192,7 +192,7 @@ describe("tRPC Authentication Middleware", () => {
       // Set up mock context
       ctx.session = mockSession;
       ctx.organization = mockOrganization;
-      ctx.db.membership.findFirst.mockResolvedValue(null); // No membership
+      (ctx.db.membership.findFirst as jest.Mock).mockResolvedValue(null); // No membership
 
       const caller = appRouter.createCaller(ctx);
 
@@ -221,7 +221,7 @@ describe("tRPC Authentication Middleware", () => {
       // Set up mock context
       ctx.session = mockSession;
       ctx.organization = null; // Organization not found
-      ctx.db.organization.findUnique.mockResolvedValue(null); // Organization not found
+      (ctx.db.organization.findUnique as jest.Mock).mockResolvedValue(null); // Organization not found
 
       const caller = appRouter.createCaller(ctx);
 
@@ -262,7 +262,7 @@ describe("tRPC Authentication Middleware", () => {
       // Set up mock context
       ctx.session = mockSession;
       ctx.organization = differentOrganization;
-      ctx.db.membership.findFirst.mockResolvedValue(null); // No membership in different org
+      (ctx.db.membership.findFirst as jest.Mock).mockResolvedValue(null); // No membership in different org
 
       const caller = appRouter.createCaller(ctx);
 
@@ -291,7 +291,7 @@ describe("tRPC Authentication Middleware", () => {
       // Set up mock context
       ctx.session = mockSession;
       ctx.organization = mockOrganization;
-      ctx.db.membership.findFirst.mockResolvedValue(mockMembership);
+      (ctx.db.membership.findFirst as jest.Mock).mockResolvedValue(mockMembership);
 
       const caller = appRouter.createCaller(ctx);
 
@@ -324,7 +324,7 @@ describe("tRPC Authentication Middleware", () => {
       // Set up mock context
       ctx.session = mockAdminSession;
       ctx.organization = mockOrganization;
-      ctx.db.membership.findFirst.mockResolvedValue(mockAdminMembership);
+      (ctx.db.membership.findFirst as jest.Mock).mockResolvedValue(mockAdminMembership);
 
       const caller = appRouter.createCaller(ctx);
 
@@ -355,7 +355,7 @@ describe("tRPC Authentication Middleware", () => {
       // Set up mock context
       ctx.session = mockMemberSession;
       ctx.organization = mockOrganization;
-      ctx.db.membership.findFirst.mockResolvedValue(mockMembership);
+      (ctx.db.membership.findFirst as jest.Mock).mockResolvedValue(mockMembership);
 
       const caller = appRouter.createCaller(ctx);
 
@@ -389,7 +389,7 @@ describe("tRPC Authentication Middleware", () => {
       // Set up mock context
       ctx.session = mockSession;
       ctx.organization = mockOrganization;
-      ctx.db.membership.findFirst.mockResolvedValue(mockMembership);
+      (ctx.db.membership.findFirst as jest.Mock).mockResolvedValue(mockMembership);
 
       const caller = appRouter.createCaller(ctx);
 
@@ -414,7 +414,7 @@ describe("tRPC Authentication Middleware", () => {
       // Set up mock context
       ctx.session = mockSession;
       ctx.organization = mockOrganization;
-      ctx.db.membership.findFirst.mockResolvedValue(mockMembership);
+      (ctx.db.membership.findFirst as jest.Mock).mockResolvedValue(mockMembership);
 
       const caller = appRouter.createCaller(ctx);
 

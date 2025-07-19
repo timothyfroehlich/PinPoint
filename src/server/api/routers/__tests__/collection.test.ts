@@ -52,7 +52,7 @@ describe("Collection Router Integration", () => {
           id: "coll1",
           name: "Front Room",
           isManual: true,
-          type: mockTypes[0]!,
+          type: mockTypes[0],
           _count: { machines: 5 },
         },
       ];

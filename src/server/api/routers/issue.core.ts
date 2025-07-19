@@ -382,7 +382,7 @@ export const issueCoreRouter = createTRPCRouter({
           }),
           ...(input.statusId && { statusId: input.statusId }),
           ...(input.assignedToId !== undefined && {
-            assignedToId: input.assignedToId || null,
+            assignedToId: input.assignedToId ?? null,
           }),
         },
         include: {
