@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 // Mock the database with proper typing
 const mockUserFindMany = jest.fn();
 const mockMembershipFindMany = jest.fn();
@@ -37,20 +36,28 @@ jest.mock("~/env.js", () => ({
 }));
 
 // Mock NextResponse
+interface MockResponseContext {
+  data: unknown;
+}
+
 const mockNextResponseInstance = {
-  json: jest.fn().mockImplementation(function (this: any) {
+  json: jest.fn().mockImplementation(function (this: MockResponseContext) {
     return Promise.resolve(this.data);
   }),
   status: 200,
 };
 
-const mockNextResponse = jest.fn().mockImplementation((body, options) => ({
+const mockNextResponse = jest.fn().mockImplementation((body: unknown, options?: { status?: number }) => ({
   ...mockNextResponseInstance,
   data: body,
   status: options?.status || 200,
 }));
 
-(mockNextResponse as any).json = jest.fn((data, options) => ({
+interface MockNextResponseConstructor {
+  json: jest.MockedFunction<(data: unknown, options?: { status?: number }) => unknown>;
+}
+
+(mockNextResponse as unknown as MockNextResponseConstructor).json = jest.fn((data: unknown, options?: { status?: number }) => ({
   ...mockNextResponseInstance,
   data,
   status: options?.status || 200,

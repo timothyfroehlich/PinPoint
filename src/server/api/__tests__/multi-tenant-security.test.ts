@@ -15,8 +15,7 @@ jest.mock("~/server/auth", () => ({
 const mockOrganizationFindUnique = jest.fn();
 const mockMembershipFindUnique = jest.fn();
 const mockMembershipFindFirst = jest.fn();
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const mockAuth = auth as jest.MockedFunction<any>;
+const mockAuth = auth as jest.MockedFunction<typeof auth>;
 const mockIssueFindUnique = jest.fn();
 const mockMachineFindFirst = jest.fn();
 const mockMachineFindUnique = jest.fn();
