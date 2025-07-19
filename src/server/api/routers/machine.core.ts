@@ -85,8 +85,9 @@ export const machineCoreRouter = createTRPCRouter({
       return machine;
     }),
 
-  getAll: organizationProcedure.query(async ({ ctx }) => {
-    const machines = await ctx.db.machine.findMany({
+  getAll: organizationProcedure.query(({ ctx }) => {
+
+    return ctx.db.machine.findMany({
       where: {
         organizationId: ctx.organization.id,
       },
@@ -103,15 +104,15 @@ export const machineCoreRouter = createTRPCRouter({
       },
       orderBy: { model: { name: "asc" } },
     });
-    return machines;
   }),
 
   // Public endpoint for issue reporting - returns minimal data needed for issue form
-  getAllForIssues: publicProcedure.query(async ({ ctx }) => {
+  getAllForIssues: publicProcedure.query(({ ctx }) => {
     // Use the organization resolved from subdomain context
     const organization = ctx.organization;
 
-    const machines = await ctx.db.machine.findMany({
+
+    return ctx.db.machine.findMany({
       where: {
         organizationId: organization.id,
       },
@@ -125,7 +126,6 @@ export const machineCoreRouter = createTRPCRouter({
       },
       orderBy: { model: { name: "asc" } },
     });
-    return machines;
   }),
 
   getById: organizationProcedure
