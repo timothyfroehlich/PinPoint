@@ -26,7 +26,7 @@ export class IssueActivityService {
         organizationId, // Now properly supported
         type: activityData.type,
         actorId: activityData.actorId,
-        field: activityData.fieldName || "",
+        field: activityData.fieldName ?? "",
         oldValue: activityData.oldValue,
         newValue: activityData.newValue,
       },
@@ -71,11 +71,11 @@ export class IssueActivityService {
   ): Promise<void> {
     let _description: string;
     if (oldAssignee && newAssignee) {
-      _description = `Reassigned from ${oldAssignee.name} to ${newAssignee.name}`;
+      _description = `Reassigned from ${String(oldAssignee.name ?? "Unknown")} to ${String(newAssignee.name ?? "Unknown")}`;
     } else if (newAssignee) {
-      _description = `Assigned to ${newAssignee.name}`;
+      _description = `Assigned to ${String(newAssignee.name ?? "Unknown")}`;
     } else if (oldAssignee) {
-      _description = `Unassigned from ${oldAssignee.name}`;
+      _description = `Unassigned from ${String(oldAssignee.name ?? "Unknown")}`;
     } else {
       _description = "Assignment changed";
     }
@@ -121,7 +121,7 @@ export class IssueActivityService {
     });
   }
 
-  async getIssueTimeline(issueId: string, organizationId: string) {
+  async getIssueTimeline(issueId: string, organizationId: string): Promise<unknown[]> {
     const [comments, activities] = await Promise.all([
       this.prisma.comment.findMany({
         where: {

@@ -12,7 +12,7 @@ export const issueAdminRouter = createTRPCRouter({
 
       return {
         deletedCount,
-        message: `Successfully deleted ${deletedCount} old comments`,
+        message: `Successfully deleted ${String(deletedCount)} old comments`,
       };
     },
   ),
