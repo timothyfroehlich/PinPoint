@@ -57,8 +57,8 @@ export const collectionRouter = createTRPCRouter({
       return service.createManualCollection(ctx.organization.id, {
         name: input.name,
         typeId: input.typeId,
-        locationId: input.locationId ?? null,
-        description: input.description ?? null,
+        locationId: input.locationId,
+        description: input.description,
       });
     }),
 

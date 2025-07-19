@@ -26,7 +26,6 @@ export const machineCoreRouter = createTRPCRouter({
         },
       });
 
-
       const location = await ctx.db.location.findFirst({
         where: {
           id: input.locationId,
@@ -37,7 +36,6 @@ export const machineCoreRouter = createTRPCRouter({
       if (!model || !location) {
         throw new Error("Invalid game title or location");
       }
-
 
       const machine = await ctx.db.machine.create({
         data: {
@@ -75,18 +73,15 @@ export const machineCoreRouter = createTRPCRouter({
       } catch (error) {
         // Log error but don't fail machine creation
         console.warn(
-
           `Failed to generate QR code for machine ${machine.id}:`,
           error,
         );
       }
 
-
       return machine;
     }),
 
   getAll: organizationProcedure.query(({ ctx }) => {
-
     return ctx.db.machine.findMany({
       where: {
         organizationId: ctx.organization.id,
@@ -111,7 +106,6 @@ export const machineCoreRouter = createTRPCRouter({
     // Use the organization resolved from subdomain context
     const organization = ctx.organization;
 
-
     return ctx.db.machine.findMany({
       where: {
         organizationId: organization.id,
@@ -131,7 +125,6 @@ export const machineCoreRouter = createTRPCRouter({
   getById: organizationProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
-
       const machine = await ctx.db.machine.findFirst({
         where: {
           id: input.id,
@@ -162,7 +155,6 @@ export const machineCoreRouter = createTRPCRouter({
         throw new Error("Game instance not found");
       }
 
-
       return machine;
     }),
 
@@ -190,7 +182,6 @@ export const machineCoreRouter = createTRPCRouter({
 
       // If updating model or location, verify they belong to the organization
       if (input.modelId) {
-
         const model = await ctx.db.model.findFirst({
           where: {
             id: input.modelId,
@@ -202,7 +193,6 @@ export const machineCoreRouter = createTRPCRouter({
       }
 
       if (input.locationId) {
-
         const location = await ctx.db.location.findFirst({
           where: {
             id: input.locationId,
@@ -213,7 +203,6 @@ export const machineCoreRouter = createTRPCRouter({
           throw new Error("Invalid location");
         }
       }
-
 
       return ctx.db.machine.update({
         where: { id: input.id },
@@ -258,7 +247,6 @@ export const machineCoreRouter = createTRPCRouter({
       if (!existingInstance) {
         throw new Error("Game instance not found");
       }
-
 
       return ctx.db.machine.delete({
         where: { id: input.id },

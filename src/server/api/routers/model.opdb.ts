@@ -46,10 +46,10 @@ export const modelOpdbRouter = createTRPCRouter({
         data: {
           name: machineData.name,
           opdbId: input.opdbId,
-          manufacturer: machineData.manufacturer ?? null,
-          year: machineData.year ?? null,
-          opdbImgUrl: machineData.playfield_image ?? null,
-          machineType: machineData.type ?? null,
+          manufacturer: machineData.manufacturer,
+          year: machineData.year,
+          opdbImgUrl: machineData.playfield_image,
+          machineType: machineData.type,
         },
       });
     }),
@@ -89,10 +89,10 @@ export const modelOpdbRouter = createTRPCRouter({
             where: { id: title.id },
             data: {
               name: machineData.name,
-              manufacturer: machineData.manufacturer ?? null,
-              year: machineData.year ?? null,
-              opdbImgUrl: machineData.playfield_image ?? null,
-              machineType: machineData.type ?? null,
+              manufacturer: machineData.manufacturer,
+              year: machineData.year,
+              opdbImgUrl: machineData.playfield_image,
+              machineType: machineData.type,
             },
           });
           syncedCount++;

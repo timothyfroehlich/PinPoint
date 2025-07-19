@@ -5,7 +5,7 @@ import { createTRPCRouter, organizationProcedure } from "~/server/api/trpc";
 export const issueStatusRouter = createTRPCRouter({
   // Get counts for each status category
   getStatusCounts: organizationProcedure.query(async ({ ctx }) => {
-    const counts = (await ctx.db.issue.groupBy({
+    const counts = await ctx.db.issue.groupBy({
       by: ["statusId"],
       where: {
         organizationId: ctx.organization.id,
@@ -13,7 +13,7 @@ export const issueStatusRouter = createTRPCRouter({
       _count: {
         _all: true,
       },
-    }));
+    });
 
     const statuses = await ctx.db.issueStatus.findMany({
       where: {

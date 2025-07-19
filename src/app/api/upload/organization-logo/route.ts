@@ -1,4 +1,3 @@
-
 import { type NextRequest, NextResponse } from "next/server";
 
 import type { ExtendedPrismaClient } from "~/server/db";
@@ -60,10 +59,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
 
     // Delete old logo if it exists
-    const currentOrg: OrganizationWithLogo | null = await db.organization.findUnique({
-      where: { id: ctx.organization.id },
-      select: { logoUrl: true },
-    });
+    const currentOrg: OrganizationWithLogo | null =
+      await db.organization.findUnique({
+        where: { id: ctx.organization.id },
+        select: { logoUrl: true },
+      });
 
     if (currentOrg?.logoUrl) {
       try {
@@ -75,10 +75,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     // Update organization logo
-    const updatedOrganization: UpdatedOrganization = await db.organization.update({
-      where: { id: ctx.organization.id },
-      data: { logoUrl: imagePath },
-    });
+    const updatedOrganization: UpdatedOrganization =
+      await db.organization.update({
+        where: { id: ctx.organization.id },
+        data: { logoUrl: imagePath },
+      });
 
     return NextResponse.json({
       success: true,

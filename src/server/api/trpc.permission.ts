@@ -10,9 +10,10 @@ import type { OrganizationTRPCContext } from "./trpc.base";
  * Creates a procedure that requires a specific permission to be present in the user's role.
  * This replaces the old adminProcedure with a more granular permission system.
  */
-export function requirePermission(permission: string): typeof organizationProcedure {
+export function requirePermission(
+  permission: string,
+): typeof organizationProcedure {
   return organizationProcedure.use(async ({ ctx, next }) => {
-     
     if (!ctx.userPermissions.includes(permission)) {
       throw new TRPCError({
         code: "FORBIDDEN",
@@ -20,8 +21,8 @@ export function requirePermission(permission: string): typeof organizationProced
       });
     }
 
-    return next({ 
-      ctx: ctx satisfies OrganizationTRPCContext
+    return next({
+      ctx: ctx satisfies OrganizationTRPCContext,
     });
   });
 }

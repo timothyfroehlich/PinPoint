@@ -16,7 +16,9 @@ interface DevLoginCompactProps {
   onLogin?: () => void;
 }
 
-export function DevLoginCompact({ onLogin }: DevLoginCompactProps): React.ReactNode {
+export function DevLoginCompact({
+  onLogin,
+}: DevLoginCompactProps): React.ReactNode {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 

@@ -50,7 +50,7 @@ const mockPrisma = {
 const service = new PinballMapService(mockPrisma);
 
 // Type assertion for testing private methods
-const servicePrivate = service as any;
+const servicePrivate = service as PinballMapService & Record<string, unknown>;
 
 describe("PinballMapService", () => {
   beforeEach(() => {
@@ -206,18 +206,8 @@ describe("PinballMapService", () => {
       } as never);
       mockMachineCreate.mockResolvedValue({} as never);
       const pinballMapMachines = [
-        {
-          id: 1,
-          name: "Medieval Madness",
-          opdb_id: "MM-001",
-          machine_name: "Medieval Madness",
-        },
-        {
-          id: 2,
-          name: "Twilight Zone",
-          opdb_id: "TZ-001",
-          machine_name: "Twilight Zone",
-        },
+        { opdb_id: "MM-001", machine_name: "Medieval Madness" },
+        { opdb_id: "TZ-001", machine_name: "Twilight Zone" },
       ];
       const result = await servicePrivate.reconcileMachines(
         "loc-123",
@@ -241,12 +231,7 @@ describe("PinballMapService", () => {
         name: "Medieval Madness",
       } as never);
       const pinballMapMachines = [
-        {
-          id: 1,
-          name: "Medieval Madness",
-          opdb_id: "MM-001",
-          machine_name: "Medieval Madness",
-        },
+        { opdb_id: "MM-001", machine_name: "Medieval Madness" },
       ];
       const result = await servicePrivate.reconcileMachines(
         "loc-123",
@@ -302,8 +287,6 @@ describe("PinballMapService", () => {
       mockMachineFindMany.mockResolvedValue([]); // No existing machines
       mockModelFindUnique.mockResolvedValue(null); // Model doesn't exist
       const unknownMachine = {
-        id: 3,
-        name: "Unknown Game",
         opdb_id: "UNKNOWN-001",
         machine_name: "Unknown Game",
       };
@@ -329,8 +312,6 @@ describe("PinballMapService", () => {
       mockModelFindUnique.mockResolvedValueOnce(existingModel as never);
       const result = await servicePrivate.findOrCreateModel(
         {
-          id: 1,
-          name: "Medieval Madness",
           opdb_id: "MM-001",
           ipdb_id: "1234",
           machine_name: "Medieval Madness",
@@ -353,13 +334,7 @@ describe("PinballMapService", () => {
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce(existingModel as never);
       const result = await servicePrivate.findOrCreateModel(
-        {
-          id: 2,
-          name: "Twilight Zone",
-          opdb_id: "TZ-001",
-          ipdb_id: "1234",
-          machine_name: "Twilight Zone",
-        },
+        { opdb_id: "TZ-001", ipdb_id: "1234", machine_name: "Twilight Zone" },
         true,
       );
       expect(result).toEqual(existingModel);
@@ -376,8 +351,6 @@ describe("PinballMapService", () => {
       mockModelCreate.mockResolvedValue(newModel as never);
       const result = await servicePrivate.findOrCreateModel(
         {
-          id: 3,
-          name: "New Game",
           opdb_id: "NEW-001",
           ipdb_id: "5678",
           machine_name: "New Game",
@@ -414,12 +387,7 @@ describe("PinballMapService", () => {
       mockModelFindUnique.mockResolvedValue(null);
 
       const result = await servicePrivate.findOrCreateModel(
-        {
-          id: 4,
-          name: "Unknown Game",
-          opdb_id: "UNKNOWN-001",
-          machine_name: "Unknown Game",
-        },
+        { opdb_id: "UNKNOWN-001", machine_name: "Unknown Game" },
         false, // createMissingModels = false
       );
 

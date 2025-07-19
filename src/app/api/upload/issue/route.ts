@@ -1,4 +1,3 @@
-
 import { type NextRequest, NextResponse } from "next/server";
 
 import type { ExtendedPrismaClient } from "~/server/db";

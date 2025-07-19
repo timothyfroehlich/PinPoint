@@ -119,7 +119,11 @@ export class IssueActivityService {
     });
   }
 
-  async getIssueTimeline(issueId: string, organizationId: string): Promise<(
+  async getIssueTimeline(
+    issueId: string,
+    organizationId: string,
+  ): Promise<
+    (
       | {
           itemType: "comment";
           timestamp: Date;
@@ -147,7 +151,8 @@ export class IssueActivityService {
             profilePicture: string | null;
           } | null;
         }
-    )[]> {
+    )[]
+  > {
     interface CommentResult {
       id: string;
       content: string;

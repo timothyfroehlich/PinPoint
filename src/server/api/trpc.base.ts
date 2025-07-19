@@ -93,9 +93,11 @@ export interface OrganizationTRPCContext extends ProtectedTRPCContext {
 /**
  * Context creation for tRPC
  */
-export const createTRPCContext = async (opts: CreateTRPCContextOptions): Promise<TRPCContext> => {
+export const createTRPCContext = async (
+  opts: CreateTRPCContextOptions,
+): Promise<TRPCContext> => {
   const dbProvider = getGlobalDatabaseProvider();
-   
+
   const db = dbProvider.getClient();
   const services = new ServiceFactory(db);
   const session = await auth();
@@ -104,7 +106,6 @@ export const createTRPCContext = async (opts: CreateTRPCContextOptions): Promise
 
   // If user is authenticated and has organization context, use that
   if (session?.user.organizationId) {
-     
     const org = await db.organization.findUnique({
       where: { id: session.user.organizationId },
     });
@@ -119,7 +120,6 @@ export const createTRPCContext = async (opts: CreateTRPCContextOptions): Promise
 
   // Fallback to organization based on subdomain
   if (!organization) {
-     
     const org = await db.organization.findUnique({
       where: { subdomain },
     });
@@ -136,7 +136,6 @@ export const createTRPCContext = async (opts: CreateTRPCContextOptions): Promise
   }
 
   return {
-     
     db,
     session,
     organization,
@@ -155,8 +154,7 @@ const t = initTRPC.context<TRPCContext>().create({
       ...shape,
       data: {
         ...shape.data,
-        zodError:
-          error.cause instanceof ZodError ? error.cause.issues : null,
+        zodError: error.cause instanceof ZodError ? error.cause.issues : null,
       },
     };
   },
@@ -241,8 +239,10 @@ export const organizationProcedure = protectedProcedure.use(
       ctx: {
         ...ctx,
         membership: membership as Membership,
-         
-        userPermissions: membership.role.permissions.map((p: { name: string }) => p.name),
+
+        userPermissions: membership.role.permissions.map(
+          (p: { name: string }) => p.name,
+        ),
       } satisfies OrganizationTRPCContext,
     });
   },

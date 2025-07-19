@@ -16,7 +16,6 @@ export const locationRouter = createTRPCRouter({
       }),
     )
     .mutation(({ ctx, input }) => {
-
       return ctx.db.location.create({
         data: {
           name: input.name,
@@ -26,7 +25,6 @@ export const locationRouter = createTRPCRouter({
     }),
 
   getAll: organizationProcedure.query(({ ctx }) => {
-
     return ctx.db.location.findMany({
       where: {
         organizationId: ctx.organization.id,
@@ -54,7 +52,6 @@ export const locationRouter = createTRPCRouter({
       }),
     )
     .mutation(({ ctx, input }) => {
-
       return ctx.db.location.update({
         where: {
           id: input.id,
@@ -70,7 +67,6 @@ export const locationRouter = createTRPCRouter({
   getById: organizationProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
-
       const location = await ctx.db.location.findFirst({
         where: {
           id: input.id,
@@ -96,14 +92,12 @@ export const locationRouter = createTRPCRouter({
         throw new Error("Location not found");
       }
 
-
       return location;
     }),
 
   delete: locationDeleteProcedure
     .input(z.object({ id: z.string() }))
     .mutation(({ ctx, input }) => {
-
       return ctx.db.location.delete({
         where: {
           id: input.id,
@@ -121,7 +115,6 @@ export const locationRouter = createTRPCRouter({
       }),
     )
     .mutation(({ ctx, input }) => {
-
       return ctx.db.location.update({
         where: {
           id: input.locationId,
