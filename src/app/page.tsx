@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import { DevLoginCompact } from "./_components/DevLoginCompact";
 import LoginModal from "./_components/LoginModal";
 
-export default function HomePage() {
+export default function HomePage(): React.ReactNode {
   const router = useRouter();
   // For now, we'll use a simple state to simulate login.
   // In a real app, this would be determined by `useSession` from next-auth.
@@ -14,7 +14,7 @@ export default function HomePage() {
 
   // A simple way to "log in" for demonstration purposes.
   // In the real app, the magic link flow will handle this.
-  const handleLogin = () => {
+  const handleLogin = (): void => {
     setIsLoggedIn(true);
   };
 
