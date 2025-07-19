@@ -2,6 +2,8 @@ import { TRPCError } from "@trpc/server";
 
 import { organizationProcedure } from "./trpc.base";
 
+import type { OrganizationTRPCContext } from "./trpc.base";
+
 /**
  * Permission-based procedure factory
  *
@@ -17,7 +19,9 @@ export function requirePermission(permission: string) {
       });
     }
 
-    return next({ ctx });
+    return next({ 
+      ctx: ctx satisfies OrganizationTRPCContext
+    });
   });
 }
 
