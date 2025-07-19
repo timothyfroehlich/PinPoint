@@ -1,17 +1,11 @@
 import { TRPCError } from "@trpc/server";
+
 import { type ExtendedPrismaClient } from "../db";
-import { type PrismaRole, type PrismaPermission } from "./types";
 
-interface MembershipInput {
-  roleId: string;
-}
-
-interface RoleWithPermissions extends PrismaRole {
-  permissions: PrismaPermission[];
-}
+import type { PrismaRole } from "./types";
 
 export async function hasPermission(
-  membership: MembershipInput,
+  membership: { roleId: string },
   permission: string,
   prisma: ExtendedPrismaClient,
 ): Promise<boolean> {
@@ -24,20 +18,20 @@ export async function hasPermission(
     },
   });
 
-  if (roleResult?.permissions) {
-    return roleResult.permissions.length > 0;
+  if (roleResult && typeof roleResult === "object" && "permissions" in roleResult) {
+    const role = roleResult as PrismaRole & { permissions: { name: string }[] };
+    return role.permissions.length > 0;
   }
 
   return false;
 }
 
 export async function requirePermission(
-  membership: MembershipInput,
+  membership: { roleId: string },
   permission: string,
   prisma: ExtendedPrismaClient,
 ): Promise<void> {
-  const hasPerm = await hasPermission(membership, permission, prisma);
-  if (!hasPerm) {
+  if (!(await hasPermission(membership, permission, prisma))) {
     throw new TRPCError({
       code: "FORBIDDEN",
       message: `Permission required: ${permission}`,
@@ -46,16 +40,17 @@ export async function requirePermission(
 }
 
 export async function getUserPermissions(
-  membership: MembershipInput,
+  membership: { roleId: string },
   prisma: ExtendedPrismaClient,
 ): Promise<string[]> {
-  const roleResult = (await prisma.role.findUnique({
+  const roleResult = await prisma.role.findUnique({
     where: { id: membership.roleId },
     include: { permissions: true },
-  })) as RoleWithPermissions | null;
+  });
 
-  if (roleResult?.permissions) {
-    return roleResult.permissions.map((p) => p.name);
+  if (roleResult && typeof roleResult === "object" && "permissions" in roleResult) {
+    const role = roleResult as PrismaRole & { permissions: { name: string }[] };
+    return role.permissions.map((p) => p.name);
   }
 
   return [];

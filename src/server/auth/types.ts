@@ -58,31 +58,23 @@ export function isValidUser(user: unknown): user is PrismaUser {
   return (
     typeof user === "object" &&
     user !== null &&
-    "id" in user &&
     typeof (user as PrismaUser).id === "string"
   );
 }
 
-export function isValidOrganization(
-  org: unknown,
-): org is PrismaOrganization {
+export function isValidOrganization(org: unknown): org is PrismaOrganization {
   return (
     typeof org === "object" &&
     org !== null &&
-    "id" in org &&
     typeof (org as PrismaOrganization).id === "string"
   );
 }
 
-export function isValidMembership(
-  membership: unknown,
-): membership is PrismaMembershipWithPermissions {
+export function isValidMembership(membership: unknown): membership is PrismaMembershipWithPermissions {
   return (
     typeof membership === "object" &&
     membership !== null &&
-    "id" in membership &&
     typeof (membership as PrismaMembershipWithPermissions).id === "string" &&
-    "role" in membership &&
     typeof (membership as PrismaMembershipWithPermissions).role === "object"
   );
 }

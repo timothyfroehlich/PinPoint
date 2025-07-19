@@ -1,42 +1,43 @@
-import { TRPCError } from "@trpc/server";
+
 import { type NextRequest, NextResponse } from "next/server";
+
+import type { ExtendedPrismaClient } from "~/server/db";
 
 import { imageStorage } from "~/lib/image-storage/local-storage";
 import {
   getUploadAuthContext,
   requireUploadPermission,
+  type UploadAuthContext,
 } from "~/server/auth/uploadAuth";
-import { type ExtendedPrismaClient } from "~/server/db";
-import {
-  getGlobalDatabaseProvider,
-  type DatabaseProvider,
-} from "~/server/db/provider";
+import { getGlobalDatabaseProvider } from "~/server/db/provider";
 
-interface ErrorResponse {
-  error: string;
-}
-
-interface SuccessResponse {
-  success: true;
+// Database query result interfaces
+interface OrganizationWithLogo {
   logoUrl: string | null;
 }
 
-export async function POST(
-  req: NextRequest,
-): Promise<NextResponse<SuccessResponse | ErrorResponse>> {
-  const dbProvider: DatabaseProvider = getGlobalDatabaseProvider();
+interface UpdatedOrganization {
+  logoUrl: string | null;
+}
+
+export async function POST(req: NextRequest): Promise<NextResponse> {
+  const dbProvider = getGlobalDatabaseProvider();
   const db: ExtendedPrismaClient = dbProvider.getClient();
   try {
-    const ctx = await getUploadAuthContext(req, db);
+    // Get authenticated context with organization resolution
+    const ctx: UploadAuthContext = await getUploadAuthContext(req, db);
+
+    // Require organization management permission
     requireUploadPermission(ctx, "organization:manage");
 
     const formData = await req.formData();
     const file = formData.get("file");
 
-    if (!(file instanceof File)) {
+    if (!file || !(file instanceof File)) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
+    // Validate file type
     if (!file.type.startsWith("image/")) {
       return NextResponse.json(
         { error: "Only image files are allowed" },
@@ -44,6 +45,7 @@ export async function POST(
       );
     }
 
+    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       return NextResponse.json(
         { error: "File size must be less than 5MB" },
@@ -51,12 +53,14 @@ export async function POST(
       );
     }
 
+    // Upload image
     const imagePath = await imageStorage.uploadImage(
       file,
       `organization-${ctx.organization.id}`,
     );
 
-    const currentOrg = await db.organization.findUnique({
+    // Delete old logo if it exists
+    const currentOrg: OrganizationWithLogo | null = await db.organization.findUnique({
       where: { id: ctx.organization.id },
       select: { logoUrl: true },
     });
@@ -64,12 +68,14 @@ export async function POST(
     if (currentOrg?.logoUrl) {
       try {
         await imageStorage.deleteImage(currentOrg.logoUrl);
-      } catch (e) {
-        console.warn("Failed to delete old logo:", e);
+      } catch (error) {
+        // Ignore deletion errors for old files
+        console.warn("Failed to delete old logo:", error);
       }
     }
 
-    const updatedOrganization = await db.organization.update({
+    // Update organization logo
+    const updatedOrganization: UpdatedOrganization = await db.organization.update({
       where: { id: ctx.organization.id },
       data: { logoUrl: imagePath },
     });
@@ -78,25 +84,27 @@ export async function POST(
       success: true,
       logoUrl: updatedOrganization.logoUrl,
     });
-  } catch (error: unknown) {
+  } catch (error) {
     console.error("Organization logo upload error:", error);
 
-    if (error instanceof TRPCError) {
-      const statusMap: Record<string, number> = {
-        UNAUTHORIZED: 401,
-        FORBIDDEN: 403,
-        NOT_FOUND: 404,
-      };
-      const statusCode = statusMap[error.code] ?? 500;
-      return NextResponse.json(
-        { error: error.message },
-        { status: statusCode },
-      );
+    if (
+      error instanceof Error &&
+      error.message.includes("Permission required")
+    ) {
+      return NextResponse.json({ error: error.message }, { status: 403 });
     }
 
-    const errorMessage =
-      error instanceof Error ? error.message : "Internal server error";
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+    if (
+      error instanceof Error &&
+      error.message.includes("Authentication required")
+    ) {
+      return NextResponse.json({ error: error.message }, { status: 401 });
+    }
+
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   } finally {
     await dbProvider.disconnect();
   }
