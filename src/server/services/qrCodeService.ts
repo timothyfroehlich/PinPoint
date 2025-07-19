@@ -1,8 +1,9 @@
-import { type PrismaClient, type Machine } from "@prisma/client";
+import { type Machine } from "@prisma/client";
 import * as QRCode from "qrcode";
 
-import { imageStorage } from "../../lib/image-storage/local-storage";
-import { constructReportUrl } from "../utils/qrCodeUtils";
+import { imageStorage } from "~/lib/image-storage/local-storage";
+import { type ExtendedPrismaClient } from "~/server/db";
+import { constructReportUrl } from "~/server/utils/qrCodeUtils";
 
 export interface QRCodeInfo {
   id: string;
@@ -35,7 +36,7 @@ export interface BulkGenerationResult {
 }
 
 export class QRCodeService {
-  constructor(private prisma: PrismaClient) {}
+  constructor(private prisma: ExtendedPrismaClient) {}
 
   /**
    * Generate QR code for a machine

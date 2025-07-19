@@ -2,10 +2,10 @@ import { TRPCError } from "@trpc/server";
 import { type NextRequest } from "next/server";
 
 import type { Session } from "next-auth";
+import type { ExtendedPrismaClient } from "~/server/db";
 
 import { env } from "~/env";
 import { auth } from "~/server/auth";
-import { db } from "~/server/db";
 
 export interface UploadAuthContext {
   session: Session;
@@ -30,6 +30,7 @@ export interface UploadAuthContext {
 
 export async function getUploadAuthContext(
   req: NextRequest,
+  db: ExtendedPrismaClient,
 ): Promise<UploadAuthContext> {
   // 1. Verify authentication
   const session = await auth();
@@ -98,4 +99,14 @@ export async function requireUploadPermission(
       message: `Permission required: ${permission}`,
     });
   }
+}
+
+export async function validateUploadAuth(
+  db: ExtendedPrismaClient,
+  sessionId?: string,
+  organizationId?: string,
+) {
+  // This function is a placeholder for now, but it will be used in the future
+  // to validate uploads without a full request object.
+  return;
 }

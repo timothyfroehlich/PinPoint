@@ -1,10 +1,8 @@
-# **PinPoint UI/UX Architecture Plan (Revised for Beta)**
+# **PinPoint UI/UX Architecture Plan (Updated for Frontend Rebuild)**
 
 This document outlines the necessary pages and high-level components for the PinPoint application, based on the Beta and V1.0 roadmap. Pages are organized by their functional purpose, with each page showing different components based on user authentication and permissions.
 
 ## **0. Global Components**
-
-### **Universal Header / Top Navigation Bar**
 
 - **Purpose:** A persistent header present on all pages providing primary navigation.
 - **Key Components:**
@@ -144,6 +142,29 @@ This document outlines the necessary pages and high-level components for the Pin
 
 ### **/dashboard**
 
+<<<<<<< HEAD
+
+## **2\. Administrative Features (Phase 4)**
+
+### **User Profile Management**
+
+- **Route:** `/profile`
+- **Purpose:** Complete user profile management with modern interface
+- **Phase 4 Implementation:**
+  - Profile editing with real-time validation
+  - Avatar upload with image compression
+  - Notification preferences management
+  - Owned machines display with issue notifications
+- **Key Features:**
+  - Material UI form components
+  - React Hook Form integration
+  - File upload progress indicators
+  - Real-time preference updates
+
+### **Organization Administration**
+
+=======
+
 - **Purpose:** Personalized overview for authenticated users.
 - **Components:**
   - Issues assigned to current user
@@ -154,7 +175,21 @@ This document outlines the necessary pages and high-level components for the Pin
 
 ## **5. User & Admin Pages**
 
-### **/profile**
+- **Route:** `/admin/organization`
+- **Purpose:** Complete organization management for administrators
+- **Access Control:** Admin role required
+- **Key Features:**
+  - Organization logo upload
+  - Member management interface
+  - Role assignment system
+  - Organization statistics dashboard
+  - Bulk user operations
+
+<<<<<<< HEAD
+
+### **Machine Management**
+
+=======
 
 - **Purpose:** User profile management.
 - **Components:**
@@ -166,7 +201,21 @@ This document outlines the necessary pages and high-level components for the Pin
   - Activity history
   - Connected social accounts
 
-### **/admin/organization**
+- **Routes:** `/machines`, `/machines/[id]`, `/machines/new`
+- **Purpose:** Complete machine lifecycle management
+- **OPDB Integration:** Real-time search and data sync
+- **Key Features:**
+  - Machine listing with advanced filtering
+  - OPDB search with autocomplete
+  - Machine detail view with issue history
+  - Ownership assignment
+  - Location management integration
+
+<<<<<<< HEAD
+
+### **Location Management**
+
+=======
 
 - **Purpose:** Organization settings (Admin only).
 - **Components:**
@@ -176,7 +225,20 @@ This document outlines the necessary pages and high-level components for the Pin
   - Member invitation controls
   - API key management
 
-### **/admin/locations**
+- **Routes:** `/locations`, `/locations/[id]`
+- **Purpose:** Physical location management
+- **Multi-tenant Support:** Organization-scoped locations
+- **Key Features:**
+  - Location listing and detail views
+  - Machine assignment to locations
+  - Location statistics and analytics
+  - Address and contact management
+
+<<<<<<< HEAD
+
+## **3\. Technical Implementation Details**
+
+=======
 
 - **Purpose:** Location management (Admin only).
 - **Components:**
@@ -269,7 +331,17 @@ Example Implementation:
 - Organization signup flow with subdomain selection
 - Tenant switching UI for users in multiple organizations
 
-### **Advanced Asset Management**
+- **Zero TypeScript Errors:** Strict typing enforced throughout
+- **ESLint Compliance:** Consistent code style and best practices
+- **Accessibility:** WCAG 2.1 compliance with screen reader support
+- **Test Coverage:** Unit, integration, and E2E tests for all phases
+- **Performance:** Lighthouse scores >90 for all pages
+
+<<<<<<< HEAD
+
+## **4\. Future Enhancements (Post-Phase 4)**
+
+=======
 
 - **Private Locations:**
   - Repair shops, storage facilities
@@ -284,7 +356,7 @@ Example Implementation:
   - Lock icon indicator
   - Filtered from public views
 
-### **Collection System**
+### **Collection Features**
 
 - **Auto-Generated Collections:**
   - By manufacturer, era, theme
