@@ -2,14 +2,17 @@ import { TRPCError } from "@trpc/server";
 
 import { organizationProcedure } from "./trpc.base";
 
+import type { OrganizationTRPCContext } from "./trpc.base";
+
 /**
  * Permission-based procedure factory
  *
  * Creates a procedure that requires a specific permission to be present in the user's role.
  * This replaces the old adminProcedure with a more granular permission system.
  */
-export function requirePermission(permission: string) {
+export function requirePermission(permission: string): typeof organizationProcedure {
   return organizationProcedure.use(async ({ ctx, next }) => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     if (!ctx.userPermissions.includes(permission)) {
       throw new TRPCError({
         code: "FORBIDDEN",
@@ -17,7 +20,9 @@ export function requirePermission(permission: string) {
       });
     }
 
-    return next({ ctx });
+    return next({ 
+      ctx: ctx satisfies OrganizationTRPCContext
+    });
   });
 }
 

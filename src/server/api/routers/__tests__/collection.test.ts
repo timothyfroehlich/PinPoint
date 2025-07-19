@@ -1,14 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
-import type { PrismaClient } from "@prisma/client";
+import type { ExtendedPrismaClient } from "~/server/db";
 
 import { CollectionService } from "~/server/services/collectionService";
 
 // Simple integration test focusing on service integration with router input validation
 describe("Collection Router Integration", () => {
   let service: CollectionService;
-  let mockPrisma: jest.Mocked<PrismaClient>;
+  let mockPrisma: jest.Mocked<ExtendedPrismaClient>;
 
   beforeEach(() => {
     mockPrisma = {
@@ -25,7 +25,11 @@ describe("Collection Router Integration", () => {
       machine: {
         findMany: jest.fn(),
       },
-    } as unknown as jest.Mocked<PrismaClient>;
+      $accelerate: {
+        invalidate: jest.fn(),
+        ttl: jest.fn(),
+      },
+    } as unknown as jest.Mocked<ExtendedPrismaClient>;
 
     service = new CollectionService(mockPrisma);
     jest.clearAllMocks();
@@ -79,7 +83,13 @@ describe("Collection Router Integration", () => {
           },
         },
         include: {
-          type: true,
+          type: {
+            select: {
+              id: true,
+              name: true,
+              displayName: true,
+            },
+          },
           _count: {
             select: {
               machines: {

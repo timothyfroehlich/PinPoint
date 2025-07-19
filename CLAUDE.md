@@ -35,18 +35,24 @@ npm run dev:full        # Start all services with monitoring
 npm run dev:clean       # Fresh start with cleanup
 npm run setup:worktree  # Setup new worktree environment
 
-# Quality Assurance (MANDATORY)
-npm run validate        # Before starting work
-npm run pre-commit      # Before every commit (MUST PASS)
+# Agent Validation Protocol (MANDATORY)
+npm run quick:agent        # Development checks + auto-fix (after code changes)
+npm run validate:agent     # Pre-commit validation + auto-fix (MUST PASS)
+npm run validate:full:agent # Pre-PR validation (MUST PASS)
+
+# Legacy Commands (Still Available)
+npm run validate        # Standard validation
+npm run pre-commit      # Full validation + workflow check + build test
 
 # Database
 npm run db:reset
 npm run db:push
 
-# Quick Checks
-npm run quick           # Fast typecheck + lint
+# Quick Fixes & Debug
 npm run fix             # Auto-fix lint + format issues
-npm run typecheck
+npm run debug:typecheck # Full TypeScript output
+npm run debug:test      # Verbose test output
+npm run debug:lint      # Detailed lint output
 
 # Testing
 npm run test:coverage
@@ -55,8 +61,9 @@ npm run test:coverage
 ## Quality Standards (Zero Tolerance)
 
 - **0 TypeScript errors** - Fix immediately, never commit with TS errors
-- **0 usage of `any`**: Never use an `any` tye, even in test code. If you don't know the type then go look for it.
+- **0 usage of `any`**: Never use an `any` type, even in test code. If you don't know the type then go look for it.
 - **0 ESLint errors** - Warnings acceptable with justification
+- **Strict type-aware linting** - Project uses `@tsconfig/strictest` + type-aware ESLint rules to enforce type safety
 - **Consistent formatting** - Auto-formatted with Prettier
 - **Modern patterns** - ES modules, typed mocks (`jest.fn<T>()`), no `any` types
 - **Test quality** - Same standards as production code
@@ -65,9 +72,17 @@ npm run test:coverage
 ## Development Workflow
 
 1. **Start**: `npm run validate` → `npm run dev:full`
-2. **During**: Fix lint/type errors immediately as they appear
-3. **Before commit**: `npm run pre-commit` must pass
-4. **Database changes**: Use `npm run db:reset` (pre-production phase)
+2. **During**: Run `npm run quick:agent` after significant code changes
+3. **Before commit**: `npm run validate:agent` must pass (MANDATORY)
+4. **Before PR**: `npm run validate:full:agent` must pass (MANDATORY)
+5. **Database changes**: Use `npm run db:reset` (pre-production phase)
+
+### Agent Protocol Benefits
+
+- **Context preservation**: ~3-5 lines output vs 100+ lines
+- **Auto-fix capability**: Automatically fixes lint/format issues
+- **Early detection**: Catch issues during development, not CI
+- **Consistent format**: ✓ Success messages, ✗ Error summaries
 
 ## Architecture Principles
 
@@ -96,6 +111,7 @@ npm run test:coverage
 - OPDB games: global (no organizationId), custom games: organization-scoped
 - **ESM modules**: Project uses `"type": "module"` - some packages (superjson, @auth/prisma-adapter) are ESM-only and may need transformIgnorePatterns updates in Jest
 - **Jest ESM**: Current config uses `ts-jest/presets/default-esm` - avoid changing without understanding ESM implications
+- **Type Safety**: Project enforces strictest TypeScript + type-aware ESLint rules. All `@typescript-eslint/no-unsafe-*` and `no-explicit-any` violations must be fixed
 
 ## Frontend Development Notes
 

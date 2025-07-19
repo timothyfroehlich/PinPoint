@@ -6,7 +6,6 @@ import {
   issueCreateProcedure,
   issueEditProcedure,
 } from "~/server/api/trpc";
-import { IssueActivityService } from "~/server/services/issueActivityService";
 
 export const issueCommentRouter = createTRPCRouter({
   // Add comment to an issue (for members/admins)
@@ -240,7 +239,7 @@ export const issueCommentRouter = createTRPCRouter({
       });
 
       // Record deletion activity
-      const activityService = new IssueActivityService(ctx.db);
+      const activityService = ctx.services.createIssueActivityService();
       await activityService.recordCommentDeleted(
         comment.issue.id,
         ctx.organization.id,

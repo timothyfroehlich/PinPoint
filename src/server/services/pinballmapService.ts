@@ -3,11 +3,11 @@
  * Handles syncing machine data between PinballMap and PinPoint
  */
 
+import type { ExtendedPrismaClient } from "./types";
 import type {
   PinballMapMachine,
   PinballMapMachineDetailsResponse,
 } from "../../lib/pinballmap/types";
-import type { PrismaClient } from "@prisma/client";
 
 export interface SyncResult {
   success: boolean;
@@ -18,7 +18,7 @@ export interface SyncResult {
 }
 
 export class PinballMapService {
-  constructor(private prisma: PrismaClient) {}
+  constructor(private prisma: ExtendedPrismaClient) {}
 
   /**
    * Enable PinballMap integration for an organization
@@ -189,7 +189,7 @@ export class PinballMapService {
 
         // Find existing machine by model and location
         const existingMachine = currentMachines.find(
-          (m) => m.modelId === model!.id,
+          (m: { modelId: string; id: string }) => m.modelId === model.id,
         );
 
         if (existingMachine) {
@@ -222,7 +222,7 @@ export class PinballMapService {
 
     // Remove machines that are no longer on PinballMap
     const machinesToRemove = currentMachines.filter(
-      (m) => !foundMachineIds.has(m.id),
+      (m: { id: string }) => !foundMachineIds.has(m.id),
     );
 
     for (const machine of machinesToRemove) {
@@ -376,7 +376,14 @@ export class PinballMapService {
 
     return {
       configEnabled: config?.apiEnabled ?? false,
-      locations: locations.map((location) => ({
+      locations: locations.map((location: {
+        id: string;
+        name: string;
+        pinballMapId: number | null;
+        syncEnabled: boolean;
+        lastSyncAt: Date | null;
+        _count: { machines: number };
+      }) => ({
         id: location.id,
         name: location.name,
         pinballMapId: location.pinballMapId,
@@ -390,7 +397,7 @@ export class PinballMapService {
 
 // Export legacy functions for backward compatibility during transition
 export async function syncLocationGames(
-  prisma: PrismaClient,
+  prisma: ExtendedPrismaClient,
   locationId: string,
 ): Promise<SyncResult> {
   const service = new PinballMapService(prisma);
@@ -398,7 +405,7 @@ export async function syncLocationGames(
 }
 
 export async function processFixtureData(
-  prisma: PrismaClient,
+  prisma: ExtendedPrismaClient,
   fixtureData: PinballMapMachineDetailsResponse,
   locationId: string,
   organizationId: string,
@@ -409,7 +416,7 @@ export async function processFixtureData(
 
     for (const machine of fixtureData.machines) {
       // Create or update model
-      const model = await service["findOrCreateModel"](machine, true);
+      const model = await service.findOrCreateModel(machine, true);
 
       if (model) {
         // Create machine instance

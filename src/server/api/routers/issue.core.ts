@@ -6,8 +6,6 @@ import {
   publicProcedure,
   issueEditProcedure,
 } from "~/server/api/trpc";
-import { IssueActivityService } from "~/server/services/issueActivityService";
-import { NotificationService } from "~/server/services/notificationService";
 
 export const issueCoreRouter = createTRPCRouter({
   // Public submission - anyone can report an issue
@@ -73,7 +71,7 @@ export const issueCoreRouter = createTRPCRouter({
       }
 
       // Determine reporter: use session user if available, otherwise use email or null
-      const createdById = ctx.session?.user?.id;
+      const createdById = ctx.session.user.id;
 
       if (!createdById) {
         throw new Error("User not found");
@@ -111,7 +109,7 @@ export const issueCoreRouter = createTRPCRouter({
 
       // Record the issue creation activity if user is logged in
       if (createdById) {
-        const activityService = new IssueActivityService(ctx.db);
+        const activityService = ctx.services.createIssueActivityService();
         await activityService.recordIssueCreated(
           issue.id,
           organization.id,
@@ -120,7 +118,7 @@ export const issueCoreRouter = createTRPCRouter({
       }
 
       // Send notifications for new issue
-      const notificationService = new NotificationService(ctx.db);
+      const notificationService = ctx.services.createNotificationService();
       await notificationService.notifyMachineOwnerOfIssue(
         issue.id,
         input.machineId,
@@ -344,8 +342,8 @@ export const issueCoreRouter = createTRPCRouter({
         throw new Error("Issue not found");
       }
 
-      const activityService = new IssueActivityService(ctx.db);
-      const notificationService = new NotificationService(ctx.db);
+      const activityService = ctx.services.createIssueActivityService();
+      const notificationService = ctx.services.createNotificationService();
       const userId = ctx.session.user.id;
 
       // Prepare data for tracking changes

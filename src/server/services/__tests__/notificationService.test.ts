@@ -1,7 +1,8 @@
-import { type PrismaClient } from "@prisma/client";
 import { NotificationType, NotificationEntity } from "@prisma/client";
 
 import { NotificationService } from "../notificationService";
+
+import { type ExtendedPrismaClient } from "~/server/db";
 
 // Mock PrismaClient - following project patterns
 const mockNotificationCreate = jest.fn();
@@ -27,7 +28,11 @@ const mockPrisma = {
   issue: {
     findUnique: mockIssueFindUnique,
   },
-} as unknown as jest.Mocked<PrismaClient>;
+  $accelerate: {
+    invalidate: jest.fn(),
+    ttl: jest.fn(),
+  },
+} as unknown as jest.Mocked<ExtendedPrismaClient>;
 
 describe("NotificationService", () => {
   let service: NotificationService;

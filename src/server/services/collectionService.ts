@@ -1,8 +1,9 @@
 import {
-  type PrismaClient,
   type Collection,
   type CollectionType,
-} from "@prisma/client";
+  Prisma,
+  type ExtendedPrismaClient,
+} from "./types";
 
 export interface CreateManualCollectionData {
   name: string;
@@ -29,8 +30,46 @@ export interface CollectionWithMachines {
   }[];
 }
 
+// Type definitions for Prisma queries
+type CollectionWithTypeAndCount = Prisma.CollectionGetPayload<{
+  include: {
+    type: {
+      select: {
+        id: true;
+        name: true;
+        displayName: true;
+      };
+    };
+    _count: {
+      select: {
+        machines: true;
+      };
+    };
+  };
+}>;
+
+type MachineWithModelManufacturer = Prisma.MachineGetPayload<{
+  select: {
+    model: {
+      select: {
+        manufacturer: true;
+      };
+    };
+  };
+}>;
+
+type CollectionTypeWithCount = Prisma.CollectionTypeGetPayload<{
+  include: {
+    _count: {
+      select: {
+        collections: true;
+      };
+    };
+  };
+}>;
+
 export class CollectionService {
-  constructor(private prisma: PrismaClient) {}
+  constructor(private prisma: ExtendedPrismaClient) {}
 
   /**
    * Get collections for a location (for public filtering)
@@ -43,7 +82,7 @@ export class CollectionService {
     auto: CollectionWithMachines[];
   }> {
     // Get all collections in one query to avoid N+1 pattern
-    const collections = await this.prisma.collection.findMany({
+    const collections: CollectionWithTypeAndCount[] = await this.prisma.collection.findMany({
       where: {
         OR: [
           { locationId }, // Location-specific collections
@@ -55,7 +94,13 @@ export class CollectionService {
         },
       },
       include: {
-        type: true,
+        type: {
+          select: {
+            id: true,
+            name: true,
+            displayName: true,
+          },
+        },
         _count: {
           select: {
             machines: {
@@ -111,7 +156,7 @@ export class CollectionService {
   /**
    * Get machines in a collection at a specific location
    */
-  async getCollectionMachines(
+  getCollectionMachines(
     collectionId: string,
     locationId: string,
   ): Promise<
@@ -147,7 +192,7 @@ export class CollectionService {
   /**
    * Create a manual collection
    */
-  async createManualCollection(
+  createManualCollection(
     organizationId: string,
     data: CreateManualCollectionData,
   ): Promise<Collection> {
@@ -220,7 +265,7 @@ export class CollectionService {
     collectionType: CollectionType,
   ): Promise<{ generated: number; updated: number }> {
     // Get all unique manufacturers for machines in this organization
-    const manufacturers = await this.prisma.machine.findMany({
+    const manufacturers: MachineWithModelManufacturer[] = await this.prisma.machine.findMany({
       where: {
         organizationId: collectionType.organizationId,
         model: {
@@ -242,7 +287,7 @@ export class CollectionService {
     const uniqueManufacturers = Array.from(
       new Set(
         manufacturers
-          .map((m) => m.model.manufacturer)
+          .map((m: MachineWithModelManufacturer) => m.model.manufacturer)
           .filter((m): m is string => m !== null),
       ),
     );
@@ -288,7 +333,7 @@ export class CollectionService {
           where: { id: collection.id },
           data: {
             machines: {
-              connect: machines.map((m) => ({ id: m.id })),
+              connect: machines.map((m: { id: string }) => ({ id: m.id })),
             },
           },
         });
@@ -310,7 +355,7 @@ export class CollectionService {
           where: { id: existing.id },
           data: {
             machines: {
-              set: machines.map((m) => ({ id: m.id })),
+              set: machines.map((m: { id: string }) => ({ id: m.id })),
             },
           },
         });
@@ -382,7 +427,7 @@ export class CollectionService {
           where: { id: collection.id },
           data: {
             machines: {
-              connect: machines.map((m) => ({ id: m.id })),
+              connect: machines.map((m: { id: string }) => ({ id: m.id })),
             },
           },
         });
@@ -393,7 +438,7 @@ export class CollectionService {
           where: { id: existing.id },
           data: {
             machines: {
-              set: machines.map((m) => ({ id: m.id })),
+              set: machines.map((m: { id: string }) => ({ id: m.id })),
             },
           },
         });
@@ -421,7 +466,7 @@ export class CollectionService {
   /**
    * Get organization's collection types for admin management
    */
-  async getOrganizationCollectionTypes(organizationId: string): Promise<
+  getOrganizationCollectionTypes(organizationId: string): Promise<
     {
       id: string;
       name: string;
@@ -431,7 +476,7 @@ export class CollectionService {
       collectionCount: number;
     }[]
   > {
-    return this.prisma.collectionType
+    const types: CollectionTypeWithCount[] = await this.prisma.collectionType
       .findMany({
         where: { organizationId },
         include: {
@@ -444,16 +489,15 @@ export class CollectionService {
         orderBy: {
           sortOrder: "asc",
         },
-      })
-      .then((types) =>
-        types.map((type) => ({
-          id: type.id,
-          name: type.name,
-          displayName: type.displayName,
-          isAutoGenerated: type.isAutoGenerated,
-          isEnabled: type.isEnabled,
-          collectionCount: type._count.collections,
-        })),
-      );
+      });
+    
+    return types.map((type) => ({
+      id: type.id,
+      name: type.name,
+      displayName: type.displayName,
+      isAutoGenerated: type.isAutoGenerated,
+      isEnabled: type.isEnabled,
+      collectionCount: type._count.collections,
+    }));
   }
 }

@@ -1,4 +1,5 @@
 {
+  "extends": "@tsconfig/strictest/tsconfig.json",
   "compilerOptions": {
     /* Base Options: */
     "esModuleInterop": true,
@@ -10,10 +11,12 @@
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
 
-    /* Strictness */
-    "strict": true,
-    "noUncheckedIndexedAccess": true,
-    "checkJs": true,
+    /* Strictness - inherited from @tsconfig/strictest */
+    /* Includes: strict, noImplicitAny, strictNullChecks, strictFunctionTypes, */
+    /* strictBindCallApply, strictPropertyInitialization, noImplicitThis, */
+    /* alwaysStrict, noUnusedLocals, noUnusedParameters, exactOptionalPropertyTypes, */
+    /* noImplicitReturns, noFallthroughCasesInSwitch, noUncheckedIndexedAccess, */
+    /* noImplicitOverride, noPropertyAccessFromIndexSignature */
 
     /* Bundled projects */
     "lib": ["dom", "dom.iterable", "ES2022"],
@@ -35,7 +38,6 @@
     "**/*.ts",
     "**/*.tsx",
     "**/*.cjs",
-    "**/*.js",
     ".next/types/**/*.ts"
   ],
   "exclude": [

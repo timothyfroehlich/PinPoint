@@ -7,7 +7,6 @@ import {
   organizationManageProcedure,
   locationEditProcedure,
 } from "~/server/api/trpc";
-import { CollectionService } from "~/server/services/collectionService";
 
 export const collectionRouter = createTRPCRouter({
   // Public: Get collections for location filtering
@@ -19,7 +18,7 @@ export const collectionRouter = createTRPCRouter({
       }),
     )
     .query(async ({ ctx, input }) => {
-      const service = new CollectionService(ctx.db);
+      const service = ctx.services.createCollectionService();
       return service.getLocationCollections(
         input.locationId,
         input.organizationId,
@@ -35,7 +34,7 @@ export const collectionRouter = createTRPCRouter({
       }),
     )
     .query(async ({ ctx, input }) => {
-      const service = new CollectionService(ctx.db);
+      const service = ctx.services.createCollectionService();
       return service.getCollectionMachines(
         input.collectionId,
         input.locationId,
@@ -53,7 +52,8 @@ export const collectionRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const service = new CollectionService(ctx.db);
+      const service = ctx.services.createCollectionService();
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return service.createManualCollection(ctx.organization.id, {
         name: input.name,
         typeId: input.typeId,
@@ -71,7 +71,7 @@ export const collectionRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const service = new CollectionService(ctx.db);
+      const service = ctx.services.createCollectionService();
       await service.addMachinesToCollection(
         input.collectionId,
         input.machineIds,
@@ -81,13 +81,13 @@ export const collectionRouter = createTRPCRouter({
 
   // Generate auto-collections
   generateAuto: organizationManageProcedure.mutation(async ({ ctx }) => {
-    const service = new CollectionService(ctx.db);
+    const service = ctx.services.createCollectionService();
     return service.generateAutoCollections(ctx.organization.id);
   }),
 
   // Get organization collection types for admin
   getTypes: organizationProcedure.query(async ({ ctx }) => {
-    const service = new CollectionService(ctx.db);
+    const service = ctx.services.createCollectionService();
     return service.getOrganizationCollectionTypes(ctx.organization.id);
   }),
 
@@ -100,7 +100,7 @@ export const collectionRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const service = new CollectionService(ctx.db);
+      const service = ctx.services.createCollectionService();
       await service.toggleCollectionType(input.collectionTypeId, input.enabled);
       return { success: true };
     }),

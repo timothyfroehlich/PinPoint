@@ -1,7 +1,7 @@
 // Comprehensive tests for redesigned PinballMapService (Task 10)
 import { PinballMapService } from "../pinballmapService";
 
-import type { PrismaClient } from "@prisma/client";
+import type { ExtendedPrismaClient } from "~/server/db";
 
 // Mock fetch globally for all tests
 global.fetch = jest.fn();
@@ -41,12 +41,16 @@ const mockPrisma = {
   issue: {
     count: mockIssueCount,
   },
-} as unknown as PrismaClient;
+  $accelerate: {
+    invalidate: jest.fn(),
+    ttl: jest.fn(),
+  },
+} as unknown as ExtendedPrismaClient;
 
 const service = new PinballMapService(mockPrisma);
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const servicePrivate = service as any;
+// Type assertion for testing private methods
+const servicePrivate = service as PinballMapService & Record<string, unknown>;
 
 describe("PinballMapService", () => {
   beforeEach(() => {

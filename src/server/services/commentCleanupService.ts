@@ -1,9 +1,9 @@
-import { type PrismaClient, type Comment } from "@prisma/client";
+import { type Comment, type ExtendedPrismaClient } from "./types";
 
 import { COMMENT_CLEANUP_CONFIG } from "~/server/constants/cleanup";
 
 export class CommentCleanupService {
-  constructor(private prisma: PrismaClient) {}
+  constructor(private prisma: ExtendedPrismaClient) {}
 
   /**
    * Permanently delete comments that have been soft-deleted for more than the configured retention period
@@ -14,7 +14,7 @@ export class CommentCleanupService {
       retentionCutoff.getDate() - COMMENT_CLEANUP_CONFIG.RETENTION_DAYS,
     );
 
-    const result = await this.prisma.comment.deleteMany({
+    const result: { count: number } = await this.prisma.comment.deleteMany({
       where: {
         deletedAt: {
           lte: retentionCutoff,
@@ -28,7 +28,7 @@ export class CommentCleanupService {
   /**
    * Get count of comments that will be cleaned up (for monitoring/reporting)
    */
-  async getCleanupCandidateCount(): Promise<number> {
+  getCleanupCandidateCount(): Promise<number> {
     const retentionCutoff = new Date();
     retentionCutoff.setDate(
       retentionCutoff.getDate() - COMMENT_CLEANUP_CONFIG.RETENTION_DAYS,
@@ -75,7 +75,7 @@ export class CommentCleanupService {
   /**
    * Get all soft-deleted comments for an organization (admin view)
    */
-  async getDeletedComments(organizationId: string): Promise<Comment[]> {
+  getDeletedComments(organizationId: string): Promise<Comment[]> {
     return this.prisma.comment.findMany({
       where: {
         deletedAt: { not: null },

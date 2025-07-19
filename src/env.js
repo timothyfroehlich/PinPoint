@@ -34,6 +34,9 @@ export const env = createEnv({
     // Image storage configuration
     IMAGE_STORAGE_PROVIDER: z.enum(["local", "vercel-blob"]).default("local"),
     BLOB_READ_WRITE_TOKEN: z.string().optional(),
+    // Seed configuration
+    SEED_ADMIN_EMAIL: z.string().email().optional(),
+    SEED_ADMIN_NAME: z.string().optional(),
   },
 
   /**
@@ -63,6 +66,8 @@ export const env = createEnv({
     OPDB_API_KEY: process.env.OPDB_API_KEY,
     IMAGE_STORAGE_PROVIDER: process.env.IMAGE_STORAGE_PROVIDER,
     BLOB_READ_WRITE_TOKEN: process.env.BLOB_READ_WRITE_TOKEN,
+    SEED_ADMIN_EMAIL: process.env.SEED_ADMIN_EMAIL,
+    SEED_ADMIN_NAME: process.env.SEED_ADMIN_NAME,
     // Next.js automatically exposes NODE_ENV to the client
   },
   /**

@@ -1,68 +1,65 @@
-// Add this helper at the top of the file
-function setNodeEnv(value: string) {
-  Object.defineProperty(process.env, "NODE_ENV", {
-    value,
-    configurable: true,
-    writable: true,
-    enumerable: true,
-  });
+import { type DeepMockProxy } from "jest-mock-extended";
+
+// Mock environment variables FIRST
+const mockEnv = {
+  NODE_ENV: "development",
+  GOOGLE_CLIENT_ID: "test-google-client-id",
+  GOOGLE_CLIENT_SECRET: "test-google-client-secret",
+  AUTH_SECRET: "test-secret",
+  NEXTAUTH_SECRET: "test-secret",
+  NEXTAUTH_URL: "http://localhost:3000",
+  DATABASE_URL: "postgresql://test:test@localhost:5432/test",
+  OPDB_API_URL: "https://opdb.org/api",
+  DEFAULT_ORG_SUBDOMAIN: "apc",
+};
+
+// Import NextAuth provider types
+import type { Provider } from "next-auth/providers";
+
+// Helper interface for provider with ID (since Provider type doesn't expose id)
+interface ProviderWithId {
+  id: string;
 }
 
-// Create properly typed mock functions
-const mockOrganizationFindUnique = jest.fn<Promise<unknown>, [unknown]>();
-const mockMembershipFindUnique = jest.fn<Promise<unknown>, [unknown]>();
-const mockUserFindUnique = jest.fn<Promise<unknown>, [unknown]>();
+// Mock functions to set environment
+function setNodeEnv(env: string): void {
+  mockEnv.NODE_ENV = env;
+}
 
-// Mock the database
-jest.mock("~/server/db", () => ({
-  db: {
-    organization: {
-      findUnique: jest.fn(),
-    },
-    membership: {
-      findUnique: jest.fn(),
-    },
-    user: {
-      findUnique: jest.fn(),
-    },
-  },
-}));
-
-// Mock the env module
-const mockEnv = {
-  NODE_ENV: "test" as string,
-  GOOGLE_CLIENT_ID: "test-client-id",
-  GOOGLE_CLIENT_SECRET: "test-client-secret",
-};
+// Mock user for auth callbacks
+const mockUserFindUnique = jest.fn();
 
 jest.mock("~/env.js", () => ({
   env: mockEnv,
 }));
 
-import { authConfig } from "../config";
-
-import { db } from "~/server/db";
+import { createAuthConfig } from "~/server/auth/config";
+import { type ExtendedPrismaClient } from "~/server/db";
+import { createMockContext, resetMockContext } from "~/test/mockContext";
 
 describe("NextAuth Configuration", () => {
+  let ctx: ReturnType<typeof createMockContext>;
+  let db: DeepMockProxy<ExtendedPrismaClient>;
+  let authConfig: ReturnType<typeof createAuthConfig>;
+
   beforeEach(() => {
-    jest.clearAllMocks();
-    // Reset environment
-    setNodeEnv("test");
-    mockEnv.NODE_ENV = "test";
-    // Assign the mock functions to the imported mocks
-    (db.organization.findUnique as jest.Mock) = mockOrganizationFindUnique;
-    (db.membership.findUnique as jest.Mock) = mockMembershipFindUnique;
-    (db.user.findUnique as jest.Mock) = mockUserFindUnique;
+    ctx = createMockContext();
+    db = ctx.db;
+    authConfig = createAuthConfig(db);
+  });
+
+  afterEach(() => {
+    resetMockContext(ctx);
   });
 
   describe("Provider Configuration", () => {
     it("should include Google provider", () => {
       expect(authConfig.providers.length).toBeGreaterThanOrEqual(1);
       const googleProvider = authConfig.providers.find(
-        (p) => p.id === "google",
+        (p: Provider) => (p as ProviderWithId).id === "google",
       );
       expect(googleProvider).toBeDefined();
-      expect(googleProvider!.id).toBe("google");
+      expect((googleProvider as ProviderWithId | undefined)?.id).toBe("google");
     });
 
     it("should include credentials provider in development", async () => {
@@ -73,12 +70,12 @@ describe("NextAuth Configuration", () => {
       jest.resetModules();
 
       const configModule = await import("../config");
-      const devConfig = configModule.authConfig;
+      const devConfig = configModule.createAuthConfig(db);
 
       expect(devConfig.providers).toHaveLength(2);
       const credentialsProvider = devConfig.providers[1];
       expect(credentialsProvider).toBeDefined();
-      expect(credentialsProvider!.id).toBe("credentials");
+      expect((credentialsProvider as ProviderWithId | undefined)?.id).toBe("credentials");
 
       // Check the custom name in options
       expect(
@@ -92,11 +89,11 @@ describe("NextAuth Configuration", () => {
 
       jest.resetModules();
       const configModule = await import("../config");
-      const prodConfig = configModule.authConfig;
+      const prodConfig = configModule.createAuthConfig(db);
 
       expect(prodConfig.providers).toHaveLength(1);
       expect(prodConfig.providers[0]).toBeDefined();
-      expect(prodConfig.providers[0]!.id).toBe("google");
+      expect((prodConfig.providers[0] as ProviderWithId | undefined)?.id).toBe("google");
     });
   });
 
@@ -119,11 +116,11 @@ describe("NextAuth Configuration", () => {
 
       jest.resetModules();
       const configModule = await import("../config");
-      const devConfig = configModule.authConfig;
+      const devConfig = configModule.createAuthConfig(db);
       const credentialsProvider = devConfig.providers[1];
 
       expect(credentialsProvider).toBeDefined();
-      expect(credentialsProvider!.id).toBe("credentials");
+      expect((credentialsProvider as ProviderWithId | undefined)?.id).toBe("credentials");
       expect(
         (credentialsProvider as { authorize?: () => unknown }).authorize,
       ).toBeInstanceOf(Function);
@@ -137,9 +134,9 @@ describe("NextAuth Configuration", () => {
 
       jest.resetModules();
       const configModule = await import("../config");
-      const prodConfig = configModule.authConfig;
+      const prodConfig = configModule.createAuthConfig(db);
       const credentialsProvider = prodConfig.providers.find(
-        (p: { id: string }) => p.id === "credentials",
+        (p: Provider) => (p as ProviderWithId).id === "credentials",
       );
 
       // Credentials provider should not exist in production
@@ -151,7 +148,7 @@ describe("NextAuth Configuration", () => {
 
       jest.resetModules();
       const configModule = await import("../config");
-      const devConfig = configModule.authConfig;
+      const devConfig = configModule.createAuthConfig(db);
       const credentialsProvider = devConfig.providers[1];
 
       const result = await (
@@ -172,7 +169,7 @@ describe("NextAuth Configuration", () => {
 
       jest.resetModules();
       const configModule = await import("../config");
-      const devConfig = configModule.authConfig;
+      const devConfig = configModule.createAuthConfig(db);
       const credentialsProvider = devConfig.providers[1];
 
       const result = await (

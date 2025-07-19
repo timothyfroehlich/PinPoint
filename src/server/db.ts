@@ -1,17 +1,25 @@
 import { PrismaClient } from "@prisma/client";
+import { withAccelerate } from "@prisma/extension-accelerate";
 
 import { env } from "~/env";
 
-const createPrismaClient = () =>
-  new PrismaClient({
+// Dedicated type alias for the extended Prisma client with Accelerate
+type AcceleratedPrismaClient = PrismaClient & ReturnType<typeof withAccelerate>;
+
+function createPrismaClientInternal(): AcceleratedPrismaClient {
+  const baseClient = new PrismaClient({
     log:
       env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
   });
 
-const globalForPrisma = globalThis as unknown as {
-  prisma: ReturnType<typeof createPrismaClient> | undefined;
+  // Always extend with Accelerate for consistent typing
+  // In development, Accelerate operations will fall back to regular Prisma
+  return baseClient.$extends(withAccelerate());
+}
+
+// Type alias for the extended Prisma client used throughout the application
+export type ExtendedPrismaClient = ReturnType<typeof createPrismaClientInternal>;
+
+export const createPrismaClient = (): ExtendedPrismaClient => {
+  return createPrismaClientInternal();
 };
-
-export const db = globalForPrisma.prisma ?? createPrismaClient();
-
-if (env.NODE_ENV !== "production") globalForPrisma.prisma = db;

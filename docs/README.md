@@ -115,7 +115,7 @@ superseded-by: [optional link]
 ```bash
 npm run dev:full        # Start all services with monitoring
 npm run validate        # Run all checks before starting work
-npm run pre-commit      # Must pass before every commit
+npm run validate:agent  # Pre-commit validation + auto-fix (MUST PASS)
 npm run db:reset        # Reset database with seed data
 npm run test:coverage   # Generate coverage reports
 ```
@@ -125,7 +125,7 @@ npm run test:coverage   # Generate coverage reports
 - **0 TypeScript errors** - Fix immediately
 - **0 ESLint errors** - No exceptions
 - **Test Coverage** - 50% global, 60% server/, 70% lib/
-- **Pre-commit** - Must always pass
+- **Agent validation** - Must always pass before commits
 
 ### Key Technologies
 

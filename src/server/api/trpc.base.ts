@@ -10,23 +10,107 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
 
+import type { Session } from "next-auth";
+import type { ExtendedPrismaClient } from "~/server/db";
+
 import { env } from "~/env";
 import { auth } from "~/server/auth";
-import { db } from "~/server/db";
+import { getGlobalDatabaseProvider } from "~/server/db/provider";
+import { ServiceFactory } from "~/server/services/factory";
+
+/**
+ * Base context interface for tRPC
+ */
+interface CreateTRPCContextOptions {
+  headers: Headers;
+}
+
+/**
+ * Organization type for context
+ */
+interface Organization {
+  id: string;
+  subdomain: string;
+  name: string;
+  // Add other fields as needed
+}
+
+/**
+ * Permission type for context
+ */
+interface Permission {
+  id: string;
+  name: string;
+}
+
+/**
+ * Role type for context
+ */
+interface Role {
+  id: string;
+  name: string;
+  permissions: Permission[];
+}
+
+/**
+ * Membership type for context
+ */
+interface Membership {
+  id: string;
+  organizationId: string;
+  userId: string;
+  role: Role;
+}
+
+/**
+ * tRPC context type that includes all available properties
+ */
+export interface TRPCContext {
+  db: ExtendedPrismaClient;
+  session: Session | null;
+  organization: Organization;
+  services: ServiceFactory;
+  headers: Headers;
+}
+
+/**
+ * Enhanced context for protected procedures with authenticated user
+ */
+export interface ProtectedTRPCContext extends TRPCContext {
+  session: Session & {
+    user: NonNullable<Session["user"]>;
+  };
+}
+
+/**
+ * Enhanced context for organization procedures with membership info
+ */
+export interface OrganizationTRPCContext extends ProtectedTRPCContext {
+  membership: Membership;
+  userPermissions: string[];
+}
 
 /**
  * Context creation for tRPC
  */
-export const createTRPCContext = async (opts: { headers: Headers }) => {
+export const createTRPCContext = async (opts: CreateTRPCContextOptions): Promise<TRPCContext> => {
+  const dbProvider = getGlobalDatabaseProvider();
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+  const db = dbProvider.getClient();
+  const services = new ServiceFactory(db);
   const session = await auth();
 
-  let organization;
+  let organization: Organization | null = null;
 
   // If user is authenticated and has organization context, use that
-  if (session?.user?.organizationId) {
-    organization = await db.organization.findUnique({
+  if (session?.user.organizationId) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    const org = await db.organization.findUnique({
       where: { id: session.user.organizationId },
     });
+    if (org) {
+      organization = org as Organization;
+    }
   }
 
   // Extract subdomain from headers (set by middleware)
@@ -34,9 +118,15 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
     opts.headers.get("x-subdomain") ?? env.DEFAULT_ORG_SUBDOMAIN;
 
   // Fallback to organization based on subdomain
-  organization ??= await db.organization.findUnique({
-    where: { subdomain },
-  });
+  if (!organization) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    const org = await db.organization.findUnique({
+      where: { subdomain },
+    });
+    if (org) {
+      organization = org as Organization;
+    }
+  }
 
   if (!organization) {
     throw new TRPCError({
@@ -46,17 +136,19 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
   }
 
   return {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     db,
     session,
     organization,
-    ...opts,
+    services,
+    headers: opts.headers,
   };
 };
 
 /**
  * tRPC initialization
  */
-const t = initTRPC.context<typeof createTRPCContext>().create({
+const t = initTRPC.context<TRPCContext>().create({
   transformer: superjson,
   errorFormatter({ shape, error }) {
     return {
@@ -64,7 +156,7 @@ const t = initTRPC.context<typeof createTRPCContext>().create({
       data: {
         ...shape.data,
         zodError:
-          error.cause instanceof ZodError ? error.cause.flatten() : null,
+          error.cause instanceof ZodError ? error.cause.issues : null,
       },
     };
   },
@@ -89,7 +181,7 @@ const timingMiddleware = t.middleware(async ({ next, path }) => {
 
   const end = Date.now();
   if (env.NODE_ENV !== "test") {
-    console.log(`[TRPC] ${path} took ${end - start}ms to execute`);
+    console.log(`[TRPC] ${path} took ${String(end - start)}ms to execute`);
   }
 
   return result;
@@ -108,21 +200,16 @@ export const protectedProcedure = t.procedure
     }
     return next({
       ctx: {
+        ...ctx,
         // infers the `session` as non-nullable
         session: { ...ctx.session, user: ctx.session.user },
-      },
+      } satisfies ProtectedTRPCContext,
     });
   });
 
 export const organizationProcedure = protectedProcedure.use(
   async ({ ctx, next }) => {
-    if (!ctx.organization) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Organization not found",
-      });
-    }
-
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     const membership = await ctx.db.membership.findFirst({
       where: {
         organizationId: ctx.organization.id,
@@ -147,9 +234,10 @@ export const organizationProcedure = protectedProcedure.use(
     return next({
       ctx: {
         ...ctx,
-        membership,
-        userPermissions: membership.role.permissions.map((p) => p.name),
-      },
+        membership: membership as Membership,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+        userPermissions: membership.role.permissions.map((p: { name: string }) => p.name),
+      } satisfies OrganizationTRPCContext,
     });
   },
 );

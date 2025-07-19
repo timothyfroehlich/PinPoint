@@ -19,7 +19,7 @@ export function parseOPDBId(opdbId: string): OPDBParsedId | null {
   if (!match) return null;
 
   return {
-    groupId: match[1]!,
+    groupId: match[1] ?? "",
     machineId: match[2] ?? undefined,
     aliasId: match[3] ?? undefined,
   };
@@ -64,7 +64,7 @@ export function buildOPDBId(
  */
 export function getPreferredImageUrl(machine: OPDBMachine): string | null {
   if (machine.images && machine.images.length > 0) {
-    return machine.images[0]!;
+    return machine.images[0] ?? null;
   }
 
   // If machine has extended details with specific image types
