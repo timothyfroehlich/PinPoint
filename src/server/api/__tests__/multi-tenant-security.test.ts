@@ -4,7 +4,7 @@ import { type Session } from "next-auth";
 import { appRouter } from "~/server/api/root";
 import { createCallerFactory } from "~/server/api/trpc";
 import { auth } from "~/server/auth";
-import { createMockContext } from "~/test/mockContext";
+import { createMockContext, type MockContext } from "~/test/mockContext";
 
 // Mock auth function
 jest.mock("~/server/auth", () => ({
@@ -27,8 +27,10 @@ const mockIssueCreate = jest.fn();
 const createCaller = createCallerFactory(appRouter);
 
 describe("Multi-Tenant Security Tests", () => {
+  let mockContext: MockContext;
+
   beforeEach(() => {
-    createMockContext();
+    mockContext = createMockContext();
   });
 
   // Test data for Organization A
@@ -198,7 +200,7 @@ describe("Multi-Tenant Security Tests", () => {
 
       const callerA = createCaller({
         ...ctx,
-        session: sessionA as never,
+        session: sessionA,
         organization: organizationA,
         headers: new Headers({
           host: "org-a.localhost:3000",
@@ -252,7 +254,7 @@ describe("Multi-Tenant Security Tests", () => {
 
       const callerA = createCaller({
         ...ctx,
-        session: sessionA as never,
+        session: sessionA,
         organization: organizationB,
         headers: new Headers({
           host: "org-b.localhost:3000", // User A trying to access org B
@@ -314,7 +316,7 @@ describe("Multi-Tenant Security Tests", () => {
 
       const callerA = createCaller({
         ...ctx,
-        session: sessionA as never,
+        session: sessionA,
         organization: organizationA,
         headers: new Headers({
           host: "org-a.localhost:3000",
@@ -344,7 +346,7 @@ describe("Multi-Tenant Security Tests", () => {
 
       const callerB = createCaller({
         ...ctxB,
-        session: sessionB as never,
+        session: sessionB,
         organization: organizationB,
         headers: new Headers({
           host: "org-b.localhost:3000",
@@ -410,7 +412,7 @@ describe("Multi-Tenant Security Tests", () => {
 
       const callerA = createCaller({
         ...ctx,
-        session: sessionA as never,
+        session: sessionA,
         organization: organizationA,
         headers: new Headers({
           host: "org-a.localhost:3000",
@@ -530,7 +532,7 @@ describe("Multi-Tenant Security Tests", () => {
 
       const callerA = createCaller({
         ...ctx,
-        session: sessionA as never,
+        session: sessionA,
         organization: organizationA,
         headers: new Headers({
           host: "org-a.localhost:3000",
@@ -605,7 +607,7 @@ describe("Multi-Tenant Security Tests", () => {
 
       const callerA = createCaller({
         ...ctx,
-        session: sessionA as never,
+        session: sessionA,
         organization: organizationA,
         headers: new Headers({
           host: "org-a.localhost:3000",
@@ -645,7 +647,7 @@ describe("Multi-Tenant Security Tests", () => {
 
       const memberCaller = createCaller({
         ...ctx,
-        session: memberSession as never,
+        session: memberSession,
         organization: organizationA,
         headers: new Headers({
           host: "org-a.localhost:3000",
@@ -691,7 +693,7 @@ describe("Multi-Tenant Security Tests", () => {
 
       const adminCaller = createCaller({
         ...ctxAdmin,
-        session: adminSession as never,
+        session: adminSession,
         organization: organizationA,
         headers: new Headers({
           host: "org-a.localhost:3000",
@@ -724,7 +726,7 @@ describe("Multi-Tenant Security Tests", () => {
   });
 
   describe("Subdomain Resolution Security", () => {
-    it("should correctly resolve organization from subdomain", () => {
+    it("should correctly resolve organization from subdomain", async () => {
       const session: Session = {
         user: {
           id: "user-a",
@@ -784,7 +786,7 @@ describe("Multi-Tenant Security Tests", () => {
 
       const caller = createCaller({
         ...ctx,
-        session: session as never,
+        session: session,
         organization: organizationB,
         headers: new Headers({
           host: "org-b.localhost:3000", // Spoofed subdomain

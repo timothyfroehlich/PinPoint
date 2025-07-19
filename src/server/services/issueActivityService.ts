@@ -64,21 +64,16 @@ export class IssueActivityService {
     issueId: string,
     organizationId: string,
     actorId: string,
-    oldAssignee: { name?: string } | null,
-    newAssignee: { name?: string } | null,
+    oldAssignee: { name?: string | null } | null,
+    newAssignee: { name?: string | null } | null,
   ): Promise<void> {
     let _description: string;
-    const oldAssigneeName = oldAssignee?.name ?? "unassigned";
-    const newAssigneeName = newAssignee?.name ?? "unassigned";
-
     if (oldAssignee?.name && newAssignee?.name) {
-      _description = `Reassigned from ${String(oldAssigneeName)} to ${String(
-        newAssigneeName,
-      )}`;
+      _description = `Reassigned from ${oldAssignee.name} to ${newAssignee.name}`;
     } else if (newAssignee?.name) {
-      _description = `Assigned to ${String(newAssigneeName)}`;
+      _description = `Assigned to ${newAssignee.name}`;
     } else if (oldAssignee?.name) {
-      _description = `Unassigned from ${String(oldAssigneeName)}`;
+      _description = `Unassigned from ${oldAssignee.name}`;
     } else {
       _description = "Assignment changed";
     }
@@ -87,8 +82,8 @@ export class IssueActivityService {
       type: ActivityType.ASSIGNED,
       actorId,
       fieldName: "assignee",
-      oldValue: oldAssignee?.name,
-      newValue: newAssignee?.name,
+      oldValue: oldAssignee?.name ?? undefined,
+      newValue: newAssignee?.name ?? undefined,
     });
   }
 

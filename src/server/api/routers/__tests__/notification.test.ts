@@ -46,7 +46,6 @@ describe("notificationRouter", () => {
 
     // Mock the service method to return the expected data
     const mockNotificationService = ctx.services.createNotificationService();
-    // eslint-disable-next-line @typescript-eslint/unbound-method
     (
       mockNotificationService.getUserNotifications as jest.MockedFunction<any>
     ).mockResolvedValue([mockNotification]);
@@ -60,7 +59,6 @@ describe("notificationRouter", () => {
 
   it("gets unread count", async () => {
     const mockNotificationService = ctx.services.createNotificationService();
-    // eslint-disable-next-line @typescript-eslint/unbound-method
     (
       mockNotificationService.getUnreadCount as jest.MockedFunction<any>
     ).mockResolvedValue(3);
@@ -74,7 +72,6 @@ describe("notificationRouter", () => {
 
   it("marks notification as read", async () => {
     const mockNotificationService = ctx.services.createNotificationService();
-    // eslint-disable-next-line @typescript-eslint/unbound-method
     (
       mockNotificationService.markAsRead as jest.MockedFunction<any>
     ).mockResolvedValue(undefined);
@@ -82,7 +79,6 @@ describe("notificationRouter", () => {
     const caller = appRouter.createCaller(ctx as any);
     await caller.notification.markAsRead({ notificationId });
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(mockNotificationService.markAsRead).toHaveBeenCalledWith(
       notificationId,
       mockUser.id,
@@ -91,7 +87,6 @@ describe("notificationRouter", () => {
 
   it("marks all as read", async () => {
     const mockNotificationService = ctx.services.createNotificationService();
-    // eslint-disable-next-line @typescript-eslint/unbound-method
     (
       mockNotificationService.markAllAsRead as jest.MockedFunction<any>
     ).mockResolvedValue(undefined);
@@ -99,7 +94,6 @@ describe("notificationRouter", () => {
     const caller = appRouter.createCaller(ctx as any);
     await caller.notification.markAllAsRead();
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(mockNotificationService.markAllAsRead).toHaveBeenCalledWith(
       mockUser.id,
     );
@@ -136,7 +130,6 @@ describe("notificationRouter", () => {
     ];
 
     const mockNotificationService = ctx.services.createNotificationService();
-    // eslint-disable-next-line @typescript-eslint/unbound-method
     (
       mockNotificationService.getUserNotifications as jest.MockedFunction<any>
     ).mockResolvedValue(mockNotifications);
@@ -148,7 +141,6 @@ describe("notificationRouter", () => {
     expect(result.some((n) => n.userId === otherUserId)).toBe(false);
 
     // Should only query for current user's notifications
-    // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(mockNotificationService.getUserNotifications).toHaveBeenCalledWith(
       mockUser.id,
       {},

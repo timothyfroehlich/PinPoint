@@ -77,7 +77,6 @@ describe("tRPC Authentication Middleware", () => {
       // Set up mock context
       ctx.session = mockSession;
       ctx.organization = mockOrganization;
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       ctx.db.membership.findFirst.mockResolvedValue(mockMembership);
 
       const caller = appRouter.createCaller(ctx);
@@ -148,7 +147,6 @@ describe("tRPC Authentication Middleware", () => {
       // Set up mock context
       ctx.session = mockSession;
       ctx.organization = mockOrganization;
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       ctx.db.membership.findFirst.mockResolvedValue(mockMembership);
 
       const caller = appRouter.createCaller(ctx);
@@ -162,7 +160,6 @@ describe("tRPC Authentication Middleware", () => {
         organizationId: mockMembership.organizationId,
         permissions: ["issues:read", "issues:write"],
       });
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(ctx.db.membership.findFirst).toHaveBeenCalledWith({
         where: {
           organizationId: "org-1",
@@ -195,7 +192,6 @@ describe("tRPC Authentication Middleware", () => {
       // Set up mock context
       ctx.session = mockSession;
       ctx.organization = mockOrganization;
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       ctx.db.membership.findFirst.mockResolvedValue(null); // No membership
 
       const caller = appRouter.createCaller(ctx);
@@ -225,7 +221,6 @@ describe("tRPC Authentication Middleware", () => {
       // Set up mock context
       ctx.session = mockSession;
       ctx.organization = null; // Organization not found
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       ctx.db.organization.findUnique.mockResolvedValue(null); // Organization not found
 
       const caller = appRouter.createCaller(ctx);
@@ -267,7 +262,6 @@ describe("tRPC Authentication Middleware", () => {
       // Set up mock context
       ctx.session = mockSession;
       ctx.organization = differentOrganization;
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       ctx.db.membership.findFirst.mockResolvedValue(null); // No membership in different org
 
       const caller = appRouter.createCaller(ctx);
@@ -297,7 +291,6 @@ describe("tRPC Authentication Middleware", () => {
       // Set up mock context
       ctx.session = mockSession;
       ctx.organization = mockOrganization;
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       ctx.db.membership.findFirst.mockResolvedValue(mockMembership);
 
       const caller = appRouter.createCaller(ctx);
@@ -331,7 +324,6 @@ describe("tRPC Authentication Middleware", () => {
       // Set up mock context
       ctx.session = mockAdminSession;
       ctx.organization = mockOrganization;
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       ctx.db.membership.findFirst.mockResolvedValue(mockAdminMembership);
 
       const caller = appRouter.createCaller(ctx);
@@ -363,7 +355,6 @@ describe("tRPC Authentication Middleware", () => {
       // Set up mock context
       ctx.session = mockMemberSession;
       ctx.organization = mockOrganization;
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       ctx.db.membership.findFirst.mockResolvedValue(mockMembership);
 
       const caller = appRouter.createCaller(ctx);
@@ -398,7 +389,6 @@ describe("tRPC Authentication Middleware", () => {
       // Set up mock context
       ctx.session = mockSession;
       ctx.organization = mockOrganization;
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       ctx.db.membership.findFirst.mockResolvedValue(mockMembership);
 
       const caller = appRouter.createCaller(ctx);
@@ -424,7 +414,6 @@ describe("tRPC Authentication Middleware", () => {
       // Set up mock context
       ctx.session = mockSession;
       ctx.organization = mockOrganization;
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       ctx.db.membership.findFirst.mockResolvedValue(mockMembership);
 
       const caller = appRouter.createCaller(ctx);

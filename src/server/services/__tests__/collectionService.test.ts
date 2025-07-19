@@ -57,19 +57,18 @@ describe("CollectionService", () => {
           id: "coll1",
           name: "Front Room",
           isManual: true,
-          type: mockCollectionTypes[0],
+          type: mockCollectionTypes[0]!,
           _count: { machines: 5 },
         },
         {
           id: "coll2",
           name: "Stern",
           isManual: false,
-          type: mockCollectionTypes[1],
+          type: mockCollectionTypes[1]!,
           _count: { machines: 3 },
         },
       ];
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       (mockPrisma.collection.findMany as jest.MockedFunction<() => unknown>).mockResolvedValue(
         mockCollections,
       );
@@ -83,12 +82,10 @@ describe("CollectionService", () => {
     });
 
     it("should only return enabled collection types", async () => {
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       (mockPrisma.collection.findMany as jest.MockedFunction<() => unknown>).mockResolvedValue([]);
 
       await service.getLocationCollections("loc1", "org1");
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(mockPrisma.collection.findMany).toHaveBeenCalledWith({
         where: {
           OR: [
@@ -145,7 +142,6 @@ describe("CollectionService", () => {
         },
       ];
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       (mockPrisma.machine.findMany as jest.MockedFunction<() => unknown>).mockResolvedValue(
         mockMachines,
       );
@@ -153,7 +149,6 @@ describe("CollectionService", () => {
       const result = await service.getCollectionMachines("coll1", "loc1");
 
       expect(result).toEqual(mockMachines);
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(mockPrisma.machine.findMany).toHaveBeenCalledWith({
         where: {
           locationId: "loc1",
@@ -185,7 +180,6 @@ describe("CollectionService", () => {
         isManual: true,
       };
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       (mockPrisma.collection.create as jest.MockedFunction<() => unknown>).mockResolvedValue(
         mockCollection,
       );
@@ -198,7 +192,6 @@ describe("CollectionService", () => {
       });
 
       expect(result).toEqual(mockCollection);
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(mockPrisma.collection.create).toHaveBeenCalledWith({
         data: {
           name: "Front Room",
@@ -214,12 +207,10 @@ describe("CollectionService", () => {
 
   describe("addMachinesToCollection", () => {
     it("should add machines to a collection", async () => {
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       (mockPrisma.collection.update as jest.MockedFunction<() => unknown>).mockResolvedValue({});
 
       await service.addMachinesToCollection("coll1", ["machine1", "machine2"]);
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(mockPrisma.collection.update).toHaveBeenCalledWith({
         where: { id: "coll1" },
         data: {
@@ -233,14 +224,12 @@ describe("CollectionService", () => {
 
   describe("toggleCollectionType", () => {
     it("should enable/disable a collection type", async () => {
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       (mockPrisma.collectionType.update as jest.MockedFunction<() => unknown>).mockResolvedValue(
         {},
       );
 
       await service.toggleCollectionType("type1", false);
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(mockPrisma.collectionType.update).toHaveBeenCalledWith({
         where: { id: "type1" },
         data: { isEnabled: false },
@@ -261,7 +250,6 @@ describe("CollectionService", () => {
         },
       ];
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       (mockPrisma.collectionType.findMany as jest.MockedFunction<() => unknown>).mockResolvedValue(
         mockTypes,
       );
@@ -283,7 +271,6 @@ describe("CollectionService", () => {
 
   describe("generateAutoCollections", () => {
     it("should return empty counts when no auto types enabled", async () => {
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       (mockPrisma.collectionType.findMany as jest.MockedFunction<() => unknown>).mockResolvedValue(
         [],
       );
@@ -291,7 +278,6 @@ describe("CollectionService", () => {
       const result = await service.generateAutoCollections("org1");
 
       expect(result).toEqual({ generated: 0, updated: 0 });
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(mockPrisma.collectionType.findMany).toHaveBeenCalledWith({
         where: {
           organizationId: "org1",

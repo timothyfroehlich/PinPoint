@@ -5,13 +5,12 @@ import Google from "next-auth/providers/google";
 
 import { isValidUser, isValidOrganization, isValidMembership } from "./types";
 
-import type { Session } from "next-auth";
-import type { User } from "next-auth";
+import type { Session, User } from "next-auth";
 import type { JWT } from "next-auth/jwt";
+import type { AdapterUser } from "next-auth/adapters";
 import type { ExtendedPrismaClient } from "~/server/db";
 
 import { env } from "~/env.js";
-
 
 /**
  * Module augmentation for `next-auth` types. Allows us to add custom properties to the `session`
@@ -28,6 +27,13 @@ declare module "next-auth" {
     } & DefaultSession["user"];
   }
 
+  interface User {
+    role?: string;
+    organizationId?: string;
+  }
+}
+
+declare module "next-auth/jwt" {
   interface JWT {
     id: string;
     role?: string;
@@ -55,20 +61,21 @@ export const createAuthConfig = (db: ExtendedPrismaClient): NextAuthConfig => ({
             credentials: {
               email: { label: "Email", type: "email" },
             },
-            async authorize(credentials: Record<string, unknown> | undefined): Promise<User | null> {
+            async authorize(
+              credentials: Partial<Record<string, unknown>>,
+            ): Promise<User | null> {
               if (env.NODE_ENV !== "development" && env.NODE_ENV !== "test") {
                 return null;
               }
 
               if (
                 !credentials ||
-                !("email" in credentials) ||
-                typeof credentials["email"] !== "string"
+                typeof credentials.email !== "string"
               ) {
                 return null;
               }
 
-              const email = credentials["email"];
+              const email = credentials.email;
 
               // Find user in database by email
               const userResult = await db.user.findUnique({
@@ -97,15 +104,16 @@ export const createAuthConfig = (db: ExtendedPrismaClient): NextAuthConfig => ({
     strategy: "jwt",
   },
   callbacks: {
-    jwt: async ({ token, user }: { token: JWT; user?: User }): Promise<JWT> => {
-      if (user && "id" in user && typeof user.id === "string") {
-        const userId = user.id;
-        token.id = userId;
+    jwt: async ({
+      token,
+      user,
+    }: {
+      token: JWT;
+      user?: User | AdapterUser;
+    }): Promise<JWT> => {
+      if (user && user.id) {
+        token.id = user.id;
 
-        // Get the user's membership in the current organization
-        // Note: In JWT callback, we don't have access to request headers/subdomain,
-        // so we default to APC. The organization context will be properly resolved
-        // in tRPC context based on subdomain.
         const organizationResult = await db.organization.findUnique({
           where: { subdomain: "apc" },
         });
@@ -114,7 +122,7 @@ export const createAuthConfig = (db: ExtendedPrismaClient): NextAuthConfig => ({
           const membershipResult = await db.membership.findUnique({
             where: {
               userId_organizationId: {
-                userId,
+                userId: user.id,
                 organizationId: organizationResult.id,
               },
             },
@@ -131,17 +139,23 @@ export const createAuthConfig = (db: ExtendedPrismaClient): NextAuthConfig => ({
       }
       return token;
     },
-    session: ({ session, token }: { session: Session; token: JWT }): Session => {
-      // For JWT sessions, get data from token
-      return {
-        ...session,
-        user: {
-          ...session.user,
-          id: typeof token["id"] === "string" ? token["id"] : "",
-          role: typeof token["role"] === "string" ? token["role"] : undefined,
-          organizationId: typeof token["organizationId"] === "string" ? token["organizationId"] : undefined,
-        },
-      };
+    session: ({
+      session,
+      token,
+    }: {
+      session: Session;
+      token: JWT;
+    }): Session => {
+      if (token.id) {
+        session.user.id = token.id;
+      }
+      if (token.role) {
+        session.user.role = token.role;
+      }
+      if (token.organizationId) {
+        session.user.organizationId = token.organizationId;
+      }
+      return session;
     },
   },
 });

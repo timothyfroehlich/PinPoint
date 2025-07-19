@@ -7,7 +7,7 @@ import {
 } from "~/server/api/trpc";
 
 export const organizationRouter = createTRPCRouter({
-  getCurrent: publicProcedure.query(({ ctx }) => {
+  getCurrent: publicProcedure.query(async ({ ctx }) => {
     // Return the organization from context (resolved based on subdomain)
     return ctx.organization;
   }),
@@ -16,7 +16,7 @@ export const organizationRouter = createTRPCRouter({
     .input(
       z.object({
         name: z.string().min(1),
-        logoUrl: z.url().optional(),
+        logoUrl: z.string().url().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {

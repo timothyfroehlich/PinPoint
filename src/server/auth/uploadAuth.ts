@@ -1,7 +1,12 @@
 import { TRPCError } from "@trpc/server";
 import { type NextRequest } from "next/server";
 
-import { isValidOrganization, isValidMembership } from "./types";
+import {
+  isValidOrganization,
+  isValidMembership,
+  type PrismaOrganization,
+  type PrismaMembershipWithPermissions,
+} from "./types";
 
 import type { Session } from "next-auth";
 import type { ExtendedPrismaClient } from "~/server/db";
@@ -9,25 +14,10 @@ import type { ExtendedPrismaClient } from "~/server/db";
 import { env } from "~/env";
 import { auth } from "~/server/auth";
 
-
 export interface UploadAuthContext {
   session: Session;
-  organization: {
-    id: string;
-    name: string;
-    subdomain: string | null;
-  };
-  membership: {
-    id: string;
-    userId: string;
-    organizationId: string;
-    roleId: string;
-    role: {
-      id: string;
-      name: string;
-      permissions: { name: string }[];
-    };
-  };
+  organization: PrismaOrganization;
+  membership: PrismaMembershipWithPermissions;
   userPermissions: string[];
 }
 
@@ -45,8 +35,7 @@ export async function getUploadAuthContext(
   }
 
   // 2. Resolve organization from subdomain
-  let subdomain = req.headers.get("x-subdomain");
-  subdomain ??= env.DEFAULT_ORG_SUBDOMAIN;
+  const subdomain = req.headers.get("x-subdomain") ?? env.DEFAULT_ORG_SUBDOMAIN;
 
   const organizationResult = await db.organization.findUnique({
     where: { subdomain },

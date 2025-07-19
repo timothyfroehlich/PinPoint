@@ -105,9 +105,7 @@ export const modelOpdbRouter = createTRPCRouter({
     return {
       synced: syncedCount,
       total: opdbGamesToSync.length,
-      message: `Synced ${String(syncedCount)} of ${String(
-        opdbGamesToSync.length,
-      )} games`,
+      message: `Synced ${syncedCount} of ${opdbGamesToSync.length} games`,
     };
   }),
 });

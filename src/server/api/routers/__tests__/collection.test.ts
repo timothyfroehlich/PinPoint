@@ -52,7 +52,7 @@ describe("Collection Router Integration", () => {
           id: "coll1",
           name: "Front Room",
           isManual: true,
-          type: mockTypes[0],
+          type: mockTypes[0]!,
           _count: { machines: 5 },
         },
       ];
@@ -60,7 +60,6 @@ describe("Collection Router Integration", () => {
       (mockPrisma.collectionType.findMany as jest.Mock<any>).mockResolvedValue(
         mockTypes,
       );
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       (mockPrisma.collection.findMany as jest.Mock<any>).mockResolvedValue(
         mockCollections,
       );
@@ -72,7 +71,6 @@ describe("Collection Router Integration", () => {
 
       expect(result).toHaveProperty("manual");
       expect(result).toHaveProperty("auto");
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(mockPrisma.collection.findMany).toHaveBeenCalledWith({
         where: {
           OR: [
@@ -124,7 +122,6 @@ describe("Collection Router Integration", () => {
         isManual: true,
       };
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       (mockPrisma.collection.create as jest.Mock<any>).mockResolvedValue(
         mockCollection,
       );
@@ -137,7 +134,6 @@ describe("Collection Router Integration", () => {
       });
 
       expect(result).toEqual(mockCollection);
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(mockPrisma.collection.create).toHaveBeenCalledWith({
         data: {
           name: "Test Collection",
@@ -151,14 +147,12 @@ describe("Collection Router Integration", () => {
     });
 
     it("should handle toggleCollectionType operations", async () => {
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       (mockPrisma.collectionType.update as jest.Mock<any>).mockResolvedValue(
         {},
       );
 
       await service.toggleCollectionType("type1", false);
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(mockPrisma.collectionType.update).toHaveBeenCalledWith({
         where: { id: "type1" },
         data: { isEnabled: false },
@@ -177,7 +171,6 @@ describe("Collection Router Integration", () => {
         },
       ];
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       (mockPrisma.collectionType.findMany as jest.Mock<any>).mockResolvedValue(
         mockTypes,
       );

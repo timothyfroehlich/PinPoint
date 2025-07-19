@@ -15,7 +15,7 @@ export const issueCoreRouter = createTRPCRouter({
         title: z.string().min(1).max(255),
         description: z.string().optional(),
         severity: z.enum(["Low", "Medium", "High", "Critical"]).optional(),
-        reporterEmail: z.email().optional(),
+        reporterEmail: z.string().email().optional(),
         machineId: z.string(),
       }),
     )

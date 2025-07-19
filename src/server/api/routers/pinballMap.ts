@@ -10,7 +10,7 @@ export const pinballMapRouter = createTRPCRouter({
   // Enable PinballMap integration for organization
   enableIntegration: organizationManageProcedure.mutation(async ({ ctx }) => {
     const service = ctx.services.createPinballMapService();
-    if (!ctx.organization.id) {
+    if (!ctx.organization?.id) {
       throw new TRPCError({
         code: "NOT_FOUND",
         message: "Organization not found",
@@ -30,7 +30,7 @@ export const pinballMapRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const service = ctx.services.createPinballMapService();
-      if (!ctx.organization.id) {
+      if (!ctx.organization?.id) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Organization not found",
@@ -64,7 +64,7 @@ export const pinballMapRouter = createTRPCRouter({
   // Get sync status for organization
   getSyncStatus: organizationManageProcedure.query(async ({ ctx }) => {
     const service = ctx.services.createPinballMapService();
-    if (!ctx.organization.id) {
+    if (!ctx.organization?.id) {
       throw new TRPCError({
         code: "NOT_FOUND",
         message: "Organization not found",

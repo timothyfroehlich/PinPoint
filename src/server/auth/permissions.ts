@@ -1,11 +1,17 @@
 import { TRPCError } from "@trpc/server";
-
 import { type ExtendedPrismaClient } from "../db";
+import { type PrismaRole, type PrismaPermission } from "./types";
 
-import type { PrismaRole } from "./types";
+interface MembershipInput {
+  roleId: string;
+}
+
+interface RoleWithPermissions extends PrismaRole {
+  permissions: PrismaPermission[];
+}
 
 export async function hasPermission(
-  membership: { roleId: string },
+  membership: MembershipInput,
   permission: string,
   prisma: ExtendedPrismaClient,
 ): Promise<boolean> {
@@ -18,20 +24,20 @@ export async function hasPermission(
     },
   });
 
-  if (roleResult && typeof roleResult === "object" && "permissions" in roleResult) {
-    const role = roleResult as PrismaRole & { permissions: { name: string }[] };
-    return role.permissions.length > 0;
+  if (roleResult?.permissions) {
+    return roleResult.permissions.length > 0;
   }
 
   return false;
 }
 
 export async function requirePermission(
-  membership: { roleId: string },
+  membership: MembershipInput,
   permission: string,
   prisma: ExtendedPrismaClient,
 ): Promise<void> {
-  if (!(await hasPermission(membership, permission, prisma))) {
+  const hasPerm = await hasPermission(membership, permission, prisma);
+  if (!hasPerm) {
     throw new TRPCError({
       code: "FORBIDDEN",
       message: `Permission required: ${permission}`,
@@ -40,17 +46,16 @@ export async function requirePermission(
 }
 
 export async function getUserPermissions(
-  membership: { roleId: string },
+  membership: MembershipInput,
   prisma: ExtendedPrismaClient,
 ): Promise<string[]> {
-  const roleResult = await prisma.role.findUnique({
+  const roleResult = (await prisma.role.findUnique({
     where: { id: membership.roleId },
     include: { permissions: true },
-  });
+  })) as RoleWithPermissions | null;
 
-  if (roleResult && typeof roleResult === "object" && "permissions" in roleResult) {
-    const role = roleResult as PrismaRole & { permissions: { name: string }[] };
-    return role.permissions.map((p) => p.name);
+  if (roleResult?.permissions) {
+    return roleResult.permissions.map((p) => p.name);
   }
 
   return [];
