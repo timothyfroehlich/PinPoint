@@ -1,6 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 
-export async function createTestContext() {
+export function createTestContext() {
   const prisma = new PrismaClient();
   // Optionally seed test org, etc. here
   return {
