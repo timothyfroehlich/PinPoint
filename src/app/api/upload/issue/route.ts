@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
 import { type NextRequest, NextResponse } from "next/server";
 
 import type { ExtendedPrismaClient } from "~/server/db";
