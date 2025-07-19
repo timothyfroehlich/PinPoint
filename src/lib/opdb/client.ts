@@ -71,14 +71,14 @@ export class OPDBClient {
           Authorization: `Bearer ${this.apiToken}`,
           "Content-Type": "application/json",
           Accept: "application/json",
-          ...options.headers,
+          ...(options.headers ?? {}),
         },
       });
 
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(
-          `OPDB API error: ${response.status} ${response.statusText} - ${errorText}`,
+          `OPDB API error: ${response.status.toString()} ${response.statusText} - ${errorText}`,
         );
       }
 
@@ -208,7 +208,7 @@ export class OPDBClient {
       cacheKey,
       () =>
         this.request<OPDBExportResponse>(
-          `/export?page=${page}&per_page=${perPage}`,
+          `/export?page=${page.toString()}&per_page=${perPage.toString()}`,
         ),
       60, // Cache export results for 1 hour (matching OPDB rate limit)
     );
@@ -218,7 +218,7 @@ export class OPDBClient {
       return [];
     }
 
-    return result.data.machines ?? [];
+    return result.data.machines;
   }
 
   /**
@@ -238,7 +238,7 @@ export class OPDBClient {
       return [];
     }
 
-    return result.data ?? [];
+    return result.data;
   }
 
   /**

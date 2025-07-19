@@ -64,13 +64,13 @@ function createMockRequest(
   url: string,
   init?: { method?: string; body?: FormData; headers?: Record<string, string> },
 ) {
-  const headersMap = new Map(Object.entries(init?.headers || {}));
+  const headersMap = new Map(Object.entries(init?.headers ?? {}));
   return {
-    method: init?.method || "GET",
+    method: init?.method ?? "GET",
     headers: {
-      get: (name: string) => headersMap.get(name) || null,
+      get: (name: string) => headersMap.get(name) ?? null,
     },
-    formData: async () => init?.body || new FormData(),
+    formData: async (): Promise<FormData> => init?.body ?? new FormData(),
   } as unknown as NextRequest;
 }
 

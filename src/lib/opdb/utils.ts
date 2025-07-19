@@ -16,10 +16,10 @@ export function parseOPDBId(opdbId: string): OPDBParsedId | null {
   const regex = /^G([a-zA-Z0-9]+)(?:-M([a-zA-Z0-9]+)(?:-A([a-zA-Z0-9]+))?)?$/;
   const match = regex.exec(opdbId);
 
-  if (!match) return null;
+  if (!match?.[1]) return null;
 
   return {
-    groupId: match[1]!,
+    groupId: match[1],
     machineId: match[2] ?? undefined,
     aliasId: match[3] ?? undefined,
   };
@@ -64,7 +64,10 @@ export function buildOPDBId(
  */
 export function getPreferredImageUrl(machine: OPDBMachine): string | null {
   if (machine.images && machine.images.length > 0) {
-    return machine.images[0]!;
+    const firstImage = machine.images[0];
+    if (firstImage) {
+      return firstImage;
+    }
   }
 
   // If machine has extended details with specific image types
