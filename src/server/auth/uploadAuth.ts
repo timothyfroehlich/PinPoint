@@ -1,11 +1,14 @@
 import { TRPCError } from "@trpc/server";
 import { type NextRequest } from "next/server";
 
+import { isValidOrganization, isValidMembership } from "./types";
+
 import type { Session } from "next-auth";
 import type { ExtendedPrismaClient } from "~/server/db";
 
 import { env } from "~/env";
 import { auth } from "~/server/auth";
+
 
 export interface UploadAuthContext {
   session: Session;
@@ -43,16 +46,13 @@ export async function getUploadAuthContext(
 
   // 2. Resolve organization from subdomain
   let subdomain = req.headers.get("x-subdomain");
-  if (!subdomain) {
-    // For beta: use environment-configured default organization
-    subdomain = env.DEFAULT_ORG_SUBDOMAIN;
-  }
+  subdomain ??= env.DEFAULT_ORG_SUBDOMAIN;
 
-  const organization = await db.organization.findUnique({
+  const organizationResult = await db.organization.findUnique({
     where: { subdomain },
   });
 
-  if (!organization) {
+  if (!isValidOrganization(organizationResult)) {
     throw new TRPCError({
       code: "NOT_FOUND",
       message: `Organization with subdomain "${subdomain}" not found`,
@@ -60,9 +60,9 @@ export async function getUploadAuthContext(
   }
 
   // 3. Get user's membership and permissions
-  const membership = await db.membership.findFirst({
+  const membershipResult = await db.membership.findFirst({
     where: {
-      organizationId: organization.id,
+      organizationId: organizationResult.id,
       userId: session.user.id,
     },
     include: {
@@ -74,7 +74,7 @@ export async function getUploadAuthContext(
     },
   });
 
-  if (!membership) {
+  if (!isValidMembership(membershipResult)) {
     throw new TRPCError({
       code: "FORBIDDEN",
       message: "User is not a member of this organization",
@@ -83,16 +83,16 @@ export async function getUploadAuthContext(
 
   return {
     session,
-    organization,
-    membership,
-    userPermissions: membership.role.permissions.map((p) => p.name),
+    organization: organizationResult,
+    membership: membershipResult,
+    userPermissions: membershipResult.role.permissions.map((p) => p.name),
   };
 }
 
-export async function requireUploadPermission(
+export function requireUploadPermission(
   ctx: UploadAuthContext,
   permission: string,
-): Promise<void> {
+): void {
   if (!ctx.userPermissions.includes(permission)) {
     throw new TRPCError({
       code: "FORBIDDEN",
@@ -101,11 +101,11 @@ export async function requireUploadPermission(
   }
 }
 
-export async function validateUploadAuth(
-  db: ExtendedPrismaClient,
-  sessionId?: string,
-  organizationId?: string,
-) {
+export function validateUploadAuth(
+  _db: ExtendedPrismaClient,
+  _sessionId?: string,
+  _organizationId?: string,
+): void {
   // This function is a placeholder for now, but it will be used in the future
   // to validate uploads without a full request object.
   return;
