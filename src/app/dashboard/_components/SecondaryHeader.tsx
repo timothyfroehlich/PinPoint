@@ -3,7 +3,9 @@
 import SettingsIcon from "@mui/icons-material/Settings";
 import { Toolbar, Typography, Button, Box } from "@mui/material";
 
-const SecondaryHeader = () => {
+import type { JSX } from "react";
+
+const SecondaryHeader = (): JSX.Element => {
   return (
     <Box
       sx={{
