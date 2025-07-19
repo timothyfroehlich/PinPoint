@@ -1,4 +1,5 @@
 import { mockDeep, mockReset, type DeepMockProxy } from "jest-mock-extended";
+import { type Session } from "next-auth";
 
 import type { ExtendedPrismaClient } from "~/server/db";
 import type { CollectionService } from "~/server/services/collectionService";
@@ -8,6 +9,7 @@ import type { IssueActivityService } from "~/server/services/issueActivityServic
 import type { NotificationService } from "~/server/services/notificationService";
 import type { PinballMapService } from "~/server/services/pinballmapService";
 import type { QRCodeService } from "~/server/services/qrCodeService";
+import { type TRPCContext } from "~/server/api/trpc.base";
 
 // Mock individual services with all methods
 const mockNotificationService: jest.Mocked<NotificationService> = {
@@ -59,24 +61,7 @@ const createMockServiceFactory = (): DeepMockProxy<ServiceFactory> => {
   } as DeepMockProxy<ServiceFactory>;
 };
 
-export interface MockContext {
-  db: DeepMockProxy<ExtendedPrismaClient>;
-  services: DeepMockProxy<ServiceFactory>;
-  session: {
-    user: {
-      id: string;
-      email?: string | null;
-      name?: string | null;
-      image?: string | null;
-    };
-    expires: string;
-  } | null;
-  organization: {
-    id: string;
-    name: string;
-  } | null;
-  headers: Headers;
-}
+export type MockContext = TRPCContext;
 
 export function createMockContext(): MockContext {
   const mockDb = mockDeep<ExtendedPrismaClient>();
@@ -132,7 +117,7 @@ export function createMockContext(): MockContext {
     db: mockDb,
     services: mockServices,
     session: null,
-    organization: null,
+    organization: mockOrganization,
     headers: new Headers(),
   };
 }

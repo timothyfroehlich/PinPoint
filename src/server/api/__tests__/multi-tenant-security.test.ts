@@ -196,7 +196,7 @@ describe("Multi-Tenant Security Tests", () => {
 
       // Mock issue data - should only return Organization A's issues
       const ctx = createMockContext();
-      ctx.db.issue.findMany.mockResolvedValue(issuesOrgA);
+      (ctx.db.issue.findMany as jest.Mock).mockResolvedValue(issuesOrgA);
 
       const callerA = createCaller({
         ...ctx,
@@ -249,8 +249,8 @@ describe("Multi-Tenant Security Tests", () => {
       // Setup context with proper mocks for no membership in Organization B
       const ctx = createMockContext();
       // User A has no membership in Organization B
-      ctx.db.membership.findFirst.mockResolvedValue(null);
-      ctx.db.membership.findUnique.mockResolvedValue(null);
+      (ctx.db.membership.findFirst as jest.Mock).mockResolvedValue(null);
+      (ctx.db.membership.findUnique as jest.Mock).mockResolvedValue(null);
 
       const callerA = createCaller({
         ...ctx,
@@ -312,7 +312,7 @@ describe("Multi-Tenant Security Tests", () => {
       mockMembershipFindFirst.mockResolvedValue(userAMember);
 
       const ctx = createMockContext();
-      ctx.db.issue.findMany.mockResolvedValue(issuesOrgA);
+      (ctx.db.issue.findMany as jest.Mock).mockResolvedValue(issuesOrgA);
 
       const callerA = createCaller({
         ...ctx,
@@ -342,7 +342,7 @@ describe("Multi-Tenant Security Tests", () => {
       mockMembershipFindFirst.mockResolvedValue(userBMember);
 
       const ctxB = createMockContext();
-      ctxB.db.issue.findMany.mockResolvedValue(issuesOrgB);
+      (ctxB.db.issue.findMany as jest.Mock).mockResolvedValue(issuesOrgB);
 
       const callerB = createCaller({
         ...ctxB,
@@ -403,7 +403,7 @@ describe("Multi-Tenant Security Tests", () => {
       });
 
       const ctx = createMockContext();
-      ctx.db.issue.findUnique.mockResolvedValue({
+      (ctx.db.issue.findUnique as jest.Mock).mockResolvedValue({
         id: "issue-b-1",
         title: "Issue B1",
         organizationId: "org-b",
@@ -479,7 +479,7 @@ describe("Multi-Tenant Security Tests", () => {
       const ctx = createMockContext();
 
       // Mock machine lookup to return a machine belonging to org-a
-      ctx.db.machine.findFirst.mockResolvedValue({
+      (ctx.db.machine.findFirst as jest.Mock).mockResolvedValue({
         id: "game-a-1",
         location: {
           organizationId: "org-a",
@@ -487,7 +487,7 @@ describe("Multi-Tenant Security Tests", () => {
       });
 
       // Mock machine findUnique for notification service
-      ctx.db.machine.findUnique.mockResolvedValue({
+      (ctx.db.machine.findUnique as jest.Mock).mockResolvedValue({
         id: "game-a-1",
         owner: {
           id: "user-a",
@@ -497,7 +497,7 @@ describe("Multi-Tenant Security Tests", () => {
       });
 
       // Mock issue status lookup (for default "New" status)
-      ctx.db.issueStatus.findFirst.mockResolvedValue({
+      (ctx.db.issueStatus.findFirst as jest.Mock).mockResolvedValue({
         id: "status-1",
         name: "New",
         organizationId: "org-a",
@@ -505,7 +505,7 @@ describe("Multi-Tenant Security Tests", () => {
       });
 
       // Mock priority lookup (for default priority)
-      ctx.db.priority.findFirst.mockResolvedValue({
+      (ctx.db.priority.findFirst as jest.Mock).mockResolvedValue({
         id: "priority-1",
         name: "Medium",
         organizationId: "org-a",
@@ -513,7 +513,7 @@ describe("Multi-Tenant Security Tests", () => {
       });
 
       // Mock successful creation
-      ctx.db.issue.create.mockResolvedValue({
+      (ctx.db.issue.create as jest.Mock).mockResolvedValue({
         id: "new-issue",
         title: "Test Issue",
         description: "Test Description",
@@ -598,7 +598,7 @@ describe("Multi-Tenant Security Tests", () => {
       const ctx = createMockContext();
 
       // Mock finding an issue from Organization B
-      ctx.db.issue.findUnique.mockResolvedValue({
+      (ctx.db.issue.findUnique as jest.Mock).mockResolvedValue({
         id: "issue-b-1",
         title: "Issue B1",
         organizationId: "org-b", // Different organization
@@ -643,7 +643,7 @@ describe("Multi-Tenant Security Tests", () => {
       mockMembershipFindFirst.mockResolvedValue(userAMember);
 
       const ctx = createMockContext();
-      ctx.db.issue.findMany.mockResolvedValue(issuesOrgA);
+      (ctx.db.issue.findMany as jest.Mock).mockResolvedValue(issuesOrgA);
 
       const memberCaller = createCaller({
         ...ctx,
@@ -689,7 +689,7 @@ describe("Multi-Tenant Security Tests", () => {
 
       // Configure the context's mock database to return the specific test data
       const ctxAdmin = createMockContext();
-      ctxAdmin.db.issue.findMany.mockResolvedValue(issuesOrgA);
+      (ctxAdmin.db.issue.findMany as jest.Mock).mockResolvedValue(issuesOrgA);
 
       const adminCaller = createCaller({
         ...ctxAdmin,
@@ -726,7 +726,7 @@ describe("Multi-Tenant Security Tests", () => {
   });
 
   describe("Subdomain Resolution Security", () => {
-    it("should correctly resolve organization from subdomain", async () => {
+    it("should correctly resolve organization from subdomain", () => {
       const session: Session = {
         user: {
           id: "user-a",
@@ -782,7 +782,7 @@ describe("Multi-Tenant Security Tests", () => {
 
       const ctx = createMockContext();
       // Mock that user has no membership in org-b
-      ctx.db.membership.findFirst.mockResolvedValue(null);
+      (ctx.db.membership.findFirst as jest.Mock).mockResolvedValue(null);
 
       const caller = createCaller({
         ...ctx,
