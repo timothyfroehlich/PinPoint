@@ -5,9 +5,9 @@ import { ServiceFactory } from "~/server/services/factory";
 import { constructReportUrl } from "~/server/utils/qrCodeUtils";
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: { qrCodeId: string } },
-) {
+): Promise<NextResponse> {
   const dbProvider = getGlobalDatabaseProvider();
   const db = dbProvider.getClient();
   try {
@@ -53,9 +53,9 @@ export async function GET(
 
 // Support HEAD requests for health checks
 export async function HEAD(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: { qrCodeId: string } },
-) {
+): Promise<NextResponse> {
   const dbProvider = getGlobalDatabaseProvider();
   const db = dbProvider.getClient();
   try {

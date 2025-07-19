@@ -18,7 +18,11 @@ export async function hasPermission(
     },
   });
 
-  if (roleResult && typeof roleResult === "object" && "permissions" in roleResult) {
+  if (
+    roleResult &&
+    typeof roleResult === "object" &&
+    "permissions" in roleResult
+  ) {
     const role = roleResult as PrismaRole & { permissions: { name: string }[] };
     return role.permissions.length > 0;
   }
@@ -48,7 +52,11 @@ export async function getUserPermissions(
     include: { permissions: true },
   });
 
-  if (roleResult && typeof roleResult === "object" && "permissions" in roleResult) {
+  if (
+    roleResult &&
+    typeof roleResult === "object" &&
+    "permissions" in roleResult
+  ) {
     const role = roleResult as PrismaRole & { permissions: { name: string }[] };
     return role.permissions.map((p) => p.name);
   }

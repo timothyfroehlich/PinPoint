@@ -12,7 +12,6 @@ import type { ExtendedPrismaClient } from "~/server/db";
 
 import { env } from "~/env.js";
 
-
 /**
  * Module augmentation for `next-auth` types. Allows us to add custom properties to the `session`
  * object and keep type safety.
@@ -55,7 +54,9 @@ export const createAuthConfig = (db: ExtendedPrismaClient): NextAuthConfig => ({
             credentials: {
               email: { label: "Email", type: "email" },
             },
-            async authorize(credentials: Record<string, unknown> | undefined): Promise<User | null> {
+            async authorize(
+              credentials: Record<string, unknown> | undefined,
+            ): Promise<User | null> {
               if (env.NODE_ENV !== "development" && env.NODE_ENV !== "test") {
                 return null;
               }
@@ -131,7 +132,13 @@ export const createAuthConfig = (db: ExtendedPrismaClient): NextAuthConfig => ({
       }
       return token;
     },
-    session: ({ session, token }: { session: Session; token: JWT }): Session => {
+    session: ({
+      session,
+      token,
+    }: {
+      session: Session;
+      token: JWT;
+    }): Session => {
       // For JWT sessions, get data from token
       return {
         ...session,
@@ -139,7 +146,10 @@ export const createAuthConfig = (db: ExtendedPrismaClient): NextAuthConfig => ({
           ...session.user,
           id: typeof token["id"] === "string" ? token["id"] : "",
           role: typeof token["role"] === "string" ? token["role"] : undefined,
-          organizationId: typeof token["organizationId"] === "string" ? token["organizationId"] : undefined,
+          organizationId:
+            typeof token["organizationId"] === "string"
+              ? token["organizationId"]
+              : undefined,
         },
       };
     },

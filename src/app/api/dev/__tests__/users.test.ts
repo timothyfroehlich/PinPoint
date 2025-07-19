@@ -47,21 +47,27 @@ const mockNextResponseInstance = {
   status: 200,
 };
 
-const mockNextResponse = jest.fn().mockImplementation((body: unknown, options?: { status?: number }) => ({
-  ...mockNextResponseInstance,
-  data: body,
-  status: options?.status ?? 200,
-}));
+const mockNextResponse = jest
+  .fn()
+  .mockImplementation((body: unknown, options?: { status?: number }) => ({
+    ...mockNextResponseInstance,
+    data: body,
+    status: options?.status ?? 200,
+  }));
 
 interface MockNextResponseConstructor {
-  json: jest.MockedFunction<(data: unknown, options?: { status?: number }) => unknown>;
+  json: jest.MockedFunction<
+    (data: unknown, options?: { status?: number }) => unknown
+  >;
 }
 
-(mockNextResponse as unknown as MockNextResponseConstructor).json = jest.fn((data: unknown, options?: { status?: number }) => ({
-  ...mockNextResponseInstance,
-  data,
-  status: options?.status ?? 200,
-}));
+(mockNextResponse as unknown as MockNextResponseConstructor).json = jest.fn(
+  (data: unknown, options?: { status?: number }) => ({
+    ...mockNextResponseInstance,
+    data,
+    status: options?.status ?? 200,
+  }),
+);
 
 jest.mock("next/server", () => ({
   NextResponse: mockNextResponse,

@@ -16,7 +16,6 @@ export const locationRouter = createTRPCRouter({
       }),
     )
     .mutation(({ ctx, input }) => {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       return ctx.db.location.create({
         data: {
           name: input.name,
@@ -26,7 +25,6 @@ export const locationRouter = createTRPCRouter({
     }),
 
   getAll: organizationProcedure.query(({ ctx }) => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     return ctx.db.location.findMany({
       where: {
         organizationId: ctx.organization.id,
@@ -54,7 +52,6 @@ export const locationRouter = createTRPCRouter({
       }),
     )
     .mutation(({ ctx, input }) => {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       return ctx.db.location.update({
         where: {
           id: input.id,
@@ -70,7 +67,6 @@ export const locationRouter = createTRPCRouter({
   getById: organizationProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       const location = await ctx.db.location.findFirst({
         where: {
           id: input.id,
@@ -96,14 +92,12 @@ export const locationRouter = createTRPCRouter({
         throw new Error("Location not found");
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return location;
     }),
 
   delete: locationDeleteProcedure
     .input(z.object({ id: z.string() }))
     .mutation(({ ctx, input }) => {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       return ctx.db.location.delete({
         where: {
           id: input.id,
@@ -121,7 +115,6 @@ export const locationRouter = createTRPCRouter({
       }),
     )
     .mutation(({ ctx, input }) => {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       return ctx.db.location.update({
         where: {
           id: input.locationId,

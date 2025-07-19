@@ -93,9 +93,11 @@ export interface OrganizationTRPCContext extends ProtectedTRPCContext {
 /**
  * Context creation for tRPC
  */
-export const createTRPCContext = async (opts: CreateTRPCContextOptions): Promise<TRPCContext> => {
+export const createTRPCContext = async (
+  opts: CreateTRPCContextOptions,
+): Promise<TRPCContext> => {
   const dbProvider = getGlobalDatabaseProvider();
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
   const db = dbProvider.getClient();
   const services = new ServiceFactory(db);
   const session = await auth();
@@ -104,7 +106,6 @@ export const createTRPCContext = async (opts: CreateTRPCContextOptions): Promise
 
   // If user is authenticated and has organization context, use that
   if (session?.user.organizationId) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     const org = await db.organization.findUnique({
       where: { id: session.user.organizationId },
     });
@@ -119,7 +120,6 @@ export const createTRPCContext = async (opts: CreateTRPCContextOptions): Promise
 
   // Fallback to organization based on subdomain
   if (!organization) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     const org = await db.organization.findUnique({
       where: { subdomain },
     });
@@ -136,7 +136,6 @@ export const createTRPCContext = async (opts: CreateTRPCContextOptions): Promise
   }
 
   return {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     db,
     session,
     organization,
@@ -155,8 +154,7 @@ const t = initTRPC.context<TRPCContext>().create({
       ...shape,
       data: {
         ...shape.data,
-        zodError:
-          error.cause instanceof ZodError ? error.cause.issues : null,
+        zodError: error.cause instanceof ZodError ? error.cause.issues : null,
       },
     };
   },
@@ -209,7 +207,13 @@ export const protectedProcedure = t.procedure
 
 export const organizationProcedure = protectedProcedure.use(
   async ({ ctx, next }) => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    if (!ctx.organization) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Organization not found",
+      });
+    }
+
     const membership = await ctx.db.membership.findFirst({
       where: {
         organizationId: ctx.organization.id,
@@ -235,8 +239,10 @@ export const organizationProcedure = protectedProcedure.use(
       ctx: {
         ...ctx,
         membership: membership as Membership,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-        userPermissions: membership.role.permissions.map((p: { name: string }) => p.name),
+
+        userPermissions: membership.role.permissions.map(
+          (p: { name: string }) => p.name,
+        ),
       } satisfies OrganizationTRPCContext,
     });
   },

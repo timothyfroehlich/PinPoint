@@ -18,7 +18,9 @@ function createPrismaClientInternal(): AcceleratedPrismaClient {
 }
 
 // Type alias for the extended Prisma client used throughout the application
-export type ExtendedPrismaClient = ReturnType<typeof createPrismaClientInternal>;
+export type ExtendedPrismaClient = ReturnType<
+  typeof createPrismaClientInternal
+>;
 
 export const createPrismaClient = (): ExtendedPrismaClient => {
   return createPrismaClientInternal();

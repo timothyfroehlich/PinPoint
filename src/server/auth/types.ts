@@ -70,7 +70,9 @@ export function isValidOrganization(org: unknown): org is PrismaOrganization {
   );
 }
 
-export function isValidMembership(membership: unknown): membership is PrismaMembershipWithPermissions {
+export function isValidMembership(
+  membership: unknown,
+): membership is PrismaMembershipWithPermissions {
   return (
     typeof membership === "object" &&
     membership !== null &&

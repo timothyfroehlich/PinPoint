@@ -53,28 +53,28 @@ export const env = createEnv({
    * middlewares) or client-side so we need to destruct manually.
    */
   runtimeEnv: {
-    AUTH_SECRET: process.env.AUTH_SECRET,
-    DATABASE_URL: process.env.DATABASE_URL,
-    NODE_ENV: process.env.NODE_ENV,
-    GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
-    GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
-    OPDB_API_URL: process.env.OPDB_API_URL,
-    DEFAULT_ORG_SUBDOMAIN: process.env.DEFAULT_ORG_SUBDOMAIN,
-    VERCEL_URL: process.env.VERCEL_URL,
-    PORT: process.env.PORT,
-    PINBALL_MAP_API_KEY: process.env.PINBALL_MAP_API_KEY,
-    OPDB_API_KEY: process.env.OPDB_API_KEY,
-    IMAGE_STORAGE_PROVIDER: process.env.IMAGE_STORAGE_PROVIDER,
-    BLOB_READ_WRITE_TOKEN: process.env.BLOB_READ_WRITE_TOKEN,
-    SEED_ADMIN_EMAIL: process.env.SEED_ADMIN_EMAIL,
-    SEED_ADMIN_NAME: process.env.SEED_ADMIN_NAME,
+    AUTH_SECRET: process.env["AUTH_SECRET"],
+    DATABASE_URL: process.env["DATABASE_URL"],
+    NODE_ENV: process.env["NODE_ENV"],
+    GOOGLE_CLIENT_ID: process.env["GOOGLE_CLIENT_ID"],
+    GOOGLE_CLIENT_SECRET: process.env["GOOGLE_CLIENT_SECRET"],
+    OPDB_API_URL: process.env["OPDB_API_URL"],
+    DEFAULT_ORG_SUBDOMAIN: process.env["DEFAULT_ORG_SUBDOMAIN"],
+    VERCEL_URL: process.env["VERCEL_URL"],
+    PORT: process.env["PORT"],
+    PINBALL_MAP_API_KEY: process.env["PINBALL_MAP_API_KEY"],
+    OPDB_API_KEY: process.env["OPDB_API_KEY"],
+    IMAGE_STORAGE_PROVIDER: process.env["IMAGE_STORAGE_PROVIDER"],
+    BLOB_READ_WRITE_TOKEN: process.env["BLOB_READ_WRITE_TOKEN"],
+    SEED_ADMIN_EMAIL: process.env["SEED_ADMIN_EMAIL"],
+    SEED_ADMIN_NAME: process.env["SEED_ADMIN_NAME"],
     // Next.js automatically exposes NODE_ENV to the client
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially
    * useful for Docker builds.
    */
-  skipValidation: !!process.env.SKIP_ENV_VALIDATION,
+  skipValidation: !!process.env["SKIP_ENV_VALIDATION"],
   /**
    * Makes it so that empty strings are treated as undefined. `SOME_VAR: z.string()` and
    * `SOME_VAR=''` will throw an error.

@@ -17,20 +17,26 @@ const createContext = async (req: NextRequest): Promise<TRPCContext> => {
   });
 };
 
-const handler = (req: NextRequest): Promise<Response> =>
-  fetchRequestHandler({
+const handler = (req: NextRequest): Promise<Response> => {
+  const baseConfig = {
     endpoint: "/api/trpc",
     req,
     router: appRouter,
     createContext: () => createContext(req),
-    onError:
-      env.NODE_ENV === "development"
-        ? ({ path, error }): void => {
-            console.error(
-              `❌ tRPC failed on ${path ?? "<no-path>"}: ${error.message}`,
-            );
-          }
-        : undefined,
-  });
+  };
+
+  if (env.NODE_ENV === "development") {
+    return fetchRequestHandler({
+      ...baseConfig,
+      onError: ({ path, error }): void => {
+        console.error(
+          `❌ tRPC failed on ${path ?? "<no-path>"}: ${error.message}`,
+        );
+      },
+    });
+  }
+
+  return fetchRequestHandler(baseConfig);
+};
 
 export { handler as GET, handler as POST };

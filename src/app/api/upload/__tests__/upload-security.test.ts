@@ -76,7 +76,7 @@ interface SuccessResponse {
 
 // Mock NextRequest for testing
 function createMockRequest(
-  url: string,
+  _url: string,
   init?: { method?: string; body?: FormData; headers?: Record<string, string> },
 ): NextRequest {
   const headersMap = new Map(Object.entries(init?.headers ?? {}));

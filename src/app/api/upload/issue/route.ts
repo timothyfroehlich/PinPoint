@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
 import { type NextRequest, NextResponse } from "next/server";
 
 import type { ExtendedPrismaClient } from "~/server/db";
@@ -80,7 +79,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     // Check if user has permission to attach files
-    await requireUploadPermission(ctx, "attachment:create");
+    requireUploadPermission(ctx, "attachment:create");
 
     // Check attachment count limit
     const existingAttachments: number = await db.attachment.count({

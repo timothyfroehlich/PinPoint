@@ -23,13 +23,13 @@ interface ProcessedIssue {
   title: string;
   description: string;
   severity: string;
-  consistency?: string;
+  consistency?: string | undefined;
   status: string;
   gameTitle: string;
   reporterEmail: string;
-  assignedTo?: string;
-  owner?: string;
-  workLog?: string;
+  assignedTo?: string | undefined;
+  owner?: string | undefined;
+  workLog?: string | undefined;
   createdAt: string;
   updatedAt: string;
 }
@@ -109,7 +109,7 @@ const severityMappings: Record<string, string> = {
   Cosmetic: "Low",
 };
 
-async function processCSVFiles() {
+async function processCSVFiles(): Promise<void> {
   const reportedIssues: ProcessedIssue[] = [];
   const resolvedIssues: ProcessedIssue[] = [];
 
@@ -129,7 +129,9 @@ async function processCSVFiles() {
         }
       })
       .on("end", () => {
-        console.log(`Processed ${reportedIssues.length} reported issues`);
+        console.log(
+          `Processed ${String(reportedIssues.length)} reported issues`,
+        );
         resolve();
       })
       .on("error", (error: Error) => {
@@ -157,7 +159,9 @@ async function processCSVFiles() {
           }
         })
         .on("end", () => {
-          console.log(`Processed ${resolvedIssues.length} resolved issues`);
+          console.log(
+            `Processed ${String(resolvedIssues.length)} resolved issues`,
+          );
           resolve();
         })
         .on("error", (error: Error) => {
@@ -187,9 +191,11 @@ async function processCSVFiles() {
   );
 
   console.log("\n=== Summary ===");
-  console.log(`Total reported issues: ${reportedIssues.length}`);
-  console.log(`Total resolved issues: ${resolvedIssues.length}`);
-  console.log(`Total issues: ${reportedIssues.length + resolvedIssues.length}`);
+  console.log(`Total reported issues: ${String(reportedIssues.length)}`);
+  console.log(`Total resolved issues: ${String(resolvedIssues.length)}`);
+  console.log(
+    `Total issues: ${String(reportedIssues.length + resolvedIssues.length)}`,
+  );
   console.log("Processed data saved to processed-issues.json");
 }
 
@@ -220,21 +226,38 @@ function processIssueRow(row: CSVIssue): ProcessedIssue | null {
     return null;
   }
 
-  return {
+  const result: ProcessedIssue = {
     title: generateTitle(gameTitle, row.Description),
     description: row.Description,
     severity: severityMappings[row.Severity] ?? "Medium",
-    consistency: row.Consistency || undefined,
     status: statusMappings[row["Fix Status"]] ?? "New",
     gameTitle: gameTitle,
     reporterEmail:
       userMappings[row["Email Address"]] ?? "anonymous@example.com",
-    assignedTo: mapUser(row["Assigned Technician"]),
-    owner: mapUser(row.Owner),
-    workLog: row["Work Log"] || undefined,
     createdAt: parseDate(row["Report Timestamp"]),
     updatedAt: parseDate(row["Last Updated"]),
   };
+
+  // Add optional properties only if they have values
+  if (row.Consistency) {
+    result.consistency = row.Consistency;
+  }
+
+  const assignedTo = mapUser(row["Assigned Technician"]);
+  if (assignedTo) {
+    result.assignedTo = assignedTo;
+  }
+
+  const owner = mapUser(row.Owner);
+  if (owner) {
+    result.owner = owner;
+  }
+
+  if (row["Work Log"]) {
+    result.workLog = row["Work Log"];
+  }
+
+  return result;
 }
 
 function generateTitle(game: string, description: string): string {
@@ -264,4 +287,10 @@ function parseDate(dateStr: string): string {
 }
 
 // Run the processing
-processCSVFiles().catch(console.error);
+void (async () => {
+  try {
+    await processCSVFiles();
+  } catch (error) {
+    console.error(error);
+  }
+})();

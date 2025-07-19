@@ -26,18 +26,9 @@ const mockIssueCreate = jest.fn();
 // Create caller factory
 const createCaller = createCallerFactory(appRouter);
 
-// Temporary enum for testing with the new schema
-enum _Role {
-  ADMIN = "admin",
-  MEMBER = "member",
-  TECHNICIAN = "technician",
-}
-
 describe("Multi-Tenant Security Tests", () => {
-  let _mockContext: MockContext;
-
   beforeEach(() => {
-    _mockContext = createMockContext();
+    createMockContext();
   });
 
   // Test data for Organization A
@@ -207,7 +198,6 @@ describe("Multi-Tenant Security Tests", () => {
 
       const callerA = createCaller({
         ...ctx,
-        session: sessionA,
         organization: organizationA,
         headers: new Headers({
           host: "org-a.localhost:3000",
@@ -226,12 +216,13 @@ describe("Multi-Tenant Security Tests", () => {
       expect(result).toEqual(issuesOrgA);
 
       // Verify that the query included organization filter
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(ctx.db.issue.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
             organizationId: "org-a",
           }),
-        }) as unknown,
+        }),
       );
     });
 
@@ -260,7 +251,6 @@ describe("Multi-Tenant Security Tests", () => {
 
       const callerA = createCaller({
         ...ctx,
-        session: sessionA,
         organization: organizationB,
         headers: new Headers({
           host: "org-b.localhost:3000", // User A trying to access org B
@@ -322,7 +312,6 @@ describe("Multi-Tenant Security Tests", () => {
 
       const callerA = createCaller({
         ...ctx,
-        session: sessionA,
         organization: organizationA,
         headers: new Headers({
           host: "org-a.localhost:3000",
@@ -352,7 +341,6 @@ describe("Multi-Tenant Security Tests", () => {
 
       const callerB = createCaller({
         ...ctxB,
-        session: sessionB,
         organization: organizationB,
         headers: new Headers({
           host: "org-b.localhost:3000",
@@ -371,12 +359,13 @@ describe("Multi-Tenant Security Tests", () => {
       expect(resultB).toEqual(issuesOrgB);
 
       // Verify Organization B query had correct filter
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(ctxB.db.issue.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
             organizationId: "org-b",
           }),
-        }) as unknown,
+        }),
       );
     });
   });
@@ -417,7 +406,6 @@ describe("Multi-Tenant Security Tests", () => {
 
       const callerA = createCaller({
         ...ctx,
-        session: sessionA,
         organization: organizationA,
         headers: new Headers({
           host: "org-a.localhost:3000",
@@ -537,7 +525,6 @@ describe("Multi-Tenant Security Tests", () => {
 
       const callerA = createCaller({
         ...ctx,
-        session: sessionA,
         organization: organizationA,
         headers: new Headers({
           host: "org-a.localhost:3000",
@@ -562,6 +549,7 @@ describe("Multi-Tenant Security Tests", () => {
       await callerA.issue.core.create(createData);
 
       // Verify that organizationId was automatically added
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(ctx.db.issue.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -570,7 +558,7 @@ describe("Multi-Tenant Security Tests", () => {
             machineId: createData.machineId,
             organizationId: "org-a", // This is the key security check
           }),
-        }) as unknown,
+        }),
       );
     });
 
@@ -611,7 +599,6 @@ describe("Multi-Tenant Security Tests", () => {
 
       const callerA = createCaller({
         ...ctx,
-        session: sessionA,
         organization: organizationA,
         headers: new Headers({
           host: "org-a.localhost:3000",
@@ -651,7 +638,6 @@ describe("Multi-Tenant Security Tests", () => {
 
       const memberCaller = createCaller({
         ...ctx,
-        session: memberSession,
         organization: organizationA,
         headers: new Headers({
           host: "org-a.localhost:3000",
@@ -697,7 +683,6 @@ describe("Multi-Tenant Security Tests", () => {
 
       const adminCaller = createCaller({
         ...ctxAdmin,
-        session: adminSession,
         organization: organizationA,
         headers: new Headers({
           host: "org-a.localhost:3000",
@@ -718,18 +703,19 @@ describe("Multi-Tenant Security Tests", () => {
       expect(result.length).toBeGreaterThan(0);
 
       // Verify admin can only access their organization's data
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(ctxAdmin.db.issue.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
             organizationId: "org-a",
           }),
-        }) as unknown,
+        }),
       );
     });
   });
 
   describe("Subdomain Resolution Security", () => {
-    it("should correctly resolve organization from subdomain", async () => {
+    it("should correctly resolve organization from subdomain", () => {
       const session: Session = {
         user: {
           id: "user-a",
@@ -789,7 +775,6 @@ describe("Multi-Tenant Security Tests", () => {
 
       const caller = createCaller({
         ...ctx,
-        session: session,
         organization: organizationB,
         headers: new Headers({
           host: "org-b.localhost:3000", // Spoofed subdomain

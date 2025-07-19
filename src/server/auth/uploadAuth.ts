@@ -9,7 +9,6 @@ import type { ExtendedPrismaClient } from "~/server/db";
 import { env } from "~/env";
 import { auth } from "~/server/auth";
 
-
 export interface UploadAuthContext {
   session: Session;
   organization: {

@@ -6,7 +6,7 @@ import { env } from "~/env.js";
 import { auth } from "~/server/auth";
 import { getGlobalDatabaseProvider } from "~/server/db/provider";
 
-export async function GET() {
+export async function GET(): Promise<NextResponse> {
   if (env.NODE_ENV !== "development") {
     return new NextResponse(null, { status: 404 });
   }
@@ -57,7 +57,7 @@ export async function GET() {
     // Transform users to include role information
     const usersWithRoles = users.map((user) => ({
       ...user,
-      role: user.memberships[0]?.role?.name ?? null,
+      role: user.memberships[0]?.role.name ?? null,
     }));
 
     return NextResponse.json({
