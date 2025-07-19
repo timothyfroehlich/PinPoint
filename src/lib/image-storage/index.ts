@@ -15,9 +15,9 @@ export interface ImageStorageProvider {
   ): Promise<string>;
   deleteImage(path: string): Promise<void>;
   getImageUrl(path: string): string;
-  validateImage(file: File, constraints?: ImageConstraints): Promise<boolean>;
+  validateImage(file: File, constraints?: ImageConstraints): boolean;
   uploadProfilePicture(file: File, userId: string): Promise<string>;
-  validateProfilePicture(file: File): Promise<boolean>;
+  validateProfilePicture(file: File): boolean;
   uploadOrganizationLogo(file: File, subdomain: string): Promise<string>;
 }
 
