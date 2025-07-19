@@ -12,6 +12,18 @@ import unusedImportsPlugin from "eslint-plugin-unused-imports";
 export default tseslint.config(
   ...tseslint.configs.recommended,
   ...tseslint.configs.stylistic,
+  // Add type-aware configs for strict type checking
+  ...tseslint.configs.strictTypeChecked,
+  ...tseslint.configs.stylisticTypeChecked,
+  {
+    // Enable type-aware linting
+    languageOptions: {
+      parserOptions: {
+        project: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+  },
   {
     // Main configuration for all TS/TSX files
     files: ["src/**/*.{ts,tsx}"],
@@ -72,6 +84,26 @@ export default tseslint.config(
       // Rules for promises
       "promise/catch-or-return": ["error", { allowFinally: true }],
       "promise/no-nesting": "warn",
+
+      // Type-aware rules - starting as warnings for migration
+      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-unsafe-assignment": "warn",
+      "@typescript-eslint/no-unsafe-argument": "warn",
+      "@typescript-eslint/no-unsafe-call": "warn",
+      "@typescript-eslint/no-unsafe-member-access": "warn",
+      "@typescript-eslint/no-unsafe-return": "warn",
+      "@typescript-eslint/no-unsafe-enum-comparison": "warn",
+
+      // Additional strict rules for better type safety
+      "@typescript-eslint/explicit-function-return-type": [
+        "warn",
+        {
+          allowExpressions: true,
+          allowTypedFunctionExpressions: true,
+          allowHigherOrderFunctions: true,
+          allowDirectConstAssertionInArrowFunctions: true,
+        },
+      ],
     },
   },
   {
@@ -106,6 +138,11 @@ export default tseslint.config(
     rules: {
       "no-restricted-properties": "off",
     },
+  },
+  {
+    // Disable type-aware linting for JavaScript files
+    files: ["**/*.js", "**/*.cjs", "**/*.mjs"],
+    ...tseslint.configs.disableTypeChecked,
   },
   {
     // Configuration for scripts - more relaxed rules for build/utility scripts
