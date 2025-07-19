@@ -7,7 +7,6 @@ import {
   machineEditProcedure,
   organizationManageProcedure,
 } from "~/server/api/trpc";
-import { QRCodeService } from "~/server/services/qrCodeService";
 
 export const qrCodeRouter = createTRPCRouter({
   /**
@@ -17,7 +16,7 @@ export const qrCodeRouter = createTRPCRouter({
     .input(z.object({ machineId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       // The machineEditProcedure already validates machine access
-      const qrCodeService = new QRCodeService(ctx.db);
+      const qrCodeService = ctx.services.createQRCodeService();
       return qrCodeService.generateQRCode(input.machineId);
     }),
 
@@ -39,7 +38,7 @@ export const qrCodeRouter = createTRPCRouter({
         throw new Error("Machine not found");
       }
 
-      const qrCodeService = new QRCodeService(ctx.db);
+      const qrCodeService = ctx.services.createQRCodeService();
       return qrCodeService.getQRCodeInfo(input.machineId);
     }),
 
@@ -50,7 +49,7 @@ export const qrCodeRouter = createTRPCRouter({
     .input(z.object({ machineId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       // The machineEditProcedure already validates machine access
-      const qrCodeService = new QRCodeService(ctx.db);
+      const qrCodeService = ctx.services.createQRCodeService();
       return qrCodeService.regenerateQRCode(input.machineId);
     }),
 
@@ -58,7 +57,7 @@ export const qrCodeRouter = createTRPCRouter({
    * Generate QR codes for all machines without QR codes in the organization
    */
   generateBulk: organizationManageProcedure.mutation(async ({ ctx }) => {
-    const qrCodeService = new QRCodeService(ctx.db);
+    const qrCodeService = ctx.services.createQRCodeService();
     return qrCodeService.generateQRCodesForOrganization(ctx.organization.id);
   }),
 
@@ -66,7 +65,7 @@ export const qrCodeRouter = createTRPCRouter({
    * Regenerate QR codes for all machines in the organization
    */
   regenerateBulk: organizationManageProcedure.mutation(async ({ ctx }) => {
-    const qrCodeService = new QRCodeService(ctx.db);
+    const qrCodeService = ctx.services.createQRCodeService();
     return qrCodeService.regenerateQRCodesForOrganization(ctx.organization.id);
   }),
 
@@ -74,7 +73,7 @@ export const qrCodeRouter = createTRPCRouter({
    * Get QR code statistics for the organization
    */
   getStats: organizationProcedure.query(async ({ ctx }) => {
-    const qrCodeService = new QRCodeService(ctx.db);
+    const qrCodeService = ctx.services.createQRCodeService();
     return qrCodeService.getOrganizationQRCodeStats(ctx.organization.id);
   }),
 
@@ -85,7 +84,7 @@ export const qrCodeRouter = createTRPCRouter({
   resolve: publicProcedure
     .input(z.object({ qrCodeId: z.string() }))
     .query(async ({ ctx, input }) => {
-      const qrCodeService = new QRCodeService(ctx.db);
+      const qrCodeService = ctx.services.createQRCodeService();
       const machine = await qrCodeService.resolveMachineFromQR(input.qrCodeId);
 
       if (!machine) {

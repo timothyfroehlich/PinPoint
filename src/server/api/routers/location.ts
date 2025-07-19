@@ -7,7 +7,6 @@ import {
   locationDeleteProcedure,
   organizationManageProcedure,
 } from "~/server/api/trpc";
-import { syncLocationGames } from "~/server/services/pinballmapService";
 
 export const locationRouter = createTRPCRouter({
   create: locationEditProcedure
@@ -130,7 +129,8 @@ export const locationRouter = createTRPCRouter({
   syncWithPinballMap: organizationManageProcedure
     .input(z.object({ locationId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      const result = await syncLocationGames(ctx.db, input.locationId);
+      const pinballMapService = ctx.services.createPinballMapService();
+      const result = await pinballMapService.syncLocation(input.locationId);
 
       if (!result.success) {
         throw new Error(result.error ?? "Sync failed");

@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 
-import { db } from "~/server/db";
+import { getGlobalDatabaseProvider } from "~/server/db/provider";
 import { getVersion } from "~/utils/version";
 
 export async function GET() {
+  const dbProvider = getGlobalDatabaseProvider();
+  const db = dbProvider.getClient();
   try {
     // Check database connectivity
     await db.$queryRaw`SELECT 1`;
@@ -26,5 +28,7 @@ export async function GET() {
       },
       { status: 503 },
     );
+  } finally {
+    await dbProvider.disconnect();
   }
 }

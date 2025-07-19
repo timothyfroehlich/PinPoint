@@ -1,10 +1,11 @@
-import { type PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
+
+import { type ExtendedPrismaClient } from "../db";
 
 export async function hasPermission(
   membership: { roleId: string },
   permission: string,
-  prisma: PrismaClient,
+  prisma: ExtendedPrismaClient,
 ): Promise<boolean> {
   const role = await prisma.role.findUnique({
     where: { id: membership.roleId },
@@ -21,7 +22,7 @@ export async function hasPermission(
 export async function requirePermission(
   membership: { roleId: string },
   permission: string,
-  prisma: PrismaClient,
+  prisma: ExtendedPrismaClient,
 ): Promise<void> {
   if (!(await hasPermission(membership, permission, prisma))) {
     throw new TRPCError({
@@ -33,7 +34,7 @@ export async function requirePermission(
 
 export async function getUserPermissions(
   membership: { roleId: string },
-  prisma: PrismaClient,
+  prisma: ExtendedPrismaClient,
 ): Promise<string[]> {
   const role = await prisma.role.findUnique({
     where: { id: membership.roleId },

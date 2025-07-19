@@ -5,19 +5,26 @@ const mockMembershipFindMany = jest.fn();
 const mockOrganizationFindMany = jest.fn();
 const mockOrganizationFindFirst = jest.fn();
 
-jest.mock("~/server/db", () => ({
-  db: {
-    organization: {
-      findMany: jest.fn(),
-      findFirst: jest.fn(),
-    },
-    user: {
-      findMany: jest.fn(),
-    },
-    membership: {
-      findMany: jest.fn(),
-    },
+// Mock database provider
+const mockDb = {
+  organization: {
+    findMany: mockOrganizationFindMany,
+    findFirst: mockOrganizationFindFirst,
   },
+  user: {
+    findMany: mockUserFindMany,
+  },
+  membership: {
+    findMany: mockMembershipFindMany,
+  },
+};
+
+jest.mock("~/server/db/provider", () => ({
+  getGlobalDatabaseProvider: jest.fn().mockReturnValue({
+    getClient: jest.fn().mockReturnValue(mockDb),
+    disconnect: jest.fn(),
+    reset: jest.fn(),
+  }),
 }));
 
 // Mock the env module
@@ -61,7 +68,6 @@ jest.mock("~/server/auth", () => ({
 import { GET } from "../users/route";
 
 import { auth } from "~/server/auth";
-import { db } from "~/server/db";
 
 interface TestUser {
   id: string;
@@ -96,11 +102,6 @@ describe("/api/dev/users", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     setTestEnv("development");
-    // Assign the mock functions to the imported mocks
-    (db.organization.findMany as jest.Mock) = mockOrganizationFindMany;
-    (db.organization.findFirst as jest.Mock) = mockOrganizationFindFirst;
-    (db.user.findMany as jest.Mock) = mockUserFindMany;
-    (db.membership.findMany as jest.Mock) = mockMembershipFindMany;
     (auth as jest.Mock).mockResolvedValue({
       user: { id: "user-1", name: "Test User" },
     });

@@ -12,12 +12,16 @@ import { ZodError } from "zod";
 
 import { env } from "~/env";
 import { auth } from "~/server/auth";
-import { db } from "~/server/db";
+import { getGlobalDatabaseProvider } from "~/server/db/provider";
+import { ServiceFactory } from "~/server/services/factory";
 
 /**
  * Context creation for tRPC
  */
 export const createTRPCContext = async (opts: { headers: Headers }) => {
+  const dbProvider = getGlobalDatabaseProvider();
+  const db = dbProvider.getClient();
+  const services = new ServiceFactory(db);
   const session = await auth();
 
   let organization;
@@ -49,6 +53,7 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
     db,
     session,
     organization,
+    services,
     ...opts,
   };
 };

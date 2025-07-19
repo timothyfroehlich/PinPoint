@@ -1,9 +1,11 @@
-import { type PrismaClient, type Comment } from "@prisma/client";
+import { type Comment } from "@prisma/client";
+
+import type { ExtendedPrismaClient } from "~/server/db";
 
 import { COMMENT_CLEANUP_CONFIG } from "~/server/constants/cleanup";
 
 export class CommentCleanupService {
-  constructor(private prisma: PrismaClient) {}
+  constructor(private prisma: ExtendedPrismaClient) {}
 
   /**
    * Permanently delete comments that have been soft-deleted for more than the configured retention period

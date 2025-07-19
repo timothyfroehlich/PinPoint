@@ -1,5 +1,7 @@
-import { type PrismaClient, ActivityType } from "@prisma/client";
+import { ActivityType } from "@prisma/client";
 import { type User, type IssueStatus } from "@prisma/client";
+
+import type { ExtendedPrismaClient } from "~/server/db";
 
 export interface ActivityData {
   type: ActivityType; // Use enum instead of string
@@ -11,7 +13,7 @@ export interface ActivityData {
 }
 
 export class IssueActivityService {
-  constructor(private prisma: PrismaClient) {}
+  constructor(private prisma: ExtendedPrismaClient) {}
 
   async recordActivity(
     issueId: string,

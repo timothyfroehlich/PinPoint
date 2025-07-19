@@ -1,9 +1,10 @@
 import {
-  type PrismaClient,
   NotificationType,
   NotificationEntity,
   type Notification,
 } from "@prisma/client";
+
+import type { ExtendedPrismaClient } from "~/server/db";
 
 export interface NotificationData {
   userId: string;
@@ -15,7 +16,7 @@ export interface NotificationData {
 }
 
 export class NotificationService {
-  constructor(private prisma: PrismaClient) {}
+  constructor(private prisma: ExtendedPrismaClient) {}
 
   /**
    * Create a new notification

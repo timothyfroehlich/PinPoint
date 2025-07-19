@@ -1,4 +1,4 @@
-const config = {
+let config = {
   preset: "ts-jest/presets/default-esm",
   extensionsToTreatAsEsm: [".ts", ".tsx"],
   globals: {
@@ -111,5 +111,18 @@ const config = {
   // Enable coverage collection
   collectCoverage: false, // Only when explicitly running with --coverage
 };
+
+// Agent mode configuration for minimal output
+if (process.env.AGENT_MODE) {
+  config.reporters = [
+    [
+      "jest-silent-reporter",
+      {
+        showPaths: true,
+        useDots: false, // Keep minimal for context preservation
+      },
+    ],
+  ];
+}
 
 export default config;
