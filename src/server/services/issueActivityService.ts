@@ -104,6 +104,19 @@ export class IssueActivityService {
     });
   }
 
+  async recordIssueResolved(
+    issueId: string,
+    organizationId: string,
+    actorId: string,
+  ): Promise<void> {
+    await this.recordActivity(issueId, organizationId, {
+      type: ActivityType.RESOLVED,
+      actorId,
+      fieldName: "status",
+      newValue: "resolved",
+    });
+  }
+
   async recordCommentDeleted(
     issueId: string,
     organizationId: string,

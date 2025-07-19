@@ -96,6 +96,7 @@ export const issueCoreRouter = createTRPCRouter({
             select: {
               id: true,
               name: true,
+              email: true,
               image: true,
             },
           },
@@ -218,6 +219,7 @@ export const issueCoreRouter = createTRPCRouter({
             select: {
               id: true,
               name: true,
+              email: true,
               image: true,
             },
           },
@@ -225,6 +227,7 @@ export const issueCoreRouter = createTRPCRouter({
             select: {
               id: true,
               name: true,
+              email: true,
               image: true,
             },
           },
@@ -256,10 +259,12 @@ export const issueCoreRouter = createTRPCRouter({
         },
         include: {
           status: true,
+          priority: true,
           assignedTo: {
             select: {
               id: true,
               name: true,
+              email: true,
               image: true,
             },
           },
@@ -267,6 +272,7 @@ export const issueCoreRouter = createTRPCRouter({
             select: {
               id: true,
               name: true,
+              email: true,
               image: true,
             },
           },
@@ -298,7 +304,16 @@ export const issueCoreRouter = createTRPCRouter({
         throw new Error("Issue not found");
       }
 
-      return issue;
+      // Map comments to include createdBy alias
+      const mappedIssue = {
+        ...issue,
+        comments: issue.comments.map((comment) => ({
+          ...comment,
+          createdBy: comment.author, // Add createdBy as alias for author
+        })),
+      };
+
+      return mappedIssue;
     }),
 
   // Update issue (for members/admins)
@@ -393,6 +408,7 @@ export const issueCoreRouter = createTRPCRouter({
             select: {
               id: true,
               name: true,
+              email: true,
               image: true,
             },
           },
@@ -400,6 +416,7 @@ export const issueCoreRouter = createTRPCRouter({
             select: {
               id: true,
               name: true,
+              email: true,
               image: true,
             },
           },
@@ -475,6 +492,261 @@ export const issueCoreRouter = createTRPCRouter({
           input.description ?? "",
         );
       }
+
+      return updatedIssue;
+    }),
+
+  // Close an issue (set status to resolved)
+  close: issueEditProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      // Find the resolved status for this organization
+      const resolvedStatus = await ctx.db.issueStatus.findFirst({
+        where: {
+          organizationId: ctx.organization.id,
+          category: "RESOLVED",
+        },
+      });
+
+      if (!resolvedStatus) {
+        throw new Error("No resolved status found for this organization");
+      }
+
+      // Update the issue
+      const updatedIssue = await ctx.db.issue.update({
+        where: { id: input.id },
+        data: {
+          statusId: resolvedStatus.id,
+          resolvedAt: new Date(),
+        },
+        include: {
+          status: true,
+          priority: true,
+          assignedTo: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              image: true,
+            },
+          },
+          createdBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              image: true,
+            },
+          },
+          machine: {
+            include: {
+              model: true,
+              location: true,
+            },
+          },
+        },
+      });
+
+      // Record activity
+      const activityService = new IssueActivityService(ctx.db);
+      await activityService.recordIssueResolved(
+        input.id,
+        ctx.organization.id,
+        ctx.session.user.id,
+      );
+
+      return updatedIssue;
+    }),
+
+  // Assign an issue to a user
+  assign: issueEditProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        assignedToId: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Verify the issue belongs to this organization
+      const existingIssue = await ctx.db.issue.findFirst({
+        where: {
+          id: input.id,
+          organizationId: ctx.organization.id,
+        },
+        include: {
+          assignedTo: true,
+        },
+      });
+
+      if (!existingIssue) {
+        throw new Error("Issue not found");
+      }
+
+      let newAssignedTo = null;
+
+      // If assignedToId is provided, verify they are a member of this organization
+      if (input.assignedToId) {
+        const membership = await ctx.db.membership.findUnique({
+          where: {
+            userId_organizationId: {
+              userId: input.assignedToId,
+              organizationId: ctx.organization.id,
+            },
+          },
+          include: {
+            user: true,
+          },
+        });
+        if (!membership) {
+          throw new Error("User is not a member of this organization");
+        }
+        newAssignedTo = membership.user;
+      }
+
+      // Update the issue
+      const updatedIssue = await ctx.db.issue.update({
+        where: { id: input.id },
+        data: {
+          assignedToId: input.assignedToId || null,
+        },
+        include: {
+          status: true,
+          priority: true,
+          assignedTo: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              image: true,
+            },
+          },
+          createdBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              image: true,
+            },
+          },
+          machine: {
+            include: {
+              model: true,
+              location: true,
+            },
+          },
+        },
+      });
+
+      // Record activity
+      const activityService = new IssueActivityService(ctx.db);
+      await activityService.recordAssignmentChange(
+        input.id,
+        ctx.organization.id,
+        ctx.session.user.id,
+        existingIssue.assignedTo,
+        newAssignedTo,
+      );
+
+      // Send notifications
+      if (newAssignedTo) {
+        const notificationService = new NotificationService(ctx.db);
+        await notificationService.notifyUserOfAssignment(
+          input.id,
+          newAssignedTo.id,
+        );
+      }
+
+      return updatedIssue;
+    }),
+
+  // Update issue status
+  updateStatus: issueEditProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        statusId: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Verify the issue belongs to this organization
+      const existingIssue = await ctx.db.issue.findFirst({
+        where: {
+          id: input.id,
+          organizationId: ctx.organization.id,
+        },
+        include: {
+          status: true,
+        },
+      });
+
+      if (!existingIssue) {
+        throw new Error("Issue not found");
+      }
+
+      // Verify the status belongs to this organization
+      const newStatus = await ctx.db.issueStatus.findFirst({
+        where: {
+          id: input.statusId,
+          organizationId: ctx.organization.id,
+        },
+      });
+
+      if (!newStatus) {
+        throw new Error("Invalid status");
+      }
+
+      // Update the issue
+      const updatedIssue = await ctx.db.issue.update({
+        where: { id: input.id },
+        data: {
+          statusId: input.statusId,
+          ...(newStatus.category === "RESOLVED" && { resolvedAt: new Date() }),
+        },
+        include: {
+          status: true,
+          priority: true,
+          assignedTo: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              image: true,
+            },
+          },
+          createdBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              image: true,
+            },
+          },
+          machine: {
+            include: {
+              model: true,
+              location: true,
+            },
+          },
+        },
+      });
+
+      // Record activity
+      const activityService = new IssueActivityService(ctx.db);
+      await activityService.recordStatusChange(
+        input.id,
+        ctx.organization.id,
+        ctx.session.user.id,
+        existingIssue.status,
+        newStatus,
+      );
+
+      // Send notifications
+      const notificationService = new NotificationService(ctx.db);
+      await notificationService.notifyMachineOwnerOfStatusChange(
+        input.id,
+        existingIssue.status.name,
+        newStatus.name,
+      );
 
       return updatedIssue;
     }),

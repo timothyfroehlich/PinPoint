@@ -87,7 +87,7 @@ function deepMerge(target: any, source: any): any {
 export const createMockTRPCHooks = (
   mockClient: ReturnType<typeof createMockTRPCClient>,
 ) => ({
-  useQuery: jest.fn<any, [any]>((procedure: string, input?: any) => {
+  useQuery: jest.fn<any, [any]>((procedure: string, _input?: any) => {
     const keys = procedure.split(".");
     let handler = mockClient;
 
@@ -139,16 +139,21 @@ export const createMockIssue = (
   id: "test-issue-1",
   title: "Test Issue",
   description: "Test description",
-  status: { id: "status-1", name: "Open", color: "#ff0000" },
-  priority: { id: "priority-1", name: "Medium", color: "#ffa500" },
+  status: { id: "status-1", name: "Open", color: "#ff0000", category: "NEW" },
+  priority: { id: "priority-1", name: "Medium", color: "#ffa500", order: 2 },
   machine: {
     id: "machine-1",
+    name: "Test Machine",
     serialNumber: "TEST123",
+    qrCodeId: "qr-123",
     model: {
+      id: "model-1",
       name: "Test Game",
       manufacturer: "Test Manufacturer",
+      year: 2020,
     },
     location: {
+      id: "location-1",
       name: "Test Location",
     },
   },
@@ -156,6 +161,7 @@ export const createMockIssue = (
     id: "user-1",
     name: "Test User",
     email: "test@example.com",
+    image: null,
   },
   assignedTo: null,
   createdAt: new Date("2024-01-01T00:00:00Z"),
@@ -173,10 +179,17 @@ export const createMockComment = (
 ): Comment => ({
   id: "comment-1",
   content: "Test comment",
-  isInternal: false,
+  author: {
+    id: "user-1",
+    name: "Test User",
+    email: "test@example.com",
+    image: null,
+  },
   createdBy: {
     id: "user-1",
     name: "Test User",
+    email: "test@example.com",
+    image: null,
   },
   createdAt: new Date("2024-01-01T00:00:00Z"),
   updatedAt: new Date("2024-01-01T00:00:00Z"),

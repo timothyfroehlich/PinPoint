@@ -318,9 +318,9 @@ export function IssueActions({
           <Button
             onClick={handleEditSave}
             variant="contained"
-            disabled={updateIssue.isLoading}
+            disabled={updateIssue.isPending}
           >
-            {updateIssue.isLoading ? "Saving..." : "Save"}
+            {updateIssue.isPending ? "Saving..." : "Save"}
           </Button>
         </DialogActions>
       </Dialog>

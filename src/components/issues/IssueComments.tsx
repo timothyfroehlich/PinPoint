@@ -8,9 +8,6 @@ import {
   Paper,
   Stack,
   Avatar,
-  Chip,
-  FormControlLabel,
-  Switch,
   Alert,
   Divider,
 } from "@mui/material";
@@ -34,14 +31,13 @@ export function IssueComments({
   onError,
 }: IssueCommentsProps) {
   const [commentText, setCommentText] = useState("");
-  const [isInternal, setIsInternal] = useState(false);
+  // isInternal functionality removed until implemented in database
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const utils = api.useUtils();
   const createComment = api.issue.comment.addComment.useMutation({
     onSuccess: () => {
       setCommentText("");
-      setIsInternal(false);
       utils.issue.core.getById.invalidate({ id: issue.id });
     },
     onError: (error) => {
@@ -59,21 +55,16 @@ export function IssueComments({
     createComment.mutate({
       issueId: issue.id,
       content: commentText,
-      isInternal,
     });
   };
 
   const isAuthenticated = !!session?.user;
   const canComment = hasPermission("issues:comment");
-  const canViewInternal = hasPermission("issues:read_internal");
-  const canCreateInternal = hasPermission("issues:comment_internal");
+  const _canViewInternal = hasPermission("issues:read_internal");
+  const _canCreateInternal = hasPermission("issues:comment_internal");
 
-  // Filter comments based on permissions
-  const visibleComments =
-    issue.comments?.filter((comment: Comment) => {
-      if (!comment.isInternal) return true; // Public comments are always visible
-      return canViewInternal; // Internal comments only visible with permission
-    }) || [];
+  // For now, all comments are visible (isInternal functionality not implemented in DB)
+  const visibleComments = issue.comments || [];
 
   return (
     <Box>
@@ -117,23 +108,7 @@ export function IssueComments({
                       <Typography variant="caption" color="text.secondary">
                         {new Date(comment.createdAt).toLocaleDateString()}
                       </Typography>
-                      {comment.isInternal ? (
-                        <Chip
-                          label="Internal"
-                          size="small"
-                          color="warning"
-                          variant="outlined"
-                          data-testid="internal-comment-badge"
-                        />
-                      ) : (
-                        <Chip
-                          label="Public"
-                          size="small"
-                          color="primary"
-                          variant="outlined"
-                          data-testid="public-badge"
-                        />
-                      )}
+                      {/* Comment visibility badges removed until isInternal is implemented */}
                     </Stack>
                     <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
                       {comment.content}
@@ -172,19 +147,7 @@ export function IssueComments({
             alignItems="center"
           >
             <Box>
-              {canCreateInternal && (
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={isInternal}
-                      onChange={(e) => setIsInternal(e.target.checked)}
-                      disabled={isSubmitting}
-                      data-testid="internal-comment-toggle"
-                    />
-                  }
-                  label="Internal comment"
-                />
-              )}
+              {/* Internal comment toggle removed until implemented in database */}
             </Box>
 
             <Button

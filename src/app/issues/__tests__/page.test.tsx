@@ -8,7 +8,7 @@ import IssuePage from "../[issueId]/page";
 
 import { TRPCProvider } from "~/app/_trpc/Provider";
 import { createMockTRPCClient } from "~/test/mockTRPCClient";
-import { type IssueWithDetails, type Comment } from "~/types/issue";
+import { type IssueWithDetails } from "~/types/issue";
 
 // Mock Next.js navigation
 jest.mock("next/navigation", () => ({
@@ -40,16 +40,31 @@ const mockIssueData = {
   id: "test-issue-1",
   title: "Test Issue Title",
   description: "Test issue description",
-  status: { id: "status-1", name: "Open", color: "#ff0000" },
-  priority: { id: "priority-1", name: "High", color: "#ff0000" },
+  organizationId: "org-1",
+  machineId: "machine-1",
+  statusId: "status-1",
+  priorityId: "priority-1",
+  createdById: "user-1",
+  status: {
+    id: "status-1",
+    name: "Open",
+    color: "#ff0000",
+    category: "NEW" as const,
+  },
+  priority: { id: "priority-1", name: "High", color: "#ff0000", order: 1 },
   machine: {
     id: "machine-1",
+    name: "Test Machine",
     serialNumber: "TEST123",
+    qrCodeId: "qr-123",
     model: {
+      id: "model-1",
       name: "Test Game",
       manufacturer: "Test Manufacturer",
+      year: 2020,
     },
     location: {
+      id: "location-1",
       name: "Test Location",
       address: "123 Test St",
     },
@@ -58,6 +73,7 @@ const mockIssueData = {
     id: "user-1",
     name: "Test User",
     email: "test@example.com",
+    image: null,
   },
   assignedTo: null,
   createdAt: new Date("2024-01-01T00:00:00Z"),
@@ -67,12 +83,20 @@ const mockIssueData = {
     {
       id: "comment-1",
       content: "Public comment",
-      isInternal: false,
+      author: {
+        id: "user-1",
+        name: "Test User",
+        email: "test@example.com",
+        image: null,
+      },
       createdBy: {
         id: "user-1",
         name: "Test User",
+        email: "test@example.com",
+        image: null,
       },
       createdAt: new Date("2024-01-01T00:00:00Z"),
+      updatedAt: new Date("2024-01-01T00:00:00Z"),
     },
   ],
   attachments: [],
@@ -86,52 +110,6 @@ const mockSession = {
     name: "Test User",
   },
   expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-};
-
-const renderWithProviders = (
-  component: React.ReactElement,
-  session: typeof mockSession | null = null,
-) => {
-  const mockTRPCClient = createMockTRPCClient({
-    issue: {
-      core: {
-        getById: jest.fn<Promise<IssueWithDetails>, [{ id: string }]>(),
-        update: jest.fn<
-          Promise<IssueWithDetails>,
-          [
-            {
-              id: string;
-              title?: string;
-              description?: string;
-              statusId?: string;
-              assignedToId?: string;
-            },
-          ]
-        >(),
-        updateStatus: jest.fn<
-          Promise<IssueWithDetails>,
-          [{ id: string; statusId: string }]
-        >(),
-        assign: jest.fn<
-          Promise<IssueWithDetails>,
-          [{ id: string; assignedToId: string }]
-        >(),
-        close: jest.fn<Promise<IssueWithDetails>, [{ id: string }]>(),
-      },
-      comment: {
-        create: jest.fn<
-          Promise<Comment>,
-          [{ issueId: string; content: string; isInternal: boolean }]
-        >(),
-      },
-    },
-  });
-
-  return render(
-    <SessionProvider session={session}>
-      <TRPCProvider client={mockTRPCClient}>{component}</TRPCProvider>
-    </SessionProvider>,
-  );
 };
 
 describe("IssuePage", () => {
@@ -153,8 +131,8 @@ describe("IssuePage", () => {
 
       render(
         <SessionProvider session={null}>
-          <TRPCProvider client={mockTRPCClient}>
-            <IssuePage />
+          <TRPCProvider>
+            <IssuePage params={{ issueId: "test-issue-1" }} />
           </TRPCProvider>
         </SessionProvider>,
       );
@@ -187,8 +165,8 @@ describe("IssuePage", () => {
 
       render(
         <SessionProvider session={null}>
-          <TRPCProvider client={mockTRPCClient}>
-            <IssuePage />
+          <TRPCProvider>
+            <IssuePage params={{ issueId: "test-issue-1" }} />
           </TRPCProvider>
         </SessionProvider>,
       );
@@ -237,8 +215,8 @@ describe("IssuePage", () => {
 
       render(
         <SessionProvider session={null}>
-          <TRPCProvider client={mockTRPCClient}>
-            <IssuePage />
+          <TRPCProvider>
+            <IssuePage params={{ issueId: "test-issue-1" }} />
           </TRPCProvider>
         </SessionProvider>,
       );
@@ -264,8 +242,8 @@ describe("IssuePage", () => {
 
       render(
         <SessionProvider session={mockSession}>
-          <TRPCProvider client={mockTRPCClient}>
-            <IssuePage />
+          <TRPCProvider>
+            <IssuePage params={{ issueId: "test-issue-1" }} />
           </TRPCProvider>
         </SessionProvider>,
       );
@@ -315,8 +293,8 @@ describe("IssuePage", () => {
 
       render(
         <SessionProvider session={mockSession}>
-          <TRPCProvider client={mockTRPCClient}>
-            <IssuePage />
+          <TRPCProvider>
+            <IssuePage params={{ issueId: "test-issue-1" }} />
           </TRPCProvider>
         </SessionProvider>,
       );
@@ -353,8 +331,8 @@ describe("IssuePage", () => {
 
       render(
         <SessionProvider session={sessionWithEditPermission}>
-          <TRPCProvider client={mockTRPCClient}>
-            <IssuePage />
+          <TRPCProvider>
+            <IssuePage params={{ issueId: "test-issue-1" }} />
           </TRPCProvider>
         </SessionProvider>,
       );
@@ -386,8 +364,8 @@ describe("IssuePage", () => {
 
       render(
         <SessionProvider session={sessionWithAssignPermission}>
-          <TRPCProvider client={mockTRPCClient}>
-            <IssuePage />
+          <TRPCProvider>
+            <IssuePage params={{ issueId: "test-issue-1" }} />
           </TRPCProvider>
         </SessionProvider>,
       );
@@ -418,8 +396,8 @@ describe("IssuePage", () => {
 
       render(
         <SessionProvider session={sessionWithClosePermission}>
-          <TRPCProvider client={mockTRPCClient}>
-            <IssuePage />
+          <TRPCProvider>
+            <IssuePage params={{ issueId: "test-issue-1" }} />
           </TRPCProvider>
         </SessionProvider>,
       );
@@ -450,8 +428,8 @@ describe("IssuePage", () => {
 
       render(
         <SessionProvider session={sessionWithoutPermissions}>
-          <TRPCProvider client={mockTRPCClient}>
-            <IssuePage />
+          <TRPCProvider>
+            <IssuePage params={{ issueId: "test-issue-1" }} />
           </TRPCProvider>
         </SessionProvider>,
       );
@@ -488,8 +466,8 @@ describe("IssuePage", () => {
 
       render(
         <SessionProvider session={mockSession}>
-          <TRPCProvider client={mockTRPCClient}>
-            <IssuePage />
+          <TRPCProvider>
+            <IssuePage params={{ issueId: "test-issue-1" }} />
           </TRPCProvider>
         </SessionProvider>,
       );
@@ -523,8 +501,8 @@ describe("IssuePage", () => {
 
       render(
         <SessionProvider session={mockSession}>
-          <TRPCProvider client={mockTRPCClient}>
-            <IssuePage />
+          <TRPCProvider>
+            <IssuePage params={{ issueId: "test-issue-1" }} />
           </TRPCProvider>
         </SessionProvider>,
       );
@@ -557,8 +535,8 @@ describe("IssuePage", () => {
 
       render(
         <SessionProvider session={mockSession}>
-          <TRPCProvider client={mockTRPCClient}>
-            <IssuePage />
+          <TRPCProvider>
+            <IssuePage params={{ issueId: "test-issue-1" }} />
           </TRPCProvider>
         </SessionProvider>,
       );
@@ -582,8 +560,8 @@ describe("IssuePage", () => {
 
       render(
         <SessionProvider session={mockSession}>
-          <TRPCProvider client={mockTRPCClient}>
-            <IssuePage />
+          <TRPCProvider>
+            <IssuePage params={{ issueId: "test-issue-1" }} />
           </TRPCProvider>
         </SessionProvider>,
       );
@@ -609,8 +587,8 @@ describe("IssuePage", () => {
 
       render(
         <SessionProvider session={mockSession}>
-          <TRPCProvider client={mockTRPCClient}>
-            <IssuePage />
+          <TRPCProvider>
+            <IssuePage params={{ issueId: "test-issue-1" }} />
           </TRPCProvider>
         </SessionProvider>,
       );
@@ -639,8 +617,8 @@ describe("IssuePage", () => {
 
       render(
         <SessionProvider session={mockSession}>
-          <TRPCProvider client={mockTRPCClient}>
-            <IssuePage />
+          <TRPCProvider>
+            <IssuePage params={{ issueId: "test-issue-1" }} />
           </TRPCProvider>
         </SessionProvider>,
       );
@@ -675,8 +653,8 @@ describe("IssuePage", () => {
 
       render(
         <SessionProvider session={mockSession}>
-          <TRPCProvider client={mockTRPCClient}>
-            <IssuePage />
+          <TRPCProvider>
+            <IssuePage params={{ issueId: "test-issue-1" }} />
           </TRPCProvider>
         </SessionProvider>,
       );
@@ -712,8 +690,8 @@ describe("IssuePage", () => {
 
       render(
         <SessionProvider session={mockSession}>
-          <TRPCProvider client={mockTRPCClient}>
-            <IssuePage />
+          <TRPCProvider>
+            <IssuePage params={{ issueId: "test-issue-1" }} />
           </TRPCProvider>
         </SessionProvider>,
       );
@@ -744,8 +722,8 @@ describe("IssuePage", () => {
 
       render(
         <SessionProvider session={mockSession}>
-          <TRPCProvider client={mockTRPCClient}>
-            <IssuePage />
+          <TRPCProvider>
+            <IssuePage params={{ issueId: "test-issue-1" }} />
           </TRPCProvider>
         </SessionProvider>,
       );

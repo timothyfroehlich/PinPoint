@@ -17,7 +17,7 @@ export interface Priority {
 export interface User {
   id: string;
   name: string | null;
-  email: string | null;
+  email?: string | null; // Optional to match Prisma schema
   image: string | null;
 }
 
@@ -50,20 +50,18 @@ export interface Machine {
 export interface Comment {
   id: string;
   content: string;
-  isInternal: boolean;
   createdAt: Date;
   updatedAt: Date;
   deletedAt?: Date | null;
   author: User;
-  createdBy: User; // Alias for compatibility
+  createdBy: User; // Alias for compatibility - maps to author
 }
 
 export interface Attachment {
   id: string;
-  filename: string;
+  fileName: string; // Match Prisma field name
   url: string;
-  contentType: string;
-  size: number;
+  fileType: string; // Match Prisma field name
   createdAt: Date;
 }
 

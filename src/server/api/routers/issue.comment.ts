@@ -55,7 +55,64 @@ export const issueCommentRouter = createTRPCRouter({
             select: {
               id: true,
               name: true,
-              profilePicture: true,
+              email: true,
+              image: true,
+            },
+          },
+        },
+      });
+
+      return comment;
+    }),
+
+  // Alias for addComment (for backward compatibility with tests)
+  create: issueCreateProcedure
+    .input(
+      z.object({
+        issueId: z.string(),
+        content: z.string().min(1).max(1000),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Verify the issue belongs to this organization
+      const existingIssue = await ctx.db.issue.findFirst({
+        where: {
+          id: input.issueId,
+          organizationId: ctx.organization.id,
+        },
+      });
+
+      if (!existingIssue) {
+        throw new Error("Issue not found");
+      }
+
+      // Verify the user is a member of this organization
+      const membership = await ctx.db.membership.findUnique({
+        where: {
+          userId_organizationId: {
+            userId: ctx.session.user.id,
+            organizationId: ctx.organization.id,
+          },
+        },
+      });
+
+      if (!membership) {
+        throw new Error("User is not a member of this organization");
+      }
+
+      const comment = await ctx.db.comment.create({
+        data: {
+          content: input.content,
+          issueId: input.issueId,
+          authorId: ctx.session.user.id,
+        },
+        include: {
+          author: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              image: true,
             },
           },
         },
@@ -111,7 +168,8 @@ export const issueCommentRouter = createTRPCRouter({
             select: {
               id: true,
               name: true,
-              profilePicture: true,
+              email: true,
+              image: true,
             },
           },
         },
