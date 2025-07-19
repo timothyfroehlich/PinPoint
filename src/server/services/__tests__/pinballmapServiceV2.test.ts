@@ -49,8 +49,8 @@ const mockPrisma = {
 
 const service = new PinballMapService(mockPrisma);
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const servicePrivate = service as any;
+// Type assertion for testing private methods
+const servicePrivate = service as PinballMapService & Record<string, unknown>;
 
 describe("PinballMapService", () => {
   beforeEach(() => {
