@@ -1,7 +1,5 @@
-import { ActivityType } from "@prisma/client";
-import { type User, type IssueStatus } from "@prisma/client";
-
-import type { ExtendedPrismaClient } from "~/server/db";
+import { ActivityType } from "./types";
+import { type IssueStatus, type ExtendedPrismaClient } from "./types";
 
 export interface ActivityData {
   type: ActivityType; // Use enum instead of string
@@ -121,8 +119,7 @@ export class IssueActivityService {
     });
   }
 
-  async getIssueTimeline(issueId: string, organizationId: string): Promise<
-    Array<
+  async getIssueTimeline(issueId: string, organizationId: string): Promise<(
       | {
           itemType: "comment";
           timestamp: Date;
@@ -150,8 +147,7 @@ export class IssueActivityService {
             profilePicture: string | null;
           } | null;
         }
-    >
-  > {
+    )[]> {
     interface CommentResult {
       id: string;
       content: string;

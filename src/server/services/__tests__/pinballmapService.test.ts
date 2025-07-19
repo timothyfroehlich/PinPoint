@@ -160,7 +160,7 @@ describe("PinballMapService", () => {
         id: "game-instance-old",
         modelId: "game-title-old",
       };
-      findManyMachineMock.mockResolvedValue([existingGame as Machine]);
+      findManyMachineMock.mockResolvedValue([existingGame]);
       countIssueMock.mockResolvedValue(0); // No issues on the machine
       deleteMachineMock.mockResolvedValue({});
       findUniqueModelMock.mockResolvedValue(null);
@@ -202,7 +202,7 @@ describe("PinballMapService", () => {
         ownerId: null,
       };
 
-      findManyMachineMock.mockResolvedValue([existingGame as Machine]);
+      findManyMachineMock.mockResolvedValue([existingGame]);
 
       // When searching for the first machine, return the existing model
       findUniqueModelMock.mockImplementation(({ where }) => {

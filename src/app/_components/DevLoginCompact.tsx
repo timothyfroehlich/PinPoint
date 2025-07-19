@@ -90,7 +90,7 @@ export function DevLoginCompact({ onLogin }: DevLoginCompactProps) {
           p: 1,
           cursor: "pointer",
         }}
-        onClick={() => setIsExpanded(!isExpanded)}
+        onClick={() => { setIsExpanded(!isExpanded); }}
       >
         <Typography
           variant="body2"

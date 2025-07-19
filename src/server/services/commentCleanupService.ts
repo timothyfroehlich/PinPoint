@@ -1,6 +1,4 @@
-import { type Comment } from "@prisma/client";
-
-import type { ExtendedPrismaClient } from "~/server/db";
+import { type Comment, type ExtendedPrismaClient } from "./types";
 
 import { COMMENT_CLEANUP_CONFIG } from "~/server/constants/cleanup";
 

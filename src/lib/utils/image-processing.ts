@@ -43,8 +43,8 @@ export async function processImageFile(
     // Load image
     const img = new Image();
     const imageLoaded = new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve();
-      img.onerror = () => reject(new Error("Failed to load image"));
+      img.onload = () => { resolve(); };
+      img.onerror = () => { reject(new Error("Failed to load image")); };
     });
 
     img.src = URL.createObjectURL(file);
@@ -157,8 +157,8 @@ export async function processIssueImageFile(
     // Load image
     const img = new Image();
     const imageLoaded = new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve();
-      img.onerror = () => reject(new Error("Failed to load image"));
+      img.onload = () => { resolve(); };
+      img.onerror = () => { reject(new Error("Failed to load image")); };
     });
 
     img.src = URL.createObjectURL(file);

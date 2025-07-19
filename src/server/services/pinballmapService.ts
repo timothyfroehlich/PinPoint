@@ -3,11 +3,11 @@
  * Handles syncing machine data between PinballMap and PinPoint
  */
 
+import type { ExtendedPrismaClient } from "./types";
 import type {
   PinballMapMachine,
   PinballMapMachineDetailsResponse,
 } from "../../lib/pinballmap/types";
-import type { ExtendedPrismaClient } from "~/server/db";
 
 export interface SyncResult {
   success: boolean;
@@ -189,7 +189,7 @@ export class PinballMapService {
 
         // Find existing machine by model and location
         const existingMachine = currentMachines.find(
-          (m: { modelId: string; id: string }) => m.modelId === model!.id,
+          (m: { modelId: string; id: string }) => m.modelId === model.id,
         );
 
         if (existingMachine) {
@@ -416,7 +416,7 @@ export async function processFixtureData(
 
     for (const machine of fixtureData.machines) {
       // Create or update model
-      const model = await service["findOrCreateModel"](machine, true);
+      const model = await service.findOrCreateModel(machine, true);
 
       if (model) {
         // Create machine instance

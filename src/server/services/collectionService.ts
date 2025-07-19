@@ -1,10 +1,9 @@
 import {
   type Collection,
   type CollectionType,
-  type Prisma,
-} from "@prisma/client";
-
-import type { ExtendedPrismaClient } from "~/server/db";
+  Prisma,
+  type ExtendedPrismaClient,
+} from "./types";
 
 export interface CreateManualCollectionData {
   name: string;

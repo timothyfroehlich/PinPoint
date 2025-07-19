@@ -5,7 +5,7 @@ import { NotificationService } from "./notificationService";
 import { PinballMapService } from "./pinballmapService";
 import { QRCodeService } from "./qrCodeService";
 
-import type { ExtendedPrismaClient } from "~/server/db";
+import type { ExtendedPrismaClient } from "./types";
 
 export class ServiceFactory {
   constructor(private db: ExtendedPrismaClient) {}
