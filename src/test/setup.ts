@@ -164,8 +164,8 @@ jest.mock("next-auth", () => {
 // Mock Next.js server APIs for tests
 global.Request = jest.fn().mockImplementation((input, init) => ({
   url: input,
-  method: init?.method || "GET",
-  headers: new Map(Object.entries(init?.headers || {})),
+  method: init?.method ?? "GET",
+  headers: new Map(Object.entries(init?.headers ?? {})),
   json: jest.fn().mockResolvedValue({}),
   text: jest.fn().mockResolvedValue(""),
 }));
@@ -176,7 +176,7 @@ global.Response = {
   redirect: jest.fn(),
   new: jest.fn().mockImplementation((body, init) => ({
     ok: true,
-    status: init?.status || 200,
+    status: init?.status ?? 200,
     json: jest.fn().mockResolvedValue(body),
     text: jest.fn().mockResolvedValue(String(body)),
   })),
@@ -193,7 +193,7 @@ jest.mock("next/server", () => ({
   NextResponse: {
     json: jest.fn().mockImplementation((data, init) => ({
       json: jest.fn().mockResolvedValue(data),
-      status: init?.status || 200,
+      status: init?.status ?? 200,
     })),
   },
 }));

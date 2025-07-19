@@ -50,7 +50,7 @@ const mockNextResponseInstance = {
 const mockNextResponse = jest.fn().mockImplementation((body: unknown, options?: { status?: number }) => ({
   ...mockNextResponseInstance,
   data: body,
-  status: options?.status || 200,
+  status: options?.status ?? 200,
 }));
 
 interface MockNextResponseConstructor {
@@ -60,7 +60,7 @@ interface MockNextResponseConstructor {
 (mockNextResponse as unknown as MockNextResponseConstructor).json = jest.fn((data: unknown, options?: { status?: number }) => ({
   ...mockNextResponseInstance,
   data,
-  status: options?.status || 200,
+  status: options?.status ?? 200,
 }));
 
 jest.mock("next/server", () => ({
