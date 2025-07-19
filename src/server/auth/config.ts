@@ -3,6 +3,10 @@ import { type DefaultSession, type NextAuthConfig } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
 
+import type { JWT } from "next-auth/jwt";
+import type { Session } from "next-auth";
+import type { User } from "next-auth";
+
 import type { ExtendedPrismaClient } from "~/server/db";
 
 import { env } from "~/env.js";
@@ -38,8 +42,8 @@ export const createAuthConfig = (db: ExtendedPrismaClient): NextAuthConfig => ({
   adapter: PrismaAdapter(db),
   providers: [
     Google({
-      clientId: env.GOOGLE_CLIENT_ID!,
-      clientSecret: env.GOOGLE_CLIENT_SECRET!,
+      clientId: env.GOOGLE_CLIENT_ID ?? "",
+      clientSecret: env.GOOGLE_CLIENT_SECRET ?? "",
     }),
     // Development-only Credentials provider for test accounts
     ...(env.NODE_ENV === "development" || env.NODE_ENV === "test"
@@ -49,7 +53,7 @@ export const createAuthConfig = (db: ExtendedPrismaClient): NextAuthConfig => ({
             credentials: {
               email: { label: "Email", type: "email" },
             },
-            async authorize(credentials) {
+            async authorize(credentials: Record<string, unknown> | undefined): Promise<User | null> {
               if (env.NODE_ENV !== "development" && env.NODE_ENV !== "test") {
                 return null;
               }
@@ -88,7 +92,7 @@ export const createAuthConfig = (db: ExtendedPrismaClient): NextAuthConfig => ({
     strategy: "jwt",
   },
   callbacks: {
-    jwt: async ({ token, user }) => {
+    jwt: async ({ token, user }: { token: JWT; user?: User }): Promise<JWT> => {
       if (user?.id) {
         token.id = user.id;
 
@@ -121,21 +125,17 @@ export const createAuthConfig = (db: ExtendedPrismaClient): NextAuthConfig => ({
       }
       return token;
     },
-    session: async ({ session, token }) => {
+    session: ({ session, token }: { session: Session; token: JWT }): Session => {
       // For JWT sessions, get data from token
-      if (token) {
-        return {
-          ...session,
-          user: {
-            ...session.user,
-            id: token.id as string,
-            role: token.role,
-            organizationId: token.organizationId,
-          },
-        };
-      }
-
-      return session;
+      return {
+        ...session,
+        user: {
+          ...session.user,
+          id: token.id as string,
+          role: token.role,
+          organizationId: token.organizationId,
+        },
+      };
     },
   },
 });

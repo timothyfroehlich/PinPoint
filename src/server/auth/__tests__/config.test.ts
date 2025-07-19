@@ -13,6 +13,9 @@ const mockEnv = {
   DEFAULT_ORG_SUBDOMAIN: "apc",
 };
 
+// Import NextAuth provider types
+import type { Provider } from "next-auth/providers";
+
 // Mock functions to set environment
 function setNodeEnv(env: string): void {
   mockEnv.NODE_ENV = env;
@@ -48,12 +51,10 @@ describe("NextAuth Configuration", () => {
     it("should include Google provider", () => {
       expect(authConfig.providers.length).toBeGreaterThanOrEqual(1);
       const googleProvider = authConfig.providers.find(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (p: any) => p.id === "google",
+        (p: Provider) => p.id === "google",
       );
       expect(googleProvider).toBeDefined();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      expect((googleProvider as any)!.id).toBe("google");
+      expect(googleProvider?.id).toBe("google");
     });
 
     it("should include credentials provider in development", async () => {
@@ -69,8 +70,7 @@ describe("NextAuth Configuration", () => {
       expect(devConfig.providers).toHaveLength(2);
       const credentialsProvider = devConfig.providers[1];
       expect(credentialsProvider).toBeDefined();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      expect((credentialsProvider as any)!.id).toBe("credentials");
+      expect(credentialsProvider?.id).toBe("credentials");
 
       // Check the custom name in options
       expect(
@@ -88,8 +88,7 @@ describe("NextAuth Configuration", () => {
 
       expect(prodConfig.providers).toHaveLength(1);
       expect(prodConfig.providers[0]).toBeDefined();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      expect((prodConfig.providers[0] as any)!.id).toBe("google");
+      expect(prodConfig.providers[0]?.id).toBe("google");
     });
   });
 
@@ -116,8 +115,7 @@ describe("NextAuth Configuration", () => {
       const credentialsProvider = devConfig.providers[1];
 
       expect(credentialsProvider).toBeDefined();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      expect((credentialsProvider as any)!.id).toBe("credentials");
+      expect(credentialsProvider?.id).toBe("credentials");
       expect(
         (credentialsProvider as { authorize?: () => unknown }).authorize,
       ).toBeInstanceOf(Function);
@@ -133,8 +131,7 @@ describe("NextAuth Configuration", () => {
       const configModule = await import("../config");
       const prodConfig = configModule.createAuthConfig(db);
       const credentialsProvider = prodConfig.providers.find(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (p: any) => p.id === "credentials",
+        (p: Provider) => p.id === "credentials",
       );
 
       // Credentials provider should not exist in production

@@ -43,10 +43,7 @@ export async function getUploadAuthContext(
 
   // 2. Resolve organization from subdomain
   let subdomain = req.headers.get("x-subdomain");
-  if (!subdomain) {
-    // For beta: use environment-configured default organization
-    subdomain = env.DEFAULT_ORG_SUBDOMAIN;
-  }
+  subdomain ??= env.DEFAULT_ORG_SUBDOMAIN;
 
   const organization = await db.organization.findUnique({
     where: { subdomain },
@@ -89,10 +86,10 @@ export async function getUploadAuthContext(
   };
 }
 
-export async function requireUploadPermission(
+export function requireUploadPermission(
   ctx: UploadAuthContext,
   permission: string,
-): Promise<void> {
+): void {
   if (!ctx.userPermissions.includes(permission)) {
     throw new TRPCError({
       code: "FORBIDDEN",
@@ -101,11 +98,11 @@ export async function requireUploadPermission(
   }
 }
 
-export async function validateUploadAuth(
-  db: ExtendedPrismaClient,
-  sessionId?: string,
-  organizationId?: string,
-) {
+export function validateUploadAuth(
+  _db: ExtendedPrismaClient,
+  _sessionId?: string,
+  _organizationId?: string,
+): void {
   // This function is a placeholder for now, but it will be used in the future
   // to validate uploads without a full request object.
   return;

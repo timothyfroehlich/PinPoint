@@ -16,7 +16,7 @@ interface DevLoginCompactProps {
   onLogin?: () => void;
 }
 
-export function DevLoginCompact({ onLogin }: DevLoginCompactProps) {
+export function DevLoginCompact({ onLogin }: DevLoginCompactProps): React.ReactNode {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -27,7 +27,7 @@ export function DevLoginCompact({ onLogin }: DevLoginCompactProps) {
     { id: "3", name: "Test Player", email: "player@test.com", role: "player" },
   ];
 
-  async function handleLogin(email: string) {
+  function handleLogin(email: string): void {
     setIsLoading(true);
     try {
       console.log("Dev login as:", email);
@@ -90,7 +90,9 @@ export function DevLoginCompact({ onLogin }: DevLoginCompactProps) {
           p: 1,
           cursor: "pointer",
         }}
-        onClick={() => setIsExpanded(!isExpanded)}
+        onClick={() => {
+          setIsExpanded(!isExpanded);
+        }}
       >
         <Typography
           variant="body2"
@@ -119,7 +121,9 @@ export function DevLoginCompact({ onLogin }: DevLoginCompactProps) {
                   variant="contained"
                   size="small"
                   disabled={isLoading}
-                  onClick={() => void handleLogin(testUser.email)}
+                  onClick={() => {
+                    handleLogin(testUser.email);
+                  }}
                   sx={{
                     justifyContent: "flex-start",
                     textTransform: "none",

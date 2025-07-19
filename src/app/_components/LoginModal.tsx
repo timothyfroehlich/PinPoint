@@ -6,7 +6,7 @@ interface LoginModalProps {
   onLogin: () => void;
 }
 
-const LoginModal = ({ onLogin }: LoginModalProps) => {
+const LoginModal = ({ onLogin }: LoginModalProps): JSX.Element => {
   return (
     <Modal
       open={true}
