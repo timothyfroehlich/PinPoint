@@ -119,12 +119,28 @@ describe("IssuePage", () => {
 
   describe("Public User View", () => {
     it("should display issue details for unauthenticated users", async () => {
-      const mockTRPCClient = createMockTRPCClient({
+      const _mockTRPCClient = createMockTRPCClient({
         issue: {
           core: {
+            create: jest.fn(),
+            getAll: jest.fn(),
             getById: jest
               .fn<Promise<IssueWithDetails>, [{ id: string }]>()
               .mockResolvedValue(mockIssueData),
+            update: jest.fn(),
+            close: jest.fn(),
+            assign: jest.fn(),
+            updateStatus: jest.fn(),
+          },
+          comment: {
+            addComment: jest.fn(),
+            create: jest.fn(),
+            editComment: jest.fn(),
+            deleteComment: jest.fn(),
+          },
+          attachment: {
+            createAttachment: jest.fn(),
+            deleteAttachment: jest.fn(),
           },
         },
       });
@@ -153,12 +169,28 @@ describe("IssuePage", () => {
     });
 
     it("should hide admin controls for unauthenticated users", async () => {
-      const mockTRPCClient = createMockTRPCClient({
+      const _mockTRPCClient = createMockTRPCClient({
         issue: {
           core: {
+            create: jest.fn(),
+            getAll: jest.fn(),
             getById: jest
               .fn<Promise<IssueWithDetails>, [{ id: string }]>()
               .mockResolvedValue(mockIssueData),
+            update: jest.fn(),
+            close: jest.fn(),
+            assign: jest.fn(),
+            updateStatus: jest.fn(),
+          },
+          comment: {
+            addComment: jest.fn(),
+            create: jest.fn(),
+            editComment: jest.fn(),
+            deleteComment: jest.fn(),
+          },
+          attachment: {
+            createAttachment: jest.fn(),
+            deleteAttachment: jest.fn(),
           },
         },
       });
@@ -189,26 +221,58 @@ describe("IssuePage", () => {
           {
             id: "comment-1",
             content: "Public comment",
-            isInternal: false,
-            createdBy: { id: "user-1", name: "Test User" },
+            author: {
+              id: "user-1",
+              name: "Test User",
+              email: "test@example.com",
+              image: null,
+            },
+            createdBy: {
+              id: "user-1",
+              name: "Test User",
+              email: "test@example.com",
+              image: null,
+            },
+            updatedAt: new Date("2024-01-01T00:00:00Z"),
             createdAt: new Date("2024-01-01T00:00:00Z"),
           },
           {
             id: "comment-2",
             content: "Internal comment",
-            isInternal: true,
-            createdBy: { id: "user-1", name: "Test User" },
+            author: {
+              id: "user-1",
+              name: "Test User",
+              email: "test@example.com",
+              image: null,
+            },
+            createdBy: {
+              id: "user-1",
+              name: "Test User",
+              email: "test@example.com",
+              image: null,
+            },
+            updatedAt: new Date("2024-01-01T00:00:00Z"),
             createdAt: new Date("2024-01-01T00:00:00Z"),
           },
         ],
       };
 
-      const mockTRPCClient = createMockTRPCClient({
+      const _mockTRPCClient = createMockTRPCClient({
         issue: {
           core: {
             getById: jest
               .fn<Promise<IssueWithDetails>, [{ id: string }]>()
-              .mockResolvedValue(issueWithMixedComments),
+              .mockResolvedValue(issueWithMixedComments as IssueWithDetails),
+          },
+          comment: {
+            addComment: jest.fn(),
+            create: jest.fn(),
+            editComment: jest.fn(),
+            deleteComment: jest.fn(),
+          },
+          attachment: {
+            createAttachment: jest.fn(),
+            deleteAttachment: jest.fn(),
           },
         },
       });
@@ -230,12 +294,28 @@ describe("IssuePage", () => {
 
   describe("Authenticated User View", () => {
     it("should display full issue details for authenticated users", async () => {
-      const mockTRPCClient = createMockTRPCClient({
+      const _mockTRPCClient = createMockTRPCClient({
         issue: {
           core: {
+            create: jest.fn(),
+            getAll: jest.fn(),
             getById: jest
               .fn<Promise<IssueWithDetails>, [{ id: string }]>()
               .mockResolvedValue(mockIssueData),
+            update: jest.fn(),
+            close: jest.fn(),
+            assign: jest.fn(),
+            updateStatus: jest.fn(),
+          },
+          comment: {
+            addComment: jest.fn(),
+            create: jest.fn(),
+            editComment: jest.fn(),
+            deleteComment: jest.fn(),
+          },
+          attachment: {
+            createAttachment: jest.fn(),
+            deleteAttachment: jest.fn(),
           },
         },
       });
@@ -267,26 +347,58 @@ describe("IssuePage", () => {
           {
             id: "comment-1",
             content: "Public comment",
-            isInternal: false,
-            createdBy: { id: "user-1", name: "Test User" },
+            author: {
+              id: "user-1",
+              name: "Test User",
+              email: "test@example.com",
+              image: null,
+            },
+            createdBy: {
+              id: "user-1",
+              name: "Test User",
+              email: "test@example.com",
+              image: null,
+            },
+            updatedAt: new Date("2024-01-01T00:00:00Z"),
             createdAt: new Date("2024-01-01T00:00:00Z"),
           },
           {
             id: "comment-2",
             content: "Internal comment",
-            isInternal: true,
-            createdBy: { id: "user-1", name: "Test User" },
+            author: {
+              id: "user-1",
+              name: "Test User",
+              email: "test@example.com",
+              image: null,
+            },
+            createdBy: {
+              id: "user-1",
+              name: "Test User",
+              email: "test@example.com",
+              image: null,
+            },
+            updatedAt: new Date("2024-01-01T00:00:00Z"),
             createdAt: new Date("2024-01-01T00:00:00Z"),
           },
         ],
       };
 
-      const mockTRPCClient = createMockTRPCClient({
+      const _mockTRPCClient = createMockTRPCClient({
         issue: {
           core: {
             getById: jest
               .fn<Promise<IssueWithDetails>, [{ id: string }]>()
-              .mockResolvedValue(issueWithMixedComments),
+              .mockResolvedValue(issueWithMixedComments as IssueWithDetails),
+          },
+          comment: {
+            addComment: jest.fn(),
+            create: jest.fn(),
+            editComment: jest.fn(),
+            deleteComment: jest.fn(),
+          },
+          attachment: {
+            createAttachment: jest.fn(),
+            deleteAttachment: jest.fn(),
           },
         },
       });
@@ -311,12 +423,28 @@ describe("IssuePage", () => {
 
   describe("Permission-based Controls", () => {
     it("should show edit controls for users with edit permissions", async () => {
-      const mockTRPCClient = createMockTRPCClient({
+      const _mockTRPCClient = createMockTRPCClient({
         issue: {
           core: {
+            create: jest.fn(),
+            getAll: jest.fn(),
             getById: jest
               .fn<Promise<IssueWithDetails>, [{ id: string }]>()
               .mockResolvedValue(mockIssueData),
+            update: jest.fn(),
+            close: jest.fn(),
+            assign: jest.fn(),
+            updateStatus: jest.fn(),
+          },
+          comment: {
+            addComment: jest.fn(),
+            create: jest.fn(),
+            editComment: jest.fn(),
+            deleteComment: jest.fn(),
+          },
+          attachment: {
+            createAttachment: jest.fn(),
+            deleteAttachment: jest.fn(),
           },
         },
       });
@@ -344,12 +472,28 @@ describe("IssuePage", () => {
     });
 
     it("should show assign controls for users with assign permissions", async () => {
-      const mockTRPCClient = createMockTRPCClient({
+      const _mockTRPCClient = createMockTRPCClient({
         issue: {
           core: {
+            create: jest.fn(),
+            getAll: jest.fn(),
             getById: jest
               .fn<Promise<IssueWithDetails>, [{ id: string }]>()
               .mockResolvedValue(mockIssueData),
+            update: jest.fn(),
+            close: jest.fn(),
+            assign: jest.fn(),
+            updateStatus: jest.fn(),
+          },
+          comment: {
+            addComment: jest.fn(),
+            create: jest.fn(),
+            editComment: jest.fn(),
+            deleteComment: jest.fn(),
+          },
+          attachment: {
+            createAttachment: jest.fn(),
+            deleteAttachment: jest.fn(),
           },
         },
       });
@@ -376,12 +520,28 @@ describe("IssuePage", () => {
     });
 
     it("should show close controls for users with close permissions", async () => {
-      const mockTRPCClient = createMockTRPCClient({
+      const _mockTRPCClient = createMockTRPCClient({
         issue: {
           core: {
+            create: jest.fn(),
+            getAll: jest.fn(),
             getById: jest
               .fn<Promise<IssueWithDetails>, [{ id: string }]>()
               .mockResolvedValue(mockIssueData),
+            update: jest.fn(),
+            close: jest.fn(),
+            assign: jest.fn(),
+            updateStatus: jest.fn(),
+          },
+          comment: {
+            addComment: jest.fn(),
+            create: jest.fn(),
+            editComment: jest.fn(),
+            deleteComment: jest.fn(),
+          },
+          attachment: {
+            createAttachment: jest.fn(),
+            deleteAttachment: jest.fn(),
           },
         },
       });
@@ -408,12 +568,28 @@ describe("IssuePage", () => {
     });
 
     it("should show permission tooltips on disabled buttons", async () => {
-      const mockTRPCClient = createMockTRPCClient({
+      const _mockTRPCClient = createMockTRPCClient({
         issue: {
           core: {
+            create: jest.fn(),
+            getAll: jest.fn(),
             getById: jest
               .fn<Promise<IssueWithDetails>, [{ id: string }]>()
               .mockResolvedValue(mockIssueData),
+            update: jest.fn(),
+            close: jest.fn(),
+            assign: jest.fn(),
+            updateStatus: jest.fn(),
+          },
+          comment: {
+            addComment: jest.fn(),
+            create: jest.fn(),
+            editComment: jest.fn(),
+            deleteComment: jest.fn(),
+          },
+          attachment: {
+            createAttachment: jest.fn(),
+            deleteAttachment: jest.fn(),
           },
         },
       });
@@ -448,8 +624,8 @@ describe("IssuePage", () => {
   });
 
   describe("Loading States", () => {
-    it("should show skeleton loader while fetching issue data", async () => {
-      const mockTRPCClient = createMockTRPCClient({
+    it("should show skeleton loader while fetching issue data", () => {
+      const _mockTRPCClient = createMockTRPCClient({
         issue: {
           core: {
             getById: jest
@@ -460,6 +636,16 @@ describe("IssuePage", () => {
                     /* Never resolves */
                   }),
               ), // Never resolves
+          },
+          comment: {
+            addComment: jest.fn(),
+            create: jest.fn(),
+            editComment: jest.fn(),
+            deleteComment: jest.fn(),
+          },
+          attachment: {
+            createAttachment: jest.fn(),
+            deleteAttachment: jest.fn(),
           },
         },
       });
@@ -478,7 +664,7 @@ describe("IssuePage", () => {
     });
 
     it("should show loading states for individual actions", async () => {
-      const mockTRPCClient = createMockTRPCClient({
+      const _mockTRPCClient = createMockTRPCClient({
         issue: {
           core: {
             getById: jest
@@ -495,6 +681,16 @@ describe("IssuePage", () => {
                     /* Never resolves */
                   }),
               ), // Never resolves
+          },
+          comment: {
+            addComment: jest.fn(),
+            create: jest.fn(),
+            editComment: jest.fn(),
+            deleteComment: jest.fn(),
+          },
+          attachment: {
+            createAttachment: jest.fn(),
+            deleteAttachment: jest.fn(),
           },
         },
       });
@@ -523,12 +719,22 @@ describe("IssuePage", () => {
 
   describe("Error States", () => {
     it("should show 404 error for non-existent issues", async () => {
-      const mockTRPCClient = createMockTRPCClient({
+      const _mockTRPCClient = createMockTRPCClient({
         issue: {
           core: {
             getById: jest
               .fn<Promise<IssueWithDetails>, [{ id: string }]>()
               .mockRejectedValue(new Error("Issue not found")),
+          },
+          comment: {
+            addComment: jest.fn(),
+            create: jest.fn(),
+            editComment: jest.fn(),
+            deleteComment: jest.fn(),
+          },
+          attachment: {
+            createAttachment: jest.fn(),
+            deleteAttachment: jest.fn(),
           },
         },
       });
@@ -548,12 +754,22 @@ describe("IssuePage", () => {
     });
 
     it("should show permission denied error for unauthorized access", async () => {
-      const mockTRPCClient = createMockTRPCClient({
+      const _mockTRPCClient = createMockTRPCClient({
         issue: {
           core: {
             getById: jest
               .fn<Promise<IssueWithDetails>, [{ id: string }]>()
               .mockRejectedValue(new Error("UNAUTHORIZED")),
+          },
+          comment: {
+            addComment: jest.fn(),
+            create: jest.fn(),
+            editComment: jest.fn(),
+            deleteComment: jest.fn(),
+          },
+          attachment: {
+            createAttachment: jest.fn(),
+            deleteAttachment: jest.fn(),
           },
         },
       });
@@ -575,12 +791,22 @@ describe("IssuePage", () => {
     });
 
     it("should show network error for failed requests", async () => {
-      const mockTRPCClient = createMockTRPCClient({
+      const _mockTRPCClient = createMockTRPCClient({
         issue: {
           core: {
             getById: jest
               .fn<Promise<IssueWithDetails>, [{ id: string }]>()
               .mockRejectedValue(new Error("Network error")),
+          },
+          comment: {
+            addComment: jest.fn(),
+            create: jest.fn(),
+            editComment: jest.fn(),
+            deleteComment: jest.fn(),
+          },
+          attachment: {
+            createAttachment: jest.fn(),
+            deleteAttachment: jest.fn(),
           },
         },
       });
@@ -605,12 +831,28 @@ describe("IssuePage", () => {
 
   describe("Accessibility", () => {
     it("should have proper ARIA labels and roles", async () => {
-      const mockTRPCClient = createMockTRPCClient({
+      const _mockTRPCClient = createMockTRPCClient({
         issue: {
           core: {
+            create: jest.fn(),
+            getAll: jest.fn(),
             getById: jest
               .fn<Promise<IssueWithDetails>, [{ id: string }]>()
               .mockResolvedValue(mockIssueData),
+            update: jest.fn(),
+            close: jest.fn(),
+            assign: jest.fn(),
+            updateStatus: jest.fn(),
+          },
+          comment: {
+            addComment: jest.fn(),
+            create: jest.fn(),
+            editComment: jest.fn(),
+            deleteComment: jest.fn(),
+          },
+          attachment: {
+            createAttachment: jest.fn(),
+            deleteAttachment: jest.fn(),
           },
         },
       });
@@ -641,12 +883,28 @@ describe("IssuePage", () => {
     });
 
     it("should support keyboard navigation", async () => {
-      const mockTRPCClient = createMockTRPCClient({
+      const _mockTRPCClient = createMockTRPCClient({
         issue: {
           core: {
+            create: jest.fn(),
+            getAll: jest.fn(),
             getById: jest
               .fn<Promise<IssueWithDetails>, [{ id: string }]>()
               .mockResolvedValue(mockIssueData),
+            update: jest.fn(),
+            close: jest.fn(),
+            assign: jest.fn(),
+            updateStatus: jest.fn(),
+          },
+          comment: {
+            addComment: jest.fn(),
+            create: jest.fn(),
+            editComment: jest.fn(),
+            deleteComment: jest.fn(),
+          },
+          attachment: {
+            createAttachment: jest.fn(),
+            deleteAttachment: jest.fn(),
           },
         },
       });
@@ -678,12 +936,28 @@ describe("IssuePage", () => {
         value: 375,
       });
 
-      const mockTRPCClient = createMockTRPCClient({
+      const _mockTRPCClient = createMockTRPCClient({
         issue: {
           core: {
+            create: jest.fn(),
+            getAll: jest.fn(),
             getById: jest
               .fn<Promise<IssueWithDetails>, [{ id: string }]>()
               .mockResolvedValue(mockIssueData),
+            update: jest.fn(),
+            close: jest.fn(),
+            assign: jest.fn(),
+            updateStatus: jest.fn(),
+          },
+          comment: {
+            addComment: jest.fn(),
+            create: jest.fn(),
+            editComment: jest.fn(),
+            deleteComment: jest.fn(),
+          },
+          attachment: {
+            createAttachment: jest.fn(),
+            deleteAttachment: jest.fn(),
           },
         },
       });
@@ -710,12 +984,28 @@ describe("IssuePage", () => {
         value: 1024,
       });
 
-      const mockTRPCClient = createMockTRPCClient({
+      const _mockTRPCClient = createMockTRPCClient({
         issue: {
           core: {
+            create: jest.fn(),
+            getAll: jest.fn(),
             getById: jest
               .fn<Promise<IssueWithDetails>, [{ id: string }]>()
               .mockResolvedValue(mockIssueData),
+            update: jest.fn(),
+            close: jest.fn(),
+            assign: jest.fn(),
+            updateStatus: jest.fn(),
+          },
+          comment: {
+            addComment: jest.fn(),
+            create: jest.fn(),
+            editComment: jest.fn(),
+            deleteComment: jest.fn(),
+          },
+          attachment: {
+            createAttachment: jest.fn(),
+            deleteAttachment: jest.fn(),
           },
         },
       });

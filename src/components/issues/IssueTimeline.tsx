@@ -8,17 +8,14 @@ import {
   Edit as EditIcon,
 } from "@mui/icons-material";
 import {
-  Box,
-  Typography,
   Timeline,
   TimelineItem,
   TimelineSeparator,
   TimelineConnector,
   TimelineContent,
   TimelineDot,
-  Paper,
-  Stack,
-} from "@mui/material";
+} from "@mui/lab";
+import { Box, Typography, Paper, Stack } from "@mui/material";
 import { type Session } from "next-auth";
 
 import { type IssueWithDetails } from "~/types/issue";
@@ -28,7 +25,10 @@ interface IssueTimelineProps {
   session: Session | null;
 }
 
-export function IssueTimeline({ issue, session }: IssueTimelineProps) {
+export function IssueTimeline({
+  issue,
+  session: _session,
+}: IssueTimelineProps): React.JSX.Element {
   // TODO: Fetch actual timeline activities from the API
   // For now, we'll create a mock timeline based on issue data
   const activities = [
@@ -36,7 +36,7 @@ export function IssueTimeline({ issue, session }: IssueTimelineProps) {
       id: "created",
       type: "created",
       title: "Issue Created",
-      description: `Created by ${issue.createdBy.name}`,
+      description: `Created by ${issue.createdBy.name ?? "Unknown"}`,
       timestamp: issue.createdAt,
       user: issue.createdBy,
     },
@@ -48,13 +48,13 @@ export function IssueTimeline({ issue, session }: IssueTimelineProps) {
       id: "assigned",
       type: "assigned",
       title: "Issue Assigned",
-      description: `Assigned to ${issue.assignedTo.name}`,
+      description: `Assigned to ${issue.assignedTo.name ?? "Unknown"}`,
       timestamp: issue.updatedAt, // TODO: Get actual assignment timestamp
       user: issue.assignedTo,
     });
   }
 
-  const getActivityIcon = (type: string) => {
+  const getActivityIcon = (type: string): React.JSX.Element => {
     switch (type) {
       case "created":
         return <CreateIcon />;
@@ -71,7 +71,7 @@ export function IssueTimeline({ issue, session }: IssueTimelineProps) {
     }
   };
 
-  const getActivityColor = (type: string) => {
+  const getActivityColor = (type: string): string => {
     switch (type) {
       case "created":
         return "primary";

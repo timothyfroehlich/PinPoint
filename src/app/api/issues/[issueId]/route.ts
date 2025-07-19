@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { auth } from "~/server/auth";
-import { db } from "~/server/db";
+import { getGlobalDatabaseProvider } from "~/server/db/provider";
 
 const issueParamsSchema = z.object({
   issueId: z.string(),
@@ -27,6 +27,7 @@ export async function GET(
     }
 
     const { issueId } = issueParamsSchema.parse(params);
+    const db = getGlobalDatabaseProvider().getClient();
 
     const issue = await db.issue.findFirst({
       where: {
@@ -103,6 +104,7 @@ export async function PUT(
     const { issueId } = issueParamsSchema.parse(params);
     const body = await request.json();
     const updateData = updateIssueSchema.parse(body);
+    const db = getGlobalDatabaseProvider().getClient();
 
     const issue = await db.issue.findFirst({
       where: {
@@ -166,6 +168,7 @@ export async function DELETE(
     }
 
     const { issueId } = issueParamsSchema.parse(params);
+    const db = getGlobalDatabaseProvider().getClient();
 
     const issue = await db.issue.findFirst({
       where: {

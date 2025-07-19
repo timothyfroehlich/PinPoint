@@ -5,7 +5,6 @@ import { httpBatchStreamLink, loggerLink } from "@trpc/client";
 import { createTRPCReact } from "@trpc/react-query";
 import { type inferRouterInputs, type inferRouterOutputs } from "@trpc/server";
 import { useState } from "react";
-import SuperJSON from "superjson";
 
 import { createQueryClient } from "./query-client";
 
@@ -13,7 +12,7 @@ import { env } from "~/env.js";
 import { type AppRouter } from "~/server/api/root";
 
 let clientQueryClientSingleton: QueryClient | undefined = undefined;
-const getQueryClient = () => {
+const getQueryClient = (): QueryClient => {
   if (typeof window === "undefined") {
     // Server: always make a new query client
     return createQueryClient();
@@ -40,7 +39,9 @@ export type RouterInputs = inferRouterInputs<AppRouter>;
  */
 export type RouterOutputs = inferRouterOutputs<AppRouter>;
 
-export function TRPCReactProvider(props: { children: React.ReactNode }) {
+export function TRPCReactProvider(props: {
+  children: React.ReactNode;
+}): React.JSX.Element {
   const queryClient = getQueryClient();
 
   const [trpcClient] = useState(() =>
@@ -52,7 +53,7 @@ export function TRPCReactProvider(props: { children: React.ReactNode }) {
             (op.direction === "down" && op.result instanceof Error),
         }),
         httpBatchStreamLink({
-          transformer: SuperJSON,
+          transformer: superjson,
           url: getBaseUrl() + "/api/trpc",
           headers: () => {
             const headers = new Headers();
@@ -73,8 +74,8 @@ export function TRPCReactProvider(props: { children: React.ReactNode }) {
   );
 }
 
-function getBaseUrl() {
+function getBaseUrl(): string {
   if (typeof window !== "undefined") return window.location.origin;
   if (env.VERCEL_URL) return `https://${env.VERCEL_URL}`;
-  return `http://localhost:${env.PORT ?? 3000}`;
+  return `http://localhost:${String(env.PORT ?? 3000)}`;
 }
