@@ -7,7 +7,7 @@ import type {
   PinballMapMachine,
   PinballMapMachineDetailsResponse,
 } from "../../lib/pinballmap/types";
-import type { PrismaClient } from "@prisma/client";
+import type { ExtendedPrismaClient } from "~/server/db";
 
 export interface SyncResult {
   success: boolean;
@@ -18,7 +18,7 @@ export interface SyncResult {
 }
 
 export class PinballMapService {
-  constructor(private prisma: PrismaClient) {}
+  constructor(private prisma: ExtendedPrismaClient) {}
 
   /**
    * Enable PinballMap integration for an organization
@@ -390,7 +390,7 @@ export class PinballMapService {
 
 // Export legacy functions for backward compatibility during transition
 export async function syncLocationGames(
-  prisma: PrismaClient,
+  prisma: ExtendedPrismaClient,
   locationId: string,
 ): Promise<SyncResult> {
   const service = new PinballMapService(prisma);
@@ -398,7 +398,7 @@ export async function syncLocationGames(
 }
 
 export async function processFixtureData(
-  prisma: PrismaClient,
+  prisma: ExtendedPrismaClient,
   fixtureData: PinballMapMachineDetailsResponse,
   locationId: string,
   organizationId: string,

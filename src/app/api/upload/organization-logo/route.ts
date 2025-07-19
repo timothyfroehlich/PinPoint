@@ -5,12 +5,14 @@ import {
   getUploadAuthContext,
   requireUploadPermission,
 } from "~/server/auth/uploadAuth";
-import { db } from "~/server/db";
+import { getGlobalDatabaseProvider } from "~/server/db/provider";
 
 export async function POST(req: NextRequest) {
+  const dbProvider = getGlobalDatabaseProvider();
+  const db = dbProvider.getClient();
   try {
     // Get authenticated context with organization resolution
-    const ctx = await getUploadAuthContext(req);
+    const ctx = await getUploadAuthContext(req, db);
 
     // Require organization management permission
     await requireUploadPermission(ctx, "organization:manage");
@@ -90,5 +92,7 @@ export async function POST(req: NextRequest) {
       { error: "Internal server error" },
       { status: 500 },
     );
+  } finally {
+    await dbProvider.disconnect();
   }
 }

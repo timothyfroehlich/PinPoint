@@ -24,7 +24,7 @@ jobs:
       - name: Install dependencies
         run: npm install
       - name: Run lint and format checks
-        run: npm run check && npm run format:check
+        run: npm run validate
       - name: Validate GitHub workflows
         uses: raven-actions/actionlint@v2
       - name: Run dependency audit
