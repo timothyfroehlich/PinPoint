@@ -1,8 +1,8 @@
-import { type Machine } from "@prisma/client";
 import * as QRCode from "qrcode";
 
+import { type Machine, type ExtendedPrismaClient } from "./types";
+
 import { imageStorage } from "~/lib/image-storage/local-storage";
-import { type ExtendedPrismaClient } from "~/server/db";
 import { constructReportUrl } from "~/server/utils/qrCodeUtils";
 
 export interface QRCodeInfo {
@@ -73,7 +73,7 @@ export class QRCodeService {
     // Upload QR code image directly from buffer
     const qrCodeUrl = await imageStorage.uploadQRCode(
       qrCodeBuffer,
-      `qr-codes/machine-${machine.id}/qr-code-${machine.id}`,
+      `qr-codes/machine-${String(machine.id)}/qr-code-${String(machine.id)}`,
     );
 
     // Update machine with QR code information
@@ -144,7 +144,7 @@ export class QRCodeService {
         await imageStorage.deleteImage(machine.qrCodeUrl);
       } catch (error) {
         // Log error but don't fail regeneration
-        console.warn(`Failed to delete old QR code image: ${error}`);
+        console.warn(`Failed to delete old QR code image: ${String(error)}`);
       }
     }
 
@@ -220,7 +220,7 @@ export class QRCodeService {
         generated++;
       } catch (error) {
         console.error(
-          `Failed to generate QR code for machine ${machine.id}:`,
+          `Failed to generate QR code for machine ${String(machine.id)}:`,
           error,
         );
         failed++;
@@ -251,7 +251,7 @@ export class QRCodeService {
         generated++;
       } catch (error) {
         console.error(
-          `Failed to regenerate QR code for machine ${machine.id}:`,
+          `Failed to regenerate QR code for machine ${String(machine.id)}:`,
           error,
         );
         failed++;
