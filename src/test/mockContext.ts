@@ -1,11 +1,16 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { mockDeep, mockReset, type DeepMockProxy } from "jest-mock-extended";
 
 import type { ExtendedPrismaClient } from "~/server/db";
+import type { CollectionService } from "~/server/services/collectionService";
+import type { CommentCleanupService } from "~/server/services/commentCleanupService";
 import type { ServiceFactory } from "~/server/services/factory";
+import type { IssueActivityService } from "~/server/services/issueActivityService";
+import type { NotificationService } from "~/server/services/notificationService";
+import type { PinballMapService } from "~/server/services/pinballmapService";
+import type { QRCodeService } from "~/server/services/qrCodeService";
 
 // Mock individual services with all methods
-const mockNotificationService = {
+const mockNotificationService: jest.Mocked<NotificationService> = {
   createNotification: jest.fn().mockResolvedValue(undefined),
   getUserNotifications: jest.fn().mockResolvedValue([]),
   getUnreadCount: jest.fn().mockResolvedValue(0),
@@ -14,13 +19,13 @@ const mockNotificationService = {
   notifyMachineOwnerOfIssue: jest.fn().mockResolvedValue(undefined),
   notifyMachineOwnerOfStatusChange: jest.fn().mockResolvedValue(undefined),
   notifyUserOfAssignment: jest.fn().mockResolvedValue(undefined),
-};
+} as jest.Mocked<NotificationService>;
 
-const mockCollectionService = {
+const mockCollectionService: jest.Mocked<CollectionService> = {
   // Add collection service methods here when needed
-};
+} as jest.Mocked<CollectionService>;
 
-const mockIssueActivityService = {
+const mockIssueActivityService: jest.Mocked<IssueActivityService> = {
   recordActivity: jest.fn().mockResolvedValue(undefined),
   recordIssueCreated: jest.fn().mockResolvedValue(undefined),
   recordStatusChange: jest.fn().mockResolvedValue(undefined),
@@ -28,19 +33,19 @@ const mockIssueActivityService = {
   recordFieldUpdate: jest.fn().mockResolvedValue(undefined),
   recordCommentDeleted: jest.fn().mockResolvedValue(undefined),
   getIssueTimeline: jest.fn().mockResolvedValue([]),
-};
+} as jest.Mocked<IssueActivityService>;
 
-const mockPinballMapService = {
+const mockPinballMapService: jest.Mocked<PinballMapService> = {
   // Add pinball map service methods here when needed
-};
+} as jest.Mocked<PinballMapService>;
 
-const mockCommentCleanupService = {
+const mockCommentCleanupService: jest.Mocked<CommentCleanupService> = {
   // Add comment cleanup service methods here when needed
-};
+} as jest.Mocked<CommentCleanupService>;
 
-const mockQRCodeService = {
+const mockQRCodeService: jest.Mocked<QRCodeService> = {
   // Add QR code service methods here when needed
-};
+} as jest.Mocked<QRCodeService>;
 
 // Mock service factory
 const createMockServiceFactory = (): DeepMockProxy<ServiceFactory> => {
@@ -51,7 +56,7 @@ const createMockServiceFactory = (): DeepMockProxy<ServiceFactory> => {
     createIssueActivityService: jest.fn(() => mockIssueActivityService),
     createCommentCleanupService: jest.fn(() => mockCommentCleanupService),
     createQRCodeService: jest.fn(() => mockQRCodeService),
-  } as any;
+  } as DeepMockProxy<ServiceFactory>;
 };
 
 export interface MockContext {
@@ -78,36 +83,36 @@ export function createMockContext(): MockContext {
   const mockServices = createMockServiceFactory();
 
   // Mock the $accelerate property that comes from Prisma Accelerate extension
-  (mockDb as any).$accelerate = {
+  (mockDb as ExtendedPrismaClient & { $accelerate: unknown }).$accelerate = {
     invalidate: jest.fn(),
     ttl: jest.fn(),
   };
 
   // Set up default membership mock - can be overridden in individual tests
-  mockDb.membership.findFirst.mockResolvedValue(mockMembership as any);
-  mockDb.membership.findUnique.mockResolvedValue(mockMembership as any);
+  mockDb.membership.findFirst.mockResolvedValue(mockMembership);
+  mockDb.membership.findUnique.mockResolvedValue(mockMembership);
 
   // Set up default organization mock
-  mockDb.organization.findUnique.mockResolvedValue(mockOrganization as any);
+  mockDb.organization.findUnique.mockResolvedValue(mockOrganization);
 
   // Set up default location mock
-  mockDb.location.findUnique.mockResolvedValue(mockLocation as any);
+  mockDb.location.findUnique.mockResolvedValue(mockLocation);
 
   // Set up default issue mock
-  mockDb.issue.findMany.mockResolvedValue([mockIssue] as any);
-  mockDb.issue.findUnique.mockResolvedValue(mockIssue as any);
-  mockDb.issue.create.mockResolvedValue(mockIssue as any);
-  mockDb.issue.update.mockResolvedValue(mockIssue as any);
+  mockDb.issue.findMany.mockResolvedValue([mockIssue]);
+  mockDb.issue.findUnique.mockResolvedValue(mockIssue);
+  mockDb.issue.create.mockResolvedValue(mockIssue);
+  mockDb.issue.update.mockResolvedValue(mockIssue);
 
   // Set up default machine mock
-  mockDb.machine.findMany.mockResolvedValue([mockMachine] as any);
-  mockDb.machine.findUnique.mockResolvedValue(mockMachine as any);
-  mockDb.machine.create.mockResolvedValue(mockMachine as any);
+  mockDb.machine.findMany.mockResolvedValue([mockMachine]);
+  mockDb.machine.findUnique.mockResolvedValue(mockMachine);
+  mockDb.machine.create.mockResolvedValue(mockMachine);
 
   // Set up default model mock
-  mockDb.model.findMany.mockResolvedValue([mockModel] as any);
-  mockDb.model.findUnique.mockResolvedValue(mockModel as any);
-  mockDb.model.create.mockResolvedValue(mockModel as any);
+  mockDb.model.findMany.mockResolvedValue([mockModel]);
+  mockDb.model.findUnique.mockResolvedValue(mockModel);
+  mockDb.model.create.mockResolvedValue(mockModel);
 
   // Set up default notification mock
   mockDb.notification.findMany.mockResolvedValue([]);
@@ -119,7 +124,7 @@ export function createMockContext(): MockContext {
     read: false,
     createdAt: new Date(),
     updatedAt: new Date(),
-  } as any);
+  });
 
   return {
     db: mockDb,
@@ -130,16 +135,16 @@ export function createMockContext(): MockContext {
   };
 }
 
-export function resetMockContext(ctx: MockContext) {
+export function resetMockContext(ctx: MockContext): void {
   mockReset(ctx.db);
   // Reset all service mocks
   Object.values(mockNotificationService).forEach((method) => {
-    if (typeof method === "function" && method.mockReset) {
+    if (jest.isMockFunction(method)) {
       method.mockReset();
     }
   });
   Object.values(mockIssueActivityService).forEach((method) => {
-    if (typeof method === "function" && method.mockReset) {
+    if (jest.isMockFunction(method)) {
       method.mockReset();
     }
   });
