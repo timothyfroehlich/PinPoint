@@ -1,11 +1,14 @@
 {
   "hooks": {
-    "postToolUse": [
+    "PostToolUse": [
       {
-        "match": {
-          "toolName": "Write|Edit|MultiEdit"
-        },
-        "command": "node .claude/validate-write.js \"$FILE_PATH\""
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/validate-write.js \"$FILE_PATH\""
+          }
+        ]
       }
     ]
   }
