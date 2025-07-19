@@ -10,7 +10,13 @@ export const pinballMapRouter = createTRPCRouter({
   // Enable PinballMap integration for organization
   enableIntegration: organizationManageProcedure.mutation(async ({ ctx }) => {
     const service = ctx.services.createPinballMapService();
-    await service.enableIntegration(ctx.organization.id);
+    if (!ctx.organization?.id) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Organization not found",
+      });
+    }
+    await service.enableIntegration(ctx.organization.id as string);
     return { success: true };
   }),
 
@@ -24,10 +30,16 @@ export const pinballMapRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const service = ctx.services.createPinballMapService();
+      if (!ctx.organization?.id) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Organization not found",
+        });
+      }
       await service.configureLocationSync(
         input.locationId,
         input.pinballMapId,
-        ctx.organization.id,
+        ctx.organization.id as string,
       );
       return { success: true };
     }),
@@ -42,7 +54,7 @@ export const pinballMapRouter = createTRPCRouter({
       if (!result.success) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: result.error || "Sync failed",
+          message: result.error ?? "Sync failed",
         });
       }
 
@@ -52,6 +64,12 @@ export const pinballMapRouter = createTRPCRouter({
   // Get sync status for organization
   getSyncStatus: organizationManageProcedure.query(async ({ ctx }) => {
     const service = ctx.services.createPinballMapService();
-    return service.getOrganizationSyncStatus(ctx.organization.id);
+    if (!ctx.organization?.id) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Organization not found",
+      });
+    }
+    return service.getOrganizationSyncStatus(ctx.organization.id as string);
   }),
 });
