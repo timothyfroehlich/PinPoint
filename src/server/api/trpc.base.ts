@@ -168,7 +168,7 @@ export const createTRPCRouter = t.router;
 /**
  * Timing middleware
  */
-const timingMiddleware = t.middleware(async ({ next, path }): Promise<unknown> => {
+const timingMiddleware = t.middleware(async ({ next, path }) => {
   const start = Date.now();
 
   if (t._config.isDev) {
