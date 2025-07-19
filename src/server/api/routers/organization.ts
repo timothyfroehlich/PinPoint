@@ -16,7 +16,7 @@ export const organizationRouter = createTRPCRouter({
     .input(
       z.object({
         name: z.string().min(1),
-        logoUrl: z.string().url().optional(),
+        logoUrl: z.url().nullish(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
