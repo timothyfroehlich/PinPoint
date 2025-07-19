@@ -71,7 +71,7 @@ export const issueCoreRouter = createTRPCRouter({
       }
 
       // Determine reporter: use session user if available, otherwise use email or null
-      const createdById = ctx.session?.user?.id;
+      const createdById = ctx.session.user.id;
 
       if (!createdById) {
         throw new Error("User not found");
