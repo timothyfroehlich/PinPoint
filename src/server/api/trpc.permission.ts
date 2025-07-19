@@ -12,7 +12,7 @@ import type { OrganizationTRPCContext } from "./trpc.base";
  */
 export function requirePermission(permission: string): typeof organizationProcedure {
   return organizationProcedure.use(async ({ ctx, next }) => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+     
     if (!ctx.userPermissions.includes(permission)) {
       throw new TRPCError({
         code: "FORBIDDEN",

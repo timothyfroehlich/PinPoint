@@ -71,7 +71,7 @@ export interface MockContext {
     };
     expires: string;
   } | null;
-  organization?: {
+  organization: {
     id: string;
     name: string;
   } | null;
@@ -121,16 +121,18 @@ export function createMockContext(): MockContext {
     userId: "user-1",
     type: "ISSUE_CREATED",
     message: "Test notification",
+    entityType: null,
+    entityId: null,
+    actionUrl: null,
     read: false,
     createdAt: new Date(),
-    updatedAt: new Date(),
   });
 
   return {
     db: mockDb,
     services: mockServices,
     session: null,
-    organization: undefined,
+    organization: null,
     headers: new Headers(),
   };
 }
@@ -237,8 +239,14 @@ export const mockModel = {
   name: "Test Game",
   manufacturer: "Test Manufacturer",
   year: 2023,
-  type: "SS" as const,
+  ipdbId: null,
   opdbId: null,
+  machineType: "SS" as const,
+  machineDisplay: "Test Display",
+  notes: null,
+  imageUrl: null,
+  isActive: true,
+  isCustom: false,
   organizationId: "org-1",
   createdAt: new Date(),
   updatedAt: new Date(),

@@ -53,7 +53,7 @@ export const collectionRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const service = ctx.services.createCollectionService();
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+       
       return service.createManualCollection(ctx.organization.id, {
         name: input.name,
         typeId: input.typeId,

@@ -13,10 +13,7 @@ export const issueStatusRouter = createTRPCRouter({
       _count: {
         _all: true,
       },
-    })) as {
-      statusId: string;
-      _count: { _all: number };
-    }[];
+    }));
 
     const statuses = await ctx.db.issueStatus.findMany({
       where: {

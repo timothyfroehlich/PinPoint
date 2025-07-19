@@ -23,13 +23,13 @@ interface ProcessedIssue {
   title: string;
   description: string;
   severity: string;
-  consistency?: string;
+  consistency?: string | undefined;
   status: string;
   gameTitle: string;
   reporterEmail: string;
-  assignedTo?: string;
-  owner?: string;
-  workLog?: string;
+  assignedTo?: string | undefined;
+  owner?: string | undefined;
+  workLog?: string | undefined;
   createdAt: string;
   updatedAt: string;
 }
@@ -220,21 +220,38 @@ function processIssueRow(row: CSVIssue): ProcessedIssue | null {
     return null;
   }
 
-  return {
+  const result: ProcessedIssue = {
     title: generateTitle(gameTitle, row.Description),
     description: row.Description,
     severity: severityMappings[row.Severity] ?? "Medium",
-    consistency: row.Consistency || undefined,
     status: statusMappings[row["Fix Status"]] ?? "New",
     gameTitle: gameTitle,
     reporterEmail:
       userMappings[row["Email Address"]] ?? "anonymous@example.com",
-    assignedTo: mapUser(row["Assigned Technician"]),
-    owner: mapUser(row.Owner),
-    workLog: row["Work Log"] || undefined,
     createdAt: parseDate(row["Report Timestamp"]),
     updatedAt: parseDate(row["Last Updated"]),
   };
+
+  // Add optional properties only if they have values
+  if (row.Consistency) {
+    result.consistency = row.Consistency;
+  }
+  
+  const assignedTo = mapUser(row["Assigned Technician"]);
+  if (assignedTo) {
+    result.assignedTo = assignedTo;
+  }
+  
+  const owner = mapUser(row.Owner);
+  if (owner) {
+    result.owner = owner;
+  }
+  
+  if (row["Work Log"]) {
+    result.workLog = row["Work Log"];
+  }
+
+  return result;
 }
 
 function generateTitle(game: string, description: string): string {

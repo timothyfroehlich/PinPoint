@@ -16,7 +16,7 @@ export const pinballMapRouter = createTRPCRouter({
         message: "Organization not found",
       });
     }
-    await service.enableIntegration(ctx.organization.id as string);
+    await service.enableIntegration(ctx.organization.id);
     return { success: true };
   }),
 
@@ -39,7 +39,7 @@ export const pinballMapRouter = createTRPCRouter({
       await service.configureLocationSync(
         input.locationId,
         input.pinballMapId,
-        ctx.organization.id as string,
+        ctx.organization.id,
       );
       return { success: true };
     }),
@@ -70,6 +70,6 @@ export const pinballMapRouter = createTRPCRouter({
         message: "Organization not found",
       });
     }
-    return service.getOrganizationSyncStatus(ctx.organization.id as string);
+    return service.getOrganizationSyncStatus(ctx.organization.id);
   }),
 });

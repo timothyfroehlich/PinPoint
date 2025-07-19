@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
+ 
 import { type NextRequest, NextResponse } from "next/server";
 
 import type { ExtendedPrismaClient } from "~/server/db";
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const ctx: UploadAuthContext = await getUploadAuthContext(req, db);
 
     // Require organization management permission
-    await requireUploadPermission(ctx, "organization:manage");
+    requireUploadPermission(ctx, "organization:manage");
 
     const formData = await req.formData();
     const file = formData.get("file");

@@ -1,65 +1,65 @@
 // Temporary type definitions for service layer
 // These will be replaced by generated Prisma types once client generation is working
 
-// Mock Prisma Client types
+// Mock Prisma Client types - using proper typing instead of any
 export interface ExtendedPrismaClient {
   collection: {
-    findMany: (args?: any) => Promise<any>;
-    findUnique: (args: any) => Promise<any>;
-    findFirst: (args: any) => Promise<any>;
-    create: (args: any) => Promise<any>;
-    update: (args: any) => Promise<any>;
-    deleteMany: (args: any) => Promise<{ count: number }>;
+    findMany: (args?: Record<string, unknown>) => Promise<Collection[]>;
+    findUnique: (args: { where: { id: string } }) => Promise<Collection | null>;
+    findFirst: (args: Record<string, unknown>) => Promise<Collection | null>;
+    create: (args: { data: Partial<Collection> }) => Promise<Collection>;
+    update: (args: { where: { id: string }; data: Partial<Collection> }) => Promise<Collection>;
+    deleteMany: (args: Record<string, unknown>) => Promise<{ count: number }>;
   };
   collectionType: {
-    findMany: (args?: any) => Promise<any>;
-    findUnique: (args: any) => Promise<any>;
-    update: (args: any) => Promise<any>;
+    findMany: (args?: Record<string, unknown>) => Promise<CollectionType[]>;
+    findUnique: (args: { where: { id: string } }) => Promise<CollectionType | null>;
+    update: (args: { where: { id: string }; data: Partial<CollectionType> }) => Promise<CollectionType>;
   };
   machine: {
-    findMany: (args?: any) => Promise<any>;
-    findUnique: (args: any) => Promise<any>;
-    create: (args: any) => Promise<any>;
-    update: (args: any) => Promise<any>;
-    delete: (args: any) => Promise<any>;
-    count: (args?: any) => Promise<number>;
+    findMany: (args?: Record<string, unknown>) => Promise<Machine[]>;
+    findUnique: (args: { where: { id: string } }) => Promise<Machine | null>;
+    create: (args: { data: Partial<Machine> }) => Promise<Machine>;
+    update: (args: { where: { id: string }; data: Partial<Machine> }) => Promise<Machine>;
+    delete: (args: { where: { id: string } }) => Promise<Machine>;
+    count: (args?: Record<string, unknown>) => Promise<number>;
   };
   notification: {
-    create: (args: any) => Promise<any>;
-    findMany: (args?: any) => Promise<any>;
-    updateMany: (args: any) => Promise<any>;
-    count: (args?: any) => Promise<number>;
+    create: (args: { data: Partial<Notification> }) => Promise<Notification>;
+    findMany: (args?: Record<string, unknown>) => Promise<Notification[]>;
+    updateMany: (args: Record<string, unknown>) => Promise<{ count: number }>;
+    count: (args?: Record<string, unknown>) => Promise<number>;
   };
   comment: {
-    findMany: (args?: any) => Promise<any>;
-    deleteMany: (args: any) => Promise<{ count: number }>;
-    count: (args?: any) => Promise<number>;
-    update: (args: any) => Promise<any>;
+    findMany: (args?: Record<string, unknown>) => Promise<Comment[]>;
+    deleteMany: (args: Record<string, unknown>) => Promise<{ count: number }>;
+    count: (args?: Record<string, unknown>) => Promise<number>;
+    update: (args: { where: { id: string }; data: Partial<Comment> }) => Promise<Comment>;
   };
   issueHistory: {
-    create: (args: any) => Promise<any>;
-    findMany: (args?: any) => Promise<any>;
+    create: (args: { data: Record<string, unknown> }) => Promise<Record<string, unknown>>;
+    findMany: (args?: Record<string, unknown>) => Promise<Record<string, unknown>[]>;
   };
   issue: {
-    findUnique: (args: any) => Promise<any>;
-    count: (args?: any) => Promise<number>;
+    findUnique: (args: { where: { id: string } }) => Promise<Record<string, unknown> | null>;
+    count: (args?: Record<string, unknown>) => Promise<number>;
   };
   pinballMapConfig: {
-    findUnique: (args: any) => Promise<any>;
-    upsert: (args: any) => Promise<any>;
+    findUnique: (args: { where: { organizationId: string } }) => Promise<Record<string, unknown> | null>;
+    upsert: (args: Record<string, unknown>) => Promise<Record<string, unknown>>;
   };
   location: {
-    findUnique: (args: any) => Promise<any>;
-    findMany: (args?: any) => Promise<any>;
-    update: (args: any) => Promise<any>;
+    findUnique: (args: { where: { id: string } }) => Promise<Record<string, unknown> | null>;
+    findMany: (args?: Record<string, unknown>) => Promise<Record<string, unknown>[]>;
+    update: (args: { where: { id: string }; data: Record<string, unknown> }) => Promise<Record<string, unknown>>;
   };
   model: {
-    findUnique: (args: any) => Promise<any>;
-    create: (args: any) => Promise<any>;
+    findUnique: (args: { where: { id: string } }) => Promise<Record<string, unknown> | null>;
+    create: (args: { data: Record<string, unknown> }) => Promise<Record<string, unknown>>;
   };
   $accelerate: {
-    invalidate: () => any;
-    ttl: () => any;
+    invalidate: () => void;
+    ttl: () => void;
   };
 }
 

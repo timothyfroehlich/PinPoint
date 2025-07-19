@@ -23,8 +23,8 @@ export interface OPDBMachine {
 
 export interface OPDBParsedId {
   groupId: string;
-  machineId?: string;
-  aliasId?: string;
+  machineId?: string | undefined;
+  aliasId?: string | undefined;
 }
 
 export interface OPDBAPIResponse<T> {

@@ -12,13 +12,13 @@ import fs from "fs";
 import { createConnection } from "net";
 
 interface PortConfiguration {
-  nextPort?: number;
-  prismaStudioPort?: number;
-  databasePort?: number;
+  nextPort?: number | undefined;
+  prismaStudioPort?: number | undefined;
+  databasePort?: number | undefined;
   databaseName: string;
   isWorktree: boolean;
-  workspaceName?: string;
-  portOffset?: number;
+  workspaceName?: string | undefined;
+  portOffset?: number | undefined;
 }
 
 interface EnvironmentVariables {
@@ -240,9 +240,9 @@ function generateEnvVars(
     envVars.PRISMA_STUDIO_PORT = ports.prismaStudioPort.toString();
 
     // Use environment variables for database credentials, with development defaults
-    const dbUser = process.env.DB_USER || "postgres";
-    const dbPassword = process.env.DB_PASSWORD || "password"; // Default to 'password' for consistency
-    const dbHost = process.env.DB_HOST || "localhost";
+    const dbUser = process.env["DB_USER"] || "postgres";
+    const dbPassword = process.env["DB_PASSWORD"] || "password"; // Default to 'password' for consistency
+    const dbHost = process.env["DB_HOST"] || "localhost";
 
     envVars.DATABASE_URL = `postgresql://${dbUser}:${dbPassword}@${dbHost}:${ports.databasePort}/${ports.databaseName}`;
   }
@@ -271,9 +271,9 @@ async function generateEnvVarsWithAvailability(
     envVars.PRISMA_STUDIO_PORT = ports.prismaStudioPort.toString();
 
     // Use environment variables for database credentials, with development defaults
-    const dbUser = process.env.DB_USER || "postgres";
-    const dbPassword = process.env.DB_PASSWORD || "password"; // Default to 'password' for consistency
-    const dbHost = process.env.DB_HOST || "localhost";
+    const dbUser = process.env["DB_USER"] || "postgres";
+    const dbPassword = process.env["DB_PASSWORD"] || "password"; // Default to 'password' for consistency
+    const dbHost = process.env["DB_HOST"] || "localhost";
 
     envVars.DATABASE_URL = `postgresql://${dbUser}:${dbPassword}@${dbHost}:${ports.databasePort}/${ports.databaseName}`;
   }

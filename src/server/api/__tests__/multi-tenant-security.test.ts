@@ -26,18 +26,11 @@ const mockIssueCreate = jest.fn();
 // Create caller factory
 const createCaller = createCallerFactory(appRouter);
 
-// Temporary enum for testing with the new schema
-enum _Role {
-  ADMIN = "admin",
-  MEMBER = "member",
-  TECHNICIAN = "technician",
-}
-
 describe("Multi-Tenant Security Tests", () => {
-  let _mockContext: MockContext;
+  let mockContext: MockContext;
 
   beforeEach(() => {
-    _mockContext = createMockContext();
+    mockContext = createMockContext();
   });
 
   // Test data for Organization A
@@ -226,12 +219,13 @@ describe("Multi-Tenant Security Tests", () => {
       expect(result).toEqual(issuesOrgA);
 
       // Verify that the query included organization filter
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(ctx.db.issue.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
             organizationId: "org-a",
           }),
-        }) as unknown,
+        }),
       );
     });
 
@@ -371,12 +365,13 @@ describe("Multi-Tenant Security Tests", () => {
       expect(resultB).toEqual(issuesOrgB);
 
       // Verify Organization B query had correct filter
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(ctxB.db.issue.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
             organizationId: "org-b",
           }),
-        }) as unknown,
+        }),
       );
     });
   });
@@ -562,6 +557,7 @@ describe("Multi-Tenant Security Tests", () => {
       await callerA.issue.core.create(createData);
 
       // Verify that organizationId was automatically added
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(ctx.db.issue.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -570,7 +566,7 @@ describe("Multi-Tenant Security Tests", () => {
             machineId: createData.machineId,
             organizationId: "org-a", // This is the key security check
           }),
-        }) as unknown,
+        }),
       );
     });
 
@@ -718,12 +714,13 @@ describe("Multi-Tenant Security Tests", () => {
       expect(result.length).toBeGreaterThan(0);
 
       // Verify admin can only access their organization's data
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(ctxAdmin.db.issue.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
             organizationId: "org-a",
           }),
-        }) as unknown,
+        }),
       );
     });
   });

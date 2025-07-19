@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { getGlobalDatabaseProvider } from "~/server/db/provider";
 import { getVersion } from "~/utils/version";
 
-export async function GET() {
+export async function GET(): Promise<NextResponse> {
   const dbProvider = getGlobalDatabaseProvider();
   const db = dbProvider.getClient();
   try {
