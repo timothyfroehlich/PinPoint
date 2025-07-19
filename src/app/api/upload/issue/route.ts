@@ -15,14 +15,14 @@ export async function POST(req: NextRequest) {
     const ctx = await getUploadAuthContext(req, db);
 
     const formData = await req.formData();
-    const file = formData.get("file") as File;
-    const issueId = formData.get("issueId") as string;
+    const file = formData.get("file");
+    const issueId = formData.get("issueId");
 
-    if (!file) {
+    if (!file || !(file instanceof File)) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
-    if (!issueId) {
+    if (!issueId || typeof issueId !== "string") {
       return NextResponse.json({ error: "Issue ID required" }, { status: 400 });
     }
 

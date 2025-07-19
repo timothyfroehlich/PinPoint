@@ -70,7 +70,7 @@ function createMockRequest(
     headers: {
       get: (name: string) => headersMap.get(name) ?? null,
     },
-    formData: async (): Promise<FormData> => init?.body ?? new FormData(),
+    formData: (): Promise<FormData> => Promise.resolve(init?.body ?? new FormData()),
   } as unknown as NextRequest;
 }
 

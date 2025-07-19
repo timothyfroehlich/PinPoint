@@ -18,9 +18,9 @@ export async function POST(req: NextRequest) {
     await requireUploadPermission(ctx, "organization:manage");
 
     const formData = await req.formData();
-    const file = formData.get("file") as File;
+    const file = formData.get("file");
 
-    if (!file) {
+    if (!file || !(file instanceof File)) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 

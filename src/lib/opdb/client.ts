@@ -71,7 +71,9 @@ export class OPDBClient {
           Authorization: `Bearer ${this.apiToken}`,
           "Content-Type": "application/json",
           Accept: "application/json",
-          ...(options.headers ?? {}),
+          ...(options.headers instanceof Headers 
+            ? Object.fromEntries(options.headers.entries())
+            : options.headers ?? {}),
         },
       });
 

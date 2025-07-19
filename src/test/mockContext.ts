@@ -83,7 +83,8 @@ export function createMockContext(): MockContext {
   const mockServices = createMockServiceFactory();
 
   // Mock the $accelerate property that comes from Prisma Accelerate extension
-  (mockDb as ExtendedPrismaClient & { $accelerate: unknown }).$accelerate = {
+  const extendedMockDb = mockDb;
+  extendedMockDb.$accelerate = {
     invalidate: jest.fn(),
     ttl: jest.fn(),
   };

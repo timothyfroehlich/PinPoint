@@ -69,7 +69,7 @@ export class NotificationService {
     await this.createNotification({
       userId: machine.owner.id,
       type: NotificationType.ISSUE_CREATED,
-      message: `New issue reported on your ${machine.model.name}: "${issue.title}"`,
+      message: `New issue reported on your ${String(machine.model.name)}: "${String(issue.title)}"`,
       entityType: NotificationEntity.ISSUE,
       entityId: issueId,
       actionUrl: `/issues/${issueId}`,
@@ -107,7 +107,7 @@ export class NotificationService {
     await this.createNotification({
       userId: issue.machine.owner.id,
       type: NotificationType.ISSUE_UPDATED,
-      message: `Issue status changed on your ${issue.machine.model.name}: ${oldStatus} → ${newStatus}`,
+      message: `Issue status changed on your ${String(issue.machine.model.name)}: ${String(oldStatus)} → ${String(newStatus)}`,
       entityType: NotificationEntity.ISSUE,
       entityId: issueId,
       actionUrl: `/issues/${issueId}`,
@@ -137,7 +137,7 @@ export class NotificationService {
     await this.createNotification({
       userId: assignedUserId,
       type: NotificationType.ISSUE_ASSIGNED,
-      message: `You were assigned to issue: "${issue.title}" on ${issue.machine.model.name}`,
+      message: `You were assigned to issue: "${String(issue.title)}" on ${String(issue.machine.model.name)}`,
       entityType: NotificationEntity.ISSUE,
       entityId: issueId,
       actionUrl: `/issues/${issueId}`,
@@ -147,7 +147,7 @@ export class NotificationService {
   /**
    * Get user's notifications
    */
-  async getUserNotifications(
+  getUserNotifications(
     userId: string,
     options: {
       unreadOnly?: boolean;
@@ -163,8 +163,8 @@ export class NotificationService {
       orderBy: {
         createdAt: "desc",
       },
-      take: options.limit || 50,
-      skip: options.offset || 0,
+      take: options.limit ?? 50,
+      skip: options.offset ?? 0,
     });
   }
 
@@ -201,7 +201,7 @@ export class NotificationService {
   /**
    * Get unread notification count
    */
-  async getUnreadCount(userId: string): Promise<number> {
+  getUnreadCount(userId: string): Promise<number> {
     return this.prisma.notification.count({
       where: {
         userId,

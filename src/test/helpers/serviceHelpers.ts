@@ -1,13 +1,10 @@
 import type { DeepMockProxy } from "jest-mock-extended";
 import type { ServiceFactory } from "~/server/services/factory";
 
-export function mockServiceMethod<
-  T extends keyof ServiceFactory,
-  M extends keyof ReturnType<ServiceFactory[T]>,
->(
+export function mockServiceMethod<T extends keyof ServiceFactory>(
   services: DeepMockProxy<ServiceFactory>,
   serviceName: T,
-  methodName: M,
+  methodName: keyof ReturnType<ServiceFactory[T]>,
   implementation?: (...args: unknown[]) => unknown,
 ): jest.MockedFunction<unknown> {
   const service = services[serviceName]() as Record<string, unknown>;
