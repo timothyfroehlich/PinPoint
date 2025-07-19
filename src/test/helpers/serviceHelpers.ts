@@ -8,12 +8,10 @@ export function mockServiceMethod<
   services: DeepMockProxy<ServiceFactory>,
   serviceName: T,
   methodName: M,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  implementation?: (...args: any[]) => unknown,
-) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const service = services[serviceName]() as any;
-  const method = service[methodName] as jest.Mock;
+  implementation?: (...args: unknown[]) => unknown,
+): jest.MockedFunction<unknown> {
+  const service = services[serviceName]() as Record<string, unknown>;
+  const method = service[methodName] as jest.MockedFunction<unknown>;
   if (implementation) {
     method.mockImplementation(implementation);
   }
@@ -21,14 +19,13 @@ export function mockServiceMethod<
 }
 
 // Helper to reset all service mocks
-export function resetAllServiceMocks(services: DeepMockProxy<ServiceFactory>) {
+export function resetAllServiceMocks(services: DeepMockProxy<ServiceFactory>): void {
   for (const key in services) {
     if (typeof services[key as keyof ServiceFactory] === "function") {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const service = (services[key as keyof ServiceFactory] as any)();
+      const service = (services[key as keyof ServiceFactory] as () => Record<string, unknown>)();
       for (const method in service) {
-        if (typeof service[method] === "function") {
-          (service[method] as jest.Mock).mockClear();
+        if (jest.isMockFunction(service[method])) {
+          (service[method] as jest.MockedFunction<unknown>).mockClear();
         }
       }
     }
