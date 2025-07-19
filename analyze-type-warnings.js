@@ -65,11 +65,11 @@ async function analyzeTypeWarnings() {
   for (const [subsystem, files] of Object.entries(typeWarnings)) {
     const total = files.reduce((sum, f) => sum + f.count, 0);
     console.log(`${subsystem}: ${total} warnings in ${files.length} files`);
-    files.slice(0, 3).forEach((f) => {
+    files.slice(0, MAX_DISPLAYED_FILES).forEach((f) => {
       console.log(`  - ${f.file} (${f.count} warnings)`);
     });
-    if (files.length > 3) {
-      console.log(`  ... and ${files.length - 3} more files`);
+    if (files.length > MAX_DISPLAYED_FILES) {
+      console.log(`  ... and ${files.length - MAX_DISPLAYED_FILES} more files`);
     }
     console.log();
   }
