@@ -32,14 +32,14 @@ export class PinballMapClient {
    * Fetch location details including basic information
    */
   async fetchLocationDetails(locationId: number): Promise<PinballMapLocation> {
-    const url = `${this.baseUrl}/locations/${locationId}.json`;
+    const url = `${this.baseUrl}/locations/${locationId.toString()}.json`;
 
     try {
       const response = await fetch(url);
 
       if (!response.ok) {
         throw new PinballMapError(
-          `Failed to fetch location ${locationId}: ${response.status} ${response.statusText}`,
+          `Failed to fetch location ${locationId.toString()}: ${response.status.toString()} ${response.statusText}`,
           response.status,
         );
       }
@@ -51,7 +51,7 @@ export class PinballMapClient {
         throw error;
       }
       throw new PinballMapError(
-        `Network error fetching location ${locationId}: ${error instanceof Error ? error.message : "Unknown error"}`,
+        `Network error fetching location ${locationId.toString()}: ${error instanceof Error ? error.message : "Unknown error"}`,
       );
     }
   }
@@ -63,14 +63,14 @@ export class PinballMapClient {
   async fetchLocationMachineDetails(
     locationId: number,
   ): Promise<PinballMapMachineDetailsResponse> {
-    const url = `${this.baseUrl}/locations/${locationId}/machine_details.json`;
+    const url = `${this.baseUrl}/locations/${locationId.toString()}/machine_details.json`;
 
     try {
       const response = await fetch(url);
 
       if (!response.ok) {
         throw new PinballMapError(
-          `Failed to fetch machine details for location ${locationId}: ${response.status} ${response.statusText}`,
+          `Failed to fetch machine details for location ${locationId.toString()}: ${response.status.toString()} ${response.statusText}`,
           response.status,
         );
       }
@@ -82,7 +82,7 @@ export class PinballMapClient {
         throw error;
       }
       throw new PinballMapError(
-        `Network error fetching machine details for location ${locationId}: ${error instanceof Error ? error.message : "Unknown error"}`,
+        `Network error fetching machine details for location ${locationId.toString()}: ${error instanceof Error ? error.message : "Unknown error"}`,
       );
     }
   }
@@ -92,8 +92,8 @@ export class PinballMapClient {
 export const pinballMapClient = new PinballMapClient();
 
 // Convenience functions using the default client
-export const fetchLocationDetails = (locationId: number) =>
+export const fetchLocationDetails = (locationId: number): Promise<PinballMapLocation> =>
   pinballMapClient.fetchLocationDetails(locationId);
 
-export const fetchLocationMachineDetails = (locationId: number) =>
+export const fetchLocationMachineDetails = (locationId: number): Promise<PinballMapMachineDetailsResponse> =>
   pinballMapClient.fetchLocationMachineDetails(locationId);
