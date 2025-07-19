@@ -9,7 +9,7 @@ interface AuthenticatedLayoutProps {
   children: React.ReactNode;
 }
 
-export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps): JSX.Element {
+export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps): React.JSX.Element {
   const pathname = usePathname();
 
   // Don't show navigation on login page

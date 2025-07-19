@@ -1,11 +1,14 @@
 import { TRPCError } from "@trpc/server";
 import { type NextRequest } from "next/server";
 
+import { isValidOrganization, isValidMembership } from "./types";
+
 import type { Session } from "next-auth";
 import type { ExtendedPrismaClient } from "~/server/db";
 
 import { env } from "~/env";
 import { auth } from "~/server/auth";
+
 
 export interface UploadAuthContext {
   session: Session;
@@ -45,11 +48,11 @@ export async function getUploadAuthContext(
   let subdomain = req.headers.get("x-subdomain");
   subdomain ??= env.DEFAULT_ORG_SUBDOMAIN;
 
-  const organization = await db.organization.findUnique({
+  const organizationResult = await db.organization.findUnique({
     where: { subdomain },
   });
 
-  if (!organization) {
+  if (!isValidOrganization(organizationResult)) {
     throw new TRPCError({
       code: "NOT_FOUND",
       message: `Organization with subdomain "${subdomain}" not found`,
@@ -57,9 +60,9 @@ export async function getUploadAuthContext(
   }
 
   // 3. Get user's membership and permissions
-  const membership = await db.membership.findFirst({
+  const membershipResult = await db.membership.findFirst({
     where: {
-      organizationId: organization.id,
+      organizationId: organizationResult.id,
       userId: session.user.id,
     },
     include: {
@@ -71,7 +74,7 @@ export async function getUploadAuthContext(
     },
   });
 
-  if (!membership) {
+  if (!isValidMembership(membershipResult)) {
     throw new TRPCError({
       code: "FORBIDDEN",
       message: "User is not a member of this organization",
@@ -80,9 +83,9 @@ export async function getUploadAuthContext(
 
   return {
     session,
-    organization,
-    membership,
-    userPermissions: membership.role.permissions.map((p) => p.name),
+    organization: organizationResult,
+    membership: membershipResult,
+    userPermissions: membershipResult.role.permissions.map((p) => p.name),
   };
 }
 

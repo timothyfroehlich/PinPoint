@@ -3,13 +3,15 @@ import { type DefaultSession, type NextAuthConfig } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
 
-import type { JWT } from "next-auth/jwt";
+import { isValidUser, isValidOrganization, isValidMembership } from "./types";
+
 import type { Session } from "next-auth";
 import type { User } from "next-auth";
-
+import type { JWT } from "next-auth/jwt";
 import type { ExtendedPrismaClient } from "~/server/db";
 
 import { env } from "~/env.js";
+
 
 /**
  * Module augmentation for `next-auth` types. Allows us to add custom properties to the `session`
@@ -59,23 +61,26 @@ export const createAuthConfig = (db: ExtendedPrismaClient): NextAuthConfig => ({
               }
 
               if (
-                !credentials?.email ||
-                typeof credentials.email !== "string"
+                !credentials ||
+                !("email" in credentials) ||
+                typeof credentials["email"] !== "string"
               ) {
                 return null;
               }
 
+              const email = credentials["email"];
+
               // Find user in database by email
-              const user = await db.user.findUnique({
-                where: { email: credentials.email },
+              const userResult = await db.user.findUnique({
+                where: { email },
               });
 
-              if (user) {
+              if (isValidUser(userResult)) {
                 return {
-                  id: user.id,
-                  name: user.name ?? "",
-                  email: user.email ?? "",
-                  image: user.profilePicture ?? null,
+                  id: userResult.id,
+                  name: userResult.name ?? "",
+                  email: userResult.email ?? "",
+                  image: userResult.profilePicture ?? null,
                 };
               }
 
@@ -93,23 +98,24 @@ export const createAuthConfig = (db: ExtendedPrismaClient): NextAuthConfig => ({
   },
   callbacks: {
     jwt: async ({ token, user }: { token: JWT; user?: User }): Promise<JWT> => {
-      if (user?.id) {
-        token.id = user.id;
+      if (user && "id" in user && typeof user.id === "string") {
+        const userId = user.id;
+        token.id = userId;
 
         // Get the user's membership in the current organization
         // Note: In JWT callback, we don't have access to request headers/subdomain,
         // so we default to APC. The organization context will be properly resolved
         // in tRPC context based on subdomain.
-        const organization = await db.organization.findUnique({
+        const organizationResult = await db.organization.findUnique({
           where: { subdomain: "apc" },
         });
 
-        if (organization) {
-          const membership = await db.membership.findUnique({
+        if (isValidOrganization(organizationResult)) {
+          const membershipResult = await db.membership.findUnique({
             where: {
               userId_organizationId: {
-                userId: user.id,
-                organizationId: organization.id,
+                userId,
+                organizationId: organizationResult.id,
               },
             },
             include: {
@@ -117,9 +123,9 @@ export const createAuthConfig = (db: ExtendedPrismaClient): NextAuthConfig => ({
             },
           });
 
-          if (membership) {
-            token.role = membership.role.name;
-            token.organizationId = organization.id;
+          if (isValidMembership(membershipResult)) {
+            token.role = membershipResult.role.name;
+            token.organizationId = organizationResult.id;
           }
         }
       }
@@ -131,9 +137,9 @@ export const createAuthConfig = (db: ExtendedPrismaClient): NextAuthConfig => ({
         ...session,
         user: {
           ...session.user,
-          id: token.id as string,
-          role: token.role,
-          organizationId: token.organizationId,
+          id: typeof token["id"] === "string" ? token["id"] : "",
+          role: typeof token["role"] === "string" ? token["role"] : undefined,
+          organizationId: typeof token["organizationId"] === "string" ? token["organizationId"] : undefined,
         },
       };
     },

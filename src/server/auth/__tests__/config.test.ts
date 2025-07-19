@@ -16,6 +16,11 @@ const mockEnv = {
 // Import NextAuth provider types
 import type { Provider } from "next-auth/providers";
 
+// Helper interface for provider with ID (since Provider type doesn't expose id)
+interface ProviderWithId {
+  id: string;
+}
+
 // Mock functions to set environment
 function setNodeEnv(env: string): void {
   mockEnv.NODE_ENV = env;
@@ -51,10 +56,10 @@ describe("NextAuth Configuration", () => {
     it("should include Google provider", () => {
       expect(authConfig.providers.length).toBeGreaterThanOrEqual(1);
       const googleProvider = authConfig.providers.find(
-        (p: Provider) => p.id === "google",
+        (p: Provider) => (p as ProviderWithId).id === "google",
       );
       expect(googleProvider).toBeDefined();
-      expect(googleProvider?.id).toBe("google");
+      expect((googleProvider as ProviderWithId | undefined)?.id).toBe("google");
     });
 
     it("should include credentials provider in development", async () => {
@@ -70,7 +75,7 @@ describe("NextAuth Configuration", () => {
       expect(devConfig.providers).toHaveLength(2);
       const credentialsProvider = devConfig.providers[1];
       expect(credentialsProvider).toBeDefined();
-      expect(credentialsProvider?.id).toBe("credentials");
+      expect((credentialsProvider as ProviderWithId | undefined)?.id).toBe("credentials");
 
       // Check the custom name in options
       expect(
@@ -88,7 +93,7 @@ describe("NextAuth Configuration", () => {
 
       expect(prodConfig.providers).toHaveLength(1);
       expect(prodConfig.providers[0]).toBeDefined();
-      expect(prodConfig.providers[0]?.id).toBe("google");
+      expect((prodConfig.providers[0] as ProviderWithId | undefined)?.id).toBe("google");
     });
   });
 
@@ -115,7 +120,7 @@ describe("NextAuth Configuration", () => {
       const credentialsProvider = devConfig.providers[1];
 
       expect(credentialsProvider).toBeDefined();
-      expect(credentialsProvider?.id).toBe("credentials");
+      expect((credentialsProvider as ProviderWithId | undefined)?.id).toBe("credentials");
       expect(
         (credentialsProvider as { authorize?: () => unknown }).authorize,
       ).toBeInstanceOf(Function);
@@ -131,7 +136,7 @@ describe("NextAuth Configuration", () => {
       const configModule = await import("../config");
       const prodConfig = configModule.createAuthConfig(db);
       const credentialsProvider = prodConfig.providers.find(
-        (p: Provider) => p.id === "credentials",
+        (p: Provider) => (p as ProviderWithId).id === "credentials",
       );
 
       // Credentials provider should not exist in production
