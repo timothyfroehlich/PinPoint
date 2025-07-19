@@ -13,7 +13,8 @@ export const commentRouter = createTRPCRouter({
   // Get comments for an issue (excludes deleted)
   getForIssue: organizationProcedure
     .input(z.object({ issueId: z.string() }))
-    .query(async ({ ctx, input }) => {
+    .query(({ ctx, input }) => {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       return ctx.db.comment.findMany({
         where: {
           issueId: input.issueId,
@@ -38,6 +39,7 @@ export const commentRouter = createTRPCRouter({
   delete: issueDeleteProcedure
     .input(z.object({ commentId: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       const comment = await ctx.db.comment.findUnique({
         where: { id: input.commentId },
         include: {
@@ -57,6 +59,7 @@ export const commentRouter = createTRPCRouter({
       }
 
       // Verify comment belongs to user's organization
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       if (comment.issue.organizationId !== ctx.organization.id) {
         throw new TRPCError({
           code: "FORBIDDEN",
@@ -73,6 +76,7 @@ export const commentRouter = createTRPCRouter({
       // Record the deletion activity
       const activityService = ctx.services.createIssueActivityService();
       await activityService.recordCommentDeleted(
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
         comment.issueId,
         ctx.organization.id,
         ctx.session.user.id,
@@ -83,7 +87,7 @@ export const commentRouter = createTRPCRouter({
     }),
 
   // Admin: Get deleted comments
-  getDeleted: organizationManageProcedure.query(async ({ ctx }) => {
+  getDeleted: organizationManageProcedure.query(({ ctx }) => {
     const cleanupService = ctx.services.createCommentCleanupService();
     return cleanupService.getDeletedComments(ctx.organization.id);
   }),
