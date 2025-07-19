@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { env } from "~/env.js";
 
-export function middleware(request: NextRequest) {
+export function middleware(request: NextRequest): NextResponse {
   const url = request.nextUrl.clone();
   const host = request.headers.get("host") ?? "";
 
@@ -10,7 +10,7 @@ export function middleware(request: NextRequest) {
 
   // Extract subdomain
   const subdomain = getSubdomain(host);
-  console.log(`[MIDDLEWARE] Detected subdomain: ${subdomain}`);
+  console.log(`[MIDDLEWARE] Detected subdomain: ${subdomain ?? "none"}`);
 
   // If no subdomain, redirect to apc subdomain (default organization)
   if (!subdomain) {

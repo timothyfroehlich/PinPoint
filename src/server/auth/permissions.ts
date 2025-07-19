@@ -2,12 +2,14 @@ import { TRPCError } from "@trpc/server";
 
 import { type ExtendedPrismaClient } from "../db";
 
+import type { PrismaRole } from "./types";
+
 export async function hasPermission(
   membership: { roleId: string },
   permission: string,
   prisma: ExtendedPrismaClient,
 ): Promise<boolean> {
-  const role = await prisma.role.findUnique({
+  const roleResult = await prisma.role.findUnique({
     where: { id: membership.roleId },
     include: {
       permissions: {
@@ -16,7 +18,12 @@ export async function hasPermission(
     },
   });
 
-  return (role?.permissions.length ?? 0) > 0;
+  if (roleResult && typeof roleResult === "object" && "permissions" in roleResult) {
+    const role = roleResult as PrismaRole & { permissions: { name: string }[] };
+    return role.permissions.length > 0;
+  }
+
+  return false;
 }
 
 export async function requirePermission(
@@ -36,10 +43,15 @@ export async function getUserPermissions(
   membership: { roleId: string },
   prisma: ExtendedPrismaClient,
 ): Promise<string[]> {
-  const role = await prisma.role.findUnique({
+  const roleResult = await prisma.role.findUnique({
     where: { id: membership.roleId },
     include: { permissions: true },
   });
 
-  return role?.permissions.map((p) => p.name) ?? [];
+  if (roleResult && typeof roleResult === "object" && "permissions" in roleResult) {
+    const role = roleResult as PrismaRole & { permissions: { name: string }[] };
+    return role.permissions.map((p) => p.name);
+  }
+
+  return [];
 }
