@@ -189,7 +189,7 @@ export class PinballMapService {
 
         // Find existing machine by model and location
         const existingMachine = currentMachines.find(
-          (m) => m.modelId === model!.id,
+          (m: { modelId: string; id: string }) => m.modelId === model!.id,
         );
 
         if (existingMachine) {
@@ -222,7 +222,7 @@ export class PinballMapService {
 
     // Remove machines that are no longer on PinballMap
     const machinesToRemove = currentMachines.filter(
-      (m) => !foundMachineIds.has(m.id),
+      (m: { id: string }) => !foundMachineIds.has(m.id),
     );
 
     for (const machine of machinesToRemove) {
@@ -376,7 +376,14 @@ export class PinballMapService {
 
     return {
       configEnabled: config?.apiEnabled ?? false,
-      locations: locations.map((location) => ({
+      locations: locations.map((location: {
+        id: string;
+        name: string;
+        pinballMapId: number | null;
+        syncEnabled: boolean;
+        lastSyncAt: Date | null;
+        _count: { machines: number };
+      }) => ({
         id: location.id,
         name: location.name,
         pinballMapId: location.pinballMapId,

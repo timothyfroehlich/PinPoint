@@ -26,7 +26,7 @@ export class IssueActivityService {
         organizationId, // Now properly supported
         type: activityData.type,
         actorId: activityData.actorId,
-        field: activityData.fieldName || "",
+        field: activityData.fieldName ?? "",
         oldValue: activityData.oldValue,
         newValue: activityData.newValue,
       },
@@ -66,15 +66,15 @@ export class IssueActivityService {
     issueId: string,
     organizationId: string,
     actorId: string,
-    oldAssignee: User | null,
-    newAssignee: User | null,
+    oldAssignee: { name?: string } | null,
+    newAssignee: { name?: string } | null,
   ): Promise<void> {
     let _description: string;
-    if (oldAssignee && newAssignee) {
+    if (oldAssignee?.name && newAssignee?.name) {
       _description = `Reassigned from ${oldAssignee.name} to ${newAssignee.name}`;
-    } else if (newAssignee) {
+    } else if (newAssignee?.name) {
       _description = `Assigned to ${newAssignee.name}`;
-    } else if (oldAssignee) {
+    } else if (oldAssignee?.name) {
       _description = `Unassigned from ${oldAssignee.name}`;
     } else {
       _description = "Assignment changed";
@@ -84,8 +84,8 @@ export class IssueActivityService {
       type: ActivityType.ASSIGNED,
       actorId,
       fieldName: "assignee",
-      oldValue: oldAssignee?.name ?? undefined,
-      newValue: newAssignee?.name ?? undefined,
+      oldValue: oldAssignee?.name,
+      newValue: newAssignee?.name,
     });
   }
 
@@ -121,7 +121,62 @@ export class IssueActivityService {
     });
   }
 
-  async getIssueTimeline(issueId: string, organizationId: string) {
+  async getIssueTimeline(issueId: string, organizationId: string): Promise<
+    Array<
+      | {
+          itemType: "comment";
+          timestamp: Date;
+          id: string;
+          content: string;
+          createdAt: Date;
+          author: {
+            id: string;
+            name: string | null;
+            profilePicture: string | null;
+          };
+        }
+      | {
+          itemType: "activity";
+          timestamp: Date;
+          id: string;
+          type: ActivityType;
+          field: string;
+          oldValue: string | null;
+          newValue: string | null;
+          changedAt: Date;
+          actor: {
+            id: string;
+            name: string | null;
+            profilePicture: string | null;
+          } | null;
+        }
+    >
+  > {
+    interface CommentResult {
+      id: string;
+      content: string;
+      createdAt: Date;
+      author: {
+        id: string;
+        name: string | null;
+        profilePicture: string | null;
+      };
+    }
+
+    interface ActivityResult {
+      id: string;
+      type: ActivityType;
+      field: string;
+      oldValue: string | null;
+      newValue: string | null;
+      changedAt: Date;
+      actor: {
+        id: string;
+        name: string | null;
+        profilePicture: string | null;
+      } | null;
+    }
+
     const [comments, activities] = await Promise.all([
       this.prisma.comment.findMany({
         where: {
@@ -138,7 +193,7 @@ export class IssueActivityService {
           },
         },
         orderBy: { createdAt: "asc" },
-      }),
+      }) as Promise<CommentResult[]>,
       this.prisma.issueHistory.findMany({
         where: { issueId, organizationId },
         include: {
@@ -151,7 +206,7 @@ export class IssueActivityService {
           },
         },
         orderBy: { changedAt: "asc" },
-      }),
+      }) as Promise<ActivityResult[]>,
     ]);
 
     // Merge comments and activities into a single timeline
