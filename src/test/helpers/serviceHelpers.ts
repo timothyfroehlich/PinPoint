@@ -1,14 +1,18 @@
 import type { DeepMockProxy } from "jest-mock-extended";
 import type { ServiceFactory } from "~/server/services/factory";
 
-export function mockServiceMethod<T extends keyof ServiceFactory>(
+export function mockServiceMethod<
+  T extends keyof ServiceFactory,
+  M extends keyof ReturnType<ServiceFactory[T]>,
+>(
   services: DeepMockProxy<ServiceFactory>,
   serviceName: T,
-  methodName: keyof ReturnType<ServiceFactory[T]>,
-  implementation?: (...args: unknown[]) => unknown,
-): jest.MockedFunction<unknown> {
-  const service = services[serviceName]() as Record<string, unknown>;
-  const method = service[methodName] as jest.MockedFunction<unknown>;
+  methodName: M,
+  implementation?: (...args: any[]) => any,
+): jest.Mock {
+  const serviceFactory = services[serviceName] as jest.Mock;
+  const service = serviceFactory() as ReturnType<ServiceFactory[T]>;
+  const method = service[methodName] as jest.Mock;
   if (implementation) {
     method.mockImplementation(implementation);
   }
@@ -16,13 +20,19 @@ export function mockServiceMethod<T extends keyof ServiceFactory>(
 }
 
 // Helper to reset all service mocks
-export function resetAllServiceMocks(services: DeepMockProxy<ServiceFactory>): void {
+export function resetAllServiceMocks(
+  services: DeepMockProxy<ServiceFactory>,
+): void {
   for (const key in services) {
-    if (typeof services[key as keyof ServiceFactory] === "function") {
-      const service = (services[key as keyof ServiceFactory] as () => Record<string, unknown>)();
-      for (const method in service) {
-        if (jest.isMockFunction(service[method])) {
-          (service[method] as jest.MockedFunction<unknown>).mockClear();
+    const serviceKey = key as keyof ServiceFactory;
+    if (typeof services[serviceKey] === "function") {
+      const serviceFactory = services[serviceKey] as jest.Mock;
+      if (jest.isMockFunction(serviceFactory) && serviceFactory.mock.calls.length > 0) {
+        const service = serviceFactory() as Record<string, unknown>;
+        for (const method in service) {
+          if (jest.isMockFunction(service[method])) {
+            (service[method] as jest.Mock).mockClear();
+          }
         }
       }
     }

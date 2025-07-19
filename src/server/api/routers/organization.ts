@@ -26,7 +26,7 @@ export const organizationRouter = createTRPCRouter({
         },
         data: {
           name: input.name,
-          logoUrl: input.logoUrl,
+          logoUrl: input.logoUrl ?? null,
         },
       });
       return organization;

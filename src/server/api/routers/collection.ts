@@ -53,12 +53,12 @@ export const collectionRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const service = ctx.services.createCollectionService();
-       
+
       return service.createManualCollection(ctx.organization.id, {
         name: input.name,
         typeId: input.typeId,
-        locationId: input.locationId,
-        description: input.description,
+        locationId: input.locationId ?? null,
+        description: input.description ?? null,
       });
     }),
 

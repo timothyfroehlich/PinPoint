@@ -28,7 +28,14 @@ describe("issueRouter notification integration", () => {
       user: { id: mockUser.id },
       expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     };
-    ctx.organization = { id: "org-1", name: "Test Org" };
+    ctx.organization = {
+      id: "org-1",
+      name: "Test Org",
+      subdomain: "test-org",
+      logoUrl: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
   });
 
   it("creates notification on issue creation", async () => {

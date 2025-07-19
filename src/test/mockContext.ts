@@ -1,5 +1,4 @@
 import { mockDeep, mockReset, type DeepMockProxy } from "jest-mock-extended";
-import { type Session } from "next-auth";
 
 import type { ExtendedPrismaClient } from "~/server/db";
 import type { CollectionService } from "~/server/services/collectionService";
@@ -9,10 +8,12 @@ import type { IssueActivityService } from "~/server/services/issueActivityServic
 import type { NotificationService } from "~/server/services/notificationService";
 import type { PinballMapService } from "~/server/services/pinballmapService";
 import type { QRCodeService } from "~/server/services/qrCodeService";
-import { type TRPCContext } from "~/server/api/trpc.base";
+
+const mockPrisma = mockDeep<ExtendedPrismaClient>();
 
 // Mock individual services with all methods
 const mockNotificationService: jest.Mocked<NotificationService> = {
+  prisma: mockPrisma,
   createNotification: jest.fn().mockResolvedValue(undefined),
   getUserNotifications: jest.fn().mockResolvedValue([]),
   getUnreadCount: jest.fn().mockResolvedValue(0),
@@ -21,13 +22,15 @@ const mockNotificationService: jest.Mocked<NotificationService> = {
   notifyMachineOwnerOfIssue: jest.fn().mockResolvedValue(undefined),
   notifyMachineOwnerOfStatusChange: jest.fn().mockResolvedValue(undefined),
   notifyUserOfAssignment: jest.fn().mockResolvedValue(undefined),
-} as jest.Mocked<NotificationService>;
+} as unknown as jest.Mocked<NotificationService>;
 
 const mockCollectionService: jest.Mocked<CollectionService> = {
+  prisma: mockPrisma,
   // Add collection service methods here when needed
-} as jest.Mocked<CollectionService>;
+} as unknown as jest.Mocked<CollectionService>;
 
 const mockIssueActivityService: jest.Mocked<IssueActivityService> = {
+  prisma: mockPrisma,
   recordActivity: jest.fn().mockResolvedValue(undefined),
   recordIssueCreated: jest.fn().mockResolvedValue(undefined),
   recordStatusChange: jest.fn().mockResolvedValue(undefined),
@@ -35,43 +38,60 @@ const mockIssueActivityService: jest.Mocked<IssueActivityService> = {
   recordFieldUpdate: jest.fn().mockResolvedValue(undefined),
   recordCommentDeleted: jest.fn().mockResolvedValue(undefined),
   getIssueTimeline: jest.fn().mockResolvedValue([]),
-} as jest.Mocked<IssueActivityService>;
+} as unknown as jest.Mocked<IssueActivityService>;
 
 const mockPinballMapService: jest.Mocked<PinballMapService> = {
+  prisma: mockPrisma,
   // Add pinball map service methods here when needed
-} as jest.Mocked<PinballMapService>;
+} as unknown as jest.Mocked<PinballMapService>;
 
 const mockCommentCleanupService: jest.Mocked<CommentCleanupService> = {
+  prisma: mockPrisma,
   // Add comment cleanup service methods here when needed
-} as jest.Mocked<CommentCleanupService>;
+} as unknown as jest.Mocked<CommentCleanupService>;
 
 const mockQRCodeService: jest.Mocked<QRCodeService> = {
+  prisma: mockPrisma,
   // Add QR code service methods here when needed
-} as jest.Mocked<QRCodeService>;
+} as unknown as jest.Mocked<QRCodeService>;
 
 // Mock service factory
-const createMockServiceFactory = (): DeepMockProxy<ServiceFactory> => {
-  return {
+const createMockServiceFactory = (): DeepMockProxy<ServiceFactory> =>
+  ({
     createNotificationService: jest.fn(() => mockNotificationService),
     createCollectionService: jest.fn(() => mockCollectionService),
     createPinballMapService: jest.fn(() => mockPinballMapService),
     createIssueActivityService: jest.fn(() => mockIssueActivityService),
     createCommentCleanupService: jest.fn(() => mockCommentCleanupService),
     createQRCodeService: jest.fn(() => mockQRCodeService),
-  } as DeepMockProxy<ServiceFactory>;
+  }) as unknown as DeepMockProxy<ServiceFactory>;
+
+import type { Session } from "next-auth";
+import type { Organization } from "@prisma/client";
+
+export type MockUser = {
+  id: string;
+  email?: string | null;
+  name?: string | null;
+  image?: string | null;
+  role?: string;
+  organizationId?: string;
 };
 
-export type MockContext = TRPCContext;
+export interface MockContext {
+  db: DeepMockProxy<ExtendedPrismaClient>;
+  services: DeepMockProxy<ServiceFactory>;
+  session: Session | null;
+  organization: Organization | null;
+  headers: Headers;
+}
 
 export function createMockContext(): MockContext {
   const mockDb = mockDeep<ExtendedPrismaClient>();
   const mockServices = createMockServiceFactory();
 
   // Mock the $accelerate property that comes from Prisma Accelerate extension
-  (mockDb).$accelerate = {
-    invalidate: jest.fn(),
-    ttl: jest.fn(),
-  };
+  (mockDb as any).$accelerate = {};
 
   // Set up default membership mock - can be overridden in individual tests
   mockDb.membership.findFirst.mockResolvedValue(mockMembership);
@@ -90,14 +110,14 @@ export function createMockContext(): MockContext {
   mockDb.issue.update.mockResolvedValue(mockIssue);
 
   // Set up default machine mock
-  mockDb.machine.findMany.mockResolvedValue([mockMachine]);
-  mockDb.machine.findUnique.mockResolvedValue(mockMachine);
-  mockDb.machine.create.mockResolvedValue(mockMachine);
+  mockDb.machine.findMany.mockResolvedValue([mockMachine as any]);
+  mockDb.machine.findUnique.mockResolvedValue(mockMachine as any);
+  mockDb.machine.create.mockResolvedValue(mockMachine as any);
 
   // Set up default model mock
-  mockDb.model.findMany.mockResolvedValue([mockModel]);
-  mockDb.model.findUnique.mockResolvedValue(mockModel);
-  mockDb.model.create.mockResolvedValue(mockModel);
+  mockDb.model.findMany.mockResolvedValue([mockModel as any]);
+  mockDb.model.findUnique.mockResolvedValue(mockModel as any);
+  mockDb.model.create.mockResolvedValue(mockModel as any);
 
   // Set up default notification mock
   mockDb.notification.findMany.mockResolvedValue([]);
@@ -117,7 +137,7 @@ export function createMockContext(): MockContext {
     db: mockDb,
     services: mockServices,
     session: null,
-    organization: mockOrganization,
+    organization: null,
     headers: new Headers(),
   };
 }
@@ -226,6 +246,9 @@ export const mockModel = {
   year: 2023,
   ipdbId: null,
   opdbId: null,
+  ipdbLink: null,
+  opdbImgUrl: null,
+  kineticistUrl: null,
   machineType: "SS" as const,
   machineDisplay: "Test Display",
   notes: null,
@@ -239,6 +262,7 @@ export const mockModel = {
 
 export const mockMachine = {
   id: "machine-1",
+  name: "Test Machine",
   serialNumber: "TEST123",
   condition: "Good",
   notes: null,
@@ -246,6 +270,13 @@ export const mockMachine = {
   locationId: "location-1",
   modelId: "model-1",
   ownerId: null,
+  ownerNotificationsEnabled: true,
+  notifyOnNewIssues: true,
+  notifyOnStatusChanges: true,
+  notifyOnComments: false,
+  qrCodeId: "qr-1",
+  qrCodeUrl: null,
+  qrCodeGeneratedAt: null,
   createdAt: new Date(),
   updatedAt: new Date(),
 };

@@ -19,14 +19,14 @@ export const machineCoreRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       // Verify that the model and room belong to the same organization
-       
+
       const model = await ctx.db.model.findFirst({
         where: {
           id: input.modelId,
         },
       });
 
-       
+
       const location = await ctx.db.location.findFirst({
         where: {
           id: input.locationId,
@@ -38,7 +38,7 @@ export const machineCoreRouter = createTRPCRouter({
         throw new Error("Invalid game title or location");
       }
 
-       
+
       const machine = await ctx.db.machine.create({
         data: {
           name: input.name,
@@ -70,18 +70,18 @@ export const machineCoreRouter = createTRPCRouter({
       // Auto-generate QR code for the new machine
       try {
         const qrCodeService = ctx.services.createQRCodeService();
-         
+
         await qrCodeService.generateQRCode(machine.id);
       } catch (error) {
         // Log error but don't fail machine creation
         console.warn(
-           
+
           `Failed to generate QR code for machine ${machine.id}:`,
           error,
         );
       }
 
-       
+
       return machine;
     }),
 
@@ -131,7 +131,7 @@ export const machineCoreRouter = createTRPCRouter({
   getById: organizationProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
-       
+
       const machine = await ctx.db.machine.findFirst({
         where: {
           id: input.id,
@@ -162,7 +162,7 @@ export const machineCoreRouter = createTRPCRouter({
         throw new Error("Game instance not found");
       }
 
-       
+
       return machine;
     }),
 
@@ -176,7 +176,7 @@ export const machineCoreRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       // First verify the game instance belongs to this organization
-       
+
       const existingInstance = await ctx.db.machine.findFirst({
         where: {
           id: input.id,
@@ -190,7 +190,7 @@ export const machineCoreRouter = createTRPCRouter({
 
       // If updating model or location, verify they belong to the organization
       if (input.modelId) {
-         
+
         const model = await ctx.db.model.findFirst({
           where: {
             id: input.modelId,
@@ -202,7 +202,7 @@ export const machineCoreRouter = createTRPCRouter({
       }
 
       if (input.locationId) {
-         
+
         const location = await ctx.db.location.findFirst({
           where: {
             id: input.locationId,
@@ -214,7 +214,7 @@ export const machineCoreRouter = createTRPCRouter({
         }
       }
 
-       
+
       return ctx.db.machine.update({
         where: { id: input.id },
         data: {
@@ -247,7 +247,7 @@ export const machineCoreRouter = createTRPCRouter({
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       // Verify the game instance belongs to this organization
-       
+
       const existingInstance = await ctx.db.machine.findFirst({
         where: {
           id: input.id,
@@ -259,7 +259,7 @@ export const machineCoreRouter = createTRPCRouter({
         throw new Error("Game instance not found");
       }
 
-       
+
       return ctx.db.machine.delete({
         where: { id: input.id },
       });

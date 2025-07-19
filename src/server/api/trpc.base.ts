@@ -215,7 +215,7 @@ export const organizationProcedure = protectedProcedure.use(
         message: "Organization not found",
       });
     }
-     
+
     const membership = await ctx.db.membership.findFirst({
       where: {
         organizationId: ctx.organization.id,

@@ -16,7 +16,7 @@ jest.mock("~/server/auth", () => ({
   auth: jest.fn(),
 }));
 
-const mockAuth = auth as jest.MockedFunction<typeof auth>;
+const mockAuth = auth as jest.Mock;
 
 // Mock admin membership
 const mockAdminMembership = {
@@ -79,7 +79,7 @@ describe("tRPC Authentication Middleware", () => {
       ctx.organization = mockOrganization;
       (ctx.db.membership.findFirst as jest.Mock).mockResolvedValue(mockMembership);
 
-      const caller = appRouter.createCaller(ctx);
+      const caller = appRouter.createCaller(ctx as any);
 
       // Test with a protected procedure - using user.getCurrentMembership as example
       const result = await caller.user.getCurrentMembership();
@@ -99,7 +99,7 @@ describe("tRPC Authentication Middleware", () => {
       ctx.session = null;
       ctx.organization = mockOrganization;
 
-      const caller = appRouter.createCaller(ctx);
+      const caller = appRouter.createCaller(ctx as any);
 
       await expect(caller.user.getCurrentMembership()).rejects.toThrow(
         new TRPCError({
@@ -119,7 +119,7 @@ describe("tRPC Authentication Middleware", () => {
       ctx.session = invalidSession;
       ctx.organization = mockOrganization;
 
-      const caller = appRouter.createCaller(ctx);
+      const caller = appRouter.createCaller(ctx as any);
 
       await expect(caller.user.getCurrentMembership()).rejects.toThrow(
         new TRPCError({
@@ -149,7 +149,7 @@ describe("tRPC Authentication Middleware", () => {
       ctx.organization = mockOrganization;
       (ctx.db.membership.findFirst as jest.Mock).mockResolvedValue(mockMembership);
 
-      const caller = appRouter.createCaller(ctx);
+      const caller = appRouter.createCaller(ctx as any);
 
       // Test with an organization procedure - using issue.getAll as example
       const result = await caller.user.getCurrentMembership();
@@ -194,7 +194,7 @@ describe("tRPC Authentication Middleware", () => {
       ctx.organization = mockOrganization;
       (ctx.db.membership.findFirst as jest.Mock).mockResolvedValue(null); // No membership
 
-      const caller = appRouter.createCaller(ctx);
+      const caller = appRouter.createCaller(ctx as any);
 
       await expect(caller.user.getCurrentMembership()).rejects.toThrow(
         new TRPCError({
@@ -223,7 +223,7 @@ describe("tRPC Authentication Middleware", () => {
       ctx.organization = null; // Organization not found
       (ctx.db.organization.findUnique as jest.Mock).mockResolvedValue(null); // Organization not found
 
-      const caller = appRouter.createCaller(ctx);
+      const caller = appRouter.createCaller(ctx as any);
 
       await expect(caller.user.getCurrentMembership()).rejects.toThrow(
         new TRPCError({
@@ -264,7 +264,7 @@ describe("tRPC Authentication Middleware", () => {
       ctx.organization = differentOrganization;
       (ctx.db.membership.findFirst as jest.Mock).mockResolvedValue(null); // No membership in different org
 
-      const caller = appRouter.createCaller(ctx);
+      const caller = appRouter.createCaller(ctx as any);
 
       await expect(caller.user.getCurrentMembership()).rejects.toThrow(
         new TRPCError({
@@ -293,7 +293,7 @@ describe("tRPC Authentication Middleware", () => {
       ctx.organization = mockOrganization;
       (ctx.db.membership.findFirst as jest.Mock).mockResolvedValue(mockMembership);
 
-      const caller = appRouter.createCaller(ctx);
+      const caller = appRouter.createCaller(ctx as any);
 
       const result = await caller.user.getCurrentMembership();
 
@@ -326,7 +326,7 @@ describe("tRPC Authentication Middleware", () => {
       ctx.organization = mockOrganization;
       (ctx.db.membership.findFirst as jest.Mock).mockResolvedValue(mockAdminMembership);
 
-      const caller = appRouter.createCaller(ctx);
+      const caller = appRouter.createCaller(ctx as any);
 
       // This should work for admin users
       const result = await caller.user.getCurrentMembership();
@@ -357,7 +357,7 @@ describe("tRPC Authentication Middleware", () => {
       ctx.organization = mockOrganization;
       (ctx.db.membership.findFirst as jest.Mock).mockResolvedValue(mockMembership);
 
-      const caller = appRouter.createCaller(ctx);
+      const caller = appRouter.createCaller(ctx as any);
 
       // Note: We would need an actual admin-only procedure to test this
       // For now, we're testing that the organization middleware works correctly
@@ -391,7 +391,7 @@ describe("tRPC Authentication Middleware", () => {
       ctx.organization = mockOrganization;
       (ctx.db.membership.findFirst as jest.Mock).mockResolvedValue(mockMembership);
 
-      const caller = appRouter.createCaller(ctx);
+      const caller = appRouter.createCaller(ctx as any);
 
       await caller.user.getCurrentMembership();
 
@@ -416,7 +416,7 @@ describe("tRPC Authentication Middleware", () => {
       ctx.organization = mockOrganization;
       (ctx.db.membership.findFirst as jest.Mock).mockResolvedValue(mockMembership);
 
-      const caller = appRouter.createCaller(ctx);
+      const caller = appRouter.createCaller(ctx as any);
 
       await caller.user.getCurrentMembership();
 

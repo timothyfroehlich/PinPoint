@@ -43,16 +43,16 @@ describe("PinballMapService", () => {
     countIssueMock = jest.fn();
 
     // Assign the jest.fn() mocks to the actual ctx.db methods
-    (ctx.db.location.findUnique) = findUniqueLocationMock;
-    (ctx.db.model.findUnique) = findUniqueModelMock;
-    (ctx.db.model.create) = createModelMock;
-    (ctx.db.model.update) = updateModelMock;
-    (ctx.db.model.upsert) = upsertModelMock;
-    (ctx.db.machine.findMany) = findManyMachineMock;
-    (ctx.db.machine.deleteMany) = deleteManyMachineMock;
-    (ctx.db.machine.delete) = deleteMachineMock;
-    (ctx.db.machine.create) = createMachineMock;
-    (ctx.db.issue.count) = countIssueMock;
+    (ctx.db.location.findUnique as any) = findUniqueLocationMock;
+    (ctx.db.model.findUnique as any) = findUniqueModelMock;
+    (ctx.db.model.create as any) = createModelMock;
+    (ctx.db.model.update as any) = updateModelMock;
+    (ctx.db.model.upsert as any) = upsertModelMock;
+    (ctx.db.machine.findMany as any) = findManyMachineMock;
+    (ctx.db.machine.deleteMany as any) = deleteManyMachineMock;
+    (ctx.db.machine.delete as any) = deleteMachineMock;
+    (ctx.db.machine.create as any) = createMachineMock;
+    (ctx.db.issue.count as any) = countIssueMock;
     apiMocker = new PinballMapAPIMocker();
     apiMocker.start();
   });
