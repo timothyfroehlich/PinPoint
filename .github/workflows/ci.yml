@@ -228,22 +228,20 @@ jobs:
           
           EOF
           
-          # Extract current stats
-          grep -A 5 "### Error Counts" TYPESCRIPT_MIGRATION.md >> migration-report.md
-          
-          # Add Betterer status
-          echo "" >> migration-report.md
-          echo "### Betterer Status" >> migration-report.md
-          if npm run betterer:check > /dev/null 2>&1; then
-            echo "✅ No regressions detected" >> migration-report.md
-          else
-            echo "⚠️ Check Betterer results for details" >> migration-report.md
-          fi
-          
-          # Add helpful links
-          echo "" >> migration-report.md
-          echo "---" >> migration-report.md
-          echo "📖 [Migration Guide](./TYPESCRIPT_MIGRATION.md) | 🔧 [Helper Scripts](./scripts/README.md)" >> migration-report.md
+          # Extract current stats and add Betterer status
+          {
+            grep -A 5 "### Error Counts" TYPESCRIPT_MIGRATION.md
+            echo ""
+            echo "### Betterer Status"
+            if npm run betterer:check > /dev/null 2>&1; then
+              echo "✅ No regressions detected"
+            else
+              echo "⚠️ Check Betterer results for details"
+            fi
+            echo ""
+            echo "---"
+            echo "📖 [Migration Guide](./TYPESCRIPT_MIGRATION.md) | 🔧 [Helper Scripts](./scripts/README.md)"
+          } >> migration-report.md
           
       - name: Comment PR
         uses: actions/github-script@v7
