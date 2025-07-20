@@ -349,6 +349,9 @@ jobs:
         with:
           node-version: "24"
           cache: "npm"
+      - uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3 # v5
+        with:
+          python-version: "3.12"
       - run: npm ci
       - name: Generate Migration Report
         run: |
