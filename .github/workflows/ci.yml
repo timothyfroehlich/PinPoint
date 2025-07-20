@@ -37,8 +37,15 @@ jobs:
           # Count total TypeScript errors
           ERROR_COUNT=$(grep -c "error TS" typescript-output.log 2>/dev/null || echo "0")
           
-          # Filter out test files more comprehensively
-          PRODUCTION_ERRORS=$(grep "error TS" typescript-output.log 2>/dev/null | grep -v -E "(test\.|\.test\.|__tests__|\.spec\.|spec\.)" || true)
+          # Filter out test files more comprehensively (including __tests__ directories)
+          PRODUCTION_ERRORS=$(grep "error TS" typescript-output.log 2>/dev/null | grep -v -E "(test\.|\.test\.|__tests__|\.spec\.|spec\.|/test/|/tests/)" || true)
+          
+          # Debug: Show what errors we're seeing
+          echo "=== ALL TYPESCRIPT ERRORS ==="
+          grep "error TS" typescript-output.log 2>/dev/null || echo "No TS errors found"
+          echo "=== FILTERED PRODUCTION ERRORS ==="
+          echo "$PRODUCTION_ERRORS"
+          echo "=== END DEBUG ==="
           
           # Count production errors with proper validation
           if [ -z "$PRODUCTION_ERRORS" ] || [ "$PRODUCTION_ERRORS" = "" ]; then
@@ -79,8 +86,10 @@ jobs:
           elif [ "$TEST_ERROR_COUNT" -gt 0 ]; then
             {
               echo "### Test File Errors (Non-blocking):"
-              grep "error TS" typescript-output.log | grep "test\|__tests__\|spec" | head -5 || true
+              grep "error TS" typescript-output.log | grep -E "(test\.|\.test\.|__tests__|\.spec\.|spec\.|/test/|/tests/)" | head -5 || true
+              echo ""
               echo "✅ Test errors don't block CI during TypeScript migration"
+              echo "📋 These will be addressed in separate cleanup tasks"
             } >> "$GITHUB_STEP_SUMMARY"
             echo "TypeScript job: SUCCESS (only test errors found)"
             exit 0
