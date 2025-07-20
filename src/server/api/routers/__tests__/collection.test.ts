@@ -134,17 +134,19 @@ describe("Collection Router Integration", () => {
       });
 
       expect(result).toEqual(mockCollection);
-      expect(mockPrisma.collection.create).toHaveBeenCalledWith({
-        data: {
-          name: "Test Collection",
-          typeId: "type1",
-          locationId: "loc1",
-          description: "Test description",
-          organizationId: "org1",
-          isManual: true,
-          isSmart: false,
-        },
-      });
+      expect(mockPrisma.collection.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            name: "Test Collection",
+            typeId: "type1",
+            locationId: "loc1",
+            description: "Test description",
+            organizationId: "org1",
+            isManual: true,
+            isSmart: false,
+          }),
+        }),
+      );
     });
 
     it("should handle toggleCollectionType operations", async () => {

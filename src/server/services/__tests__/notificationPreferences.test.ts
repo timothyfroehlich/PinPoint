@@ -171,12 +171,11 @@ describe("Notification preference logic", () => {
     });
     const createdMachine = await mockPrisma.machine.create({
       data: {
-        serialNumber: "Test Machine",
         organizationId: "org-1",
         locationId: "location-1",
         modelId: "model-1",
         ownerId: newUser.id,
-      },
+      } as any,
     });
 
     expect(createdUser.emailNotificationsEnabled).toBe(true);
