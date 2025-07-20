@@ -14,15 +14,17 @@ import {
 } from "@mui/material";
 import { useState } from "react";
 
-const PrimaryAppBar = () => {
+import type { JSX } from "react";
+
+const PrimaryAppBar = (): JSX.Element => {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
 
-  const handleMenu = (event: React.MouseEvent<HTMLElement>) => {
+  const handleMenu = (event: React.MouseEvent<HTMLElement>): void => {
     setAnchorEl(event.currentTarget);
   };
 
-  const handleClose = () => {
+  const handleClose = (): void => {
     setAnchorEl(null);
   };
 

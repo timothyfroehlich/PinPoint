@@ -10,5 +10,5 @@
  * a configuration variable but a runtime environment provided by npm itself.
  */
 export function getVersion(): string {
-  return process.env.npm_package_version ?? "unknown";
+  return process.env["npm_package_version"] ?? "unknown";
 }

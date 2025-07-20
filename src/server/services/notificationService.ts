@@ -21,15 +21,32 @@ export class NotificationService {
    * Create a new notification
    */
   async createNotification(data: NotificationData): Promise<void> {
+    const createData: {
+      userId: string;
+      type: NotificationType;
+      message: string;
+      entityType?: NotificationEntity;
+      entityId?: string;
+      actionUrl?: string;
+    } = {
+      userId: data.userId,
+      type: data.type,
+      message: data.message,
+    };
+
+    // Only assign optional properties if they have values
+    if (data.entityType) {
+      createData.entityType = data.entityType;
+    }
+    if (data.entityId) {
+      createData.entityId = data.entityId;
+    }
+    if (data.actionUrl) {
+      createData.actionUrl = data.actionUrl;
+    }
+
     await this.prisma.notification.create({
-      data: {
-        userId: data.userId,
-        type: data.type,
-        message: data.message,
-        entityType: data.entityType,
-        entityId: data.entityId,
-        actionUrl: data.actionUrl,
-      },
+      data: createData,
     });
   }
 
@@ -146,7 +163,7 @@ export class NotificationService {
   /**
    * Get user's notifications
    */
-  getUserNotifications(
+  async getUserNotifications(
     userId: string,
     options: {
       unreadOnly?: boolean;
@@ -154,7 +171,7 @@ export class NotificationService {
       offset?: number;
     } = {},
   ): Promise<Notification[]> {
-    return this.prisma.notification.findMany({
+    const notifications = await this.prisma.notification.findMany({
       where: {
         userId,
         ...(options.unreadOnly && { read: false }),
@@ -165,6 +182,7 @@ export class NotificationService {
       take: options.limit ?? 50,
       skip: options.offset ?? 0,
     });
+    return notifications;
   }
 
   /**
@@ -200,12 +218,13 @@ export class NotificationService {
   /**
    * Get unread notification count
    */
-  getUnreadCount(userId: string): Promise<number> {
-    return this.prisma.notification.count({
+  async getUnreadCount(userId: string): Promise<number> {
+    const count = await this.prisma.notification.count({
       where: {
         userId,
         read: false,
       },
     });
+    return count;
   }
 }

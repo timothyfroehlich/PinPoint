@@ -3,24 +3,22 @@ import { z } from "zod";
 import {
   createTRPCRouter,
   organizationProcedure,
-  publicProcedure,
   issueEditProcedure,
 } from "~/server/api/trpc";
 
 export const issueCoreRouter = createTRPCRouter({
-  // Public submission - anyone can report an issue
-  create: publicProcedure
+  // Create issue - requires organization membership
+  create: organizationProcedure
     .input(
       z.object({
         title: z.string().min(1).max(255),
         description: z.string().optional(),
         severity: z.enum(["Low", "Medium", "High", "Critical"]).optional(),
-        reporterEmail: z.string().email().optional(),
         machineId: z.string(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Use the organization resolved from subdomain context
+      // Organization is guaranteed by organizationProcedure middleware
       const organization = ctx.organization;
 
       // Verify that the game instance belongs to the organization
@@ -70,24 +68,33 @@ export const issueCoreRouter = createTRPCRouter({
         );
       }
 
-      // Determine reporter: use session user if available, otherwise use email or null
+      // User is guaranteed to exist in protected procedure
       const createdById = ctx.session.user.id;
 
-      if (!createdById) {
-        throw new Error("User not found");
+      // Create the issue
+      const issueData: {
+        title: string;
+        description?: string | null;
+        createdById: string;
+        machineId: string;
+        organizationId: string;
+        statusId: string;
+        priorityId: string;
+      } = {
+        title: input.title,
+        createdById,
+        machineId: input.machineId,
+        organizationId: organization.id,
+        statusId: newStatus.id,
+        priorityId: defaultPriority.id,
+      };
+
+      if (input.description) {
+        issueData.description = input.description;
       }
 
-      // Create the issue
       const issue = await ctx.db.issue.create({
-        data: {
-          title: input.title,
-          description: input.description,
-          createdById,
-          machineId: input.machineId,
-          organizationId: organization.id,
-          statusId: newStatus.id,
-          priorityId: defaultPriority.id,
-        },
+        data: issueData,
         include: {
           status: true,
           createdBy: {
@@ -106,15 +113,13 @@ export const issueCoreRouter = createTRPCRouter({
         },
       });
 
-      // Record the issue creation activity if user is logged in
-      if (createdById) {
-        const activityService = ctx.services.createIssueActivityService();
-        await activityService.recordIssueCreated(
-          issue.id,
-          organization.id,
-          createdById,
-        );
-      }
+      // Record the issue creation activity
+      const activityService = ctx.services.createIssueActivityService();
+      await activityService.recordIssueCreated(
+        issue.id,
+        organization.id,
+        createdById,
+      );
 
       // Send notifications for new issue
       const notificationService = ctx.services.createNotificationService();
@@ -382,7 +387,7 @@ export const issueCoreRouter = createTRPCRouter({
           }),
           ...(input.statusId && { statusId: input.statusId }),
           ...(input.assignedToId !== undefined && {
-            assignedToId: input.assignedToId || null,
+            assignedToId: input.assignedToId ?? null,
           }),
         },
         include: {
