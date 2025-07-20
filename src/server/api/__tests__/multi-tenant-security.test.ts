@@ -2,6 +2,8 @@ import { jest } from "@jest/globals";
 import { TRPCError } from "@trpc/server";
 import { type Session } from "next-auth";
 
+import type { TRPCContext } from "~/server/api/trpc.base";
+
 import { appRouter } from "~/server/api/root";
 import { createCallerFactory } from "~/server/api/trpc";
 import { auth } from "~/server/auth";
@@ -135,44 +137,48 @@ describe("Multi-Tenant Security Tests", () => {
         expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       };
 
-      mockAuth.mockResolvedValue(sessionA);
+      mockAuth.mockResolvedValue(Promise.resolve(sessionA) as any);
 
       // Mock issue data - should only return Organization A's issues
       const ctx = createMockContext();
-      ctx.db.issue.findMany.mockResolvedValue(issuesOrgA);
+      ctx.db.issue.findMany.mockResolvedValue(
+        Promise.resolve(issuesOrgA) as any,
+      );
 
       // Mock membership for user A in organization A
-      ctx.db.membership.findFirst.mockResolvedValue({
-        id: "membership-a",
-        userId: "user-a",
-        organizationId: "org-a",
-        roleId: "role-a",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        role: {
-          id: "role-a",
-          name: "member",
+      ctx.db.membership.findFirst.mockResolvedValue(
+        Promise.resolve({
+          id: "membership-a",
+          userId: "user-a",
           organizationId: "org-a",
+          roleId: "role-a",
           createdAt: new Date(),
           updatedAt: new Date(),
-          permissions: [
-            {
-              id: "perm-1",
-              name: "issues:read",
-              description: "Read issues",
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            },
-            {
-              id: "perm-2",
-              name: "issues:write",
-              description: "Write issues",
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            },
-          ],
-        },
-      });
+          role: {
+            id: "role-a",
+            name: "member",
+            organizationId: "org-a",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            permissions: [
+              {
+                id: "perm-1",
+                name: "issues:read",
+                description: "Read issues",
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              },
+              {
+                id: "perm-2",
+                name: "issues:write",
+                description: "Write issues",
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              },
+            ],
+          },
+        }) as any,
+      );
 
       const callerA = createCaller({
         ...ctx,
@@ -181,7 +187,7 @@ describe("Multi-Tenant Security Tests", () => {
         headers: new Headers({
           host: "org-a.localhost:3000",
         }),
-      }) as CallerType;
+      } as TRPCContext) as CallerType;
 
       const result = await callerA.issue.core.getAll({
         locationId: undefined,
@@ -218,13 +224,17 @@ describe("Multi-Tenant Security Tests", () => {
         expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       };
 
-      mockAuth.mockResolvedValue(sessionA);
+      mockAuth.mockResolvedValue(Promise.resolve(sessionA) as any);
 
       // Setup context with proper mocks for no membership in Organization B
       const ctx = createMockContext();
       // User A has no membership in Organization B
-      ctx.db.membership.findFirst.mockResolvedValue(null);
-      ctx.db.membership.findUnique.mockResolvedValue(null);
+      ctx.db.membership.findFirst.mockResolvedValue(
+        Promise.resolve(null) as any,
+      );
+      ctx.db.membership.findUnique.mockResolvedValue(
+        Promise.resolve(null) as any,
+      );
 
       const callerA = createCaller({
         ...ctx,
@@ -233,7 +243,7 @@ describe("Multi-Tenant Security Tests", () => {
         headers: new Headers({
           host: "org-b.localhost:3000", // User A trying to access org B
         }),
-      }) as CallerType;
+      } as TRPCContext) as CallerType;
 
       await expect(
         callerA.issue.core.getAll({
@@ -280,43 +290,47 @@ describe("Multi-Tenant Security Tests", () => {
       };
 
       // Test Organization A access
-      mockAuth.mockResolvedValue(sessionA);
+      mockAuth.mockResolvedValue(Promise.resolve(sessionA) as any);
 
       const ctx = createMockContext();
-      ctx.db.issue.findMany.mockResolvedValue(issuesOrgA);
+      ctx.db.issue.findMany.mockResolvedValue(
+        Promise.resolve(issuesOrgA) as any,
+      );
 
       // Mock membership for user A in organization A
-      ctx.db.membership.findFirst.mockResolvedValue({
-        id: "membership-a",
-        userId: "user-a",
-        organizationId: "org-a",
-        roleId: "role-a",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        role: {
-          id: "role-a",
-          name: "member",
+      ctx.db.membership.findFirst.mockResolvedValue(
+        Promise.resolve({
+          id: "membership-a",
+          userId: "user-a",
           organizationId: "org-a",
+          roleId: "role-a",
           createdAt: new Date(),
           updatedAt: new Date(),
-          permissions: [
-            {
-              id: "perm-1",
-              name: "issues:read",
-              description: "Read issues",
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            },
-            {
-              id: "perm-2",
-              name: "issues:write",
-              description: "Write issues",
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            },
-          ],
-        },
-      });
+          role: {
+            id: "role-a",
+            name: "member",
+            organizationId: "org-a",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            permissions: [
+              {
+                id: "perm-1",
+                name: "issues:read",
+                description: "Read issues",
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              },
+              {
+                id: "perm-2",
+                name: "issues:write",
+                description: "Write issues",
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              },
+            ],
+          },
+        }) as any,
+      );
 
       const callerA = createCaller({
         ...ctx,
@@ -325,7 +339,7 @@ describe("Multi-Tenant Security Tests", () => {
         headers: new Headers({
           host: "org-a.localhost:3000",
         }),
-      }) as CallerType;
+      } as TRPCContext) as CallerType;
 
       const resultA = await callerA.issue.core.getAll({
         locationId: undefined,
@@ -340,43 +354,47 @@ describe("Multi-Tenant Security Tests", () => {
 
       // Reset mocks and test Organization B access
       jest.clearAllMocks();
-      mockAuth.mockResolvedValue(sessionB);
+      mockAuth.mockResolvedValue(Promise.resolve(sessionB) as any);
 
       const ctxB = createMockContext();
-      ctxB.db.issue.findMany.mockResolvedValue(issuesOrgB);
+      ctxB.db.issue.findMany.mockResolvedValue(
+        Promise.resolve(issuesOrgB) as any,
+      );
 
       // Mock membership for user B in organization B
-      ctxB.db.membership.findFirst.mockResolvedValue({
-        id: "membership-b",
-        userId: "user-b",
-        organizationId: "org-b",
-        roleId: "role-b",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        role: {
-          id: "role-b",
-          name: "member",
+      ctxB.db.membership.findFirst.mockResolvedValue(
+        Promise.resolve({
+          id: "membership-b",
+          userId: "user-b",
           organizationId: "org-b",
+          roleId: "role-b",
           createdAt: new Date(),
           updatedAt: new Date(),
-          permissions: [
-            {
-              id: "perm-1",
-              name: "issues:read",
-              description: "Read issues",
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            },
-            {
-              id: "perm-2",
-              name: "issues:write",
-              description: "Write issues",
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            },
-          ],
-        },
-      });
+          role: {
+            id: "role-b",
+            name: "member",
+            organizationId: "org-b",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            permissions: [
+              {
+                id: "perm-1",
+                name: "issues:read",
+                description: "Read issues",
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              },
+              {
+                id: "perm-2",
+                name: "issues:write",
+                description: "Write issues",
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              },
+            ],
+          },
+        }) as any,
+      );
 
       const callerB = createCaller({
         ...ctxB,
@@ -385,7 +403,7 @@ describe("Multi-Tenant Security Tests", () => {
         headers: new Headers({
           host: "org-b.localhost:3000",
         }),
-      }) as CallerType;
+      } as TRPCContext) as CallerType;
 
       const resultB = await callerB.issue.core.getAll({
         locationId: undefined,
@@ -423,40 +441,44 @@ describe("Multi-Tenant Security Tests", () => {
         expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       };
 
-      mockAuth.mockResolvedValue(sessionA);
+      mockAuth.mockResolvedValue(Promise.resolve(sessionA) as any);
 
       const ctx = createMockContext();
-      ctx.db.issue.findUnique.mockResolvedValue({
-        id: "issue-b-1",
-        title: "Issue B1",
-        description: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        organizationId: "org-b",
-        machineId: "game-b-1",
-        statusId: "status-1",
-        priorityId: "priority-1",
-        createdById: "user-b",
-        assignedToId: null,
-        consistency: null,
-        checklist: null,
-        resolvedAt: null,
-      });
+      ctx.db.issue.findUnique.mockResolvedValue(
+        Promise.resolve({
+          id: "issue-b-1",
+          title: "Issue B1",
+          description: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          organizationId: "org-b",
+          machineId: "game-b-1",
+          statusId: "status-1",
+          priorityId: "priority-1",
+          createdById: "user-b",
+          assignedToId: null,
+          consistency: null,
+          checklist: null,
+          resolvedAt: null,
+        }) as any,
+      );
 
       // Mock membership for user A in organization A (but not in org B)
-      ctx.db.membership.findFirst.mockResolvedValue({
-        id: "membership-a",
-        userId: "user-a",
-        organizationId: "org-a",
-        roleId: "role-a",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        role: {
-          id: "role-a",
-          name: "admin",
-          permissions: [{ name: "issues:read" }, { name: "issues:write" }],
-        },
-      });
+      ctx.db.membership.findFirst.mockResolvedValue(
+        Promise.resolve({
+          id: "membership-a",
+          userId: "user-a",
+          organizationId: "org-a",
+          roleId: "role-a",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          role: {
+            id: "role-a",
+            name: "admin",
+            permissions: [{ name: "issues:read" }, { name: "issues:write" }],
+          },
+        }) as any,
+      );
 
       const callerA = createCaller({
         ...ctx,
@@ -465,7 +487,7 @@ describe("Multi-Tenant Security Tests", () => {
         headers: new Headers({
           host: "org-a.localhost:3000",
         }),
-      }) as CallerType;
+      } as TRPCContext) as CallerType;
 
       // This should fail because the issue belongs to a different organization
       await expect(
@@ -485,118 +507,130 @@ describe("Multi-Tenant Security Tests", () => {
         expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       };
 
-      mockAuth.mockResolvedValue(sessionA);
+      mockAuth.mockResolvedValue(Promise.resolve(sessionA) as any);
 
       const ctx = createMockContext();
 
       // Mock membership for user A in organization A
-      ctx.db.membership.findFirst.mockResolvedValue({
-        id: "membership-a",
-        userId: "user-a",
-        organizationId: "org-a",
-        roleId: "role-a",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        role: {
-          id: "role-a",
-          name: "member",
+      ctx.db.membership.findFirst.mockResolvedValue(
+        Promise.resolve({
+          id: "membership-a",
+          userId: "user-a",
           organizationId: "org-a",
+          roleId: "role-a",
           createdAt: new Date(),
           updatedAt: new Date(),
-          permissions: [
-            {
-              id: "perm-1",
-              name: "issues:read",
-              description: "Read issues",
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            },
-            {
-              id: "perm-2",
-              name: "issues:write",
-              description: "Write issues",
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            },
-          ],
-        },
-      });
+          role: {
+            id: "role-a",
+            name: "member",
+            organizationId: "org-a",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            permissions: [
+              {
+                id: "perm-1",
+                name: "issues:read",
+                description: "Read issues",
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              },
+              {
+                id: "perm-2",
+                name: "issues:write",
+                description: "Write issues",
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              },
+            ],
+          },
+        }) as any,
+      );
 
       // Mock machine lookup to return a machine belonging to org-a
-      ctx.db.machine.findFirst.mockResolvedValue({
-        id: "game-a-1",
-        name: "Game A1",
-        organizationId: "org-a",
-        locationId: "location-a-1",
-        modelId: "model-1",
-        ownerId: null,
-        ownerNotificationsEnabled: false,
-        notifyOnNewIssues: false,
-        notifyOnStatusChanges: false,
-        notifyOnComments: false,
-        qrCodeId: "qr-a-1",
-        qrCodeUrl: null,
-        qrCodeGeneratedAt: null,
-        location: {
+      ctx.db.machine.findFirst.mockResolvedValue(
+        Promise.resolve({
+          id: "game-a-1",
+          name: "Game A1",
           organizationId: "org-a",
-        },
-      });
+          locationId: "location-a-1",
+          modelId: "model-1",
+          ownerId: null,
+          ownerNotificationsEnabled: false,
+          notifyOnNewIssues: false,
+          notifyOnStatusChanges: false,
+          notifyOnComments: false,
+          qrCodeId: "qr-a-1",
+          qrCodeUrl: null,
+          qrCodeGeneratedAt: null,
+          location: {
+            organizationId: "org-a",
+          },
+        }) as any,
+      );
 
       // Mock machine findUnique for notification service
-      ctx.db.machine.findUnique.mockResolvedValue({
-        id: "game-a-1",
-        name: "Game A1",
-        organizationId: "org-a",
-        locationId: "location-a-1",
-        modelId: "model-1",
-        ownerId: "user-a",
-        ownerNotificationsEnabled: false,
-        notifyOnNewIssues: false,
-        notifyOnStatusChanges: false,
-        notifyOnComments: false,
-        qrCodeId: "qr-a-1",
-        qrCodeUrl: null,
-        qrCodeGeneratedAt: null,
-        location: {
+      ctx.db.machine.findUnique.mockResolvedValue(
+        Promise.resolve({
+          id: "game-a-1",
+          name: "Game A1",
           organizationId: "org-a",
-        },
-      });
+          locationId: "location-a-1",
+          modelId: "model-1",
+          ownerId: "user-a",
+          ownerNotificationsEnabled: false,
+          notifyOnNewIssues: false,
+          notifyOnStatusChanges: false,
+          notifyOnComments: false,
+          qrCodeId: "qr-a-1",
+          qrCodeUrl: null,
+          qrCodeGeneratedAt: null,
+          location: {
+            organizationId: "org-a",
+          },
+        }) as any,
+      );
 
       // Mock issue status lookup (for default "New" status)
-      ctx.db.issueStatus.findFirst.mockResolvedValue({
-        id: "status-1",
-        name: "New",
-        organizationId: "org-a",
-        isDefault: true,
-        category: "NEW",
-      });
+      ctx.db.issueStatus.findFirst.mockResolvedValue(
+        Promise.resolve({
+          id: "status-1",
+          name: "New",
+          organizationId: "org-a",
+          isDefault: true,
+          category: "NEW",
+        }) as any,
+      );
 
       // Mock priority lookup (for default priority)
-      ctx.db.priority.findFirst.mockResolvedValue({
-        id: "priority-1",
-        name: "Medium",
-        organizationId: "org-a",
-        isDefault: true,
-        order: 2,
-      });
+      ctx.db.priority.findFirst.mockResolvedValue(
+        Promise.resolve({
+          id: "priority-1",
+          name: "Medium",
+          organizationId: "org-a",
+          isDefault: true,
+          order: 2,
+        }) as any,
+      );
 
       // Mock successful creation
-      ctx.db.issue.create.mockResolvedValue({
-        id: "new-issue",
-        title: "Test Issue",
-        description: "Test Description",
-        machineId: "game-a-1",
-        statusId: "status-1",
-        organizationId: "org-a", // Should be automatically set
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        priorityId: "priority-1",
-        createdById: "user-a",
-        assignedToId: null,
-        resolvedAt: null,
-        consistency: null,
-        checklist: null,
-      });
+      ctx.db.issue.create.mockResolvedValue(
+        Promise.resolve({
+          id: "new-issue",
+          title: "Test Issue",
+          description: "Test Description",
+          machineId: "game-a-1",
+          statusId: "status-1",
+          organizationId: "org-a", // Should be automatically set
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          priorityId: "priority-1",
+          createdById: "user-a",
+          assignedToId: null,
+          resolvedAt: null,
+          consistency: null,
+          checklist: null,
+        }) as any,
+      );
 
       const callerA = createCaller({
         ...ctx,
@@ -605,7 +639,7 @@ describe("Multi-Tenant Security Tests", () => {
         headers: new Headers({
           host: "org-a.localhost:3000",
         }),
-      }) as CallerType;
+      } as TRPCContext) as CallerType;
 
       // The create mutation should automatically add the correct organizationId
       const createData = {
@@ -643,42 +677,46 @@ describe("Multi-Tenant Security Tests", () => {
         expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       };
 
-      mockAuth.mockResolvedValue(sessionA);
+      mockAuth.mockResolvedValue(Promise.resolve(sessionA) as any);
 
       const ctx = createMockContext();
 
       // Mock membership for user A in organization A (but user should NOT be able to edit org B issues)
-      ctx.db.membership.findFirst.mockResolvedValue({
-        id: "membership-a",
-        userId: "user-a",
-        organizationId: "org-a",
-        roleId: "role-a",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        role: {
-          id: "role-a",
-          name: "admin",
-          permissions: [{ name: "issues:read" }, { name: "issues:write" }],
-        },
-      });
+      ctx.db.membership.findFirst.mockResolvedValue(
+        Promise.resolve({
+          id: "membership-a",
+          userId: "user-a",
+          organizationId: "org-a",
+          roleId: "role-a",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          role: {
+            id: "role-a",
+            name: "admin",
+            permissions: [{ name: "issues:read" }, { name: "issues:write" }],
+          },
+        }) as any,
+      );
 
       // Mock finding an issue from Organization B
-      ctx.db.issue.findUnique.mockResolvedValue({
-        id: "issue-b-1",
-        title: "Issue B1",
-        description: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        organizationId: "org-b", // Different organization
-        machineId: "game-b-1",
-        statusId: "status-1",
-        priorityId: "priority-1",
-        createdById: "user-b",
-        assignedToId: null,
-        consistency: null,
-        checklist: null,
-        resolvedAt: null,
-      });
+      ctx.db.issue.findUnique.mockResolvedValue(
+        Promise.resolve({
+          id: "issue-b-1",
+          title: "Issue B1",
+          description: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          organizationId: "org-b", // Different organization
+          machineId: "game-b-1",
+          statusId: "status-1",
+          priorityId: "priority-1",
+          createdById: "user-b",
+          assignedToId: null,
+          consistency: null,
+          checklist: null,
+          resolvedAt: null,
+        }) as any,
+      );
 
       const callerA = createCaller({
         ...ctx,
@@ -687,7 +725,7 @@ describe("Multi-Tenant Security Tests", () => {
         headers: new Headers({
           host: "org-a.localhost:3000",
         }),
-      }) as CallerType;
+      } as TRPCContext) as CallerType;
 
       // Should fail to update issue from different organization
       await expect(
@@ -712,25 +750,29 @@ describe("Multi-Tenant Security Tests", () => {
         expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       };
 
-      mockAuth.mockResolvedValue(memberSession);
+      mockAuth.mockResolvedValue(Promise.resolve(memberSession) as any);
 
       const ctx = createMockContext();
-      ctx.db.issue.findMany.mockResolvedValue(issuesOrgA);
+      ctx.db.issue.findMany.mockResolvedValue(
+        Promise.resolve(issuesOrgA) as any,
+      );
 
       // Mock membership for member user in organization A
-      ctx.db.membership.findFirst.mockResolvedValue({
-        id: "membership-member",
-        userId: "user-a-member",
-        organizationId: "org-a",
-        roleId: "role-member",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        role: {
-          id: "role-member",
-          name: "member",
-          permissions: [{ name: "issues:read" }],
-        },
-      });
+      ctx.db.membership.findFirst.mockResolvedValue(
+        Promise.resolve({
+          id: "membership-member",
+          userId: "user-a-member",
+          organizationId: "org-a",
+          roleId: "role-member",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          role: {
+            id: "role-member",
+            name: "member",
+            permissions: [{ name: "issues:read" }],
+          },
+        }) as any,
+      );
 
       const memberCaller = createCaller({
         ...ctx,
@@ -739,7 +781,7 @@ describe("Multi-Tenant Security Tests", () => {
         headers: new Headers({
           host: "org-a.localhost:3000",
         }),
-      }) as CallerType;
+      } as TRPCContext) as CallerType;
 
       // Member should be able to access organization data
       const result = await memberCaller.issue.core.getAll({
@@ -769,30 +811,34 @@ describe("Multi-Tenant Security Tests", () => {
         expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       };
 
-      mockAuth.mockResolvedValue(adminSession);
+      mockAuth.mockResolvedValue(Promise.resolve(adminSession) as any);
 
       // Configure the context's mock database to return the specific test data
       const ctxAdmin = createMockContext();
-      ctxAdmin.db.issue.findMany.mockResolvedValue(issuesOrgA);
+      ctxAdmin.db.issue.findMany.mockResolvedValue(
+        Promise.resolve(issuesOrgA) as any,
+      );
 
       // Mock membership for admin user in organization A
-      ctxAdmin.db.membership.findFirst.mockResolvedValue({
-        id: "membership-admin",
-        userId: "user-a-admin-id",
-        organizationId: "org-a",
-        roleId: "role-admin",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        role: {
-          id: "role-admin",
-          name: "admin",
-          permissions: [
-            { name: "issues:read" },
-            { name: "issues:write" },
-            { name: "admin:all" },
-          ],
-        },
-      });
+      ctxAdmin.db.membership.findFirst.mockResolvedValue(
+        Promise.resolve({
+          id: "membership-admin",
+          userId: "user-a-admin-id",
+          organizationId: "org-a",
+          roleId: "role-admin",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          role: {
+            id: "role-admin",
+            name: "admin",
+            permissions: [
+              { name: "issues:read" },
+              { name: "issues:write" },
+              { name: "admin:all" },
+            ],
+          },
+        }) as any,
+      );
 
       const adminCaller = createCaller({
         ...ctxAdmin,
@@ -801,7 +847,7 @@ describe("Multi-Tenant Security Tests", () => {
         headers: new Headers({
           host: "org-a.localhost:3000",
         }),
-      }) as CallerType;
+      } as TRPCContext) as CallerType;
 
       const result = await adminCaller.issue.core.getAll({
         locationId: undefined,
@@ -841,7 +887,7 @@ describe("Multi-Tenant Security Tests", () => {
         expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       };
 
-      mockAuth.mockResolvedValue(session);
+      mockAuth.mockResolvedValue(Promise.resolve(session) as any);
 
       // Test that subdomain resolution logic works by verifying
       // the organization is found by subdomain when needed
@@ -867,11 +913,13 @@ describe("Multi-Tenant Security Tests", () => {
         expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       };
 
-      mockAuth.mockResolvedValue(session);
+      mockAuth.mockResolvedValue(Promise.resolve(session) as any);
 
       const ctx = createMockContext();
       // Mock that user has no membership in org-b
-      ctx.db.membership.findFirst.mockResolvedValue(null);
+      ctx.db.membership.findFirst.mockResolvedValue(
+        Promise.resolve(null) as any,
+      );
 
       const caller = createCaller({
         ...ctx,
@@ -880,7 +928,7 @@ describe("Multi-Tenant Security Tests", () => {
         headers: new Headers({
           host: "org-b.localhost:3000", // Spoofed subdomain
         }),
-      }) as CallerType;
+      } as TRPCContext) as CallerType;
 
       await expect(caller.user.getCurrentMembership()).rejects.toThrow(
         new TRPCError({

@@ -19,7 +19,7 @@ const mockNotificationService: jest.Mocked<NotificationService> = {
   notifyMachineOwnerOfIssue: jest.fn().mockResolvedValue(undefined),
   notifyMachineOwnerOfStatusChange: jest.fn().mockResolvedValue(undefined),
   notifyUserOfAssignment: jest.fn().mockResolvedValue(undefined),
-} as jest.Mocked<NotificationService>;
+} as unknown as jest.Mocked<NotificationService>;
 
 const mockCollectionService: jest.Mocked<CollectionService> = {
   // Add collection service methods here when needed
@@ -33,7 +33,7 @@ const mockIssueActivityService: jest.Mocked<IssueActivityService> = {
   recordFieldUpdate: jest.fn().mockResolvedValue(undefined),
   recordCommentDeleted: jest.fn().mockResolvedValue(undefined),
   getIssueTimeline: jest.fn().mockResolvedValue([]),
-} as jest.Mocked<IssueActivityService>;
+} as unknown as jest.Mocked<IssueActivityService>;
 
 const mockPinballMapService: jest.Mocked<PinballMapService> = {
   // Add pinball map service methods here when needed
@@ -56,7 +56,7 @@ const createMockServiceFactory = (): DeepMockProxy<ServiceFactory> => {
     createIssueActivityService: jest.fn(() => mockIssueActivityService),
     createCommentCleanupService: jest.fn(() => mockCommentCleanupService),
     createQRCodeService: jest.fn(() => mockQRCodeService),
-  } as DeepMockProxy<ServiceFactory>;
+  } as unknown as DeepMockProxy<ServiceFactory>;
 };
 
 export interface MockContext {
@@ -87,7 +87,7 @@ export function createMockContext(): MockContext {
   mockDb.$accelerate = {
     invalidate: jest.fn(),
     ttl: jest.fn(),
-  };
+  } as any;
 
   // Set up default membership mock - can be overridden in individual tests
   mockDb.membership.findFirst.mockResolvedValue(mockMembership);
@@ -108,12 +108,12 @@ export function createMockContext(): MockContext {
   // Set up default machine mock
   mockDb.machine.findMany.mockResolvedValue([mockMachine]);
   mockDb.machine.findUnique.mockResolvedValue(mockMachine);
-  mockDb.machine.create.mockResolvedValue(mockMachine);
+  mockDb.machine.create.mockResolvedValue(mockMachine as any);
 
   // Set up default model mock
   mockDb.model.findMany.mockResolvedValue([mockModel]);
   mockDb.model.findUnique.mockResolvedValue(mockModel);
-  mockDb.model.create.mockResolvedValue(mockModel);
+  mockDb.model.create.mockResolvedValue(mockModel as any);
 
   // Set up default notification mock
   mockDb.notification.findMany.mockResolvedValue([]);
