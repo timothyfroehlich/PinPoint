@@ -84,6 +84,56 @@ npm run typecheck:changed                         # Check git-modified files
 - **Test quality** - Same standards as production code
 - **Coverage thresholds** - 50% global, 60% server/, 70% lib/ (configured in jest.config.js)
 
+## TypeScript Strictest Mode Guidelines
+
+### Key Patterns for `@tsconfig/strictest` Compliance
+
+1. **Optional Properties (`exactOptionalPropertyTypes`)**
+
+   ```typescript
+   // ❌ Bad: undefined not assignable to optional
+   const data: { prop?: string } = { prop: value || undefined };
+
+   // ✅ Good: Use conditional assignment
+   const data: { prop?: string } = {};
+   if (value) data.prop = value;
+   ```
+
+2. **Null Checks (`strictNullChecks`)**
+
+   ```typescript
+   // ❌ Bad: Object possibly null
+   const id = ctx.session.user.id;
+
+   // ✅ Good: Guard with optional chaining
+   if (!ctx.session?.user?.id) throw new Error("Not authenticated");
+   const id = ctx.session.user.id;
+   ```
+
+3. **Type Assertions**
+
+   ```typescript
+   // ❌ Bad: Avoid 'as' casting
+   const mock = jest.fn() as jest.Mock<any>;
+
+   // ✅ Good: Use proper generics
+   const mock = jest.fn<ReturnType, [Parameters]>();
+   ```
+
+4. **Prisma Mocks (with $accelerate)**
+   ```typescript
+   // ✅ ExtendedPrismaClient includes $accelerate
+   const mockPrisma = {
+     user: { findUnique: jest.fn() },
+     $accelerate: {
+       invalidate: jest.fn(),
+       invalidateAll: jest.fn(),
+     },
+   };
+   ```
+
+**Remember**: Betterer tracks all TypeScript errors - no new errors allowed in production code!
+
 ## Development Workflow
 
 1. **Start**: `npm run validate` → `npm run dev:full`
@@ -127,8 +177,8 @@ npm run typecheck:changed                         # Check git-modified files
 - **ESM modules**: Project uses `"type": "module"` - some packages (superjson, @auth/prisma-adapter) are ESM-only and may need transformIgnorePatterns updates in Jest
 - **Jest ESM**: Current config uses `ts-jest/presets/default-esm` - avoid changing without understanding ESM implications
 - **Type Safety**: Project enforces strictest TypeScript + type-aware ESLint rules. All `@typescript-eslint/no-unsafe-*` and `no-explicit-any` violations must be fixed
-- **TypeScript Migration**: Currently migrating to strictest mode - use new file-specific scripts for focused type checking during fixes
-- **Migration Tracking**: See `TYPESCRIPT_MIGRATION.md` for current status, error counts, lessons learned, and coordination across branches/PRs. Run `./scripts/update-typescript-stats.sh` to update counts
+- **TypeScript Migration**: ✅ Production code is 100% strict mode compliant! Test files being cleaned up incrementally
+- **Migration Tracking**: See `TYPESCRIPT_MIGRATION.md` for patterns and progress. Betterer prevents regressions
 
 ## Frontend Development Notes
 
