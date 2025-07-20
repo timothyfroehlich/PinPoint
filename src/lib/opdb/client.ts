@@ -77,7 +77,10 @@ export class OPDBClient {
           options.headers.forEach((value, key) => {
             (headers as Headers).set(key, value);
           });
-        } else if (typeof options.headers === "object" && !Array.isArray(options.headers)) {
+        } else if (
+          typeof options.headers === "object" &&
+          !Array.isArray(options.headers)
+        ) {
           headers = { ...baseHeaders, ...options.headers };
         } else {
           // Handle array format if needed

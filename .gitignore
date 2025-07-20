@@ -57,3 +57,12 @@ node_modules/
 # Orchestrator multi-agent system
 .claude/SUBAGENT_TASK.md
 .claude/ORCHESTRATOR_NOTES.md
+
+# Build/lint/test output files
+*-errors.json
+*-report.json
+*-output.log
+typescript-output.log
+eslint-test-output.log
+eslint-prod-errors.json
+betterer-output.log

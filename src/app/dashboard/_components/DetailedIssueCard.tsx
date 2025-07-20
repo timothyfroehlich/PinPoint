@@ -43,7 +43,7 @@ const DetailedIssueCard = ({
   machineName,
   status,
   priority,
-}: DetailedIssueCardProps) => {
+}: DetailedIssueCardProps): React.ReactElement => {
   return (
     <Card
       sx={{

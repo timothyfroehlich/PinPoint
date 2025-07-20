@@ -44,8 +44,10 @@ describe("Notification preference logic", () => {
       ownerNotificationsEnabled: false,
     };
 
-    (mockPrisma.machine.update).mockResolvedValue(updatedMachine);
-    (mockPrisma.machine.findUnique).mockResolvedValue(updatedMachine);
+    (mockPrisma.machine.update as jest.Mock).mockResolvedValue(updatedMachine);
+    (mockPrisma.machine.findUnique as jest.Mock).mockResolvedValue(
+      updatedMachine,
+    );
 
     // Test disabling all notifications for machine
     await mockPrisma.machine.update({
@@ -58,6 +60,7 @@ describe("Notification preference logic", () => {
     });
 
     expect(updated?.ownerNotificationsEnabled).toBe(false);
+    // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(mockPrisma.machine.update).toHaveBeenCalledWith({
       where: { id: mockMachine.id },
       data: { ownerNotificationsEnabled: false },
@@ -70,8 +73,8 @@ describe("Notification preference logic", () => {
       emailNotificationsEnabled: false,
     };
 
-    (mockPrisma.user.update).mockResolvedValue(updatedUser);
-    (mockPrisma.user.findUnique).mockResolvedValue(updatedUser);
+    (mockPrisma.user.update as jest.Mock).mockResolvedValue(updatedUser);
+    (mockPrisma.user.findUnique as jest.Mock).mockResolvedValue(updatedUser);
 
     // Test disabling all notifications for user
     await mockPrisma.user.update({
@@ -84,6 +87,7 @@ describe("Notification preference logic", () => {
     });
 
     expect(updated?.emailNotificationsEnabled).toBe(false);
+    // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(mockPrisma.user.update).toHaveBeenCalledWith({
       where: { id: mockUser.id },
       data: { emailNotificationsEnabled: false },
@@ -100,10 +104,12 @@ describe("Notification preference logic", () => {
       emailNotificationsEnabled: false,
     };
 
-    (mockPrisma.machine.update).mockResolvedValue(updatedMachine);
-    (mockPrisma.machine.findUnique).mockResolvedValue(updatedMachine);
-    (mockPrisma.user.update).mockResolvedValue(updatedUser);
-    (mockPrisma.user.findUnique).mockResolvedValue(updatedUser);
+    (mockPrisma.machine.update as jest.Mock).mockResolvedValue(updatedMachine);
+    (mockPrisma.machine.findUnique as jest.Mock).mockResolvedValue(
+      updatedMachine,
+    );
+    (mockPrisma.user.update as jest.Mock).mockResolvedValue(updatedUser);
+    (mockPrisma.user.findUnique as jest.Mock).mockResolvedValue(updatedUser);
 
     // Machine notifications enabled, user notifications disabled
     await mockPrisma.machine.update({
@@ -157,15 +163,15 @@ describe("Notification preference logic", () => {
       updatedAt: new Date(),
     };
 
-    (mockPrisma.user.create).mockResolvedValue(newUser);
-    (mockPrisma.machine.create).mockResolvedValue(newMachine);
+    (mockPrisma.user.create as jest.Mock).mockResolvedValue(newUser);
+    (mockPrisma.machine.create as jest.Mock).mockResolvedValue(newMachine);
 
     const createdUser = await mockPrisma.user.create({
       data: { email: "defaultuser@example.com", name: "Default User" },
     });
     const createdMachine = await mockPrisma.machine.create({
       data: {
-        name: "Test Machine",
+        serialNumber: "Test Machine",
         organizationId: "org-1",
         locationId: "location-1",
         modelId: "model-1",

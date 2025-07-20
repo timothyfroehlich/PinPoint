@@ -43,7 +43,7 @@ export const userRouter = createTRPCRouter({
   }),
 
   // Get current user's membership info in the current organization
-  getCurrentMembership: organizationProcedure.query(async ({ ctx }) => {
+  getCurrentMembership: organizationProcedure.query(({ ctx }) => {
     return {
       userId: ctx.membership.userId,
       role: ctx.membership.role.name,
@@ -194,7 +194,7 @@ export const userRouter = createTRPCRouter({
     });
 
     return memberships.map((m) => ({
-      ...(m.user ?? {}),
+      ...m.user,
       role: m.role.name,
     }));
   }),

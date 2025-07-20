@@ -5,6 +5,8 @@ import Grid from "@mui/material/Grid";
 
 import DetailedIssueCard from "./_components/DetailedIssueCard";
 
+import type { JSX } from "react";
+
 type IssueStatus = "new" | "in progress" | "acknowledged" | "resolved";
 type IssuePriority = "high" | "medium" | "low";
 
@@ -41,7 +43,7 @@ const resolvedIssues: Issue[] = [
 
 const newlyReported = [{ location: "Pinballz Arcade", count: 2 }];
 
-export default function DashboardPage() {
+export default function DashboardPage(): JSX.Element {
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto" }}>
       <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>

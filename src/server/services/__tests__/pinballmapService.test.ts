@@ -43,16 +43,16 @@ describe("PinballMapService", () => {
     countIssueMock = jest.fn();
 
     // Assign the jest.fn() mocks to the actual ctx.db methods
-    (ctx.db.location.findUnique) = findUniqueLocationMock;
-    (ctx.db.model.findUnique) = findUniqueModelMock;
-    (ctx.db.model.create) = createModelMock;
-    (ctx.db.model.update) = updateModelMock;
-    (ctx.db.model.upsert) = upsertModelMock;
-    (ctx.db.machine.findMany) = findManyMachineMock;
-    (ctx.db.machine.deleteMany) = deleteManyMachineMock;
-    (ctx.db.machine.delete) = deleteMachineMock;
-    (ctx.db.machine.create) = createMachineMock;
-    (ctx.db.issue.count) = countIssueMock;
+    ctx.db.location.findUnique = findUniqueLocationMock;
+    ctx.db.model.findUnique = findUniqueModelMock;
+    ctx.db.model.create = createModelMock;
+    ctx.db.model.update = updateModelMock;
+    ctx.db.model.upsert = upsertModelMock;
+    ctx.db.machine.findMany = findManyMachineMock;
+    ctx.db.machine.deleteMany = deleteManyMachineMock;
+    ctx.db.machine.delete = deleteMachineMock;
+    ctx.db.machine.create = createMachineMock;
+    ctx.db.issue.count = countIssueMock;
     apiMocker = new PinballMapAPIMocker();
     apiMocker.start();
   });
@@ -206,7 +206,8 @@ describe("PinballMapService", () => {
 
       // When searching for the first machine, return the existing model
       findUniqueModelMock.mockImplementation(({ where }) => {
-        if (where?.opdbId === firstMachine.opdb_id) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        if (where?.opdbId === (firstMachine as { opdb_id?: string }).opdb_id) {
           return Promise.resolve(existingModel as Model);
         }
         return Promise.resolve(null);

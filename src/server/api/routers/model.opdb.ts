@@ -46,10 +46,10 @@ export const modelOpdbRouter = createTRPCRouter({
         data: {
           name: machineData.name,
           opdbId: input.opdbId,
-          manufacturer: machineData.manufacturer,
-          year: machineData.year,
-          opdbImgUrl: machineData.playfield_image,
-          machineType: machineData.type,
+          manufacturer: machineData.manufacturer ?? null,
+          year: machineData.year ?? null,
+          opdbImgUrl: machineData.playfield_image ?? null,
+          machineType: machineData.type ?? null,
         },
       });
     }),
@@ -89,10 +89,10 @@ export const modelOpdbRouter = createTRPCRouter({
             where: { id: title.id },
             data: {
               name: machineData.name,
-              manufacturer: machineData.manufacturer,
-              year: machineData.year,
-              opdbImgUrl: machineData.playfield_image,
-              machineType: machineData.type,
+              manufacturer: machineData.manufacturer ?? null,
+              year: machineData.year ?? null,
+              opdbImgUrl: machineData.playfield_image ?? null,
+              machineType: machineData.type ?? null,
             },
           });
           syncedCount++;
@@ -105,7 +105,7 @@ export const modelOpdbRouter = createTRPCRouter({
     return {
       synced: syncedCount,
       total: opdbGamesToSync.length,
-      message: `Synced ${syncedCount} of ${opdbGamesToSync.length} games`,
+      message: `Synced ${syncedCount.toString()} of ${opdbGamesToSync.length.toString()} games`,
     };
   }),
 });

@@ -1,43 +1,29 @@
+import { jest } from "@jest/globals";
 import { TRPCError } from "@trpc/server";
 import { type Session } from "next-auth";
 
 import { appRouter } from "~/server/api/root";
 import { createCallerFactory } from "~/server/api/trpc";
 import { auth } from "~/server/auth";
-import { createMockContext, type MockContext } from "~/test/mockContext";
+import { createMockContext } from "~/test/mockContext";
 
 // Mock auth function
 jest.mock("~/server/auth", () => ({
   auth: jest.fn(),
 }));
 
-// Create properly typed mock functions
-const mockOrganizationFindUnique = jest.fn();
-const mockMembershipFindUnique = jest.fn();
-const mockMembershipFindFirst = jest.fn();
-const mockAuth = auth as jest.MockedFunction<typeof auth>;
-const mockIssueFindUnique = jest.fn();
-const mockMachineFindFirst = jest.fn();
-const mockMachineFindUnique = jest.fn();
-const mockIssueStatusFindFirst = jest.fn();
-const mockPriorityFindFirst = jest.fn();
-const mockIssueCreate = jest.fn();
+const mockAuth = auth as unknown as jest.MockedFunction<
+  () => Promise<Session | null>
+>;
+
+// These mock functions are defined but not used as the tests use ctx.db.* mocks instead
 
 // Create caller factory
 const createCaller = createCallerFactory(appRouter);
 
-// Temporary enum for testing with the new schema
-enum _Role {
-  ADMIN = "admin",
-  MEMBER = "member",
-  TECHNICIAN = "technician",
-}
-
 describe("Multi-Tenant Security Tests", () => {
-  let _mockContext: MockContext;
-
   beforeEach(() => {
-    _mockContext = createMockContext();
+    createMockContext();
   });
 
   // Test data for Organization A
@@ -50,38 +36,6 @@ describe("Multi-Tenant Security Tests", () => {
     updatedAt: new Date(),
   };
 
-  const userAMember = {
-    id: "membership-a",
-    userId: "user-a",
-    organizationId: "org-a",
-    role: {
-      id: "role-member-a",
-      name: "member",
-      organizationId: "org-a",
-      permissions: [
-        { id: "perm-1", name: "issues:read" },
-        { id: "perm-2", name: "issues:write" },
-      ],
-    },
-  };
-
-  const userAAdmin = {
-    id: "membership-a-admin",
-    userId: "user-a-admin-id",
-    organizationId: "org-a",
-    role: {
-      id: "role-admin",
-      name: "admin",
-      organizationId: "org-a",
-      permissions: [
-        { id: "perm-1", name: "issues:read" },
-        { id: "perm-2", name: "issues:write" },
-        { id: "perm-3", name: "issue:edit" },
-        { id: "perm-4", name: "admin:manage" },
-      ],
-    },
-  };
-
   // Test data for Organization B
   const organizationB = {
     id: "org-b",
@@ -90,21 +44,6 @@ describe("Multi-Tenant Security Tests", () => {
     logoUrl: null,
     createdAt: new Date(),
     updatedAt: new Date(),
-  };
-
-  const userBMember = {
-    id: "user-b-member",
-    userId: "user-b",
-    organizationId: "org-b",
-    role: {
-      id: "role-member-b",
-      name: "member",
-      organizationId: "org-b",
-      permissions: [
-        { id: "perm-1", name: "issues:read" },
-        { id: "perm-2", name: "issues:write" },
-      ],
-    },
   };
 
   // Sample issues for each organization
@@ -197,13 +136,43 @@ describe("Multi-Tenant Security Tests", () => {
       };
 
       mockAuth.mockResolvedValue(sessionA);
-      mockOrganizationFindUnique.mockResolvedValue(organizationA);
-      mockMembershipFindUnique.mockResolvedValue(userAMember);
-      mockMembershipFindFirst.mockResolvedValue(userAMember);
 
       // Mock issue data - should only return Organization A's issues
       const ctx = createMockContext();
       ctx.db.issue.findMany.mockResolvedValue(issuesOrgA);
+
+      // Mock membership for user A in organization A
+      ctx.db.membership.findFirst.mockResolvedValue({
+        id: "membership-a",
+        userId: "user-a",
+        organizationId: "org-a",
+        roleId: "role-a",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        role: {
+          id: "role-a",
+          name: "member",
+          organizationId: "org-a",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          permissions: [
+            {
+              id: "perm-1",
+              name: "issues:read",
+              description: "Read issues",
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+            {
+              id: "perm-2",
+              name: "issues:write",
+              description: "Write issues",
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          ],
+        },
+      });
 
       const callerA = createCaller({
         ...ctx,
@@ -226,12 +195,13 @@ describe("Multi-Tenant Security Tests", () => {
       expect(result).toEqual(issuesOrgA);
 
       // Verify that the query included organization filter
+
       expect(ctx.db.issue.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
             organizationId: "org-a",
           }),
-        }) as unknown,
+        }),
       );
     });
 
@@ -249,8 +219,6 @@ describe("Multi-Tenant Security Tests", () => {
       };
 
       mockAuth.mockResolvedValue(sessionA);
-      // Return Organization B when subdomain is org-b
-      mockOrganizationFindUnique.mockResolvedValue(organizationB);
 
       // Setup context with proper mocks for no membership in Organization B
       const ctx = createMockContext();
@@ -313,12 +281,42 @@ describe("Multi-Tenant Security Tests", () => {
 
       // Test Organization A access
       mockAuth.mockResolvedValue(sessionA);
-      mockOrganizationFindUnique.mockResolvedValue(organizationA);
-      mockMembershipFindUnique.mockResolvedValue(userAMember);
-      mockMembershipFindFirst.mockResolvedValue(userAMember);
 
       const ctx = createMockContext();
       ctx.db.issue.findMany.mockResolvedValue(issuesOrgA);
+
+      // Mock membership for user A in organization A
+      ctx.db.membership.findFirst.mockResolvedValue({
+        id: "membership-a",
+        userId: "user-a",
+        organizationId: "org-a",
+        roleId: "role-a",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        role: {
+          id: "role-a",
+          name: "member",
+          organizationId: "org-a",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          permissions: [
+            {
+              id: "perm-1",
+              name: "issues:read",
+              description: "Read issues",
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+            {
+              id: "perm-2",
+              name: "issues:write",
+              description: "Write issues",
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          ],
+        },
+      });
 
       const callerA = createCaller({
         ...ctx,
@@ -343,12 +341,42 @@ describe("Multi-Tenant Security Tests", () => {
       // Reset mocks and test Organization B access
       jest.clearAllMocks();
       mockAuth.mockResolvedValue(sessionB);
-      mockOrganizationFindUnique.mockResolvedValue(organizationB);
-      mockMembershipFindUnique.mockResolvedValue(userBMember);
-      mockMembershipFindFirst.mockResolvedValue(userBMember);
 
       const ctxB = createMockContext();
       ctxB.db.issue.findMany.mockResolvedValue(issuesOrgB);
+
+      // Mock membership for user B in organization B
+      ctxB.db.membership.findFirst.mockResolvedValue({
+        id: "membership-b",
+        userId: "user-b",
+        organizationId: "org-b",
+        roleId: "role-b",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        role: {
+          id: "role-b",
+          name: "member",
+          organizationId: "org-b",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          permissions: [
+            {
+              id: "perm-1",
+              name: "issues:read",
+              description: "Read issues",
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+            {
+              id: "perm-2",
+              name: "issues:write",
+              description: "Write issues",
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          ],
+        },
+      });
 
       const callerB = createCaller({
         ...ctxB,
@@ -371,12 +399,13 @@ describe("Multi-Tenant Security Tests", () => {
       expect(resultB).toEqual(issuesOrgB);
 
       // Verify Organization B query had correct filter
+
       expect(ctxB.db.issue.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
             organizationId: "org-b",
           }),
-        }) as unknown,
+        }),
       );
     });
   });
@@ -395,24 +424,38 @@ describe("Multi-Tenant Security Tests", () => {
       };
 
       mockAuth.mockResolvedValue(sessionA);
-      mockOrganizationFindUnique.mockResolvedValue(organizationA);
-      mockMembershipFindUnique.mockResolvedValue(userAAdmin);
-      mockMembershipFindFirst.mockResolvedValue(userAAdmin);
-
-      // Try to return an issue from Organization B
-      mockIssueFindUnique.mockResolvedValue({
-        id: "issue-b-1",
-        title: "Issue B1",
-        organizationId: "org-b", // Different organization!
-        machineId: "game-b-1",
-      });
 
       const ctx = createMockContext();
       ctx.db.issue.findUnique.mockResolvedValue({
         id: "issue-b-1",
         title: "Issue B1",
+        description: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
         organizationId: "org-b",
         machineId: "game-b-1",
+        statusId: "status-1",
+        priorityId: "priority-1",
+        createdById: "user-b",
+        assignedToId: null,
+        consistency: null,
+        checklist: null,
+        resolvedAt: null,
+      });
+
+      // Mock membership for user A in organization A (but not in org B)
+      ctx.db.membership.findFirst.mockResolvedValue({
+        id: "membership-a",
+        userId: "user-a",
+        organizationId: "org-a",
+        roleId: "role-a",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        role: {
+          id: "role-a",
+          name: "admin",
+          permissions: [{ name: "issues:read" }, { name: "issues:write" }],
+        },
       });
 
       const callerA = createCaller({
@@ -443,49 +486,57 @@ describe("Multi-Tenant Security Tests", () => {
       };
 
       mockAuth.mockResolvedValue(sessionA);
-      mockOrganizationFindUnique.mockResolvedValue(organizationA);
-      mockMembershipFindUnique.mockResolvedValue(userAMember);
-      mockMembershipFindFirst.mockResolvedValue(userAMember);
-
-      // Mock machine lookup to return a machine belonging to org-a
-      mockMachineFindFirst.mockResolvedValue({
-        id: "game-a-1",
-        location: {
-          organizationId: "org-a",
-        },
-      });
-
-      // Mock machine findUnique for notification service
-      mockMachineFindUnique.mockResolvedValue({
-        id: "game-a-1",
-        owner: {
-          id: "user-a",
-          name: "User A",
-          email: "user-a@example.com",
-        },
-      });
-
-      // Mock issue status lookup (for default "New" status)
-      mockIssueStatusFindFirst.mockResolvedValue({
-        id: "status-1",
-        name: "New",
-        organizationId: "org-a",
-        isDefault: true,
-      });
-
-      // Mock priority lookup (for default priority)
-      mockPriorityFindFirst.mockResolvedValue({
-        id: "priority-1",
-        name: "Medium",
-        organizationId: "org-a",
-        isDefault: true,
-      });
 
       const ctx = createMockContext();
+
+      // Mock membership for user A in organization A
+      ctx.db.membership.findFirst.mockResolvedValue({
+        id: "membership-a",
+        userId: "user-a",
+        organizationId: "org-a",
+        roleId: "role-a",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        role: {
+          id: "role-a",
+          name: "member",
+          organizationId: "org-a",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          permissions: [
+            {
+              id: "perm-1",
+              name: "issues:read",
+              description: "Read issues",
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+            {
+              id: "perm-2",
+              name: "issues:write",
+              description: "Write issues",
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          ],
+        },
+      });
 
       // Mock machine lookup to return a machine belonging to org-a
       ctx.db.machine.findFirst.mockResolvedValue({
         id: "game-a-1",
+        name: "Game A1",
+        organizationId: "org-a",
+        locationId: "location-a-1",
+        modelId: "model-1",
+        ownerId: null,
+        ownerNotificationsEnabled: false,
+        notifyOnNewIssues: false,
+        notifyOnStatusChanges: false,
+        notifyOnComments: false,
+        qrCodeId: "qr-a-1",
+        qrCodeUrl: null,
+        qrCodeGeneratedAt: null,
         location: {
           organizationId: "org-a",
         },
@@ -494,10 +545,20 @@ describe("Multi-Tenant Security Tests", () => {
       // Mock machine findUnique for notification service
       ctx.db.machine.findUnique.mockResolvedValue({
         id: "game-a-1",
-        owner: {
-          id: "user-a",
-          name: "User A",
-          email: "user-a@example.com",
+        name: "Game A1",
+        organizationId: "org-a",
+        locationId: "location-a-1",
+        modelId: "model-1",
+        ownerId: "user-a",
+        ownerNotificationsEnabled: false,
+        notifyOnNewIssues: false,
+        notifyOnStatusChanges: false,
+        notifyOnComments: false,
+        qrCodeId: "qr-a-1",
+        qrCodeUrl: null,
+        qrCodeGeneratedAt: null,
+        location: {
+          organizationId: "org-a",
         },
       });
 
@@ -507,6 +568,7 @@ describe("Multi-Tenant Security Tests", () => {
         name: "New",
         organizationId: "org-a",
         isDefault: true,
+        category: "NEW",
       });
 
       // Mock priority lookup (for default priority)
@@ -515,6 +577,7 @@ describe("Multi-Tenant Security Tests", () => {
         name: "Medium",
         organizationId: "org-a",
         isDefault: true,
+        order: 2,
       });
 
       // Mock successful creation
@@ -552,16 +615,10 @@ describe("Multi-Tenant Security Tests", () => {
         statusId: "status-1",
       };
 
-      // Mock successful creation
-      mockIssueCreate.mockResolvedValue({
-        id: "new-issue",
-        ...createData,
-        organizationId: "org-a", // Should be automatically set
-      });
-
       await callerA.issue.core.create(createData);
 
       // Verify that organizationId was automatically added
+
       expect(ctx.db.issue.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -570,7 +627,7 @@ describe("Multi-Tenant Security Tests", () => {
             machineId: createData.machineId,
             organizationId: "org-a", // This is the key security check
           }),
-        }) as unknown,
+        }),
       );
     });
 
@@ -587,26 +644,40 @@ describe("Multi-Tenant Security Tests", () => {
       };
 
       mockAuth.mockResolvedValue(sessionA);
-      mockOrganizationFindUnique.mockResolvedValue(organizationA);
-      mockMembershipFindUnique.mockResolvedValue(userAAdmin);
-      mockMembershipFindFirst.mockResolvedValue(userAAdmin);
-
-      // Mock finding an issue from Organization B
-      mockIssueFindUnique.mockResolvedValue({
-        id: "issue-b-1",
-        title: "Issue B1",
-        organizationId: "org-b", // Different organization
-        machineId: "game-b-1",
-      });
 
       const ctx = createMockContext();
+
+      // Mock membership for user A in organization A (but user should NOT be able to edit org B issues)
+      ctx.db.membership.findFirst.mockResolvedValue({
+        id: "membership-a",
+        userId: "user-a",
+        organizationId: "org-a",
+        roleId: "role-a",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        role: {
+          id: "role-a",
+          name: "admin",
+          permissions: [{ name: "issues:read" }, { name: "issues:write" }],
+        },
+      });
 
       // Mock finding an issue from Organization B
       ctx.db.issue.findUnique.mockResolvedValue({
         id: "issue-b-1",
         title: "Issue B1",
+        description: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
         organizationId: "org-b", // Different organization
         machineId: "game-b-1",
+        statusId: "status-1",
+        priorityId: "priority-1",
+        createdById: "user-b",
+        assignedToId: null,
+        consistency: null,
+        checklist: null,
+        resolvedAt: null,
       });
 
       const callerA = createCaller({
@@ -642,12 +713,24 @@ describe("Multi-Tenant Security Tests", () => {
       };
 
       mockAuth.mockResolvedValue(memberSession);
-      mockOrganizationFindUnique.mockResolvedValue(organizationA);
-      mockMembershipFindUnique.mockResolvedValue(userAMember);
-      mockMembershipFindFirst.mockResolvedValue(userAMember);
 
       const ctx = createMockContext();
       ctx.db.issue.findMany.mockResolvedValue(issuesOrgA);
+
+      // Mock membership for member user in organization A
+      ctx.db.membership.findFirst.mockResolvedValue({
+        id: "membership-member",
+        userId: "user-a-member",
+        organizationId: "org-a",
+        roleId: "role-member",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        role: {
+          id: "role-member",
+          name: "member",
+          permissions: [{ name: "issues:read" }],
+        },
+      });
 
       const memberCaller = createCaller({
         ...ctx,
@@ -687,13 +770,29 @@ describe("Multi-Tenant Security Tests", () => {
       };
 
       mockAuth.mockResolvedValue(adminSession);
-      mockOrganizationFindUnique.mockResolvedValue(organizationA);
-      mockMembershipFindUnique.mockResolvedValue(userAAdmin);
-      mockMembershipFindFirst.mockResolvedValue(userAAdmin);
 
       // Configure the context's mock database to return the specific test data
       const ctxAdmin = createMockContext();
       ctxAdmin.db.issue.findMany.mockResolvedValue(issuesOrgA);
+
+      // Mock membership for admin user in organization A
+      ctxAdmin.db.membership.findFirst.mockResolvedValue({
+        id: "membership-admin",
+        userId: "user-a-admin-id",
+        organizationId: "org-a",
+        roleId: "role-admin",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        role: {
+          id: "role-admin",
+          name: "admin",
+          permissions: [
+            { name: "issues:read" },
+            { name: "issues:write" },
+            { name: "admin:all" },
+          ],
+        },
+      });
 
       const adminCaller = createCaller({
         ...ctxAdmin,
@@ -718,18 +817,19 @@ describe("Multi-Tenant Security Tests", () => {
       expect(result.length).toBeGreaterThan(0);
 
       // Verify admin can only access their organization's data
+
       expect(ctxAdmin.db.issue.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
             organizationId: "org-a",
           }),
-        }) as unknown,
+        }),
       );
     });
   });
 
   describe("Subdomain Resolution Security", () => {
-    it("should correctly resolve organization from subdomain", async () => {
+    it("should correctly resolve organization from subdomain", () => {
       const session: Session = {
         user: {
           id: "user-a",
@@ -742,17 +842,6 @@ describe("Multi-Tenant Security Tests", () => {
       };
 
       mockAuth.mockResolvedValue(session);
-
-      // Mock organization lookup by both ID and subdomain
-      mockOrganizationFindUnique.mockImplementation((query) => {
-        if (query.where.id === "org-a" || query.where.subdomain === "org-a") {
-          return Promise.resolve(organizationA);
-        }
-        return Promise.resolve(null);
-      });
-
-      mockMembershipFindUnique.mockResolvedValue(userAMember);
-      mockMembershipFindFirst.mockResolvedValue(userAMember);
 
       // Test that subdomain resolution logic works by verifying
       // the organization is found by subdomain when needed
@@ -779,9 +868,6 @@ describe("Multi-Tenant Security Tests", () => {
       };
 
       mockAuth.mockResolvedValue(session);
-      mockOrganizationFindUnique.mockResolvedValue(organizationB); // But subdomain resolves to org-b
-      mockMembershipFindUnique.mockResolvedValue(null);
-      mockMembershipFindFirst.mockResolvedValue(null); // No membership in org-b
 
       const ctx = createMockContext();
       // Mock that user has no membership in org-b

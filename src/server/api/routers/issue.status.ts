@@ -5,7 +5,7 @@ import { createTRPCRouter, organizationProcedure } from "~/server/api/trpc";
 export const issueStatusRouter = createTRPCRouter({
   // Get counts for each status category
   getStatusCounts: organizationProcedure.query(async ({ ctx }) => {
-    const counts = (await ctx.db.issue.groupBy({
+    const counts = await ctx.db.issue.groupBy({
       by: ["statusId"],
       where: {
         organizationId: ctx.organization.id,
@@ -13,10 +13,7 @@ export const issueStatusRouter = createTRPCRouter({
       _count: {
         _all: true,
       },
-    })) as {
-      statusId: string;
-      _count: { _all: number };
-    }[];
+    });
 
     const statuses = await ctx.db.issueStatus.findMany({
       where: {
@@ -33,9 +30,14 @@ export const issueStatusRouter = createTRPCRouter({
     };
 
     for (const group of counts) {
-      const category = statusMap.get(group.statusId);
-      if (category) {
-        categoryCounts[category] += Number(group._count._all);
+      // Add type assertion for the group object properties
+      const groupTyped = group as {
+        statusId: string;
+        _count: { _all: number };
+      };
+      const category = statusMap.get(groupTyped.statusId);
+      if (category && Object.values(StatusCategory).includes(category)) {
+        categoryCounts[category] += Number(groupTyped._count._all);
       }
     }
 
