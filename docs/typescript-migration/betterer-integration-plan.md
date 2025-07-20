@@ -24,48 +24,49 @@ npm install --save-dev @betterer/cli @betterer/typescript @betterer/eslint
 #### 1.2 Create `.betterer.ts` Configuration
 
 ```typescript
-import { typescript } from '@betterer/typescript';
-import { eslint } from '@betterer/eslint';
+import { typescript } from "@betterer/typescript";
+import { eslint } from "@betterer/eslint";
 
 export default {
   // Track TypeScript strict mode errors
-  'typescript strict mode': () =>
-    typescript('./tsconfig.json', {
+  "typescript strict mode": () =>
+    typescript("./tsconfig.json", {
       strict: true,
       exactOptionalPropertyTypes: true,
       noUncheckedIndexedAccess: true,
-    }).include('./src/**/*.{ts,tsx}'),
-  
+    }).include("./src/**/*.{ts,tsx}"),
+
   // Track specific ESLint rules for production code
-  'no explicit any (production)': () =>
-    eslint({ '@typescript-eslint/no-explicit-any': 'error' })
-      .include('./src/**/*.{ts,tsx}')
-      .exclude('./src/**/*.test.{ts,tsx}')
-      .exclude('./src/**/__tests__/**'),
-  
+  "no explicit any (production)": () =>
+    eslint({ "@typescript-eslint/no-explicit-any": "error" })
+      .include("./src/**/*.{ts,tsx}")
+      .exclude("./src/**/*.test.{ts,tsx}")
+      .exclude("./src/**/__tests__/**"),
+
   // Track unsafe operations in production code
-  'no unsafe operations (production)': () =>
+  "no unsafe operations (production)": () =>
     eslint({
-      '@typescript-eslint/no-unsafe-assignment': 'error',
-      '@typescript-eslint/no-unsafe-argument': 'error',
-      '@typescript-eslint/no-unsafe-call': 'error',
-      '@typescript-eslint/no-unsafe-member-access': 'error',
-      '@typescript-eslint/no-unsafe-return': 'error',
+      "@typescript-eslint/no-unsafe-assignment": "error",
+      "@typescript-eslint/no-unsafe-argument": "error",
+      "@typescript-eslint/no-unsafe-call": "error",
+      "@typescript-eslint/no-unsafe-member-access": "error",
+      "@typescript-eslint/no-unsafe-return": "error",
     })
-      .include('./src/**/*.{ts,tsx}')
-      .exclude('./src/**/*.test.{ts,tsx}')
-      .exclude('./src/**/__tests__/**'),
-  
+      .include("./src/**/*.{ts,tsx}")
+      .exclude("./src/**/*.test.{ts,tsx}")
+      .exclude("./src/**/__tests__/**"),
+
   // Separate tracking for test files
-  'no explicit any (tests)': () =>
-    eslint({ '@typescript-eslint/no-explicit-any': 'error' })
-      .include('./src/**/*.test.{ts,tsx}')
-      .include('./src/**/__tests__/**'),
-  
+  "no explicit any (tests)": () =>
+    eslint({ "@typescript-eslint/no-explicit-any": "error" })
+      .include("./src/**/*.test.{ts,tsx}")
+      .include("./src/**/__tests__/**"),
+
   // Track unbound method issues
-  'no unbound method': () =>
-    eslint({ '@typescript-eslint/unbound-method': 'error' })
-      .include('./src/**/*.{ts,tsx}'),
+  "no unbound method": () =>
+    eslint({ "@typescript-eslint/unbound-method": "error" }).include(
+      "./src/**/*.{ts,tsx}",
+    ),
 };
 ```
 
@@ -170,7 +171,7 @@ jobs:
       - name: ESLint Check - Production Code
         run: |
           npm run lint -- --ignore-pattern "**/*.test.ts" --ignore-pattern "**/*.test.tsx" --ignore-pattern "**/__tests__/**"
-      
+
   lint-tests:
     name: ESLint (Tests)
     runs-on: ubuntu-latest
@@ -306,16 +307,16 @@ jobs:
         run: |
           # Update stats
           ./scripts/update-typescript-stats.sh
-          
+
           # Create PR comment
           cat > migration-report.md << 'EOF'
           ## 📊 TypeScript Migration Progress Report
-          
+
           EOF
-          
+
           # Extract current stats
           grep -A 5 "### Error Counts" TYPESCRIPT_MIGRATION.md >> migration-report.md
-          
+
           # Add Betterer status
           echo "" >> migration-report.md
           echo "### Betterer Status" >> migration-report.md
@@ -324,12 +325,12 @@ jobs:
           else
             echo "⚠️ Check Betterer results for details" >> migration-report.md
           fi
-          
+
           # Add helpful links
           echo "" >> migration-report.md
           echo "---" >> migration-report.md
           echo "📖 [Migration Guide](./TYPESCRIPT_MIGRATION.md) | 🔧 [Helper Scripts](./scripts/README.md)" >> migration-report.md
-          
+
       - name: Comment PR
         uses: actions/github-script@v7
         if: always()
@@ -337,19 +338,19 @@ jobs:
           script: |
             const fs = require('fs');
             const report = fs.readFileSync('migration-report.md', 'utf8');
-            
+
             // Find existing comment
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
             });
-            
+
             const botComment = comments.find(comment => 
               comment.user.type === 'Bot' && 
               comment.body.includes('TypeScript Migration Progress Report')
             );
-            
+
             if (botComment) {
               // Update existing comment
               await github.rest.issues.updateComment({
@@ -372,7 +373,16 @@ jobs:
   ci-summary:
     name: CI Summary
     runs-on: ubuntu-latest
-    needs: [typecheck, lint-production, format, betterer, test, security, validate-actions]
+    needs:
+      [
+        typecheck,
+        lint-production,
+        format,
+        betterer,
+        test,
+        security,
+        validate-actions,
+      ]
     if: always()
     steps:
       - name: Check Results
@@ -464,6 +474,7 @@ echo "4. Update .betterer.results by running 'npm run betterer:update'"
 ```
 
 Make it executable:
+
 ```bash
 chmod +x scripts/migrate-test-file.sh
 ```
@@ -512,10 +523,10 @@ for FILE in $TEST_FILES; do
     echo "Checking $FILE..."
     TS_ERRORS=$(npx tsc --noEmit --strict "$FILE" 2>&1 | grep -c "error TS" || echo "0")
     ESLINT_ERRORS=$(npx eslint "$FILE" --rule '@typescript-eslint/no-explicit-any: error' 2>&1 | grep -c "error" || echo "0")
-    
+
     TOTAL_TS_ERRORS=$((TOTAL_TS_ERRORS + TS_ERRORS))
     TOTAL_ESLINT_ERRORS=$((TOTAL_ESLINT_ERRORS + ESLINT_ERRORS))
-    
+
     echo "  TypeScript errors: $TS_ERRORS"
     echo "  ESLint errors: $ESLINT_ERRORS"
 done
@@ -573,17 +584,21 @@ Add new sections:
 **Status**: ✅ Implemented (2025-01-XX)
 
 ### Overview
+
 Betterer is now integrated to track TypeScript migration progress and prevent regressions. It monitors:
+
 - TypeScript strict mode errors
 - ESLint type-safety rule violations
 - Test file migration progress
 
 ### Usage
+
 - `npm run betterer` - Update baseline after improvements
 - `npm run betterer:check` - CI check (fails on regression)
 - `npm run betterer:watch` - Watch mode during development
 
 ### CI Integration
+
 Betterer runs as a separate job in our CI pipeline, preventing any PR that would increase error counts.
 
 ## Ban-ts-comment Policy
@@ -591,13 +606,16 @@ Betterer runs as a separate job in our CI pipeline, preventing any PR that would
 **Effective**: 2025-01-XX
 
 ### Policy
+
 - `@ts-ignore`: ❌ Completely banned
 - `@ts-expect-error`: ✅ Allowed with description (min 10 chars)
 - `@ts-nocheck`: ❌ Banned
 - `@ts-check`: ✅ Allowed (for JS files)
 
 ### Rationale
+
 Using `@ts-expect-error` with descriptions ensures:
+
 1. Suppressions are documented
 2. They fail when the underlying issue is fixed
 3. Technical debt is visible
@@ -605,6 +623,7 @@ Using `@ts-expect-error` with descriptions ensures:
 ## CI Pipeline Architecture
 
 ### Discrete Jobs
+
 Our CI pipeline is split into focused jobs that run in parallel:
 
 1. **typecheck**: TypeScript compilation
@@ -618,6 +637,7 @@ Our CI pipeline is split into focused jobs that run in parallel:
 9. **migration-report**: PR progress updates
 
 ### Benefits
+
 - Faster feedback through parallelization
 - Clear identification of failure causes
 - Non-blocking warnings for test files
@@ -626,7 +646,7 @@ Our CI pipeline is split into focused jobs that run in parallel:
 
 #### 6.2 Create scripts/README.md
 
-```markdown
+````markdown
 # TypeScript Migration Scripts
 
 This directory contains helper scripts for the TypeScript strict mode migration.
@@ -634,18 +654,22 @@ This directory contains helper scripts for the TypeScript strict mode migration.
 ## Available Scripts
 
 ### migrate-test-file.sh
+
 Analyzes a single test file for strict mode compatibility.
 
 ```bash
 ./scripts/migrate-test-file.sh src/server/api/__tests__/trpc-auth.test.ts
 ```
+````
 
 Shows:
+
 - All TypeScript strict mode errors
 - All ESLint type-safety violations
 - Next steps for migration
 
 ### migrate-test-directory.sh
+
 Provides overview of all test files in a directory.
 
 ```bash
@@ -653,11 +677,13 @@ Provides overview of all test files in a directory.
 ```
 
 Shows:
+
 - List of all test files
 - Error counts for each file
 - Total errors in the directory
 
 ### update-typescript-stats.sh
+
 Updates the TYPESCRIPT_MIGRATION.md file with current error counts.
 
 ```bash
@@ -665,6 +691,7 @@ Updates the TYPESCRIPT_MIGRATION.md file with current error counts.
 ```
 
 Automatically:
+
 - Runs typecheck and lint
 - Counts errors by type
 - Updates migration tracking document
@@ -686,6 +713,7 @@ Automatically:
 - Focus on one error type at a time
 - Use proper Jest mock typing patterns (see TYPESCRIPT_MIGRATION.md)
 - Ask for help if you encounter complex type issues
+
 ```
 
 ## Implementation Steps
@@ -708,3 +736,4 @@ Automatically:
 - CI provides clear feedback on which checks fail
 - PR comments show migration progress
 - Developers have tools to migrate files incrementally
+```

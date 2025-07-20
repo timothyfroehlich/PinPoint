@@ -1,9 +1,11 @@
 # Task: Implementation Agent - Roles and Permissions System
 
 ## Mission Statement
+
 Implement the roles and permissions system to make all tests pass. Build a flexible RBAC system with system roles, template roles, and permission dependencies for beta release.
 
 ## Context
+
 - Tests written by test agent are currently failing
 - Implementing design from `/docs/design-docs/roles-permissions-design.md`
 - Beta focus: System roles + Member template
@@ -14,6 +16,7 @@ Implement the roles and permissions system to make all tests pass. Build a flexi
 ## Implementation Steps
 
 ### 1. Review Failing Tests
+
 - Run `npm run test` to understand requirements
 - Map test requirements to implementation tasks
 - Identify schema changes needed
@@ -21,7 +24,9 @@ Implement the roles and permissions system to make all tests pass. Build a flexi
 ### 2. Database Schema Updates
 
 #### Update Prisma Schema
+
 Add to `prisma/schema.prisma`:
+
 ```prisma
 model Role {
   id              String    @id @default(cuid())
@@ -44,49 +49,52 @@ model Member {
   // ... existing fields ...
   roleId          String?
   role            Role?     @relation(fields: [roleId], references: [id])
-  
+
   @@index([roleId])
 }
 ```
 
 Run migrations:
+
 ```bash
 npm run db:push
 ```
 
 ### 3. Permission Constants
+
 Create `src/server/auth/permissions.constants.ts`:
+
 ```typescript
 export const PERMISSIONS = {
   // Issues
-  ISSUE_VIEW: 'issue:view',
-  ISSUE_CREATE: 'issue:create',
-  ISSUE_EDIT: 'issue:edit',
-  ISSUE_DELETE: 'issue:delete',
-  ISSUE_ASSIGN: 'issue:assign',
-  ISSUE_BULK_MANAGE: 'issue:bulk_manage',
-  
+  ISSUE_VIEW: "issue:view",
+  ISSUE_CREATE: "issue:create",
+  ISSUE_EDIT: "issue:edit",
+  ISSUE_DELETE: "issue:delete",
+  ISSUE_ASSIGN: "issue:assign",
+  ISSUE_BULK_MANAGE: "issue:bulk_manage",
+
   // Machines
-  MACHINE_VIEW: 'machine:view',
-  MACHINE_CREATE: 'machine:create',
-  MACHINE_EDIT: 'machine:edit',
-  MACHINE_DELETE: 'machine:delete',
-  
+  MACHINE_VIEW: "machine:view",
+  MACHINE_CREATE: "machine:create",
+  MACHINE_EDIT: "machine:edit",
+  MACHINE_DELETE: "machine:delete",
+
   // Locations
-  LOCATION_VIEW: 'location:view',
-  LOCATION_CREATE: 'location:create',
-  LOCATION_EDIT: 'location:edit',
-  LOCATION_DELETE: 'location:delete',
-  
+  LOCATION_VIEW: "location:view",
+  LOCATION_CREATE: "location:create",
+  LOCATION_EDIT: "location:edit",
+  LOCATION_DELETE: "location:delete",
+
   // Attachments
-  ATTACHMENT_VIEW: 'attachment:view',
-  ATTACHMENT_CREATE: 'attachment:create',
-  ATTACHMENT_DELETE: 'attachment:delete',
-  
+  ATTACHMENT_VIEW: "attachment:view",
+  ATTACHMENT_CREATE: "attachment:create",
+  ATTACHMENT_DELETE: "attachment:delete",
+
   // Admin
-  ADMIN_MANAGE_USERS: 'admin:manage_users',
-  ADMIN_MANAGE_ROLES: 'admin:manage_roles',
-  ADMIN_VIEW_ANALYTICS: 'admin:view_analytics',
+  ADMIN_MANAGE_USERS: "admin:manage_users",
+  ADMIN_MANAGE_ROLES: "admin:manage_roles",
+  ADMIN_VIEW_ANALYTICS: "admin:view_analytics",
 } as const;
 
 export const PERMISSION_DEPENDENCIES: Record<string, string[]> = {
@@ -101,13 +109,13 @@ export const PERMISSION_DEPENDENCIES: Record<string, string[]> = {
 };
 
 export const SYSTEM_ROLES = {
-  ADMIN: 'Admin',
-  UNAUTHENTICATED: 'Unauthenticated',
+  ADMIN: "Admin",
+  UNAUTHENTICATED: "Unauthenticated",
 } as const;
 
 export const ROLE_TEMPLATES = {
   MEMBER: {
-    name: 'Member',
+    name: "Member",
     permissions: [
       PERMISSIONS.ISSUE_VIEW,
       PERMISSIONS.ISSUE_CREATE,
@@ -127,21 +135,23 @@ export const ROLE_TEMPLATES = {
 ```
 
 ### 4. Role Service Implementation
+
 Create `src/server/services/roleService.ts`:
+
 ```typescript
-import { PrismaClient, Role } from '@prisma/client';
-import { TRPCError } from '@trpc/server';
-import { 
-  PERMISSIONS, 
-  PERMISSION_DEPENDENCIES, 
+import { PrismaClient, Role } from "@prisma/client";
+import { TRPCError } from "@trpc/server";
+import {
+  PERMISSIONS,
+  PERMISSION_DEPENDENCIES,
   SYSTEM_ROLES,
-  ROLE_TEMPLATES 
-} from '../auth/permissions.constants';
+  ROLE_TEMPLATES,
+} from "../auth/permissions.constants";
 
 export class RoleService {
   constructor(
     private prisma: PrismaClient,
-    private organizationId: string
+    private organizationId: string,
   ) {}
 
   async createSystemRoles(): Promise<void> {
@@ -172,9 +182,11 @@ export class RoleService {
     });
   }
 
-  async createTemplateRole(template: keyof typeof ROLE_TEMPLATES): Promise<Role> {
+  async createTemplateRole(
+    template: keyof typeof ROLE_TEMPLATES,
+  ): Promise<Role> {
     const roleTemplate = ROLE_TEMPLATES[template];
-    
+
     return this.prisma.role.create({
       data: {
         name: roleTemplate.name,
@@ -193,21 +205,21 @@ export class RoleService {
     });
 
     if (!role) {
-      throw new TRPCError({ code: 'NOT_FOUND' });
+      throw new TRPCError({ code: "NOT_FOUND" });
     }
 
     if (role.isSystem) {
       if (role.name === SYSTEM_ROLES.ADMIN) {
-        throw new TRPCError({ 
-          code: 'FORBIDDEN',
-          message: 'Admin role cannot be modified',
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Admin role cannot be modified",
         });
       }
       // Only allow permission updates for Unauthenticated
       if (updates.name || updates.isDefault !== undefined) {
         throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'System roles cannot be renamed or have defaults changed',
+          code: "FORBIDDEN",
+          message: "System roles cannot be renamed or have defaults changed",
         });
       }
     }
@@ -230,13 +242,13 @@ export class RoleService {
     });
 
     if (!role) {
-      throw new TRPCError({ code: 'NOT_FOUND' });
+      throw new TRPCError({ code: "NOT_FOUND" });
     }
 
     if (role.isSystem) {
       throw new TRPCError({
-        code: 'FORBIDDEN',
-        message: 'System roles cannot be deleted',
+        code: "FORBIDDEN",
+        message: "System roles cannot be deleted",
       });
     }
 
@@ -251,8 +263,8 @@ export class RoleService {
 
     if (!defaultRole) {
       throw new TRPCError({
-        code: 'FAILED_PRECONDITION',
-        message: 'No default role available for user reassignment',
+        code: "FAILED_PRECONDITION",
+        message: "No default role available for user reassignment",
       });
     }
 
@@ -272,10 +284,10 @@ export class RoleService {
     const allPermissions = new Set(permissions);
 
     // Add all dependencies
-    permissions.forEach(permission => {
+    permissions.forEach((permission) => {
       const deps = PERMISSION_DEPENDENCIES[permission];
       if (deps) {
-        deps.forEach(dep => allPermissions.add(dep));
+        deps.forEach((dep) => allPermissions.add(dep));
       }
     });
 
@@ -293,8 +305,8 @@ export class RoleService {
 
     if (!adminRole || adminRole.members.length === 0) {
       throw new TRPCError({
-        code: 'FAILED_PRECONDITION',
-        message: 'Organization must have at least one admin',
+        code: "FAILED_PRECONDITION",
+        message: "Organization must have at least one admin",
       });
     }
   }
@@ -302,16 +314,18 @@ export class RoleService {
 ```
 
 ### 5. Permission Service Updates
+
 Update `src/server/auth/permissions.ts`:
+
 ```typescript
-import { Session } from 'next-auth';
-import { prisma } from '../db';
-import { PERMISSIONS, SYSTEM_ROLES } from './permissions.constants';
+import { Session } from "next-auth";
+import { prisma } from "../db";
+import { PERMISSIONS, SYSTEM_ROLES } from "./permissions.constants";
 
 export async function hasPermission(
   session: Session | null,
   permission: string,
-  organizationId?: string
+  organizationId?: string,
 ): Promise<boolean> {
   // Unauthenticated users
   if (!session?.user) {
@@ -321,7 +335,7 @@ export async function hasPermission(
         name: SYSTEM_ROLES.UNAUTHENTICATED,
       },
     });
-    
+
     const permissions = (unauthRole?.permissions as string[]) || [];
     return permissions.includes(permission);
   }
@@ -354,12 +368,12 @@ export async function hasPermission(
 export async function requirePermission(
   session: Session | null,
   permission: string,
-  organizationId?: string
+  organizationId?: string,
 ): Promise<void> {
   const hasAccess = await hasPermission(session, permission, organizationId);
   if (!hasAccess) {
     throw new TRPCError({
-      code: 'FORBIDDEN',
+      code: "FORBIDDEN",
       message: `Missing required permission: ${permission}`,
     });
   }
@@ -367,7 +381,9 @@ export async function requirePermission(
 ```
 
 ### 6. Organization Service Updates
+
 Update organization creation in `src/server/services/organizationService.ts`:
+
 ```typescript
 async createOrganization(input: CreateOrganizationInput, userId: string) {
   return await this.prisma.$transaction(async (tx) => {
@@ -381,13 +397,13 @@ async createOrganization(input: CreateOrganizationInput, userId: string) {
 
     // Create role service for this org
     const roleService = new RoleService(tx, organization.id);
-    
+
     // Create system roles
     await roleService.createSystemRoles();
-    
+
     // Create default Member role
     const memberRole = await roleService.createTemplateRole('MEMBER');
-    
+
     // Get admin role
     const adminRole = await tx.role.findFirst({
       where: {
@@ -411,7 +427,9 @@ async createOrganization(input: CreateOrganizationInput, userId: string) {
 ```
 
 ### 7. Update Seed Data
+
 Update `prisma/seed.ts` to use new role system:
+
 ```typescript
 // Remove old permission-based seeding
 // Add role-based member creation
@@ -434,38 +452,38 @@ await prisma.member.create({
 ```
 
 ### 8. API Router Implementation
+
 Create `src/server/api/routers/role.ts`:
+
 ```typescript
 export const roleRouter = createTRPCRouter({
-  list: protectedProcedure
-    .query(async ({ ctx }) => {
-      await requirePermission(ctx.session, PERMISSIONS.ADMIN_MANAGE_ROLES);
-      
-      return ctx.prisma.role.findMany({
-        where: { organizationId: ctx.session.user.organizationId },
-        include: {
-          _count: {
-            select: { members: true },
-          },
+  list: protectedProcedure.query(async ({ ctx }) => {
+    await requirePermission(ctx.session, PERMISSIONS.ADMIN_MANAGE_ROLES);
+
+    return ctx.prisma.role.findMany({
+      where: { organizationId: ctx.session.user.organizationId },
+      include: {
+        _count: {
+          select: { members: true },
         },
-        orderBy: [
-          { isSystem: 'desc' },
-          { name: 'asc' },
-        ],
-      });
-    }),
+      },
+      orderBy: [{ isSystem: "desc" }, { name: "asc" }],
+    });
+  }),
 
   update: protectedProcedure
-    .input(z.object({
-      roleId: z.string(),
-      updates: z.object({
-        name: z.string().optional(),
-        permissions: z.array(z.string()).optional(),
+    .input(
+      z.object({
+        roleId: z.string(),
+        updates: z.object({
+          name: z.string().optional(),
+          permissions: z.array(z.string()).optional(),
+        }),
       }),
-    }))
+    )
     .mutation(async ({ ctx, input }) => {
       await requirePermission(ctx.session, PERMISSIONS.ADMIN_MANAGE_ROLES);
-      
+
       const roleService = ctx.services.createRoleService();
       return roleService.updateRole(input.roleId, input.updates);
     }),
@@ -474,7 +492,7 @@ export const roleRouter = createTRPCRouter({
     .input(z.object({ roleId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       await requirePermission(ctx.session, PERMISSIONS.ADMIN_MANAGE_ROLES);
-      
+
       const roleService = ctx.services.createRoleService();
       await roleService.deleteRole(input.roleId);
     }),
@@ -482,14 +500,18 @@ export const roleRouter = createTRPCRouter({
 ```
 
 ### 9. Complete Playwright Tests
+
 Update the scaffolded E2E tests:
+
 1. Add authentication helpers
 2. Add data-testid attributes to UI components
 3. Remove test.skip() and test.fixme() flags
 4. Implement permission management UI components
 
 ### 10. Service Factory Updates
+
 Add to `src/server/services/serviceFactory.ts`:
+
 ```typescript
 createRoleService(): RoleService {
   return new RoleService(this.prisma, this.organizationId);
@@ -497,6 +519,7 @@ createRoleService(): RoleService {
 ```
 
 ## Quality Requirements
+
 - All tests must pass
 - Maintain data integrity (always one admin)
 - Permission dependencies work correctly
@@ -505,6 +528,7 @@ createRoleService(): RoleService {
 - Type safety throughout
 
 ## Success Criteria
+
 - [ ] All unit tests passing
 - [ ] Database schema updated
 - [ ] System roles created on org creation
@@ -516,7 +540,9 @@ createRoleService(): RoleService {
 - [ ] Pre-commit hooks pass
 
 ## Completion Instructions
+
 When your task is complete:
+
 1. Run `npm run validate` - must pass
 2. Run `npm run test` - all tests pass
 3. Run `npm run db:reset` - seed data works

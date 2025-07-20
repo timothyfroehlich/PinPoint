@@ -7,15 +7,18 @@ Fix all TypeScript strictest mode violations in the rebased roles-permissions im
 ## Context
 
 ### Current State
+
 - **Roles functionality successfully rebased** onto latest main with TypeScript strictest mode
 - **307 TypeScript/ESLint violations** across roles implementation files
 - **All roles infrastructure preserved**: services, routers, tests, and factories
 - **Working directory clean** - ready for systematic fixes
 
 ### Background
+
 This branch contains a complete RBAC (Role-Based Access Control) implementation:
+
 - **Schema Models**: `Role`, `Permission`, `Membership` with proper relationships
-- **Service Layer**: `roleService.ts`, `permissionService.ts` with full CRUD operations  
+- **Service Layer**: `roleService.ts`, `permissionService.ts` with full CRUD operations
 - **API Layer**: `role.ts` router with tRPC integration
 - **Test Infrastructure**: Comprehensive test factories and helpers
 - **Permission System**: Constants and dependency resolution
@@ -32,11 +35,11 @@ The implementation was originally created before TypeScript strictest mode and n
    - Locations: `seed.ts`, test factories, service implementations
 
 2. **Deprecated Method Usage** (12 errors)
-   - `@typescript-eslint/no-deprecated` 
+   - `@typescript-eslint/no-deprecated`
    - Usage of `.substr()` instead of `.substring()` or `.slice()`
    - Locations: All factory classes
 
-3. **Static Class Pattern** (7 errors)  
+3. **Static Class Pattern** (7 errors)
    - `@typescript-eslint/no-extraneous-class`
    - Factory classes with only static methods
    - Should use namespace pattern or function exports
@@ -52,19 +55,22 @@ The implementation was originally created before TypeScript strictest mode and n
 
 ## Implementation Strategy
 
-### Phase 1: Fix Critical Errors (38 errors) 
+### Phase 1: Fix Critical Errors (38 errors)
+
 1. **Template Literal Safety** - Convert number/nullable values to strings
 2. **Deprecated Method Updates** - Replace `.substr()` with `.slice()`
 3. **Factory Class Restructure** - Convert to namespace/function pattern
 4. **Nullish Coalescing** - Update logical operators
 
 ### Phase 2: Type Safety Compliance (269 warnings)
+
 1. **Remove any types** - Replace with proper type definitions
 2. **Add return type annotations** - Explicit function return types
 3. **Fix unsafe assignments** - Proper type guards and assertions
 4. **Update mock patterns** - Jest type-safe mocking
 
 ### Phase 3: Verification & Testing
+
 1. **TypeScript compilation** - Zero errors required
 2. **Test execution** - All tests must pass
 3. **Lint validation** - Clean ESLint results
@@ -73,12 +79,14 @@ The implementation was originally created before TypeScript strictest mode and n
 ## Key Files to Fix
 
 ### High Priority (Errors)
+
 - `prisma/seed.ts` - 13 errors (template literals, unused vars, catch types)
 - `src/test/factories/roleFactory.ts` - 18 errors (classes, substr, templates)
 - `src/server/api/__tests__/trpc.permission.test.ts` - Various type safety issues
 - `src/server/api/routers/__tests__/` - Test type annotation issues
 
-### Medium Priority (Warnings)  
+### Medium Priority (Warnings)
+
 - Service test files - Mock type safety
 - Factory helpers - Type annotation completion
 - Integration tests - Context type safety
@@ -86,43 +94,54 @@ The implementation was originally created before TypeScript strictest mode and n
 ## TypeScript Strictest Patterns Required
 
 ### Template Literal Safety
+
 ```typescript
 // ❌ Bad: Number in template literal
 const id = `user-${Math.random()}`;
 
-// ✅ Good: Explicit string conversion  
+// ✅ Good: Explicit string conversion
 const id = `user-${Math.random().toString()}`;
 ```
 
 ### Deprecated Method Replacement
+
 ```typescript
 // ❌ Bad: Using deprecated substr
-str.substr(2, 9)
+str.substr(2, 9);
 
 // ✅ Good: Using slice
-str.slice(2, 11)
+str.slice(2, 11);
 ```
 
 ### Factory Pattern Modernization
+
 ```typescript
 // ❌ Bad: Static-only class
 export class RoleFactory {
-  static create() { /* */ }
+  static create() {
+    /* */
+  }
 }
 
 // ✅ Good: Namespace pattern
 export namespace RoleFactory {
-  export function create() { /* */ }
+  export function create() {
+    /* */
+  }
 }
 ```
 
 ### Type-Safe Mock Creation
+
 ```typescript
 // ❌ Bad: Any type usage
 const mockService = jest.fn() as any;
 
 // ✅ Good: Proper typing
-const mockService = jest.fn<ReturnType<ServiceMethod>, Parameters<ServiceMethod>>();
+const mockService = jest.fn<
+  ReturnType<ServiceMethod>,
+  Parameters<ServiceMethod>
+>();
 ```
 
 ## Quality Requirements
@@ -144,32 +163,37 @@ const mockService = jest.fn<ReturnType<ServiceMethod>, Parameters<ServiceMethod>
 ## Implementation Steps
 
 ### Step 1: Environment Validation
+
 ```bash
 cd /home/froeht/Code/PinPoint-worktrees/implement-roles-permissions
 npm run typecheck  # See exact error count and locations
-npm run lint       # See all violations  
+npm run lint       # See all violations
 ```
 
 ### Step 2: Fix Template Literal Violations
+
 - Update all template literals with number/nullable interpolation
 - Add explicit `.toString()` conversions where needed
 - Handle null/undefined cases with nullish coalescing
 
-### Step 3: Modernize Factory Patterns  
+### Step 3: Modernize Factory Patterns
+
 - Convert factory classes to namespace pattern
 - Replace deprecated `.substr()` with `.slice()`
 - Update random ID generation patterns
 
 ### Step 4: Type Safety Remediation
+
 - Remove all `any` type usage
 - Add explicit return type annotations
 - Fix unsafe assignment patterns
 - Update Jest mock typing
 
 ### Step 5: Test & Validate
+
 ```bash
 npm run typecheck     # Must show 0 errors
-npm run lint          # Must pass  
+npm run lint          # Must pass
 npm run test          # All tests pass
 npm run validate:agent # Final validation
 ```
@@ -194,6 +218,7 @@ When all violations are resolved:
 ## Emergency Procedures
 
 If blocked on specific violations:
+
 - **Check strictest mode guide**: `docs/developer-guides/typescript-strictest.md`
 - **Reference working patterns**: Look at main branch implementations
 - **Use targeted TypeScript checks**: `./scripts/typecheck-files.sh` for specific files
@@ -206,15 +231,17 @@ If blocked on specific violations:
 **Total Issues**: 307 (38 errors, 269 warnings)
 
 **Error Distribution**:
+
 - Template literal expressions: 13 locations
-- Deprecated substr usage: 12 locations  
+- Deprecated substr usage: 12 locations
 - Static-only classes: 7 locations
 - Nullish coalescing: 4 locations
 - Misc type safety: 2 locations
 
 **Primary Files**:
+
 - `prisma/seed.ts` (13 errors)
-- `src/test/factories/roleFactory.ts` (18 errors)  
+- `src/test/factories/roleFactory.ts` (18 errors)
 - `src/server/api/__tests__/trpc.permission.test.ts` (type safety)
 - `src/server/api/routers/__tests__/` (test typing)
 
