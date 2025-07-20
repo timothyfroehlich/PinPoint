@@ -6,7 +6,7 @@
 
 - **Stack**: Next.js 14 + TypeScript + tRPC + Prisma + MUI v7.2.0
 - **Multi-tenancy**: Shared database with row-level security
-- **Branch**: `epic/backend-refactor`
+- **Main Branch**: `main` (protected, requires PRs)
 - **Quality**: See `@CLAUDE.md` for complete standards
 
 ## Environment
@@ -63,9 +63,27 @@ npm run db:reset      # Reset database
 
 ## Task File Organization
 
-- Task files are placed in `agent_workspace/` directory in each worktree
-- See `@docs/orchestrator-system/agent-workspace.md` for details
-- Orchestrator creates specialized task files for each agent type
+### Agent Workspace Structure
+
+Each worktree contains an `agent_workspace/` directory with specialized task files:
+
+**For TDD Workflow (3-agent system):**
+
+- `test-agent-task.md` - Test creation instructions
+- `implementation-agent-task.md` - Implementation instructions
+- `review-agent-task.md` - Code review and PR management
+- `SUBAGENT_TASK.md` - General overview and workflow coordination
+
+**For Single Agent Tasks:**
+
+- `task-agent-implementation.md` - Single-agent implementation task
+- Or role-specific files like `fix-typescript-errors-task.md`
+
+**Task File Discovery Protocol:**
+
+- Orchestrator checks for existing specialized files first
+- Falls back to creating appropriate files based on task type
+- Always places files in `agent_workspace/` directory within worktree
 
 ## Post-Completion Tasks
 
