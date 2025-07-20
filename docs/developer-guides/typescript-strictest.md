@@ -460,6 +460,165 @@ const config = {
 - `npm run betterer:update` - Update baseline after fixes
 - `npm run betterer:check` - CI-style check
 
+## ⚠️ Critical Lessons from Real Migrations
+
+### Infrastructure Dependencies: The Cascade Effect
+
+**Lesson**: Fixing TypeScript errors in shared infrastructure can break more files than it fixes.
+
+**Real Example**: Changing `mockContext.ts` from `DeepMockProxy<ExtendedPrismaClient>` to manual mocks to fix AcceleratePromise errors:
+
+- ✅ Fixed: 6 AcceleratePromise errors
+- ❌ Broke: 40+ dependent test files
+- 📈 **Net result**: 72 → 108 errors (+36 errors)
+
+**Solution Strategy**:
+
+1. **Map dependencies first**: `grep -r "mockContext" src/` before changing
+2. **Incremental fixes**: Fix one file at a time, not infrastructure
+3. **Interface preservation**: Keep existing interfaces, add compatibility layers
+4. **Error tracking**: Monitor total error count as primary success metric
+
+### The Right Order: Dependencies First
+
+**Lesson**: Fix in dependency order to avoid cascade failures.
+
+**Recommended Order**:
+
+```
+1. Fix shared types and interfaces
+2. Fix utility functions and helpers
+3. Fix mock infrastructure (carefully!)
+4. Fix individual test files
+5. Fix router/API files
+6. Fix component files
+```
+
+**Wrong Order Example**:
+
+```typescript
+// ❌ Fixed individual files first
+// Fixed: trpc-auth.test.ts (24 errors)
+// Then changed: mockContext.ts
+// Result: trpc-auth.test.ts broke again + 20 new errors
+```
+
+**Right Order Example**:
+
+```typescript
+// ✅ Fixed infrastructure first (incrementally)
+// Fixed: mockContext.ts AcceleratePromise patterns
+// Then fixed: individual test files using new patterns
+// Result: Stable progress, no regressions
+```
+
+### Prisma Accelerate: The Hidden Type Trap
+
+**Lesson**: Prisma + Accelerate changes method signatures in non-obvious ways.
+
+**The Problem**:
+
+```typescript
+// Before Accelerate
+mockDb.user.findFirst.mockResolvedValue(user); // Works
+
+// After Accelerate
+mockDb.user.findFirst.mockResolvedValue(user);
+// Error: Type 'User' is not assignable to type 'AcceleratePromise<User | null>'
+```
+
+**Root Cause**: `@prisma/extension-accelerate` wraps all Prisma methods in `AcceleratePromise<T>` which has additional properties (`withAccelerateInfo`, `[Symbol.toStringTag]`, etc.).
+
+**Working Solutions**:
+
+```typescript
+// ✅ Solution 1: Promise wrapper + type assertion
+mockDb.user.findFirst.mockResolvedValue(Promise.resolve(user) as any);
+
+// ✅ Solution 2: Use mockImplementation
+mockDb.user.findFirst.mockImplementation(async () => user);
+
+// ✅ Solution 3: Create AcceleratePromise-compatible mock
+const createAcceleratePromise = <T>(value: T): AcceleratePromise<T> => {
+  const promise = Promise.resolve(value);
+  return Object.assign(promise, {
+    withAccelerateInfo: promise,
+    [Symbol.toStringTag]: "Promise",
+  }) as AcceleratePromise<T>;
+};
+```
+
+### Error Count as Primary Metric
+
+**Lesson**: Total TypeScript error count is the most reliable progress indicator.
+
+**Monitoring Commands**:
+
+```bash
+# Primary metric
+npm run typecheck 2>&1 | grep -c "error TS"
+
+# Progress breakdown
+npm run typecheck 2>&1 | grep "error TS" | cut -d'(' -f1 | sort | uniq -c | sort -nr
+
+# Continuous monitoring
+watch 'npm run typecheck 2>&1 | grep -c "error TS"'
+```
+
+**Decision Rules**:
+
+- ✅ Error count decreases: Continue current approach
+- ⚠️ Error count stable: Change approach
+- ❌ Error count increases >20%: Rollback immediately
+
+**Success Pattern**:
+
+```
+Starting: 72 errors
+After fix 1: 68 errors (-4) ✅
+After fix 2: 64 errors (-4) ✅
+After fix 3: 45 errors (-19) ✅
+After infrastructure change: 108 errors (+63) ❌ ROLLBACK!
+After rollback: 64 errors (back to known good) ✅
+After targeted fix: 52 errors (-12) ✅
+```
+
+### Session Context Types: The tRPC Trap
+
+**Lesson**: tRPC context typing is stricter than it appears.
+
+**The Problem**:
+
+```typescript
+// Looks correct but fails
+const caller = appRouter.createCaller(mockContext);
+// Error: Session is not assignable to parameter of type 'never'
+```
+
+**Root Cause**: tRPC's `createCaller` expects exact context types, not compatible mock types.
+
+**Solution**:
+
+```typescript
+// ✅ Explicit type assertion
+import type { TRPCContext } from "~/server/api/trpc.base";
+const caller = appRouter.createCaller(mockContext as TRPCContext);
+
+// ✅ Better: Create proper context factory
+function createTRPCMockContext(
+  overrides: Partial<TRPCContext> = {},
+): TRPCContext {
+  return {
+    db: mockDeep<ExtendedPrismaClient>(),
+    session: null,
+    organization: null,
+    services: mockServiceFactory(),
+    headers: new Headers(),
+    ...overrides,
+  };
+}
+```
+
 ## Related Documentation
 
 - **Quick Reference**: [CLAUDE.md TypeScript Guidelines](../../CLAUDE.md#typescript-strictest-mode-guidelines)
