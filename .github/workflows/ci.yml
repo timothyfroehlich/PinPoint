@@ -34,8 +34,12 @@ jobs:
         run: |
           npm run typecheck 2>&1 | tee typescript-output.log || true
           ERROR_COUNT=$(grep -c "error TS" typescript-output.log || echo "0")
-          PRODUCTION_ERRORS=$(grep "error TS" typescript-output.log | grep -v "test\|__tests__\|spec" || echo "")
-          PRODUCTION_ERROR_COUNT=$(echo "$PRODUCTION_ERRORS" | grep -c "error TS" || echo "0")
+          PRODUCTION_ERRORS=$(grep "error TS" typescript-output.log | grep -v "test\|__tests__\|spec" || true)
+          if [ -z "$PRODUCTION_ERRORS" ]; then
+            PRODUCTION_ERROR_COUNT=0
+          else
+            PRODUCTION_ERROR_COUNT=$(echo "$PRODUCTION_ERRORS" | grep -c "error TS")
+          fi
           TEST_ERROR_COUNT=$((ERROR_COUNT - PRODUCTION_ERROR_COUNT))
           
           {
