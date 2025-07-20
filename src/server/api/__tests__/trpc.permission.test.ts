@@ -45,6 +45,30 @@ const createMockTRPCContext = (
 } => {
   const mockContext = createMockContext();
 
+  const mockMembership = {
+    id: "membership-1",
+    userId: "user-1",
+    organizationId: "org-1",
+    roleId: "role-1",
+    role: {
+      id: "role-1",
+      name: "Test Role",
+      organizationId: "org-1",
+      isSystem: false,
+      isDefault: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      permissions: permissions.map((name, index) => ({
+        id: `perm-${(index + 1).toString()}`,
+        name,
+        description: `${name} permission`,
+      })),
+    },
+  };
+
+  // Mock the membership lookup for organizationProcedure
+  mockContext.db.membership.findFirst.mockResolvedValue(mockMembership);
+
   return {
     ...mockContext,
     session: {
@@ -53,6 +77,7 @@ const createMockTRPCContext = (
         email: "test@example.com",
         name: "Test User",
         image: null,
+        organizationId: "org-1",
       },
       expires: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(),
     },
@@ -61,26 +86,7 @@ const createMockTRPCContext = (
       name: "Test Organization",
       subdomain: "test-org",
     },
-    membership: {
-      id: "membership-1",
-      userId: "user-1",
-      organizationId: "org-1",
-      roleId: "role-1",
-      role: {
-        id: "role-1",
-        name: "Test Role",
-        organizationId: "org-1",
-        isSystem: false,
-        isDefault: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        permissions: permissions.map((name, index) => ({
-          id: `perm-${(index + 1).toString()}`,
-          name,
-          description: `${name} permission`,
-        })),
-      },
-    },
+    membership: mockMembership,
     userPermissions: permissions,
   };
 };
@@ -188,7 +194,7 @@ describe("tRPC Permission Middleware", () => {
       const caller = testRouter.createCaller(ctx);
 
       // Act
-      const result = await caller["testRequirePermission"]();
+      const result = await caller.testRequirePermission();
 
       // Assert
       expect(result).toEqual({ message: "Permission granted" });
@@ -200,10 +206,8 @@ describe("tRPC Permission Middleware", () => {
       const caller = testRouter.createCaller(ctx);
 
       // Act & Assert
-      await expect(caller["testRequirePermission"]()).rejects.toThrow(
-        TRPCError,
-      );
-      await expect(caller["testRequirePermission"]()).rejects.toThrow(
+      await expect(caller.testRequirePermission()).rejects.toThrow(TRPCError);
+      await expect(caller.testRequirePermission()).rejects.toThrow(
         "Permission required: test:permission",
       );
     });
@@ -214,11 +218,9 @@ describe("tRPC Permission Middleware", () => {
       const caller = testRouter.createCaller(ctx);
 
       // Act & Assert
-      await expect(caller["testRequirePermission"]()).rejects.toThrow(
-        TRPCError,
-      );
+      await expect(caller.testRequirePermission()).rejects.toThrow(TRPCError);
       try {
-        await caller["testRequirePermission"]();
+        await caller.testRequirePermission();
         expect.fail("Should have thrown TRPCError");
       } catch (error) {
         expect(error).toBeInstanceOf(TRPCError);
@@ -234,7 +236,7 @@ describe("tRPC Permission Middleware", () => {
       const caller = testRouter.createCaller(ctx);
 
       // Act
-      const result = await caller["testIssueCreate"]({ title: "Test Issue" });
+      const result = await caller.testIssueCreate({ title: "Test Issue" });
 
       // Assert
       expect(result).toEqual({ message: "Issue created: Test Issue" });
@@ -247,7 +249,7 @@ describe("tRPC Permission Middleware", () => {
 
       // Act & Assert
       await expect(
-        caller["testIssueCreate"]({ title: "Test Issue" }),
+        caller.testIssueCreate({ title: "Test Issue" }),
       ).rejects.toThrow("Permission required: issue:create");
     });
 
@@ -257,7 +259,7 @@ describe("tRPC Permission Middleware", () => {
       const caller = testRouter.createCaller(ctx);
 
       // Act
-      const result = await caller["testIssueEdit"]({
+      const result = await caller.testIssueEdit({
         id: "issue-1",
         title: "Updated Issue",
       });
@@ -273,7 +275,7 @@ describe("tRPC Permission Middleware", () => {
 
       // Act & Assert
       await expect(
-        caller["testIssueEdit"]({ id: "issue-1", title: "Updated Issue" }),
+        caller.testIssueEdit({ id: "issue-1", title: "Updated Issue" }),
       ).rejects.toThrow("Permission required: issue:edit");
     });
 
@@ -283,7 +285,7 @@ describe("tRPC Permission Middleware", () => {
       const caller = testRouter.createCaller(ctx);
 
       // Act
-      const result = await caller["testIssueDelete"]({ id: "issue-1" });
+      const result = await caller.testIssueDelete({ id: "issue-1" });
 
       // Assert
       expect(result).toEqual({ message: "Issue deleted: issue-1" });
@@ -295,9 +297,9 @@ describe("tRPC Permission Middleware", () => {
       const caller = testRouter.createCaller(ctx);
 
       // Act & Assert
-      await expect(
-        caller["testIssueDelete"]({ id: "issue-1" }),
-      ).rejects.toThrow("Permission required: issue:delete");
+      await expect(caller.testIssueDelete({ id: "issue-1" })).rejects.toThrow(
+        "Permission required: issue:delete",
+      );
     });
 
     it("should allow issue assignment with issue:assign permission", async () => {
@@ -306,7 +308,7 @@ describe("tRPC Permission Middleware", () => {
       const caller = testRouter.createCaller(ctx);
 
       // Act
-      const result = await caller["testIssueAssign"]({
+      const result = await caller.testIssueAssign({
         issueId: "issue-1",
         userId: "user-2",
       });
@@ -322,7 +324,7 @@ describe("tRPC Permission Middleware", () => {
 
       // Act & Assert
       await expect(
-        caller["testIssueAssign"]({ issueId: "issue-1", userId: "user-2" }),
+        caller.testIssueAssign({ issueId: "issue-1", userId: "user-2" }),
       ).rejects.toThrow("Permission required: issue:assign");
     });
   });
@@ -334,7 +336,7 @@ describe("tRPC Permission Middleware", () => {
       const caller = testRouter.createCaller(ctx);
 
       // Act
-      const result = await caller["testAttachmentCreate"]({
+      const result = await caller.testAttachmentCreate({
         filename: "test.jpg",
       });
 
@@ -349,7 +351,7 @@ describe("tRPC Permission Middleware", () => {
 
       // Act & Assert
       await expect(
-        caller["testAttachmentCreate"]({ filename: "test.jpg" }),
+        caller.testAttachmentCreate({ filename: "test.jpg" }),
       ).rejects.toThrow("Permission required: attachment:create");
     });
 
@@ -566,14 +568,14 @@ describe("tRPC Permission Middleware", () => {
       const caller = testRouter.createCaller(ctx);
 
       // Act
-      const createResult = await caller["testIssueCreate"]({
+      const createResult = await caller.testIssueCreate({
         title: "Test Issue",
       });
-      const editResult = await caller["testIssueEdit"]({
+      const editResult = await caller.testIssueEdit({
         id: "issue-1",
         title: "Updated Issue",
       });
-      const deleteResult = await caller["testIssueDelete"]({ id: "issue-1" });
+      const deleteResult = await caller.testIssueDelete({ id: "issue-1" });
       const orgResult = await caller.testOrganizationManage({
         name: "Org Name",
       });
@@ -595,9 +597,9 @@ describe("tRPC Permission Middleware", () => {
       const caller = testRouter.createCaller(ctx);
 
       // Act & Assert
-      await expect(
-        caller["testIssueDelete"]({ id: "issue-1" }),
-      ).rejects.toThrow("Permission required: issue:delete");
+      await expect(caller.testIssueDelete({ id: "issue-1" })).rejects.toThrow(
+        "Permission required: issue:delete",
+      );
     });
   });
 
@@ -610,9 +612,7 @@ describe("tRPC Permission Middleware", () => {
       const caller = testRouter.createCaller(ctx);
 
       // Act & Assert
-      await expect(caller["testRequirePermission"]()).rejects.toThrow(
-        TRPCError,
-      );
+      await expect(caller.testRequirePermission()).rejects.toThrow(TRPCError);
     });
 
     it("should handle null userPermissions gracefully", async () => {
@@ -623,9 +623,7 @@ describe("tRPC Permission Middleware", () => {
       const caller = testRouter.createCaller(ctx);
 
       // Act & Assert
-      await expect(caller["testRequirePermission"]()).rejects.toThrow(
-        TRPCError,
-      );
+      await expect(caller.testRequirePermission()).rejects.toThrow(TRPCError);
     });
 
     it("should handle empty string permission", async () => {
@@ -652,7 +650,7 @@ describe("tRPC Permission Middleware", () => {
 
       // Act & Assert
       await expect(
-        caller["testIssueCreate"]({ title: "Test Issue" }),
+        caller.testIssueCreate({ title: "Test Issue" }),
       ).rejects.toThrow("Permission required: issue:create");
     });
   });
