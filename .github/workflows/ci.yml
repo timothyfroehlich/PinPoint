@@ -352,8 +352,8 @@ jobs:
       - run: npm ci
       - name: Generate Migration Report
         run: |
-          # Update stats
-          ./scripts/update-typescript-stats.sh
+          # Update stats using Python script (more reliable than bash)
+          python3 scripts/update-typescript-stats.py
           
           # Create PR comment
           cat > migration-report.md << 'EOF'
