@@ -1,3 +1,4 @@
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import {
@@ -105,6 +106,13 @@ export const machineCoreRouter = createTRPCRouter({
   getAllForIssues: publicProcedure.query(({ ctx }) => {
     // Use the organization resolved from subdomain context
     const organization = ctx.organization;
+
+    if (!organization) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Organization not found",
+      });
+    }
 
     return ctx.db.machine.findMany({
       where: {

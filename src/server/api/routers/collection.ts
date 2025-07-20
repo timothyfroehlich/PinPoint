@@ -72,7 +72,7 @@ export const collectionRouter = createTRPCRouter({
         data.description = input.description;
       }
 
-      return service.createManualCollection(data);
+      return service.createManualCollection(ctx.organization.id, data);
     }),
 
   // Add machines to collection
