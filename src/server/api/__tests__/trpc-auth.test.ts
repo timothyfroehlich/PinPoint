@@ -162,7 +162,7 @@ describe("tRPC Authentication Middleware", () => {
         permissions: ["issues:read", "issues:write"],
       });
       // Verify membership lookup was called with correct parameters
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+
       expect(ctx.db.membership.findFirst).toHaveBeenCalledWith({
         where: {
           organizationId: "org-1",

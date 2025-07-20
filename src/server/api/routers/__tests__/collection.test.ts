@@ -58,10 +58,10 @@ describe("Collection Router Integration", () => {
       ];
 
       (mockPrisma.collectionType.findMany as jest.Mock<any>).mockImplementation(
-        async () => mockTypes,
+        () => Promise.resolve(mockTypes),
       );
       (mockPrisma.collection.findMany as jest.Mock<any>).mockImplementation(
-        async () => mockCollections,
+        () => Promise.resolve(mockCollections),
       );
 
       const result = await service.getLocationCollections(
@@ -122,11 +122,11 @@ describe("Collection Router Integration", () => {
         isManual: true,
       };
 
-      (mockPrisma.collection.create as jest.Mock<any>).mockImplementation(
-        async () => mockCollection,
+      (mockPrisma.collection.create as jest.Mock<any>).mockImplementation(() =>
+        Promise.resolve(mockCollection),
       );
 
-      const result = await service.createManualCollection("org1", {
+      const result = await service.createManualCollection({
         name: "Test Collection",
         typeId: "type1",
         locationId: "loc1",
@@ -148,7 +148,7 @@ describe("Collection Router Integration", () => {
 
     it("should handle toggleCollectionType operations", async () => {
       (mockPrisma.collectionType.update as jest.Mock<any>).mockImplementation(
-        async () => ({}),
+        () => Promise.resolve({}),
       );
 
       await service.toggleCollectionType("type1", false);
@@ -172,7 +172,7 @@ describe("Collection Router Integration", () => {
       ];
 
       (mockPrisma.collectionType.findMany as jest.Mock<any>).mockImplementation(
-        async () => mockTypes,
+        () => Promise.resolve(mockTypes),
       );
 
       const result = await service.getOrganizationCollectionTypes("org1");

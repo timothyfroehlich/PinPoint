@@ -30,9 +30,14 @@ export const issueStatusRouter = createTRPCRouter({
     };
 
     for (const group of counts) {
-      const category = statusMap.get(group.statusId);
-      if (category) {
-        categoryCounts[category] += Number(group._count._all);
+      // Add type assertion for the group object properties
+      const groupTyped = group as {
+        statusId: string;
+        _count: { _all: number };
+      };
+      const category = statusMap.get(groupTyped.statusId);
+      if (category && Object.values(StatusCategory).includes(category)) {
+        categoryCounts[category] += Number(groupTyped._count._all);
       }
     }
 

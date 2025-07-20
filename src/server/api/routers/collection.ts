@@ -54,12 +54,25 @@ export const collectionRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const service = ctx.services.createCollectionService();
 
-      return service.createManualCollection(ctx.organization.id, {
+      const data: {
+        name: string;
+        typeId: string;
+        locationId?: string;
+        description?: string;
+      } = {
         name: input.name,
         typeId: input.typeId,
-        locationId: input.locationId,
-        description: input.description,
-      });
+      };
+
+      if (input.locationId) {
+        data.locationId = input.locationId;
+      }
+
+      if (input.description) {
+        data.description = input.description;
+      }
+
+      return service.createManualCollection(data);
     }),
 
   // Add machines to collection

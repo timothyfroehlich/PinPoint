@@ -215,7 +215,10 @@ export class PinballMapService {
           added++;
         }
       } catch (error) {
-        console.error(`Error processing machine ${pmMachine.opdb_id}:`, error);
+        console.error(
+          `Error processing machine ${pmMachine.opdb_id ?? "unknown"}:`,
+          error,
+        );
         // Continue processing other machines
       }
     }
@@ -251,7 +254,7 @@ export class PinballMapService {
   /**
    * Find existing Model or create new one from PinballMap data
    */
-  private async findOrCreateModel(
+  async findOrCreateModel(
     pmMachine: PinballMapMachine,
     createMissingModels: boolean,
   ): Promise<{ id: string; name: string } | null> {
@@ -285,23 +288,31 @@ export class PinballMapService {
     try {
       model = await this.prisma.model.create({
         data: {
-          name: pmMachine.machine_name ?? pmMachine.name,
-          manufacturer: pmMachine.manufacturer ?? null,
-          year: pmMachine.year ?? null,
+          name: pmMachine.machine_name,
+          ...(pmMachine.manufacturer && {
+            manufacturer: pmMachine.manufacturer,
+          }),
+          ...(pmMachine.year && { year: pmMachine.year }),
 
           // Cross-database references
-          opdbId: pmMachine.opdb_id,
-          ipdbId: pmMachine.ipdb_id ?? null,
+          ...(pmMachine.opdb_id && { opdbId: pmMachine.opdb_id }),
+          ...(pmMachine.ipdb_id && { ipdbId: pmMachine.ipdb_id }),
 
           // Technical details
-          machineType: pmMachine.machine_type ?? null,
-          machineDisplay: pmMachine.machine_display ?? null,
+          ...(pmMachine.machine_type && {
+            machineType: pmMachine.machine_type,
+          }),
+          ...(pmMachine.machine_display && {
+            machineDisplay: pmMachine.machine_display,
+          }),
           isActive: pmMachine.is_active ?? true,
 
           // Metadata and links
-          ipdbLink: pmMachine.ipdb_link ?? null,
-          opdbImgUrl: pmMachine.opdb_img ?? null,
-          kineticistUrl: pmMachine.kineticist_url ?? null,
+          ...(pmMachine.ipdb_link && { ipdbLink: pmMachine.ipdb_link }),
+          ...(pmMachine.opdb_img && { opdbImgUrl: pmMachine.opdb_img }),
+          ...(pmMachine.kineticist_url && {
+            kineticistUrl: pmMachine.kineticist_url,
+          }),
 
           // PinPoint-specific
           isCustom: false, // OPDB games are not custom
@@ -331,11 +342,11 @@ export class PinballMapService {
   ): Promise<PinballMapMachineDetailsResponse | null> {
     try {
       const response = await fetch(
-        `https://pinballmap.com/api/v1/locations/${pinballMapId}/machine_details.json`,
+        `https://pinballmap.com/api/v1/locations/${pinballMapId.toString()}/machine_details.json`,
       );
 
       if (!response.ok) {
-        throw new Error(`PinballMap API error: ${response.status}`);
+        throw new Error(`PinballMap API error: ${response.status.toString()}`);
       }
 
       const result: unknown = await response.json();

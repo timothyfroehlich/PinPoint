@@ -71,23 +71,35 @@ export const issueCoreRouter = createTRPCRouter({
       }
 
       // Determine reporter: use session user if available, otherwise use email or null
-      const createdById = ctx.session.user.id;
-
-      if (!createdById) {
+      if (!ctx.session.user.id) {
         throw new Error("User not found");
       }
+      const createdById = ctx.session.user.id;
 
       // Create the issue
+      const issueData: {
+        title: string;
+        description?: string | null;
+        createdById: string;
+        machineId: string;
+        organizationId: string;
+        statusId: string;
+        priorityId: string;
+      } = {
+        title: input.title,
+        createdById,
+        machineId: input.machineId,
+        organizationId: organization.id,
+        statusId: newStatus.id,
+        priorityId: defaultPriority.id,
+      };
+
+      if (input.description) {
+        issueData.description = input.description;
+      }
+
       const issue = await ctx.db.issue.create({
-        data: {
-          title: input.title,
-          description: input.description,
-          createdById,
-          machineId: input.machineId,
-          organizationId: organization.id,
-          statusId: newStatus.id,
-          priorityId: defaultPriority.id,
-        },
+        data: issueData,
         include: {
           status: true,
           createdBy: {

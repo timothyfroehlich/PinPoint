@@ -60,6 +60,7 @@ describe("Notification preference logic", () => {
     });
 
     expect(updated?.ownerNotificationsEnabled).toBe(false);
+    // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(mockPrisma.machine.update).toHaveBeenCalledWith({
       where: { id: mockMachine.id },
       data: { ownerNotificationsEnabled: false },
@@ -86,6 +87,7 @@ describe("Notification preference logic", () => {
     });
 
     expect(updated?.emailNotificationsEnabled).toBe(false);
+    // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(mockPrisma.user.update).toHaveBeenCalledWith({
       where: { id: mockUser.id },
       data: { emailNotificationsEnabled: false },

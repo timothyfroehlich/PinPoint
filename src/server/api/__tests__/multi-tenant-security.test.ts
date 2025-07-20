@@ -195,7 +195,7 @@ describe("Multi-Tenant Security Tests", () => {
       expect(result).toEqual(issuesOrgA);
 
       // Verify that the query included organization filter
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+
       expect(ctx.db.issue.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
@@ -399,7 +399,7 @@ describe("Multi-Tenant Security Tests", () => {
       expect(resultB).toEqual(issuesOrgB);
 
       // Verify Organization B query had correct filter
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+
       expect(ctxB.db.issue.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
@@ -618,7 +618,7 @@ describe("Multi-Tenant Security Tests", () => {
       await callerA.issue.core.create(createData);
 
       // Verify that organizationId was automatically added
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+
       expect(ctx.db.issue.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -817,7 +817,7 @@ describe("Multi-Tenant Security Tests", () => {
       expect(result.length).toBeGreaterThan(0);
 
       // Verify admin can only access their organization's data
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+
       expect(ctxAdmin.db.issue.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({

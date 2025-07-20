@@ -82,59 +82,59 @@ export class CollectionService {
     auto: CollectionWithMachines[];
   }> {
     // Get all collections in one query to avoid N+1 pattern
-    const collections: CollectionWithTypeAndCount[] =
-      await this.prisma.collection.findMany({
-        where: {
-          OR: [
-            { locationId }, // Location-specific collections
-            { locationId: null, isManual: false }, // Organization-wide auto-collections
-          ],
-          type: {
-            organizationId,
-            isEnabled: true,
+    const collections = await this.prisma.collection.findMany({
+      where: {
+        OR: [
+          { locationId }, // Location-specific collections
+          { locationId: null, isManual: false }, // Organization-wide auto-collections
+        ],
+        type: {
+          organizationId,
+          isEnabled: true,
+        },
+      },
+      include: {
+        type: {
+          select: {
+            id: true,
+            name: true,
+            displayName: true,
           },
         },
-        include: {
-          type: {
-            select: {
-              id: true,
-              name: true,
-              displayName: true,
-            },
-          },
-          _count: {
-            select: {
-              machines: {
-                where: {
-                  locationId, // Only count machines at this location
-                },
+        _count: {
+          select: {
+            machines: {
+              where: {
+                locationId, // Only count machines at this location
               },
             },
           },
         },
-        orderBy: [
-          {
-            type: {
-              sortOrder: "asc",
-            },
-          },
-          {
+      },
+      orderBy: [
+        {
+          type: {
             sortOrder: "asc",
           },
-        ],
-      });
+        },
+        {
+          sortOrder: "asc",
+        },
+      ],
+    });
 
     const { manual, auto } = collections.reduce(
       (acc, collection) => {
+        const typedCollection = collection as CollectionWithTypeAndCount;
         const collectionData: CollectionWithMachines = {
-          id: collection.id,
-          name: collection.name,
+          id: typedCollection.id,
+          name: typedCollection.name,
           type: {
-            id: collection.type.id,
-            name: collection.type.name,
-            displayName: collection.type.displayName,
+            id: typedCollection.type.id,
+            name: typedCollection.type.name,
+            displayName: typedCollection.type.displayName,
           },
-          machineCount: collection._count.machines,
+          machineCount: typedCollection._count.machines,
         };
 
         if (collection.isManual) {
@@ -195,18 +195,32 @@ export class CollectionService {
    * Create a manual collection
    */
   createManualCollection(
-    organizationId: string,
     data: CreateManualCollectionData,
   ): Promise<Collection> {
+    const createData: {
+      name: string;
+      typeId: string;
+      locationId?: string | null;
+      description?: string | null;
+      isManual: true;
+      isSmart: false;
+    } = {
+      name: data.name,
+      typeId: data.typeId,
+      isManual: true,
+      isSmart: false,
+    };
+
+    if (data.locationId) {
+      createData.locationId = data.locationId;
+    }
+
+    if (data.description) {
+      createData.description = data.description;
+    }
+
     return this.prisma.collection.create({
-      data: {
-        name: data.name,
-        typeId: data.typeId,
-        locationId: data.locationId,
-        description: data.description,
-        isManual: true,
-        isSmart: false,
-      },
+      data: createData,
     });
   }
 
@@ -267,29 +281,28 @@ export class CollectionService {
     collectionType: CollectionType,
   ): Promise<{ generated: number; updated: number }> {
     // Get all unique manufacturers for machines in this organization
-    const manufacturers: MachineWithModelManufacturer[] =
-      await this.prisma.machine.findMany({
-        where: {
-          organizationId: collectionType.organizationId,
-          model: {
-            manufacturer: {
-              not: null,
-            },
+    const machines = await this.prisma.machine.findMany({
+      where: {
+        organizationId: collectionType.organizationId,
+        model: {
+          manufacturer: {
+            not: null,
           },
         },
-        select: {
-          model: {
-            select: {
-              manufacturer: true,
-            },
+      },
+      select: {
+        model: {
+          select: {
+            manufacturer: true,
           },
         },
-        distinct: ["modelId"],
-      });
+      },
+      distinct: ["modelId"],
+    });
 
     const uniqueManufacturers = Array.from(
       new Set(
-        manufacturers
+        (machines as unknown as MachineWithModelManufacturer[])
           .map((m) => m.model.manufacturer)
           .filter((m): m is string => m !== null),
       ),
@@ -317,7 +330,7 @@ export class CollectionService {
             locationId: null,
             isManual: false,
             isSmart: false,
-            filterCriteria: { manufacturer },
+            filterCriteria: { manufacturer } as Prisma.JsonObject,
           },
         });
 
@@ -422,7 +435,10 @@ export class CollectionService {
             locationId: null,
             isManual: false,
             isSmart: false,
-            filterCriteria: { yearStart: era.start, yearEnd: era.end },
+            filterCriteria: {
+              yearStart: era.start,
+              yearEnd: era.end,
+            } as Prisma.JsonObject,
           },
         });
 

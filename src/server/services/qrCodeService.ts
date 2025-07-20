@@ -91,7 +91,7 @@ export class QRCodeService {
     });
 
     return {
-      id: updatedMachine.qrCodeId ?? "",
+      id: updatedMachine.qrCodeId,
       url: updatedMachine.qrCodeUrl,
       generatedAt: updatedMachine.qrCodeGeneratedAt,
     };

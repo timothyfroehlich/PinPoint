@@ -99,8 +99,8 @@ export const createAuthConfig = (db: ExtendedPrismaClient): NextAuthConfig => ({
   },
   callbacks: {
     jwt: async ({ token, user }: { token: JWT; user?: User }): Promise<JWT> => {
-      if (user && "id" in user && typeof user["id"] === "string") {
-        const userId = user["id"];
+      if (user && "id" in user && typeof user.id === "string") {
+        const userId = user.id;
         token["id"] = userId;
 
         // Get the user's membership in the current organization

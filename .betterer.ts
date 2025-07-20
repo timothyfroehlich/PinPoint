@@ -7,5 +7,7 @@ export default {
       strict: true,
       exactOptionalPropertyTypes: true,
       noUncheckedIndexedAccess: true,
+      target: "ES2022", // Explicitly set target to match tsconfig.json
+      lib: ["dom", "dom.iterable", "ES2022"], // Match tsconfig.json lib
     }).include("./src/**/*.{ts,tsx}"),
 };

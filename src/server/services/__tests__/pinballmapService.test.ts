@@ -185,10 +185,7 @@ describe("PinballMapService", () => {
     });
     it("should preserve existing games that are still in PinballMap", async () => {
       const fixtureData = PinballMapAPIMocker.getFixtureData();
-      const firstMachine = fixtureData.machines[0] as {
-        name: string;
-        opdb_id: string;
-      };
+      const firstMachine = fixtureData.machines[0];
       if (!firstMachine) throw new Error("Fixture data is empty");
 
       // Mock one existing game that matches the first machine in fixture data
@@ -209,7 +206,8 @@ describe("PinballMapService", () => {
 
       // When searching for the first machine, return the existing model
       findUniqueModelMock.mockImplementation(({ where }) => {
-        if (where?.opdbId === firstMachine.opdb_id) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        if (where?.opdbId === (firstMachine as { opdb_id?: string }).opdb_id) {
           return Promise.resolve(existingModel as Model);
         }
         return Promise.resolve(null);
