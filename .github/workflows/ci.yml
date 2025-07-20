@@ -33,14 +33,29 @@ jobs:
         id: typecheck
         run: |
           npm run typecheck 2>&1 | tee typescript-output.log || true
-          ERROR_COUNT=$(grep -c "error TS" typescript-output.log || echo "0")
-          PRODUCTION_ERRORS=$(grep "error TS" typescript-output.log | grep -v "test\|__tests__\|spec" || true)
-          if [ -z "$PRODUCTION_ERRORS" ]; then
+          
+          # Count total TypeScript errors
+          ERROR_COUNT=$(grep -c "error TS" typescript-output.log 2>/dev/null || echo "0")
+          
+          # Filter out test files more comprehensively
+          PRODUCTION_ERRORS=$(grep "error TS" typescript-output.log 2>/dev/null | grep -v -E "(test\.|\.test\.|__tests__|\.spec\.|spec\.)" || true)
+          
+          # Count production errors with proper validation
+          if [ -z "$PRODUCTION_ERRORS" ] || [ "$PRODUCTION_ERRORS" = "" ]; then
             PRODUCTION_ERROR_COUNT=0
           else
-            PRODUCTION_ERROR_COUNT=$(echo "$PRODUCTION_ERRORS" | grep -c "error TS")
+            PRODUCTION_ERROR_COUNT=$(echo "$PRODUCTION_ERRORS" | wc -l)
+            # Ensure it's a valid number
+            if ! [[ "$PRODUCTION_ERROR_COUNT" =~ ^[0-9]+$ ]]; then
+              PRODUCTION_ERROR_COUNT=0
+            fi
           fi
+          
+          # Calculate test errors
           TEST_ERROR_COUNT=$((ERROR_COUNT - PRODUCTION_ERROR_COUNT))
+          if [ "$TEST_ERROR_COUNT" -lt 0 ]; then
+            TEST_ERROR_COUNT=0
+          fi
           
           {
             echo "error_count=$ERROR_COUNT"
@@ -128,13 +143,23 @@ jobs:
         id: lint-tests
         run: |
           npm run lint src/ 2>&1 | tee eslint-test-output.log || true
-          WARNING_COUNT=$(grep -c "warning\|error" eslint-test-output.log || echo "0")
-          echo "warning_count=$WARNING_COUNT" >> "$GITHUB_OUTPUT"
+          
+          # Count warnings/errors with proper validation
+          WARNING_COUNT=$(grep -c "warning\|error" eslint-test-output.log 2>/dev/null || echo "0")
+          # Ensure WARNING_COUNT is a valid number
+          if ! [[ "$WARNING_COUNT" =~ ^[0-9]+$ ]]; then
+            WARNING_COUNT=0
+          fi
+          
+          # Output to GitHub Actions with proper formatting
+          echo "warning_count=${WARNING_COUNT}" >> "$GITHUB_OUTPUT"
+          
           {
             echo "## ESLint Test Files Report"
             echo "Found $WARNING_COUNT warnings/errors in test files (non-blocking)"
             echo "✅ Test linting issues don't block CI during TypeScript migration"
           } >> "$GITHUB_STEP_SUMMARY"
+          
           echo "ESLint Tests job: SUCCESS (test issues are non-blocking)"
           exit 0
 
