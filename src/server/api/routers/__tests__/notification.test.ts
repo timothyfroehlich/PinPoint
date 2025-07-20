@@ -79,6 +79,7 @@ describe("notificationRouter", () => {
     const caller = appRouter.createCaller(ctx as any);
     await caller.notification.markAsRead({ notificationId });
 
+    // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(mockNotificationService.markAsRead).toHaveBeenCalledWith(
       notificationId,
       mockUser.id,
@@ -94,6 +95,7 @@ describe("notificationRouter", () => {
     const caller = appRouter.createCaller(ctx as any);
     await caller.notification.markAllAsRead();
 
+    // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(mockNotificationService.markAllAsRead).toHaveBeenCalledWith(
       mockUser.id,
     );
@@ -141,6 +143,7 @@ describe("notificationRouter", () => {
     expect(result.some((n) => n.userId === otherUserId)).toBe(false);
 
     // Should only query for current user's notifications
+    // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(mockNotificationService.getUserNotifications).toHaveBeenCalledWith(
       mockUser.id,
       {},

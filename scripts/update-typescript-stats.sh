@@ -16,10 +16,14 @@ echo "📊 Gathering TypeScript migration statistics..."
 # Get TypeScript error count
 echo -n "Running typecheck... "
 TS_OUTPUT=$(npm run typecheck 2>&1 || true)
-TS_ERRORS=$(echo "$TS_OUTPUT" | grep -E "Found [0-9]+ error" | grep -oE "[0-9]+" | head -1 || echo "0")
-if [ -z "$TS_ERRORS" ]; then
+TS_ERRORS=$(echo "$TS_OUTPUT" | grep -E "Found [0-9]+ error" | grep -oE "[0-9]+" | head -1 2>/dev/null || echo "0")
+if [ -z "$TS_ERRORS" ] || [ "$TS_ERRORS" = "" ]; then
   # Count individual error lines if summary not found
-  TS_ERRORS=$(echo "$TS_OUTPUT" | grep -cE "^src/.*\.tsx?.*: error TS[0-9]+:" || echo "0")
+  TS_ERRORS=$(echo "$TS_OUTPUT" | grep -cE "error TS[0-9]+:" 2>/dev/null || echo "0")
+fi
+# Ensure TS_ERRORS is a valid number
+if ! [[ "$TS_ERRORS" =~ ^[0-9]+$ ]]; then
+  TS_ERRORS=0
 fi
 echo -e "${GREEN}✓${NC} Found ${RED}$TS_ERRORS${NC} TypeScript errors"
 
@@ -58,9 +62,12 @@ sed -i.tmp "s/| 'any' Usage |.*|.*|/| 'any' Usage | $ANY_COUNT | 0 |/" TYPESCRIP
 LAST_TS_ERRORS=$(grep -E "^\| [0-9]{4}-[0-9]{2}-[0-9]{2}" TYPESCRIPT_MIGRATION.md | tail -1 | awk -F'|' '{print $4}' | tr -d ' ' || echo "999")
 if [ "$TS_ERRORS" != "$LAST_TS_ERRORS" ]; then
   echo "Adding new history entry..."
-  # Find the history table and add new row
-  sed -i.tmp "/^| Date | Commit | TS Errors | ESLint Warnings | 'any' Count | Notes |$/a\\
-| $CURRENT_DATE | $CURRENT_COMMIT | $TS_ERRORS | $TOTAL_WARNINGS ($TYPE_WARNINGS type) | $ANY_COUNT | Auto-updated |" TYPESCRIPT_MIGRATION.md
+  # Find the history table and add new row (find the table header and insert after it)
+  sed -i.tmp "/^| Date.*| Commit.*| TS Errors.*| ESLint Warnings.*| 'any' Count.*| Notes.*|$/{
+n
+a\\
+| $CURRENT_DATE | $CURRENT_COMMIT | $TS_ERRORS | $TOTAL_WARNINGS ($TYPE_WARNINGS type) | $ANY_COUNT | Auto-updated |
+}" TYPESCRIPT_MIGRATION.md
 fi
 
 # Clean up temp files
