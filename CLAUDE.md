@@ -56,6 +56,21 @@ npm run debug:lint      # Detailed lint output
 
 # Testing
 npm run test:coverage
+
+# File-Specific TypeScript Checking (NEW)
+npm run typecheck:files -- src/specific/file.ts   # Check specific files
+npm run typecheck:routes                          # Check route files only
+npm run typecheck:tests                           # Check test files only
+npm run typecheck:changed                         # Check git-modified files
+
+# Advanced TypeScript Scripts (Auto-Approved)
+./scripts/typecheck-files.sh [--lines N] src/**/*.ts     # Direct bash script (default: 10 lines)
+./scripts/typecheck-grep.sh [--lines N] "pattern" [files] # Type check + grep filter (default: 5 lines)
+# Examples:
+#   ./scripts/typecheck-files.sh --lines 20 src/app/api/**/*.ts
+#   ./scripts/typecheck-grep.sh -l 0 "multi-tenant" # Show all matching errors
+#   ./scripts/typecheck-grep.sh --lines 3 "route\.ts" # Show only 3 errors
+# Note: These scripts use `npx tsc --noEmit` and are auto-approved for faster execution
 ```
 
 ## Quality Standards (Zero Tolerance)
@@ -68,6 +83,104 @@ npm run test:coverage
 - **Modern patterns** - ES modules, typed mocks (`jest.fn<T>()`), no `any` types
 - **Test quality** - Same standards as production code
 - **Coverage thresholds** - 50% global, 60% server/, 70% lib/ (configured in jest.config.js)
+
+## TypeScript Strictest Mode Guidelines
+
+### Key Patterns for `@tsconfig/strictest` Compliance
+
+1. **Optional Properties (`exactOptionalPropertyTypes`)**
+
+   ```typescript
+   // ❌ Bad: undefined not assignable to optional
+   const data: { prop?: string } = { prop: value || undefined };
+
+   // ✅ Good: Use conditional assignment
+   const data: { prop?: string } = {};
+   if (value) data.prop = value;
+
+   // ✅ Alternative: Object spread with filter
+   const data = { ...otherProps, ...(value && { prop: value }) };
+   ```
+
+2. **Null Checks (`strictNullChecks`)**
+
+   ```typescript
+   // ❌ Bad: Object possibly null
+   const id = ctx.session.user.id;
+
+   // ✅ Good: Guard with optional chaining
+   if (!ctx.session?.user?.id) throw new Error("Not authenticated");
+   const id = ctx.session.user.id;
+   ```
+
+3. **Array Access (`noUncheckedIndexedAccess`)**
+
+   ```typescript
+   // ❌ Bad: Array access without bounds check
+   const first = items[0].name;
+
+   // ✅ Good: Safe array access
+   const first = items[0]?.name ?? "Unknown";
+   const first = items.at(0)?.name ?? "Unknown";
+   ```
+
+4. **Type Assertions**
+
+   ```typescript
+   // ❌ Bad: Avoid 'as' casting
+   const mock = jest.fn() as jest.Mock<any>;
+
+   // ✅ Good: Use proper generics
+   const mock = jest.fn<ReturnType, [Parameters]>();
+   ```
+
+5. **Never Use 'any' Type**
+
+   ```typescript
+   // ❌ Bad: Using any defeats type safety
+   const data: any = await someApi();
+
+   // ✅ Good: Find or define the real type
+   const data: UserResponse = await userApi.get();
+
+   // ✅ Good: Use unknown for truly unknown data
+   const data: unknown = JSON.parse(str);
+   if (isUserData(data)) {
+     /* now typed */
+   }
+   ```
+
+6. **Prisma Mocks (with $accelerate)**
+   ```typescript
+   // ✅ ExtendedPrismaClient includes $accelerate
+   const mockPrisma = {
+     user: { findUnique: jest.fn() },
+     $accelerate: {
+       invalidate: jest.fn(),
+       invalidateAll: jest.fn(),
+     },
+   };
+   ```
+
+### Critical Do's and Don'ts
+
+**✅ ALWAYS:**
+
+- Use `@ts-expect-error` with descriptive comments (never `@ts-ignore`)
+- Handle null/undefined before property access
+- Use type guards instead of assertions
+- Check array bounds or use optional chaining
+- Find real types instead of using `any`
+
+**❌ NEVER:**
+
+- Use `@ts-ignore` (banned by ESLint)
+- Assign `undefined` to optional properties
+- Access array elements without bounds checking
+- Use `any` type (even in tests)
+- Skip null checks in protected procedures
+
+**Remember**: Betterer tracks all TypeScript errors - no new errors allowed in production code!
 
 ## Development Workflow
 
@@ -97,10 +210,21 @@ npm run test:coverage
 - **Playwright**: Browser automation, E2E testing
 - **Context7**: Library documentation lookup
 
+## Developer Guides
+
+For detailed guidance beyond these essentials:
+
+- **TypeScript Issues**: See `docs/developer-guides/typescript-strictest.md` for comprehensive error resolution
+- **Testing Patterns**: See `docs/developer-guides/testing-patterns.md` for Jest mocking and coverage patterns
+- **ESLint Errors**: See `docs/developer-guides/common-errors.md` for specific rule violations and fixes
+- **Betterer Workflow**: See `docs/developer-guides/betterer-workflow.md` for migration workflow and team coordination
+- **Migration Progress**: See `TYPESCRIPT_MIGRATION.md` for current status and tracking
+- **Script Usage**: See `scripts/README.md` for TypeScript analysis tools
+
 ## Repository
 
 - **Repo**: timothyfroehlich/PinPoint
-- **Troubleshooting**: See `docs/troubleshooting.md`
+- **Troubleshooting**: See `docs/troubleshooting.md` (environment) or `docs/developer-guides/troubleshooting.md` (development)
 - **Design Docs**: Available in Notion workspace (`/PinPoint/`)
 - **Protected Main**: Never commit to main, all changes require PRs.
 
@@ -112,6 +236,8 @@ npm run test:coverage
 - **ESM modules**: Project uses `"type": "module"` - some packages (superjson, @auth/prisma-adapter) are ESM-only and may need transformIgnorePatterns updates in Jest
 - **Jest ESM**: Current config uses `ts-jest/presets/default-esm` - avoid changing without understanding ESM implications
 - **Type Safety**: Project enforces strictest TypeScript + type-aware ESLint rules. All `@typescript-eslint/no-unsafe-*` and `no-explicit-any` violations must be fixed
+- **TypeScript Migration**: ✅ Production code is 100% strict mode compliant! Test files being cleaned up incrementally
+- **Migration Tracking**: See `TYPESCRIPT_MIGRATION.md` for patterns and progress. Betterer prevents regressions
 
 ## Frontend Development Notes
 

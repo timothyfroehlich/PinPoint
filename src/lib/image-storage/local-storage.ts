@@ -21,10 +21,7 @@ export class LocalImageStorage implements ImageStorageProvider {
     }
   }
 
-  validateImage(
-    file: File,
-    constraints = IMAGE_CONSTRAINTS,
-  ): boolean {
+  validateImage(file: File, constraints = IMAGE_CONSTRAINTS): boolean {
     // Check file size
     if (file.size > constraints.maxSizeBytes) {
       return false;

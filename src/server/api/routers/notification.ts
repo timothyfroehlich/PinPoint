@@ -14,7 +14,25 @@ export const notificationRouter = createTRPCRouter({
     )
     .query(async ({ ctx, input }) => {
       const service = ctx.services.createNotificationService();
-      return service.getUserNotifications(ctx.session.user.id, input);
+
+      // Build options object to avoid exactOptionalPropertyTypes issues
+      const options: {
+        unreadOnly?: boolean;
+        limit?: number;
+        offset?: number;
+      } = {};
+
+      if (input.unreadOnly !== undefined) {
+        options.unreadOnly = input.unreadOnly;
+      }
+      if (input.limit !== undefined) {
+        options.limit = input.limit;
+      }
+      if (input.offset !== undefined) {
+        options.offset = input.offset;
+      }
+
+      return service.getUserNotifications(ctx.session.user.id, options);
     }),
 
   // Get unread count

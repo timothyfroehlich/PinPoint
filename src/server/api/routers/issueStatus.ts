@@ -21,7 +21,11 @@ export const issueStatusRouter = createTRPCRouter({
     .input(
       z.object({
         name: z.string().min(1).max(50),
-        category: z.nativeEnum(StatusCategory),
+        category: z.enum([
+          StatusCategory.NEW,
+          StatusCategory.IN_PROGRESS,
+          StatusCategory.RESOLVED,
+        ]),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -39,7 +43,13 @@ export const issueStatusRouter = createTRPCRouter({
       z.object({
         id: z.string(),
         name: z.string().min(1).max(50).optional(),
-        category: z.nativeEnum(StatusCategory).optional(),
+        category: z
+          .enum([
+            StatusCategory.NEW,
+            StatusCategory.IN_PROGRESS,
+            StatusCategory.RESOLVED,
+          ])
+          .optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {

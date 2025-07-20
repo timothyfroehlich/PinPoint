@@ -1,1 +1,11 @@
+# Run actionlint if available
+if command -v actionlint &> /dev/null; then
+    echo "🔍 Checking GitHub Actions workflows..."
+    actionlint .github/workflows/*.yml || {
+        echo "❌ GitHub Actions validation failed. Please fix the errors above."
+        exit 1
+    }
+fi
+
+# Run standard pre-commit
 npx lint-staged

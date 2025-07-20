@@ -1,3 +1,4 @@
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import {
@@ -19,14 +20,13 @@ export const machineCoreRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       // Verify that the model and room belong to the same organization
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+
       const model = await ctx.db.model.findFirst({
         where: {
           id: input.modelId,
         },
       });
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       const location = await ctx.db.location.findFirst({
         where: {
           id: input.locationId,
@@ -38,7 +38,6 @@ export const machineCoreRouter = createTRPCRouter({
         throw new Error("Invalid game title or location");
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       const machine = await ctx.db.machine.create({
         data: {
           name: input.name,
@@ -70,23 +69,20 @@ export const machineCoreRouter = createTRPCRouter({
       // Auto-generate QR code for the new machine
       try {
         const qrCodeService = ctx.services.createQRCodeService();
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
+
         await qrCodeService.generateQRCode(machine.id);
       } catch (error) {
         // Log error but don't fail machine creation
         console.warn(
-          // eslint-disable-next-line @typescript-eslint/restrict-template-expressions, @typescript-eslint/no-unsafe-member-access
           `Failed to generate QR code for machine ${machine.id}:`,
           error,
         );
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return machine;
     }),
 
   getAll: organizationProcedure.query(({ ctx }) => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     return ctx.db.machine.findMany({
       where: {
         organizationId: ctx.organization.id,
@@ -111,7 +107,13 @@ export const machineCoreRouter = createTRPCRouter({
     // Use the organization resolved from subdomain context
     const organization = ctx.organization;
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    if (!organization) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Organization not found",
+      });
+    }
+
     return ctx.db.machine.findMany({
       where: {
         organizationId: organization.id,
@@ -131,7 +133,6 @@ export const machineCoreRouter = createTRPCRouter({
   getById: organizationProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       const machine = await ctx.db.machine.findFirst({
         where: {
           id: input.id,
@@ -162,7 +163,6 @@ export const machineCoreRouter = createTRPCRouter({
         throw new Error("Game instance not found");
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return machine;
     }),
 
@@ -176,7 +176,7 @@ export const machineCoreRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       // First verify the game instance belongs to this organization
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+
       const existingInstance = await ctx.db.machine.findFirst({
         where: {
           id: input.id,
@@ -190,7 +190,6 @@ export const machineCoreRouter = createTRPCRouter({
 
       // If updating model or location, verify they belong to the organization
       if (input.modelId) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
         const model = await ctx.db.model.findFirst({
           where: {
             id: input.modelId,
@@ -202,7 +201,6 @@ export const machineCoreRouter = createTRPCRouter({
       }
 
       if (input.locationId) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
         const location = await ctx.db.location.findFirst({
           where: {
             id: input.locationId,
@@ -214,7 +212,6 @@ export const machineCoreRouter = createTRPCRouter({
         }
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       return ctx.db.machine.update({
         where: { id: input.id },
         data: {
@@ -247,7 +244,7 @@ export const machineCoreRouter = createTRPCRouter({
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       // Verify the game instance belongs to this organization
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+
       const existingInstance = await ctx.db.machine.findFirst({
         where: {
           id: input.id,
@@ -259,7 +256,6 @@ export const machineCoreRouter = createTRPCRouter({
         throw new Error("Game instance not found");
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       return ctx.db.machine.delete({
         where: { id: input.id },
       });

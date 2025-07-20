@@ -3,7 +3,7 @@
 ---
 
 status: current
-last-updated: 2025-01-14
+last-updated: 2025-01-20
 
 ---
 
@@ -32,7 +32,7 @@ These documents represent the current state of the project and should be referen
 
 ### Implementation Guides
 
-- **[Backend Implementation Tasks](backend_impl_tasks/README.md)** - Detailed task breakdown for backend refactor
+- **[Backend Implementation Tasks](backend_impl_tasks/CLAUDE.md)** - Detailed task breakdown for backend refactor
 - **[Multi-Agent Workflow](backend_impl_tasks/MULTI_AGENT_WORKFLOW.md)** - Parallel development using git worktrees
 
 ### Development Resources

@@ -12,7 +12,6 @@ import type { ExtendedPrismaClient } from "~/server/db";
 
 import { env } from "~/env.js";
 
-
 /**
  * Module augmentation for `next-auth` types. Allows us to add custom properties to the `session`
  * object and keep type safety.
@@ -55,7 +54,9 @@ export const createAuthConfig = (db: ExtendedPrismaClient): NextAuthConfig => ({
             credentials: {
               email: { label: "Email", type: "email" },
             },
-            async authorize(credentials: Record<string, unknown> | undefined): Promise<User | null> {
+            async authorize(
+              credentials: Record<string, unknown> | undefined,
+            ): Promise<User | null> {
               if (env.NODE_ENV !== "development" && env.NODE_ENV !== "test") {
                 return null;
               }
@@ -100,7 +101,7 @@ export const createAuthConfig = (db: ExtendedPrismaClient): NextAuthConfig => ({
     jwt: async ({ token, user }: { token: JWT; user?: User }): Promise<JWT> => {
       if (user && "id" in user && typeof user.id === "string") {
         const userId = user.id;
-        token.id = userId;
+        token["id"] = userId;
 
         // Get the user's membership in the current organization
         // Note: In JWT callback, we don't have access to request headers/subdomain,
@@ -124,22 +125,42 @@ export const createAuthConfig = (db: ExtendedPrismaClient): NextAuthConfig => ({
           });
 
           if (isValidMembership(membershipResult)) {
-            token.role = membershipResult.role.name;
-            token.organizationId = organizationResult.id;
+            token["role"] = membershipResult.role.name;
+            token["organizationId"] = organizationResult.id;
           }
         }
       }
       return token;
     },
-    session: ({ session, token }: { session: Session; token: JWT }): Session => {
+    session: ({
+      session,
+      token,
+    }: {
+      session: Session;
+      token: JWT;
+    }): Session => {
       // For JWT sessions, get data from token
+      const userUpdate: {
+        id: string;
+        role?: string;
+        organizationId?: string;
+      } = {
+        id: typeof token["id"] === "string" ? token["id"] : "",
+      };
+
+      if (typeof token["role"] === "string") {
+        userUpdate.role = token["role"];
+      }
+
+      if (typeof token["organizationId"] === "string") {
+        userUpdate.organizationId = token["organizationId"];
+      }
+
       return {
         ...session,
         user: {
           ...session.user,
-          id: typeof token["id"] === "string" ? token["id"] : "",
-          role: typeof token["role"] === "string" ? token["role"] : undefined,
-          organizationId: typeof token["organizationId"] === "string" ? token["organizationId"] : undefined,
+          ...userUpdate,
         },
       };
     },

@@ -30,3 +30,8 @@ updates:
       - "dependencies"
       - "github-actions"
       - "automerge"
+    # Support for pinned SHA updates
+    reviewers:
+      - "timothyfroehlich"
+    assignees:
+      - "timothyfroehlich"

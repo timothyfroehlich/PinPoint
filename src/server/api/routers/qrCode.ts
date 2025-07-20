@@ -27,7 +27,7 @@ export const qrCodeRouter = createTRPCRouter({
     .input(z.object({ machineId: z.string() }))
     .query(async ({ ctx, input }) => {
       // Verify machine belongs to organization
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+
       const machine = await ctx.db.machine.findUnique({
         where: {
           id: input.machineId,

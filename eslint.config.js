@@ -16,10 +16,11 @@ export default tseslint.config(
   ...tseslint.configs.strictTypeChecked,
   ...tseslint.configs.stylisticTypeChecked,
   {
-    // Enable type-aware linting
+    // Enable type-aware linting for all files
     languageOptions: {
       parserOptions: {
-        project: true,
+        // Explicitly specify tsconfig path to avoid Next.js auto-generation conflicts
+        project: ["./tsconfig.json"],
         tsconfigRootDir: import.meta.dirname,
       },
     },
@@ -104,6 +105,18 @@ export default tseslint.config(
           allowDirectConstAssertionInArrowFunctions: true,
         },
       ],
+
+      // Ban problematic TypeScript comment directives
+      "@typescript-eslint/ban-ts-comment": [
+        "error",
+        {
+          "ts-expect-error": "allow-with-description",
+          "ts-ignore": true,
+          "ts-nocheck": true,
+          "ts-check": false,
+          minimumDescriptionLength: 10,
+        },
+      ],
     },
   },
   {
@@ -181,6 +194,7 @@ export default tseslint.config(
       "next.config.js",
       "postcss.config.js",
       "tailwind.config.ts",
+      ".betterer.ts",
     ],
   },
 );

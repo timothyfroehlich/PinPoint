@@ -6,7 +6,13 @@ import { type ReactNode } from "react";
 
 import theme from "./theme";
 
-export default function Providers({ children }: { children: ReactNode }) {
+import type { JSX } from "react";
+
+export default function Providers({
+  children,
+}: {
+  children: ReactNode;
+}): JSX.Element {
   return (
     <ThemeProvider theme={theme}>
       {/* CssBaseline kickstart an elegant, consistent, and simple baseline to build upon. */}
