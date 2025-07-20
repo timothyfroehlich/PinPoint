@@ -97,6 +97,9 @@ npm run typecheck:changed                         # Check git-modified files
    // ✅ Good: Use conditional assignment
    const data: { prop?: string } = {};
    if (value) data.prop = value;
+
+   // ✅ Alternative: Object spread with filter
+   const data = { ...otherProps, ...(value && { prop: value }) };
    ```
 
 2. **Null Checks (`strictNullChecks`)**
@@ -110,7 +113,18 @@ npm run typecheck:changed                         # Check git-modified files
    const id = ctx.session.user.id;
    ```
 
-3. **Type Assertions**
+3. **Array Access (`noUncheckedIndexedAccess`)**
+
+   ```typescript
+   // ❌ Bad: Array access without bounds check
+   const first = items[0].name;
+
+   // ✅ Good: Safe array access
+   const first = items[0]?.name ?? "Unknown";
+   const first = items.at(0)?.name ?? "Unknown";
+   ```
+
+4. **Type Assertions**
 
    ```typescript
    // ❌ Bad: Avoid 'as' casting
@@ -120,7 +134,23 @@ npm run typecheck:changed                         # Check git-modified files
    const mock = jest.fn<ReturnType, [Parameters]>();
    ```
 
-4. **Prisma Mocks (with $accelerate)**
+5. **Never Use 'any' Type**
+
+   ```typescript
+   // ❌ Bad: Using any defeats type safety
+   const data: any = await someApi();
+
+   // ✅ Good: Find or define the real type
+   const data: UserResponse = await userApi.get();
+
+   // ✅ Good: Use unknown for truly unknown data
+   const data: unknown = JSON.parse(str);
+   if (isUserData(data)) {
+     /* now typed */
+   }
+   ```
+
+6. **Prisma Mocks (with $accelerate)**
    ```typescript
    // ✅ ExtendedPrismaClient includes $accelerate
    const mockPrisma = {
@@ -131,6 +161,24 @@ npm run typecheck:changed                         # Check git-modified files
      },
    };
    ```
+
+### Critical Do's and Don'ts
+
+**✅ ALWAYS:**
+
+- Use `@ts-expect-error` with descriptive comments (never `@ts-ignore`)
+- Handle null/undefined before property access
+- Use type guards instead of assertions
+- Check array bounds or use optional chaining
+- Find real types instead of using `any`
+
+**❌ NEVER:**
+
+- Use `@ts-ignore` (banned by ESLint)
+- Assign `undefined` to optional properties
+- Access array elements without bounds checking
+- Use `any` type (even in tests)
+- Skip null checks in protected procedures
 
 **Remember**: Betterer tracks all TypeScript errors - no new errors allowed in production code!
 
@@ -162,10 +210,21 @@ npm run typecheck:changed                         # Check git-modified files
 - **Playwright**: Browser automation, E2E testing
 - **Context7**: Library documentation lookup
 
+## Developer Guides
+
+For detailed guidance beyond these essentials:
+
+- **TypeScript Issues**: See `docs/developer-guides/typescript-strictest.md` for comprehensive error resolution
+- **Testing Patterns**: See `docs/developer-guides/testing-patterns.md` for Jest mocking and coverage patterns
+- **ESLint Errors**: See `docs/developer-guides/common-errors.md` for specific rule violations and fixes
+- **Betterer Workflow**: See `docs/developer-guides/betterer-workflow.md` for migration workflow and team coordination
+- **Migration Progress**: See `TYPESCRIPT_MIGRATION.md` for current status and tracking
+- **Script Usage**: See `scripts/README.md` for TypeScript analysis tools
+
 ## Repository
 
 - **Repo**: timothyfroehlich/PinPoint
-- **Troubleshooting**: See `docs/troubleshooting.md`
+- **Troubleshooting**: See `docs/troubleshooting.md` (environment) or `docs/developer-guides/troubleshooting.md` (development)
 - **Design Docs**: Available in Notion workspace (`/PinPoint/`)
 - **Protected Main**: Never commit to main, all changes require PRs.
 
