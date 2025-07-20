@@ -2,22 +2,22 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 
 import { createTRPCRouter } from "../trpc";
-import { roleManageProcedure, organizationProcedure } from "../trpc.permission";
+import { roleManageProcedure, organizationManageProcedure } from "../trpc.permission";
 import { RoleService } from "../../services/roleService";
-import { PERMISSIONS, ROLE_TEMPLATES } from "../../auth/permissions.constants";
+import { ROLE_TEMPLATES } from "../../auth/permissions.constants";
 
 export const roleRouter = createTRPCRouter({
   /**
    * List all roles in the organization
    */
-  list: organizationProcedure.query(async ({ ctx }) => {
+  list: organizationManageProcedure.query(async ({ ctx }) => {
     const roleService = new RoleService(ctx.db, ctx.organization.id);
     const roles = await roleService.getRoles();
 
-    return roles.map((role) => ({
+    return roles.map((role: any) => ({
       ...role,
       memberCount: role._count.memberships,
-      permissions: role.permissions.map(p => ({
+      permissions: role.permissions.map((p: any) => ({
         id: p.id,
         name: p.name,
         description: p.description
@@ -83,11 +83,17 @@ export const roleRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const roleService = new RoleService(ctx.db, ctx.organization.id);
       
-      return roleService.updateRole(input.roleId, {
-        name: input.name,
-        permissionIds: input.permissionIds,
-        isDefault: input.isDefault,
-      });
+      const updateData: {
+        name?: string;
+        permissionIds?: string[];
+        isDefault?: boolean;
+      } = {};
+      
+      if (input.name !== undefined) updateData.name = input.name;
+      if (input.permissionIds !== undefined) updateData.permissionIds = input.permissionIds;
+      if (input.isDefault !== undefined) updateData.isDefault = input.isDefault;
+      
+      return roleService.updateRole(input.roleId, updateData);
     }),
 
   /**
@@ -113,13 +119,13 @@ export const roleRouter = createTRPCRouter({
   /**
    * Get a specific role by ID
    */
-  get: organizationProcedure
+  get: organizationManageProcedure
     .input(
       z.object({
         roleId: z.string(),
       }),
     )
-    .query(async ({ ctx, input }) => {
+    .query(async ({ ctx, input }: { ctx: any; input: { roleId: string } }) => {
       const role = await ctx.db.role.findUnique({
         where: {
           id: input.roleId,
@@ -143,7 +149,7 @@ export const roleRouter = createTRPCRouter({
       return {
         ...role,
         memberCount: role._count.memberships,
-        permissions: role.permissions.map(p => ({
+        permissions: role.permissions.map((p: { id: string; name: string; description: string | null }) => ({
           id: p.id,
           name: p.name,
           description: p.description
@@ -154,7 +160,7 @@ export const roleRouter = createTRPCRouter({
   /**
    * Get all available permissions
    */
-  getPermissions: organizationProcedure.query(async ({ ctx }) => {
+  getPermissions: organizationManageProcedure.query(async ({ ctx }) => {
     const permissions = await ctx.db.permission.findMany({
       orderBy: { name: "asc" },
     });
@@ -165,7 +171,7 @@ export const roleRouter = createTRPCRouter({
   /**
    * Get role templates available for creation
    */
-  getTemplates: organizationProcedure.query(() => {
+  getTemplates: organizationManageProcedure.query(() => {
     return Object.entries(ROLE_TEMPLATES).map(([key, template]) => ({
       key,
       ...template,

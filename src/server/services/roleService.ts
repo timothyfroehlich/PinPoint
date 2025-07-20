@@ -1,9 +1,8 @@
-import { type PrismaClient, type Role } from "@prisma/client";
+import { type Role } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { 
   SYSTEM_ROLES,
   ROLE_TEMPLATES,
-  ADMIN_PERMISSIONS,
   UNAUTHENTICATED_PERMISSIONS,
   PERMISSION_DESCRIPTIONS,
   ALL_PERMISSIONS
@@ -20,7 +19,7 @@ export class RoleService {
   private permissionService: PermissionService;
 
   constructor(
-    private prisma: PrismaClient,
+    private prisma: any,
     private organizationId: string
   ) {
     this.permissionService = new PermissionService(prisma);
@@ -99,7 +98,7 @@ export class RoleService {
     // Create the role
     const role = await this.prisma.role.create({
       data: {
-        name: overrides.name || template.name,
+        name: overrides.name ?? template.name,
         organizationId: this.organizationId,
         isSystem: false,
         isDefault: overrides.isDefault ?? true,
@@ -108,7 +107,7 @@ export class RoleService {
 
     // Get permissions with dependencies
     const expandedPermissions = this.permissionService.expandPermissionsWithDependencies(
-      template.permissions
+      [...template.permissions]
     );
 
     // Find permission records
@@ -250,7 +249,7 @@ export class RoleService {
 
     if (!defaultRole) {
       throw new TRPCError({
-        code: 'FAILED_PRECONDITION',
+        code: 'PRECONDITION_FAILED',
         message: 'No default role available for member reassignment',
       });
     }
@@ -304,7 +303,7 @@ export class RoleService {
 
     if (!adminRole || adminRole.memberships.length === 0) {
       throw new TRPCError({
-        code: 'FAILED_PRECONDITION',
+        code: 'PRECONDITION_FAILED',
         message: 'Organization must have at least one admin',
       });
     }

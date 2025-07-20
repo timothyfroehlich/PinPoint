@@ -97,7 +97,7 @@ async function createOrganizationWithRoles(orgData: {
   console.log(`Created system roles for organization: ${organization.name}`);
 
   // Create default Member role from template
-  const memberRole = await roleService.createTemplateRole('MEMBER');
+  await roleService.createTemplateRole('MEMBER');
   console.log(`Created Member role template for organization: ${organization.name}`);
 
   return organization;

@@ -42,68 +42,68 @@ export interface TestOrganization extends Organization {
  * Permission Factory
  * Creates permission objects with default values
  */
-export class PermissionFactory {
-  static create(overrides: Partial<TestPermission> = {}): TestPermission {
+export namespace PermissionFactory {
+  export function create(overrides: Partial<TestPermission> = {}): TestPermission {
     return {
-      id: `perm-${Math.random().toString(36).substr(2, 9)}`,
+      id: `perm-${Math.random().toString(36).slice(2, 11)}`,
       name: "issue:create",
       description: "Create issues",
       ...overrides,
     };
   }
 
-  static createIssuePermissions(): TestPermission[] {
+  export function createIssuePermissions(): TestPermission[] {
     return [
-      this.create({ name: "issue:create", description: "Create issues" }),
-      this.create({ name: "issue:edit", description: "Edit issues" }),
-      this.create({ name: "issue:delete", description: "Delete issues" }),
-      this.create({ name: "issue:assign", description: "Assign issues" }),
-      this.create({ name: "issue:view", description: "View issues" }),
-      this.create({ name: "issue:confirm", description: "Confirm issues" }),
+      create({ name: "issue:create", description: "Create issues" }),
+      create({ name: "issue:edit", description: "Edit issues" }),
+      create({ name: "issue:delete", description: "Delete issues" }),
+      create({ name: "issue:assign", description: "Assign issues" }),
+      create({ name: "issue:view", description: "View issues" }),
+      create({ name: "issue:confirm", description: "Confirm issues" }),
     ];
   }
 
-  static createMachinePermissions(): TestPermission[] {
+  export function createMachinePermissions(): TestPermission[] {
     return [
-      this.create({ name: "machine:create", description: "Create machines" }),
-      this.create({ name: "machine:edit", description: "Edit machines" }),
-      this.create({ name: "machine:delete", description: "Delete machines" }),
-      this.create({ name: "machine:view", description: "View machines" }),
+      create({ name: "machine:create", description: "Create machines" }),
+      create({ name: "machine:edit", description: "Edit machines" }),
+      create({ name: "machine:delete", description: "Delete machines" }),
+      create({ name: "machine:view", description: "View machines" }),
     ];
   }
 
-  static createLocationPermissions(): TestPermission[] {
+  export function createLocationPermissions(): TestPermission[] {
     return [
-      this.create({ name: "location:create", description: "Create locations" }),
-      this.create({ name: "location:edit", description: "Edit locations" }),
-      this.create({ name: "location:delete", description: "Delete locations" }),
-      this.create({ name: "location:view", description: "View locations" }),
+      create({ name: "location:create", description: "Create locations" }),
+      create({ name: "location:edit", description: "Edit locations" }),
+      create({ name: "location:delete", description: "Delete locations" }),
+      create({ name: "location:view", description: "View locations" }),
     ];
   }
 
-  static createAttachmentPermissions(): TestPermission[] {
+  export function createAttachmentPermissions(): TestPermission[] {
     return [
-      this.create({ name: "attachment:create", description: "Create attachments" }),
-      this.create({ name: "attachment:delete", description: "Delete attachments" }),
-      this.create({ name: "attachment:view", description: "View attachments" }),
+      create({ name: "attachment:create", description: "Create attachments" }),
+      create({ name: "attachment:delete", description: "Delete attachments" }),
+      create({ name: "attachment:view", description: "View attachments" }),
     ];
   }
 
-  static createAdminPermissions(): TestPermission[] {
+  export function createAdminPermissions(): TestPermission[] {
     return [
-      this.create({ name: "organization:manage", description: "Manage organization" }),
-      this.create({ name: "user:manage", description: "Manage users" }),
-      this.create({ name: "role:manage", description: "Manage roles" }),
+      create({ name: "organization:manage", description: "Manage organization" }),
+      create({ name: "user:manage", description: "Manage users" }),
+      create({ name: "role:manage", description: "Manage roles" }),
     ];
   }
 
-  static createAllPermissions(): TestPermission[] {
+  export function createAllPermissions(): TestPermission[] {
     return [
-      ...this.createIssuePermissions(),
-      ...this.createMachinePermissions(),
-      ...this.createLocationPermissions(),
-      ...this.createAttachmentPermissions(),
-      ...this.createAdminPermissions(),
+      ...createIssuePermissions(),
+      ...createMachinePermissions(),
+      ...createLocationPermissions(),
+      ...createAttachmentPermissions(),
+      ...createAdminPermissions(),
     ];
   }
 }
@@ -112,10 +112,10 @@ export class PermissionFactory {
  * Role Factory
  * Creates role objects with default values and permission assignments
  */
-export class RoleFactory {
-  static create(overrides: Partial<TestRole> = {}): TestRole {
+export namespace RoleFactory {
+  export function create(overrides: Partial<TestRole> = {}): TestRole {
     return {
-      id: `role-${Math.random().toString(36).substr(2, 9)}`,
+      id: `role-${Math.random().toString(36).slice(2, 11)}`,
       name: "Test Role",
       organizationId: "org-1",
       isSystem: false,
@@ -127,8 +127,8 @@ export class RoleFactory {
     };
   }
 
-  static createUnauthenticatedRole(organizationId: string = "org-1"): TestRole {
-    return this.create({
+  export function createUnauthenticatedRole(organizationId: string = "org-1"): TestRole {
+    return create({
       name: "Unauthenticated",
       organizationId,
       isSystem: true,
@@ -137,8 +137,8 @@ export class RoleFactory {
     });
   }
 
-  static createMemberRole(organizationId: string = "org-1"): TestRole {
-    return this.create({
+  export function createMemberRole(organizationId: string = "org-1"): TestRole {
+    return create({
       name: "Member",
       organizationId,
       isSystem: false,
@@ -152,8 +152,8 @@ export class RoleFactory {
     });
   }
 
-  static createTechnicianRole(organizationId: string = "org-1"): TestRole {
-    return this.create({
+  export function createTechnicianRole(organizationId: string = "org-1"): TestRole {
+    return create({
       name: "Technician",
       organizationId,
       isSystem: false,
@@ -173,8 +173,8 @@ export class RoleFactory {
     });
   }
 
-  static createAdminRole(organizationId: string = "org-1"): TestRole {
-    return this.create({
+  export function createAdminRole(organizationId: string = "org-1"): TestRole {
+    return create({
       name: "Admin",
       organizationId,
       isSystem: true,
@@ -183,12 +183,12 @@ export class RoleFactory {
     });
   }
 
-  static createCustomRole(
+  export function createCustomRole(
     name: string,
     permissions: TestPermission[],
     organizationId: string = "org-1"
   ): TestRole {
-    return this.create({
+    return create({
       name,
       organizationId,
       isSystem: false,
@@ -197,18 +197,18 @@ export class RoleFactory {
     });
   }
 
-  static createSystemRoleSet(organizationId: string = "org-1"): TestRole[] {
+  export function createSystemRoleSet(organizationId: string = "org-1"): TestRole[] {
     return [
-      this.createUnauthenticatedRole(organizationId),
-      this.createMemberRole(organizationId),
-      this.createTechnicianRole(organizationId),
-      this.createAdminRole(organizationId),
+      createUnauthenticatedRole(organizationId),
+      createMemberRole(organizationId),
+      createTechnicianRole(organizationId),
+      createAdminRole(organizationId),
     ];
   }
 
-  static createWithMemberCount(memberCount: number, overrides: Partial<TestRole> = {}): TestRole {
+  export function createWithMemberCount(memberCount: number, overrides: Partial<TestRole> = {}): TestRole {
     return {
-      ...this.create(overrides),
+      ...create(overrides),
       _count: {
         memberships: memberCount,
       },
@@ -220,10 +220,10 @@ export class RoleFactory {
  * Membership Factory
  * Creates membership objects linking users to organizations with roles
  */
-export class MembershipFactory {
-  static create(overrides: Partial<TestMembership> = {}): TestMembership {
+export namespace MembershipFactory {
+  export function create(overrides: Partial<TestMembership> = {}): TestMembership {
     return {
-      id: `membership-${Math.random().toString(36).substr(2, 9)}`,
+      id: `membership-${Math.random().toString(36).slice(2, 11)}`,
       userId: "user-1",
       organizationId: "org-1",
       roleId: "role-1",
@@ -232,8 +232,8 @@ export class MembershipFactory {
     };
   }
 
-  static createWithRole(role: TestRole, userId: string = "user-1"): TestMembership {
-    return this.create({
+  export function createWithRole(role: TestRole, userId: string = "user-1"): TestMembership {
+    return create({
       userId,
       organizationId: role.organizationId,
       roleId: role.id,
@@ -241,13 +241,13 @@ export class MembershipFactory {
     });
   }
 
-  static createWithUser(
+  export function createWithUser(
     userId: string,
     userName: string,
     userEmail: string,
     role: TestRole
   ): TestMembership {
-    return this.create({
+    return create({
       userId,
       organizationId: role.organizationId,
       roleId: role.id,
@@ -260,7 +260,7 @@ export class MembershipFactory {
     });
   }
 
-  static createMultipleForOrganization(
+  export function createMultipleForOrganization(
     organizationId: string,
     userCount: number = 3
   ): TestMembership[] {
@@ -270,10 +270,10 @@ export class MembershipFactory {
     for (let i = 0; i < userCount; i++) {
       const role = roles[i % roles.length];
       memberships.push(
-        this.createWithUser(
-          `user-${i + 1}`,
-          `Test User ${i + 1}`,
-          `user${i + 1}@example.com`,
+        createWithUser(
+          `user-${(i + 1).toString()}`,
+          `Test User ${(i + 1).toString()}`,
+          `user${(i + 1).toString()}@example.com`,
           role
         )
       );
@@ -287,10 +287,10 @@ export class MembershipFactory {
  * Organization Factory
  * Creates organization objects with complete role and membership structures
  */
-export class OrganizationFactory {
-  static create(overrides: Partial<TestOrganization> = {}): TestOrganization {
+export namespace OrganizationFactory {
+  export function create(overrides: Partial<TestOrganization> = {}): TestOrganization {
     return {
-      id: `org-${Math.random().toString(36).substr(2, 9)}`,
+      id: `org-${Math.random().toString(36).slice(2, 11)}`,
       name: "Test Organization",
       subdomain: "test",
       logoUrl: null,
@@ -300,14 +300,14 @@ export class OrganizationFactory {
     };
   }
 
-  static createWithRoles(
+  export function createWithRoles(
     name: string = "Test Organization",
     subdomain: string = "test"
   ): TestOrganization {
-    const orgId = `org-${Math.random().toString(36).substr(2, 9)}`;
+    const orgId = `org-${Math.random().toString(36).slice(2, 11)}`;
     const roles = RoleFactory.createSystemRoleSet(orgId);
     
-    return this.create({
+    return create({
       id: orgId,
       name,
       subdomain,
@@ -315,16 +315,16 @@ export class OrganizationFactory {
     });
   }
 
-  static createWithMemberships(
+  export function createWithMemberships(
     name: string = "Test Organization",
     subdomain: string = "test",
     memberCount: number = 3
   ): TestOrganization {
-    const orgId = `org-${Math.random().toString(36).substr(2, 9)}`;
+    const orgId = `org-${Math.random().toString(36).slice(2, 11)}`;
     const roles = RoleFactory.createSystemRoleSet(orgId);
     const memberships = MembershipFactory.createMultipleForOrganization(orgId, memberCount);
     
-    return this.create({
+    return create({
       id: orgId,
       name,
       subdomain,
@@ -333,14 +333,14 @@ export class OrganizationFactory {
     });
   }
 
-  static createMultipleForTesting(count: number = 2): TestOrganization[] {
+  export function createMultipleForTesting(count: number = 2): TestOrganization[] {
     const organizations: TestOrganization[] = [];
     
     for (let i = 0; i < count; i++) {
       organizations.push(
-        this.createWithMemberships(
-          `Test Organization ${i + 1}`,
-          `test-${i + 1}`,
+        createWithMemberships(
+          `Test Organization ${(i + 1).toString()}`,
+          `test-${(i + 1).toString()}`,
           3
         )
       );
@@ -354,8 +354,8 @@ export class OrganizationFactory {
  * Permission Matrix Factory
  * Creates permission matrices for testing role-based access control
  */
-export class PermissionMatrixFactory {
-  static createMatrix(): Record<string, string[]> {
+export namespace PermissionMatrixFactory {
+  export function createMatrix(): Record<string, string[]> {
     return {
       Unauthenticated: [],
       User: [
@@ -402,17 +402,17 @@ export class PermissionMatrixFactory {
     };
   }
 
-  static getRolePermissions(roleName: string): string[] {
-    const matrix = this.createMatrix();
+  export function getRolePermissions(roleName: string): string[] {
+    const matrix = createMatrix();
     return matrix[roleName] || [];
   }
 
-  static hasPermission(roleName: string, permission: string): boolean {
-    const permissions = this.getRolePermissions(roleName);
+  export function hasPermission(roleName: string, permission: string): boolean {
+    const permissions = getRolePermissions(roleName);
     return permissions.includes(permission);
   }
 
-  static getPermissionDependencies(): Record<string, string[]> {
+  export function getPermissionDependencies(): Record<string, string[]> {
     return {
       "issue:edit": ["issue:view"],
       "issue:delete": ["issue:view"],
@@ -431,8 +431,8 @@ export class PermissionMatrixFactory {
  * Mock Context Factory
  * Creates mock tRPC contexts with different permission configurations
  */
-export class MockContextFactory {
-  static createWithPermissions(
+export namespace MockContextFactory {
+  export function createWithPermissions(
     permissions: string[],
     organizationId: string = "org-1"
   ) {
@@ -461,27 +461,27 @@ export class MockContextFactory {
     };
   }
 
-  static createWithRole(
+  export function createWithRole(
     roleName: "Unauthenticated" | "User" | "Technician" | "Admin",
     organizationId: string = "org-1"
   ) {
     const permissions = PermissionMatrixFactory.getRolePermissions(roleName);
-    return this.createWithPermissions(permissions, organizationId);
+    return createWithPermissions(permissions, organizationId);
   }
 
-  static createAdmin(organizationId: string = "org-1") {
-    return this.createWithRole("Admin", organizationId);
+  export function createAdmin(organizationId: string = "org-1") {
+    return createWithRole("Admin", organizationId);
   }
 
-  static createTechnician(organizationId: string = "org-1") {
-    return this.createWithRole("Technician", organizationId);
+  export function createTechnician(organizationId: string = "org-1") {
+    return createWithRole("Technician", organizationId);
   }
 
-  static createUser(organizationId: string = "org-1") {
-    return this.createWithRole("User", organizationId);
+  export function createUser(organizationId: string = "org-1") {
+    return createWithRole("User", organizationId);
   }
 
-  static createUnauthenticated(organizationId: string = "org-1") {
-    return this.createWithRole("Unauthenticated", organizationId);
+  export function createUnauthenticated(organizationId: string = "org-1") {
+    return createWithRole("Unauthenticated", organizationId);
   }
 }

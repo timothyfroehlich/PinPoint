@@ -1,4 +1,3 @@
-import { type PrismaClient } from "@prisma/client";
 import { type Session } from "next-auth";
 import { TRPCError } from "@trpc/server";
 import { 
@@ -14,7 +13,7 @@ import {
  * Supports both authenticated users and unauthenticated access.
  */
 export class PermissionService {
-  constructor(private prisma: PrismaClient) {}
+  constructor(private prisma: any) {}
 
   /**
    * Check if a user has a specific permission
@@ -35,9 +34,14 @@ export class PermissionService {
     }
 
     // Get the user's membership and role
+    const finalOrgId = organizationId ?? session.user.organizationId;
+    if (!finalOrgId) {
+      throw new Error('Organization ID is required');
+    }
+    
     const membership = await this.getUserMembership(
       session.user.id,
-      organizationId || session.user.organizationId
+      finalOrgId
     );
 
     if (!membership?.role) {
@@ -93,9 +97,14 @@ export class PermissionService {
     }
 
     // Get the user's membership and role
+    const finalOrgId = organizationId ?? session.user.organizationId;
+    if (!finalOrgId) {
+      throw new Error('Organization ID is required');
+    }
+    
     const membership = await this.getUserMembership(
       session.user.id,
-      organizationId || session.user.organizationId
+      finalOrgId
     );
 
     if (!membership?.role) {
@@ -147,7 +156,7 @@ export class PermissionService {
   ): Promise<boolean> {
     if (!organizationId) {
       // Default unauthenticated permissions
-      return UNAUTHENTICATED_PERMISSIONS.includes(permission);
+      return UNAUTHENTICATED_PERMISSIONS.includes(permission as any);
     }
 
     // Get organization-specific unauthenticated role permissions
@@ -161,7 +170,7 @@ export class PermissionService {
 
     if (!unauthRole) {
       // Fallback to default permissions
-      return UNAUTHENTICATED_PERMISSIONS.includes(permission);
+      return UNAUTHENTICATED_PERMISSIONS.includes(permission as any);
     }
 
     const rolePermissions = unauthRole.permissions.map(p => p.name);
