@@ -559,6 +559,111 @@ npm run typecheck:tests -- src/server/api/__tests__/user.test.ts
 npm run typecheck:tests
 ```
 
+## Critical Infrastructure Lessons
+
+### ⚠️ Mock Infrastructure Changes: High-Risk Operations
+
+**Lesson**: Changing core mock infrastructure (like `mockContext.ts` or `serviceHelpers.ts`) can cascade failures across the entire test suite.
+
+**What Happened**: Attempting to fix Prisma AcceleratePromise errors by switching from `DeepMockProxy<ExtendedPrismaClient>` to manual mock objects broke 40+ additional test files that depended on the mock infrastructure.
+
+**Key Principles**:
+
+1. **Preserve Interface Compatibility**: Keep existing mock interfaces intact when fixing underlying issues
+2. **Incremental Changes**: Fix one file at a time rather than changing shared infrastructure
+3. **Dependency Mapping**: Understand what depends on shared utilities before changing them
+4. **Rollback Strategy**: Always have a path back to a known working state
+
+**Recommended Approach for Infrastructure Changes**:
+
+```typescript
+// ❌ Big Bang Approach - High Risk
+// Replace entire mock infrastructure at once
+const mockDb = {
+  // Completely new structure...
+} as jest.Mocked<ExtendedPrismaClient>;
+
+// ✅ Incremental Approach - Low Risk
+// Keep existing structure, fix specific issues
+const mockDb = mockDeep<ExtendedPrismaClient>();
+// Add fixes for specific issues without breaking interface
+mockDb.$accelerate = {
+  invalidate: jest.fn(),
+  ttl: jest.fn(),
+};
+```
+
+### 🔄 Parallel vs Sequential Fixes
+
+**Lesson**: Use parallel agents for isolated files, sequential approach for interdependent changes.
+
+**What Worked**:
+
+- ✅ Parallel fixes for isolated test files (collection.test.ts, issue.notification.test.ts)
+- ✅ Files with no shared dependencies can be fixed simultaneously
+
+**What Failed**:
+
+- ❌ Parallel fixes when shared infrastructure was changing
+- ❌ Agents working with broken mock context due to simultaneous changes
+
+**Decision Matrix**:
+
+```
+File Type              | Approach    | Risk Level
+----------------------|-------------|------------
+Isolated test files   | Parallel    | Low
+Shared utilities      | Sequential  | High
+Mock infrastructure   | Sequential  | Very High
+Individual routers    | Parallel    | Low
+Service tests         | Sequential  | Medium
+```
+
+### 🎯 Prisma Accelerate Mock Patterns
+
+**Lesson**: Prisma Accelerate integration requires specific mock patterns that maintain type compatibility.
+
+**The Problem**: Prisma methods with Accelerate return `AcceleratePromise<T>` instead of `Promise<T>`, breaking standard Jest mock patterns.
+
+**Solutions**:
+
+```typescript
+// ❌ Breaks with AcceleratePromise
+mockDb.user.findFirst.mockResolvedValue(userData);
+
+// ✅ Compatible pattern
+mockDb.user.findFirst.mockResolvedValue(
+  Promise.resolve(userData) as any, // Type assertion for complex Prisma types
+);
+
+// ✅ Alternative: Use mockImplementation
+mockDb.user.findFirst.mockImplementation(async () => userData);
+```
+
+### 📊 Error Count Management
+
+**Lesson**: Track error counts as a key metric for progress validation.
+
+**Pattern**:
+
+1. **Baseline**: Establish starting error count (`npm run typecheck 2>&1 | grep -c "error TS"`)
+2. **File Breakdown**: Track errors by file (`cut -d'(' -f1 | sort | uniq -c | sort -nr`)
+3. **Progress Validation**: Ensure error count decreases with each change
+4. **Rollback Trigger**: If error count increases significantly, rollback immediately
+
+**Example Workflow**:
+
+```bash
+# Before changes
+npm run typecheck 2>&1 | grep -c "error TS"  # 72 errors
+
+# After infrastructure change
+npm run typecheck 2>&1 | grep -c "error TS"  # 108 errors - ROLLBACK!
+
+# After rollback + targeted fixes
+npm run typecheck 2>&1 | grep -c "error TS"  # 64 errors - Progress!
+```
+
 ## Related Documentation
 
 - **Quick Patterns**: [CLAUDE.md TypeScript Guidelines](../../CLAUDE.md#typescript-strictest-mode-guidelines)

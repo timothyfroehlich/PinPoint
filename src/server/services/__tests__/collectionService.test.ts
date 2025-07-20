@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 import { CollectionService } from "../collectionService";
 
-import type { ExtendedPrismaClient } from "~/server/db";
+import type { ExtendedPrismaClient } from "../../db";
 
 // Mock Prisma Client
 const mockPrisma = {
@@ -71,7 +71,9 @@ describe("CollectionService", () => {
       ];
 
       (
-        mockPrisma.collection.findMany as jest.MockedFunction<() => unknown>
+        mockPrisma.collection.findMany as jest.MockedFunction<
+          typeof mockPrisma.collection.findMany
+        >
       ).mockResolvedValue(mockCollections);
 
       const result = await service.getLocationCollections("loc1", "org1");
@@ -84,7 +86,9 @@ describe("CollectionService", () => {
 
     it("should only return enabled collection types", async () => {
       (
-        mockPrisma.collection.findMany as jest.MockedFunction<() => unknown>
+        mockPrisma.collection.findMany as jest.MockedFunction<
+          typeof mockPrisma.collection.findMany
+        >
       ).mockResolvedValue([]);
 
       await service.getLocationCollections("loc1", "org1");
@@ -146,7 +150,9 @@ describe("CollectionService", () => {
       ];
 
       (
-        mockPrisma.machine.findMany as jest.MockedFunction<() => unknown>
+        mockPrisma.machine.findMany as jest.MockedFunction<
+          typeof mockPrisma.machine.findMany
+        >
       ).mockResolvedValue(mockMachines);
 
       const result = await service.getCollectionMachines("coll1", "loc1");
@@ -184,8 +190,10 @@ describe("CollectionService", () => {
       };
 
       (
-        mockPrisma.collection.create as jest.MockedFunction<() => unknown>
-      ).mockResolvedValue(mockCollection);
+        mockPrisma.collection.create as jest.MockedFunction<
+          typeof mockPrisma.collection.create
+        >
+      ).mockResolvedValue(mockCollection as any);
 
       const result = await service.createManualCollection("org1", {
         name: "Front Room",
@@ -204,7 +212,7 @@ describe("CollectionService", () => {
           isManual: true,
           isSmart: false,
           organizationId: "org1",
-        },
+        } as any,
       });
     });
   });
@@ -212,8 +220,10 @@ describe("CollectionService", () => {
   describe("addMachinesToCollection", () => {
     it("should add machines to a collection", async () => {
       (
-        mockPrisma.collection.update as jest.MockedFunction<() => unknown>
-      ).mockResolvedValue({});
+        mockPrisma.collection.update as jest.MockedFunction<
+          typeof mockPrisma.collection.update
+        >
+      ).mockResolvedValue({} as any);
 
       await service.addMachinesToCollection("coll1", ["machine1", "machine2"]);
 
@@ -231,8 +241,10 @@ describe("CollectionService", () => {
   describe("toggleCollectionType", () => {
     it("should enable/disable a collection type", async () => {
       (
-        mockPrisma.collectionType.update as jest.MockedFunction<() => unknown>
-      ).mockResolvedValue({});
+        mockPrisma.collectionType.update as jest.MockedFunction<
+          typeof mockPrisma.collectionType.update
+        >
+      ).mockResolvedValue({} as any);
 
       await service.toggleCollectionType("type1", false);
 
@@ -257,7 +269,9 @@ describe("CollectionService", () => {
       ];
 
       (
-        mockPrisma.collectionType.findMany as jest.MockedFunction<() => unknown>
+        mockPrisma.collectionType.findMany as jest.MockedFunction<
+          typeof mockPrisma.collectionType.findMany
+        >
       ).mockResolvedValue(mockTypes);
 
       const result = await service.getOrganizationCollectionTypes("org1");
@@ -279,7 +293,9 @@ describe("CollectionService", () => {
   describe("generateAutoCollections", () => {
     it("should return empty counts when no auto types enabled", async () => {
       (
-        mockPrisma.collectionType.findMany as jest.MockedFunction<() => unknown>
+        mockPrisma.collectionType.findMany as jest.MockedFunction<
+          typeof mockPrisma.collectionType.findMany
+        >
       ).mockResolvedValue([]);
 
       const result = await service.generateAutoCollections("org1");
