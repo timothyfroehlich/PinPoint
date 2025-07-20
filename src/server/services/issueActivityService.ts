@@ -18,17 +18,34 @@ export class IssueActivityService {
     organizationId: string,
     activityData: ActivityData,
   ): Promise<void> {
-    await this.prisma.issueHistory.create({
-      data: {
-        issueId,
-        organizationId, // Now properly supported
-        type: activityData.type,
-        actorId: activityData.actorId,
-        field: activityData.fieldName ?? "",
-        oldValue: activityData.oldValue,
-        newValue: activityData.newValue,
-      },
-    });
+    // Build data object with conditional assignment for exactOptionalPropertyTypes compatibility
+    const data: {
+      issueId: string;
+      organizationId: string;
+      type: ActivityType;
+      field: string;
+      actorId?: string;
+      oldValue?: string;
+      newValue?: string;
+    } = {
+      issueId,
+      organizationId, // Now properly supported
+      type: activityData.type,
+      field: activityData.fieldName ?? "",
+    };
+
+    // Use conditional assignment for optional properties to avoid undefined assignments
+    if (activityData.actorId) {
+      data.actorId = activityData.actorId;
+    }
+    if (activityData.oldValue) {
+      data.oldValue = activityData.oldValue;
+    }
+    if (activityData.newValue) {
+      data.newValue = activityData.newValue;
+    }
+
+    await this.prisma.issueHistory.create({ data });
   }
 
   async recordIssueCreated(
@@ -67,24 +84,21 @@ export class IssueActivityService {
     oldAssignee: { name?: string | null } | null,
     newAssignee: { name?: string | null } | null,
   ): Promise<void> {
-    let _description: string;
-    if (oldAssignee?.name && newAssignee?.name) {
-      _description = `Reassigned from ${oldAssignee.name} to ${newAssignee.name}`;
-    } else if (newAssignee?.name) {
-      _description = `Assigned to ${newAssignee.name}`;
-    } else if (oldAssignee?.name) {
-      _description = `Unassigned from ${oldAssignee.name}`;
-    } else {
-      _description = "Assignment changed";
-    }
-
-    await this.recordActivity(issueId, organizationId, {
+    const activityData: ActivityData = {
       type: ActivityType.ASSIGNED,
       actorId,
       fieldName: "assignee",
-      oldValue: oldAssignee?.name ?? undefined,
-      newValue: newAssignee?.name ?? undefined,
-    });
+    };
+
+    // Use conditional assignment for exactOptionalPropertyTypes compatibility
+    if (oldAssignee?.name) {
+      activityData.oldValue = oldAssignee.name;
+    }
+    if (newAssignee?.name) {
+      activityData.newValue = newAssignee.name;
+    }
+
+    await this.recordActivity(issueId, organizationId, activityData);
   }
 
   async recordFieldUpdate(
