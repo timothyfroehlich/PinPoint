@@ -5,13 +5,13 @@ import { ServiceFactory } from "~/server/services/factory";
 import { constructReportUrl } from "~/server/utils/qrCodeUtils";
 
 export async function GET(
-  request: NextRequest,
-  { params }: { params: { qrCodeId: string } },
-) {
+  _request: NextRequest,
+  { params }: { params: Promise<{ qrCodeId: string }> },
+): Promise<NextResponse> {
   const dbProvider = getGlobalDatabaseProvider();
   const db = dbProvider.getClient();
   try {
-    const { qrCodeId } = params;
+    const { qrCodeId } = await params;
 
     if (!qrCodeId) {
       return NextResponse.json(
@@ -53,13 +53,13 @@ export async function GET(
 
 // Support HEAD requests for health checks
 export async function HEAD(
-  request: NextRequest,
-  { params }: { params: { qrCodeId: string } },
-) {
+  _request: NextRequest,
+  { params }: { params: Promise<{ qrCodeId: string }> },
+): Promise<NextResponse> {
   const dbProvider = getGlobalDatabaseProvider();
   const db = dbProvider.getClient();
   try {
-    const { qrCodeId } = params;
+    const { qrCodeId } = await params;
 
     if (!qrCodeId) {
       return new NextResponse(null, { status: 400 });

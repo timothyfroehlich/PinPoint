@@ -75,7 +75,9 @@ describe("NextAuth Configuration", () => {
       expect(devConfig.providers).toHaveLength(2);
       const credentialsProvider = devConfig.providers[1];
       expect(credentialsProvider).toBeDefined();
-      expect((credentialsProvider as ProviderWithId | undefined)?.id).toBe("credentials");
+      expect((credentialsProvider as ProviderWithId | undefined)?.id).toBe(
+        "credentials",
+      );
 
       // Check the custom name in options
       expect(
@@ -93,7 +95,9 @@ describe("NextAuth Configuration", () => {
 
       expect(prodConfig.providers).toHaveLength(1);
       expect(prodConfig.providers[0]).toBeDefined();
-      expect((prodConfig.providers[0] as ProviderWithId | undefined)?.id).toBe("google");
+      expect((prodConfig.providers[0] as ProviderWithId | undefined)?.id).toBe(
+        "google",
+      );
     });
   });
 
@@ -120,7 +124,9 @@ describe("NextAuth Configuration", () => {
       const credentialsProvider = devConfig.providers[1];
 
       expect(credentialsProvider).toBeDefined();
-      expect((credentialsProvider as ProviderWithId | undefined)?.id).toBe("credentials");
+      expect((credentialsProvider as ProviderWithId | undefined)?.id).toBe(
+        "credentials",
+      );
       expect(
         (credentialsProvider as { authorize?: () => unknown }).authorize,
       ).toBeInstanceOf(Function);

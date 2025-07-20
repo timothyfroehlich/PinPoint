@@ -16,10 +16,14 @@ export function mockServiceMethod<T extends keyof ServiceFactory>(
 }
 
 // Helper to reset all service mocks
-export function resetAllServiceMocks(services: DeepMockProxy<ServiceFactory>): void {
+export function resetAllServiceMocks(
+  services: DeepMockProxy<ServiceFactory>,
+): void {
   for (const key in services) {
     if (typeof services[key as keyof ServiceFactory] === "function") {
-      const service = (services[key as keyof ServiceFactory] as () => Record<string, unknown>)();
+      const service = (
+        services[key as keyof ServiceFactory] as () => Record<string, unknown>
+      )();
       for (const method in service) {
         if (jest.isMockFunction(service[method])) {
           (service[method] as jest.MockedFunction<unknown>).mockClear();

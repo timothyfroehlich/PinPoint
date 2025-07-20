@@ -191,7 +191,7 @@ describe("PinballMapService", () => {
       await service.syncLocation("loc-123");
       expect(mockPrisma.location.update).toHaveBeenCalledWith({
         where: { id: "loc-123" },
-        data: { lastSyncAt: expect.any(Date) },
+        data: { lastSyncAt: expect.any(Date) as Date },
       });
     });
   });
