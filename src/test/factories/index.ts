@@ -67,7 +67,7 @@ export const CommonPermissions = {
 // Common role configurations for quick testing
 export const CommonRoles = {
   UNAUTHENTICATED: "Unauthenticated" as const,
-  USER: "User" as const,
+  MEMBER: "Member" as const,
   TECHNICIAN: "Technician" as const,
   ADMIN: "Admin" as const,
 } as const;

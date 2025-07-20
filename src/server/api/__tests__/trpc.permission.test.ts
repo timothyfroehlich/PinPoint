@@ -44,8 +44,6 @@ const createMockTRPCContext = (permissions: string[] = []) => {
       userId: "user-1",
       organizationId: "org-1",
       roleId: "role-1",
-      createdAt: new Date(),
-      updatedAt: new Date(),
       role: {
         id: "role-1",
         name: "Test Role",
@@ -58,8 +56,6 @@ const createMockTRPCContext = (permissions: string[] = []) => {
           id: `perm-${index + 1}`,
           name,
           description: `${name} permission`,
-          createdAt: new Date(),
-          updatedAt: new Date(),
         })),
       },
     },

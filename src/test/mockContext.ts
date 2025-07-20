@@ -287,22 +287,25 @@ export const mockRole = {
   id: "role-1",
   name: "Admin",
   organizationId: "org-1",
+  isSystem: true,
+  isDefault: false,
   createdAt: new Date(),
   updatedAt: new Date(),
   permissions: [
     {
       id: "perm-1",
-      name: "issues:read",
-      description: "Read issues",
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      name: "issue:view",
+      description: "View issues",
     },
     {
       id: "perm-2",
-      name: "issues:write",
-      description: "Write issues",
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      name: "issue:create",
+      description: "Create issues",
+    },
+    {
+      id: "perm-3",
+      name: "role:manage",
+      description: "Manage roles",
     },
   ],
 };
@@ -312,8 +315,6 @@ export const mockMembership = {
   userId: "user-1",
   organizationId: "org-1",
   roleId: "role-1",
-  createdAt: new Date(),
-  updatedAt: new Date(),
   role: mockRole,
 };
 

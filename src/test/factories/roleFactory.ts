@@ -48,8 +48,6 @@ export class PermissionFactory {
       id: `perm-${Math.random().toString(36).substr(2, 9)}`,
       name: "issue:create",
       description: "Create issues",
-      createdAt: new Date(),
-      updatedAt: new Date(),
       ...overrides,
     };
   }
@@ -139,11 +137,11 @@ export class RoleFactory {
     });
   }
 
-  static createUserRole(organizationId: string = "org-1"): TestRole {
+  static createMemberRole(organizationId: string = "org-1"): TestRole {
     return this.create({
-      name: "User",
+      name: "Member",
       organizationId,
-      isSystem: true,
+      isSystem: false,
       isDefault: true,
       permissions: [
         PermissionFactory.create({ name: "issue:create" }),
@@ -158,7 +156,7 @@ export class RoleFactory {
     return this.create({
       name: "Technician",
       organizationId,
-      isSystem: true,
+      isSystem: false,
       isDefault: false,
       permissions: [
         PermissionFactory.create({ name: "issue:create" }),
@@ -202,7 +200,7 @@ export class RoleFactory {
   static createSystemRoleSet(organizationId: string = "org-1"): TestRole[] {
     return [
       this.createUnauthenticatedRole(organizationId),
-      this.createUserRole(organizationId),
+      this.createMemberRole(organizationId),
       this.createTechnicianRole(organizationId),
       this.createAdminRole(organizationId),
     ];
@@ -229,9 +227,7 @@ export class MembershipFactory {
       userId: "user-1",
       organizationId: "org-1",
       roleId: "role-1",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      role: RoleFactory.createUserRole(),
+      role: RoleFactory.createMemberRole(),
       ...overrides,
     };
   }

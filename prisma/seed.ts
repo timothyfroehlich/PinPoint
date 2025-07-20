@@ -1,4 +1,10 @@
 import { PrismaClient, StatusCategory } from "@prisma/client";
+import { RoleService } from "../src/server/services/roleService";
+import { 
+  ALL_PERMISSIONS, 
+  PERMISSION_DESCRIPTIONS,
+  SYSTEM_ROLES 
+} from "../src/server/auth/permissions.constants";
 
 const prisma = new PrismaClient();
 
@@ -8,32 +14,20 @@ function getRandomDefaultAvatar(): string {
   return `/images/default-avatars/default-avatar-${avatarNumber}.webp`;
 }
 
-// Create global permissions
+// Create global permissions using the constants
 async function createGlobalPermissions() {
-  const permissions = [
-    "issue:create",
-    "issue:edit",
-    "issue:delete",
-    "issue:assign",
-    "machine:edit",
-    "machine:delete",
-    "location:edit",
-    "location:delete",
-    "organization:manage",
-    "role:manage",
-    "user:manage",
-    "attachment:create",
-  ];
-
-  for (const permName of permissions) {
+  for (const permName of ALL_PERMISSIONS) {
     await prisma.permission.upsert({
       where: { name: permName },
       update: {},
-      create: { name: permName },
+      create: { 
+        name: permName,
+        description: PERMISSION_DESCRIPTIONS[permName] || `Permission: ${permName}`
+      },
     });
   }
 
-  console.log(`Created ${permissions.length} global permissions`);
+  console.log(`Created ${ALL_PERMISSIONS.length} global permissions`);
 }
 
 // Create default collection types for an organization
@@ -82,7 +76,7 @@ async function createDefaultCollectionTypes(organizationId: string) {
   }
 }
 
-// Create organization with automatic default roles
+// Create organization with automatic default roles using RoleService
 async function createOrganizationWithRoles(orgData: {
   name: string;
   subdomain: string;
@@ -95,65 +89,16 @@ async function createOrganizationWithRoles(orgData: {
     create: orgData,
   });
 
-  // Create default roles for this organization
-  const defaultRoles = [
-    {
-      name: "Admin",
-      permissions: [
-        "issue:create",
-        "issue:edit",
-        "issue:delete",
-        "issue:assign",
-        "machine:edit",
-        "machine:delete",
-        "location:edit",
-        "location:delete",
-        "organization:manage",
-        "role:manage",
-        "user:manage",
-        "attachment:create",
-      ],
-    },
-    {
-      name: "Player",
-      permissions: ["issue:create", "attachment:create"], // Base role for authenticated members with minimal permissions
-    },
-  ];
+  // Create role service for this organization
+  const roleService = new RoleService(prisma, organization.id);
 
-  for (const roleData of defaultRoles) {
-    const role = await prisma.role.upsert({
-      where: {
-        name_organizationId: {
-          name: roleData.name,
-          organizationId: organization.id,
-        },
-      },
-      update: {},
-      create: {
-        name: roleData.name,
-        organizationId: organization.id,
-        isDefault: true,
-      },
-    });
+  // Create system roles (Admin and Unauthenticated)
+  await roleService.createSystemRoles();
+  console.log(`Created system roles for organization: ${organization.name}`);
 
-    // Connect permissions to role
-    const permissions = await prisma.permission.findMany({
-      where: { name: { in: roleData.permissions } },
-    });
-
-    await prisma.role.update({
-      where: { id: role.id },
-      data: {
-        permissions: {
-          connect: permissions.map((p) => ({ id: p.id })),
-        },
-      },
-    });
-
-    console.log(
-      `Created role: ${roleData.name} with ${roleData.permissions.length} permissions`,
-    );
-  }
+  // Create default Member role from template
+  const memberRole = await roleService.createTemplateRole('MEMBER');
+  console.log(`Created Member role template for organization: ${organization.name}`);
 
   return organization;
 }
@@ -209,13 +154,13 @@ async function main() {
 
   // 5. Get the created roles for membership assignment
   const adminRole = await prisma.role.findFirst({
-    where: { name: "Admin", organizationId: organization.id },
+    where: { name: SYSTEM_ROLES.ADMIN, organizationId: organization.id },
   });
-  const playerRole = await prisma.role.findFirst({
-    where: { name: "Player", organizationId: organization.id },
+  const memberRole = await prisma.role.findFirst({
+    where: { name: "Member", organizationId: organization.id },
   });
 
-  if (!adminRole || !playerRole) {
+  if (!adminRole || !memberRole) {
     throw new Error("Default roles not found after creation");
   }
 
@@ -231,19 +176,19 @@ async function main() {
       name: "Gary Stern",
       email: "gary.stern@testaccount.dev",
       bio: "Founder of Stern Pinball.",
-      roleId: playerRole.id,
+      roleId: memberRole.id,
     },
     {
       name: "Escher Lefkoff",
       email: "escher.lefkoff@testaccount.dev",
       bio: "World champion competitive pinball player.",
-      roleId: playerRole.id,
+      roleId: memberRole.id,
     },
     {
       name: "Harry Williams",
       email: "harry.williams@testaccount.dev",
       bio: "The father of pinball.",
-      roleId: playerRole.id,
+      roleId: memberRole.id,
     },
     {
       name: "Tim Froehlich",
