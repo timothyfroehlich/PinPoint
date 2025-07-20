@@ -16,10 +16,11 @@ export default tseslint.config(
   ...tseslint.configs.strictTypeChecked,
   ...tseslint.configs.stylisticTypeChecked,
   {
-    // Enable type-aware linting
+    // Enable type-aware linting for all files
     languageOptions: {
       parserOptions: {
-        project: true,
+        // Explicitly specify tsconfig path to avoid Next.js auto-generation conflicts
+        project: ["./tsconfig.json"],
         tsconfigRootDir: import.meta.dirname,
       },
     },
