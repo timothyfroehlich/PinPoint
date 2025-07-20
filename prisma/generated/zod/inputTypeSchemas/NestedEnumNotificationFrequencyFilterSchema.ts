@@ -1,0 +1,13 @@
+import type { Prisma } from '@prisma/client';
+
+import { z } from 'zod';
+import { NotificationFrequencySchema } from './NotificationFrequencySchema';
+
+export const NestedEnumNotificationFrequencyFilterSchema: z.ZodType<Prisma.NestedEnumNotificationFrequencyFilter> = z.object({
+  equals: z.lazy(() => NotificationFrequencySchema).optional(),
+  in: z.lazy(() => NotificationFrequencySchema).array().optional(),
+  notIn: z.lazy(() => NotificationFrequencySchema).array().optional(),
+  not: z.union([ z.lazy(() => NotificationFrequencySchema),z.lazy(() => NestedEnumNotificationFrequencyFilterSchema) ]).optional(),
+}).strict();
+
+export default NestedEnumNotificationFrequencyFilterSchema;

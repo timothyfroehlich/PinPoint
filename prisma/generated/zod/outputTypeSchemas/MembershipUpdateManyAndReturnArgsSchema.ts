@@ -1,0 +1,13 @@
+import { z } from 'zod';
+import type { Prisma } from '@prisma/client';
+import { MembershipUpdateManyMutationInputSchema } from '../inputTypeSchemas/MembershipUpdateManyMutationInputSchema'
+import { MembershipUncheckedUpdateManyInputSchema } from '../inputTypeSchemas/MembershipUncheckedUpdateManyInputSchema'
+import { MembershipWhereInputSchema } from '../inputTypeSchemas/MembershipWhereInputSchema'
+
+export const MembershipUpdateManyAndReturnArgsSchema: z.ZodType<Prisma.MembershipUpdateManyAndReturnArgs> = z.object({
+  data: z.union([ MembershipUpdateManyMutationInputSchema,MembershipUncheckedUpdateManyInputSchema ]),
+  where: MembershipWhereInputSchema.optional(),
+  limit: z.number().optional(),
+}).strict() ;
+
+export default MembershipUpdateManyAndReturnArgsSchema;

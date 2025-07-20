@@ -1,4 +1,5 @@
 import { mockDeep, mockReset, type DeepMockProxy } from "jest-mock-extended";
+import { z } from "zod";
 
 import type { ExtendedPrismaClient } from "~/server/db";
 import type { CollectionService } from "~/server/services/collectionService";
@@ -8,6 +9,112 @@ import type { IssueActivityService } from "~/server/services/issueActivityServic
 import type { NotificationService } from "~/server/services/notificationService";
 import type { PinballMapService } from "~/server/services/pinballmapService";
 import type { QRCodeService } from "~/server/services/qrCodeService";
+
+// ====================================
+// ZOD SCHEMA INTEGRATION
+// ====================================
+
+// Export generated schemas for easy agent access
+export * from "../../prisma/generated/zod";
+
+// Import commonly used schemas for mock generation
+import {
+  UserSchema,
+  UserCreateInputSchema,
+  OrganizationSchema,
+  LocationSchema,
+  MachineSchema,
+  IssueSchema,
+  IssueCreateInputSchema,
+  MembershipSchema,
+} from "../../prisma/generated/zod";
+
+// Type-safe mock data generation utilities
+export function createMockDataForSchema<T>(
+  schema: z.ZodSchema<T>,
+  overrides: Partial<T> = {},
+  baseData?: Partial<T>
+): T {
+  /**
+   * Helper function for agents to create valid mock data
+   * Combines base data with overrides and validates against schema
+   */
+  const combined = { ...baseData, ...overrides } as T;
+  return schema.parse(combined);
+}
+
+export function validateMockData<T>(
+  schema: z.ZodSchema<T>,
+  data: unknown
+): T {
+  /**
+   * Validates mock data against schema and returns typed result
+   * Throws descriptive error if validation fails
+   */
+  try {
+    return schema.parse(data);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      throw new Error(
+        `Mock data validation failed: ${error.issues
+          .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
+          .join(", ")}`
+      );
+    }
+    throw error;
+  }
+}
+
+// Agent-friendly factory functions for common test scenarios
+export const createValidUser = (overrides: Partial<Parameters<typeof UserSchema.parse>[0]> = {}) => {
+  return validateMockData(UserSchema, {
+    id: `user_${Date.now()}`,
+    name: "Test User",
+    email: "test@example.com",
+    emailVerified: null,
+    image: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    bio: null,
+    profilePicture: null,
+    emailNotificationsEnabled: true,
+    pushNotificationsEnabled: false,
+    notificationFrequency: "IMMEDIATE",
+    ...overrides,
+  });
+};
+
+export const createValidOrganization = (overrides: Partial<Parameters<typeof OrganizationSchema.parse>[0]> = {}) => {
+  return validateMockData(OrganizationSchema, {
+    id: `org_${Date.now()}`,
+    name: "Test Organization",
+    subdomain: `test-org-${Date.now()}`,
+    logoUrl: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...overrides,
+  });
+};
+
+export const createValidIssue = (overrides: Partial<Parameters<typeof IssueSchema.parse>[0]> = {}) => {
+  return validateMockData(IssueSchema, {
+    id: `issue_${Date.now()}`,
+    title: "Test Issue",
+    description: "Test description",
+    consistency: null,
+    checklist: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    resolvedAt: null,
+    organizationId: "org-1",
+    machineId: "machine-1",
+    statusId: "status-1",
+    priorityId: "priority-1",
+    createdById: "user-1",
+    assignedToId: null,
+    ...overrides,
+  });
+};
 
 // Mock individual services with all methods
 const mockNotificationService: jest.Mocked<NotificationService> = {
@@ -163,56 +270,53 @@ export {
   mockQRCodeService,
 };
 
-// Common mock data for testing
-export const mockUser = {
+// ====================================
+// SCHEMA-VALIDATED MOCK DATA
+// ====================================
+
+// Common mock data for testing - all validated with Zod schemas
+export const mockUser = validateMockData(UserSchema, {
   id: "user-1",
-  email: "test@example.com",
   name: "Test User",
-  image: null,
+  email: "test@example.com",
   emailVerified: null,
+  image: null,
   createdAt: new Date(),
   updatedAt: new Date(),
-};
+  bio: null,
+  profilePicture: null,
+  emailNotificationsEnabled: true,
+  pushNotificationsEnabled: false,
+  notificationFrequency: "IMMEDIATE",
+});
 
-export const mockOrganization = {
+export const mockOrganization = validateMockData(OrganizationSchema, {
   id: "org-1",
   name: "Test Organization",
   subdomain: "test-org",
   logoUrl: null,
   createdAt: new Date(),
   updatedAt: new Date(),
-  pinballMapConfig: {
-    id: "config-1",
-    organizationId: "org-1",
-    apiEnabled: true,
-    apiKey: "test-api-key",
-    autoSync: false,
-    syncInterval: 24,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-};
+});
 
-export const mockLocation = {
+export const mockLocation = validateMockData(LocationSchema, {
   id: "location-1",
   name: "Test Location",
+  organizationId: "org-1",
   street: "123 Test St",
   city: "Test City",
   state: "TS",
   zip: "12345",
   phone: null,
   website: null,
-  organizationId: "org-1",
-  pinballMapId: 26454,
   latitude: null,
   longitude: null,
   description: null,
+  pinballMapId: 26454,
   regionId: null,
   lastSyncAt: null,
   syncEnabled: true,
-  createdAt: new Date(),
-  updatedAt: new Date(),
-};
+});
 
 export const mockStatus = {
   id: "status-1",
@@ -253,35 +357,38 @@ export const mockModel = {
   updatedAt: new Date(),
 };
 
-export const mockMachine = {
+export const mockMachine = validateMockData(MachineSchema, {
   id: "machine-1",
-  serialNumber: "TEST123",
-  condition: "Good",
-  notes: null,
+  name: "Medieval Madness #1",
   organizationId: "org-1",
   locationId: "location-1",
   modelId: "model-1",
   ownerId: null,
-  createdAt: new Date(),
-  updatedAt: new Date(),
-};
+  ownerNotificationsEnabled: true,
+  notifyOnNewIssues: true,
+  notifyOnStatusChanges: true,
+  notifyOnComments: false,
+  qrCodeId: "qr_123",
+  qrCodeUrl: null,
+  qrCodeGeneratedAt: null,
+});
 
-export const mockIssue = {
+export const mockIssue = validateMockData(IssueSchema, {
   id: "issue-1",
   title: "Test Issue",
   description: "Test description",
+  consistency: null,
+  checklist: null,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  resolvedAt: null,
   organizationId: "org-1",
   machineId: "machine-1",
   statusId: "status-1",
   priorityId: "priority-1",
   createdById: "user-1",
   assignedToId: null,
-  createdAt: new Date(),
-  updatedAt: new Date(),
-  resolvedAt: null,
-  consistency: null,
-  checklist: null,
-};
+});
 
 export const mockRole = {
   id: "role-1",
