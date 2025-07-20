@@ -1,10 +1,13 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from "@prisma/client";
 
-import { z } from 'zod';
+import { z } from "zod";
 
-export const IssueStatusNameOrganizationIdCompoundUniqueInputSchema: z.ZodType<Prisma.IssueStatusNameOrganizationIdCompoundUniqueInput> = z.object({
-  name: z.string(),
-  organizationId: z.string()
-}).strict();
+export const IssueStatusNameOrganizationIdCompoundUniqueInputSchema: z.ZodType<Prisma.IssueStatusNameOrganizationIdCompoundUniqueInput> =
+  z
+    .object({
+      name: z.string(),
+      organizationId: z.string(),
+    })
+    .strict() as z.ZodType<Prisma.IssueStatusNameOrganizationIdCompoundUniqueInput>;
 
 export default IssueStatusNameOrganizationIdCompoundUniqueInputSchema;

@@ -1,11 +1,17 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from "@prisma/client";
 
-import { z } from 'zod';
-import { IssueHistoryCreateManyIssueInputSchema } from './IssueHistoryCreateManyIssueInputSchema';
+import { z } from "zod";
+import { IssueHistoryCreateManyIssueInputSchema } from "./IssueHistoryCreateManyIssueInputSchema";
 
-export const IssueHistoryCreateManyIssueInputEnvelopeSchema: z.ZodType<Prisma.IssueHistoryCreateManyIssueInputEnvelope> = z.object({
-  data: z.union([ z.lazy(() => IssueHistoryCreateManyIssueInputSchema),z.lazy(() => IssueHistoryCreateManyIssueInputSchema).array() ]),
-  skipDuplicates: z.boolean().optional()
-}).strict();
+export const IssueHistoryCreateManyIssueInputEnvelopeSchema: z.ZodType<Prisma.IssueHistoryCreateManyIssueInputEnvelope> =
+  z
+    .object({
+      data: z.union([
+        z.lazy(() => IssueHistoryCreateManyIssueInputSchema),
+        z.lazy(() => IssueHistoryCreateManyIssueInputSchema).array(),
+      ]),
+      skipDuplicates: z.boolean().optional(),
+    })
+    .strict() as z.ZodType<Prisma.IssueHistoryCreateManyIssueInputEnvelope>;
 
 export default IssueHistoryCreateManyIssueInputEnvelopeSchema;

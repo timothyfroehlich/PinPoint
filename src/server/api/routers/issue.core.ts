@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { IssueUncheckedCreateInputSchema } from "../../../../prisma/generated/zod";
+
 import {
   createTRPCRouter,
   organizationProcedure,
@@ -10,11 +12,12 @@ export const issueCoreRouter = createTRPCRouter({
   // Create issue - requires organization membership
   create: organizationProcedure
     .input(
-      z.object({
-        title: z.string().min(1).max(255),
-        description: z.string().optional(),
-        severity: z.enum(["Low", "Medium", "High", "Critical"]).optional(),
-        machineId: z.string(),
+      // Use generated schema, picking only the fields we want from the frontend
+      IssueUncheckedCreateInputSchema.pick({
+        title: true,
+        description: true,
+        consistency: true,
+        machineId: true,
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -75,6 +78,7 @@ export const issueCoreRouter = createTRPCRouter({
       const issueData: {
         title: string;
         description?: string | null;
+        consistency?: string | null;
         createdById: string;
         machineId: string;
         organizationId: string;
@@ -82,16 +86,14 @@ export const issueCoreRouter = createTRPCRouter({
         priorityId: string;
       } = {
         title: input.title,
+        description: input.description ?? null,
+        consistency: input.consistency ?? null,
         createdById,
         machineId: input.machineId,
         organizationId: organization.id,
         statusId: newStatus.id,
         priorityId: defaultPriority.id,
       };
-
-      if (input.description) {
-        issueData.description = input.description;
-      }
 
       const issue = await ctx.db.issue.create({
         data: issueData,

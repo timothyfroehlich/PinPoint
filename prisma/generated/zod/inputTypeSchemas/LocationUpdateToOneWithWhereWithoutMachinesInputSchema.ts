@@ -1,13 +1,19 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from "@prisma/client";
 
-import { z } from 'zod';
-import { LocationWhereInputSchema } from './LocationWhereInputSchema';
-import { LocationUpdateWithoutMachinesInputSchema } from './LocationUpdateWithoutMachinesInputSchema';
-import { LocationUncheckedUpdateWithoutMachinesInputSchema } from './LocationUncheckedUpdateWithoutMachinesInputSchema';
+import { z } from "zod";
+import { LocationWhereInputSchema } from "./LocationWhereInputSchema";
+import { LocationUpdateWithoutMachinesInputSchema } from "./LocationUpdateWithoutMachinesInputSchema";
+import { LocationUncheckedUpdateWithoutMachinesInputSchema } from "./LocationUncheckedUpdateWithoutMachinesInputSchema";
 
-export const LocationUpdateToOneWithWhereWithoutMachinesInputSchema: z.ZodType<Prisma.LocationUpdateToOneWithWhereWithoutMachinesInput> = z.object({
-  where: z.lazy(() => LocationWhereInputSchema).optional(),
-  data: z.union([ z.lazy(() => LocationUpdateWithoutMachinesInputSchema),z.lazy(() => LocationUncheckedUpdateWithoutMachinesInputSchema) ]),
-}).strict();
+export const LocationUpdateToOneWithWhereWithoutMachinesInputSchema: z.ZodType<Prisma.LocationUpdateToOneWithWhereWithoutMachinesInput> =
+  z
+    .object({
+      where: z.lazy(() => LocationWhereInputSchema).optional(),
+      data: z.union([
+        z.lazy(() => LocationUpdateWithoutMachinesInputSchema),
+        z.lazy(() => LocationUncheckedUpdateWithoutMachinesInputSchema),
+      ]),
+    })
+    .strict() as z.ZodType<Prisma.LocationUpdateToOneWithWhereWithoutMachinesInput>;
 
 export default LocationUpdateToOneWithWhereWithoutMachinesInputSchema;

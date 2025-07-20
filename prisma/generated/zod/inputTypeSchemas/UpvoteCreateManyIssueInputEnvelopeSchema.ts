@@ -1,11 +1,17 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from "@prisma/client";
 
-import { z } from 'zod';
-import { UpvoteCreateManyIssueInputSchema } from './UpvoteCreateManyIssueInputSchema';
+import { z } from "zod";
+import { UpvoteCreateManyIssueInputSchema } from "./UpvoteCreateManyIssueInputSchema";
 
-export const UpvoteCreateManyIssueInputEnvelopeSchema: z.ZodType<Prisma.UpvoteCreateManyIssueInputEnvelope> = z.object({
-  data: z.union([ z.lazy(() => UpvoteCreateManyIssueInputSchema),z.lazy(() => UpvoteCreateManyIssueInputSchema).array() ]),
-  skipDuplicates: z.boolean().optional()
-}).strict();
+export const UpvoteCreateManyIssueInputEnvelopeSchema: z.ZodType<Prisma.UpvoteCreateManyIssueInputEnvelope> =
+  z
+    .object({
+      data: z.union([
+        z.lazy(() => UpvoteCreateManyIssueInputSchema),
+        z.lazy(() => UpvoteCreateManyIssueInputSchema).array(),
+      ]),
+      skipDuplicates: z.boolean().optional(),
+    })
+    .strict() as z.ZodType<Prisma.UpvoteCreateManyIssueInputEnvelope>;
 
 export default UpvoteCreateManyIssueInputEnvelopeSchema;

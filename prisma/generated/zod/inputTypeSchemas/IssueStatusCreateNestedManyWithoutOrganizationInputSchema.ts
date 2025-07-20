@@ -1,17 +1,51 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from "@prisma/client";
 
-import { z } from 'zod';
-import { IssueStatusCreateWithoutOrganizationInputSchema } from './IssueStatusCreateWithoutOrganizationInputSchema';
-import { IssueStatusUncheckedCreateWithoutOrganizationInputSchema } from './IssueStatusUncheckedCreateWithoutOrganizationInputSchema';
-import { IssueStatusCreateOrConnectWithoutOrganizationInputSchema } from './IssueStatusCreateOrConnectWithoutOrganizationInputSchema';
-import { IssueStatusCreateManyOrganizationInputEnvelopeSchema } from './IssueStatusCreateManyOrganizationInputEnvelopeSchema';
-import { IssueStatusWhereUniqueInputSchema } from './IssueStatusWhereUniqueInputSchema';
+import { z } from "zod";
+import { IssueStatusCreateWithoutOrganizationInputSchema } from "./IssueStatusCreateWithoutOrganizationInputSchema";
+import { IssueStatusUncheckedCreateWithoutOrganizationInputSchema } from "./IssueStatusUncheckedCreateWithoutOrganizationInputSchema";
+import { IssueStatusCreateOrConnectWithoutOrganizationInputSchema } from "./IssueStatusCreateOrConnectWithoutOrganizationInputSchema";
+import { IssueStatusCreateManyOrganizationInputEnvelopeSchema } from "./IssueStatusCreateManyOrganizationInputEnvelopeSchema";
+import { IssueStatusWhereUniqueInputSchema } from "./IssueStatusWhereUniqueInputSchema";
 
-export const IssueStatusCreateNestedManyWithoutOrganizationInputSchema: z.ZodType<Prisma.IssueStatusCreateNestedManyWithoutOrganizationInput> = z.object({
-  create: z.union([ z.lazy(() => IssueStatusCreateWithoutOrganizationInputSchema),z.lazy(() => IssueStatusCreateWithoutOrganizationInputSchema).array(),z.lazy(() => IssueStatusUncheckedCreateWithoutOrganizationInputSchema),z.lazy(() => IssueStatusUncheckedCreateWithoutOrganizationInputSchema).array() ]).optional(),
-  connectOrCreate: z.union([ z.lazy(() => IssueStatusCreateOrConnectWithoutOrganizationInputSchema),z.lazy(() => IssueStatusCreateOrConnectWithoutOrganizationInputSchema).array() ]).optional(),
-  createMany: z.lazy(() => IssueStatusCreateManyOrganizationInputEnvelopeSchema).optional(),
-  connect: z.union([ z.lazy(() => IssueStatusWhereUniqueInputSchema),z.lazy(() => IssueStatusWhereUniqueInputSchema).array() ]).optional(),
-}).strict();
+export const IssueStatusCreateNestedManyWithoutOrganizationInputSchema: z.ZodType<Prisma.IssueStatusCreateNestedManyWithoutOrganizationInput> =
+  z
+    .object({
+      create: z
+        .union([
+          z.lazy(() => IssueStatusCreateWithoutOrganizationInputSchema),
+          z.lazy(() => IssueStatusCreateWithoutOrganizationInputSchema).array(),
+          z.lazy(
+            () => IssueStatusUncheckedCreateWithoutOrganizationInputSchema,
+          ),
+          z
+            .lazy(
+              () => IssueStatusUncheckedCreateWithoutOrganizationInputSchema,
+            )
+            .array(),
+        ])
+        .optional(),
+      connectOrCreate: z
+        .union([
+          z.lazy(
+            () => IssueStatusCreateOrConnectWithoutOrganizationInputSchema,
+          ),
+          z
+            .lazy(
+              () => IssueStatusCreateOrConnectWithoutOrganizationInputSchema,
+            )
+            .array(),
+        ])
+        .optional(),
+      createMany: z
+        .lazy(() => IssueStatusCreateManyOrganizationInputEnvelopeSchema)
+        .optional(),
+      connect: z
+        .union([
+          z.lazy(() => IssueStatusWhereUniqueInputSchema),
+          z.lazy(() => IssueStatusWhereUniqueInputSchema).array(),
+        ])
+        .optional(),
+    })
+    .strict() as z.ZodType<Prisma.IssueStatusCreateNestedManyWithoutOrganizationInput>;
 
 export default IssueStatusCreateNestedManyWithoutOrganizationInputSchema;

@@ -1,13 +1,19 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from "@prisma/client";
 
-import { z } from 'zod';
-import { UserWhereUniqueInputSchema } from './UserWhereUniqueInputSchema';
-import { UserCreateWithoutDeletedCommentsInputSchema } from './UserCreateWithoutDeletedCommentsInputSchema';
-import { UserUncheckedCreateWithoutDeletedCommentsInputSchema } from './UserUncheckedCreateWithoutDeletedCommentsInputSchema';
+import { z } from "zod";
+import { UserWhereUniqueInputSchema } from "./UserWhereUniqueInputSchema";
+import { UserCreateWithoutDeletedCommentsInputSchema } from "./UserCreateWithoutDeletedCommentsInputSchema";
+import { UserUncheckedCreateWithoutDeletedCommentsInputSchema } from "./UserUncheckedCreateWithoutDeletedCommentsInputSchema";
 
-export const UserCreateOrConnectWithoutDeletedCommentsInputSchema: z.ZodType<Prisma.UserCreateOrConnectWithoutDeletedCommentsInput> = z.object({
-  where: z.lazy(() => UserWhereUniqueInputSchema),
-  create: z.union([ z.lazy(() => UserCreateWithoutDeletedCommentsInputSchema),z.lazy(() => UserUncheckedCreateWithoutDeletedCommentsInputSchema) ]),
-}).strict();
+export const UserCreateOrConnectWithoutDeletedCommentsInputSchema: z.ZodType<Prisma.UserCreateOrConnectWithoutDeletedCommentsInput> =
+  z
+    .object({
+      where: z.lazy(() => UserWhereUniqueInputSchema),
+      create: z.union([
+        z.lazy(() => UserCreateWithoutDeletedCommentsInputSchema),
+        z.lazy(() => UserUncheckedCreateWithoutDeletedCommentsInputSchema),
+      ]),
+    })
+    .strict() as z.ZodType<Prisma.UserCreateOrConnectWithoutDeletedCommentsInput>;
 
 export default UserCreateOrConnectWithoutDeletedCommentsInputSchema;

@@ -1,15 +1,18 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from "@prisma/client";
 
-import { z } from 'zod';
-import { IssueCreateNestedOneWithoutAttachmentsInputSchema } from './IssueCreateNestedOneWithoutAttachmentsInputSchema';
+import { z } from "zod";
+import { IssueCreateNestedOneWithoutAttachmentsInputSchema } from "./IssueCreateNestedOneWithoutAttachmentsInputSchema";
 
-export const AttachmentCreateWithoutOrganizationInputSchema: z.ZodType<Prisma.AttachmentCreateWithoutOrganizationInput> = z.object({
-  id: z.string().cuid().optional(),
-  url: z.string(),
-  fileName: z.string(),
-  fileType: z.string(),
-  createdAt: z.coerce.date().optional(),
-  issue: z.lazy(() => IssueCreateNestedOneWithoutAttachmentsInputSchema)
-}).strict();
+export const AttachmentCreateWithoutOrganizationInputSchema: z.ZodType<Prisma.AttachmentCreateWithoutOrganizationInput> =
+  z
+    .object({
+      id: z.string().cuid().optional(),
+      url: z.string(),
+      fileName: z.string(),
+      fileType: z.string(),
+      createdAt: z.coerce.date().optional(),
+      issue: z.lazy(() => IssueCreateNestedOneWithoutAttachmentsInputSchema),
+    })
+    .strict() as z.ZodType<Prisma.AttachmentCreateWithoutOrganizationInput>;
 
 export default AttachmentCreateWithoutOrganizationInputSchema;

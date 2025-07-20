@@ -1,10 +1,13 @@
-import { z } from 'zod';
-import type { Prisma } from '@prisma/client';
-import { LocationWhereInputSchema } from '../inputTypeSchemas/LocationWhereInputSchema'
+import { z } from "zod";
+import type { Prisma } from "@prisma/client";
+import { LocationWhereInputSchema } from "../inputTypeSchemas/LocationWhereInputSchema";
 
-export const LocationDeleteManyArgsSchema: z.ZodType<Prisma.LocationDeleteManyArgs> = z.object({
-  where: LocationWhereInputSchema.optional(),
-  limit: z.number().optional(),
-}).strict() ;
+export const LocationDeleteManyArgsSchema: z.ZodType<Prisma.LocationDeleteManyArgs> =
+  z
+    .object({
+      where: LocationWhereInputSchema.optional(),
+      limit: z.number().optional(),
+    })
+    .strict() as z.ZodType<Prisma.LocationDeleteManyArgs>;
 
 export default LocationDeleteManyArgsSchema;

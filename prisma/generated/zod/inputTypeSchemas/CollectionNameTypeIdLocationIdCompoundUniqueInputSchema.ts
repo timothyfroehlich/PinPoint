@@ -1,11 +1,14 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from "@prisma/client";
 
-import { z } from 'zod';
+import { z } from "zod";
 
-export const CollectionNameTypeIdLocationIdCompoundUniqueInputSchema: z.ZodType<Prisma.CollectionNameTypeIdLocationIdCompoundUniqueInput> = z.object({
-  name: z.string(),
-  typeId: z.string(),
-  locationId: z.string()
-}).strict();
+export const CollectionNameTypeIdLocationIdCompoundUniqueInputSchema: z.ZodType<Prisma.CollectionNameTypeIdLocationIdCompoundUniqueInput> =
+  z
+    .object({
+      name: z.string(),
+      typeId: z.string(),
+      locationId: z.string(),
+    })
+    .strict() as z.ZodType<Prisma.CollectionNameTypeIdLocationIdCompoundUniqueInput>;
 
 export default CollectionNameTypeIdLocationIdCompoundUniqueInputSchema;

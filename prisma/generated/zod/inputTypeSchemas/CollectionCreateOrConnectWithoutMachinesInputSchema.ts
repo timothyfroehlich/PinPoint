@@ -1,13 +1,19 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from "@prisma/client";
 
-import { z } from 'zod';
-import { CollectionWhereUniqueInputSchema } from './CollectionWhereUniqueInputSchema';
-import { CollectionCreateWithoutMachinesInputSchema } from './CollectionCreateWithoutMachinesInputSchema';
-import { CollectionUncheckedCreateWithoutMachinesInputSchema } from './CollectionUncheckedCreateWithoutMachinesInputSchema';
+import { z } from "zod";
+import { CollectionWhereUniqueInputSchema } from "./CollectionWhereUniqueInputSchema";
+import { CollectionCreateWithoutMachinesInputSchema } from "./CollectionCreateWithoutMachinesInputSchema";
+import { CollectionUncheckedCreateWithoutMachinesInputSchema } from "./CollectionUncheckedCreateWithoutMachinesInputSchema";
 
-export const CollectionCreateOrConnectWithoutMachinesInputSchema: z.ZodType<Prisma.CollectionCreateOrConnectWithoutMachinesInput> = z.object({
-  where: z.lazy(() => CollectionWhereUniqueInputSchema),
-  create: z.union([ z.lazy(() => CollectionCreateWithoutMachinesInputSchema),z.lazy(() => CollectionUncheckedCreateWithoutMachinesInputSchema) ]),
-}).strict();
+export const CollectionCreateOrConnectWithoutMachinesInputSchema: z.ZodType<Prisma.CollectionCreateOrConnectWithoutMachinesInput> =
+  z
+    .object({
+      where: z.lazy(() => CollectionWhereUniqueInputSchema),
+      create: z.union([
+        z.lazy(() => CollectionCreateWithoutMachinesInputSchema),
+        z.lazy(() => CollectionUncheckedCreateWithoutMachinesInputSchema),
+      ]),
+    })
+    .strict() as z.ZodType<Prisma.CollectionCreateOrConnectWithoutMachinesInput>;
 
 export default CollectionCreateOrConnectWithoutMachinesInputSchema;

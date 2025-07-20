@@ -1,13 +1,28 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from "@prisma/client";
 
-import { z } from 'zod';
-import { StringFieldUpdateOperationsInputSchema } from './StringFieldUpdateOperationsInputSchema';
-import { RoleUncheckedUpdateManyWithoutPermissionsNestedInputSchema } from './RoleUncheckedUpdateManyWithoutPermissionsNestedInputSchema';
+import { z } from "zod";
+import { StringFieldUpdateOperationsInputSchema } from "./StringFieldUpdateOperationsInputSchema";
+import { RoleUncheckedUpdateManyWithoutPermissionsNestedInputSchema } from "./RoleUncheckedUpdateManyWithoutPermissionsNestedInputSchema";
 
-export const PermissionUncheckedUpdateInputSchema: z.ZodType<Prisma.PermissionUncheckedUpdateInput> = z.object({
-  id: z.union([ z.string().cuid(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
-  name: z.union([ z.string(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
-  roles: z.lazy(() => RoleUncheckedUpdateManyWithoutPermissionsNestedInputSchema).optional()
-}).strict();
+export const PermissionUncheckedUpdateInputSchema: z.ZodType<Prisma.PermissionUncheckedUpdateInput> =
+  z
+    .object({
+      id: z
+        .union([
+          z.string().cuid(),
+          z.lazy(() => StringFieldUpdateOperationsInputSchema),
+        ])
+        .optional(),
+      name: z
+        .union([
+          z.string(),
+          z.lazy(() => StringFieldUpdateOperationsInputSchema),
+        ])
+        .optional(),
+      roles: z
+        .lazy(() => RoleUncheckedUpdateManyWithoutPermissionsNestedInputSchema)
+        .optional(),
+    })
+    .strict() as z.ZodType<Prisma.PermissionUncheckedUpdateInput>;
 
 export default PermissionUncheckedUpdateInputSchema;

@@ -1,6 +1,14 @@
 import { mockDeep, mockReset, type DeepMockProxy } from "jest-mock-extended";
 import { z } from "zod";
 
+import {
+  UserSchema,
+  OrganizationSchema,
+  LocationSchema,
+  MachineSchema,
+  IssueSchema,
+} from "../../prisma/generated/zod";
+
 import type { ExtendedPrismaClient } from "~/server/db";
 import type { CollectionService } from "~/server/services/collectionService";
 import type { CommentCleanupService } from "~/server/services/commentCleanupService";
@@ -18,22 +26,12 @@ import type { QRCodeService } from "~/server/services/qrCodeService";
 export * from "../../prisma/generated/zod";
 
 // Import commonly used schemas for mock generation
-import {
-  UserSchema,
-  UserCreateInputSchema,
-  OrganizationSchema,
-  LocationSchema,
-  MachineSchema,
-  IssueSchema,
-  IssueCreateInputSchema,
-  MembershipSchema,
-} from "../../prisma/generated/zod";
 
 // Type-safe mock data generation utilities
 export function createMockDataForSchema<T>(
-  schema: z.ZodSchema<T>,
+  schema: z.ZodType<T>,
   overrides: Partial<T> = {},
-  baseData?: Partial<T>
+  baseData?: Partial<T>,
 ): T {
   /**
    * Helper function for agents to create valid mock data
@@ -43,10 +41,7 @@ export function createMockDataForSchema<T>(
   return schema.parse(combined);
 }
 
-export function validateMockData<T>(
-  schema: z.ZodSchema<T>,
-  data: unknown
-): T {
+export function validateMockData<T>(schema: z.ZodType<T>, data: unknown): T {
   /**
    * Validates mock data against schema and returns typed result
    * Throws descriptive error if validation fails
@@ -58,7 +53,7 @@ export function validateMockData<T>(
       throw new Error(
         `Mock data validation failed: ${error.issues
           .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
-          .join(", ")}`
+          .join(", ")}`,
       );
     }
     throw error;
@@ -66,9 +61,11 @@ export function validateMockData<T>(
 }
 
 // Agent-friendly factory functions for common test scenarios
-export const createValidUser = (overrides: Partial<Parameters<typeof UserSchema.parse>[0]> = {}) => {
+export const createValidUser = (
+  overrides: Partial<Parameters<typeof UserSchema.parse>[0]> = {},
+) => {
   return validateMockData(UserSchema, {
-    id: `user_${Date.now()}`,
+    id: `clh7xkg7w${Date.now().toString().slice(-12)}x9yz0qj3k1vq`, // Generate valid CUID format
     name: "Test User",
     email: "test@example.com",
     emailVerified: null,
@@ -84,11 +81,13 @@ export const createValidUser = (overrides: Partial<Parameters<typeof UserSchema.
   });
 };
 
-export const createValidOrganization = (overrides: Partial<Parameters<typeof OrganizationSchema.parse>[0]> = {}) => {
+export const createValidOrganization = (
+  overrides: Partial<Parameters<typeof OrganizationSchema.parse>[0]> = {},
+) => {
   return validateMockData(OrganizationSchema, {
-    id: `org_${Date.now()}`,
+    id: `clh7xkg7w${Date.now().toString().slice(-12)}x9yz0qj3k1vr`, // Generate valid CUID format
     name: "Test Organization",
-    subdomain: `test-org-${Date.now()}`,
+    subdomain: `test-org-${Date.now().toString()}`,
     logoUrl: null,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -96,9 +95,11 @@ export const createValidOrganization = (overrides: Partial<Parameters<typeof Org
   });
 };
 
-export const createValidIssue = (overrides: Partial<Parameters<typeof IssueSchema.parse>[0]> = {}) => {
+export const createValidIssue = (
+  overrides: Partial<Parameters<typeof IssueSchema.parse>[0]> = {},
+) => {
   return validateMockData(IssueSchema, {
-    id: `issue_${Date.now()}`,
+    id: `clh7xkg7w${Date.now().toString().slice(-12)}x9yz0qj3k1vw`, // Generate valid CUID format
     title: "Test Issue",
     description: "Test description",
     consistency: null,
@@ -106,11 +107,11 @@ export const createValidIssue = (overrides: Partial<Parameters<typeof IssueSchem
     createdAt: new Date(),
     updatedAt: new Date(),
     resolvedAt: null,
-    organizationId: "org-1",
-    machineId: "machine-1",
-    statusId: "status-1",
-    priorityId: "priority-1",
-    createdById: "user-1",
+    organizationId: "clh7xkg7w0001x9yz0qj3k1vr",
+    machineId: "clh7xkg7w0003x9yz0qj3k1vt",
+    statusId: "clh7xkg7w0007x9yz0qj3k1vx",
+    priorityId: "clh7xkg7w0008x9yz0qj3k1vy",
+    createdById: "clh7xkg7w0000x9yz0qj3k1vq",
     assignedToId: null,
     ...overrides,
   });
@@ -276,7 +277,7 @@ export {
 
 // Common mock data for testing - all validated with Zod schemas
 export const mockUser = validateMockData(UserSchema, {
-  id: "user-1",
+  id: "clh7xkg7w0000x9yz0qj3k1vq", // Valid CUID format
   name: "Test User",
   email: "test@example.com",
   emailVerified: null,
@@ -291,7 +292,7 @@ export const mockUser = validateMockData(UserSchema, {
 });
 
 export const mockOrganization = validateMockData(OrganizationSchema, {
-  id: "org-1",
+  id: "clh7xkg7w0001x9yz0qj3k1vr", // Valid CUID format
   name: "Test Organization",
   subdomain: "test-org",
   logoUrl: null,
@@ -300,9 +301,9 @@ export const mockOrganization = validateMockData(OrganizationSchema, {
 });
 
 export const mockLocation = validateMockData(LocationSchema, {
-  id: "location-1",
+  id: "clh7xkg7w0002x9yz0qj3k1vs", // Valid CUID format
   name: "Test Location",
-  organizationId: "org-1",
+  organizationId: "clh7xkg7w0001x9yz0qj3k1vr",
   street: "123 Test St",
   city: "Test City",
   state: "TS",
@@ -358,23 +359,23 @@ export const mockModel = {
 };
 
 export const mockMachine = validateMockData(MachineSchema, {
-  id: "machine-1",
+  id: "clh7xkg7w0003x9yz0qj3k1vt", // Valid CUID format
   name: "Medieval Madness #1",
-  organizationId: "org-1",
-  locationId: "location-1",
-  modelId: "model-1",
+  organizationId: "clh7xkg7w0001x9yz0qj3k1vr",
+  locationId: "clh7xkg7w0002x9yz0qj3k1vs",
+  modelId: "clh7xkg7w0004x9yz0qj3k1vu",
   ownerId: null,
   ownerNotificationsEnabled: true,
   notifyOnNewIssues: true,
   notifyOnStatusChanges: true,
   notifyOnComments: false,
-  qrCodeId: "qr_123",
+  qrCodeId: "clh7xkg7w0005x9yz0qj3k1vv",
   qrCodeUrl: null,
   qrCodeGeneratedAt: null,
 });
 
 export const mockIssue = validateMockData(IssueSchema, {
-  id: "issue-1",
+  id: "clh7xkg7w0006x9yz0qj3k1vw", // Valid CUID format
   title: "Test Issue",
   description: "Test description",
   consistency: null,
@@ -382,11 +383,11 @@ export const mockIssue = validateMockData(IssueSchema, {
   createdAt: new Date(),
   updatedAt: new Date(),
   resolvedAt: null,
-  organizationId: "org-1",
-  machineId: "machine-1",
-  statusId: "status-1",
-  priorityId: "priority-1",
-  createdById: "user-1",
+  organizationId: "clh7xkg7w0001x9yz0qj3k1vr",
+  machineId: "clh7xkg7w0003x9yz0qj3k1vt",
+  statusId: "clh7xkg7w0007x9yz0qj3k1vx",
+  priorityId: "clh7xkg7w0008x9yz0qj3k1vy",
+  createdById: "clh7xkg7w0000x9yz0qj3k1vq",
   assignedToId: null,
 });
 

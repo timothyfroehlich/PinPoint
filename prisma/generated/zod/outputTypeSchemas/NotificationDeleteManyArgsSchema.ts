@@ -1,10 +1,13 @@
-import { z } from 'zod';
-import type { Prisma } from '@prisma/client';
-import { NotificationWhereInputSchema } from '../inputTypeSchemas/NotificationWhereInputSchema'
+import { z } from "zod";
+import type { Prisma } from "@prisma/client";
+import { NotificationWhereInputSchema } from "../inputTypeSchemas/NotificationWhereInputSchema";
 
-export const NotificationDeleteManyArgsSchema: z.ZodType<Prisma.NotificationDeleteManyArgs> = z.object({
-  where: NotificationWhereInputSchema.optional(),
-  limit: z.number().optional(),
-}).strict() ;
+export const NotificationDeleteManyArgsSchema: z.ZodType<Prisma.NotificationDeleteManyArgs> =
+  z
+    .object({
+      where: NotificationWhereInputSchema.optional(),
+      limit: z.number().optional(),
+    })
+    .strict() as z.ZodType<Prisma.NotificationDeleteManyArgs>;
 
 export default NotificationDeleteManyArgsSchema;

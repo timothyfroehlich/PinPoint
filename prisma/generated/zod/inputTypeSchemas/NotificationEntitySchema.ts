@@ -1,7 +1,13 @@
-import { z } from 'zod';
+import { z } from "zod";
 
-export const NotificationEntitySchema = z.enum(['ISSUE','MACHINE','COMMENT','ORGANIZATION']);
+export const NotificationEntitySchema = z.enum([
+  "ISSUE",
+  "MACHINE",
+  "COMMENT",
+  "ORGANIZATION",
+]);
 
-export type NotificationEntityType = `${z.infer<typeof NotificationEntitySchema>}`
+export type NotificationEntityType =
+  `${z.infer<typeof NotificationEntitySchema>}`;
 
 export default NotificationEntitySchema;

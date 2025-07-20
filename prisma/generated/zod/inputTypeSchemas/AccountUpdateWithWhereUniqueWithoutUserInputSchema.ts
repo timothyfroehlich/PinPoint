@@ -1,13 +1,19 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from "@prisma/client";
 
-import { z } from 'zod';
-import { AccountWhereUniqueInputSchema } from './AccountWhereUniqueInputSchema';
-import { AccountUpdateWithoutUserInputSchema } from './AccountUpdateWithoutUserInputSchema';
-import { AccountUncheckedUpdateWithoutUserInputSchema } from './AccountUncheckedUpdateWithoutUserInputSchema';
+import { z } from "zod";
+import { AccountWhereUniqueInputSchema } from "./AccountWhereUniqueInputSchema";
+import { AccountUpdateWithoutUserInputSchema } from "./AccountUpdateWithoutUserInputSchema";
+import { AccountUncheckedUpdateWithoutUserInputSchema } from "./AccountUncheckedUpdateWithoutUserInputSchema";
 
-export const AccountUpdateWithWhereUniqueWithoutUserInputSchema: z.ZodType<Prisma.AccountUpdateWithWhereUniqueWithoutUserInput> = z.object({
-  where: z.lazy(() => AccountWhereUniqueInputSchema),
-  data: z.union([ z.lazy(() => AccountUpdateWithoutUserInputSchema),z.lazy(() => AccountUncheckedUpdateWithoutUserInputSchema) ]),
-}).strict();
+export const AccountUpdateWithWhereUniqueWithoutUserInputSchema: z.ZodType<Prisma.AccountUpdateWithWhereUniqueWithoutUserInput> =
+  z
+    .object({
+      where: z.lazy(() => AccountWhereUniqueInputSchema),
+      data: z.union([
+        z.lazy(() => AccountUpdateWithoutUserInputSchema),
+        z.lazy(() => AccountUncheckedUpdateWithoutUserInputSchema),
+      ]),
+    })
+    .strict() as z.ZodType<Prisma.AccountUpdateWithWhereUniqueWithoutUserInput>;
 
 export default AccountUpdateWithWhereUniqueWithoutUserInputSchema;

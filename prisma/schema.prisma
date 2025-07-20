@@ -22,6 +22,7 @@ generator zod {
   useDefaultValidators             = true
   coerceDate                       = true
   writeNullishInModelTypes         = false
+  useTypeAssertions                = true
   prismaClientPath                 = "@prisma/client"
 }
 

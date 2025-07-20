@@ -1,11 +1,17 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from "@prisma/client";
 
-import { z } from 'zod';
-import { IssueCreateManyStatusInputSchema } from './IssueCreateManyStatusInputSchema';
+import { z } from "zod";
+import { IssueCreateManyStatusInputSchema } from "./IssueCreateManyStatusInputSchema";
 
-export const IssueCreateManyStatusInputEnvelopeSchema: z.ZodType<Prisma.IssueCreateManyStatusInputEnvelope> = z.object({
-  data: z.union([ z.lazy(() => IssueCreateManyStatusInputSchema),z.lazy(() => IssueCreateManyStatusInputSchema).array() ]),
-  skipDuplicates: z.boolean().optional()
-}).strict();
+export const IssueCreateManyStatusInputEnvelopeSchema: z.ZodType<Prisma.IssueCreateManyStatusInputEnvelope> =
+  z
+    .object({
+      data: z.union([
+        z.lazy(() => IssueCreateManyStatusInputSchema),
+        z.lazy(() => IssueCreateManyStatusInputSchema).array(),
+      ]),
+      skipDuplicates: z.boolean().optional(),
+    })
+    .strict() as z.ZodType<Prisma.IssueCreateManyStatusInputEnvelope>;
 
 export default IssueCreateManyStatusInputEnvelopeSchema;

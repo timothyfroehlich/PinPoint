@@ -1,10 +1,13 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from "@prisma/client";
 
-import { z } from 'zod';
-import { NotificationTypeSchema } from './NotificationTypeSchema';
+import { z } from "zod";
+import { NotificationTypeSchema } from "./NotificationTypeSchema";
 
-export const EnumNotificationTypeFieldUpdateOperationsInputSchema: z.ZodType<Prisma.EnumNotificationTypeFieldUpdateOperationsInput> = z.object({
-  set: z.lazy(() => NotificationTypeSchema).optional()
-}).strict();
+export const EnumNotificationTypeFieldUpdateOperationsInputSchema: z.ZodType<Prisma.EnumNotificationTypeFieldUpdateOperationsInput> =
+  z
+    .object({
+      set: z.lazy(() => NotificationTypeSchema).optional(),
+    })
+    .strict() as z.ZodType<Prisma.EnumNotificationTypeFieldUpdateOperationsInput>;
 
 export default EnumNotificationTypeFieldUpdateOperationsInputSchema;

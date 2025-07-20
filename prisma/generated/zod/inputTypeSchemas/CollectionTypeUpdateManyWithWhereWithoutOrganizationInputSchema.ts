@@ -1,13 +1,21 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from "@prisma/client";
 
-import { z } from 'zod';
-import { CollectionTypeScalarWhereInputSchema } from './CollectionTypeScalarWhereInputSchema';
-import { CollectionTypeUpdateManyMutationInputSchema } from './CollectionTypeUpdateManyMutationInputSchema';
-import { CollectionTypeUncheckedUpdateManyWithoutOrganizationInputSchema } from './CollectionTypeUncheckedUpdateManyWithoutOrganizationInputSchema';
+import { z } from "zod";
+import { CollectionTypeScalarWhereInputSchema } from "./CollectionTypeScalarWhereInputSchema";
+import { CollectionTypeUpdateManyMutationInputSchema } from "./CollectionTypeUpdateManyMutationInputSchema";
+import { CollectionTypeUncheckedUpdateManyWithoutOrganizationInputSchema } from "./CollectionTypeUncheckedUpdateManyWithoutOrganizationInputSchema";
 
-export const CollectionTypeUpdateManyWithWhereWithoutOrganizationInputSchema: z.ZodType<Prisma.CollectionTypeUpdateManyWithWhereWithoutOrganizationInput> = z.object({
-  where: z.lazy(() => CollectionTypeScalarWhereInputSchema),
-  data: z.union([ z.lazy(() => CollectionTypeUpdateManyMutationInputSchema),z.lazy(() => CollectionTypeUncheckedUpdateManyWithoutOrganizationInputSchema) ]),
-}).strict();
+export const CollectionTypeUpdateManyWithWhereWithoutOrganizationInputSchema: z.ZodType<Prisma.CollectionTypeUpdateManyWithWhereWithoutOrganizationInput> =
+  z
+    .object({
+      where: z.lazy(() => CollectionTypeScalarWhereInputSchema),
+      data: z.union([
+        z.lazy(() => CollectionTypeUpdateManyMutationInputSchema),
+        z.lazy(
+          () => CollectionTypeUncheckedUpdateManyWithoutOrganizationInputSchema,
+        ),
+      ]),
+    })
+    .strict() as z.ZodType<Prisma.CollectionTypeUpdateManyWithWhereWithoutOrganizationInput>;
 
 export default CollectionTypeUpdateManyWithWhereWithoutOrganizationInputSchema;

@@ -1,13 +1,19 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from "@prisma/client";
 
-import { z } from 'zod';
-import { IssueWhereUniqueInputSchema } from './IssueWhereUniqueInputSchema';
-import { IssueCreateWithoutMachineInputSchema } from './IssueCreateWithoutMachineInputSchema';
-import { IssueUncheckedCreateWithoutMachineInputSchema } from './IssueUncheckedCreateWithoutMachineInputSchema';
+import { z } from "zod";
+import { IssueWhereUniqueInputSchema } from "./IssueWhereUniqueInputSchema";
+import { IssueCreateWithoutMachineInputSchema } from "./IssueCreateWithoutMachineInputSchema";
+import { IssueUncheckedCreateWithoutMachineInputSchema } from "./IssueUncheckedCreateWithoutMachineInputSchema";
 
-export const IssueCreateOrConnectWithoutMachineInputSchema: z.ZodType<Prisma.IssueCreateOrConnectWithoutMachineInput> = z.object({
-  where: z.lazy(() => IssueWhereUniqueInputSchema),
-  create: z.union([ z.lazy(() => IssueCreateWithoutMachineInputSchema),z.lazy(() => IssueUncheckedCreateWithoutMachineInputSchema) ]),
-}).strict();
+export const IssueCreateOrConnectWithoutMachineInputSchema: z.ZodType<Prisma.IssueCreateOrConnectWithoutMachineInput> =
+  z
+    .object({
+      where: z.lazy(() => IssueWhereUniqueInputSchema),
+      create: z.union([
+        z.lazy(() => IssueCreateWithoutMachineInputSchema),
+        z.lazy(() => IssueUncheckedCreateWithoutMachineInputSchema),
+      ]),
+    })
+    .strict() as z.ZodType<Prisma.IssueCreateOrConnectWithoutMachineInput>;
 
 export default IssueCreateOrConnectWithoutMachineInputSchema;

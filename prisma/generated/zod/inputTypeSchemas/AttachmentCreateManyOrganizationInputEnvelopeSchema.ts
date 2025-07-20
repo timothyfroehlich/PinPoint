@@ -1,11 +1,17 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from "@prisma/client";
 
-import { z } from 'zod';
-import { AttachmentCreateManyOrganizationInputSchema } from './AttachmentCreateManyOrganizationInputSchema';
+import { z } from "zod";
+import { AttachmentCreateManyOrganizationInputSchema } from "./AttachmentCreateManyOrganizationInputSchema";
 
-export const AttachmentCreateManyOrganizationInputEnvelopeSchema: z.ZodType<Prisma.AttachmentCreateManyOrganizationInputEnvelope> = z.object({
-  data: z.union([ z.lazy(() => AttachmentCreateManyOrganizationInputSchema),z.lazy(() => AttachmentCreateManyOrganizationInputSchema).array() ]),
-  skipDuplicates: z.boolean().optional()
-}).strict();
+export const AttachmentCreateManyOrganizationInputEnvelopeSchema: z.ZodType<Prisma.AttachmentCreateManyOrganizationInputEnvelope> =
+  z
+    .object({
+      data: z.union([
+        z.lazy(() => AttachmentCreateManyOrganizationInputSchema),
+        z.lazy(() => AttachmentCreateManyOrganizationInputSchema).array(),
+      ]),
+      skipDuplicates: z.boolean().optional(),
+    })
+    .strict() as z.ZodType<Prisma.AttachmentCreateManyOrganizationInputEnvelope>;
 
 export default AttachmentCreateManyOrganizationInputEnvelopeSchema;

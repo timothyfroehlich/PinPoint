@@ -1,11 +1,17 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from "@prisma/client";
 
-import { z } from 'zod';
-import { CollectionCreateManyTypeInputSchema } from './CollectionCreateManyTypeInputSchema';
+import { z } from "zod";
+import { CollectionCreateManyTypeInputSchema } from "./CollectionCreateManyTypeInputSchema";
 
-export const CollectionCreateManyTypeInputEnvelopeSchema: z.ZodType<Prisma.CollectionCreateManyTypeInputEnvelope> = z.object({
-  data: z.union([ z.lazy(() => CollectionCreateManyTypeInputSchema),z.lazy(() => CollectionCreateManyTypeInputSchema).array() ]),
-  skipDuplicates: z.boolean().optional()
-}).strict();
+export const CollectionCreateManyTypeInputEnvelopeSchema: z.ZodType<Prisma.CollectionCreateManyTypeInputEnvelope> =
+  z
+    .object({
+      data: z.union([
+        z.lazy(() => CollectionCreateManyTypeInputSchema),
+        z.lazy(() => CollectionCreateManyTypeInputSchema).array(),
+      ]),
+      skipDuplicates: z.boolean().optional(),
+    })
+    .strict() as z.ZodType<Prisma.CollectionCreateManyTypeInputEnvelope>;
 
 export default CollectionCreateManyTypeInputEnvelopeSchema;

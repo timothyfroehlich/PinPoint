@@ -1,12 +1,36 @@
-import { z } from 'zod';
-import { JsonValueSchema } from '../inputTypeSchemas/JsonValueSchema'
-import type { JsonValueType } from '../inputTypeSchemas/JsonValueSchema';
-import { CollectionTypeWithRelationsSchema, CollectionTypePartialWithRelationsSchema, CollectionTypeOptionalDefaultsWithRelationsSchema } from './CollectionTypeSchema'
-import type { CollectionTypeWithRelations, CollectionTypePartialWithRelations, CollectionTypeOptionalDefaultsWithRelations } from './CollectionTypeSchema'
-import { LocationWithRelationsSchema, LocationPartialWithRelationsSchema, LocationOptionalDefaultsWithRelationsSchema } from './LocationSchema'
-import type { LocationWithRelations, LocationPartialWithRelations, LocationOptionalDefaultsWithRelations } from './LocationSchema'
-import { MachineWithRelationsSchema, MachinePartialWithRelationsSchema, MachineOptionalDefaultsWithRelationsSchema } from './MachineSchema'
-import type { MachineWithRelations, MachinePartialWithRelations, MachineOptionalDefaultsWithRelations } from './MachineSchema'
+import { z } from "zod";
+import { JsonValueSchema } from "../inputTypeSchemas/JsonValueSchema";
+import type { JsonValueType } from "../inputTypeSchemas/JsonValueSchema";
+import {
+  CollectionTypeWithRelationsSchema,
+  CollectionTypePartialWithRelationsSchema,
+  CollectionTypeOptionalDefaultsWithRelationsSchema,
+} from "./CollectionTypeSchema";
+import type {
+  CollectionTypeWithRelations,
+  CollectionTypePartialWithRelations,
+  CollectionTypeOptionalDefaultsWithRelations,
+} from "./CollectionTypeSchema";
+import {
+  LocationWithRelationsSchema,
+  LocationPartialWithRelationsSchema,
+  LocationOptionalDefaultsWithRelationsSchema,
+} from "./LocationSchema";
+import type {
+  LocationWithRelations,
+  LocationPartialWithRelations,
+  LocationOptionalDefaultsWithRelations,
+} from "./LocationSchema";
+import {
+  MachineWithRelationsSchema,
+  MachinePartialWithRelationsSchema,
+  MachineOptionalDefaultsWithRelationsSchema,
+} from "./MachineSchema";
+import type {
+  MachineWithRelations,
+  MachinePartialWithRelations,
+  MachineOptionalDefaultsWithRelations,
+} from "./MachineSchema";
 
 /////////////////////////////////////////
 // COLLECTION SCHEMA
@@ -22,30 +46,34 @@ export const CollectionSchema = z.object({
   description: z.string().nullable(),
   sortOrder: z.number().int(),
   filterCriteria: JsonValueSchema.nullable(),
-})
+});
 
-export type Collection = z.infer<typeof CollectionSchema>
+export type Collection = z.infer<typeof CollectionSchema>;
 
 /////////////////////////////////////////
 // COLLECTION PARTIAL SCHEMA
 /////////////////////////////////////////
 
-export const CollectionPartialSchema = CollectionSchema.partial()
+export const CollectionPartialSchema = CollectionSchema.partial();
 
-export type CollectionPartial = z.infer<typeof CollectionPartialSchema>
+export type CollectionPartial = z.infer<typeof CollectionPartialSchema>;
 
 /////////////////////////////////////////
 // COLLECTION OPTIONAL DEFAULTS SCHEMA
 /////////////////////////////////////////
 
-export const CollectionOptionalDefaultsSchema = CollectionSchema.merge(z.object({
-  id: z.string().cuid().optional(),
-  isSmart: z.boolean().optional(),
-  isManual: z.boolean().optional(),
-  sortOrder: z.number().int().optional(),
-}))
+export const CollectionOptionalDefaultsSchema = CollectionSchema.merge(
+  z.object({
+    id: z.string().cuid().optional(),
+    isSmart: z.boolean().optional(),
+    isManual: z.boolean().optional(),
+    sortOrder: z.number().int().optional(),
+  }),
+);
 
-export type CollectionOptionalDefaults = z.infer<typeof CollectionOptionalDefaultsSchema>
+export type CollectionOptionalDefaults = z.infer<
+  typeof CollectionOptionalDefaultsSchema
+>;
 
 /////////////////////////////////////////
 // COLLECTION RELATION SCHEMA
@@ -57,15 +85,21 @@ export type CollectionRelations = {
   machines: MachineWithRelations[];
 };
 
-export type CollectionWithRelations = Omit<z.infer<typeof CollectionSchema>, "filterCriteria"> & {
+export type CollectionWithRelations = Omit<
+  z.infer<typeof CollectionSchema>,
+  "filterCriteria"
+> & {
   filterCriteria?: JsonValueType | null;
-} & CollectionRelations
+} & CollectionRelations;
 
-export const CollectionWithRelationsSchema: z.ZodType<CollectionWithRelations> = CollectionSchema.merge(z.object({
-  type: z.lazy(() => CollectionTypeWithRelationsSchema),
-  location: z.lazy(() => LocationWithRelationsSchema).nullable(),
-  machines: z.lazy(() => MachineWithRelationsSchema).array(),
-}))
+export const CollectionWithRelationsSchema: z.ZodType<CollectionWithRelations> =
+  CollectionSchema.merge(
+    z.object({
+      type: z.lazy(() => CollectionTypeWithRelationsSchema),
+      location: z.lazy(() => LocationWithRelationsSchema).nullable(),
+      machines: z.lazy(() => MachineWithRelationsSchema).array(),
+    }),
+  );
 
 /////////////////////////////////////////
 // COLLECTION OPTIONAL DEFAULTS RELATION SCHEMA
@@ -77,15 +111,25 @@ export type CollectionOptionalDefaultsRelations = {
   machines: MachineOptionalDefaultsWithRelations[];
 };
 
-export type CollectionOptionalDefaultsWithRelations = Omit<z.infer<typeof CollectionOptionalDefaultsSchema>, "filterCriteria"> & {
+export type CollectionOptionalDefaultsWithRelations = Omit<
+  z.infer<typeof CollectionOptionalDefaultsSchema>,
+  "filterCriteria"
+> & {
   filterCriteria?: JsonValueType | null;
-} & CollectionOptionalDefaultsRelations
+} & CollectionOptionalDefaultsRelations;
 
-export const CollectionOptionalDefaultsWithRelationsSchema: z.ZodType<CollectionOptionalDefaultsWithRelations> = CollectionOptionalDefaultsSchema.merge(z.object({
-  type: z.lazy(() => CollectionTypeOptionalDefaultsWithRelationsSchema),
-  location: z.lazy(() => LocationOptionalDefaultsWithRelationsSchema).nullable(),
-  machines: z.lazy(() => MachineOptionalDefaultsWithRelationsSchema).array(),
-}))
+export const CollectionOptionalDefaultsWithRelationsSchema: z.ZodType<CollectionOptionalDefaultsWithRelations> =
+  CollectionOptionalDefaultsSchema.merge(
+    z.object({
+      type: z.lazy(() => CollectionTypeOptionalDefaultsWithRelationsSchema),
+      location: z
+        .lazy(() => LocationOptionalDefaultsWithRelationsSchema)
+        .nullable(),
+      machines: z
+        .lazy(() => MachineOptionalDefaultsWithRelationsSchema)
+        .array(),
+    }),
+  );
 
 /////////////////////////////////////////
 // COLLECTION PARTIAL RELATION SCHEMA
@@ -97,34 +141,56 @@ export type CollectionPartialRelations = {
   machines?: MachinePartialWithRelations[];
 };
 
-export type CollectionPartialWithRelations = Omit<z.infer<typeof CollectionPartialSchema>, "filterCriteria"> & {
+export type CollectionPartialWithRelations = Omit<
+  z.infer<typeof CollectionPartialSchema>,
+  "filterCriteria"
+> & {
   filterCriteria?: JsonValueType | null;
-} & CollectionPartialRelations
+} & CollectionPartialRelations;
 
-export const CollectionPartialWithRelationsSchema: z.ZodType<CollectionPartialWithRelations> = CollectionPartialSchema.merge(z.object({
-  type: z.lazy(() => CollectionTypePartialWithRelationsSchema),
-  location: z.lazy(() => LocationPartialWithRelationsSchema).nullable(),
-  machines: z.lazy(() => MachinePartialWithRelationsSchema).array(),
-})).partial()
+export const CollectionPartialWithRelationsSchema: z.ZodType<CollectionPartialWithRelations> =
+  CollectionPartialSchema.merge(
+    z.object({
+      type: z.lazy(() => CollectionTypePartialWithRelationsSchema),
+      location: z.lazy(() => LocationPartialWithRelationsSchema).nullable(),
+      machines: z.lazy(() => MachinePartialWithRelationsSchema).array(),
+    }),
+  ).partial();
 
-export type CollectionOptionalDefaultsWithPartialRelations = Omit<z.infer<typeof CollectionOptionalDefaultsSchema>, "filterCriteria"> & {
+export type CollectionOptionalDefaultsWithPartialRelations = Omit<
+  z.infer<typeof CollectionOptionalDefaultsSchema>,
+  "filterCriteria"
+> & {
   filterCriteria?: JsonValueType | null;
-} & CollectionPartialRelations
+} & CollectionPartialRelations;
 
-export const CollectionOptionalDefaultsWithPartialRelationsSchema: z.ZodType<CollectionOptionalDefaultsWithPartialRelations> = CollectionOptionalDefaultsSchema.merge(z.object({
-  type: z.lazy(() => CollectionTypePartialWithRelationsSchema),
-  location: z.lazy(() => LocationPartialWithRelationsSchema).nullable(),
-  machines: z.lazy(() => MachinePartialWithRelationsSchema).array(),
-}).partial())
+export const CollectionOptionalDefaultsWithPartialRelationsSchema: z.ZodType<CollectionOptionalDefaultsWithPartialRelations> =
+  CollectionOptionalDefaultsSchema.merge(
+    z
+      .object({
+        type: z.lazy(() => CollectionTypePartialWithRelationsSchema),
+        location: z.lazy(() => LocationPartialWithRelationsSchema).nullable(),
+        machines: z.lazy(() => MachinePartialWithRelationsSchema).array(),
+      })
+      .partial(),
+  );
 
-export type CollectionWithPartialRelations = Omit<z.infer<typeof CollectionSchema>, "filterCriteria"> & {
+export type CollectionWithPartialRelations = Omit<
+  z.infer<typeof CollectionSchema>,
+  "filterCriteria"
+> & {
   filterCriteria?: JsonValueType | null;
-} & CollectionPartialRelations
+} & CollectionPartialRelations;
 
-export const CollectionWithPartialRelationsSchema: z.ZodType<CollectionWithPartialRelations> = CollectionSchema.merge(z.object({
-  type: z.lazy(() => CollectionTypePartialWithRelationsSchema),
-  location: z.lazy(() => LocationPartialWithRelationsSchema).nullable(),
-  machines: z.lazy(() => MachinePartialWithRelationsSchema).array(),
-}).partial())
+export const CollectionWithPartialRelationsSchema: z.ZodType<CollectionWithPartialRelations> =
+  CollectionSchema.merge(
+    z
+      .object({
+        type: z.lazy(() => CollectionTypePartialWithRelationsSchema),
+        location: z.lazy(() => LocationPartialWithRelationsSchema).nullable(),
+        machines: z.lazy(() => MachinePartialWithRelationsSchema).array(),
+      })
+      .partial(),
+  );
 
 export default CollectionSchema;

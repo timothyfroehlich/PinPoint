@@ -1,11 +1,14 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from "@prisma/client";
 
-import { z } from 'zod';
-import { RoleWhereInputSchema } from './RoleWhereInputSchema';
+import { z } from "zod";
+import { RoleWhereInputSchema } from "./RoleWhereInputSchema";
 
-export const RoleScalarRelationFilterSchema: z.ZodType<Prisma.RoleScalarRelationFilter> = z.object({
-  is: z.lazy(() => RoleWhereInputSchema).optional(),
-  isNot: z.lazy(() => RoleWhereInputSchema).optional()
-}).strict();
+export const RoleScalarRelationFilterSchema: z.ZodType<Prisma.RoleScalarRelationFilter> =
+  z
+    .object({
+      is: z.lazy(() => RoleWhereInputSchema).optional(),
+      isNot: z.lazy(() => RoleWhereInputSchema).optional(),
+    })
+    .strict() as z.ZodType<Prisma.RoleScalarRelationFilter>;
 
 export default RoleScalarRelationFilterSchema;

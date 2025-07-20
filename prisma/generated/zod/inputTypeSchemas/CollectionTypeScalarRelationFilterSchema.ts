@@ -1,11 +1,14 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from "@prisma/client";
 
-import { z } from 'zod';
-import { CollectionTypeWhereInputSchema } from './CollectionTypeWhereInputSchema';
+import { z } from "zod";
+import { CollectionTypeWhereInputSchema } from "./CollectionTypeWhereInputSchema";
 
-export const CollectionTypeScalarRelationFilterSchema: z.ZodType<Prisma.CollectionTypeScalarRelationFilter> = z.object({
-  is: z.lazy(() => CollectionTypeWhereInputSchema).optional(),
-  isNot: z.lazy(() => CollectionTypeWhereInputSchema).optional()
-}).strict();
+export const CollectionTypeScalarRelationFilterSchema: z.ZodType<Prisma.CollectionTypeScalarRelationFilter> =
+  z
+    .object({
+      is: z.lazy(() => CollectionTypeWhereInputSchema).optional(),
+      isNot: z.lazy(() => CollectionTypeWhereInputSchema).optional(),
+    })
+    .strict() as z.ZodType<Prisma.CollectionTypeScalarRelationFilter>;
 
 export default CollectionTypeScalarRelationFilterSchema;

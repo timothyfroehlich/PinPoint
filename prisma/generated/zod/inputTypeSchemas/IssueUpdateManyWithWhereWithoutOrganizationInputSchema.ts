@@ -1,13 +1,19 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from "@prisma/client";
 
-import { z } from 'zod';
-import { IssueScalarWhereInputSchema } from './IssueScalarWhereInputSchema';
-import { IssueUpdateManyMutationInputSchema } from './IssueUpdateManyMutationInputSchema';
-import { IssueUncheckedUpdateManyWithoutOrganizationInputSchema } from './IssueUncheckedUpdateManyWithoutOrganizationInputSchema';
+import { z } from "zod";
+import { IssueScalarWhereInputSchema } from "./IssueScalarWhereInputSchema";
+import { IssueUpdateManyMutationInputSchema } from "./IssueUpdateManyMutationInputSchema";
+import { IssueUncheckedUpdateManyWithoutOrganizationInputSchema } from "./IssueUncheckedUpdateManyWithoutOrganizationInputSchema";
 
-export const IssueUpdateManyWithWhereWithoutOrganizationInputSchema: z.ZodType<Prisma.IssueUpdateManyWithWhereWithoutOrganizationInput> = z.object({
-  where: z.lazy(() => IssueScalarWhereInputSchema),
-  data: z.union([ z.lazy(() => IssueUpdateManyMutationInputSchema),z.lazy(() => IssueUncheckedUpdateManyWithoutOrganizationInputSchema) ]),
-}).strict();
+export const IssueUpdateManyWithWhereWithoutOrganizationInputSchema: z.ZodType<Prisma.IssueUpdateManyWithWhereWithoutOrganizationInput> =
+  z
+    .object({
+      where: z.lazy(() => IssueScalarWhereInputSchema),
+      data: z.union([
+        z.lazy(() => IssueUpdateManyMutationInputSchema),
+        z.lazy(() => IssueUncheckedUpdateManyWithoutOrganizationInputSchema),
+      ]),
+    })
+    .strict() as z.ZodType<Prisma.IssueUpdateManyWithWhereWithoutOrganizationInput>;
 
 export default IssueUpdateManyWithWhereWithoutOrganizationInputSchema;

@@ -1,18 +1,21 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from "@prisma/client";
 
-import { z } from 'zod';
-import { SortOrderSchema } from './SortOrderSchema';
+import { z } from "zod";
+import { SortOrderSchema } from "./SortOrderSchema";
 
-export const IssueHistoryCountOrderByAggregateInputSchema: z.ZodType<Prisma.IssueHistoryCountOrderByAggregateInput> = z.object({
-  id: z.lazy(() => SortOrderSchema).optional(),
-  field: z.lazy(() => SortOrderSchema).optional(),
-  oldValue: z.lazy(() => SortOrderSchema).optional(),
-  newValue: z.lazy(() => SortOrderSchema).optional(),
-  changedAt: z.lazy(() => SortOrderSchema).optional(),
-  organizationId: z.lazy(() => SortOrderSchema).optional(),
-  actorId: z.lazy(() => SortOrderSchema).optional(),
-  type: z.lazy(() => SortOrderSchema).optional(),
-  issueId: z.lazy(() => SortOrderSchema).optional()
-}).strict();
+export const IssueHistoryCountOrderByAggregateInputSchema: z.ZodType<Prisma.IssueHistoryCountOrderByAggregateInput> =
+  z
+    .object({
+      id: z.lazy(() => SortOrderSchema).optional(),
+      field: z.lazy(() => SortOrderSchema).optional(),
+      oldValue: z.lazy(() => SortOrderSchema).optional(),
+      newValue: z.lazy(() => SortOrderSchema).optional(),
+      changedAt: z.lazy(() => SortOrderSchema).optional(),
+      organizationId: z.lazy(() => SortOrderSchema).optional(),
+      actorId: z.lazy(() => SortOrderSchema).optional(),
+      type: z.lazy(() => SortOrderSchema).optional(),
+      issueId: z.lazy(() => SortOrderSchema).optional(),
+    })
+    .strict() as z.ZodType<Prisma.IssueHistoryCountOrderByAggregateInput>;
 
 export default IssueHistoryCountOrderByAggregateInputSchema;

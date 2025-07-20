@@ -1,11 +1,14 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from "@prisma/client";
 
-import { z } from 'zod';
+import { z } from "zod";
 
-export const VerificationTokenUncheckedCreateInputSchema: z.ZodType<Prisma.VerificationTokenUncheckedCreateInput> = z.object({
-  identifier: z.string(),
-  token: z.string(),
-  expires: z.coerce.date()
-}).strict();
+export const VerificationTokenUncheckedCreateInputSchema: z.ZodType<Prisma.VerificationTokenUncheckedCreateInput> =
+  z
+    .object({
+      identifier: z.string(),
+      token: z.string(),
+      expires: z.coerce.date(),
+    })
+    .strict() as z.ZodType<Prisma.VerificationTokenUncheckedCreateInput>;
 
 export default VerificationTokenUncheckedCreateInputSchema;

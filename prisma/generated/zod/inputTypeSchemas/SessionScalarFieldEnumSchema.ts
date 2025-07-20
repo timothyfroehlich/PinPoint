@@ -1,5 +1,10 @@
-import { z } from 'zod';
+import { z } from "zod";
 
-export const SessionScalarFieldEnumSchema = z.enum(['id','sessionToken','userId','expires']);
+export const SessionScalarFieldEnumSchema = z.enum([
+  "id",
+  "sessionToken",
+  "userId",
+  "expires",
+]);
 
 export default SessionScalarFieldEnumSchema;

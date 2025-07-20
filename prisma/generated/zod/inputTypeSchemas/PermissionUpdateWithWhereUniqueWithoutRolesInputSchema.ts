@@ -1,13 +1,19 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from "@prisma/client";
 
-import { z } from 'zod';
-import { PermissionWhereUniqueInputSchema } from './PermissionWhereUniqueInputSchema';
-import { PermissionUpdateWithoutRolesInputSchema } from './PermissionUpdateWithoutRolesInputSchema';
-import { PermissionUncheckedUpdateWithoutRolesInputSchema } from './PermissionUncheckedUpdateWithoutRolesInputSchema';
+import { z } from "zod";
+import { PermissionWhereUniqueInputSchema } from "./PermissionWhereUniqueInputSchema";
+import { PermissionUpdateWithoutRolesInputSchema } from "./PermissionUpdateWithoutRolesInputSchema";
+import { PermissionUncheckedUpdateWithoutRolesInputSchema } from "./PermissionUncheckedUpdateWithoutRolesInputSchema";
 
-export const PermissionUpdateWithWhereUniqueWithoutRolesInputSchema: z.ZodType<Prisma.PermissionUpdateWithWhereUniqueWithoutRolesInput> = z.object({
-  where: z.lazy(() => PermissionWhereUniqueInputSchema),
-  data: z.union([ z.lazy(() => PermissionUpdateWithoutRolesInputSchema),z.lazy(() => PermissionUncheckedUpdateWithoutRolesInputSchema) ]),
-}).strict();
+export const PermissionUpdateWithWhereUniqueWithoutRolesInputSchema: z.ZodType<Prisma.PermissionUpdateWithWhereUniqueWithoutRolesInput> =
+  z
+    .object({
+      where: z.lazy(() => PermissionWhereUniqueInputSchema),
+      data: z.union([
+        z.lazy(() => PermissionUpdateWithoutRolesInputSchema),
+        z.lazy(() => PermissionUncheckedUpdateWithoutRolesInputSchema),
+      ]),
+    })
+    .strict() as z.ZodType<Prisma.PermissionUpdateWithWhereUniqueWithoutRolesInput>;
 
 export default PermissionUpdateWithWhereUniqueWithoutRolesInputSchema;

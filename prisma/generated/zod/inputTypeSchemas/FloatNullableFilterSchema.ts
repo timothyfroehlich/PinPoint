@@ -1,17 +1,23 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from "@prisma/client";
 
-import { z } from 'zod';
-import { NestedFloatNullableFilterSchema } from './NestedFloatNullableFilterSchema';
+import { z } from "zod";
+import { NestedFloatNullableFilterSchema } from "./NestedFloatNullableFilterSchema";
 
-export const FloatNullableFilterSchema: z.ZodType<Prisma.FloatNullableFilter> = z.object({
-  equals: z.number().optional().nullable(),
-  in: z.number().array().optional().nullable(),
-  notIn: z.number().array().optional().nullable(),
-  lt: z.number().optional(),
-  lte: z.number().optional(),
-  gt: z.number().optional(),
-  gte: z.number().optional(),
-  not: z.union([ z.number(),z.lazy(() => NestedFloatNullableFilterSchema) ]).optional().nullable(),
-}).strict();
+export const FloatNullableFilterSchema: z.ZodType<Prisma.FloatNullableFilter> =
+  z
+    .object({
+      equals: z.number().optional().nullable(),
+      in: z.number().array().optional().nullable(),
+      notIn: z.number().array().optional().nullable(),
+      lt: z.number().optional(),
+      lte: z.number().optional(),
+      gt: z.number().optional(),
+      gte: z.number().optional(),
+      not: z
+        .union([z.number(), z.lazy(() => NestedFloatNullableFilterSchema)])
+        .optional()
+        .nullable(),
+    })
+    .strict() as z.ZodType<Prisma.FloatNullableFilter>;
 
 export default FloatNullableFilterSchema;

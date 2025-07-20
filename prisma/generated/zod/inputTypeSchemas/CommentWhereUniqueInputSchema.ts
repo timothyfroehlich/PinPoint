@@ -1,35 +1,89 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from "@prisma/client";
 
-import { z } from 'zod';
-import { CommentWhereInputSchema } from './CommentWhereInputSchema';
-import { StringFilterSchema } from './StringFilterSchema';
-import { DateTimeFilterSchema } from './DateTimeFilterSchema';
-import { DateTimeNullableFilterSchema } from './DateTimeNullableFilterSchema';
-import { StringNullableFilterSchema } from './StringNullableFilterSchema';
-import { IssueScalarRelationFilterSchema } from './IssueScalarRelationFilterSchema';
-import { IssueWhereInputSchema } from './IssueWhereInputSchema';
-import { UserScalarRelationFilterSchema } from './UserScalarRelationFilterSchema';
-import { UserWhereInputSchema } from './UserWhereInputSchema';
-import { UserNullableScalarRelationFilterSchema } from './UserNullableScalarRelationFilterSchema';
+import { z } from "zod";
+import { CommentWhereInputSchema } from "./CommentWhereInputSchema";
+import { StringFilterSchema } from "./StringFilterSchema";
+import { DateTimeFilterSchema } from "./DateTimeFilterSchema";
+import { DateTimeNullableFilterSchema } from "./DateTimeNullableFilterSchema";
+import { StringNullableFilterSchema } from "./StringNullableFilterSchema";
+import { IssueScalarRelationFilterSchema } from "./IssueScalarRelationFilterSchema";
+import { IssueWhereInputSchema } from "./IssueWhereInputSchema";
+import { UserScalarRelationFilterSchema } from "./UserScalarRelationFilterSchema";
+import { UserWhereInputSchema } from "./UserWhereInputSchema";
+import { UserNullableScalarRelationFilterSchema } from "./UserNullableScalarRelationFilterSchema";
 
-export const CommentWhereUniqueInputSchema: z.ZodType<Prisma.CommentWhereUniqueInput> = z.object({
-  id: z.string().cuid()
-})
-.and(z.object({
-  id: z.string().cuid().optional(),
-  AND: z.union([ z.lazy(() => CommentWhereInputSchema),z.lazy(() => CommentWhereInputSchema).array() ]).optional(),
-  OR: z.lazy(() => CommentWhereInputSchema).array().optional(),
-  NOT: z.union([ z.lazy(() => CommentWhereInputSchema),z.lazy(() => CommentWhereInputSchema).array() ]).optional(),
-  content: z.union([ z.lazy(() => StringFilterSchema),z.string() ]).optional(),
-  createdAt: z.union([ z.lazy(() => DateTimeFilterSchema),z.coerce.date() ]).optional(),
-  updatedAt: z.union([ z.lazy(() => DateTimeFilterSchema),z.coerce.date() ]).optional(),
-  deletedAt: z.union([ z.lazy(() => DateTimeNullableFilterSchema),z.coerce.date() ]).optional().nullable(),
-  deletedBy: z.union([ z.lazy(() => StringNullableFilterSchema),z.string() ]).optional().nullable(),
-  issueId: z.union([ z.lazy(() => StringFilterSchema),z.string() ]).optional(),
-  authorId: z.union([ z.lazy(() => StringFilterSchema),z.string() ]).optional(),
-  issue: z.union([ z.lazy(() => IssueScalarRelationFilterSchema),z.lazy(() => IssueWhereInputSchema) ]).optional(),
-  author: z.union([ z.lazy(() => UserScalarRelationFilterSchema),z.lazy(() => UserWhereInputSchema) ]).optional(),
-  deleter: z.union([ z.lazy(() => UserNullableScalarRelationFilterSchema),z.lazy(() => UserWhereInputSchema) ]).optional().nullable(),
-}).strict());
+export const CommentWhereUniqueInputSchema: z.ZodType<Prisma.CommentWhereUniqueInput> =
+  z
+    .object({
+      id: z.string().cuid(),
+    })
+    .and(
+      z
+        .object({
+          id: z.string().cuid().optional(),
+          AND: z
+            .union([
+              z.lazy(() => CommentWhereInputSchema),
+              z.lazy(() => CommentWhereInputSchema).array(),
+            ])
+            .optional(),
+          OR: z
+            .lazy(() => CommentWhereInputSchema)
+            .array()
+            .optional(),
+          NOT: z
+            .union([
+              z.lazy(() => CommentWhereInputSchema),
+              z.lazy(() => CommentWhereInputSchema).array(),
+            ])
+            .optional(),
+          content: z
+            .union([z.lazy(() => StringFilterSchema), z.string()])
+            .optional(),
+          createdAt: z
+            .union([z.lazy(() => DateTimeFilterSchema), z.coerce.date()])
+            .optional(),
+          updatedAt: z
+            .union([z.lazy(() => DateTimeFilterSchema), z.coerce.date()])
+            .optional(),
+          deletedAt: z
+            .union([
+              z.lazy(() => DateTimeNullableFilterSchema),
+              z.coerce.date(),
+            ])
+            .optional()
+            .nullable(),
+          deletedBy: z
+            .union([z.lazy(() => StringNullableFilterSchema), z.string()])
+            .optional()
+            .nullable(),
+          issueId: z
+            .union([z.lazy(() => StringFilterSchema), z.string()])
+            .optional(),
+          authorId: z
+            .union([z.lazy(() => StringFilterSchema), z.string()])
+            .optional(),
+          issue: z
+            .union([
+              z.lazy(() => IssueScalarRelationFilterSchema),
+              z.lazy(() => IssueWhereInputSchema),
+            ])
+            .optional(),
+          author: z
+            .union([
+              z.lazy(() => UserScalarRelationFilterSchema),
+              z.lazy(() => UserWhereInputSchema),
+            ])
+            .optional(),
+          deleter: z
+            .union([
+              z.lazy(() => UserNullableScalarRelationFilterSchema),
+              z.lazy(() => UserWhereInputSchema),
+            ])
+            .optional()
+            .nullable(),
+        })
+        .strict(),
+    ) as z.ZodType<Prisma.CommentWhereUniqueInput>;
 
 export default CommentWhereUniqueInputSchema;

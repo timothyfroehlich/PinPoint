@@ -1,28 +1,46 @@
-import { z } from 'zod';
-import type { Prisma } from '@prisma/client';
-import { OrganizationArgsSchema } from "../outputTypeSchemas/OrganizationArgsSchema"
-import { MachineArgsSchema } from "../outputTypeSchemas/MachineArgsSchema"
-import { PriorityArgsSchema } from "../outputTypeSchemas/PriorityArgsSchema"
-import { IssueStatusArgsSchema } from "../outputTypeSchemas/IssueStatusArgsSchema"
-import { UserArgsSchema } from "../outputTypeSchemas/UserArgsSchema"
-import { CommentFindManyArgsSchema } from "../outputTypeSchemas/CommentFindManyArgsSchema"
-import { AttachmentFindManyArgsSchema } from "../outputTypeSchemas/AttachmentFindManyArgsSchema"
-import { IssueHistoryFindManyArgsSchema } from "../outputTypeSchemas/IssueHistoryFindManyArgsSchema"
-import { UpvoteFindManyArgsSchema } from "../outputTypeSchemas/UpvoteFindManyArgsSchema"
-import { IssueCountOutputTypeArgsSchema } from "../outputTypeSchemas/IssueCountOutputTypeArgsSchema"
+import { z } from "zod";
+import type { Prisma } from "@prisma/client";
+import { OrganizationArgsSchema } from "../outputTypeSchemas/OrganizationArgsSchema";
+import { MachineArgsSchema } from "../outputTypeSchemas/MachineArgsSchema";
+import { PriorityArgsSchema } from "../outputTypeSchemas/PriorityArgsSchema";
+import { IssueStatusArgsSchema } from "../outputTypeSchemas/IssueStatusArgsSchema";
+import { UserArgsSchema } from "../outputTypeSchemas/UserArgsSchema";
+import { CommentFindManyArgsSchema } from "../outputTypeSchemas/CommentFindManyArgsSchema";
+import { AttachmentFindManyArgsSchema } from "../outputTypeSchemas/AttachmentFindManyArgsSchema";
+import { IssueHistoryFindManyArgsSchema } from "../outputTypeSchemas/IssueHistoryFindManyArgsSchema";
+import { UpvoteFindManyArgsSchema } from "../outputTypeSchemas/UpvoteFindManyArgsSchema";
+import { IssueCountOutputTypeArgsSchema } from "../outputTypeSchemas/IssueCountOutputTypeArgsSchema";
 
-export const IssueIncludeSchema: z.ZodType<Prisma.IssueInclude> = z.object({
-  organization: z.union([z.boolean(),z.lazy(() => OrganizationArgsSchema)]).optional(),
-  machine: z.union([z.boolean(),z.lazy(() => MachineArgsSchema)]).optional(),
-  priority: z.union([z.boolean(),z.lazy(() => PriorityArgsSchema)]).optional(),
-  status: z.union([z.boolean(),z.lazy(() => IssueStatusArgsSchema)]).optional(),
-  createdBy: z.union([z.boolean(),z.lazy(() => UserArgsSchema)]).optional(),
-  assignedTo: z.union([z.boolean(),z.lazy(() => UserArgsSchema)]).optional(),
-  comments: z.union([z.boolean(),z.lazy(() => CommentFindManyArgsSchema)]).optional(),
-  attachments: z.union([z.boolean(),z.lazy(() => AttachmentFindManyArgsSchema)]).optional(),
-  history: z.union([z.boolean(),z.lazy(() => IssueHistoryFindManyArgsSchema)]).optional(),
-  upvotes: z.union([z.boolean(),z.lazy(() => UpvoteFindManyArgsSchema)]).optional(),
-  _count: z.union([z.boolean(),z.lazy(() => IssueCountOutputTypeArgsSchema)]).optional(),
-}).strict()
+export const IssueIncludeSchema: z.ZodType<Prisma.IssueInclude> = z
+  .object({
+    organization: z
+      .union([z.boolean(), z.lazy(() => OrganizationArgsSchema)])
+      .optional(),
+    machine: z.union([z.boolean(), z.lazy(() => MachineArgsSchema)]).optional(),
+    priority: z
+      .union([z.boolean(), z.lazy(() => PriorityArgsSchema)])
+      .optional(),
+    status: z
+      .union([z.boolean(), z.lazy(() => IssueStatusArgsSchema)])
+      .optional(),
+    createdBy: z.union([z.boolean(), z.lazy(() => UserArgsSchema)]).optional(),
+    assignedTo: z.union([z.boolean(), z.lazy(() => UserArgsSchema)]).optional(),
+    comments: z
+      .union([z.boolean(), z.lazy(() => CommentFindManyArgsSchema)])
+      .optional(),
+    attachments: z
+      .union([z.boolean(), z.lazy(() => AttachmentFindManyArgsSchema)])
+      .optional(),
+    history: z
+      .union([z.boolean(), z.lazy(() => IssueHistoryFindManyArgsSchema)])
+      .optional(),
+    upvotes: z
+      .union([z.boolean(), z.lazy(() => UpvoteFindManyArgsSchema)])
+      .optional(),
+    _count: z
+      .union([z.boolean(), z.lazy(() => IssueCountOutputTypeArgsSchema)])
+      .optional(),
+  })
+  .strict();
 
 export default IssueIncludeSchema;
