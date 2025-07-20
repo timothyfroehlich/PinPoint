@@ -84,8 +84,10 @@ export interface ProtectedTRPCContext extends TRPCContext {
 
 /**
  * Enhanced context for organization procedures with membership info
+ * Note: organization is guaranteed to be non-null by organizationProcedure middleware
  */
 export interface OrganizationTRPCContext extends ProtectedTRPCContext {
+  organization: Organization; // Override to be non-null (guaranteed by middleware)
   membership: Membership;
   userPermissions: string[];
 }
@@ -238,8 +240,8 @@ export const organizationProcedure = protectedProcedure.use(
     return next({
       ctx: {
         ...ctx,
+        organization: ctx.organization, // Safe assertion - already checked above
         membership: membership as Membership,
-
         userPermissions: membership.role.permissions.map(
           (p: { name: string }) => p.name,
         ),

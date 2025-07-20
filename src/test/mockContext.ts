@@ -74,6 +74,7 @@ export interface MockContext {
   organization: {
     id: string;
     name: string;
+    subdomain: string;
   } | null;
   headers: Headers;
 }

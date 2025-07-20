@@ -3,13 +3,12 @@ import { z } from "zod";
 import {
   createTRPCRouter,
   organizationProcedure,
-  protectedProcedure,
   issueEditProcedure,
 } from "~/server/api/trpc";
 
 export const issueCoreRouter = createTRPCRouter({
-  // Create issue - requires authentication
-  create: protectedProcedure
+  // Create issue - requires organization membership
+  create: organizationProcedure
     .input(
       z.object({
         title: z.string().min(1).max(255),
@@ -19,7 +18,7 @@ export const issueCoreRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Use the organization resolved from subdomain context
+      // Organization is guaranteed by organizationProcedure middleware
       const organization = ctx.organization;
 
       // Verify that the game instance belongs to the organization

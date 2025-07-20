@@ -1,5 +1,12 @@
 # Phase 1A Backend Refactor Task Documentation
 
+---
+
+status: current
+last-updated: 2025-01-20
+
+---
+
 ## Overview
 
 This directory contains detailed implementation tasks for Phase 1A of the PinPoint backend refactor. These tasks implement the complete V1.0 schema with RBAC system as documented in `docs/planning/backend_impl_plan.md`.

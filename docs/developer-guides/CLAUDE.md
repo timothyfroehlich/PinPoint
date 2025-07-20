@@ -1,5 +1,12 @@
 # Developer Guides
 
+---
+
+status: current
+last-updated: 2025-01-20
+
+---
+
 This directory contains comprehensive guides for PinPoint development beyond the essentials in `CLAUDE.md`.
 
 ## Available Guides

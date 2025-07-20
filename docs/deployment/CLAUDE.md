@@ -1,5 +1,12 @@
 # PinPoint Deployment Documentation
 
+---
+
+status: current
+last-updated: 2025-01-20
+
+---
+
 ## Architecture
 
 PinPoint uses a modern serverless architecture:
