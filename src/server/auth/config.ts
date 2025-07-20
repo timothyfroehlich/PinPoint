@@ -99,9 +99,9 @@ export const createAuthConfig = (db: ExtendedPrismaClient): NextAuthConfig => ({
   },
   callbacks: {
     jwt: async ({ token, user }: { token: JWT; user?: User }): Promise<JWT> => {
-      if (user && "id" in user && typeof user.id === "string") {
-        const userId = user.id;
-        token.id = userId;
+      if (user && "id" in user && typeof user["id"] === "string") {
+        const userId = user["id"];
+        token["id"] = userId;
 
         // Get the user's membership in the current organization
         // Note: In JWT callback, we don't have access to request headers/subdomain,
@@ -125,8 +125,8 @@ export const createAuthConfig = (db: ExtendedPrismaClient): NextAuthConfig => ({
           });
 
           if (isValidMembership(membershipResult)) {
-            token.role = membershipResult.role.name;
-            token.organizationId = organizationResult.id;
+            token["role"] = membershipResult.role.name;
+            token["organizationId"] = organizationResult.id;
           }
         }
       }
@@ -140,16 +140,27 @@ export const createAuthConfig = (db: ExtendedPrismaClient): NextAuthConfig => ({
       token: JWT;
     }): Session => {
       // For JWT sessions, get data from token
+      const userUpdate: {
+        id: string;
+        role?: string;
+        organizationId?: string;
+      } = {
+        id: typeof token["id"] === "string" ? token["id"] : "",
+      };
+
+      if (typeof token["role"] === "string") {
+        userUpdate.role = token["role"];
+      }
+
+      if (typeof token["organizationId"] === "string") {
+        userUpdate.organizationId = token["organizationId"];
+      }
+
       return {
         ...session,
         user: {
           ...session.user,
-          id: typeof token["id"] === "string" ? token["id"] : "",
-          role: typeof token["role"] === "string" ? token["role"] : undefined,
-          organizationId:
-            typeof token["organizationId"] === "string"
-              ? token["organizationId"]
-              : undefined,
+          ...userUpdate,
         },
       };
     },

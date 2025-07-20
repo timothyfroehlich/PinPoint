@@ -78,9 +78,7 @@ describe("tRPC Authentication Middleware", () => {
       // Set up mock context
       ctx.session = mockSession;
       ctx.organization = mockOrganization;
-      ctx.db.membership.findFirst.mockImplementation(
-        () => mockMembership,
-      );
+      ctx.db.membership.findFirst.mockImplementation(() => mockMembership);
 
       const caller = appRouter.createCaller(ctx);
 
@@ -150,9 +148,7 @@ describe("tRPC Authentication Middleware", () => {
       // Set up mock context
       ctx.session = mockSession;
       ctx.organization = mockOrganization;
-      ctx.db.membership.findFirst.mockImplementation(
-        () => mockMembership,
-      );
+      ctx.db.membership.findFirst.mockImplementation(() => mockMembership);
 
       const caller = appRouter.createCaller(ctx);
 
@@ -298,9 +294,7 @@ describe("tRPC Authentication Middleware", () => {
       // Set up mock context
       ctx.session = mockSession;
       ctx.organization = mockOrganization;
-      ctx.db.membership.findFirst.mockImplementation(
-        () => mockMembership,
-      );
+      ctx.db.membership.findFirst.mockImplementation(() => mockMembership);
 
       const caller = appRouter.createCaller(ctx);
 
@@ -333,9 +327,7 @@ describe("tRPC Authentication Middleware", () => {
       // Set up mock context
       ctx.session = mockAdminSession;
       ctx.organization = mockOrganization;
-      ctx.db.membership.findFirst.mockImplementation(
-        () => mockAdminMembership,
-      );
+      ctx.db.membership.findFirst.mockImplementation(() => mockAdminMembership);
 
       const caller = appRouter.createCaller(ctx);
 
@@ -366,9 +358,7 @@ describe("tRPC Authentication Middleware", () => {
       // Set up mock context
       ctx.session = mockMemberSession;
       ctx.organization = mockOrganization;
-      ctx.db.membership.findFirst.mockImplementation(
-        () => mockMembership,
-      );
+      ctx.db.membership.findFirst.mockImplementation(() => mockMembership);
 
       const caller = appRouter.createCaller(ctx);
 
@@ -402,9 +392,7 @@ describe("tRPC Authentication Middleware", () => {
       // Set up mock context
       ctx.session = mockSession;
       ctx.organization = mockOrganization;
-      ctx.db.membership.findFirst.mockImplementation(
-        () => mockMembership,
-      );
+      ctx.db.membership.findFirst.mockImplementation(() => mockMembership);
 
       const caller = appRouter.createCaller(ctx);
 
@@ -429,9 +417,7 @@ describe("tRPC Authentication Middleware", () => {
       // Set up mock context
       ctx.session = mockSession;
       ctx.organization = mockOrganization;
-      ctx.db.membership.findFirst.mockImplementation(
-        () => mockMembership,
-      );
+      ctx.db.membership.findFirst.mockImplementation(() => mockMembership);
 
       const caller = appRouter.createCaller(ctx);
 

@@ -13,13 +13,13 @@ export class DatabaseProvider {
   async disconnect(): Promise<void> {
     if (this.instance) {
       await this.instance.$disconnect();
-      this.instance = undefined;
+      delete this.instance;
     }
   }
 
   // For testing purposes
   reset(): void {
-    this.instance = undefined;
+    delete this.instance;
   }
 }
 

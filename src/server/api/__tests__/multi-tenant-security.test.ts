@@ -12,7 +12,9 @@ jest.mock("~/server/auth", () => ({
   auth: jest.fn(),
 }));
 
-const mockAuth = auth as unknown as jest.MockedFunction<() => Promise<Session | null>>;
+const mockAuth = auth as unknown as jest.MockedFunction<
+  () => Promise<Session | null>
+>;
 
 // These mock functions are defined but not used as the tests use ctx.db.* mocks instead
 
@@ -34,8 +36,6 @@ describe("Multi-Tenant Security Tests", () => {
     updatedAt: new Date(),
   };
 
-
-
   // Test data for Organization B
   const organizationB = {
     id: "org-b",
@@ -45,7 +45,6 @@ describe("Multi-Tenant Security Tests", () => {
     createdAt: new Date(),
     updatedAt: new Date(),
   };
-
 
   // Sample issues for each organization
   const issuesOrgA = [
@@ -141,7 +140,7 @@ describe("Multi-Tenant Security Tests", () => {
       // Mock issue data - should only return Organization A's issues
       const ctx = createMockContext();
       ctx.db.issue.findMany.mockResolvedValue(issuesOrgA);
-      
+
       // Mock membership for user A in organization A
       ctx.db.membership.findFirst.mockResolvedValue({
         id: "membership-a",
@@ -157,20 +156,20 @@ describe("Multi-Tenant Security Tests", () => {
           createdAt: new Date(),
           updatedAt: new Date(),
           permissions: [
-            { 
+            {
               id: "perm-1",
               name: "issues:read",
               description: "Read issues",
               createdAt: new Date(),
               updatedAt: new Date(),
             },
-            { 
+            {
               id: "perm-2",
               name: "issues:write",
-              description: "Write issues", 
+              description: "Write issues",
               createdAt: new Date(),
               updatedAt: new Date(),
-            }
+            },
           ],
         },
       });
@@ -285,7 +284,7 @@ describe("Multi-Tenant Security Tests", () => {
 
       const ctx = createMockContext();
       ctx.db.issue.findMany.mockResolvedValue(issuesOrgA);
-      
+
       // Mock membership for user A in organization A
       ctx.db.membership.findFirst.mockResolvedValue({
         id: "membership-a",
@@ -301,20 +300,20 @@ describe("Multi-Tenant Security Tests", () => {
           createdAt: new Date(),
           updatedAt: new Date(),
           permissions: [
-            { 
+            {
               id: "perm-1",
               name: "issues:read",
               description: "Read issues",
               createdAt: new Date(),
               updatedAt: new Date(),
             },
-            { 
+            {
               id: "perm-2",
               name: "issues:write",
-              description: "Write issues", 
+              description: "Write issues",
               createdAt: new Date(),
               updatedAt: new Date(),
-            }
+            },
           ],
         },
       });
@@ -345,7 +344,7 @@ describe("Multi-Tenant Security Tests", () => {
 
       const ctxB = createMockContext();
       ctxB.db.issue.findMany.mockResolvedValue(issuesOrgB);
-      
+
       // Mock membership for user B in organization B
       ctxB.db.membership.findFirst.mockResolvedValue({
         id: "membership-b",
@@ -361,20 +360,20 @@ describe("Multi-Tenant Security Tests", () => {
           createdAt: new Date(),
           updatedAt: new Date(),
           permissions: [
-            { 
+            {
               id: "perm-1",
               name: "issues:read",
               description: "Read issues",
               createdAt: new Date(),
               updatedAt: new Date(),
             },
-            { 
+            {
               id: "perm-2",
               name: "issues:write",
-              description: "Write issues", 
+              description: "Write issues",
               createdAt: new Date(),
               updatedAt: new Date(),
-            }
+            },
           ],
         },
       });
@@ -426,7 +425,6 @@ describe("Multi-Tenant Security Tests", () => {
 
       mockAuth.mockResolvedValue(sessionA);
 
-
       const ctx = createMockContext();
       ctx.db.issue.findUnique.mockResolvedValue({
         id: "issue-b-1",
@@ -444,7 +442,7 @@ describe("Multi-Tenant Security Tests", () => {
         checklist: null,
         resolvedAt: null,
       });
-      
+
       // Mock membership for user A in organization A (but not in org B)
       ctx.db.membership.findFirst.mockResolvedValue({
         id: "membership-a",
@@ -489,10 +487,8 @@ describe("Multi-Tenant Security Tests", () => {
 
       mockAuth.mockResolvedValue(sessionA);
 
-
-
       const ctx = createMockContext();
-      
+
       // Mock membership for user A in organization A
       ctx.db.membership.findFirst.mockResolvedValue({
         id: "membership-a",
@@ -508,20 +504,20 @@ describe("Multi-Tenant Security Tests", () => {
           createdAt: new Date(),
           updatedAt: new Date(),
           permissions: [
-            { 
+            {
               id: "perm-1",
               name: "issues:read",
               description: "Read issues",
               createdAt: new Date(),
               updatedAt: new Date(),
             },
-            { 
+            {
               id: "perm-2",
               name: "issues:write",
-              description: "Write issues", 
+              description: "Write issues",
               createdAt: new Date(),
               updatedAt: new Date(),
-            }
+            },
           ],
         },
       });
@@ -619,7 +615,6 @@ describe("Multi-Tenant Security Tests", () => {
         statusId: "status-1",
       };
 
-
       await callerA.issue.core.create(createData);
 
       // Verify that organizationId was automatically added
@@ -650,9 +645,8 @@ describe("Multi-Tenant Security Tests", () => {
 
       mockAuth.mockResolvedValue(sessionA);
 
-
       const ctx = createMockContext();
-      
+
       // Mock membership for user A in organization A (but user should NOT be able to edit org B issues)
       ctx.db.membership.findFirst.mockResolvedValue({
         id: "membership-a",
@@ -722,7 +716,7 @@ describe("Multi-Tenant Security Tests", () => {
 
       const ctx = createMockContext();
       ctx.db.issue.findMany.mockResolvedValue(issuesOrgA);
-      
+
       // Mock membership for member user in organization A
       ctx.db.membership.findFirst.mockResolvedValue({
         id: "membership-member",
@@ -780,7 +774,7 @@ describe("Multi-Tenant Security Tests", () => {
       // Configure the context's mock database to return the specific test data
       const ctxAdmin = createMockContext();
       ctxAdmin.db.issue.findMany.mockResolvedValue(issuesOrgA);
-      
+
       // Mock membership for admin user in organization A
       ctxAdmin.db.membership.findFirst.mockResolvedValue({
         id: "membership-admin",
@@ -792,7 +786,11 @@ describe("Multi-Tenant Security Tests", () => {
         role: {
           id: "role-admin",
           name: "admin",
-          permissions: [{ name: "issues:read" }, { name: "issues:write" }, { name: "admin:all" }],
+          permissions: [
+            { name: "issues:read" },
+            { name: "issues:write" },
+            { name: "admin:all" },
+          ],
         },
       });
 
@@ -844,8 +842,6 @@ describe("Multi-Tenant Security Tests", () => {
       };
 
       mockAuth.mockResolvedValue(session);
-
-
 
       // Test that subdomain resolution logic works by verifying
       // the organization is found by subdomain when needed
