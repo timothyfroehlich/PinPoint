@@ -1,15 +1,17 @@
 import { describe, it, expect, beforeEach } from "@jest/globals";
 import { TRPCError } from "@trpc/server";
-import { z } from "zod";
 
-import { createTRPCRouter } from "../../trpc";
-import { createMockContext, resetMockContext, type MockContext } from "../../../../test/mockContext";
+import {
+  createMockContext,
+  resetMockContext,
+  type MockContext,
+} from "../../../../test/mockContext";
 import { appRouter } from "../../root";
 import { createCallerFactory } from "../../trpc";
 
 /**
  * Integration Tests for Existing Routers with Permission System
- * 
+ *
  * These tests verify that the permission system correctly integrates with
  * existing router implementations, testing end-to-end permission workflows.
  */
@@ -17,7 +19,7 @@ import { createCallerFactory } from "../../trpc";
 // Mock context helper with different permission sets
 const createMockTRPCContext = (permissions: string[] = []) => {
   const mockContext = createMockContext();
-  
+
   return {
     ...mockContext,
     session: {
@@ -53,7 +55,7 @@ const createMockTRPCContext = (permissions: string[] = []) => {
         createdAt: new Date(),
         updatedAt: new Date(),
         permissions: permissions.map((name, index) => ({
-          id: `perm-${index + 1}`,
+          id: `perm-${(index + 1).toString()}`,
           name,
           description: `${name} permission`,
           createdAt: new Date(),
@@ -163,11 +165,13 @@ describe("Router Integration Tests", () => {
       });
 
       // Assert
-      expect(result).toEqual(expect.objectContaining({
-        id: "issue-1",
-        title: "Test Issue",
-        description: "Test description",
-      }));
+      expect(result).toEqual(
+        expect.objectContaining({
+          id: "issue-1",
+          title: "Test Issue",
+          description: "Test description",
+        }),
+      );
       expect(mockContext.db.issue.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -186,10 +190,12 @@ describe("Router Integration Tests", () => {
       const caller = createCaller(ctx as any);
 
       // Act & Assert
-      await expect(caller.issue.core.create({
-        title: "Test Issue",
-        machineId: "machine-1",
-      })).rejects.toThrow("Permission required: issue:create");
+      await expect(
+        caller.issue.core.create({
+          title: "Test Issue",
+          machineId: "machine-1",
+        }),
+      ).rejects.toThrow("Permission required: issue:create");
     });
 
     it("should allow issue editing with proper permissions", async () => {
@@ -262,11 +268,13 @@ describe("Router Integration Tests", () => {
       });
 
       // Assert
-      expect(result).toEqual(expect.objectContaining({
-        id: "issue-1",
-        title: "Updated Title",
-        description: "Updated description",
-      }));
+      expect(result).toEqual(
+        expect.objectContaining({
+          id: "issue-1",
+          title: "Updated Title",
+          description: "Updated description",
+        }),
+      );
       expect(mockContext.db.issue.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: "issue-1" },
@@ -284,10 +292,12 @@ describe("Router Integration Tests", () => {
       const caller = createCaller(ctx as any);
 
       // Act & Assert
-      await expect(caller.issue.core.update({
-        id: "issue-1",
-        title: "Updated Title",
-      })).rejects.toThrow("Permission required: issue:edit");
+      await expect(
+        caller.issue.core.update({
+          id: "issue-1",
+          title: "Updated Title",
+        }),
+      ).rejects.toThrow("Permission required: issue:edit");
     });
 
     it("should enforce organization isolation in issue operations", async () => {
@@ -315,10 +325,12 @@ describe("Router Integration Tests", () => {
       mockContext.db.issue.findUnique.mockResolvedValue(mockIssue);
 
       // Act & Assert
-      await expect(caller.issue.core.update({
-        id: "issue-1",
-        title: "Malicious Update",
-      })).rejects.toThrow("Issue not found");
+      await expect(
+        caller.issue.core.update({
+          id: "issue-1",
+          title: "Malicious Update",
+        }),
+      ).rejects.toThrow("Issue not found");
     });
   });
 
@@ -375,10 +387,12 @@ describe("Router Integration Tests", () => {
       });
 
       // Assert
-      expect(result).toEqual(expect.objectContaining({
-        id: "machine-1",
-        name: "Updated Machine Name",
-      }));
+      expect(result).toEqual(
+        expect.objectContaining({
+          id: "machine-1",
+          name: "Updated Machine Name",
+        }),
+      );
       expect(mockContext.db.machine.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: "machine-1" },
@@ -395,10 +409,12 @@ describe("Router Integration Tests", () => {
       const caller = createCaller(ctx as any);
 
       // Act & Assert
-      await expect(caller.machine.core.update({
-        id: "machine-1",
-        name: "Updated Machine Name",
-      })).rejects.toThrow("Permission required: machine:edit");
+      await expect(
+        caller.machine.core.update({
+          id: "machine-1",
+          name: "Updated Machine Name",
+        }),
+      ).rejects.toThrow("Permission required: machine:edit");
     });
 
     it("should enforce organization isolation in machine operations", async () => {
@@ -424,10 +440,12 @@ describe("Router Integration Tests", () => {
       mockContext.db.machine.findUnique.mockResolvedValue(mockMachine);
 
       // Act & Assert
-      await expect(caller.machine.core.update({
-        id: "machine-1",
-        name: "Malicious Update",
-      })).rejects.toThrow("Machine not found or access denied");
+      await expect(
+        caller.machine.core.update({
+          id: "machine-1",
+          name: "Malicious Update",
+        }),
+      ).rejects.toThrow("Machine not found or access denied");
     });
   });
 
@@ -448,7 +466,7 @@ describe("Router Integration Tests", () => {
         phone: "555-1234",
         website: "https://example.com",
         latitude: 40.7128,
-        longitude: -74.0060,
+        longitude: -74.006,
         description: "Test location description",
         pinballMapId: null,
         regionId: null,
@@ -477,10 +495,12 @@ describe("Router Integration Tests", () => {
       });
 
       // Assert
-      expect(result).toEqual(expect.objectContaining({
-        id: "location-1",
-        name: "Updated Location Name",
-      }));
+      expect(result).toEqual(
+        expect.objectContaining({
+          id: "location-1",
+          name: "Updated Location Name",
+        }),
+      );
       expect(mockContext.db.location.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: "location-1" },
@@ -497,10 +517,12 @@ describe("Router Integration Tests", () => {
       const caller = createCaller(ctx as any);
 
       // Act & Assert
-      await expect(caller.location.update({
-        id: "location-1",
-        name: "Updated Location Name",
-      })).rejects.toThrow("Permission required: location:edit");
+      await expect(
+        caller.location.update({
+          id: "location-1",
+          name: "Updated Location Name",
+        }),
+      ).rejects.toThrow("Permission required: location:edit");
     });
   });
 
@@ -535,7 +557,9 @@ describe("Router Integration Tests", () => {
         name: "Updated Organization Name",
       };
 
-      mockContext.db.organization.findUnique.mockResolvedValue(mockOrganization);
+      mockContext.db.organization.findUnique.mockResolvedValue(
+        mockOrganization,
+      );
       mockContext.db.organization.update.mockResolvedValue(updatedOrganization);
 
       // Act
@@ -544,10 +568,12 @@ describe("Router Integration Tests", () => {
       });
 
       // Assert
-      expect(result).toEqual(expect.objectContaining({
-        id: "org-1",
-        name: "Updated Organization Name",
-      }));
+      expect(result).toEqual(
+        expect.objectContaining({
+          id: "org-1",
+          name: "Updated Organization Name",
+        }),
+      );
       expect(mockContext.db.organization.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: "org-1" },
@@ -564,9 +590,11 @@ describe("Router Integration Tests", () => {
       const caller = createCaller(ctx as any);
 
       // Act & Assert
-      await expect(caller.organization.update({
-        name: "Updated Organization Name",
-      })).rejects.toThrow("Permission required: organization:manage");
+      await expect(
+        caller.organization.update({
+          name: "Updated Organization Name",
+        }),
+      ).rejects.toThrow("Permission required: organization:manage");
     });
   });
 
@@ -638,11 +666,13 @@ describe("Router Integration Tests", () => {
       });
 
       // Assert
-      expect(result).toEqual(expect.objectContaining({
-        id: "membership-2",
-        userId: "user-2",
-        roleId: "role-2",
-      }));
+      expect(result).toEqual(
+        expect.objectContaining({
+          id: "membership-2",
+          userId: "user-2",
+          roleId: "role-2",
+        }),
+      );
       expect(mockContext.db.membership.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
@@ -664,10 +694,12 @@ describe("Router Integration Tests", () => {
       const caller = createCaller(ctx as any);
 
       // Act & Assert
-      await expect(caller.user.updateMembership({
-        userId: "user-2",
-        roleId: "role-2",
-      })).rejects.toThrow("Permission required: user:manage");
+      await expect(
+        caller.user.updateMembership({
+          userId: "user-2",
+          roleId: "role-2",
+        }),
+      ).rejects.toThrow("Permission required: user:manage");
     });
   });
 
@@ -712,7 +744,11 @@ describe("Router Integration Tests", () => {
         },
         status: { id: "status-1", name: "New", category: "NEW" },
         priority: { id: "priority-1", name: "Medium" },
-        createdBy: { id: "user-1", name: "Test User", email: "test@example.com" },
+        createdBy: {
+          id: "user-1",
+          name: "Test User",
+          email: "test@example.com",
+        },
         assignedTo: null,
         comments: [],
         attachments: [],
@@ -733,10 +769,12 @@ describe("Router Integration Tests", () => {
       });
 
       // Assert
-      expect(result).toEqual(expect.objectContaining({
-        id: "issue-1",
-        assignedToId: "user-2",
-      }));
+      expect(result).toEqual(
+        expect.objectContaining({
+          id: "issue-1",
+          assignedToId: "user-2",
+        }),
+      );
     });
 
     it("should properly restrict permissions based on role limitations", async () => {
@@ -745,19 +783,25 @@ describe("Router Integration Tests", () => {
       const caller = createCaller(ctx as any);
 
       // Act & Assert - Should be denied for all write operations
-      await expect(caller.issue.core.create({
-        title: "Test Issue",
-        machineId: "machine-1",
-      })).rejects.toThrow("Permission required: issue:create");
+      await expect(
+        caller.issue.core.create({
+          title: "Test Issue",
+          machineId: "machine-1",
+        }),
+      ).rejects.toThrow("Permission required: issue:create");
 
-      await expect(caller.issue.core.update({
-        id: "issue-1",
-        title: "Updated Title",
-      })).rejects.toThrow("Permission required: issue:edit");
+      await expect(
+        caller.issue.core.update({
+          id: "issue-1",
+          title: "Updated Title",
+        }),
+      ).rejects.toThrow("Permission required: issue:edit");
 
-      await expect(caller.issue.core.delete({
-        id: "issue-1",
-      })).rejects.toThrow("Permission required: issue:delete");
+      await expect(
+        caller.issue.core.delete({
+          id: "issue-1",
+        }),
+      ).rejects.toThrow("Permission required: issue:delete");
     });
   });
 
@@ -768,10 +812,12 @@ describe("Router Integration Tests", () => {
       const caller = createCaller(ctx as any);
 
       // Act & Assert
-      await expect(caller.issue.core.create({
-        title: "Test Issue",
-        machineId: "machine-1",
-      })).rejects.toThrow("Permission required: issue:create");
+      await expect(
+        caller.issue.core.create({
+          title: "Test Issue",
+          machineId: "machine-1",
+        }),
+      ).rejects.toThrow("Permission required: issue:create");
     });
 
     it("should handle corrupted permission data gracefully", async () => {
@@ -782,10 +828,12 @@ describe("Router Integration Tests", () => {
       const caller = createCaller(ctx as any);
 
       // Act & Assert
-      await expect(caller.issue.core.create({
-        title: "Test Issue",
-        machineId: "machine-1",
-      })).rejects.toThrow(TRPCError);
+      await expect(
+        caller.issue.core.create({
+          title: "Test Issue",
+          machineId: "machine-1",
+        }),
+      ).rejects.toThrow(TRPCError);
     });
 
     it("should handle permission changes during session", async () => {
@@ -820,10 +868,12 @@ describe("Router Integration Tests", () => {
       (ctx as any).userPermissions = ["issue:view"];
 
       // Act & Assert
-      await expect(caller.issue.core.create({
-        title: "Test Issue",
-        machineId: "machine-1",
-      })).rejects.toThrow("Permission required: issue:create");
+      await expect(
+        caller.issue.core.create({
+          title: "Test Issue",
+          machineId: "machine-1",
+        }),
+      ).rejects.toThrow("Permission required: issue:create");
     });
   });
 });

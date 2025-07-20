@@ -1,14 +1,12 @@
-import { type MockContext } from "../mockContext.js";
-import { 
-  PermissionMatrixFactory, 
+import {
+  PermissionMatrixFactory,
   MockContextFactory,
   type TestRole,
-  type TestPermission 
 } from "../factories/index.js";
 
 /**
  * Role and Permission Test Helpers
- * 
+ *
  * Utility functions for common test scenarios involving roles and permissions.
  * These helpers reduce boilerplate in test files and ensure consistent test patterns.
  */
@@ -25,7 +23,7 @@ export function getPermissionTestScenarios(requiredPermission: string) {
       shouldPass: true,
     },
     {
-      name: "should deny access without required permission", 
+      name: "should deny access without required permission",
       permissions: ["some:other:permission"],
       shouldPass: false,
     },
@@ -48,12 +46,12 @@ export function getPermissionTestScenarios(requiredPermission: string) {
  */
 export function getRoleTestScenarios(requiredPermission: string) {
   const matrix = PermissionMatrixFactory.createMatrix();
-  
+
   return Object.entries(matrix).map(([roleName, permissions]) => ({
     roleName,
     permissions,
     shouldPass: permissions.includes(requiredPermission),
-    description: `should ${permissions.includes(requiredPermission) ? 'allow' : 'deny'} access for ${roleName} role`,
+    description: `should ${permissions.includes(requiredPermission) ? "allow" : "deny"} access for ${roleName} role`,
   }));
 }
 
@@ -66,7 +64,7 @@ export function getMultiTenantTestScenarios() {
     {
       name: "should allow access within same organization",
       userOrgId: "org-1",
-      dataOrgId: "org-1", 
+      dataOrgId: "org-1",
       shouldPass: true,
     },
     {
@@ -90,9 +88,11 @@ export function getMultiTenantTestScenarios() {
 export function createPermissionTestContexts(permission: string) {
   return {
     withPermission: MockContextFactory.createWithPermissions([permission]),
-    withoutPermission: MockContextFactory.createWithPermissions(["other:permission"]),
+    withoutPermission: MockContextFactory.createWithPermissions([
+      "other:permission",
+    ]),
     admin: MockContextFactory.createAdmin(),
-    technician: MockContextFactory.createTechnician(), 
+    technician: MockContextFactory.createTechnician(),
     user: MockContextFactory.createUser(),
     unauthenticated: MockContextFactory.createUnauthenticated(),
   };
@@ -121,32 +121,33 @@ export function createMultiTenantTestContexts() {
  */
 export function validatePermissionInheritance(
   role: TestRole,
-  expectedPermissions: string[]
+  expectedPermissions: string[],
 ): boolean {
-  const rolePermissions = role.permissions.map(p => p.name);
-  return expectedPermissions.every(permission => 
-    rolePermissions.includes(permission)
+  const rolePermissions = role.permissions.map((p) => p.name);
+  return expectedPermissions.every((permission) =>
+    rolePermissions.includes(permission),
   );
 }
 
 /**
  * Helper to validate permission dependencies
  */
-export function validatePermissionDependencies(
-  permissions: string[]
-): { valid: boolean; missing: string[] } {
+export function validatePermissionDependencies(permissions: string[]): {
+  valid: boolean;
+  missing: string[];
+} {
   const dependencies = PermissionMatrixFactory.getPermissionDependencies();
   const missing: string[] = [];
-  
+
   for (const permission of permissions) {
-    const deps = dependencies[permission] || [];
+    const deps = dependencies[permission] ?? [];
     for (const dep of deps) {
       if (!permissions.includes(dep)) {
         missing.push(dep);
       }
     }
   }
-  
+
   return {
     valid: missing.length === 0,
     missing,
@@ -156,11 +157,11 @@ export function validatePermissionDependencies(
 /**
  * Helper to generate test data for different permission combinations
  */
-export function generatePermissionCombinations(): Array<{
+export function generatePermissionCombinations(): {
   name: string;
   permissions: string[];
   expectedOutcomes: Record<string, boolean>;
-}> {
+}[] {
   return [
     {
       name: "Read-only user",
@@ -189,9 +190,16 @@ export function generatePermissionCombinations(): Array<{
     {
       name: "Technician",
       permissions: [
-        "issue:create", "issue:edit", "issue:assign", "issue:view", "issue:confirm",
-        "machine:edit", "machine:view", "location:view",
-        "attachment:create", "attachment:view"
+        "issue:create",
+        "issue:edit",
+        "issue:assign",
+        "issue:view",
+        "issue:confirm",
+        "machine:edit",
+        "machine:view",
+        "location:view",
+        "attachment:create",
+        "attachment:view",
       ],
       expectedOutcomes: {
         "issue:create": true,
@@ -232,7 +240,7 @@ export function getPermissionEscalationScenarios() {
       userPermissions: ["issue:view", "machine:view"],
       attemptedActions: [
         "organization:manage",
-        "user:manage", 
+        "user:manage",
         "role:manage",
         "machine:delete",
         "issue:delete",
@@ -242,14 +250,13 @@ export function getPermissionEscalationScenarios() {
     {
       name: "Technician attempting admin operations",
       userPermissions: [
-        "issue:create", "issue:edit", "issue:view",
-        "machine:edit", "machine:view"
+        "issue:create",
+        "issue:edit",
+        "issue:view",
+        "machine:edit",
+        "machine:view",
       ],
-      attemptedActions: [
-        "organization:manage",
-        "user:manage",
-        "role:manage", 
-      ],
+      attemptedActions: ["organization:manage", "user:manage", "role:manage"],
       expectedResult: "DENIED",
     },
     {
@@ -260,7 +267,7 @@ export function getPermissionEscalationScenarios() {
         "machine:edit", // Different domain
         "organization:manage", // Admin privilege
       ],
-      expectedResult: "DENIED", 
+      expectedResult: "DENIED",
     },
   ];
 }
@@ -273,32 +280,41 @@ export function validateRoleSystemIntegrity(roles: TestRole[]): {
   errors: string[];
 } {
   const errors: string[] = [];
-  
+
   // Check for system role completeness
-  const systemRoles = roles.filter(r => r.isSystem);
-  const expectedSystemRoles = ["Unauthenticated", "User", "Technician", "Admin"];
-  
+  const systemRoles = roles.filter((r) => r.isSystem);
+  const expectedSystemRoles = [
+    "Unauthenticated",
+    "User",
+    "Technician",
+    "Admin",
+  ];
+
   for (const expectedRole of expectedSystemRoles) {
-    if (!systemRoles.find(r => r.name === expectedRole)) {
+    if (!systemRoles.find((r) => r.name === expectedRole)) {
       errors.push(`Missing system role: ${expectedRole}`);
     }
   }
-  
+
   // Check for default role existence
-  const defaultRoles = roles.filter(r => r.isDefault);
+  const defaultRoles = roles.filter((r) => r.isDefault);
   if (defaultRoles.length !== 1) {
-    errors.push(`Expected exactly 1 default role, found ${defaultRoles.length}`);
+    errors.push(
+      `Expected exactly 1 default role, found ${defaultRoles.length.toString()}`,
+    );
   }
-  
+
   // Check permission dependencies
   for (const role of roles) {
-    const permissionNames = role.permissions.map(p => p.name);
+    const permissionNames = role.permissions.map((p) => p.name);
     const validation = validatePermissionDependencies(permissionNames);
     if (!validation.valid) {
-      errors.push(`Role ${role.name} missing permission dependencies: ${validation.missing.join(', ')}`);
+      errors.push(
+        `Role ${role.name} missing permission dependencies: ${validation.missing.join(", ")}`,
+      );
     }
   }
-  
+
   return {
     valid: errors.length === 0,
     errors,
@@ -313,7 +329,7 @@ export function createTestSuiteData() {
   const roles = PermissionMatrixFactory.createMatrix();
   const permissionCombinations = generatePermissionCombinations();
   const escalationScenarios = getPermissionEscalationScenarios();
-  
+
   return {
     organizations: [orgs],
     roleMatrix: roles,

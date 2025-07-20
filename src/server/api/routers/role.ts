@@ -1,10 +1,13 @@
-import { z } from "zod";
 import { TRPCError } from "@trpc/server";
+import { z } from "zod";
 
-import { createTRPCRouter } from "../trpc";
-import { roleManageProcedure, organizationManageProcedure } from "../trpc.permission";
-import { RoleService } from "../../services/roleService";
 import { ROLE_TEMPLATES } from "../../auth/permissions.constants";
+import { RoleService } from "../../services/roleService";
+import { createTRPCRouter } from "../trpc";
+import {
+  roleManageProcedure,
+  organizationManageProcedure,
+} from "../trpc.permission";
 
 export const roleRouter = createTRPCRouter({
   /**
@@ -14,15 +17,29 @@ export const roleRouter = createTRPCRouter({
     const roleService = new RoleService(ctx.db, ctx.organization.id);
     const roles = await roleService.getRoles();
 
-    return roles.map((role: any) => ({
-      ...role,
-      memberCount: role._count.memberships,
-      permissions: role.permissions.map((p: any) => ({
-        id: p.id,
-        name: p.name,
-        description: p.description
-      }))
-    }));
+    return roles.map(
+      (role: {
+        id: string;
+        name: string;
+        organizationId: string;
+        isSystem: boolean;
+        isDefault: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+        permissions: { id: string; name: string; description: string | null }[];
+        _count: { memberships: number };
+      }) => ({
+        ...role,
+        memberCount: role._count.memberships,
+        permissions: role.permissions.map(
+          (p: { id: string; name: string; description: string | null }) => ({
+            id: p.id,
+            name: p.name,
+            description: p.description,
+          }),
+        ),
+      }),
+    );
   }),
 
   /**
@@ -33,7 +50,9 @@ export const roleRouter = createTRPCRouter({
       z.object({
         name: z.string().min(1).max(50),
         permissionIds: z.array(z.string()).optional(),
-        template: z.enum(Object.keys(ROLE_TEMPLATES) as [keyof typeof ROLE_TEMPLATES]).optional(),
+        template: z
+          .enum(Object.keys(ROLE_TEMPLATES) as [keyof typeof ROLE_TEMPLATES])
+          .optional(),
         isDefault: z.boolean().default(false),
       }),
     )
@@ -82,17 +101,18 @@ export const roleRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const roleService = new RoleService(ctx.db, ctx.organization.id);
-      
+
       const updateData: {
         name?: string;
         permissionIds?: string[];
         isDefault?: boolean;
       } = {};
-      
+
       if (input.name !== undefined) updateData.name = input.name;
-      if (input.permissionIds !== undefined) updateData.permissionIds = input.permissionIds;
+      if (input.permissionIds !== undefined)
+        updateData.permissionIds = input.permissionIds;
       if (input.isDefault !== undefined) updateData.isDefault = input.isDefault;
-      
+
       return roleService.updateRole(input.roleId, updateData);
     }),
 
@@ -107,12 +127,12 @@ export const roleRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const roleService = new RoleService(ctx.db, ctx.organization.id);
-      
+
       // Ensure we maintain at least one admin before deletion
       await roleService.ensureAtLeastOneAdmin();
-      
+
       await roleService.deleteRole(input.roleId);
-      
+
       return { success: true };
     }),
 
@@ -125,7 +145,7 @@ export const roleRouter = createTRPCRouter({
         roleId: z.string(),
       }),
     )
-    .query(async ({ ctx, input }: { ctx: any; input: { roleId: string } }) => {
+    .query(async ({ ctx, input }) => {
       const role = await ctx.db.role.findUnique({
         where: {
           id: input.roleId,
@@ -149,11 +169,13 @@ export const roleRouter = createTRPCRouter({
       return {
         ...role,
         memberCount: role._count.memberships,
-        permissions: role.permissions.map((p: { id: string; name: string; description: string | null }) => ({
-          id: p.id,
-          name: p.name,
-          description: p.description
-        }))
+        permissions: role.permissions.map(
+          (p: { id: string; name: string; description: string | null }) => ({
+            id: p.id,
+            name: p.name,
+            description: p.description,
+          }),
+        ),
       };
     }),
 

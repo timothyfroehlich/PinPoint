@@ -2,9 +2,16 @@ import { describe, it, expect, beforeEach } from "@jest/globals";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
+import {
+  createMockContext,
+  resetMockContext,
+  type MockContext,
+} from "../../../../test/mockContext";
 import { createTRPCRouter } from "../../trpc";
-import { roleManageProcedure, organizationProcedure } from "../../trpc.permission";
-import { createMockContext, resetMockContext, type MockContext } from "../../../../test/mockContext";
+import {
+  roleManageProcedure,
+  organizationProcedure,
+} from "../../trpc.permission";
 
 // Mock Role Router - This will be implemented by the implementation agent
 const roleRouter = createTRPCRouter({
@@ -20,10 +27,7 @@ const roleRouter = createTRPCRouter({
           },
         },
       },
-      orderBy: [
-        { isSystem: "desc" },
-        { name: "asc" },
-      ],
+      orderBy: [{ isSystem: "desc" }, { name: "asc" }],
     });
 
     return roles.map((role) => ({
@@ -100,8 +104,11 @@ const roleRouter = createTRPCRouter({
       }
 
       // Update role
-      const updateData: { name?: string; permissions?: { set: { id: string }[] } } = {};
-      
+      const updateData: {
+        name?: string;
+        permissions?: { set: { id: string }[] };
+      } = {};
+
       if (input.name) {
         updateData.name = input.name;
       }
@@ -160,7 +167,8 @@ const roleRouter = createTRPCRouter({
       if (existingRole.memberships.length > 0 && !input.reassignToRoleId) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: "Cannot delete role with active members. Please specify a role to reassign members to.",
+          message:
+            "Cannot delete role with active members. Please specify a role to reassign members to.",
         });
       }
 
@@ -222,7 +230,7 @@ const roleRouter = createTRPCRouter({
 // Mock context helper
 const createMockTRPCContext = (permissions: string[] = []) => {
   const mockContext = createMockContext();
-  
+
   return {
     ...mockContext,
     session: {
@@ -254,7 +262,7 @@ const createMockTRPCContext = (permissions: string[] = []) => {
         createdAt: new Date(),
         updatedAt: new Date(),
         permissions: permissions.map((name, index) => ({
-          id: `perm-${index + 1}`,
+          id: `perm-${(index + 1).toString()}`,
           name,
           description: `${name} permission`,
           createdAt: new Date(),
@@ -328,18 +336,22 @@ describe("Role Management API", () => {
 
       // Assert
       expect(result).toHaveLength(2);
-      expect(result[0]).toEqual(expect.objectContaining({
-        id: "system-admin",
-        name: "Admin",
-        isSystem: true,
-        memberCount: 1,
-      }));
-      expect(result[1]).toEqual(expect.objectContaining({
-        id: "member-role",
-        name: "Member",
-        isSystem: false,
-        memberCount: 3,
-      }));
+      expect(result[0]).toEqual(
+        expect.objectContaining({
+          id: "system-admin",
+          name: "Admin",
+          isSystem: true,
+          memberCount: 1,
+        }),
+      );
+      expect(result[1]).toEqual(
+        expect.objectContaining({
+          id: "member-role",
+          name: "Member",
+          isSystem: false,
+          memberCount: 3,
+        }),
+      );
       expect(mockContext.db.role.findMany).toHaveBeenCalledWith({
         where: { organizationId: "org-1" },
         include: {
@@ -350,10 +362,7 @@ describe("Role Management API", () => {
             },
           },
         },
-        orderBy: [
-          { isSystem: "desc" },
-          { name: "asc" },
-        ],
+        orderBy: [{ isSystem: "desc" }, { name: "asc" }],
       });
     });
 
@@ -394,12 +403,14 @@ describe("Role Management API", () => {
       });
 
       // Assert
-      expect(result).toEqual(expect.objectContaining({
-        id: "new-role",
-        name: "New Role",
-        isSystem: false,
-        isDefault: false,
-      }));
+      expect(result).toEqual(
+        expect.objectContaining({
+          id: "new-role",
+          name: "New Role",
+          isSystem: false,
+          isDefault: false,
+        }),
+      );
       expect(mockContext.db.role.create).toHaveBeenCalledWith({
         data: {
           name: "New Role",
@@ -456,7 +467,9 @@ describe("Role Management API", () => {
       const caller = roleRouter.createCaller(ctx as any);
 
       // Act & Assert
-      await expect(caller.create({ name: "New Role" })).rejects.toThrow("Permission required: role:manage");
+      await expect(caller.create({ name: "New Role" })).rejects.toThrow(
+        "Permission required: role:manage",
+      );
     });
 
     it("should validate role name requirements", async () => {
@@ -511,15 +524,17 @@ describe("Role Management API", () => {
       });
 
       // Assert
-      expect(result).toEqual(expect.objectContaining({
-        id: "role-1",
-        name: "New Name",
-        permissions: expect.arrayContaining([
-          expect.objectContaining({
-            name: "issue:create",
-          }),
-        ]),
-      }));
+      expect(result).toEqual(
+        expect.objectContaining({
+          id: "role-1",
+          name: "New Name",
+          permissions: expect.arrayContaining([
+            expect.objectContaining({
+              name: "issue:create",
+            }),
+          ]),
+        }),
+      );
       expect(mockContext.db.role.update).toHaveBeenCalledWith({
         where: { id: "role-1" },
         data: {
@@ -552,10 +567,12 @@ describe("Role Management API", () => {
       mockContext.db.role.findFirst.mockResolvedValue(systemRole as any);
 
       // Act & Assert
-      await expect(caller.update({
-        id: "system-admin",
-        name: "Modified Admin",
-      })).rejects.toThrow("Cannot modify system roles");
+      await expect(
+        caller.update({
+          id: "system-admin",
+          name: "Modified Admin",
+        }),
+      ).rejects.toThrow("Cannot modify system roles");
     });
 
     it("should return NOT_FOUND for non-existent role", async () => {
@@ -566,10 +583,12 @@ describe("Role Management API", () => {
       mockContext.db.role.findFirst.mockResolvedValue(null);
 
       // Act & Assert
-      await expect(caller.update({
-        id: "non-existent",
-        name: "New Name",
-      })).rejects.toThrow("Role not found");
+      await expect(
+        caller.update({
+          id: "non-existent",
+          name: "New Name",
+        }),
+      ).rejects.toThrow("Role not found");
     });
 
     it("should deny role update without role:manage permission", async () => {
@@ -578,10 +597,12 @@ describe("Role Management API", () => {
       const caller = roleRouter.createCaller(ctx as any);
 
       // Act & Assert
-      await expect(caller.update({
-        id: "role-1",
-        name: "New Name",
-      })).rejects.toThrow("Permission required: role:manage");
+      await expect(
+        caller.update({
+          id: "role-1",
+          name: "New Name",
+        }),
+      ).rejects.toThrow("Permission required: role:manage");
     });
   });
 
@@ -674,7 +695,9 @@ describe("Role Management API", () => {
       mockContext.db.role.findFirst.mockResolvedValue(systemRole as any);
 
       // Act & Assert
-      await expect(caller.delete({ id: "system-admin" })).rejects.toThrow("Cannot delete system roles");
+      await expect(caller.delete({ id: "system-admin" })).rejects.toThrow(
+        "Cannot delete system roles",
+      );
     });
 
     it("should require reassignment when role has members", async () => {
@@ -698,7 +721,9 @@ describe("Role Management API", () => {
       mockContext.db.role.findFirst.mockResolvedValue(roleWithMembers as any);
 
       // Act & Assert
-      await expect(caller.delete({ id: "role-1" })).rejects.toThrow("Cannot delete role with active members");
+      await expect(caller.delete({ id: "role-1" })).rejects.toThrow(
+        "Cannot delete role with active members",
+      );
     });
 
     it("should return NOT_FOUND for non-existent role", async () => {
@@ -709,7 +734,9 @@ describe("Role Management API", () => {
       mockContext.db.role.findFirst.mockResolvedValue(null);
 
       // Act & Assert
-      await expect(caller.delete({ id: "non-existent" })).rejects.toThrow("Role not found");
+      await expect(caller.delete({ id: "non-existent" })).rejects.toThrow(
+        "Role not found",
+      );
     });
 
     it("should deny role deletion without role:manage permission", async () => {
@@ -718,7 +745,9 @@ describe("Role Management API", () => {
       const caller = roleRouter.createCaller(ctx as any);
 
       // Act & Assert
-      await expect(caller.delete({ id: "role-1" })).rejects.toThrow("Permission required: role:manage");
+      await expect(caller.delete({ id: "role-1" })).rejects.toThrow(
+        "Permission required: role:manage",
+      );
     });
   });
 
@@ -752,7 +781,9 @@ describe("Role Management API", () => {
         },
       ];
 
-      mockContext.db.permission.findMany.mockResolvedValue(mockPermissions as any);
+      mockContext.db.permission.findMany.mockResolvedValue(
+        mockPermissions as any,
+      );
 
       // Act
       const result = await caller.getPermissions();
@@ -797,16 +828,18 @@ describe("Role Management API", () => {
       const result = await caller.getById({ id: "role-1" });
 
       // Assert
-      expect(result).toEqual(expect.objectContaining({
-        id: "role-1",
-        name: "Test Role",
-        memberCount: 5,
-        permissions: expect.arrayContaining([
-          expect.objectContaining({
-            name: "issue:create",
-          }),
-        ]),
-      }));
+      expect(result).toEqual(
+        expect.objectContaining({
+          id: "role-1",
+          name: "Test Role",
+          memberCount: 5,
+          permissions: expect.arrayContaining([
+            expect.objectContaining({
+              name: "issue:create",
+            }),
+          ]),
+        }),
+      );
     });
 
     it("should return NOT_FOUND for non-existent role", async () => {
@@ -817,7 +850,9 @@ describe("Role Management API", () => {
       mockContext.db.role.findFirst.mockResolvedValue(null);
 
       // Act & Assert
-      await expect(caller.getById({ id: "non-existent" })).rejects.toThrow("Role not found");
+      await expect(caller.getById({ id: "non-existent" })).rejects.toThrow(
+        "Role not found",
+      );
     });
   });
 });

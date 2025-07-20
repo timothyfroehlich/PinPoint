@@ -1,7 +1,16 @@
 import { describe, it, expect, beforeEach } from "@jest/globals";
 import { TRPCError } from "@trpc/server";
-import { hasPermission, requirePermission, getUserPermissions } from "../permissions";
-import { createMockContext, resetMockContext, type MockContext } from "../../../test/mockContext";
+
+import {
+  createMockContext,
+  resetMockContext,
+  type MockContext,
+} from "../../../test/mockContext";
+import {
+  hasPermission,
+  requirePermission,
+  getUserPermissions,
+} from "../permissions";
 
 describe("Permission System Core Functions", () => {
   let mockContext: MockContext;
@@ -16,7 +25,7 @@ describe("Permission System Core Functions", () => {
       // Arrange
       const membership = { roleId: "role-1" };
       const permission = "issue:create";
-      
+
       mockContext.db.role.findUnique.mockResolvedValue({
         id: "role-1",
         name: "Test Role",
@@ -37,7 +46,11 @@ describe("Permission System Core Functions", () => {
       });
 
       // Act
-      const result = await hasPermission(membership, permission, mockContext.db);
+      const result = await hasPermission(
+        membership,
+        permission,
+        mockContext.db,
+      );
 
       // Assert
       expect(result).toBe(true);
@@ -55,7 +68,7 @@ describe("Permission System Core Functions", () => {
       // Arrange
       const membership = { roleId: "role-1" };
       const permission = "issue:delete";
-      
+
       mockContext.db.role.findUnique.mockResolvedValue({
         id: "role-1",
         name: "Test Role",
@@ -68,7 +81,11 @@ describe("Permission System Core Functions", () => {
       });
 
       // Act
-      const result = await hasPermission(membership, permission, mockContext.db);
+      const result = await hasPermission(
+        membership,
+        permission,
+        mockContext.db,
+      );
 
       // Assert
       expect(result).toBe(false);
@@ -78,11 +95,15 @@ describe("Permission System Core Functions", () => {
       // Arrange
       const membership = { roleId: "non-existent-role" };
       const permission = "issue:create";
-      
+
       mockContext.db.role.findUnique.mockResolvedValue(null);
 
       // Act
-      const result = await hasPermission(membership, permission, mockContext.db);
+      const result = await hasPermission(
+        membership,
+        permission,
+        mockContext.db,
+      );
 
       // Assert
       expect(result).toBe(false);
@@ -92,7 +113,7 @@ describe("Permission System Core Functions", () => {
       // Arrange
       const membership = { roleId: "system-admin-role" };
       const permission = "organization:manage";
-      
+
       mockContext.db.role.findUnique.mockResolvedValue({
         id: "system-admin-role",
         name: "System Admin",
@@ -113,7 +134,11 @@ describe("Permission System Core Functions", () => {
       });
 
       // Act
-      const result = await hasPermission(membership, permission, mockContext.db);
+      const result = await hasPermission(
+        membership,
+        permission,
+        mockContext.db,
+      );
 
       // Assert
       expect(result).toBe(true);
@@ -125,7 +150,7 @@ describe("Permission System Core Functions", () => {
       // Arrange
       const membership = { roleId: "role-1" };
       const permission = "issue:edit";
-      
+
       mockContext.db.role.findUnique.mockResolvedValue({
         id: "role-1",
         name: "Test Role",
@@ -146,14 +171,16 @@ describe("Permission System Core Functions", () => {
       });
 
       // Act & Assert
-      await expect(requirePermission(membership, permission, mockContext.db)).resolves.not.toThrow();
+      await expect(
+        requirePermission(membership, permission, mockContext.db),
+      ).resolves.not.toThrow();
     });
 
     it("should throw FORBIDDEN error when user lacks required permission", async () => {
       // Arrange
       const membership = { roleId: "role-1" };
       const permission = "issue:delete";
-      
+
       mockContext.db.role.findUnique.mockResolvedValue({
         id: "role-1",
         name: "Test Role",
@@ -166,15 +193,19 @@ describe("Permission System Core Functions", () => {
       });
 
       // Act & Assert
-      await expect(requirePermission(membership, permission, mockContext.db)).rejects.toThrow(TRPCError);
-      await expect(requirePermission(membership, permission, mockContext.db)).rejects.toThrow("Permission required: issue:delete");
+      await expect(
+        requirePermission(membership, permission, mockContext.db),
+      ).rejects.toThrow(TRPCError);
+      await expect(
+        requirePermission(membership, permission, mockContext.db),
+      ).rejects.toThrow("Permission required: issue:delete");
     });
 
     it("should throw FORBIDDEN error with correct error code", async () => {
       // Arrange
       const membership = { roleId: "role-1" };
       const permission = "user:manage";
-      
+
       mockContext.db.role.findUnique.mockResolvedValue({
         id: "role-1",
         name: "Test Role",
@@ -193,7 +224,9 @@ describe("Permission System Core Functions", () => {
       } catch (error) {
         expect(error).toBeInstanceOf(TRPCError);
         expect((error as TRPCError).code).toBe("FORBIDDEN");
-        expect((error as TRPCError).message).toBe("Permission required: user:manage");
+        expect((error as TRPCError).message).toBe(
+          "Permission required: user:manage",
+        );
       }
     });
   });
@@ -203,7 +236,7 @@ describe("Permission System Core Functions", () => {
       // Arrange
       const membership = { roleId: "role-1" };
       const expectedPermissions = ["issue:create", "issue:edit", "issue:view"];
-      
+
       mockContext.db.role.findUnique.mockResolvedValue({
         id: "role-1",
         name: "Test Role",
@@ -251,7 +284,7 @@ describe("Permission System Core Functions", () => {
     it("should return empty array when role has no permissions", async () => {
       // Arrange
       const membership = { roleId: "role-1" };
-      
+
       mockContext.db.role.findUnique.mockResolvedValue({
         id: "role-1",
         name: "Test Role",
@@ -273,7 +306,7 @@ describe("Permission System Core Functions", () => {
     it("should return empty array when role does not exist", async () => {
       // Arrange
       const membership = { roleId: "non-existent-role" };
-      
+
       mockContext.db.role.findUnique.mockResolvedValue(null);
 
       // Act
@@ -299,7 +332,7 @@ describe("Permission System Core Functions", () => {
         "role:manage",
         "user:manage",
       ];
-      
+
       mockContext.db.role.findUnique.mockResolvedValue({
         id: "admin-role",
         name: "Admin",
@@ -309,7 +342,7 @@ describe("Permission System Core Functions", () => {
         createdAt: new Date(),
         updatedAt: new Date(),
         permissions: adminPermissions.map((name, index) => ({
-          id: `perm-${index + 1}`,
+          id: `perm-${(index + 1).toString()}`,
           name,
           description: `${name} permission`,
           createdAt: new Date(),
@@ -331,11 +364,15 @@ describe("Permission System Core Functions", () => {
       // Arrange
       const membership = { roleId: "" };
       const permission = "issue:create";
-      
+
       mockContext.db.role.findUnique.mockResolvedValue(null);
 
       // Act
-      const result = await hasPermission(membership, permission, mockContext.db);
+      const result = await hasPermission(
+        membership,
+        permission,
+        mockContext.db,
+      );
 
       // Assert
       expect(result).toBe(false);
@@ -345,7 +382,7 @@ describe("Permission System Core Functions", () => {
       // Arrange
       const membership = { roleId: "role-1" };
       const permission = "";
-      
+
       mockContext.db.role.findUnique.mockResolvedValue({
         id: "role-1",
         name: "Test Role",
@@ -358,7 +395,11 @@ describe("Permission System Core Functions", () => {
       });
 
       // Act
-      const result = await hasPermission(membership, permission, mockContext.db);
+      const result = await hasPermission(
+        membership,
+        permission,
+        mockContext.db,
+      );
 
       // Assert
       expect(result).toBe(false);
@@ -368,11 +409,15 @@ describe("Permission System Core Functions", () => {
       // Arrange
       const membership = { roleId: "role-1" };
       const permission = "issue:create";
-      
-      mockContext.db.role.findUnique.mockRejectedValue(new Error("Database connection error"));
+
+      mockContext.db.role.findUnique.mockRejectedValue(
+        new Error("Database connection error"),
+      );
 
       // Act & Assert
-      await expect(hasPermission(membership, permission, mockContext.db)).rejects.toThrow("Database connection error");
+      await expect(
+        hasPermission(membership, permission, mockContext.db),
+      ).rejects.toThrow("Database connection error");
     });
   });
 });

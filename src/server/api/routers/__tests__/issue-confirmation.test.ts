@@ -2,14 +2,17 @@ import { describe, it, expect, beforeEach } from "@jest/globals";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
+import {
+  createMockContext,
+  resetMockContext,
+  type MockContext,
+} from "../../../../test/mockContext";
 import { createTRPCRouter } from "../../trpc";
-import { 
-  organizationProcedure, 
-  issueCreateProcedure, 
-  issueEditProcedure,
-  requirePermission 
+import {
+  organizationProcedure,
+  issueCreateProcedure,
+  requirePermission,
 } from "../../trpc.permission";
-import { createMockContext, resetMockContext, type MockContext } from "../../../../test/mockContext";
 
 // Mock Issue Confirmation Router - This will be implemented by the implementation agent
 const issueConfirmationRouter = createTRPCRouter({
@@ -32,14 +35,14 @@ const issueConfirmationRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       // Determine confirmation status based on form type and permissions
       let confirmationStatus = false;
-      
+
       if (input.formType === "basic") {
         // Basic form always creates unconfirmed issues
         confirmationStatus = false;
-      } else if (input.formType === "full") {
+      } else {
         // Full form creates confirmed issues by default
         confirmationStatus = true;
-        
+
         // But allow explicit override if provided
         if (input.isConfirmed !== undefined) {
           confirmationStatus = input.isConfirmed;
@@ -176,9 +179,7 @@ const issueConfirmationRouter = createTRPCRouter({
           priority: true,
           createdBy: true,
         },
-        orderBy: [
-          { createdAt: "desc" },
-        ],
+        orderBy: [{ createdAt: "desc" }],
       });
 
       // Mock confirmation status for testing
@@ -196,10 +197,12 @@ const issueConfirmationRouter = createTRPCRouter({
     .input(
       z.object({
         locationId: z.string().optional(),
-        dateRange: z.object({
-          from: z.date().optional(),
-          to: z.date().optional(),
-        }).optional(),
+        dateRange: z
+          .object({
+            from: z.date().optional(),
+            to: z.date().optional(),
+          })
+          .optional(),
       }),
     )
     .query(async ({ ctx, input }) => {
@@ -233,7 +236,8 @@ const issueConfirmationRouter = createTRPCRouter({
         totalIssues,
         confirmedCount,
         unconfirmedCount,
-        confirmationRate: totalIssues > 0 ? (confirmedCount / totalIssues) * 100 : 0,
+        confirmationRate:
+          totalIssues > 0 ? (confirmedCount / totalIssues) * 100 : 0,
       };
     }),
 });
@@ -241,7 +245,7 @@ const issueConfirmationRouter = createTRPCRouter({
 // Mock context helper with different permission sets
 const createMockTRPCContext = (permissions: string[] = []) => {
   const mockContext = createMockContext();
-  
+
   return {
     ...mockContext,
     session: {
@@ -271,7 +275,7 @@ const createMockTRPCContext = (permissions: string[] = []) => {
         createdAt: new Date(),
         updatedAt: new Date(),
         permissions: permissions.map((name, index) => ({
-          id: `perm-${index + 1}`,
+          id: `perm-${(index + 1).toString()}`,
           name,
           description: `${name} permission`,
         })),
@@ -484,13 +488,15 @@ describe("Issue Confirmation Workflow", () => {
       const caller = issueConfirmationRouter.createCaller(ctx as any);
 
       // Act & Assert
-      await expect(caller.create({
-        title: "Test Issue",
-        machineId: "machine-1",
-        statusId: "status-1",
-        priorityId: "priority-1",
-        formType: "basic",
-      })).rejects.toThrow("Permission required: issue:create");
+      await expect(
+        caller.create({
+          title: "Test Issue",
+          machineId: "machine-1",
+          statusId: "status-1",
+          priorityId: "priority-1",
+          formType: "basic",
+        }),
+      ).rejects.toThrow("Permission required: issue:create");
     });
   });
 
@@ -539,10 +545,12 @@ describe("Issue Confirmation Workflow", () => {
       const caller = issueConfirmationRouter.createCaller(ctx as any);
 
       // Act & Assert
-      await expect(caller.toggleConfirmation({
-        issueId: "issue-1",
-        isConfirmed: true,
-      })).rejects.toThrow("Permission required: issue:confirm");
+      await expect(
+        caller.toggleConfirmation({
+          issueId: "issue-1",
+          isConfirmed: true,
+        }),
+      ).rejects.toThrow("Permission required: issue:confirm");
     });
 
     it("should return NOT_FOUND for non-existent issue", async () => {
@@ -553,10 +561,12 @@ describe("Issue Confirmation Workflow", () => {
       mockContext.db.issue.findFirst.mockResolvedValue(null);
 
       // Act & Assert
-      await expect(caller.toggleConfirmation({
-        issueId: "non-existent",
-        isConfirmed: true,
-      })).rejects.toThrow("Issue not found");
+      await expect(
+        caller.toggleConfirmation({
+          issueId: "non-existent",
+          isConfirmed: true,
+        }),
+      ).rejects.toThrow("Issue not found");
     });
 
     it("should toggle confirmation status from true to false", async () => {
@@ -607,7 +617,12 @@ describe("Issue Confirmation Workflow", () => {
           createdById: "user-1",
           createdAt: new Date(),
           updatedAt: new Date(),
-          machine: { id: "machine-1", name: "Test Machine", location: { id: "location-1", name: "Test Location" }, model: { id: "model-1", name: "Test Model" } },
+          machine: {
+            id: "machine-1",
+            name: "Test Machine",
+            location: { id: "location-1", name: "Test Location" },
+            model: { id: "model-1", name: "Test Model" },
+          },
           status: { id: "status-1", name: "Open" },
           priority: { id: "priority-1", name: "Medium" },
           createdBy: { id: "user-1", name: "Test User" },
@@ -619,7 +634,12 @@ describe("Issue Confirmation Workflow", () => {
           createdById: "user-2",
           createdAt: new Date(),
           updatedAt: new Date(),
-          machine: { id: "machine-2", name: "Test Machine 2", location: { id: "location-1", name: "Test Location" }, model: { id: "model-2", name: "Test Model 2" } },
+          machine: {
+            id: "machine-2",
+            name: "Test Machine 2",
+            location: { id: "location-1", name: "Test Location" },
+            model: { id: "model-2", name: "Test Model 2" },
+          },
           status: { id: "status-1", name: "Open" },
           priority: { id: "priority-2", name: "High" },
           createdBy: { id: "user-2", name: "Test User 2" },
@@ -788,13 +808,15 @@ describe("Issue Confirmation Workflow", () => {
       const caller = issueConfirmationRouter.createCaller(ctx as any);
 
       // Act & Assert
-      await expect(caller.create({
-        title: "Test Issue",
-        machineId: "machine-1",
-        statusId: "status-1",
-        priorityId: "priority-1",
-        formType: "basic",
-      })).rejects.toThrow("Permission required: issue:create");
+      await expect(
+        caller.create({
+          title: "Test Issue",
+          machineId: "machine-1",
+          statusId: "status-1",
+          priorityId: "priority-1",
+          formType: "basic",
+        }),
+      ).rejects.toThrow("Permission required: issue:create");
     });
 
     it("should require issue:create permission for full form", async () => {
@@ -803,13 +825,15 @@ describe("Issue Confirmation Workflow", () => {
       const caller = issueConfirmationRouter.createCaller(ctx as any);
 
       // Act & Assert
-      await expect(caller.create({
-        title: "Test Issue",
-        machineId: "machine-1",
-        statusId: "status-1",
-        priorityId: "priority-1",
-        formType: "full",
-      })).rejects.toThrow("Permission required: issue:create");
+      await expect(
+        caller.create({
+          title: "Test Issue",
+          machineId: "machine-1",
+          statusId: "status-1",
+          priorityId: "priority-1",
+          formType: "full",
+        }),
+      ).rejects.toThrow("Permission required: issue:create");
     });
 
     it("should not require additional permissions for basic form beyond issue:create", async () => {
@@ -833,13 +857,15 @@ describe("Issue Confirmation Workflow", () => {
       mockContext.db.issue.create.mockResolvedValue(mockIssue as any);
 
       // Act & Assert
-      await expect(caller.create({
-        title: "Test Issue",
-        machineId: "machine-1",
-        statusId: "status-1",
-        priorityId: "priority-1",
-        formType: "basic",
-      })).resolves.toBeTruthy();
+      await expect(
+        caller.create({
+          title: "Test Issue",
+          machineId: "machine-1",
+          statusId: "status-1",
+          priorityId: "priority-1",
+          formType: "basic",
+        }),
+      ).resolves.toBeTruthy();
     });
   });
 });

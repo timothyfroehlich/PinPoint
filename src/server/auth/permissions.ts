@@ -1,16 +1,17 @@
 import { type PrismaClient } from "@prisma/client";
-import { type Session } from "next-auth";
 import { TRPCError } from "@trpc/server";
+import { type Session } from "next-auth";
+
+import { type ExtendedPrismaClient } from "../db";
 import { PermissionService } from "../services/permissionService";
+
 import { SYSTEM_ROLES } from "./permissions.constants";
 
 /**
  * Session-based Permission Functions
- * 
+ *
  * Use these for new code that works with user sessions.
  */
-
-import { type ExtendedPrismaClient } from "../db";
 
 export async function hasPermission(
   session: Session | null,
@@ -29,7 +30,11 @@ export async function requirePermission(
   organizationId?: string,
 ): Promise<void> {
   const permissionService = new PermissionService(prisma);
-  return permissionService.requirePermission(session, permission, organizationId);
+  return permissionService.requirePermission(
+    session,
+    permission,
+    organizationId,
+  );
 }
 
 export async function getUserPermissions(
@@ -43,7 +48,7 @@ export async function getUserPermissions(
 
 /**
  * Legacy Membership-based Permission Functions
- * 
+ *
  * Maintained for backward compatibility. Use session-based functions for new code.
  */
 
@@ -70,9 +75,10 @@ export async function hasPermissionLegacy(
 
   // Check if role has the specific permission (with dependency resolution)
   const permissionService = new PermissionService(prisma);
-  const rolePermissions = role.permissions.map(p => p.name);
-  const expandedPermissions = permissionService.expandPermissionsWithDependencies(rolePermissions);
-  
+  const rolePermissions = role.permissions.map((p) => p.name);
+  const expandedPermissions =
+    permissionService.expandPermissionsWithDependencies(rolePermissions);
+
   return expandedPermissions.includes(permission);
 }
 
@@ -104,6 +110,6 @@ export async function getUserPermissionsLegacy(
 
   // Expand permissions with dependencies
   const permissionService = new PermissionService(prisma);
-  const rolePermissions = role.permissions.map(p => p.name);
+  const rolePermissions = role.permissions.map((p) => p.name);
   return permissionService.expandPermissionsWithDependencies(rolePermissions);
 }

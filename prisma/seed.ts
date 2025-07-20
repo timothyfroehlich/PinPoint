@@ -1,17 +1,18 @@
-import { PrismaClient, StatusCategory } from "@prisma/client";
+import { StatusCategory } from "@prisma/client";
+import { createPrismaClient } from "../src/server/db";
 import { RoleService } from "../src/server/services/roleService";
-import { 
-  ALL_PERMISSIONS, 
+import {
+  ALL_PERMISSIONS,
   PERMISSION_DESCRIPTIONS,
-  SYSTEM_ROLES 
+  SYSTEM_ROLES,
 } from "../src/server/auth/permissions.constants";
 
-const prisma = new PrismaClient();
+const prisma = createPrismaClient();
 
 // Helper function to get random default avatar
 function getRandomDefaultAvatar(): string {
   const avatarNumber = Math.floor(Math.random() * 10) + 1;
-  return `/images/default-avatars/default-avatar-${avatarNumber}.webp`;
+  return `/images/default-avatars/default-avatar-${avatarNumber.toString()}.webp`;
 }
 
 // Create global permissions using the constants
@@ -20,14 +21,17 @@ async function createGlobalPermissions() {
     await prisma.permission.upsert({
       where: { name: permName },
       update: {},
-      create: { 
+      create: {
         name: permName,
-        description: PERMISSION_DESCRIPTIONS[permName] || `Permission: ${permName}`
+        description:
+          PERMISSION_DESCRIPTIONS[permName] ?? `Permission: ${permName}`,
       },
     });
   }
 
-  console.log(`Created ${ALL_PERMISSIONS.length} global permissions`);
+  console.log(
+    `Created ${ALL_PERMISSIONS.length.toString()} global permissions`,
+  );
 }
 
 // Create default collection types for an organization
@@ -97,8 +101,10 @@ async function createOrganizationWithRoles(orgData: {
   console.log(`Created system roles for organization: ${organization.name}`);
 
   // Create default Member role from template
-  await roleService.createTemplateRole('MEMBER');
-  console.log(`Created Member role template for organization: ${organization.name}`);
+  await roleService.createTemplateRole("MEMBER");
+  console.log(
+    `Created Member role template for organization: ${organization.name}`,
+  );
 
   return organization;
 }
@@ -129,7 +135,7 @@ async function createDefaultPriorities(organizationId: string) {
     });
   }
 
-  console.log(`Created ${priorities.length} default priorities`);
+  console.log(`Created ${priorities.length.toString()} default priorities`);
 }
 
 async function main() {
@@ -210,7 +216,7 @@ async function main() {
         profilePicture: getRandomDefaultAvatar(),
       },
     });
-    console.log(`Created user: ${user.name}`);
+    console.log(`Created user: ${user.name ?? "Unknown"}`);
     createdUsers.push({ ...user, roleId: userData.roleId });
   }
 
@@ -235,7 +241,7 @@ async function main() {
       where: { id: userData.roleId },
     });
     console.log(
-      `Created ${role?.name} membership for ${userData.name} in ${organization.name}`,
+      `Created ${role?.name ?? "Unknown"} membership for ${userData.name ?? "Unknown"} in ${organization.name}`,
     );
   }
 
@@ -248,14 +254,12 @@ async function main() {
     },
   });
 
-  if (!austinPinballLocation) {
-    austinPinballLocation = await prisma.location.create({
-      data: {
-        name: "Austin Pinball Collective",
-        organizationId: organization.id,
-      },
-    });
-  }
+  austinPinballLocation ??= await prisma.location.create({
+    data: {
+      name: "Austin Pinball Collective",
+      organizationId: organization.id,
+    },
+  });
   console.log(`Created/Updated location: ${austinPinballLocation.name}`);
 
   // 9. Create models (formerly GameTitles) from PinballMap fixture data and additional OPDB games
@@ -310,13 +314,13 @@ async function main() {
       update: {
         name: game.name,
         manufacturer: game.manufacturer,
-        year: game.year || null,
+        year: game.year,
       },
       create: {
         name: game.name,
         opdbId: game.opdb_id,
         manufacturer: game.manufacturer,
-        year: game.year || null,
+        year: game.year,
         isCustom: false, // OPDB games are not custom
         // Do NOT set organizationId for OPDB models (global)
       },
@@ -329,7 +333,7 @@ async function main() {
   for (let i = 0; i < fixtureData.machines.length; i++) {
     const machine = fixtureData.machines[i];
     if (!machine) {
-      console.error(`Machine at index ${i} is undefined`);
+      console.error(`Machine at index ${i.toString()} is undefined`);
       continue;
     }
 
@@ -343,7 +347,7 @@ async function main() {
     const owner = createdUsers[i % createdUsers.length]; // Rotate through users
 
     if (!owner) {
-      console.error(`No owner found for index ${i}`);
+      console.error(`No owner found for index ${i.toString()}`);
       continue;
     }
 
@@ -373,7 +377,7 @@ async function main() {
       });
     }
     console.log(
-      `Created/Updated machine: ${model.name} (Owner: ${owner.name})`,
+      `Created/Updated machine: ${model.name} (Owner: ${owner.name ?? "Unknown"})`,
     );
   }
 
@@ -480,7 +484,7 @@ async function main() {
 }
 
 void main()
-  .catch((e) => {
+  .catch((e: unknown) => {
     console.error(e);
     process.exit(1);
   })

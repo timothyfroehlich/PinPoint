@@ -1,8 +1,13 @@
-import { type Role, type Permission, type Organization, type Membership } from "@prisma/client";
+import {
+  type Role,
+  type Permission,
+  type Organization,
+  type Membership,
+} from "@prisma/client";
 
 /**
  * Test Data Factory for Roles and Permissions
- * 
+ *
  * Provides reusable factory functions for creating consistent test data
  * for roles, permissions, and related entities across the test suite.
  */
@@ -17,7 +22,7 @@ export interface TestRole extends Role {
 }
 
 export interface TestPermission extends Permission {
-  description?: string;
+  description: string | null;
 }
 
 export interface TestMembership extends Membership {
@@ -42,8 +47,11 @@ export interface TestOrganization extends Organization {
  * Permission Factory
  * Creates permission objects with default values
  */
+// eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace PermissionFactory {
-  export function create(overrides: Partial<TestPermission> = {}): TestPermission {
+  export function create(
+    overrides: Partial<TestPermission> = {},
+  ): TestPermission {
     return {
       id: `perm-${Math.random().toString(36).slice(2, 11)}`,
       name: "issue:create",
@@ -91,7 +99,10 @@ export namespace PermissionFactory {
 
   export function createAdminPermissions(): TestPermission[] {
     return [
-      create({ name: "organization:manage", description: "Manage organization" }),
+      create({
+        name: "organization:manage",
+        description: "Manage organization",
+      }),
       create({ name: "user:manage", description: "Manage users" }),
       create({ name: "role:manage", description: "Manage roles" }),
     ];
@@ -112,6 +123,7 @@ export namespace PermissionFactory {
  * Role Factory
  * Creates role objects with default values and permission assignments
  */
+// eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace RoleFactory {
   export function create(overrides: Partial<TestRole> = {}): TestRole {
     return {
@@ -127,7 +139,9 @@ export namespace RoleFactory {
     };
   }
 
-  export function createUnauthenticatedRole(organizationId: string = "org-1"): TestRole {
+  export function createUnauthenticatedRole(
+    organizationId = "org-1",
+  ): TestRole {
     return create({
       name: "Unauthenticated",
       organizationId,
@@ -137,7 +151,7 @@ export namespace RoleFactory {
     });
   }
 
-  export function createMemberRole(organizationId: string = "org-1"): TestRole {
+  export function createMemberRole(organizationId = "org-1"): TestRole {
     return create({
       name: "Member",
       organizationId,
@@ -152,7 +166,7 @@ export namespace RoleFactory {
     });
   }
 
-  export function createTechnicianRole(organizationId: string = "org-1"): TestRole {
+  export function createTechnicianRole(organizationId = "org-1"): TestRole {
     return create({
       name: "Technician",
       organizationId,
@@ -173,7 +187,7 @@ export namespace RoleFactory {
     });
   }
 
-  export function createAdminRole(organizationId: string = "org-1"): TestRole {
+  export function createAdminRole(organizationId = "org-1"): TestRole {
     return create({
       name: "Admin",
       organizationId,
@@ -186,7 +200,7 @@ export namespace RoleFactory {
   export function createCustomRole(
     name: string,
     permissions: TestPermission[],
-    organizationId: string = "org-1"
+    organizationId = "org-1",
   ): TestRole {
     return create({
       name,
@@ -197,7 +211,7 @@ export namespace RoleFactory {
     });
   }
 
-  export function createSystemRoleSet(organizationId: string = "org-1"): TestRole[] {
+  export function createSystemRoleSet(organizationId = "org-1"): TestRole[] {
     return [
       createUnauthenticatedRole(organizationId),
       createMemberRole(organizationId),
@@ -206,7 +220,10 @@ export namespace RoleFactory {
     ];
   }
 
-  export function createWithMemberCount(memberCount: number, overrides: Partial<TestRole> = {}): TestRole {
+  export function createWithMemberCount(
+    memberCount: number,
+    overrides: Partial<TestRole> = {},
+  ): TestRole {
     return {
       ...create(overrides),
       _count: {
@@ -220,8 +237,11 @@ export namespace RoleFactory {
  * Membership Factory
  * Creates membership objects linking users to organizations with roles
  */
+// eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace MembershipFactory {
-  export function create(overrides: Partial<TestMembership> = {}): TestMembership {
+  export function create(
+    overrides: Partial<TestMembership> = {},
+  ): TestMembership {
     return {
       id: `membership-${Math.random().toString(36).slice(2, 11)}`,
       userId: "user-1",
@@ -232,7 +252,10 @@ export namespace MembershipFactory {
     };
   }
 
-  export function createWithRole(role: TestRole, userId: string = "user-1"): TestMembership {
+  export function createWithRole(
+    role: TestRole,
+    userId = "user-1",
+  ): TestMembership {
     return create({
       userId,
       organizationId: role.organizationId,
@@ -245,7 +268,7 @@ export namespace MembershipFactory {
     userId: string,
     userName: string,
     userEmail: string,
-    role: TestRole
+    role: TestRole,
   ): TestMembership {
     return create({
       userId,
@@ -262,20 +285,25 @@ export namespace MembershipFactory {
 
   export function createMultipleForOrganization(
     organizationId: string,
-    userCount: number = 3
+    userCount = 3,
   ): TestMembership[] {
     const roles = RoleFactory.createSystemRoleSet(organizationId);
     const memberships: TestMembership[] = [];
 
     for (let i = 0; i < userCount; i++) {
       const role = roles[i % roles.length];
+      if (!role) {
+        throw new Error(
+          `No role found at index ${(i % roles.length).toString()}`,
+        );
+      }
       memberships.push(
         createWithUser(
           `user-${(i + 1).toString()}`,
           `Test User ${(i + 1).toString()}`,
           `user${(i + 1).toString()}@example.com`,
-          role
-        )
+          role,
+        ),
       );
     }
 
@@ -287,8 +315,11 @@ export namespace MembershipFactory {
  * Organization Factory
  * Creates organization objects with complete role and membership structures
  */
+// eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace OrganizationFactory {
-  export function create(overrides: Partial<TestOrganization> = {}): TestOrganization {
+  export function create(
+    overrides: Partial<TestOrganization> = {},
+  ): TestOrganization {
     return {
       id: `org-${Math.random().toString(36).slice(2, 11)}`,
       name: "Test Organization",
@@ -301,12 +332,12 @@ export namespace OrganizationFactory {
   }
 
   export function createWithRoles(
-    name: string = "Test Organization",
-    subdomain: string = "test"
+    name = "Test Organization",
+    subdomain = "test",
   ): TestOrganization {
     const orgId = `org-${Math.random().toString(36).slice(2, 11)}`;
     const roles = RoleFactory.createSystemRoleSet(orgId);
-    
+
     return create({
       id: orgId,
       name,
@@ -316,14 +347,17 @@ export namespace OrganizationFactory {
   }
 
   export function createWithMemberships(
-    name: string = "Test Organization",
-    subdomain: string = "test",
-    memberCount: number = 3
+    name = "Test Organization",
+    subdomain = "test",
+    memberCount = 3,
   ): TestOrganization {
     const orgId = `org-${Math.random().toString(36).slice(2, 11)}`;
     const roles = RoleFactory.createSystemRoleSet(orgId);
-    const memberships = MembershipFactory.createMultipleForOrganization(orgId, memberCount);
-    
+    const memberships = MembershipFactory.createMultipleForOrganization(
+      orgId,
+      memberCount,
+    );
+
     return create({
       id: orgId,
       name,
@@ -333,19 +367,19 @@ export namespace OrganizationFactory {
     });
   }
 
-  export function createMultipleForTesting(count: number = 2): TestOrganization[] {
+  export function createMultipleForTesting(count = 2): TestOrganization[] {
     const organizations: TestOrganization[] = [];
-    
+
     for (let i = 0; i < count; i++) {
       organizations.push(
         createWithMemberships(
           `Test Organization ${(i + 1).toString()}`,
           `test-${(i + 1).toString()}`,
-          3
-        )
+          3,
+        ),
       );
     }
-    
+
     return organizations;
   }
 }
@@ -354,6 +388,7 @@ export namespace OrganizationFactory {
  * Permission Matrix Factory
  * Creates permission matrices for testing role-based access control
  */
+// eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace PermissionMatrixFactory {
   export function createMatrix(): Record<string, string[]> {
     return {
@@ -404,7 +439,7 @@ export namespace PermissionMatrixFactory {
 
   export function getRolePermissions(roleName: string): string[] {
     const matrix = createMatrix();
-    return matrix[roleName] || [];
+    return matrix[roleName] ?? [];
   }
 
   export function hasPermission(roleName: string, permission: string): boolean {
@@ -431,20 +466,21 @@ export namespace PermissionMatrixFactory {
  * Mock Context Factory
  * Creates mock tRPC contexts with different permission configurations
  */
+// eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace MockContextFactory {
   export function createWithPermissions(
     permissions: string[],
-    organizationId: string = "org-1"
+    organizationId = "org-1",
   ) {
     const role = RoleFactory.createCustomRole(
       "Test Role",
-      permissions.map(p => PermissionFactory.create({ name: p })),
-      organizationId
+      permissions.map((p) => PermissionFactory.create({ name: p })),
+      organizationId,
     );
-    
+
     const membership = MembershipFactory.createWithRole(role);
     const organization = OrganizationFactory.create({ id: organizationId });
-    
+
     return {
       session: {
         user: {
@@ -463,25 +499,25 @@ export namespace MockContextFactory {
 
   export function createWithRole(
     roleName: "Unauthenticated" | "User" | "Technician" | "Admin",
-    organizationId: string = "org-1"
+    organizationId = "org-1",
   ) {
     const permissions = PermissionMatrixFactory.getRolePermissions(roleName);
     return createWithPermissions(permissions, organizationId);
   }
 
-  export function createAdmin(organizationId: string = "org-1") {
+  export function createAdmin(organizationId = "org-1") {
     return createWithRole("Admin", organizationId);
   }
 
-  export function createTechnician(organizationId: string = "org-1") {
+  export function createTechnician(organizationId = "org-1") {
     return createWithRole("Technician", organizationId);
   }
 
-  export function createUser(organizationId: string = "org-1") {
+  export function createUser(organizationId = "org-1") {
     return createWithRole("User", organizationId);
   }
 
-  export function createUnauthenticated(organizationId: string = "org-1") {
+  export function createUnauthenticated(organizationId = "org-1") {
     return createWithRole("Unauthenticated", organizationId);
   }
 }
