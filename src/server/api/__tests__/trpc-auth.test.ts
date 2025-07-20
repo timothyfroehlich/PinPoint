@@ -171,7 +171,7 @@ describe("tRPC Authentication Middleware", () => {
 
       expect(ctx.db.membership.findFirst).toHaveBeenCalledWith({
         where: {
-          organizationId: "org-1",
+          organizationId: "clh7xkg7w0001x9yz0qj3k1vr",
           userId: "user-123",
         },
         include: {

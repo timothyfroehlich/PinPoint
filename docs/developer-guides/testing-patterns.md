@@ -6,6 +6,8 @@ This guide covers Jest testing patterns, mocking strategies, and coverage best p
 
 For basic testing patterns, see [CLAUDE.md TypeScript Guidelines](../../CLAUDE.md#typescript-strictest-mode-guidelines). This guide covers advanced scenarios and comprehensive patterns.
 
+**NEW**: For schema-validated testing with Zod-Prisma integration, see [Zod-Prisma Integration Guide](./zod-prisma-integration.md).
+
 ## Jest Mocking Patterns
 
 ### 1. Service Mocking with jest.Mocked
@@ -119,6 +121,34 @@ function createMockUser(overrides: Partial<User> = {}): User {
     updatedAt: new Date("2023-01-01"),
     ...overrides,
   };
+}
+```
+
+**Schema-Validated Factories (Recommended)**
+
+```typescript
+import { UserSchema, IssueSchema } from "~/prisma/generated/zod";
+
+// ✅ Schema-validated factory with CUID format
+function createValidUser(overrides: Partial<User> = {}): User {
+  const baseUser = {
+    id: "clh7xkg7w0000x9yz0qj3k1vq", // Valid CUID format
+    name: "Test User",
+    email: "test@example.com",
+    emailVerified: null,
+    image: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    bio: null,
+    profilePicture: null,
+    emailNotificationsEnabled: true,
+    pushNotificationsEnabled: false,
+    notificationFrequency: "IMMEDIATE" as const,
+    ...overrides,
+  };
+
+  // Always validate with schema to ensure data consistency
+  return UserSchema.parse(baseUser);
 }
 
 // Organization factory

@@ -83,6 +83,7 @@ npm run typecheck:changed                         # Check git-modified files
 - **Modern patterns** - ES modules, typed mocks (`jest.fn<T>()`), no `any` types
 - **Test quality** - Same standards as production code
 - **Coverage thresholds** - 50% global, 60% server/, 70% lib/ (configured in jest.config.js)
+- **Schema validation** - All test data must be validated with generated Zod schemas
 
 ## TypeScript Strictest Mode Guidelines
 
@@ -181,6 +182,63 @@ npm run typecheck:changed                         # Check git-modified files
 - Skip null checks in protected procedures
 
 **Remember**: Betterer tracks all TypeScript errors - no new errors allowed in production code!
+
+## Schema-Validated Testing with Zod-Prisma
+
+### Quick Start
+
+```typescript
+// Import generated schemas
+import {
+  UserSchema,
+  IssueUncheckedCreateInputSchema,
+} from "~/prisma/generated/zod";
+import { createValidUser, validateMockData } from "~/src/test/mockContext";
+
+// ✅ Use factory functions for CUID-valid mock data
+const user = createValidUser({
+  name: "Test User",
+  email: "test@example.com",
+});
+
+// ✅ Validate custom mock data with schemas
+const issue = validateMockData(IssueSchema, {
+  id: "clh7xkg7w0001x9yz0qj3k1vq", // Valid CUID format
+  title: "Test Issue",
+  description: "Test description",
+  // ... other required fields
+});
+
+// ✅ Use schemas for tRPC input validation
+const inputSchema = IssueUncheckedCreateInputSchema.pick({
+  title: true,
+  description: true,
+  machineId: true,
+});
+```
+
+### CUID Format Requirements
+
+Always use valid CUID format for database IDs in tests:
+
+```typescript
+// ✅ Valid CUID format (25 characters)
+const USER_ID = "clh7xkg7w0000x9yz0qj3k1vq";
+const ORG_ID = "clh7xkg7w0001x9yz0qj3k1vr";
+
+// ❌ Invalid formats
+const badId = "user-1"; // Too short
+const badId2 = "123456789"; // Wrong format
+```
+
+### Key Benefits
+
+- **Type Safety**: All test data validated against Prisma schemas
+- **Agent Friendly**: LLMs can generate valid mock data using schema guidance
+- **Error Prevention**: Invalid data caught at validation time
+- **Schema Documentation**: Generated schemas serve as living documentation
+
+**For comprehensive patterns**: See [Zod-Prisma Integration Guide](docs/developer-guides/zod-prisma-integration.md)
 
 ## Development Workflow
 

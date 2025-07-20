@@ -646,7 +646,6 @@ describe("Multi-Tenant Security Tests", () => {
         title: "Test Issue",
         description: "Test Description",
         machineId: "game-a-1",
-        statusId: "status-1",
       };
 
       await callerA.issue.core.create(createData);

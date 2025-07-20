@@ -45,6 +45,7 @@
     "scripts/**/*.cjs",
     "src/_archived_frontend/**/*",
     "coverage/**/*",
-    ".betterer.ts"
+    ".betterer.ts",
+    "prisma/generated/**/*"
   ]
 }

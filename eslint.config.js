@@ -189,6 +189,7 @@ export default tseslint.config(
       "node_modules/",
       "drizzle/",
       "src/_archived_frontend/**/*",
+      "prisma/generated/**/*",
       "eslint.config.js",
       "prettier.config.js",
       "next.config.js",
