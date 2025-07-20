@@ -203,6 +203,7 @@ describe("CollectionService", () => {
           description: "Main playing area",
           isManual: true,
           isSmart: false,
+          organizationId: "org1",
         },
       });
     });

@@ -195,11 +195,13 @@ export class CollectionService {
    * Create a manual collection
    */
   createManualCollection(
+    organizationId: string,
     data: CreateManualCollectionData,
   ): Promise<Collection> {
     const createData: {
       name: string;
       typeId: string;
+      organizationId: string;
       locationId?: string | null;
       description?: string | null;
       isManual: true;
@@ -207,6 +209,7 @@ export class CollectionService {
     } = {
       name: data.name,
       typeId: data.typeId,
+      organizationId,
       isManual: true,
       isSmart: false,
     };

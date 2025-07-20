@@ -126,7 +126,7 @@ describe("Collection Router Integration", () => {
         Promise.resolve(mockCollection),
       );
 
-      const result = await service.createManualCollection({
+      const result = await service.createManualCollection("org1", {
         name: "Test Collection",
         typeId: "type1",
         locationId: "loc1",
@@ -140,6 +140,7 @@ describe("Collection Router Integration", () => {
           typeId: "type1",
           locationId: "loc1",
           description: "Test description",
+          organizationId: "org1",
           isManual: true,
           isSmart: false,
         },
