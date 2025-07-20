@@ -1,12 +1,12 @@
-# Task: fix-typescript-errors
+# Task: implement-zod-prisma-integration
 
 ## Mission Statement
 
-[The orchestrator will fill this in with specific task details]
+Implement a comprehensive solution for type-safe Prisma mocking that empowers LLM agents with intelligent, schema-driven mock generation. Transform the current TypeScript-Prisma-Jest testing workflow into an agent-friendly architecture using automatically generated Zod schemas.
 
 ## Context
 
-[Background information and constraints will be provided here]
+This task implements enhanced agent architecture with zod-prisma-types integration as documented in Issue #123. See `implement-zod-prisma-integration-task.md` for detailed implementation strategy.
 
 ## Implementation Steps
 
