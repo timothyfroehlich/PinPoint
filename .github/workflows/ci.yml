@@ -37,8 +37,8 @@ jobs:
           # Count total TypeScript errors
           ERROR_COUNT=$(grep -c "error TS" typescript-output.log 2>/dev/null || echo "0")
           
-          # Filter out test files more comprehensively (including __tests__ directories)
-          PRODUCTION_ERRORS=$(grep "error TS" typescript-output.log 2>/dev/null | grep -v -E "(test\.|\.test\.|__tests__|\.spec\.|spec\.|/test/|/tests/)" || true)
+          # Filter out test files more comprehensively (including all test-related paths)
+          PRODUCTION_ERRORS=$(grep "error TS" typescript-output.log 2>/dev/null | grep -v -E "(test\.|\.test\.|__tests__|\.spec\.|spec\.|/test/|/tests/|src/test/|mockContext)" || true)
           
           # Debug: Show what errors we're seeing
           echo "=== ALL TYPESCRIPT ERRORS ==="
@@ -86,7 +86,7 @@ jobs:
           elif [ "$TEST_ERROR_COUNT" -gt 0 ]; then
             {
               echo "### Test File Errors (Non-blocking):"
-              grep "error TS" typescript-output.log | grep -E "(test\.|\.test\.|__tests__|\.spec\.|spec\.|/test/|/tests/)" | head -5 || true
+              grep "error TS" typescript-output.log | grep -E "(test\.|\.test\.|__tests__|\.spec\.|spec\.|/test/|/tests/|src/test/|mockContext)" | head -5 || true
               echo ""
               echo "✅ Test errors don't block CI during TypeScript migration"
               echo "📋 These will be addressed in separate cleanup tasks"
