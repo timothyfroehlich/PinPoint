@@ -19,9 +19,12 @@ jobs:
   typecheck:
     name: TypeScript
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "24"
           cache: "npm"
@@ -41,7 +44,7 @@ jobs:
           fi
       - name: Upload TypeScript Error Report
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: typescript-errors
           path: typescript-output.log
@@ -50,6 +53,8 @@ jobs:
   lint-production:
     name: ESLint (Production)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     env:
       AUTH_SECRET: "temp_secret_value" # Temporary value for CI validation only
       DATABASE_URL: "sqlite://temp_db.sqlite" # Temporary value for CI validation only
@@ -58,8 +63,8 @@ jobs:
       GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
       OPDB_API_TOKEN: ${{ secrets.OPDB_API_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "24"
           cache: "npm"
@@ -72,6 +77,8 @@ jobs:
     name: ESLint (Tests)
     runs-on: ubuntu-latest
     continue-on-error: true # Don't fail CI for test warnings
+    permissions:
+      contents: read
     env:
       AUTH_SECRET: "temp_secret_value" # Temporary value for CI validation only
       DATABASE_URL: "sqlite://temp_db.sqlite" # Temporary value for CI validation only
@@ -80,8 +87,8 @@ jobs:
       GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
       OPDB_API_TOKEN: ${{ secrets.OPDB_API_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "24"
           cache: "npm"
@@ -99,9 +106,11 @@ jobs:
   format:
     name: Prettier
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "24"
           cache: "npm"
@@ -113,6 +122,9 @@ jobs:
   betterer:
     name: Betterer
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write
     env:
       AUTH_SECRET: "temp_secret_value" # Temporary value for CI validation only
       DATABASE_URL: "sqlite://temp_db.sqlite" # Temporary value for CI validation only
@@ -121,8 +133,8 @@ jobs:
       GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
       OPDB_API_TOKEN: ${{ secrets.OPDB_API_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "24"
           cache: "npm"
@@ -140,7 +152,7 @@ jobs:
           fi
       - name: Upload Betterer Diff
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: betterer-diff
           path: |
@@ -151,6 +163,8 @@ jobs:
   test:
     name: Tests
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     env:
       AUTH_SECRET: "temp_secret_value" # Temporary value for CI
       DATABASE_URL: "sqlite://temp_db.sqlite" # Temporary value for CI
@@ -158,10 +172,10 @@ jobs:
       DEFAULT_ORG_SUBDOMAIN: "apc"
       NODE_ENV: "test"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "24"
           cache: "npm"
@@ -169,7 +183,7 @@ jobs:
       - name: Run Tests with Coverage
         run: npm run test:coverage
       - name: Upload Coverage
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@18283e04ce6e62d37312384ff67231eb8fd56d24 # v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage/lcov.info
@@ -181,9 +195,11 @@ jobs:
   security:
     name: Security
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "24"
           cache: "npm"
@@ -195,10 +211,12 @@ jobs:
   validate-actions:
     name: Validate Actions
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - name: Validate GitHub workflows
-        uses: raven-actions/actionlint@v2
+        uses: raven-actions/actionlint@3a24062651993d40fed1019b58ac6fbdfbf276cc # v2
 
   # Job 8: Migration Progress Report (PR only)
   migration-report:
@@ -206,6 +224,9 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     needs: [typecheck, lint-production, lint-tests, betterer]
+    permissions:
+      contents: read
+      pull-requests: write
     env:
       AUTH_SECRET: "temp_secret_value" # Temporary value for CI validation only
       DATABASE_URL: "sqlite://temp_db.sqlite" # Temporary value for CI validation only
@@ -214,8 +235,8 @@ jobs:
       GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
       OPDB_API_TOKEN: ${{ secrets.OPDB_API_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "24"
           cache: "npm"
@@ -247,7 +268,7 @@ jobs:
           } >> migration-report.md
           
       - name: Comment PR
-        uses: actions/github-script@v7
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7
         if: always()
         with:
           script: |
@@ -290,6 +311,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: [typecheck, lint-production, format, betterer, test, security, validate-actions]
     if: always()
+    permissions:
+      contents: read
     steps:
       - name: Check Results
         run: |
