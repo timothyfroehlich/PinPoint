@@ -3,19 +3,18 @@ import { z } from "zod";
 import {
   createTRPCRouter,
   organizationProcedure,
-  publicProcedure,
+  protectedProcedure,
   issueEditProcedure,
 } from "~/server/api/trpc";
 
 export const issueCoreRouter = createTRPCRouter({
-  // Public submission - anyone can report an issue
-  create: publicProcedure
+  // Create issue - requires authentication
+  create: protectedProcedure
     .input(
       z.object({
         title: z.string().min(1).max(255),
         description: z.string().optional(),
         severity: z.enum(["Low", "Medium", "High", "Critical"]).optional(),
-        reporterEmail: z.email().optional(),
         machineId: z.string(),
       }),
     )
@@ -70,10 +69,7 @@ export const issueCoreRouter = createTRPCRouter({
         );
       }
 
-      // Determine reporter: use session user if available, otherwise use email or null
-      if (!ctx.session.user.id) {
-        throw new Error("User not found");
-      }
+      // User is guaranteed to exist in protected procedure
       const createdById = ctx.session.user.id;
 
       // Create the issue
@@ -118,15 +114,13 @@ export const issueCoreRouter = createTRPCRouter({
         },
       });
 
-      // Record the issue creation activity if user is logged in
-      if (createdById) {
-        const activityService = ctx.services.createIssueActivityService();
-        await activityService.recordIssueCreated(
-          issue.id,
-          organization.id,
-          createdById,
-        );
-      }
+      // Record the issue creation activity
+      const activityService = ctx.services.createIssueActivityService();
+      await activityService.recordIssueCreated(
+        issue.id,
+        organization.id,
+        createdById,
+      );
 
       // Send notifications for new issue
       const notificationService = ctx.services.createNotificationService();
