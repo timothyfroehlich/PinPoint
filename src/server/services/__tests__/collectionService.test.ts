@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 import { CollectionService } from "../collectionService";
 
-import type { ExtendedPrismaClient } from "~/server/db";
+import type { ExtendedPrismaClient } from "../../db";
 
 // Mock Prisma Client
 const mockPrisma = {
@@ -193,7 +193,7 @@ describe("CollectionService", () => {
         mockPrisma.collection.create as jest.MockedFunction<
           typeof mockPrisma.collection.create
         >
-      ).mockResolvedValue(mockCollection);
+      ).mockResolvedValue(mockCollection as any);
 
       const result = await service.createManualCollection("org1", {
         name: "Front Room",
@@ -212,7 +212,7 @@ describe("CollectionService", () => {
           isManual: true,
           isSmart: false,
           organizationId: "org1",
-        },
+        } as any,
       });
     });
   });
@@ -223,7 +223,7 @@ describe("CollectionService", () => {
         mockPrisma.collection.update as jest.MockedFunction<
           typeof mockPrisma.collection.update
         >
-      ).mockResolvedValue({});
+      ).mockResolvedValue({} as any);
 
       await service.addMachinesToCollection("coll1", ["machine1", "machine2"]);
 
@@ -244,7 +244,7 @@ describe("CollectionService", () => {
         mockPrisma.collectionType.update as jest.MockedFunction<
           typeof mockPrisma.collectionType.update
         >
-      ).mockResolvedValue({});
+      ).mockResolvedValue({} as any);
 
       await service.toggleCollectionType("type1", false);
 
