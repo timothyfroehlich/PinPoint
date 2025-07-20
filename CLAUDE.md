@@ -56,6 +56,21 @@ npm run debug:lint      # Detailed lint output
 
 # Testing
 npm run test:coverage
+
+# File-Specific TypeScript Checking (NEW)
+npm run typecheck:files -- src/specific/file.ts   # Check specific files
+npm run typecheck:routes                          # Check route files only
+npm run typecheck:tests                           # Check test files only
+npm run typecheck:changed                         # Check git-modified files
+
+# Advanced TypeScript Scripts (Auto-Approved)
+./scripts/typecheck-files.sh [--lines N] src/**/*.ts     # Direct bash script (default: 10 lines)
+./scripts/typecheck-grep.sh [--lines N] "pattern" [files] # Type check + grep filter (default: 5 lines)
+# Examples:
+#   ./scripts/typecheck-files.sh --lines 20 src/app/api/**/*.ts
+#   ./scripts/typecheck-grep.sh -l 0 "multi-tenant" # Show all matching errors
+#   ./scripts/typecheck-grep.sh --lines 3 "route\.ts" # Show only 3 errors
+# Note: These scripts use `npx tsc --noEmit` and are auto-approved for faster execution
 ```
 
 ## Quality Standards (Zero Tolerance)
@@ -112,6 +127,8 @@ npm run test:coverage
 - **ESM modules**: Project uses `"type": "module"` - some packages (superjson, @auth/prisma-adapter) are ESM-only and may need transformIgnorePatterns updates in Jest
 - **Jest ESM**: Current config uses `ts-jest/presets/default-esm` - avoid changing without understanding ESM implications
 - **Type Safety**: Project enforces strictest TypeScript + type-aware ESLint rules. All `@typescript-eslint/no-unsafe-*` and `no-explicit-any` violations must be fixed
+- **TypeScript Migration**: Currently migrating to strictest mode - use new file-specific scripts for focused type checking during fixes
+- **Migration Tracking**: See `TYPESCRIPT_MIGRATION.md` for current status, error counts, lessons learned, and coordination across branches/PRs. Run `./scripts/update-typescript-stats.sh` to update counts
 
 ## Frontend Development Notes
 

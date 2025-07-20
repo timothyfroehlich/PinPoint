@@ -113,7 +113,7 @@ function validateFile(filePath) {
   // Only validate TypeScript/JavaScript files
   if (!shouldValidateFile(filePath)) {
     return {
-      decision: "continue",
+      decision: "approve",
       reason: "File type doesn't require validation",
     };
   }
@@ -121,7 +121,7 @@ function validateFile(filePath) {
   // Check if file exists
   if (!existsSync(filePath)) {
     return {
-      decision: "continue",
+      decision: "approve",
       reason: "File was deleted or moved",
     };
   }
@@ -193,13 +193,13 @@ function validateFile(filePath) {
     };
   } else if (issues.length > 0) {
     return {
-      decision: "continue",
+      decision: "approve",
       reason: `File validated with ${issues.length} warning(s)`,
       issues: issues,
     };
   } else {
     return {
-      decision: "continue",
+      decision: "approve",
       reason: "File validated successfully",
     };
   }
@@ -215,7 +215,7 @@ function main() {
   if (!filePath) {
     console.log(
       JSON.stringify({
-        decision: "continue",
+        decision: "approve",
         reason: "No file path provided",
       }),
     );

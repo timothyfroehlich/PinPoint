@@ -4,9 +4,48 @@ on:
   push:
     branches: [main]
   pull_request:
+    types: [opened, synchronize, reopened]
+
+# Cancel in-progress runs for the same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  lint:
+  # Job 1: TypeScript Type Checking
+  typecheck:
+    name: TypeScript
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+      - run: npm ci
+      - name: TypeScript Check
+        id: typecheck
+        run: |
+          npm run typecheck 2>&1 | tee typescript-output.log || true
+          ERROR_COUNT=$(grep -c "error TS" typescript-output.log || echo "0")
+          echo "error_count=$ERROR_COUNT" >> $GITHUB_OUTPUT
+          echo "## TypeScript Check Results" >> $GITHUB_STEP_SUMMARY
+          echo "Found $ERROR_COUNT TypeScript errors" >> $GITHUB_STEP_SUMMARY
+          if [ $ERROR_COUNT -gt 0 ]; then
+            echo "### First 10 errors:" >> $GITHUB_STEP_SUMMARY
+            grep "error TS" typescript-output.log | head -10 >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+      - name: Upload TypeScript Error Report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: typescript-errors
+          path: typescript-output.log
+
+  # Job 2: ESLint Linting (Split into production and test)
+  lint-production:
+    name: ESLint (Production)
     runs-on: ubuntu-latest
     env:
       AUTH_SECRET: "temp_secret_value" # Temporary value for CI validation only
@@ -17,20 +56,97 @@ jobs:
       OPDB_API_TOKEN: ${{ secrets.OPDB_API_TOKEN }}
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "24"
-      - name: Install dependencies
-        run: npm install
-      - name: Run lint and format checks
-        run: npm run validate
-      - name: Validate GitHub workflows
-        uses: raven-actions/actionlint@v2
-      - name: Run dependency audit
-        run: npm audit --audit-level=high
+          cache: "npm"
+      - run: npm ci
+      - name: ESLint Check - Production Code
+        run: |
+          npm run lint -- --ignore-pattern "**/*.test.ts" --ignore-pattern "**/*.test.tsx" --ignore-pattern "**/__tests__/**"
+      
+  lint-tests:
+    name: ESLint (Tests)
+    runs-on: ubuntu-latest
+    continue-on-error: true # Don't fail CI for test warnings
+    env:
+      AUTH_SECRET: "temp_secret_value" # Temporary value for CI validation only
+      DATABASE_URL: "sqlite://temp_db.sqlite" # Temporary value for CI validation only
+      DEFAULT_ORG_SUBDOMAIN: ${{ secrets.DEFAULT_ORG_SUBDOMAIN }}
+      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+      GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+      OPDB_API_TOKEN: ${{ secrets.OPDB_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+      - run: npm ci
+      - name: ESLint Check - Test Files
+        id: lint-tests
+        run: |
+          npm run lint -- src/**/*.test.ts src/**/*.test.tsx src/**/__tests__/** 2>&1 | tee eslint-test-output.log || true
+          WARNING_COUNT=$(grep -c "warning" eslint-test-output.log || echo "0")
+          echo "warning_count=$WARNING_COUNT" >> $GITHUB_OUTPUT
+          echo "## ESLint Test Files Report" >> $GITHUB_STEP_SUMMARY
+          echo "Found $WARNING_COUNT warnings in test files" >> $GITHUB_STEP_SUMMARY
 
+  # Job 3: Prettier Formatting
+  format:
+    name: Prettier
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+      - run: npm ci
+      - name: Prettier Check
+        run: npm run format:check
+
+  # Job 4: Betterer Regression Check
+  betterer:
+    name: Betterer
+    runs-on: ubuntu-latest
+    env:
+      AUTH_SECRET: "temp_secret_value" # Temporary value for CI validation only
+      DATABASE_URL: "sqlite://temp_db.sqlite" # Temporary value for CI validation only
+      DEFAULT_ORG_SUBDOMAIN: ${{ secrets.DEFAULT_ORG_SUBDOMAIN }}
+      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+      GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+      OPDB_API_TOKEN: ${{ secrets.OPDB_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+      - run: npm ci
+      - name: Betterer Check
+        id: betterer
+        run: |
+          npm run betterer:check 2>&1 | tee betterer-output.log || BETTERER_EXIT=$?
+          if [ "$BETTERER_EXIT" = "2" ]; then
+            echo "❌ Betterer found regressions!" >> $GITHUB_STEP_SUMMARY
+            grep "got worse" betterer-output.log >> $GITHUB_STEP_SUMMARY || true
+            exit 1
+          elif [ "$BETTERER_EXIT" = "0" ]; then
+            echo "✅ No regressions found" >> $GITHUB_STEP_SUMMARY
+          fi
+      - name: Upload Betterer Diff
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: betterer-diff
+          path: |
+            .betterer.results
+            betterer-output.log
+
+  # Job 5: Tests with Coverage
   test:
+    name: Tests
     runs-on: ubuntu-latest
     env:
       AUTH_SECRET: "temp_secret_value" # Temporary value for CI
@@ -41,21 +157,150 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Fetch full history for better coverage diff
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
         with:
           node-version: "24"
-      - name: Install dependencies
-        run: npm install
-      - name: Run tests with coverage
+          cache: "npm"
+      - run: npm ci
+      - name: Run Tests with Coverage
         run: npm run test:coverage
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@18283e04ce6e62d37312384ff67231eb8fd56d24 # v5.4.3
+      - name: Upload Coverage
+        uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage/lcov.info
           flags: unittests
           name: codecov-umbrella
           fail_ci_if_error: true
-          verbose: true
+
+  # Job 6: Security Audit
+  security:
+    name: Security
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+      - run: npm ci
+      - name: Security Audit
+        run: npm audit --audit-level=high
+
+  # Job 7: Validate GitHub Actions
+  validate-actions:
+    name: Validate Actions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate GitHub workflows
+        uses: raven-actions/actionlint@v2
+
+  # Job 8: Migration Progress Report (PR only)
+  migration-report:
+    name: Migration Progress
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    needs: [typecheck, lint-production, lint-tests, betterer]
+    env:
+      AUTH_SECRET: "temp_secret_value" # Temporary value for CI validation only
+      DATABASE_URL: "sqlite://temp_db.sqlite" # Temporary value for CI validation only
+      DEFAULT_ORG_SUBDOMAIN: ${{ secrets.DEFAULT_ORG_SUBDOMAIN }}
+      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+      GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+      OPDB_API_TOKEN: ${{ secrets.OPDB_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+      - run: npm ci
+      - name: Generate Migration Report
+        run: |
+          # Update stats
+          ./scripts/update-typescript-stats.sh
+          
+          # Create PR comment
+          cat > migration-report.md << 'EOF'
+          ## 📊 TypeScript Migration Progress Report
+          
+          EOF
+          
+          # Extract current stats
+          grep -A 5 "### Error Counts" TYPESCRIPT_MIGRATION.md >> migration-report.md
+          
+          # Add Betterer status
+          echo "" >> migration-report.md
+          echo "### Betterer Status" >> migration-report.md
+          if npm run betterer:check > /dev/null 2>&1; then
+            echo "✅ No regressions detected" >> migration-report.md
+          else
+            echo "⚠️ Check Betterer results for details" >> migration-report.md
+          fi
+          
+          # Add helpful links
+          echo "" >> migration-report.md
+          echo "---" >> migration-report.md
+          echo "📖 [Migration Guide](./TYPESCRIPT_MIGRATION.md) | 🔧 [Helper Scripts](./scripts/README.md)" >> migration-report.md
+          
+      - name: Comment PR
+        uses: actions/github-script@v7
+        if: always()
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('migration-report.md', 'utf8');
+            
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const botComment = comments.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('TypeScript Migration Progress Report')
+            );
+            
+            if (botComment) {
+              // Update existing comment
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: report,
+              });
+            } else {
+              // Create new comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: report,
+              });
+            }
+
+  # Summary job to ensure all checks pass
+  ci-summary:
+    name: CI Summary
+    runs-on: ubuntu-latest
+    needs: [typecheck, lint-production, format, betterer, test, security, validate-actions]
+    if: always()
+    steps:
+      - name: Check Results
+        run: |
+          if [ "${{ needs.typecheck.result }}" != "success" ] ||
+             [ "${{ needs.lint-production.result }}" != "success" ] ||
+             [ "${{ needs.format.result }}" != "success" ] ||
+             [ "${{ needs.betterer.result }}" != "success" ] ||
+             [ "${{ needs.test.result }}" != "success" ] ||
+             [ "${{ needs.security.result }}" != "success" ] ||
+             [ "${{ needs.validate-actions.result }}" != "success" ]; then
+            echo "❌ One or more required checks failed"
+            exit 1
+          else
+            echo "✅ All required checks passed"
+          fi

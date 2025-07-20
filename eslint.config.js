@@ -181,6 +181,7 @@ export default tseslint.config(
       "next.config.js",
       "postcss.config.js",
       "tailwind.config.ts",
+      ".betterer.ts",
     ],
   },
 );

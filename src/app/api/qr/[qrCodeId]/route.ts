@@ -6,12 +6,12 @@ import { constructReportUrl } from "~/server/utils/qrCodeUtils";
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { qrCodeId: string } },
+  { params }: { params: Promise<{ qrCodeId: string }> },
 ): Promise<NextResponse> {
   const dbProvider = getGlobalDatabaseProvider();
   const db = dbProvider.getClient();
   try {
-    const { qrCodeId } = params;
+    const { qrCodeId } = await params;
 
     if (!qrCodeId) {
       return NextResponse.json(
@@ -54,12 +54,12 @@ export async function GET(
 // Support HEAD requests for health checks
 export async function HEAD(
   _request: NextRequest,
-  { params }: { params: { qrCodeId: string } },
+  { params }: { params: Promise<{ qrCodeId: string }> },
 ): Promise<NextResponse> {
   const dbProvider = getGlobalDatabaseProvider();
   const db = dbProvider.getClient();
   try {
-    const { qrCodeId } = params;
+    const { qrCodeId } = await params;
 
     if (!qrCodeId) {
       return new NextResponse(null, { status: 400 });

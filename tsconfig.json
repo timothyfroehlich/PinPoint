@@ -44,6 +44,7 @@
     "node_modules",
     "scripts/**/*.cjs",
     "src/_archived_frontend/**/*",
-    "coverage/**/*"
+    "coverage/**/*",
+    ".betterer.ts"
   ]
 }

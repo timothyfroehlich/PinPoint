@@ -410,7 +410,7 @@ export async function processFixtureData(
 
     for (const machine of fixtureData.machines) {
       // Create or update model
-      const model = await service["findOrCreateModel"](machine, true);
+      const model = await service.findOrCreateModel(machine, true);
 
       if (model) {
         // Create machine instance

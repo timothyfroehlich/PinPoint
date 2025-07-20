@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    env:
+      AUTH_SECRET: "temp_secret_value" # Temporary value for CI validation only
+      DATABASE_URL: "sqlite://temp_db.sqlite" # Temporary value for CI validation only
+      DEFAULT_ORG_SUBDOMAIN: ${{ secrets.DEFAULT_ORG_SUBDOMAIN }}
+      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+      GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+      OPDB_API_TOKEN: ${{ secrets.OPDB_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Install dependencies
+        run: npm install
+      - name: Run lint and format checks
+        run: npm run validate
+      - name: Validate GitHub workflows
+        uses: raven-actions/actionlint@v2
+      - name: Run dependency audit
+        run: npm audit --audit-level=high
+
+  test:
+    runs-on: ubuntu-latest
+    env:
+      AUTH_SECRET: "temp_secret_value" # Temporary value for CI
+      DATABASE_URL: "sqlite://temp_db.sqlite" # Temporary value for CI
+      OPDB_API_TOKEN: "temp_opdb_token" # Temporary value for CI
+      DEFAULT_ORG_SUBDOMAIN: "apc"
+      NODE_ENV: "test"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch full history for better coverage diff
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Install dependencies
+        run: npm install
+      - name: Run tests with coverage
+        run: npm run test:coverage
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@18283e04ce6e62d37312384ff67231eb8fd56d24 # v5.4.3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/lcov.info
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: true
+          verbose: true
