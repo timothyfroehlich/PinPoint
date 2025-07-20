@@ -104,6 +104,18 @@ export default tseslint.config(
           allowDirectConstAssertionInArrowFunctions: true,
         },
       ],
+
+      // Ban problematic TypeScript comment directives
+      "@typescript-eslint/ban-ts-comment": [
+        "error",
+        {
+          "ts-expect-error": "allow-with-description",
+          "ts-ignore": true,
+          "ts-nocheck": true,
+          "ts-check": false,
+          minimumDescriptionLength: 10,
+        },
+      ],
     },
   },
   {

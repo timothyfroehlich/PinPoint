@@ -28,12 +28,12 @@ jobs:
         run: |
           npm run typecheck 2>&1 | tee typescript-output.log || true
           ERROR_COUNT=$(grep -c "error TS" typescript-output.log || echo "0")
-          echo "error_count=$ERROR_COUNT" >> $GITHUB_OUTPUT
-          echo "## TypeScript Check Results" >> $GITHUB_STEP_SUMMARY
-          echo "Found $ERROR_COUNT TypeScript errors" >> $GITHUB_STEP_SUMMARY
-          if [ $ERROR_COUNT -gt 0 ]; then
-            echo "### First 10 errors:" >> $GITHUB_STEP_SUMMARY
-            grep "error TS" typescript-output.log | head -10 >> $GITHUB_STEP_SUMMARY
+          echo "error_count=$ERROR_COUNT" >> "$GITHUB_OUTPUT"
+          echo "## TypeScript Check Results" >> "$GITHUB_STEP_SUMMARY"
+          echo "Found $ERROR_COUNT TypeScript errors" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$ERROR_COUNT" -gt 0 ]; then
+            echo "### First 10 errors:" >> "$GITHUB_STEP_SUMMARY"
+            grep "error TS" typescript-output.log | head -10 >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
       - name: Upload TypeScript Error Report
@@ -88,9 +88,9 @@ jobs:
         run: |
           npm run lint -- src/**/*.test.ts src/**/*.test.tsx src/**/__tests__/** 2>&1 | tee eslint-test-output.log || true
           WARNING_COUNT=$(grep -c "warning" eslint-test-output.log || echo "0")
-          echo "warning_count=$WARNING_COUNT" >> $GITHUB_OUTPUT
-          echo "## ESLint Test Files Report" >> $GITHUB_STEP_SUMMARY
-          echo "Found $WARNING_COUNT warnings in test files" >> $GITHUB_STEP_SUMMARY
+          echo "warning_count=$WARNING_COUNT" >> "$GITHUB_OUTPUT"
+          echo "## ESLint Test Files Report" >> "$GITHUB_STEP_SUMMARY"
+          echo "Found $WARNING_COUNT warnings in test files" >> "$GITHUB_STEP_SUMMARY"
 
   # Job 3: Prettier Formatting
   format:
@@ -129,11 +129,11 @@ jobs:
         run: |
           npm run betterer:check 2>&1 | tee betterer-output.log || BETTERER_EXIT=$?
           if [ "$BETTERER_EXIT" = "2" ]; then
-            echo "❌ Betterer found regressions!" >> $GITHUB_STEP_SUMMARY
-            grep "got worse" betterer-output.log >> $GITHUB_STEP_SUMMARY || true
+            echo "❌ Betterer found regressions!" >> "$GITHUB_STEP_SUMMARY"
+            grep "got worse" betterer-output.log >> "$GITHUB_STEP_SUMMARY" || true
             exit 1
           elif [ "$BETTERER_EXIT" = "0" ]; then
-            echo "✅ No regressions found" >> $GITHUB_STEP_SUMMARY
+            echo "✅ No regressions found" >> "$GITHUB_STEP_SUMMARY"
           fi
       - name: Upload Betterer Diff
         if: failure()

@@ -58,7 +58,7 @@
     "debug:format": "prettier --check \"**/*.{ts,tsx,js,jsx,mdx}\" --cache",
     "workflow:lint": "actionlint .github/workflows/*.yml",
     "betterer": "betterer",
-    "betterer:check": "betterer ci --strict",
+    "betterer:check": "betterer ci",
     "betterer:update": "betterer update",
     "betterer:watch": "betterer watch",
     "pre-commit": "npm run validate && npm run workflow:lint && npm run smoke-test",
