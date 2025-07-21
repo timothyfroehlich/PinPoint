@@ -7,12 +7,9 @@ import {
   resetMockContext,
   type MockContext,
 } from "../../../../test/mockContext";
-import { createTRPCRouter } from "../../trpc";
-import {
-  organizationProcedure,
-  issueCreateProcedure,
-  requirePermission,
-} from "../../trpc.permission";
+import { requirePermission } from "../../../auth/permissions";
+import { createTRPCRouter, organizationProcedure } from "../../trpc";
+import { issueCreateProcedure } from "../../trpc.permission";
 
 // Mock Issue Confirmation Router - This will be implemented by the implementation agent
 const issueConfirmationRouter = createTRPCRouter({

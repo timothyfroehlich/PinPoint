@@ -7,6 +7,7 @@ import {
   protectedProcedure,
   organizationProcedure,
 } from "~/server/api/trpc";
+import { userManageProcedure } from "~/server/api/trpc.permission";
 
 export const userRouter = createTRPCRouter({
   // Get current user's profile
@@ -220,4 +221,70 @@ export const userRouter = createTRPCRouter({
 
     return { profilePicture: user.profilePicture };
   }),
+
+  // Update user membership (role assignment)
+  updateMembership: userManageProcedure
+    .input(
+      z.object({
+        userId: z.string(),
+        roleId: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Verify the role exists and belongs to the current organization
+      const role = await ctx.db.role.findUnique({
+        where: { id: input.roleId },
+      });
+
+      if (!role || role.organizationId !== ctx.organization.id) {
+        throw new Error(
+          "Role not found or does not belong to this organization",
+        );
+      }
+
+      // Verify the user is a member of the current organization
+      const membership = await ctx.db.membership.findUnique({
+        where: {
+          userId_organizationId: {
+            userId: input.userId,
+            organizationId: ctx.organization.id,
+          },
+        },
+      });
+
+      if (!membership) {
+        throw new Error("User is not a member of this organization");
+      }
+
+      // Update the membership
+      const updatedMembership = await ctx.db.membership.update({
+        where: {
+          userId_organizationId: {
+            userId: input.userId,
+            organizationId: ctx.organization.id,
+          },
+        },
+        data: { roleId: input.roleId },
+        include: {
+          role: true,
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+        },
+      });
+
+      return {
+        success: true,
+        membership: {
+          userId: updatedMembership.userId,
+          roleId: updatedMembership.roleId,
+          role: updatedMembership.role.name,
+          user: updatedMembership.user,
+        },
+      };
+    }),
 });

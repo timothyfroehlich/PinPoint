@@ -5,6 +5,7 @@ import {
   PERMISSION_DEPENDENCIES,
   SYSTEM_ROLES,
   UNAUTHENTICATED_PERMISSIONS,
+  ALL_PERMISSIONS,
 } from "../auth/permissions.constants";
 
 import { type ExtendedPrismaClient } from "~/server/db";
@@ -120,11 +121,8 @@ export class PermissionService {
 
     // Admin role has all permissions
     if (membership.role.name === SYSTEM_ROLES.ADMIN) {
-      // Get all permissions from the database
-      const allPermissions = await this.prisma.permission.findMany({
-        select: { name: true },
-      });
-      return allPermissions.map((p: { name: string }) => p.name);
+      // Admin gets all permissions - use constants for consistency
+      return ALL_PERMISSIONS;
     }
 
     // Get role permissions with dependencies

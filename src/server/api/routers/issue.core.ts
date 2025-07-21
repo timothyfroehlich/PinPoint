@@ -5,10 +5,14 @@ import {
   organizationProcedure,
   issueEditProcedure,
 } from "~/server/api/trpc";
+import {
+  issueCreateProcedure,
+  issueAssignProcedure,
+} from "~/server/api/trpc.permission";
 
 export const issueCoreRouter = createTRPCRouter({
-  // Create issue - requires organization membership
-  create: organizationProcedure
+  // Create issue - requires issue:create permission
+  create: issueCreateProcedure
     .input(
       z.object({
         title: z.string().min(1).max(255),
@@ -129,6 +133,87 @@ export const issueCoreRouter = createTRPCRouter({
       );
 
       return issue;
+    }),
+
+  // Assign issue to a user - requires issue:assign permission
+  assign: issueAssignProcedure
+    .input(
+      z.object({
+        issueId: z.string(),
+        userId: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Verify the issue exists and belongs to the organization
+      const issue = await ctx.db.issue.findFirst({
+        where: {
+          id: input.issueId,
+          organizationId: ctx.organization.id,
+        },
+      });
+
+      if (!issue) {
+        throw new Error(
+          "Issue not found or does not belong to this organization",
+        );
+      }
+
+      // Verify the user is a member of the organization
+      const membership = await ctx.db.membership.findUnique({
+        where: {
+          userId_organizationId: {
+            userId: input.userId,
+            organizationId: ctx.organization.id,
+          },
+        },
+        include: { user: true },
+      });
+
+      if (!membership) {
+        throw new Error("User is not a member of this organization");
+      }
+
+      // Update the issue assignment
+      const updatedIssue = await ctx.db.issue.update({
+        where: { id: input.issueId },
+        data: { assignedToId: input.userId },
+        include: {
+          assignedTo: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+          status: true,
+          createdBy: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          machine: {
+            include: {
+              model: true,
+              location: true,
+            },
+          },
+        },
+      });
+
+      // Record the assignment activity
+      const activityService = ctx.services.createIssueActivityService();
+      await activityService.recordIssueAssigned(
+        input.issueId,
+        ctx.organization.id,
+        ctx.session.user.id,
+        input.userId,
+      );
+
+      return {
+        success: true,
+        issue: updatedIssue,
+      };
     }),
 
   // Get all issues for an organization
