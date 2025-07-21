@@ -546,7 +546,7 @@ export const issueCoreRouter = createTRPCRouter({
       });
 
       // Record activity
-      const activityService = new IssueActivityService(ctx.db);
+      const activityService = ctx.services.createIssueActivityService();
       await activityService.recordIssueResolved(
         input.id,
         ctx.organization.id,
@@ -636,7 +636,7 @@ export const issueCoreRouter = createTRPCRouter({
       });
 
       // Record activity
-      const activityService = new IssueActivityService(ctx.db);
+      const activityService = ctx.services.createIssueActivityService();
       await activityService.recordAssignmentChange(
         input.id,
         ctx.organization.id,
@@ -647,7 +647,7 @@ export const issueCoreRouter = createTRPCRouter({
 
       // Send notifications
       if (newAssignedTo) {
-        const notificationService = new NotificationService(ctx.db);
+        const notificationService = ctx.services.createNotificationService();
         await notificationService.notifyUserOfAssignment(
           input.id,
           newAssignedTo.id,
@@ -729,7 +729,7 @@ export const issueCoreRouter = createTRPCRouter({
       });
 
       // Record activity
-      const activityService = new IssueActivityService(ctx.db);
+      const activityService = ctx.services.createIssueActivityService();
       await activityService.recordStatusChange(
         input.id,
         ctx.organization.id,
@@ -739,7 +739,7 @@ export const issueCoreRouter = createTRPCRouter({
       );
 
       // Send notifications
-      const notificationService = new NotificationService(ctx.db);
+      const notificationService = ctx.services.createNotificationService();
       await notificationService.notifyMachineOwnerOfStatusChange(
         input.id,
         existingIssue.status.name,

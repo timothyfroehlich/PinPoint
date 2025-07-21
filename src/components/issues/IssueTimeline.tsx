@@ -29,8 +29,7 @@ export function IssueTimeline({
   issue,
   session: _session,
 }: IssueTimelineProps): React.JSX.Element {
-  // TODO: Fetch actual timeline activities from the API
-  // For now, we'll create a mock timeline based on issue data
+  // Create timeline activities from available issue data
   const activities = [
     {
       id: "created",
@@ -40,19 +39,48 @@ export function IssueTimeline({
       timestamp: issue.createdAt,
       user: issue.createdBy,
     },
-    // Add more activities as needed
   ];
 
+  // Add assignment activity if issue is assigned
   if (issue.assignedTo) {
     activities.push({
       id: "assigned",
       type: "assigned",
       title: "Issue Assigned",
       description: `Assigned to ${issue.assignedTo.name ?? "Unknown"}`,
-      timestamp: issue.updatedAt, // TODO: Get actual assignment timestamp
+      timestamp: issue.updatedAt, // Best approximation available
       user: issue.assignedTo,
     });
   }
+
+  // Add comment activities
+  if (issue.comments) {
+    issue.comments.forEach((comment, index) => {
+      activities.push({
+        id: `comment-${comment.id}`,
+        type: "comment",
+        title: "Comment Added",
+        description: `${comment.author.name ?? "Unknown"} commented: ${comment.content.slice(0, 100)}${comment.content.length > 100 ? "..." : ""}`,
+        timestamp: comment.createdAt,
+        user: comment.author,
+      });
+    });
+  }
+
+  // Add resolution activity if issue is resolved
+  if (issue.resolvedAt) {
+    activities.push({
+      id: "resolved",
+      type: "status_change",
+      title: "Issue Resolved",
+      description: `Issue marked as ${issue.status.name}`,
+      timestamp: issue.resolvedAt,
+      user: issue.createdBy, // Best approximation
+    });
+  }
+
+  // Sort activities by timestamp
+  activities.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
   const getActivityIcon = (type: string): React.JSX.Element => {
     switch (type) {

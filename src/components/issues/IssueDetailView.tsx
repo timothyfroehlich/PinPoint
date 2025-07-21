@@ -7,6 +7,7 @@ import {
   Typography,
   Alert,
   Skeleton,
+  Button,
   useTheme,
   useMediaQuery,
 } from "@mui/material";
@@ -44,6 +45,7 @@ export function IssueDetailView({
     data: issue,
     isLoading,
     error: queryError,
+    refetch,
   } = api.issue.core.getById.useQuery(
     { id: issueId },
     {
@@ -89,6 +91,14 @@ export function IssueDetailView({
         <Alert severity="error" data-testid="network-error" sx={{ mb: 2 }}>
           Failed to load issue. Please try again.
         </Alert>
+        <Button
+          variant="contained"
+          onClick={() => refetch()}
+          data-testid="retry-button"
+          sx={{ mt: 2 }}
+        >
+          Retry
+        </Button>
       </Container>
     );
   }

@@ -4,7 +4,6 @@ import {
   Edit as EditIcon,
   PersonAdd as AssignIcon,
   Close as CloseIcon,
-  Delete as DeleteIcon,
   SwapHoriz as TransferIcon,
   History as AuditLogIcon,
 } from "@mui/icons-material";
@@ -18,9 +17,6 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-  FormControlLabel,
-  Checkbox,
-  Alert,
   Tooltip,
   Divider,
 } from "@mui/material";
@@ -45,10 +41,8 @@ export function IssueActions({
 }: IssueActionsProps) {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
   const [_anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [deleteConfirmed, setDeleteConfirmed] = useState(false);
 
   const [editTitle, setEditTitle] = useState(issue.title);
   const [editDescription, setEditDescription] = useState(
@@ -67,22 +61,16 @@ export function IssueActions({
     },
   });
 
-  // TODO: Create delete mutation when API is available
-  // const deleteIssue = api.issue.core.delete?.useMutation({
-  //   onSuccess: () => {
-  //     // Navigate back to issues list
-  //     window.history.back();
-  //   },
-  //   onError: (error) => {
-  //     onError(error.message);
-  //   },
-  // });
-  const deleteIssue = {
-    mutate: (_args: { id: string }) => {
-      /* TODO: Implement delete */
+  const closeIssue = api.issue.core.close.useMutation({
+    onSuccess: () => {
+      utils.issue.core.getById.invalidate({ id: issue.id });
     },
-    isLoading: false,
-  };
+    onError: (error) => {
+      onError(error.message);
+    },
+  });
+
+  // Delete functionality not implemented - API endpoint doesn't exist
 
   const isAuthenticated = !!session?.user;
   const canEdit = hasPermission("issues:edit");
@@ -100,10 +88,9 @@ export function IssueActions({
     });
   };
 
-  const handleDelete = () => {
-    if (deleteConfirmed) {
-      deleteIssue.mutate({ id: issue.id });
-    }
+
+  const handleClose = () => {
+    closeIssue.mutate({ id: issue.id });
   };
 
   const handleAssignToSelf = () => {
@@ -194,14 +181,12 @@ export function IssueActions({
           <Button
             variant="outlined"
             startIcon={<CloseIcon />}
-            onClick={() => {
-              // TODO: Implement close functionality
-              onError("Close functionality not yet implemented");
-            }}
+            onClick={handleClose}
+            disabled={closeIssue.isPending}
             data-testid="close-issue-button"
             fullWidth
           >
-            Close Issue
+            {closeIssue.isPending ? "Closing..." : "Close Issue"}
           </Button>
         ) : (
           <Tooltip title="You need close permissions to close this issue">
@@ -259,8 +244,8 @@ export function IssueActions({
           </Box>
         )}
 
-        {/* Danger Zone */}
-        {canDelete && (
+        {/* Danger Zone - Delete functionality not yet implemented */}
+        {canDelete && false && (
           <Box data-testid="danger-actions">
             <Divider sx={{ my: 2 }} />
             <Typography variant="subtitle2" color="error" gutterBottom>
@@ -362,41 +347,6 @@ export function IssueActions({
         </DialogActions>
       </Dialog>
 
-      {/* Delete Dialog */}
-      <Dialog
-        open={deleteDialogOpen}
-        onClose={() => setDeleteDialogOpen(false)}
-      >
-        <DialogTitle>Delete Issue</DialogTitle>
-        <DialogContent>
-          <Alert severity="warning" sx={{ mb: 2 }}>
-            This action cannot be undone. The issue and all its comments will be
-            permanently deleted.
-          </Alert>
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={deleteConfirmed}
-                onChange={(e) => setDeleteConfirmed(e.target.checked)}
-                data-testid="confirm-delete-checkbox"
-              />
-            }
-            label="I understand that this action cannot be undone"
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
-          <Button
-            onClick={handleDelete}
-            color="error"
-            variant="contained"
-            disabled={!deleteConfirmed || deleteIssue.isLoading}
-            data-testid="confirm-delete-button"
-          >
-            {deleteIssue.isLoading ? "Deleting..." : "Delete Issue"}
-          </Button>
-        </DialogActions>
-      </Dialog>
 
       {/* Transfer Dialog */}
       <Dialog

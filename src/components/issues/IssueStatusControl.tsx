@@ -35,10 +35,8 @@ export function IssueStatusControl({
 
   const utils = api.useUtils();
 
-  // TODO: Fetch available statuses for the organization
-  // const { data: statuses, isLoading: statusesLoading } = api.issueStatus.getAll.useQuery();
-  const statuses: IssueStatus[] = []; // Mock for now
-  const statusesLoading = false;
+  // Fetch available statuses for the organization
+  const { data: statuses, isLoading: statusesLoading } = api.issueStatus.getAll.useQuery();
 
   const updateStatus = api.issue.core.update.useMutation({
     onSuccess: () => {
@@ -99,7 +97,7 @@ export function IssueStatusControl({
         </Box>
 
         {/* Status Change Control */}
-        {canEditStatus && statuses && (
+        {canEditStatus && statuses && statuses.length > 0 && (
           <Box>
             <FormControl fullWidth>
               <InputLabel id="status-select-label">Change Status</InputLabel>
