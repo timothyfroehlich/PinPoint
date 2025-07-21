@@ -28,7 +28,7 @@ export function IssueStatusControl({
   issue,
   hasPermission,
   onError,
-}: IssueStatusControlProps) {
+}: IssueStatusControlProps): JSX.Element {
   const [selectedStatusId, setSelectedStatusId] = useState(issue.statusId);
   const [isUpdating, setIsUpdating] = useState(false);
 
@@ -50,7 +50,7 @@ export function IssueStatusControl({
     },
   });
 
-  const handleStatusChange = (newStatusId: string) => {
+  const handleStatusChange = (newStatusId: string): void => {
     setSelectedStatusId(newStatusId);
     setIsUpdating(true);
 

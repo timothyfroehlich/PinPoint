@@ -33,7 +33,7 @@ export function IssueDetailView({
   issue: initialIssue,
   session,
   issueId,
-}: IssueDetailViewProps) {
+}: IssueDetailViewProps): JSX.Element {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
@@ -48,7 +48,8 @@ export function IssueDetailView({
 
   const hasPermission = (permission: string): boolean => {
     if (!session?.user) return false;
-    return (session.user as any).permissions?.includes(permission) ?? false;
+    const userWithPermissions = session.user as { permissions?: string[] };
+    return userWithPermissions.permissions?.includes(permission) ?? false;
   };
 
   const isAuthenticated = !!session?.user;

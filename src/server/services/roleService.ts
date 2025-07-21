@@ -182,7 +182,11 @@ export class RoleService {
     }
 
     // Prepare update data
-    const updateData: any = {};
+    const updateData: {
+      name?: string;
+      isDefault?: boolean;
+      permissions?: { connect: { id: string }[] };
+    } = {};
 
     if (updates.name) {
       updateData.name = updates.name;
@@ -278,7 +282,12 @@ export class RoleService {
    *
    * @returns Promise<Role[]> - Array of roles with permissions and member counts
    */
-  async getRoles() {
+  async getRoles(): Promise<
+    (Role & {
+      permissions: { id: string; name: string }[];
+      _count: { memberships: number };
+    })[]
+  > {
     return this.prisma.role.findMany({
       where: { organizationId: this.organizationId },
       include: {
@@ -318,7 +327,7 @@ export class RoleService {
    *
    * @returns Promise<Role | null> - Default role or null if none exists
    */
-  async getDefaultRole() {
+  async getDefaultRole(): Promise<Role | null> {
     return this.prisma.role.findFirst({
       where: {
         organizationId: this.organizationId,
@@ -333,7 +342,7 @@ export class RoleService {
    *
    * @returns Promise<Role | null> - Admin role or null if none exists
    */
-  async getAdminRole() {
+  async getAdminRole(): Promise<Role | null> {
     return this.prisma.role.findFirst({
       where: {
         organizationId: this.organizationId,

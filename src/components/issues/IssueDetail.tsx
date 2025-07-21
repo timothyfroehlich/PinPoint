@@ -11,7 +11,7 @@ interface IssueDetailProps {
   hasPermission: (permission: string) => boolean;
 }
 
-export function IssueDetail({ issue, session }: IssueDetailProps) {
+export function IssueDetail({ issue, session }: IssueDetailProps): JSX.Element {
   const isAuthenticated = !!session?.user;
 
   return (

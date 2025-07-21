@@ -38,7 +38,7 @@ export function IssueActions({
   session,
   hasPermission,
   onError,
-}: IssueActionsProps) {
+}: IssueActionsProps): React.JSX.Element | null {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
@@ -75,7 +75,7 @@ export function IssueActions({
 
   const isAuthenticated = !!session?.user;
 
-  const handleEditSave = () => {
+  const handleEditSave = (): void => {
     updateIssue.mutate({
       id: issue.id,
       title: editTitle,
@@ -83,11 +83,11 @@ export function IssueActions({
     });
   };
 
-  const handleClose = () => {
+  const handleClose = (): void => {
     closeIssue.mutate({ id: issue.id });
   };
 
-  const handleAssignToSelf = () => {
+  const handleAssignToSelf = (): void => {
     updateIssue.mutate({
       id: issue.id,
       assignedToId: session?.user.id,

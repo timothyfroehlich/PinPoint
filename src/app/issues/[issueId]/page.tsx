@@ -34,7 +34,9 @@ export async function generateMetadata({
   }
 }
 
-export default async function IssuePage({ params }: IssuePageProps) {
+export default async function IssuePage({
+  params,
+}: IssuePageProps): Promise<JSX.Element> {
   const session = await auth();
 
   try {
@@ -53,7 +55,7 @@ export default async function IssuePage({ params }: IssuePageProps) {
         />
       </main>
     );
-  } catch (error) {
+  } catch {
     // If issue doesn't exist or user doesn't have access, show 404
     notFound();
   }

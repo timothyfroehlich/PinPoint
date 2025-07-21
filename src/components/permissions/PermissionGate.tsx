@@ -55,7 +55,7 @@ export function PermissionGate({
   fallback,
   children,
   showFallback = false,
-}: PermissionGateProps) {
+}: PermissionGateProps): ReactNode {
   const hasRequiredPermission = hasPermission(permission);
 
   if (hasRequiredPermission) {

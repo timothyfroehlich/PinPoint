@@ -29,7 +29,7 @@ export function IssueComments({
   session,
   hasPermission,
   onError,
-}: IssueCommentsProps) {
+}: IssueCommentsProps): JSX.Element {
   const [commentText, setCommentText] = useState("");
   // isInternal functionality removed until implemented in database
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -48,7 +48,7 @@ export function IssueComments({
     },
   });
 
-  const handleSubmitComment = () => {
+  const handleSubmitComment = (): void => {
     if (!commentText.trim()) return;
 
     setIsSubmitting(true);
