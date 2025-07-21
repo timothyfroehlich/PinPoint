@@ -38,7 +38,7 @@ export async function hasPermission(
   }
 
   const permissionService = new PermissionService(prisma);
-  const rolePermissions = role.permissions.map(p => p.name);
+  const rolePermissions = role.permissions.map((p) => p.name);
   const expandedPermissions =
     permissionService.expandPermissionsWithDependencies(rolePermissions);
 
@@ -97,7 +97,7 @@ export async function getUserPermissions(
   }
 
   const permissionService = new PermissionService(prisma);
-  const rolePermissions = role.permissions.map(p => p.name);
+  const rolePermissions = role.permissions.map((p) => p.name);
   return permissionService.expandPermissionsWithDependencies(rolePermissions);
 }
 
