@@ -2,11 +2,10 @@
 
 import CssBaseline from "@mui/material/CssBaseline";
 import { ThemeProvider } from "@mui/material/styles";
-import { type ReactNode } from "react";
+import { type ReactNode, type JSX } from "react";
 
 import theme from "./theme";
-
-import type { JSX } from "react";
+import { TRPCReactProvider } from "~/trpc/react";
 
 export default function Providers({
   children,
@@ -14,10 +13,12 @@ export default function Providers({
   children: ReactNode;
 }): JSX.Element {
   return (
-    <ThemeProvider theme={theme}>
-      {/* CssBaseline kickstart an elegant, consistent, and simple baseline to build upon. */}
-      <CssBaseline />
-      {children}
-    </ThemeProvider>
+    <TRPCReactProvider>
+      <ThemeProvider theme={theme}>
+        {/* CssBaseline kickstart an elegant, consistent, and simple baseline to build upon. */}
+        <CssBaseline />
+        {children}
+      </ThemeProvider>
+    </TRPCReactProvider>
   );
 }
