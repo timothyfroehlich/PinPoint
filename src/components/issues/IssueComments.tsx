@@ -38,7 +38,7 @@ export function IssueComments({
   const createComment = api.issue.comment.addComment.useMutation({
     onSuccess: () => {
       setCommentText("");
-      utils.issue.core.getById.invalidate({ id: issue.id });
+      void utils.issue.core.getById.invalidate({ id: issue.id });
     },
     onError: (error) => {
       onError(error.message);
@@ -48,7 +48,7 @@ export function IssueComments({
     },
   });
 
-  const handleSubmitComment = async () => {
+  const handleSubmitComment = () => {
     if (!commentText.trim()) return;
 
     setIsSubmitting(true);
@@ -60,11 +60,12 @@ export function IssueComments({
 
   const isAuthenticated = !!session?.user;
   const canComment = hasPermission("issues:comment");
-  const _canViewInternal = hasPermission("issues:read_internal");
-  const _canCreateInternal = hasPermission("issues:comment_internal");
+  // Internal comment permissions - for future implementation
+  // const canViewInternal = hasPermission("issues:read_internal");
+  // const canCreateInternal = hasPermission("issues:comment_internal");
 
   // For now, all comments are visible (isInternal functionality not implemented in DB)
-  const visibleComments = issue.comments || [];
+  const visibleComments = issue.comments;
 
   return (
     <Box>
@@ -93,7 +94,7 @@ export function IssueComments({
               >
                 <Stack direction="row" spacing={2}>
                   <Avatar sx={{ width: 32, height: 32 }}>
-                    {comment.author.name?.[0] || "?"}
+                    {comment.author.name?.[0] ?? "?"}
                   </Avatar>
                   <Box sx={{ flex: 1 }}>
                     <Stack
@@ -134,7 +135,9 @@ export function IssueComments({
             multiline
             rows={3}
             value={commentText}
-            onChange={(e) => setCommentText(e.target.value)}
+            onChange={(e) => {
+              setCommentText(e.target.value);
+            }}
             placeholder="Write your comment..."
             disabled={isSubmitting}
             data-testid="comment-textarea"

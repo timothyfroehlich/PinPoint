@@ -154,7 +154,7 @@ export const createCommentTypes = {
     createCommentFactory({
       overrides: {
         isInternal: true,
-        content: `Internal note: ${faker.lorem.sentence()}`,
+        content: `Internal note: ${String(faker.lorem.sentence())}`,
         createdById: "user-technician",
         createdBy: createUserFactory({
           overrides: { id: "user-technician", name: "Tech User" },
@@ -167,7 +167,7 @@ export const createCommentTypes = {
     createCommentFactory({
       overrides: {
         isInternal: false,
-        content: `Issue resolved: ${faker.lorem.sentence()}`,
+        content: `Issue resolved: ${String(faker.lorem.sentence())}`,
         ...overrides,
       },
     }),
@@ -496,11 +496,18 @@ export const createActivityFactory = (options: FactoryOptions = {}) => {
   return Array.from({ length: count }, () => createSingleActivity());
 };
 
+// Helper to get a single issue object
+const getSingleIssue = (overrides: Record<string, any> = {}) => {
+  const factory = createIssueFactory({ count: 1, overrides });
+  // Since count: 1, this always returns a single object, not an array
+  return factory as Exclude<typeof factory, any[]>;
+};
+
 // Complex issue factory (with comments, attachments, activities)
 export const createComplexIssueFactory = (options: FactoryOptions = {}) => {
   const { overrides = {} } = options;
 
-  const baseIssue = createIssueFactory();
+  const baseIssue = getSingleIssue(overrides);
 
   return {
     ...baseIssue,
@@ -516,7 +523,7 @@ export const createComplexIssueFactory = (options: FactoryOptions = {}) => {
 export const createIssueWithMixedComments = (options: FactoryOptions = {}) => {
   const { overrides = {} } = options;
 
-  const baseIssue = createIssueFactory();
+  const baseIssue = getSingleIssue();
 
   return {
     ...baseIssue,

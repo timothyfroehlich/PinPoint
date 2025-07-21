@@ -22,6 +22,24 @@ process.env["PORT"] = "3000";
 // Mock fetch globally for tests
 global.fetch = jest.fn();
 
+// Mock env.js module to prevent server-side environment access in client tests
+jest.mock("~/env.js", () => ({
+  env: {
+    NODE_ENV: "test",
+    GOOGLE_CLIENT_ID: "test-google-client-id",
+    GOOGLE_CLIENT_SECRET: "test-google-client-secret",
+    NEXTAUTH_URL: "http://localhost:3000",
+    NEXTAUTH_SECRET: "test-auth-secret",
+    DATABASE_URL: "postgresql://test:test@localhost:5432/test",
+    OPDB_API_URL: "https://opdb.org/api",
+    DEFAULT_ORG_SUBDOMAIN: "apc",
+    OPDB_API_KEY: "test-token",
+    IMAGE_STORAGE_PROVIDER: "local",
+    VERCEL_URL: "",
+    PORT: "3000",
+  },
+}));
+
 // Create a mock Prisma client
 const mockPrismaClient = {
   $disconnect: jest.fn().mockResolvedValue(undefined),
@@ -160,6 +178,48 @@ jest.mock("next-auth", () => {
     signOut: jest.fn(),
   }));
 });
+
+// Mock NextAuth React hooks
+jest.mock("next-auth/react", () => ({
+  useSession: jest.fn(() => ({
+    data: null,
+    status: "loading",
+  })),
+  signIn: jest.fn(),
+  signOut: jest.fn(),
+  SessionProvider: jest.fn(({ children, session }) => {
+    // Mock the SessionProvider to provide the session via React context
+    const { createContext, useContext } = jest.requireActual("react");
+    const SessionContext = createContext({
+      data: session,
+      status: session ? "authenticated" : "unauthenticated",
+    });
+
+    // Override useSession when inside SessionProvider
+    jest.mocked(jest.requireActual("next-auth/react")).useSession = jest.fn(
+      () => useContext(SessionContext),
+    );
+
+    return children;
+  }),
+}));
+
+// Mock tRPC to prevent server-side imports
+jest.mock("~/trpc/react", () => ({
+  api: {
+    Provider: jest.fn(({ children }) => children),
+    createClient: jest.fn(() => ({})),
+    user: {
+      getCurrentMembership: {
+        useQuery: jest.fn(() => ({
+          data: null,
+          isLoading: false,
+          error: null,
+        })),
+      },
+    },
+  },
+}));
 
 // Mock Next.js server APIs for tests
 global.Request = jest.fn().mockImplementation((input, init) => ({

@@ -56,11 +56,7 @@ describe("Permission System Core Functions", () => {
       expect(result).toBe(true);
       expect(mockContext.db.role.findUnique).toHaveBeenCalledWith({
         where: { id: "role-1" },
-        include: {
-          permissions: {
-            where: { name: "issue:create" },
-          },
-        },
+        select: { name: true, permissions: { select: { name: true } } },
       });
     });
 
@@ -277,7 +273,7 @@ describe("Permission System Core Functions", () => {
       expect(result).toEqual(expectedPermissions);
       expect(mockContext.db.role.findUnique).toHaveBeenCalledWith({
         where: { id: "role-1" },
-        include: { permissions: true },
+        select: { name: true, permissions: { select: { name: true } } },
       });
     });
 
@@ -349,6 +345,17 @@ describe("Permission System Core Functions", () => {
           updatedAt: new Date(),
         })),
       });
+
+      // Mock the permission.findMany call for admin users
+      mockContext.db.permission.findMany.mockResolvedValue(
+        adminPermissions.map((name, index) => ({
+          id: `perm-${(index + 1).toString()}`,
+          name,
+          description: `${name} permission`,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })),
+      );
 
       // Act
       const result = await getUserPermissions(membership, mockContext.db);

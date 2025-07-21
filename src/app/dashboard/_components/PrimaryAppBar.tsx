@@ -16,9 +16,13 @@ import { useState } from "react";
 
 import type { JSX } from "react";
 
+import { PermissionButton } from "~/components/permissions/PermissionButton";
+import { usePermissions } from "~/hooks/usePermissions";
+
 const PrimaryAppBar = (): JSX.Element => {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
+  const { hasPermission } = usePermissions();
 
   const handleMenu = (event: React.MouseEvent<HTMLElement>): void => {
     setAnchorEl(event.currentTarget);
@@ -63,7 +67,9 @@ const PrimaryAppBar = (): JSX.Element => {
           >
             Dashboard
           </Button>
-          <Button
+          <PermissionButton
+            permission="issue:view"
+            hasPermission={hasPermission}
             color="inherit"
             sx={{
               borderRadius: 2,
@@ -72,10 +78,13 @@ const PrimaryAppBar = (): JSX.Element => {
               fontWeight: "medium",
               "&:hover": { bgcolor: "rgba(255,255,255,0.1)" },
             }}
+            tooltipText="View and manage issues"
           >
             Issues
-          </Button>
-          <Button
+          </PermissionButton>
+          <PermissionButton
+            permission="machine:view"
+            hasPermission={hasPermission}
             color="inherit"
             sx={{
               borderRadius: 2,
@@ -84,9 +93,10 @@ const PrimaryAppBar = (): JSX.Element => {
               fontWeight: "medium",
               "&:hover": { bgcolor: "rgba(255,255,255,0.1)" },
             }}
+            tooltipText="View and manage games"
           >
             Games
-          </Button>
+          </PermissionButton>
         </Box>
 
         {/* User Profile Menu */}

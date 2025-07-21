@@ -5,10 +5,10 @@ import { httpBatchStreamLink, loggerLink } from "@trpc/client";
 import { createTRPCReact } from "@trpc/react-query";
 import { type inferRouterInputs, type inferRouterOutputs } from "@trpc/server";
 import { useState } from "react";
+import superjson from "superjson";
 
 import { createQueryClient } from "./query-client";
 
-import { env } from "~/env.js";
 import { type AppRouter } from "~/server/api/root";
 
 let clientQueryClientSingleton: QueryClient | undefined = undefined;
@@ -49,7 +49,7 @@ export function TRPCReactProvider(props: {
       links: [
         loggerLink({
           enabled: (op) =>
-            env.NODE_ENV === "development" ||
+            process.env.NODE_ENV === "development" ||
             (op.direction === "down" && op.result instanceof Error),
         }),
         httpBatchStreamLink({
@@ -74,8 +74,7 @@ export function TRPCReactProvider(props: {
   );
 }
 
-function getBaseUrl(): string {
-  if (typeof window !== "undefined") return window.location.origin;
-  if (env.VERCEL_URL) return `https://${env.VERCEL_URL}`;
-  return `http://localhost:${String(env.PORT ?? 3000)}`;
+function getBaseUrl() {
+  if (typeof window !== "undefined") return ""; // browser should use relative url
+  return `http://localhost:${process.env.PORT ?? "3000"}`;
 }

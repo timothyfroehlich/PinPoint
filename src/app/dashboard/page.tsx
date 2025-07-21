@@ -1,49 +1,59 @@
 "use client";
 
-import { Box, Typography, Card, Chip } from "@mui/material";
+import {
+  Box,
+  Typography,
+  Card,
+  Chip,
+  CircularProgress,
+  Alert,
+} from "@mui/material";
 import Grid from "@mui/material/Grid";
 
 import DetailedIssueCard from "./_components/DetailedIssueCard";
 
 import type { JSX } from "react";
 
+import { api } from "~/trpc/react";
+
 type IssueStatus = "new" | "in progress" | "acknowledged" | "resolved";
 type IssuePriority = "high" | "medium" | "low";
-
-interface Issue {
-  title: string;
-  machineName: string;
-  status: IssueStatus;
-  priority: IssuePriority;
-}
-
-const openIssues: Issue[] = [
-  {
-    title: "Left flipper is weak",
-    machineName: "Twilight Zone",
-    status: "in progress",
-    priority: "high",
-  },
-  {
-    title: "Sound cutting out",
-    machineName: "The Addams Family",
-    status: "acknowledged",
-    priority: "medium",
-  },
-];
-
-const resolvedIssues: Issue[] = [
-  {
-    title: "GI lights out in backbox",
-    machineName: "The Addams Family",
-    status: "resolved",
-    priority: "low",
-  },
-];
 
 const newlyReported = [{ location: "Pinballz Arcade", count: 2 }];
 
 export default function DashboardPage(): JSX.Element {
+  const { data: issues, isLoading, error } = api.issue.core.getAll.useQuery({});
+
+  if (isLoading) {
+    return <CircularProgress />;
+  }
+
+  if (error) {
+    return <Alert severity="error">{error.message}</Alert>;
+  }
+
+  const openIssues =
+    issues
+      ?.filter((issue) => issue.status.category !== "RESOLVED")
+      .map((issue) => ({
+        id: issue.id,
+        title: issue.title,
+        machineName: issue.machine.model.name,
+        status: issue.status.name.toLowerCase() as IssueStatus,
+        priority: issue.priority.name.toLowerCase() as IssuePriority,
+      })) ?? [];
+
+  const resolvedIssues =
+    issues
+      ?.filter((issue) => issue.status.category === "RESOLVED")
+      .map((issue) => ({
+        id: issue.id,
+        title: issue.title,
+        machineName: issue.machine.model.name,
+        status: issue.status.name.toLowerCase() as IssueStatus,
+        priority: issue.priority.name.toLowerCase() as IssuePriority,
+      })) ?? [];
+
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto" }}>
       <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
@@ -57,8 +67,8 @@ export default function DashboardPage(): JSX.Element {
               My Open Issues
             </Typography>
             {openIssues.length > 0 ? (
-              openIssues.map((issue, index) => (
-                <DetailedIssueCard key={index} {...issue} />
+              openIssues.map((issue) => (
+                <DetailedIssueCard key={issue.id} {...issue} />
               ))
             ) : (
               <Typography color="text.secondary">
@@ -72,8 +82,8 @@ export default function DashboardPage(): JSX.Element {
               Recently Resolved
             </Typography>
             {resolvedIssues.length > 0 ? (
-              resolvedIssues.map((issue, index) => (
-                <DetailedIssueCard key={index} {...issue} />
+              resolvedIssues.map((issue) => (
+                <DetailedIssueCard key={issue.id} {...issue} />
               ))
             ) : (
               <Typography color="text.secondary">

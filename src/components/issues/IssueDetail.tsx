@@ -11,11 +11,7 @@ interface IssueDetailProps {
   hasPermission: (permission: string) => boolean;
 }
 
-export function IssueDetail({
-  issue,
-  session,
-  hasPermission,
-}: IssueDetailProps) {
+export function IssueDetail({ issue, session }: IssueDetailProps) {
   const isAuthenticated = !!session?.user;
 
   return (
@@ -38,22 +34,22 @@ export function IssueDetail({
           variant="outlined"
           data-testid="issue-status"
           sx={{
-            backgroundColor: issue.status.color + "20",
-            borderColor: issue.status.color,
-            color: issue.status.color,
+            backgroundColor: (issue.status.color ?? "#000") + "20",
+            borderColor: issue.status.color ?? "#000",
+            color: issue.status.color ?? "#000",
           }}
         />
 
-        {issue.priority && (
+        {issue.priority.color && (
           <Chip
             label={issue.priority.name}
             color="secondary"
             variant="outlined"
             data-testid="issue-priority"
             sx={{
-              backgroundColor: issue.priority.color + "20",
-              borderColor: issue.priority.color,
-              color: issue.priority.color,
+              backgroundColor: (issue.priority.color ?? "#000") + "20",
+              borderColor: issue.priority.color ?? "#000",
+              color: issue.priority.color ?? "#000",
             }}
           />
         )}

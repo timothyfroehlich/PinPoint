@@ -19,10 +19,10 @@ export async function generateMetadata({
 
     return {
       title: `${issue.title} - PinPoint`,
-      description: issue.description?.slice(0, 160) || "Issue details",
+      description: issue.description?.slice(0, 160) ?? "Issue details",
       openGraph: {
         title: issue.title,
-        description: issue.description || "Issue details",
+        description: issue.description ?? "Issue details",
         type: "article",
       },
     };

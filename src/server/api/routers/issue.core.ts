@@ -8,6 +8,7 @@ import {
 import {
   issueCreateProcedure,
   issueAssignProcedure,
+  issueViewProcedure,
 } from "~/server/api/trpc.permission";
 
 export const issueCoreRouter = createTRPCRouter({
@@ -303,6 +304,7 @@ export const issueCoreRouter = createTRPCRouter({
         where: whereClause,
         include: {
           status: true,
+          priority: true,
           assignedTo: {
             select: {
               id: true,
@@ -337,7 +339,7 @@ export const issueCoreRouter = createTRPCRouter({
     }),
 
   // Get a single issue by ID
-  getById: organizationProcedure
+  getById: issueViewProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
       const issue = await ctx.db.issue.findFirst({
@@ -642,107 +644,6 @@ export const issueCoreRouter = createTRPCRouter({
         ctx.organization.id,
         ctx.session.user.id,
       );
-
-      return updatedIssue;
-    }),
-
-  // Assign an issue to a user
-  assign: issueEditProcedure
-    .input(
-      z.object({
-        id: z.string(),
-        assignedToId: z.string().optional(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      // Verify the issue belongs to this organization
-      const existingIssue = await ctx.db.issue.findFirst({
-        where: {
-          id: input.id,
-          organizationId: ctx.organization.id,
-        },
-        include: {
-          assignedTo: true,
-        },
-      });
-
-      if (!existingIssue) {
-        throw new Error("Issue not found");
-      }
-
-      let newAssignedTo = null;
-
-      // If assignedToId is provided, verify they are a member of this organization
-      if (input.assignedToId) {
-        const membership = await ctx.db.membership.findUnique({
-          where: {
-            userId_organizationId: {
-              userId: input.assignedToId,
-              organizationId: ctx.organization.id,
-            },
-          },
-          include: {
-            user: true,
-          },
-        });
-        if (!membership) {
-          throw new Error("User is not a member of this organization");
-        }
-        newAssignedTo = membership.user;
-      }
-
-      // Update the issue
-      const updatedIssue = await ctx.db.issue.update({
-        where: { id: input.id },
-        data: {
-          assignedToId: input.assignedToId || null,
-        },
-        include: {
-          status: true,
-          priority: true,
-          assignedTo: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              image: true,
-            },
-          },
-          createdBy: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              image: true,
-            },
-          },
-          machine: {
-            include: {
-              model: true,
-              location: true,
-            },
-          },
-        },
-      });
-
-      // Record activity
-      const activityService = ctx.services.createIssueActivityService();
-      await activityService.recordAssignmentChange(
-        input.id,
-        ctx.organization.id,
-        ctx.session.user.id,
-        existingIssue.assignedTo,
-        newAssignedTo,
-      );
-
-      // Send notifications
-      if (newAssignedTo) {
-        const notificationService = ctx.services.createNotificationService();
-        await notificationService.notifyUserOfAssignment(
-          input.id,
-          newAssignedTo.id,
-        );
-      }
 
       return updatedIssue;
     }),

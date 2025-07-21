@@ -26,7 +26,6 @@ interface IssueStatusControlProps {
 
 export function IssueStatusControl({
   issue,
-  session,
   hasPermission,
   onError,
 }: IssueStatusControlProps) {
@@ -36,11 +35,12 @@ export function IssueStatusControl({
   const utils = api.useUtils();
 
   // Fetch available statuses for the organization
-  const { data: statuses, isLoading: statusesLoading } = api.issueStatus.getAll.useQuery();
+  const { data: statuses, isLoading: statusesLoading } =
+    api.issueStatus.getAll.useQuery();
 
   const updateStatus = api.issue.core.update.useMutation({
     onSuccess: () => {
-      utils.issue.core.getById.invalidate({ id: issue.id });
+      void utils.issue.core.getById.invalidate({ id: issue.id });
       setIsUpdating(false);
     },
     onError: (error) => {
@@ -105,7 +105,9 @@ export function IssueStatusControl({
                 labelId="status-select-label"
                 value={selectedStatusId}
                 label="Change Status"
-                onChange={(e) => handleStatusChange(e.target.value)}
+                onChange={(e) => {
+                  handleStatusChange(e.target.value);
+                }}
                 disabled={isUpdating}
                 data-testid="status-dropdown"
               >

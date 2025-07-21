@@ -6,7 +6,6 @@ import {
   Paper,
   Typography,
   Alert,
-  Skeleton,
   Button,
   useTheme,
   useMediaQuery,
@@ -43,20 +42,13 @@ export function IssueDetailView({
   // Use tRPC query to get real-time updates
   const {
     data: issue,
-    isLoading,
     error: queryError,
     refetch,
-  } = api.issue.core.getById.useQuery(
-    { id: issueId },
-    {
-      initialData: initialIssue,
-      refetchOnWindowFocus: false,
-    },
-  );
+  } = api.issue.core.getById.useQuery({ id: issueId });
 
   const hasPermission = (permission: string): boolean => {
-    if (!session?.user?.permissions) return false;
-    return session.user.permissions.includes(permission);
+    if (!session?.user) return false;
+    return (session.user as any).permissions?.includes(permission) ?? false;
   };
 
   const isAuthenticated = !!session?.user;
@@ -93,7 +85,9 @@ export function IssueDetailView({
         </Alert>
         <Button
           variant="contained"
-          onClick={() => refetch()}
+          onClick={() => {
+            void refetch();
+          }}
           data-testid="retry-button"
           sx={{ mt: 2 }}
         >
@@ -103,39 +97,8 @@ export function IssueDetailView({
     );
   }
 
-  if (isLoading || !issue) {
-    return (
-      <Container maxWidth="lg" sx={{ py: 4 }}>
-        <div data-testid="issue-skeleton">
-          <Skeleton variant="text" width="60%" height={60} />
-          <Skeleton
-            variant="rectangular"
-            width="100%"
-            height={200}
-            sx={{ mt: 2 }}
-          />
-        </div>
-        <div data-testid="comments-skeleton">
-          <Skeleton variant="text" width="40%" height={40} sx={{ mt: 4 }} />
-          <Skeleton
-            variant="rectangular"
-            width="100%"
-            height={150}
-            sx={{ mt: 2 }}
-          />
-        </div>
-        <div data-testid="timeline-skeleton">
-          <Skeleton variant="text" width="30%" height={40} sx={{ mt: 4 }} />
-          <Skeleton
-            variant="rectangular"
-            width="100%"
-            height={100}
-            sx={{ mt: 2 }}
-          />
-        </div>
-      </Container>
-    );
-  }
+  // Use the data from query if available, fallback to initial data
+  const currentIssue = issue ?? initialIssue;
 
   const layoutProps = {
     "data-testid": isMobile ? "mobile-layout" : "desktop-layout",
@@ -144,7 +107,13 @@ export function IssueDetailView({
   return (
     <Container maxWidth="lg" sx={{ py: 4 }} {...layoutProps}>
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+        <Alert
+          severity="error"
+          sx={{ mb: 2 }}
+          onClose={() => {
+            setError(null);
+          }}
+        >
           {error}
         </Alert>
       )}
@@ -154,7 +123,7 @@ export function IssueDetailView({
         <Grid size={{ xs: 12, md: 8 }}>
           <Paper elevation={1} sx={{ p: 3, mb: 3 }}>
             <IssueDetail
-              issue={issue}
+              issue={currentIssue}
               session={session}
               hasPermission={hasPermission}
             />
@@ -162,7 +131,7 @@ export function IssueDetailView({
 
           <Paper elevation={1} sx={{ p: 3, mb: 3 }}>
             <IssueComments
-              issue={issue}
+              issue={currentIssue}
               session={session}
               hasPermission={hasPermission}
               onError={setError}
@@ -171,7 +140,7 @@ export function IssueDetailView({
 
           {isAuthenticated && (
             <Paper elevation={1} sx={{ p: 3 }}>
-              <IssueTimeline issue={issue} session={session} />
+              <IssueTimeline issue={currentIssue} session={session} />
             </Paper>
           )}
         </Grid>
@@ -185,7 +154,7 @@ export function IssueDetailView({
             {isAuthenticated && hasPermission("issues:edit") && (
               <Paper elevation={1} sx={{ p: 2, mb: 2 }}>
                 <IssueStatusControl
-                  issue={issue}
+                  issue={currentIssue}
                   session={session}
                   hasPermission={hasPermission}
                   onError={setError}
@@ -196,7 +165,7 @@ export function IssueDetailView({
             {/* Actions */}
             <Paper elevation={1} sx={{ p: 2, mb: 2 }}>
               <IssueActions
-                issue={issue}
+                issue={currentIssue}
                 session={session}
                 hasPermission={hasPermission}
                 onError={setError}
@@ -214,7 +183,7 @@ export function IssueDetailView({
                   Created
                 </Typography>
                 <Typography variant="body1" data-testid="issue-created-date">
-                  {new Date(issue.createdAt).toLocaleDateString()}
+                  {new Date(currentIssue.createdAt).toLocaleDateString()}
                 </Typography>
               </Box>
 
@@ -223,17 +192,17 @@ export function IssueDetailView({
                   Last Updated
                 </Typography>
                 <Typography variant="body1" data-testid="issue-last-updated">
-                  {new Date(issue.updatedAt).toLocaleDateString()}
+                  {new Date(currentIssue.updatedAt).toLocaleDateString()}
                 </Typography>
               </Box>
 
-              {issue.assignedTo && (
+              {currentIssue.assignedTo && (
                 <Box sx={{ mb: 2 }}>
                   <Typography variant="body2" color="text.secondary">
                     Assigned To
                   </Typography>
                   <Typography variant="body1" data-testid="assigned-to">
-                    {issue.assignedTo.name}
+                    {currentIssue.assignedTo.name}
                   </Typography>
                 </Box>
               )}
@@ -243,7 +212,7 @@ export function IssueDetailView({
                   Created By
                 </Typography>
                 <Typography variant="body1" data-testid="issue-created-by">
-                  {issue.createdBy.name}
+                  {currentIssue.createdBy.name}
                 </Typography>
               </Box>
             </Paper>

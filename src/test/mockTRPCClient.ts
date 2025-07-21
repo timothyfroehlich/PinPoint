@@ -5,7 +5,14 @@ import { type IssueWithDetails, type Comment, type User } from "~/types/issue";
 export type MockTRPCClient = {
   [K in keyof AppRouter]: {
     [P in keyof AppRouter[K]]: {
-      [Q in keyof AppRouter[K][P]]: jest.Mock<any, any>;
+      [Q in keyof AppRouter[K][P]]:
+        | jest.Mock
+        | {
+            useQuery?: jest.Mock;
+            useMutation?: jest.Mock;
+            _def?: jest.Mock;
+            meta?: jest.Mock;
+          };
     };
   };
 };
@@ -40,6 +47,15 @@ export function createMockTRPCClient(
       getProfile: jest.fn<Promise<any>, [any]>(),
       updateProfile: jest.fn<Promise<any>, [any]>(),
       list: jest.fn<Promise<any>, [any]>(),
+      getCurrentMembership: {
+        useQuery: jest.fn(() => ({
+          data: null,
+          isLoading: false,
+          error: null,
+        })),
+        _def: jest.fn(),
+        meta: jest.fn(),
+      },
     },
     organization: {
       getCurrent: jest.fn<Promise<any>, [any]>(),
@@ -74,7 +90,7 @@ function deepMerge(target: any, source: any): any {
       typeof source[key] === "object" &&
       !Array.isArray(source[key])
     ) {
-      result[key] = deepMerge(result[key] || {}, source[key]);
+      result[key] = deepMerge(result[key] ?? {}, source[key]);
     } else {
       result[key] = source[key];
     }

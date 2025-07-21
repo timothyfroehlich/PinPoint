@@ -153,6 +153,13 @@ export default tseslint.config(
     },
   },
   {
+    // Override: Allow process.env in tRPC provider for base URL
+    files: ["src/trpc/react.tsx"],
+    rules: {
+      "no-restricted-properties": "off",
+    },
+  },
+  {
     // Disable type-aware linting for JavaScript files
     files: ["**/*.js", "**/*.cjs", "**/*.mjs"],
     ...tseslint.configs.disableTypeChecked,

@@ -45,6 +45,8 @@ let config = {
       testEnvironment: "jsdom",
       testMatch: [
         "<rootDir>/src/app/**/__tests__/**/*.test.{js,ts,tsx}",
+        "<rootDir>/src/components/**/__tests__/**/*.test.{js,ts,tsx}",
+        "<rootDir>/src/hooks/**/__tests__/**/*.test.{js,ts,tsx}",
         "<rootDir>/src/lib/hooks/**/__tests__/**/*.test.{js,ts,tsx}",
       ],
       setupFilesAfterEnv: ["<rootDir>/src/test/setup.ts"],
@@ -53,6 +55,9 @@ let config = {
           "ts-jest",
           {
             useESM: true,
+            tsconfig: {
+              jsx: "react-jsx",
+            },
           },
         ],
         "^.+\\.js$": [

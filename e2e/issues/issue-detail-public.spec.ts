@@ -216,11 +216,7 @@ test.describe("Issue Detail - Public User", () => {
 
   test.fixme("shows proper loading states", async ({ page }) => {
     // TODO: Implementation agent will complete this test
-    // Mock slow network to test loading states
-    await page.route("**/api/issues/**", (route) => {
-      setTimeout(() => route.continue(), 2000);
-    });
-
+    // Note: API routes removed - this test will need to be updated for tRPC
     await page.goto("/issues/test-issue-1");
 
     // Should show skeleton loaders
@@ -245,11 +241,7 @@ test.describe("Issue Detail - Public User", () => {
 
   test.fixme("handles network errors gracefully", async ({ page }) => {
     // TODO: Implementation agent will complete this test
-    // Mock network failure
-    await page.route("**/api/issues/**", (route) => {
-      route.abort("failed");
-    });
-
+    // Note: API routes removed - this test will need to be updated for tRPC
     await page.goto("/issues/test-issue-1");
 
     // Should show error message
@@ -262,7 +254,6 @@ test.describe("Issue Detail - Public User", () => {
     await expect(page.locator('[data-testid="retry-button"]')).toBeVisible();
 
     // Test retry functionality
-    await page.route("**/api/issues/**", (route) => route.continue());
     await page.locator('[data-testid="retry-button"]').click();
 
     await expect(page.locator('[data-testid="issue-title"]')).toBeVisible();

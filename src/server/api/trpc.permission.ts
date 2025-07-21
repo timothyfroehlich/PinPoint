@@ -2,6 +2,16 @@ import { organizationProcedure } from "./trpc.base";
 
 import { requirePermissionForSession } from "~/server/auth/permissions";
 
+export const issueViewProcedure = organizationProcedure.use(async (opts) => {
+  await requirePermissionForSession(
+    opts.ctx.session,
+    "issue:view",
+    opts.ctx.db,
+    opts.ctx.organization.id,
+  );
+  return opts.next();
+});
+
 export const issueCreateProcedure = organizationProcedure.use(async (opts) => {
   await requirePermissionForSession(
     opts.ctx.session,

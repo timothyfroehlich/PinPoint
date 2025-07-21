@@ -21,18 +21,32 @@ const createMockTRPCContext = (
     permissions,
   };
 
-  // Mock the database calls for permission checks
-  mockContext.db.role.findUnique.mockResolvedValue(mockRole as never);
-
-  // The membership object passed in the context
+  // The membership object with role for PermissionService
   const mockMembership = {
     id: "membership-1",
     userId: "user-1",
     organizationId: "org-1",
     roleId: "role-1",
+    role: {
+      id: "role-1",
+      name: "Test Role",
+      organizationId: "org-1",
+      permissions: permissions.map((name, index) => ({
+        id: `perm-${(index + 1).toString()}`,
+        name,
+        description: `${name} permission`,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })),
+    },
   };
 
-  // Mock the membership lookup for organizationProcedure
+  // Mock the membership lookup for PermissionService (uses findUnique with compound key)
+  mockContext.db.membership.findUnique.mockResolvedValue(
+    mockMembership as never,
+  );
+
+  // Mock the membership lookup for organizationProcedure (uses findFirst)
   mockContext.db.membership.findFirst.mockResolvedValue(
     mockMembership as never,
   );
@@ -98,7 +112,7 @@ describe("tRPC Permission Middleware", () => {
       // Act & Assert
       await expect(caller.testRequirePermission()).rejects.toThrow(TRPCError);
       await expect(caller.testRequirePermission()).rejects.toThrow(
-        "Permission required: test:permission",
+        "Missing required permission: test:permission",
       );
     });
 

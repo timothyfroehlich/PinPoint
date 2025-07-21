@@ -119,7 +119,7 @@ describe("IssuePage", () => {
 
   describe("Public User View", () => {
     it("should display issue details for unauthenticated users", async () => {
-      const _mockTRPCClient = createMockTRPCClient({
+      createMockTRPCClient({
         issue: {
           core: {
             create: jest.fn(),
@@ -169,7 +169,7 @@ describe("IssuePage", () => {
     });
 
     it("should hide admin controls for unauthenticated users", async () => {
-      const _mockTRPCClient = createMockTRPCClient({
+      createMockTRPCClient({
         issue: {
           core: {
             create: jest.fn(),
@@ -257,12 +257,18 @@ describe("IssuePage", () => {
         ],
       };
 
-      const _mockTRPCClient = createMockTRPCClient({
+      createMockTRPCClient({
         issue: {
           core: {
+            create: jest.fn(),
+            getAll: jest.fn(),
             getById: jest
               .fn<Promise<IssueWithDetails>, [{ id: string }]>()
               .mockResolvedValue(issueWithMixedComments as IssueWithDetails),
+            update: jest.fn(),
+            close: jest.fn(),
+            assign: jest.fn(),
+            updateStatus: jest.fn(),
           },
           comment: {
             addComment: jest.fn(),
@@ -294,7 +300,7 @@ describe("IssuePage", () => {
 
   describe("Authenticated User View", () => {
     it("should display full issue details for authenticated users", async () => {
-      const _mockTRPCClient = createMockTRPCClient({
+      createMockTRPCClient({
         issue: {
           core: {
             create: jest.fn(),
@@ -383,12 +389,18 @@ describe("IssuePage", () => {
         ],
       };
 
-      const _mockTRPCClient = createMockTRPCClient({
+      createMockTRPCClient({
         issue: {
           core: {
+            create: jest.fn(),
+            getAll: jest.fn(),
             getById: jest
               .fn<Promise<IssueWithDetails>, [{ id: string }]>()
               .mockResolvedValue(issueWithMixedComments as IssueWithDetails),
+            update: jest.fn(),
+            close: jest.fn(),
+            assign: jest.fn(),
+            updateStatus: jest.fn(),
           },
           comment: {
             addComment: jest.fn(),
@@ -423,7 +435,7 @@ describe("IssuePage", () => {
 
   describe("Permission-based Controls", () => {
     it("should show edit controls for users with edit permissions", async () => {
-      const _mockTRPCClient = createMockTRPCClient({
+      createMockTRPCClient({
         issue: {
           core: {
             create: jest.fn(),
@@ -472,7 +484,7 @@ describe("IssuePage", () => {
     });
 
     it("should show assign controls for users with assign permissions", async () => {
-      const _mockTRPCClient = createMockTRPCClient({
+      createMockTRPCClient({
         issue: {
           core: {
             create: jest.fn(),
@@ -520,7 +532,7 @@ describe("IssuePage", () => {
     });
 
     it("should show close controls for users with close permissions", async () => {
-      const _mockTRPCClient = createMockTRPCClient({
+      createMockTRPCClient({
         issue: {
           core: {
             create: jest.fn(),
@@ -568,7 +580,7 @@ describe("IssuePage", () => {
     });
 
     it("should show permission tooltips on disabled buttons", async () => {
-      const _mockTRPCClient = createMockTRPCClient({
+      createMockTRPCClient({
         issue: {
           core: {
             create: jest.fn(),
@@ -625,9 +637,11 @@ describe("IssuePage", () => {
 
   describe("Loading States", () => {
     it("should show skeleton loader while fetching issue data", () => {
-      const _mockTRPCClient = createMockTRPCClient({
+      createMockTRPCClient({
         issue: {
           core: {
+            create: jest.fn(),
+            getAll: jest.fn(),
             getById: jest
               .fn<Promise<IssueWithDetails>, [{ id: string }]>()
               .mockImplementation(
@@ -636,6 +650,10 @@ describe("IssuePage", () => {
                     /* Never resolves */
                   }),
               ), // Never resolves
+            update: jest.fn(),
+            close: jest.fn(),
+            assign: jest.fn(),
+            updateStatus: jest.fn(),
           },
           comment: {
             addComment: jest.fn(),
@@ -664,12 +682,17 @@ describe("IssuePage", () => {
     });
 
     it("should show loading states for individual actions", async () => {
-      const _mockTRPCClient = createMockTRPCClient({
+      createMockTRPCClient({
         issue: {
           core: {
+            create: jest.fn(),
+            getAll: jest.fn(),
             getById: jest
               .fn<Promise<IssueWithDetails>, [{ id: string }]>()
               .mockResolvedValue(mockIssueData),
+            update: jest.fn(),
+            close: jest.fn(),
+            assign: jest.fn(),
             updateStatus: jest
               .fn<
                 Promise<IssueWithDetails>,
@@ -719,12 +742,18 @@ describe("IssuePage", () => {
 
   describe("Error States", () => {
     it("should show 404 error for non-existent issues", async () => {
-      const _mockTRPCClient = createMockTRPCClient({
+      createMockTRPCClient({
         issue: {
           core: {
+            create: jest.fn(),
+            getAll: jest.fn(),
             getById: jest
               .fn<Promise<IssueWithDetails>, [{ id: string }]>()
               .mockRejectedValue(new Error("Issue not found")),
+            update: jest.fn(),
+            close: jest.fn(),
+            assign: jest.fn(),
+            updateStatus: jest.fn(),
           },
           comment: {
             addComment: jest.fn(),
@@ -754,12 +783,18 @@ describe("IssuePage", () => {
     });
 
     it("should show permission denied error for unauthorized access", async () => {
-      const _mockTRPCClient = createMockTRPCClient({
+      createMockTRPCClient({
         issue: {
           core: {
+            create: jest.fn(),
+            getAll: jest.fn(),
             getById: jest
               .fn<Promise<IssueWithDetails>, [{ id: string }]>()
               .mockRejectedValue(new Error("UNAUTHORIZED")),
+            update: jest.fn(),
+            close: jest.fn(),
+            assign: jest.fn(),
+            updateStatus: jest.fn(),
           },
           comment: {
             addComment: jest.fn(),
@@ -791,12 +826,18 @@ describe("IssuePage", () => {
     });
 
     it("should show network error for failed requests", async () => {
-      const _mockTRPCClient = createMockTRPCClient({
+      createMockTRPCClient({
         issue: {
           core: {
+            create: jest.fn(),
+            getAll: jest.fn(),
             getById: jest
               .fn<Promise<IssueWithDetails>, [{ id: string }]>()
               .mockRejectedValue(new Error("Network error")),
+            update: jest.fn(),
+            close: jest.fn(),
+            assign: jest.fn(),
+            updateStatus: jest.fn(),
           },
           comment: {
             addComment: jest.fn(),
@@ -831,7 +872,7 @@ describe("IssuePage", () => {
 
   describe("Accessibility", () => {
     it("should have proper ARIA labels and roles", async () => {
-      const _mockTRPCClient = createMockTRPCClient({
+      createMockTRPCClient({
         issue: {
           core: {
             create: jest.fn(),
@@ -883,7 +924,7 @@ describe("IssuePage", () => {
     });
 
     it("should support keyboard navigation", async () => {
-      const _mockTRPCClient = createMockTRPCClient({
+      createMockTRPCClient({
         issue: {
           core: {
             create: jest.fn(),
@@ -936,7 +977,7 @@ describe("IssuePage", () => {
         value: 375,
       });
 
-      const _mockTRPCClient = createMockTRPCClient({
+      createMockTRPCClient({
         issue: {
           core: {
             create: jest.fn(),
@@ -984,7 +1025,7 @@ describe("IssuePage", () => {
         value: 1024,
       });
 
-      const _mockTRPCClient = createMockTRPCClient({
+      createMockTRPCClient({
         issue: {
           core: {
             create: jest.fn(),
