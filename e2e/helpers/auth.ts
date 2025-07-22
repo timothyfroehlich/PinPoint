@@ -1,17 +1,27 @@
 import { type Page } from "@playwright/test";
 
 export interface UserPermissions {
-  "issues:read"?: boolean;
-  "issues:edit"?: boolean;
-  "issues:create"?: boolean;
-  "issues:assign"?: boolean;
-  "issues:close"?: boolean;
-  "issues:delete"?: boolean;
-  "issues:comment"?: boolean;
-  "issues:comment_internal"?: boolean;
-  "issues:read_internal"?: boolean;
-  "issues:transfer"?: boolean;
-  admin?: boolean;
+  "issue:view"?: boolean;
+  "issue:edit"?: boolean;
+  "issue:create"?: boolean;
+  "issue:assign"?: boolean;
+  "issue:delete"?: boolean;
+  "issue:bulk_manage"?: boolean;
+  "machine:view"?: boolean;
+  "machine:create"?: boolean;
+  "machine:edit"?: boolean;
+  "machine:delete"?: boolean;
+  "location:view"?: boolean;
+  "location:create"?: boolean;
+  "location:edit"?: boolean;
+  "location:delete"?: boolean;
+  "attachment:view"?: boolean;
+  "attachment:create"?: boolean;
+  "attachment:delete"?: boolean;
+  "organization:manage"?: boolean;
+  "role:manage"?: boolean;
+  "user:manage"?: boolean;
+  "admin:view_analytics"?: boolean;
 }
 
 /**
@@ -19,13 +29,14 @@ export interface UserPermissions {
  */
 export async function loginAsTechnician(page: Page) {
   const permissions: UserPermissions = {
-    "issues:read": true,
-    "issues:edit": true,
-    "issues:comment": true,
-    "issues:comment_internal": true,
-    "issues:read_internal": true,
-    "issues:assign": true,
-    "issues:close": true,
+    "issue:view": true,
+    "issue:edit": true,
+    "issue:assign": true,
+    "issue:delete": true,
+    "machine:view": true,
+    "location:view": true,
+    "attachment:view": true,
+    "attachment:create": true,
   };
 
   await loginAsUserWithPermissions(page, permissions, {
@@ -40,17 +51,27 @@ export async function loginAsTechnician(page: Page) {
  */
 export async function loginAsAdmin(page: Page) {
   const permissions: UserPermissions = {
-    "issues:read": true,
-    "issues:edit": true,
-    "issues:create": true,
-    "issues:assign": true,
-    "issues:close": true,
-    "issues:delete": true,
-    "issues:comment": true,
-    "issues:comment_internal": true,
-    "issues:read_internal": true,
-    "issues:transfer": true,
-    admin: true,
+    "issue:view": true,
+    "issue:edit": true,
+    "issue:create": true,
+    "issue:assign": true,
+    "issue:delete": true,
+    "issue:bulk_manage": true,
+    "machine:view": true,
+    "machine:create": true,
+    "machine:edit": true,
+    "machine:delete": true,
+    "location:view": true,
+    "location:create": true,
+    "location:edit": true,
+    "location:delete": true,
+    "attachment:view": true,
+    "attachment:create": true,
+    "attachment:delete": true,
+    "organization:manage": true,
+    "role:manage": true,
+    "user:manage": true,
+    "admin:view_analytics": true,
   };
 
   await loginAsUserWithPermissions(page, permissions, {
@@ -115,8 +136,12 @@ export async function loginAsUserWithPermissions(
  */
 export async function loginAsRegularUser(page: Page) {
   const permissions: UserPermissions = {
-    "issues:read": true,
-    "issues:comment": true,
+    "issue:view": true,
+    "issue:create": true,
+    "machine:view": true,
+    "location:view": true,
+    "attachment:view": true,
+    "attachment:create": true,
   };
 
   await loginAsUserWithPermissions(page, permissions, {
