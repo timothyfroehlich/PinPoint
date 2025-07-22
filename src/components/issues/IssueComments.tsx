@@ -26,7 +26,7 @@ interface IssueCommentsProps {
 
 export function IssueComments({
   issue,
-  session,
+  session: _session,
   hasPermission,
   onError,
 }: IssueCommentsProps): JSX.Element {
@@ -58,9 +58,9 @@ export function IssueComments({
     });
   };
 
-  const isAuthenticated = !!session?.user;
+  // Remove unused variable
   // Internal comment permissions - for future implementation
-  // const canViewInternal = hasPermission("issues:read_internal");  
+  // const canViewInternal = hasPermission("issues:read_internal");
   // const canCreateInternal = hasPermission("issues:comment_internal");
 
   // For now, all comments are visible (isInternal functionality not implemented in DB)
@@ -122,10 +122,7 @@ export function IssueComments({
       </Box>
 
       {/* Comment Form */}
-      <PermissionGate
-        permission="issue:create"
-        hasPermission={hasPermission}
-      >
+      <PermissionGate permission="issue:create" hasPermission={hasPermission}>
         <Box data-testid="comment-form">
           <Divider sx={{ mb: 2 }} />
           <Typography variant="subtitle1" gutterBottom>
