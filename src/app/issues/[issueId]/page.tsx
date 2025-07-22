@@ -5,15 +5,11 @@ import { IssueDetailView } from "~/components/issues/IssueDetailView";
 import { auth } from "~/server/auth";
 import { api } from "~/trpc/server";
 
-interface IssuePageProps {
-  params: {
-    issueId: string;
-  };
-}
-
 export async function generateMetadata({
   params,
-}: IssuePageProps): Promise<Metadata> {
+}: {
+  params: { issueId: string };
+}): Promise<Metadata> {
   try {
     const issue = await api.issue.core.getById({ id: params.issueId });
 
@@ -36,7 +32,9 @@ export async function generateMetadata({
 
 export default async function IssuePage({
   params,
-}: IssuePageProps): Promise<JSX.Element> {
+}: {
+  params: { issueId: string };
+}): Promise<JSX.Element> {
   const session = await auth();
 
   try {

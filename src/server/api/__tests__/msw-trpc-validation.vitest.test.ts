@@ -61,7 +61,7 @@ describe('MSW-tRPC Infrastructure Validation', () => {
     expect(error.message).toBe('Permission required: test:permission');
   });
 
-  it('should validate superjson transformer configuration', async () => {
+  it('should validate superjson transformer configuration', () => {
     // Test that superjson configuration doesn't cause errors
     const testData = {
       date: new Date(),
