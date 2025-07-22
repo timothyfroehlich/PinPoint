@@ -243,3 +243,7 @@ For detailed guidance beyond these essentials:
 
 - **MUI Version**: Currently using MUI v7.2.0 - always check Context7 for latest MUI documentation before making changes
 - **Grid Components**: In MUI v7, use `import Grid from "@mui/material/Grid"` and `size={{ xs: 12, lg: 8 }}` syntax (no `item` prop needed)
+
+## Claude Memories
+
+- Don't be a yes-man and don't pander to me

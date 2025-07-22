@@ -553,6 +553,253 @@ export default defineConfig({
 - Environment variable mocking requires hoisting
 - Module reset (`vi.resetModules()`) works for dynamic imports
 
+## When to Refactor to Dependency Injection During Migration
+
+### Decision Framework: Refactor vs. Mock
+
+Based on our migration experience, here's a practical guide for deciding when to refactor to DI during Vitest migration:
+
+#### 🟢 **Migrate Without Refactoring When:**
+
+1. **Pure Functions** (like OPDB utils)
+   - No dependencies to mock
+   - Tests migrate in minutes
+   - Example: Utility functions, validators, parsers
+
+2. **Simple Direct Dependencies** (like database provider)
+   - 1-2 direct mocks needed
+   - No transitive dependencies
+   - Clear module boundaries
+   - Example: Simple services with injected database
+
+3. **Well-Structured DI Already Exists**
+   - Constructor injection present
+   - Clear interfaces defined
+   - Example: `new ServiceFactory(db)`
+
+#### 🟡 **Consider Light Refactoring When:**
+
+1. **3-4 Transitive Dependencies**
+   - Mocking becomes verbose but manageable
+   - Clear improvement path exists
+   - Example: Services importing 3-4 utilities directly
+
+2. **Repeated Mock Patterns**
+   - Same mocks needed across multiple tests
+   - Could benefit from shared test utilities
+   - Example: Common auth or storage mocks
+
+#### 🔴 **Refactor to DI First When:**
+
+1. **5+ Transitive Dependencies** (like complex factory test)
+   - Mocking effort exceeds refactoring effort
+   - Test setup becomes brittle
+   - Example: Services with deep import chains
+
+2. **Circular Dependencies Emerge**
+   - Vitest exposes hidden circular imports
+   - Jest masked the problem
+   - Must refactor to break cycles
+
+3. **Module Bundling Issues**
+   - `require()` calls in dependencies
+   - Vitest can't mock CommonJS transitive deps
+   - Need to inject at boundaries
+
+4. **Test Logic Obscured by Mocks**
+   - More mock setup than actual test code
+   - Hard to understand test intent
+   - Example: 30+ lines of mocks for 10-line test
+
+### Refactoring Patterns for Vitest Migration
+
+#### Pattern 1: Constructor Injection
+**Before (Hard to test with Vitest):**
+```typescript
+import { imageStorage } from '~/lib/image-storage/local-storage';
+import { qrCodeUtils } from '~/server/utils/qrCodeUtils';
+
+export class QRCodeService {
+  async generate(data: string) {
+    const code = qrCodeUtils.create(data);
+    await imageStorage.store(code);
+    return code;
+  }
+}
+```
+
+**After (Vitest-friendly):**
+```typescript
+export class QRCodeService {
+  constructor(
+    private storage: ImageStorage,
+    private qrUtils: QRCodeUtils
+  ) {}
+
+  async generate(data: string) {
+    const code = this.qrUtils.create(data);
+    await this.storage.store(code);
+    return code;
+  }
+}
+```
+
+#### Pattern 2: Factory Functions for Complex Services
+**Before:**
+```typescript
+// Deep coupling to environment and dependencies
+export function createNotificationService() {
+  const emailClient = new EmailClient(process.env.SMTP_HOST);
+  const smsClient = new SMSClient(process.env.TWILIO_KEY);
+  const pushClient = new PushClient(process.env.FCM_KEY);
+  
+  return new NotificationService(emailClient, smsClient, pushClient);
+}
+```
+
+**After:**
+```typescript
+// Dependencies injected, easy to test
+export function createNotificationService(deps: {
+  emailClient: EmailClient;
+  smsClient: SMSClient;
+  pushClient: PushClient;
+}) {
+  return new NotificationService(
+    deps.emailClient,
+    deps.smsClient,
+    deps.pushClient
+  );
+}
+```
+
+#### Pattern 3: Context Pattern (Already in PinPoint)
+**Leverage existing tRPC context:**
+```typescript
+// Good pattern already in place
+export const organizationProcedure = protectedProcedure.use(async (opts) => {
+  // Context provides all dependencies
+  const { ctx } = opts;
+  const service = new IssueService(ctx.db, ctx.session);
+  // Easy to test with mock context
+});
+```
+
+### Migration Strategy with DI Refactoring
+
+#### Phase 1: Assessment (Before Migration)
+1. Run complexity analysis on test file
+2. Count direct imports in file under test
+3. Check for circular dependency warnings
+4. Estimate: Migration time vs. Refactoring time
+
+#### Phase 2: Decision
+- **< 30 min estimated**: Just migrate with explicit mocks
+- **> 30 min estimated**: Refactor to DI first
+- **Circular deps**: Must refactor first
+
+#### Phase 3: Execution
+1. **If refactoring**: Create separate PR for DI refactor
+2. **If migrating**: Document excessive mocks as tech debt
+3. **Track metrics**: Time spent, mocks needed, test clarity
+
+### Real-World Examples from PinPoint
+
+#### ✅ **Good Migration Candidate** (No Refactor Needed)
+```typescript
+// src/lib/opdb/__tests__/utils.test.ts
+// Pure functions, no dependencies
+// Migration time: 15 minutes
+// Mocks needed: 0
+```
+
+#### 🟡 **Borderline Case** (Light Refactor Helped)
+```typescript
+// src/server/db/__tests__/provider.test.ts
+// Simple provider with clear boundaries
+// Migration time: 15 minutes
+// Mocks needed: 2-3
+```
+
+#### 🔴 **Refactor First Case** (Would Benefit)
+```typescript
+// src/server/services/__tests__/factory.test.ts
+// Complex transitive dependencies
+// Migration time: 25 minutes
+// Mocks needed: 8+
+// Better approach: Inject dependencies into ServiceFactory
+```
+
+### ROI Calculation for DI Refactoring
+
+**Refactor When:**
+```
+(Time to mock transitive deps) + (Future test maintenance) > (Time to refactor to DI)
+```
+
+**Typical Values:**
+- Mocking 5+ transitive deps: 20-30 min
+- Future test changes: 5-10 min per change
+- DI refactor: 30-45 min
+- **Break-even**: 3-4 future test modifications
+
+### Anti-Patterns to Avoid
+
+#### ❌ **Don't: Create Test-Only Abstractions**
+```typescript
+// Bad: Interface only exists for testing
+interface MockableService {
+  doThing(): void;
+}
+```
+
+#### ❌ **Don't: Over-Engineer Simple Cases**
+```typescript
+// Bad: DI for a pure function
+function add(a: number, b: number, calculator: Calculator) {
+  return calculator.add(a, b); // Unnecessary
+}
+```
+
+#### ❌ **Don't: Mix Refactoring with Migration**
+Do refactoring in separate commits/PRs for clean history
+
+### Tooling to Help Decide
+
+#### Quick Dependency Analysis Script
+```bash
+# Count imports in a file
+grep -E "^import .* from ['\"]" src/server/services/myService.ts | \
+  grep -v "@types" | \
+  wc -l
+
+# Find transitive dependencies
+npx madge --circular src/server/services/myService.ts
+```
+
+### Team Guidelines
+
+1. **Document Decision**: Add comment when choosing to mock vs. refactor
+2. **Track Tech Debt**: Create tickets for "should refactor" cases  
+3. **Share Patterns**: Update team DI patterns doc with examples
+4. **Measure Success**: Track test execution time improvements
+
+### Summary: The Vitest Migration DI Decision Tree
+
+```
+Start Migration
+    ↓
+Is it a pure function? → YES → Migrate directly
+    ↓ NO
+< 3 dependencies? → YES → Migrate with mocks
+    ↓ NO
+Circular deps? → YES → Refactor to DI first
+    ↓ NO
+> 5 transitive deps? → YES → Refactor to DI first
+    ↓ NO
+Migrate with mocks & document as tech debt
+```
+
 ---
 
 *This document will be updated as we progress through the migration and discover more insights.*
