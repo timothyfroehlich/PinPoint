@@ -37,111 +37,106 @@ test.describe("Issue Detail - Permission Matrix", () => {
       ).not.toBeVisible();
     });
 
-    test(
-      "denies users without issue:view from viewing issues",
-      async ({ page }) => {
-        // Login with no permissions
-        await loginAsUserWithPermissions(page, {});
+    test("denies users without issue:view from viewing issues", async ({
+      page,
+    }) => {
+      // Login with no permissions
+      await loginAsUserWithPermissions(page, {});
 
-        await page.goto("/issues/test-issue-1");
+      await page.goto("/issues/test-issue-1");
 
-        // Should show permission denied
-        await expect(
-          page.locator('[data-testid="permission-denied"]'),
-        ).toBeVisible();
-        await expect(
-          page.locator('[data-testid="permission-denied"]'),
-        ).toContainText("You do not have permission to view this issue");
-      },
-    );
+      // Should show permission denied
+      await expect(
+        page.locator('[data-testid="permission-denied"]'),
+      ).toBeVisible();
+      await expect(
+        page.locator('[data-testid="permission-denied"]'),
+      ).toContainText("You do not have permission to view this issue");
+    });
   });
 
   test.describe("Edit Permissions", () => {
-    test(
-      "shows edit button only with issue:edit permission",
-      async ({ page }) => {
-        // Login with view and edit permissions
-        await loginAsUserWithPermissions(page, { 
-          "issue:view": true, 
-          "issue:edit": true 
-        });
+    test("shows edit button only with issue:edit permission", async ({
+      page,
+    }) => {
+      // Login with view and edit permissions
+      await loginAsUserWithPermissions(page, {
+        "issue:view": true,
+        "issue:edit": true,
+      });
 
-        await page.goto("/issues/test-issue-1");
+      await page.goto("/issues/test-issue-1");
 
-        // Should see edit controls
-        await expect(
-          page.locator('[data-testid="edit-issue-button"]'),
-        ).toBeVisible();
+      // Should see edit controls
+      await expect(
+        page.locator('[data-testid="edit-issue-button"]'),
+      ).toBeVisible();
 
-        // Should be able to edit title and description
-        await page.locator('[data-testid="edit-issue-button"]').click();
-        await expect(page.locator('[data-testid="title-input"]')).toBeVisible();
-        await expect(
-          page.locator('[data-testid="description-textarea"]'),
-        ).toBeVisible();
-      },
-    );
+      // Should be able to edit title and description
+      await page.locator('[data-testid="edit-issue-button"]').click();
+      await expect(page.locator('[data-testid="title-input"]')).toBeVisible();
+      await expect(
+        page.locator('[data-testid="description-textarea"]'),
+      ).toBeVisible();
+    });
 
-    test(
-      "shows disabled edit button without issue:edit permission",
-      async ({ page }) => {
-        // Login with only view permission
-        await loginAsUserWithPermissions(page, { "issue:view": true });
+    test("shows disabled edit button without issue:edit permission", async ({
+      page,
+    }) => {
+      // Login with only view permission
+      await loginAsUserWithPermissions(page, { "issue:view": true });
 
-        await page.goto("/issues/test-issue-1");
+      await page.goto("/issues/test-issue-1");
 
-        // PermissionButton should show as disabled with tooltip
-        const editButton = page.locator('[data-testid="edit-issue-button"]');
-        await expect(editButton).toBeVisible();
-        await expect(editButton).toBeDisabled();
+      // PermissionButton should show as disabled with tooltip
+      const editButton = page.locator('[data-testid="edit-issue-button"]');
+      await expect(editButton).toBeVisible();
+      await expect(editButton).toBeDisabled();
 
-        // Hover to see tooltip
-        await editButton.hover();
-        const tooltip = page.locator('div[role="tooltip"]');
-        await expect(tooltip).toBeVisible();
-        await expect(tooltip).toContainText("edit");
-      },
-    );
+      // Hover to see tooltip
+      await editButton.hover();
+      const tooltip = page.locator('div[role="tooltip"]');
+      await expect(tooltip).toBeVisible();
+      await expect(tooltip).toContainText("edit");
+    });
 
-    test(
-      "allows status changes with issue:edit permission",
-      async ({ page }) => {
-        // Login with view and edit permissions
-        await loginAsUserWithPermissions(page, { 
-          "issue:view": true, 
-          "issue:edit": true 
-        });
+    test("allows status changes with issue:edit permission", async ({
+      page,
+    }) => {
+      // Login with view and edit permissions
+      await loginAsUserWithPermissions(page, {
+        "issue:view": true,
+        "issue:edit": true,
+      });
 
-        await page.goto("/issues/test-issue-1");
+      await page.goto("/issues/test-issue-1");
 
-        // Should see status control section with edit permission
-        const statusSection = page.locator('[data-testid="status-control"]');
-        await expect(statusSection).toBeVisible();
+      // Should see status control section with edit permission
+      const statusSection = page.locator('[data-testid="status-control"]');
+      await expect(statusSection).toBeVisible();
 
-        // Note: Actual status change testing would require
-        // mocking the tRPC mutation endpoints appropriately
-      },
-    );
+      // Note: Actual status change testing would require
+      // mocking the tRPC mutation endpoints appropriately
+    });
   });
 
   test.describe("Close Permissions", () => {
-    test(
-      "shows close button only with issue:edit permission",
-      async ({ page }) => {
-        // Login with view and edit permissions
-        await loginAsUserWithPermissions(page, { 
-          "issue:view": true, 
-          "issue:edit": true 
-        });
+    test("shows close button only with issue:edit permission", async ({
+      page,
+    }) => {
+      // Login with view and edit permissions
+      await loginAsUserWithPermissions(page, {
+        "issue:view": true,
+        "issue:edit": true,
+      });
 
-        await page.goto("/issues/test-issue-1");
+      await page.goto("/issues/test-issue-1");
 
-        // Should see close button (uses issue:edit permission)
-        await expect(
-          page.locator('[data-testid="close-issue-button"]'),
-        ).toBeVisible();
-      },
-    );
+      // Should see close button (uses issue:edit permission)
+      await expect(
+        page.locator('[data-testid="close-issue-button"]'),
+      ).toBeVisible();
+    });
 
     test.fixme(
       "hides close button without issues:close permission",
@@ -199,23 +194,22 @@ test.describe("Issue Detail - Permission Matrix", () => {
   });
 
   test.describe("Assign Permissions", () => {
-    test(
-      "shows assign control only with issue:assign permission",
-      async ({ page }) => {
-        // Login with view and assign permissions
-        await loginAsUserWithPermissions(page, { 
-          "issue:view": true, 
-          "issue:assign": true 
-        });
+    test("shows assign control only with issue:assign permission", async ({
+      page,
+    }) => {
+      // Login with view and assign permissions
+      await loginAsUserWithPermissions(page, {
+        "issue:view": true,
+        "issue:assign": true,
+      });
 
-        await page.goto("/issues/test-issue-1");
+      await page.goto("/issues/test-issue-1");
 
-        // Should see assign button
-        await expect(
-          page.locator('[data-testid="assign-user-button"]'),
-        ).toBeVisible();
-      },
-    );
+      // Should see assign button
+      await expect(
+        page.locator('[data-testid="assign-user-button"]'),
+      ).toBeVisible();
+    });
 
     test.fixme(
       "hides assign control without issues:assign permission",
@@ -352,20 +346,19 @@ test.describe("Issue Detail - Permission Matrix", () => {
       },
     );
 
-    test(
-      "hides comment form without issue:create permission", 
-      async ({ page }) => {
-        // Login with only view permission (no comment/create permission)
-        await loginAsUserWithPermissions(page, { "issue:view": true });
+    test("hides comment form without issue:create permission", async ({
+      page,
+    }) => {
+      // Login with only view permission (no comment/create permission)
+      await loginAsUserWithPermissions(page, { "issue:view": true });
 
-        await page.goto("/issues/test-issue-1");
+      await page.goto("/issues/test-issue-1");
 
-        // PermissionGate should hide the comment form
-        await expect(
-          page.locator('[data-testid="comment-form"]'),
-        ).not.toBeVisible();
-      },
-    );
+      // PermissionGate should hide the comment form
+      await expect(
+        page.locator('[data-testid="comment-form"]'),
+      ).not.toBeVisible();
+    });
   });
 
   test.describe("Delete Permissions", () => {
@@ -419,7 +412,7 @@ test.describe("Issue Detail - Permission Matrix", () => {
         await page.locator('[data-testid="confirm-delete-button"]').click();
 
         // Should redirect to dashboard
-        await expect(page.url()).toContain("/dashboard");
+        expect(page.url()).toContain("/dashboard");
 
         // Should show deletion success message
         await expect(

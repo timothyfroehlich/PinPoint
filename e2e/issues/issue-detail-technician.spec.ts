@@ -178,7 +178,7 @@ test.describe("Issue Detail - Technician Workflow", () => {
     await page.locator('[data-testid="confirm-merge-button"]').click();
 
     // Should redirect to original issue
-    await expect(page.url()).toContain("/issues/test-issue-original");
+    expect(page.url()).toContain("/issues/test-issue-original");
 
     // Should see merge activity
     await expect(page.locator('[data-testid="merge-activity"]')).toBeVisible();
