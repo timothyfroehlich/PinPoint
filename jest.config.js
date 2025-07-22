@@ -18,6 +18,14 @@ let config = {
         "<rootDir>/src/lib/**/__tests__/**/*.test.{js,ts}",
         "<rootDir>/src/app/api/**/__tests__/**/*.test.{js,ts}",
       ],
+      testPathIgnorePatterns: [
+        "<rootDir>/vitest-tests/",
+        "<rootDir>/src/lib/opdb/__tests__/utils.test.ts",
+        "<rootDir>/src/server/services/__tests__/factory.test.ts",
+        "<rootDir>/src/server/services/__tests__/pinballmapService.test.ts",
+        "<rootDir>/src/server/api/__tests__/trpc-auth.test.ts",
+        "<rootDir>/src/test/mockContext.ts",
+      ],
       setupFilesAfterEnv: ["<rootDir>/src/test/setup.ts"],
       transform: {
         "^.+\\.(ts|tsx)$": [
@@ -46,6 +54,14 @@ let config = {
       testMatch: [
         "<rootDir>/src/app/**/__tests__/**/*.test.{js,ts,tsx}",
         "<rootDir>/src/lib/hooks/**/__tests__/**/*.test.{js,ts,tsx}",
+      ],
+      testPathIgnorePatterns: [
+        "<rootDir>/vitest-tests/",
+        "<rootDir>/src/lib/opdb/__tests__/utils.test.ts",
+        "<rootDir>/src/server/services/__tests__/factory.test.ts",
+        "<rootDir>/src/server/services/__tests__/pinballmapService.test.ts",
+        "<rootDir>/src/server/api/__tests__/trpc-auth.test.ts",
+        "<rootDir>/src/test/mockContext.ts",
       ],
       setupFilesAfterEnv: ["<rootDir>/src/test/setup.ts"],
       transform: {
