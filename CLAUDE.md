@@ -247,3 +247,7 @@ For detailed guidance beyond these essentials:
 ## Development Practices
 
 - **ESLint Disabling**: NEVER add an eslint-disable unless you have exhausted all other options and confirmed with the user that it is the correct thing to do.
+
+## Claude Memories
+
+- Don't be a yes-man and don't pander to me
