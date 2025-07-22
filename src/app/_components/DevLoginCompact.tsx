@@ -10,6 +10,7 @@ import {
   Collapse,
   IconButton,
 } from "@mui/material";
+import { signIn } from "next-auth/react";
 import { useState } from "react";
 
 interface DevLoginCompactProps {
@@ -29,19 +30,31 @@ export function DevLoginCompact({
     { id: "3", name: "Test Player", email: "player@test.com", role: "player" },
   ];
 
-  function handleLogin(email: string): void {
+  async function handleLogin(email: string): Promise<void> {
     setIsLoading(true);
     try {
       console.log("Dev login as:", email);
-      // Simulate login success and call the parent's onLogin
-      setTimeout(() => {
-        setIsLoading(false);
+      
+      // Use NextAuth signIn with Credentials provider
+      const result = await signIn("credentials", {
+        email,
+        redirect: false, // Don't redirect automatically
+      });
+
+      if (result.error) {
+        console.error("Login failed:", result.error);
+        alert(`Login failed: ${result.error}`);
+      } else if (result.ok) {
+        console.log("Login successful");
+        // Let NextAuth handle the redirect, or call onLogin if provided
         if (onLogin) {
           onLogin();
         }
-      }, 500);
+      }
     } catch (error) {
       console.error("Login failed:", error);
+      alert("Login failed - check console for details");
+    } finally {
       setIsLoading(false);
     }
   }
@@ -124,7 +137,7 @@ export function DevLoginCompact({
                   size="small"
                   disabled={isLoading}
                   onClick={() => {
-                    handleLogin(testUser.email);
+                    void handleLogin(testUser.email);
                   }}
                   sx={{
                     justifyContent: "flex-start",

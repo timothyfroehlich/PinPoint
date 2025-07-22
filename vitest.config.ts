@@ -15,6 +15,12 @@ export default defineConfig({
   test: {
     projects: [
       {
+        plugins: [react(), tsconfigPaths()],
+        resolve: {
+          alias: {
+            '~': path.resolve(__dirname, './src'),
+          },
+        },
         // Node environment for server-side tests
         test: {
           name: 'node',
@@ -50,6 +56,12 @@ export default defineConfig({
         },
       },
       {
+        plugins: [react(), tsconfigPaths()],
+        resolve: {
+          alias: {
+            '~': path.resolve(__dirname, './src'),
+          },
+        },
         // jsdom environment for browser/React tests
         test: {
           name: 'jsdom',

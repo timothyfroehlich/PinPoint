@@ -2,6 +2,7 @@
 // This test ensures the global mock is properly configured
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+
 import { DatabaseProvider, getGlobalDatabaseProvider } from "../provider";
 
 // Mock the database provider at the module level for Vitest

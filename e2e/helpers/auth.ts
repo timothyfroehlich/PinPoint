@@ -99,7 +99,7 @@ export async function loginAsUserWithPermissions(
     email: "test@example.com",
   };
 
-  const userInfo = user || defaultUser;
+  const userInfo = user ?? defaultUser;
 
   // Convert permissions object to array format
   const permissionsList = Object.entries(permissions)

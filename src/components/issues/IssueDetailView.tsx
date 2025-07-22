@@ -20,6 +20,8 @@ import { IssueDetail } from "./IssueDetail";
 import { IssueStatusControl } from "./IssueStatusControl";
 import { IssueTimeline } from "./IssueTimeline";
 
+import { PermissionGate } from "~/components/permissions";
+import { usePermissions } from "~/hooks/usePermissions";
 import { api } from "~/trpc/react";
 import { type IssueWithDetails } from "~/types/issue";
 
@@ -46,13 +48,8 @@ export function IssueDetailView({
     refetch,
   } = api.issue.core.getById.useQuery({ id: issueId });
 
-  const hasPermission = (permission: string): boolean => {
-    if (!session?.user) return false;
-    const userWithPermissions = session.user as { permissions?: string[] };
-    return userWithPermissions.permissions?.includes(permission) ?? false;
-  };
-
-  const isAuthenticated = !!session?.user;
+  // Use the proper permissions hook
+  const { hasPermission, isAuthenticated } = usePermissions();
 
   if (queryError) {
     if (queryError.message.includes("UNAUTHORIZED")) {
@@ -152,7 +149,10 @@ export function IssueDetailView({
             data-testid={isMobile ? "mobile-actions-menu" : "desktop-sidebar"}
           >
             {/* Status Control */}
-            {isAuthenticated && hasPermission("issues:edit") && (
+            <PermissionGate
+              permission="issue:edit"
+              hasPermission={hasPermission}
+            >
               <Paper elevation={1} sx={{ p: 2, mb: 2 }}>
                 <IssueStatusControl
                   issue={currentIssue}
@@ -161,7 +161,7 @@ export function IssueDetailView({
                   onError={setError}
                 />
               </Paper>
-            )}
+            </PermissionGate>
 
             {/* Actions */}
             <Paper elevation={1} sx={{ p: 2, mb: 2 }}>

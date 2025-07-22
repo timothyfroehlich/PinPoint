@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { MockedFunction } from "vitest";
+
 
 // Use vi.hoisted to properly handle variable hoisting
 const { mockEnv, setNodeEnv, mockUserFindUnique } = vi.hoisted(() => {

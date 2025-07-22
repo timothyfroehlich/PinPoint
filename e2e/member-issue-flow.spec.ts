@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { loginAsRegularUser, loginAsAdmin, logout } from "./helpers/auth";
+import { loginAsRegularUser, logout } from "./helpers/auth";
 
 test.describe("Member Issue Reporting Flow", () => {
   test.beforeEach(async ({ page }) => {
@@ -28,7 +28,7 @@ test.describe("Member Issue Reporting Flow", () => {
       await createIssueButton.click();
       
       // Should navigate to issue creation form
-      await expect(page.url()).toMatch(/\/issues\/create|\/issues\/new|\/create|\/report/);
+      expect(page.url()).toMatch(/\/issues\/create|\/issues\/new|\/create|\/report/);
       
       // Should see form fields
       const titleField = page.locator('input[type="text"]')

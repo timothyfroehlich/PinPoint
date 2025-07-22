@@ -4,7 +4,6 @@ import {
   Box,
   Typography,
   TextField,
-  Button,
   Paper,
   Stack,
   Avatar,
@@ -14,6 +13,7 @@ import {
 import { type Session } from "next-auth";
 import { useState } from "react";
 
+import { PermissionButton, PermissionGate } from "~/components/permissions";
 import { api } from "~/trpc/react";
 import { type IssueWithDetails, type Comment } from "~/types/issue";
 
@@ -59,9 +59,8 @@ export function IssueComments({
   };
 
   const isAuthenticated = !!session?.user;
-  const canComment = hasPermission("issues:comment");
   // Internal comment permissions - for future implementation
-  // const canViewInternal = hasPermission("issues:read_internal");
+  // const canViewInternal = hasPermission("issues:read_internal");  
   // const canCreateInternal = hasPermission("issues:comment_internal");
 
   // For now, all comments are visible (isInternal functionality not implemented in DB)
@@ -123,7 +122,10 @@ export function IssueComments({
       </Box>
 
       {/* Comment Form */}
-      {isAuthenticated && canComment && (
+      <PermissionGate
+        permission="issue:create"
+        hasPermission={hasPermission}
+      >
         <Box data-testid="comment-form">
           <Divider sx={{ mb: 2 }} />
           <Typography variant="subtitle1" gutterBottom>
@@ -153,30 +155,37 @@ export function IssueComments({
               {/* Internal comment toggle removed until implemented in database */}
             </Box>
 
-            <Button
+            <PermissionButton
+              permission="issue:create"
+              hasPermission={hasPermission}
               variant="contained"
               onClick={handleSubmitComment}
               disabled={!commentText.trim() || isSubmitting}
               data-testid="submit-comment-button"
             >
               {isSubmitting ? "Posting..." : "Post Comment"}
-            </Button>
+            </PermissionButton>
           </Stack>
         </Box>
-      )}
+      </PermissionGate>
 
       {/* Add Comment Button (for mobile/compact view) */}
-      {isAuthenticated && !canComment && (
-        <Box data-testid="no-comment-permission">
-          <Alert severity="info">
-            You need comment permissions to add comments
-          </Alert>
-        </Box>
-      )}
-
-      {isAuthenticated && canComment && (
+      <PermissionGate
+        permission="issue:create"
+        hasPermission={hasPermission}
+        fallback={
+          <Box data-testid="no-comment-permission">
+            <Alert severity="info">
+              You need permission to create issues to add comments
+            </Alert>
+          </Box>
+        }
+        showFallback={false}
+      >
         <Box sx={{ display: { xs: "block", md: "none" }, mt: 2 }}>
-          <Button
+          <PermissionButton
+            permission="issue:create"
+            hasPermission={hasPermission}
             variant="outlined"
             fullWidth
             data-testid="add-comment-button"
@@ -189,9 +198,9 @@ export function IssueComments({
             }}
           >
             Add Comment
-          </Button>
+          </PermissionButton>
         </Box>
-      )}
+      </PermissionGate>
     </Box>
   );
 }

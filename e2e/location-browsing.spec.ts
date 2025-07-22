@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { loginAsAdmin, loginAsRegularUser, logout } from "./helpers/auth";
+import { loginAsRegularUser, logout } from "./helpers/auth";
 
 test.describe("Location Browsing Flow", () => {
   test.beforeEach(async ({ page }) => {
@@ -23,7 +23,7 @@ test.describe("Location Browsing Flow", () => {
     
     if (await locationLinks.isVisible().catch(() => false)) {
       await locationLinks.first().click();
-      await expect(page.url()).toMatch(/\/locations|\/venues|\/browse/);
+      expect(page.url()).toMatch(/\/locations|\/venues|\/browse/);
     } else {
       // If no direct location links, look for organization-specific browsing
       const orgLink = page.locator('a[href*="/apc"]')
@@ -59,7 +59,6 @@ test.describe("Location Browsing Flow", () => {
         .or(page.locator('[data-testid*="game"]'));
       
       if (await machineElements.isVisible().catch(() => false)) {
-        machinesFound = true;
         
         // Should see machine listings
         await expect(machineElements).toBeVisible();
@@ -239,7 +238,7 @@ test.describe("Location Browsing Flow", () => {
       
       if (await homeLink.isVisible().catch(() => false)) {
         await homeLink.click();
-        await expect(page.url()).toMatch(/\/dashboard|\/$/);
+        expect(page.url()).toMatch(/\/dashboard|\/$/);
       }
     }
     
@@ -314,7 +313,7 @@ test.describe("Location Browsing Flow", () => {
     }
     
     // Look for issue counts or badges
-    const issueBadges = page.locator('[data-testid*="issue"]')
+    page.locator('[data-testid*="issue"]')
       .or(page.locator('text*="issue"'))
       .or(page.locator('.badge'))
       .or(page.locator('text="0"'))

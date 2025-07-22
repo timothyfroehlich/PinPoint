@@ -161,7 +161,7 @@ rbd, dnd-kit provides a set of unopinionated primitives (useDraggable, useDroppa
 
 The Kanban board will be composed of several key React components:
 
-- \\<KanbanBoard\\>: The top-level container component. It will be responsible for fetching all board data via the GET /api/organizations/\\{orgId\\}/board endpoint and initializing the dnd-kit \\<DndContext\\>. This context provider manages the global drag-and-drop state.
+- \\<KanbanBoard\\>: The top-level container component. It will be responsible for fetching all board data via the `organization.board.get` tRPC query and initializing the dnd-kit \\<DndContext\\>. This context provider manages the global drag-and-drop state.
 - \\<StatusColumn\\>: This component will represent a single vertical column on the board (e.g., "In Progress"). It will use the useDroppable hook from dnd-kit to register itself as a valid drop zone. It will also provide a \\<SortableContext\\> for the issue cards it contains, enabling smooth reordering within the column.21
 - \\<IssueCard\\>: This component will represent a single draggable issue. It will use the useDraggable and useSortable hooks to make itself interactive. It will render the at-a-glance issue details as specified in the PRD.
 
@@ -173,7 +173,7 @@ The implementation flow for a drag-and-drop action (e.g., moving a card to a new
 1. **Initial State:** The \\<KanbanBoard\\> component maintains the board's structure in its local state (e.g., an object mapping status IDs to arrays of issue objects).
 2. **User Action:** The onDragEnd event handler, provided by \\<DndContext\\>, is triggered when the user releases the mouse button after dragging a card.
 3. **Optimistic UI Update:** Inside the onDragEnd handler, the code will _immediately_ update the component's local state to reflect the card's new position. React's reconciliation process will then re-render the UI instantly, showing the card in its new column. The new useOptimistic hook in React 18 is designed specifically for this purpose and should be leveraged.6
-4. **Asynchronous API Call:** Concurrently with the UI update, an asynchronous PATCH request is dispatched to the /api/issues/\\{issueId\\} endpoint, sending the new statusId or assigneeId to the server for persistence.
+4. **Asynchronous API Call:** Concurrently with the UI update, an asynchronous mutation is dispatched via the `issue.update` tRPC procedure, sending the new statusId or assigneeId to the server for persistence.
 5. **Success Handling:** If the API call returns a successful response (e.g., HTTP 200 OK), no further action is needed on the client. The UI already reflects the final, correct state.
 6. **Failure Handling:** If the API call fails (due to a server error, network issue, or validation failure), the catch block of the promise is executed. This block must perform two actions: - **Revert the UI:** Set the component's local state _back_ to its original configuration before the drag action began. This will cause the card to animate back to its original position, preserving data integrity. - **Notify the User:** Display a non-intrusive error message (e.g., a toast notification) informing the user that the update failed and they should try again.
    This sequence ensures the application feels instantaneous to the user while guaranteeing that the UI never remains in a state that is inconsistent with the backend.

@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { loginAsAdmin, loginAsTechnician, loginAsRegularUser, logout } from "./helpers/auth";
+import { loginAsAdmin, loginAsRegularUser, logout } from "./helpers/auth";
 
 test.describe("Authentication Flow", () => {
   test.beforeEach(async ({ page }) => {
@@ -142,11 +142,8 @@ test.describe("Authentication Flow", () => {
       
       // Should either be redirected or see access denied
       // TODO: Update based on actual access control behavior
-      const isAccessDenied = 
-        page.url().includes("403") || 
-        page.url().includes("unauthorized") ||
-        await page.locator('text="Access Denied"').isVisible().catch(() => false) ||
-        await page.locator('text="Forbidden"').isVisible().catch(() => false);
+      await page.locator('text="Access Denied"').isVisible().catch(() => false);
+      await page.locator('text="Forbidden"').isVisible().catch(() => false);
       
       // For now, just verify the navigation attempt doesn't crash
       expect(page.url()).toContain("localhost");
@@ -166,10 +163,8 @@ test.describe("Authentication Flow", () => {
       page.locator('text="admin@example.com"'),
     ];
     
-    let userInfoVisible = false;
     for (const element of userInfoElements) {
       if (await element.isVisible().catch(() => false)) {
-        userInfoVisible = true;
         break;
       }
     }

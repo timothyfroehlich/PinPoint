@@ -1,6 +1,13 @@
 # Testing Patterns Guide
 
+> **⚠️ Migration Notice**: PinPoint is transitioning to Vitest. New tests should use Vitest patterns. See [Vitest Migration Guide](./vitest-migration.md) for details.
+
 This guide covers Jest testing patterns, mocking strategies, and coverage best practices for PinPoint's TypeScript strictest mode environment.
+
+**For new development**:
+- Write tests using Vitest (see [Vitest Migration Guide](./vitest-migration.md))
+- When modifying existing tests, migrate them to Vitest
+- Use patterns below as reference for migration
 
 ## Quick Reference
 

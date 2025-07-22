@@ -202,6 +202,25 @@ async function main() {
       bio: "Project owner.",
       roleId: adminRole.id,
     },
+    // Dev login test users
+    {
+      name: "Test Admin",
+      email: "admin@test.com",
+      bio: "Development test admin account.",
+      roleId: adminRole.id,
+    },
+    {
+      name: "Test Member",
+      email: "member@test.com",
+      bio: "Development test member account.",
+      roleId: memberRole.id,
+    },
+    {
+      name: "Test Player",
+      email: "player@test.com",
+      bio: "Development test player account.",
+      roleId: memberRole.id,
+    },
   ];
 
   const createdUsers = [];

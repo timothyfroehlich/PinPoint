@@ -6,10 +6,20 @@
 - **Database**: PostgreSQL + Prisma ORM
 - **Authentication**: NextAuth.js (Auth.js v5)
 - **UI**: Material UI (MUI)
-- **API**: tRPC
+- **API**: tRPC (exclusive - no custom API routes)
 - **Deployment**: Vercel
 
 ## Core Architecture
+
+### API Strategy
+
+PinPoint uses **tRPC exclusively** for all application endpoints. Traditional API routes are only used for:
+- Authentication handlers (NextAuth requirement)
+- Health checks (monitoring requirement)
+- QR code redirects (HTTP redirect requirement)
+- Development utilities (dev environment only)
+
+See `docs/architecture/api-routes.md` for details on legitimate exceptions.
 
 ### Multi-Tenancy
 
