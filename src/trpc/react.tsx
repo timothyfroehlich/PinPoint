@@ -74,7 +74,7 @@ export function TRPCReactProvider(props: {
   );
 }
 
-function getBaseUrl() {
+function getBaseUrl(): string {
   if (typeof window !== "undefined") return ""; // browser should use relative url
-  return `http://localhost:${process.env.PORT ?? "3000"}`;
+  return `http://localhost:${process.env["PORT"] ?? "3000"}`;
 }

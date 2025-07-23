@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 import { TRPCError } from "@trpc/server";
 
 // Mock NextAuth first to avoid import issues

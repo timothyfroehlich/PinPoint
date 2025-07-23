@@ -29,91 +29,26 @@ jobs:
           node-version: "24"
           cache: "npm"
       - run: npm ci
-      - name: TypeScript Check (Test errors non-blocking)
+      - name: TypeScript Check (Multi-config)
         id: typecheck
         run: |
-          npm run typecheck 2>&1 | tee typescript-output.log || true
-
-          # Count total TypeScript errors
-          ERROR_COUNT=$(grep -c "error TS" typescript-output.log 2>/dev/null || echo "0")
-
-          # Ensure ERROR_COUNT is a valid number
-          if ! [[ "$ERROR_COUNT" =~ ^[0-9]+$ ]]; then
-            ERROR_COUNT=0
-          fi
-
-          # Filter out test files more comprehensively (including all test-related paths)
-          # First, save all errors to a temp file to avoid shell quoting issues
-          grep "error TS" typescript-output.log > all-errors.tmp 2>/dev/null || touch all-errors.tmp
-
-          # Filter out test patterns and save to production errors file
-          # Note: vitest.test files are now treated as production code (blocking errors)
-          grep -v -E "(\.test\.|__tests__|\.spec\.|spec\.|/test/|/tests/|src/test/|mockContext)" all-errors.tmp > production-errors.tmp 2>/dev/null || touch production-errors.tmp
-
-          # Debug: Show what errors we're seeing
-          echo "=== ALL TYPESCRIPT ERRORS ==="
-          cat all-errors.tmp || echo "No TS errors found"
-          echo "=== FILTERED PRODUCTION ERRORS ==="
-          cat production-errors.tmp || echo "No production errors found"
-          echo "=== END DEBUG ==="
-
-          # Count production errors more reliably
-          PRODUCTION_ERROR_COUNT=$(wc -l < production-errors.tmp)
-          # Handle empty file case (wc -l returns 0 for empty files, but let's be explicit)
-          if [ ! -s production-errors.tmp ]; then
-            PRODUCTION_ERROR_COUNT=0
-          fi
-
-          # Ensure it's a valid number
-          if ! [[ "$PRODUCTION_ERROR_COUNT" =~ ^[0-9]+$ ]]; then
-            PRODUCTION_ERROR_COUNT=0
-          fi
-
-          # Clean up temp files
-          rm -f all-errors.tmp production-errors.tmp
-
-          # Calculate test errors
-          TEST_ERROR_COUNT=$((ERROR_COUNT - PRODUCTION_ERROR_COUNT))
-          if [ "$TEST_ERROR_COUNT" -lt 0 ]; then
-            TEST_ERROR_COUNT=0
-          fi
-
-          {
-            echo "error_count=$ERROR_COUNT"
-            echo "production_error_count=$PRODUCTION_ERROR_COUNT"
-            echo "test_error_count=$TEST_ERROR_COUNT"
-          } >> "$GITHUB_OUTPUT"
-
-          {
-            echo "## TypeScript Check Results"
-            echo "- **Production Code Errors**: $PRODUCTION_ERROR_COUNT (❌ blocking)"
-            echo "- **Test File Errors**: $TEST_ERROR_COUNT (⚠️ non-blocking)"
-            echo "- **Total Errors**: $ERROR_COUNT"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-          if [ "$PRODUCTION_ERROR_COUNT" -gt 0 ]; then
-            {
-              echo "### Production Code Errors (Blocking):"
-              head -10 production-errors.tmp || echo "No production errors to display"
-            } >> "$GITHUB_STEP_SUMMARY"
-            echo "TypeScript job: FAILED (production errors found)"
+          # Production code (strictest) - must pass
+          echo "=== Checking Production Code (Strictest) ==="
+          if ! npm run typecheck 2>&1 | tee production-typescript.log; then
+            echo "❌ Production code has TypeScript errors!" >> "$GITHUB_STEP_SUMMARY"
+            grep "error TS" production-typescript.log | head -10 >> "$GITHUB_STEP_SUMMARY" || true
             exit 1
-          elif [ "$TEST_ERROR_COUNT" -gt 0 ]; then
-            {
-              echo "### Test File Errors (Non-blocking):"
-              # Show test errors by filtering all errors (excludes vitest.test files which are now blocking)
-              grep "error TS" typescript-output.log | grep -E "(\.test\.|__tests__|\.spec\.|spec\.|/test/|/tests/|src/test/|mockContext)" | head -5 || true
-              echo ""
-              echo "✅ Test errors don't block CI during TypeScript migration"
-              echo "📋 These will be addressed in separate cleanup tasks"
-            } >> "$GITHUB_STEP_SUMMARY"
-            echo "TypeScript job: SUCCESS (only test errors found)"
-            exit 0
-          else
-            echo "✅ No TypeScript errors found!" >> "$GITHUB_STEP_SUMMARY"
-            echo "TypeScript job: SUCCESS (no errors found)"
-            exit 0
           fi
+          
+          # Check test utilities separately (warnings only)
+          echo "=== Checking Test Utils (Recommended) ==="
+          npx tsc --project tsconfig.test-utils.json --noEmit 2>&1 | tee test-utils-typescript.log || true
+          
+          # Check test files separately (warnings only) 
+          echo "=== Checking Test Files (Relaxed) ==="
+          npx tsc --project tsconfig.tests.json --noEmit 2>&1 | tee tests-typescript.log || true
+          
+          echo "✅ Multi-config TypeScript check completed!" >> "$GITHUB_STEP_SUMMARY"
       - name: Upload TypeScript Error Report
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -141,9 +76,8 @@ jobs:
           node-version: "24"
           cache: "npm"
       - run: npm ci
-      - name: ESLint Check - Production Code
-        run: |
-          npm run lint src/ --quiet
+      - name: ESLint Check - Production Code  
+        run: npm run lint:quiet
 
   lint-tests:
     name: ESLint (Tests)
@@ -164,29 +98,10 @@ jobs:
           node-version: "24"
           cache: "npm"
       - run: npm ci
-      - name: ESLint Check - Test Files (Non-blocking)
-        id: lint-tests
+      - name: ESLint Check - Test Files (Non-blocking)  
         run: |
-          npm run lint src/ 2>&1 | tee eslint-test-output.log || true
-
-          # Count warnings/errors with proper validation
-          WARNING_COUNT=$(grep -c "warning\|error" eslint-test-output.log 2>/dev/null || echo "0")
-          # Ensure WARNING_COUNT is a valid number
-          if ! [[ "$WARNING_COUNT" =~ ^[0-9]+$ ]]; then
-            WARNING_COUNT=0
-          fi
-
-          # Output to GitHub Actions with proper formatting
-          echo "warning_count=${WARNING_COUNT}" >> "$GITHUB_OUTPUT"
-
-          {
-            echo "## ESLint Test Files Report"
-            echo "Found $WARNING_COUNT warnings/errors in test files (non-blocking)"
-            echo "✅ Test linting issues don't block CI during TypeScript migration"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-          echo "ESLint Tests job: SUCCESS (test issues are non-blocking)"
-          exit 0
+          npm run lint 2>&1 | tee eslint-test-output.log || true
+          echo "✅ Test linting completed (warnings/errors are non-blocking)" >> "$GITHUB_STEP_SUMMARY"
 
   # Job 3: Prettier Formatting
   format:

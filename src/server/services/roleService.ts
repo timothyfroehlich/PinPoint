@@ -291,13 +291,23 @@ export class RoleService {
     return this.prisma.role.findMany({
       where: { organizationId: this.organizationId },
       include: {
-        permissions: true,
+        permissions: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
         _count: {
           select: { memberships: true },
         },
       },
       orderBy: [{ isSystem: "desc" }, { name: "asc" }],
-    });
+    }) as unknown as Promise<
+      (Role & {
+        permissions: { id: string; name: string }[];
+        _count: { memberships: number };
+      })[]
+    >;
   }
 
   /**

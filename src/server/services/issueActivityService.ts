@@ -131,6 +131,20 @@ export class IssueActivityService {
     });
   }
 
+  async recordIssueAssigned(
+    issueId: string,
+    organizationId: string,
+    actorId: string,
+    assigneeId: string,
+  ): Promise<void> {
+    await this.recordActivity(issueId, organizationId, {
+      type: ActivityType.ASSIGNED,
+      actorId,
+      fieldName: "assignee",
+      newValue: assigneeId,
+    });
+  }
+
   async recordCommentDeleted(
     issueId: string,
     organizationId: string,

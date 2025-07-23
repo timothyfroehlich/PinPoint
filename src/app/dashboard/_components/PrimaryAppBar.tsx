@@ -70,6 +70,7 @@ const PrimaryAppBar = (): JSX.Element => {
           <PermissionButton
             permission="issue:view"
             hasPermission={hasPermission}
+            showWhenDenied={false}
             color="inherit"
             sx={{
               borderRadius: 2,
@@ -85,6 +86,7 @@ const PrimaryAppBar = (): JSX.Element => {
           <PermissionButton
             permission="machine:view"
             hasPermission={hasPermission}
+            showWhenDenied={false}
             color="inherit"
             sx={{
               borderRadius: 2,

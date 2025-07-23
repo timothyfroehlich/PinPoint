@@ -6,18 +6,18 @@ Object.defineProperty(process.env, "NODE_ENV", {
   writable: true,
   configurable: true,
 });
-process.env["AUTH_SECRET"] = "test-auth-secret";
-process.env["NEXTAUTH_SECRET"] = "test-auth-secret"; // Alternative name
-process.env["GOOGLE_CLIENT_ID"] = "test-google-client-id";
-process.env["GOOGLE_CLIENT_SECRET"] = "test-google-client-secret";
-process.env["DATABASE_URL"] = "postgresql://test:test@localhost:5432/test";
-process.env["OPDB_API_URL"] = "https://opdb.org/api";
-process.env["DEFAULT_ORG_SUBDOMAIN"] = "apc";
-process.env["OPDB_API_KEY"] = "test-token";
-process.env["IMAGE_STORAGE_PROVIDER"] = "local";
-process.env["NEXTAUTH_URL"] = "http://localhost:3000";
-process.env["VERCEL_URL"] = "";
-process.env["PORT"] = "3000";
+process.env.AUTH_SECRET = "test-auth-secret";
+process.env.NEXTAUTH_SECRET = "test-auth-secret"; // Alternative name
+process.env.GOOGLE_CLIENT_ID = "test-google-client-id";
+process.env.GOOGLE_CLIENT_SECRET = "test-google-client-secret";
+process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test";
+process.env.OPDB_API_URL = "https://opdb.org/api";
+process.env.DEFAULT_ORG_SUBDOMAIN = "apc";
+process.env.OPDB_API_KEY = "test-token";
+process.env.IMAGE_STORAGE_PROVIDER = "local";
+process.env.NEXTAUTH_URL = "http://localhost:3000";
+process.env.VERCEL_URL = "";
+process.env.PORT = "3000";
 
 // Mock fetch globally for tests
 global.fetch = jest.fn();

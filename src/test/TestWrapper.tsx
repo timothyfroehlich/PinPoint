@@ -10,12 +10,12 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SessionProvider } from "next-auth/react";
-import { ReactNode, useState } from "react";
+import { useState } from "react";
 
 import { createMockTRPCClient } from "./mockTRPCClient";
 
-// Import types for proper mocking
-import type { User } from "~/types/user";
+import type { User } from "@prisma/client";
+import type { ReactNode } from "react";
 
 import { api } from "~/trpc/react";
 
@@ -25,9 +25,15 @@ function createMockUser(overrides: Partial<User> = {}): User {
     id: "test-user-id",
     name: "Test User",
     email: "test@example.com",
+    emailVerified: null,
     image: null,
     createdAt: new Date("2023-01-01"),
     updatedAt: new Date("2023-01-01"),
+    bio: null,
+    profilePicture: null,
+    emailNotificationsEnabled: true,
+    pushNotificationsEnabled: true,
+    notificationFrequency: "IMMEDIATE" as const,
     ...overrides,
   };
 }
@@ -111,26 +117,16 @@ const createTestQueryClient = () =>
  * Creates properly typed mock tRPC client with getCurrentMembership
  */
 function createMockTRPCClientWithPermissions(permissions: string[] = []) {
-  return createMockTRPCClient({
-    user: {
-      getCurrentMembership: jest
-        .fn<
-          Promise<{
-            id: string;
-            userId: string;
-            organizationId: string;
-            role: string;
-            permissions: string[];
-            createdAt: Date;
-            updatedAt: Date;
-          } | null>,
-          []
-        >()
-        .mockResolvedValue(
-          createMockMembership({ permissions, role: "Member" }),
-        ),
-    },
-  });
+  const mockTRPCClient = createMockTRPCClient({});
+
+  // Override the getCurrentMembership specifically
+  mockTRPCClient.user.getCurrentMembership.useQuery = jest.fn(() => ({
+    data: createMockMembership({ permissions, role: "Member" }),
+    isLoading: false,
+    error: null,
+  }));
+
+  return mockTRPCClient;
 }
 
 /**

@@ -1,6 +1,9 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { describe, it, expect, beforeEach, beforeAll, afterEach, afterAll, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
+
+// Import MSW setup
+import { server } from "~/test/msw/setup";
 
 // Mock Next.js navigation
 vi.mock("next/navigation", () => ({
@@ -11,16 +14,16 @@ vi.mock("next/navigation", () => ({
   })),
 }));
 
-// Mock VitestTestWrapper dependencies for Vitest
-vi.mock("~/test/mockTRPCClient", () => ({
-  createMockTRPCClient: vi.fn((mockRouters = {}) => mockRouters),
-}));
-
 import PrimaryAppBar from "../PrimaryAppBar";
 
 import { VitestTestWrapper, VITEST_PERMISSION_SCENARIOS } from "~/test/VitestTestWrapper";
 
 describe("PrimaryAppBar", () => {
+  // Set up MSW server
+  beforeAll(() => { server.listen({ onUnhandledRequest: 'error' }); });
+  afterEach(() => { server.resetHandlers(); });
+  afterAll(() => { server.close(); });
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -63,27 +66,34 @@ describe("PrimaryAppBar", () => {
   });
 
   describe("Permission-based Navigation", () => {
-    it("should show Issues button for users with issue:view permission", () => {
+    it("should show Issues button for users with issue:view permission", async () => {
       render(
         <VitestTestWrapper userPermissions={["issue:view"]}>
           <PrimaryAppBar />
         </VitestTestWrapper>,
       );
 
+      // Wait for async permission loading
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "Issues" })).toBeInTheDocument();
+      });
+      
       const issuesButton = screen.getByRole("button", { name: "Issues" });
-      expect(issuesButton).toBeInTheDocument();
       expect(issuesButton).toBeEnabled();
     });
 
-    it("should show Games button for users with machine:view permission", () => {
+    it("should show Games button for users with machine:view permission", async () => {
       render(
         <VitestTestWrapper userPermissions={["machine:view"]}>
           <PrimaryAppBar />
         </VitestTestWrapper>,
       );
 
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "Games" })).toBeInTheDocument();
+      });
+      
       const gamesButton = screen.getByRole("button", { name: "Games" });
-      expect(gamesButton).toBeInTheDocument();
       expect(gamesButton).toBeEnabled();
     });
 
@@ -111,43 +121,43 @@ describe("PrimaryAppBar", () => {
       ).not.toBeInTheDocument();
     });
 
-    it("should show both navigation buttons for admin users", () => {
+    it("should show both navigation buttons for admin users", async () => {
       render(
         <VitestTestWrapper userPermissions={VITEST_PERMISSION_SCENARIOS.ADMIN}>
           <PrimaryAppBar />
         </VitestTestWrapper>,
       );
 
-      expect(
-        screen.getByRole("button", { name: "Issues" }),
-      ).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Games" })).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "Issues" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Games" })).toBeInTheDocument();
+      });
     });
 
-    it("should show appropriate buttons for manager users", () => {
+    it("should show appropriate buttons for manager users", async () => {
       render(
         <VitestTestWrapper userPermissions={VITEST_PERMISSION_SCENARIOS.MANAGER}>
           <PrimaryAppBar />
         </VitestTestWrapper>,
       );
 
-      expect(
-        screen.getByRole("button", { name: "Issues" }),
-      ).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Games" })).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "Issues" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Games" })).toBeInTheDocument();
+      });
     });
 
-    it("should show appropriate buttons for member users", () => {
+    it("should show appropriate buttons for member users", async () => {
       render(
         <VitestTestWrapper userPermissions={VITEST_PERMISSION_SCENARIOS.MEMBER}>
           <PrimaryAppBar />
         </VitestTestWrapper>,
       );
 
-      expect(
-        screen.getByRole("button", { name: "Issues" }),
-      ).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Games" })).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "Issues" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Games" })).toBeInTheDocument();
+      });
     });
 
     it("should hide all navigation buttons for public users", () => {

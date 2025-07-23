@@ -29,14 +29,14 @@ jest.mock("../../auth/permissions.constants", () => ({
 }));
 
 // Mock ExtendedPrismaClient since we're only testing expandPermissionsWithDependencies
-// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
+ 
 const mockPrisma = {} as any;
 
 describe("PermissionService - expandPermissionsWithDependencies", () => {
   let permissionService: PermissionService;
 
   beforeEach(() => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+     
     permissionService = new PermissionService(mockPrisma);
   });
 

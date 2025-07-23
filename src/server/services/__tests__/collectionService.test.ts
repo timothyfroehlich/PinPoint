@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-non-null-assertion */
+ 
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 import { CollectionService } from "../collectionService";
@@ -58,14 +58,14 @@ describe("CollectionService", () => {
           id: "coll1",
           name: "Front Room",
           isManual: true,
-          type: mockCollectionTypes[0]!,
+          type: mockCollectionTypes[0],
           _count: { machines: 5 },
         },
         {
           id: "coll2",
           name: "Stern",
           isManual: false,
-          type: mockCollectionTypes[1]!,
+          type: mockCollectionTypes[1],
           _count: { machines: 3 },
         },
       ];

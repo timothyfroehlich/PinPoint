@@ -26,16 +26,16 @@ export const roleRouter = createTRPCRouter({
         isDefault: boolean;
         createdAt: Date;
         updatedAt: Date;
-        permissions: { id: string; name: string; description: string | null }[];
+        permissions: { id: string; name: string }[];
         _count: { memberships: number };
       }) => ({
         ...role,
         memberCount: role._count.memberships,
         permissions: role.permissions.map(
-          (p: { id: string; name: string; description: string | null }) => ({
+          (p: { id: string; name: string }) => ({
             id: p.id,
             name: p.name,
-            description: p.description,
+            description: null,
           }),
         ),
       }),

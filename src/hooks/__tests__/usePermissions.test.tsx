@@ -11,8 +11,8 @@ import {
   usePermissionTooltip,
 } from "../usePermissions";
 
-import { server } from "~/test/msw/setup";
 import { handlers } from "~/test/msw/handlers";
+import { server } from "~/test/msw/setup";
 import { TestWrapper, PERMISSION_SCENARIOS } from "~/test/TestWrapper";
 
 // Create a wrapper function for renderHook

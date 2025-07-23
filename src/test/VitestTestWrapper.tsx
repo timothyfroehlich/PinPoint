@@ -4,21 +4,21 @@
  * This wrapper ensures components using authentication hooks, permissions hooks,
  * and tRPC don't fail with "must be wrapped in provider" errors.
  *
- * Follows Vitest best practices and patterns from Context7 documentation.
+ * Uses MSW-tRPC for proper HTTP interception - the official pattern for tRPC testing.
  */
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { httpBatchStreamLink, loggerLink } from "@trpc/client";
 import { SessionProvider } from "next-auth/react";
-import { ReactNode, useState } from "react";
-import { vi } from 'vitest';
-import { createTRPCClient, httpBatchLink } from "@trpc/client";
+import { useState, useEffect } from "react";
 import superjson from "superjson";
 
-// Import types for proper mocking
-import type { User } from "~/types/user";
-import type { AppRouter } from "~/server/api/root";
+import type { User, NotificationFrequency } from "@prisma/client";
+import type { ReactNode } from "react";
 
+import { handlers } from "~/test/msw/handlers";
+import { server } from "~/test/msw/setup";
 import { api } from "~/trpc/react";
 
 // Mock data factories following Vitest patterns
@@ -27,7 +27,13 @@ function createMockUser(overrides: Partial<User> = {}): User {
     id: "test-user-id",
     name: "Test User",
     email: "test@example.com",
+    emailVerified: null,
     image: null,
+    bio: null,
+    profilePicture: null,
+    emailNotificationsEnabled: true,
+    pushNotificationsEnabled: true,
+    notificationFrequency: "DAILY" as NotificationFrequency,
     createdAt: new Date("2023-01-01"),
     updatedAt: new Date("2023-01-01"),
     ...overrides,
@@ -66,64 +72,11 @@ function createMockMembership(
 }
 
 /**
- * Creates a mock tRPC client for testing with Vitest
- * This creates a real tRPC client but mocks the HTTP layer
+ * Sets up MSW handlers for the test with proper MSW-tRPC integration
  */
-function createVitestMockTRPCClient(permissions: string[] = []) {
-  // Mock fetch to return the appropriate responses
-  const mockFetch = vi.fn();
-  global.fetch = mockFetch;
-
-  // Mock the getCurrentMembership response
-  const mockMembership = createMockMembership({ permissions, role: "Member" });
-  
-  mockFetch.mockImplementation(async (url: string, options: any) => {
-    const body = JSON.parse(options.body);
-    
-    // Handle tRPC batch requests
-    if (Array.isArray(body)) {
-      const responses = body.map((req: any) => {
-        if (req.path === 'user.getCurrentMembership') {
-          return {
-            result: {
-              data: mockMembership,
-            },
-          };
-        }
-        // Default empty response for other endpoints
-        return {
-          result: {
-            data: null,
-          },
-        };
-      });
-      
-      return new Response(JSON.stringify(responses), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-    
-    // Handle single requests
-    return new Response(JSON.stringify({
-      result: {
-        data: mockMembership,
-      },
-    }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  });
-
-  // Create a real tRPC client that will use the mocked fetch
-  return createTRPCClient<AppRouter>({
-    links: [
-      httpBatchLink({
-        url: 'http://localhost:3000/api/trpc',
-        transformer: superjson,
-      }),
-    ],
-  });
+function setupMSWHandlers(permissions: string[] = []): void {
+  // Use the existing MSW-tRPC handler for mocking permissions
+  server.use(handlers.mockUserWithPermissions(permissions));
 }
 
 /**
@@ -156,6 +109,19 @@ function createVitestMockTRPCClient(permissions: string[] = []) {
  * );
  * ```
  */
+interface VitestTestWrapperProps {
+  children: ReactNode;
+  /** Mock session data - null for unauthenticated tests */
+  session?: {
+    user: User;
+    expires: string;
+  } | null;
+  /** Mock user permissions for testing permission-based components */
+  userPermissions?: string[] | undefined;
+  /** Override MSW setup - if false, no MSW handlers will be set up */
+  setupMSW?: boolean;
+}
+
 export function VitestTestWrapper({
   children,
   session = {
@@ -163,16 +129,8 @@ export function VitestTestWrapper({
     expires: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(),
   },
   userPermissions = [],
-  trpcClient,
-}: {
-  children: ReactNode;
-  session?: {
-    user: User;
-    expires: string;
-  } | null;
-  userPermissions?: string[] | undefined;
-  trpcClient?: any;
-}) {
+  setupMSW = true,
+}: VitestTestWrapperProps): React.JSX.Element {
   const [queryClient] = useState(
     () =>
       new QueryClient({
@@ -187,13 +145,37 @@ export function VitestTestWrapper({
       }),
   );
 
-  const mockTrpcClient =
-    trpcClient ?? createVitestMockTRPCClient(userPermissions);
+  // Create a real tRPC client - MSW will intercept HTTP requests
+  const [trpcClient] = useState(() =>
+    api.createClient({
+      links: [
+        loggerLink({
+          enabled: () => false, // Disable logging in tests
+        }),
+        httpBatchStreamLink({
+          transformer: superjson,
+          url: `http://localhost:${process.env["PORT"] ?? "3000"}/api/trpc`,
+          headers: () => {
+            const headers = new Headers();
+            headers.set("x-trpc-source", "vitest-test");
+            return headers;
+          },
+        }),
+      ],
+    }),
+  );
+
+  // Set up MSW handlers for this test
+  useEffect(() => {
+    if (setupMSW) {
+      setupMSWHandlers(userPermissions);
+    }
+  }, [userPermissions, setupMSW]);
 
   return (
     <QueryClientProvider client={queryClient}>
       <SessionProvider session={session}>
-        <api.Provider client={mockTrpcClient} queryClient={queryClient}>
+        <api.Provider client={trpcClient} queryClient={queryClient}>
           {children}
         </api.Provider>
       </SessionProvider>

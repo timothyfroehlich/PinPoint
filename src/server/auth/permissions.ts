@@ -1,4 +1,3 @@
-import { type PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { type Session } from "next-auth";
 
@@ -113,7 +112,7 @@ export async function getUserPermissions(
 export async function hasPermissionForSession(
   session: Session | null,
   permission: string,
-  prisma: PrismaClient,
+  prisma: ExtendedPrismaClient,
   organizationId: string,
 ): Promise<boolean> {
   const permissionService = new PermissionService(prisma);
@@ -132,7 +131,7 @@ export async function hasPermissionForSession(
 export async function requirePermissionForSession(
   session: Session | null,
   permission: string,
-  prisma: PrismaClient,
+  prisma: ExtendedPrismaClient,
   organizationId: string,
 ): Promise<void> {
   const permissionService = new PermissionService(prisma);
@@ -153,7 +152,7 @@ export async function requirePermissionForSession(
  */
 export async function getUserPermissionsForSession(
   session: Session | null,
-  prisma: PrismaClient,
+  prisma: ExtendedPrismaClient,
   organizationId: string,
 ): Promise<string[]> {
   const permissionService = new PermissionService(prisma);

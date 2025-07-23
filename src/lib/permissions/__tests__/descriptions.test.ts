@@ -119,7 +119,7 @@ describe("Permission Descriptions", () => {
 
     describe("edge cases", () => {
       it("should handle null input gracefully", () => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+         
         const result = getPermissionDescription(null as any);
         expect(result).toBe(
           "You don't have permission to perform this action (null)"
@@ -127,7 +127,7 @@ describe("Permission Descriptions", () => {
       });
 
       it("should handle undefined input gracefully", () => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+         
         const result = getPermissionDescription(undefined as any);
         expect(result).toBe(
           "You don't have permission to perform this action (undefined)"

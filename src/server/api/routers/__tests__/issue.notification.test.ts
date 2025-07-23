@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 import { NotificationType } from "@prisma/client";
 
 // Mock NextAuth first to avoid import issues

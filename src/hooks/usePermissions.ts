@@ -107,15 +107,21 @@ export function usePermissions(): UsePermissionsReturn {
     return membership?.role === "Admin";
   }, [membership?.role]);
 
-  return {
+  const result: UsePermissionsReturn = {
     hasPermission,
     permissions,
     isAuthenticated,
     isLoading: status === "loading" || isLoading,
     isError,
-    roleName: membership?.role,
     isAdmin,
   };
+
+  // Use conditional assignment for exactOptionalPropertyTypes compatibility
+  if (membership?.role) {
+    result.roleName = membership.role;
+  }
+
+  return result;
 }
 
 /**
