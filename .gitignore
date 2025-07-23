@@ -66,3 +66,6 @@ typescript-output.log
 eslint-test-output.log
 eslint-prod-errors.json
 betterer-output.log
+
+# Logging
+/logs
