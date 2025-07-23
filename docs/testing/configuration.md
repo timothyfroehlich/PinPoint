@@ -1,59 +1,83 @@
-# Vitest Configuration
+# Testing Configuration & Multi-Config TypeScript
 
-## Current Setup
+## Overview
 
-PinPoint uses Vitest with separate project configurations for different environments.
+PinPoint uses a dual testing setup (Jest + Vitest) with multi-config TypeScript for different testing contexts and strictness levels.
 
-### Configuration File: `vitest.config.ts`
+## Multi-Config TypeScript for Testing
+
+### TypeScript Configuration Hierarchy
+
+1. **`tsconfig.base.json`** - Common settings shared across all configs
+2. **`tsconfig.json`** - Production code (strictest)
+3. **`tsconfig.test-utils.json`** - Test utilities (recommended)
+4. **`tsconfig.tests.json`** - Test files (relaxed)
+
+### Testing Context Standards
+
+#### Test Files (`**/*.test.ts`, `**/*.vitest.test.ts`)
+
+- **Config**: `tsconfig.tests.json` (relaxed mode)
+- **Standards**: Pragmatic - `any` types and unsafe operations allowed
+- **ESLint**: Type-safety rules disabled
+- **Purpose**: Enable effective testing without TypeScript friction
 
 ```typescript
-import { defineConfig } from 'vitest/config';
-import react from '@vitejs/plugin-react';
-import tsconfigPaths from 'vite-tsconfig-paths';
-import path from 'path';
+// ✅ Allowed in test files
+const mockUser: any = { id: "1", name: "Test" };
+const mockResponse = { data: mockUser } as any;
+mockService.getData.mockReturnValue(mockResponse);
+```
 
+#### Test Utilities (`src/test/**/*.ts`)
+
+- **Config**: `tsconfig.test-utils.json` (recommended mode)
+- **Standards**: Moderate - practical testing patterns with some safety
+- **ESLint**: Type-safety rules as warnings
+- **Purpose**: Reusable test infrastructure with reasonable type safety
+
+```typescript
+// ✅ Test utility patterns
+export function createMockUser(overrides: Partial<User> = {}): User {
+  return {
+    id: "1",
+    name: "Test User",
+    email: "test@example.com",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...overrides,
+  };
+}
+```
+
+### Vitest Configuration with Multi-Config
+
+```typescript
+// vitest.config.ts
 export default defineConfig({
-  plugins: [react(), tsconfigPaths()],
-  resolve: {
-    alias: {
-      '~': path.resolve(__dirname, './src'),
-    },
-  },
   test: {
     projects: [
       {
-        // Node environment for server-side tests
-        plugins: [react(), tsconfigPaths()],
-        resolve: {
-          alias: { '~': path.resolve(__dirname, './src') },
-        },
         test: {
-          name: 'node',
-          globals: true,
-          environment: 'node',
-          setupFiles: ['src/test/vitest.setup.ts'],
+          name: "node",
+          typecheck: {
+            tsconfig: "./tsconfig.tests.json", // Relaxed for tests
+          },
           include: [
-            'src/lib/**/*.vitest.test.{ts,tsx}',
-            'src/server/**/*.vitest.test.{ts,tsx}',
-            'src/integration-tests/**/*.vitest.test.{ts,tsx}',
+            "src/lib/**/*.vitest.test.{ts,tsx}",
+            "src/server/**/*.vitest.test.{ts,tsx}",
           ],
         },
       },
       {
-        // jsdom environment for React/browser tests
-        plugins: [react(), tsconfigPaths()],
-        resolve: {
-          alias: { '~': path.resolve(__dirname, './src') },
-        },
         test: {
-          name: 'jsdom',
-          globals: true,
-          environment: 'jsdom',
-          setupFiles: ['src/test/vitest.setup.ts'],
+          name: "jsdom",
+          typecheck: {
+            tsconfig: "./tsconfig.tests.json", // Relaxed for tests
+          },
           include: [
-            'src/app/**/*.vitest.test.{ts,tsx}',
-            'src/components/**/*.vitest.test.{ts,tsx}',
-            'src/hooks/**/*.vitest.test.{ts,tsx}',
+            "src/app/**/*.vitest.test.{ts,tsx}",
+            "src/components/**/*.vitest.test.{ts,tsx}",
           ],
         },
       },
@@ -67,6 +91,7 @@ export default defineConfig({
 ### 1. Projects Configuration (Modern Approach)
 
 **Why Projects?**
+
 - Separate environments (node vs jsdom)
 - Parallel execution for better performance
 - Clear separation of concerns
@@ -75,6 +100,7 @@ export default defineConfig({
 ### 2. Path Aliases
 
 Each project needs its own alias configuration:
+
 ```typescript
 plugins: [react(), tsconfigPaths()],
 resolve: {
@@ -94,12 +120,13 @@ This allows both frameworks to coexist during migration.
 ### 4. Setup Files
 
 Common setup in `src/test/vitest.setup.ts`:
+
 ```typescript
-import { beforeAll, afterAll, afterEach } from 'vitest';
+import { beforeAll, afterAll, afterEach } from "vitest";
 
 // Set test environment variables
-process.env.NODE_ENV = 'test';
-process.env.DATABASE_URL = 'postgresql://test';
+process.env.NODE_ENV = "test";
+process.env.DATABASE_URL = "postgresql://test";
 
 beforeAll(() => {
   // Global setup
@@ -117,11 +144,13 @@ afterAll(() => {
 ## Environment-Specific Configuration
 
 ### Node Environment
+
 - For server-side code, API routes, services
 - No DOM globals
 - Direct file system access
 
 ### jsdom Environment
+
 - For React components, hooks, browser code
 - DOM globals available
 - Browser-like environment
@@ -164,6 +193,7 @@ npm run test:vitest:ui
 ## Deprecated Patterns
 
 ### ❌ Old: environmentMatchGlobs
+
 ```typescript
 // No longer supported in Vitest 3.2+
 test: {
@@ -175,23 +205,56 @@ test: {
 ```
 
 ### ✅ New: Projects Configuration
+
 Use the projects configuration shown above instead.
+
+## Multi-Config Benefits for Testing
+
+### Development Experience
+
+- **Test files**: Write tests efficiently without TypeScript friction
+- **Test utilities**: Maintain some type safety for reusable code
+- **Production code**: Keep strict standards where it matters
+
+### Migration Benefits
+
+- **Gradual improvement**: Can improve test TypeScript incrementally
+- **No blocking**: Test TypeScript issues don't prevent development
+- **Clear separation**: Different expectations for different contexts
 
 ## Integration with CI/CD
 
+Multi-config approach in CI:
+
+```yaml
+# Check production code (must pass)
+npm run typecheck
+
+# Check test utilities (warnings only)
+npx tsc --project tsconfig.test-utils.json --noEmit || true
+
+# Test files are very permissive
+npx tsc --project tsconfig.tests.json --noEmit || true
+```
+
 Both Jest and Vitest run in CI during migration:
+
 - Jest tests: `npm run test:jest`
 - Vitest tests: `npm run test:vitest:run`
 
 ## Troubleshooting Configuration
 
 ### Path Resolution Issues
+
 If `~` imports fail, ensure:
+
 1. Each project has plugins and resolve config
 2. `tsconfigPaths()` plugin is included
 3. tsconfig.json has proper paths mapping
 
 ### Environment Issues
+
 If tests fail with "window is not defined":
+
 - Check the test is in the correct project (jsdom vs node)
 - Verify the file glob patterns match your test location

@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/validate-write.js \"$FILE_PATH\""
+            "command": "node .claude/hooks/quality-check.cjs"
           }
         ]
       }

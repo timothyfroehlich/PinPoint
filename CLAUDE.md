@@ -14,6 +14,7 @@
 ### API Strategy
 
 PinPoint uses **tRPC exclusively** for all application endpoints. Traditional API routes are only used for:
+
 - Authentication handlers (NextAuth requirement)
 - Health checks (monitoring requirement)
 - QR code redirects (HTTP redirect requirement)
@@ -74,148 +75,136 @@ npm run typecheck | head -10                     # Show first 10 errors
 npm run typecheck | grep "usePermissions"        # Find specific function errors
 ```
 
-## Quality Standards (Zero Tolerance)
+## Multi-Config TypeScript Strategy
 
-- **0 TypeScript errors** - Fix immediately, never commit with TS errors
-- **0 usage of `any`**: Never use an `any` type, even in test code. If you don't know the type then go look for it.
-- **0 ESLint errors** - Warnings acceptable with justification
-- **Strict type-aware linting** - Project uses `@tsconfig/strictest` + type-aware ESLint rules to enforce type safety
+PinPoint uses a tiered TypeScript configuration system for different code contexts, balancing strict production standards with pragmatic testing needs.
+
+### Configuration Files
+
+1. **`tsconfig.base.json`** - Common settings (paths, module resolution, Next.js plugins)
+2. **`tsconfig.json`** - Production code (extends base + @tsconfig/strictest)
+3. **`tsconfig.test-utils.json`** - Test utilities (extends base + @tsconfig/recommended)
+4. **`tsconfig.tests.json`** - Test files (extends base with relaxed settings)
+
+### TypeScript Standards by Context
+
+#### Production Code (`src/**/*.ts` excluding tests)
+
+- **Config**: `tsconfig.json` (strictest mode)
+- **Standards**: **Zero tolerance** - all TypeScript errors must be fixed
+- **ESLint**: Strict type-safety rules at error level
+- **Coverage**: 50% global, 60% server/, 70% lib/
+
+#### Test Utilities (`src/test/**/*.ts`)
+
+- **Config**: `tsconfig.test-utils.json` (recommended mode)
+- **Standards**: Moderate - allows practical testing patterns
+- **ESLint**: Type-safety rules at warning level
+
+#### Test Files (`**/*.test.ts`, `**/*.vitest.test.ts`)
+
+- **Config**: `tsconfig.tests.json` (relaxed mode)
+- **Standards**: Pragmatic - allows `any` types and unsafe operations for testing
+- **ESLint**: Type-safety rules disabled
+
+## Quality Standards
+
+- **Production Code**: Zero TypeScript errors, zero `any` usage, strict ESLint
+- **Test Utilities**: Moderate standards, warnings acceptable
+- **Test Files**: Relaxed standards, pragmatic patterns allowed
 - **Consistent formatting** - Auto-formatted with Prettier
-- **Modern patterns** - ES modules, typed mocks (`jest.fn<T>()`), no `any` types
-- **Test quality** - Same standards as production code
-- **Coverage thresholds** - 50% global, 60% server/, 70% lib/ (configured in jest.config.js)
+- **Modern patterns** - ES modules, proper TypeScript throughout
 
-## TypeScript Strictest Mode Guidelines
+## TypeScript Patterns for Production Code
 
-### Key Patterns for `@tsconfig/strictest` Compliance
+### Key Patterns for `@tsconfig/strictest` Compliance (Production Only)
+
+Production code must follow strictest TypeScript patterns. Test files can use pragmatic patterns.
 
 1. **Optional Properties (`exactOptionalPropertyTypes`)**
 
    ```typescript
-   // ❌ Bad: undefined not assignable to optional
+   // ❌ Production: undefined not assignable to optional
    const data: { prop?: string } = { prop: value || undefined };
 
-   // ✅ Good: Use conditional assignment
+   // ✅ Production: Use conditional assignment
    const data: { prop?: string } = {};
    if (value) data.prop = value;
 
-   // ✅ Alternative: Object spread with filter
-   const data = { ...otherProps, ...(value && { prop: value }) };
+   // ✅ Tests: Relaxed patterns allowed
+   const testData: any = { prop: value || undefined }; // OK in tests
    ```
 
 2. **Null Checks (`strictNullChecks`)**
 
    ```typescript
-   // ❌ Bad: Object possibly null
+   // ❌ Production: Object possibly null
    const id = ctx.session.user.id;
 
-   // ✅ Good: Guard with optional chaining
+   // ✅ Production: Guard with optional chaining
    if (!ctx.session?.user?.id) throw new Error("Not authenticated");
    const id = ctx.session.user.id;
+
+   // ✅ Tests: Can use non-null assertions for mocks
+   const id = mockSession.user!.id; // OK in tests
    ```
 
 3. **Array Access (`noUncheckedIndexedAccess`)**
 
    ```typescript
-   // ❌ Bad: Array access without bounds check
+   // ❌ Production: Array access without bounds check
    const first = items[0].name;
 
-   // ✅ Good: Safe array access
+   // ✅ Production: Safe array access
    const first = items[0]?.name ?? "Unknown";
-   const first = items.at(0)?.name ?? "Unknown";
+
+   // ✅ Tests: Direct access OK for known test data
+   const first = testItems[0].name; // OK in tests
    ```
 
-4. **Type Assertions**
+### Multi-Config Benefits
 
-   ```typescript
-   // ❌ Bad: Avoid 'as' casting
-   const mock = jest.fn() as jest.Mock<any>;
+- **Production**: Strictest TypeScript ensures runtime safety
+- **Test Utils**: Moderate standards for reusable test code
+- **Tests**: Pragmatic patterns for effective testing
+- **ESLint**: Pattern-based rules match config strictness levels
 
-   // ✅ Good: Use proper generics
-   const mock = jest.fn<ReturnType, [Parameters]>();
-   ```
+## Multi-Config TypeScript Workflow
 
-5. **Never Use 'any' Type**
+### ✅ Check Different Contexts
 
-   ```typescript
-   // ❌ Bad: Using any defeats type safety
-   const data: any = await someApi();
-
-   // ✅ Good: Find or define the real type
-   const data: UserResponse = await userApi.get();
-
-   // ✅ Good: Use unknown for truly unknown data
-   const data: unknown = JSON.parse(str);
-   if (isUserData(data)) {
-     /* now typed */
-   }
-   ```
-
-6. **Prisma Mocks (with $accelerate)**
-   ```typescript
-   // ✅ ExtendedPrismaClient includes $accelerate
-   const mockPrisma = {
-     user: { findUnique: jest.fn() },
-     $accelerate: {
-       invalidate: jest.fn(),
-       invalidateAll: jest.fn(),
-     },
-   };
-   ```
-
-### Critical Do's and Don'ts
-
-**✅ ALWAYS:**
-
-- Use `@ts-expect-error` with descriptive comments (never `@ts-ignore`)
-- Handle null/undefined before property access
-- Use type guards instead of assertions
-- Check array bounds or use optional chaining
-- Find real types instead of using `any`
-
-**❌ NEVER:**
-
-- Use `@ts-ignore` (banned by ESLint)
-- Assign `undefined` to optional properties
-- Access array elements without bounds checking
-- Use `any` type (even in tests)
-- Skip null checks in protected procedures
-
-**Remember**: Betterer tracks all TypeScript errors - no new errors allowed in production code!
-
-## TypeScript Best Practices
-
-### ✅ Correct TypeScript Checking
 ```bash
-# ✅ Always use full project context
-npm run typecheck                    # Check entire codebase
-npm run typecheck | grep "pattern"   # Filter results if needed
-npm run dev:typecheck               # Watch mode for development
+# Production code (strictest) - must pass
+npm run typecheck
+
+# Test utilities (recommended) - warnings OK
+npx tsc --project tsconfig.test-utils.json --noEmit
+
+# Test files (relaxed) - very permissive
+npx tsc --project tsconfig.tests.json --noEmit
+
+# Watch mode for development
+npm run dev:typecheck
 ```
 
-### ❌ Common Mistakes to Avoid
-```bash
-# ❌ NEVER: Individual file checking loses project context
-tsc src/file.ts                     # Breaks path mappings (~/* imports)
-npx tsc --noEmit src/file.ts        # Loses tsconfig.json settings
-tsc --project . src/file.ts         # Still problematic
+### ✅ Agent Commands (Recommended)
 
-# ❌ NEVER: These cause false positives
-npm run typecheck:files             # REMOVED - was problematic
-./scripts/typecheck-files.sh        # REMOVED - caused path errors
+```bash
+# Quick validation with auto-fix
+npm run quick:agent
+
+# Pre-commit validation
+npm run validate:agent
+
+# Full pre-PR validation
+npm run validate:full:agent
 ```
 
-### Why Individual File Checking Fails
-- **Path mapping loss**: `~/*` imports become unresolvable
-- **Missing project context**: TypeScript ignores tsconfig.json when checking individual files
-- **False positives**: Errors that don't exist in full project context
-- **Build tool confusion**: Different behavior between dev and production
+### Config-Specific Commands
 
-### Modern TypeScript Workflow
-1. **Development**: Use `npm run dev:typecheck` for real-time feedback
-2. **Debugging**: Use `npm run typecheck | grep "pattern"` for filtering
-3. **CI/CD**: Use `npm run typecheck` as quality gate
-4. **IDE integration**: Let your editor handle real-time type checking
+- **Production errors**: Always block CI/commits
+- **Test utility warnings**: Reported but non-blocking
+- **Test file issues**: Ignored for pragmatic testing
 
 ## Development Workflow
 
@@ -258,11 +247,13 @@ The Memory MCP server stores critical coding standards and patterns as a knowled
 - **Common TypeScript Fixes**: Solutions for strictest mode errors
 
 Quick commands:
+
 - `mcp__memory__search_nodes` - Search for patterns by keyword
 - `mcp__memory__open_nodes` - Get specific entity details
 - `mcp__memory__read_graph` - See all stored knowledge
 
 Use memory to quickly recall:
+
 - Specific TypeScript error fixes
 - Prisma mock patterns with $accelerate
 - tRPC router patterns and security
@@ -272,7 +263,7 @@ Use memory to quickly recall:
 
 For detailed guidance beyond these essentials:
 
-- **TypeScript Issues**: See `docs/developer-guides/typescript-strictest.md` for comprehensive error resolution
+- **TypeScript Issues**: See `docs/developer-guides/typescript-multi-config.md` for multi-config setup and error resolution
 - **Testing Patterns**: See `docs/developer-guides/testing-patterns.md` for Jest mocking and coverage patterns
 - **ESLint Errors**: See `docs/developer-guides/common-errors.md` for specific rule violations and fixes
 - **Betterer Workflow**: See `docs/developer-guides/betterer-workflow.md` for migration workflow and team coordination

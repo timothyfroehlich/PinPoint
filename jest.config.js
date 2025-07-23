@@ -25,6 +25,8 @@ let config = {
         "<rootDir>/src/server/services/__tests__/pinballmapService.test.ts",
         "<rootDir>/src/server/api/__tests__/trpc-auth.test.ts",
         "<rootDir>/src/test/mockContext.ts",
+        // Exclude all Vitest test files
+        "\\.vitest\\.test\\.",
       ],
       setupFilesAfterEnv: ["<rootDir>/src/test/setup.ts"],
       transform: {
@@ -64,6 +66,8 @@ let config = {
         "<rootDir>/src/server/services/__tests__/pinballmapService.test.ts",
         "<rootDir>/src/server/api/__tests__/trpc-auth.test.ts",
         "<rootDir>/src/test/mockContext.ts",
+        // Exclude all Vitest test files
+        "\\.vitest\\.test\\.",
       ],
       setupFilesAfterEnv: ["<rootDir>/src/test/setup.ts"],
       transform: {
@@ -134,7 +138,8 @@ let config = {
 };
 
 // Agent mode configuration for minimal output
-if (process.env.AGENT_MODE) {
+if (process.env["AGENT_MODE"]) {
+  // @ts-expect-error - reporters is valid Jest config but not in type definition
   config.reporters = [
     [
       "jest-silent-reporter",

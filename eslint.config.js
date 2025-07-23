@@ -16,11 +16,15 @@ export default tseslint.config(
   ...tseslint.configs.strictTypeChecked,
   ...tseslint.configs.stylisticTypeChecked,
   {
-    // Enable type-aware linting for all files
+    // Enable type-aware linting with multi-config support
     languageOptions: {
       parserOptions: {
-        // Explicitly specify tsconfig path to avoid Next.js auto-generation conflicts
-        project: ["./tsconfig.json"],
+        // Multiple tsconfig files for different contexts
+        project: [
+          "./tsconfig.json",
+          "./tsconfig.test-utils.json",
+          "./tsconfig.tests.json",
+        ],
         tsconfigRootDir: import.meta.dirname,
       },
     },
@@ -86,14 +90,14 @@ export default tseslint.config(
       "promise/catch-or-return": ["error", { allowFinally: true }],
       "promise/no-nesting": "warn",
 
-      // Type-aware rules - starting as warnings for migration
-      "@typescript-eslint/no-explicit-any": "warn",
-      "@typescript-eslint/no-unsafe-assignment": "warn",
-      "@typescript-eslint/no-unsafe-argument": "warn",
-      "@typescript-eslint/no-unsafe-call": "warn",
-      "@typescript-eslint/no-unsafe-member-access": "warn",
-      "@typescript-eslint/no-unsafe-return": "warn",
-      "@typescript-eslint/no-unsafe-enum-comparison": "warn",
+      // Type-aware rules - strict for production code
+      "@typescript-eslint/no-explicit-any": "error",
+      "@typescript-eslint/no-unsafe-assignment": "error",
+      "@typescript-eslint/no-unsafe-argument": "error",
+      "@typescript-eslint/no-unsafe-call": "error",
+      "@typescript-eslint/no-unsafe-member-access": "error",
+      "@typescript-eslint/no-unsafe-return": "error",
+      "@typescript-eslint/no-unsafe-enum-comparison": "error",
 
       // Additional strict rules for better type safety
       "@typescript-eslint/explicit-function-return-type": [
@@ -136,10 +140,55 @@ export default tseslint.config(
     },
   },
   {
-    // Override: Allow process.env in test files (documented exception)
-    // Tests legitimately need to mock environment variables and check NODE_ENV
-    // Note: Excludes vitest tests (*.vitest.test.{ts,tsx}) which should follow strict rules
-    files: ["**/__tests__/**", "**/*.test.ts", "**/*.test.tsx", "**/test/**", "!**/*.vitest.test.ts", "!**/*.vitest.test.tsx"],
+    // Override: Test utilities - moderate standards (src/test/**)
+    files: ["src/test/**/*.{ts,tsx}"],
+    rules: {
+      // Moderate type-safety for reusable test utilities
+      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-unsafe-assignment": "warn",
+      "@typescript-eslint/no-unsafe-argument": "warn",
+      "@typescript-eslint/no-unsafe-call": "warn",
+      "@typescript-eslint/no-unsafe-member-access": "warn",
+      "@typescript-eslint/no-unsafe-return": "warn",
+      "@typescript-eslint/no-unsafe-enum-comparison": "warn",
+      // Allow process.env for test utilities
+      "no-restricted-properties": "off",
+    },
+  },
+  {
+    // Override: Test files - relaxed standards for pragmatic testing
+    files: [
+      "**/*.test.ts",
+      "**/*.test.tsx",
+      "**/*.spec.ts",
+      "**/*.spec.tsx",
+      "**/*.vitest.test.ts",
+      "**/*.vitest.test.tsx",
+      "**/__tests__/**/*.{ts,tsx}",
+    ],
+    rules: {
+      // Allow any types and unsafe operations in tests
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-unsafe-assignment": "off",
+      "@typescript-eslint/no-unsafe-argument": "off",
+      "@typescript-eslint/no-unsafe-call": "off",
+      "@typescript-eslint/no-unsafe-member-access": "off",
+      "@typescript-eslint/no-unsafe-return": "off",
+      "@typescript-eslint/no-unsafe-enum-comparison": "off",
+      // Allow process.env for test mocking
+      "no-restricted-properties": "off",
+      // Relax other strict rules for tests
+      "@typescript-eslint/explicit-function-return-type": "off",
+      // Disable strictNullChecks-dependent rules (tests use relaxed TypeScript)
+      "@typescript-eslint/no-unnecessary-condition": "off",
+      "@typescript-eslint/no-unnecessary-boolean-literal-compare": "off",
+      "@typescript-eslint/prefer-nullish-coalescing": "off",
+      "@typescript-eslint/no-unnecessary-type-assertion": "off",
+    },
+  },
+  {
+    // Legacy override: Allow process.env in remaining test paths
+    files: ["**/test/**"],
     rules: {
       "no-restricted-properties": "off",
     },
@@ -202,6 +251,9 @@ export default tseslint.config(
       "next.config.js",
       "postcss.config.js",
       "tailwind.config.ts",
+      "vitest.config.ts",
+      "jest.config.js",
+      "playwright.config.ts",
       ".betterer.ts",
     ],
   },
