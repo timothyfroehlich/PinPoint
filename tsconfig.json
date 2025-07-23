@@ -1,25 +1,28 @@
 {
-  "extends": [
-    "./tsconfig.base.json",
-    "@tsconfig/strictest/tsconfig.json"
-  ],
+  "extends": ["./tsconfig.base.json", "@tsconfig/strictest/tsconfig.json"],
   "compilerOptions": {
     /* Strictness - inherited from @tsconfig/strictest */
     /* Explicitly enable key options for ESLint type-aware rules */
     "strict": true,
     "strictNullChecks": true,
     "exactOptionalPropertyTypes": true,
-    "noUncheckedIndexedAccess": true
+    "noUncheckedIndexedAccess": true,
+    /* Ensure path aliases work for middleware */
+    "baseUrl": ".",
+    "paths": {
+      "~/*": ["./src/*"]
+    }
   },
   "include": [
     "src/**/*.ts",
     "src/**/*.tsx",
-    ".next/types/**/*.ts"
+    ".next/types/**/*.ts",
+    "middleware.ts"
   ],
   "exclude": [
     "src/_archived_frontend/**/*",
     "src/test/**/*",
-    "**/__tests__/**/*", 
+    "**/__tests__/**/*",
     "**/*.test.*",
     "**/*.spec.*",
     "**/*.vitest.test.*"

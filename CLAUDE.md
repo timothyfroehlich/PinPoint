@@ -214,6 +214,12 @@ npm run validate:full:agent
 4. **Before PR**: `npm run validate:full:agent` must pass (MANDATORY)
 5. **Database changes**: Use `npm run db:reset` (pre-production phase)
 
+### Environment Configuration
+
+- **Development Port**: Each worktree has a unique port configuration in the git-ignored `.env` file (e.g., `PORT=49841`)
+- **Port Assignment**: Worktree setup automatically assigns ports to avoid conflicts between different feature branches
+- **Check Your Port**: Run `grep PORT .env` to see your current development server port
+
 ### Agent Protocol Benefits
 
 - **Context preservation**: ~3-5 lines output vs 100+ lines
