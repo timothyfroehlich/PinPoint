@@ -34,7 +34,7 @@ export function DevLoginCompact({
     setIsLoading(true);
     try {
       console.log("Dev login as:", email);
-      
+
       // Use NextAuth signIn with Credentials provider
       const result = await signIn("credentials", {
         email,
@@ -74,10 +74,11 @@ export function DevLoginCompact({
     }
   }
 
-  // Only show in development
+  // Only show in development or preview environments
   if (
     typeof window !== "undefined" &&
-    window.location.hostname !== "localhost"
+    window.location.hostname !== "localhost" &&
+    !window.location.hostname.includes("vercel.app")
   ) {
     return null;
   }
