@@ -2,6 +2,7 @@
  * @jest-environment jsdom
  */
 import { renderHook, waitFor } from "@testing-library/react";
+import * as React from "react";
 import { type ReactNode } from "react";
 
 import {
@@ -10,7 +11,8 @@ import {
   usePermissionTooltip,
 } from "../usePermissions";
 
-import { createMockTRPCClient } from "~/test/mockTRPCClient";
+import { server } from "~/test/msw/setup";
+import { handlers } from "~/test/msw/handlers";
 import { TestWrapper, PERMISSION_SCENARIOS } from "~/test/TestWrapper";
 
 // Create a wrapper function for renderHook
@@ -18,7 +20,6 @@ const createWrapper = (
   options: {
     userPermissions?: string[];
     session?: any;
-    mockTRPCClient?: any;
   } = {},
 ) => {
   return ({ children }: { children: ReactNode }) => (
@@ -27,8 +28,17 @@ const createWrapper = (
 };
 
 describe("usePermissions", () => {
+  beforeAll(() => {
+    server.listen();
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
+    server.resetHandlers();
+  });
+
+  afterAll(() => {
+    server.close();
   });
 
   describe("Basic Permission Checking", () => {
@@ -102,24 +112,15 @@ describe("usePermissions", () => {
 
   describe("Hook Return Values", () => {
     it("should return complete interface for authenticated user", async () => {
+      server.use(
+        handlers.userGetCurrentMembership({
+          permissions: ["issue:view", "issue:edit"],
+          role: "Manager",
+        }),
+      );
+
       const wrapper = createWrapper({
         userPermissions: ["issue:view", "issue:edit"],
-        mockTRPCClient: createMockTRPCClient({
-          user: {
-            getCurrentMembership: {
-              useQuery: jest.fn(() => ({
-                data: {
-                  permissions: ["issue:view", "issue:edit"],
-                  role: "Manager",
-                },
-                isLoading: false,
-                error: null,
-              })),
-              _def: jest.fn(),
-              meta: jest.fn(),
-            },
-          },
-        }),
       });
 
       const { result } = renderHook(() => usePermissions(), { wrapper });
@@ -141,24 +142,15 @@ describe("usePermissions", () => {
     });
 
     it("should return isAdmin true for Admin role", async () => {
+      server.use(
+        handlers.userGetCurrentMembership({
+          permissions: PERMISSION_SCENARIOS.ADMIN,
+          role: "Admin",
+        }),
+      );
+
       const wrapper = createWrapper({
         userPermissions: PERMISSION_SCENARIOS.ADMIN,
-        mockTRPCClient: createMockTRPCClient({
-          user: {
-            getCurrentMembership: {
-              useQuery: jest.fn(() => ({
-                data: {
-                  permissions: PERMISSION_SCENARIOS.ADMIN,
-                  role: "Admin",
-                },
-                isLoading: false,
-                error: null,
-              })),
-              _def: jest.fn(),
-              meta: jest.fn(),
-            },
-          },
-        }),
       });
 
       const { result } = renderHook(() => usePermissions(), { wrapper });
@@ -171,24 +163,15 @@ describe("usePermissions", () => {
     });
 
     it("should return isAdmin false for non-admin roles", async () => {
+      server.use(
+        handlers.userGetCurrentMembership({
+          permissions: PERMISSION_SCENARIOS.MEMBER,
+          role: "Member",
+        }),
+      );
+
       const wrapper = createWrapper({
         userPermissions: PERMISSION_SCENARIOS.MEMBER,
-        mockTRPCClient: createMockTRPCClient({
-          user: {
-            getCurrentMembership: {
-              useQuery: jest.fn(() => ({
-                data: {
-                  permissions: PERMISSION_SCENARIOS.MEMBER,
-                  role: "Member",
-                },
-                isLoading: false,
-                error: null,
-              })),
-              _def: jest.fn(),
-              meta: jest.fn(),
-            },
-          },
-        }),
       });
 
       const { result } = renderHook(() => usePermissions(), { wrapper });
@@ -203,50 +186,22 @@ describe("usePermissions", () => {
 
   describe("Loading States", () => {
     it("should handle loading state correctly", () => {
-      const mockTRPCClient = createMockTRPCClient({
-        user: {
-          getCurrentMembership: {
-            useQuery: jest.fn(() => ({
-              data: null,
-              isLoading: true,
-              error: null,
-            })),
-            _def: jest.fn(),
-            meta: jest.fn(),
-          },
-        },
-      });
-
       const wrapper = createWrapper({
         userPermissions: ["issue:view"],
-        mockTRPCClient,
       });
 
       const { result } = renderHook(() => usePermissions(), { wrapper });
 
-      // Should start with loading state
+      // Initial loading state should be true
       expect(result.current.isLoading).toBe(true);
       expect(result.current.isError).toBe(false);
     });
 
     it("should handle error state correctly", async () => {
-      const mockTRPCClient = createMockTRPCClient({
-        user: {
-          getCurrentMembership: {
-            useQuery: jest.fn(() => ({
-              data: null,
-              isLoading: false,
-              error: new Error("Network error"),
-            })),
-            _def: jest.fn(),
-            meta: jest.fn(),
-          },
-        },
-      });
+      server.use(handlers.errorUnauthorized());
 
       const wrapper = createWrapper({
         userPermissions: ["issue:view"],
-        mockTRPCClient,
       });
 
       const { result } = renderHook(() => usePermissions(), { wrapper });
@@ -283,31 +238,16 @@ describe("usePermissions", () => {
     });
 
     it("should update when permissions change", async () => {
-      let callCount = 0;
-      const mockTRPCClient = createMockTRPCClient({
-        user: {
-          getCurrentMembership: {
-            useQuery: jest.fn(() => {
-              callCount++;
-              return {
-                data:
-                  callCount === 1
-                    ? { permissions: ["issue:view"], role: "Member" }
-                    : {
-                        permissions: ["issue:view", "issue:edit"],
-                        role: "Member",
-                      },
-                isLoading: false,
-                error: null,
-              };
-            }),
-            _def: jest.fn(),
-            meta: jest.fn(),
-          },
-        },
-      });
+      server.use(
+        handlers.userGetCurrentMembership({
+          permissions: ["issue:view"],
+          role: "Member",
+        }),
+      );
 
-      const wrapper = createWrapper({ mockTRPCClient });
+      const wrapper = createWrapper({
+        userPermissions: ["issue:view"],
+      });
 
       const { result, rerender } = renderHook(() => usePermissions(), {
         wrapper,
@@ -319,7 +259,14 @@ describe("usePermissions", () => {
 
       expect(result.current.hasPermission("issue:edit")).toBe(false);
 
-      // Simulate permission update
+      // Simulate permission update by changing the handler
+      server.use(
+        handlers.userGetCurrentMembership({
+          permissions: ["issue:view", "issue:edit"],
+          role: "Member",
+        }),
+      );
+
       rerender();
 
       await waitFor(() => {
@@ -330,24 +277,14 @@ describe("usePermissions", () => {
 
   describe("Edge Cases", () => {
     it("should handle undefined permissions gracefully", async () => {
-      const mockTRPCClient = createMockTRPCClient({
-        user: {
-          getCurrentMembership: {
-            useQuery: jest.fn(() => ({
-              data: {
-                permissions: undefined,
-                role: "Member",
-              },
-              isLoading: false,
-              error: null,
-            })),
-            _def: jest.fn(),
-            meta: jest.fn(),
-          },
-        },
-      });
+      server.use(
+        handlers.userGetCurrentMembership({
+          permissions: undefined,
+          role: "Member",
+        }),
+      );
 
-      const wrapper = createWrapper({ mockTRPCClient });
+      const wrapper = createWrapper({});
 
       const { result } = renderHook(() => usePermissions(), { wrapper });
 
@@ -360,21 +297,14 @@ describe("usePermissions", () => {
     });
 
     it("should handle null membership gracefully", async () => {
-      const mockTRPCClient = createMockTRPCClient({
-        user: {
-          getCurrentMembership: {
-            useQuery: jest.fn(() => ({
-              data: null,
-              isLoading: false,
-              error: null,
-            })),
-            _def: jest.fn(),
-            meta: jest.fn(),
-          },
-        },
-      });
+      server.use(
+        handlers.userGetCurrentMembership({
+          permissions: [],
+          role: undefined,
+        }),
+      );
 
-      const wrapper = createWrapper({ mockTRPCClient });
+      const wrapper = createWrapper({});
 
       const { result } = renderHook(() => usePermissions(), { wrapper });
 

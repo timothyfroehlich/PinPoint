@@ -2,6 +2,7 @@
 
 import { Box, Typography, Chip, Stack, Card, CardContent } from "@mui/material";
 import { type Session } from "next-auth";
+import * as React from "react";
 
 import { type IssueWithDetails } from "~/types/issue";
 
@@ -11,7 +12,7 @@ interface IssueDetailProps {
   hasPermission: (permission: string) => boolean;
 }
 
-export function IssueDetail({ issue, session }: IssueDetailProps): JSX.Element {
+export function IssueDetail({ issue, session }: IssueDetailProps): React.JSX.Element {
   const isAuthenticated = !!session?.user;
 
   return (

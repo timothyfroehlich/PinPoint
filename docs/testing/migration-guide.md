@@ -3,7 +3,7 @@
 ---
 
 status: active
-last-updated: 2025-07-22
+last-updated: 2025-07-23
 
 ---
 
@@ -101,6 +101,34 @@ class Service {
 const service = new Service(mockDb, mockLogger);
 ```
 
+### React Component Testing (NEW)
+```typescript
+// Jest Pattern
+import { TestWrapper, PERMISSION_SCENARIOS } from "~/test/TestWrapper";
+
+render(
+  <TestWrapper userPermissions={["issue:view"]}>
+    <ComponentUnderTest />
+  </TestWrapper>
+);
+
+// Vitest Pattern - Use VitestTestWrapper
+import { VitestTestWrapper, VITEST_PERMISSION_SCENARIOS } from "~/test/VitestTestWrapper";
+import '@testing-library/jest-dom/vitest';
+
+render(
+  <VitestTestWrapper userPermissions={["issue:view"]}>
+    <ComponentUnderTest />
+  </VitestTestWrapper>
+);
+```
+
+**Key Differences**:
+- Import `@testing-library/jest-dom/vitest` for DOM matchers
+- Use `VitestTestWrapper` instead of `TestWrapper`
+- tRPC client uses real client with mocked HTTP layer
+- Better performance due to Vitest's native ESM support
+
 ## Performance Results
 
 From actual PinPoint migrations:
@@ -110,6 +138,9 @@ From actual PinPoint migrations:
 | Pure functions | 658ms | 10ms | 65x faster |
 | Service tests | 539ms | 14ms | 38x faster |
 | Complex tests | 310ms | 42ms | 7x faster |
+| React components | ~800ms | ~490ms | 1.6x faster |
+
+**Note**: React component tests show smaller improvements due to DOM rendering overhead, but still benefit from Vitest's faster startup and native ESM support.
 
 ## Common Migration Issues
 
@@ -145,6 +176,30 @@ const { mockUser } = vi.hoisted(() => ({
 vi.mock('~/lib/user', () => ({ getUser: () => mockUser }));
 ```
 
+### 4. React Component tRPC Mocking
+```typescript
+// Error: Cannot read properties of undefined (reading 'Symbol(trpc_untypedClient)')
+// Fix: Use VitestTestWrapper with proper tRPC client
+
+// ❌ Wrong: Direct mock objects don't work with tRPC
+const mockTrpcClient = { user: { getCurrentMembership: vi.fn() } };
+
+// ✅ Correct: Use VitestTestWrapper which creates real tRPC client
+import { VitestTestWrapper } from "~/test/VitestTestWrapper";
+
+render(
+  <VitestTestWrapper userPermissions={["issue:view"]}>
+    <Component />
+  </VitestTestWrapper>
+);
+```
+
+### 5. DOM Testing Matchers
+```typescript
+// Add this import for DOM matchers like toBeInTheDocument()
+import '@testing-library/jest-dom/vitest';
+```
+
 ## Step-by-Step Migration
 
 1. **Copy test file**
@@ -154,19 +209,35 @@ vi.mock('~/lib/user', () => ({ getUser: () => mockUser }));
 
 2. **Update imports**
    ```typescript
+   // For server tests
    import { describe, it, expect, vi } from 'vitest';
+   
+   // For React component tests
+   import { describe, it, expect, beforeEach, vi } from 'vitest';
+   import { render, screen, fireEvent } from "@testing-library/react";
+   import '@testing-library/jest-dom/vitest';
    ```
 
 3. **Replace Jest globals**
    - `jest.fn()` → `vi.fn()`
    - `jest.mock()` → `vi.mock()`
    - `jest.spyOn()` → `vi.spyOn()`
+   - `jest.clearAllMocks()` → `vi.clearAllMocks()`
 
-4. **Add transitive mocks** (iteratively as errors appear)
+4. **Update test wrappers** (React components only)
+   ```typescript
+   // Replace TestWrapper with VitestTestWrapper
+   import { VitestTestWrapper, VITEST_PERMISSION_SCENARIOS } from "~/test/VitestTestWrapper";
+   
+   // Update all TestWrapper → VitestTestWrapper
+   // Update all PERMISSION_SCENARIOS → VITEST_PERMISSION_SCENARIOS
+   ```
 
-5. **Run and verify**
+5. **Add transitive mocks** (iteratively as errors appear)
+
+6. **Run and verify**
    ```bash
-   npm run test:vitest auth.vitest.test.ts
+   npm run test:vitest component.vitest.test.tsx
    ```
 
 ## When to Refactor vs Mock
@@ -212,11 +283,45 @@ export function createMockContext() {
 const mockFn = vi.fn<[string], Promise<User>>();
 ```
 
+### VitestTestWrapper Architecture (React Components)
+```typescript
+// VitestTestWrapper creates a real tRPC client with mocked HTTP layer
+import { VitestTestWrapper } from "~/test/VitestTestWrapper";
+
+// ✅ Correct: Proper provider setup
+render(
+  <VitestTestWrapper userPermissions={["issue:view", "machine:create"]}>
+    <ComponentUnderTest />
+  </VitestTestWrapper>
+);
+
+// ✅ Different scenarios
+render(
+  <VitestTestWrapper userPermissions={VITEST_PERMISSION_SCENARIOS.ADMIN}>
+    <AdminComponent />
+  </VitestTestWrapper>
+);
+
+// ✅ Unauthenticated tests
+render(
+  <VitestTestWrapper session={null}>
+    <PublicComponent />
+  </VitestTestWrapper>
+);
+```
+
+**Architecture Benefits**:
+- Real tRPC client ensures accurate behavior
+- HTTP mocking is more reliable than object mocking
+- Proper QueryClient and SessionProvider setup
+- Reusable across all React component tests
+
 ## Related Documentation
 
-- [Vitest Lessons Learned](./vitest-lessons-learned.md) - Detailed insights from migration
-- [Testing Patterns](./testing-patterns.md) - Current Jest patterns (being migrated)
-- [TypeScript Strictest](./typescript-strictest.md) - Type safety in tests
+- **[Testing Guide](../testing/index.md)** - Main testing documentation
+- **[Migration Examples](../testing/migration-examples.md)** - Real migration case studies
+- **[Mocking Patterns](../testing/mocking-patterns.md)** - Vitest mocking strategies
+- **[TypeScript Strictest](./typescript-strictest.md)** - Type safety in tests
 - Migration tasks: `/vitest-migration-tasks/`
 
 ## Next Steps

@@ -57,7 +57,7 @@ npm run dev:full
 
 # During implementation (tests may fail)
 npm run lint                             # Focus on this first!
-npm run typecheck:files -- <your-files> # Check specific files
+npm run typecheck | grep "pattern"    # Filter errors by pattern
 npm run fix                             # Auto-fix lint/format issues
 
 # For incremental validation
@@ -75,7 +75,7 @@ npm run debug:lint       # Detailed lint output
 
 1. **Make changes incrementally**
 2. **Run `npm run lint` frequently**
-3. **Check TypeScript for your files**: `npm run typecheck:files -- src/your/files`
+3. **Check TypeScript errors**: `npm run typecheck | grep "your-pattern"`
 4. **Don't worry if tests fail initially** - focus on linting
 5. **Manual testing is OK** during implementation
 6. **Fix all tests in Task 008** (final validation)

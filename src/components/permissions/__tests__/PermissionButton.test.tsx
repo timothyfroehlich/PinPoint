@@ -5,6 +5,7 @@
 import "@testing-library/jest-dom";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import * as React from "react";
 import { createRef } from "react";
 
 import { PermissionButton } from "../PermissionButton";
@@ -12,7 +13,7 @@ import { PermissionButton } from "../PermissionButton";
 // Mock MUI components to avoid complex setup
 jest.mock("@mui/material", () => ({
   Button: jest.fn<
-    JSX.Element,
+    React.JSX.Element,
     [
       {
         children: React.ReactNode;
@@ -35,7 +36,7 @@ jest.mock("@mui/material", () => ({
     </button>
   )),
   Tooltip: jest.fn<
-    JSX.Element,
+    React.JSX.Element,
     [{ children: React.ReactNode; title: string }]
   >(({ children, title }) => (
     <div data-testid="tooltip" title={title}>

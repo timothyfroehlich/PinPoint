@@ -65,7 +65,7 @@ Each task file in this directory represents a specific work item. Tasks are orga
 **Tests may not pass during implementation!** This is expected. Focus on:
 
 1. **Linting first**: Ensure your changes pass `npm run lint`
-2. **TypeScript compilation**: Use `npm run typecheck:files -- <your-files>` to check specific files
+2. **TypeScript compilation**: Use `npm run typecheck | grep "pattern"` to filter errors
 3. **Incremental progress**: Build features step by step
 4. **Manual testing**: Verify functionality works even if tests are failing
 

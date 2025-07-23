@@ -47,7 +47,8 @@ jobs:
           grep "error TS" typescript-output.log > all-errors.tmp 2>/dev/null || touch all-errors.tmp
 
           # Filter out test patterns and save to production errors file
-          grep -v -E "(test\.|\.test\.|__tests__|\.spec\.|spec\.|/test/|/tests/|src/test/|mockContext)" all-errors.tmp > production-errors.tmp 2>/dev/null || touch production-errors.tmp
+          # Note: vitest.test files are now treated as production code (blocking errors)
+          grep -v -E "(\.test\.|__tests__|\.spec\.|spec\.|/test/|/tests/|src/test/|mockContext)" all-errors.tmp > production-errors.tmp 2>/dev/null || touch production-errors.tmp
 
           # Debug: Show what errors we're seeing
           echo "=== ALL TYPESCRIPT ERRORS ==="
@@ -100,8 +101,8 @@ jobs:
           elif [ "$TEST_ERROR_COUNT" -gt 0 ]; then
             {
               echo "### Test File Errors (Non-blocking):"
-              # Show test errors by filtering all errors
-              grep "error TS" typescript-output.log | grep -E "(test\.|\.test\.|__tests__|\.spec\.|spec\.|/test/|/tests/|src/test/|mockContext)" | head -5 || true
+              # Show test errors by filtering all errors (excludes vitest.test files which are now blocking)
+              grep "error TS" typescript-output.log | grep -E "(\.test\.|__tests__|\.spec\.|spec\.|/test/|/tests/|src/test/|mockContext)" | head -5 || true
               echo ""
               echo "✅ Test errors don't block CI during TypeScript migration"
               echo "📋 These will be addressed in separate cleanup tasks"

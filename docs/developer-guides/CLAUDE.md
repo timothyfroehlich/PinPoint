@@ -14,7 +14,7 @@ This directory contains comprehensive guides for PinPoint development beyond the
 ### 📝 Core Development
 
 - **[TypeScript Strictest Mode](./typescript-strictest.md)** - Comprehensive guide to resolving TypeScript errors and ESLint violations in strictest mode
-- **[Testing Patterns](./testing-patterns.md)** - Jest mocking patterns, Prisma test utilities, and coverage best practices
+- **[Testing Guide](../testing/index.md)** - Vitest testing patterns, mocking strategies, and migration guidance
 - **[Common Errors](./common-errors.md)** - ESLint rule violations and their fixes with real examples
 
 ### 🔧 Tools & Workflow

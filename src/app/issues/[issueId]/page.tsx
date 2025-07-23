@@ -1,21 +1,23 @@
 import { type Metadata } from "next";
 import { notFound } from "next/navigation";
+import * as React from "react";
 
 import { IssueDetailView } from "~/components/issues/IssueDetailView";
 import { auth } from "~/server/auth";
 import { api } from "~/trpc/server";
 
 interface IssuePageProps {
-  params: {
+  params: Promise<{
     issueId: string;
-  };
+  }>;
 }
 
 export async function generateMetadata({
   params,
 }: IssuePageProps): Promise<Metadata> {
   try {
-    const issue = await api.issue.core.getById({ id: params.issueId });
+    const resolvedParams = await params;
+    const issue = await api.issue.core.getById({ id: resolvedParams.issueId });
 
     return {
       title: `${issue.title} - PinPoint`,
@@ -36,12 +38,13 @@ export async function generateMetadata({
 
 export default async function IssuePage({
   params,
-}: IssuePageProps): Promise<JSX.Element> {
+}: IssuePageProps): Promise<React.JSX.Element> {
   const session = await auth();
 
   try {
     // Fetch issue data on the server
-    const issue = await api.issue.core.getById({ id: params.issueId });
+    const resolvedParams = await params;
+    const issue = await api.issue.core.getById({ id: resolvedParams.issueId });
 
     // Check if user has permission to view this issue
     // For now, we'll allow public access and let the component handle permissions
@@ -51,7 +54,7 @@ export default async function IssuePage({
         <IssueDetailView
           issue={issue}
           session={session}
-          issueId={params.issueId}
+          issueId={resolvedParams.issueId}
         />
       </main>
     );

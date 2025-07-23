@@ -29,7 +29,7 @@ export function IssueComments({
   session: _session,
   hasPermission,
   onError,
-}: IssueCommentsProps): JSX.Element {
+}: IssueCommentsProps): React.JSX.Element {
   const [commentText, setCommentText] = useState("");
   // isInternal functionality removed until implemented in database
   const [isSubmitting, setIsSubmitting] = useState(false);

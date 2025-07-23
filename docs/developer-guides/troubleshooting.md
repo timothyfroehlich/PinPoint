@@ -224,8 +224,8 @@ npm run typecheck -- --noEmit
 # 1. Use incremental checking
 npm run typecheck -- --incremental
 
-# 2. Check specific files only
-npm run typecheck:files -- src/server/api/routers/*.ts
+# 2. Filter for specific patterns
+npm run typecheck | grep "routers"
 
 # 3. Use watch mode for development
 npm run typecheck -- --watch
@@ -244,8 +244,8 @@ npm run debug:lint 2>&1 | head -50
 # 2. Lint specific directories
 npm run lint -- src/server/
 
-# 3. Skip type-aware rules temporarily
-npm run lint -- --rule "!@typescript-eslint/no-unsafe-*"
+# 3. Check lint output by pattern
+npm run lint 2>&1 | grep "no-unsafe"
 ```
 
 ### Slow Jest Tests
@@ -328,8 +328,8 @@ git status TYPESCRIPT_MIGRATION.md
 # Detailed TypeScript output
 npm run debug:typecheck
 
-# Check specific file compilation
-npx tsc --noEmit --strict src/server/api/routers/user.ts
+# Check specific errors by pattern
+npm run typecheck | grep "user.ts"
 
 # List all files being checked
 npm run typecheck -- --listFiles
@@ -444,5 +444,5 @@ git log --oneline -5
 
 - **Environment Setup**: [docs/troubleshooting.md](../troubleshooting.md)
 - **TypeScript Patterns**: [typescript-strictest.md](./typescript-strictest.md)
-- **Testing Issues**: [testing-patterns.md](./testing-patterns.md)
+- **Testing Issues**: [docs/testing/troubleshooting.md](../testing/troubleshooting.md)
 - **Migration Workflow**: [betterer-workflow.md](./betterer-workflow.md)

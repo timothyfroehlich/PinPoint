@@ -12,6 +12,7 @@ import {
   CircularProgress,
 } from "@mui/material";
 import { type Session } from "next-auth";
+import * as React from "react";
 import { useState } from "react";
 
 import { api } from "~/trpc/react";
@@ -28,7 +29,7 @@ export function IssueStatusControl({
   issue,
   hasPermission,
   onError,
-}: IssueStatusControlProps): JSX.Element {
+}: IssueStatusControlProps): React.JSX.Element {
   const [selectedStatusId, setSelectedStatusId] = useState(issue.statusId);
   const [isUpdating, setIsUpdating] = useState(false);
 

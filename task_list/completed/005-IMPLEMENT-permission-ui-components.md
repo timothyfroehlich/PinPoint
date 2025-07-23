@@ -76,7 +76,7 @@ rg -t tsx "Button|IconButton" src/components src/app
 **Note**: Tests may not pass immediately during the implementation phase. Focus on:
 
 - Ensuring your changes pass linting: `npm run lint`
-- Checking TypeScript compilation: `npm run typecheck:files -- src/components/permissions src/hooks`
+- Checking TypeScript compilation: `npm run typecheck | grep "permissions\|hooks"`
 - Building the components incrementally
 - Testing UI states manually
 

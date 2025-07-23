@@ -12,6 +12,7 @@ import {
 } from "@mui/material";
 import Grid from "@mui/material/Grid";
 import { type Session } from "next-auth";
+import * as React from "react";
 import { useState } from "react";
 
 import { IssueActions } from "./IssueActions";
@@ -35,7 +36,7 @@ export function IssueDetailView({
   issue: initialIssue,
   session,
   issueId,
-}: IssueDetailViewProps): JSX.Element {
+}: IssueDetailViewProps): React.JSX.Element {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 

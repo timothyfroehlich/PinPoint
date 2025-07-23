@@ -2,6 +2,7 @@ import { typescript } from "@betterer/typescript";
 
 export default {
   // Track TypeScript strict mode errors - this is the most important metric
+  // Excludes jest test files (*.test.{ts,tsx}) but includes vitest tests (*.vitest.test.{ts,tsx})
   "typescript strict mode": () =>
     typescript("./tsconfig.json", {
       strict: true,
@@ -9,5 +10,7 @@ export default {
       noUncheckedIndexedAccess: true,
       target: "ES2022", // Explicitly set target to match tsconfig.json
       lib: ["dom", "dom.iterable", "ES2022"], // Match tsconfig.json lib
-    }).include("./src/**/*.{ts,tsx}"),
+    })
+      .include("./src/**/*.{ts,tsx}")
+      .exclude("./src/**/*.test.{ts,tsx}", "./src/**/__tests__/**/*.test.{ts,tsx}"),
 };

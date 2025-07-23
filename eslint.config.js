@@ -138,7 +138,8 @@ export default tseslint.config(
   {
     // Override: Allow process.env in test files (documented exception)
     // Tests legitimately need to mock environment variables and check NODE_ENV
-    files: ["**/__tests__/**", "**/*.test.ts", "**/*.test.tsx", "**/test/**"],
+    // Note: Excludes vitest tests (*.vitest.test.{ts,tsx}) which should follow strict rules
+    files: ["**/__tests__/**", "**/*.test.ts", "**/*.test.tsx", "**/test/**", "!**/*.vitest.test.ts", "!**/*.vitest.test.tsx"],
     rules: {
       "no-restricted-properties": "off",
     },

@@ -625,4 +625,4 @@ function createTRPCMockContext(
 - **Migration Progress**: [TYPESCRIPT_MIGRATION.md](../../TYPESCRIPT_MIGRATION.md)
 - **Script Documentation**: [scripts/README.md](../../scripts/README.md)
 - **Betterer Workflow**: [betterer-workflow.md](./betterer-workflow.md)
-- **Testing Patterns**: [testing-patterns.md](./testing-patterns.md)
+- **Testing Guide**: [docs/testing/](../testing/index.md)

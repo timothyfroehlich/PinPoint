@@ -67,20 +67,11 @@ npm run debug:lint      # Detailed lint output
 # Testing
 npm run test:coverage
 
-# File-Specific TypeScript Checking (NEW)
-npm run typecheck:files -- src/specific/file.ts   # Check specific files
-npm run typecheck:routes                          # Check route files only
-npm run typecheck:tests                           # Check test files only
-npm run typecheck:changed                         # Check git-modified files
-
-# Advanced TypeScript Scripts (Auto-Approved)
-./scripts/typecheck-files.sh [--lines N] src/**/*.ts     # Direct bash script (default: 10 lines)
-./scripts/typecheck-grep.sh [--lines N] "pattern" [files] # Type check + grep filter (default: 5 lines)
-# Examples:
-#   ./scripts/typecheck-files.sh --lines 20 src/app/api/**/*.ts
-#   ./scripts/typecheck-grep.sh -l 0 "multi-tenant" # Show all matching errors
-#   ./scripts/typecheck-grep.sh --lines 3 "route\.ts" # Show only 3 errors
-# Note: These scripts use `npx tsc --noEmit` and are auto-approved for faster execution
+# TypeScript Error Filtering
+npm run typecheck                                 # Check entire project (recommended)
+npm run typecheck | grep "pattern"               # Filter errors by pattern
+npm run typecheck | head -10                     # Show first 10 errors
+npm run typecheck | grep "usePermissions"        # Find specific function errors
 ```
 
 ## Quality Standards (Zero Tolerance)
@@ -192,6 +183,40 @@ npm run typecheck:changed                         # Check git-modified files
 
 **Remember**: Betterer tracks all TypeScript errors - no new errors allowed in production code!
 
+## TypeScript Best Practices
+
+### ✅ Correct TypeScript Checking
+```bash
+# ✅ Always use full project context
+npm run typecheck                    # Check entire codebase
+npm run typecheck | grep "pattern"   # Filter results if needed
+npm run dev:typecheck               # Watch mode for development
+```
+
+### ❌ Common Mistakes to Avoid
+```bash
+# ❌ NEVER: Individual file checking loses project context
+tsc src/file.ts                     # Breaks path mappings (~/* imports)
+npx tsc --noEmit src/file.ts        # Loses tsconfig.json settings
+tsc --project . src/file.ts         # Still problematic
+
+# ❌ NEVER: These cause false positives
+npm run typecheck:files             # REMOVED - was problematic
+./scripts/typecheck-files.sh        # REMOVED - caused path errors
+```
+
+### Why Individual File Checking Fails
+- **Path mapping loss**: `~/*` imports become unresolvable
+- **Missing project context**: TypeScript ignores tsconfig.json when checking individual files
+- **False positives**: Errors that don't exist in full project context
+- **Build tool confusion**: Different behavior between dev and production
+
+### Modern TypeScript Workflow
+1. **Development**: Use `npm run dev:typecheck` for real-time feedback
+2. **Debugging**: Use `npm run typecheck | grep "pattern"` for filtering
+3. **CI/CD**: Use `npm run typecheck` as quality gate
+4. **IDE integration**: Let your editor handle real-time type checking
+
 ## Development Workflow
 
 1. **Start**: `npm run validate` → `npm run dev:full`
@@ -219,6 +244,29 @@ npm run typecheck:changed                         # Check git-modified files
 - **GitHub**: Repository management, PRs, issues
 - **Playwright**: Browser automation, E2E testing
 - **Context7**: Library documentation lookup
+- **Memory**: Knowledge graph for storing and retrieving coding patterns
+
+### Memory Server Usage
+
+The Memory MCP server stores critical coding standards and patterns as a knowledge graph. Key entities include:
+
+- **PinPoint Tech Stack**: Core technologies and configuration
+- **TypeScript Strictest Standards**: Zero-tolerance rules and patterns
+- **Multi-Tenancy Architecture**: Row-level security and org scoping
+- **API Security Patterns**: tRPC procedures and permission checks
+- **Testing Best Practices**: Mock patterns and coverage requirements
+- **Common TypeScript Fixes**: Solutions for strictest mode errors
+
+Quick commands:
+- `mcp__memory__search_nodes` - Search for patterns by keyword
+- `mcp__memory__open_nodes` - Get specific entity details
+- `mcp__memory__read_graph` - See all stored knowledge
+
+Use memory to quickly recall:
+- Specific TypeScript error fixes
+- Prisma mock patterns with $accelerate
+- tRPC router patterns and security
+- Multi-tenant query patterns
 
 ## Developer Guides
 
