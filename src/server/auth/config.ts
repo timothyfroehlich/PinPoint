@@ -11,6 +11,7 @@ import type { JWT } from "next-auth/jwt";
 import type { ExtendedPrismaClient } from "~/server/db";
 
 import { env } from "~/env.js";
+import { shouldEnableDevFeatures } from "~/lib/environment";
 
 /**
  * Module augmentation for `next-auth` types. Allows us to add custom properties to the `session`
@@ -47,7 +48,7 @@ export const createAuthConfig = (db: ExtendedPrismaClient): NextAuthConfig => ({
       clientSecret: env.GOOGLE_CLIENT_SECRET ?? "",
     }),
     // Development-only Credentials provider for test accounts
-    ...(env.NODE_ENV === "development" || env.NODE_ENV === "test"
+    ...(shouldEnableDevFeatures() || env.NODE_ENV === "test"
       ? [
           Credentials({
             name: "Development Test Users",
@@ -57,7 +58,7 @@ export const createAuthConfig = (db: ExtendedPrismaClient): NextAuthConfig => ({
             async authorize(
               credentials: Record<string, unknown> | undefined,
             ): Promise<User | null> {
-              if (env.NODE_ENV !== "development" && env.NODE_ENV !== "test") {
+              if (!shouldEnableDevFeatures() && env.NODE_ENV !== "test") {
                 return null;
               }
 

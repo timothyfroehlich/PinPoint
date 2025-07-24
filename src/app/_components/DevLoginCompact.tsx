@@ -75,12 +75,20 @@ export function DevLoginCompact({
   }
 
   // Only show in development or preview environments
-  if (
-    typeof window !== "undefined" &&
-    window.location.hostname !== "localhost" &&
-    !window.location.hostname.includes("vercel.app")
-  ) {
-    return null;
+  // In local dev: localhost
+  // In preview: vercel.app domains
+  // Hide in production deployments
+  if (typeof window !== "undefined") {
+    const hostname = window.location.hostname;
+    const isLocalDev =
+      hostname === "localhost" || hostname.includes("127.0.0.1");
+    const isPreview =
+      hostname.includes("vercel.app") &&
+      !hostname.includes("pin-point.vercel.app");
+
+    if (!isLocalDev && !isPreview) {
+      return null;
+    }
   }
 
   return (

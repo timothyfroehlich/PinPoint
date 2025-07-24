@@ -8,19 +8,20 @@ export const env = createEnv({
    */
   server: {
     AUTH_SECRET:
-      process.env.NODE_ENV === "production"
+      process.env["NODE_ENV"] === "production"
         ? z.string()
         : z.string().optional(),
     DATABASE_URL: z.string().url(),
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),
+    VERCEL_ENV: z.enum(["development", "preview", "production"]).optional(),
     GOOGLE_CLIENT_ID:
-      process.env.NODE_ENV === "development"
+      process.env["NODE_ENV"] === "development"
         ? z.string().optional()
         : z.string(),
     GOOGLE_CLIENT_SECRET:
-      process.env.NODE_ENV === "development"
+      process.env["NODE_ENV"] === "development"
         ? z.string().optional()
         : z.string(),
     OPDB_API_URL: z.string().url().default("https://opdb.org/api"),
@@ -68,6 +69,7 @@ export const env = createEnv({
     BLOB_READ_WRITE_TOKEN: process.env["BLOB_READ_WRITE_TOKEN"],
     SEED_ADMIN_EMAIL: process.env["SEED_ADMIN_EMAIL"],
     SEED_ADMIN_NAME: process.env["SEED_ADMIN_NAME"],
+    VERCEL_ENV: process.env["VERCEL_ENV"],
     // Next.js automatically exposes NODE_ENV to the client
   },
   /**

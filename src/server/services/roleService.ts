@@ -39,8 +39,18 @@ export class RoleService {
     await this.ensurePermissionsExist();
 
     // Create Admin role with all permissions
-    const adminRole = await this.prisma.role.create({
-      data: {
+    const adminRole = await this.prisma.role.upsert({
+      where: {
+        name_organizationId: {
+          name: SYSTEM_ROLES.ADMIN,
+          organizationId: this.organizationId,
+        },
+      },
+      update: {
+        isSystem: true,
+        isDefault: false,
+      },
+      create: {
         name: SYSTEM_ROLES.ADMIN,
         organizationId: this.organizationId,
         isSystem: true,
@@ -60,8 +70,18 @@ export class RoleService {
     });
 
     // Create Unauthenticated role with limited permissions
-    const unauthRole = await this.prisma.role.create({
-      data: {
+    const unauthRole = await this.prisma.role.upsert({
+      where: {
+        name_organizationId: {
+          name: SYSTEM_ROLES.UNAUTHENTICATED,
+          organizationId: this.organizationId,
+        },
+      },
+      update: {
+        isSystem: true,
+        isDefault: false,
+      },
+      create: {
         name: SYSTEM_ROLES.UNAUTHENTICATED,
         organizationId: this.organizationId,
         isSystem: true,
@@ -100,8 +120,18 @@ export class RoleService {
     const template = ROLE_TEMPLATES[templateName];
 
     // Create the role
-    const role = await this.prisma.role.create({
-      data: {
+    const role = await this.prisma.role.upsert({
+      where: {
+        name_organizationId: {
+          name: overrides.name ?? template.name,
+          organizationId: this.organizationId,
+        },
+      },
+      update: {
+        isSystem: false,
+        isDefault: overrides.isDefault ?? true,
+      },
+      create: {
         name: overrides.name ?? template.name,
         organizationId: this.organizationId,
         isSystem: false,
