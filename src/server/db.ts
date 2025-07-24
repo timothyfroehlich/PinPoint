@@ -1,13 +1,12 @@
 import { PrismaClient } from "@prisma/client";
 import { withAccelerate } from "@prisma/extension-accelerate";
 
-import { env } from "~/env";
+import { isDevelopment } from "~/lib/environment";
 
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 function createPrismaClientInternal() {
   const baseClient = new PrismaClient({
-    log:
-      env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
+    log: isDevelopment() ? ["query", "error", "warn"] : ["error"],
   });
 
   // Always extend with Accelerate for consistent typing
