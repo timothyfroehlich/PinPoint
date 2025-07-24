@@ -83,7 +83,7 @@ Update `package.json`:
     "betterer:update": "betterer update",
     "betterer:watch": "betterer watch",
     // Update pre-commit to include actionlint
-    "pre-commit": "npm run validate && actionlint .github/workflows/*.yml"
+    "pre-commit": "npm run validate:agent && actionlint .github/workflows/*.yml"
   }
 }
 ```
@@ -569,7 +569,7 @@ if command -v actionlint &> /dev/null; then
 fi
 
 # Run standard pre-commit
-npm run pre-commit
+npm run validate:agent
 ```
 
 ### Phase 6: Documentation Updates

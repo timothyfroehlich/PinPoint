@@ -210,8 +210,8 @@ npm run dev:clean       # Fresh start with cleanup
 npm run setup:worktree  # Setup new worktree environment
 
 # Quality Assurance (MANDATORY)
-npm run validate        # Before starting work
-npm run pre-commit      # Before every commit (MUST PASS)
+npm run validate:agent     # Before starting work
+npm run validate:agent     # Before every commit (MUST PASS)
 
 # Database
 npm run db:reset        # Complete reset + reseed

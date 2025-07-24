@@ -81,9 +81,9 @@ npm run test:coverage
 
 ```bash
 # All must pass
+npm run validate:agent:agent
+npm run validate:agent:full:agent
 npm run validate:agent
-npm run validate:full:agent
-npm run pre-commit
 ```
 
 ### 6. Create Audit Report
@@ -126,7 +126,7 @@ Document:
 npm run quick:agent
 
 # Full validation
-npm run validate:full:agent
+npm run validate:agent:full:agent
 
 # Debug commands
 npm run debug:typecheck

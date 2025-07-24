@@ -14,32 +14,41 @@ This index provides an overview of all tasks organized by category and priority.
 ### 🔧 Core Implementation
 
 - **[Task 004](completed/004-IMPLEMENT-issue-detail-page.md)**: Complete issue detail page implementation ✅
-- **[Task 005](005-IMPLEMENT-permission-ui-components.md)**: Implement permission-based UI components
+- **[Task 005](completed/005-IMPLEMENT-permission-ui-components.md)**: Implement permission-based UI components ✅
 
 ### 🧪 Testing
 
-- **[Task 006](006-TEST-e2e-permission-scenarios.md)**: Create E2E tests for permission scenarios
+- **[Task 006](completed/006-TEST-e2e-permission-scenarios.md)**: Create E2E tests for permission scenarios ✅
 
 ### 📝 Documentation & Cleanup
 
-- **[Task 007](007-CLEANUP-update-documentation.md)**: Update documentation for API changes
+- **[Task 007](completed/007-CLEANUP-update-documentation.md)**: Update documentation for API changes ✅
+
+### 🧪 E2E Test Reliability Fixes
+
+- **[Task 009](009-TEST-fix-member-auth-consistency.md)**: Fix Test Member authentication consistency issue 🔧
+- **[Task 010](010-TEST-fix-mobile-viewport-menu.md)**: Fix mobile viewport user menu button positioning issue 🔧
+- **[Task 011](011-TEST-add-auth-retry-logic.md)**: Add retry logic for flaky authentication tests 🔧
 
 ### ✅ Validation
 
-- **[Task 008](008-VALIDATE-full-system-test.md)**: Full system validation and testing
+- **[Task 008](completed/008-VALIDATE-full-system-test.md)**: Full system validation and testing ✅
+- **[Task 012](012-VALIDATE-comprehensive-test-run.md)**: Validate fixes with comprehensive test run 🔧
 
 ## Execution Order
 
 1. ✅ **Security fixes** (Tasks 001-003) - COMPLETED!
 2. ✅ **Core implementation** (Tasks 004-005) - COMPLETED!
 3. ✅ **Documentation** (Task 007) - COMPLETED!
-4. 🏃 **Testing & validation** (Tasks 006, 008) - IN PROGRESS
+4. ✅ **Testing & validation** (Tasks 006, 008) - COMPLETED!
+5. 🔧 **E2E test reliability fixes** (Tasks 009-011) - IN PROGRESS
+6. 🔧 **Final validation** (Task 012) - PENDING
 
 ## Progress Summary
 
-- **Completed**: 4/8 tasks (50%)
-- **In Progress**: 0 tasks
-- **Remaining**: 4 tasks
+- **Completed**: 8/12 tasks (67%)
+- **In Progress**: 4 tasks (E2E test reliability fixes)
+- **Remaining**: 0 tasks
 
 ### What's Been Accomplished
 
@@ -48,6 +57,14 @@ This index provides an overview of all tasks organized by category and priority.
 - ✅ Complete permission coverage on all tRPC procedures
 - ✅ Multi-tenant isolation enforced
 - ✅ Security foundation is solid
+- ✅ Initial E2E test suite cleanup completed
+
+### Current Focus: E2E Test Reliability
+
+- 🔧 Member authentication consistency issues
+- 🔧 Mobile viewport user menu positioning
+- 🔧 Retry logic for flaky authentication tests
+- 🔧 Comprehensive validation of all fixes
 
 ## Quick Commands
 
@@ -64,7 +81,7 @@ npm run fix                             # Auto-fix lint/format issues
 npm run quick:agent    # Quick checks during development
 
 # Before final commit (Task 008)
-npm run validate:agent # Everything should pass by then
+npm run validate:agent:agent # Everything should pass by then
 
 # Debugging helpers
 npm run debug:typecheck  # Full TypeScript output

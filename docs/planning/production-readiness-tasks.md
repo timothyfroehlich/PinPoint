@@ -16,7 +16,7 @@ The project maintains strict quality standards as documented in [CLAUDE.md](../.
 - **0 TypeScript errors** - Fix immediately, never commit with TS errors
 - **0 ESLint errors** - Warnings acceptable with justification
 - **Test Coverage** - 50% global, 60% server/, 70% lib/
-- **Pre-commit** - `npm run pre-commit` must pass before every commit
+- **Pre-commit** - `npm run validate:agent` must pass before every commit
 - **Development** - Use `npm run dev:full` for comprehensive monitoring
 
 ## 1. CI/CD and Deployment

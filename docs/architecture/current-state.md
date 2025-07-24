@@ -182,8 +182,8 @@ npm run dev:full      # Recommended: all services with monitoring
 npm run dev:clean     # Fresh start with database reset
 
 # Quality checks
-npm run validate      # Run before starting work
-npm run pre-commit    # Must pass before commits
+npm run validate:agent      # Run before starting work
+npm run validate:agent    # Must pass before commits
 
 # Database
 npm run db:reset      # Reset and reseed

@@ -1,79 +1,64 @@
-# PinPoint Task List - Roles & Permissions Implementation
+# PinPoint Task Management
 
-## Task Status Summary
+## 🚨 IMPORTANT: Task Lists Have Been Consolidated
 
-### ✅ Completed Tasks (4/8)
-- **Task 001**: Remove insecure /api/issues API routes
-- **Task 002**: Remove unused /api/upload routes  
-- **Task 003**: Audit tRPC procedures for permission coverage
-- **Task 004**: Complete issue detail page implementation
+**This directory has been reorganized. Please use the new consolidated resources:**
 
-### 📋 Pending Tasks (4/8)
-- **Task 005**: Implement permission-based UI components (Note: Actually completed, needs verification)
-- **Task 006**: Create E2E tests for permission scenarios
-- **Task 007**: Update documentation for API changes (Note: Actually completed in this session)
-- **Task 008**: Full system validation and testing
+- **📋 Active Tasks**: See `CONSOLIDATED_TASK_LIST.md` in the repository root
+- **📚 Lessons Learned**: See `docs/lessons-learned/task-completion-insights.md`
+- **📁 Completed Tasks**: Archived in `docs/archive/completed-task-lists/`
 
-### 🧪 Additional Unit Test Tasks (Created separately)
-- **UNIT-TEST-001 to 008**: Comprehensive unit test coverage for permission system
+## 🎉 Roles & Permissions Implementation Status: 75% Complete
 
-## Primary Objectives
+### ✅ Completed (6/8 tasks)
 
-### 1. Complete Roles and Permissions Implementation
+1. ✓ Remove insecure API routes
+2. ✓ Remove unused upload routes
+3. ✓ Audit tRPC procedures for permission coverage
+4. ✓ Complete issue detail page implementation
+5. ✓ Implement permission-based UI components
+6. ✓ Update documentation for API changes
 
-The roles and permissions system is partially implemented but needs to be completed across all areas of the application. This includes:
+### 📋 Remaining Critical Tasks (2/8)
 
-- Ensuring all tRPC procedures have proper permission checks
-- Completing the permission system integration in all UI components
-- Implementing role-based access control for all features
-- Testing the permission system thoroughly
+- **Task 006**: Create E2E tests for permission scenarios (IN PROGRESS)
+- **Task 008**: Full system validation and testing (PENDING)
 
-### 2. Finish the Issue Detail Page
+- **📋 Current Work**: See remaining tasks in `006-TEST-e2e-permission-scenarios.md` and `008-VALIDATE-full-system-test.md`
+- **🔄 Login Flow**: See `login-flow/` subdirectory for related authentication improvements
+- **📖 Architecture**: Permission system implemented in `src/lib/permissions/`
 
-The issue detail page needs to be completed with full permission integration:
+## Migration Summary
 
-- Display issue details with proper permission checks
-- Enable editing only for users with appropriate permissions
-- Implement status updates with permission validation
-- Add comment functionality with proper access control
-- Integrate file attachments with permission checks
+**What Changed**:
 
-## Current State
+- All individual completed task files moved to archive
+- Lessons learned extracted to dedicated documentation
+- All remaining work consolidated into single prioritized list
+- Focus shifted to final validation and testing phase
 
-- **Permissions System**: Core implementation exists in `src/lib/permissions/`
-- **tRPC Integration**: Permission checks are implemented in some procedures but not all
-- **UI Components**: Some components check permissions, others need updates
-- **Issue Detail Page**: Basic structure exists but needs completion
+**Why This Helps**:
 
-## Architecture Decisions
+- Single source of truth for remaining work
+- Lessons learned preserved for future reference
+- Reduced clutter and confusion
+- Clear completion criteria established
 
-- **API Strategy**: Consolidating on tRPC for all API calls (removing REST API routes)
-- **Permission Model**: Row-level security with organization-based multi-tenancy
-- **UI Pattern**: Optimistic updates with permission pre-checks
+## Development Context
 
-## Task Organization
+**Current State**: Roles & permissions core implementation is complete
 
-Each task file in this directory represents a specific work item. Tasks are organized by:
+- ✅ Security foundation solid (API routes consolidated, permissions audited)
+- ✅ UI components created and integrated
+- ✅ Documentation updated and comprehensive
+- 📋 Final testing and validation needed
 
-- **Security Critical**: Tasks that fix security vulnerabilities
-- **Core Implementation**: Tasks to complete the permission system
-- **UI Integration**: Tasks to integrate permissions into UI components
-- **Testing**: Tasks to ensure everything works correctly
+**Next Steps**: Focus on the critical path to completion
 
-## Important Development Notes
+1. Complete E2E permission scenario testing
+2. Run full system validation
+3. Prepare for production deployment
 
-**Tests may not pass during implementation!** This is expected. Focus on:
+---
 
-1. **Linting first**: Ensure your changes pass `npm run lint`
-2. **TypeScript compilation**: Use `npm run typecheck | grep "pattern"` to filter errors
-3. **Incremental progress**: Build features step by step
-4. **Manual testing**: Verify functionality works even if tests are failing
-
-The final validation task (Task 008) is when all tests should be passing. Until then, focus on clean, linted code that compiles without TypeScript errors.
-
-## References
-
-- Permission system implementation: `src/lib/permissions/`
-- tRPC procedures: `src/server/api/routers/`
-- UI components: `src/app/` and `src/components/`
-- Issue detail page: `src/app/(features)/issues/[issueId]/`
+_For detailed task information, see the consolidated task list and lessons learned documents referenced above._

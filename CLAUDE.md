@@ -51,9 +51,9 @@ npm run quick:agent        # Development checks + auto-fix (after code changes)
 npm run validate:agent     # Pre-commit validation + auto-fix (MUST PASS)
 npm run validate:full:agent # Pre-PR validation (MUST PASS)
 
-# Legacy Commands (Still Available)
-npm run validate        # Standard validation
-npm run pre-commit      # Full validation + workflow check + build test
+# Legacy Commands (Removed - Use Agent Commands Instead)
+# npm run validate      # REMOVED - use validate:agent
+# npm run pre-commit    # REMOVED - use validate:agent
 
 # Database
 npm run db:reset
@@ -61,7 +61,6 @@ npm run db:push
 
 # Quick Fixes & Debug
 npm run fix             # Auto-fix lint + format issues
-npm run debug:typecheck # Full TypeScript output
 npm run debug:test      # Verbose test output
 npm run debug:lint      # Detailed lint output
 
@@ -269,11 +268,11 @@ Use memory to quickly recall:
 
 For detailed guidance beyond these essentials:
 
-- **TypeScript Issues**: See `docs/developer-guides/typescript-multi-config.md` for multi-config setup and error resolution
-- **Testing Patterns**: See `docs/developer-guides/testing-patterns.md` for Jest mocking and coverage patterns
+- **TypeScript Issues**: See `docs/developer-guides/typescript-guide.md` for comprehensive TypeScript setup, error resolution, and migration patterns
+- **Testing Patterns**: See `docs/testing/vitest-best-practices.md` for Vitest patterns and performance data
 - **ESLint Errors**: See `docs/developer-guides/common-errors.md` for specific rule violations and fixes
 - **Betterer Workflow**: See `docs/developer-guides/betterer-workflow.md` for migration workflow and team coordination
-- **Migration Progress**: See `TYPESCRIPT_MIGRATION.md` for current status and tracking
+- **Migration Lessons**: All migration insights now consolidated in `docs/developer-guides/typescript-guide.md`
 - **Script Usage**: See `scripts/README.md` for TypeScript analysis tools
 
 ## Repository
@@ -288,11 +287,10 @@ For detailed guidance beyond these essentials:
 - Database strategy in development: sessions clear on `db:reset`
 - Pre-production: frequent schema changes, no migrations
 - OPDB games: global (no organizationId), custom games: organization-scoped
-- **ESM modules**: Project uses `"type": "module"` - some packages (superjson, @auth/prisma-adapter) are ESM-only and may need transformIgnorePatterns updates in Jest
-- **Jest ESM**: Current config uses `ts-jest/presets/default-esm` - avoid changing without understanding ESM implications
+- **ESM modules**: Project uses `"type": "module"` with native ESM support - Vitest handles this seamlessly
 - **Type Safety**: Project enforces strictest TypeScript + type-aware ESLint rules. All `@typescript-eslint/no-unsafe-*` and `no-explicit-any` violations must be fixed
 - **TypeScript Migration**: ✅ Production code is 100% strict mode compliant! Test files being cleaned up incrementally
-- **Migration Tracking**: See `TYPESCRIPT_MIGRATION.md` for patterns and progress. Betterer prevents regressions
+- **Migration Patterns**: Complete TypeScript migration patterns in `docs/developer-guides/typescript-guide.md`. Betterer prevents regressions
 
 ## Frontend Development Notes
 
@@ -303,6 +301,31 @@ For detailed guidance beyond these essentials:
 
 - **ESLint Disabling**: NEVER add an eslint-disable unless you have exhausted all other options and confirmed with the user that it is the correct thing to do.
 
+## Key Lessons Learned (Non-Obvious Insights)
+
+### Counter-Intuitive Discoveries
+
+- **Mock data accuracy was critical for test reliability**: Initial test failures weren't due to logic bugs but because mocks returned full objects while APIs used Prisma `select` clauses - mocks must simulate exact response structure
+- **Explicit dependency mocking forces better architecture**: What initially seemed like Vitest being "more work" actually drove better dependency injection patterns and cleaner service boundaries
+- **Public endpoints still need multi-tenant scoping**: Even unauthenticated APIs must respect organization boundaries through subdomain resolution, not just skip authentication entirely
+- **"Migration complete" doesn't mean "working"**: Functionality existing in codebase doesn't guarantee it's properly tested or behaves correctly under all conditions
+
+### Performance Insights
+
+- **7-65x performance improvements**: Not just marketing - real measured improvements from Jest → Vitest migration with the biggest gains on pure functions (65x) and service layer tests (12-19x)
+- **ESM transformation overhead is significant**: Native ESM support eliminated a major performance bottleneck that wasn't obvious until measuring before/after
+
+### Security & Testing Revelations
+
+- **Permission UI testing requires both states**: Testing permission-based components for authorized state isn't enough - must test unauthorized state with proper fallbacks/tooltips
+- **Security boundaries blur with public endpoints**: Public APIs can leak sensitive data through careless Prisma queries - explicit `select` clauses are essential for data security
+- **Test mocks often fail to catch real API issues**: If mocks don't match production API structure exactly, tests give false confidence
+
 ## Claude Memories
 
 - Don't be a yes-man and don't pander to me
+- Don't leave references to old/removed things in documentation
+
+```
+
+```

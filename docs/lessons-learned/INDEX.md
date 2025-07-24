@@ -1,5 +1,7 @@
 # Index of docs/lessons-learned
 
-This directory contains documentation about lessons learned during the development of the PinPoint application. These documents capture insights, solutions to complex problems, and best practices derived from real-world development experiences, serving as a valuable resource for current and future team members.
+This directory contains documentation about lessons learned during the development of the PinPoint application. These documents capture insights, solutions to complex problems, and best practices derived from real-world development experiences.
 
-- **[msw-trpc-configuration-fix.md](./msw-trpc-configuration-fix.md)**: This document details the problem, diagnosis, root cause investigation, and solution for a critical issue encountered with MSW-tRPC configuration that caused all `PrimaryAppBar` tests to fail. It highlights key learnings about documentation versus actual TypeScript definitions, version-specific APIs, and the importance of links-based configuration for `msw-trpc` v2.0.1, providing a clear guide for resolving similar integration challenges.
+**Note**: Core lessons learned have been integrated into the main `CLAUDE.md` file and testing documentation at `@docs/testing/vitest-best-practices.md` for easier agent reference.
+
+- **[public-api-endpoints.md](./public-api-endpoints.md)**: Documents the implementation and validation of public API endpoints for unauthenticated access, covering security boundary testing, mock data accuracy challenges, and comprehensive test coverage strategies. Demonstrates counter-intuitive insights about multi-tenant scoping in public endpoints and the critical importance of mock data accuracy in testing.

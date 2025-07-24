@@ -314,10 +314,10 @@ vercel inspect https://your-preview-url.vercel.app
 
 ```bash
 # Before committing
-npm run validate  # TypeScript + ESLint + Tests
+npm run validate:agent  # TypeScript + ESLint + Tests
 
 # Before pushing
-npm run pre-commit  # Husky hooks
+npm run validate:agent  # Husky hooks
 ```
 
 ### Database Best Practices
@@ -349,7 +349,7 @@ vercel env pull          # Pull environment variables
 vercel logs              # View deployment logs
 
 # Testing
-npm run validate         # Full validation
+npm run validate:agent         # Full validation
 npm test                 # Run tests
 npm run typecheck        # TypeScript check
 ```
