@@ -36,7 +36,6 @@
     "**/*.cjs",
     ".next/types/**/*.ts",
     "vitest.config.ts",
-    "jest.config.js",
     "playwright.config.ts"
   ],
   "exclude": [

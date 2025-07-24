@@ -81,6 +81,7 @@ export function createVitestMockContext(): VitestMockContext {
       delete: vi.fn(),
     },
     machine: {
+      findFirst: vi.fn(),
       findUnique: vi.fn(),
       findMany: vi.fn(),
       create: vi.fn(),
@@ -133,7 +134,15 @@ export function createVitestMockContext(): VitestMockContext {
     })),
     createCollectionService: vi.fn(),
     createPinballMapService: vi.fn(),
-    createIssueActivityService: vi.fn(),
+    createIssueActivityService: vi.fn(() => ({
+      recordIssueCreated: vi.fn(),
+      recordActivity: vi.fn(),
+      recordStatusChange: vi.fn(),
+      recordAssignmentChange: vi.fn(),
+      recordFieldUpdate: vi.fn(),
+      recordCommentDeleted: vi.fn(),
+      getIssueTimeline: vi.fn(),
+    })),
     createCommentCleanupService: vi.fn(),
     createQRCodeService: vi.fn(),
   } as unknown as ServiceFactory;

@@ -47,38 +47,12 @@ export async function loginAsTechnician(page: Page) {
 }
 
 /**
- * Login as an admin with all permissions
+ * Login as an admin with all permissions - Enhanced with retry logic
  */
 export async function loginAsAdmin(page: Page) {
-  const permissions: UserPermissions = {
-    "issue:view": true,
-    "issue:edit": true,
-    "issue:create": true,
-    "issue:assign": true,
-    "issue:delete": true,
-    "issue:bulk_manage": true,
-    "machine:view": true,
-    "machine:create": true,
-    "machine:edit": true,
-    "machine:delete": true,
-    "location:view": true,
-    "location:create": true,
-    "location:edit": true,
-    "location:delete": true,
-    "attachment:view": true,
-    "attachment:create": true,
-    "attachment:delete": true,
-    "organization:manage": true,
-    "role:manage": true,
-    "user:manage": true,
-    "admin:view_analytics": true,
-  };
-
-  await loginAsUserWithPermissions(page, permissions, {
-    id: "admin-1",
-    name: "Test Admin",
-    email: "admin@example.com",
-  });
+  // Use the enhanced loginAsUser from unified-dashboard helpers for better reliability
+  const { loginAsUser } = await import("./unified-dashboard");
+  await loginAsUser(page, "Test Admin");
 }
 
 /**
@@ -132,39 +106,21 @@ export async function loginAsUserWithPermissions(
 }
 
 /**
- * Login as a regular user with minimal permissions
+ * Login as a regular user with minimal permissions - Enhanced with retry logic
  */
 export async function loginAsRegularUser(page: Page) {
-  const permissions: UserPermissions = {
-    "issue:view": true,
-    "issue:create": true,
-    "machine:view": true,
-    "location:view": true,
-    "attachment:view": true,
-    "attachment:create": true,
-  };
-
-  await loginAsUserWithPermissions(page, permissions, {
-    id: "user-1",
-    name: "Regular User",
-    email: "user@example.com",
-  });
+  // Use the enhanced loginAsUser from unified-dashboard helpers for better reliability
+  const { loginAsUser } = await import("./unified-dashboard");
+  await loginAsUser(page, "Test Member");
 }
 
 /**
- * Logout the current user
+ * Logout the current user - Enhanced with retry logic
  */
 export async function logout(page: Page) {
-  await page.addInitScript(() => {
-    // Clear test session
-    delete (window as { __TEST_SESSION__?: unknown }).__TEST_SESSION__;
-  });
-
-  // TODO: Clear authentication cookies/tokens
-  // This might involve:
-  // 1. Making API calls to destroy the session
-  // 2. Clearing authentication cookies
-  // 3. Redirecting to logout endpoint
+  // Use the enhanced logout from unified-dashboard helpers for better reliability
+  const { logout: enhancedLogout } = await import("./unified-dashboard");
+  await enhancedLogout(page);
 }
 
 /**

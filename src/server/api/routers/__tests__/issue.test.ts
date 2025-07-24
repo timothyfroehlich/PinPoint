@@ -1,36 +1,67 @@
 import { TRPCError } from "@trpc/server";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 
 // Mock NextAuth first to avoid import issues
-jest.mock("next-auth", () => {
-  return jest.fn().mockImplementation(() => ({
-    auth: jest.fn(),
-    handlers: { GET: jest.fn(), POST: jest.fn() },
-    signIn: jest.fn(),
-    signOut: jest.fn(),
+vi.mock("next-auth", () => {
+  return vi.fn().mockImplementation(() => ({
+    auth: vi.fn(),
+    handlers: { GET: vi.fn(), POST: vi.fn() },
+    signIn: vi.fn(),
+    signOut: vi.fn(),
   }));
 });
 
 import { appRouter } from "~/server/api/root";
 import {
-  createMockContext,
-  mockUser,
-  mockIssue,
-  mockMachine,
-  mockLocation,
-  mockOrganization,
-  mockStatus,
-  mockPriority,
-  mockMembership,
-  mockRole,
-  type MockContext,
-} from "~/test/mockContext";
+  createVitestMockContext,
+  type VitestMockContext,
+} from "~/test/vitestMockContext";
+
+// Mock data for tests
+const mockUser = { id: "user-1", email: "test@example.com", name: "Test User" };
+const mockIssue = {
+  id: "issue-1",
+  title: "Test Issue",
+  machineId: "machine-1",
+  organizationId: "org-1",
+};
+const mockMachine = {
+  id: "machine-1",
+  name: "Test Machine",
+  organizationId: "org-1",
+  locationId: "location-1",
+};
+const mockLocation = {
+  id: "location-1",
+  name: "Test Location",
+  organizationId: "org-1",
+};
+const mockOrganization = {
+  id: "org-1",
+  name: "Test Org",
+  subdomain: "test-org",
+};
+const mockStatus = { id: "status-1", name: "Open", organizationId: "org-1" };
+const mockPriority = {
+  id: "priority-1",
+  name: "Medium",
+  organizationId: "org-1",
+};
+const mockMembership = {
+  id: "membership-1",
+  userId: "user-1",
+  organizationId: "org-1",
+  roleId: "role-1",
+};
+const mockRole = { id: "role-1", name: "Admin", organizationId: "org-1" };
 
 describe("issueRouter - Issue Detail Page", () => {
-  let ctx: MockContext;
+  let ctx: VitestMockContext;
   let caller: ReturnType<typeof appRouter.createCaller>;
 
   beforeEach(() => {
-    ctx = createMockContext();
+    vi.clearAllMocks();
+    ctx = createVitestMockContext();
     ctx.session = {
       user: { id: mockUser.id },
       expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),

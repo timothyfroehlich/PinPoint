@@ -49,7 +49,7 @@ exec('npm run validate:agent', (error, stdout, stderr) => {
     console.log('? Prettier: Could not determine status.');
   }
 
-  // Jest Tests Check
+  // Tests Check
   const testSuccess = output.includes('✓ Tests: All passing');
   const testFailMatch = output.match(/Tests:.*?(\d+) failed/);
   const testSuiteFailMatch = output.match(/Test suite failed to run/g);

@@ -1,11 +1,9 @@
-/**
- * @jest-environment node
- */
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 import { PermissionService } from "../permissionService";
 
 // Mock the permission constants
-jest.mock("../../auth/permissions.constants", () => ({
+vi.mock("../../auth/permissions.constants", () => ({
   PERMISSION_DEPENDENCIES: {
     "issue:edit": ["issue:view"],
     "issue:delete": ["issue:view"],
@@ -35,7 +33,6 @@ jest.mock("../../auth/permissions.constants", () => ({
 }));
 
 // Mock ExtendedPrismaClient since we're only testing expandPermissionsWithDependencies
-
 const mockPrisma = {} as any;
 
 describe("PermissionService - expandPermissionsWithDependencies", () => {

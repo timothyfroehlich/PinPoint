@@ -1,7 +1,7 @@
 "use client";
 
-import PlaceIcon from "@mui/icons-material/Place";
 import { AccountCircle } from "@mui/icons-material";
+import PlaceIcon from "@mui/icons-material/Place";
 import {
   AppBar,
   Toolbar,
@@ -12,6 +12,8 @@ import {
   Avatar,
   Menu,
   MenuItem,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
 import { useRouter } from "next/navigation";
 import { signOut, signIn, useSession } from "next-auth/react";
@@ -28,6 +30,10 @@ const PrimaryAppBar = (): JSX.Element => {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
   const { hasPermission } = usePermissions();
+
+  // Responsive design: hide navigation items on mobile to make room for user menu
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
   const handleMenu = (event: React.MouseEvent<HTMLElement>): void => {
     setAnchorEl(event.currentTarget);
@@ -54,7 +60,9 @@ const PrimaryAppBar = (): JSX.Element => {
 
   return (
     <AppBar position="fixed" sx={{ bgcolor: "background.paper" }}>
-      <Toolbar sx={{ justifyContent: "space-between" }}>
+      <Toolbar
+        sx={{ justifyContent: "space-between", minHeight: { xs: 56, sm: 64 } }}
+      >
         {/* Logo & Branding */}
         <Box
           component="a"
@@ -72,60 +80,62 @@ const PrimaryAppBar = (): JSX.Element => {
           </Typography>
         </Box>
 
-        {/* Primary Navigation */}
-        <Box sx={{ display: "flex", gap: 1 }}>
-          <Button
-            color="inherit"
-            href="/"
-            sx={{
-              borderRadius: 2,
-              px: 3,
-              textTransform: "none",
-              fontWeight: "medium",
-              "&:hover": { bgcolor: "rgba(255,255,255,0.1)" },
-            }}
-          >
-            Home
-          </Button>
+        {/* Primary Navigation - Hidden on mobile to make room for user menu */}
+        {!isMobile && (
+          <Box sx={{ display: "flex", gap: 1 }}>
+            <Button
+              color="inherit"
+              href="/"
+              sx={{
+                borderRadius: 2,
+                px: 3,
+                textTransform: "none",
+                fontWeight: "medium",
+                "&:hover": { bgcolor: "rgba(255,255,255,0.1)" },
+              }}
+            >
+              Home
+            </Button>
 
-          {/* Authenticated navigation */}
-          {session && (
-            <>
-              <PermissionButton
-                permission="issue:view"
-                hasPermission={hasPermission}
-                showWhenDenied={false}
-                color="inherit"
-                sx={{
-                  borderRadius: 2,
-                  px: 3,
-                  textTransform: "none",
-                  fontWeight: "medium",
-                  "&:hover": { bgcolor: "rgba(255,255,255,0.1)" },
-                }}
-                tooltipText="View and manage issues"
-              >
-                Issues
-              </PermissionButton>
-              <PermissionButton
-                permission="machine:view"
-                hasPermission={hasPermission}
-                showWhenDenied={false}
-                color="inherit"
-                sx={{
-                  borderRadius: 2,
-                  px: 3,
-                  textTransform: "none",
-                  fontWeight: "medium",
-                  "&:hover": { bgcolor: "rgba(255,255,255,0.1)" },
-                }}
-                tooltipText="View and manage games"
-              >
-                Games
-              </PermissionButton>
-            </>
-          )}
-        </Box>
+            {/* Authenticated navigation */}
+            {session && (
+              <>
+                <PermissionButton
+                  permission="issue:view"
+                  hasPermission={hasPermission}
+                  showWhenDenied={false}
+                  color="inherit"
+                  sx={{
+                    borderRadius: 2,
+                    px: 3,
+                    textTransform: "none",
+                    fontWeight: "medium",
+                    "&:hover": { bgcolor: "rgba(255,255,255,0.1)" },
+                  }}
+                  tooltipText="View and manage issues"
+                >
+                  Issues
+                </PermissionButton>
+                <PermissionButton
+                  permission="machine:view"
+                  hasPermission={hasPermission}
+                  showWhenDenied={false}
+                  color="inherit"
+                  sx={{
+                    borderRadius: 2,
+                    px: 3,
+                    textTransform: "none",
+                    fontWeight: "medium",
+                    "&:hover": { bgcolor: "rgba(255,255,255,0.1)" },
+                  }}
+                  tooltipText="View and manage games"
+                >
+                  Games
+                </PermissionButton>
+              </>
+            )}
+          </Box>
+        )}
 
         {/* Authentication Controls */}
         <Box>

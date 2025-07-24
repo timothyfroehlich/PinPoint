@@ -74,3 +74,4 @@ cleanup_analysis/
 .claude/hooks/.quality-check.json.swp
 .claude/hooks/tsconfig-cache.json
 .betterer.results.backup
+.env*.local

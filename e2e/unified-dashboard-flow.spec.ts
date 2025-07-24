@@ -22,7 +22,9 @@ test.describe("Unified Dashboard Authentication Flow", () => {
     await expect(page).toHaveTitle(/PinPoint/);
 
     // Should see organization name and information
-    await expect(page.locator("h1")).toContainText("Austin Pinball Collective");
+    await expect(
+      page.locator("h1", { hasText: "Austin Pinball Collective" }),
+    ).toBeVisible();
 
     // Should see locations and machine counts
     await expect(page.locator("text=Our Locations")).toBeVisible();
@@ -39,6 +41,14 @@ test.describe("Unified Dashboard Authentication Flow", () => {
     // Should NOT see authenticated content yet
     await expect(page.locator("text=My Dashboard")).not.toBeVisible();
     await expect(page.locator("text=My Open Issues")).not.toBeVisible();
+
+    // Should NOT see Issues/Games navigation buttons when unauthenticated
+    await expect(
+      page.locator("button", { hasText: "Issues" }),
+    ).not.toBeVisible();
+    await expect(
+      page.locator("button", { hasText: "Games" }),
+    ).not.toBeVisible();
   });
 
   test("should show enhanced content after login", async ({ page }) => {
@@ -49,8 +59,11 @@ test.describe("Unified Dashboard Authentication Flow", () => {
     await page.locator('text="Dev Quick Login"').click();
     await page.locator('button:has-text("Test Admin")').click();
 
-    // Wait for authentication to complete
-    await page.waitForTimeout(3000);
+    // Wait for authentication to complete - look for authenticated content
+    // Authentication involves a page reload, so wait longer
+    await expect(page.locator("text=My Dashboard")).toBeVisible({
+      timeout: 10000,
+    });
 
     // Should still see public content
     await expect(page.locator("text=Our Locations")).toBeVisible();
@@ -63,11 +76,13 @@ test.describe("Unified Dashboard Authentication Flow", () => {
     await expect(
       page.locator('button[aria-label="account of current user"]'),
     ).toBeVisible();
-    await expect(page.locator("text=Issues")).toBeVisible();
-    await expect(page.locator("text=Games")).toBeVisible();
+    await expect(page.locator("button", { hasText: "Issues" })).toBeVisible();
+    await expect(page.locator("button", { hasText: "Games" })).toBeVisible();
 
     // Should NOT see sign in button anymore
-    await expect(page.locator("text=Sign In")).not.toBeVisible();
+    await expect(
+      page.locator("button", { hasText: "Sign In" }),
+    ).not.toBeVisible();
   });
 
   test("should return to public-only content after logout", async ({
@@ -77,6 +92,7 @@ test.describe("Unified Dashboard Authentication Flow", () => {
     await page.locator('text="Dev Quick Login"').click();
     await page.locator('button:has-text("Test Admin")').click();
     await page.waitForTimeout(3000);
+    await expect(page.locator("text=My Dashboard")).toBeVisible();
 
     // Verify authenticated content is present
     await expect(page.locator("text=My Dashboard")).toBeVisible();
@@ -93,7 +109,9 @@ test.describe("Unified Dashboard Authentication Flow", () => {
 
     // Should see public content
     await expect(page.locator("text=Our Locations")).toBeVisible();
-    await expect(page.locator("text=Austin Pinball Collective")).toBeVisible();
+    await expect(
+      page.locator("h1", { hasText: "Austin Pinball Collective" }),
+    ).toBeVisible();
 
     // Should NOT see authenticated content
     await expect(page.locator("text=My Dashboard")).not.toBeVisible();
@@ -119,6 +137,7 @@ test.describe("Unified Dashboard Authentication Flow", () => {
     await page.locator('text="Dev Quick Login"').click();
     await page.locator('button:has-text("Test Admin")').click();
     await page.waitForTimeout(3000);
+    await expect(page.locator("text=My Dashboard")).toBeVisible();
 
     // Verify admin authenticated content
     await expect(page.locator("text=My Dashboard")).toBeVisible();
@@ -136,6 +155,7 @@ test.describe("Unified Dashboard Authentication Flow", () => {
     await page.locator('text="Dev Quick Login"').click();
     await page.locator('button:has-text("Test Member")').click();
     await page.waitForTimeout(3000);
+    await expect(page.locator("text=My Dashboard")).toBeVisible();
 
     // Should see authenticated content for member
     await expect(page.locator("text=My Dashboard")).toBeVisible();
@@ -152,6 +172,7 @@ test.describe("Unified Dashboard Authentication Flow", () => {
     await page.locator('text="Dev Quick Login"').click();
     await page.locator('button:has-text("Test Player")').click();
     await page.waitForTimeout(3000);
+    await expect(page.locator("text=My Dashboard")).toBeVisible();
 
     // Should see appropriate content for player
     await expect(page.locator("text=My Dashboard")).toBeVisible();
@@ -165,6 +186,7 @@ test.describe("Unified Dashboard Authentication Flow", () => {
     await page.locator('text="Dev Quick Login"').click();
     await page.locator('button:has-text("Test Admin")').click();
     await page.waitForTimeout(3000);
+    await expect(page.locator("text=My Dashboard")).toBeVisible();
 
     // Verify authenticated state
     await expect(page.locator("text=My Dashboard")).toBeVisible();
@@ -191,6 +213,7 @@ test.describe("Unified Dashboard Authentication Flow", () => {
     await page.locator('text="Dev Quick Login"').click();
     await page.locator('button:has-text("Test Admin")').click();
     await page.waitForTimeout(3000);
+    await expect(page.locator("text=My Dashboard")).toBeVisible();
 
     // Navigate via PinPoint logo (should stay on homepage with unified dashboard)
     await page.locator('text="PinPoint"').click();
@@ -216,7 +239,11 @@ test.describe("Unified Dashboard Authentication Flow", () => {
     // Login as admin
     await page.locator('text="Dev Quick Login"').click();
     await page.locator('button:has-text("Test Admin")').click();
-    await page.waitForTimeout(3000);
+    // Wait for authentication to complete - look for authenticated content
+    // Authentication involves a page reload, so wait longer
+    await expect(page.locator("text=My Dashboard")).toBeVisible({
+      timeout: 10000,
+    });
 
     // Open user menu
     await page.locator('button[aria-label="account of current user"]').click();
@@ -236,6 +263,7 @@ test.describe("Unified Dashboard Authentication Flow", () => {
     await page.locator('text="Dev Quick Login"').click();
     await page.locator('button:has-text("Test Admin")').click();
     await page.waitForTimeout(3000);
+    await expect(page.locator("text=My Dashboard")).toBeVisible();
 
     // Should see authenticated content on mobile
     await expect(page.locator("text=My Dashboard")).toBeVisible();

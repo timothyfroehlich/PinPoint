@@ -147,7 +147,9 @@ const adminEmail = env.SEED_ADMIN_EMAIL;
 const adminName = env.SEED_ADMIN_NAME;
 
 if (!adminEmail || !adminName) {
-  throw new Error("SEED_ADMIN_EMAIL and SEED_ADMIN_NAME environment variables are required for production seeding");
+  throw new Error(
+    "SEED_ADMIN_EMAIL and SEED_ADMIN_NAME environment variables are required for production seeding",
+  );
 }
 
 const PRODUCTION_USERS = [

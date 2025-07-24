@@ -457,7 +457,7 @@
   },
   {
     "title": "Skill shot cup doesn't register",
-    "description": "When plunging the ball, the "skill shot" cup doesn't register the movement of the ball in the cup and will only select the first thing on screen.",
+    "description": "When plunging the ball, the \"skill shot\" cup doesn't register the movement of the ball in the cup and will only select the first thing on screen.",
     "severity": "Minor",
     "consistency": "Always",
     "status": "Fixed",

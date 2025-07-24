@@ -76,9 +76,12 @@ export const mockUserProfile = (user: Partial<User> = {}) =>
 export const mockCurrentMembership = (
   membership: Parameters<typeof createMockMembership>[0] = {},
 ) =>
-  trpcMsw.user.getCurrentMembership.query(() =>
-    createMockMembership(membership),
-  );
+  trpcMsw.user.getCurrentMembership.query(() => {
+    console.log(`[MSW Handler] mockCurrentMembership called with:`, membership);
+    const result = createMockMembership(membership);
+    console.log(`[MSW Handler] returning membership:`, result);
+    return result;
+  });
 
 // Organization handler - returns current organization
 export const mockCurrentOrganization = (org: Partial<Organization> = {}) =>
@@ -152,3 +155,13 @@ export const adminUserHandlers = [
 ];
 
 export const unauthorizedHandlers = [mockUnauthorizedError()];
+
+// Export handlers object for compatibility with existing tests
+export const handlers = {
+  userGetProfile: mockUserProfile,
+  userGetCurrentMembership: mockCurrentMembership,
+  errorUnauthorized: mockUnauthorizedError,
+  errorForbidden: mockForbiddenError,
+  mockUserWithPermissions,
+  mockAdminUser,
+};

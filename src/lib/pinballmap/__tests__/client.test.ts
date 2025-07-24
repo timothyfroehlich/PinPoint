@@ -1,6 +1,8 @@
 /**
- * Tests for PinballMap API client
+ * Tests for PinballMap API client (Vitest version)
  */
+
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 import { PinballMapClient, PinballMapError } from "../client";
 
@@ -51,7 +53,7 @@ describe("PinballMapClient", () => {
     it("should include error details in thrown exception", async () => {
       try {
         await client.fetchLocationMachineDetails(999999);
-        fail("Expected error to be thrown");
+        expect.fail("Expected error to be thrown");
       } catch (error) {
         expect(error).toBeInstanceOf(PinballMapError);
         const pinballMapError = error as PinballMapError;
@@ -75,7 +77,7 @@ describe("PinballMapClient", () => {
 
     it("should handle network errors", async () => {
       // Mock a network error
-      global.fetch = jest.fn().mockRejectedValue(new Error("Network error"));
+      global.fetch = vi.fn().mockRejectedValue(new Error("Network error"));
 
       await expect(client.fetchLocationDetails(26454)).rejects.toThrow(
         "Network error fetching location 26454",

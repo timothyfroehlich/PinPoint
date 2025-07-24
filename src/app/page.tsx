@@ -1,11 +1,11 @@
 "use client";
 
-import { useSession } from "next-auth/react";
 import { Box } from "@mui/material";
+import { useSession } from "next-auth/react";
 
-import { PublicDashboard } from "./_components/PublicDashboard";
 import { AuthenticatedDashboard } from "./_components/AuthenticatedDashboard";
 import { DevLoginCompact } from "./_components/DevLoginCompact";
+import { PublicDashboard } from "./_components/PublicDashboard";
 
 export default function HomePage(): React.ReactNode {
   const { data: session } = useSession();

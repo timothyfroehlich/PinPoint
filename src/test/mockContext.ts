@@ -1,61 +1,56 @@
-import { mockDeep, mockReset, type DeepMockProxy } from "jest-mock-extended";
+import { vi } from "vitest";
+import { mockDeep, mockReset, type DeepMockProxy } from "vitest-mock-extended";
 
 import type { ExtendedPrismaClient } from "~/server/db";
-import type { CollectionService } from "~/server/services/collectionService";
-import type { CommentCleanupService } from "~/server/services/commentCleanupService";
 import type { ServiceFactory } from "~/server/services/factory";
-import type { IssueActivityService } from "~/server/services/issueActivityService";
-import type { NotificationService } from "~/server/services/notificationService";
-import type { PinballMapService } from "~/server/services/pinballmapService";
-import type { QRCodeService } from "~/server/services/qrCodeService";
 
 // Mock individual services with all methods
-const mockNotificationService: jest.Mocked<NotificationService> = {
-  createNotification: jest.fn().mockResolvedValue(undefined),
-  getUserNotifications: jest.fn().mockResolvedValue([]),
-  getUnreadCount: jest.fn().mockResolvedValue(0),
-  markAsRead: jest.fn().mockResolvedValue(undefined),
-  markAllAsRead: jest.fn().mockResolvedValue(undefined),
-  notifyMachineOwnerOfIssue: jest.fn().mockResolvedValue(undefined),
-  notifyMachineOwnerOfStatusChange: jest.fn().mockResolvedValue(undefined),
-  notifyUserOfAssignment: jest.fn().mockResolvedValue(undefined),
-} as unknown as jest.Mocked<NotificationService>;
+const mockNotificationService: any = {
+  createNotification: vi.fn().mockResolvedValue(undefined),
+  getUserNotifications: vi.fn().mockResolvedValue([]),
+  getUnreadCount: vi.fn().mockResolvedValue(0),
+  markAsRead: vi.fn().mockResolvedValue(undefined),
+  markAllAsRead: vi.fn().mockResolvedValue(undefined),
+  notifyMachineOwnerOfIssue: vi.fn().mockResolvedValue(undefined),
+  notifyMachineOwnerOfStatusChange: vi.fn().mockResolvedValue(undefined),
+  notifyUserOfAssignment: vi.fn().mockResolvedValue(undefined),
+};
 
-const mockCollectionService: jest.Mocked<CollectionService> = {
+const mockCollectionService: any = {
   // Add collection service methods here when needed
-} as jest.Mocked<CollectionService>;
+};
 
-const mockIssueActivityService: jest.Mocked<IssueActivityService> = {
-  recordActivity: jest.fn().mockResolvedValue(undefined),
-  recordIssueCreated: jest.fn().mockResolvedValue(undefined),
-  recordStatusChange: jest.fn().mockResolvedValue(undefined),
-  recordAssignmentChange: jest.fn().mockResolvedValue(undefined),
-  recordFieldUpdate: jest.fn().mockResolvedValue(undefined),
-  recordCommentDeleted: jest.fn().mockResolvedValue(undefined),
-  getIssueTimeline: jest.fn().mockResolvedValue([]),
-} as unknown as jest.Mocked<IssueActivityService>;
+const mockIssueActivityService: any = {
+  recordActivity: vi.fn().mockResolvedValue(undefined),
+  recordIssueCreated: vi.fn().mockResolvedValue(undefined),
+  recordStatusChange: vi.fn().mockResolvedValue(undefined),
+  recordAssignmentChange: vi.fn().mockResolvedValue(undefined),
+  recordFieldUpdate: vi.fn().mockResolvedValue(undefined),
+  recordCommentDeleted: vi.fn().mockResolvedValue(undefined),
+  getIssueTimeline: vi.fn().mockResolvedValue([]),
+};
 
-const mockPinballMapService: jest.Mocked<PinballMapService> = {
+const mockPinballMapService: any = {
   // Add pinball map service methods here when needed
-} as jest.Mocked<PinballMapService>;
+};
 
-const mockCommentCleanupService: jest.Mocked<CommentCleanupService> = {
+const mockCommentCleanupService: any = {
   // Add comment cleanup service methods here when needed
-} as jest.Mocked<CommentCleanupService>;
+};
 
-const mockQRCodeService: jest.Mocked<QRCodeService> = {
+const mockQRCodeService: any = {
   // Add QR code service methods here when needed
-} as jest.Mocked<QRCodeService>;
+};
 
 // Mock service factory
 const createMockServiceFactory = (): DeepMockProxy<ServiceFactory> => {
   return {
-    createNotificationService: jest.fn(() => mockNotificationService),
-    createCollectionService: jest.fn(() => mockCollectionService),
-    createPinballMapService: jest.fn(() => mockPinballMapService),
-    createIssueActivityService: jest.fn(() => mockIssueActivityService),
-    createCommentCleanupService: jest.fn(() => mockCommentCleanupService),
-    createQRCodeService: jest.fn(() => mockQRCodeService),
+    createNotificationService: vi.fn(() => mockNotificationService),
+    createCollectionService: vi.fn(() => mockCollectionService),
+    createPinballMapService: vi.fn(() => mockPinballMapService),
+    createIssueActivityService: vi.fn(() => mockIssueActivityService),
+    createCommentCleanupService: vi.fn(() => mockCommentCleanupService),
+    createQRCodeService: vi.fn(() => mockQRCodeService),
   } as unknown as DeepMockProxy<ServiceFactory>;
 };
 
@@ -80,14 +75,16 @@ export interface MockContext {
 }
 
 export function createMockContext(): MockContext {
-  const mockDb = mockDeep<ExtendedPrismaClient>();
+  const mockDb: DeepMockProxy<ExtendedPrismaClient> =
+    mockDeep<ExtendedPrismaClient>();
   const mockServices = createMockServiceFactory();
 
   // Mock the $accelerate property that comes from Prisma Accelerate extension
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   mockDb.$accelerate = {
-    invalidate: jest.fn(),
-    ttl: jest.fn(),
-  } as any;
+    invalidate: vi.fn(),
+    ttl: vi.fn(),
+  } as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
   // Set up default membership mock - can be overridden in individual tests
   mockDb.membership.findFirst.mockResolvedValue(mockMembership);
@@ -102,17 +99,20 @@ export function createMockContext(): MockContext {
   // Set up default issue mock
   mockDb.issue.findMany.mockResolvedValue([mockIssue]);
   mockDb.issue.findUnique.mockResolvedValue(mockIssue);
+  mockDb.issue.findFirst.mockResolvedValue(mockIssue);
   mockDb.issue.create.mockResolvedValue(mockIssue);
   mockDb.issue.update.mockResolvedValue(mockIssue);
 
   // Set up default machine mock
   mockDb.machine.findMany.mockResolvedValue([mockMachine]);
   mockDb.machine.findUnique.mockResolvedValue(mockMachine);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   mockDb.machine.create.mockResolvedValue(mockMachine as any);
 
   // Set up default model mock
   mockDb.model.findMany.mockResolvedValue([mockModel]);
   mockDb.model.findUnique.mockResolvedValue(mockModel);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   mockDb.model.create.mockResolvedValue(mockModel as any);
 
   // Set up default notification mock
@@ -129,6 +129,25 @@ export function createMockContext(): MockContext {
     createdAt: new Date(),
   });
 
+  // Set up default comment mock
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+  mockDb.issueComment.create.mockResolvedValue({
+    id: "comment-1",
+    content: "Test comment",
+    isInternal: false,
+    issueId: "issue-1",
+    authorId: "user-1",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    deletedAt: null,
+  });
+
+  // Set up default status and priority mocks
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+  mockDb.status.findUnique.mockResolvedValue(mockStatus);
+
+  mockDb.priority.findUnique.mockResolvedValue(mockPriority);
+
   return {
     db: mockDb,
     services: mockServices,
@@ -142,12 +161,12 @@ export function resetMockContext(ctx: MockContext): void {
   mockReset(ctx.db);
   // Reset all service mocks
   Object.values(mockNotificationService).forEach((method) => {
-    if (jest.isMockFunction(method)) {
+    if (vi.isMockFunction(method)) {
       method.mockReset();
     }
   });
   Object.values(mockIssueActivityService).forEach((method) => {
-    if (jest.isMockFunction(method)) {
+    if (vi.isMockFunction(method)) {
       method.mockReset();
     }
   });
@@ -281,6 +300,7 @@ export const mockIssue = {
   resolvedAt: null,
   consistency: null,
   checklist: null,
+  comments: [],
 };
 
 export const mockRole = {
@@ -294,18 +314,13 @@ export const mockRole = {
   permissions: [
     {
       id: "perm-1",
-      name: "issue:view",
+      name: "issues:read",
       description: "View issues",
     },
     {
       id: "perm-2",
-      name: "issue:create",
-      description: "Create issues",
-    },
-    {
-      id: "perm-3",
-      name: "role:manage",
-      description: "Manage roles",
+      name: "issues:write",
+      description: "Create and edit issues",
     },
   ],
 };

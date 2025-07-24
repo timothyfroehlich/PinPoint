@@ -293,10 +293,30 @@ async function main() {
 
   // 9. Create models from comprehensive OPDB game data
   const comprehensiveOPDBGames = [
-    { opdb_id: "G43W4-MrRpw", name: "AC/DC (Premium)", manufacturer: "Stern", year: 2012 },
-    { opdb_id: "GBLLd-MdEON-A94po", name: "Ultraman: Kaiju Rumble (Blood Sucker Edition)", manufacturer: "Stern", year: 2023 },
-    { opdb_id: "G42Pk-MZe2e", name: "Xenon", manufacturer: "Bally", year: 1980 },
-    { opdb_id: "GrknN-MQrdv", name: "Cleopatra", manufacturer: "Gottlieb", year: 1977 },
+    {
+      opdb_id: "G43W4-MrRpw",
+      name: "AC/DC (Premium)",
+      manufacturer: "Stern",
+      year: 2012,
+    },
+    {
+      opdb_id: "GBLLd-MdEON-A94po",
+      name: "Ultraman: Kaiju Rumble (Blood Sucker Edition)",
+      manufacturer: "Stern",
+      year: 2023,
+    },
+    {
+      opdb_id: "G42Pk-MZe2e",
+      name: "Xenon",
+      manufacturer: "Bally",
+      year: 1980,
+    },
+    {
+      opdb_id: "GrknN-MQrdv",
+      name: "Cleopatra",
+      manufacturer: "Gottlieb",
+      year: 1977,
+    },
     // Add more games as needed from the sample-issues.json
   ];
 
@@ -346,7 +366,7 @@ async function main() {
           locationId: austinPinballLocation.id,
           modelId: model.id,
           ownerId: owner.id,
-          qrCodeId: `qr-${model.name.toLowerCase().replace(/\s+/g, '-')}-${i + 1}`,
+          qrCodeId: `qr-${model.name.toLowerCase().replace(/\s+/g, "-")}-${i + 1}`,
         },
       });
       console.log(`[DEV] Created machine: ${model.name} #${i + 1}`);
@@ -407,8 +427,10 @@ async function main() {
 
     if (machine) {
       // Find the creator
-      const creator = createdUsers.find((u) => u.email === issueData.reporterEmail);
-      
+      const creator = createdUsers.find(
+        (u) => u.email === issueData.reporterEmail,
+      );
+
       // Find the status
       const status = await prisma.issueStatus.findFirst({
         where: {

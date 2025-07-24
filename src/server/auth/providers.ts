@@ -4,8 +4,8 @@ import Google from "next-auth/providers/google";
 import { isValidUser } from "./types";
 import { assertOAuthConfigValid } from "./validation";
 
-import type { Provider } from "next-auth/providers";
 import type { User } from "next-auth";
+import type { Provider } from "next-auth/providers";
 import type { ExtendedPrismaClient } from "~/server/db";
 
 import { env } from "~/env.js";

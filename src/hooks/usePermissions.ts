@@ -1,11 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
 import { useCallback, useMemo } from "react";
 
+import { usePermissionDependencies } from "~/contexts/PermissionDepsContext";
 import { getPermissionDescription } from "~/lib/permissions/descriptions";
-import { api } from "~/trpc/react";
 
 /**
  * Permission check function type
@@ -37,6 +36,9 @@ export interface UsePermissionsReturn {
  *
  * This hook centralizes permission checking logic and integrates with the tRPC
  * organization context to provide real-time permission information.
+ *
+ * Uses dependency injection via PermissionDepsContext to allow for easier testing
+ * while maintaining production functionality.
  *
  * @example Basic usage
  * ```tsx
@@ -72,9 +74,23 @@ export interface UsePermissionsReturn {
  *   );
  * }
  * ```
+ *
+ * @example Testing with dependency injection
+ * ```tsx
+ * // In tests, wrap with PermissionDepsProvider to inject mocks
+ * <PermissionDepsProvider
+ *   sessionHook={() => ({ data: mockSession, status: "authenticated" })}
+ *   membershipQuery={() => ({ data: mockMembership, isLoading: false })}
+ * >
+ *   <ComponentUnderTest />
+ * </PermissionDepsProvider>
+ * ```
  */
 export function usePermissions(): UsePermissionsReturn {
-  const { data: session, status } = useSession();
+  // Get dependencies from context (allows injection in tests)
+  const { sessionHook, membershipQuery } = usePermissionDependencies();
+
+  const { data: session, status } = sessionHook();
   const isAuthenticated = status === "authenticated" && !!session;
 
   // Get current membership and permissions (only if authenticated)
@@ -82,7 +98,7 @@ export function usePermissions(): UsePermissionsReturn {
     data: membership,
     isLoading,
     isError,
-  } = api.user.getCurrentMembership.useQuery(undefined, {
+  } = membershipQuery(undefined, {
     enabled: isAuthenticated,
   });
 

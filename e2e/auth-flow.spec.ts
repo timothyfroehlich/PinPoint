@@ -5,15 +5,28 @@ test.describe("Authentication Flow", () => {
   test.beforeEach(async ({ page }) => {
     // Start fresh for each test
     await logout(page);
-  });
-
-  test("should load the homepage when not authenticated", async ({ page }) => {
     await page.goto("/");
 
-    // Should see the login UI
+    // Clear any existing sessions
+    await page.evaluate(() => {
+      localStorage.clear();
+      sessionStorage.clear();
+    });
+
+    // Wait for page to load completely
+    await page.waitForLoadState("networkidle");
+  });
+
+  test("should load the unified homepage/dashboard when not authenticated", async ({
+    page,
+  }) => {
+    // Page already loaded in beforeEach
+
+    // Should see the page title
     await expect(page).toHaveTitle(/PinPoint/);
 
-    // Should see Dev Quick Login in development
+    // Should see public content (not authenticated dashboard content)
+    // and Dev Quick Login in development
     await expect(page.locator('text="Dev Quick Login"')).toBeVisible();
 
     // Click to expand dev login options and verify quick login works
@@ -28,61 +41,68 @@ test.describe("Authentication Flow", () => {
       page.locator("button", { hasText: "Test Player" }),
     ).toBeVisible();
 
-    // Should also see the email login form
-    await expect(page.locator('text="Welcome to PinPoint"')).toBeVisible();
+    // Should also see the sign in button and organization content
+    await expect(page.locator('button:has-text("Sign In")')).toBeVisible();
     await expect(
-      page.locator("button", { hasText: "Continue with Email" }),
+      page.locator("h1", { hasText: "Austin Pinball Collective" }),
     ).toBeVisible();
   });
 
-  test("should authenticate as admin and access dashboard", async ({
+  test("should authenticate as admin and see authenticated dashboard content", async ({
     page,
   }) => {
     // Use dev quick login for admin
-    await page.goto("/");
     await page.locator('text="Dev Quick Login"').click();
     await page.locator('button:has-text("Test Admin")').click();
 
-    // Should be redirected to dashboard
-    await expect(page).toHaveURL(/\/dashboard/);
+    // Wait for authentication to complete - look for authenticated content
+    // Authentication involves a page reload, so wait longer
+    await expect(page.locator('text="My Dashboard"')).toBeVisible({
+      timeout: 10000,
+    });
+
+    // Should stay on homepage (now showing authenticated content)
+    await expect(page).toHaveURL(/\/$/);
     await expect(page).toHaveTitle(/PinPoint/);
 
     // Should see main navigation (PinPoint logo is nested inside link)
     await expect(page.locator('text="PinPoint"')).toBeVisible();
-    await expect(
-      page.locator("button", { hasText: "Dashboard" }),
-    ).toBeVisible();
     await expect(page.locator("button", { hasText: "Issues" })).toBeVisible();
     await expect(page.locator("button", { hasText: "Games" })).toBeVisible();
+    await expect(page.locator('a:has-text("Home")')).toBeVisible();
 
     // Should see user account button
     await expect(
       page.locator('button[aria-label="account of current user"]'),
     ).toBeVisible();
 
-    // Basic verification - should see dashboard content
-    await expect(page.locator('text="Dashboard"').first()).toBeVisible();
+    // Should see authenticated dashboard content
+    await expect(page.locator('text="My Dashboard"')).toBeVisible();
+    await expect(page.locator('text="My Open Issues"')).toBeVisible();
   });
 
   test("should authenticate as member with standard permissions", async ({
     page,
   }) => {
     // Use dev quick login for member
-    await page.goto("/");
     await page.locator('text="Dev Quick Login"').click();
     await page.locator('button:has-text("Test Member")').click();
 
-    // Should be redirected to dashboard
-    await expect(page).toHaveURL(/\/dashboard/);
+    // Wait for authentication to complete - look for authenticated content
+    // Authentication involves a page reload, so wait longer
+    await expect(page.locator('text="My Dashboard"')).toBeVisible({
+      timeout: 10000,
+    });
+
+    // Should stay on homepage (now showing authenticated content)
+    await expect(page).toHaveURL(/\/$/);
     await expect(page).toHaveTitle(/PinPoint/);
 
     // Should see same navigation as admin (UI permissions are likely handled differently)
     await expect(page.locator('text="PinPoint"')).toBeVisible();
-    await expect(
-      page.locator("button", { hasText: "Dashboard" }),
-    ).toBeVisible();
     await expect(page.locator("button", { hasText: "Issues" })).toBeVisible();
     await expect(page.locator("button", { hasText: "Games" })).toBeVisible();
+    await expect(page.locator('a:has-text("Home")')).toBeVisible();
 
     // Should see user account button
     await expect(
@@ -94,19 +114,22 @@ test.describe("Authentication Flow", () => {
     page,
   }) => {
     // Use dev quick login for player
-    await page.goto("/");
     await page.locator('text="Dev Quick Login"').click();
     await page.locator('button:has-text("Test Player")').click();
 
-    // Should be redirected to dashboard
-    await expect(page).toHaveURL(/\/dashboard/);
+    // Wait for authentication to complete - look for authenticated content
+    // Authentication involves a page reload, so wait longer
+    await expect(page.locator('text="My Dashboard"')).toBeVisible({
+      timeout: 10000,
+    });
+
+    // Should stay on homepage (now showing authenticated content)
+    await expect(page).toHaveURL(/\/$/);
     await expect(page).toHaveTitle(/PinPoint/);
 
     // Should see basic navigation
     await expect(page.locator('text="PinPoint"')).toBeVisible();
-    await expect(
-      page.locator("button", { hasText: "Dashboard" }),
-    ).toBeVisible();
+    await expect(page.locator('a:has-text("Home")')).toBeVisible();
 
     // Player may have more restricted access
     await expect(
@@ -116,12 +139,15 @@ test.describe("Authentication Flow", () => {
 
   test("should handle logout properly", async ({ page }) => {
     // Login as admin
-    await page.goto("/");
     await page.locator('text="Dev Quick Login"').click();
     await page.locator('button:has-text("Test Admin")').click();
 
-    // Verify logged in state
-    await expect(page).toHaveURL(/\/dashboard/);
+    // Wait for authentication to complete
+    await page.waitForTimeout(3000);
+    await expect(page.locator('text="My Dashboard"')).toBeVisible();
+
+    // Verify logged in state (stays on homepage with authenticated content)
+    await expect(page).toHaveURL(/\/$/);
 
     // Perform logout via user menu
     await page.locator('button[aria-label="account of current user"]').click();
@@ -130,10 +156,12 @@ test.describe("Authentication Flow", () => {
     // Wait a moment for logout to complete
     await page.waitForTimeout(2000);
 
-    // The logout worked - the test is whether something changed on the page
-    // This could be a permission error, redirect, or content change
-    const currentUrl = page.url();
-    expect(currentUrl).toBeDefined(); // Simple assertion - logout completed without crashing
+    // Should now see the sign in button again (back to unauthenticated state)
+    await expect(page.locator('button:has-text("Sign In")')).toBeVisible();
+    // Should not see the user account button
+    await expect(
+      page.locator('button[aria-label="account of current user"]'),
+    ).not.toBeVisible();
   });
 
   test("should maintain session across page reloads", async ({ page }) => {

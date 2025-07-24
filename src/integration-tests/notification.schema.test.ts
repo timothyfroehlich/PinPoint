@@ -1,4 +1,5 @@
 import { PrismaClient, NotificationType } from "@prisma/client";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 
 describe("Notification schema integration", () => {
   let prisma: PrismaClient;

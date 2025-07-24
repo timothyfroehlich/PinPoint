@@ -1,15 +1,14 @@
-/**
- * @jest-environment jsdom
- */
 import { render, screen } from "@testing-library/react";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import "@testing-library/jest-dom/vitest";
 
 import { PermissionGate } from "../PermissionGate";
 
 describe("PermissionGate", () => {
-  const mockHasPermission = jest.fn();
+  const mockHasPermission = vi.fn();
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe("Basic Permission Checking", () => {
@@ -86,7 +85,7 @@ describe("PermissionGate", () => {
     it("should not render fallback when showFallback is true but no fallback is provided", () => {
       mockHasPermission.mockReturnValue(false);
 
-      render(
+      const { container } = render(
         <PermissionGate
           permission="test:permission"
           hasPermission={mockHasPermission}
@@ -97,7 +96,7 @@ describe("PermissionGate", () => {
       );
 
       expect(screen.queryByTestId("protected-content")).not.toBeInTheDocument();
-      expect(document.body).toBeEmptyDOMElement();
+      expect(container.firstChild).toBeNull();
     });
 
     it("should render children instead of fallback when permission is granted", () => {
@@ -248,7 +247,7 @@ describe("PermissionGate", () => {
     it("should handle null children gracefully", () => {
       mockHasPermission.mockReturnValue(true);
 
-      render(
+      const { container } = render(
         <PermissionGate
           permission="test:permission"
           hasPermission={mockHasPermission}
@@ -258,13 +257,13 @@ describe("PermissionGate", () => {
       );
 
       // Should not crash and render nothing
-      expect(document.body).toBeEmptyDOMElement();
+      expect(container.firstChild).toBeNull();
     });
 
     it("should handle undefined children gracefully", () => {
       mockHasPermission.mockReturnValue(true);
 
-      render(
+      const { container } = render(
         <PermissionGate
           permission="test:permission"
           hasPermission={mockHasPermission}
@@ -274,13 +273,13 @@ describe("PermissionGate", () => {
       );
 
       // Should not crash and render nothing
-      expect(document.body).toBeEmptyDOMElement();
+      expect(container.firstChild).toBeNull();
     });
 
     it("should handle false children gracefully", () => {
       mockHasPermission.mockReturnValue(true);
 
-      render(
+      const { container } = render(
         <PermissionGate
           permission="test:permission"
           hasPermission={mockHasPermission}
@@ -290,7 +289,7 @@ describe("PermissionGate", () => {
       );
 
       // Should not crash and render nothing
-      expect(document.body).toBeEmptyDOMElement();
+      expect(container.firstChild).toBeNull();
     });
 
     it("should handle string children", () => {

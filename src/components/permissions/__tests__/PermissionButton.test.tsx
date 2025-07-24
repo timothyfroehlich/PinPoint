@@ -1,18 +1,16 @@
-/**
- * @jest-environment jsdom
- */
-
-import "@testing-library/jest-dom";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import * as React from "react";
 import { createRef } from "react";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+
+import "@testing-library/jest-dom/vitest";
 
 import { PermissionButton } from "../PermissionButton";
 
 // Mock MUI components to avoid complex setup
-jest.mock("@mui/material", () => ({
-  Button: jest.fn<
+vi.mock("@mui/material", () => ({
+  Button: vi.fn<
     React.JSX.Element,
     [
       {
@@ -35,7 +33,7 @@ jest.mock("@mui/material", () => ({
       {children}
     </button>
   )),
-  Tooltip: jest.fn<
+  Tooltip: vi.fn<
     React.JSX.Element,
     [{ children: React.ReactNode; title: string }]
   >(({ children, title }) => (
@@ -46,7 +44,7 @@ jest.mock("@mui/material", () => ({
 }));
 
 // Mock permission constants
-jest.mock("~/server/auth/permissions.constants", () => ({
+vi.mock("~/server/auth/permissions.constants", () => ({
   PERMISSION_DESCRIPTIONS: {
     "issue:edit": "Edit existing issues",
     "issue:delete": "Delete issues",
@@ -54,8 +52,8 @@ jest.mock("~/server/auth/permissions.constants", () => ({
 }));
 
 describe("PermissionButton", () => {
-  const mockHasPermission = jest.fn<boolean, [string]>();
-  const mockOnClick = jest.fn();
+  const mockHasPermission = vi.fn<[string], boolean>();
+  const mockOnClick = vi.fn();
 
   const defaultProps = {
     permission: "issue:edit",
@@ -65,7 +63,7 @@ describe("PermissionButton", () => {
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe("when user has permission", () => {

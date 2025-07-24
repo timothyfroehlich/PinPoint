@@ -2,7 +2,10 @@
 import { beforeAll, afterAll, afterEach } from "vitest";
 
 // Determine environment and load appropriate setup
-const isJsdom = typeof window !== "undefined";
+const _isJsdom = typeof window !== "undefined";
+
+// Temporarily revert MSW polyfills to focus on core issue
+// Will implement direct tRPC mocking instead of MSW HTTP interception
 
 // Common setup for both environments
 beforeAll(() => {
@@ -16,24 +19,22 @@ beforeAll(() => {
   process.env.GOOGLE_CLIENT_SECRET = "test-google-client-secret";
 });
 
-// MSW setup (works in Node environment for server tests)
-if (!isJsdom) {
-  const { server } = await import("./msw/setup");
+// MSW setup for both Node and jsdom environments
+const { server } = await import("./msw/setup");
 
-  beforeAll(() => {
-    server.listen({
-      onUnhandledRequest: "warn", // Warn on unhandled requests
-    });
+beforeAll(() => {
+  server.listen({
+    onUnhandledRequest: "warn", // Warn on unhandled requests
   });
+});
 
-  afterEach(() => {
-    server.resetHandlers();
-  });
+afterEach(() => {
+  server.resetHandlers();
+});
 
-  afterAll(() => {
-    server.close();
-  });
-}
+afterAll(() => {
+  server.close();
+});
 
 afterEach(() => {
   // Cleanup after each test

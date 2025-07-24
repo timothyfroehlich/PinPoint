@@ -1,6 +1,4 @@
-/**
- * @jest-environment node
- */
+import { describe, it, expect } from "vitest";
 
 import {
   PERMISSION_DESCRIPTIONS,

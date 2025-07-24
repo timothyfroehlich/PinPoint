@@ -11,14 +11,14 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { httpBatchStreamLink, loggerLink } from "@trpc/client";
 import { SessionProvider } from "next-auth/react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import superjson from "superjson";
 
 import type { User, NotificationFrequency } from "@prisma/client";
+import type { Session } from "next-auth";
 import type { ReactNode } from "react";
 
-import { mockUserWithPermissions } from "~/test/msw/handlers";
-import { server } from "~/test/msw/setup";
+import { PermissionDepsProvider } from "~/contexts/PermissionDepsContext";
 import { api } from "~/trpc/react";
 
 // Mock data factories following Vitest patterns
@@ -72,11 +72,38 @@ function createMockMembership(
 }
 
 /**
- * Sets up MSW handlers for the test with proper MSW-tRPC integration
+ * Creates mock session hook for testing
  */
-function setupMSWHandlers(permissions: string[] = []): void {
-  // Use the existing MSW-tRPC handler for mocking permissions
-  server.use(mockUserWithPermissions(permissions));
+function createMockSessionHook(session: Session | null) {
+  return () => ({
+    data: session,
+    status: session ? "authenticated" : "unauthenticated",
+    update: () => Promise.resolve(session),
+  });
+}
+
+/**
+ * Creates mock membership query for testing
+ */
+function createMockMembershipQuery(
+  permissions: string[] = [],
+  role = "Member",
+  options: {
+    isLoading?: boolean;
+    isError?: boolean;
+    error?: Error | null;
+  } = {},
+) {
+  return () => ({
+    data:
+      permissions.length > 0
+        ? { permissions, role, userId: "test-user", organizationId: "test-org" }
+        : null,
+    isLoading: options.isLoading ?? false,
+    isError: options.isError ?? false,
+    error: options.error ?? null,
+    refetch: () => Promise.resolve({ data: null }),
+  });
 }
 
 /**
@@ -118,8 +145,18 @@ interface VitestTestWrapperProps {
   } | null;
   /** Mock user permissions for testing permission-based components */
   userPermissions?: string[] | undefined;
-  /** Override MSW setup - if false, no MSW handlers will be set up */
+  /** Mock user role for testing role-based logic */
+  userRole?: string;
+  /** Override MSW setup - if false, no MSW handlers will be set up (deprecated - use permission injection) */
   setupMSW?: boolean;
+  /** Whether to provide permission dependency injection (defaults to true) */
+  injectPermissionDeps?: boolean;
+  /** Mock query state options */
+  queryOptions?: {
+    isLoading?: boolean;
+    isError?: boolean;
+    error?: Error | null;
+  };
 }
 
 export function VitestTestWrapper({
@@ -129,7 +166,10 @@ export function VitestTestWrapper({
     expires: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(),
   },
   userPermissions = [],
-  setupMSW = true,
+  userRole = "Member",
+  _setupMSW = false, // Deprecated in favor of permission injection
+  injectPermissionDeps = true,
+  queryOptions = {},
 }: VitestTestWrapperProps): React.JSX.Element {
   const [queryClient] = useState(
     () =>
@@ -146,15 +186,17 @@ export function VitestTestWrapper({
   );
 
   // Create a real tRPC client - MSW will intercept HTTP requests
-  const [trpcClient] = useState(() =>
-    api.createClient({
+  const [trpcClient] = useState(() => {
+    const url = `http://localhost:${process.env.PORT ?? "3000"}/api/trpc`;
+    console.log(`[VitestTestWrapper] Creating tRPC client with URL: ${url}`);
+    return api.createClient({
       links: [
         loggerLink({
-          enabled: () => false, // Disable logging in tests
+          enabled: () => true, // Enable logging to see requests
         }),
         httpBatchStreamLink({
           transformer: superjson,
-          url: `http://localhost:${process.env.PORT ?? "3000"}/api/trpc`,
+          url,
           headers: () => {
             const headers = new Headers();
             headers.set("x-trpc-source", "vitest-test");
@@ -162,17 +204,18 @@ export function VitestTestWrapper({
           },
         }),
       ],
-    }),
+    });
+  });
+
+  // Create mock dependencies for permission injection
+  const mockSessionHook = createMockSessionHook(session);
+  const mockMembershipQuery = createMockMembershipQuery(
+    userPermissions,
+    userRole,
+    queryOptions,
   );
 
-  // Set up MSW handlers for this test
-  useEffect(() => {
-    if (setupMSW) {
-      setupMSWHandlers(userPermissions);
-    }
-  }, [userPermissions, setupMSW]);
-
-  return (
+  const content = (
     <QueryClientProvider client={queryClient}>
       <SessionProvider session={session}>
         <api.Provider client={trpcClient} queryClient={queryClient}>
@@ -181,6 +224,20 @@ export function VitestTestWrapper({
       </SessionProvider>
     </QueryClientProvider>
   );
+
+  // Wrap with permission dependency injection if enabled
+  if (injectPermissionDeps) {
+    return (
+      <PermissionDepsProvider
+        sessionHook={mockSessionHook}
+        membershipQuery={mockMembershipQuery}
+      >
+        {content}
+      </PermissionDepsProvider>
+    );
+  }
+
+  return content;
 }
 
 // Pre-defined permission scenarios for common test cases
@@ -190,6 +247,7 @@ export const VITEST_PERMISSION_SCENARIOS = {
     "issue:create",
     "issue:update",
     "issue:delete",
+    "issue:assign",
     "machine:view",
     "machine:create",
     "machine:update",
@@ -198,6 +256,12 @@ export const VITEST_PERMISSION_SCENARIOS = {
     "location:create",
     "location:update",
     "location:delete",
+    "organization:admin", // Added missing permission that tests expect
+    "organization:manage",
+    "role:manage",
+    "user:manage",
+    "attachment:create",
+    "attachment:delete",
   ],
   MANAGER: [
     "issue:view",
@@ -210,6 +274,14 @@ export const VITEST_PERMISSION_SCENARIOS = {
   ],
   MEMBER: ["issue:view", "issue:create", "machine:view"],
   PUBLIC: [],
+} as const;
+
+// Role mapping for permission scenarios
+export const VITEST_ROLE_MAPPING = {
+  ADMIN: "Admin",
+  MANAGER: "Manager",
+  MEMBER: "Member",
+  PUBLIC: "Public",
 } as const;
 
 // Export helper functions for use in tests

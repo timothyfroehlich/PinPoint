@@ -1,4 +1,5 @@
-import "@testing-library/jest-dom";
+import "@testing-library/jest-dom/vitest";
+import { vi } from "vitest";
 
 // Mock environment variables for testing
 Object.defineProperty(process.env, "NODE_ENV", {
@@ -20,10 +21,10 @@ process.env.VERCEL_URL = "";
 process.env.PORT = "3000";
 
 // Mock fetch globally for tests
-global.fetch = jest.fn();
+global.fetch = vi.fn();
 
 // Mock env.js module to prevent server-side environment access in client tests
-jest.mock("~/env.js", () => ({
+vi.mock("~/env.js", () => ({
   env: {
     NODE_ENV: "test",
     GOOGLE_CLIENT_ID: "test-google-client-id",
@@ -42,176 +43,164 @@ jest.mock("~/env.js", () => ({
 
 // Create a mock Prisma client
 const mockPrismaClient = {
-  $disconnect: jest.fn().mockResolvedValue(undefined),
+  $disconnect: vi.fn().mockResolvedValue(undefined),
   organization: {
-    findMany: jest.fn(),
-    findFirst: jest.fn(),
-    findUnique: jest.fn(),
-    create: jest.fn(),
-    update: jest.fn(),
-    delete: jest.fn(),
+    findMany: vi.fn(),
+    findFirst: vi.fn(),
+    findUnique: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
   },
   user: {
-    findMany: jest.fn(),
-    findFirst: jest.fn(),
-    findUnique: jest.fn(),
-    create: jest.fn(),
-    update: jest.fn(),
-    delete: jest.fn(),
+    findMany: vi.fn(),
+    findFirst: vi.fn(),
+    findUnique: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
   },
   membership: {
-    findMany: jest.fn(),
-    findFirst: jest.fn(),
-    findUnique: jest.fn(),
-    create: jest.fn(),
-    update: jest.fn(),
-    delete: jest.fn(),
+    findMany: vi.fn(),
+    findFirst: vi.fn(),
+    findUnique: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
   },
   issue: {
-    findMany: jest.fn(),
-    findFirst: jest.fn(),
-    findUnique: jest.fn(),
-    create: jest.fn(),
-    update: jest.fn(),
-    delete: jest.fn(),
-    count: jest.fn(),
+    findMany: vi.fn(),
+    findFirst: vi.fn(),
+    findUnique: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+    count: vi.fn(),
   },
   machine: {
-    findMany: jest.fn(),
-    findFirst: jest.fn(),
-    findUnique: jest.fn(),
-    create: jest.fn(),
-    update: jest.fn(),
-    delete: jest.fn(),
+    findMany: vi.fn(),
+    findFirst: vi.fn(),
+    findUnique: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
   },
   location: {
-    findMany: jest.fn(),
-    findFirst: jest.fn(),
-    findUnique: jest.fn(),
-    create: jest.fn(),
-    update: jest.fn(),
-    delete: jest.fn(),
+    findMany: vi.fn(),
+    findFirst: vi.fn(),
+    findUnique: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
   },
   attachment: {
-    findMany: jest.fn(),
-    findFirst: jest.fn(),
-    findUnique: jest.fn(),
-    create: jest.fn(),
-    update: jest.fn(),
-    delete: jest.fn(),
-    count: jest.fn(),
+    findMany: vi.fn(),
+    findFirst: vi.fn(),
+    findUnique: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+    count: vi.fn(),
   },
   model: {
-    findMany: jest.fn(),
-    findFirst: jest.fn(),
-    findUnique: jest.fn(),
-    create: jest.fn(),
-    update: jest.fn(),
-    delete: jest.fn(),
+    findMany: vi.fn(),
+    findFirst: vi.fn(),
+    findUnique: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
   },
   issueStatus: {
-    findMany: jest.fn(),
-    findFirst: jest.fn(),
-    findUnique: jest.fn(),
-    create: jest.fn(),
-    update: jest.fn(),
-    delete: jest.fn(),
+    findMany: vi.fn(),
+    findFirst: vi.fn(),
+    findUnique: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
   },
   priority: {
-    findMany: jest.fn(),
-    findFirst: jest.fn(),
-    findUnique: jest.fn(),
-    create: jest.fn(),
-    update: jest.fn(),
-    delete: jest.fn(),
+    findMany: vi.fn(),
+    findFirst: vi.fn(),
+    findUnique: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
   },
   issueHistory: {
-    findMany: jest.fn(),
-    findFirst: jest.fn(),
-    findUnique: jest.fn(),
-    create: jest.fn(),
-    update: jest.fn(),
-    delete: jest.fn(),
+    findMany: vi.fn(),
+    findFirst: vi.fn(),
+    findUnique: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
   },
   notification: {
-    findMany: jest.fn(),
-    findFirst: jest.fn(),
-    findUnique: jest.fn(),
-    create: jest.fn(),
-    update: jest.fn(),
-    delete: jest.fn(),
+    findMany: vi.fn(),
+    findFirst: vi.fn(),
+    findUnique: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
   },
   pinballMapConfig: {
-    findMany: jest.fn(),
-    findFirst: jest.fn(),
-    findUnique: jest.fn(),
-    create: jest.fn(),
-    update: jest.fn(),
-    delete: jest.fn(),
-    upsert: jest.fn(),
+    findMany: vi.fn(),
+    findFirst: vi.fn(),
+    findUnique: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+    upsert: vi.fn(),
   },
 };
 
 // Mock database module
-jest.mock("~/server/db", () => ({
-  createPrismaClient: jest.fn().mockReturnValue(mockPrismaClient),
+vi.mock("~/server/db", () => ({
+  createPrismaClient: vi.fn().mockReturnValue(mockPrismaClient),
 }));
 
 // Mock database provider
 const mockDatabaseProvider = {
-  getClient: jest.fn().mockReturnValue(mockPrismaClient),
-  disconnect: jest.fn().mockResolvedValue(undefined),
-  reset: jest.fn(),
+  getClient: vi.fn().mockReturnValue(mockPrismaClient),
+  disconnect: vi.fn().mockResolvedValue(undefined),
+  reset: vi.fn(),
 };
 
-jest.mock("~/server/db/provider", () => ({
-  DatabaseProvider: jest.fn().mockImplementation(() => mockDatabaseProvider),
-  getGlobalDatabaseProvider: jest.fn().mockReturnValue(mockDatabaseProvider),
+vi.mock("~/server/db/provider", () => ({
+  DatabaseProvider: vi.fn().mockImplementation(() => mockDatabaseProvider),
+  getGlobalDatabaseProvider: vi.fn().mockReturnValue(mockDatabaseProvider),
 }));
 
 // Mock NextAuth first to avoid import issues
-jest.mock("next-auth", () => {
-  return jest.fn().mockImplementation(() => ({
-    auth: jest.fn(),
-    handlers: { GET: jest.fn(), POST: jest.fn() },
-    signIn: jest.fn(),
-    signOut: jest.fn(),
+vi.mock("next-auth", () => {
+  return vi.fn().mockImplementation(() => ({
+    auth: vi.fn(),
+    handlers: { GET: vi.fn(), POST: vi.fn() },
+    signIn: vi.fn(),
+    signOut: vi.fn(),
   }));
 });
 
 // Mock NextAuth React hooks
-jest.mock("next-auth/react", () => ({
-  useSession: jest.fn(() => ({
+vi.mock("next-auth/react", () => ({
+  useSession: vi.fn(() => ({
     data: null,
     status: "loading",
   })),
-  signIn: jest.fn(),
-  signOut: jest.fn(),
-  SessionProvider: jest.fn(({ children, session }) => {
-    // Mock the SessionProvider to provide the session via React context
-    const { createContext, useContext } = jest.requireActual("react");
-    const SessionContext = createContext({
-      data: session,
-      status: session ? "authenticated" : "unauthenticated",
-    });
-
-    // Override useSession when inside SessionProvider
-    jest.mocked(jest.requireActual("next-auth/react")).useSession = jest.fn(
-      () => useContext(SessionContext),
-    );
-
-    return children;
-  }),
+  signIn: vi.fn(),
+  signOut: vi.fn(),
+  SessionProvider: vi.fn(
+    ({ children }: { children: React.ReactNode }) => children,
+  ),
 }));
 
 // Mock tRPC to prevent server-side imports
-jest.mock("~/trpc/react", () => ({
+vi.mock("~/trpc/react", () => ({
   api: {
-    Provider: jest.fn(({ children }) => children),
-    createClient: jest.fn(() => ({})),
+    Provider: vi.fn(({ children }: { children: React.ReactNode }) => children),
+    createClient: vi.fn(() => ({})),
     user: {
       getCurrentMembership: {
-        useQuery: jest.fn(() => ({
+        useQuery: vi.fn(() => ({
           data: null,
           isLoading: false,
           error: null,
@@ -222,24 +211,28 @@ jest.mock("~/trpc/react", () => ({
 }));
 
 // Mock Next.js server APIs for tests
-global.Request = jest.fn().mockImplementation((input, init) => ({
-  url: input,
-  method: init?.method ?? "GET",
-  headers: new Map(Object.entries(init?.headers ?? {})),
-  json: jest.fn().mockResolvedValue({}),
-  text: jest.fn().mockResolvedValue(""),
-}));
+global.Request = vi
+  .fn()
+  .mockImplementation((input: string, init?: RequestInit) => ({
+    url: input,
+    method: init?.method ?? "GET",
+    headers: new Map(Object.entries(init?.headers ?? {})),
+    json: vi.fn().mockResolvedValue({}),
+    text: vi.fn().mockResolvedValue(""),
+  })) as unknown as typeof Request;
 
 global.Response = {
-  json: jest.fn().mockResolvedValue({}),
-  error: jest.fn(),
-  redirect: jest.fn(),
-  new: jest.fn().mockImplementation((body, init) => ({
-    ok: true,
-    status: init?.status ?? 200,
-    json: jest.fn().mockResolvedValue(body),
-    text: jest.fn().mockResolvedValue(String(body)),
-  })),
+  json: vi.fn().mockResolvedValue({}),
+  error: vi.fn(),
+  redirect: vi.fn(),
+  new: vi
+    .fn()
+    .mockImplementation((body?: BodyInit | null, init?: ResponseInit) => ({
+      ok: true,
+      status: init?.status ?? 200,
+      json: vi.fn().mockResolvedValue(body),
+      text: vi.fn().mockResolvedValue(body ? JSON.stringify(body) : ""),
+    })),
 } as unknown as {
   new (body?: BodyInit | null, init?: ResponseInit): Response;
   prototype: Response;
@@ -249,10 +242,10 @@ global.Response = {
 };
 
 // Mock NextResponse
-jest.mock("next/server", () => ({
+vi.mock("next/server", () => ({
   NextResponse: {
-    json: jest.fn().mockImplementation((data, init) => ({
-      json: jest.fn().mockResolvedValue(data),
+    json: vi.fn().mockImplementation((data: unknown, init?: ResponseInit) => ({
+      json: vi.fn().mockResolvedValue(data),
       status: init?.status ?? 200,
     })),
   },
@@ -260,5 +253,5 @@ jest.mock("next/server", () => ({
 
 // Reset all mocks after each test
 afterEach(() => {
-  jest.clearAllMocks();
+  vi.clearAllMocks();
 });

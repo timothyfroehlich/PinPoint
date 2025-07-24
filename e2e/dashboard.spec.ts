@@ -7,15 +7,18 @@ test("has title", async ({ page }) => {
   await expect(page).toHaveTitle(/PinPoint/);
 });
 
-test("login modal is visible", async ({ page }) => {
+test("public dashboard content is visible when not authenticated", async ({
+  page,
+}) => {
   await page.goto("/");
 
-  // Expect the login modal to be visible
-  await expect(page.getByText("Welcome to PinPoint")).toBeVisible();
+  // Expect the public organization content to be visible
   await expect(
-    page.getByText("Enter your email to receive a magic link."),
+    page.locator('h1:has-text("Austin Pinball Collective")'),
   ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Continue with Email" }),
-  ).toBeVisible();
+  await expect(page.getByText("Browse our pinball locations")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign In" })).toBeVisible();
+
+  // Should also see Dev Quick Login in development
+  await expect(page.getByText("Dev Quick Login")).toBeVisible();
 });

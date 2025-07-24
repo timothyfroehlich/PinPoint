@@ -15,7 +15,11 @@ import {
  * Test permission scenarios for a given operation
  * Returns test cases with expected outcomes
  */
-export function getPermissionTestScenarios(requiredPermission: string) {
+export function getPermissionTestScenarios(requiredPermission: string): {
+  name: string;
+  permissions: string[];
+  shouldPass: boolean;
+}[] {
   return [
     {
       name: "should allow access with required permission",
@@ -44,7 +48,12 @@ export function getPermissionTestScenarios(requiredPermission: string) {
  * Test role-based access scenarios
  * Returns test cases for different role types
  */
-export function getRoleTestScenarios(requiredPermission: string) {
+export function getRoleTestScenarios(requiredPermission: string): {
+  roleName: string;
+  permissions: string[];
+  shouldPass: boolean;
+  description: string;
+}[] {
   const matrix = PermissionMatrixFactory.createMatrix();
 
   return Object.entries(matrix).map(([roleName, permissions]) => ({
@@ -59,7 +68,12 @@ export function getRoleTestScenarios(requiredPermission: string) {
  * Test multi-tenant isolation scenarios
  * Returns test cases for cross-organization access attempts
  */
-export function getMultiTenantTestScenarios() {
+export function getMultiTenantTestScenarios(): {
+  name: string;
+  userOrgId: string;
+  dataOrgId: string | null;
+  shouldPass: boolean;
+}[] {
   return [
     {
       name: "should allow access within same organization",
@@ -85,7 +99,16 @@ export function getMultiTenantTestScenarios() {
 /**
  * Create test contexts for permission testing
  */
-export function createPermissionTestContexts(permission: string) {
+export function createPermissionTestContexts(permission: string): {
+  withPermission: ReturnType<typeof MockContextFactory.createWithPermissions>;
+  withoutPermission: ReturnType<
+    typeof MockContextFactory.createWithPermissions
+  >;
+  admin: ReturnType<typeof MockContextFactory.createAdmin>;
+  technician: ReturnType<typeof MockContextFactory.createTechnician>;
+  user: ReturnType<typeof MockContextFactory.createUser>;
+  unauthenticated: ReturnType<typeof MockContextFactory.createUnauthenticated>;
+} {
   return {
     withPermission: MockContextFactory.createWithPermissions([permission]),
     withoutPermission: MockContextFactory.createWithPermissions([
@@ -101,7 +124,18 @@ export function createPermissionTestContexts(permission: string) {
 /**
  * Create test contexts for multi-tenant testing
  */
-export function createMultiTenantTestContexts() {
+export function createMultiTenantTestContexts(): {
+  orgA: {
+    admin: ReturnType<typeof MockContextFactory.createAdmin>;
+    technician: ReturnType<typeof MockContextFactory.createTechnician>;
+    user: ReturnType<typeof MockContextFactory.createUser>;
+  };
+  orgB: {
+    admin: ReturnType<typeof MockContextFactory.createAdmin>;
+    technician: ReturnType<typeof MockContextFactory.createTechnician>;
+    user: ReturnType<typeof MockContextFactory.createUser>;
+  };
+} {
   return {
     orgA: {
       admin: MockContextFactory.createAdmin("org-a"),
@@ -233,7 +267,12 @@ export function generatePermissionCombinations(): {
 /**
  * Helper to create test scenarios for permission escalation attempts
  */
-export function getPermissionEscalationScenarios() {
+export function getPermissionEscalationScenarios(): {
+  name: string;
+  userPermissions: string[];
+  attemptedActions: string[];
+  expectedResult: string;
+}[] {
   return [
     {
       name: "User attempting admin operations",
@@ -324,7 +363,15 @@ export function validateRoleSystemIntegrity(roles: TestRole[]): {
 /**
  * Helper to create comprehensive test suite data
  */
-export function createTestSuiteData() {
+export function createTestSuiteData(): {
+  organizations: ReturnType<
+    typeof MockContextFactory.createAdmin
+  >["organization"][];
+  roleMatrix: ReturnType<typeof PermissionMatrixFactory.createMatrix>;
+  permissionCombinations: ReturnType<typeof generatePermissionCombinations>;
+  escalationScenarios: ReturnType<typeof getPermissionEscalationScenarios>;
+  multiTenantContexts: ReturnType<typeof createMultiTenantTestContexts>;
+} {
   const orgs = MockContextFactory.createAdmin("org-1").organization;
   const roles = PermissionMatrixFactory.createMatrix();
   const permissionCombinations = generatePermissionCombinations();

@@ -30,9 +30,9 @@ export default defineConfig({
             tsconfig: "./tsconfig.tests.json",
           },
           include: [
-            "src/lib/**/*.vitest.test.{ts,tsx}",
-            "src/server/**/*.vitest.test.{ts,tsx}",
-            "src/integration-tests/**/*.vitest.test.{ts,tsx}",
+            "src/lib/**/*.test.{ts,tsx}",
+            "src/server/**/*.test.{ts,tsx}",
+            "src/integration-tests/**/*.test.{ts,tsx}",
           ],
           exclude: [
             "node_modules",
@@ -56,13 +56,14 @@ export default defineConfig({
           globals: true,
           environment: "jsdom",
           setupFiles: ["src/test/vitest.setup.ts"],
+          pool: "forks",
           typecheck: {
             tsconfig: "./tsconfig.tests.json",
           },
           include: [
-            "src/app/**/*.vitest.test.{ts,tsx}",
-            "src/components/**/*.vitest.test.{ts,tsx}",
-            "src/hooks/**/*.vitest.test.{ts,tsx}",
+            "src/app/**/*.test.{ts,tsx}",
+            "src/components/**/*.test.{ts,tsx}",
+            "src/hooks/**/*.test.{ts,tsx}",
           ],
           exclude: [
             "node_modules",

@@ -19,5 +19,18 @@ export const trpcMsw = createTRPCMsw<AppRouter>({
   },
 });
 
-// Create MSW server instance
+// Create MSW server instance with request logging
 export const server = setupServer();
+
+// Add request logging to debug MSW interception
+server.events.on("request:start", ({ request }) => {
+  console.log(`[MSW] Intercepting: ${request.method} ${request.url}`);
+});
+
+server.events.on("request:match", ({ request }) => {
+  console.log(`[MSW] Handler matched: ${request.method} ${request.url}`);
+});
+
+server.events.on("request:unhandled", ({ request }) => {
+  console.log(`[MSW] Unhandled request: ${request.method} ${request.url}`);
+});

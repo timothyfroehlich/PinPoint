@@ -1,18 +1,45 @@
-import { describe, it, expect } from "@jest/globals";
 import { TRPCError } from "@trpc/server";
+import { describe, it, expect, vi } from "vitest";
 
-import { createMockContext, type MockContext } from "../../../test/mockContext";
-import { requirePermissionForSession } from "../../auth/permissions";
+import {
+  createVitestMockContext,
+  type VitestMockContext,
+} from "../../../test/vitestMockContext";
+import {
+  requirePermissionForSession,
+  getUserPermissionsForSession,
+} from "../../auth/permissions";
 import { createTRPCRouter, organizationProcedure } from "../trpc";
+
+// Mock environment modules
+vi.mock("~/env", () => ({
+  env: {
+    NODE_ENV: "test",
+    DATABASE_URL: "postgresql://test",
+    AUTH_SECRET: "test-secret",
+    DEFAULT_ORG_SUBDOMAIN: "apc",
+  },
+}));
+
+// Mock NextAuth
+vi.mock("~/server/auth", () => ({
+  auth: vi.fn(),
+}));
+
+// Mock permissions system
+vi.mock("../../auth/permissions", () => ({
+  requirePermissionForSession: vi.fn(),
+  getUserPermissionsForSession: vi.fn(),
+}));
 
 // Mock tRPC context with a simplified membership structure
 const createMockTRPCContext = (
   permissions: string[] = [],
-): MockContext & {
+): VitestMockContext & {
   membership: { roleId: string | null };
   userPermissions: string[];
 } => {
-  const mockContext = createMockContext();
+  const mockContext = createVitestMockContext();
 
   // The membership object with role for PermissionService
   const mockMembership = {
@@ -35,14 +62,10 @@ const createMockTRPCContext = (
   };
 
   // Mock the membership lookup for PermissionService (uses findUnique with compound key)
-  mockContext.db.membership.findUnique.mockResolvedValue(
-    mockMembership as never,
-  );
+  mockContext.db.membership.findUnique.mockResolvedValue(mockMembership as any);
 
   // Mock the membership lookup for organizationProcedure (uses findFirst)
-  mockContext.db.membership.findFirst.mockResolvedValue(
-    mockMembership as never,
-  );
+  mockContext.db.membership.findFirst.mockResolvedValue(mockMembership as any);
 
   return {
     ...mockContext,
@@ -90,6 +113,12 @@ describe("tRPC Permission Middleware", () => {
       const ctx = createMockTRPCContext(["test:permission"]);
       const caller = testRouter.createCaller(ctx as any);
 
+      // Mock permission functions
+      vi.mocked(getUserPermissionsForSession).mockResolvedValue([
+        "test:permission",
+      ]);
+      vi.mocked(requirePermissionForSession).mockResolvedValue(undefined);
+
       // Act
       const result = await caller.testRequirePermission();
 
@@ -102,6 +131,17 @@ describe("tRPC Permission Middleware", () => {
       const ctx = createMockTRPCContext(["other:permission"]);
       const caller = testRouter.createCaller(ctx as any);
 
+      // Mock permission functions
+      vi.mocked(getUserPermissionsForSession).mockResolvedValue([
+        "other:permission",
+      ]);
+      vi.mocked(requirePermissionForSession).mockRejectedValue(
+        new TRPCError({
+          code: "FORBIDDEN",
+          message: "Missing required permission: test:permission",
+        }),
+      );
+
       // Act & Assert
       await expect(caller.testRequirePermission()).rejects.toThrow(TRPCError);
       await expect(caller.testRequirePermission()).rejects.toThrow(
@@ -113,6 +153,15 @@ describe("tRPC Permission Middleware", () => {
       // Arrange
       const ctx = createMockTRPCContext([]);
       const caller = testRouter.createCaller(ctx as any);
+
+      // Mock permission functions
+      vi.mocked(getUserPermissionsForSession).mockResolvedValue([]);
+      vi.mocked(requirePermissionForSession).mockRejectedValue(
+        new TRPCError({
+          code: "FORBIDDEN",
+          message: "Missing required permission: test:permission",
+        }),
+      );
 
       // Act & Assert
       await expect(caller.testRequirePermission()).rejects.toThrow(TRPCError);
