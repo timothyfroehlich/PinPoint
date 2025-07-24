@@ -38,9 +38,14 @@ export class PermissionService {
     }
 
     // Get the user's membership and role
-    const finalOrgId = organizationId ?? session.user.organizationId;
+    const finalOrgId =
+      organizationId ??
+      (session.user as { organizationId?: string }).organizationId;
     if (!finalOrgId) {
       throw new Error("Organization ID is required");
+    }
+    if (!session.user.id) {
+      throw new Error("User ID is required");
     }
 
     const membership = await this.getUserMembership(
@@ -105,9 +110,14 @@ export class PermissionService {
     }
 
     // Get the user's membership and role
-    const finalOrgId = organizationId ?? session.user.organizationId;
+    const finalOrgId =
+      organizationId ??
+      (session.user as { organizationId?: string }).organizationId;
     if (!finalOrgId) {
       throw new Error("Organization ID is required");
+    }
+    if (!session.user.id) {
+      throw new Error("User ID is required");
     }
 
     const membership = await this.getUserMembership(
@@ -228,7 +238,15 @@ export class PermissionService {
   /**
    * Get user membership with role and permissions
    */
-  private async getUserMembership(userId: string, organizationId: string) {
+  private async getUserMembership(
+    userId: string,
+    organizationId: string,
+  ): Promise<{
+    role: {
+      name: string;
+      permissions: { name: string }[];
+    };
+  } | null> {
     return this.prisma.membership.findUnique({
       where: {
         userId_organizationId: {
