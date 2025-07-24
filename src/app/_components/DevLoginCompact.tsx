@@ -18,7 +18,7 @@ interface DevLoginCompactProps {
 }
 
 export function DevLoginCompact({
-  onLogin,
+  onLogin: _onLogin,
 }: DevLoginCompactProps): React.ReactNode {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -46,10 +46,8 @@ export function DevLoginCompact({
         alert(`Login failed: ${result.error}`);
       } else if (result.ok) {
         console.log("Login successful");
-        // Let NextAuth handle the redirect, or call onLogin if provided
-        if (onLogin) {
-          onLogin();
-        }
+        // Refresh the page to show authenticated content
+        window.location.reload();
       }
     } catch (error) {
       console.error("Login failed:", error);

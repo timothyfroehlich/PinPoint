@@ -17,7 +17,8 @@
     "src/**/*.ts",
     "src/**/*.tsx",
     ".next/types/**/*.ts",
-    "middleware.ts"
+    "middleware.ts",
+    "prisma/**/*.ts"
   ],
   "exclude": [
     "src/_archived_frontend/**/*",

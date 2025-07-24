@@ -1,28 +1,32 @@
 import { NotificationType } from "@prisma/client";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 
 // Mock NextAuth first to avoid import issues
-jest.mock("next-auth", () => {
-  return jest.fn().mockImplementation(() => ({
-    auth: jest.fn(),
-    handlers: { GET: jest.fn(), POST: jest.fn() },
-    signIn: jest.fn(),
-    signOut: jest.fn(),
-  }));
-});
+vi.mock("next-auth", () => ({
+  default: vi.fn().mockImplementation(() => ({
+    auth: vi.fn(),
+    handlers: { GET: vi.fn(), POST: vi.fn() },
+    signIn: vi.fn(),
+    signOut: vi.fn(),
+  })),
+}));
 
 import {
-  createMockContext,
-  mockUser,
-  type MockContext,
-} from "../../../../test/mockContext";
+  createVitestMockContext,
+  type VitestMockContext,
+} from "../../../../test/vitestMockContext";
 import { appRouter } from "../../root";
 
+// Mock data for tests
+const mockUser = { id: "user-1", email: "test@example.com", name: "Test User" };
+
 describe("notificationRouter", () => {
-  let ctx: MockContext;
+  let ctx: VitestMockContext;
   const notificationId = "notification-1";
 
   beforeEach(() => {
-    ctx = createMockContext();
+    vi.clearAllMocks();
+    ctx = createVitestMockContext();
     ctx.session = {
       user: { id: mockUser.id },
       expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
@@ -45,9 +49,9 @@ describe("notificationRouter", () => {
 
     // Mock the service method to return the expected data
     const mockNotificationService = ctx.services.createNotificationService();
-    (
-      mockNotificationService.getUserNotifications as jest.MockedFunction<any>
-    ).mockResolvedValue([mockNotification]);
+    (mockNotificationService.getUserNotifications as any).mockResolvedValue([
+      mockNotification,
+    ]);
 
     const caller = appRouter.createCaller(ctx as any);
     const result = await caller.notification.getNotifications({});
@@ -58,9 +62,7 @@ describe("notificationRouter", () => {
 
   it("gets unread count", async () => {
     const mockNotificationService = ctx.services.createNotificationService();
-    (
-      mockNotificationService.getUnreadCount as jest.MockedFunction<any>
-    ).mockResolvedValue(3);
+    (mockNotificationService.getUnreadCount as any).mockResolvedValue(3);
 
     const caller = appRouter.createCaller(ctx as any);
     const count = await caller.notification.getUnreadCount();
@@ -71,9 +73,7 @@ describe("notificationRouter", () => {
 
   it("marks notification as read", async () => {
     const mockNotificationService = ctx.services.createNotificationService();
-    (
-      mockNotificationService.markAsRead as jest.MockedFunction<any>
-    ).mockResolvedValue(undefined);
+    (mockNotificationService.markAsRead as any).mockResolvedValue(undefined);
 
     const caller = appRouter.createCaller(ctx as any);
     await caller.notification.markAsRead({ notificationId });
@@ -87,9 +87,7 @@ describe("notificationRouter", () => {
 
   it("marks all as read", async () => {
     const mockNotificationService = ctx.services.createNotificationService();
-    (
-      mockNotificationService.markAllAsRead as jest.MockedFunction<any>
-    ).mockResolvedValue(undefined);
+    (mockNotificationService.markAllAsRead as any).mockResolvedValue(undefined);
 
     const caller = appRouter.createCaller(ctx as any);
     await caller.notification.markAllAsRead();
@@ -131,9 +129,9 @@ describe("notificationRouter", () => {
     ];
 
     const mockNotificationService = ctx.services.createNotificationService();
-    (
-      mockNotificationService.getUserNotifications as jest.MockedFunction<any>
-    ).mockResolvedValue(mockNotifications);
+    (mockNotificationService.getUserNotifications as any).mockResolvedValue(
+      mockNotifications,
+    );
 
     const caller = appRouter.createCaller(ctx as any);
 

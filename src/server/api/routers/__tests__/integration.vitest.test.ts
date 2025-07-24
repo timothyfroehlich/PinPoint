@@ -1,13 +1,17 @@
-import { describe, it, expect, beforeEach } from "@jest/globals";
 import { TRPCError } from "@trpc/server";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 
 import {
-  createMockContext,
-  resetMockContext,
-  type MockContext,
-} from "../../../../test/mockContext";
+  createVitestMockContext,
+  type VitestMockContext,
+} from "../../../../test/vitestMockContext";
 import { appRouter } from "../../root";
 import { createCallerFactory } from "../../trpc";
+
+// Type assertions for relaxed test mode - allows any type usage
+// Using any types is acceptable in test files per multi-config strategy
+
+type AnyTRPCCaller = any;
 
 /**
  * Integration Tests for Existing Routers with Permission System
@@ -17,8 +21,9 @@ import { createCallerFactory } from "../../trpc";
  */
 
 // Mock context helper with different permission sets
-const createMockTRPCContext = (permissions: string[] = []) => {
-  const mockContext = createMockContext();
+
+const createMockTRPCContext = (permissions: string[] = []): any => {
+  const mockContext = createVitestMockContext();
 
   return {
     ...mockContext,
@@ -68,12 +73,12 @@ const createMockTRPCContext = (permissions: string[] = []) => {
 };
 
 describe("Router Integration Tests", () => {
-  let mockContext: MockContext;
+  let mockContext: VitestMockContext;
   const createCaller = createCallerFactory(appRouter);
 
   beforeEach(() => {
-    mockContext = createMockContext();
-    resetMockContext(mockContext);
+    vi.clearAllMocks();
+    mockContext = createVitestMockContext();
   });
 
   describe("Issue Router Integration", () => {
@@ -157,11 +162,19 @@ describe("Router Integration Tests", () => {
         upvotes: [],
       };
 
-      mockContext.db.machine.findFirst.mockResolvedValue(mockMachine);
-      mockContext.db.machine.findUnique.mockResolvedValue(mockMachine);
-      mockContext.db.issueStatus.findFirst.mockResolvedValue(mockStatus);
-      mockContext.db.priority.findFirst.mockResolvedValue(mockPriority);
-      mockContext.db.issue.create.mockResolvedValue(mockIssue);
+      vi.mocked(mockContext.db.machine.findFirst).mockResolvedValue(
+        mockMachine,
+      );
+      vi.mocked(mockContext.db.machine.findUnique).mockResolvedValue(
+        mockMachine,
+      );
+      vi.mocked(mockContext.db.issueStatus.findFirst).mockResolvedValue(
+        mockStatus,
+      );
+      vi.mocked(mockContext.db.priority.findFirst).mockResolvedValue(
+        mockPriority,
+      );
+      vi.mocked(mockContext.db.issue.create).mockResolvedValue(mockIssue);
 
       // Act
       const result = await caller.issue.core.create({
@@ -264,8 +277,8 @@ describe("Router Integration Tests", () => {
         description: "Updated description",
       };
 
-      mockContext.db.issue.findUnique.mockResolvedValue(mockIssue);
-      mockContext.db.issue.update.mockResolvedValue(updatedIssue);
+      vi.mocked(mockContext.db.issue.findUnique).mockResolvedValue(mockIssue);
+      vi.mocked(mockContext.db.issue.update).mockResolvedValue(updatedIssue);
 
       // Act
       const result = await caller.issue.core.update({
@@ -329,7 +342,7 @@ describe("Router Integration Tests", () => {
         assignedToId: null,
       };
 
-      mockContext.db.issue.findUnique.mockResolvedValue(mockIssue);
+      vi.mocked(mockContext.db.issue.findUnique).mockResolvedValue(mockIssue);
 
       // Act & Assert
       await expect(
@@ -384,8 +397,12 @@ describe("Router Integration Tests", () => {
         name: "Updated Machine Name",
       };
 
-      mockContext.db.machine.findUnique.mockResolvedValue(mockMachine);
-      mockContext.db.machine.update.mockResolvedValue(updatedMachine);
+      vi.mocked(mockContext.db.machine.findUnique).mockResolvedValue(
+        mockMachine,
+      );
+      vi.mocked(mockContext.db.machine.update).mockResolvedValue(
+        updatedMachine,
+      );
 
       // Act
       const result = await caller.machine.core.update({
@@ -451,7 +468,9 @@ describe("Router Integration Tests", () => {
         },
       };
 
-      mockContext.db.machine.findUnique.mockResolvedValue(mockMachine);
+      vi.mocked(mockContext.db.machine.findUnique).mockResolvedValue(
+        mockMachine,
+      );
 
       // Act & Assert
       await expect(
@@ -499,8 +518,12 @@ describe("Router Integration Tests", () => {
         name: "Updated Location Name",
       };
 
-      mockContext.db.location.findUnique.mockResolvedValue(mockLocation);
-      mockContext.db.location.update.mockResolvedValue(updatedLocation);
+      vi.mocked(mockContext.db.location.findUnique).mockResolvedValue(
+        mockLocation,
+      );
+      vi.mocked(mockContext.db.location.update).mockResolvedValue(
+        updatedLocation,
+      );
 
       // Act
       const result = await caller.location.update({
@@ -571,10 +594,12 @@ describe("Router Integration Tests", () => {
         name: "Updated Organization Name",
       };
 
-      mockContext.db.organization.findUnique.mockResolvedValue(
+      vi.mocked(mockContext.db.organization.findUnique).mockResolvedValue(
         mockOrganization,
       );
-      mockContext.db.organization.update.mockResolvedValue(updatedOrganization);
+      vi.mocked(mockContext.db.organization.update).mockResolvedValue(
+        updatedOrganization,
+      );
 
       // Act
       const result = await caller.organization.update({
@@ -670,8 +695,12 @@ describe("Router Integration Tests", () => {
         roleId: "role-2",
       };
 
-      mockContext.db.membership.findUnique.mockResolvedValue(mockMembership);
-      mockContext.db.membership.update.mockResolvedValue(updatedMembership);
+      vi.mocked(mockContext.db.membership.findUnique).mockResolvedValue(
+        mockMembership,
+      );
+      vi.mocked(mockContext.db.membership.update).mockResolvedValue(
+        updatedMembership,
+      );
 
       // Act
       const result = await caller.user.updateMembership({
@@ -733,7 +762,7 @@ describe("Router Integration Tests", () => {
         "user:manage",
         "role:manage",
       ]);
-      const caller = createCaller(ctx as any);
+      const caller: AnyTRPCCaller = createCaller(ctx);
 
       // Mock data for multiple operations
       const mockIssue = {
@@ -770,11 +799,12 @@ describe("Router Integration Tests", () => {
         upvotes: [],
       };
 
-      mockContext.db.issue.findUnique.mockResolvedValue(mockIssue);
-      mockContext.db.issue.update.mockResolvedValue({
+      vi.mocked(mockContext.db.issue.findUnique).mockResolvedValue(mockIssue);
+      vi.mocked(mockContext.db.issue.update).mockResolvedValue({
         ...mockIssue,
         assignedToId: "user-2",
-      } as any);
+        description: "Test description", // Add required description field
+      });
 
       // Act - Admin should be able to perform all operations
       const result = await caller.issue.core.assign({
@@ -794,7 +824,7 @@ describe("Router Integration Tests", () => {
     it("should properly restrict permissions based on role limitations", async () => {
       // Arrange - User with limited permissions (only view)
       const ctx = createMockTRPCContext(["issue:view"]);
-      const caller = createCaller(ctx as any);
+      const caller: AnyTRPCCaller = createCaller(ctx);
 
       // Act & Assert - Should be denied for all write operations
       await expect(
@@ -819,7 +849,7 @@ describe("Router Integration Tests", () => {
     it("should handle missing permission middleware gracefully", async () => {
       // Arrange
       const ctx = createMockTRPCContext([]);
-      const caller = createCaller(ctx as any);
+      const caller: AnyTRPCCaller = createCaller(ctx);
 
       // Act & Assert
       await expect(
@@ -834,8 +864,10 @@ describe("Router Integration Tests", () => {
       // Arrange
       const ctx = createMockTRPCContext([]);
       // Corrupt the permissions array
+      // Using any for test flexibility in relaxed mode
+
       (ctx as any).userPermissions = undefined;
-      const caller = createCaller(ctx as any);
+      const caller: AnyTRPCCaller = createCaller(ctx);
 
       // Act & Assert
       await expect(
@@ -849,7 +881,7 @@ describe("Router Integration Tests", () => {
     it("should handle permission changes during session", async () => {
       // Arrange
       const ctx = createMockTRPCContext(["issue:create"]);
-      const caller = createCaller(ctx as any);
+      const caller: AnyTRPCCaller = createCaller(ctx);
 
       const mockMachine = {
         id: "machine-1",
@@ -870,12 +902,18 @@ describe("Router Integration Tests", () => {
         isDefault: true,
       };
 
-      mockContext.db.machine.findFirst.mockResolvedValue(mockMachine);
-      mockContext.db.issueStatus.findFirst.mockResolvedValue(mockStatus);
-      mockContext.db.priority.findFirst.mockResolvedValue(mockPriority);
+      vi.mocked(mockContext.db.machine.findFirst).mockResolvedValue(
+        mockMachine,
+      );
+      vi.mocked(mockContext.db.issueStatus.findFirst).mockResolvedValue(
+        mockStatus,
+      );
+      vi.mocked(mockContext.db.priority.findFirst).mockResolvedValue(
+        mockPriority,
+      );
 
       // Simulate permission being revoked mid-session
-      (ctx as any).userPermissions = ["issue:view"];
+      ctx.userPermissions = ["issue:view"];
 
       // Act & Assert
       await expect(

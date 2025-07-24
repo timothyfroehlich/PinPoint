@@ -68,3 +68,9 @@ eslint-prod-errors.json
 betterer-output.log
 agent_workspace/
 cleanup_analysis/
+
+# Claude hooks cache files
+.claude/hooks/.quality-check.js.swp
+.claude/hooks/.quality-check.json.swp
+.claude/hooks/tsconfig-cache.json
+.betterer.results.backup

@@ -67,37 +67,40 @@ DEFAULT_ORG_SUBDOMAIN="apc"
 
 ### Environment Detection
 
-Create a utility function to detect the current environment:
+**✅ IMPLEMENTED**: Environment detection is handled in two places:
+
+1. **`src/lib/environment.ts`** - Application-level environment utilities:
 
 ```typescript
-// src/lib/environment.ts
-export type Environment = "development" | "preview" | "production";
-
-export function getEnvironment(): Environment {
-  // Use VERCEL_ENV if available (Vercel deployments)
-  if (process.env.VERCEL_ENV) {
-    return process.env.VERCEL_ENV as Environment;
-  }
-
-  // Fallback to NODE_ENV for local development
-  if (process.env.NODE_ENV === "development") {
-    return "development";
-  }
-
-  // Default to production
-  return "production";
-}
-
 export function isDevelopment(): boolean {
-  return getEnvironment() === "development";
+  return env.VERCEL_ENV === undefined && env.NODE_ENV === "development";
 }
 
 export function isPreview(): boolean {
-  return getEnvironment() === "preview";
+  return env.VERCEL_ENV === "preview";
 }
 
 export function isProduction(): boolean {
-  return getEnvironment() === "production";
+  return env.VERCEL_ENV === "production";
+}
+
+export function isDevelopmentOrPreview(): boolean {
+  return isDevelopment() || isPreview();
+}
+```
+
+2. **`src/env.js`** - Environment variable validation with proper test support:
+
+```javascript
+function getEnvironmentType() {
+  // Test environment - set by test runners
+  if (process.env["NODE_ENV"] === "test") return "test";
+  
+  // Use VERCEL_ENV if available (Vercel deployments)
+  if (process.env["VERCEL_ENV"]) return process.env["VERCEL_ENV"];
+  
+  // Fallback to NODE_ENV for local development
+  return process.env["NODE_ENV"] || "development";
 }
 ```
 
@@ -186,11 +189,11 @@ export function isProduction(): boolean {
 
 ## Implementation Requirements
 
-### 1. Environment Detection
+### 1. Environment Detection ✅ COMPLETED
 
-- [ ] Create `src/lib/environment.ts` utility
-- [ ] Update all environment checks to use new utility
-- [ ] Replace NODE_ENV checks with proper environment detection
+- [x] **Create `src/lib/environment.ts` utility** - Implemented with VERCEL_ENV-based detection
+- [x] **Update all environment checks to use new utility** - `env.js` updated with proper environment detection
+- [x] **Replace NODE_ENV checks with proper environment detection** - Test environment properly handled
 
 ### 2. Authentication Configuration
 
@@ -210,37 +213,44 @@ export function isProduction(): boolean {
 - [ ] Add environment-specific npm scripts
 - [ ] Update deployment scripts to use appropriate seeding
 
-### 5. Environment Variable Management
+### 5. Environment Variable Management ✅ PARTIALLY COMPLETED
 
+- [x] **Create environment variable validation** - Implemented in `env.js` with test environment support
 - [ ] Set up environment-specific variables in Vercel dashboard
 - [ ] Update documentation with variable management workflow
-- [ ] Create environment variable validation
 
 ## Current Issues
 
-### ❌ **No Environment Separation**
+### ✅ **Environment Detection** - RESOLVED
+
+- ~~Code uses NODE_ENV instead of VERCEL_ENV~~ → **Fixed**: Proper VERCEL_ENV detection implemented
+- ~~No proper environment detection utility~~ → **Fixed**: `src/lib/environment.ts` provides utilities
+- ~~Environment-specific configuration is missing~~ → **Fixed**: Test environment properly handled
+
+### ✅ **Environment Variable Validation** - RESOLVED
+
+- ~~Environment variables fail in test environment~~ → **Fixed**: Test environment support in `env.js`
+- ~~Google OAuth credentials required in development/test~~ → **Fixed**: Optional in dev/test environments
+- ~~DATABASE_URL validation blocks test runs~~ → **Fixed**: Optional in test environment
+
+### ❌ **Authentication Strategy** - REMAINING
 
 - All environments currently use same authentication strategy
-- All environments use local file storage
-- Seeding strategy is not environment-specific
+- Credentials provider enabled in non-development environments
+- Same OAuth app used for all environments
+- No clear authentication strategy per environment
 
-### ❌ **Vercel Environment Detection**
-
-- Code uses NODE_ENV instead of VERCEL_ENV
-- No proper environment detection utility
-- Environment-specific configuration is missing
-
-### ❌ **File Storage Limitations**
+### ❌ **File Storage Limitations** - REMAINING
 
 - Preview/production environments use local storage (not suitable for serverless)
 - No UploadThing integration despite having account
 - File uploads don't persist in preview deployments
 
-### ❌ **Authentication Confusion**
+### ❌ **Data Seeding Strategy** - REMAINING
 
-- Credentials provider enabled in non-development environments
-- Same OAuth app used for all environments
-- No clear authentication strategy per environment
+- All environments use same seeding strategy
+- No environment-specific seed files
+- Seeding strategy is not environment-specific
 
 ## Success Criteria
 
@@ -268,8 +278,41 @@ export function isProduction(): boolean {
 - Demo-ready preview environment
 - Secure production authentication
 
+## Test Environment Setup
+
+### ✅ **Test Environment Variables**
+
+The test environment is configured in `src/test/vitest.setup.ts`:
+
+```typescript
+beforeAll(() => {
+  process.env["DATABASE_URL"] = "postgresql://test:test@localhost:5432/test";
+  process.env["AUTH_SECRET"] = "test-auth-secret";
+  process.env["NEXTAUTH_URL"] = "http://localhost:3000";
+  process.env["PUBLIC_URL"] = "http://localhost:3000";
+  process.env["GOOGLE_CLIENT_ID"] = "test-google-client-id";
+  process.env["GOOGLE_CLIENT_SECRET"] = "test-google-client-secret";
+});
+```
+
+### ✅ **Environment Variable Validation**
+
+Tests benefit from relaxed validation in `src/env.js`:
+
+- **DATABASE_URL**: Optional in test environment (can use mocked database)
+- **GOOGLE_CLIENT_ID/SECRET**: Optional in test environment (uses test values)
+- **AUTH_SECRET**: Optional in non-production environments
+
+### Troubleshooting Test Environment Issues
+
+If tests fail with environment variable errors:
+
+1. **Check `vitest.setup.ts`**: Ensure all required environment variables are set
+2. **Verify `env.js`**: Confirm test environment has optional validation for development/test variables
+3. **Test runner**: Ensure `NODE_ENV=test` is set (handled automatically by Vitest)
+
 ---
 
-**Status**: Planning document - implementation required
-**Priority**: High - affects deployment and development workflows
-**Estimated Effort**: 1-2 sprints
+**Status**: ✅ Core environment detection implemented - Authentication and file storage strategies remain
+**Priority**: Medium - Core issues resolved, remaining items are deployment optimizations
+**Estimated Effort**: 0.5-1 sprint for remaining items

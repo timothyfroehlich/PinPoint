@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ExtendedPrismaClient } from "~/server/db";
 
@@ -7,31 +7,31 @@ import { CollectionService } from "~/server/services/collectionService";
 // Simple integration test focusing on service integration with router input validation
 describe("Collection Router Integration", () => {
   let service: CollectionService;
-  let mockPrisma: jest.Mocked<ExtendedPrismaClient>;
+  let mockPrisma: ExtendedPrismaClient;
 
   beforeEach(() => {
     mockPrisma = {
       collectionType: {
-        findMany: jest.fn(),
-        update: jest.fn(),
+        findMany: vi.fn(),
+        update: vi.fn(),
       },
       collection: {
-        findMany: jest.fn(),
-        findFirst: jest.fn(),
-        create: jest.fn(),
-        update: jest.fn(),
+        findMany: vi.fn(),
+        findFirst: vi.fn(),
+        create: vi.fn(),
+        update: vi.fn(),
       },
       machine: {
-        findMany: jest.fn(),
+        findMany: vi.fn(),
       },
       $accelerate: {
-        invalidate: jest.fn(),
-        ttl: jest.fn(),
+        invalidate: vi.fn(),
+        ttl: vi.fn(),
       },
-    } as unknown as jest.Mocked<ExtendedPrismaClient>;
+    } as unknown as ExtendedPrismaClient;
 
     service = new CollectionService(mockPrisma);
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe("Input validation and service integration", () => {
@@ -56,11 +56,11 @@ describe("Collection Router Integration", () => {
         },
       ];
 
-      (mockPrisma.collectionType.findMany as jest.Mock<any>).mockImplementation(
-        () => Promise.resolve(mockTypes),
+      vi.mocked(mockPrisma.collectionType.findMany).mockResolvedValue(
+        mockTypes as any,
       );
-      (mockPrisma.collection.findMany as jest.Mock<any>).mockImplementation(
-        () => Promise.resolve(mockCollections),
+      vi.mocked(mockPrisma.collection.findMany).mockResolvedValue(
+        mockCollections as any,
       );
 
       const result = await service.getLocationCollections(
@@ -121,8 +121,8 @@ describe("Collection Router Integration", () => {
         isManual: true,
       };
 
-      (mockPrisma.collection.create as jest.Mock<any>).mockImplementation(() =>
-        Promise.resolve(mockCollection),
+      vi.mocked(mockPrisma.collection.create).mockResolvedValue(
+        mockCollection as any,
       );
 
       const result = await service.createManualCollection("org1", {
@@ -149,9 +149,7 @@ describe("Collection Router Integration", () => {
     });
 
     it("should handle toggleCollectionType operations", async () => {
-      (mockPrisma.collectionType.update as jest.Mock<any>).mockImplementation(
-        () => Promise.resolve({}),
-      );
+      vi.mocked(mockPrisma.collectionType.update).mockResolvedValue({} as any);
 
       await service.toggleCollectionType("type1", false);
 
@@ -173,8 +171,8 @@ describe("Collection Router Integration", () => {
         },
       ];
 
-      (mockPrisma.collectionType.findMany as jest.Mock<any>).mockImplementation(
-        () => Promise.resolve(mockTypes),
+      vi.mocked(mockPrisma.collectionType.findMany).mockResolvedValue(
+        mockTypes as any,
       );
 
       const result = await service.getOrganizationCollectionTypes("org1");

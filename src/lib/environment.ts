@@ -58,3 +58,41 @@ export function getEnvironmentName(): string {
 export function shouldEnableDevFeatures(): boolean {
   return isDevelopmentOrPreview();
 }
+
+/**
+ * Authentication Strategy Functions
+ * These functions determine which authentication providers should be enabled
+ * based on the current environment
+ */
+
+/**
+ * Check if credentials provider should be enabled
+ * Used for test users in development and demo users in preview
+ */
+export function shouldEnableCredentialsProvider(): boolean {
+  return isDevelopment() || isPreview() || env.NODE_ENV === "test";
+}
+
+/**
+ * Check if test login should be enabled
+ * Only enabled in development and test environments for easy testing
+ */
+export function shouldEnableTestLogin(): boolean {
+  return isDevelopment() || env.NODE_ENV === "test";
+}
+
+/**
+ * Check if demo login should be enabled
+ * Only enabled in preview environment for stakeholder demonstrations
+ */
+export function shouldEnableDemoLogin(): boolean {
+  return isPreview();
+}
+
+/**
+ * Check if Google OAuth should be required
+ * OAuth is optional in development/test, required in preview/production
+ */
+export function shouldRequireGoogleOAuth(): boolean {
+  return isPreview() || isProduction();
+}

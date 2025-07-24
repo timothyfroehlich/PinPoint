@@ -28,6 +28,15 @@ vi.mock("next/navigation", () => ({
   })),
 }));
 
+// Mock NextAuth
+vi.mock("next-auth/react", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("next-auth/react")>();
+  return {
+    ...actual,
+    signOut: vi.fn(),
+  };
+});
+
 describe("PrimaryAppBar", () => {
   // Set up MSW server
   beforeAll(() => {
@@ -232,7 +241,10 @@ describe("PrimaryAppBar", () => {
       expect(screen.getByText("Logout")).toBeInTheDocument();
     });
 
-    it("should close profile menu when menu item is clicked", () => {
+    it("should call signOut when logout is clicked", async () => {
+      const { signOut } = await import("next-auth/react");
+      const mockSignOut = vi.mocked(signOut);
+
       render(
         <VitestTestWrapper>
           <PrimaryAppBar />
@@ -245,12 +257,12 @@ describe("PrimaryAppBar", () => {
       });
       fireEvent.click(profileButton);
 
-      // Click menu item
+      // Click logout
       const logoutItem = screen.getByText("Logout");
       fireEvent.click(logoutItem);
 
-      // Menu should be closed (logout text should not be visible)
-      expect(screen.queryByText("Logout")).not.toBeInTheDocument();
+      // Should call signOut
+      expect(mockSignOut).toHaveBeenCalledOnce();
     });
 
     it("should have proper accessibility attributes", () => {

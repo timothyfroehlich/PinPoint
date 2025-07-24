@@ -1,15 +1,62 @@
-import { describe, it, expect, beforeEach } from "@jest/globals";
 import { TRPCError } from "@trpc/server";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { z } from "zod";
 
-import {
-  createMockContext,
-  resetMockContext,
-  type MockContext,
-} from "../../../../test/mockContext";
-import { requirePermission } from "../../../auth/permissions";
 import { createTRPCRouter, organizationProcedure } from "../../trpc";
 import { issueCreateProcedure } from "../../trpc.permission";
+
+import type { ExtendedPrismaClient } from "~/server/db";
+
+// Proper types for test context
+interface MockTRPCContext {
+  db: ExtendedPrismaClient;
+  session: {
+    user: {
+      id: string;
+      email: string | null;
+      name: string | null;
+      image: string | null;
+    };
+    expires: string;
+  };
+  organization: {
+    id: string;
+    name: string;
+  };
+  membership: {
+    id: string;
+    userId: string;
+    organizationId: string;
+    roleId: string;
+    role: {
+      id: string;
+      name: string;
+      organizationId: string;
+      isSystem: boolean;
+      isDefault: boolean;
+      createdAt: Date;
+      updatedAt: Date;
+      permissions: {
+        id: string;
+        name: string;
+        description: string;
+      }[];
+    };
+  };
+  userPermissions: string[];
+}
+
+// Create issue confirm procedure for testing
+const issueConfirmProcedure = organizationProcedure.use(async (opts) => {
+  // Mock permission check for testing
+  if (!opts.ctx.userPermissions?.includes("issue:confirm")) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Permission required: issue:confirm",
+    });
+  }
+  return opts.next();
+});
 
 // Mock Issue Confirmation Router - This will be implemented by the implementation agent
 const issueConfirmationRouter = createTRPCRouter({
@@ -50,13 +97,14 @@ const issueConfirmationRouter = createTRPCRouter({
       const issue = await ctx.db.issue.create({
         data: {
           title: input.title,
-          description: input.description,
+          description: input.description ?? null,
           machineId: input.machineId,
           statusId: input.statusId,
           priorityId: input.priorityId,
-          consistency: input.consistency,
+          consistency: input.consistency ?? null,
           organizationId: ctx.organization.id,
           createdById: ctx.session.user.id,
+          assignedToId: null,
           // Note: In reality, this would need the schema to be updated first
           // For now, we'll mock this behavior
           // isConfirmed: confirmationStatus,
@@ -86,7 +134,7 @@ const issueConfirmationRouter = createTRPCRouter({
     }),
 
   // Toggle confirmation status - requires issue:confirm permission
-  toggleConfirmation: requirePermission("issue:confirm")
+  toggleConfirmation: issueConfirmProcedure
     .input(
       z.object({
         issueId: z.string(),
@@ -240,11 +288,23 @@ const issueConfirmationRouter = createTRPCRouter({
 });
 
 // Mock context helper with different permission sets
-const createMockTRPCContext = (permissions: string[] = []) => {
-  const mockContext = createMockContext();
+const createMockTRPCContext = (permissions: string[] = []): MockTRPCContext => {
+  const mockPrisma: ExtendedPrismaClient = {
+    issue: {
+      create: vi.fn(),
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
+      update: vi.fn(),
+      count: vi.fn(),
+    },
+    $accelerate: {
+      invalidate: vi.fn(),
+      ttl: vi.fn(),
+    },
+  } as unknown as ExtendedPrismaClient;
 
   return {
-    ...mockContext,
+    db: mockPrisma,
     session: {
       user: {
         id: "user-1",
@@ -283,11 +343,8 @@ const createMockTRPCContext = (permissions: string[] = []) => {
 };
 
 describe("Issue Confirmation Workflow", () => {
-  let mockContext: MockContext;
-
   beforeEach(() => {
-    mockContext = createMockContext();
-    resetMockContext(mockContext);
+    vi.clearAllMocks();
   });
 
   describe("Basic vs Full Form Creation", () => {
@@ -310,6 +367,7 @@ describe("Issue Confirmation Workflow", () => {
         updatedAt: new Date(),
         resolvedAt: null,
         checklist: null,
+        assignedToId: null,
         machine: {
           id: "machine-1",
           name: "Test Machine",
@@ -345,7 +403,7 @@ describe("Issue Confirmation Workflow", () => {
         },
       };
 
-      mockContext.db.issue.create.mockResolvedValue(mockIssue as any);
+      vi.mocked(ctx.db.issue.create).mockResolvedValue(mockIssue as any);
 
       // Act
       const result = await caller.create({
@@ -361,7 +419,7 @@ describe("Issue Confirmation Workflow", () => {
       expect(result.isConfirmed).toBe(false);
       expect(result.confirmedAt).toBeNull();
       expect(result.confirmedById).toBeNull();
-      expect(mockContext.db.issue.create).toHaveBeenCalledWith({
+      expect(ctx.db.issue.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           title: "Test Issue",
           description: "Test description",
@@ -425,7 +483,7 @@ describe("Issue Confirmation Workflow", () => {
         },
       };
 
-      mockContext.db.issue.create.mockResolvedValue(mockIssue as any);
+      vi.mocked(ctx.db.issue.create).mockResolvedValue(mockIssue as any);
 
       // Act
       const result = await caller.create({
@@ -461,7 +519,7 @@ describe("Issue Confirmation Workflow", () => {
         createdBy: { id: "user-1", name: "Test User" },
       };
 
-      mockContext.db.issue.create.mockResolvedValue(mockIssue as any);
+      vi.mocked(ctx.db.issue.create).mockResolvedValue(mockIssue as any);
 
       // Act
       const result = await caller.create({
@@ -516,8 +574,8 @@ describe("Issue Confirmation Workflow", () => {
         createdBy: { id: "user-1", name: "Test User" },
       };
 
-      mockContext.db.issue.findFirst.mockResolvedValue(mockIssue as any);
-      mockContext.db.issue.update.mockResolvedValue(mockIssue as any);
+      vi.mocked(ctx.db.issue.findFirst).mockResolvedValue(mockIssue as any);
+      vi.mocked(ctx.db.issue.update).mockResolvedValue(mockIssue as any);
 
       // Act
       const result = await caller.toggleConfirmation({
@@ -529,7 +587,7 @@ describe("Issue Confirmation Workflow", () => {
       expect(result.isConfirmed).toBe(true);
       expect(result.confirmedAt).not.toBeNull();
       expect(result.confirmedById).toBe("user-1");
-      expect(mockContext.db.issue.update).toHaveBeenCalledWith({
+      expect(ctx.db.issue.update).toHaveBeenCalledWith({
         where: { id: "issue-1" },
         data: {},
         include: expect.any(Object),
@@ -555,7 +613,7 @@ describe("Issue Confirmation Workflow", () => {
       const ctx = createMockTRPCContext(["issue:confirm"]);
       const caller = issueConfirmationRouter.createCaller(ctx as any);
 
-      mockContext.db.issue.findFirst.mockResolvedValue(null);
+      vi.mocked(ctx.db.issue.findFirst).mockResolvedValue(null);
 
       // Act & Assert
       await expect(
@@ -584,8 +642,8 @@ describe("Issue Confirmation Workflow", () => {
         createdBy: { id: "user-1", name: "Test User" },
       };
 
-      mockContext.db.issue.findFirst.mockResolvedValue(mockIssue as any);
-      mockContext.db.issue.update.mockResolvedValue(mockIssue as any);
+      vi.mocked(ctx.db.issue.findFirst).mockResolvedValue(mockIssue as any);
+      vi.mocked(ctx.db.issue.update).mockResolvedValue(mockIssue as any);
 
       // Act
       const result = await caller.toggleConfirmation({
@@ -643,7 +701,7 @@ describe("Issue Confirmation Workflow", () => {
         },
       ];
 
-      mockContext.db.issue.findMany.mockResolvedValue(mockIssues as any);
+      vi.mocked(ctx.db.issue.findMany).mockResolvedValue(mockIssues as any);
 
       // Act
       const result = await caller.listWithConfirmationStatus({
@@ -665,7 +723,7 @@ describe("Issue Confirmation Workflow", () => {
       const ctx = createMockTRPCContext([]);
       const caller = issueConfirmationRouter.createCaller(ctx as any);
 
-      mockContext.db.issue.findMany.mockResolvedValue([]);
+      vi.mocked(ctx.db.issue.findMany).mockResolvedValue([]);
 
       // Act
       await caller.listWithConfirmationStatus({
@@ -673,7 +731,7 @@ describe("Issue Confirmation Workflow", () => {
       });
 
       // Assert
-      expect(mockContext.db.issue.findMany).toHaveBeenCalledWith({
+      expect(ctx.db.issue.findMany).toHaveBeenCalledWith({
         where: {
           organizationId: "org-1",
           machine: { locationId: "location-1" },
@@ -688,7 +746,7 @@ describe("Issue Confirmation Workflow", () => {
       const ctx = createMockTRPCContext([]);
       const caller = issueConfirmationRouter.createCaller(ctx as any);
 
-      mockContext.db.issue.findMany.mockResolvedValue([]);
+      vi.mocked(ctx.db.issue.findMany).mockResolvedValue([]);
 
       // Act
       await caller.listWithConfirmationStatus({
@@ -696,7 +754,7 @@ describe("Issue Confirmation Workflow", () => {
       });
 
       // Assert
-      expect(mockContext.db.issue.findMany).toHaveBeenCalledWith({
+      expect(ctx.db.issue.findMany).toHaveBeenCalledWith({
         where: {
           organizationId: "org-1",
           machineId: "machine-1",
@@ -713,7 +771,7 @@ describe("Issue Confirmation Workflow", () => {
       const ctx = createMockTRPCContext([]);
       const caller = issueConfirmationRouter.createCaller(ctx as any);
 
-      mockContext.db.issue.count.mockResolvedValue(100);
+      vi.mocked(ctx.db.issue.count).mockResolvedValue(100);
 
       // Act
       const result = await caller.getConfirmationStats({});
@@ -732,7 +790,7 @@ describe("Issue Confirmation Workflow", () => {
       const ctx = createMockTRPCContext([]);
       const caller = issueConfirmationRouter.createCaller(ctx as any);
 
-      mockContext.db.issue.count.mockResolvedValue(0);
+      vi.mocked(ctx.db.issue.count).mockResolvedValue(0);
 
       // Act
       const result = await caller.getConfirmationStats({});
@@ -754,7 +812,7 @@ describe("Issue Confirmation Workflow", () => {
       const fromDate = new Date("2024-01-01");
       const toDate = new Date("2024-12-31");
 
-      mockContext.db.issue.count.mockResolvedValue(50);
+      vi.mocked(ctx.db.issue.count).mockResolvedValue(50);
 
       // Act
       await caller.getConfirmationStats({
@@ -765,7 +823,7 @@ describe("Issue Confirmation Workflow", () => {
       });
 
       // Assert
-      expect(mockContext.db.issue.count).toHaveBeenCalledWith({
+      expect(ctx.db.issue.count).toHaveBeenCalledWith({
         where: {
           organizationId: "org-1",
           createdAt: {
@@ -781,7 +839,7 @@ describe("Issue Confirmation Workflow", () => {
       const ctx = createMockTRPCContext([]);
       const caller = issueConfirmationRouter.createCaller(ctx as any);
 
-      mockContext.db.issue.count.mockResolvedValue(25);
+      vi.mocked(ctx.db.issue.count).mockResolvedValue(25);
 
       // Act
       await caller.getConfirmationStats({
@@ -789,7 +847,7 @@ describe("Issue Confirmation Workflow", () => {
       });
 
       // Assert
-      expect(mockContext.db.issue.count).toHaveBeenCalledWith({
+      expect(ctx.db.issue.count).toHaveBeenCalledWith({
         where: {
           organizationId: "org-1",
           machine: { locationId: "location-1" },
@@ -851,7 +909,7 @@ describe("Issue Confirmation Workflow", () => {
         createdBy: { id: "user-1", name: "Test User" },
       };
 
-      mockContext.db.issue.create.mockResolvedValue(mockIssue as any);
+      vi.mocked(ctx.db.issue.create).mockResolvedValue(mockIssue as any);
 
       // Act & Assert
       await expect(

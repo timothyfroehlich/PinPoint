@@ -9,8 +9,16 @@ import superjson from "superjson";
 
 import { createQueryClient } from "./query-client";
 
-import { isDevelopment } from "~/lib/environment";
 import { type AppRouter } from "~/server/api/root";
+
+// Client-safe development detection
+const isClientDevelopment = (): boolean => {
+  if (typeof window === "undefined") return false;
+  return (
+    window.location.hostname === "localhost" ||
+    window.location.hostname.includes("127.0.0.1")
+  );
+};
 
 let clientQueryClientSingleton: QueryClient | undefined = undefined;
 const getQueryClient = (): QueryClient => {
@@ -50,7 +58,7 @@ export function TRPCReactProvider(props: {
       links: [
         loggerLink({
           enabled: (op) =>
-            isDevelopment() ||
+            isClientDevelopment() ||
             (op.direction === "down" && op.result instanceof Error),
         }),
         httpBatchStreamLink({

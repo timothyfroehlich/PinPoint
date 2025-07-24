@@ -98,6 +98,23 @@ export function createVitestMockContext(): VitestMockContext {
       findUnique: vi.fn(),
       findMany: vi.fn(),
       create: vi.fn(),
+      createMany: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+    },
+    issueStatus: {
+      findFirst: vi.fn(),
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+    },
+    priority: {
+      findFirst: vi.fn(),
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+      create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
     },
@@ -105,7 +122,15 @@ export function createVitestMockContext(): VitestMockContext {
 
   // Create a mock service factory
   const mockServices = {
-    createNotificationService: vi.fn(),
+    createNotificationService: vi.fn(() => ({
+      getUserNotifications: vi.fn(),
+      getUnreadCount: vi.fn(),
+      markAsRead: vi.fn(),
+      markAllAsRead: vi.fn(),
+      createNotification: vi.fn(),
+      notifyMachineOwnerOfIssue: vi.fn(),
+      notifyMachineOwnerOfStatusChange: vi.fn(),
+    })),
     createCollectionService: vi.fn(),
     createPinballMapService: vi.fn(),
     createIssueActivityService: vi.fn(),

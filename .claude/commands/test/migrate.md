@@ -42,7 +42,14 @@ Migrating test file: $ARGUMENTS
    ! npm run test:vitest ${ARGUMENTS%.test.ts}.vitest.test.ts
    ```
 
-6. **Document the migration**
+6. **Clean up original Jest file** (if migration successful)
+   ```bash
+   ! rm $ARGUMENTS
+   ```
+   
+   **Note**: Only delete the original Jest file AFTER confirming the Vitest version passes all tests. If there are existing .vitest.test files that work, verify them first then clean up the corresponding .test files.
+
+7. **Document the migration**
    Create a migration report at: @docs/testing/migration-reports/
    
    File name format: `YYYY-MM-DD-filename.md`

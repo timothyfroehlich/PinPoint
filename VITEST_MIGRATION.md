@@ -111,8 +111,91 @@ vi.mock("~/trpc/react");
 
 Total: 1-2 days of focused work
 
+## Current Test File Analysis
+
+### Migration Status Summary
+- **Total test files**: 47
+- **Already migrated to Vitest**: 11 files
+- **Still using Jest (need migration)**: 36 files
+
+### Vitest Files (✅ Already Migrated)
+```
+src/app/dashboard/_components/__tests__/PrimaryAppBar.vitest.test.tsx
+src/lib/opdb/__tests__/utils.vitest.test.ts
+src/server/api/__tests__/msw-trpc-validation.vitest.test.ts
+src/server/api/__tests__/trpc-auth-modern.vitest.test.ts
+src/server/auth/__tests__/auth-simple.vitest.test.ts
+src/server/auth/__tests__/config.vitest.test.ts
+src/server/auth/__tests__/permissions.constants.vitest.test.ts
+src/server/auth/__tests__/permissions.vitest.test.ts
+src/server/db/__tests__/provider.vitest.test.ts
+src/server/services/__tests__/factory.vitest.test.ts
+src/server/services/__tests__/pinballmapService.vitest.test.ts
+```
+
+### Jest Files Requiring Migration
+
+#### Frontend/Component Tests (10 files)
+```
+src/app/api/dev/__tests__/users-simple.test.ts
+src/app/api/dev/__tests__/users.test.ts
+src/app/dashboard/_components/__tests__/PrimaryAppBar.test.tsx
+src/app/issues/__tests__/page.test.tsx
+src/_archived_frontend/_components/dev/__tests__/dev-login-compact.test.tsx
+src/_archived_frontend/hooks/__tests__/auth-integration.test.ts
+src/_archived_frontend/hooks/__tests__/use-current-user.test.ts
+src/components/permissions/__tests__/PermissionButton.test.tsx
+src/components/permissions/__tests__/PermissionGate.test.tsx
+src/hooks/__tests__/usePermissions.test.tsx
+```
+
+#### Server Tests (22 files)
+```
+src/server/api/routers/__tests__/collection.test.ts
+src/server/api/routers/__tests__/integration.test.ts
+src/server/api/routers/__tests__/issue-confirmation.test.ts
+src/server/api/routers/__tests__/issue.notification.test.ts
+src/server/api/routers/__tests__/issue.test.ts
+src/server/api/routers/__tests__/notification.test.ts
+src/server/api/routers/__tests__/pinballmap-integration.test.ts
+src/server/api/routers/__tests__/role.test.ts
+src/server/api/__tests__/multi-tenant-security.test.ts
+src/server/api/__tests__/trpc-auth.test.ts
+src/server/api/__tests__/trpc.permission.test.ts
+src/server/auth/__tests__/auth-simple.test.ts
+src/server/auth/__tests__/config.test.ts
+src/server/auth/__tests__/permissions.constants.test.ts
+src/server/auth/__tests__/permissions.test.ts
+src/server/db/__tests__/provider.test.ts
+src/server/services/__tests__/collectionService.test.ts
+src/server/services/__tests__/factory.test.ts
+src/server/services/__tests__/notificationPreferences.test.ts
+src/server/services/__tests__/notificationService.test.ts
+src/server/services/__tests__/permissionService.expandDependencies.test.ts
+src/server/services/__tests__/pinballmapService.test.ts
+```
+
+#### Library/Utility Tests (3 files)
+```
+src/lib/opdb/__tests__/utils.test.ts
+src/lib/permissions/__tests__/descriptions.test.ts
+src/lib/pinballmap/__tests__/client.test.ts
+```
+
+#### Integration Tests (1 file)
+```
+src/integration-tests/notification.schema.test.ts
+```
+
+### Migration Priority
+1. **High Priority - Server Tests**: Critical business logic, easier to migrate (no DOM dependencies)
+2. **Medium Priority - Library/Utility Tests**: Pure functions, straightforward migration
+3. **Medium Priority - Integration Tests**: Database tests, need careful handling
+4. **Lower Priority - Frontend/Component Tests**: May have complex DOM/React dependencies
+
 ## Notes
 
 - Keep both Jest and Vitest configs during migration
 - Run both test suites in parallel to verify compatibility
 - Document any workarounds needed for specific patterns
+- Several files already have Vitest equivalents (e.g., `*.vitest.test.ts` alongside `*.test.ts`)

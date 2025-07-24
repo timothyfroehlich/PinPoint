@@ -1,17 +1,13 @@
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { type DefaultSession, type NextAuthConfig } from "next-auth";
-import Credentials from "next-auth/providers/credentials";
-import Google from "next-auth/providers/google";
 
-import { isValidUser, isValidOrganization, isValidMembership } from "./types";
+import { createAuthProviders } from "./providers";
+import { isValidOrganization, isValidMembership } from "./types";
 
 import type { Session } from "next-auth";
 import type { User } from "next-auth";
 import type { JWT } from "next-auth/jwt";
 import type { ExtendedPrismaClient } from "~/server/db";
-
-import { env } from "~/env.js";
-import { shouldEnableDevFeatures } from "~/lib/environment";
 
 /**
  * Module augmentation for `next-auth` types. Allows us to add custom properties to the `session`
@@ -42,56 +38,7 @@ declare module "next-auth" {
  */
 export const createAuthConfig = (db: ExtendedPrismaClient): NextAuthConfig => ({
   adapter: PrismaAdapter(db),
-  providers: [
-    Google({
-      clientId: env.GOOGLE_CLIENT_ID ?? "",
-      clientSecret: env.GOOGLE_CLIENT_SECRET ?? "",
-    }),
-    // Development-only Credentials provider for test accounts
-    ...(shouldEnableDevFeatures() || env.NODE_ENV === "test"
-      ? [
-          Credentials({
-            name: "Development Test Users",
-            credentials: {
-              email: { label: "Email", type: "email" },
-            },
-            async authorize(
-              credentials: Record<string, unknown> | undefined,
-            ): Promise<User | null> {
-              if (!shouldEnableDevFeatures() && env.NODE_ENV !== "test") {
-                return null;
-              }
-
-              if (
-                !credentials ||
-                !("email" in credentials) ||
-                typeof credentials["email"] !== "string"
-              ) {
-                return null;
-              }
-
-              const email = credentials["email"];
-
-              // Find user in database by email
-              const userResult = await db.user.findUnique({
-                where: { email },
-              });
-
-              if (isValidUser(userResult)) {
-                return {
-                  id: userResult.id,
-                  name: userResult.name ?? "",
-                  email: userResult.email ?? "",
-                  image: userResult.profilePicture ?? null,
-                };
-              }
-
-              return null;
-            },
-          }),
-        ]
-      : []),
-  ],
+  providers: createAuthProviders(db),
   pages: {
     signIn: "/sign-in",
   },

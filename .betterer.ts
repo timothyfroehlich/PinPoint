@@ -32,6 +32,7 @@ export default {
       .exclude(
         "./src/test/**/*",
         "./src/**/*.test.*",
+        "./src/**/*.vitest.test.*",
         "./src/**/__tests__/**/*",
       ),
 };
