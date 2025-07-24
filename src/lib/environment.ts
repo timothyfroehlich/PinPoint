@@ -71,6 +71,7 @@ export function shouldEnableDevFeatures(): boolean {
  */
 export function shouldEnableCredentialsProvider(): boolean {
   // Temporary override for production deployment - allows preview behavior in production
+  // TODO: Remove this after successful production deployment verification
   if (env.FORCE_PREVIEW_BEHAVIOR === "true") {
     return true;
   }
