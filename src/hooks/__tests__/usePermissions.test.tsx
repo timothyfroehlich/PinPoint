@@ -3,7 +3,7 @@ import * as React from "react";
 import { type ReactNode } from "react";
 import { describe, it, expect, vi } from "vitest";
 
-import "@testing-library/jest-dom/vitest";
+import "@testing-library/jest-dom";
 
 import {
   usePermissions,

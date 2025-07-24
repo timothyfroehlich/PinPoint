@@ -9,7 +9,7 @@ import {
   afterAll,
   vi,
 } from "vitest";
-import "@testing-library/jest-dom/vitest";
+import "@testing-library/jest-dom";
 
 import PrimaryAppBar from "../PrimaryAppBar";
 

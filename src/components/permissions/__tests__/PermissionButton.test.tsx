@@ -4,7 +4,7 @@ import * as React from "react";
 import { createRef } from "react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-import "@testing-library/jest-dom/vitest";
+import "@testing-library/jest-dom";
 
 import { PermissionButton } from "../PermissionButton";
 

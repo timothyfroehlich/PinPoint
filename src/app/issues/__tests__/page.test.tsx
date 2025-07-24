@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
-import "@testing-library/jest-dom/vitest";
+import "@testing-library/jest-dom";
 import { SessionProvider } from "next-auth/react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
