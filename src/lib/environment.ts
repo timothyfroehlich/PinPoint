@@ -70,6 +70,10 @@ export function shouldEnableDevFeatures(): boolean {
  * Used for test users in development and demo users in preview
  */
 export function shouldEnableCredentialsProvider(): boolean {
+  // Temporary override for production deployment - allows preview behavior in production
+  if (env.FORCE_PREVIEW_BEHAVIOR === "true") {
+    return true;
+  }
   return isDevelopment() || isPreview() || env.NODE_ENV === "test";
 }
 
