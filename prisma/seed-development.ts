@@ -53,6 +53,31 @@ const DEVELOPMENT_TEST_USERS = [
     bio: "Legacy development test player account.",
     role: "member",
   },
+  // Original comprehensive test users from main branch
+  {
+    name: "Roger Sharpe",
+    email: "roger.sharpe@pinpoint.dev",
+    bio: "Pinball ambassador and historian.",
+    role: "admin",
+  },
+  {
+    name: "Gary Stern",
+    email: "gary.stern@pinpoint.dev",
+    bio: "Founder of Stern Pinball.",
+    role: "member",
+  },
+  {
+    name: "Escher Lefkoff",
+    email: "escher.lefkoff@pinpoint.dev",
+    bio: "World champion competitive pinball player.",
+    role: "member",
+  },
+  {
+    name: "Harry Williams",
+    email: "harry.williams@pinpoint.dev",
+    bio: "The father of pinball.",
+    role: "member",
+  },
 ];
 
 // Create global permissions using the constants
@@ -188,8 +213,8 @@ async function main() {
 
   // 2. Create test organization
   const organization = await createOrganizationWithRoles({
-    name: "Development Test Organization",
-    subdomain: "dev-test",
+    name: "Austin Pinball Collective",
+    subdomain: "apc",
     logoUrl: "/images/logos/austinpinballcollective-logo-outline.png",
   });
   console.log(`[DEV] Created organization: ${organization.name}`);
@@ -250,6 +275,168 @@ async function main() {
     console.log(`[DEV] Created membership for: ${userData.name ?? "Unknown"}`);
   }
 
+  // 8. Create the Austin Pinball Collective location
+  let austinPinballLocation = await prisma.location.findFirst({
+    where: {
+      organizationId: organization.id,
+      name: "Austin Pinball Collective",
+    },
+  });
+
+  austinPinballLocation ??= await prisma.location.create({
+    data: {
+      name: "Austin Pinball Collective",
+      organizationId: organization.id,
+    },
+  });
+  console.log(`[DEV] Created/Updated location: ${austinPinballLocation.name}`);
+
+  // 9. Create models from comprehensive OPDB game data
+  const comprehensiveOPDBGames = [
+    { opdb_id: "G43W4-MrRpw", name: "AC/DC (Premium)", manufacturer: "Stern", year: 2012 },
+    { opdb_id: "GBLLd-MdEON-A94po", name: "Ultraman: Kaiju Rumble (Blood Sucker Edition)", manufacturer: "Stern", year: 2023 },
+    { opdb_id: "G42Pk-MZe2e", name: "Xenon", manufacturer: "Bally", year: 1980 },
+    { opdb_id: "GrknN-MQrdv", name: "Cleopatra", manufacturer: "Gottlieb", year: 1977 },
+    // Add more games as needed from the sample-issues.json
+  ];
+
+  const createdModels = [];
+  for (const game of comprehensiveOPDBGames) {
+    const model = await prisma.model.upsert({
+      where: { opdbId: game.opdb_id },
+      update: {
+        name: game.name,
+        manufacturer: game.manufacturer,
+        year: game.year,
+      },
+      create: {
+        name: game.name,
+        opdbId: game.opdb_id,
+        manufacturer: game.manufacturer,
+        year: game.year || null,
+        isCustom: false,
+        // Do NOT set organizationId for OPDB models (global)
+      },
+    });
+    console.log(`[DEV] Created/Updated OPDB model: ${model.name}`);
+    createdModels.push(model);
+  }
+
+  // 10. Create machines (instances) in the location
+  for (let i = 0; i < createdModels.length; i++) {
+    const model = createdModels[i];
+    if (!model) continue;
+
+    const owner = createdUsers[i % createdUsers.length]; // Rotate through users
+    if (!owner) continue;
+
+    const existingMachine = await prisma.machine.findFirst({
+      where: {
+        organizationId: organization.id,
+        locationId: austinPinballLocation.id,
+        modelId: model.id,
+      },
+    });
+
+    if (!existingMachine) {
+      await prisma.machine.create({
+        data: {
+          name: `${model.name} #${i + 1}`,
+          organizationId: organization.id,
+          locationId: austinPinballLocation.id,
+          modelId: model.id,
+          ownerId: owner.id,
+          qrCodeId: `qr-${model.name.toLowerCase().replace(/\s+/g, '-')}-${i + 1}`,
+        },
+      });
+      console.log(`[DEV] Created machine: ${model.name} #${i + 1}`);
+    }
+  }
+
+  // 11. Create issue statuses
+  const statusesToUpsert = [
+    { name: "New", category: "OPEN" as const },
+    { name: "In Progress", category: "OPEN" as const },
+    { name: "Needs expert help", category: "OPEN" as const },
+    { name: "Needs Parts", category: "OPEN" as const },
+    { name: "Fixed", category: "RESOLVED" as const },
+    { name: "Not to be Fixed", category: "RESOLVED" as const },
+    { name: "Not Reproducible", category: "RESOLVED" as const },
+  ];
+
+  for (const statusData of statusesToUpsert) {
+    await prisma.issueStatus.upsert({
+      where: {
+        name_organizationId: {
+          name: statusData.name,
+          organizationId: organization.id,
+        },
+      },
+      update: { category: statusData.category },
+      create: {
+        name: statusData.name,
+        category: statusData.category,
+        organizationId: organization.id,
+        isDefault: true,
+      },
+    });
+    console.log(`[DEV] Upserted issue status: ${statusData.name}`);
+  }
+
+  // 12. Load sample issues from JSON file
+  const defaultPriority = await prisma.priority.findFirst({
+    where: { name: "Medium", organizationId: organization.id },
+  });
+
+  if (!defaultPriority) {
+    throw new Error("Default priority not found");
+  }
+
+  const sampleIssuesData = await import("./seeds/sample-issues.json");
+  const sampleIssues = sampleIssuesData.default;
+
+  // Create the issues with updated schema
+  for (const issueData of sampleIssues) {
+    // Find the machine by OPDB ID
+    const machine = await prisma.machine.findFirst({
+      where: {
+        model: { opdbId: issueData.gameOpdbId },
+        organizationId: organization.id,
+      },
+    });
+
+    if (machine) {
+      // Find the creator
+      const creator = createdUsers.find((u) => u.email === issueData.reporterEmail);
+      
+      // Find the status
+      const status = await prisma.issueStatus.findFirst({
+        where: {
+          name: issueData.status,
+          organizationId: organization.id,
+        },
+      });
+
+      if (creator && status) {
+        await prisma.issue.create({
+          data: {
+            title: issueData.title,
+            description: issueData.description,
+            consistency: issueData.consistency,
+            createdById: creator.id,
+            machineId: machine.id,
+            statusId: status.id,
+            priorityId: defaultPriority.id,
+            organizationId: organization.id,
+            createdAt: new Date(issueData.createdAt),
+            updatedAt: new Date(issueData.updatedAt),
+          },
+        });
+        console.log(`[DEV] Created issue: ${issueData.title}`);
+      }
+    }
+  }
+
   console.log("✅ [DEV] Development database seeding completed!");
   console.log("");
   console.log("🔑 Test Account Credentials:");
@@ -257,7 +444,10 @@ async function main() {
   console.log("  Member: member@dev.local or member@test.com");
   console.log("  Player: player@dev.local or player@test.com");
   console.log("");
-  console.log("🌐 Organization: dev-test.localhost:3000");
+  console.log("🌐 Organization: apc (Austin Pinball Collective)");
+  console.log(`📍 Location: ${austinPinballLocation.name}`);
+  console.log(`🎮 Games: ${createdModels.length} OPDB models with machines`);
+  console.log(`🔧 Issues: ${sampleIssues.length} sample issues loaded`);
 }
 
 main()

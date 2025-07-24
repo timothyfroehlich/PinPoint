@@ -7,6 +7,7 @@ import {
   PERMISSION_DESCRIPTIONS,
   SYSTEM_ROLES,
 } from "../src/server/auth/permissions.constants";
+import { env } from "../src/env";
 
 const prisma = createPrismaClient();
 
@@ -141,26 +142,20 @@ async function createDefaultPriorities(organizationId: string) {
   );
 }
 
-// Production users - real accounts only
+// Production users - admin from environment variables
+const adminEmail = env.SEED_ADMIN_EMAIL;
+const adminName = env.SEED_ADMIN_NAME;
+
+if (!adminEmail || !adminName) {
+  throw new Error("SEED_ADMIN_EMAIL and SEED_ADMIN_NAME environment variables are required for production seeding");
+}
+
 const PRODUCTION_USERS = [
   {
-    name: "Tim Froehlich",
-    email: "phoenixavatar2@gmail.com",
+    name: adminName,
+    email: adminEmail,
     bio: "Project owner.",
     role: "admin",
-  },
-  // Notable pinball figures for demo purposes (will only exist if they actually sign up)
-  {
-    name: "Roger Sharpe",
-    email: "roger.sharpe@testaccount.dev",
-    bio: "Pinball ambassador and historian.",
-    role: "member",
-  },
-  {
-    name: "Gary Stern",
-    email: "gary.stern@testaccount.dev",
-    bio: "Founder of Stern Pinball.",
-    role: "member",
   },
 ];
 

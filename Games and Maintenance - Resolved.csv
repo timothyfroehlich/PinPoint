@@ -1,22 +1,22 @@
 Timestamp,Email Address,Game,Severity,Consistency,Fix Status,Description,Assigned Technician,Work Log,Owner Notified,Email of owner,Owner Comments/Plans to Address,Last Updated,
-5/29/2025 20:40:02,phoenixavatar2@gmail.com,TNG,Major,Always,Fixed,"Won't let you start a game, shuttle mech keeps spinning and.banging",,,,,,,
-6/16/2025 19:21:40,caaaykai@gmail.com,JDJP,Major,Always,Fixed,Test,,,,,,,
+5/29/2025 20:40:02,timfroehlich@pinpoint.dev,TNG,Major,Always,Fixed,"Won't let you start a game, shuttle mech keeps spinning and.banging",,,,,,,
+6/16/2025 19:21:40,keith.johnson@pinpoint.dev,JDJP,Major,Always,Fixed,Test,,,,,,,
 6/8/2025 0:00:00,,Revenge from Mars,,,Not to be Fixed,Reported that Capture Switch is not always registering; noted that it needs to be hit once to light lock and then again to lock ball; Scoop not predictable (there is a mod that exists),,,,,Eric is aware of issue. Only a mod can fix it,,
-5/18/2025 13:45:12,timothyfroehlich@gmail.com,Labyrinth (with topper),Cosmetic,Always,Fixed,Right flipper button is a little sticky,,,,,,,
-5/18/2025 14:04:05,timothyfroehlich@gmail.com,Monopoly,Cosmetic,Always,Not to be Fixed,High pitched buzzing from the speakers that occurs when the lights flash on the game,,,,,Jason is aware,,
-6/16/2025 22:00:40,ppp.roy@gmail.com,Cactus Canyon,Minor,Always,Fixed,"When plunging the ball, the ""skill shot"" cup doesn't register the movement of the ball in the cup and will only select the first thing on screen.  ",Cayman,,,,Tim may not be aware; Cayman to reach out,,
-6/27/2025 20:27:35,rmh5989@gmail.com,Flight 2000,Major,Every game,Fixed,Left flipper starting to stick,,,,,,6/30/2025,
-6/28/2025 11:26:25,rae_beyond@yahoo.com,Lord of the rings,Severe,Every game,Fixed,Right flipper keeps dying during play,,,,,,,
-6/28/2025 13:00:24,rmh5989@gmail.com,World Cup Soccer ,Minor,Always,Not Reproducible,Flipper Alignment,,,,,,,
-6/28/2025 13:04:53,rmh5989@gmail.com,Monopoly,Cosmetic,Always,Not to be Fixed,Audio electrical buzzing issue,,,,,,,
-6/21/2025 13:38:25,rmh5989@gmail.com,Ultraman,Major,Every game,Not Reproducible,Top right flipper is out,,,Yes -Phil,,,,
-6/28/2025 13:15:38,rmh5989@gmail.com,Eight Ball Deluxe,Minor,Occasionally,Fixed,"Flippers sticking occasionally, rubbing playfield",Justin/Matt O,Justin and Matt O fixed and rebuilt flippers,Yes,justinweaver@hotmail.com,Justin is aware; planning to rebuild flipper,6/30/2025 9:32:29,
-6/29/2025 13:00:16,rmh5989@gmail.com,Labyrinth (w/topper),Minor,Occasionally,Not Reproducible,"Possible Lighting Issues (Barrell Ball, more?)",Charles,Running Diagnostic/Testing,Yes,cspeer504@gmail.com,,6/30/2025 12:36:03,
-6/21/2025 13:12:42,rmh5989@gmail.com,World Cup Soccer,Cosmetic,Always,Not to be Fixed,Backglass lighting is out? it's just kinda dim,Neil,,,,,6/30/2025 19:14:29,
+5/18/2025 13:45:12,timfroehlich@pinpoint.dev,Labyrinth (with topper),Cosmetic,Always,Fixed,Right flipper button is a little sticky,,,,,,,
+5/18/2025 14:04:05,timfroehlich@pinpoint.dev,Monopoly,Cosmetic,Always,Not to be Fixed,High pitched buzzing from the speakers that occurs when the lights flash on the game,,,,,Jason is aware,,
+6/16/2025 22:00:40,mark.ritchie@pinpoint.dev,Cactus Canyon,Minor,Always,Fixed,"When plunging the ball, the ""skill shot"" cup doesn't register the movement of the ball in the cup and will only select the first thing on screen.  ",Cayman,,,,Tim may not be aware; Cayman to reach out,,
+6/27/2025 20:27:35,keith.elwin@pinpoint.dev,Flight 2000,Major,Every game,Fixed,Left flipper starting to stick,,,,,,6/30/2025,
+6/28/2025 11:26:25,steve.kordek@pinpoint.dev,Lord of the rings,Severe,Every game,Fixed,Right flipper keeps dying during play,,,,,,,
+6/28/2025 13:00:24,keith.elwin@pinpoint.dev,World Cup Soccer ,Minor,Always,Not Reproducible,Flipper Alignment,,,,,,,
+6/28/2025 13:04:53,keith.elwin@pinpoint.dev,Monopoly,Cosmetic,Always,Not to be Fixed,Audio electrical buzzing issue,,,,,,,
+6/21/2025 13:38:25,keith.elwin@pinpoint.dev,Ultraman,Major,Every game,Not Reproducible,Top right flipper is out,,,Yes -Phil,,,,
+6/28/2025 13:15:38,keith.elwin@pinpoint.dev,Eight Ball Deluxe,Minor,Occasionally,Fixed,"Flippers sticking occasionally, rubbing playfield",Justin/Matt O,Justin and Matt O fixed and rebuilt flippers,Yes,wayne.neyens@pinpoint.dev,Justin is aware; planning to rebuild flipper,6/30/2025 9:32:29,
+6/29/2025 13:00:16,keith.elwin@pinpoint.dev,Labyrinth (w/topper),Minor,Occasionally,Not Reproducible,"Possible Lighting Issues (Barrell Ball, more?)",Charles,Running Diagnostic/Testing,Yes,pat.lawlor@pinpoint.dev,,6/30/2025 12:36:03,
+6/21/2025 13:12:42,keith.elwin@pinpoint.dev,World Cup Soccer,Cosmetic,Always,Not to be Fixed,Backglass lighting is out? it's just kinda dim,Neil,,,,,6/30/2025 19:14:29,
 6/8/2025 0:00:00,,Stingray,Cosmetic,Occasionally,Not Reproducible,Extra Ball Light flickering,,Chris E. ,,,,,7/1/2025 18:56:33
-6/30/2025 12:15:36,rmh5989@gmail.com,Ultraman,Major,Every game,Fixed,Left inlane subway flap is stuck in the up position,Chris E/Eric E,Eric E,"""I stopped by yesterday briefly and reset the servo. 
+6/30/2025 12:15:36,keith.elwin@pinpoint.dev,Ultraman,Major,Every game,Fixed,Left inlane subway flap is stuck in the up position,Chris E/Eric E,Eric E,"""I stopped by yesterday briefly and reset the servo. 
 I didn’t have time to replace the Baltan sculpts / servos 
-on the left ramp though.""  - Chris E",Yes,chris.engberg@gmail.com,,7/4/2025 23:27:23
+on the left ramp though.""  - Chris E",Yes,jack.danger@pinpoint.dev,,7/4/2025 23:27:23
 6/8/2025 0:00:00,,STARS,Minor,Every game,Fixed,Right spinner resting in horizontal position; Right Side of Pop not Registering,,Chris E. ,,,,,7/4/2025 23:28:26
 ,,,,,,,,,,,,,
 ,,,,,,,,,,,,,

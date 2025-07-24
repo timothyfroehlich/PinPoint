@@ -304,7 +304,7 @@ async function main() {
     console.log("\n✅ Beta seed completed successfully!");
     console.log("\n📝 Next steps:");
     console.log("1. Deploy to Vercel");
-    console.log("2. Log in with Google (phoenixavatar2@gmail.com)");
+    console.log("2. Log in with Google using your configured admin email");
     console.log("3. You'll automatically be an admin");
     console.log("4. Add machines and invite beta testers");
   } catch (error) {
