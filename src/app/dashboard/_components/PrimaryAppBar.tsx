@@ -1,6 +1,7 @@
 "use client";
 
 import PlaceIcon from "@mui/icons-material/Place";
+import { AccountCircle } from "@mui/icons-material";
 import {
   AppBar,
   Toolbar,
@@ -12,6 +13,8 @@ import {
   Menu,
   MenuItem,
 } from "@mui/material";
+import { useRouter } from "next/navigation";
+import { signOut, signIn, useSession } from "next-auth/react";
 import { useState } from "react";
 
 import type { JSX } from "react";
@@ -20,6 +23,8 @@ import { PermissionButton } from "~/components/permissions/PermissionButton";
 import { usePermissions } from "~/hooks/usePermissions";
 
 const PrimaryAppBar = (): JSX.Element => {
+  const router = useRouter();
+  const { data: session, status } = useSession();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
   const { hasPermission } = usePermissions();
@@ -30,6 +35,21 @@ const PrimaryAppBar = (): JSX.Element => {
 
   const handleClose = (): void => {
     setAnchorEl(null);
+  };
+
+  const handleLogout = async (): Promise<void> => {
+    try {
+      handleClose();
+      await signOut({ redirect: false });
+      router.push("/");
+    } catch (error) {
+      console.error("Logout failed:", error);
+      router.push("/");
+    }
+  };
+
+  const handleLogin = (): void => {
+    void signIn();
   };
 
   return (
@@ -44,7 +64,7 @@ const PrimaryAppBar = (): JSX.Element => {
             textDecoration: "none",
             color: "inherit",
           }}
-          href="/dashboard"
+          href="/"
         >
           <PlaceIcon sx={{ mr: 1, color: "primary.main" }} />
           <Typography variant="h6" noWrap component="div">
@@ -56,81 +76,129 @@ const PrimaryAppBar = (): JSX.Element => {
         <Box sx={{ display: "flex", gap: 1 }}>
           <Button
             color="inherit"
+            href="/"
             sx={{
-              bgcolor: "primary.main",
               borderRadius: 2,
               px: 3,
               textTransform: "none",
               fontWeight: "medium",
-              "&:hover": { bgcolor: "primary.dark" },
+              "&:hover": { bgcolor: "rgba(255,255,255,0.1)" },
             }}
           >
-            Dashboard
+            Home
           </Button>
-          <PermissionButton
-            permission="issue:view"
-            hasPermission={hasPermission}
-            showWhenDenied={false}
-            color="inherit"
-            sx={{
-              borderRadius: 2,
-              px: 3,
-              textTransform: "none",
-              fontWeight: "medium",
-              "&:hover": { bgcolor: "rgba(255,255,255,0.1)" },
-            }}
-            tooltipText="View and manage issues"
-          >
-            Issues
-          </PermissionButton>
-          <PermissionButton
-            permission="machine:view"
-            hasPermission={hasPermission}
-            showWhenDenied={false}
-            color="inherit"
-            sx={{
-              borderRadius: 2,
-              px: 3,
-              textTransform: "none",
-              fontWeight: "medium",
-              "&:hover": { bgcolor: "rgba(255,255,255,0.1)" },
-            }}
-            tooltipText="View and manage games"
-          >
-            Games
-          </PermissionButton>
+
+          {/* Authenticated navigation */}
+          {session && (
+            <>
+              <PermissionButton
+                permission="issue:view"
+                hasPermission={hasPermission}
+                showWhenDenied={false}
+                color="inherit"
+                sx={{
+                  borderRadius: 2,
+                  px: 3,
+                  textTransform: "none",
+                  fontWeight: "medium",
+                  "&:hover": { bgcolor: "rgba(255,255,255,0.1)" },
+                }}
+                tooltipText="View and manage issues"
+              >
+                Issues
+              </PermissionButton>
+              <PermissionButton
+                permission="machine:view"
+                hasPermission={hasPermission}
+                showWhenDenied={false}
+                color="inherit"
+                sx={{
+                  borderRadius: 2,
+                  px: 3,
+                  textTransform: "none",
+                  fontWeight: "medium",
+                  "&:hover": { bgcolor: "rgba(255,255,255,0.1)" },
+                }}
+                tooltipText="View and manage games"
+              >
+                Games
+              </PermissionButton>
+            </>
+          )}
         </Box>
 
-        {/* User Profile Menu */}
-        <div>
-          <IconButton
-            size="large"
-            aria-label="account of current user"
-            aria-controls="menu-appbar"
-            aria-haspopup="true"
-            onClick={handleMenu}
-            color="inherit"
-          >
-            <Avatar sx={{ bgcolor: "primary.main" }}>T</Avatar>
-          </IconButton>
-          <Menu
-            id="menu-appbar"
-            anchorEl={anchorEl}
-            anchorOrigin={{
-              vertical: "top",
-              horizontal: "right",
-            }}
-            keepMounted
-            transformOrigin={{
-              vertical: "top",
-              horizontal: "right",
-            }}
-            open={open}
-            onClose={handleClose}
-          >
-            <MenuItem onClick={handleClose}>Logout</MenuItem>
-          </Menu>
-        </div>
+        {/* Authentication Controls */}
+        <Box>
+          {status === "loading" ? (
+            <IconButton color="inherit" disabled>
+              <AccountCircle />
+            </IconButton>
+          ) : session ? (
+            // Authenticated state - show user menu
+            <div>
+              <IconButton
+                size="large"
+                aria-label="account of current user"
+                aria-controls="menu-appbar"
+                aria-haspopup="true"
+                onClick={handleMenu}
+                color="inherit"
+              >
+                {session.user.image ? (
+                  <Avatar
+                    src={session.user.image}
+                    alt={session.user.name ?? "User"}
+                    sx={{ width: 32, height: 32 }}
+                  />
+                ) : (
+                  <Avatar
+                    sx={{ bgcolor: "primary.main", width: 32, height: 32 }}
+                  >
+                    {session.user.name?.charAt(0) ?? "U"}
+                  </Avatar>
+                )}
+              </IconButton>
+              <Menu
+                id="menu-appbar"
+                anchorEl={anchorEl}
+                anchorOrigin={{
+                  vertical: "top",
+                  horizontal: "right",
+                }}
+                keepMounted
+                transformOrigin={{
+                  vertical: "top",
+                  horizontal: "right",
+                }}
+                open={open}
+                onClose={handleClose}
+              >
+                <MenuItem
+                  onClick={() => {
+                    void handleLogout();
+                  }}
+                >
+                  Logout
+                </MenuItem>
+              </Menu>
+            </div>
+          ) : (
+            // Unauthenticated state - show login button
+            <Button
+              color="inherit"
+              onClick={handleLogin}
+              sx={{
+                borderRadius: 2,
+                px: 3,
+                textTransform: "none",
+                fontWeight: "medium",
+                "&:hover": { bgcolor: "rgba(255,255,255,0.1)" },
+              }}
+            >
+              Sign In
+            </Button>
+          )}
+        </Box>
       </Toolbar>
     </AppBar>
   );
