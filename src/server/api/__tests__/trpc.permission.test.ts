@@ -14,13 +14,6 @@ const createMockTRPCContext = (
 } => {
   const mockContext = createMockContext();
 
-  // Simulate a role with the given permissions
-  const mockRole = {
-    id: "role-1",
-    name: "Test Role",
-    permissions,
-  };
-
   // The membership object with role for PermissionService
   const mockMembership = {
     id: "membership-1",

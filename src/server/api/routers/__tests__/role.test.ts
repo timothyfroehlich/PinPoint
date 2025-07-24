@@ -444,7 +444,7 @@ describe("Role Management API", () => {
       mockContext.db.role.update.mockResolvedValue(mockRole as any);
 
       // Act
-      const result = await caller.create({
+      await caller.create({
         name: "New Role",
         permissionIds: ["perm-1", "perm-2"],
       });

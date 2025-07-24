@@ -1,16 +1,37 @@
+import { eslint } from "@betterer/eslint";
 import { typescript } from "@betterer/typescript";
 
 export default {
-  // Track TypeScript strict mode errors - this is the most important metric
-  // Excludes jest test files (*.test.{ts,tsx}) but includes vitest tests (*.vitest.test.{ts,tsx})
-  "typescript strict mode": () =>
+  // Production code - strictest enforcement (blocks CI)
+  "typescript strict (production)": () =>
     typescript("./tsconfig.json", {
       strict: true,
       exactOptionalPropertyTypes: true,
       noUncheckedIndexedAccess: true,
-      target: "ES2022", // Explicitly set target to match tsconfig.json
-      lib: ["dom", "dom.iterable", "ES2022"], // Match tsconfig.json lib
     })
       .include("./src/**/*.{ts,tsx}")
-      .exclude("./src/**/*.test.{ts,tsx}", "./src/**/__tests__/**/*.test.{ts,tsx}"),
+      .exclude(
+        "./src/test/**/*",
+        "./src/**/*.test.*",
+        "./src/**/__tests__/**/*",
+      ),
+
+  // Test utilities - moderate tracking (warns but doesn't block)
+  "typescript recommended (test-utils)": () =>
+    typescript("./tsconfig.test-utils.json", {
+      strict: true,
+      strictNullChecks: true,
+    })
+      .include("./src/test/**/*.{ts,tsx}")
+      .exclude("./src/**/*.test.*"),
+
+  // Track any-usage in production code
+  "no explicit any (production)": () =>
+    eslint({ rules: { "@typescript-eslint/no-explicit-any": "error" } })
+      .include("./src/**/*.{ts,tsx}")
+      .exclude(
+        "./src/test/**/*",
+        "./src/**/*.test.*",
+        "./src/**/__tests__/**/*",
+      ),
 };

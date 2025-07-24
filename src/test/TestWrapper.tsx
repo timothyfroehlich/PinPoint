@@ -72,7 +72,7 @@ function createMockMembership(
 function createMockSession(
   user: Partial<User> = {},
   permissions: string[] = [],
-) {
+): { user: User & { permissions: string[] }; expires: string } {
   return {
     user: {
       ...createMockUser(user),
@@ -103,7 +103,7 @@ interface TestWrapperProps {
 /**
  * Creates a test-specific QueryClient instance to avoid state leaking between tests
  */
-const createTestQueryClient = () =>
+const createTestQueryClient = (): QueryClient =>
   new QueryClient({
     defaultOptions: {
       queries: {
@@ -116,10 +116,13 @@ const createTestQueryClient = () =>
 /**
  * Creates properly typed mock tRPC client with getCurrentMembership
  */
-function createMockTRPCClientWithPermissions(permissions: string[] = []) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function createMockTRPCClientWithPermissions(permissions: string[] = []): any {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const mockTRPCClient = createMockTRPCClient({});
 
   // Override the getCurrentMembership specifically
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
   mockTRPCClient.user.getCurrentMembership.useQuery = jest.fn(() => ({
     data: createMockMembership({ permissions, role: "Member" }),
     isLoading: false,
@@ -178,7 +181,7 @@ export function TestWrapper({
   session,
   mockTRPCClient,
   userPermissions = [],
-}: TestWrapperProps) {
+}: TestWrapperProps): React.JSX.Element {
   // Create isolated QueryClient instance for each test
   const [queryClient] = useState(createTestQueryClient);
 
@@ -189,12 +192,14 @@ export function TestWrapper({
       : (session ?? createMockSession({}, userPermissions));
 
   // Create default mock tRPC client if none provided
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const trpcClient =
     mockTRPCClient ?? createMockTRPCClientWithPermissions(userPermissions);
 
   return (
     <QueryClientProvider client={queryClient}>
       <SessionProvider session={effectiveSession}>
+        {/* eslint-disable-next-line @typescript-eslint/no-unsafe-assignment */}
         <api.Provider client={trpcClient} queryClient={queryClient}>
           {children}
         </api.Provider>
@@ -216,7 +221,7 @@ export function TestWrapper({
 export function renderWithProviders(
   ui: ReactNode,
   options: Omit<TestWrapperProps, "children"> = {},
-) {
+): React.JSX.Element {
   return <TestWrapper {...options}>{ui}</TestWrapper>;
 }
 
@@ -255,7 +260,7 @@ export {
 /**
  * Setup helper for tests following established patterns
  */
-export function setupTestEnvironment() {
+export function setupTestEnvironment(): void {
   beforeEach(() => {
     jest.clearAllMocks();
   });

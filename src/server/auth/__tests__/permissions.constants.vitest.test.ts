@@ -1,6 +1,4 @@
-/**
- * @jest-environment node
- */
+import { describe, it, expect } from "vitest";
 
 import {
   PERMISSIONS,
@@ -158,7 +156,7 @@ describe("Permission Constants", () => {
         if (resource) {
           const viewPermission = `${resource}:view`;
 
-          if (Object.values(PERMISSIONS).includes(viewPermission)) {
+          if (Object.values(PERMISSIONS).includes(viewPermission as any)) {
             expect(PERMISSION_DEPENDENCIES[editPermission]).toContain(
               viewPermission,
             );

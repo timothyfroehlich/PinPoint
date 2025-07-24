@@ -17,13 +17,13 @@ vi.mock("../issueActivityService");
 vi.mock("../commentCleanupService");
 vi.mock("../qrCodeService");
 vi.mock("~/server/constants/cleanup", () => ({
-  COMMENT_CLEANUP_CONFIG: { retentionDays: 30 }
+  COMMENT_CLEANUP_CONFIG: { retentionDays: 30 },
 }));
 vi.mock("~/lib/image-storage/local-storage", () => ({
-  imageStorage: { store: vi.fn(), delete: vi.fn() }
+  imageStorage: { store: vi.fn(), delete: vi.fn() },
 }));
 vi.mock("~/server/utils/qrCodeUtils", () => ({
-  constructReportUrl: vi.fn()
+  constructReportUrl: vi.fn(),
 }));
 
 describe("ServiceFactory", () => {

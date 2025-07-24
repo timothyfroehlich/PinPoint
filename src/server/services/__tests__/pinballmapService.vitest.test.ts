@@ -130,7 +130,7 @@ describe("PinballMapService", () => {
         clone: () => mockResponse,
         text: () => Promise.resolve(JSON.stringify({ machines })),
         status: 200,
-        statusText: 'OK',
+        statusText: "OK",
         headers: new Headers(),
       };
       mockFetch.mockResolvedValue(mockResponse);
@@ -473,10 +473,10 @@ describe("PinballMapService", () => {
       const mockErrorResponse = {
         ok: false,
         status: 404,
-        statusText: 'Not Found',
+        statusText: "Not Found",
         clone: () => mockErrorResponse,
-        text: () => Promise.resolve('Not Found'),
-        json: () => Promise.reject(new Error('Not JSON')),
+        text: () => Promise.resolve("Not Found"),
+        json: () => Promise.reject(new Error("Not JSON")),
         headers: new Headers(),
       };
       mockFetch.mockResolvedValue(mockErrorResponse);
@@ -489,7 +489,7 @@ describe("PinballMapService", () => {
       const mockMalformedResponse = {
         ok: true,
         status: 200,
-        statusText: 'OK',
+        statusText: "OK",
         json: () => Promise.resolve({ invalid: "data" }),
         clone: () => mockMalformedResponse,
         text: () => Promise.resolve('{"invalid": "data"}'),

@@ -12,7 +12,10 @@ interface IssueDetailProps {
   hasPermission: (permission: string) => boolean;
 }
 
-export function IssueDetail({ issue, session }: IssueDetailProps): React.JSX.Element {
+export function IssueDetail({
+  issue,
+  session,
+}: IssueDetailProps): React.JSX.Element {
   const isAuthenticated = !!session?.user;
 
   return (

@@ -1,4 +1,3 @@
- 
 import { NotificationType } from "@prisma/client";
 
 // Mock NextAuth first to avoid import issues

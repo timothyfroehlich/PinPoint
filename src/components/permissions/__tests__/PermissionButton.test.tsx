@@ -156,7 +156,9 @@ describe("PermissionButton", () => {
         );
 
         expect(container.firstChild).toBeNull();
-        expect(screen.queryByTestId("permission-button")).not.toBeInTheDocument();
+        expect(
+          screen.queryByTestId("permission-button"),
+        ).not.toBeInTheDocument();
       });
     });
   });

@@ -17,7 +17,7 @@ import superjson from "superjson";
 import type { User, NotificationFrequency } from "@prisma/client";
 import type { ReactNode } from "react";
 
-import { handlers } from "~/test/msw/handlers";
+import { mockUserWithPermissions } from "~/test/msw/handlers";
 import { server } from "~/test/msw/setup";
 import { api } from "~/trpc/react";
 
@@ -76,7 +76,7 @@ function createMockMembership(
  */
 function setupMSWHandlers(permissions: string[] = []): void {
   // Use the existing MSW-tRPC handler for mocking permissions
-  server.use(handlers.mockUserWithPermissions(permissions));
+  server.use(mockUserWithPermissions(permissions));
 }
 
 /**
@@ -154,7 +154,7 @@ export function VitestTestWrapper({
         }),
         httpBatchStreamLink({
           transformer: superjson,
-          url: `http://localhost:${process.env["PORT"] ?? "3000"}/api/trpc`,
+          url: `http://localhost:${process.env.PORT ?? "3000"}/api/trpc`,
           headers: () => {
             const headers = new Headers();
             headers.set("x-trpc-source", "vitest-test");

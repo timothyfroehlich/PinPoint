@@ -67,3 +67,4 @@ eslint-test-output.log
 eslint-prod-errors.json
 betterer-output.log
 agent_workspace/
+cleanup_analysis/

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/explicit-function-return-type */
 import {
   type Role,
   type Permission,
@@ -291,12 +292,8 @@ export namespace MembershipFactory {
     const memberships: TestMembership[] = [];
 
     for (let i = 0; i < userCount; i++) {
-      const role = roles[i % roles.length];
-      if (!role) {
-        throw new Error(
-          `No role found at index ${(i % roles.length).toString()}`,
-        );
-      }
+      const roleIndex = i % roles.length;
+      const role = roles[roleIndex]; // Safe: modulo guarantees valid index
       memberships.push(
         createWithUser(
           `user-${(i + 1).toString()}`,

@@ -46,12 +46,14 @@ describe("Permission Descriptions", () => {
     });
 
     it("should have non-empty descriptions for all permissions", () => {
-      Object.entries(PERMISSION_DESCRIPTIONS).forEach(([permission, description]) => {
-        expect(description).toBeTruthy();
-        expect(typeof description).toBe("string");
-        expect(description.length).toBeGreaterThan(0);
-        expect(description).not.toBe(permission);
-      });
+      Object.entries(PERMISSION_DESCRIPTIONS).forEach(
+        ([permission, description]) => {
+          expect(description).toBeTruthy();
+          expect(typeof description).toBe("string");
+          expect(description.length).toBeGreaterThan(0);
+          expect(description).not.toBe(permission);
+        },
+      );
     });
 
     it("should use consistent description formatting", () => {
@@ -84,12 +86,16 @@ describe("Permission Descriptions", () => {
 
       it("should return formatted description for machine permissions", () => {
         const result = getPermissionDescription("machine:view");
-        expect(result).toBe("This action requires: View machines and their details");
+        expect(result).toBe(
+          "This action requires: View machines and their details",
+        );
       });
 
       it("should return formatted description for admin permissions", () => {
         const result = getPermissionDescription("admin:view_analytics");
-        expect(result).toBe("This action requires: Access analytics and reports");
+        expect(result).toBe(
+          "This action requires: Access analytics and reports",
+        );
       });
     });
 
@@ -97,14 +103,14 @@ describe("Permission Descriptions", () => {
       it("should return fallback message for non-existent permission", () => {
         const result = getPermissionDescription("unknown:permission");
         expect(result).toBe(
-          "You don't have permission to perform this action (unknown:permission)"
+          "You don't have permission to perform this action (unknown:permission)",
         );
       });
 
       it("should return fallback message for empty string", () => {
         const result = getPermissionDescription("");
         expect(result).toBe(
-          "You don't have permission to perform this action ()"
+          "You don't have permission to perform this action ()",
         );
       });
 
@@ -112,25 +118,23 @@ describe("Permission Descriptions", () => {
         const malformedPermission = "malformed-permission";
         const result = getPermissionDescription(malformedPermission);
         expect(result).toBe(
-          `You don't have permission to perform this action (${malformedPermission})`
+          `You don't have permission to perform this action (${malformedPermission})`,
         );
       });
     });
 
     describe("edge cases", () => {
       it("should handle null input gracefully", () => {
-         
         const result = getPermissionDescription(null as any);
         expect(result).toBe(
-          "You don't have permission to perform this action (null)"
+          "You don't have permission to perform this action (null)",
         );
       });
 
       it("should handle undefined input gracefully", () => {
-         
         const result = getPermissionDescription(undefined as any);
         expect(result).toBe(
-          "You don't have permission to perform this action (undefined)"
+          "You don't have permission to perform this action (undefined)",
         );
       });
 
@@ -138,7 +142,7 @@ describe("Permission Descriptions", () => {
         const specialPermission = "test:action@#$%";
         const result = getPermissionDescription(specialPermission);
         expect(result).toBe(
-          `You don't have permission to perform this action (${specialPermission})`
+          `You don't have permission to perform this action (${specialPermission})`,
         );
       });
     });
@@ -148,9 +152,9 @@ describe("Permission Descriptions", () => {
     it("should provide descriptions for core CRUD operations", () => {
       const crudPermissions = [
         "issue:view",
-        "issue:create", 
+        "issue:create",
         "issue:edit",
-        "issue:delete"
+        "issue:delete",
       ];
 
       crudPermissions.forEach((permission) => {

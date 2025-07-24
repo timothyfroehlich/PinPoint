@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/explicit-function-return-type */
 import { faker } from "@faker-js/faker";
 
 /**
@@ -154,7 +154,7 @@ export const createCommentTypes = {
     createCommentFactory({
       overrides: {
         isInternal: true,
-        content: `Internal note: ${String(faker.lorem.sentence())}`,
+        content: `Internal note: ${faker.lorem.sentence()}`,
         createdById: "user-technician",
         createdBy: createUserFactory({
           overrides: { id: "user-technician", name: "Tech User" },
@@ -167,7 +167,7 @@ export const createCommentTypes = {
     createCommentFactory({
       overrides: {
         isInternal: false,
-        content: `Issue resolved: ${String(faker.lorem.sentence())}`,
+        content: `Issue resolved: ${faker.lorem.sentence()}`,
         ...overrides,
       },
     }),
@@ -327,8 +327,12 @@ export const createLocationFactory = (options: FactoryOptions = {}) => {
     website: faker.internet.url(),
     organizationId: "org-test",
     pinballMapId: faker.number.int({ min: 1000, max: 99999 }),
-    latitude: faker.number.float({ min: -90, max: 90, fractionDigits: 6 }),
-    longitude: faker.number.float({ min: -180, max: 180, fractionDigits: 6 }),
+    latitude: faker.number.float({ min: -90, max: 90, multipleOf: 0.000001 }),
+    longitude: faker.number.float({
+      min: -180,
+      max: 180,
+      multipleOf: 0.000001,
+    }),
     description: faker.lorem.paragraph(),
     regionId: null,
     lastSyncAt: faker.date.recent({ days: 7 }),
@@ -353,7 +357,7 @@ export const createStatusFactory = (options: FactoryOptions = {}) => {
       "Resolved",
       "Closed",
     ]),
-    color: faker.internet.color(),
+    color: faker.color.rgb(),
     organizationId: "org-test",
     isDefault: false,
     createdAt: faker.date.past({ years: 1 }),
@@ -370,7 +374,7 @@ export const createPriorityFactory = (options: FactoryOptions = {}) => {
   return {
     id: faker.string.uuid(),
     name: faker.helpers.arrayElement(["Low", "Medium", "High", "Critical"]),
-    color: faker.internet.color(),
+    color: faker.color.rgb(),
     level: faker.number.int({ min: 1, max: 4 }),
     organizationId: "org-test",
     isDefault: false,

@@ -1,4 +1,3 @@
-
 // Common mock data for testing
 export const mockUser = {
   id: "user-1",

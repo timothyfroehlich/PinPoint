@@ -3,6 +3,7 @@ import { withAccelerate } from "@prisma/extension-accelerate";
 
 import { env } from "~/env";
 
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 function createPrismaClientInternal() {
   const baseClient = new PrismaClient({
     log:

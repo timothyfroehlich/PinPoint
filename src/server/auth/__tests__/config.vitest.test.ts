@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
+import { type ExtendedPrismaClient } from "../../db";
+import { createAuthConfig } from "../config";
+
+import type { Provider } from "next-auth/providers";
 
 // Use vi.hoisted to properly handle variable hoisting
 const { mockEnv, setNodeEnv, mockUserFindUnique } = vi.hoisted(() => {
@@ -23,9 +27,6 @@ const { mockEnv, setNodeEnv, mockUserFindUnique } = vi.hoisted(() => {
 
   return { mockEnv, setNodeEnv, mockUserFindUnique };
 });
-
-// Import NextAuth provider types
-import type { Provider } from "next-auth/providers";
 
 // Helper interface for provider with ID (since Provider type doesn't expose id)
 interface ProviderWithId {
@@ -66,9 +67,6 @@ vi.mock("next-auth/providers/credentials", () => ({
   })),
 }));
 
-import { createAuthConfig } from "../config";
-import { type ExtendedPrismaClient } from "../../db";
-
 // Create Vitest-compatible mock context
 interface MockContext {
   db: ExtendedPrismaClient;
@@ -89,7 +87,7 @@ const createMockContext = (): MockContext => ({
   } as any,
 });
 
-const resetMockContext = (ctx: MockContext) => {
+const resetMockContext = (_ctx: MockContext) => {
   vi.clearAllMocks();
 };
 

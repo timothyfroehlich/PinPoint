@@ -1,4 +1,3 @@
- 
 import { TRPCError } from "@trpc/server";
 
 // Mock NextAuth first to avoid import issues

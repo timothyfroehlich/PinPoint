@@ -102,7 +102,11 @@ function deepMerge(target: any, source: any): any {
 // Mock tRPC hooks for React components
 export const createMockTRPCHooks = (
   mockClient: ReturnType<typeof createMockTRPCClient>,
-) => ({
+): {
+  useQuery: jest.Mock<any, [any]>;
+  useMutation: jest.Mock<any, [any]>;
+  useUtils: jest.Mock;
+} => ({
   useQuery: jest.fn<any, [any]>((procedure: string, _input?: any) => {
     const keys = procedure.split(".");
     let handler = mockClient;
@@ -155,6 +159,10 @@ export const createMockIssue = (
   id: "test-issue-1",
   title: "Test Issue",
   description: "Test description",
+  organizationId: "test-org-1",
+  machineId: "machine-1",
+  statusId: "status-1",
+  priorityId: "priority-1",
   status: { id: "status-1", name: "Open", color: "#ff0000", category: "NEW" },
   priority: { id: "priority-1", name: "Medium", color: "#ffa500", order: 2 },
   machine: {
@@ -173,6 +181,7 @@ export const createMockIssue = (
       name: "Test Location",
     },
   },
+  createdById: "user-1",
   createdBy: {
     id: "user-1",
     name: "Test User",
@@ -220,7 +229,10 @@ export const createMockUser = (
       role: { id: string; name: string; permissions: string[] };
     }
   > = {},
-) => ({
+): User & {
+  permissions: string[];
+  role: { id: string; name: string; permissions: string[] };
+} => ({
   id: "user-1",
   name: "Test User",
   email: "test@example.com",
@@ -240,7 +252,10 @@ export const createMockSession = (
     user: User & { permissions: string[] };
     expires: string;
   }> = {},
-) => ({
+): {
+  user: User & { permissions: string[] };
+  expires: string;
+} => ({
   user: createMockUser(),
   expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
   ...overrides,
