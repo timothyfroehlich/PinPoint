@@ -49,7 +49,7 @@
   },
   {
     "title": "Sensitive Tilt Warning - needs adjustment/testing",
-    "description": "Sensitive Tilt Warning - needs adjustment/testing. Spooky suggests it may be a loose connector or cracked solder joint.",
+    "description": "Sensitive Tilt Warning - needs adjustment/testing. A designer suggests it may be a loose connector or cracked solder joint.",
     "severity": "Minor",
     "consistency": "Occasionally",
     "status": "Needs expert help",
@@ -337,7 +337,7 @@
   },
   {
     "title": "Soccer Ball disabled due to rattling",
-    "description": "Soccer Ball disabled due to rattling (unknown cause; Neil is working on it)",
+    "description": "Soccer Ball disabled due to rattling (unknown cause; a designer is working on it)",
     "severity": "Minor",
     "consistency": "Every game",
     "status": "In Progress",
@@ -373,7 +373,7 @@
   },
   {
     "title": "Does not start a game",
-    "description": "Does not start a game. Chris E looked at game; thinks contacts may need to be cleaned; previously it was recommended to use something to poke the stepper motor, however, this fix no longer works and game is inoperable.",
+    "description": "Does not start a game. A designer looked at game; thinks contacts may need to be cleaned; previously it was recommended to use something to poke the stepper motor, however, this fix no longer works and game is inoperable.",
     "severity": "Severe",
     "consistency": "Always",
     "status": "In Progress",
@@ -385,7 +385,7 @@
   },
   {
     "title": "Broken railing under house",
-    "description": "Broken railing under house. Neil is ordering parts from Spooky",
+    "description": "Broken railing under house. A designer is ordering parts from Spooky",
     "severity": "Major",
     "consistency": "Always",
     "status": "In Progress",
@@ -409,7 +409,7 @@
   },
   {
     "title": "coil voltage fuse is still blowing randomly",
-    "description": "coil voltage fuse is still blowing randomly. later this week, Ted to use meter to review amp usage on all coils. May want to get some time from Brandon.",
+    "description": "coil voltage fuse is still blowing randomly. later this week, a designer to use meter to review amp usage on all coils. May want to get some time from another designer.",
     "severity": "Major",
     "consistency": "Occasionally",
     "status": "Not to be Fixed",
@@ -457,7 +457,7 @@
   },
   {
     "title": "Skill shot cup doesn't register",
-    "description": "When plunging the ball, the \"skill shot\" cup doesn't register the movement of the ball in the cup and will only select the first thing on screen.",
+    "description": "When plunging the ball, the "skill shot" cup doesn't register the movement of the ball in the cup and will only select the first thing on screen.",
     "severity": "Minor",
     "consistency": "Always",
     "status": "Fixed",
@@ -529,7 +529,7 @@
   },
   {
     "title": "Flippers sticking occasionally",
-    "description": "Flippers sticking occasionally, rubbing playfield. Justin and Matt O fixed and rebuilt flippers",
+    "description": "Flippers sticking occasionally, rubbing playfield. Two designers fixed and rebuilt flippers",
     "severity": "Minor",
     "consistency": "Occasionally",
     "status": "Fixed",

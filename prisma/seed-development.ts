@@ -355,10 +355,10 @@ async function main() {
 
   // 11. Create issue statuses
   const statusesToUpsert = [
-    { name: "New", category: "OPEN" as const },
-    { name: "In Progress", category: "OPEN" as const },
-    { name: "Needs expert help", category: "OPEN" as const },
-    { name: "Needs Parts", category: "OPEN" as const },
+    { name: "New", category: "NEW" as const },
+    { name: "In Progress", category: "IN_PROGRESS" as const },
+    { name: "Needs expert help", category: "IN_PROGRESS" as const },
+    { name: "Needs Parts", category: "IN_PROGRESS" as const },
     { name: "Fixed", category: "RESOLVED" as const },
     { name: "Not to be Fixed", category: "RESOLVED" as const },
     { name: "Not Reproducible", category: "RESOLVED" as const },

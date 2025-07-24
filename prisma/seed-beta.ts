@@ -260,9 +260,15 @@ async function main() {
     });
 
     if (adminRole) {
-      // Pre-create admin user from environment variables (fallback to defaults for local dev)
-      const adminEmail = env.SEED_ADMIN_EMAIL ?? "phoenixavatar2@gmail.com";
-      const adminName = env.SEED_ADMIN_NAME ?? "Tim Froehlich";
+      // Pre-create admin user from environment variables
+      const adminEmail = env.SEED_ADMIN_EMAIL;
+      const adminName = env.SEED_ADMIN_NAME;
+
+      if (!adminEmail || !adminName) {
+        throw new Error(
+          "SEED_ADMIN_EMAIL and SEED_ADMIN_NAME environment variables are required for beta seeding",
+        );
+      }
 
       const adminUser = await prisma.user.upsert({
         where: { email: adminEmail },
