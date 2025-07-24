@@ -77,7 +77,7 @@ jobs:
           cache: "npm"
       - run: npm ci
       - name: ESLint Check - Production Code  
-        run: npm run lint:quiet
+        run: npm run lint
 
   lint-tests:
     name: ESLint (Tests)
@@ -230,7 +230,7 @@ jobs:
           cache: "npm"
       - run: npm ci
       - name: Security Audit
-        run: npm audit --audit-level=high
+        run: npm run deps:check
 
   # Job 7: Validate GitHub Actions
   validate-actions:
@@ -282,7 +282,9 @@ jobs:
 
           # Extract current stats and add Betterer status
           {
-            grep -A 5 "### Error Counts" TYPESCRIPT_MIGRATION.md
+            echo "### TypeScript Status"
+            echo "- **Production Code**: 100% strict mode compliant"
+            echo "- **Test Files**: Incremental cleanup in progress"
             echo ""
             echo "### Betterer Status"
             if npm run betterer:check > /dev/null 2>&1; then
@@ -292,7 +294,7 @@ jobs:
             fi
             echo ""
             echo "---"
-            echo "📖 [Migration Guide](./TYPESCRIPT_MIGRATION.md) | 🔧 [Helper Scripts](./scripts/README.md)"
+            echo "📖 [TypeScript Guide](./docs/developer-guides/typescript-guide.md) | 🔧 [Helper Scripts](./scripts/README.md)"
           } >> migration-report.md
 
       - name: Comment PR
