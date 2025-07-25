@@ -288,6 +288,100 @@ class TypeScriptConfigCache {
 // Global config cache instance
 const tsConfigCache = new TypeScriptConfigCache();
 
+/**
+ * Debouncing system to reduce noise from rapid file edits
+ * Only runs quality checks after a brief pause in editing
+ */
+class FileDebouncer {
+  constructor(debounceMs = 2000) {
+    this.debounceMs = debounceMs;
+    this.pendingChecks = new Map();
+    this.recentChecks = new Map();
+    this.cleanupInterval = setInterval(() => this.cleanup(), 30000); // Cleanup every 30s
+  }
+
+  /**
+   * Check if we should run quality check now or debounce it
+   * @param {string} filePath - File being edited
+   * @returns {boolean} True if should check now, false if debouncing
+   */
+  shouldCheck(filePath) {
+    const now = Date.now();
+    const lastCheck = this.recentChecks.get(filePath) || 0;
+    
+    // If we checked this file recently (within debounce window), skip
+    if (now - lastCheck < this.debounceMs) {
+      log.debug(`Debouncing check for ${path.basename(filePath)} (last check ${now - lastCheck}ms ago)`);
+      return false;
+    }
+
+    // Clear any pending timeout for this file
+    if (this.pendingChecks.has(filePath)) {
+      clearTimeout(this.pendingChecks.get(filePath));
+      this.pendingChecks.delete(filePath);
+    }
+
+    // Record this check time
+    this.recentChecks.set(filePath, now);
+    return true;
+  }
+
+  /**
+   * Schedule a debounced check for later
+   * @param {string} filePath - File to check later
+   * @param {Function} checkFunction - Function to run the check
+   */
+  scheduleCheck(filePath, checkFunction) {
+    // Clear existing timeout
+    if (this.pendingChecks.has(filePath)) {
+      clearTimeout(this.pendingChecks.get(filePath));
+    }
+
+    // Schedule new check
+    const timeoutId = setTimeout(() => {
+      log.debug(`Running debounced check for ${path.basename(filePath)}`);
+      checkFunction();
+      this.pendingChecks.delete(filePath);
+    }, this.debounceMs);
+
+    this.pendingChecks.set(filePath, timeoutId);
+    log.debug(`Scheduled debounced check for ${path.basename(filePath)} in ${this.debounceMs}ms`);
+  }
+
+  /**
+   * Clean up old entries to prevent memory leaks
+   */
+  cleanup() {
+    const now = Date.now();
+    const maxAge = this.debounceMs * 10; // Keep entries for 10x debounce time
+
+    for (const [filePath, timestamp] of this.recentChecks.entries()) {
+      if (now - timestamp > maxAge) {
+        this.recentChecks.delete(filePath);
+      }
+    }
+  }
+
+  /**
+   * Clean up all timers (for graceful shutdown)
+   */
+  destroy() {
+    // Clear all pending timeouts
+    for (const timeoutId of this.pendingChecks.values()) {
+      clearTimeout(timeoutId);
+    }
+    this.pendingChecks.clear();
+    
+    // Clear cleanup interval
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+    }
+  }
+}
+
+// Global debouncer instance
+const fileDebouncer = new FileDebouncer();
+
 // ANSI color codes
 const colors = {
   red: '\x1b[0;31m',
@@ -413,6 +507,106 @@ try {
   ts = require(path.join(projectRoot, 'node_modules', 'typescript'));
 } catch (e) {
   log.debug('TypeScript not found in project - will skip TypeScript checks');
+}
+
+/**
+ * Context-aware file analysis to detect work-in-progress patterns
+ * @param {string} filePath - Path to file
+ * @param {string} content - File content
+ * @returns {Object} Analysis result with shouldSkip flag and reasons
+ */
+function analyzeFileContext(filePath, content) {
+  const reasons = [];
+  let shouldSkip = false;
+
+  // Check for explicit work-in-progress markers
+  const wipMarkers = [
+    '// TODO: implement',
+    '/* TODO: implement',
+    '// TEMP:',
+    '/* TEMP:',
+    '// WIP:',
+    '/* WIP:',
+    '// FIXME: incomplete',
+    '/* FIXME: incomplete'
+  ];
+
+  for (const marker of wipMarkers) {
+    if (content.includes(marker)) {
+      reasons.push(`Found work-in-progress marker: ${marker}`);
+      shouldSkip = true;
+    }
+  }
+
+  // Check for incomplete import patterns
+  const lines = content.split('\n');
+  const importLines = lines.filter(line => line.trim().startsWith('import '));
+  const nonImportLines = lines.filter(line => 
+    line.trim() && 
+    !line.trim().startsWith('import ') &&
+    !line.trim().startsWith('//') &&
+    !line.trim().startsWith('/*')
+  );
+
+  // If we have imports but very little other content, might be mid-edit
+  if (importLines.length > 0 && nonImportLines.length < 3) {
+    reasons.push('File appears to be mostly imports with minimal implementation');
+    shouldSkip = true;
+  }
+
+  // Check for dangling imports (imports that aren't used yet)
+  const importedNames = [];
+  importLines.forEach(line => {
+    const match = line.match(/import\s+(?:\{([^}]+)\}|\*\s+as\s+(\w+)|(\w+))/);
+    if (match) {
+      if (match[1]) {
+        // Named imports: { foo, bar }
+        importedNames.push(...match[1].split(',').map(name => name.trim()));
+      } else if (match[2]) {
+        // Namespace import: * as foo
+        importedNames.push(match[2].trim());
+      } else if (match[3]) {
+        // Default import: foo
+        importedNames.push(match[3].trim());
+      }
+    }
+  });
+
+  // Count how many imports are actually used
+  let unusedImports = 0;
+  for (const importName of importedNames) {
+    if (!content.includes(importName) || content.indexOf(importName) === content.lastIndexOf(importName)) {
+      unusedImports++;
+    }
+  }
+
+  // If more than half the imports are unused, likely still adding code
+  if (importedNames.length > 2 && unusedImports / importedNames.length > 0.5) {
+    reasons.push(`Many unused imports detected (${unusedImports}/${importedNames.length})`);
+    shouldSkip = true;
+  }
+
+  // Check for empty function bodies or incomplete class definitions
+  const emptyFunctionPattern = /(?:function\s+\w+\s*\([^)]*\)|(?:const|let|var)\s+\w+\s*=\s*(?:\([^)]*\)\s*)?=>?|export\s+function\s+\w+\s*\([^)]*\))\s*\{\s*(?:\/\/\s*TODO|\/\*\s*TODO|\/\/\s*FIXME|\/\*\s*FIXME)?\s*\}/g;
+  const incompleteFunctions = content.match(emptyFunctionPattern);
+  if (incompleteFunctions && incompleteFunctions.length > 0) {
+    // Only skip if the function bodies are truly empty or just have TODO comments
+    const hasActualEmptyFunctions = incompleteFunctions.some(func => {
+      const body = func.match(/\{([^}]*)\}/);
+      if (body) {
+        const bodyContent = body[1].trim();
+        return bodyContent === '' || /^\/\/\s*(TODO|FIXME)/.test(bodyContent) || /^\/\*\s*(TODO|FIXME)/.test(bodyContent);
+      }
+      return false;
+    });
+    
+    if (hasActualEmptyFunctions) {
+      reasons.push('Found functions with empty or TODO-marked bodies');
+      shouldSkip = true;
+    }
+  }
+
+  return { shouldSkip, reasons };
 }
 
 /**
@@ -1083,6 +1277,33 @@ async function main() {
     process.exit(0);
   }
 
+  // Check if we should skip this check due to debouncing
+  if (!fileDebouncer.shouldCheck(filePath)) {
+    console.error(`\n${colors.yellow}⏳ Debouncing check for ${path.basename(filePath)} - waiting for edits to complete${colors.reset}`);
+    process.exit(0);
+  }
+
+  // Read file content for context analysis
+  let fileContent = '';
+  try {
+    fileContent = await fs.readFile(filePath, 'utf8');
+  } catch (error) {
+    log.error(`Could not read file content: ${error.message}`);
+    process.exit(1);
+  }
+
+  // Analyze file context to see if we should skip
+  const contextAnalysis = analyzeFileContext(filePath, fileContent);
+  if (contextAnalysis.shouldSkip) {
+    console.error(`\n${colors.yellow}🚧 Skipping validation - file appears to be work-in-progress${colors.reset}`);
+    contextAnalysis.reasons.forEach(reason => {
+      console.error(`   ${colors.cyan}→${colors.reset} ${reason}`);
+    });
+    console.error(`\n${colors.yellow}💡 Tip: Use // TODO: implement or similar markers to indicate WIP files${colors.reset}`);
+    console.error(`\n${colors.green}✅ Will validate when file appears complete${colors.reset}`);
+    process.exit(0);
+  }
+
   // Update header with file name
   console.error('');
   console.error(`🔍 Validating: ${path.basename(filePath)}`);
@@ -1163,14 +1384,28 @@ async function main() {
   }
 }
 
-// Handle errors
+// Handle errors and cleanup
 process.on('unhandledRejection', (error) => {
   log.error(`Unhandled error: ${error.message}`);
+  fileDebouncer.destroy();
   process.exit(1);
+});
+
+process.on('SIGINT', () => {
+  log.debug('Received SIGINT, cleaning up...');
+  fileDebouncer.destroy();
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  log.debug('Received SIGTERM, cleaning up...');
+  fileDebouncer.destroy();
+  process.exit(0);
 });
 
 // Run main
 main().catch((error) => {
   log.error(`Fatal error: ${error.message}`);
+  fileDebouncer.destroy();
   process.exit(1);
 });

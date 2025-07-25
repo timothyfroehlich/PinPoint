@@ -1,15 +1,16 @@
 {
   "hooks": {
     "PostToolUse": [
-      // {
-      //   "matcher": "Write|Edit|MultiEdit",
-      //   "hooks": [
-      //     {
-      //       "type": "command",
-      //       "command": "node .claude/hooks/quality-check.cjs"
-      //     }
-      //   ]
-      // }
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/quality-check.cjs",
+            "timeout": 30000
+          }
+        ]
+      }
     ]
   }
 }

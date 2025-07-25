@@ -10,15 +10,15 @@
   },
   "eslint": {
     "enabled": true,
-    "autofix": true,
+    "autofix": false,
     "extends": ["react-app", "react-app/jest"]
   },
   "prettier": {
     "enabled": true,
-    "autofix": true
+    "autofix": false
   },
   "general": {
-    "autofixSilent": true,
+    "autofixSilent": false,
     "debug": false
   },
   "rules": {

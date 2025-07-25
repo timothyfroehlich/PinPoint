@@ -2,10 +2,15 @@
 import { beforeAll, afterAll, afterEach } from "vitest";
 
 // Determine environment and load appropriate setup
-const _isJsdom = typeof window !== "undefined";
+const isJsdom = typeof window !== "undefined";
 
-// Temporarily revert MSW polyfills to focus on core issue
-// Will implement direct tRPC mocking instead of MSW HTTP interception
+// Ensure AbortController/AbortSignal are properly available in test environments
+// Modern Node.js has these built-in, but jsdom may need explicit global assignment
+if (isJsdom) {
+  // Ensure Node.js built-in AbortController is available in jsdom global scope
+  globalThis.AbortController = AbortController;
+  globalThis.AbortSignal = AbortSignal;
+}
 
 // Common setup for both environments
 beforeAll(() => {
