@@ -680,8 +680,10 @@ class QualityChecker {
 
     await Promise.all(checkPromises);
 
-    // Check for related tests (not critical, so separate)
-    await this.suggestRelatedTests();
+    // Skip test suggestions unless debug mode
+    if (config.debug) {
+      await this.suggestRelatedTests();
+    }
 
     return {
       errors: this.errors,
@@ -766,7 +768,7 @@ class QualityChecker {
       return;
     }
 
-    log.info('Running TypeScript compilation check...');
+    if (config.debug) log.info('Running TypeScript compilation check...');
 
     try {
       // Get intelligent config for this file
@@ -844,7 +846,7 @@ class QualityChecker {
         });
       }
 
-      if (diagnostics.length === 0) {
+      if (diagnostics.length === 0 && config.debug) {
         log.success('TypeScript compilation passed');
       }
     } catch (error) {
@@ -861,7 +863,7 @@ class QualityChecker {
       return;
     }
 
-    log.info('Running ESLint...');
+    if (config.debug) log.info('Running ESLint...');
 
     try {
       const eslint = new ESLint({
@@ -911,7 +913,7 @@ class QualityChecker {
           const output = formatter.format(results);
           console.error(output);
         }
-      } else {
+      } else if (config.debug) {
         log.success('ESLint passed');
       }
     } catch (error) {
@@ -928,7 +930,7 @@ class QualityChecker {
       return;
     }
 
-    log.info('Running Prettier check...');
+    if (config.debug) log.info('Running Prettier check...');
 
     try {
       const fileContent = await fs.readFile(this.filePath, 'utf8');
@@ -960,7 +962,7 @@ class QualityChecker {
           this.errors.push(`Prettier formatting issues in ${this.filePath}`);
           console.error('Run prettier --write to fix');
         }
-      } else {
+      } else if (config.debug) {
         log.success('Prettier formatting correct');
       }
     } catch (error) {
@@ -973,7 +975,7 @@ class QualityChecker {
    * @returns {Promise<void>}
    */
   async checkCommonIssues() {
-    log.info('Checking for common issues...');
+    if (config.debug) log.info('Checking for common issues...');
 
     try {
       const content = await fs.readFile(this.filePath, 'utf8');
@@ -996,7 +998,7 @@ class QualityChecker {
               this.errors.push(`Found 'as any' usage in ${this.filePath} - ${message}`);
               console.error(`  Line ${index + 1}: ${line.trim()}`);
               foundIssues = true;
-            } else {
+            } else if (config.debug) {
               // Warning level - just warn, don't block
               log.warning(`'as any' usage at line ${index + 1}: ${message}`);
             }
@@ -1048,7 +1050,7 @@ class QualityChecker {
               this.errors.push(`Found console statements in ${this.filePath} - ${message}`);
               console.error(`  Line ${index + 1}: ${line.trim()}`);
               foundIssues = true;
-            } else {
+            } else if (config.debug) {
               // Info level - just warn, don't block
               log.warning(`Console usage at line ${index + 1}: ${message}`);
             }
@@ -1056,14 +1058,16 @@ class QualityChecker {
         });
       }
 
-      // Check for TODO/FIXME comments
-      lines.forEach((line, index) => {
-        if (/TODO|FIXME/.test(line)) {
-          log.warning(`Found TODO/FIXME comment at line ${index + 1}`);
-        }
-      });
+      // Check for TODO/FIXME comments (debug only)
+      if (config.debug) {
+        lines.forEach((line, index) => {
+          if (/TODO|FIXME/.test(line)) {
+            log.warning(`Found TODO/FIXME comment at line ${index + 1}`);
+          }
+        });
+      }
 
-      if (!foundIssues) {
+      if (!foundIssues && config.debug) {
         log.success('No common issues found');
       }
     } catch (error) {
@@ -1076,58 +1080,37 @@ class QualityChecker {
    * @returns {Promise<void>}
    */
   async suggestRelatedTests() {
-    // Skip for test files
-    if (this.fileType === 'test') {
+    // Only show test suggestions in debug mode
+    if (this.fileType === 'test' || !config.debug) {
       return;
     }
 
     const baseName = this.filePath.replace(/\.[^.]+$/, '');
     const testExtensions = ['test.ts', 'test.tsx', 'spec.ts', 'spec.tsx'];
-    let hasTests = false;
 
     for (const ext of testExtensions) {
       try {
         await fs.access(`${baseName}.${ext}`);
-        hasTests = true;
-        log.warning(`💡 Related test found: ${path.basename(baseName)}.${ext}`);
-        log.warning('   Consider running the tests to ensure nothing broke');
-        break;
+        log.warning(`💡 Test: ${path.basename(baseName)}.${ext}`);
+        return;
       } catch {
         // File doesn't exist, continue
       }
     }
 
-    if (!hasTests) {
-      // Check __tests__ directory
-      const dir = path.dirname(this.filePath);
-      const fileName = path.basename(this.filePath);
-      const baseFileName = fileName.replace(/\.[^.]+$/, '');
+    // Check __tests__ directory
+    const dir = path.dirname(this.filePath);
+    const fileName = path.basename(this.filePath);
+    const baseFileName = fileName.replace(/\.[^.]+$/, '');
 
-      for (const ext of testExtensions) {
-        try {
-          await fs.access(path.join(dir, '__tests__', `${baseFileName}.${ext}`));
-          hasTests = true;
-          log.warning(`💡 Related test found: __tests__/${baseFileName}.${ext}`);
-          log.warning('   Consider running the tests to ensure nothing broke');
-          break;
-        } catch {
-          // File doesn't exist, continue
-        }
+    for (const ext of testExtensions) {
+      try {
+        await fs.access(path.join(dir, '__tests__', `${baseFileName}.${ext}`));
+        log.warning(`💡 Test: __tests__/${baseFileName}.${ext}`);
+        return;
+      } catch {
+        // File doesn't exist, continue
       }
-    }
-
-    if (!hasTests) {
-      log.warning(`💡 No test file found for ${path.basename(this.filePath)}`);
-      log.warning('   Consider adding tests for better code quality');
-    }
-
-    // Special reminders for specific file types
-    if (/\/state\/slices\//.test(this.filePath)) {
-      log.warning('💡 Redux state file! Consider testing state updates');
-    } else if (/\/components\//.test(this.filePath)) {
-      log.warning('💡 Component file! Consider testing UI behavior');
-    } else if (/\/services\//.test(this.filePath)) {
-      log.warning('💡 Service file! Consider testing business logic');
     }
   }
 }
@@ -1205,31 +1188,11 @@ function isSourceFile(filePath) {
  * @param {string[]} autofixes - List of autofixes
  */
 function printSummary(errors, autofixes) {
-  // Show auto-fixes if any
-  if (autofixes.length > 0) {
-    console.error(`\n${colors.blue}═══ Auto-fixes Applied ═══${colors.reset}`);
-    autofixes.forEach((fix) => {
-      console.error(`${colors.green}✨${colors.reset} ${fix}`);
-    });
-    console.error(
-      `${colors.green}Automatically fixed ${autofixes.length} issue(s) for you!${colors.reset}`
-    );
-  }
-
-  // Show errors if any
+  // Only show errors - much more concise
   if (errors.length > 0) {
-    console.error(`\n${colors.blue}═══ Quality Check Summary ═══${colors.reset}`);
     errors.forEach((error) => {
       console.error(`${colors.red}❌${colors.reset} ${error}`);
     });
-
-    console.error(
-      `\n${colors.red}Found ${errors.length} issue(s) that MUST be fixed!${colors.reset}`
-    );
-    console.error(`${colors.red}════════════════════════════════════════════${colors.reset}`);
-    console.error(`${colors.red}❌ ALL ISSUES ARE BLOCKING ❌${colors.reset}`);
-    console.error(`${colors.red}════════════════════════════════════════════${colors.reset}`);
-    console.error(`${colors.red}Fix EVERYTHING above until all checks are ✅ GREEN${colors.reset}`);
   }
 }
 
@@ -1238,11 +1201,13 @@ function printSummary(errors, autofixes) {
  * @returns {Promise<void>}
  */
 async function main() {
-  // Show header with version
-  const hookVersion = config._fileConfig.version || '1.0.0';
-  console.error('');
-  console.error(`⚛️  React App Quality Check v${hookVersion} - Starting...`);
-  console.error('────────────────────────────────────────────');
+  // Only show header in debug mode
+  if (config.debug) {
+    const hookVersion = config._fileConfig.version || '1.0.0';
+    console.error('');
+    console.error(`⚛️  React App Quality Check v${hookVersion} - Starting...`);
+    console.error('────────────────────────────────────────────');
+  }
 
   // Debug: show loaded configuration
   log.debug(`Loaded config: ${JSON.stringify(config, null, 2)}`);
@@ -1279,7 +1244,6 @@ async function main() {
 
   // Check if we should skip this check due to debouncing
   if (!fileDebouncer.shouldCheck(filePath)) {
-    console.error(`\n${colors.yellow}⏳ Debouncing check for ${path.basename(filePath)} - waiting for edits to complete${colors.reset}`);
     process.exit(0);
   }
 
@@ -1295,20 +1259,14 @@ async function main() {
   // Analyze file context to see if we should skip
   const contextAnalysis = analyzeFileContext(filePath, fileContent);
   if (contextAnalysis.shouldSkip) {
-    console.error(`\n${colors.yellow}🚧 Skipping validation - file appears to be work-in-progress${colors.reset}`);
-    contextAnalysis.reasons.forEach(reason => {
-      console.error(`   ${colors.cyan}→${colors.reset} ${reason}`);
-    });
-    console.error(`\n${colors.yellow}💡 Tip: Use // TODO: implement or similar markers to indicate WIP files${colors.reset}`);
-    console.error(`\n${colors.green}✅ Will validate when file appears complete${colors.reset}`);
+    console.error(`${colors.yellow}⏸️  Skipping ${path.basename(filePath)} (WIP)${colors.reset}`);
     process.exit(0);
   }
 
-  // Update header with file name
-  console.error('');
-  console.error(`🔍 Validating: ${path.basename(filePath)}`);
-  console.error('────────────────────────────────────────────');
-  log.info(`Checking: ${filePath}`);
+  // Minimal validation indicator
+  if (config.debug) {
+    console.error(`🔍 ${path.basename(filePath)}`);
+  }
 
   // Run quality checks
   const checker = new QualityChecker(filePath);
@@ -1332,53 +1290,16 @@ async function main() {
 
   // Exit with appropriate code
   if (editedFileErrors.length > 0) {
-    // Critical - blocks immediately
-    console.error(`\n${colors.red}🛑 FAILED - Fix issues in your edited file! 🛑${colors.reset}`);
-    console.error(`${colors.cyan}💡 CLAUDE.md CHECK:${colors.reset}`);
-    console.error(
-      `${colors.cyan}  → What CLAUDE.md pattern would have prevented this?${colors.reset}`
-    );
-    console.error(`${colors.cyan}  → Are you following JSDoc batching strategy?${colors.reset}`);
-    console.error(`${colors.yellow}📋 NEXT STEPS:${colors.reset}`);
-    console.error(`${colors.yellow}  1. Fix the issues listed above${colors.reset}`);
-    console.error(`${colors.yellow}  2. The hook will run again automatically${colors.reset}`);
-    console.error(
-      `${colors.yellow}  3. Continue with your original task once all checks pass${colors.reset}`
-    );
+    console.error(`${colors.red}✗ ${path.basename(filePath)} - fix issues${colors.reset}`);
     process.exit(2);
   } else if (dependencyWarnings.length > 0) {
-    // Warning - shows but doesn't block
-    console.error(`\n${colors.yellow}⚠️ WARNING - Dependency issues found${colors.reset}`);
-    console.error(
-      `${colors.yellow}These won't block your progress but should be addressed${colors.reset}`
-    );
-    console.error(
-      `\n${colors.green}✅ Quality check passed for ${path.basename(filePath)}${colors.reset}`
-    );
-
-    if (autofixes.length > 0 && config.autofixSilent) {
-      console.error(
-        `\n${colors.yellow}👉 File quality verified. Auto-fixes applied. Continue with your task.${colors.reset}`
-      );
-    } else {
-      console.error(
-        `\n${colors.yellow}👉 File quality verified. Continue with your task.${colors.reset}`
-      );
+    if (config.debug) {
+      console.error(`${colors.yellow}⚠️  ${path.basename(filePath)} - dependency warnings${colors.reset}`);
     }
-    process.exit(0); // Don't block on dependency issues
+    process.exit(0);
   } else {
-    console.error(
-      `\n${colors.green}✅ Quality check passed for ${path.basename(filePath)}${colors.reset}`
-    );
-
-    if (autofixes.length > 0 && config.autofixSilent) {
-      console.error(
-        `\n${colors.yellow}👉 File quality verified. Auto-fixes applied. Continue with your task.${colors.reset}`
-      );
-    } else {
-      console.error(
-        `\n${colors.yellow}👉 File quality verified. Continue with your task.${colors.reset}`
-      );
+    if (config.debug) {
+      console.error(`${colors.green}✓ ${path.basename(filePath)}${colors.reset}`);
     }
     process.exit(0);
   }
