@@ -45,7 +45,9 @@ describe("notificationRouter", () => {
     };
 
     // Make the service factory return our single mock instance
-    (ctx.services.createNotificationService as any).mockReturnValue(mockNotificationService);
+    (ctx.services.createNotificationService as any).mockReturnValue(
+      mockNotificationService,
+    );
   });
 
   it("gets notifications for user", async () => {
@@ -90,7 +92,6 @@ describe("notificationRouter", () => {
     const caller = appRouter.createCaller(ctx as any);
     await caller.notification.markAsRead({ notificationId });
 
-     
     expect(mockNotificationService.markAsRead).toHaveBeenCalledWith(
       notificationId,
       mockUser.id,
@@ -103,7 +104,6 @@ describe("notificationRouter", () => {
     const caller = appRouter.createCaller(ctx as any);
     await caller.notification.markAllAsRead();
 
-     
     expect(mockNotificationService.markAllAsRead).toHaveBeenCalledWith(
       mockUser.id,
     );
@@ -150,7 +150,7 @@ describe("notificationRouter", () => {
     expect(result.some((n) => n.userId === otherUserId)).toBe(false);
 
     // Should only query for current user's notifications
-     
+
     expect(mockNotificationService.getUserNotifications).toHaveBeenCalledWith(
       mockUser.id,
       {},

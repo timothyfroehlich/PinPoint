@@ -13,14 +13,14 @@
     "noFallthroughCasesInSwitch": true
   },
   "include": [
-    "**/*.test.ts",
-    "**/*.test.tsx",
-    "**/*.spec.ts",
-    "**/*.spec.tsx",
-    "**/*.vitest.test.ts",
-    "**/*.vitest.test.tsx",
-    "**/__tests__/**/*.ts",
-    "**/__tests__/**/*.tsx",
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/**/*.spec.ts",
+    "src/**/*.spec.tsx",
+    "src/**/__tests__/**/*.ts",
+    "src/**/__tests__/**/*.tsx",
+    "src/integration-tests/**/*.ts",
+    "src/integration-tests/**/*.tsx",
     "e2e/**/*.ts",
     "e2e/**/*.tsx"
   ]

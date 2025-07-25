@@ -460,10 +460,10 @@ describe("PinballMapService", () => {
       } as never);
     }
     it("should handle PinballMap API being unavailable", async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {
         // Suppress console.error for this test
       });
-      
+
       setupMockLocation();
       mockFetch.mockRejectedValue(new Error("Network error"));
       const result = await service.syncLocation("loc-123");
@@ -471,14 +471,14 @@ describe("PinballMapService", () => {
       expect(result.error).toBe("No machine data returned from PinballMap");
       expect(result.added).toBe(0);
       expect(result.removed).toBe(0);
-      
+
       consoleSpy.mockRestore();
     });
     it("should handle HTTP error responses from PinballMap", async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {
         // Suppress console.error for this test
       });
-      
+
       setupMockLocation();
       const mockErrorResponse = {
         ok: false,
@@ -493,7 +493,7 @@ describe("PinballMapService", () => {
       const result = await service.syncLocation("loc-123");
       expect(result.success).toBe(false);
       expect(result.error).toBe("No machine data returned from PinballMap");
-      
+
       consoleSpy.mockRestore();
     });
     it("should handle malformed JSON responses", async () => {

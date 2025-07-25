@@ -11,6 +11,5 @@
     "module": "ESNext",
     "moduleResolution": "Bundler"
   },
-  "include": ["src/test/**/*.ts", "src/test/**/*.tsx"],
-  "exclude": ["**/*.test.*", "**/*.spec.*", "**/*.vitest.test.*"]
+  "include": ["src/test/**/*.ts", "src/test/**/*.tsx"]
 }

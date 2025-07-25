@@ -51,7 +51,9 @@ describe("Router Integration Tests", () => {
   const createCaller = createCallerFactory(appRouter);
 
   // Mock context helper with different permission sets
-  const createMockTRPCContext = (permissions: string[] = []): any => {
+  const createMockTRPCContext = (
+    permissions: string[] = [],
+  ): VitestMockContext => {
     // Use the shared mockContext instead of creating a new one
 
     const mockMembership = {
@@ -134,7 +136,7 @@ describe("Router Integration Tests", () => {
     it("should allow issue creation with proper permissions", async () => {
       // Arrange
       const ctx = createMockTRPCContext(["issue:create"]);
-      const caller = createCaller(ctx as any);
+      const caller = createCaller(ctx);
 
       const mockMachine = {
         id: "machine-1",
@@ -254,7 +256,7 @@ describe("Router Integration Tests", () => {
     it("should deny issue creation without proper permissions", async () => {
       // Arrange
       const ctx = createMockTRPCContext(["issue:view"]);
-      const caller = createCaller(ctx as any);
+      const caller = createCaller(ctx);
 
       // Act & Assert
       await expect(
@@ -268,7 +270,7 @@ describe("Router Integration Tests", () => {
     it("should allow issue editing with proper permissions", async () => {
       // Arrange
       const ctx = createMockTRPCContext(["issue:edit"]);
-      const caller = createCaller(ctx as any);
+      const caller = createCaller(ctx);
 
       const mockIssue = {
         id: "issue-1",
@@ -356,7 +358,7 @@ describe("Router Integration Tests", () => {
     it("should deny issue editing without proper permissions", async () => {
       // Arrange
       const ctx = createMockTRPCContext(["issue:view"]);
-      const caller = createCaller(ctx as any);
+      const caller = createCaller(ctx);
 
       // Act & Assert
       await expect(
@@ -370,7 +372,7 @@ describe("Router Integration Tests", () => {
     it("should enforce organization isolation in issue operations", async () => {
       // Arrange
       const ctx = createMockTRPCContext(["issue:edit"]);
-      const caller = createCaller(ctx as any);
+      const caller = createCaller(ctx);
 
       // Mock issue from different organization
       const mockIssue = {
@@ -405,7 +407,7 @@ describe("Router Integration Tests", () => {
     it("should allow machine operations with proper permissions", async () => {
       // Arrange
       const ctx = createMockTRPCContext(["machine:edit"]);
-      const caller = createCaller(ctx as any);
+      const caller = createCaller(ctx);
 
       const mockMachine = {
         id: "machine-1",
@@ -475,7 +477,7 @@ describe("Router Integration Tests", () => {
     it("should deny machine operations without proper permissions", async () => {
       // Arrange
       const ctx = createMockTRPCContext(["machine:view"]);
-      const caller = createCaller(ctx as any);
+      const caller = createCaller(ctx);
 
       // Act & Assert
       await expect(
@@ -489,7 +491,7 @@ describe("Router Integration Tests", () => {
     it("should enforce organization isolation in machine operations", async () => {
       // Arrange
       const ctx = createMockTRPCContext(["machine:edit"]);
-      const caller = createCaller(ctx as any);
+      const caller = createCaller(ctx);
 
       // Mock machine from different organization - return null to simulate not found
       vi.mocked(mockContext.db.machine.findFirst).mockResolvedValue(null);
@@ -508,7 +510,7 @@ describe("Router Integration Tests", () => {
     it("should allow location operations with proper permissions", async () => {
       // Arrange
       const ctx = createMockTRPCContext(["location:edit"]);
-      const caller = createCaller(ctx as any);
+      const caller = createCaller(ctx);
 
       const mockLocation = {
         id: "location-1",
@@ -571,7 +573,7 @@ describe("Router Integration Tests", () => {
     it("should deny location operations without proper permissions", async () => {
       // Arrange
       const ctx = createMockTRPCContext(["location:view"]);
-      const caller = createCaller(ctx as any);
+      const caller = createCaller(ctx);
 
       // Act & Assert
       await expect(
@@ -587,7 +589,7 @@ describe("Router Integration Tests", () => {
     it("should allow organization operations with proper permissions", async () => {
       // Arrange
       const ctx = createMockTRPCContext(["organization:manage"]);
-      const caller = createCaller(ctx as any);
+      const caller = createCaller(ctx);
 
       const mockOrganization = {
         id: "org-1",
@@ -646,7 +648,7 @@ describe("Router Integration Tests", () => {
     it("should deny organization operations without proper permissions", async () => {
       // Arrange
       const ctx = createMockTRPCContext(["user:manage"]);
-      const caller = createCaller(ctx as any);
+      const caller = createCaller(ctx);
 
       // Act & Assert
       await expect(
@@ -661,7 +663,7 @@ describe("Router Integration Tests", () => {
     it("should allow user operations with proper permissions", async () => {
       // Arrange
       const ctx = createMockTRPCContext(["user:manage"]);
-      const caller = createCaller(ctx as any);
+      const caller = createCaller(ctx);
 
       const mockUser = {
         id: "user-2",
@@ -766,7 +768,7 @@ describe("Router Integration Tests", () => {
     it("should deny user operations without proper permissions", async () => {
       // Arrange
       const ctx = createMockTRPCContext(["organization:manage"]);
-      const caller = createCaller(ctx as any);
+      const caller = createCaller(ctx);
 
       // Act & Assert
       await expect(
@@ -837,7 +839,7 @@ describe("Router Integration Tests", () => {
       };
       vi.mocked(
         mockContext.services.createIssueActivityService,
-      ).mockReturnValue(mockActivityService as any);
+      ).mockReturnValue(mockActivityService);
 
       vi.mocked(mockContext.db.issue.findFirst).mockResolvedValue(mockIssue);
       vi.mocked(mockContext.db.membership.findUnique).mockResolvedValue({
@@ -852,14 +854,14 @@ describe("Router Integration Tests", () => {
           name: "Test User 2",
           email: "user2@example.com",
         },
-      } as any);
+      });
       vi.mocked(mockContext.db.issue.update).mockResolvedValue({
         success: true,
         issue: {
           ...mockIssue,
           assignedToId: "user-2",
         },
-      } as any);
+      });
 
       // Act - Admin should be able to perform all operations
       const result = await caller.issue.core.assign({
@@ -925,7 +927,10 @@ describe("Router Integration Tests", () => {
       // Corrupt the permissions array
       // Using any for test flexibility in relaxed mode
 
-      (ctx as any).userPermissions = undefined;
+      // Test case for corrupted permissions - using type assertion for test scenario
+      (
+        ctx as VitestMockContext & { userPermissions?: undefined }
+      ).userPermissions = undefined;
       const caller: AnyTRPCCaller = createCaller(ctx);
 
       // Act & Assert

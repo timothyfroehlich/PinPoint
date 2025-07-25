@@ -18,14 +18,16 @@
     "src/**/*.tsx",
     ".next/types/**/*.ts",
     "middleware.ts",
-    "prisma/**/*.ts"
+    "prisma/**/*.ts",
+    "tooling.config.ts",
+    "vitest.coverage-test.config.ts"
   ],
   "exclude": [
     "src/_archived_frontend/**/*",
     "src/test/**/*",
-    "**/__tests__/**/*",
-    "**/*.test.*",
-    "**/*.spec.*",
-    "**/*.vitest.test.*"
+    "src/**/*.test.*",
+    "src/**/*.spec.*",
+    "src/**/__tests__/**/*",
+    "src/integration-tests/**/*"
   ]
 }

@@ -8,6 +8,11 @@ import importPlugin from "eslint-plugin-import";
 // @ts-expect-error - No TypeScript declarations available
 import promisePlugin from "eslint-plugin-promise";
 import unusedImportsPlugin from "eslint-plugin-unused-imports";
+import {
+  INCLUDE_PATTERNS,
+  ESLINT_RULES,
+  convertPatterns,
+} from "./tooling.config.ts";
 
 export default tseslint.config(
   ...tseslint.configs.recommended,
@@ -31,7 +36,7 @@ export default tseslint.config(
   },
   {
     // Main configuration for all TS/TSX files
-    files: ["src/**/*.{ts,tsx}"],
+    files: convertPatterns.forESLint(INCLUDE_PATTERNS.production),
     plugins: {
       "@next/next": nextPlugin,
       import: importPlugin,
@@ -90,14 +95,8 @@ export default tseslint.config(
       "promise/catch-or-return": ["error", { allowFinally: true }],
       "promise/no-nesting": "warn",
 
-      // Type-aware rules - strict for production code
-      "@typescript-eslint/no-explicit-any": "error",
-      "@typescript-eslint/no-unsafe-assignment": "error",
-      "@typescript-eslint/no-unsafe-argument": "error",
-      "@typescript-eslint/no-unsafe-call": "error",
-      "@typescript-eslint/no-unsafe-member-access": "error",
-      "@typescript-eslint/no-unsafe-return": "error",
-      "@typescript-eslint/no-unsafe-enum-comparison": "error",
+      // Type-aware rules from shared config
+      ...ESLINT_RULES.production,
 
       // Additional strict rules for better type safety
       "@typescript-eslint/explicit-function-return-type": [
@@ -140,45 +139,23 @@ export default tseslint.config(
     },
   },
   {
-    // Override: Test utilities - moderate standards (src/test/**)
-    files: ["src/test/**/*.{ts,tsx}"],
+    // Override: Test utilities - moderate standards
+    files: convertPatterns.forESLint(INCLUDE_PATTERNS.testUtils),
     rules: {
-      // Moderate type-safety for reusable test utilities
-      "@typescript-eslint/no-explicit-any": "warn",
-      "@typescript-eslint/no-unsafe-assignment": "warn",
-      "@typescript-eslint/no-unsafe-argument": "warn",
-      "@typescript-eslint/no-unsafe-call": "warn",
-      "@typescript-eslint/no-unsafe-member-access": "warn",
-      "@typescript-eslint/no-unsafe-return": "warn",
-      "@typescript-eslint/no-unsafe-enum-comparison": "warn",
+      // Use shared rules configuration
+      ...ESLINT_RULES.testUtils,
       // Allow process.env for test utilities
       "no-restricted-properties": "off",
     },
   },
   {
     // Override: Test files - relaxed standards for pragmatic testing
-    files: [
-      "**/*.test.ts",
-      "**/*.test.tsx",
-      "**/*.spec.ts",
-      "**/*.spec.tsx",
-      "**/*.vitest.test.ts",
-      "**/*.vitest.test.tsx",
-      "**/__tests__/**/*.{ts,tsx}",
-    ],
+    files: convertPatterns.forESLint(INCLUDE_PATTERNS.tests),
     rules: {
-      // Allow any types and unsafe operations in tests
-      "@typescript-eslint/no-explicit-any": "off",
-      "@typescript-eslint/no-unsafe-assignment": "off",
-      "@typescript-eslint/no-unsafe-argument": "off",
-      "@typescript-eslint/no-unsafe-call": "off",
-      "@typescript-eslint/no-unsafe-member-access": "off",
-      "@typescript-eslint/no-unsafe-return": "off",
-      "@typescript-eslint/no-unsafe-enum-comparison": "off",
+      // Use shared rules configuration
+      ...ESLINT_RULES.tests,
       // Allow process.env for test mocking
       "no-restricted-properties": "off",
-      // Relax other strict rules for tests
-      "@typescript-eslint/explicit-function-return-type": "off",
       // Disable strictNullChecks-dependent rules (tests use relaxed TypeScript)
       "@typescript-eslint/no-unnecessary-condition": "off",
       "@typescript-eslint/no-unnecessary-boolean-literal-compare": "off",

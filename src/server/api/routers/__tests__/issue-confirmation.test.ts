@@ -20,12 +20,14 @@ vi.mock("../../../auth/permissions", () => ({
 
 import {
   createVitestMockContext,
+  type VitestMockContext,
 } from "../../../../test/vitestMockContext";
-import { getUserPermissionsForSession, requirePermissionForSession } from "../../../auth/permissions";
+import {
+  getUserPermissionsForSession,
+  requirePermissionForSession,
+} from "../../../auth/permissions";
 import { createTRPCRouter, organizationProcedure } from "../../trpc";
 import { issueCreateProcedure } from "../../trpc.permission";
-
-
 
 // Create issue confirm procedure for testing
 const issueConfirmProcedure = organizationProcedure.use(async (opts) => {
@@ -269,9 +271,11 @@ const issueConfirmationRouter = createTRPCRouter({
 });
 
 // Mock context helper with different permission sets
-const createMockTRPCContext = (permissions: string[] = []) => {
+const createMockTRPCContext = (
+  permissions: string[] = [],
+): VitestMockContext => {
   const mockContext = createVitestMockContext();
-  
+
   // Set up session and organization
   mockContext.session = {
     user: {
@@ -282,7 +286,7 @@ const createMockTRPCContext = (permissions: string[] = []) => {
     },
     expires: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(),
   };
-  
+
   mockContext.organization = {
     id: "org-1",
     name: "Test Organization",
@@ -312,21 +316,25 @@ const createMockTRPCContext = (permissions: string[] = []) => {
   };
 
   // Mock the database query for membership lookup
-  vi.mocked(mockContext.db.membership.findFirst).mockResolvedValue(membershipData as any);
-  
+  vi.mocked(mockContext.db.membership.findFirst).mockResolvedValue(
+    membershipData as any,
+  );
+
   // Mock the permissions system
   vi.mocked(getUserPermissionsForSession).mockResolvedValue(permissions);
-  
+
   // Mock requirePermissionForSession - it should throw when permission is missing
-  vi.mocked(requirePermissionForSession).mockImplementation((_session, permission, _db, _orgId) => {
-    if (!permissions.includes(permission)) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: `Missing required permission: ${permission}`,
-      });
-    }
-    return Promise.resolve();
-  });
+  vi.mocked(requirePermissionForSession).mockImplementation(
+    (_session, permission, _db, _orgId) => {
+      if (!permissions.includes(permission)) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: `Missing required permission: ${permission}`,
+        });
+      }
+      return Promise.resolve();
+    },
+  );
 
   return {
     ...mockContext,
@@ -344,7 +352,7 @@ describe("Issue Confirmation Workflow", () => {
     it("should create unconfirmed issues with basic form", async () => {
       // Arrange
       const ctx = createMockTRPCContext(["issue:create"]);
-      const caller = issueConfirmationRouter.createCaller(ctx as any);
+      const caller = issueConfirmationRouter.createCaller(ctx);
 
       const mockIssue = {
         id: "issue-1",
@@ -426,7 +434,7 @@ describe("Issue Confirmation Workflow", () => {
     it("should create confirmed issues with full form by default", async () => {
       // Arrange
       const ctx = createMockTRPCContext(["issue:create"]);
-      const caller = issueConfirmationRouter.createCaller(ctx as any);
+      const caller = issueConfirmationRouter.createCaller(ctx);
 
       const mockIssue = {
         id: "issue-1",
@@ -497,7 +505,7 @@ describe("Issue Confirmation Workflow", () => {
     it("should allow explicit override of confirmation status in full form", async () => {
       // Arrange
       const ctx = createMockTRPCContext(["issue:create"]);
-      const caller = issueConfirmationRouter.createCaller(ctx as any);
+      const caller = issueConfirmationRouter.createCaller(ctx);
 
       const mockIssue = {
         id: "issue-1",
@@ -533,7 +541,7 @@ describe("Issue Confirmation Workflow", () => {
     it("should require issue:create permission for issue creation", async () => {
       // Arrange
       const ctx = createMockTRPCContext(["issue:view"]);
-      const caller = issueConfirmationRouter.createCaller(ctx as any);
+      const caller = issueConfirmationRouter.createCaller(ctx);
 
       // Act & Assert
       await expect(
@@ -552,7 +560,7 @@ describe("Issue Confirmation Workflow", () => {
     it("should toggle confirmation status with issue:confirm permission", async () => {
       // Arrange
       const ctx = createMockTRPCContext(["issue:confirm"]);
-      const caller = issueConfirmationRouter.createCaller(ctx as any);
+      const caller = issueConfirmationRouter.createCaller(ctx);
 
       const mockIssue = {
         id: "issue-1",
@@ -590,7 +598,7 @@ describe("Issue Confirmation Workflow", () => {
     it("should deny confirmation toggle without issue:confirm permission", async () => {
       // Arrange
       const ctx = createMockTRPCContext(["issue:create"]);
-      const caller = issueConfirmationRouter.createCaller(ctx as any);
+      const caller = issueConfirmationRouter.createCaller(ctx);
 
       // Act & Assert
       await expect(
@@ -604,7 +612,7 @@ describe("Issue Confirmation Workflow", () => {
     it("should return NOT_FOUND for non-existent issue", async () => {
       // Arrange
       const ctx = createMockTRPCContext(["issue:confirm"]);
-      const caller = issueConfirmationRouter.createCaller(ctx as any);
+      const caller = issueConfirmationRouter.createCaller(ctx);
 
       vi.mocked(ctx.db.issue.findFirst).mockResolvedValue(null);
 
@@ -620,7 +628,7 @@ describe("Issue Confirmation Workflow", () => {
     it("should toggle confirmation status from true to false", async () => {
       // Arrange
       const ctx = createMockTRPCContext(["issue:confirm"]);
-      const caller = issueConfirmationRouter.createCaller(ctx as any);
+      const caller = issueConfirmationRouter.createCaller(ctx);
 
       const mockIssue = {
         id: "issue-1",
@@ -655,7 +663,7 @@ describe("Issue Confirmation Workflow", () => {
     it("should list issues with confirmation status", async () => {
       // Arrange
       const ctx = createMockTRPCContext([]);
-      const caller = issueConfirmationRouter.createCaller(ctx as any);
+      const caller = issueConfirmationRouter.createCaller(ctx);
 
       const mockIssues = [
         {
@@ -714,7 +722,7 @@ describe("Issue Confirmation Workflow", () => {
     it("should filter by location when locationId provided", async () => {
       // Arrange
       const ctx = createMockTRPCContext([]);
-      const caller = issueConfirmationRouter.createCaller(ctx as any);
+      const caller = issueConfirmationRouter.createCaller(ctx);
 
       vi.mocked(ctx.db.issue.findMany).mockResolvedValue([]);
 
@@ -737,7 +745,7 @@ describe("Issue Confirmation Workflow", () => {
     it("should filter by machine when machineId provided", async () => {
       // Arrange
       const ctx = createMockTRPCContext([]);
-      const caller = issueConfirmationRouter.createCaller(ctx as any);
+      const caller = issueConfirmationRouter.createCaller(ctx);
 
       vi.mocked(ctx.db.issue.findMany).mockResolvedValue([]);
 
@@ -762,7 +770,7 @@ describe("Issue Confirmation Workflow", () => {
     it("should return confirmation statistics", async () => {
       // Arrange
       const ctx = createMockTRPCContext([]);
-      const caller = issueConfirmationRouter.createCaller(ctx as any);
+      const caller = issueConfirmationRouter.createCaller(ctx);
 
       vi.mocked(ctx.db.issue.count).mockResolvedValue(100);
 
@@ -781,7 +789,7 @@ describe("Issue Confirmation Workflow", () => {
     it("should handle zero issues gracefully", async () => {
       // Arrange
       const ctx = createMockTRPCContext([]);
-      const caller = issueConfirmationRouter.createCaller(ctx as any);
+      const caller = issueConfirmationRouter.createCaller(ctx);
 
       vi.mocked(ctx.db.issue.count).mockResolvedValue(0);
 
@@ -800,7 +808,7 @@ describe("Issue Confirmation Workflow", () => {
     it("should filter by date range when provided", async () => {
       // Arrange
       const ctx = createMockTRPCContext([]);
-      const caller = issueConfirmationRouter.createCaller(ctx as any);
+      const caller = issueConfirmationRouter.createCaller(ctx);
 
       const fromDate = new Date("2024-01-01");
       const toDate = new Date("2024-12-31");
@@ -830,7 +838,7 @@ describe("Issue Confirmation Workflow", () => {
     it("should filter by location when locationId provided", async () => {
       // Arrange
       const ctx = createMockTRPCContext([]);
-      const caller = issueConfirmationRouter.createCaller(ctx as any);
+      const caller = issueConfirmationRouter.createCaller(ctx);
 
       vi.mocked(ctx.db.issue.count).mockResolvedValue(25);
 
@@ -853,7 +861,7 @@ describe("Issue Confirmation Workflow", () => {
     it("should require issue:create permission for basic form", async () => {
       // Arrange
       const ctx = createMockTRPCContext(["issue:view"]);
-      const caller = issueConfirmationRouter.createCaller(ctx as any);
+      const caller = issueConfirmationRouter.createCaller(ctx);
 
       // Act & Assert
       await expect(
@@ -870,7 +878,7 @@ describe("Issue Confirmation Workflow", () => {
     it("should require issue:create permission for full form", async () => {
       // Arrange
       const ctx = createMockTRPCContext(["issue:view"]);
-      const caller = issueConfirmationRouter.createCaller(ctx as any);
+      const caller = issueConfirmationRouter.createCaller(ctx);
 
       // Act & Assert
       await expect(
@@ -887,7 +895,7 @@ describe("Issue Confirmation Workflow", () => {
     it("should not require additional permissions for basic form beyond issue:create", async () => {
       // Arrange
       const ctx = createMockTRPCContext(["issue:create"]);
-      const caller = issueConfirmationRouter.createCaller(ctx as any);
+      const caller = issueConfirmationRouter.createCaller(ctx);
 
       const mockIssue = {
         id: "issue-1",

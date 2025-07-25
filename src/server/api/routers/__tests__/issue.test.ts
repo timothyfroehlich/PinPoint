@@ -43,11 +43,6 @@ const mockMachine = {
   organizationId: "org-1",
   locationId: "location-1",
 };
-const _mockLocation = {
-  id: "location-1",
-  name: "Test Location",
-  organizationId: "org-1",
-};
 const mockStatus = { id: "status-1", name: "Open", organizationId: "org-1" };
 const mockPriority = {
   id: "priority-1",
@@ -136,11 +131,8 @@ const createAuthenticatedContext = (permissions: string[] = []) => {
 };
 
 describe("issueRouter - Issue Detail Page", () => {
-  let _ctx: any;
-
   beforeEach(() => {
     vi.clearAllMocks();
-    _ctx = createAuthenticatedContext(["issue:view"]);
   });
 
   describe("Authenticated Issue Detail Access", () => {
