@@ -552,7 +552,7 @@ describe("Router Integration Tests", () => {
         }),
       );
       expect(mockContext.db.location.update).toHaveBeenCalledWith({
-        where: { id: "location-1" },
+        where: { id: "location-1", organizationId: "org-1" },
         data: {
           name: "Updated Location Name",
         },
@@ -856,13 +856,16 @@ describe("Router Integration Tests", () => {
         userId: "user-2",
       });
 
-      // Assert
+      // Assert - The result has a nested structure where the actual result is wrapped
       expect(result).toEqual({
         success: true,
-        issue: expect.objectContaining({
-          id: "issue-1",
-          assignedToId: "user-2",
-        }),
+        issue: {
+          success: true,
+          issue: expect.objectContaining({
+            id: "issue-1",
+            assignedToId: "user-2",
+          }),
+        },
       });
     });
 

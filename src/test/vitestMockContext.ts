@@ -136,6 +136,14 @@ export function createVitestMockContext(): VitestMockContext {
       update: vi.fn(),
       delete: vi.fn(),
     },
+    comment: {
+      findFirst: vi.fn(),
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+    },
   } as unknown as ExtendedPrismaClient;
 
   // Create a mock service factory
@@ -158,6 +166,8 @@ export function createVitestMockContext(): VitestMockContext {
       recordAssignmentChange: vi.fn(),
       recordFieldUpdate: vi.fn(),
       recordCommentDeleted: vi.fn(),
+      recordIssueResolved: vi.fn(),
+      recordIssueAssigned: vi.fn(),
       getIssueTimeline: vi.fn(),
     })),
     createCommentCleanupService: vi.fn(),
