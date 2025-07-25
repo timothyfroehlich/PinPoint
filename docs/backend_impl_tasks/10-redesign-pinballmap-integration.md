@@ -1278,7 +1278,7 @@ describe("Organization Isolation", () => {
 describe("API Error Handling", () => {
   it("should handle PinballMap API being unavailable", async () => {
     setupMockLocation();
-    global.fetch = jest.fn().mockRejectedValue(new Error("Network error"));
+    global.fetch = vi.fn().mockRejectedValue(new Error("Network error"));
 
     const result = await service.syncLocation("loc-123");
 
@@ -1290,7 +1290,7 @@ describe("API Error Handling", () => {
 
   it("should handle HTTP error responses from PinballMap", async () => {
     setupMockLocation();
-    global.fetch = jest.fn().mockResolvedValue({
+    global.fetch = vi.fn().mockResolvedValue({
       ok: false,
       status: 404,
     });
@@ -1303,7 +1303,7 @@ describe("API Error Handling", () => {
 
   it("should handle malformed JSON responses", async () => {
     setupMockLocation();
-    global.fetch = jest.fn().mockResolvedValue({
+    global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ invalid: "data" }),
     });

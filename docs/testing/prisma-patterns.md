@@ -11,7 +11,9 @@ PinPoint uses Prisma with the Accelerate extension, which changes method return 
 const user: Promise<User | null> = prisma.user.findUnique({ where: { id } });
 
 // With Accelerate
-const user: AcceleratePromise<User | null> = prisma.user.findUnique({ where: { id } });
+const user: AcceleratePromise<User | null> = prisma.user.findUnique({
+  where: { id },
+});
 ```
 
 This breaks standard mocking patterns:
@@ -36,9 +38,7 @@ mockPrisma.user.findMany.mockImplementation(async () => [userData]);
 
 ```typescript
 // ✅ Quick fix for simple cases
-mockPrisma.user.findUnique.mockResolvedValue(
-  Promise.resolve(userData) as any
-);
+mockPrisma.user.findUnique.mockResolvedValue(Promise.resolve(userData) as any);
 ```
 
 ### Solution 3: AcceleratePromise Factory
@@ -54,9 +54,7 @@ function createAcceleratePromise<T>(value: T): AcceleratePromise<T> {
 }
 
 // Usage
-mockPrisma.user.findUnique.mockResolvedValue(
-  createAcceleratePromise(userData)
-);
+mockPrisma.user.findUnique.mockResolvedValue(createAcceleratePromise(userData));
 ```
 
 ## Complete Mock Structure
@@ -64,7 +62,7 @@ mockPrisma.user.findUnique.mockResolvedValue(
 ### Basic ExtendedPrismaClient Mock
 
 ```typescript
-import type { ExtendedPrismaClient } from '~/server/db';
+import type { ExtendedPrismaClient } from "~/server/db";
 
 const mockPrisma = {
   // User model
@@ -76,23 +74,23 @@ const mockPrisma = {
     delete: vi.fn(),
     count: vi.fn(),
   },
-  
+
   // Organization model
   organization: {
     findUnique: vi.fn(),
     findMany: vi.fn(),
     create: vi.fn(),
   },
-  
+
   // Required: $accelerate methods
   $accelerate: {
     invalidate: vi.fn(),
     invalidateAll: vi.fn(),
   },
-  
+
   // Transaction support
   $transaction: vi.fn(),
-  
+
   // Cleanup
   $disconnect: vi.fn(),
 } satisfies Partial<ExtendedPrismaClient>;
@@ -138,14 +136,14 @@ function createModelMock() {
 ### Testing Multi-Tenant Queries
 
 ```typescript
-it('should scope queries by organization', async () => {
-  const mockGames = [createMockGameInstance({ organizationId: 'org-1' })];
+it("should scope queries by organization", async () => {
+  const mockGames = [createMockMachine({ organizationId: "org-1" })];
   mockPrisma.gameInstance.findMany.mockImplementation(async () => mockGames);
-  
-  const result = await service.getGames('org-1');
-  
+
+  const result = await service.getGames("org-1");
+
   expect(mockPrisma.gameInstance.findMany).toHaveBeenCalledWith({
-    where: { organizationId: 'org-1' },
+    where: { organizationId: "org-1" },
     include: expect.any(Object),
   });
 });
@@ -154,11 +152,11 @@ it('should scope queries by organization', async () => {
 ### Testing Transactions
 
 ```typescript
-it('should handle transaction rollback', async () => {
-  const error = new Error('Transaction failed');
-  
+it("should handle transaction rollback", async () => {
+  const error = new Error("Transaction failed");
+
   mockPrisma.$transaction.mockRejectedValueOnce(error);
-  
+
   await expect(service.complexOperation()).rejects.toThrow(error);
   expect(mockPrisma.$transaction).toHaveBeenCalled();
 });
@@ -167,13 +165,13 @@ it('should handle transaction rollback', async () => {
 ### Testing Cache Invalidation
 
 ```typescript
-it('should invalidate cache after update', async () => {
+it("should invalidate cache after update", async () => {
   mockPrisma.user.update.mockImplementation(async () => updatedUser);
-  
-  await service.updateUser('user-1', { name: 'New Name' });
-  
+
+  await service.updateUser("user-1", { name: "New Name" });
+
   expect(mockPrisma.$accelerate.invalidate).toHaveBeenCalledWith(
-    expect.stringContaining('user-1')
+    expect.stringContaining("user-1"),
   );
 });
 ```
@@ -185,12 +183,12 @@ it('should invalidate cache after update', async () => {
 ```typescript
 export function createMockUser(overrides: Partial<User> = {}): User {
   return {
-    id: 'mock-user-id',
-    email: 'test@example.com',
-    name: 'Test User',
+    id: "mock-user-id",
+    email: "test@example.com",
+    name: "Test User",
     image: null,
-    createdAt: new Date('2024-01-01'),
-    updatedAt: new Date('2024-01-01'),
+    createdAt: new Date("2024-01-01"),
+    updatedAt: new Date("2024-01-01"),
     ...overrides,
   };
 }
@@ -200,15 +198,15 @@ export function createMockUser(overrides: Partial<User> = {}): User {
 
 ```typescript
 export function createMockOrganization(
-  overrides: Partial<Organization> = {}
+  overrides: Partial<Organization> = {},
 ): Organization {
   return {
-    id: 'mock-org-id',
-    name: 'Test Organization',
-    subdomain: 'test-org',
+    id: "mock-org-id",
+    name: "Test Organization",
+    subdomain: "test-org",
     settings: {},
-    createdAt: new Date('2024-01-01'),
-    updatedAt: new Date('2024-01-01'),
+    createdAt: new Date("2024-01-01"),
+    updatedAt: new Date("2024-01-01"),
     ...overrides,
   };
 }
@@ -218,16 +216,16 @@ export function createMockOrganization(
 
 ```typescript
 export function createMockMembership(
-  overrides: Partial<Membership> = {}
+  overrides: Partial<Membership> = {},
 ): Membership {
   return {
-    id: 'mock-membership-id',
-    userId: 'mock-user-id',
-    organizationId: 'mock-org-id',
-    role: 'Member',
-    permissions: ['issue:view', 'issue:create'],
-    createdAt: new Date('2024-01-01'),
-    updatedAt: new Date('2024-01-01'),
+    id: "mock-membership-id",
+    userId: "mock-user-id",
+    organizationId: "mock-org-id",
+    role: "Member",
+    permissions: ["issue:view", "issue:create"],
+    createdAt: new Date("2024-01-01"),
+    updatedAt: new Date("2024-01-01"),
     ...overrides,
   };
 }
@@ -239,7 +237,7 @@ export function createMockMembership(
 
 ```typescript
 // For integration tests only
-import { prisma } from '~/server/db';
+import { prisma } from "~/server/db";
 
 beforeEach(async () => {
   // Clean database
@@ -262,26 +260,26 @@ afterAll(async () => {
 async function seedTestData() {
   const org = await prisma.organization.create({
     data: {
-      name: 'Test Org',
-      subdomain: 'test',
+      name: "Test Org",
+      subdomain: "test",
     },
   });
-  
+
   const user = await prisma.user.create({
     data: {
-      email: 'test@example.com',
-      name: 'Test User',
+      email: "test@example.com",
+      name: "Test User",
     },
   });
-  
+
   await prisma.member.create({
     data: {
       userId: user.id,
       organizationId: org.id,
-      role: 'Admin',
+      role: "Admin",
     },
   });
-  
+
   return { org, user };
 }
 ```
@@ -297,10 +295,11 @@ async function seedTestData() {
 ## Common Gotchas
 
 ### Missing $accelerate Mock
+
 ```typescript
 // ❌ Incomplete mock
 const mockPrisma = {
-  user: { findUnique: vi.fn() }
+  user: { findUnique: vi.fn() },
 };
 
 // ✅ Complete mock
@@ -309,11 +308,12 @@ const mockPrisma = {
   $accelerate: {
     invalidate: vi.fn(),
     invalidateAll: vi.fn(),
-  }
+  },
 };
 ```
 
 ### Wrong Mock Return Type
+
 ```typescript
 // ❌ Returns wrong type
 mockPrisma.user.findMany.mockResolvedValue(singleUser);
@@ -323,6 +323,7 @@ mockPrisma.user.findMany.mockResolvedValue([singleUser]);
 ```
 
 ### Forgetting Relations
+
 ```typescript
 // ❌ Missing included relations
 mockPrisma.issue.findUnique.mockResolvedValue(issue);
@@ -330,7 +331,7 @@ mockPrisma.issue.findUnique.mockResolvedValue(issue);
 // ✅ Include relations if query includes them
 mockPrisma.issue.findUnique.mockResolvedValue({
   ...issue,
-  gameInstance: mockGameInstance,
+  machine: mockMachine,
   creator: mockUser,
 });
 ```

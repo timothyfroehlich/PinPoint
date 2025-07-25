@@ -6,7 +6,7 @@ This document explains how to set up and use code coverage with Codecov in the P
 
 We use:
 
-- **Jest** for running tests and generating coverage reports
+- **Vitest** for running tests and generating coverage reports
 - **Codecov** for coverage tracking and PR comments
 - **GitHub Actions** for automated coverage reporting
 
@@ -31,7 +31,7 @@ Consider adding coverage requirements to your branch protection rules:
 
 ## Coverage Thresholds
 
-Current coverage thresholds are set in `jest.config.js`:
+Current coverage thresholds are set in `vitest.config.ts`:
 
 ```javascript
 coverageThreshold: {

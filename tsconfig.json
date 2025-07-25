@@ -19,8 +19,7 @@
     ".next/types/**/*.ts",
     "middleware.ts",
     "prisma/**/*.ts",
-    "tooling.config.ts",
-    "vitest.coverage-test.config.ts"
+    "tooling.config.ts"
   ],
   "exclude": [
     "src/_archived_frontend/**/*",
