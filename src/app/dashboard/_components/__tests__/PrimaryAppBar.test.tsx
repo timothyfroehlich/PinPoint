@@ -62,7 +62,7 @@ describe("PrimaryAppBar", () => {
       );
 
       expect(screen.getByText("PinPoint")).toBeInTheDocument();
-      expect(screen.getByText("Dashboard")).toBeInTheDocument();
+      expect(screen.getByText("Home")).toBeInTheDocument();
     });
 
     it("should render user profile menu", () => {
@@ -85,8 +85,9 @@ describe("PrimaryAppBar", () => {
         </VitestTestWrapper>,
       );
 
-      const logoLink = screen.getByRole("link");
-      expect(logoLink).toHaveAttribute("href", "/dashboard");
+      // Get the logo link specifically by finding the link that contains PinPoint text
+      const logoLink = screen.getByRole("link", { name: /pinpoint/i });
+      expect(logoLink).toHaveAttribute("href", "/");
     });
   });
 
@@ -294,11 +295,11 @@ describe("PrimaryAppBar", () => {
 
       // Basic branding should still be there
       expect(screen.getByText("PinPoint")).toBeInTheDocument();
-      expect(screen.getByText("Dashboard")).toBeInTheDocument();
+      expect(screen.getByText("Home")).toBeInTheDocument();
 
-      // Profile menu should still be there (will likely show login option in real app)
+      // Sign In button should be shown for unauthenticated users
       expect(
-        screen.getByRole("button", { name: /account of current user/i }),
+        screen.getByRole("button", { name: "Sign In" }),
       ).toBeInTheDocument();
     });
 
@@ -359,7 +360,7 @@ describe("PrimaryAppBar", () => {
 
       // All main elements should be present
       expect(screen.getByText("PinPoint")).toBeInTheDocument();
-      expect(screen.getByText("Dashboard")).toBeInTheDocument();
+      expect(screen.getByText("Home")).toBeInTheDocument();
       expect(
         screen.getByRole("button", { name: "Issues" }),
       ).toBeInTheDocument();
@@ -397,7 +398,7 @@ describe("PrimaryAppBar", () => {
 
       // Should render basic structure without permission-based buttons
       expect(screen.getByText("PinPoint")).toBeInTheDocument();
-      expect(screen.getByText("Dashboard")).toBeInTheDocument();
+      expect(screen.getByText("Home")).toBeInTheDocument();
       expect(
         screen.queryByRole("button", { name: "Issues" }),
       ).not.toBeInTheDocument();

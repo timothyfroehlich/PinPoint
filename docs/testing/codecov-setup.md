@@ -92,13 +92,13 @@ npm run test:coverage # Fails if below thresholds
 
 ## Codecov Features
 
-### Vite Plugin Integration
+### Vite Integration
 
-The `@codecov/vite-plugin` provides:
+Codecov integrates with Vitest through standard coverage reports without requiring additional plugins. The current setup uses:
 
-- Bundle analysis for build optimization
-- Enhanced coverage tracking
-- Integration with Codecov dashboard
+- Native Vitest coverage generation with V8 provider
+- LCOV format for Codecov compatibility
+- GitHub Actions upload integration
 
 ### Pull Request Comments
 

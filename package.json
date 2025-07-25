@@ -105,7 +105,6 @@
     "@betterer/cli": "^6.0.0-alpha.1",
     "@betterer/eslint": "^6.0.0-alpha.1",
     "@betterer/typescript": "^6.0.0-alpha.1",
-    "@codecov/vite-plugin": "^1.9.1",
     "@eslint/eslintrc": "^3.3.1",
     "@faker-js/faker": "^9.9.0",
     "@playwright/test": "^1.54.1",

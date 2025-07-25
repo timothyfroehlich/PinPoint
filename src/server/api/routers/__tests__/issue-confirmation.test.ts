@@ -2,49 +2,30 @@ import { TRPCError } from "@trpc/server";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { z } from "zod";
 
+// Mock NextAuth to prevent module resolution issues
+vi.mock("next-auth", () => ({
+  default: vi.fn().mockImplementation(() => ({
+    auth: vi.fn(),
+    handlers: { GET: vi.fn(), POST: vi.fn() },
+    signIn: vi.fn(),
+    signOut: vi.fn(),
+  })),
+}));
+
+// Mock permissions system
+vi.mock("../../../auth/permissions", () => ({
+  getUserPermissionsForSession: vi.fn(),
+  requirePermissionForSession: vi.fn(),
+}));
+
+import {
+  createVitestMockContext,
+} from "../../../../test/vitestMockContext";
+import { getUserPermissionsForSession, requirePermissionForSession } from "../../../auth/permissions";
 import { createTRPCRouter, organizationProcedure } from "../../trpc";
 import { issueCreateProcedure } from "../../trpc.permission";
 
-import type { ExtendedPrismaClient } from "~/server/db";
 
-// Proper types for test context
-interface MockTRPCContext {
-  db: ExtendedPrismaClient;
-  session: {
-    user: {
-      id: string;
-      email: string | null;
-      name: string | null;
-      image: string | null;
-    };
-    expires: string;
-  };
-  organization: {
-    id: string;
-    name: string;
-  };
-  membership: {
-    id: string;
-    userId: string;
-    organizationId: string;
-    roleId: string;
-    role: {
-      id: string;
-      name: string;
-      organizationId: string;
-      isSystem: boolean;
-      isDefault: boolean;
-      createdAt: Date;
-      updatedAt: Date;
-      permissions: {
-        id: string;
-        name: string;
-        description: string;
-      }[];
-    };
-  };
-  userPermissions: string[];
-}
 
 // Create issue confirm procedure for testing
 const issueConfirmProcedure = organizationProcedure.use(async (opts) => {
@@ -52,7 +33,7 @@ const issueConfirmProcedure = organizationProcedure.use(async (opts) => {
   if (!opts.ctx.userPermissions?.includes("issue:confirm")) {
     throw new TRPCError({
       code: "FORBIDDEN",
-      message: "Permission required: issue:confirm",
+      message: "Missing required permission: issue:confirm",
     });
   }
   return opts.next();
@@ -288,56 +269,68 @@ const issueConfirmationRouter = createTRPCRouter({
 });
 
 // Mock context helper with different permission sets
-const createMockTRPCContext = (permissions: string[] = []): MockTRPCContext => {
-  const mockPrisma: ExtendedPrismaClient = {
-    issue: {
-      create: vi.fn(),
-      findFirst: vi.fn(),
-      findMany: vi.fn(),
-      update: vi.fn(),
-      count: vi.fn(),
+const createMockTRPCContext = (permissions: string[] = []) => {
+  const mockContext = createVitestMockContext();
+  
+  // Set up session and organization
+  mockContext.session = {
+    user: {
+      id: "user-1",
+      email: "user@example.com",
+      name: "Test User",
+      image: null,
     },
-    $accelerate: {
-      invalidate: vi.fn(),
-      ttl: vi.fn(),
+    expires: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(),
+  };
+  
+  mockContext.organization = {
+    id: "org-1",
+    name: "Test Organization",
+    subdomain: "test",
+  };
+
+  // Mock the membership database query that organizationProcedure performs
+  const membershipData = {
+    id: "membership-1",
+    userId: "user-1",
+    organizationId: "org-1",
+    roleId: "role-1",
+    role: {
+      id: "role-1",
+      name: "Test Role",
+      organizationId: "org-1",
+      isSystem: false,
+      isDefault: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      permissions: permissions.map((name, index) => ({
+        id: `perm-${(index + 1).toString()}`,
+        name,
+        description: `${name} permission`,
+      })),
     },
-  } as unknown as ExtendedPrismaClient;
+  };
+
+  // Mock the database query for membership lookup
+  vi.mocked(mockContext.db.membership.findFirst).mockResolvedValue(membershipData as any);
+  
+  // Mock the permissions system
+  vi.mocked(getUserPermissionsForSession).mockResolvedValue(permissions);
+  
+  // Mock requirePermissionForSession - it should throw when permission is missing
+  vi.mocked(requirePermissionForSession).mockImplementation((_session, permission, _db, _orgId) => {
+    if (!permissions.includes(permission)) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: `Missing required permission: ${permission}`,
+      });
+    }
+    return Promise.resolve();
+  });
 
   return {
-    db: mockPrisma,
-    session: {
-      user: {
-        id: "user-1",
-        email: "user@example.com",
-        name: "Test User",
-        image: null,
-      },
-      expires: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(),
-    },
-    organization: {
-      id: "org-1",
-      name: "Test Organization",
-    },
-    membership: {
-      id: "membership-1",
-      userId: "user-1",
-      organizationId: "org-1",
-      roleId: "role-1",
-      role: {
-        id: "role-1",
-        name: "Test Role",
-        organizationId: "org-1",
-        isSystem: false,
-        isDefault: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        permissions: permissions.map((name, index) => ({
-          id: `perm-${(index + 1).toString()}`,
-          name,
-          description: `${name} permission`,
-        })),
-      },
-    },
+    ...mockContext,
+    membership: membershipData,
     userPermissions: permissions,
   };
 };
@@ -551,7 +544,7 @@ describe("Issue Confirmation Workflow", () => {
           priorityId: "priority-1",
           formType: "basic",
         }),
-      ).rejects.toThrow("Permission required: issue:create");
+      ).rejects.toThrow("Missing required permission: issue:create");
     });
   });
 
@@ -605,7 +598,7 @@ describe("Issue Confirmation Workflow", () => {
           issueId: "issue-1",
           isConfirmed: true,
         }),
-      ).rejects.toThrow("Permission required: issue:confirm");
+      ).rejects.toThrow("Missing required permission: issue:confirm");
     });
 
     it("should return NOT_FOUND for non-existent issue", async () => {
@@ -871,7 +864,7 @@ describe("Issue Confirmation Workflow", () => {
           priorityId: "priority-1",
           formType: "basic",
         }),
-      ).rejects.toThrow("Permission required: issue:create");
+      ).rejects.toThrow("Missing required permission: issue:create");
     });
 
     it("should require issue:create permission for full form", async () => {
@@ -888,7 +881,7 @@ describe("Issue Confirmation Workflow", () => {
           priorityId: "priority-1",
           formType: "full",
         }),
-      ).rejects.toThrow("Permission required: issue:create");
+      ).rejects.toThrow("Missing required permission: issue:create");
     });
 
     it("should not require additional permissions for basic form beyond issue:create", async () => {

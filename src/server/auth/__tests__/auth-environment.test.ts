@@ -50,7 +50,13 @@ describe("Auth Environment Configuration", () => {
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    // Only restore environment mocks, keep console spies active for test assertions
+    vi.mocked(shouldEnableCredentialsProvider).mockRestore();
+    vi.mocked(shouldEnableTestLogin).mockRestore();
+    vi.mocked(shouldEnableDemoLogin).mockRestore();
+    vi.mocked(isDevelopment).mockRestore();
+    vi.mocked(isPreview).mockRestore();
+    vi.mocked(isProduction).mockRestore();
   });
 
   describe("Provider Selection", () => {

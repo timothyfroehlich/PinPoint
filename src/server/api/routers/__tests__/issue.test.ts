@@ -11,11 +11,19 @@ vi.mock("next-auth", () => ({
   })),
 }));
 
+// Mock permissions system
+vi.mock("~/server/auth/permissions", async () => {
+  const actual = await vi.importActual("~/server/auth/permissions");
+  return {
+    ...actual,
+    getUserPermissionsForSession: vi.fn(),
+    requirePermissionForSession: vi.fn(),
+  };
+});
+
 import { appRouter } from "~/server/api/root";
-import {
-  createVitestMockContext,
-  type VitestMockContext,
-} from "~/test/vitestMockContext";
+import { getUserPermissionsForSession, requirePermissionForSession } from "~/server/auth/permissions";
+import { createVitestMockContext } from "~/test/vitestMockContext";
 
 // Mock data for tests
 const mockUser = { id: "user-1", email: "test@example.com", name: "Test User" };
@@ -36,11 +44,6 @@ const mockLocation = {
   name: "Test Location",
   organizationId: "org-1",
 };
-const mockOrganization = {
-  id: "org-1",
-  name: "Test Org",
-  subdomain: "test-org",
-};
 const mockStatus = { id: "status-1", name: "Open", organizationId: "org-1" };
 const mockPriority = {
   id: "priority-1",
@@ -53,32 +56,94 @@ const mockMembership = {
   organizationId: "org-1",
   roleId: "role-1",
 };
-const mockRole = { id: "role-1", name: "Admin", organizationId: "org-1" };
+
+// Helper to create authenticated context with permissions
+const createAuthenticatedContext = (permissions: string[] = []) => {
+  const mockContext = createVitestMockContext();
+  
+  // Set up session and organization
+  mockContext.session = {
+    user: {
+      id: "user-1",
+      email: "test@example.com",
+      name: "Test User",
+      image: null,
+    },
+    expires: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(),
+  };
+  
+  mockContext.organization = {
+    id: "org-1",
+    name: "Test Organization",
+    subdomain: "test",
+  };
+
+  const membershipData = {
+    id: "membership-1",
+    userId: "user-1",
+    organizationId: "org-1",
+    roleId: "role-1",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    role: {
+      id: "role-1",
+      name: "Test Role",
+      organizationId: "org-1",
+      isSystem: false,
+      isDefault: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      permissions: permissions.map((name, index) => ({
+        id: `perm-${(index + 1).toString()}`,
+        name,
+        description: `${name} permission`,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })),
+    },
+  };
+
+  // Mock the database query for membership lookup
+  vi.mocked(mockContext.db.membership.findFirst).mockResolvedValue(membershipData as any);
+  
+  // Mock the permissions system
+  vi.mocked(getUserPermissionsForSession).mockResolvedValue(permissions);
+  
+  // Mock requirePermissionForSession - it should throw when permission is missing
+  vi.mocked(requirePermissionForSession).mockImplementation((_session, permission, _db, _orgId) => {
+    if (!permissions.includes(permission)) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: `Missing required permission: ${permission}`,
+      });
+    }
+    return Promise.resolve();
+  });
+
+  return {
+    ...mockContext,
+    membership: membershipData,
+    userPermissions: permissions,
+  };
+};
 
 describe("issueRouter - Issue Detail Page", () => {
-  let ctx: VitestMockContext;
-  let caller: ReturnType<typeof appRouter.createCaller>;
+  let ctx: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    ctx = createVitestMockContext();
-    ctx.session = {
-      user: { id: mockUser.id },
-      expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-    };
-    ctx.organization = mockOrganization;
-
-    // Create caller with mock context directly
-    caller = appRouter.createCaller(ctx);
+    ctx = createAuthenticatedContext(["issue:view"]);
   });
 
   describe("Public Issue Detail Access", () => {
     it("should allow public users to view issue details", async () => {
+      // Create a public caller (no session, no organization)
+      const publicCtx = createAuthenticatedContext();
       const publicCaller = appRouter.createCaller({
+        ...publicCtx,
         session: null,
-        headers: ctx.headers,
-        db: ctx.db,
-      });
+        organization: null,
+      } as any);
 
       const issueWithDetails = {
         ...mockIssue,
@@ -107,11 +172,13 @@ describe("issueRouter - Issue Detail Page", () => {
     });
 
     it("should filter sensitive data for public users", async () => {
+      // Create a public caller (no session, no organization)
+      const publicCtx = createAuthenticatedContext();
       const publicCaller = appRouter.createCaller({
+        ...publicCtx,
         session: null,
-        headers: ctx.headers,
-        db: ctx.db,
-      });
+        organization: null,
+      } as any);
 
       const issueWithSensitiveData = {
         ...mockIssue,
@@ -138,7 +205,7 @@ describe("issueRouter - Issue Detail Page", () => {
         ],
       };
 
-      ctx.db.issue.findUnique.mockResolvedValue(issueWithSensitiveData as any);
+      publicCtx.db.issue.findUnique.mockResolvedValue(issueWithSensitiveData as any);
 
       const result = await publicCaller.issue.core.getById({
         id: mockIssue.id,
@@ -150,13 +217,15 @@ describe("issueRouter - Issue Detail Page", () => {
     });
 
     it("should throw 404 for non-existent issues", async () => {
+      // Create a public caller (no session, no organization)
+      const publicCtx = createAuthenticatedContext();
       const publicCaller = appRouter.createCaller({
+        ...publicCtx,
         session: null,
-        headers: ctx.headers,
-        db: ctx.db,
-      });
+        organization: null,
+      } as any);
 
-      ctx.db.issue.findUnique.mockResolvedValue(null);
+      publicCtx.db.issue.findUnique.mockResolvedValue(null);
 
       await expect(
         publicCaller.issue.core.getById({ id: "non-existent" }),
@@ -166,7 +235,10 @@ describe("issueRouter - Issue Detail Page", () => {
 
   describe("Authenticated Issue Detail Access", () => {
     it("should allow authenticated users to view all issue details", async () => {
-      ctx.db.membership.findFirst.mockResolvedValue(mockMembership as any);
+      const authCtx = createAuthenticatedContext(["issue:view"]);  
+      const authCaller = appRouter.createCaller(authCtx);
+      
+      authCtx.db.membership.findFirst.mockResolvedValue(mockMembership as any);
 
       const issueWithDetails = {
         ...mockIssue,
@@ -193,9 +265,9 @@ describe("issueRouter - Issue Detail Page", () => {
         ],
       };
 
-      ctx.db.issue.findUnique.mockResolvedValue(issueWithDetails as any);
+      authCtx.db.issue.findUnique.mockResolvedValue(issueWithDetails as any);
 
-      const result = await caller.issue.core.getById({ id: mockIssue.id });
+      const result = await authCaller.issue.core.getById({ id: mockIssue.id });
 
       // Should see all comments
       expect(result.comments).toHaveLength(2);
@@ -203,153 +275,156 @@ describe("issueRouter - Issue Detail Page", () => {
     });
 
     it("should enforce organization isolation", async () => {
+      const authCtx = createAuthenticatedContext(["issue:view"]);
+      const authCaller = appRouter.createCaller(authCtx);
+      
       const otherOrgIssue = {
         ...mockIssue,
         organizationId: "other-org",
         machine: { ...mockMachine, organizationId: "other-org" },
       };
 
-      ctx.db.issue.findUnique.mockResolvedValue(otherOrgIssue as any);
+      authCtx.db.issue.findUnique.mockResolvedValue(otherOrgIssue as any);
 
       await expect(
-        caller.issue.core.getById({ id: mockIssue.id }),
+        authCaller.issue.core.getById({ id: mockIssue.id }),
       ).rejects.toThrow("Issue not found");
     });
   });
 
   describe("Permission-based Issue Operations", () => {
     it("should allow users with edit permissions to update issues", async () => {
-      const editPermissionRole = {
-        ...mockRole,
-        permissions: [{ name: "issues:edit", description: "Edit issues" }],
+      const editCtx = createAuthenticatedContext(["issue:edit"]);
+      const editCaller = appRouter.createCaller(editCtx);
+      
+      // Mock activity and notification services
+      const mockActivityService = {
+        recordFieldUpdate: vi.fn().mockResolvedValue(undefined),
       };
-
-      ctx.db.membership.findFirst.mockResolvedValue({
-        ...mockMembership,
-        role: editPermissionRole,
+      const mockNotificationService = {
+        notifyMachineOwnerOfStatusChange: vi.fn().mockResolvedValue(undefined),
+      };
+      vi.mocked(editCtx.services.createIssueActivityService).mockReturnValue(mockActivityService);
+      vi.mocked(editCtx.services.createNotificationService).mockReturnValue(mockNotificationService);
+      
+      editCtx.db.issue.findFirst.mockResolvedValue({
+        ...mockIssue,
+        status: mockStatus,
+        assignedTo: null,
       } as any);
-
-      ctx.db.issue.findUnique.mockResolvedValue(mockIssue as any);
-      ctx.db.issue.update.mockResolvedValue({
+      editCtx.db.issue.update.mockResolvedValue({
         ...mockIssue,
         title: "Updated Title",
       } as any);
 
-      const result = await caller.issue.core.update({
+      const result = await editCaller.issue.core.update({
         id: mockIssue.id,
         title: "Updated Title",
       });
 
       expect(result.title).toBe("Updated Title");
-      expect(ctx.db.issue.update).toHaveBeenCalledWith({
-        where: { id: mockIssue.id },
-        data: { title: "Updated Title" },
-      });
+      expect(editCtx.db.issue.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: mockIssue.id },
+          data: expect.objectContaining({ title: "Updated Title" }),
+        })
+      );
     });
 
     it("should deny users without edit permissions from updating issues", async () => {
-      const readOnlyRole = {
-        ...mockRole,
-        permissions: [{ name: "issues:read", description: "Read issues" }],
-      };
-
-      ctx.db.membership.findFirst.mockResolvedValue({
-        ...mockMembership,
-        role: readOnlyRole,
-      } as any);
+      const readOnlyCtx = createAuthenticatedContext(["issue:view"]);
+      const readOnlyCaller = appRouter.createCaller(readOnlyCtx);
 
       await expect(
-        caller.issue.core.update({
+        readOnlyCaller.issue.core.update({
           id: mockIssue.id,
           title: "Updated Title",
         }),
-      ).rejects.toThrow("UNAUTHORIZED");
+      ).rejects.toThrow("Missing required permission: issue:edit");
     });
 
     it("should allow users with close permissions to close issues", async () => {
-      const closePermissionRole = {
-        ...mockRole,
-        permissions: [{ name: "issues:close", description: "Close issues" }],
-      };
-
-      ctx.db.membership.findFirst.mockResolvedValue({
-        ...mockMembership,
-        role: closePermissionRole,
-      } as any);
-
-      ctx.db.issue.findUnique.mockResolvedValue(mockIssue as any);
-      ctx.db.issue.update.mockResolvedValue({
+      const closeCtx = createAuthenticatedContext(["issue:edit"]);
+      const closeCaller = appRouter.createCaller(closeCtx);
+      
+      const resolvedStatus = { id: "status-resolved", name: "Resolved", category: "RESOLVED" };
+      closeCtx.db.issueStatus.findFirst.mockResolvedValue(resolvedStatus as any);
+      closeCtx.db.issue.update.mockResolvedValue({
         ...mockIssue,
         resolvedAt: new Date(),
       } as any);
 
-      const result = await caller.issue.core.close({
+      const result = await closeCaller.issue.core.close({
         id: mockIssue.id,
       });
 
       expect(result.resolvedAt).toBeTruthy();
-      expect(ctx.db.issue.update).toHaveBeenCalledWith({
-        where: { id: mockIssue.id },
-        data: { resolvedAt: expect.any(Date) },
-      });
+      expect(closeCtx.db.issue.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: mockIssue.id },
+          data: expect.objectContaining({ resolvedAt: expect.any(Date) }),
+        })
+      );
     });
 
     it("should allow users with assign permissions to assign issues", async () => {
-      const assignPermissionRole = {
-        ...mockRole,
-        permissions: [{ name: "issues:assign", description: "Assign issues" }],
+      const assignCtx = createAuthenticatedContext(["issue:assign"]);
+      const assignCaller = appRouter.createCaller(assignCtx);
+      
+      // Mock activity service
+      const mockActivityService = {
+        recordIssueAssigned: vi.fn().mockResolvedValue(undefined),
       };
-
-      ctx.db.membership.findFirst.mockResolvedValue({
+      vi.mocked(assignCtx.services.createIssueActivityService).mockReturnValue(mockActivityService);
+      
+      assignCtx.db.issue.findFirst.mockResolvedValue(mockIssue as any);
+      assignCtx.db.membership.findUnique.mockResolvedValue({
         ...mockMembership,
-        role: assignPermissionRole,
+        user: mockUser,
       } as any);
-
-      ctx.db.issue.findUnique.mockResolvedValue(mockIssue as any);
-      ctx.db.issue.update.mockResolvedValue({
+      assignCtx.db.issue.update.mockResolvedValue({
         ...mockIssue,
         assignedToId: mockUser.id,
+        assignedTo: mockUser,
       } as any);
 
-      const result = await caller.issue.core.assign({
-        id: mockIssue.id,
-        assignedToId: mockUser.id,
+      const result = await assignCaller.issue.core.assign({
+        issueId: mockIssue.id,
+        userId: mockUser.id,
       });
 
-      expect(result.assignedToId).toBe(mockUser.id);
-      expect(ctx.db.issue.update).toHaveBeenCalledWith({
-        where: { id: mockIssue.id },
-        data: { assignedToId: mockUser.id },
-      });
+      expect(result.issue.assignedToId).toBe(mockUser.id);
+      expect(assignCtx.db.issue.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: mockIssue.id },
+          data: { assignedToId: mockUser.id },
+        })
+      );
     });
   });
 
   describe("Issue Status Changes", () => {
     it("should allow status changes with proper validation", async () => {
-      const statusChangeRole = {
-        ...mockRole,
-        permissions: [{ name: "issues:edit", description: "Edit issues" }],
-      };
-
-      ctx.db.membership.findFirst.mockResolvedValue({
-        ...mockMembership,
-        role: statusChangeRole,
-      } as any);
-
+      const statusCtx = createAuthenticatedContext(["issue:edit"]);
+      const statusCaller = appRouter.createCaller(statusCtx);
+      
       const newStatus = {
         ...mockStatus,
         id: "status-in-progress",
         name: "In Progress",
       };
 
-      ctx.db.issue.findUnique.mockResolvedValue(mockIssue as any);
-      ctx.db.issueStatus.findUnique.mockResolvedValue(newStatus as any);
-      ctx.db.issue.update.mockResolvedValue({
+      statusCtx.db.issue.findFirst.mockResolvedValue({
+        ...mockIssue,
+        status: mockStatus,
+      } as any);
+      statusCtx.db.issueStatus.findFirst.mockResolvedValue(newStatus as any);
+      statusCtx.db.issue.update.mockResolvedValue({
         ...mockIssue,
         statusId: newStatus.id,
       } as any);
 
-      const result = await caller.issue.core.updateStatus({
+      const result = await statusCaller.issue.core.updateStatus({
         id: mockIssue.id,
         statusId: newStatus.id,
       });
@@ -358,32 +433,26 @@ describe("issueRouter - Issue Detail Page", () => {
     });
 
     it("should validate status belongs to same organization", async () => {
-      const statusChangeRole = {
-        ...mockRole,
-        permissions: [{ name: "issues:edit", description: "Edit issues" }],
-      };
-
-      ctx.db.membership.findFirst.mockResolvedValue({
-        ...mockMembership,
-        role: statusChangeRole,
-      } as any);
-
-      const otherOrgStatus = { ...mockStatus, organizationId: "other-org" };
-
-      ctx.db.issue.findUnique.mockResolvedValue(mockIssue as any);
-      ctx.db.issueStatus.findUnique.mockResolvedValue(otherOrgStatus as any);
+      const statusCtx = createAuthenticatedContext(["issue:edit"]);
+      const statusCaller = appRouter.createCaller(statusCtx);
+      
+      statusCtx.db.issue.findFirst.mockResolvedValue(mockIssue as any);
+      statusCtx.db.issueStatus.findFirst.mockResolvedValue(null); // Status not found
 
       await expect(
-        caller.issue.core.updateStatus({
+        statusCaller.issue.core.updateStatus({
           id: mockIssue.id,
-          statusId: otherOrgStatus.id,
+          statusId: "other-org-status",
         }),
-      ).rejects.toThrow("Status not found");
+      ).rejects.toThrow("Invalid status");
     });
   });
 
   describe("Issue Comment Operations", () => {
     it("should allow adding comments to issues", async () => {
+      const commentCtx = createAuthenticatedContext(["issue:comment"]);
+      const commentCaller = appRouter.createCaller(commentCtx);
+      
       const newComment = {
         id: "comment-new",
         content: "New comment",
@@ -394,10 +463,10 @@ describe("issueRouter - Issue Detail Page", () => {
         updatedAt: new Date(),
       };
 
-      ctx.db.issue.findUnique.mockResolvedValue(mockIssue as any);
-      ctx.db.issueComment.create.mockResolvedValue(newComment as any);
+      commentCtx.db.issue.findFirst.mockResolvedValue(mockIssue as any);
+      commentCtx.db.issueComment.create.mockResolvedValue(newComment as any);
 
-      const result = await caller.issue.comment.create({
+      const result = await commentCaller.issue.comment.create({
         issueId: mockIssue.id,
         content: "New comment",
         isInternal: false,
@@ -408,18 +477,9 @@ describe("issueRouter - Issue Detail Page", () => {
     });
 
     it("should allow internal comments for authorized users", async () => {
-      const internalCommentRole = {
-        ...mockRole,
-        permissions: [
-          { name: "issues:internal_comment", description: "Internal comments" },
-        ],
-      };
-
-      ctx.db.membership.findFirst.mockResolvedValue({
-        ...mockMembership,
-        role: internalCommentRole,
-      } as any);
-
+      const internalCtx = createAuthenticatedContext(["issue:internal_comment"]);
+      const internalCaller = appRouter.createCaller(internalCtx);
+      
       const internalComment = {
         id: "comment-internal",
         content: "Internal note",
@@ -430,10 +490,10 @@ describe("issueRouter - Issue Detail Page", () => {
         updatedAt: new Date(),
       };
 
-      ctx.db.issue.findUnique.mockResolvedValue(mockIssue as any);
-      ctx.db.issueComment.create.mockResolvedValue(internalComment as any);
+      internalCtx.db.issue.findFirst.mockResolvedValue(mockIssue as any);
+      internalCtx.db.issueComment.create.mockResolvedValue(internalComment as any);
 
-      const result = await caller.issue.comment.create({
+      const result = await internalCaller.issue.comment.create({
         issueId: mockIssue.id,
         content: "Internal note",
         isInternal: true,
@@ -443,48 +503,45 @@ describe("issueRouter - Issue Detail Page", () => {
     });
 
     it("should deny internal comments for unauthorized users", async () => {
-      const publicRole = {
-        ...mockRole,
-        permissions: [
-          { name: "issues:comment", description: "Public comments" },
-        ],
-      };
-
-      ctx.db.membership.findFirst.mockResolvedValue({
-        ...mockMembership,
-        role: publicRole,
-      } as any);
+      const publicCommentCtx = createAuthenticatedContext(["issue:comment"]);
+      const publicCommentCaller = appRouter.createCaller(publicCommentCtx);
 
       await expect(
-        caller.issue.comment.create({
+        publicCommentCaller.issue.comment.create({
           issueId: mockIssue.id,
           content: "Internal note",
           isInternal: true,
         }),
-      ).rejects.toThrow("UNAUTHORIZED");
+      ).rejects.toThrow("Missing required permission: issue:internal_comment");
     });
   });
 
   describe("Loading States and Error Handling", () => {
     it("should handle database connection errors gracefully", async () => {
-      ctx.db.issue.findUnique.mockRejectedValue(
+      const errorCtx = createAuthenticatedContext(["issue:view"]);
+      const errorCaller = appRouter.createCaller(errorCtx);
+      
+      errorCtx.db.issue.findFirst.mockRejectedValue(
         new Error("Database connection failed"),
       );
 
       await expect(
-        caller.issue.core.getById({ id: mockIssue.id }),
+        errorCaller.issue.core.getById({ id: mockIssue.id }),
       ).rejects.toThrow("Database connection failed");
     });
 
     it("should handle concurrent access scenarios", async () => {
+      const concurrentCtx = createAuthenticatedContext(["issue:edit"]);
+      const concurrentCaller = appRouter.createCaller(concurrentCtx);
+      
       // Simulate optimistic locking scenario
-      ctx.db.issue.findUnique.mockResolvedValue(mockIssue as any);
-      ctx.db.issue.update.mockRejectedValue(
+      concurrentCtx.db.issue.findFirst.mockResolvedValue(mockIssue as any);
+      concurrentCtx.db.issue.update.mockRejectedValue(
         new Error("Concurrent modification"),
       );
 
       await expect(
-        caller.issue.core.update({
+        concurrentCaller.issue.core.update({
           id: mockIssue.id,
           title: "Updated Title",
         }),

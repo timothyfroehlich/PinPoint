@@ -31,6 +31,7 @@ export function createVitestMockContext(): VitestMockContext {
       ttl: vi.fn(),
     },
     user: {
+      findFirst: vi.fn(),
       findUnique: vi.fn(),
       findMany: vi.fn(),
       create: vi.fn(),
@@ -46,6 +47,7 @@ export function createVitestMockContext(): VitestMockContext {
       delete: vi.fn(),
     },
     organization: {
+      findFirst: vi.fn(),
       findUnique: vi.fn(),
       findMany: vi.fn(),
       create: vi.fn(),
@@ -53,6 +55,7 @@ export function createVitestMockContext(): VitestMockContext {
       delete: vi.fn(),
     },
     role: {
+      findFirst: vi.fn(),
       findUnique: vi.fn(),
       findMany: vi.fn(),
       create: vi.fn(),
@@ -60,6 +63,7 @@ export function createVitestMockContext(): VitestMockContext {
       delete: vi.fn(),
     },
     permission: {
+      findFirst: vi.fn(),
       findUnique: vi.fn(),
       findMany: vi.fn(),
       create: vi.fn(),
@@ -67,6 +71,7 @@ export function createVitestMockContext(): VitestMockContext {
       delete: vi.fn(),
     },
     location: {
+      findFirst: vi.fn(),
       findUnique: vi.fn(),
       findMany: vi.fn(),
       create: vi.fn(),
@@ -74,11 +79,13 @@ export function createVitestMockContext(): VitestMockContext {
       delete: vi.fn(),
     },
     issue: {
+      findFirst: vi.fn(),
       findUnique: vi.fn(),
       findMany: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
+      count: vi.fn(),
     },
     machine: {
       findFirst: vi.fn(),
@@ -89,6 +96,7 @@ export function createVitestMockContext(): VitestMockContext {
       delete: vi.fn(),
     },
     model: {
+      findFirst: vi.fn(),
       findUnique: vi.fn(),
       findMany: vi.fn(),
       create: vi.fn(),
@@ -96,6 +104,7 @@ export function createVitestMockContext(): VitestMockContext {
       delete: vi.fn(),
     },
     notification: {
+      findFirst: vi.fn(),
       findUnique: vi.fn(),
       findMany: vi.fn(),
       create: vi.fn(),
@@ -112,6 +121,14 @@ export function createVitestMockContext(): VitestMockContext {
       delete: vi.fn(),
     },
     priority: {
+      findFirst: vi.fn(),
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+    },
+    issueComment: {
       findFirst: vi.fn(),
       findUnique: vi.fn(),
       findMany: vi.fn(),

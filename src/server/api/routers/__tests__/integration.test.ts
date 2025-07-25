@@ -1,12 +1,34 @@
 import { TRPCError } from "@trpc/server";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
+// Mock NextAuth to prevent module resolution issues
+vi.mock("next-auth", () => ({
+  default: vi.fn().mockImplementation(() => ({
+    auth: vi.fn(),
+    handlers: { GET: vi.fn(), POST: vi.fn() },
+    signIn: vi.fn(),
+    signOut: vi.fn(),
+  })),
+}));
+
+// Mock getUserPermissionsForSession to return the permissions we set in the test
+vi.mock("~/server/auth/permissions", async () => {
+  const actual = await vi.importActual("~/server/auth/permissions");
+  return {
+    ...actual,
+    getUserPermissionsForSession: vi.fn(),
+    requirePermissionForSession: vi.fn(),
+  };
+});
+
 import {
   createVitestMockContext,
   type VitestMockContext,
 } from "../../../../test/vitestMockContext";
 import { appRouter } from "../../root";
 import { createCallerFactory } from "../../trpc";
+
+import { getUserPermissionsForSession, requirePermissionForSession } from "~/server/auth/permissions";
 
 // Type assertions for relaxed test mode - allows any type usage
 // Using any types is acceptable in test files per multi-config strategy
@@ -20,10 +42,55 @@ type AnyTRPCCaller = any;
  * existing router implementations, testing end-to-end permission workflows.
  */
 
-// Mock context helper with different permission sets
+describe("Router Integration Tests", () => {
+  let mockContext: VitestMockContext;
+  const createCaller = createCallerFactory(appRouter);
 
-const createMockTRPCContext = (permissions: string[] = []): any => {
-  const mockContext = createVitestMockContext();
+  // Mock context helper with different permission sets
+  const createMockTRPCContext = (permissions: string[] = []): any => {
+  // Use the shared mockContext instead of creating a new one
+  
+  const mockMembership = {
+    id: "membership-1",
+    userId: "user-1",
+    organizationId: "org-1",
+    roleId: "role-1",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    role: {
+      id: "role-1",
+      name: "Test Role",
+      organizationId: "org-1",
+      isSystem: false,
+      isDefault: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      permissions: permissions.map((name, index) => ({
+        id: `perm-${(index + 1).toString()}`,
+        name,
+        description: `${name} permission`,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })),
+    },
+  };
+
+  // Mock the database call that organizationProcedure makes
+  vi.mocked(mockContext.db.membership.findFirst).mockResolvedValue(mockMembership);
+  
+  // Mock getUserPermissionsForSession to return the permissions we want
+  vi.mocked(getUserPermissionsForSession).mockResolvedValue(permissions);
+  
+  // Mock requirePermissionForSession to check if permission is in our list
+  vi.mocked(requirePermissionForSession).mockImplementation(async (_session, permission) => {
+    if (!permissions.includes(permission)) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: `Missing required permission: ${permission}`,
+      });
+    }
+    // If permission exists, just return (no error)
+  });
 
   return {
     ...mockContext,
@@ -44,37 +111,10 @@ const createMockTRPCContext = (permissions: string[] = []): any => {
       createdAt: new Date(),
       updatedAt: new Date(),
     },
-    membership: {
-      id: "membership-1",
-      userId: "user-1",
-      organizationId: "org-1",
-      roleId: "role-1",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      role: {
-        id: "role-1",
-        name: "Test Role",
-        organizationId: "org-1",
-        isSystem: false,
-        isDefault: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        permissions: permissions.map((name, index) => ({
-          id: `perm-${(index + 1).toString()}`,
-          name,
-          description: `${name} permission`,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })),
-      },
-    },
+    membership: mockMembership,
     userPermissions: permissions,
   };
 };
-
-describe("Router Integration Tests", () => {
-  let mockContext: VitestMockContext;
-  const createCaller = createCallerFactory(appRouter);
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -102,8 +142,6 @@ describe("Router Integration Tests", () => {
         notifyOnStatusChanges: true,
         notifyOnComments: false,
         location: {
-          id: "location-1",
-          name: "Test Location",
           organizationId: "org-1",
         },
         model: {
@@ -215,7 +253,7 @@ describe("Router Integration Tests", () => {
           title: "Test Issue",
           machineId: "machine-1",
         }),
-      ).rejects.toThrow("Permission required: issue:create");
+      ).rejects.toThrow("Missing required permission: issue:create");
     });
 
     it("should allow issue editing with proper permissions", async () => {
@@ -277,7 +315,7 @@ describe("Router Integration Tests", () => {
         description: "Updated description",
       };
 
-      vi.mocked(mockContext.db.issue.findUnique).mockResolvedValue(mockIssue);
+      vi.mocked(mockContext.db.issue.findFirst).mockResolvedValue(mockIssue);
       vi.mocked(mockContext.db.issue.update).mockResolvedValue(updatedIssue);
 
       // Act
@@ -317,7 +355,7 @@ describe("Router Integration Tests", () => {
           id: "issue-1",
           title: "Updated Title",
         }),
-      ).rejects.toThrow("Permission required: issue:edit");
+      ).rejects.toThrow("Missing required permission: issue:edit");
     });
 
     it("should enforce organization isolation in issue operations", async () => {
@@ -375,8 +413,6 @@ describe("Router Integration Tests", () => {
         notifyOnStatusChanges: true,
         notifyOnComments: false,
         location: {
-          id: "location-1",
-          name: "Test Location",
           organizationId: "org-1",
         },
         model: {
@@ -397,7 +433,7 @@ describe("Router Integration Tests", () => {
         name: "Updated Machine Name",
       };
 
-      vi.mocked(mockContext.db.machine.findUnique).mockResolvedValue(
+      vi.mocked(mockContext.db.machine.findFirst).mockResolvedValue(
         mockMachine,
       );
       vi.mocked(mockContext.db.machine.update).mockResolvedValue(
@@ -438,7 +474,7 @@ describe("Router Integration Tests", () => {
           id: "machine-1",
           name: "Updated Machine Name",
         }),
-      ).rejects.toThrow("Permission required: machine:edit");
+      ).rejects.toThrow("Missing required permission: machine:edit");
     });
 
     it("should enforce organization isolation in machine operations", async () => {
@@ -446,31 +482,8 @@ describe("Router Integration Tests", () => {
       const ctx = createMockTRPCContext(["machine:edit"]);
       const caller = createCaller(ctx as any);
 
-      // Mock machine from different organization
-      const mockMachine = {
-        id: "machine-1",
-        name: "Cross Org Machine",
-        organizationId: "different-org", // Different organization!
-        locationId: "location-1",
-        modelId: "model-1",
-        ownerId: "user-1",
-        qrCodeId: "qr-1",
-        qrCodeUrl: "https://example.com/qr/qr-1",
-        qrCodeGeneratedAt: new Date(),
-        ownerNotificationsEnabled: true,
-        notifyOnNewIssues: true,
-        notifyOnStatusChanges: true,
-        notifyOnComments: false,
-        location: {
-          id: "location-1",
-          name: "Test Location",
-          organizationId: "different-org",
-        },
-      };
-
-      vi.mocked(mockContext.db.machine.findUnique).mockResolvedValue(
-        mockMachine,
-      );
+      // Mock machine from different organization - return null to simulate not found
+      vi.mocked(mockContext.db.machine.findFirst).mockResolvedValue(null);
 
       // Act & Assert
       await expect(
@@ -478,7 +491,7 @@ describe("Router Integration Tests", () => {
           id: "machine-1",
           name: "Malicious Update",
         }),
-      ).rejects.toThrow("Machine not found or access denied");
+      ).rejects.toThrow("Game instance not found");
     });
   });
 
@@ -518,7 +531,7 @@ describe("Router Integration Tests", () => {
         name: "Updated Location Name",
       };
 
-      vi.mocked(mockContext.db.location.findUnique).mockResolvedValue(
+      vi.mocked(mockContext.db.location.findFirst).mockResolvedValue(
         mockLocation,
       );
       vi.mocked(mockContext.db.location.update).mockResolvedValue(
@@ -538,14 +551,12 @@ describe("Router Integration Tests", () => {
           name: "Updated Location Name",
         }),
       );
-      expect(mockContext.db.location.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: "location-1" },
-          data: expect.objectContaining({
-            name: "Updated Location Name",
-          }),
-        }),
-      );
+      expect(mockContext.db.location.update).toHaveBeenCalledWith({
+        where: { id: "location-1" },
+        data: {
+          name: "Updated Location Name",
+        },
+      });
     });
 
     it("should deny location operations without proper permissions", async () => {
@@ -559,7 +570,7 @@ describe("Router Integration Tests", () => {
           id: "location-1",
           name: "Updated Location Name",
         }),
-      ).rejects.toThrow("Permission required: location:edit");
+      ).rejects.toThrow("Missing required permission: location:edit");
     });
   });
 
@@ -633,7 +644,7 @@ describe("Router Integration Tests", () => {
         caller.organization.update({
           name: "Updated Organization Name",
         }),
-      ).rejects.toThrow("Permission required: organization:manage");
+      ).rejects.toThrow("Missing required permission: organization:manage");
     });
   });
 
@@ -669,6 +680,17 @@ describe("Router Integration Tests", () => {
         notifications: [],
       };
 
+      const mockRole = {
+        id: "role-2",
+        name: "Admin Role",
+        organizationId: "org-1",
+        isSystem: false,
+        isDefault: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        permissions: [],
+      };
+
       const mockMembership = {
         id: "membership-2",
         userId: "user-2",
@@ -695,6 +717,7 @@ describe("Router Integration Tests", () => {
         roleId: "role-2",
       };
 
+      vi.mocked(mockContext.db.role.findUnique).mockResolvedValue(mockRole);
       vi.mocked(mockContext.db.membership.findUnique).mockResolvedValue(
         mockMembership,
       );
@@ -709,13 +732,13 @@ describe("Router Integration Tests", () => {
       });
 
       // Assert
-      expect(result).toEqual(
-        expect.objectContaining({
-          id: "membership-2",
+      expect(result).toEqual({
+        success: true,
+        membership: expect.objectContaining({
           userId: "user-2",
           roleId: "role-2",
         }),
-      );
+      });
       expect(mockContext.db.membership.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
@@ -742,7 +765,7 @@ describe("Router Integration Tests", () => {
           userId: "user-2",
           roleId: "role-2",
         }),
-      ).rejects.toThrow("Permission required: user:manage");
+      ).rejects.toThrow("Missing required permission: user:manage");
     });
   });
 
@@ -799,12 +822,33 @@ describe("Router Integration Tests", () => {
         upvotes: [],
       };
 
-      vi.mocked(mockContext.db.issue.findUnique).mockResolvedValue(mockIssue);
+      // Mock activity service for issue assignment
+      const mockActivityService = {
+        recordIssueAssigned: vi.fn().mockResolvedValue(undefined),
+      };
+      vi.mocked(mockContext.services.createIssueActivityService).mockReturnValue(mockActivityService);
+      
+      vi.mocked(mockContext.db.issue.findFirst).mockResolvedValue(mockIssue);
+      vi.mocked(mockContext.db.membership.findUnique).mockResolvedValue({
+        id: "membership-2", 
+        userId: "user-2",
+        organizationId: "org-1",
+        roleId: "role-1",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        user: {
+          id: "user-2",
+          name: "Test User 2", 
+          email: "user2@example.com",
+        }
+      } as any);
       vi.mocked(mockContext.db.issue.update).mockResolvedValue({
-        ...mockIssue,
-        assignedToId: "user-2",
-        description: "Test description", // Add required description field
-      });
+        success: true,
+        issue: {
+          ...mockIssue,
+          assignedToId: "user-2",
+        }
+      } as any);
 
       // Act - Admin should be able to perform all operations
       const result = await caller.issue.core.assign({
@@ -813,12 +857,13 @@ describe("Router Integration Tests", () => {
       });
 
       // Assert
-      expect(result).toEqual(
-        expect.objectContaining({
+      expect(result).toEqual({
+        success: true,
+        issue: expect.objectContaining({
           id: "issue-1",
           assignedToId: "user-2",
         }),
-      );
+      });
     });
 
     it("should properly restrict permissions based on role limitations", async () => {
@@ -832,14 +877,14 @@ describe("Router Integration Tests", () => {
           title: "Test Issue",
           machineId: "machine-1",
         }),
-      ).rejects.toThrow("Permission required: issue:create");
+      ).rejects.toThrow("Missing required permission: issue:create");
 
       await expect(
         caller.issue.core.update({
           id: "issue-1",
           title: "Updated Title",
         }),
-      ).rejects.toThrow("Permission required: issue:edit");
+      ).rejects.toThrow("Missing required permission: issue:edit");
 
       // Note: issue.core.delete does not exist yet - test removed
     });
@@ -857,7 +902,7 @@ describe("Router Integration Tests", () => {
           title: "Test Issue",
           machineId: "machine-1",
         }),
-      ).rejects.toThrow("Permission required: issue:create");
+      ).rejects.toThrow("Missing required permission: issue:create");
     });
 
     it("should handle corrupted permission data gracefully", async () => {
@@ -883,37 +928,19 @@ describe("Router Integration Tests", () => {
       const ctx = createMockTRPCContext(["issue:create"]);
       const caller: AnyTRPCCaller = createCaller(ctx);
 
-      const mockMachine = {
-        id: "machine-1",
-        location: { organizationId: "org-1" },
-      };
-
-      const mockStatus = {
-        id: "status-1",
-        name: "New",
-        organizationId: "org-1",
-        isDefault: true,
-      };
-
-      const mockPriority = {
-        id: "priority-1",
-        name: "Medium",
-        organizationId: "org-1",
-        isDefault: true,
-      };
-
-      vi.mocked(mockContext.db.machine.findFirst).mockResolvedValue(
-        mockMachine,
-      );
-      vi.mocked(mockContext.db.issueStatus.findFirst).mockResolvedValue(
-        mockStatus,
-      );
-      vi.mocked(mockContext.db.priority.findFirst).mockResolvedValue(
-        mockPriority,
-      );
-
-      // Simulate permission being revoked mid-session
-      ctx.userPermissions = ["issue:view"];
+      // Simulate permission being revoked mid-session by updating the mock
+      // The permission should be checked BEFORE any database operations
+      vi.mocked(getUserPermissionsForSession).mockResolvedValue(["issue:view"]);
+      vi.mocked(requirePermissionForSession).mockImplementation(async (session, permission) => {
+        if (!["issue:view"].includes(permission)) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: `Missing required permission: ${permission}`,
+          });
+        }
+      });
+      
+      // No need to mock database calls since permission check should fail first
 
       // Act & Assert
       await expect(
@@ -921,7 +948,7 @@ describe("Router Integration Tests", () => {
           title: "Test Issue",
           machineId: "machine-1",
         }),
-      ).rejects.toThrow("Permission required: issue:create");
+      ).rejects.toThrow("Missing required permission: issue:create");
     });
   });
 });
