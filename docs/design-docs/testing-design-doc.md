@@ -32,11 +32,11 @@ During rapid development, we prioritize fast feedback and quick iteration:
   - **Test Quality:** Test code must meet the same quality standards as production code
   - **No `any` Types:** Tests should use proper TypeScript types, including typed mocks
 - **Current Technology Stack:**
-  - **Unit Testing:** **Jest** as test runner for service layer and utility functions
-  - **Mocking:** Jest's built-in mocking with typed mocks (`jest.fn<T>()`) and custom utilities
+  - **Unit Testing:** **Vitest** as test runner for service layer and utility functions
+  - **Mocking:** Vitest's built-in mocking with typed mocks (`vi.fn<T>()`) and custom utilities
   - **Fixtures:** Static test data to ensure consistent test scenarios
-  - **ESM Support:** Uses `ts-jest/presets/default-esm` preset for ES module compatibility
-  - **Coverage:** Jest with v8 provider for accurate coverage metrics
+  - **ESM Support:** Native ES module support without transformation overhead
+  - **Coverage:** Vitest with v8 provider for accurate coverage metrics
 - **Future Technology Stack (Deferred):**
   - **Integration Testing:** React Testing Library for components, direct tRPC procedure calls
   - **End-to-End Testing:** Playwright for browser automation
@@ -113,10 +113,10 @@ npm run test:ci
   - Test client-side form validation and state management logic.
 - **Integration Tests:**
   - Test the full data flow from the UI to the database. For example, a test will simulate filling out and submitting the issue form, mocking the tRPC procedure call to verify the correct payload is sent, and asserting the UI updates accordingly.
-  - Write integration tests for all new CRUD tRPC procedures related to `GameInstances` and `Issues`.
+  - Write integration tests for all new CRUD tRPC procedures related to `Machines` and `Issues`.
 - **End-to-End Tests (Playwright):**
   - **Public User Flow:** Automate a browser to navigate to the site, view the public issue dashboard, select a game, submit a new issue, and verify that the new issue appears on the dashboard and the game's status page.
-  - **Admin User Flow:** Automate a login as an `Admin`, navigate to the admin panel, create a new `GameInstance`, find a submitted issue, and update its status. The test will then assert that the change is correctly reflected in the UI and the audit log.
+  - **Admin User Flow:** Automate a login as an `Admin`, navigate to the admin panel, create a new `Machine`, find a submitted issue, and update its status. The test will then assert that the change is correctly reflected in the UI and the audit log.
 
 ### Tests for Milestone 3: Advanced Tooling
 
@@ -150,13 +150,13 @@ npm run test:ci
 // Use typed mocks for better type safety
 const mockPrisma = {
   issue: {
-    findMany: jest.fn<typeof prisma.issue.findMany>(),
-    create: jest.fn<typeof prisma.issue.create>(),
+    findMany: vi.fn<typeof prisma.issue.findMany>(),
+    create: vi.fn<typeof prisma.issue.create>(),
   },
 };
 
 // Mock ES modules
-jest.mock("~/server/db", () => ({
+vi.mock("~/server/db", () => ({
   prisma: mockPrisma,
 }));
 ```
@@ -165,7 +165,7 @@ jest.mock("~/server/db", () => ({
 
 - Import test utilities using ES module syntax
 - Add `.js` extensions if needed for local imports
-- Update `transformIgnorePatterns` in jest.config.js for problematic packages
+- Update Vitest configuration for problematic packages
 - Use dynamic imports for ESM-only packages in tests
 
 ### Organization Isolation Testing
