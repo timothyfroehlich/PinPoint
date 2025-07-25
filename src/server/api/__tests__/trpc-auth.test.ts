@@ -1,25 +1,72 @@
-import { jest } from "@jest/globals";
 import { TRPCError } from "@trpc/server";
 import { type Session } from "next-auth";
-
-import {
-  createMockContext,
-  mockOrganization,
-  mockMembership,
-  type MockContext,
-} from "../../../test/mockContext";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 import { appRouter } from "~/server/api/root";
 import { auth } from "~/server/auth";
+import { getUserPermissionsForSession } from "~/server/auth/permissions";
+import {
+  createVitestMockContext,
+  type VitestMockContext,
+} from "~/test/vitestMockContext";
 
 // Mock NextAuth
-jest.mock("~/server/auth", () => ({
-  auth: jest.fn(),
+vi.mock("~/server/auth", () => ({
+  auth: vi.fn(),
 }));
 
-const mockAuth = auth as unknown as jest.MockedFunction<
-  () => Promise<Session | null>
+// Mock permissions system
+vi.mock("~/server/auth/permissions", () => ({
+  getUserPermissionsForSession: vi.fn(),
+  requirePermissionForSession: vi.fn(),
+}));
+
+const mockAuth = auth as unknown as ReturnType<
+  typeof vi.fn<[], Promise<Session | null>>
 >;
+
+// Mock organization data
+const mockOrganization = {
+  id: "org-1",
+  name: "Test Organization",
+  subdomain: "test",
+  logoUrl: null,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+};
+
+// Mock membership data
+const mockMembership = {
+  id: "membership-1",
+  userId: "user-123",
+  organizationId: "org-1",
+  roleId: "role-1",
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  role: {
+    id: "role-1",
+    name: "Member",
+    organizationId: "org-1",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    permissions: [
+      {
+        id: "perm-1",
+        name: "issues:read",
+        description: "Read issues",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: "perm-2",
+        name: "issues:write",
+        description: "Write issues",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ],
+  },
+};
 
 // Mock admin membership
 const mockAdminMembership = {
@@ -55,11 +102,11 @@ const mockAdminMembership = {
 };
 
 describe("tRPC Authentication Middleware", () => {
-  let ctx: MockContext;
+  let ctx: VitestMockContext;
 
   beforeEach(() => {
-    ctx = createMockContext();
-    jest.clearAllMocks();
+    ctx = createVitestMockContext();
+    vi.clearAllMocks();
   });
 
   describe("protectedProcedure middleware", () => {
@@ -80,9 +127,13 @@ describe("tRPC Authentication Middleware", () => {
       // Set up mock context
       ctx.session = mockSession;
       ctx.organization = mockOrganization;
-      ctx.db.membership.findFirst.mockResolvedValue(
-        Promise.resolve(mockMembership) as any,
-      );
+      ctx.db.membership.findFirst.mockResolvedValue(mockMembership as any);
+
+      // Mock permissions for the user
+      vi.mocked(getUserPermissionsForSession).mockResolvedValue([
+        "issues:read",
+        "issues:write",
+      ]);
 
       const caller = appRouter.createCaller(ctx);
 
@@ -152,13 +203,17 @@ describe("tRPC Authentication Middleware", () => {
       // Set up mock context
       ctx.session = mockSession;
       ctx.organization = mockOrganization;
-      ctx.db.membership.findFirst.mockResolvedValue(
-        Promise.resolve(mockMembership) as any,
-      );
+      ctx.db.membership.findFirst.mockResolvedValue(mockMembership as any);
+
+      // Mock permissions for the user
+      vi.mocked(getUserPermissionsForSession).mockResolvedValue([
+        "issues:read",
+        "issues:write",
+      ]);
 
       const caller = appRouter.createCaller(ctx);
 
-      // Test with an organization procedure - using issue.getAll as example
+      // Test with an organization procedure - using user.getCurrentMembership as example
       const result = await caller.user.getCurrentMembership();
 
       expect(result).toEqual({
@@ -167,8 +222,8 @@ describe("tRPC Authentication Middleware", () => {
         organizationId: mockMembership.organizationId,
         permissions: ["issues:read", "issues:write"],
       });
-      // Verify membership lookup was called with correct parameters
 
+      // Verify membership lookup was called with correct parameters
       expect(ctx.db.membership.findFirst).toHaveBeenCalledWith({
         where: {
           organizationId: "org-1",
@@ -201,9 +256,7 @@ describe("tRPC Authentication Middleware", () => {
       // Set up mock context
       ctx.session = mockSession;
       ctx.organization = mockOrganization;
-      ctx.db.membership.findFirst.mockResolvedValue(
-        Promise.resolve(null) as any,
-      ); // No membership
+      ctx.db.membership.findFirst.mockResolvedValue(null); // No membership
 
       const caller = appRouter.createCaller(ctx);
 
@@ -232,9 +285,7 @@ describe("tRPC Authentication Middleware", () => {
       // Set up mock context
       ctx.session = mockSession;
       ctx.organization = null; // Organization not found
-      ctx.db.organization.findUnique.mockResolvedValue(
-        Promise.resolve(null) as any,
-      ); // Organization not found
+      ctx.db.organization.findUnique.mockResolvedValue(null); // Organization not found
 
       const caller = appRouter.createCaller(ctx);
 
@@ -275,9 +326,7 @@ describe("tRPC Authentication Middleware", () => {
       // Set up mock context
       ctx.session = mockSession;
       ctx.organization = differentOrganization;
-      ctx.db.membership.findFirst.mockResolvedValue(
-        Promise.resolve(null) as any,
-      ); // No membership in different org
+      ctx.db.membership.findFirst.mockResolvedValue(null); // No membership in different org
 
       const caller = appRouter.createCaller(ctx);
 
@@ -306,9 +355,13 @@ describe("tRPC Authentication Middleware", () => {
       // Set up mock context
       ctx.session = mockSession;
       ctx.organization = mockOrganization;
-      ctx.db.membership.findFirst.mockResolvedValue(
-        Promise.resolve(mockMembership) as any,
-      );
+      ctx.db.membership.findFirst.mockResolvedValue(mockMembership as any);
+
+      // Mock permissions for the user
+      vi.mocked(getUserPermissionsForSession).mockResolvedValue([
+        "issues:read",
+        "issues:write",
+      ]);
 
       const caller = appRouter.createCaller(ctx);
 
@@ -341,9 +394,13 @@ describe("tRPC Authentication Middleware", () => {
       // Set up mock context
       ctx.session = mockAdminSession;
       ctx.organization = mockOrganization;
-      ctx.db.membership.findFirst.mockResolvedValue(
-        Promise.resolve(mockAdminMembership) as any,
-      );
+      ctx.db.membership.findFirst.mockResolvedValue(mockAdminMembership as any);
+
+      // Mock permissions for the admin user
+      vi.mocked(getUserPermissionsForSession).mockResolvedValue([
+        "issues:read",
+        "issues:write",
+      ]);
 
       const caller = appRouter.createCaller(ctx);
 
@@ -374,9 +431,13 @@ describe("tRPC Authentication Middleware", () => {
       // Set up mock context
       ctx.session = mockMemberSession;
       ctx.organization = mockOrganization;
-      ctx.db.membership.findFirst.mockResolvedValue(
-        Promise.resolve(mockMembership) as any,
-      );
+      ctx.db.membership.findFirst.mockResolvedValue(mockMembership as any);
+
+      // Mock permissions for the member user
+      vi.mocked(getUserPermissionsForSession).mockResolvedValue([
+        "issues:read",
+        "issues:write",
+      ]);
 
       const caller = appRouter.createCaller(ctx);
 
@@ -410,9 +471,13 @@ describe("tRPC Authentication Middleware", () => {
       // Set up mock context
       ctx.session = mockSession;
       ctx.organization = mockOrganization;
-      ctx.db.membership.findFirst.mockResolvedValue(
-        Promise.resolve(mockMembership) as any,
-      );
+      ctx.db.membership.findFirst.mockResolvedValue(mockMembership as any);
+
+      // Mock permissions for the user
+      vi.mocked(getUserPermissionsForSession).mockResolvedValue([
+        "issues:read",
+        "issues:write",
+      ]);
 
       const caller = appRouter.createCaller(ctx);
 
@@ -437,9 +502,13 @@ describe("tRPC Authentication Middleware", () => {
       // Set up mock context
       ctx.session = mockSession;
       ctx.organization = mockOrganization;
-      ctx.db.membership.findFirst.mockResolvedValue(
-        Promise.resolve(mockMembership) as any,
-      );
+      ctx.db.membership.findFirst.mockResolvedValue(mockMembership as any);
+
+      // Mock permissions for the user
+      vi.mocked(getUserPermissionsForSession).mockResolvedValue([
+        "issues:read",
+        "issues:write",
+      ]);
 
       const caller = appRouter.createCaller(ctx);
 

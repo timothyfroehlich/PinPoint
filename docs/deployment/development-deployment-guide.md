@@ -317,7 +317,7 @@ vercel inspect https://your-preview-url.vercel.app
 npm run validate  # TypeScript + ESLint + Tests
 
 # Before pushing
-npm run pre-commit  # Husky hooks
+npm run validate  # Husky hooks
 ```
 
 ### Database Best Practices

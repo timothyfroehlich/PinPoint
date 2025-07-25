@@ -1,51 +1,158 @@
-import { TRPCError } from "@trpc/server";
-
 import { organizationProcedure } from "./trpc.base";
 
-import type { OrganizationTRPCContext } from "./trpc.base";
+import { requirePermissionForSession } from "~/server/auth/permissions";
 
-/**
- * Permission-based procedure factory
- *
- * Creates a procedure that requires a specific permission to be present in the user's role.
- * This replaces the old adminProcedure with a more granular permission system.
- */
-export function requirePermission(
-  permission: string,
-): typeof organizationProcedure {
-  return organizationProcedure.use(async ({ ctx, next }) => {
-    if (!ctx.userPermissions.includes(permission)) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: `Permission required: ${permission}`,
-      });
-    }
+export const issueViewProcedure = organizationProcedure.use(async (opts) => {
+  await requirePermissionForSession(
+    opts.ctx.session,
+    "issue:view",
+    opts.ctx.db,
+    opts.ctx.organization.id,
+  );
+  return opts.next();
+});
 
-    return next({
-      ctx: ctx satisfies OrganizationTRPCContext,
-    });
-  });
-}
+export const issueCreateProcedure = organizationProcedure.use(async (opts) => {
+  await requirePermissionForSession(
+    opts.ctx.session,
+    "issue:create",
+    opts.ctx.db,
+    opts.ctx.organization.id,
+  );
+  return opts.next();
+});
 
-// Specific permission procedures for common actions
-export const issueCreateProcedure = requirePermission("issue:create");
-export const issueEditProcedure = requirePermission("issue:edit");
-export const issueDeleteProcedure = requirePermission("issue:delete");
-export const issueAssignProcedure = requirePermission("issue:assign");
-export const attachmentCreateProcedure = requirePermission("attachment:create");
-export const attachmentDeleteProcedure = requirePermission("attachment:delete");
-export const machineEditProcedure = requirePermission("machine:edit");
-export const machineDeleteProcedure = requirePermission("machine:delete");
-export const locationEditProcedure = requirePermission("location:edit");
-export const locationDeleteProcedure = requirePermission("location:delete");
-export const organizationManageProcedure = requirePermission(
-  "organization:manage",
+export const issueEditProcedure = organizationProcedure.use(async (opts) => {
+  await requirePermissionForSession(
+    opts.ctx.session,
+    "issue:edit",
+    opts.ctx.db,
+    opts.ctx.organization.id,
+  );
+  return opts.next();
+});
+
+export const issueDeleteProcedure = organizationProcedure.use(async (opts) => {
+  await requirePermissionForSession(
+    opts.ctx.session,
+    "issue:delete",
+    opts.ctx.db,
+    opts.ctx.organization.id,
+  );
+  return opts.next();
+});
+
+export const issueAssignProcedure = organizationProcedure.use(async (opts) => {
+  await requirePermissionForSession(
+    opts.ctx.session,
+    "issue:assign",
+    opts.ctx.db,
+    opts.ctx.organization.id,
+  );
+  return opts.next();
+});
+
+export const attachmentCreateProcedure = organizationProcedure.use(
+  async (opts) => {
+    await requirePermissionForSession(
+      opts.ctx.session,
+      "attachment:create",
+      opts.ctx.db,
+      opts.ctx.organization.id,
+    );
+    return opts.next();
+  },
 );
-export const roleManageProcedure = requirePermission("role:manage");
-export const userManageProcedure = requirePermission("user:manage");
+
+export const attachmentDeleteProcedure = organizationProcedure.use(
+  async (opts) => {
+    await requirePermissionForSession(
+      opts.ctx.session,
+      "attachment:delete",
+      opts.ctx.db,
+      opts.ctx.organization.id,
+    );
+    return opts.next();
+  },
+);
+
+export const machineEditProcedure = organizationProcedure.use(async (opts) => {
+  await requirePermissionForSession(
+    opts.ctx.session,
+    "machine:edit",
+    opts.ctx.db,
+    opts.ctx.organization.id,
+  );
+  return opts.next();
+});
+
+export const machineDeleteProcedure = organizationProcedure.use(
+  async (opts) => {
+    await requirePermissionForSession(
+      opts.ctx.session,
+      "machine:delete",
+      opts.ctx.db,
+      opts.ctx.organization.id,
+    );
+    return opts.next();
+  },
+);
+
+export const locationEditProcedure = organizationProcedure.use(async (opts) => {
+  await requirePermissionForSession(
+    opts.ctx.session,
+    "location:edit",
+    opts.ctx.db,
+    opts.ctx.organization.id,
+  );
+  return opts.next();
+});
+
+export const locationDeleteProcedure = organizationProcedure.use(
+  async (opts) => {
+    await requirePermissionForSession(
+      opts.ctx.session,
+      "location:delete",
+      opts.ctx.db,
+      opts.ctx.organization.id,
+    );
+    return opts.next();
+  },
+);
+
+export const organizationManageProcedure = organizationProcedure.use(
+  async (opts) => {
+    await requirePermissionForSession(
+      opts.ctx.session,
+      "organization:manage",
+      opts.ctx.db,
+      opts.ctx.organization.id,
+    );
+    return opts.next();
+  },
+);
+
+export const roleManageProcedure = organizationProcedure.use(async (opts) => {
+  await requirePermissionForSession(
+    opts.ctx.session,
+    "role:manage",
+    opts.ctx.db,
+    opts.ctx.organization.id,
+  );
+  return opts.next();
+});
+
+export const userManageProcedure = organizationProcedure.use(async (opts) => {
+  await requirePermissionForSession(
+    opts.ctx.session,
+    "user:manage",
+    opts.ctx.db,
+    opts.ctx.organization.id,
+  );
+  return opts.next();
+});
 
 /**
  * @deprecated Use specific permission procedures instead
- * Legacy adminProcedure - kept for backward compatibility during migration
  */
 export const adminProcedure = organizationManageProcedure;

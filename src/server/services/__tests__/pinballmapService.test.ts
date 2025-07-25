@@ -1,23 +1,26 @@
 // Comprehensive tests for redesigned PinballMapService (Task 10)
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
 import { PinballMapService } from "../pinballmapService";
 
 import type { ExtendedPrismaClient } from "~/server/db";
 
 // Mock fetch globally for all tests
-global.fetch = jest.fn();
+const mockFetch = vi.fn();
+global.fetch = mockFetch;
 
 // Create properly typed mocks
-const mockPinballMapConfigUpsert = jest.fn();
-const mockPinballMapConfigFindUnique = jest.fn();
-const mockLocationUpdate = jest.fn();
-const mockLocationFindUnique = jest.fn();
-const mockLocationFindMany = jest.fn();
-const mockMachineFindMany = jest.fn();
-const mockMachineCreate = jest.fn();
-const mockMachineDelete = jest.fn();
-const mockModelFindUnique = jest.fn();
-const mockModelCreate = jest.fn();
-const mockIssueCount = jest.fn();
+const mockPinballMapConfigUpsert = vi.fn();
+const mockPinballMapConfigFindUnique = vi.fn();
+const mockLocationUpdate = vi.fn();
+const mockLocationFindUnique = vi.fn();
+const mockLocationFindMany = vi.fn();
+const mockMachineFindMany = vi.fn();
+const mockMachineCreate = vi.fn();
+const mockMachineDelete = vi.fn();
+const mockModelFindUnique = vi.fn();
+const mockModelCreate = vi.fn();
+const mockIssueCount = vi.fn();
 
 const mockPrisma = {
   pinballMapConfig: {
@@ -42,8 +45,8 @@ const mockPrisma = {
     count: mockIssueCount,
   },
   $accelerate: {
-    invalidate: jest.fn(),
-    ttl: jest.fn(),
+    invalidate: vi.fn(),
+    ttl: vi.fn(),
   },
 } as unknown as ExtendedPrismaClient;
 
@@ -54,20 +57,7 @@ const servicePrivate = service as any;
 
 describe("PinballMapService", () => {
   beforeEach(() => {
-    jest.clearAllMocks();
-    // Reset all mocks to prevent test pollution
-    mockPinballMapConfigUpsert.mockReset();
-    mockPinballMapConfigFindUnique.mockReset();
-    mockLocationUpdate.mockReset();
-    mockLocationFindUnique.mockReset();
-    mockLocationFindMany.mockReset();
-    mockMachineFindMany.mockReset();
-    mockMachineCreate.mockReset();
-    mockMachineDelete.mockReset();
-    mockModelFindUnique.mockReset();
-    mockModelCreate.mockReset();
-    mockIssueCount.mockReset();
-    (global.fetch as jest.Mock).mockReset();
+    vi.clearAllMocks();
   });
 
   describe("constructor", () => {
@@ -134,10 +124,16 @@ describe("PinballMapService", () => {
     function setupMockPinballMapAPI(
       machines = [{ opdb_id: "MM-001", machine_name: "Medieval Madness" }],
     ) {
-      (global.fetch as jest.Mock).mockResolvedValue({
+      const mockResponse = {
         ok: true,
         json: () => Promise.resolve({ machines }),
-      });
+        clone: () => mockResponse,
+        text: () => Promise.resolve(JSON.stringify({ machines })),
+        status: 200,
+        statusText: "OK",
+        headers: new Headers(),
+      };
+      mockFetch.mockResolvedValue(mockResponse);
     }
     it("should return error if location not found", async () => {
       mockLocationFindUnique.mockResolvedValue(null);
@@ -174,8 +170,10 @@ describe("PinballMapService", () => {
       const result = await service.syncLocation("loc-123");
       expect(result.success).toBe(true);
       expect(result.added).toBeGreaterThan(0);
-      expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining("/locations/26454/machine_details.json"),
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          url: expect.stringContaining("/locations/26454/machine_details.json"),
+        }),
       );
     });
     it("should update lastSyncAt timestamp on successful sync", async () => {
@@ -462,27 +460,54 @@ describe("PinballMapService", () => {
       } as never);
     }
     it("should handle PinballMap API being unavailable", async () => {
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {
+        // Suppress console.error for this test
+      });
+
       setupMockLocation();
-      (global.fetch as jest.Mock).mockRejectedValue(new Error("Network error"));
+      mockFetch.mockRejectedValue(new Error("Network error"));
       const result = await service.syncLocation("loc-123");
       expect(result.success).toBe(false);
       expect(result.error).toBe("No machine data returned from PinballMap");
       expect(result.added).toBe(0);
       expect(result.removed).toBe(0);
+
+      consoleSpy.mockRestore();
     });
     it("should handle HTTP error responses from PinballMap", async () => {
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {
+        // Suppress console.error for this test
+      });
+
       setupMockLocation();
-      (global.fetch as jest.Mock).mockResolvedValue({ ok: false, status: 404 });
+      const mockErrorResponse = {
+        ok: false,
+        status: 404,
+        statusText: "Not Found",
+        clone: () => mockErrorResponse,
+        text: () => Promise.resolve("Not Found"),
+        json: () => Promise.reject(new Error("Not JSON")),
+        headers: new Headers(),
+      };
+      mockFetch.mockResolvedValue(mockErrorResponse);
       const result = await service.syncLocation("loc-123");
       expect(result.success).toBe(false);
       expect(result.error).toBe("No machine data returned from PinballMap");
+
+      consoleSpy.mockRestore();
     });
     it("should handle malformed JSON responses", async () => {
       setupMockLocation();
-      (global.fetch as jest.Mock).mockResolvedValue({
+      const mockMalformedResponse = {
         ok: true,
+        status: 200,
+        statusText: "OK",
         json: () => Promise.resolve({ invalid: "data" }),
-      });
+        clone: () => mockMalformedResponse,
+        text: () => Promise.resolve('{"invalid": "data"}'),
+        headers: new Headers(),
+      };
+      mockFetch.mockResolvedValue(mockMalformedResponse);
       const result = await service.syncLocation("loc-123");
       expect(result.success).toBe(false);
       expect(result.error).toBe("No machine data returned from PinballMap");

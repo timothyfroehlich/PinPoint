@@ -1,17 +1,18 @@
 import { NotificationType, NotificationEntity } from "@prisma/client";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 import { NotificationService } from "../notificationService";
 
 import { type ExtendedPrismaClient } from "~/server/db";
 
 // Mock PrismaClient - following project patterns
-const mockNotificationCreate = jest.fn();
-const mockNotificationFindMany = jest.fn();
-const mockNotificationFindUnique = jest.fn();
-const mockNotificationUpdateMany = jest.fn();
-const mockNotificationCount = jest.fn();
-const mockMachineFindUnique = jest.fn();
-const mockIssueFindUnique = jest.fn();
+const mockNotificationCreate = vi.fn();
+const mockNotificationFindMany = vi.fn();
+const mockNotificationFindUnique = vi.fn();
+const mockNotificationUpdateMany = vi.fn();
+const mockNotificationCount = vi.fn();
+const mockMachineFindUnique = vi.fn();
+const mockIssueFindUnique = vi.fn();
 
 // Create mock Prisma instance
 const mockPrisma = {
@@ -29,10 +30,10 @@ const mockPrisma = {
     findUnique: mockIssueFindUnique,
   },
   $accelerate: {
-    invalidate: jest.fn(),
-    ttl: jest.fn(),
+    invalidate: vi.fn(),
+    ttl: vi.fn(),
   },
-} as unknown as jest.Mocked<ExtendedPrismaClient>;
+} as unknown as ExtendedPrismaClient;
 
 describe("NotificationService", () => {
   let service: NotificationService;
@@ -84,7 +85,7 @@ describe("NotificationService", () => {
 
   beforeEach(() => {
     // Reset mocks
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     // Setup default mock returns
     mockNotificationCreate.mockResolvedValue(mockNotification);

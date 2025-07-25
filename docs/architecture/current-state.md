@@ -1,6 +1,6 @@
 ---
 status: current
-last-updated: 2025-01-14
+last-updated: 2025-07-22
 ---
 
 # PinPoint Architecture: Current State
@@ -21,7 +21,7 @@ PinPoint is a multi-tenant issue tracking system for pinball arcade operators, b
 | **Database**       | PostgreSQL                                | ✅ Implemented |
 | **ORM**            | Prisma with extensions                    | ✅ Implemented |
 | **Authentication** | NextAuth.js (Auth.js v5)                  | ✅ Implemented |
-| **API Layer**      | tRPC                                      | ✅ Implemented |
+| **API Layer**      | tRPC (exclusive)                          | ✅ Implemented |
 | **File Storage**   | Local (dev) / Vercel Blob (prod)          | ✅ Implemented |
 | **External APIs**  | OPDB, PinballMap                          | 🔄 In Progress |
 | **Deployment**     | Vercel                                    | ✅ Implemented |
@@ -75,7 +75,19 @@ The multi-tenancy system is operational with the following components:
 - **Default Roles**: Created automatically for new organizations
 - **Beta Status**: Fixed roles, configurable in V1.0
 
-## API Architecture (tRPC)
+## API Architecture
+
+### tRPC-First Strategy
+
+PinPoint follows a **tRPC-exclusive API strategy**. All application endpoints are implemented as tRPC procedures, with only the following exceptions:
+
+1. **Authentication routes** (`/api/auth/*`) - Required by NextAuth.js
+2. **tRPC handler** (`/api/trpc/*`) - The tRPC endpoint itself
+3. **Health check** (`/api/health`) - For monitoring tools
+4. **QR redirects** (`/api/qr/*`) - For HTTP redirect responses
+5. **Dev utilities** (`/api/dev/*`) - Development-only endpoints
+
+See [API Routes Documentation](./api-routes.md) for detailed information about these exceptions.
 
 ### Router Structure
 
@@ -171,7 +183,7 @@ npm run dev:clean     # Fresh start with database reset
 
 # Quality checks
 npm run validate      # Run before starting work
-npm run pre-commit    # Must pass before commits
+npm run validate    # Must pass before commits
 
 # Database
 npm run db:reset      # Reset and reseed
@@ -218,6 +230,7 @@ See `CLAUDE.md` for complete quality standards and development guidelines.
 
 ## References
 
+- [API Routes Documentation](./api-routes.md) - Legitimate API routes and tRPC strategy
 - [Backend Implementation Plan](../planning/backend_impl_plan.md) - Updated plan for the backend
 - [Technical Design Document](../design-docs/technical-design-document.md) - Detailed specifications
 - [Orchestrator System](../orchestrator-system/) - Multi-agent coordination system

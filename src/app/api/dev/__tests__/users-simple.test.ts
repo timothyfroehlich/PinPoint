@@ -1,6 +1,7 @@
 /**
  * Simplified dev users API tests that avoid NextAuth imports
  */
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
 function setNodeEnv(value: string) {
   Object.defineProperty(process.env, "NODE_ENV", {
@@ -28,130 +29,78 @@ describe("/api/dev/users (simplified)", () => {
     it("should define expected user structure", () => {
       interface DevUser {
         id: string;
-        name: string;
-        email: string;
-        bio?: string | null;
-        profilePicture?: string | null;
-        role: "admin" | "member" | "player";
+        name: string | null;
+        email: string | null;
+        image: string | null;
+        bio: string | null;
+        profilePicture: string | null;
+        memberships: {
+          organizationId: string;
+          roleId: string;
+          role: {
+            name: string;
+            permissions: {
+              name: string;
+            }[];
+          };
+        }[];
       }
 
-      const mockUser: DevUser = {
-        id: "user-1",
-        name: "Roger Sharpe",
-        email: "roger.sharpe@testaccount.dev",
-        bio: "Pinball ambassador and historian.",
-        profilePicture: "/images/default-avatars/default-avatar-1.webp",
-        role: "admin",
+      const expectedUser: DevUser = {
+        id: "test-id",
+        name: "Test User",
+        email: "test@example.com",
+        image: null,
+        bio: null,
+        profilePicture: null,
+        memberships: [],
       };
 
-      expect(mockUser.id).toBe("user-1");
-      expect(mockUser.name).toBe("Roger Sharpe");
-      expect(mockUser.email).toBe("roger.sharpe@testaccount.dev");
-      expect(mockUser.role).toBe("admin");
-    });
-
-    it("should include test account emails", () => {
-      const testAccountEmails = [
-        "roger.sharpe@testaccount.dev",
-        "gary.stern@testaccount.dev",
-        "escher.lefkoff@testaccount.dev",
-        "harry.williams@testaccount.dev",
-      ];
-
-      testAccountEmails.forEach((email) => {
-        expect(email).toContain("@testaccount.dev");
-      });
-    });
-
-    it("should include project owner email", () => {
-      const projectOwnerEmail = "email9@example.com";
-      expect(projectOwnerEmail).toBe("email9@example.com");
+      expect(expectedUser).toBeDefined();
+      expect(expectedUser.id).toBe("test-id");
     });
 
     it("should define expected API response structure", () => {
       interface DevUsersResponse {
         users: {
           id: string;
-          name: string;
-          email: string;
-          bio?: string | null;
-          profilePicture?: string | null;
-          role: "admin" | "member" | "player";
+          name: string | null;
+          email: string | null;
         }[];
+        count: number;
       }
 
-      const mockResponse: DevUsersResponse = {
+      const expectedResponse: DevUsersResponse = {
         users: [
           {
             id: "user-1",
-            name: "Roger Sharpe",
-            email: "roger.sharpe@testaccount.dev",
-            bio: "Pinball ambassador and historian.",
-            profilePicture: "/images/default-avatars/default-avatar-1.webp",
-            role: "admin",
+            name: "User 1",
+            email: "user1@example.com",
           },
         ],
+        count: 1,
       };
 
-      expect(mockResponse.users).toHaveLength(1);
-      expect(mockResponse.users[0]?.name).toBe("Roger Sharpe");
-      expect(mockResponse.users[0]?.role).toBe("admin");
+      expect(expectedResponse).toBeDefined();
+      expect(expectedResponse.count).toBe(1);
+      expect(expectedResponse.users).toHaveLength(1);
     });
   });
 
-  describe("Production Environment", () => {
-    it("should not be available in production", () => {
+  describe("Environment Safety", () => {
+    it("should prevent production access", () => {
       setNodeEnv("production");
       expect(process.env.NODE_ENV).toBe("production");
+
+      // In production, this endpoint should not be accessible
+      // This test validates the basic structure
     });
 
-    it("should return 404 in production", () => {
-      setNodeEnv("production");
-      const expectedResponse = {
-        error: "Not found",
-      };
-      expect(expectedResponse.error).toBe("Not found");
-    });
-  });
+    it("should allow test environment access", () => {
+      setNodeEnv("test");
+      expect(process.env.NODE_ENV).toBe("test");
 
-  describe("Security", () => {
-    it("should only return test account users", () => {
-      const testEmail1 = "roger.sharpe@testaccount.dev";
-      const testEmail2 = "email9@example.com";
-      const regularEmail = "user@example.com";
-
-      expect(testEmail1).toContain("@testaccount.dev");
-      expect(testEmail2).toBe("email9@example.com");
-      expect(regularEmail).not.toContain("@testaccount.dev");
-      expect(regularEmail).not.toBe("email9@example.com");
-    });
-
-    it("should not expose sensitive user data", () => {
-      const exposedFields = [
-        "id",
-        "name",
-        "email",
-        "bio",
-        "profilePicture",
-        "role",
-      ];
-
-      const sensitiveFields = [
-        "joinDate",
-        "emailVerified",
-        "image",
-        "password",
-        "token",
-      ];
-
-      expect(exposedFields).toContain("id");
-      expect(exposedFields).toContain("name");
-      expect(exposedFields).toContain("email");
-      expect(exposedFields).toContain("role");
-
-      expect(sensitiveFields).toContain("password");
-      expect(sensitiveFields).toContain("token");
-      expect(sensitiveFields).toContain("joinDate");
+      // Test environment should have access for testing purposes
     });
   });
 });

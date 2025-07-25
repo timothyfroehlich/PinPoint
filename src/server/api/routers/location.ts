@@ -1,7 +1,9 @@
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import {
   createTRPCRouter,
+  publicProcedure,
   organizationProcedure,
   locationEditProcedure,
   locationDeleteProcedure,
@@ -35,6 +37,57 @@ export const locationRouter = createTRPCRouter({
             _count: {
               select: {
                 issues: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { name: "asc" },
+    });
+  }),
+
+  // Public endpoint for unified dashboard - no authentication required
+  getPublic: publicProcedure.query(({ ctx }) => {
+    if (!ctx.organization) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Organization not found",
+      });
+    }
+
+    return ctx.db.location.findMany({
+      where: {
+        organizationId: ctx.organization.id,
+      },
+      select: {
+        id: true,
+        name: true,
+        _count: {
+          select: {
+            machines: true,
+          },
+        },
+        machines: {
+          select: {
+            id: true,
+            name: true,
+            model: {
+              select: {
+                name: true,
+                manufacturer: true,
+              },
+            },
+            _count: {
+              select: {
+                issues: {
+                  where: {
+                    status: {
+                      category: {
+                        not: "RESOLVED",
+                      },
+                    },
+                  },
+                },
               },
             },
           },

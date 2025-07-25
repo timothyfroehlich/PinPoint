@@ -8,6 +8,11 @@ import importPlugin from "eslint-plugin-import";
 // @ts-expect-error - No TypeScript declarations available
 import promisePlugin from "eslint-plugin-promise";
 import unusedImportsPlugin from "eslint-plugin-unused-imports";
+import {
+  INCLUDE_PATTERNS,
+  ESLINT_RULES,
+  convertPatterns,
+} from "./tooling.config.ts";
 
 export default tseslint.config(
   ...tseslint.configs.recommended,
@@ -16,18 +21,22 @@ export default tseslint.config(
   ...tseslint.configs.strictTypeChecked,
   ...tseslint.configs.stylisticTypeChecked,
   {
-    // Enable type-aware linting for all files
+    // Enable type-aware linting with multi-config support
     languageOptions: {
       parserOptions: {
-        // Explicitly specify tsconfig path to avoid Next.js auto-generation conflicts
-        project: ["./tsconfig.json"],
+        // Multiple tsconfig files for different contexts
+        project: [
+          "./tsconfig.json",
+          "./tsconfig.test-utils.json",
+          "./tsconfig.tests.json",
+        ],
         tsconfigRootDir: import.meta.dirname,
       },
     },
   },
   {
     // Main configuration for all TS/TSX files
-    files: ["src/**/*.{ts,tsx}"],
+    files: convertPatterns.forESLint(INCLUDE_PATTERNS.production),
     plugins: {
       "@next/next": nextPlugin,
       import: importPlugin,
@@ -86,14 +95,8 @@ export default tseslint.config(
       "promise/catch-or-return": ["error", { allowFinally: true }],
       "promise/no-nesting": "warn",
 
-      // Type-aware rules - starting as warnings for migration
-      "@typescript-eslint/no-explicit-any": "warn",
-      "@typescript-eslint/no-unsafe-assignment": "warn",
-      "@typescript-eslint/no-unsafe-argument": "warn",
-      "@typescript-eslint/no-unsafe-call": "warn",
-      "@typescript-eslint/no-unsafe-member-access": "warn",
-      "@typescript-eslint/no-unsafe-return": "warn",
-      "@typescript-eslint/no-unsafe-enum-comparison": "warn",
+      // Type-aware rules from shared config
+      ...ESLINT_RULES.production,
 
       // Additional strict rules for better type safety
       "@typescript-eslint/explicit-function-return-type": [
@@ -136,9 +139,33 @@ export default tseslint.config(
     },
   },
   {
-    // Override: Allow process.env in test files (documented exception)
-    // Tests legitimately need to mock environment variables and check NODE_ENV
-    files: ["**/__tests__/**", "**/*.test.ts", "**/*.test.tsx", "**/test/**"],
+    // Override: Test utilities - moderate standards
+    files: convertPatterns.forESLint(INCLUDE_PATTERNS.testUtils),
+    rules: {
+      // Use shared rules configuration
+      ...ESLINT_RULES.testUtils,
+      // Allow process.env for test utilities
+      "no-restricted-properties": "off",
+    },
+  },
+  {
+    // Override: Test files - relaxed standards for pragmatic testing
+    files: convertPatterns.forESLint(INCLUDE_PATTERNS.tests),
+    rules: {
+      // Use shared rules configuration
+      ...ESLINT_RULES.tests,
+      // Allow process.env for test mocking
+      "no-restricted-properties": "off",
+      // Disable strictNullChecks-dependent rules (tests use relaxed TypeScript)
+      "@typescript-eslint/no-unnecessary-condition": "off",
+      "@typescript-eslint/no-unnecessary-boolean-literal-compare": "off",
+      "@typescript-eslint/prefer-nullish-coalescing": "off",
+      "@typescript-eslint/no-unnecessary-type-assertion": "off",
+    },
+  },
+  {
+    // Legacy override: Allow process.env in remaining test paths
+    files: ["**/test/**"],
     rules: {
       "no-restricted-properties": "off",
     },
@@ -148,6 +175,13 @@ export default tseslint.config(
     // Prisma files need environment access for seeding and migrations
     // Should use validated env object from ~/env.js when possible
     files: ["prisma/**/*.ts"],
+    rules: {
+      "no-restricted-properties": "off",
+    },
+  },
+  {
+    // Override: Allow process.env in tRPC provider for base URL
+    files: ["src/trpc/react.tsx"],
     rules: {
       "no-restricted-properties": "off",
     },
@@ -194,6 +228,9 @@ export default tseslint.config(
       "next.config.js",
       "postcss.config.js",
       "tailwind.config.ts",
+      "vitest.config.ts",
+      "jest.config.js",
+      "playwright.config.ts",
       ".betterer.ts",
     ],
   },
