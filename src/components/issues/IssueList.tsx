@@ -326,7 +326,20 @@ export function IssueList({
               {selectedIssues.length > 1 ? "s" : ""} selected
             </Typography>
 
-            {hasPermission("issue:assign") ? (
+            <PermissionGate
+              permission="issue:assign"
+              hasPermission={hasPermission}
+              fallback={
+                <Tooltip title="Requires issue:assign permission">
+                  <span>
+                    <Button disabled startIcon={<Assignment />}>
+                      Assign
+                    </Button>
+                  </span>
+                </Tooltip>
+              }
+              showFallback
+            >
               <Button
                 startIcon={<Assignment />}
                 onClick={() => {
@@ -336,17 +349,22 @@ export function IssueList({
               >
                 Assign
               </Button>
-            ) : (
-              <Tooltip title="Requires issue:assign permission">
-                <span>
-                  <Button disabled startIcon={<Assignment />}>
-                    Assign
-                  </Button>
-                </span>
-              </Tooltip>
-            )}
+            </PermissionGate>
 
-            {hasPermission("issue:update") ? (
+            <PermissionGate
+              permission="issue:edit"
+              hasPermission={hasPermission}
+              fallback={
+                <Tooltip title="Requires issue:edit permission">
+                  <span>
+                    <Button disabled sx={{ ml: 1 }} startIcon={<Close />}>
+                      Close
+                    </Button>
+                  </span>
+                </Tooltip>
+              }
+              showFallback
+            >
               <Button
                 sx={{ ml: 1 }}
                 startIcon={<Close />}
@@ -357,15 +375,7 @@ export function IssueList({
               >
                 Close
               </Button>
-            ) : (
-              <Tooltip title="Requires issue:update permission">
-                <span>
-                  <Button disabled sx={{ ml: 1 }} startIcon={<Close />}>
-                    Close
-                  </Button>
-                </span>
-              </Tooltip>
-            )}
+            </PermissionGate>
           </Toolbar>
         </Card>
       )}
