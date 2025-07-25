@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/unbound-method */
 import { TRPCError } from "@trpc/server";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
@@ -834,7 +835,6 @@ describe("Router Integration Tests", () => {
       const mockActivityService = {
         recordIssueAssigned: vi.fn().mockResolvedValue(undefined),
       };
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       vi.mocked(
         mockContext.services.createIssueActivityService,
       ).mockReturnValue(mockActivityService as any);
