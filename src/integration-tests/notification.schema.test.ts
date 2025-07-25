@@ -7,10 +7,14 @@ describe("Notification schema integration", () => {
 
   beforeAll(async () => {
     // Skip integration tests if no real database is available
-    if (!process.env.DATABASE_URL || process.env.DATABASE_URL.includes("test://") || process.env.DATABASE_URL.includes("postgresql://test:test@")) {
+    if (
+      !process.env.DATABASE_URL ||
+      process.env.DATABASE_URL.includes("test://") ||
+      process.env.DATABASE_URL.includes("postgresql://test:test@")
+    ) {
       return;
     }
-    
+
     prisma = new PrismaClient();
     try {
       await prisma.$connect();
@@ -30,7 +34,7 @@ describe("Notification schema integration", () => {
       await prisma.notification.deleteMany();
       await prisma.user.deleteMany();
       await prisma.$disconnect();
-    } catch (error) {
+    } catch {
       // Ignore cleanup errors in test environment
     }
   });

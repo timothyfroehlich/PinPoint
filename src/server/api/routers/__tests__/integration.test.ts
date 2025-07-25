@@ -28,7 +28,10 @@ import {
 import { appRouter } from "../../root";
 import { createCallerFactory } from "../../trpc";
 
-import { getUserPermissionsForSession, requirePermissionForSession } from "~/server/auth/permissions";
+import {
+  getUserPermissionsForSession,
+  requirePermissionForSession,
+} from "~/server/auth/permissions";
 
 // Type assertions for relaxed test mode - allows any type usage
 // Using any types is acceptable in test files per multi-config strategy
@@ -48,74 +51,78 @@ describe("Router Integration Tests", () => {
 
   // Mock context helper with different permission sets
   const createMockTRPCContext = (permissions: string[] = []): any => {
-  // Use the shared mockContext instead of creating a new one
-  
-  const mockMembership = {
-    id: "membership-1",
-    userId: "user-1",
-    organizationId: "org-1",
-    roleId: "role-1",
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    role: {
-      id: "role-1",
-      name: "Test Role",
+    // Use the shared mockContext instead of creating a new one
+
+    const mockMembership = {
+      id: "membership-1",
+      userId: "user-1",
       organizationId: "org-1",
-      isSystem: false,
-      isDefault: false,
+      roleId: "role-1",
       createdAt: new Date(),
       updatedAt: new Date(),
-      permissions: permissions.map((name, index) => ({
-        id: `perm-${(index + 1).toString()}`,
-        name,
-        description: `${name} permission`,
+      role: {
+        id: "role-1",
+        name: "Test Role",
+        organizationId: "org-1",
+        isSystem: false,
+        isDefault: false,
         createdAt: new Date(),
         updatedAt: new Date(),
-      })),
-    },
-  };
-
-  // Mock the database call that organizationProcedure makes
-  vi.mocked(mockContext.db.membership.findFirst).mockResolvedValue(mockMembership);
-  
-  // Mock getUserPermissionsForSession to return the permissions we want
-  vi.mocked(getUserPermissionsForSession).mockResolvedValue(permissions);
-  
-  // Mock requirePermissionForSession to check if permission is in our list
-  vi.mocked(requirePermissionForSession).mockImplementation(async (_session, permission) => {
-    await Promise.resolve(); // ESLint fix
-    if (!permissions.includes(permission)) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: `Missing required permission: ${permission}`,
-      });
-    }
-    // If permission exists, just return (no error)
-  });
-
-  return {
-    ...mockContext,
-    session: {
-      user: {
-        id: "user-1",
-        email: "test@example.com",
-        name: "Test User",
-        image: null,
+        permissions: permissions.map((name, index) => ({
+          id: `perm-${(index + 1).toString()}`,
+          name,
+          description: `${name} permission`,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })),
       },
-      expires: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(),
-    },
-    organization: {
-      id: "org-1",
-      name: "Test Organization",
-      subdomain: "test",
-      logoUrl: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    membership: mockMembership,
-    userPermissions: permissions,
+    };
+
+    // Mock the database call that organizationProcedure makes
+    vi.mocked(mockContext.db.membership.findFirst).mockResolvedValue(
+      mockMembership,
+    );
+
+    // Mock getUserPermissionsForSession to return the permissions we want
+    vi.mocked(getUserPermissionsForSession).mockResolvedValue(permissions);
+
+    // Mock requirePermissionForSession to check if permission is in our list
+    vi.mocked(requirePermissionForSession).mockImplementation(
+      async (_session, permission) => {
+        await Promise.resolve(); // ESLint fix
+        if (!permissions.includes(permission)) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: `Missing required permission: ${permission}`,
+          });
+        }
+        // If permission exists, just return (no error)
+      },
+    );
+
+    return {
+      ...mockContext,
+      session: {
+        user: {
+          id: "user-1",
+          email: "test@example.com",
+          name: "Test User",
+          image: null,
+        },
+        expires: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(),
+      },
+      organization: {
+        id: "org-1",
+        name: "Test Organization",
+        subdomain: "test",
+        logoUrl: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      membership: mockMembership,
+      userPermissions: permissions,
+    };
   };
-};
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -827,11 +834,14 @@ describe("Router Integration Tests", () => {
       const mockActivityService = {
         recordIssueAssigned: vi.fn().mockResolvedValue(undefined),
       };
-      (vi.mocked(mockContext.services.createIssueActivityService) as any).mockReturnValue(mockActivityService);
-      
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      vi.mocked(
+        mockContext.services.createIssueActivityService,
+      ).mockReturnValue(mockActivityService as any);
+
       vi.mocked(mockContext.db.issue.findFirst).mockResolvedValue(mockIssue);
       vi.mocked(mockContext.db.membership.findUnique).mockResolvedValue({
-        id: "membership-2", 
+        id: "membership-2",
         userId: "user-2",
         organizationId: "org-1",
         roleId: "role-1",
@@ -839,16 +849,16 @@ describe("Router Integration Tests", () => {
         updatedAt: new Date(),
         user: {
           id: "user-2",
-          name: "Test User 2", 
+          name: "Test User 2",
           email: "user2@example.com",
-        }
+        },
       } as any);
       vi.mocked(mockContext.db.issue.update).mockResolvedValue({
         success: true,
         issue: {
           ...mockIssue,
           assignedToId: "user-2",
-        }
+        },
       } as any);
 
       // Act - Admin should be able to perform all operations
@@ -935,16 +945,18 @@ describe("Router Integration Tests", () => {
       // Simulate permission being revoked mid-session by updating the mock
       // The permission should be checked BEFORE any database operations
       vi.mocked(getUserPermissionsForSession).mockResolvedValue(["issue:view"]);
-      vi.mocked(requirePermissionForSession).mockImplementation(async (session, permission) => {
-        await Promise.resolve(); // ESLint fix
-        if (!["issue:view"].includes(permission)) {
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: `Missing required permission: ${permission}`,
-          });
-        }
-      });
-      
+      vi.mocked(requirePermissionForSession).mockImplementation(
+        async (session, permission) => {
+          await Promise.resolve(); // ESLint fix
+          if (!["issue:view"].includes(permission)) {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: `Missing required permission: ${permission}`,
+            });
+          }
+        },
+      );
+
       // No need to mock database calls since permission check should fail first
 
       // Act & Assert

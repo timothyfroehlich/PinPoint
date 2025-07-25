@@ -5,7 +5,7 @@ import type { ExtendedPrismaClient } from "~/server/db";
 import type { ServiceFactory } from "~/server/services/factory";
 
 // Mock individual services with all methods
-const mockNotificationService: any = {
+const mockNotificationService = {
   createNotification: vi.fn().mockResolvedValue(undefined),
   getUserNotifications: vi.fn().mockResolvedValue([]),
   getUnreadCount: vi.fn().mockResolvedValue(0),
@@ -16,11 +16,11 @@ const mockNotificationService: any = {
   notifyUserOfAssignment: vi.fn().mockResolvedValue(undefined),
 };
 
-const mockCollectionService: any = {
+const mockCollectionService = {
   // Add collection service methods here when needed
 };
 
-const mockIssueActivityService: any = {
+const mockIssueActivityService = {
   recordActivity: vi.fn().mockResolvedValue(undefined),
   recordIssueCreated: vi.fn().mockResolvedValue(undefined),
   recordStatusChange: vi.fn().mockResolvedValue(undefined),
@@ -30,27 +30,31 @@ const mockIssueActivityService: any = {
   getIssueTimeline: vi.fn().mockResolvedValue([]),
 };
 
-const mockPinballMapService: any = {
+const mockPinballMapService = {
   // Add pinball map service methods here when needed
 };
 
-const mockCommentCleanupService: any = {
+const mockCommentCleanupService = {
   // Add comment cleanup service methods here when needed
 };
 
-const mockQRCodeService: any = {
+const mockQRCodeService = {
   // Add QR code service methods here when needed
 };
 
 // Mock service factory
 const createMockServiceFactory = (): DeepMockProxy<ServiceFactory> => {
   return {
-    createNotificationService: vi.fn(() => mockNotificationService),
-    createCollectionService: vi.fn(() => mockCollectionService),
-    createPinballMapService: vi.fn(() => mockPinballMapService),
-    createIssueActivityService: vi.fn(() => mockIssueActivityService),
-    createCommentCleanupService: vi.fn(() => mockCommentCleanupService),
-    createQRCodeService: vi.fn(() => mockQRCodeService),
+    createNotificationService: vi.fn().mockReturnValue(mockNotificationService),
+    createCollectionService: vi.fn().mockReturnValue(mockCollectionService),
+    createPinballMapService: vi.fn().mockReturnValue(mockPinballMapService),
+    createIssueActivityService: vi
+      .fn()
+      .mockReturnValue(mockIssueActivityService),
+    createCommentCleanupService: vi
+      .fn()
+      .mockReturnValue(mockCommentCleanupService),
+    createQRCodeService: vi.fn().mockReturnValue(mockQRCodeService),
   } as unknown as DeepMockProxy<ServiceFactory>;
 };
 
@@ -106,13 +110,13 @@ export function createMockContext(): MockContext {
   // Set up default machine mock
   mockDb.machine.findMany.mockResolvedValue([mockMachine]);
   mockDb.machine.findUnique.mockResolvedValue(mockMachine);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
   mockDb.machine.create.mockResolvedValue(mockMachine as any);
 
   // Set up default model mock
   mockDb.model.findMany.mockResolvedValue([mockModel]);
   mockDb.model.findUnique.mockResolvedValue(mockModel);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
   mockDb.model.create.mockResolvedValue(mockModel as any);
 
   // Set up default notification mock
@@ -160,12 +164,12 @@ export function createMockContext(): MockContext {
 export function resetMockContext(ctx: MockContext): void {
   mockReset(ctx.db);
   // Reset all service mocks
-  Object.values(mockNotificationService).forEach((method) => {
+  Object.values(mockNotificationService).forEach((method: unknown) => {
     if (vi.isMockFunction(method)) {
       method.mockReset();
     }
   });
-  Object.values(mockIssueActivityService).forEach((method) => {
+  Object.values(mockIssueActivityService).forEach((method: unknown) => {
     if (vi.isMockFunction(method)) {
       method.mockReset();
     }

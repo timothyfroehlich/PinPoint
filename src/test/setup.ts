@@ -252,6 +252,7 @@ vi.mock("next/server", () => ({
 }));
 
 // Reset all mocks after each test
+// eslint-disable-next-line @typescript-eslint/no-unsafe-call
 afterEach(() => {
   vi.clearAllMocks();
 });

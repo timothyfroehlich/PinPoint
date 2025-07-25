@@ -22,7 +22,10 @@ vi.mock("~/server/auth/permissions", async () => {
 });
 
 import { appRouter } from "~/server/api/root";
-import { getUserPermissionsForSession, requirePermissionForSession } from "~/server/auth/permissions";
+import {
+  getUserPermissionsForSession,
+  requirePermissionForSession,
+} from "~/server/auth/permissions";
 import { createVitestMockContext } from "~/test/vitestMockContext";
 
 // Mock data for tests
@@ -60,7 +63,7 @@ const mockMembership = {
 // Helper to create authenticated context with permissions
 const createAuthenticatedContext = (permissions: string[] = []) => {
   const mockContext = createVitestMockContext();
-  
+
   // Set up session and organization
   mockContext.session = {
     user: {
@@ -71,7 +74,7 @@ const createAuthenticatedContext = (permissions: string[] = []) => {
     },
     expires: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(),
   };
-  
+
   mockContext.organization = {
     id: "org-1",
     name: "Test Organization",
@@ -104,21 +107,25 @@ const createAuthenticatedContext = (permissions: string[] = []) => {
   };
 
   // Mock the database query for membership lookup
-  vi.mocked(mockContext.db.membership.findFirst).mockResolvedValue(membershipData as any);
-  
+  vi.mocked(mockContext.db.membership.findFirst).mockResolvedValue(
+    membershipData as any,
+  );
+
   // Mock the permissions system
   vi.mocked(getUserPermissionsForSession).mockResolvedValue(permissions);
-  
+
   // Mock requirePermissionForSession - it should throw when permission is missing
-  vi.mocked(requirePermissionForSession).mockImplementation((_session, permission, _db, _orgId) => {
-    if (!permissions.includes(permission)) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: `Missing required permission: ${permission}`,
-      });
-    }
-    return Promise.resolve();
-  });
+  vi.mocked(requirePermissionForSession).mockImplementation(
+    (_session, permission, _db, _orgId) => {
+      if (!permissions.includes(permission)) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: `Missing required permission: ${permission}`,
+        });
+      }
+      return Promise.resolve();
+    },
+  );
 
   return {
     ...mockContext,
@@ -135,12 +142,11 @@ describe("issueRouter - Issue Detail Page", () => {
     _ctx = createAuthenticatedContext(["issue:view"]);
   });
 
-
   describe("Authenticated Issue Detail Access", () => {
     it("should allow authenticated users to view all issue details", async () => {
-      const authCtx = createAuthenticatedContext(["issue:view"]);  
+      const authCtx = createAuthenticatedContext(["issue:view"]);
       const authCaller = appRouter.createCaller(authCtx);
-      
+
       authCtx.db.membership.findFirst.mockResolvedValue(mockMembership as any);
 
       const issueWithDetails = {
@@ -182,7 +188,7 @@ describe("issueRouter - Issue Detail Page", () => {
     it("should enforce organization isolation", async () => {
       const authCtx = createAuthenticatedContext(["issue:view"]);
       const authCaller = appRouter.createCaller(authCtx);
-      
+
       const otherOrgIssue = {
         ...mockIssue,
         organizationId: "other-org",
@@ -201,7 +207,7 @@ describe("issueRouter - Issue Detail Page", () => {
     it("should allow users with edit permissions to update issues", async () => {
       const editCtx = createAuthenticatedContext(["issue:edit"]);
       const editCaller = appRouter.createCaller(editCtx);
-      
+
       // Mock activity and notification services
       const mockActivityService = {
         recordFieldUpdate: vi.fn().mockResolvedValue(undefined),
@@ -209,9 +215,15 @@ describe("issueRouter - Issue Detail Page", () => {
       const mockNotificationService = {
         notifyMachineOwnerOfStatusChange: vi.fn().mockResolvedValue(undefined),
       };
-      (vi.mocked(editCtx.services.createIssueActivityService) as any).mockReturnValue(mockActivityService);
-      (vi.mocked(editCtx.services.createNotificationService) as any).mockReturnValue(mockNotificationService);
-      
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      vi.mocked(editCtx.services.createIssueActivityService).mockReturnValue(
+        mockActivityService as any,
+      );
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      vi.mocked(editCtx.services.createNotificationService).mockReturnValue(
+        mockNotificationService as any,
+      );
+
       editCtx.db.issue.findFirst.mockResolvedValue({
         ...mockIssue,
         status: mockStatus,
@@ -232,7 +244,7 @@ describe("issueRouter - Issue Detail Page", () => {
         expect.objectContaining({
           where: { id: mockIssue.id },
           data: expect.objectContaining({ title: "Updated Title" }),
-        })
+        }),
       );
     });
 
@@ -251,9 +263,15 @@ describe("issueRouter - Issue Detail Page", () => {
     it("should allow users with close permissions to close issues", async () => {
       const closeCtx = createAuthenticatedContext(["issue:edit"]);
       const closeCaller = appRouter.createCaller(closeCtx);
-      
-      const resolvedStatus = { id: "status-resolved", name: "Resolved", category: "RESOLVED" };
-      closeCtx.db.issueStatus.findFirst.mockResolvedValue(resolvedStatus as any);
+
+      const resolvedStatus = {
+        id: "status-resolved",
+        name: "Resolved",
+        category: "RESOLVED",
+      };
+      closeCtx.db.issueStatus.findFirst.mockResolvedValue(
+        resolvedStatus as any,
+      );
       closeCtx.db.issue.update.mockResolvedValue({
         ...mockIssue,
         resolvedAt: new Date(),
@@ -268,20 +286,23 @@ describe("issueRouter - Issue Detail Page", () => {
         expect.objectContaining({
           where: { id: mockIssue.id },
           data: expect.objectContaining({ resolvedAt: expect.any(Date) }),
-        })
+        }),
       );
     });
 
     it("should allow users with assign permissions to assign issues", async () => {
       const assignCtx = createAuthenticatedContext(["issue:assign"]);
       const assignCaller = appRouter.createCaller(assignCtx);
-      
+
       // Mock activity service
       const mockActivityService = {
         recordIssueAssigned: vi.fn().mockResolvedValue(undefined),
       };
-      (vi.mocked(assignCtx.services.createIssueActivityService) as any).mockReturnValue(mockActivityService);
-      
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      vi.mocked(assignCtx.services.createIssueActivityService).mockReturnValue(
+        mockActivityService as any,
+      );
+
       assignCtx.db.issue.findFirst.mockResolvedValue(mockIssue as any);
       assignCtx.db.membership.findUnique.mockResolvedValue({
         ...mockMembership,
@@ -303,7 +324,7 @@ describe("issueRouter - Issue Detail Page", () => {
         expect.objectContaining({
           where: { id: mockIssue.id },
           data: { assignedToId: mockUser.id },
-        })
+        }),
       );
     });
   });
@@ -312,7 +333,7 @@ describe("issueRouter - Issue Detail Page", () => {
     it("should allow status changes with proper validation", async () => {
       const statusCtx = createAuthenticatedContext(["issue:edit"]);
       const statusCaller = appRouter.createCaller(statusCtx);
-      
+
       const newStatus = {
         ...mockStatus,
         id: "status-in-progress",
@@ -340,7 +361,7 @@ describe("issueRouter - Issue Detail Page", () => {
     it("should validate status belongs to same organization", async () => {
       const statusCtx = createAuthenticatedContext(["issue:edit"]);
       const statusCaller = appRouter.createCaller(statusCtx);
-      
+
       statusCtx.db.issue.findFirst.mockResolvedValue(mockIssue as any);
       statusCtx.db.issueStatus.findFirst.mockResolvedValue(null); // Status not found
 
@@ -355,9 +376,12 @@ describe("issueRouter - Issue Detail Page", () => {
 
   describe("Issue Comment Operations", () => {
     it("should allow adding comments to issues", async () => {
-      const commentCtx = createAuthenticatedContext(["issue:create", "issue:comment"]);
+      const commentCtx = createAuthenticatedContext([
+        "issue:create",
+        "issue:comment",
+      ]);
       const commentCaller = appRouter.createCaller(commentCtx);
-      
+
       const newComment = {
         id: "comment-new",
         content: "New comment",
@@ -369,7 +393,9 @@ describe("issueRouter - Issue Detail Page", () => {
       };
 
       commentCtx.db.issue.findFirst.mockResolvedValue(mockIssue as any);
-      commentCtx.db.membership.findUnique.mockResolvedValue(mockMembership as any);
+      commentCtx.db.membership.findUnique.mockResolvedValue(
+        mockMembership as any,
+      );
       commentCtx.db.comment.create.mockResolvedValue(newComment as any);
 
       const result = await commentCaller.issue.comment.create({
@@ -383,9 +409,12 @@ describe("issueRouter - Issue Detail Page", () => {
     });
 
     it("should allow internal comments for authorized users", async () => {
-      const internalCtx = createAuthenticatedContext(["issue:create", "issue:internal_comment"]);
+      const internalCtx = createAuthenticatedContext([
+        "issue:create",
+        "issue:internal_comment",
+      ]);
       const internalCaller = appRouter.createCaller(internalCtx);
-      
+
       const internalComment = {
         id: "comment-internal",
         content: "Internal note",
@@ -397,7 +426,9 @@ describe("issueRouter - Issue Detail Page", () => {
       };
 
       internalCtx.db.issue.findFirst.mockResolvedValue(mockIssue as any);
-      internalCtx.db.membership.findUnique.mockResolvedValue(mockMembership as any);
+      internalCtx.db.membership.findUnique.mockResolvedValue(
+        mockMembership as any,
+      );
       internalCtx.db.comment.create.mockResolvedValue(internalComment as any);
 
       const result = await internalCaller.issue.comment.create({
@@ -410,11 +441,16 @@ describe("issueRouter - Issue Detail Page", () => {
     });
 
     it("should deny internal comments for unauthorized users", async () => {
-      const publicCommentCtx = createAuthenticatedContext(["issue:create", "issue:comment"]);
+      const publicCommentCtx = createAuthenticatedContext([
+        "issue:create",
+        "issue:comment",
+      ]);
       const publicCommentCaller = appRouter.createCaller(publicCommentCtx);
 
       publicCommentCtx.db.issue.findFirst.mockResolvedValue(mockIssue as any);
-      publicCommentCtx.db.membership.findUnique.mockResolvedValue(mockMembership as any);
+      publicCommentCtx.db.membership.findUnique.mockResolvedValue(
+        mockMembership as any,
+      );
 
       // Try the call and see what happens
       try {
@@ -427,7 +463,9 @@ describe("issueRouter - Issue Detail Page", () => {
         expect(result).toBeUndefined(); // Force a failure to see what we actually got
       } catch (error) {
         // This is expected - should throw a permission error
-        expect(error.message).toMatch(/Missing required permission|internal_comment/);
+        expect(error.message).toMatch(
+          /Missing required permission|internal_comment/,
+        );
       }
     });
   });
@@ -436,7 +474,7 @@ describe("issueRouter - Issue Detail Page", () => {
     it("should handle database connection errors gracefully", async () => {
       const errorCtx = createAuthenticatedContext(["issue:view"]);
       const errorCaller = appRouter.createCaller(errorCtx);
-      
+
       errorCtx.db.issue.findFirst.mockRejectedValue(
         new Error("Database connection failed"),
       );
@@ -449,7 +487,7 @@ describe("issueRouter - Issue Detail Page", () => {
     it("should handle concurrent access scenarios", async () => {
       const concurrentCtx = createAuthenticatedContext(["issue:edit"]);
       const concurrentCaller = appRouter.createCaller(concurrentCtx);
-      
+
       // Simulate optimistic locking scenario
       concurrentCtx.db.issue.findFirst.mockResolvedValue(mockIssue as any);
       concurrentCtx.db.issue.update.mockRejectedValue(
