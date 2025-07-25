@@ -3,31 +3,39 @@
 ## Daily Usage
 
 ### Check for Regressions
+
 ```bash
 npm run betterer:check
 ```
+
 Run this before committing to ensure you haven't introduced new errors.
 
 ### Update Baseline After Improvements
+
 ```bash
 npm run betterer:update
 ```
+
 Run this after fixing errors to update the baseline.
 
 ### Watch Mode During Development
+
 ```bash
 npm run betterer:watch
 ```
+
 Runs continuously and shows impact of changes in real-time.
 
 ## Understanding Betterer Output
 
 ### Success (No Changes)
+
 ```
 ✅ 5 tests got checked. 0 tests got better. 0 tests got worse.
 ```
 
 ### Improvement Detected
+
 ```
 ✅ 5 tests got checked. 1 test got better. 0 tests got worse.
 
@@ -38,6 +46,7 @@ Don't forget to run `npm run betterer:update` to save improvements!
 ```
 
 ### Regression Detected
+
 ```
 ❌ 5 tests got checked. 0 tests got better. 1 test got worse.
 
@@ -59,26 +68,32 @@ Files with new errors:
 ## Common Scenarios
 
 ### Adding a New File
+
 - Betterer will catch any new errors in the file
 - Must fix errors or the check will fail
 
 ### Fixing Errors in Existing File
+
 1. Fix the errors
 2. Run `npm run betterer:check` to verify improvement
 3. Run `npm run betterer:update` to save new baseline
 
 ### Temporarily Adding Errors
+
 - Not allowed! Betterer will fail the check
 - Must fix before committing
 
 ### Emergency Override (Use Sparingly)
+
 If you absolutely must merge with regressions:
+
 ```bash
 # Update the baseline to include new errors
 npm run betterer:update
 git add .betterer.results
 git commit -m "chore: update betterer baseline (temporary regression)"
 ```
+
 **Note**: This should be rare and requires team discussion.
 
 ## Integration with CI

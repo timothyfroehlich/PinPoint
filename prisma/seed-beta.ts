@@ -260,9 +260,15 @@ async function main() {
     });
 
     if (adminRole) {
-      // Pre-create admin user from environment variables (fallback to defaults for local dev)
-      const adminEmail = env.SEED_ADMIN_EMAIL ?? "phoenixavatar2@gmail.com";
-      const adminName = env.SEED_ADMIN_NAME ?? "Tim Froehlich";
+      // Pre-create admin user from environment variables
+      const adminEmail = env.SEED_ADMIN_EMAIL;
+      const adminName = env.SEED_ADMIN_NAME;
+
+      if (!adminEmail || !adminName) {
+        throw new Error(
+          "SEED_ADMIN_EMAIL and SEED_ADMIN_NAME environment variables are required for beta seeding",
+        );
+      }
 
       const adminUser = await prisma.user.upsert({
         where: { email: adminEmail },
@@ -304,7 +310,7 @@ async function main() {
     console.log("\n✅ Beta seed completed successfully!");
     console.log("\n📝 Next steps:");
     console.log("1. Deploy to Vercel");
-    console.log("2. Log in with Google (phoenixavatar2@gmail.com)");
+    console.log("2. Log in with Google using your configured admin email");
     console.log("3. You'll automatically be an admin");
     console.log("4. Add machines and invite beta testers");
   } catch (error) {

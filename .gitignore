@@ -31,8 +31,8 @@ next-env.d.ts
 
 # local env files
 # do not commit any .env files to git, except for the .env.example file. https://create.t3.gg/en/usage/env-variables#using-environment-variables
-.env
-.env*.local
+.env*
+!.env.example
 
 # vercel
 .vercel
@@ -66,3 +66,12 @@ typescript-output.log
 eslint-test-output.log
 eslint-prod-errors.json
 betterer-output.log
+agent_workspace/
+cleanup_analysis/
+
+# Claude hooks cache files
+.claude/hooks/.quality-check.js.swp
+.claude/hooks/.quality-check.json.swp
+.claude/hooks/tsconfig-cache.json
+.betterer.results.backup
+.env*.local

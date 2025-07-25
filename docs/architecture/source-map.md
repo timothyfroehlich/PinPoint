@@ -135,9 +135,8 @@ These files are referenced across multiple subsystems and should be understood f
 
 ### Backend Implementation
 
-- `src/server/api/routers/upload.ts` - File upload operations
+- `src/server/api/routers/upload.ts` - File upload operations via tRPC
 - `src/lib/upload.ts` - Upload utilities and storage abstraction
-- `src/app/api/uploads/[filename]/route.ts` - File serving endpoint
 
 ### Database Models
 

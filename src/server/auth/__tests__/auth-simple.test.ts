@@ -1,6 +1,8 @@
+import { describe, it, expect } from "vitest";
+
 /**
  * Simplified authentication tests that verify the core authentication logic
- * without importing NextAuth directly (to avoid Jest ES module issues)
+ * without importing NextAuth directly (to avoid ES module issues)
  */
 
 describe("Authentication Core Logic", () => {

@@ -1,7 +1,6 @@
 "use client";
 
 import { Box, Toolbar } from "@mui/material";
-import { usePathname } from "next/navigation";
 
 import PrimaryAppBar from "../dashboard/_components/PrimaryAppBar";
 
@@ -12,20 +11,18 @@ interface AuthenticatedLayoutProps {
 export function AuthenticatedLayout({
   children,
 }: AuthenticatedLayoutProps): React.JSX.Element {
-  const pathname = usePathname();
-
-  // Don't show navigation on login page
-  const isLoginPage = pathname === "/";
-
-  if (isLoginPage) {
-    return <>{children}</>;
-  }
-
   return (
     <>
       <PrimaryAppBar />
       <Toolbar />
-      <Box component="main" sx={{ flexGrow: 1, bgcolor: "background.default" }}>
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          bgcolor: "background.default",
+          minHeight: "calc(100vh - 64px)", // Full height minus AppBar
+        }}
+      >
         {children}
       </Box>
     </>

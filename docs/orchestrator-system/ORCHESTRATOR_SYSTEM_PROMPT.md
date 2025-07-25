@@ -169,7 +169,7 @@ Every task must specify:
 
 - **TypeScript requirements**: `npm run typecheck` must pass
 - **Testing requirements**: `npm run test` must pass
-- **Pre-commit requirements**: `npm run pre-commit` must pass
+- **Pre-commit requirements**: `npm run validate` must pass
 - **Code standards**: Follow existing patterns and conventions
 
 ## Post-Completion Documentation Maintenance

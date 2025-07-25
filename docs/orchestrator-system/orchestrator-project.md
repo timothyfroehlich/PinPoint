@@ -13,7 +13,7 @@
 
 - **Main Repo**: `/home/froeht/Code/PinPoint`
 - **Worktrees**: `/home/froeht/Code/PinPoint-worktrees/`
-- **Commands**: `npm run dev:full`, `npm run validate`, `npm run pre-commit`
+- **Commands**: `npm run dev:full`, `npm run validate`, `npm run validate`
 
 ## Key Procedures
 
@@ -50,7 +50,7 @@ See `docs/design-docs/cujs-list.md` for complete CUJ definitions.
 ```bash
 npm run validate      # Before starting work
 npm run dev:full      # Development with monitoring
-npm run pre-commit    # Must pass before commits
+npm run validate    # Must pass before commits
 npm run db:reset      # Reset database
 ```
 

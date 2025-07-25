@@ -428,6 +428,5 @@ DEBUG=betterer npm run betterer:check     # Debug mode
 ## Related Documentation
 
 - **Daily Usage**: [CLAUDE.md Development Workflow](../../CLAUDE.md#development-workflow)
-- **Error Patterns**: [typescript-strictest.md](./typescript-strictest.md)
+- **TypeScript Guide**: [typescript-guide.md](./typescript-guide.md) - Complete TypeScript setup, error patterns, and migration lessons
 - **Migration Scripts**: [scripts/README.md](../../scripts/README.md)
-- **Project Status**: [TYPESCRIPT_MIGRATION.md](../../TYPESCRIPT_MIGRATION.md)
