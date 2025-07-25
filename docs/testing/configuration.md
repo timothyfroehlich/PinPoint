@@ -2,7 +2,7 @@
 
 ## Overview
 
-PinPoint uses a dual testing setup (Jest + Vitest) with multi-config TypeScript for different testing contexts and strictness levels.
+PinPoint uses Vitest exclusively for all testing, with multi-config TypeScript for different testing contexts and strictness levels.
 
 ## Multi-Config TypeScript for Testing
 
@@ -112,10 +112,9 @@ resolve: {
 
 ### 3. File Naming Convention
 
-- Vitest tests: `*.vitest.test.ts`
-- Jest tests (legacy): `*.test.ts`
+- Vitest tests: `*.test.ts` and `*.vitest.test.ts`
 
-This allows both frameworks to coexist during migration.
+All tests now use Vitest exclusively.
 
 ### 4. Setup Files
 
@@ -237,10 +236,11 @@ npx tsc --project tsconfig.test-utils.json --noEmit || true
 npx tsc --project tsconfig.tests.json --noEmit || true
 ```
 
-Both Jest and Vitest run in CI during migration:
+All tests run in CI using Vitest:
 
-- Jest tests: `npm run test:jest`
-- Vitest tests: `npm run test:vitest:run`
+- All tests: `npm run test`
+- Coverage: `npm run test:coverage`
+- Watch mode: `npm run test:watch`
 
 ## Troubleshooting Configuration
 

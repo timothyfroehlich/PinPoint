@@ -181,7 +181,7 @@ npm run test:coverage       # Coverage report
 
 ## Need Help?
 
-- **TypeScript errors?** → See [docs/developer-guides/typescript-strictest.md](../developer-guides/typescript-strictest.md)
+- **TypeScript errors?** → See [TypeScript Strictest Production](../developer-guides/typescript-strictest-production.md)
 - **Migration issues?** → See [Migration Examples](./migration-examples.md)
 - **Mocking problems?** → See [Mocking Patterns](./mocking-patterns.md)
 

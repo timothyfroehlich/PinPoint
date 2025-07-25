@@ -1,5 +1,8 @@
 # Roles and Permissions Design
 
+**Implementation Status**: ✅ **COMPLETED** in PR #130 (July 2025)  
+**Current State**: See `docs/architecture/permissions-roles-implementation.md` for detailed implementation
+
 ## Overview
 
 PinPoint uses a flexible Role-Based Access Control (RBAC) system that balances security, flexibility, and usability. The system distinguishes between system roles (hardcoded) and template-based roles (customizable per organization).

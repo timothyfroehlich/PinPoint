@@ -249,7 +249,7 @@ These files are referenced across multiple subsystems and should be understood f
 ### Configuration Files
 
 - `eslint.config.js` - ESLint configuration
-- `jest.config.js` - Jest testing configuration
+- `vitest.config.ts` - Vitest testing configuration
 - `playwright.config.ts` - E2E testing setup
 - `prettier.config.js` - Code formatting rules
 - `next.config.js` - Next.js configuration
