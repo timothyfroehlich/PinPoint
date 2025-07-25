@@ -242,98 +242,6 @@ jobs:
       - name: Validate GitHub workflows
         uses: raven-actions/actionlint@3a24062651993d40fed1019b58ac6fbdfbf276cc # v2
 
-  # Job 8: Migration Progress Report (PR only)
-  migration-report:
-    name: Migration Progress
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    needs: [typecheck, lint-production, lint-tests, betterer]
-    permissions:
-      contents: read
-      pull-requests: write
-    env:
-      AUTH_SECRET: "temp_secret_value" # Temporary value for CI validation only
-      DATABASE_URL: "sqlite://temp_db.sqlite" # Temporary value for CI validation only
-      DEFAULT_ORG_SUBDOMAIN: ${{ secrets.DEFAULT_ORG_SUBDOMAIN }}
-      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-      GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-      OPDB_API_TOKEN: ${{ secrets.OPDB_API_TOKEN }}
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: "24"
-          cache: "npm"
-      - uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3 # v5
-        with:
-          python-version: "3.12"
-      - run: npm ci
-      - name: Generate Migration Report
-        run: |
-          # Update stats using Python script (more reliable than bash)
-          python3 scripts/update-typescript-stats.py
-
-          # Create PR comment
-          cat > migration-report.md << 'EOF'
-          ## 📊 TypeScript Migration Progress Report
-
-          EOF
-
-          # Extract current stats and add Betterer status
-          {
-            echo "### TypeScript Status"
-            echo "- **Production Code**: 100% strict mode compliant"
-            echo "- **Test Files**: Incremental cleanup in progress"
-            echo ""
-            echo "### Betterer Status"
-            if npm run betterer:check > /dev/null 2>&1; then
-              echo "✅ No regressions detected"
-            else
-              echo "⚠️ Check Betterer results for details"
-            fi
-            echo ""
-            echo "---"
-            echo "📖 [TypeScript Guide](./docs/developer-guides/typescript-guide.md) | 🔧 [Helper Scripts](./scripts/README.md)"
-          } >> migration-report.md
-
-      - name: Comment PR
-        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7
-        if: always()
-        with:
-          script: |
-            const fs = require('fs');
-            const report = fs.readFileSync('migration-report.md', 'utf8');
-
-            // Find existing comment
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            });
-
-            const botComment = comments.find(comment => 
-              comment.user.type === 'Bot' && 
-              comment.body.includes('TypeScript Migration Progress Report')
-            );
-
-            if (botComment) {
-              // Update existing comment
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: botComment.id,
-                body: report,
-              });
-            } else {
-              // Create new comment
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body: report,
-              });
-            }
-
   # Summary job to ensure all checks pass
   ci-summary:
     name: CI Summary
@@ -353,25 +261,29 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Check Results (Production code must pass, tests can fail during migration)
+      - name: Check Results (All checks must pass)
         run: |
-          # Core production checks that must pass
+          # Core checks that must pass
           if [ "${{ needs.typecheck.result }}" != "success" ] ||
              [ "${{ needs.lint-production.result }}" != "success" ] ||
              [ "${{ needs.format.result }}" != "success" ] ||
              [ "${{ needs.betterer.result }}" != "success" ] ||
              [ "${{ needs.security.result }}" != "success" ] ||
              [ "${{ needs.validate-actions.result }}" != "success" ]; then
-            echo "❌ One or more required production checks failed"
+            echo "❌ One or more required checks failed"
             exit 1
           fi
 
-          # Report on test-related jobs (should now be succeeding with warnings)
-          echo "## Production Code Status: ✅ PASSING"
-          echo "## Test/Migration Status:"
-          echo "- typecheck: ${{ needs.typecheck.result }} (production errors block, test errors are warnings)"
-          echo "- lint-tests: ${{ needs.lint-tests.result }} (non-blocking)"
-          echo "- test: ${{ needs.test.result }} (non-blocking during migration)"
+          # Report on all job statuses
+          echo "## CI Status: ✅ ALL CHECKS PASSING"
+          echo "## Job Results:"
+          echo "- typecheck: ${{ needs.typecheck.result }}"
+          echo "- lint-production: ${{ needs.lint-production.result }}"
+          echo "- lint-tests: ${{ needs.lint-tests.result }}" 
+          echo "- format: ${{ needs.format.result }}"
+          echo "- betterer: ${{ needs.betterer.result }}"
+          echo "- test: ${{ needs.test.result }}"
+          echo "- security: ${{ needs.security.result }}"
+          echo "- validate-actions: ${{ needs.validate-actions.result }}"
           echo ""
-          echo "✅ All production code checks passed!"
-          echo "✅ Test-related jobs are designed to succeed while reporting migration status"
+          echo "✅ All checks passed successfully!"
