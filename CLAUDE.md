@@ -46,14 +46,10 @@ npm run dev:full        # Start all services with monitoring
 npm run dev:clean       # Fresh start with cleanup
 npm run setup:worktree  # Setup new worktree environment
 
-# Agent Validation Protocol (MANDATORY)
-npm run quick:agent        # Development checks + auto-fix (after code changes)
-npm run validate:agent     # Pre-commit validation + auto-fix (MUST PASS)
-npm run validate:full:agent # Pre-PR validation (MUST PASS)
-
-# Legacy Commands (Removed - Use Agent Commands Instead)
-# npm run validate      # REMOVED - use validate:agent
-# npm run pre-commit    # REMOVED - use validate:agent
+# Validation Protocol (MANDATORY)
+npm run quick        # Development checks + auto-fix (after code changes)
+npm run validate     # Pre-commit validation + auto-fix (MUST PASS)
+npm run pre-commit   # Pre-PR validation (MUST PASS)
 
 # Database
 npm run db:reset
@@ -186,17 +182,17 @@ npx tsc --project tsconfig.tests.json --noEmit
 npm run dev:typecheck
 ```
 
-### ✅ Agent Commands (Recommended)
+### ✅ Validation Commands (Recommended)
 
 ```bash
 # Quick validation with auto-fix
-npm run quick:agent
+npm run quick
 
 # Pre-commit validation
-npm run validate:agent
+npm run validate
 
 # Full pre-PR validation
-npm run validate:full:agent
+npm run pre-commit
 ```
 
 ### Config-Specific Commands
@@ -208,9 +204,9 @@ npm run validate:full:agent
 ## Development Workflow
 
 1. **Start**: `npm run validate` → `npm run dev:full`
-2. **During**: Run `npm run quick:agent` after significant code changes
-3. **Before commit**: `npm run validate:agent` must pass (MANDATORY)
-4. **Before PR**: `npm run validate:full:agent` must pass (MANDATORY)
+2. **During**: Run `npm run quick` after significant code changes
+3. **Before commit**: `npm run validate` must pass (MANDATORY)
+4. **Before PR**: `npm run pre-commit` must pass (MANDATORY)
 5. **Database changes**: Use `npm run db:reset` (pre-production phase)
 
 ### Environment Configuration

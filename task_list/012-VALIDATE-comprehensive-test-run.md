@@ -180,7 +180,7 @@ Pre-validation state (after implementing Tasks 009-011):
 
 ```bash
 # Quick validation during development
-npm run quick:agent
+npm run quick
 npm run test:e2e -- --headed --grep "auth"
 
 # Comprehensive local validation
@@ -192,7 +192,7 @@ npm run test:e2e -- --project=mobile-chrome,desktop-chrome
 
 ```bash
 # Full CI validation
-npm run validate:agent:full:agent
+npm run pre-commit
 npm run test:e2e -- --workers=2 --repeat-each=3
 
 # Performance validation

@@ -13,7 +13,7 @@
 
 - **Main Repo**: `/home/froeht/Code/PinPoint`
 - **Worktrees**: `/home/froeht/Code/PinPoint-worktrees/`
-- **Commands**: `npm run dev:full`, `npm run validate:agent`, `npm run validate:agent`
+- **Commands**: `npm run dev:full`, `npm run validate`, `npm run validate`
 
 ## Key Procedures
 
@@ -23,7 +23,7 @@
 git fetch origin epic/backend-refactor
 git status
 ./scripts/list-worktrees.sh
-npm run validate:agent
+npm run validate
 ```
 
 ### Worktree Management
@@ -48,9 +48,9 @@ See `docs/design-docs/cujs-list.md` for complete CUJ definitions.
 ## Key Commands
 
 ```bash
-npm run validate:agent      # Before starting work
+npm run validate      # Before starting work
 npm run dev:full      # Development with monitoring
-npm run validate:agent    # Must pass before commits
+npm run validate    # Must pass before commits
 npm run db:reset      # Reset database
 ```
 

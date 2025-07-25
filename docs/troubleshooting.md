@@ -80,7 +80,7 @@ This document contains detailed troubleshooting procedures for development and d
 2. **Revert Recent Changes**: `git checkout -- .` to discard unstaged changes
 3. **Clean Install**: Delete `node_modules` and `package-lock.json`, run `npm install`
 4. **Database Reset**: If needed, reset database and run `npm run seed`
-5. **Validate Clean State**: Run `npm run validate:agent` and `npm run build`
+5. **Validate Clean State**: Run `npm run validate` and `npm run build`
 
 ### If Dependencies Are Broken
 

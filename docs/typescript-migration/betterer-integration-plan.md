@@ -83,7 +83,7 @@ Update `package.json`:
     "betterer:update": "betterer update",
     "betterer:watch": "betterer watch",
     // Update pre-commit to include actionlint
-    "pre-commit": "npm run validate:agent && actionlint .github/workflows/*.yml"
+    "pre-commit": "npm run validate && actionlint .github/workflows/*.yml"
   }
 }
 ```
@@ -469,7 +469,7 @@ echo ""
 echo "📝 Next steps:"
 echo "1. Fix all TypeScript and ESLint errors shown above"
 echo "2. Remove '$FILE' from the test file overrides in eslint.config.js"
-echo "3. Run 'npm run validate:agent' to verify all checks pass"
+echo "3. Run 'npm run validate' to verify all checks pass"
 echo "4. Update .betterer.results by running 'npm run betterer:update'"
 ```
 
@@ -569,7 +569,7 @@ if command -v actionlint &> /dev/null; then
 fi
 
 # Run standard pre-commit
-npm run validate:agent
+npm run validate
 ```
 
 ### Phase 6: Documentation Updates
@@ -703,7 +703,7 @@ Automatically:
 2. Run the analysis script to see current errors
 3. Fix TypeScript errors first (they often resolve ESLint issues)
 4. Remove the file from ESLint test overrides
-5. Run `npm run validate:agent` to verify
+5. Run `npm run validate` to verify
 6. Update Betterer baseline: `npm run betterer:update`
 7. Commit changes
 

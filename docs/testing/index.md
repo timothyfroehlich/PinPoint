@@ -7,14 +7,14 @@
 ### Writing Tests
 
 ```typescript
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
-describe('MyComponent', () => {
+describe("MyComponent", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('should work', () => {
+  it("should work", () => {
     expect(true).toBe(true);
   });
 });
@@ -32,18 +32,20 @@ npm run test:vitest path/to/file # Specific file
 ## Core Principles
 
 ### 1. Explicit Mocking
+
 Vitest requires explicit mocking of all dependencies. This is by design to encourage better architecture.
 
 ```typescript
 // Mock the service AND its dependencies
-vi.mock('../service');
-vi.mock('../service/dependency');
-vi.mock('../service/dependency/nested');
+vi.mock("../service");
+vi.mock("../service/dependency");
+vi.mock("../service/dependency/nested");
 ```
 
 **Why?** Forces clear dependencies and reveals architectural issues.
 
 ### 2. TypeScript Strictest
+
 All tests must pass TypeScript strictest mode checks.
 
 ```typescript
@@ -55,17 +57,19 @@ const mockFn = vi.fn() as any;
 ```
 
 ### 3. Multi-Tenant Safety
+
 Tests must validate organization-scoped data access.
 
 ```typescript
 expect(mockDb.gameInstance.findMany).toHaveBeenCalledWith({
-  where: { organizationId: 'org-1' }
+  where: { organizationId: "org-1" },
 });
 ```
 
 ## Common Patterns
 
 ### Prisma Mocking
+
 ```typescript
 const mockPrisma = {
   user: { findUnique: vi.fn() },
@@ -82,15 +86,17 @@ mockPrisma.user.findUnique.mockImplementation(async () => userData);
 See [Prisma Patterns](./prisma-patterns.md) for advanced patterns.
 
 ### Variable Hoisting
+
 ```typescript
 const { mockEnv } = vi.hoisted(() => ({
-  mockEnv: { NODE_ENV: 'test' }
+  mockEnv: { NODE_ENV: "test" },
 }));
 
-vi.mock('~/env.js', () => ({ env: mockEnv }));
+vi.mock("~/env.js", () => ({ env: mockEnv }));
 ```
 
 ### React Component Testing
+
 ```typescript
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent } from "@testing-library/react";
@@ -126,6 +132,7 @@ describe('MyComponent', () => {
 ```
 
 **Key Requirements:**
+
 - Import `@testing-library/jest-dom/vitest` for DOM matchers
 - Use `VitestTestWrapper` instead of Jest's `TestWrapper`
 - Include `vi.clearAllMocks()` in `beforeEach`
@@ -143,6 +150,7 @@ describe('MyComponent', () => {
 ## Migration Guide
 
 ### Quick Decision Tree
+
 ```
 < 3 dependencies? → Migrate directly
 5+ dependencies? → Consider refactoring to DI
@@ -156,7 +164,7 @@ See [Migration Guide](./migration-guide.md) for step-by-step instructions and [M
 
 ```bash
 # Validation
-npm run validate:agent      # Quick validation
+npm run validate      # Quick validation
 npm run typecheck | grep "test.ts" # Check test types
 npm run test:coverage       # Coverage report
 

@@ -17,10 +17,10 @@ This comprehensive guide covers PinPoint's TypeScript setup, error resolution pa
 npm run typecheck
 
 # Full validation with auto-fix
-npm run validate:agent
+npm run validate
 
 # Quick checks during development
-npm run quick:agent
+npm run quick
 
 # Update Betterer baseline after fixes
 npm run betterer:update
@@ -87,9 +87,9 @@ npx tsc --project tsconfig.test-utils.json --noEmit
 npx tsc --project tsconfig.tests.json --noEmit
 
 # Agent commands (recommended)
-npm run quick:agent        # Quick validation with auto-fix
-npm run validate:agent     # Pre-commit validation
-npm run validate:agent:full:agent # Pre-PR validation
+npm run quick        # Quick validation with auto-fix
+npm run validate     # Pre-commit validation
+npm run pre-commit # Pre-PR validation
 ```
 
 ## 🔧 Error Categories and Solutions
@@ -657,7 +657,7 @@ const config = {
 
 ```bash
 # Quick validation
-npm run validate:agent
+npm run validate
 
 # Detailed output
 npm run debug:typecheck
@@ -754,10 +754,10 @@ npx tsc --project tsconfig.tests.json --noEmit 2>&1 | grep -c "error TS"
 
 ```bash
 # Verify multi-config setup
-npm run quick:agent
+npm run quick
 
 # Full validation
-npm run validate:agent
+npm run validate
 ```
 
 ## 📚 Tools and Commands Reference
@@ -766,7 +766,7 @@ npm run validate:agent
 
 - `npm run typecheck` - Check TypeScript errors (production code only)
 - `npm run lint` - Check ESLint warnings
-- `npm run validate:agent` - Full validation with auto-fix
+- `npm run validate` - Full validation with auto-fix
 - `npm run debug:typecheck` - Detailed TypeScript output
 
 ### Migration Scripts
@@ -783,9 +783,9 @@ npm run validate:agent
 
 ### Agent Validation Protocol
 
-- `npm run quick:agent` - Development checks + auto-fix (after code changes)
-- `npm run validate:agent` - Pre-commit validation + auto-fix (MUST PASS)
-- `npm run validate:agent:full:agent` - Pre-PR validation (MUST PASS)
+- `npm run quick` - Development checks + auto-fix (after code changes)
+- `npm run validate` - Pre-commit validation + auto-fix (MUST PASS)
+- `npm run pre-commit` - Pre-PR validation (MUST PASS)
 
 ## 🎯 Best Practices
 
@@ -798,7 +798,7 @@ npm run validate:agent
 ### For Migration
 
 - Fix errors file by file, not globally
-- Run `npm run quick:agent` after changes
+- Run `npm run quick` after changes
 - Keep PR sizes manageable
 - Document type utilities and patterns
 - Monitor error count as primary success metric

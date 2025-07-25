@@ -63,9 +63,9 @@ See `docs/architecture/api-routes.md` for details on legitimate exceptions.
 
 ```bash
 # Agent Validation Protocol (MANDATORY)
-npm run quick:agent        # Development checks + auto-fix (after code changes)
-npm run validate:agent:agent     # Pre-commit validation + auto-fix (MUST PASS)
-npm run validate:agent:full:agent # Pre-PR validation (MUST PASS)
+npm run quick        # Development checks + auto-fix (after code changes)
+npm run validate     # Pre-commit validation + auto-fix (MUST PASS)
+npm run pre-commit # Pre-PR validation (MUST PASS)
 ```
 ````
 

@@ -20,7 +20,7 @@
 
 ```bash
 npm run dev:full      # Development with monitoring
-npm run validate:agent    # Must pass before committing
+npm run validate    # Must pass before committing
 npm run typecheck     # TypeScript validation
 npm run db:push       # Push schema changes
 ```
@@ -35,7 +35,7 @@ npm run db:push       # Push schema changes
 ## PR Creation
 
 1. Ensure all tests pass: `npm run test:coverage`
-2. Run quality checks: `npm run validate:agent`
+2. Run quality checks: `npm run validate`
 3. Push to remote and create PR
 4. Monitor GitHub Actions until completion
 

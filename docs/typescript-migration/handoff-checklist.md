@@ -108,7 +108,7 @@ if command -v actionlint &> /dev/null; then
 fi
 
 # Run standard pre-commit
-npm run validate:agent
+npm run validate
 ```
 
 ### Step 7: Test New CI Pipeline Locally

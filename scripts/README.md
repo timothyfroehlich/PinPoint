@@ -61,7 +61,7 @@ npm run process-csv-issues
 2. Run the analysis script to see current errors
 3. Fix TypeScript errors first (they often resolve ESLint issues)
 4. Remove the file from ESLint test overrides
-5. Run `npm run validate:agent` to verify
+5. Run `npm run validate` to verify
 6. Update Betterer baseline: `npm run betterer:update`
 7. Commit changes
 

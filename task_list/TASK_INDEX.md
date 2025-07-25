@@ -78,10 +78,10 @@ npm run typecheck | grep "pattern"    # Filter errors by pattern
 npm run fix                             # Auto-fix lint/format issues
 
 # For incremental validation
-npm run quick:agent    # Quick checks during development
+npm run quick    # Quick checks during development
 
 # Before final commit (Task 008)
-npm run validate:agent:agent # Everything should pass by then
+npm run validate # Everything should pass by then
 
 # Debugging helpers
 npm run debug:typecheck  # Full TypeScript output

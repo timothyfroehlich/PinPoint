@@ -167,7 +167,7 @@ npm ls | grep -E "(superjson|@auth)"
 
 ```bash
 # 1. Run validation manually to see details
-npm run validate:agent
+npm run validate
 
 # 2. Check actionlint if available
 which actionlint && actionlint .github/workflows/*.yml
@@ -385,7 +385,7 @@ git reset --hard <good-commit-hash>
 # Rebuild everything
 rm -rf node_modules package-lock.json
 npm install
-npm run validate:agent
+npm run validate
 ```
 
 ### Quick Fixes for Common Patterns

@@ -12,8 +12,8 @@ npm run test:watch     # Watch mode
 npm run test:ui        # Interactive UI
 
 # Agent validation
-npm run quick:agent    # Fast validation
-npm run validate:agent # Pre-commit check
+npm run quick    # Fast validation
+npm run validate # Pre-commit check
 ```
 
 ### Core Import Pattern

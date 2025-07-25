@@ -9,6 +9,7 @@ argument-hint: "[test-file-path] - Optional specific test file to work on"
 You're working on PinPoint's test suite, which is transitioning from Jest to Vitest. Here's your comprehensive testing context:
 
 ## Essential Documentation
+
 @docs/testing/index.md
 @docs/testing/mocking-patterns.md
 @docs/testing/prisma-patterns.md
@@ -17,6 +18,7 @@ You're working on PinPoint's test suite, which is transitioning from Jest to Vit
 @vitest.config.ts
 
 ## Current Testing State
+
 - **Migration in Progress**: Jest → Vitest
 - **Naming Convention**: New/migrated tests use `.vitest.test.ts`
 - **Both frameworks run in CI** during transition
@@ -25,11 +27,13 @@ You're working on PinPoint's test suite, which is transitioning from Jest to Vit
 ## Key Testing Patterns
 
 ### Vitest Imports
+
 ```typescript
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from "vitest";
 ```
 
 ### Prisma Mock with $accelerate
+
 ```typescript
 const mockPrisma = {
   user: { findUnique: vi.fn() },
@@ -41,13 +45,15 @@ const mockPrisma = {
 ```
 
 ### Transitive Dependencies (Vitest requires explicit mocking)
+
 ```typescript
-vi.mock('../service');
-vi.mock('../service/dependency'); // Must mock this too!
-vi.mock('../service/dependency/nested'); // And this!
+vi.mock("../service");
+vi.mock("../service/dependency"); // Must mock this too!
+vi.mock("../service/dependency/nested"); // And this!
 ```
 
 ## Common Tasks
+
 - **New test**: Write in Vitest, follow patterns in testing/index.md
 - **Fix TypeScript errors**: See typescript-strictest.md patterns
 - **Mock Prisma**: Use patterns from testing/prisma-patterns.md
@@ -55,10 +61,11 @@ vi.mock('../service/dependency/nested'); // And this!
 - **Troubleshooting**: See testing/troubleshooting.md
 
 ## Validation Commands
+
 ```bash
 npm run test:vitest $ARGUMENTS
 npm run typecheck:tests
-npm run validate:agent
+npm run validate
 ```
 
 Remember: Vitest's explicit mocking isn't a limitation - it drives better architecture!
