@@ -1,33 +1,53 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NotificationType } from "@prisma/client";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 
 // Mock NextAuth first to avoid import issues
-jest.mock("next-auth", () => {
-  return jest.fn().mockImplementation(() => ({
-    auth: jest.fn(),
-    handlers: { GET: jest.fn(), POST: jest.fn() },
-    signIn: jest.fn(),
-    signOut: jest.fn(),
-  }));
-});
+vi.mock("next-auth", () => ({
+  default: vi.fn().mockImplementation(() => ({
+    auth: vi.fn(),
+    handlers: { GET: vi.fn(), POST: vi.fn() },
+    signIn: vi.fn(),
+    signOut: vi.fn(),
+  })),
+}));
 
 import {
-  createMockContext,
-  mockUser,
-  type MockContext,
-} from "../../../../test/mockContext";
+  createVitestMockContext,
+  type VitestMockContext,
+} from "../../../../test/vitestMockContext";
 import { appRouter } from "../../root";
 
+// Mock data for tests
+const mockUser = { id: "user-1", email: "test@example.com", name: "Test User" };
+
 describe("notificationRouter", () => {
-  let ctx: MockContext;
+  let ctx: VitestMockContext;
+  let mockNotificationService: any;
   const notificationId = "notification-1";
 
   beforeEach(() => {
-    ctx = createMockContext();
+    vi.clearAllMocks();
+    ctx = createVitestMockContext();
     ctx.session = {
       user: { id: mockUser.id },
       expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     };
+
+    // Create a single mock service instance and make createNotificationService return it
+    mockNotificationService = {
+      getUserNotifications: vi.fn(),
+      getUnreadCount: vi.fn(),
+      markAsRead: vi.fn(),
+      markAllAsRead: vi.fn(),
+      createNotification: vi.fn(),
+      notifyMachineOwnerOfIssue: vi.fn(),
+      notifyMachineOwnerOfStatusChange: vi.fn(),
+    };
+
+    // Make the service factory return our single mock instance
+    (ctx.services.createNotificationService as any).mockReturnValue(
+      mockNotificationService,
+    );
   });
 
   it("gets notifications for user", async () => {
@@ -45,10 +65,9 @@ describe("notificationRouter", () => {
     };
 
     // Mock the service method to return the expected data
-    const mockNotificationService = ctx.services.createNotificationService();
-    (
-      mockNotificationService.getUserNotifications as jest.MockedFunction<any>
-    ).mockResolvedValue([mockNotification]);
+    mockNotificationService.getUserNotifications.mockResolvedValue([
+      mockNotification,
+    ]);
 
     const caller = appRouter.createCaller(ctx as any);
     const result = await caller.notification.getNotifications({});
@@ -58,10 +77,7 @@ describe("notificationRouter", () => {
   });
 
   it("gets unread count", async () => {
-    const mockNotificationService = ctx.services.createNotificationService();
-    (
-      mockNotificationService.getUnreadCount as jest.MockedFunction<any>
-    ).mockResolvedValue(3);
+    mockNotificationService.getUnreadCount.mockResolvedValue(3);
 
     const caller = appRouter.createCaller(ctx as any);
     const count = await caller.notification.getUnreadCount();
@@ -71,15 +87,11 @@ describe("notificationRouter", () => {
   });
 
   it("marks notification as read", async () => {
-    const mockNotificationService = ctx.services.createNotificationService();
-    (
-      mockNotificationService.markAsRead as jest.MockedFunction<any>
-    ).mockResolvedValue(undefined);
+    mockNotificationService.markAsRead.mockResolvedValue(undefined);
 
     const caller = appRouter.createCaller(ctx as any);
     await caller.notification.markAsRead({ notificationId });
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(mockNotificationService.markAsRead).toHaveBeenCalledWith(
       notificationId,
       mockUser.id,
@@ -87,15 +99,11 @@ describe("notificationRouter", () => {
   });
 
   it("marks all as read", async () => {
-    const mockNotificationService = ctx.services.createNotificationService();
-    (
-      mockNotificationService.markAllAsRead as jest.MockedFunction<any>
-    ).mockResolvedValue(undefined);
+    mockNotificationService.markAllAsRead.mockResolvedValue(undefined);
 
     const caller = appRouter.createCaller(ctx as any);
     await caller.notification.markAllAsRead();
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(mockNotificationService.markAllAsRead).toHaveBeenCalledWith(
       mockUser.id,
     );
@@ -131,10 +139,9 @@ describe("notificationRouter", () => {
       },
     ];
 
-    const mockNotificationService = ctx.services.createNotificationService();
-    (
-      mockNotificationService.getUserNotifications as jest.MockedFunction<any>
-    ).mockResolvedValue(mockNotifications);
+    mockNotificationService.getUserNotifications.mockResolvedValue(
+      mockNotifications,
+    );
 
     const caller = appRouter.createCaller(ctx as any);
 
@@ -143,7 +150,7 @@ describe("notificationRouter", () => {
     expect(result.some((n) => n.userId === otherUserId)).toBe(false);
 
     // Should only query for current user's notifications
-    // eslint-disable-next-line @typescript-eslint/unbound-method
+
     expect(mockNotificationService.getUserNotifications).toHaveBeenCalledWith(
       mockUser.id,
       {},

@@ -1,43 +1,43 @@
 Report Timestamp,Email Address,Game,Severity,Consistency,Fix Status,Description,Assigned Technician,Owner,Work Log,Owner Notified,Email of owner,Owner Comments/Plans to Address,Last Updated
-6/21/2025 13:40:02,rmh5989@gmail.com,Ultraman,Cosmetic,Every game,New,Kaiju figures on left ramp are not responding,,Eric E/Chris E,,Yes -Phil,chris.engberg@gmail.com,,7/1/2025 19:09:30
-6/27/2025 19:05:40,rmh5989@gmail.com,Xenon,Severe,Always,Needs expert help,Loud buzzing noise then crashes,Ryan/Chris E,Ryan,"Ran into a wall with testing, trying to find cause. Need someone
-to test MPU board, power board possibly shorting",Yes,rmh5989@gmail.com,"Working on finding cause, 
+6/21/2025 13:40:02,keith.elwin@pinpoint.dev,Ultraman,Cosmetic,Every game,New,Kaiju figures on left ramp are not responding,Keith Elwin,George Gomez,"Yes -Phil",jack.danger@pinpoint.dev,,7/1/2025 19:09:30
+6/27/2025 19:05:40,keith.elwin@pinpoint.dev,Xenon,Severe,Always,Needs expert help,"George Gomez,Steve Ritchie",George Gomez,"Ran into a wall with testing, trying to find cause. Need someone
+to test MPU board, power board possibly shorting",Yes,keith.elwin@pinpoint.dev,"Working on finding cause, 
 swapping MPU board for testing",7/6/2025 10:27:36
-6/27/2025 20:12:44,rmh5989@gmail.com,Cleopatra,Minor,Every game,New,Left top rollover target not responding,,Neil Wilson,,,,,7/1/2025 19:10:53
-6/27/2025 20:13:27,rmh5989@gmail.com,Cleopatra,Minor,Every game,New,Center pop bumper is out,,Neil Wilson,,,,,7/1/2025 19:10:58
-6/28/2025 12:55:37,rmh5989@gmail.com,Ultraman,Minor,Occasionally,Needs expert help,Sensitive Tilt Warning - needs adjustment/testing,Eric E/Chris E,Eric E/Chris E,"""Spooky suggests it may be a loose connector or 
-cracked solder joint. I can take a look next time I am in."" -Chris E",Yes,chris.engberg@gmail.com,,7/2/2025 15:30:02
-6/28/2025 12:59:21,rmh5989@gmail.com,Revenge From Mars,Minor,Occasionally,New,Capture Switch not always reading - Ball Lock shot not reading ball immedately,,,,,,,7/4/2025 23:34:55
-6/28/2025 13:01:33,rmh5989@gmail.com,Star Trek TNG,Major,Occasionally,New,Right gun opto is flakey - auto fires (current workaround -> power cycle),Mark,Mark,,Yes,,,7/1/2025 19:11:54
-6/28/2025 13:02:22,rmh5989@gmail.com,Star Trek TNG ,Minor,Occasionally,New,Lock Shot is inconsistently responding - rattling,Mark,Mark,,Yes,,,6/29/2025 14:35:23
-6/28/2025 13:03:48,rmh5989@gmail.com,Lord of the Rings,Cosmetic,Always,New,Sarumon front screw missing,,Taylor S.,,,,,7/1/2025 19:12:49
-6/28/2025 13:06:09,rmh5989@gmail.com,Transporter: The Rescue,Severe,Always,Needs Parts,No CPU / VRAM,Eric E,Eric E,Ordering new replacements,Yes,,,7/1/2025 13:13:11
-6/28/2025 13:08:51,rmh5989@gmail.com,Sea Ray,Severe,Always,Needs expert help,will not turn on,,John Walter,,Yes,,,7/1/2025 19:21:25
-6/28/2025 13:10:20,rmh5989@gmail.com,Super Soccer,Minor,Occasionally,New,Bonus Counter jams up - incorrectly counts,,Eric Cole,,Yes,,,7/6/2025 10:24:09
-6/28/2025 13:11:14,rmh5989@gmail.com,Super Soccer,Minor,Every game,New,3rd top lane light and scoring issues,,Eric COle,,Yes,,,7/1/2025 19:13:48
-6/28/2025 13:11:58,rmh5989@gmail.com,Domino,Minor,Always,New,Pop bumpers weak / not responsive,Nik P,Nik P,,Yes,Nikolas.Poklitar@gmail.com,,7/1/2025 19:15:04
-6/28/2025 13:12:48,rmh5989@gmail.com,Domino,Major,Always,Needs Parts,Right flipper electrical issues; new coil stop needed for right flipper A-18702,Nik P,Nik P,,Yes,Nikolas.Poklitar@gmail.com,,7/1/2025 19:15:05
-6/28/2025 13:13:53,rmh5989@gmail.com,Cleopatra,Minor,Every game,New,"Game logic faulty - light issues, sound issues",Jordan B?,Neil Wilson,,Yes,,,7/6/2025 10:35:04
-6/28/2025 13:16:23,rmh5989@gmail.com,Eight Ball Deluxe,Cosmetic,Always,New,"5 + 6 ball, upper 9, EB, 60K lights out",,Justin,,Yes,justinweaver@hotmail.com,,7/1/2025 19:16:18
-6/28/2025 13:52:14,rmh5989@gmail.com,Star Trek TNG,Minor,Always,Needs Parts,Left Sling not firing,Mark,Mark,Linkage is broken,Yes,,Ordering Parts,7/1/2025 19:15:53
-7/4/2025 18:52:21,lgscott3@gmail.com,Lord of the Rings ,Major,Always,New,Right flipper is dead wont register.,,Taylor S.,,,,,7/6/2025 10:36:13
-7/5/2025 13:50:33,rmh5989@gmail.com,Split Second,Minor,Every game,New,"Release All Captive Balls will not release all captive balls, only one",,Chris E,,,,,7/6/2025 10:29:32
-7/5/2025 14:04:10,rmh5989@gmail.com,Ultraman,Minor,Every game,New,Right drop target doesn't drop flush on hit - does not respond,,Eric E,,,,,7/6/2025 10:29:38
-7/5/2025 14:15:14,rmh5989@gmail.com,Scooby Doo,Minor,Occasionally,New,Center Action Button getting stuck,,Ryan McCabe,,NO,,,7/6/2025 10:30:36
-7/5/2025 14:21:08,rmh5989@gmail.com,Scooby Doo,Minor,Occasionally,New,Auto plunge too weak to clear - possibly broken?,,Ryan McCabe,,NO,,,7/6/2025 10:30:36
-7/5/2025 15:07:02,rebecca.salam@gmail.com,Cactus Canyon,Major,Always,In Progress,There is no tilt bob installed ,Rebecca/Jordan B,Tim,Need to find a tilt bob,N/A,,,7/6/2025 10:32:27
-7/5/2025 15:56:01,rebecca.salam@gmail.com,Eight Ball Deluxe,Minor,Always,New,“b” top roll over does not register ,,Justin,,Yes,,,7/6/2025 10:32:55
-7/5/2025 15:59:56,rebecca.salam@gmail.com,Monopoly,Major,Always,In Progress,No tilt bob installed; tilt ring will need to be adjusted,Rebecca/Jordan B,Jason,Need to find a tilt bob,N/A,,,7/6/2025 10:33:25
-6/8/2025 0:00:00,,Black Knight,Minor,Always,In Progress,Loss of flipper strength/power (intermittent); lock does not register on upper playfield,Matt O/Jordan B,Matt O,"6/8/2025 - Jordan B noted that upper and left flippers are weak; cleaned the end of stroke switches, cleaned and adjusted Ball Lock 1 Switch (works not). Reports flippers may need additional work; check flipper button switch for clean contacts. ","YES, he's planning on rebuilding the flipper",Coyote2412@outlook.com,Matt going to rebuild upper flipper,7/1/2025 19:16:58
-6/8/2025 0:00:00,,Meteor,Minor,Always,In Progress,Right Drop Target Falling; Player 3 Display Out; ,Matt O/Jordan B,Matt O,Matt was working on this Monday at the meeting - in progress,Yes,Coyote2412@outlook.com,Matt is aware of issue,7/1/2025 19:17:55
-6/8/2025 0:00:00,,World Cup Soccer,Minor,Every game,In Progress,Soccer Ball disabled due to rattling (unknown cause; Neil is working on it),Neil Wilson,Neil Wilson,,,,Neil tried fixing; disabled for now,7/1/2025 19:18:34
-6/8/2025 0:00:00,,Xenon,Cosmetic,Always,In Progress,Multiple lights out,Ryan,Ryan,Yoppsicle LED Upgrade in progress - NEED TOOLS,Yes,rmh5989@gmail.com,Upgrading to Yoppsicle LEDs/New light board,7/1/2025 19:18:58
-6/8/2025 0:00:00,,Hokus Pokus,Major,Always,In Progress,Lock needs to be keyed (unable to access machine),Cayman,Summer,Locks are in tech room; old lock needs to be drilled out and replaced,,,"Summer bought the locks, I just need to find the time to install them.",7/1/2025 19:19:13
-6/8/2025 0:00:00,,Pharoah ,Severe,Always,Needs expert help,Right flipper: Bell chime every button press / binding issues / will not fully flip,,John Walter,,Yes - John Walter,,,7/1/2025 19:21:28
-6/8/2025 0:00:00,,Top Score,Severe,Always,In Progress,Does not start a game,Chris E/Rob Byers,Rob Byers,"Chris E looked at game; thinks contacts may need to be cleaned; previously it was recommended to use something to poke the stepper motor, however, this fix no longer works and game is inoperable. '",Yes,rbyers95@yahoo.com,,7/1/2025 19:21:32
-6/16/2025 0:00:00,,Halloween,Major,Always,In Progress,Broken railing under house,Neil C,Neil C,Neil is ordering parts from Spooky,Yes,javagrind888@gmail.com,Neil is ordering parts from Spooky,7/1/2025 19:22:09
-6/30/2025 0:00:00,,Game of Thrones,Major,Occasionally,In Progress,"Auto plunger does not clear the lane, only about 20% of the time",Jordan/Ted,Jordan,,Yes,,"Ted was working on this, Jordan is aware of issue and will fix next time he is here",7/1/2025 19:22:32
-6/30/2025 0:00:00,ted.gaunt@gmail.com,Border Town,Major,Always,In Progress,Marking game as down due to restoration activities. Ted is in process to fix/replace/restore the bumpers.,Ted,Summer," 7/5 Ted reinstalled new bumpers.  
-6/30 Ted took several bumpers off 6to begin restoration.",Yes,,,7/6/2025 0:23:31
-6/30/2025 0:00:00,ted.gaunt@gmail.com,Hot Tip,Major,Occasionally,Not to be Fixed,coil voltage fuse is still blowing randomly.,Ted,Ted,"later this week, Ted to use meter to review amp usage on all coils.  May want to get some time from Brandon.",Yes,,,7/1/2025 12:52:37
-6/30/2025 0:00:00,ted.gaunt@gmail.com,El Paso,Major,Always,New,"Need to assemble game and test.  FIRST, need to pick or drill locks as the keys are missing.",,,,,,,7/1/2025 12:53:49
+6/27/2025 20:12:44,keith.elwin@pinpoint.dev,Cleopatra,Minor,Every game,New,Left top rollover target not responding,,Steve Ritchie,,,,,7/1/2025 19:10:53
+6/27/2025 20:13:27,keith.elwin@pinpoint.dev,Cleopatra,Minor,Every game,New,Center pop bumper is out,,Steve Ritchie,,,,,7/1/2025 19:10:58
+6/28/2025 12:55:37,keith.elwin@pinpoint.dev,Ultraman,Minor,Occasionally,Needs expert help,"George Gomez,Steve Ritchie","George Gomez,Steve Ritchie","""Spooky suggests it may be a loose connector or 
+cracked solder joint. I can take a look next time I am in."" -Steve Ritchie",Yes,jack.danger@pinpoint.dev,,7/2/2025 15:30:02
+6/28/2025 12:59:21,keith.elwin@pinpoint.dev,Revenge From Mars,Minor,Occasionally,New,Capture Switch not always reading - Ball Lock shot not reading ball immedately,,,,,,,7/4/2025 23:34:55
+6/28/2025 13:01:33,keith.elwin@pinpoint.dev,Star Trek TNG,Major,Occasionally,New,Right gun opto is flakey - auto fires (current workaround -> power cycle),Mark Ritchie,Mark Ritchie,,Yes,,,7/1/2025 19:11:54
+6/28/2025 13:02:22,keith.elwin@pinpoint.dev,Star Trek TNG ,Minor,Occasionally,New,Lock Shot is inconsistently responding - rattling,Mark Ritchie,Mark Ritchie,,Yes,,,6/29/2025 14:35:23
+6/28/2025 13:03:48,keith.elwin@pinpoint.dev,Lord of the Rings,Cosmetic,Always,New,Sarumon front screw missing,,Pat Lawlor,,,,,7/1/2025 19:12:49
+6/28/2025 13:06:09,keith.elwin@pinpoint.dev,Transporter: The Rescue,Severe,Always,Needs Parts,No CPU / VRAM,George Gomez,George Gomez,Ordering new replacements,Yes,,,7/1/2025 13:13:11
+6/28/2025 13:08:51,keith.elwin@pinpoint.dev,Sea Ray,Severe,Always,Needs expert help,will not turn on,,Ed Boon,,Yes,,,7/1/2025 19:21:25
+6/28/2025 13:10:20,keith.elwin@pinpoint.dev,Super Soccer,Minor,Occasionally,New,Bonus Counter jams up - incorrectly counts,,Steve Kordek,,Yes,,,7/6/2025 10:24:09
+6/28/2025 13:11:14,keith.elwin@pinpoint.dev,Super Soccer,Minor,Every game,New,3rd top lane light and scoring issues,,Steve Kordek,,Yes,,,7/1/2025 19:13:48
+6/28/2025 13:11:58,keith.elwin@pinpoint.dev,Domino,Minor,Always,New,Pop bumpers weak / not responsive,Wayne Neyens,Wayne Neyens,,Yes,steve.ritchie@pinpoint.dev,,7/1/2025 19:15:04
+6/28/2025 13:12:48,keith.elwin@pinpoint.dev,Domino,Major,Always,Needs Parts,Right flipper electrical issues; new coil stop needed for right flipper A-18702,Wayne Neyens,Wayne Neyens,,Yes,steve.ritchie@pinpoint.dev,,7/1/2025 19:15:05
+6/28/2025 13:13:53,keith.elwin@pinpoint.dev,Cleopatra,Minor,Every game,New,"Game logic faulty - light issues, sound issues",Bowen Kerins?,Steve Ritchie,,Yes,,,7/6/2025 10:35:04
+6/28/2025 13:16:23,keith.elwin@pinpoint.dev,Eight Ball Deluxe,Cosmetic,Always,New,"5 + 6 ball, upper 9, EB, 60K lights out",,Keith Johnson,,Yes,wayne.neyens@pinpoint.dev,,7/1/2025 19:16:18
+6/28/2025 13:52:14,keith.elwin@pinpoint.dev,Star Trek TNG,Minor,Always,Needs Parts,Left Sling not firing,Mark Ritchie,Mark Ritchie,Linkage is broken,Yes,,Ordering Parts,7/1/2025 19:15:53
+7/4/2025 18:52:21,python.anghelo@pinpoint.dev,Lord of the Rings ,Major,Always,New,Right flipper is dead wont register.,,Pat Lawlor,,,,,7/6/2025 10:36:13
+7/5/2025 13:50:33,keith.elwin@pinpoint.dev,Split Second,Minor,Every game,New,"Release All Captive Balls will not release all captive balls, only one",,Steve Ritchie,,,,,7/6/2025 10:29:32
+7/5/2025 14:04:10,keith.elwin@pinpoint.dev,Ultraman,Minor,Every game,New,Right drop target doesn't drop flush on hit - does not respond,,George Gomez,,,,,7/6/2025 10:29:38
+7/5/2025 14:15:14,keith.elwin@pinpoint.dev,Scooby Doo,Minor,Occasionally,New,Center Action Button getting stuck,,Python Anghelo,,NO,,,7/6/2025 10:30:36
+7/5/2025 14:21:08,keith.elwin@pinpoint.dev,Scooby Doo,Minor,Occasionally,New,Auto plunge too weak to clear - possibly broken?,,Python Anghelo,,NO,,,7/6/2025 10:30:36
+7/5/2025 15:07:02,bowen.kerins@pinpoint.dev,Cactus Canyon,Major,Always,In Progress,There is no tilt bob installed ,"Mark Ritchie,Bowen Kerins",Tim Froehlich,Need to find a tilt bob,N/A,,,7/6/2025 10:32:27
+7/5/2025 15:56:01,bowen.kerins@pinpoint.dev,Eight Ball Deluxe,Minor,Always,New,“b” top roll over does not register ,,Keith Johnson,,Yes,,,7/6/2025 10:32:55
+7/5/2025 15:59:56,bowen.kerins@pinpoint.dev,Monopoly,Major,Always,In Progress,No tilt bob installed; tilt ring will need to be adjusted,"Mark Ritchie,Bowen Kerins",Jack Danger,Need to find a tilt bob,N/A,,,7/6/2025 10:33:25
+6/8/2025 0:00:00,,Black Knight,Minor,Always,In Progress,Loss of flipper strength/power (intermittent); lock does not register on upper playfield,"Pat Lawlor,Bowen Kerins",Pat Lawlor,"6/8/2025 - Bowen Kerins noted that upper and left flippers are weak; cleaned the end of stroke switches, cleaned and adjusted Ball Lock 1 Switch (works not). Reports flippers may need additional work; check flipper button switch for clean contacts. ","YES, he's planning on rebuilding the flipper",Coyote2412@outlook.com,Pat Lawlor going to rebuild upper flipper,7/1/2025 19:16:58
+6/8/2025 0:00:00,,Meteor,Minor,Always,In Progress,Right Drop Target Falling; Player 3 Display Out; ,"Pat Lawlor,Bowen Kerins",Pat Lawlor,Pat Lawlor was working on this Monday at the meeting - in progress,Yes,Coyote2412@outlook.com,Pat Lawlor is aware of issue,7/1/2025 19:17:55
+6/8/2025 0:00:00,,World Cup Soccer,Minor,Every game,In Progress,Soccer Ball disabled due to rattling (unknown cause; Keith Johnson is working on it),Steve Ritchie,Steve Ritchie,,,,Keith Johnson tried fixing; disabled for now,7/1/2025 19:18:34
+6/8/2025 0:00:00,,Xenon,Cosmetic,Always,In Progress,Multiple lights out,George Gomez,George Gomez,Yoppsicle LED Upgrade in progress - NEED TOOLS,Yes,keith.elwin@pinpoint.dev,Upgrading to Yoppsicle LEDs/New light board,7/1/2025 19:18:58
+6/8/2025 0:00:00,,Hokus Pokus,Major,Always,In Progress,Lock needs to be keyed (unable to access machine),Wayne Neyens,Python Anghelo,Locks are in tech room; old lock needs to be drilled out and replaced,,,Python Anghelo bought the locks, I just need to find the time to install them.,7/1/2025 19:19:13
+6/8/2025 0:00:00,,Pharoah ,Severe,Always,Needs expert help,Right flipper: Bell chime every button press / binding issues / will not fully flip,,Ed Boon,,Yes - Ed Boon,,,7/1/2025 19:21:28
+6/8/2025 0:00:00,,Top Score,Severe,Always,In Progress,Does not start a game,"Steve Ritchie,Steve Kordek",Steve Kordek,"Steve Ritchie looked at game; thinks contacts may need to be cleaned; previously it was recommended to use something to poke the stepper motor, however, this fix no longer works and game is inoperable. '",Yes,rbyers95@yahoo.com,,7/1/2025 19:21:32
+6/16/2025 0:00:00,,Halloween,Major,Always,In Progress,Broken railing under house,Keith Johnson,Keith Johnson,Keith Johnson is ordering parts from Spooky,Yes,george.gomez@pinpoint.dev,Keith Johnson is ordering parts from Spooky,7/1/2025 19:22:09
+6/30/2025 0:00:00,,Game of Thrones,Major,Occasionally,In Progress,"Auto plunger does not clear the lane, only about 20% of the time","Bowen Kerins,Ed Boon",Bowen Kerins,,Yes,,"Ed Boon was working on this, Bowen Kerins is aware of issue and will fix next time he is here",7/1/2025 19:22:32
+6/30/2025 0:00:00,ed.boon@pinpoint.dev,Border Town,Major,Always,In Progress,Marking game as down due to restoration activities. Ed Boon is in process to fix/replace/restore the bumpers.,Ed Boon,Python Anghelo," 7/5 Ed Boon reinstalled new bumpers.  
+6/30 Ed Boon took several bumpers off 6to begin restoration.",Yes,,,7/6/2025 0:23:31
+6/30/2025 0:00:00,ed.boon@pinpoint.dev,Hot Tip,Major,Occasionally,Not to be Fixed,coil voltage fuse is still blowing randomly.,Ed Boon,Ed Boon,"later this week, Ed Boon to use meter to review amp usage on all coils.  May want to get some time from a designer.",Yes,,,7/1/2025 12:52:37
+6/30/2025 0:00:00,ed.boon@pinpoint.dev,El Paso,Major,Always,New,"Need to assemble game and test.  FIRST, need to pick or drill locks as the keys are missing.",,,,,,,7/1/2025 12:53:49

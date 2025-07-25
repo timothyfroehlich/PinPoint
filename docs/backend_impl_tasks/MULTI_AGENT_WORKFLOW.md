@@ -154,7 +154,7 @@ Based on the README.md task documentation:
 
 - ✅ `npm run typecheck` passes
 - ✅ `npm run test` passes
-- ✅ `npm run pre-commit` passes
+- ✅ `npm run validate` passes
 - ✅ Task-specific validation steps completed
 - ✅ Progress Notes section updated
 
@@ -209,7 +209,7 @@ git push -u origin task/##-your-descriptive-name
 When your task is complete:
 
 1. **Move Task File**: Move your task file from `docs/backend_impl_tasks/` to `docs/backend_impl_tasks/completed/` as part of your PR
-2. **Run Quality Checks**: Execute `npm run pre-commit` to ensure all standards pass
+2. **Run Quality Checks**: Execute `npm run validate` to ensure all standards pass
 3. **Create Pull Request**: Target `epic/backend-refactor` branch (NOT main)
 4. **Update Task Documentation**: Mark your task as completed in the moved task file
 5. **Notify Coordination**: Your PR will be reviewed and merged by the orchestrating manager

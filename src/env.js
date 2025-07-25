@@ -1,6 +1,21 @@
 import { createEnv } from "@t3-oss/env-nextjs";
 import { z } from "zod";
 
+/**
+ * Environment Detection Helper
+ * Uses VERCEL_ENV for proper deployment environment detection
+ */
+function getEnvironmentType() {
+  // Test environment - set by test runners
+  if (process.env["NODE_ENV"] === "test") return "test";
+
+  // Use VERCEL_ENV if available (Vercel deployments)
+  if (process.env["VERCEL_ENV"]) return process.env["VERCEL_ENV"];
+
+  // Fallback to NODE_ENV for local development
+  return process.env["NODE_ENV"] || "development";
+}
+
 export const env = createEnv({
   /**
    * Specify your server-side environment variables schema here. This way you can ensure the app
@@ -8,19 +23,23 @@ export const env = createEnv({
    */
   server: {
     AUTH_SECRET:
-      process.env.NODE_ENV === "production"
+      getEnvironmentType() === "production"
         ? z.string()
         : z.string().optional(),
-    DATABASE_URL: z.string().url(),
+    DATABASE_URL:
+      getEnvironmentType() === "test"
+        ? z.string().url().optional()
+        : z.string().url(),
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),
+    VERCEL_ENV: z.enum(["development", "preview", "production"]).optional(),
     GOOGLE_CLIENT_ID:
-      process.env.NODE_ENV === "development"
+      getEnvironmentType() === "development" || getEnvironmentType() === "test"
         ? z.string().optional()
         : z.string(),
     GOOGLE_CLIENT_SECRET:
-      process.env.NODE_ENV === "development"
+      getEnvironmentType() === "development" || getEnvironmentType() === "test"
         ? z.string().optional()
         : z.string(),
     OPDB_API_URL: z.string().url().default("https://opdb.org/api"),
@@ -37,6 +56,8 @@ export const env = createEnv({
     // Seed configuration
     SEED_ADMIN_EMAIL: z.string().email().optional(),
     SEED_ADMIN_NAME: z.string().optional(),
+    // Temporary override for production deployment
+    FORCE_PREVIEW_BEHAVIOR: z.string().optional(),
   },
 
   /**
@@ -68,6 +89,8 @@ export const env = createEnv({
     BLOB_READ_WRITE_TOKEN: process.env["BLOB_READ_WRITE_TOKEN"],
     SEED_ADMIN_EMAIL: process.env["SEED_ADMIN_EMAIL"],
     SEED_ADMIN_NAME: process.env["SEED_ADMIN_NAME"],
+    VERCEL_ENV: process.env["VERCEL_ENV"],
+    FORCE_PREVIEW_BEHAVIOR: process.env["FORCE_PREVIEW_BEHAVIOR"],
     // Next.js automatically exposes NODE_ENV to the client
   },
   /**

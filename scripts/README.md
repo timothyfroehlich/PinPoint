@@ -5,6 +5,7 @@ This directory contains helper scripts for the TypeScript strict mode migration.
 ## Available Scripts
 
 ### migrate-test-file.sh
+
 Analyzes a single test file for strict mode compatibility.
 
 ```bash
@@ -12,11 +13,13 @@ Analyzes a single test file for strict mode compatibility.
 ```
 
 Shows:
+
 - All TypeScript strict mode errors
 - All ESLint type-safety violations
 - Next steps for migration
 
 ### migrate-test-directory.sh
+
 Provides overview of all test files in a directory.
 
 ```bash
@@ -24,11 +27,13 @@ Provides overview of all test files in a directory.
 ```
 
 Shows:
+
 - List of all test files
 - Error counts for each file
 - Total errors in the directory
 
 ### update-typescript-stats.sh
+
 Updates the TYPESCRIPT_MIGRATION.md file with current error counts.
 
 ```bash
@@ -36,12 +41,14 @@ Updates the TYPESCRIPT_MIGRATION.md file with current error counts.
 ```
 
 Automatically:
+
 - Runs typecheck and lint
 - Counts errors by type
 - Updates migration tracking document
 - Preserves error history
 
 ### process-csv-issues.ts
+
 Processes CSV exports from GitHub issues for bulk operations.
 
 ```bash
@@ -54,7 +61,7 @@ npm run process-csv-issues
 2. Run the analysis script to see current errors
 3. Fix TypeScript errors first (they often resolve ESLint issues)
 4. Remove the file from ESLint test overrides
-5. Run `npm run validate:agent` to verify
+5. Run `npm run validate` to verify
 6. Update Betterer baseline: `npm run betterer:update`
 7. Commit changes
 
@@ -70,15 +77,17 @@ npm run process-csv-issues
 ### Common Test File Issues
 
 1. **Mock Type Definitions**
+
    ```typescript
    // ❌ Bad
    const mockFn = jest.fn() as jest.Mock<any>;
-   
+
    // ✅ Good
    const mockFn = jest.fn<ReturnType, [Parameters]>();
    ```
 
 2. **Prisma Mock with Accelerate**
+
    ```typescript
    // ✅ Include $accelerate for ExtendedPrismaClient
    const mockPrisma = {
@@ -86,15 +95,16 @@ npm run process-csv-issues
      $accelerate: {
        invalidate: jest.fn(),
        invalidateAll: jest.fn(),
-     }
+     },
    };
    ```
 
 3. **exactOptionalPropertyTypes**
+
    ```typescript
    // ❌ Bad
    const obj: { prop?: string } = { prop: value || undefined };
-   
+
    // ✅ Good
    const obj: { prop?: string } = value ? { prop: value } : {};
    ```

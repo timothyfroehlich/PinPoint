@@ -1,3 +1,5 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
 import { CollectionService } from "../collectionService";
 import { CommentCleanupService } from "../commentCleanupService";
 import { ServiceFactory } from "../factory";
@@ -8,18 +10,28 @@ import { QRCodeService } from "../qrCodeService";
 
 import type { ExtendedPrismaClient } from "~/server/db";
 
-jest.mock("../notificationService");
-jest.mock("../collectionService");
-jest.mock("../pinballmapService");
-jest.mock("../issueActivityService");
-jest.mock("../commentCleanupService");
-jest.mock("../qrCodeService");
+vi.mock("../notificationService");
+vi.mock("../collectionService");
+vi.mock("../pinballmapService");
+vi.mock("../issueActivityService");
+vi.mock("../commentCleanupService");
+vi.mock("../qrCodeService");
+vi.mock("~/server/constants/cleanup", () => ({
+  COMMENT_CLEANUP_CONFIG: { retentionDays: 30 },
+}));
+vi.mock("~/lib/image-storage/local-storage", () => ({
+  imageStorage: { store: vi.fn(), delete: vi.fn() },
+}));
+vi.mock("~/server/utils/qrCodeUtils", () => ({
+  constructReportUrl: vi.fn(),
+}));
 
 describe("ServiceFactory", () => {
   let factory: ServiceFactory;
   const mockDb = {} as ExtendedPrismaClient;
 
   beforeEach(() => {
+    vi.clearAllMocks();
     factory = new ServiceFactory(mockDb);
   });
 

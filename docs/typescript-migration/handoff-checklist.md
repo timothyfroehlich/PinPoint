@@ -1,17 +1,20 @@
 # TypeScript Migration Handoff Checklist
 
 ## Overview
+
 This document provides a complete checklist for implementing the Betterer integration and CI pipeline reorganization.
 
 ## Pre-Implementation Checklist
 
 ### 1. Review Current State
+
 - [ ] Read `TYPESCRIPT_MIGRATION.md` for current error counts and status
 - [ ] Review `eslint.config.js` to understand baseline configuration
 - [ ] Check current CI workflow in `.github/workflows/ci.yml`
 - [ ] Verify all Zod deprecation fixes have been applied
 
 ### 2. Dependencies to Install
+
 ```bash
 npm install --save-dev @betterer/cli @betterer/typescript @betterer/eslint
 ```
@@ -19,6 +22,7 @@ npm install --save-dev @betterer/cli @betterer/typescript @betterer/eslint
 ### 3. Files to Create/Update
 
 #### New Files
+
 - [ ] `.betterer.ts` - Betterer configuration (already created)
 - [ ] `.github/workflows/ci-discrete.yml` - New CI pipeline (already created)
 - [ ] `scripts/migrate-test-file.sh` - Migration helper (already created)
@@ -26,6 +30,7 @@ npm install --save-dev @betterer/cli @betterer/typescript @betterer/eslint
 - [ ] `scripts/README.md` - Scripts documentation (already created)
 
 #### Files to Update
+
 - [ ] `package.json` - Add Betterer scripts
 - [ ] `eslint.config.js` - Add ban-ts-comment rule
 - [ ] `.husky/pre-commit` - Add actionlint check
@@ -34,12 +39,15 @@ npm install --save-dev @betterer/cli @betterer/typescript @betterer/eslint
 ## Implementation Steps
 
 ### Step 1: Install Dependencies
+
 ```bash
 npm install --save-dev @betterer/cli @betterer/typescript @betterer/eslint
 ```
 
 ### Step 2: Update package.json
+
 Add these scripts to the scripts section:
+
 ```json
 "betterer": "betterer",
 "betterer:check": "betterer ci --strict",
@@ -48,7 +56,9 @@ Add these scripts to the scripts section:
 ```
 
 ### Step 3: Update eslint.config.js
+
 Add the ban-ts-comment rule to the main rules section:
+
 ```javascript
 "@typescript-eslint/ban-ts-comment": ["error", {
   "ts-expect-error": "allow-with-description",
@@ -60,6 +70,7 @@ Add the ban-ts-comment rule to the main rules section:
 ```
 
 ### Step 4: Create Initial Betterer Baseline
+
 ```bash
 # This will create .betterer.results file
 npm run betterer
@@ -70,6 +81,7 @@ git commit -m "feat: add initial Betterer baseline for TypeScript migration"
 ```
 
 ### Step 5: Install actionlint
+
 ```bash
 # macOS
 brew install actionlint
@@ -79,7 +91,9 @@ curl -L https://github.com/rhysd/actionlint/releases/latest/download/actionlint_
 ```
 
 ### Step 6: Update .husky/pre-commit
+
 Replace the contents with:
+
 ```bash
 #!/usr/bin/env sh
 . "$(dirname "$0")/_/husky.sh"
@@ -94,10 +108,11 @@ if command -v actionlint &> /dev/null; then
 fi
 
 # Run standard pre-commit
-npm run pre-commit
+npm run validate
 ```
 
 ### Step 7: Test New CI Pipeline Locally
+
 ```bash
 # Validate the new workflow file
 actionlint .github/workflows/ci-discrete.yml
@@ -108,13 +123,16 @@ act -j lint-production
 ```
 
 ### Step 8: Deploy New CI Pipeline
+
 1. Create a new branch for the CI changes
 2. Delete or rename the old `.github/workflows/ci.yml`
 3. Rename `ci-discrete.yml` to `ci.yml`
 4. Push and create PR to test the new pipeline
 
 ### Step 9: Update TYPESCRIPT_MIGRATION.md
+
 Add the new sections documented in the implementation plan:
+
 - Betterer Integration status
 - Ban-ts-comment Policy
 - CI Pipeline Architecture
@@ -122,6 +140,7 @@ Add the new sections documented in the implementation plan:
 ## Post-Implementation Verification
 
 ### 1. Verify Betterer Works
+
 ```bash
 # Should show current state
 npm run betterer
@@ -134,6 +153,7 @@ npm run betterer:check  # Should fail
 ```
 
 ### 2. Test Migration Scripts
+
 ```bash
 # Test single file analysis
 ./scripts/migrate-test-file.sh src/test/mockContext.ts
@@ -143,6 +163,7 @@ npm run betterer:check  # Should fail
 ```
 
 ### 3. Verify CI Pipeline
+
 - Push a commit to trigger CI
 - Check that all jobs run in parallel
 - Verify PR comment appears with migration progress
@@ -170,6 +191,7 @@ npm run betterer:check  # Should fail
 ## Communication Template
 
 ### Slack/Team Message
+
 ```
 🚀 TypeScript Migration Tooling Update
 

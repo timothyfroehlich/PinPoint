@@ -5,18 +5,18 @@
  * Performs smart cleanup before starting development services
  */
 
-const { spawn, exec } = require('child_process');
-const fs = require('fs').promises;
-const path = require('path');
+const { spawn, exec } = require("child_process");
+const fs = require("fs").promises;
+const path = require("path");
 
 // ANSI color codes
 const colors = {
-  green: '\x1b[32m',
-  red: '\x1b[31m',
-  yellow: '\x1b[33m',
-  blue: '\x1b[34m',
-  reset: '\x1b[0m',
-  bold: '\x1b[1m'
+  green: "\x1b[32m",
+  red: "\x1b[31m",
+  yellow: "\x1b[33m",
+  blue: "\x1b[34m",
+  reset: "\x1b[0m",
+  bold: "\x1b[1m",
 };
 
 class DevCleaner {
@@ -41,54 +41,65 @@ class DevCleaner {
   }
 
   async killProcessesOnPorts(ports) {
-    this.log(`🔍 Checking for processes on ports: ${ports.join(', ')}...`);
-    
+    this.log(`🔍 Checking for processes on ports: ${ports.join(", ")}...`);
+
     for (const port of ports) {
       try {
         // Find process using the port
-        const { stdout } = await this.execPromise(`lsof -ti :${port} 2>/dev/null || echo ""`);
-        const pids = stdout.trim().split('\\n').filter(pid => pid);
-        
+        const { stdout } = await this.execPromise(
+          `lsof -ti :${port} 2>/dev/null || echo ""`,
+        );
+        const pids = stdout
+          .trim()
+          .split("\\n")
+          .filter((pid) => pid);
+
         if (pids.length > 0) {
-          this.log(`${colors.yellow}⚡ Killing ${pids.length} process(es) on port ${port}${colors.reset}`);
-          
+          this.log(
+            `${colors.yellow}⚡ Killing ${pids.length} process(es) on port ${port}${colors.reset}`,
+          );
+
           for (const pid of pids) {
             try {
               await this.execPromise(`kill -TERM ${pid}`);
               // Wait a moment for graceful shutdown
-              await new Promise(resolve => setTimeout(resolve, 1000));
-              
+              await new Promise((resolve) => setTimeout(resolve, 1000));
+
               // Force kill if still running
               try {
                 await this.execPromise(`kill -0 ${pid} 2>/dev/null`);
                 await this.execPromise(`kill -KILL ${pid}`);
-                this.log(`${colors.red}  ⚡ Force killed process ${pid}${colors.reset}`);
+                this.log(
+                  `${colors.red}  ⚡ Force killed process ${pid}${colors.reset}`,
+                );
               } catch {
                 // Process already terminated
-                this.log(`${colors.green}  ✅ Process ${pid} terminated gracefully${colors.reset}`);
+                this.log(
+                  `${colors.green}  ✅ Process ${pid} terminated gracefully${colors.reset}`,
+                );
               }
             } catch (error) {
-              this.log(`${colors.red}  ❌ Failed to kill process ${pid}: ${error.message}${colors.reset}`);
+              this.log(
+                `${colors.red}  ❌ Failed to kill process ${pid}: ${error.message}${colors.reset}`,
+              );
             }
           }
         } else {
           this.log(`${colors.green}✅ Port ${port} is free${colors.reset}`);
         }
       } catch (error) {
-        this.log(`${colors.yellow}⚠️  Could not check port ${port}: ${error.message}${colors.reset}`);
+        this.log(
+          `${colors.yellow}⚠️  Could not check port ${port}: ${error.message}${colors.reset}`,
+        );
       }
     }
   }
 
   async clearNextCache() {
-    const cacheDirectories = [
-      '.next',
-      '.turbo',
-      'node_modules/.cache'
-    ];
+    const cacheDirectories = [".next", ".turbo", "node_modules/.cache"];
 
-    this.log('🧹 Clearing Next.js cache directories...');
-    
+    this.log("🧹 Clearing Next.js cache directories...");
+
     for (const dir of cacheDirectories) {
       try {
         const dirPath = path.join(process.cwd(), dir);
@@ -96,26 +107,23 @@ class DevCleaner {
         await fs.rm(dirPath, { recursive: true, force: true });
         this.log(`${colors.green}  ✅ Cleared ${dir}${colors.reset}`);
       } catch (error) {
-        if (error.code !== 'ENOENT') {
-          this.log(`${colors.yellow}  ⚠️  Could not clear ${dir}: ${error.message}${colors.reset}`);
+        if (error.code !== "ENOENT") {
+          this.log(
+            `${colors.yellow}  ⚠️  Could not clear ${dir}: ${error.message}${colors.reset}`,
+          );
         }
       }
     }
   }
 
   async cleanTempFiles() {
-    const tempPaths = [
-      'tmp',
-      '.tmp',
-      '*.log',
-      'coverage'
-    ];
+    const tempPaths = ["tmp", ".tmp", "*.log", "coverage"];
 
-    this.log('🗑️  Cleaning temporary files...');
-    
+    this.log("🗑️  Cleaning temporary files...");
+
     for (const tempPath of tempPaths) {
       try {
-        if (tempPath.includes('*')) {
+        if (tempPath.includes("*")) {
           // Handle glob patterns
           await this.execPromise(`rm -f ${tempPath} 2>/dev/null || true`);
         } else {
@@ -125,8 +133,10 @@ class DevCleaner {
             await fs.rm(fullPath, { recursive: true, force: true });
             this.log(`${colors.green}  ✅ Cleaned ${tempPath}${colors.reset}`);
           } catch (error) {
-            if (error.code !== 'ENOENT') {
-              this.log(`${colors.yellow}  ⚠️  Could not clean ${tempPath}: ${error.message}${colors.reset}`);
+            if (error.code !== "ENOENT") {
+              this.log(
+                `${colors.yellow}  ⚠️  Could not clean ${tempPath}: ${error.message}${colors.reset}`,
+              );
             }
           }
         }
@@ -137,15 +147,23 @@ class DevCleaner {
   }
 
   async checkDatabaseConnection() {
-    this.log('🗄️  Checking database connection...');
-    
+    this.log("🗄️  Checking database connection...");
+
     try {
-      await this.execPromise('npx prisma db execute --command "SELECT 1" --schema prisma/schema.prisma');
-      this.log(`${colors.green}✅ Database connection is healthy${colors.reset}`);
+      await this.execPromise(
+        'npx prisma db execute --command "SELECT 1" --schema prisma/schema.prisma',
+      );
+      this.log(
+        `${colors.green}✅ Database connection is healthy${colors.reset}`,
+      );
       return true;
     } catch (error) {
-      this.log(`${colors.red}❌ Database connection failed: ${error.stderr || error.message}${colors.reset}`);
-      this.log(`${colors.yellow}💡 You may need to run: npm run db:push${colors.reset}`);
+      this.log(
+        `${colors.red}❌ Database connection failed: ${error.stderr || error.message}${colors.reset}`,
+      );
+      this.log(
+        `${colors.yellow}💡 You may need to run: npm run db:push${colors.reset}`,
+      );
       return false;
     }
   }
@@ -153,36 +171,44 @@ class DevCleaner {
   async promptDatabaseReset() {
     // For automated cleanup, we'll skip the database reset prompt
     // Users can run npm run db:reset manually if needed
-    this.log('💡 To reset database and sessions, run: npm run db:reset');
+    this.log("💡 To reset database and sessions, run: npm run db:reset");
     return false;
   }
 
   async runCleanup() {
-    this.log(`${colors.bold}🧹 Starting Development Environment Cleanup${colors.reset}\\n`);
+    this.log(
+      `${colors.bold}🧹 Starting Development Environment Cleanup${colors.reset}\\n`,
+    );
 
     try {
       // Step 1: Kill processes on development ports
       await this.killProcessesOnPorts([3000, 5555]);
-      
+
       // Step 2: Clear caches
       await this.clearNextCache();
-      
+
       // Step 3: Clean temporary files
       await this.cleanTempFiles();
-      
+
       // Step 4: Check database
       const dbHealthy = await this.checkDatabaseConnection();
-      
+
       if (!dbHealthy) {
         await this.promptDatabaseReset();
       }
 
-      this.log(`\\n${colors.green}${colors.bold}✅ Development environment cleanup completed!${colors.reset}`);
-      this.log(`${colors.blue}🚀 Ready to start development services...${colors.reset}\\n`);
-      
+      this.log(
+        `\\n${colors.green}${colors.bold}✅ Development environment cleanup completed!${colors.reset}`,
+      );
+      this.log(
+        `${colors.blue}🚀 Ready to start development services...${colors.reset}\\n`,
+      );
+
       return true;
     } catch (error) {
-      this.log(`${colors.red}❌ Cleanup failed: ${error.message}${colors.reset}`);
+      this.log(
+        `${colors.red}❌ Cleanup failed: ${error.message}${colors.reset}`,
+      );
       throw error;
     }
   }
@@ -191,12 +217,15 @@ class DevCleaner {
 // Run cleanup if called directly
 if (require.main === module) {
   const cleaner = new DevCleaner();
-  cleaner.runCleanup()
+  cleaner
+    .runCleanup()
     .then(() => {
       process.exit(0);
     })
-    .catch(error => {
-      console.error(`${colors.red}❌ Cleanup failed: ${error.message}${colors.reset}`);
+    .catch((error) => {
+      console.error(
+        `${colors.red}❌ Cleanup failed: ${error.message}${colors.reset}`,
+      );
       process.exit(1);
     });
 }

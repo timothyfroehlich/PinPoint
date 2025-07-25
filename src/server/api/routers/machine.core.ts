@@ -13,7 +13,7 @@ export const machineCoreRouter = createTRPCRouter({
   create: machineEditProcedure
     .input(
       z.object({
-        name: z.string().min(1, "Name is required"),
+        name: z.string().optional(),
         modelId: z.string(),
         locationId: z.string(),
       }),
@@ -40,7 +40,7 @@ export const machineCoreRouter = createTRPCRouter({
 
       const machine = await ctx.db.machine.create({
         data: {
-          name: input.name,
+          name: input.name ?? model.name,
           modelId: input.modelId,
           locationId: input.locationId,
           organizationId: ctx.organization.id,
@@ -120,6 +120,7 @@ export const machineCoreRouter = createTRPCRouter({
       },
       select: {
         id: true,
+        name: true,
         model: {
           select: {
             name: true,
@@ -170,6 +171,7 @@ export const machineCoreRouter = createTRPCRouter({
     .input(
       z.object({
         id: z.string(),
+        name: z.string().optional(),
         modelId: z.string().optional(),
         locationId: z.string().optional(),
       }),
@@ -215,6 +217,7 @@ export const machineCoreRouter = createTRPCRouter({
       return ctx.db.machine.update({
         where: { id: input.id },
         data: {
+          ...(input.name && { name: input.name }),
           ...(input.modelId && { modelId: input.modelId }),
           ...(input.locationId && { locationId: input.locationId }),
         },

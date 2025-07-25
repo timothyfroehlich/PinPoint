@@ -10,6 +10,7 @@ import {
   Collapse,
   IconButton,
 } from "@mui/material";
+import { signIn } from "next-auth/react";
 import { useState } from "react";
 
 interface DevLoginCompactProps {
@@ -17,7 +18,7 @@ interface DevLoginCompactProps {
 }
 
 export function DevLoginCompact({
-  onLogin,
+  onLogin: _onLogin,
 }: DevLoginCompactProps): React.ReactNode {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -29,19 +30,29 @@ export function DevLoginCompact({
     { id: "3", name: "Test Player", email: "player@test.com", role: "player" },
   ];
 
-  function handleLogin(email: string): void {
+  async function handleLogin(email: string): Promise<void> {
     setIsLoading(true);
     try {
       console.log("Dev login as:", email);
-      // Simulate login success and call the parent's onLogin
-      setTimeout(() => {
-        setIsLoading(false);
-        if (onLogin) {
-          onLogin();
-        }
-      }, 500);
+
+      // Use NextAuth signIn with Credentials provider
+      const result = await signIn("credentials", {
+        email,
+        redirect: false, // Don't redirect automatically
+      });
+
+      if (result.error) {
+        console.error("Login failed:", result.error);
+        alert(`Login failed: ${result.error}`);
+      } else if (result.ok) {
+        console.log("Login successful");
+        // Refresh the page to show authenticated content
+        window.location.reload();
+      }
     } catch (error) {
       console.error("Login failed:", error);
+      alert("Login failed - check console for details");
+    } finally {
       setIsLoading(false);
     }
   }
@@ -61,12 +72,21 @@ export function DevLoginCompact({
     }
   }
 
-  // Only show in development
-  if (
-    typeof window !== "undefined" &&
-    window.location.hostname !== "localhost"
-  ) {
-    return null;
+  // Only show in development or preview environments
+  // In local dev: localhost
+  // In preview: vercel.app domains
+  // Hide in production deployments
+  if (typeof window !== "undefined") {
+    const hostname = window.location.hostname;
+    const isLocalDev =
+      hostname === "localhost" || hostname.includes("127.0.0.1");
+    const isPreview =
+      hostname.includes("vercel.app") &&
+      !hostname.includes("pin-point.vercel.app");
+
+    if (!isLocalDev && !isPreview) {
+      return null;
+    }
   }
 
   return (
@@ -124,7 +144,7 @@ export function DevLoginCompact({
                   size="small"
                   disabled={isLoading}
                   onClick={() => {
-                    handleLogin(testUser.email);
+                    void handleLogin(testUser.email);
                   }}
                   sx={{
                     justifyContent: "flex-start",

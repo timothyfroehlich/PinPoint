@@ -122,10 +122,13 @@ model Membership {
 
 // Models for V1.0 Configurable RBAC
 model Role {
-  id             String  @id @default(cuid())
-  name           String  // e.g., "Admin", "Technician", "Manager"
+  id             String   @id @default(cuid())
+  name           String   // e.g., "Admin", "Technician", "Manager"
   organizationId String
-  isDefault      Boolean @default(false) // To identify system-default roles
+  isDefault      Boolean  @default(false) // To identify system-default roles
+  isSystem       Boolean  @default(false) // To identify system roles (Admin, Unauthenticated)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   memberships  Membership[]
@@ -135,8 +138,9 @@ model Role {
 }
 
 model Permission {
-  id   String @id @default(cuid())
-  name String @unique // e.g., "issue:create", "machine:delete", "role:manage"
+  id          String  @id @default(cuid())
+  name        String  @unique // e.g., "issue:create", "machine:delete", "role:manage"
+  description String? // Human-readable description of the permission
 
   roles Role[] @relation("RolePermissions")
 }
