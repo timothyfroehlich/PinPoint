@@ -2,16 +2,16 @@
 echo "🚀 Running pre-push validation..."
 
 # Quick format check (in case someone bypassed pre-commit)
-npm run format:agent
+npm run format:ci
 
 # Core validation with concise output
-npm run typecheck:agent
-npm run lint:agent  
-npm run test:agent
+npm run typecheck:ci
+npm run lint:ci  
+npm run test:ci
 
 # Additional checks
-npm run workflow:agent
-npm run deps:agent
-npm run smoke:agent
+npm run workflow:ci
+npm run deps:ci
+npm run smoke:ci
 
 echo "✅ Pre-push validation complete!"

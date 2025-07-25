@@ -37,6 +37,7 @@ beforeEach(() => vi.clearAllMocks());
 ## Core Testing Documentation
 
 - **[vitest-best-practices.md](./vitest-best-practices.md)**: **ESSENTIAL FOR AGENTS** - Complete Vitest patterns, performance data, MSW-tRPC integration, and real migration results. Contains all critical info in first 50 lines for quick agent reference.
+- **[codecov-setup.md](./codecov-setup.md)**: **NEW** - Complete Codecov integration guide with tokenless upload configuration, coverage thresholds (50% global, 60% server, 70% lib), and CI/CD pipeline integration.
 - **[configuration.md](./configuration.md)**: This document details the configuration of the testing environment for PinPoint. It covers how different testing frameworks and tools are set up and integrated into the development workflow, ensuring consistency and efficiency in test execution.
 
 ## Current Testing Standards
