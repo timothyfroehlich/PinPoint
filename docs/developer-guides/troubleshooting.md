@@ -59,7 +59,7 @@ npm run typecheck -- --build --force
 
 ## Test Issues
 
-### Jest Mock Type Errors
+### Vitest Mock Type Errors
 
 **Symptom**: Mock functions showing TypeScript errors despite correct setup.
 
@@ -69,14 +69,14 @@ npm run typecheck -- --build --force
 // ❌ Problem: Circular type reference
 const mockPrisma = {
   user: {
-    findUnique: jest.fn() as jest.MockedFunction<typeof prisma.user.findUnique>,
+    findUnique: vi.fn() as MockedFunction<typeof prisma.user.findUnique>,
   },
 };
 
 // ✅ Solution: Use explicit types
 const mockPrisma = {
   user: {
-    findUnique: jest.fn<Promise<User | null>, [any]>(),
+    findUnique: vi.fn<Promise<User | null>, [any]>(),
   },
 };
 ```
@@ -90,13 +90,13 @@ const mockPrisma = {
 ```typescript
 // ✅ Complete mock structure
 const mockPrisma: Partial<ExtendedPrismaClient> = {
-  user: { findUnique: jest.fn() },
+  user: { findUnique: vi.fn() },
   $accelerate: {
-    invalidate: jest.fn<Promise<void>, [string]>(),
-    invalidateAll: jest.fn<Promise<void>, []>(),
+    invalidate: vi.fn<Promise<void>, [string]>(),
+    invalidateAll: vi.fn<Promise<void>, []>(),
   },
-  $transaction: jest.fn(),
-  $disconnect: jest.fn<Promise<void>, []>(),
+  $transaction: vi.fn(),
+  $disconnect: vi.fn<Promise<void>, []>(),
 };
 ```
 
@@ -109,7 +109,7 @@ const mockPrisma: Partial<ExtendedPrismaClient> = {
 ```typescript
 // Ensure proper cleanup in test setup
 beforeEach(() => {
-  jest.clearAllMocks();
+  vi.clearAllMocks();
 
   // Reset mock implementations to default
   mockPrisma.user!.findUnique!.mockResolvedValue(null);
@@ -117,7 +117,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  jest.restoreAllMocks();
+  vi.restoreAllMocks();
 });
 ```
 
@@ -150,8 +150,8 @@ grep -r "process.env" src/ --exclude-dir=node_modules
 # 1. Check package.json type field
 grep '"type"' package.json
 
-# 2. Verify Jest ESM configuration
-grep -A 5 "preset" jest.config.js
+# 2. Verify Vitest ESM configuration
+grep -A 5 "define" vitest.config.ts
 
 # 3. Check for mixed module types
 npm ls | grep -E "(superjson|@auth)"
@@ -248,7 +248,7 @@ npm run lint -- src/server/
 npm run lint 2>&1 | grep "no-unsafe"
 ```
 
-### Slow Jest Tests
+### Slow Vitest Tests
 
 **Symptom**: Test suite takes very long to run.
 
@@ -443,6 +443,6 @@ git log --oneline -5
 ## Related Documentation
 
 - **Environment Setup**: [docs/troubleshooting.md](../troubleshooting.md)
-- **TypeScript Patterns**: [typescript-strictest.md](./typescript-strictest.md)
+- **TypeScript Patterns**: [typescript-strictest-production.md](./typescript-strictest-production.md)
 - **Testing Issues**: [docs/testing/troubleshooting.md](../testing/troubleshooting.md)
 - **Migration Workflow**: [betterer-workflow.md](./betterer-workflow.md)

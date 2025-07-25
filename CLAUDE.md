@@ -33,8 +33,8 @@ See `docs/architecture/api-routes.md` for details on legitimate exceptions.
 
 - **Organization**: Top-level tenant (e.g., "Austin Pinball Collective")
 - **Location**: Physical venue belonging to an Organization
-- **Game Title**: Generic machine model (e.g., "Godzilla Premium")
-- **Game Instance**: Specific physical machine at a Location
+- **Model**: Generic machine model (e.g., "Godzilla Premium")
+- **Machine**: Specific physical machine at a Location
 - **Issue**: Problem/task for a Game Instance
 - **User**: Global account; **Member**: User + Organization + Role
 
@@ -264,11 +264,18 @@ Use memory to quickly recall:
 
 For detailed guidance beyond these essentials:
 
-- **TypeScript Issues**: See `docs/developer-guides/typescript-guide.md` for comprehensive TypeScript setup, error resolution, and migration patterns
+- **TypeScript Standards**:
+  - `docs/developer-guides/typescript-guide.md` - Comprehensive TypeScript setup, error resolution, and migration patterns
+  - `docs/developer-guides/typescript-base-standards.md` - Foundation patterns for all code and test utilities
+  - `docs/developer-guides/typescript-strictest-production.md` - Production-specific strictest patterns
 - **Testing Patterns**: See `docs/testing/vitest-best-practices.md` for Vitest patterns and performance data
+- **Configuration**: `docs/configuration/multi-config-strategy.md` - Multi-tier configuration system guide
+- **Architecture**:
+  - `docs/architecture/dependency-injection.md` - DI patterns and testing
+  - `docs/architecture/permissions-roles-implementation.md` - Complete RBAC implementation guide
+  - `docs/architecture/current-state.md` - Current implementation state and multi-tenant architecture
 - **ESLint Errors**: See `docs/developer-guides/common-errors.md` for specific rule violations and fixes
 - **Betterer Workflow**: See `docs/developer-guides/betterer-workflow.md` for migration workflow and team coordination
-- **Migration Lessons**: All migration insights now consolidated in `docs/developer-guides/typescript-guide.md`
 - **Script Usage**: See `scripts/README.md` for TypeScript analysis tools
 
 ## Repository
@@ -286,6 +293,7 @@ For detailed guidance beyond these essentials:
 - **ESM modules**: Project uses `"type": "module"` with native ESM support - Vitest handles this seamlessly
 - **Type Safety**: Project enforces strictest TypeScript + type-aware ESLint rules. All `@typescript-eslint/no-unsafe-*` and `no-explicit-any` violations must be fixed
 - **TypeScript Migration**: ✅ Production code is 100% strict mode compliant! Test files being cleaned up incrementally
+- **Testing Framework**: ✅ Vitest exclusively - Jest migration completed with 7-65x performance improvements
 - **Migration Patterns**: Complete TypeScript migration patterns in `docs/developer-guides/typescript-guide.md`. Betterer prevents regressions
 
 ## Frontend Development Notes
@@ -303,6 +311,8 @@ For detailed guidance beyond these essentials:
 
 - **Mock data accuracy was critical for test reliability**: Initial test failures weren't due to logic bugs but because mocks returned full objects while APIs used Prisma `select` clauses - mocks must simulate exact response structure
 - **Explicit dependency mocking forces better architecture**: What initially seemed like Vitest being "more work" actually drove better dependency injection patterns and cleaner service boundaries
+- **Multi-config TypeScript complexity vs. benefits**: Sophisticated 4-tier TypeScript setup provides precise control but requires careful agent guidance to navigate effectively
+- **Permission system implementation learnings**: Dependency injection pattern for testing permission components proved essential for both authorized and unauthorized state testing
 - **Public endpoints still need multi-tenant scoping**: Even unauthenticated APIs must respect organization boundaries through subdomain resolution, not just skip authentication entirely
 - **"Migration complete" doesn't mean "working"**: Functionality existing in codebase doesn't guarantee it's properly tested or behaves correctly under all conditions
 
@@ -314,8 +324,10 @@ For detailed guidance beyond these essentials:
 ### Security & Testing Revelations
 
 - **Permission UI testing requires both states**: Testing permission-based components for authorized state isn't enough - must test unauthorized state with proper fallbacks/tooltips
+- **Dependency injection transformed permission testing**: PermissionDepsProvider pattern enables precise mocking of session and membership data, leading to more reliable permission component tests
 - **Security boundaries blur with public endpoints**: Public APIs can leak sensitive data through careless Prisma queries - explicit `select` clauses are essential for data security
 - **Test mocks often fail to catch real API issues**: If mocks don't match production API structure exactly, tests give false confidence
+- **Betterer integration success**: Regression prevention through measurable progress tracking proved invaluable for maintaining strictest TypeScript compliance during development
 
 ## Claude Memories
 
