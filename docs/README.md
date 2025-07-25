@@ -115,7 +115,7 @@ superseded-by: [optional link]
 ```bash
 npm run dev:full        # Start all services with monitoring
 npm run validate        # Run all checks before starting work
-npm run validate:agent  # Pre-commit validation + auto-fix (MUST PASS)
+npm run validate  # Pre-commit validation + auto-fix (MUST PASS)
 npm run db:reset        # Reset database with seed data
 npm run test:coverage   # Generate coverage reports
 ```

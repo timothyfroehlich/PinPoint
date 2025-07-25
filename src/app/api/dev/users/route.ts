@@ -2,12 +2,12 @@ import { NextResponse } from "next/server";
 
 import type { Prisma } from "@prisma/client";
 
-import { env } from "~/env.js";
+import { shouldEnableDevFeatures } from "~/lib/environment";
 import { auth } from "~/server/auth";
 import { getGlobalDatabaseProvider } from "~/server/db/provider";
 
 export async function GET(): Promise<NextResponse> {
-  if (env.NODE_ENV !== "development") {
+  if (!shouldEnableDevFeatures()) {
     return new NextResponse(null, { status: 404 });
   }
 

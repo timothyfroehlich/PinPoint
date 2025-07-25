@@ -3,7 +3,7 @@ import { type NextRequest } from "next/server";
 
 import type { TRPCContext } from "~/server/api/trpc.base";
 
-import { env } from "~/env";
+import { isDevelopment } from "~/lib/environment";
 import { appRouter } from "~/server/api/root";
 import { createTRPCContext } from "~/server/api/trpc";
 
@@ -25,7 +25,7 @@ const handler = (req: NextRequest): Promise<Response> => {
     createContext: () => createContext(req),
   };
 
-  if (env.NODE_ENV === "development") {
+  if (isDevelopment()) {
     return fetchRequestHandler({
       ...baseConfig,
       onError: ({ path, error }): void => {

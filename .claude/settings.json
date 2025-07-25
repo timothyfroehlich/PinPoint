@@ -2,11 +2,12 @@
   "hooks": {
     "PostToolUse": [
       {
-        "matcher": "Write|Edit|MultiEdit",
+        "matcher": "Edit|Write|MultiEdit",
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/validate-write.js \"$FILE_PATH\""
+            "command": "node .claude/hooks/quality-check.cjs",
+            "timeout": 30000
           }
         ]
       }

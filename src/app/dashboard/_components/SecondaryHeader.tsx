@@ -1,11 +1,16 @@
 "use client";
 
 import SettingsIcon from "@mui/icons-material/Settings";
-import { Toolbar, Typography, Button, Box } from "@mui/material";
+import { Toolbar, Typography, Box } from "@mui/material";
 
 import type { JSX } from "react";
 
+import { PermissionButton } from "~/components/permissions/PermissionButton";
+import { usePermissions } from "~/hooks/usePermissions";
+
 const SecondaryHeader = (): JSX.Element => {
+  const { hasPermission } = usePermissions();
+
   return (
     <Box
       sx={{
@@ -18,7 +23,9 @@ const SecondaryHeader = (): JSX.Element => {
         <Typography variant="h5" fontWeight="bold">
           Dashboard
         </Typography>
-        <Button
+        <PermissionButton
+          permission="organization:admin"
+          hasPermission={hasPermission}
           variant="outlined"
           startIcon={<SettingsIcon />}
           sx={{
@@ -30,9 +37,11 @@ const SecondaryHeader = (): JSX.Element => {
               bgcolor: "rgba(255,255,255,0.05)",
             },
           }}
+          tooltipText="Customize dashboard layout and settings"
+          showWhenDenied={false}
         >
           Customize
-        </Button>
+        </PermissionButton>
       </Toolbar>
     </Box>
   );

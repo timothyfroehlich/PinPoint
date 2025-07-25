@@ -1,0 +1,16 @@
+#!/bin/sh
+echo "🚀 Running pre-push validation..."
+
+# Quick format check (in case someone bypassed pre-commit)
+npm run format:ci
+
+# Core validation with concise output (fast checks only)
+npm run typecheck:ci
+npm run lint:ci
+
+# Lightweight additional checks
+npm run workflow:ci
+npm run deps:ci
+
+echo "✅ Pre-push validation complete!"
+echo "📋 Note: Tests run in CI for comprehensive validation"

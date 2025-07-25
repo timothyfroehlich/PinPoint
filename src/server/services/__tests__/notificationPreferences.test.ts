@@ -1,8 +1,18 @@
-import { PrismaClient } from "@prisma/client";
-import { mockDeep } from "jest-mock-extended";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 describe("Notification preference logic", () => {
-  let mockPrisma: jest.Mocked<PrismaClient>;
+  let mockPrisma: {
+    user: {
+      create: ReturnType<typeof vi.fn>;
+      update: ReturnType<typeof vi.fn>;
+      findUnique: ReturnType<typeof vi.fn>;
+    };
+    machine: {
+      create: ReturnType<typeof vi.fn>;
+      update: ReturnType<typeof vi.fn>;
+      findUnique: ReturnType<typeof vi.fn>;
+    };
+  };
 
   const mockUser = {
     id: "user-1",
@@ -35,7 +45,18 @@ describe("Notification preference logic", () => {
   };
 
   beforeEach(() => {
-    mockPrisma = mockDeep<PrismaClient>();
+    mockPrisma = {
+      user: {
+        create: vi.fn(),
+        update: vi.fn(),
+        findUnique: vi.fn(),
+      },
+      machine: {
+        create: vi.fn(),
+        update: vi.fn(),
+        findUnique: vi.fn(),
+      },
+    };
   });
 
   it("respects machine-level notification toggles", async () => {
@@ -44,10 +65,8 @@ describe("Notification preference logic", () => {
       ownerNotificationsEnabled: false,
     };
 
-    (mockPrisma.machine.update as jest.Mock).mockResolvedValue(updatedMachine);
-    (mockPrisma.machine.findUnique as jest.Mock).mockResolvedValue(
-      updatedMachine,
-    );
+    mockPrisma.machine.update.mockResolvedValue(updatedMachine);
+    mockPrisma.machine.findUnique.mockResolvedValue(updatedMachine);
 
     // Test disabling all notifications for machine
     await mockPrisma.machine.update({
@@ -60,7 +79,6 @@ describe("Notification preference logic", () => {
     });
 
     expect(updated?.ownerNotificationsEnabled).toBe(false);
-    // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(mockPrisma.machine.update).toHaveBeenCalledWith({
       where: { id: mockMachine.id },
       data: { ownerNotificationsEnabled: false },
@@ -73,8 +91,8 @@ describe("Notification preference logic", () => {
       emailNotificationsEnabled: false,
     };
 
-    (mockPrisma.user.update as jest.Mock).mockResolvedValue(updatedUser);
-    (mockPrisma.user.findUnique as jest.Mock).mockResolvedValue(updatedUser);
+    mockPrisma.user.update.mockResolvedValue(updatedUser);
+    mockPrisma.user.findUnique.mockResolvedValue(updatedUser);
 
     // Test disabling all notifications for user
     await mockPrisma.user.update({
@@ -87,7 +105,6 @@ describe("Notification preference logic", () => {
     });
 
     expect(updated?.emailNotificationsEnabled).toBe(false);
-    // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(mockPrisma.user.update).toHaveBeenCalledWith({
       where: { id: mockUser.id },
       data: { emailNotificationsEnabled: false },
@@ -104,12 +121,10 @@ describe("Notification preference logic", () => {
       emailNotificationsEnabled: false,
     };
 
-    (mockPrisma.machine.update as jest.Mock).mockResolvedValue(updatedMachine);
-    (mockPrisma.machine.findUnique as jest.Mock).mockResolvedValue(
-      updatedMachine,
-    );
-    (mockPrisma.user.update as jest.Mock).mockResolvedValue(updatedUser);
-    (mockPrisma.user.findUnique as jest.Mock).mockResolvedValue(updatedUser);
+    mockPrisma.machine.update.mockResolvedValue(updatedMachine);
+    mockPrisma.machine.findUnique.mockResolvedValue(updatedMachine);
+    mockPrisma.user.update.mockResolvedValue(updatedUser);
+    mockPrisma.user.findUnique.mockResolvedValue(updatedUser);
 
     // Machine notifications enabled, user notifications disabled
     await mockPrisma.machine.update({
@@ -163,8 +178,8 @@ describe("Notification preference logic", () => {
       updatedAt: new Date(),
     };
 
-    (mockPrisma.user.create as jest.Mock).mockResolvedValue(newUser);
-    (mockPrisma.machine.create as jest.Mock).mockResolvedValue(newMachine);
+    mockPrisma.user.create.mockResolvedValue(newUser);
+    mockPrisma.machine.create.mockResolvedValue(newMachine);
 
     const createdUser = await mockPrisma.user.create({
       data: { email: "defaultuser@example.com", name: "Default User" },

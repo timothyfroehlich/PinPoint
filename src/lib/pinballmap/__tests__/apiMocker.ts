@@ -1,7 +1,9 @@
 /**
- * API mocker for PinballMap tests
+ * API mocker for PinballMap tests (Vitest version)
  * Similar to DisPinMap's APIMocker pattern
  */
+
+import { vi } from "vitest";
 
 import fixtureData from "./fixtures/api_responses/locations/location_26454_machine_details.json";
 
@@ -18,7 +20,7 @@ export class PinballMapAPIMocker {
    * Mock the fetch function to return fixture data
    */
   start(): void {
-    global.fetch = jest.fn().mockImplementation((url: string) => {
+    global.fetch = vi.fn().mockImplementation((url: string) => {
       // Mock machine details endpoint
       if (url.includes("/locations/26454/machine_details.json")) {
         return Promise.resolve({

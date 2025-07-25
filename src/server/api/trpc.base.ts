@@ -15,6 +15,7 @@ import type { ExtendedPrismaClient } from "~/server/db";
 
 import { env } from "~/env";
 import { auth } from "~/server/auth";
+import { getUserPermissionsForSession } from "~/server/auth/permissions";
 import { getGlobalDatabaseProvider } from "~/server/db/provider";
 import { ServiceFactory } from "~/server/services/factory";
 
@@ -237,14 +238,19 @@ export const organizationProcedure = protectedProcedure.use(
       });
     }
 
+    // Get user permissions (handles admin role automatically)
+    const userPermissions = await getUserPermissionsForSession(
+      ctx.session,
+      ctx.db,
+      ctx.organization.id,
+    );
+
     return next({
       ctx: {
         ...ctx,
         organization: ctx.organization, // Safe assertion - already checked above
         membership: membership as Membership,
-        userPermissions: membership.role.permissions.map(
-          (p: { name: string }) => p.name,
-        ),
+        userPermissions,
       } satisfies OrganizationTRPCContext,
     });
   },

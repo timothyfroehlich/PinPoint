@@ -1,40 +1,31 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { Box } from "@mui/material";
+import { useSession } from "next-auth/react";
 
+import { AuthenticatedDashboard } from "./_components/AuthenticatedDashboard";
 import { DevLoginCompact } from "./_components/DevLoginCompact";
-import LoginModal from "./_components/LoginModal";
+import { PublicDashboard } from "./_components/PublicDashboard";
 
 export default function HomePage(): React.ReactNode {
-  const router = useRouter();
-  // For now, we'll use a simple state to simulate login.
-  // In a real app, this would be determined by `useSession` from next-auth.
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const { data: session } = useSession();
 
-  // A simple way to "log in" for demonstration purposes.
-  // In the real app, the magic link flow will handle this.
-  const handleLogin = (): void => {
-    setIsLoggedIn(true);
-  };
+  // Always show public content
+  const publicContent = <PublicDashboard />;
 
-  // Redirect to dashboard when logged in
-  useEffect(() => {
-    if (isLoggedIn) {
-      router.push("/dashboard");
-    }
-  }, [isLoggedIn, router]);
+  // Show additional authenticated content if logged in
+  const authenticatedContent = session ? <AuthenticatedDashboard /> : null;
 
-  // This is a temporary hack to allow the login modal to "work"
-  if (!isLoggedIn) {
-    return (
-      <>
-        <LoginModal onLogin={handleLogin} />
-        <DevLoginCompact onLogin={handleLogin} />
-      </>
-    );
-  }
+  return (
+    <Box>
+      {/* Public content - visible to everyone */}
+      {publicContent}
 
-  // Show loading state while redirecting
-  return null;
+      {/* Authenticated content - only visible when logged in */}
+      {authenticatedContent}
+
+      {/* Dev login helper - only in development */}
+      <DevLoginCompact />
+    </Box>
+  );
 }

@@ -574,5 +574,5 @@ type DeepPartial<T> = { [P in keyof T]?: DeepPartial<T[P]> };
 
 - **Essential Patterns**: [CLAUDE.md TypeScript Guidelines](../../CLAUDE.md#typescript-strictest-mode-guidelines)
 - **Comprehensive Guide**: [typescript-strictest.md](./typescript-strictest.md)
-- **Testing Patterns**: [testing-patterns.md](./testing-patterns.md)
+- **Testing Guide**: [docs/testing/](../testing/index.md)
 - **ESLint Configuration**: [eslint.config.js](../../eslint.config.js)
