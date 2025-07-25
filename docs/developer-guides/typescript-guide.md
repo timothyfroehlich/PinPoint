@@ -251,18 +251,18 @@ function processFirstItem(items: Item[]) {
 ```typescript
 // ❌ Bad
 const mockPrisma = {
-  user: { findUnique: jest.fn() },
+  user: { findUnique: vi.fn() },
 } as ExtendedPrismaClient;
 
 // ✅ Good
 const mockPrisma = {
   user: {
-    findUnique: jest.fn<Promise<User | null>, [any]>(),
-    create: jest.fn<Promise<User>, [any]>(),
+    findUnique: vi.fn<Promise<User | null>, [any]>(),
+    create: vi.fn<Promise<User>, [any]>(),
   },
   $accelerate: {
-    invalidate: jest.fn<Promise<void>, [string]>(),
-    invalidateAll: jest.fn<Promise<void>, []>(),
+    invalidate: vi.fn<Promise<void>, [string]>(),
+    invalidateAll: vi.fn<Promise<void>, []>(),
   },
 } satisfies Partial<ExtendedPrismaClient>;
 ```
@@ -357,7 +357,7 @@ function createMockUser(overrides: Partial<User> = {}): User {
 }
 
 // ⚠️ Test Utils: Warnings for any usage (but not blocking)
-const mockService: any = jest.fn(); // Warning but allowed
+const mockService: any = vi.fn(); // Warning but allowed
 ```
 
 #### Test File Patterns
@@ -371,27 +371,27 @@ const mockSession = { user: mockUser };
 const userId = mockSession.user.id; // Direct access OK
 
 // ✅ Tests: Flexible mocking
-jest.mock("~/lib/service", () => ({
-  getUserData: jest.fn().mockReturnValue({ data: "test" }),
+vi.mock("~/lib/service", () => ({
+  getUserData: vi.fn().mockReturnValue({ data: "test" }),
 }));
 
 // ✅ Tests: Type assertions for mocks
-const mockFunction = jest.fn() as jest.MockedFunction<typeof realFunction>;
+const mockFunction = vi.fn() as MockedFunction<typeof realFunction>;
 ```
 
-### Jest Mock Typing
+### Vitest Mock Typing
 
 ```typescript
 // ❌ Bad
 const mockUserService = {
-  get: jest.fn(),
-  create: jest.fn(),
+  get: vi.fn(),
+  create: vi.fn(),
 } as any;
 
 // ✅ Good
-const mockUserService: jest.Mocked<UserService> = {
-  get: jest.fn<Promise<User>, [string]>(),
-  create: jest.fn<Promise<User>, [CreateUserData]>(),
+const mockUserService: MockedObject<UserService> = {
+  get: vi.fn<Promise<User>, [string]>(),
+  create: vi.fn<Promise<User>, [CreateUserData]>(),
 };
 ```
 
@@ -704,7 +704,7 @@ npm run betterer:update
 ```javascript
 // eslint.config.js
 {
-  ignores: ["vitest.config.ts", "jest.config.js", "playwright.config.ts"];
+  ignores: ["vitest.config.ts", "playwright.config.ts"];
 }
 ```
 

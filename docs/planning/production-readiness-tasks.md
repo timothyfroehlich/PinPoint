@@ -485,10 +485,10 @@ Description:
 To ensure code quality and testing rigor, we should set up code coverage reporting. This will measure the percentage of our code that is executed by the test suite, helping to identify untested logic and providing confidence when refactoring. We will integrate this with a service like Codecov to track coverage over time and display reports in pull requests.
 **Actionable Steps:**
 
-1.  **Configure Jest for Coverage:** - Modify your `jest.config.js` file to enable coverage collection and specify which files to include.
+1.  **Configure Vitest for Coverage:** - Modify your `vitest.config.ts` file to enable coverage collection and specify which files to include.
 
-    ````plain text
-    // jest.config.js
+    ````typescript
+    // vitest.config.ts
     module.exports = {
     // ... existing config
     collectCoverage: true,

@@ -28,27 +28,35 @@ PinPoint is a multi-tenant issue tracking system for pinball arcade operators, b
 
 ## Multi-Tenancy Architecture
 
-### Implementation Status: ✅ Fully Implemented
+### Current State: Single-Tenant Beta → Multi-Tenant V1.0
 
-The multi-tenancy system is operational with the following components:
+**Beta (Current)**: Single-tenant deployment with multi-tenant-ready architecture  
+**V1.0 (Planned)**: Full multi-tenant deployment with subdomain routing
 
-1. **Subdomain Routing**
-   - Custom Next.js middleware intercepts all requests
-   - Extracts subdomain from hostname
-   - Looks up organization in database
-   - Rewrites request with organization context
+The multi-tenancy system architecture is implemented with the following components:
+
+1. **Subdomain Routing** (V1.0 Ready)
+   - ✅ Custom Next.js middleware implemented
+   - ✅ Subdomain extraction and organization lookup
+   - ✅ Request rewriting with organization context
+   - 🔄 **Beta**: Single organization deployment (bypass routing)
+   - 🚀 **V1.0**: Full subdomain routing activation
    - See: [subdomain-development-setup.md](../design-docs/subdomain-development-setup.md)
 
-2. **Row-Level Security**
-   - Prisma extension automatically adds `organizationId` filter to all queries
-   - Applied to all tenant-aware models
-   - Prevents cross-tenant data access at ORM level
+2. **Row-Level Security** (Fully Active)
+   - ✅ Prisma extension automatically adds `organizationId` filter to all queries
+   - ✅ Applied to all tenant-aware models
+   - ✅ Prevents cross-tenant data access at ORM level
+   - ✅ **Beta**: Single organization filtering
+   - ✅ **V1.0**: Multi-organization isolation
    - See: `src/server/db/client.ts`
 
-3. **Organization Context**
-   - Stored in server session
-   - Available to all tRPC procedures
-   - Used for authorization checks
+3. **Organization Context** (Architecture Ready)
+   - ✅ Stored in server session
+   - ✅ Available to all tRPC procedures
+   - ✅ Used for authorization checks
+   - 🔄 **Beta**: Single organization context (Austin Pinball Collective)
+   - 🚀 **V1.0**: Dynamic organization context per subdomain
 
 ## Database Schema (Current Implementation)
 
@@ -205,20 +213,30 @@ See `CLAUDE.md` for complete quality standards and development guidelines.
 
 ## Current Limitations & Planned Improvements
 
-### Beta Limitations
+### Beta (Single-Tenant) Limitations
 
-1. Frontend temporarily out of compilation (being rebuilt)
-2. Role management UI not implemented (API complete)
-3. Email delivery not connected (notifications stored)
-4. No production deployment yet
+1. **Single Organization**: Fixed deployment for Austin Pinball Collective
+2. **No Subdomain Routing**: Organization context bypassed/hardcoded
+3. **Frontend Rebuild**: New frontend with all features (in progress)
+4. **Role Management UI**: Not implemented (API complete)
+5. **Email Delivery**: Not connected (notifications stored)
 
-### V1.0 Planned Features
+### V1.0 (Multi-Tenant) Transition
 
-1. New frontend with all Beta features
-2. Configurable RBAC management
-3. Email notification delivery
-4. Production deployment on Vercel
-5. Subdomain support for organizations
+**Architecture Ready**:
+
+- ✅ Multi-tenant database schema complete
+- ✅ Organization-scoped queries implemented
+- ✅ Permission system with organization isolation
+- ✅ Subdomain middleware ready for activation
+
+**Deployment Changes**:
+
+1. **Subdomain Activation**: Enable full subdomain routing
+2. **Organization Registration**: Self-service organization creation
+3. **Multi-Tenant Frontend**: Organization-aware UI components
+4. **Production Deployment**: Multi-tenant Vercel deployment
+5. **Email Integration**: Multi-tenant notification delivery
 
 ## Key Implementation Decisions
 
