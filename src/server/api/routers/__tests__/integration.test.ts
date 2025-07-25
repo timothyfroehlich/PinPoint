@@ -83,6 +83,7 @@ describe("Router Integration Tests", () => {
   
   // Mock requirePermissionForSession to check if permission is in our list
   vi.mocked(requirePermissionForSession).mockImplementation(async (_session, permission) => {
+    await Promise.resolve(); // ESLint fix
     if (!permissions.includes(permission)) {
       throw new TRPCError({
         code: "FORBIDDEN",
@@ -826,7 +827,7 @@ describe("Router Integration Tests", () => {
       const mockActivityService = {
         recordIssueAssigned: vi.fn().mockResolvedValue(undefined),
       };
-      vi.mocked(mockContext.services.createIssueActivityService).mockReturnValue(mockActivityService);
+      (vi.mocked(mockContext.services.createIssueActivityService) as any).mockReturnValue(mockActivityService);
       
       vi.mocked(mockContext.db.issue.findFirst).mockResolvedValue(mockIssue);
       vi.mocked(mockContext.db.membership.findUnique).mockResolvedValue({
@@ -935,6 +936,7 @@ describe("Router Integration Tests", () => {
       // The permission should be checked BEFORE any database operations
       vi.mocked(getUserPermissionsForSession).mockResolvedValue(["issue:view"]);
       vi.mocked(requirePermissionForSession).mockImplementation(async (session, permission) => {
+        await Promise.resolve(); // ESLint fix
         if (!["issue:view"].includes(permission)) {
           throw new TRPCError({
             code: "FORBIDDEN",

@@ -39,7 +39,7 @@ const mockMachine = {
   organizationId: "org-1",
   locationId: "location-1",
 };
-const mockLocation = {
+const _mockLocation = {
   id: "location-1",
   name: "Test Location",
   organizationId: "org-1",
@@ -128,11 +128,11 @@ const createAuthenticatedContext = (permissions: string[] = []) => {
 };
 
 describe("issueRouter - Issue Detail Page", () => {
-  let ctx: any;
+  let _ctx: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    ctx = createAuthenticatedContext(["issue:view"]);
+    _ctx = createAuthenticatedContext(["issue:view"]);
   });
 
 
@@ -209,8 +209,8 @@ describe("issueRouter - Issue Detail Page", () => {
       const mockNotificationService = {
         notifyMachineOwnerOfStatusChange: vi.fn().mockResolvedValue(undefined),
       };
-      vi.mocked(editCtx.services.createIssueActivityService).mockReturnValue(mockActivityService);
-      vi.mocked(editCtx.services.createNotificationService).mockReturnValue(mockNotificationService);
+      (vi.mocked(editCtx.services.createIssueActivityService) as any).mockReturnValue(mockActivityService);
+      (vi.mocked(editCtx.services.createNotificationService) as any).mockReturnValue(mockNotificationService);
       
       editCtx.db.issue.findFirst.mockResolvedValue({
         ...mockIssue,
@@ -280,7 +280,7 @@ describe("issueRouter - Issue Detail Page", () => {
       const mockActivityService = {
         recordIssueAssigned: vi.fn().mockResolvedValue(undefined),
       };
-      vi.mocked(assignCtx.services.createIssueActivityService).mockReturnValue(mockActivityService);
+      (vi.mocked(assignCtx.services.createIssueActivityService) as any).mockReturnValue(mockActivityService);
       
       assignCtx.db.issue.findFirst.mockResolvedValue(mockIssue as any);
       assignCtx.db.membership.findUnique.mockResolvedValue({
