@@ -171,14 +171,14 @@ vi.mock("~/server/db/provider", () => ({
 }));
 
 // Mock NextAuth first to avoid import issues
-vi.mock("next-auth", () => {
-  return vi.fn().mockImplementation(() => ({
+vi.mock("next-auth", () => ({
+  default: vi.fn().mockImplementation(() => ({
     auth: vi.fn(),
     handlers: { GET: vi.fn(), POST: vi.fn() },
     signIn: vi.fn(),
     signOut: vi.fn(),
-  }));
-});
+  })),
+}));
 
 // Mock NextAuth React hooks
 vi.mock("next-auth/react", () => ({

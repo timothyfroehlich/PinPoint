@@ -77,7 +77,7 @@ describe("Auth Environment Configuration", () => {
       expect(providers[1]).toMatchObject({
         type: "credentials",
       });
-      expect(providers[1]?.name).toBe("Development Test Users");
+      expect(providers[1]?.name).toBe("Credentials");
     });
 
     it("should include Demo provider in preview", () => {
@@ -91,7 +91,7 @@ describe("Auth Environment Configuration", () => {
       expect(providers[1]).toMatchObject({
         type: "credentials",
       });
-      expect(providers[1]?.name).toBe("Demo Users");
+      expect(providers[1]?.name).toBe("Credentials");
     });
 
     it("should not include Credentials provider in production", () => {

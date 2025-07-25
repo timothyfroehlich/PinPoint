@@ -325,7 +325,4 @@ For detailed guidance beyond these essentials:
 
 - Don't be a yes-man and don't pander to me
 - Don't leave references to old/removed things in documentation
-
-```
-
-```
+- Your training ended in 2024. It's July 2025 now. Don't hesitate to look up the latest documentation if you suspect you're out of date

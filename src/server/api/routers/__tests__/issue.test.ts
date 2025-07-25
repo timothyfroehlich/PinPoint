@@ -2,14 +2,14 @@ import { TRPCError } from "@trpc/server";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 // Mock NextAuth first to avoid import issues
-vi.mock("next-auth", () => {
-  return vi.fn().mockImplementation(() => ({
+vi.mock("next-auth", () => ({
+  default: vi.fn().mockImplementation(() => ({
     auth: vi.fn(),
     handlers: { GET: vi.fn(), POST: vi.fn() },
     signIn: vi.fn(),
     signOut: vi.fn(),
-  }));
-});
+  })),
+}));
 
 import { appRouter } from "~/server/api/root";
 import {
