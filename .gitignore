@@ -75,3 +75,5 @@ cleanup_analysis/
 .claude/hooks/tsconfig-cache.json
 .betterer.results.backup
 .env*.local
+# Playwright reports
+playwright-report/
