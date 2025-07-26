@@ -299,7 +299,7 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: ${{ !cancelled() }}
         with:
-          name: playwright-report-${{ matrix.test-group }}${{ matrix.shard && format('-{0}', replace(matrix.shard, '--shard=', '')) || '' }}
+          name: playwright-report-${{ matrix.test-group }}${{ matrix.shard && '-shard' || '' }}
           path: playwright-report/
           retention-days: 30
 
