@@ -321,6 +321,13 @@ For detailed guidance beyond these essentials:
 - **Security boundaries blur with public endpoints**: Public APIs can leak sensitive data through careless Prisma queries - explicit `select` clauses are essential for data security
 - **Test mocks often fail to catch real API issues**: If mocks don't match production API structure exactly, tests give false confidence
 
+### From `issue-list-testing-patterns.md`
+
+- **Partial Mocking Breaks React Rendering**: Mocking only specific tRPC queries while leaving the React infrastructure intact is essential. Complete mocking, while seemingly logical, breaks component rendering.
+- **MUI Components Need Position-Based Testing**: Despite Material UI's emphasis on accessibility, their Select components often lack accessible names in default configurations, requiring position-based selection strategies.
+- **vi.hoisted() is Mandatory, Not Optional**: Vitest's hoisting requirements are strict. All mock variables used in `vi.mock()` calls must be hoisted, even if they appear to work initially.
+- **Test Success ≠ Component Correctness**: Getting tests to pass requires understanding the exact mock structure that production code expects. Mocks that "work" but don't match production API structure provide false confidence.
+
 ## Claude Memories
 
 - Don't be a yes-man and don't pander to me
