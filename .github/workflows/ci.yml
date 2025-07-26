@@ -235,6 +235,9 @@ jobs:
   e2e:
     name: E2E Tests
     runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.54.1-jammy
+    timeout-minutes: 15
     permissions:
       contents: read
     env:
@@ -252,8 +255,6 @@ jobs:
           node-version: "24"
           cache: "npm"
       - run: npm ci
-      - name: Install Playwright Chromium (CI Optimized)
-        run: npx playwright install chromium --with-deps
       - name: Run Playwright Tests
         run: npx playwright test
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
