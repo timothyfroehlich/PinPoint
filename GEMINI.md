@@ -305,6 +305,7 @@ For detailed guidance beyond these essentials:
 
 ### Counter-Intuitive Discoveries
 
+- **Implementation Verification First**: Always verify current implementation status before starting development work. Documentation may be outdated relative to actual code state.
 - **Mock data accuracy was critical for test reliability**: Initial test failures weren't due to logic bugs but because mocks returned full objects while APIs used Prisma `select` clauses - mocks must simulate exact response structure
 - **Explicit dependency mocking forces better architecture**: What initially seemed like Vitest being "more work" actually drove better dependency injection patterns and cleaner service boundaries
 - **Public endpoints still need multi-tenant scoping**: Even unauthenticated APIs must respect organization boundaries through subdomain resolution, not just skip authentication entirely

@@ -45,6 +45,29 @@ const mockIssue = {
 };
 ```
 
+### Public API Testing Patterns
+
+**Mock Data Accuracy**: Test mocks must accurately simulate production API behavior, including Prisma `select` clause behavior. If the API only returns a subset of fields, the mock data should reflect that.
+
+```typescript
+// Production API uses a select clause to only return public data
+const mockPublicLocationData = {
+  id: mockLocation.id,
+  name: mockLocation.name,
+  _count: { machines: 2 },
+  machines: [
+    /* only public machine data */
+  ],
+};
+```
+
+**Comprehensive Test Coverage**: Public endpoints need extensive testing covering:
+
+- Functional operation
+- Security boundaries (authentication bypass, organization scoping)
+- Error conditions
+- Data exposure validation
+
 ### Permission-Based Testing Architecture
 
 **Pattern**: Permission checks at the procedure level, not as afterthoughts.
