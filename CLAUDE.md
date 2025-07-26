@@ -42,7 +42,10 @@ See `docs/architecture/api-routes.md` for details on legitimate exceptions.
 
 ```bash
 # Development (RECOMMENDED)
-npm run dev:full        # Start all services with monitoring
+npm run dev:bg          # Start dev server in background
+npm run dev:bg:stop     # Stop background server
+npm run dev:bg:status   # Check server status
+npm run dev:bg:logs     # View server logs
 npm run dev:clean       # Fresh start with cleanup
 npm run setup:worktree  # Setup new worktree environment
 
@@ -203,7 +206,7 @@ npm run pre-commit
 
 ## Development Workflow
 
-1. **Start**: `npm run validate` → `npm run dev:full`
+1. **Start**: `npm run validate` → `npm run dev:bg`
 2. **During**: Run `npm run quick` after significant code changes
 3. **Before commit**: `npm run validate` must pass (MANDATORY)
 4. **Before PR**: `npm run pre-commit` must pass (MANDATORY)
