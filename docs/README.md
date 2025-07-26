@@ -32,8 +32,8 @@ These documents represent the current state of the project and should be referen
 
 ### Implementation Guides
 
-- **[Backend Implementation Tasks](backend_impl_tasks/CLAUDE.md)** - Detailed task breakdown for backend refactor
-- **[Multi-Agent Workflow](backend_impl_tasks/MULTI_AGENT_WORKFLOW.md)** - Parallel development using git worktrees
+- **[Orchestrator System](orchestrator-system/INDEX.md)** - Multi-agent TDD workflow system with test, implementation, and review agents
+- **[Multi-Agent Development Workflow](orchestrator-system/multi-agent-development-workflow.md)** - Parallel development patterns using git worktrees
 
 ### Development Resources
 
@@ -58,9 +58,11 @@ These documents represent the current state of the project and should be referen
 
 ### Pending Backend Tasks
 
-- 🔄 [Redesign PinballMap Integration](backend_impl_tasks/10-redesign-pinballmap-integration.md)
-- 📋 [Implement QR Code System](backend_impl_tasks/12-implement-qr-code-system.md)
-- 📋 [Implement Collections System](backend_impl_tasks/14-implement-collections-system.md)
+Tasks converted to GitHub issues and removed from documentation:
+
+- 🔄 [Redesign PinballMap Integration](https://github.com/timothyfroehlich/PinPoint/issues/144)
+- 📋 [Implement QR Code System](https://github.com/timothyfroehlich/PinPoint/issues/145)
+- 📋 [Implement Collections System](https://github.com/timothyfroehlich/PinPoint/issues/146)
 
 ## 📚 Planning & Future Features
 
@@ -79,8 +81,10 @@ These documents provide historical context but have been superseded by current d
 
 ### Out of Date
 
-- **[Product Specification](out-of-date/product-specification.md)** - Original product vision (see roadmap.md for current)
-- **[User Profile Implementation Plan](out-of-date/user-profile-implementation-plan.md)** - Unimplemented feature (deprioritized)
+Historical documents removed - all current information moved to active documentation:
+
+- **Product Specification** - See [roadmap.md](planning/roadmap.md) for current vision
+- **User Profile Implementation** - Feature deprioritized, not planned for current releases
 
 ### Archived Planning Documents
 
