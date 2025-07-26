@@ -71,7 +71,9 @@ vi.mock("~/trpc/react", async () => {
   };
 });
 
-// Mock usePermissions hook with vi.hoisted
+// Mock hasPermission function for tests that need direct permission mocking
+const mockHasPermission = vi.fn();
+
 // Using dependency injection via PermissionDepsProvider instead of global mocks
 
 describe("IssueList Component", () => {

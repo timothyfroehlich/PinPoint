@@ -72,6 +72,9 @@ vi.mock("~/trpc/react", async () => {
   };
 });
 
+// Mock hasPermission function for tests that need direct permission mocking
+const mockHasPermission = vi.fn();
+
 // Using dependency injection via PermissionDepsProvider instead of global mocks
 
 describe("IssueList - Permission-Based Access Control", () => {
@@ -518,22 +521,25 @@ describe("IssueList - Permission-Based Access Control", () => {
     });
 
     it("gracefully handles permission check failures", () => {
-      // Mock permission function to throw error
-      mockHasPermission.mockImplementation(() => {
-        throw new Error("Permission check failed");
-      });
+      // Test error boundary behavior with permission system
+      // When membership query has error, component should still render with fallback behavior
+      render(
+        <VitestTestWrapper
+          userPermissions={[...VITEST_PERMISSION_SCENARIOS.MEMBER]}
+          userRole={VITEST_ROLE_MAPPING.MEMBER}
+          queryOptions={{
+            isError: true,
+            error: new Error("Permission check failed"),
+          }}
+        >
+          <IssueList initialFilters={defaultFilters} />
+        </VitestTestWrapper>,
+      );
 
-      // Component should fail when permission checks throw errors
-      expect(() => {
-        render(
-          <VitestTestWrapper
-            userPermissions={[...VITEST_PERMISSION_SCENARIOS.MEMBER]}
-            userRole={VITEST_ROLE_MAPPING.MEMBER}
-          >
-            <IssueList initialFilters={defaultFilters} />
-          </VitestTestWrapper>,
-        );
-      }).toThrow("Permission check failed");
+      // Component should still render but with degraded permissions (like a fallback)
+      // Should show basic content but no permission-dependent features
+      expect(screen.getByText("Critical Machine Failure")).toBeInTheDocument();
+      expect(screen.queryByText("Select All")).not.toBeInTheDocument();
     });
   });
 
