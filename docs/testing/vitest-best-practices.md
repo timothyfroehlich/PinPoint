@@ -279,6 +279,54 @@ const handlers = [
 4. **Use MSW for HTTP-level mocking** instead of module mocking when possible
 5. **Batch related tests** in describe blocks with shared setup
 
+### tRPC Component Testing Patterns
+
+**The Problem**: Partial tRPC mocking can break React component rendering. A common error is `Element type is invalid: expected a string (for built-in components) or a class/function (for composite components) but got: undefined`.
+
+**The Solution**: Preserve the tRPC React components by using `vi.importActual()` and only mocking the specific queries you need to.
+
+```typescript
+vi.mock("~/trpc/react", async () => {
+  const actual =
+    await vi.importActual<typeof import("~/trpc/react")>("~/trpc/react");
+  return {
+    ...actual,
+    api: {
+      ...actual.api,
+      createClient: actual.api.createClient, // ← CRITICAL
+      Provider: actual.api.Provider, // ← CRITICAL
+      issue: {
+        core: {
+          getAll: {
+            useQuery: mockIssuesQuery,
+          },
+        },
+      },
+      // ... other mocked queries
+    },
+  };
+});
+```
+
+**Key Insight**: The `VitestTestWrapper` needs the real `api.createClient` and `api.Provider` to function correctly.
+
+**`vi.hoisted()` is Mandatory**: All mock functions referenced in `vi.mock()` calls must be created with `vi.hoisted()` to avoid `ReferenceError: Cannot access 'mockX' before initialization`.
+
+```typescript
+const { mockIssuesQuery } = vi.hoisted(() => ({
+  mockIssuesQuery: vi.fn(),
+}));
+```
+
+**MUI Component Testing**: For complex MUI components like `Select` that may not have accessible names, use position-based selection.
+
+```typescript
+// ✅ Works - select by position with type assertion
+const comboboxes = screen.getAllByRole("combobox");
+expect(comboboxes).toHaveLength(4);
+const locationSelect = comboboxes[0] as HTMLElement;
+```
+
 ### Quick Migration Checklist
 
 - [ ] Update imports: `jest` → `vitest`

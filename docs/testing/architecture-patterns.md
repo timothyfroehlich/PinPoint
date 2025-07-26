@@ -45,6 +45,29 @@ const mockIssue = {
 };
 ```
 
+### Public API Testing Patterns
+
+**Mock Data Accuracy**: Test mocks must accurately simulate production API behavior, including Prisma `select` clause behavior. If the API only returns a subset of fields, the mock data should reflect that.
+
+```typescript
+// Production API uses a select clause to only return public data
+const mockPublicLocationData = {
+  id: mockLocation.id,
+  name: mockLocation.name,
+  _count: { machines: 2 },
+  machines: [
+    /* only public machine data */
+  ],
+};
+```
+
+**Comprehensive Test Coverage**: Public endpoints need extensive testing covering:
+
+- Functional operation
+- Security boundaries (authentication bypass, organization scoping)
+- Error conditions
+- Data exposure validation
+
 ### Permission-Based Testing Architecture
 
 **Pattern**: Permission checks at the procedure level, not as afterthoughts.
@@ -76,6 +99,29 @@ describe("Issue Router - Permission Testing", () => {
 1. **organizationProcedure**: Automatic organization membership validation
 2. **issueEditProcedure**: Role-based access with resource ownership checks
 3. **publicProcedure**: Unauthenticated but organization-scoped access
+
+### Authentication Journey Testing
+
+**Pattern**: Comprehensive E2E testing of the authentication flow, covering public, authenticated, and logout states on a single page.
+
+```typescript
+// Test pattern from planning docs
+test("authentication flow journey", async ({ page }) => {
+  // Start with public content
+  await page.goto("/");
+  await expect(page.locator("text=Public Organization Info")).toBeVisible();
+
+  // Login adds authenticated content
+  await login(page);
+  await expect(page.locator("text=My Dashboard")).toBeVisible();
+  await expect(page.locator("text=Public Organization Info")).toBeVisible(); // Still there
+
+  // Logout returns to public content
+  await logout(page);
+  await expect(page.locator("text=Public Organization Info")).toBeVisible();
+  await expect(page.locator("text=My Dashboard")).not.toBeVisible();
+});
+```
 
 ## Service Layer Testing Patterns
 

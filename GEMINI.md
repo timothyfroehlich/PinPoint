@@ -304,10 +304,38 @@ For detailed guidance beyond these essentials:
 
 ### Counter-Intuitive Discoveries
 
+- **Implementation Verification First**: Always verify current implementation status before starting development work. Documentation may be outdated relative to actual code state.
 - **Mock data accuracy was critical for test reliability**: Initial test failures weren't due to logic bugs but because mocks returned full objects while APIs used Prisma `select` clauses - mocks must simulate exact response structure
 - **Explicit dependency mocking forces better architecture**: What initially seemed like Vitest being "more work" actually drove better dependency injection patterns and cleaner service boundaries
 - **Public endpoints still need multi-tenant scoping**: Even unauthenticated APIs must respect organization boundaries through subdomain resolution, not just skip authentication entirely
 - **"Migration complete" doesn't mean "working"**: Functionality existing in codebase doesn't guarantee it's properly tested or behaves correctly under all conditions
+
+### Counter-Intuitive Discoveries
+
+- **Implementation Verification First**: Always verify current implementation status before starting development work. Documentation may be outdated relative to actual code state.
+- **Mock data accuracy was critical for test reliability**: Initial test failures weren't due to logic bugs but because mocks returned full objects while APIs used Prisma `select` clauses - mocks must simulate exact response structure
+- **Explicit dependency mocking forces better architecture**: What initially seemed like Vitest being "more work" actually drove better dependency injection patterns and cleaner service boundaries
+- **Public endpoints still need multi-tenant scoping**: Even unauthenticated APIs must respect organization boundaries through subdomain resolution, not just skip authentication entirely
+- **"Migration complete" doesn't mean "working"**: Functionality existing in codebase doesn't guarantee it's properly tested or behaves correctly under all conditions
+- **Multi-config complexity paid dividends**: Initial complexity of maintaining 3+ TypeScript configurations proved worthwhile for precise control over different code contexts.
+- **Test pragmatism vs. production strictness**: Allowing pragmatic patterns in tests while maintaining production strictness improved development velocity without sacrificing quality.
+- **Betterer effectiveness**: Regression prevention through measurement proved more effective than trying to maintain perfect state manually.
+- **Incremental migration success**: Production-first approach allowed immediate benefits while test cleanup happened incrementally.
+
+### Counter-Intuitive Discoveries
+
+- **Implementation Verification First**: Always verify current implementation status before starting development work. Documentation may be outdated relative to actual code state.
+- **Mock data accuracy was critical for test reliability**: Initial test failures weren't due to logic bugs but because mocks returned full objects while APIs used Prisma `select` clauses - mocks must simulate exact response structure
+- **Explicit dependency mocking forces better architecture**: What initially seemed like Vitest being "more work" actually drove better dependency injection patterns and cleaner service boundaries
+- **Public endpoints still need multi-tenant scoping**: Even unauthenticated APIs must respect organization boundaries through subdomain resolution, not just skip authentication entirely
+- **"Migration complete" doesn't mean "working"**: Functionality existing in codebase doesn't guarantee it's properly tested or behaves correctly under all conditions
+- **Multi-config complexity paid dividends**: Initial complexity of maintaining 3+ TypeScript configurations proved worthwhile for precise control over different code contexts.
+- **Test pragmatism vs. production strictness**: Allowing pragmatic patterns in tests while maintaining production strictness improved development velocity without sacrificing quality.
+- **Betterer effectiveness**: Regression prevention through measurement proved more effective than trying to maintain perfect state manually.
+- **Incremental migration success**: Production-first approach allowed immediate benefits while test cleanup happened incrementally.
+- **Authentication Isn't Binary**: Traditional thinking: "Either authenticated or not" Reality: "Public experience enhanced by authentication".
+- **Logout Should Preserve Context**: Traditional thinking: "Logout clears everything, redirect to login" Reality: "Logout removes private features, keeps public context".
+- **Single Page, Multiple Audiences**: Traditional thinking: "Different pages for public/private users" Reality: "Same page, different enhancement levels".
 
 ### Performance Insights
 
@@ -319,6 +347,44 @@ For detailed guidance beyond these essentials:
 - **Permission UI testing requires both states**: Testing permission-based components for authorized state isn't enough - must test unauthorized state with proper fallbacks/tooltips
 - **Security boundaries blur with public endpoints**: Public APIs can leak sensitive data through careless Prisma queries - explicit `select` clauses are essential for data security
 - **Test mocks often fail to catch real API issues**: If mocks don't match production API structure exactly, tests give false confidence
+
+### From `issue-list-testing-patterns.md`
+
+- **Partial Mocking Breaks React Rendering**: Mocking only specific tRPC queries while leaving the React infrastructure intact is essential. Complete mocking, while seemingly logical, breaks component rendering.
+- **MUI Components Need Position-Based Testing**: Despite Material UI's emphasis on accessibility, their Select components often lack accessible names in default configurations, requiring position-based selection strategies.
+- **vi.hoisted() is Mandatory, Not Optional**: Vitest's hoisting requirements are strict. All mock variables used in `vi.mock()` calls must be hoisted, even if they appear to work initially.
+- **Test Success ≠ Component Correctness**: Getting tests to pass requires understanding the exact mock structure that production code expects. Mocks that "work" but don't match production API structure provide false confidence.
+
+### Security & Testing Revelations
+
+- **Permission UI testing requires both states**: Testing permission-based components for authorized state isn't enough - must test unauthorized state with proper fallbacks/tooltips
+- **Security boundaries blur with public endpoints**: Public APIs can leak sensitive data through careless Prisma queries - explicit `select` clauses are essential for data security
+- **Test mocks often fail to catch real API issues**: If mocks don't match production API structure exactly, tests give false confidence
+
+### From `issue-list-testing-patterns.md`
+
+- **Partial Mocking Breaks React Rendering**: Mocking only specific tRPC queries while leaving the React infrastructure intact is essential. Complete mocking, while seemingly logical, breaks component rendering.
+- **MUI Components Need Position-Based Testing**: Despite Material UI's emphasis on accessibility, their Select components often lack accessible names in default configurations, requiring position-based selection strategies.
+- **vi.hoisted() is Mandatory, Not Optional**: Vitest's hoisting requirements are strict. All mock variables used in `vi.mock()` calls must be hoisted, even if they appear to work initially.
+- **Test Success ≠ Component Correctness**: Getting tests to pass requires understanding the exact mock structure that production code expects. Mocks that "work" but don't match production API structure provide false confidence.
+
+### TypeScript Migration Impact
+
+- **Quality Improvements**: Zero `any` types in production code, comprehensive null safety, enhanced multi-tenant security through strict typing, reduced runtime errors through compile-time checking.
+- **Developer Experience**: Context-aware IDE support, clear error messages with actionable fixes, automated quality enforcement, comprehensive documentation and patterns.
+- **Technical Debt Reduction**: Eliminated loose typing technical debt, established sustainable quality practices, created comprehensive regression prevention, standardized development patterns.
+
+### TypeScript Migration Impact
+
+- **Quality Improvements**: Zero `any` types in production code, comprehensive null safety, enhanced multi-tenant security through strict typing, reduced runtime errors through compile-time checking.
+- **Developer Experience**: Context-aware IDE support, clear error messages with actionable fixes, automated quality enforcement, comprehensive documentation and patterns.
+- **Technical Debt Reduction**: Eliminated loose typing technical debt, established sustainable quality practices, created comprehensive regression prevention, standardized development patterns.
+
+### Unified Dashboard Benefits
+
+- **User Experience**: No "broken" logout experience, fast initial page load, graceful authentication failures.
+- **SEO & Accessibility**: Public content indexable, works without JavaScript for public features, progressive enhancement improves with better browsers/connection.
+- **Development Benefits**: Easier testing, clearer separation between public and private features, simpler error handling.
 
 ## Claude Memories
 
