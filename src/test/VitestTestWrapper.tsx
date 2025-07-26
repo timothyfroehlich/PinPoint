@@ -74,10 +74,17 @@ function createMockMembership(
 /**
  * Creates mock session hook for testing
  */
-function createMockSessionHook(session: Session | null) {
+function createMockSessionHook(
+  session: Session | null,
+  sessionLoading = false,
+) {
   return () => ({
-    data: session,
-    status: session ? "authenticated" : "unauthenticated",
+    data: sessionLoading ? null : session,
+    status: sessionLoading
+      ? "loading"
+      : session
+        ? "authenticated"
+        : "unauthenticated",
     update: () => Promise.resolve(session),
   });
 }
@@ -94,7 +101,13 @@ function createMockMembershipQuery(
     error?: Error | null;
   } = {},
 ) {
-  return () => ({
+  // Mock function that accepts tRPC hook arguments (input, options) but ignores them
+  return (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    _input?: any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    _queryOptions?: any,
+  ) => ({
     data:
       permissions.length > 0
         ? { permissions, role, userId: "test-user", organizationId: "test-org" }
@@ -103,6 +116,11 @@ function createMockMembershipQuery(
     isError: options.isError ?? false,
     error: options.error ?? null,
     refetch: () => Promise.resolve({ data: null }),
+    // Add minimal required tRPC query result properties
+    isPending: options.isLoading ?? false,
+    isSuccess: !options.isLoading && !options.isError,
+    isLoadingError: false,
+    isRefetchError: false,
   });
 }
 
@@ -135,6 +153,27 @@ function createMockMembershipQuery(
  *   </VitestTestWrapper>
  * );
  * ```
+ *
+ * @example Session loading state test (realistic auth flow)
+ * ```tsx
+ * render(
+ *   <VitestTestWrapper sessionLoading={true}>
+ *     <ComponentUnderTest />
+ *   </VitestTestWrapper>
+ * );
+ * ```
+ *
+ * @example Membership loading state test
+ * ```tsx
+ * render(
+ *   <VitestTestWrapper
+ *     userPermissions={["issue:view"]}
+ *     membershipLoading={true}
+ *   >
+ *     <ComponentUnderTest />
+ *   </VitestTestWrapper>
+ * );
+ * ```
  */
 interface VitestTestWrapperProps {
   children: ReactNode;
@@ -157,6 +196,10 @@ interface VitestTestWrapperProps {
     isError?: boolean;
     error?: Error | null;
   };
+  /** Mock session loading state (realistic authentication flow) */
+  sessionLoading?: boolean;
+  /** Mock membership query loading state (for when session is ready but permissions loading) */
+  membershipLoading?: boolean;
 }
 
 export function VitestTestWrapper({
@@ -167,9 +210,10 @@ export function VitestTestWrapper({
   },
   userPermissions = [],
   userRole = "Member",
-  _setupMSW = false, // Deprecated in favor of permission injection
   injectPermissionDeps = true,
   queryOptions = {},
+  sessionLoading = false,
+  membershipLoading = false,
 }: VitestTestWrapperProps): React.JSX.Element {
   const [queryClient] = useState(
     () =>
@@ -187,7 +231,8 @@ export function VitestTestWrapper({
 
   // Create a real tRPC client - MSW will intercept HTTP requests
   const [trpcClient] = useState(() => {
-    const url = `http://localhost:${process.env.PORT ?? "3000"}/api/trpc`;
+    // eslint-disable-next-line @typescript-eslint/dot-notation
+    const url = `http://localhost:${process.env["PORT"] ?? "3000"}/api/trpc`;
     console.log(`[VitestTestWrapper] Creating tRPC client with URL: ${url}`);
     return api.createClient({
       links: [
@@ -208,11 +253,15 @@ export function VitestTestWrapper({
   });
 
   // Create mock dependencies for permission injection
-  const mockSessionHook = createMockSessionHook(session);
+  const mockSessionHook = createMockSessionHook(session, sessionLoading);
+  const finalQueryOptions = {
+    ...queryOptions,
+    ...(membershipLoading && { isLoading: true }),
+  };
   const mockMembershipQuery = createMockMembershipQuery(
     userPermissions,
     userRole,
-    queryOptions,
+    finalQueryOptions,
   );
 
   const content = (
@@ -229,8 +278,14 @@ export function VitestTestWrapper({
   if (injectPermissionDeps) {
     return (
       <PermissionDepsProvider
-        sessionHook={mockSessionHook}
-        membershipQuery={mockMembershipQuery}
+        sessionHook={
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
+          mockSessionHook as any
+        }
+        membershipQuery={
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
+          mockMembershipQuery as any
+        }
       >
         {content}
       </PermissionDepsProvider>
