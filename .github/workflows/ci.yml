@@ -240,9 +240,21 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: test_db
+          POSTGRES_USER: test_user
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
       AUTH_SECRET: "temp_secret_value" # Temporary value for CI validation only
-      DATABASE_URL: "sqlite://temp_db.sqlite" # Temporary value for CI validation only
+      DATABASE_URL: "postgresql://test_user:test_password@postgres:5432/test_db"
       DEFAULT_ORG_SUBDOMAIN: ${{ secrets.DEFAULT_ORG_SUBDOMAIN }}
       GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
       GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
@@ -255,6 +267,8 @@ jobs:
           node-version: "24"
           cache: "npm"
       - run: npm ci
+      - name: Set up database
+        run: npx prisma db push --force-reset
       - name: Run Playwright Tests
         run: npx playwright test
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
