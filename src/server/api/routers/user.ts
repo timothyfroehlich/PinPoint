@@ -24,6 +24,7 @@ export const userRouter = createTRPCRouter({
         memberships: {
           include: {
             organization: true,
+            role: true,
           },
         },
         _count: {
