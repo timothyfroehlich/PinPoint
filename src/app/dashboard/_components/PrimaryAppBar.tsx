@@ -185,6 +185,14 @@ const PrimaryAppBar = (): JSX.Element => {
               >
                 <MenuItem
                   onClick={() => {
+                    handleClose();
+                    router.push("/profile");
+                  }}
+                >
+                  Profile
+                </MenuItem>
+                <MenuItem
+                  onClick={() => {
                     void handleLogout();
                   }}
                 >
