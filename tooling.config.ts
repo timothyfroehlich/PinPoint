@@ -29,6 +29,7 @@ export const INCLUDE_PATTERNS = {
     "./src/**/*.spec.{ts,tsx}",
     "./src/**/__tests__/**/*.{ts,tsx}",
     "./src/integration-tests/**/*.{ts,tsx}",
+    "./e2e/**/*.{ts,tsx}",
   ],
 
   // Build and configuration files
@@ -122,6 +123,10 @@ export const ESLINT_RULES = {
     "@typescript-eslint/no-unsafe-return": "off",
     "@typescript-eslint/no-unsafe-enum-comparison": "off",
     "@typescript-eslint/explicit-function-return-type": "off",
+    // E2E test specific relaxations
+    "@typescript-eslint/restrict-template-expressions": "off",
+    "@typescript-eslint/require-await": "off",
+    "@typescript-eslint/no-unused-vars": "off",
   },
 } as const;
 

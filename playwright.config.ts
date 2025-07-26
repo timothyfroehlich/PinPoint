@@ -36,22 +36,26 @@ export default defineConfig({
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
     },
-
-    {
-      name: "firefox",
-      use: { ...devices["Desktop Firefox"] },
-    },
-
-    {
-      name: "webkit",
-      use: { ...devices["Desktop Safari"] },
-    },
+    // Other browsers only for local development (CI optimization)
+    ...(process.env["CI"]
+      ? []
+      : [
+          {
+            name: "firefox",
+            use: { ...devices["Desktop Firefox"] },
+          },
+          {
+            name: "webkit",
+            use: { ...devices["Desktop Safari"] },
+          },
+        ]),
   ],
 
-  // Testing against existing server on localhost:3000
-  // webServer: {
-  //   command: "npm run dev",
-  //   url: "http://localhost:49841",
-  //   reuseExistingServer: !process.env.CI,
-  // },
+  // Automatically start dev server for tests
+  webServer: {
+    command: "npm run dev",
+    url: "http://localhost:3000",
+    reuseExistingServer: !process.env["CI"],
+    timeout: 120000,
+  },
 });

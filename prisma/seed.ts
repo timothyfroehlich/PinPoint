@@ -12,20 +12,21 @@ async function runEnvironmentSpecificSeed(): Promise<void> {
   let seedScript: string;
   let environment: string;
 
-  if (isDevelopment()) {
-    seedScript = "npx tsx prisma/seed-development.ts";
-    environment = "development";
-  } else if (isPreview()) {
-    console.log(
-      "⚠️  Preview environment detected - using production seeding (no test accounts)",
-    );
-    seedScript = "npx tsx prisma/seed-production.ts";
-    environment = "preview";
-  } else if (isProduction()) {
+  if (isProduction()) {
     seedScript = "npx tsx prisma/seed-production.ts";
     environment = "production";
   } else {
-    throw new Error("Unable to determine environment for seeding");
+    // Use development seed for all non-production environments
+    // (development, test, preview) to provide rich test data
+    seedScript = "npx tsx prisma/seed-development.ts";
+    if (isDevelopment()) {
+      environment = "development";
+    } else if (isPreview()) {
+      environment = "preview";
+    } else {
+      environment = "test";
+    }
+    console.log("🧪 Using development seed for rich test data");
   }
 
   console.log(`🌍 Environment: ${environment}`);
