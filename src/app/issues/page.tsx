@@ -8,7 +8,7 @@ export default async function IssuesPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
+}): Promise<React.JSX.Element> {
   const session = await auth();
 
   if (!session?.user.id) {

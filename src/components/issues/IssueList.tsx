@@ -110,7 +110,9 @@ interface IssueListProps {
   initialFilters: IssueFilters;
 }
 
-export function IssueList({ initialFilters }: IssueListProps) {
+export function IssueList({
+  initialFilters,
+}: IssueListProps): React.JSX.Element {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { hasPermission, isLoading: permissionsLoading } = usePermissions();
@@ -135,7 +137,7 @@ export function IssueList({ initialFilters }: IssueListProps) {
   const { data: statuses } = api.issueStatus.getAll.useQuery();
 
   // Update URL when filters change
-  const updateFilters = (newFilters: Partial<IssueFilters>) => {
+  const updateFilters = (newFilters: Partial<IssueFilters>): void => {
     const updated: IssueFilters = { ...filters };
 
     // Handle each filter property explicitly for TypeScript strictest
@@ -175,13 +177,13 @@ export function IssueList({ initialFilters }: IssueListProps) {
   };
 
   // Handle issue selection
-  const handleSelectIssue = (issueId: string, selected: boolean) => {
+  const handleSelectIssue = (issueId: string, selected: boolean): void => {
     setSelectedIssues((prev) =>
       selected ? [...prev, issueId] : prev.filter((id) => id !== issueId),
     );
   };
 
-  const handleSelectAll = (selected: boolean) => {
+  const handleSelectAll = (selected: boolean): void => {
     setSelectedIssues(selected ? (issues?.map((issue) => issue.id) ?? []) : []);
   };
 
@@ -324,20 +326,7 @@ export function IssueList({ initialFilters }: IssueListProps) {
               {selectedIssues.length > 1 ? "s" : ""} selected
             </Typography>
 
-            <PermissionGate
-              permission="issue:assign"
-              hasPermission={hasPermission}
-              fallback={
-                <Tooltip title="Requires issue:assign permission">
-                  <span>
-                    <Button disabled startIcon={<Assignment />}>
-                      Assign
-                    </Button>
-                  </span>
-                </Tooltip>
-              }
-              showFallback
-            >
+            {hasPermission("issue:assign") ? (
               <Button
                 startIcon={<Assignment />}
                 onClick={() => {
@@ -347,22 +336,17 @@ export function IssueList({ initialFilters }: IssueListProps) {
               >
                 Assign
               </Button>
-            </PermissionGate>
+            ) : (
+              <Tooltip title="Requires issue:assign permission">
+                <span>
+                  <Button disabled startIcon={<Assignment />}>
+                    Assign
+                  </Button>
+                </span>
+              </Tooltip>
+            )}
 
-            <PermissionGate
-              permission="issue:edit"
-              hasPermission={hasPermission}
-              fallback={
-                <Tooltip title="Requires issue:edit permission">
-                  <span>
-                    <Button disabled sx={{ ml: 1 }} startIcon={<Close />}>
-                      Close
-                    </Button>
-                  </span>
-                </Tooltip>
-              }
-              showFallback
-            >
+            {hasPermission("issue:update") ? (
               <Button
                 sx={{ ml: 1 }}
                 startIcon={<Close />}
@@ -373,7 +357,15 @@ export function IssueList({ initialFilters }: IssueListProps) {
               >
                 Close
               </Button>
-            </PermissionGate>
+            ) : (
+              <Tooltip title="Requires issue:update permission">
+                <span>
+                  <Button disabled sx={{ ml: 1 }} startIcon={<Close />}>
+                    Close
+                  </Button>
+                </span>
+              </Tooltip>
+            )}
           </Toolbar>
         </Card>
       )}

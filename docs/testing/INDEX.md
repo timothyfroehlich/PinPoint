@@ -70,3 +70,4 @@ PinPoint uses **Vitest exclusively** for all testing. Migration from Jest is com
 - **Infrastructure**: MSW-tRPC v2.0.1 integration with type-safe API mocking
 - **Quality**: Multi-tenant safety through organization scoping enforcement
 - **Success Rate**: 87-93% test migration success across all categories
+- **Migration Reports**: Historical migration documentation moved to `@docs/lessons-learned/migration-reports/`
