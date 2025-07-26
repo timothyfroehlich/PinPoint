@@ -231,7 +231,67 @@ jobs:
       - name: Security Audit
         run: npm run deps:check
 
-  # Job 7: Validate GitHub Actions
+  # Job 7: End-to-End Tests (Playwright) - Parallel Execution
+  e2e:
+    name: E2E Tests (${{ matrix.test-group }})
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.54.1-jammy
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        test-group:
+          - "auth-flow"
+          - "dashboard" 
+          - "roles-permissions"
+          - "location-browsing"
+          - "issue-confirmation"
+          - "unified-dashboard-flow"
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: test_db
+          POSTGRES_USER: test_user
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      AUTH_SECRET: "temp_secret_value" # Temporary value for CI validation only
+      DATABASE_URL: "postgresql://test_user:test_password@postgres:5432/test_db"
+      DEFAULT_ORG_SUBDOMAIN: ${{ secrets.DEFAULT_ORG_SUBDOMAIN }}
+      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+      GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+      OPDB_API_TOKEN: ${{ secrets.OPDB_API_TOKEN }}
+      NODE_ENV: "test"
+      CI: true
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+          cache: "npm"
+      - run: npm ci
+      - name: Set up database
+        run: npx prisma db push --force-reset
+      - name: Seed database with test data
+        run: npm run seed
+      - name: Run Playwright Tests (${{ matrix.test-group }})
+        run: npx playwright test e2e/${{ matrix.test-group }}.spec.ts
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report-${{ matrix.test-group }}
+          path: playwright-report/
+          retention-days: 30
+
+  # Job 8: Validate GitHub Actions
   validate-actions:
     name: Validate Actions
     runs-on: ubuntu-latest
@@ -255,6 +315,7 @@ jobs:
         betterer,
         test,
         security,
+        e2e,
         validate-actions,
       ]
     if: always()
@@ -269,6 +330,7 @@ jobs:
              [ "${{ needs.format.result }}" != "success" ] ||
              [ "${{ needs.betterer.result }}" != "success" ] ||
              [ "${{ needs.security.result }}" != "success" ] ||
+             [ "${{ needs.e2e.result }}" != "success" ] ||
              [ "${{ needs.validate-actions.result }}" != "success" ]; then
             echo "❌ One or more required checks failed"
             exit 1
@@ -284,6 +346,7 @@ jobs:
           echo "- betterer: ${{ needs.betterer.result }}"
           echo "- test: ${{ needs.test.result }}"
           echo "- security: ${{ needs.security.result }}"
+          echo "- e2e: ${{ needs.e2e.result }}"
           echo "- validate-actions: ${{ needs.validate-actions.result }}"
           echo ""
           echo "✅ All checks passed successfully!"
