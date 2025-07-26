@@ -97,6 +97,17 @@ PinPoint follows a **tRPC-exclusive API strategy**. All application endpoints ar
 
 See [API Routes Documentation](./api-routes.md) for detailed information about these exceptions.
 
+### Unified Dashboard Progressive Enhancement
+
+PinPoint implements a unified public/authenticated dashboard using a progressive enhancement pattern. This ensures a seamless user experience by:
+
+- **Public-First Content**: Public content loads first without authentication, providing immediate value.
+- **Authentication Enhancement**: Authenticated content enhances the experience when a session exists.
+- **Single Page, Multiple Audiences**: A single page serves both public and authenticated use cases, adapting based on the user's authentication state.
+- **Graceful Degradation**: The system gracefully handles authentication failures or logouts by defaulting to the public view, avoiding "UNAUTHORIZED" screens.
+
+This pattern addresses common authentication flow issues, such as broken logout experiences and forced logins, by prioritizing user experience and content accessibility.
+
 ### Router Structure
 
 ```

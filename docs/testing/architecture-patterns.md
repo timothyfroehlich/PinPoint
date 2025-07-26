@@ -100,6 +100,29 @@ describe("Issue Router - Permission Testing", () => {
 2. **issueEditProcedure**: Role-based access with resource ownership checks
 3. **publicProcedure**: Unauthenticated but organization-scoped access
 
+### Authentication Journey Testing
+
+**Pattern**: Comprehensive E2E testing of the authentication flow, covering public, authenticated, and logout states on a single page.
+
+```typescript
+// Test pattern from planning docs
+test("authentication flow journey", async ({ page }) => {
+  // Start with public content
+  await page.goto("/");
+  await expect(page.locator("text=Public Organization Info")).toBeVisible();
+
+  // Login adds authenticated content
+  await login(page);
+  await expect(page.locator("text=My Dashboard")).toBeVisible();
+  await expect(page.locator("text=Public Organization Info")).toBeVisible(); // Still there
+
+  // Logout returns to public content
+  await logout(page);
+  await expect(page.locator("text=Public Organization Info")).toBeVisible();
+  await expect(page.locator("text=My Dashboard")).not.toBeVisible();
+});
+```
+
 ## Service Layer Testing Patterns
 
 ### Centralized Service Architecture
