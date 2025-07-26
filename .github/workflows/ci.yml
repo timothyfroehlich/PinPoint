@@ -280,6 +280,8 @@ jobs:
       - run: npm ci
       - name: Set up database
         run: npx prisma db push --force-reset
+      - name: Seed database with test data
+        run: npm run seed
       - name: Run Playwright Tests (${{ matrix.test-group }})
         run: npx playwright test e2e/${{ matrix.test-group }}.spec.ts
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
