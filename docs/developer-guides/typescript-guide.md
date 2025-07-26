@@ -282,6 +282,15 @@ if (!user) {
 return user.name; // Safe after null check
 ```
 
+### Insights from Migration
+
+The TypeScript migration revealed several key technical insights:
+
+- **`exactOptionalPropertyTypes`**: Required significant refactoring but caught real bugs by enforcing stricter handling of optional properties.
+- **`noUncheckedIndexedAccess`**: Forced defensive programming patterns, such as optional chaining and bounds checking, which improved code reliability.
+- **Template literal restrictions**: Highlighted and helped eliminate unsafe string concatenation patterns, leading to more robust string handling.
+- **Multi-tenant patterns**: Benefited significantly from strict typing enforcement, ensuring `organization_id` was consistently handled and preventing potential data leakage.
+
 ### 5. ESLint Type-Safety Rule Violations
 
 #### @typescript-eslint/no-unsafe-assignment
