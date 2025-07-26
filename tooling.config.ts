@@ -4,13 +4,12 @@
  * This file centralizes file patterns and settings used across:
  * - TypeScript configs (tsconfig.json, tsconfig.test-utils.json, tsconfig.tests.json)
  * - ESLint config (eslint.config.js)
- * - Betterer config (.betterer.ts)
  * - Vitest config (vitest.config.ts)
  *
  * Approach: Industry-standard explicit inclusion patterns
  * - Each tool explicitly includes only the files it should process
  * - Clear separation between production, test utilities, and test files
- * - Follows patterns documented by TypeScript ESLint, Betterer, and Vitest
+ * - Follows patterns documented by TypeScript ESLint and Vitest
  */
 
 /**
@@ -30,6 +29,7 @@ export const INCLUDE_PATTERNS = {
     "./src/**/*.spec.{ts,tsx}",
     "./src/**/__tests__/**/*.{ts,tsx}",
     "./src/integration-tests/**/*.{ts,tsx}",
+    "./e2e/**/*.{ts,tsx}",
   ],
 
   // Build and configuration files
@@ -123,6 +123,10 @@ export const ESLINT_RULES = {
     "@typescript-eslint/no-unsafe-return": "off",
     "@typescript-eslint/no-unsafe-enum-comparison": "off",
     "@typescript-eslint/explicit-function-return-type": "off",
+    // E2E test specific relaxations
+    "@typescript-eslint/restrict-template-expressions": "off",
+    "@typescript-eslint/require-await": "off",
+    "@typescript-eslint/no-unused-vars": "off",
   },
 } as const;
 
@@ -130,15 +134,6 @@ export const ESLINT_RULES = {
  * Helper functions for converting between tool-specific pattern formats
  */
 export const convertPatterns = {
-  /**
-   * Convert inclusion patterns for Betterer (needs './' prefix)
-   */
-  forBetterer: (patterns: readonly string[]): string[] => {
-    return patterns.map((pattern) =>
-      pattern.startsWith("./") ? pattern : `./${pattern}`,
-    );
-  },
-
   /**
    * Convert inclusion patterns for ESLint (no './' prefix)
    */

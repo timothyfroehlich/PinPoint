@@ -71,17 +71,10 @@ vi.mock("~/trpc/react", async () => {
   };
 });
 
-// Mock usePermissions hook with vi.hoisted
-const { mockHasPermission } = vi.hoisted(() => ({
-  mockHasPermission: vi.fn(),
-}));
+// Mock hasPermission function for tests that need direct permission mocking
+const mockHasPermission = vi.fn();
 
-vi.mock("~/hooks/usePermissions", () => ({
-  usePermissions: () => ({
-    hasPermission: mockHasPermission,
-    isLoading: false,
-  }),
-}));
+// Using dependency injection via PermissionDepsProvider instead of global mocks
 
 describe("IssueList Component", () => {
   const mockIssues = [
@@ -200,7 +193,7 @@ describe("IssueList Component", () => {
       data: mockStatuses,
     });
 
-    mockHasPermission.mockReturnValue(true);
+    // Using dependency injection instead of global mocks
   });
 
   describe("Core Rendering", () => {
@@ -958,10 +951,37 @@ describe("IssueList Component", () => {
   });
 
   describe("Permissions Loading State", () => {
-    it.skip("shows loading spinner when permissions are loading", () => {
-      // This test requires dynamic mocking which is complex with the current setup
-      // The permissions loading state is covered in the component logic
-      // and can be tested via VitestTestWrapper queryOptions in integration tests
+    it("shows loading spinner when session is loading", () => {
+      // Test realistic authentication flow - session loading
+      render(
+        <VitestTestWrapper sessionLoading={true}>
+          <IssueList initialFilters={defaultFilters} />
+        </VitestTestWrapper>,
+      );
+
+      // Should show loading spinner when session is loading
+      expect(screen.getByRole("progressbar")).toBeInTheDocument();
+
+      // Should not show any issue content while loading
+      expect(screen.queryByText("No issues found")).not.toBeInTheDocument();
+    });
+
+    it("shows loading spinner when membership is loading", () => {
+      // Test edge case - session ready but membership query loading
+      render(
+        <VitestTestWrapper
+          userPermissions={["issue:view"]}
+          membershipLoading={true}
+        >
+          <IssueList initialFilters={defaultFilters} />
+        </VitestTestWrapper>,
+      );
+
+      // Should show loading spinner when membership is loading
+      expect(screen.getByRole("progressbar")).toBeInTheDocument();
+
+      // Should not show any issue content while loading
+      expect(screen.queryByText("No issues found")).not.toBeInTheDocument();
     });
   });
 });
