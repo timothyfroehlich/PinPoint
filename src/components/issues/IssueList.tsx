@@ -31,6 +31,11 @@ import {
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
+import { AdvancedFiltersDropdown } from "./AdvancedFiltersDropdown";
+import { GameFilterDropdown } from "./GameFilterDropdown";
+import { SearchTextField } from "./SearchTextField";
+import { StatusCategoryMultiSelect } from "./StatusCategoryMultiSelect";
+
 import { PermissionGate } from "~/components/permissions/PermissionGate";
 import { usePermissions } from "~/hooks/usePermissions";
 import { api } from "~/trpc/react";
@@ -54,8 +59,11 @@ const getStatusColor = (
 interface IssueFilters {
   locationId?: string | undefined;
   machineId?: string | undefined;
-  statusId?: string | undefined;
-  statusCategory?: "NEW" | "IN_PROGRESS" | "RESOLVED" | undefined;
+  statusIds?: string[] | undefined;
+  search?: string | undefined;
+  assigneeId?: string | undefined;
+  reporterId?: string | undefined;
+  ownerId?: string | undefined;
   sortBy: "created" | "updated" | "status" | "severity" | "game";
   sortOrder: "asc" | "desc";
 }
@@ -133,9 +141,6 @@ export function IssueList({
   // Fetch locations for filter dropdown
   const { data: locations } = api.location.getAll.useQuery();
 
-  // Fetch issue statuses for filter dropdown
-  const { data: statuses } = api.issueStatus.getAll.useQuery();
-
   // Update URL when filters change
   const updateFilters = (newFilters: Partial<IssueFilters>): void => {
     const updated: IssueFilters = { ...filters };
@@ -147,11 +152,20 @@ export function IssueList({
     if ("machineId" in newFilters) {
       updated.machineId = newFilters.machineId;
     }
-    if ("statusId" in newFilters) {
-      updated.statusId = newFilters.statusId;
+    if ("statusIds" in newFilters) {
+      updated.statusIds = newFilters.statusIds;
     }
-    if ("statusCategory" in newFilters) {
-      updated.statusCategory = newFilters.statusCategory;
+    if ("search" in newFilters) {
+      updated.search = newFilters.search;
+    }
+    if ("assigneeId" in newFilters) {
+      updated.assigneeId = newFilters.assigneeId;
+    }
+    if ("reporterId" in newFilters) {
+      updated.reporterId = newFilters.reporterId;
+    }
+    if ("ownerId" in newFilters) {
+      updated.ownerId = newFilters.ownerId;
     }
     if ("sortBy" in newFilters) {
       updated.sortBy = newFilters.sortBy;
@@ -167,7 +181,17 @@ export function IssueList({
 
     Object.entries(updated).forEach(([key, value]) => {
       if (value != null && value !== "") {
-        params.set(key, String(value));
+        if (Array.isArray(value)) {
+          // Handle array parameters (like statusIds)
+          params.delete(key); // Clear existing values
+          if (value.length > 0) {
+            value.forEach((item) => {
+              params.append(key, String(item));
+            });
+          }
+        } else {
+          params.set(key, String(value));
+        }
       } else {
         params.delete(key);
       }
@@ -219,6 +243,7 @@ export function IssueList({
           </Box>
 
           <Grid container spacing={2}>
+            {/* Location Filter */}
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <FormControl fullWidth size="small">
                 <InputLabel>Location</InputLabel>
@@ -242,57 +267,29 @@ export function IssueList({
               </FormControl>
             </Grid>
 
+            {/* Status & Category Filter */}
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Status</InputLabel>
-                <Select
-                  value={filters.statusId ?? ""}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    updateFilters({
-                      statusId: value === "" ? undefined : value,
-                    });
-                  }}
-                  label="Status"
-                >
-                  <MenuItem value="">All Statuses</MenuItem>
-                  {statuses?.map((status: { id: string; name: string }) => (
-                    <MenuItem key={status.id} value={status.id}>
-                      {status.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+              <StatusCategoryMultiSelect
+                value={filters.statusIds ?? []}
+                onChange={(statusIds) => {
+                  updateFilters({ statusIds });
+                }}
+              />
             </Grid>
 
+            {/* Machine/Game Filter */}
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Category</InputLabel>
-                <Select
-                  value={filters.statusCategory ?? ""}
-                  onChange={(e) => {
-                    const value = e.target.value as string;
-                    if (value === "") {
-                      updateFilters({ statusCategory: undefined });
-                    } else {
-                      updateFilters({
-                        statusCategory: value as
-                          | "NEW"
-                          | "IN_PROGRESS"
-                          | "RESOLVED",
-                      });
-                    }
-                  }}
-                  label="Category"
-                >
-                  <MenuItem value="">All Categories</MenuItem>
-                  <MenuItem value="NEW">New</MenuItem>
-                  <MenuItem value="IN_PROGRESS">In Progress</MenuItem>
-                  <MenuItem value="RESOLVED">Resolved</MenuItem>
-                </Select>
-              </FormControl>
+              <GameFilterDropdown
+                value={filters.machineId ?? ""}
+                onChange={(machineId) => {
+                  updateFilters({
+                    machineId: machineId === "" ? undefined : machineId,
+                  });
+                }}
+              />
             </Grid>
 
+            {/* Sort By Filter */}
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <FormControl fullWidth size="small">
                 <InputLabel>Sort By</InputLabel>
@@ -312,6 +309,40 @@ export function IssueList({
                   <MenuItem value="game">Game</MenuItem>
                 </Select>
               </FormControl>
+            </Grid>
+
+            {/* Search Field */}
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <SearchTextField
+                value={filters.search ?? ""}
+                onChange={(search) => {
+                  updateFilters({ search: search === "" ? undefined : search });
+                }}
+              />
+            </Grid>
+
+            {/* Advanced Filters */}
+            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+              <AdvancedFiltersDropdown
+                assigneeId={filters.assigneeId ?? ""}
+                reporterId={filters.reporterId ?? ""}
+                ownerId={filters.ownerId ?? ""}
+                onAssigneeChange={(assigneeId) => {
+                  updateFilters({
+                    assigneeId: assigneeId === "" ? undefined : assigneeId,
+                  });
+                }}
+                onReporterChange={(reporterId) => {
+                  updateFilters({
+                    reporterId: reporterId === "" ? undefined : reporterId,
+                  });
+                }}
+                onOwnerChange={(ownerId) => {
+                  updateFilters({
+                    ownerId: ownerId === "" ? undefined : ownerId,
+                  });
+                }}
+              />
             </Grid>
           </Grid>
         </CardContent>
