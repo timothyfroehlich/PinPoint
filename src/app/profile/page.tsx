@@ -6,6 +6,9 @@ import {
   Games,
   BugReport,
   Comment,
+  ViewModule,
+  ViewList,
+  Logout,
 } from "@mui/icons-material";
 import {
   Container,
@@ -23,7 +26,14 @@ import {
   DialogContent,
   TextField,
   DialogActions,
+  Tooltip,
+  List,
+  ListItem,
+  ListItemText,
+  ToggleButton,
+  ToggleButtonGroup,
 } from "@mui/material";
+import { signOut } from "next-auth/react";
 import React, { useState } from "react";
 
 import type { JSX } from "react";
@@ -36,6 +46,7 @@ export default function ProfilePage(): JSX.Element {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [editForm, setEditForm] = useState({ name: "", bio: "" });
+  const [gamesViewMode, setGamesViewMode] = useState<"grid" | "list">("grid");
 
   const {
     data: userProfile,
@@ -165,6 +176,16 @@ export default function ProfilePage(): JSX.Element {
                   >
                     Change Picture
                   </Button>
+                  <Button
+                    variant="outlined"
+                    startIcon={<Logout />}
+                    onClick={() => {
+                      void signOut({ callbackUrl: "/" });
+                    }}
+                    color="error"
+                  >
+                    Sign Out
+                  </Button>
                 </Box>
               </Box>
             </CardContent>
@@ -245,41 +266,119 @@ export default function ProfilePage(): JSX.Element {
         <Grid size={12}>
           <Card>
             <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Owned Games ({ownedMachines.length})
-              </Typography>
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  mb: 2,
+                }}
+              >
+                <Typography variant="h6">
+                  Owned Games ({ownedMachines.length})
+                </Typography>
+                {ownedMachines.length > 0 && (
+                  <ToggleButtonGroup
+                    value={gamesViewMode}
+                    exclusive
+                    onChange={(_, newMode: string | null) => {
+                      if (newMode !== null)
+                        setGamesViewMode(newMode as "grid" | "list");
+                    }}
+                    size="small"
+                  >
+                    <ToggleButton value="grid">
+                      <Tooltip title="Grid View">
+                        <ViewModule fontSize="small" />
+                      </Tooltip>
+                    </ToggleButton>
+                    <ToggleButton value="list">
+                      <Tooltip title="List View">
+                        <ViewList fontSize="small" />
+                      </Tooltip>
+                    </ToggleButton>
+                  </ToggleButtonGroup>
+                )}
+              </Box>
               {ownedMachines.length === 0 ? (
                 <Typography variant="body2" color="text.secondary">
                   No games owned yet
                 </Typography>
-              ) : (
-                <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              ) : gamesViewMode === "grid" ? (
+                <Grid container spacing={2}>
                   {ownedMachines.map((machine) => (
-                    <Box
-                      key={machine.id}
-                      sx={{
-                        p: 2,
-                        border: 1,
-                        borderColor: "divider",
-                        borderRadius: 1,
-                      }}
-                    >
-                      <Typography variant="subtitle1" fontWeight="bold">
-                        {machine.name}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {machine.model.name}
-                        {machine.model.manufacturer && (
-                          <> • {machine.model.manufacturer}</>
-                        )}
-                        {machine.model.year && <> • {machine.model.year}</>}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        Location: {machine.location.name}
-                      </Typography>
-                    </Box>
+                    <Grid key={machine.id} size={{ xs: 12, sm: 6, md: 4 }}>
+                      <Card variant="outlined" sx={{ height: "100%" }}>
+                        <CardContent sx={{ p: 2 }}>
+                          <Typography
+                            variant="subtitle2"
+                            fontWeight="bold"
+                            noWrap
+                          >
+                            {machine.name}
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            sx={{ mt: 0.5 }}
+                          >
+                            {machine.model.name}
+                          </Typography>
+                          {machine.model.manufacturer && (
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              display="block"
+                            >
+                              {machine.model.manufacturer}
+                              {machine.model.year &&
+                                ` • ${machine.model.year.toString()}`}
+                            </Typography>
+                          )}
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            display="block"
+                            sx={{ mt: 1 }}
+                          >
+                            @ {machine.location.name}
+                          </Typography>
+                        </CardContent>
+                      </Card>
+                    </Grid>
                   ))}
-                </Box>
+                </Grid>
+              ) : (
+                <List sx={{ p: 0 }}>
+                  {ownedMachines.map((machine, index) => (
+                    <ListItem
+                      key={machine.id}
+                      divider={index < ownedMachines.length - 1}
+                      sx={{ px: 0 }}
+                    >
+                      <ListItemText
+                        primary={machine.name}
+                        secondary={
+                          <>
+                            {machine.model.name}
+                            {machine.model.manufacturer && (
+                              <> • {machine.model.manufacturer}</>
+                            )}
+                            {machine.model.year && <> • {machine.model.year}</>}
+                            <br />
+                            <Typography
+                              component="span"
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              @ {machine.location.name}
+                            </Typography>
+                          </>
+                        }
+                      />
+                    </ListItem>
+                  ))}
+                </List>
               )}
             </CardContent>
           </Card>

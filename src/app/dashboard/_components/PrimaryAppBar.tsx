@@ -10,14 +10,11 @@ import {
   Box,
   IconButton,
   Avatar,
-  Menu,
-  MenuItem,
   useMediaQuery,
   useTheme,
 } from "@mui/material";
 import { useRouter } from "next/navigation";
-import { signOut, signIn, useSession } from "next-auth/react";
-import { useState } from "react";
+import { signIn, useSession } from "next-auth/react";
 
 import type { JSX } from "react";
 
@@ -27,32 +24,11 @@ import { usePermissions } from "~/hooks/usePermissions";
 const PrimaryAppBar = (): JSX.Element => {
   const router = useRouter();
   const { data: session, status } = useSession();
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const open = Boolean(anchorEl);
   const { hasPermission } = usePermissions();
 
   // Responsive design: hide navigation items on mobile to make room for user menu
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
-
-  const handleMenu = (event: React.MouseEvent<HTMLElement>): void => {
-    setAnchorEl(event.currentTarget);
-  };
-
-  const handleClose = (): void => {
-    setAnchorEl(null);
-  };
-
-  const handleLogout = async (): Promise<void> => {
-    try {
-      handleClose();
-      await signOut({ redirect: false });
-      router.push("/");
-    } catch (error) {
-      console.error("Logout failed:", error);
-      router.push("/");
-    }
-  };
 
   const handleLogin = (): void => {
     void signIn();
@@ -152,9 +128,9 @@ const PrimaryAppBar = (): JSX.Element => {
               <IconButton
                 size="large"
                 aria-label="account of current user"
-                aria-controls="menu-appbar"
-                aria-haspopup="true"
-                onClick={handleMenu}
+                onClick={() => {
+                  router.push("/profile");
+                }}
                 color="inherit"
               >
                 {session.user.image ? (
@@ -171,37 +147,6 @@ const PrimaryAppBar = (): JSX.Element => {
                   </Avatar>
                 )}
               </IconButton>
-              <Menu
-                id="menu-appbar"
-                anchorEl={anchorEl}
-                anchorOrigin={{
-                  vertical: "top",
-                  horizontal: "right",
-                }}
-                keepMounted
-                transformOrigin={{
-                  vertical: "top",
-                  horizontal: "right",
-                }}
-                open={open}
-                onClose={handleClose}
-              >
-                <MenuItem
-                  onClick={() => {
-                    handleClose();
-                    router.push("/profile");
-                  }}
-                >
-                  Profile
-                </MenuItem>
-                <MenuItem
-                  onClick={() => {
-                    void handleLogout();
-                  }}
-                >
-                  Logout
-                </MenuItem>
-              </Menu>
             </div>
           ) : (
             // Unauthenticated state - show login button
