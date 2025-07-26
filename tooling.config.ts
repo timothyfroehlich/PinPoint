@@ -4,13 +4,12 @@
  * This file centralizes file patterns and settings used across:
  * - TypeScript configs (tsconfig.json, tsconfig.test-utils.json, tsconfig.tests.json)
  * - ESLint config (eslint.config.js)
- * - Betterer config (.betterer.ts)
  * - Vitest config (vitest.config.ts)
  *
  * Approach: Industry-standard explicit inclusion patterns
  * - Each tool explicitly includes only the files it should process
  * - Clear separation between production, test utilities, and test files
- * - Follows patterns documented by TypeScript ESLint, Betterer, and Vitest
+ * - Follows patterns documented by TypeScript ESLint and Vitest
  */
 
 /**
@@ -130,15 +129,6 @@ export const ESLINT_RULES = {
  * Helper functions for converting between tool-specific pattern formats
  */
 export const convertPatterns = {
-  /**
-   * Convert inclusion patterns for Betterer (needs './' prefix)
-   */
-  forBetterer: (patterns: readonly string[]): string[] => {
-    return patterns.map((pattern) =>
-      pattern.startsWith("./") ? pattern : `./${pattern}`,
-    );
-  },
-
   /**
    * Convert inclusion patterns for ESLint (no './' prefix)
    */
