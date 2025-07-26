@@ -237,7 +237,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: mcr.microsoft.com/playwright:v1.54.1-jammy
-    timeout-minutes: 15
+    timeout-minutes: 10
     permissions:
       contents: read
     strategy:
