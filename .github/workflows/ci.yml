@@ -233,7 +233,7 @@ jobs:
 
   # Job 7: End-to-End Tests (Playwright) - Parallel Execution
   e2e:
-    name: E2E Tests (${{ matrix.test-group }})
+    name: E2E Tests (${{ matrix.test-group }}${{ matrix.shard && format(' {0}', matrix.shard) || '' }})
     runs-on: ubuntu-latest
     container:
       image: mcr.microsoft.com/playwright:v1.54.1-jammy
@@ -243,13 +243,25 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        test-group:
-          - "auth-flow"
-          - "dashboard" 
-          - "roles-permissions"
-          - "location-browsing"
-          - "issue-confirmation"
-          - "unified-dashboard-flow"
+        include:
+          # Light test suites (run as single jobs)
+          - test-group: "auth-flow"
+            shard: ""
+          - test-group: "dashboard" 
+            shard: ""
+          - test-group: "location-browsing"
+            shard: ""
+          - test-group: "unified-dashboard-flow"
+            shard: ""
+          # Heavy test suites (split into shards for better balance)
+          - test-group: "roles-permissions"
+            shard: "--shard=1/2"
+          - test-group: "roles-permissions"
+            shard: "--shard=2/2"
+          - test-group: "issue-confirmation"
+            shard: "--shard=1/2"
+          - test-group: "issue-confirmation"
+            shard: "--shard=2/2"
     services:
       postgres:
         image: postgres:16
@@ -282,12 +294,12 @@ jobs:
         run: npx prisma db push --force-reset
       - name: Seed database with test data
         run: npm run seed
-      - name: Run Playwright Tests (${{ matrix.test-group }})
-        run: npx playwright test e2e/${{ matrix.test-group }}.spec.ts
+      - name: Run Playwright Tests (${{ matrix.test-group }}${{ matrix.shard && format(' {0}', matrix.shard) || '' }})
+        run: npx playwright test e2e/${{ matrix.test-group }}.spec.ts ${{ matrix.shard }}
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: ${{ !cancelled() }}
         with:
-          name: playwright-report-${{ matrix.test-group }}
+          name: playwright-report-${{ matrix.test-group }}${{ matrix.shard && format('-{0}', replace(matrix.shard, '--shard=', '')) || '' }}
           path: playwright-report/
           retention-days: 30
 
