@@ -188,6 +188,18 @@ const issues = await ctx.db.issue.findMany();
 3. Procedures check resource ownership
 4. UI hides cross-tenant links
 
+## Public Endpoint Security
+
+Public endpoints, while not requiring authentication, still have critical security considerations:
+
+- **Organization Context**: Public endpoints must still be scoped to the correct organization, usually via subdomain resolution. This prevents data leakage between tenants.
+- **Data Exposure**: Use Prisma's `select` statement to explicitly define the public data that can be exposed. Never return the entire object.
+- **Security-First Design Validation**: Public endpoints require comprehensive testing to validate security boundaries, including:
+    - No authentication required.
+    - Organization context is preserved.
+    - Data exposure is limited to only safe public data.
+    - Graceful error handling for missing organizations or database errors.
+
 ## HTTP API Security
 
 ### Authentication Routes
