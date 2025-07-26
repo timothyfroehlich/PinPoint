@@ -12,7 +12,7 @@ export default defineConfig({
   // Retry on CI only
   retries: process.env["CI"] ? 2 : 0,
 
-  // Opt out of parallel tests on CI
+  // Use single worker per shard in CI (sharding provides parallelism)
   ...(process.env["CI"] && { workers: 1 }),
 
   // Reporter to use
