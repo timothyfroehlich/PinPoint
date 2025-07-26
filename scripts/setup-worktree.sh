@@ -41,13 +41,16 @@ echo "Configuring ports for worktree: $CURRENT_PATH"
 if npx tsx scripts/port-utils.ts check "$CURRENT_PATH" | grep -q "Is worktree: true"; then
     echo "Detected worktree environment - configuring unique ports..."
     
-    # Remove any existing DATABASE_URL lines to avoid duplicates
-    sed -i '/^DATABASE_URL=/d' .env
-    
-    # Generate and append port configuration to .env
+    # Generate and append port configuration to .env (but keep shared DATABASE_URL)
     echo "" >> .env
     echo "# Worktree-specific port configuration (auto-generated)" >> .env
-    npx tsx scripts/port-utils.ts env "$CURRENT_PATH" >> .env
+    
+    # Only add PORT and PRISMA_STUDIO_PORT, not DATABASE_URL (use shared database)
+    PORT=$(npx tsx scripts/port-utils.ts port "$CURRENT_PATH")
+    PRISMA_PORT=$((PORT + 1))
+    
+    echo "PORT=$PORT" >> .env
+    echo "PRISMA_STUDIO_PORT=$PRISMA_PORT" >> .env
     
     echo "Port configuration added to .env"
     npx tsx scripts/port-utils.ts check "$CURRENT_PATH"
