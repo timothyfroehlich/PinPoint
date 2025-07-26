@@ -225,8 +225,14 @@ export const issueCoreRouter = createTRPCRouter({
         .object({
           locationId: z.string().optional(),
           machineId: z.string().optional(),
-          statusId: z.string().optional(),
+          statusIds: z.array(z.string()).optional(),
+          search: z.string().optional(),
+          assigneeId: z.string().optional(),
+          reporterId: z.string().optional(),
+          ownerId: z.string().optional(),
           modelId: z.string().optional(),
+          // Legacy support
+          statusId: z.string().optional(),
           statusCategory: z.enum(["NEW", "IN_PROGRESS", "RESOLVED"]).optional(),
           sortBy: z
             .enum(["created", "updated", "status", "severity", "game"])
@@ -241,12 +247,19 @@ export const issueCoreRouter = createTRPCRouter({
         machine?: {
           location?: { id: string };
           modelId?: string;
+          owner?: { id: string };
         };
         machineId?: string;
-        statusId?: string;
+        statusId?: string | { in: string[] };
         status?: {
           category: "NEW" | "IN_PROGRESS" | "RESOLVED";
         };
+        assignedToId?: string | null;
+        createdById?: string;
+        OR?: {
+          title?: { contains: string; mode: "insensitive" };
+          description?: { contains: string; mode: "insensitive" };
+        }[];
       } = {
         organizationId: ctx.organization.id,
       };
@@ -269,13 +282,47 @@ export const issueCoreRouter = createTRPCRouter({
         };
       }
 
-      if (input?.statusId) {
+      // Handle status filtering - support both single statusId and statusIds array
+      if (input?.statusIds && input.statusIds.length > 0) {
+        whereClause.statusId = { in: input.statusIds };
+      } else if (input?.statusId) {
         whereClause.statusId = input.statusId;
       }
 
       if (input?.statusCategory) {
         whereClause.status = {
           category: input.statusCategory,
+        };
+      }
+
+      // Handle search across title and description
+      if (input?.search && input.search.trim() !== "") {
+        const searchTerm = input.search.trim();
+        whereClause.OR = [
+          { title: { contains: searchTerm, mode: "insensitive" } },
+          { description: { contains: searchTerm, mode: "insensitive" } },
+        ];
+      }
+
+      // Handle assignee filter
+      if (input?.assigneeId) {
+        if (input.assigneeId === "unassigned") {
+          whereClause.assignedToId = null;
+        } else {
+          whereClause.assignedToId = input.assigneeId;
+        }
+      }
+
+      // Handle reporter filter
+      if (input?.reporterId) {
+        whereClause.createdById = input.reporterId;
+      }
+
+      // Handle machine owner filter
+      if (input?.ownerId) {
+        whereClause.machine = {
+          ...whereClause.machine,
+          owner: { id: input.ownerId },
         };
       }
 
