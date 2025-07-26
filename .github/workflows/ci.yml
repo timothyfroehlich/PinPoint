@@ -231,15 +231,25 @@ jobs:
       - name: Security Audit
         run: npm run deps:check
 
-  # Job 7: End-to-End Tests (Playwright)
+  # Job 7: End-to-End Tests (Playwright) - Parallel Execution
   e2e:
-    name: E2E Tests
+    name: E2E Tests (${{ matrix.test-group }})
     runs-on: ubuntu-latest
     container:
       image: mcr.microsoft.com/playwright:v1.54.1-jammy
     timeout-minutes: 15
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        test-group:
+          - "auth-flow"
+          - "dashboard" 
+          - "roles-permissions"
+          - "location-browsing"
+          - "issue-confirmation"
+          - "unified-dashboard-flow"
     services:
       postgres:
         image: postgres:16
@@ -269,12 +279,12 @@ jobs:
       - run: npm ci
       - name: Set up database
         run: npx prisma db push --force-reset
-      - name: Run Playwright Tests
-        run: npx playwright test
+      - name: Run Playwright Tests (${{ matrix.test-group }})
+        run: npx playwright test e2e/${{ matrix.test-group }}.spec.ts
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: ${{ !cancelled() }}
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.test-group }}
           path: playwright-report/
           retention-days: 30
 
