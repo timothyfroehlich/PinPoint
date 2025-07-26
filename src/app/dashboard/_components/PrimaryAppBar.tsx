@@ -113,6 +113,9 @@ const PrimaryAppBar = (): JSX.Element => {
                     "&:hover": { bgcolor: "rgba(255,255,255,0.1)" },
                   }}
                   tooltipText="View and manage issues"
+                  onClick={() => {
+                    router.push("/issues");
+                  }}
                 >
                   Issues
                 </PermissionButton>
