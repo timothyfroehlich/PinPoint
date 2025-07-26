@@ -72,17 +72,7 @@ vi.mock("~/trpc/react", async () => {
   };
 });
 
-// Mock usePermissions hook with vi.hoisted
-const { mockHasPermission } = vi.hoisted(() => ({
-  mockHasPermission: vi.fn(),
-}));
-
-vi.mock("~/hooks/usePermissions", () => ({
-  usePermissions: () => ({
-    hasPermission: mockHasPermission,
-    isLoading: false,
-  }),
-}));
+// Using dependency injection via PermissionDepsProvider instead of global mocks
 
 describe("IssueList - Permission-Based Access Control", () => {
   const mockIssues = [
@@ -515,20 +505,15 @@ describe("IssueList - Permission-Based Access Control", () => {
       expect(closeButton).toBeDisabled();
     });
 
-    it.skip("handles permission loading state", () => {
-      // This test would need a different approach since we can't easily override the mock
-      // For now, let's skip this complex mock override pattern
-
+    it("handles permission loading state", () => {
+      // Test realistic authentication flow - session loading
       render(
-        <VitestTestWrapper
-          userPermissions={[...VITEST_PERMISSION_SCENARIOS.MEMBER]}
-          userRole={VITEST_ROLE_MAPPING.MEMBER}
-        >
+        <VitestTestWrapper sessionLoading={true}>
           <IssueList initialFilters={defaultFilters} />
         </VitestTestWrapper>,
       );
 
-      // Should show loading spinner when permissions are loading
+      // Should show loading spinner when session is loading
       expect(screen.getByRole("progressbar")).toBeInTheDocument();
     });
 
