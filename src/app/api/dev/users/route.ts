@@ -38,8 +38,9 @@ export async function GET(): Promise<NextResponse> {
     const users = (await db.user.findMany({
       where: {
         OR: [
-          { email: { endsWith: "testaccount.dev" } },
-          { email: "phoenixavatar2@gmail.com" },
+          { email: { endsWith: "@dev.local" } },
+          { email: { endsWith: "@test.com" } },
+          { email: { endsWith: "@pinpoint.dev" } },
         ],
       },
       include: {
