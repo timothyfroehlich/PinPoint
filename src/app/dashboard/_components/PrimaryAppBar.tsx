@@ -124,6 +124,9 @@ const PrimaryAppBar = (): JSX.Element => {
                   hasPermission={hasPermission}
                   showWhenDenied={false}
                   color="inherit"
+                  onClick={() => {
+                    router.push("/machines");
+                  }}
                   sx={{
                     borderRadius: 2,
                     px: 3,
