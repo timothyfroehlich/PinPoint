@@ -1,250 +1,255 @@
-# Task: machine-page-implementation
+# User Profile Page Implementation Task
 
-## 🎯 Objective
+## Overview
 
-Implement a comprehensive machine listing page (`/machines`) that allows users to view, manage, and interact with pinball machines within their organization following existing design patterns and leveraging complete backend API infrastructure.
+Implement a comprehensive user profile page for PinPoint by adapting and modernizing the existing archived frontend components to work with the current Next.js App Router architecture.
 
-## 📋 Requirements Overview
+## Context & Research Findings
 
-### Core Functionality
+### ✅ Strong Foundation Already Exists
 
-- **Machine List Display**: Card-based grid layout showing all organization machines
-- **Permission-Based Actions**: Role-based create/edit/delete capabilities
-- **Location Management**: Display machine locations with proper icons
-- **Owner Assignment**: Show machine owners with avatars
-- **Responsive Design**: Works across all screen sizes
+- **Complete Implementation**: Archived profile page at `src/_archived_frontend/profile/page.tsx`
+- **Backend APIs Ready**: All necessary tRPC endpoints implemented in `src/server/api/routers/user.ts`
+- **Supporting Components**: `ProfilePictureUpload`, `UserAvatar`, image processing utilities
+- **Current Architecture**: Next.js App Router, MUI v7, TypeScript strictest mode, tRPC multi-tenant
 
-### Target Implementation
+### Key APIs Available
 
-- **Primary Route**: `/machines` (machine list page)
-- **Components**: MachineList, MachineCard components
+- `api.user.getProfile.useQuery()` - User data with statistics, memberships, owned machines
+- `api.user.updateProfile.useMutation()` - Update name and bio
+- `api.user.uploadProfilePicture.useMutation()` - Image upload with processing
 
-## 🏗️ Technical Architecture
+## Implementation Plan
 
-### Backend APIs Available
+### Phase 1: Route & Layout Setup
 
-**Primary API**: `api.machine.core.getAll`
+**Files to Create:**
 
-- **File**: `src/server/api/routers/machine.core.ts:85-103`
-- **Returns**: All machines for organization with full relations
-- **Includes**: model, location, owner (with avatar data)
+- `src/app/profile/page.tsx` - Main profile page route
+- `src/app/profile/layout.tsx` - Profile-specific layout (if needed)
 
-**Additional APIs Ready**:
+**Requirements:**
 
-- `api.machine.core.create` - Create new machine
-- `api.machine.core.update` - Update machine properties
-- `api.machine.core.delete` - Delete machine (admin only)
+- Use `AuthenticatedLayout` wrapper
+- Follow App Router patterns
+- Ensure proper TypeScript strictest compliance
 
-### Frontend Patterns to Follow
+### Phase 2: Component Migration & Modernization
 
-- **Reference**: `src/app/dashboard/_components/DetailedIssueCard.tsx`
-- **Card Structure**: MUI Card with left border for visual hierarchy
-- **Typography**: Consistent with existing components
-- **Color Scheme**: Use existing theme colors (`#667eea`, etc.)
+**Component Migrations:**
 
-### Permission Matrix
+1. **UserAvatar Component**
+   - **Source**: `src/_archived_frontend/_components/user-avatar.tsx`
+   - **Target**: `src/components/ui/UserAvatar.tsx`
+   - **Updates**: Fix import paths, ensure current architecture compatibility
 
-```typescript
-interface MachinePermissions {
-  "machines:view": ["admin", "technician", "member"]; // View all machines
-  "machines:create": ["admin", "technician"]; // Add new machines
-  "machines:edit": ["admin", "technician"]; // Edit machine details
-  "machines:delete": ["admin"]; // Delete machines
-}
+2. **ProfilePictureUpload Component**
+   - **Source**: `src/_archived_frontend/_components/profile-picture-upload.tsx`
+   - **Target**: `src/components/profile/ProfilePictureUpload.tsx`
+   - **Updates**: Fix import paths, ensure proper integration
+
+**Key Modernization Requirements:**
+
+- Update MUI Grid from deprecated `Grid item xs={12}` to `Grid size={{ xs: 12, md: 4 }}`
+- Fix all import paths from archived structure to current architecture
+- Ensure TypeScript strictest mode compliance (no `any` types, proper null checks)
+- Follow current component organization patterns
+
+### Phase 3: Navigation Integration
+
+**File to Modify:**
+
+- `src/app/dashboard/_components/PrimaryAppBar.tsx`
+
+**Implementation:**
+
+- Add "Profile" menu item to user dropdown menu (currently only has "Logout")
+- Use Next.js `useRouter()` for navigation to `/profile`
+- Maintain existing responsive design patterns
+
+**Navigation Flow:**
+
+1. User clicks avatar in app bar
+2. Dropdown shows: "Profile" and "Logout" options
+3. "Profile" navigates to `/profile` page
+
+### Phase 4: Profile Page Implementation
+
+**Main Profile Page Features:**
+
+1. **Profile Header Section**
+   - Large avatar with edit functionality
+   - User name, email, bio display
+   - Join date with calendar icon
+   - Edit Profile and Change Picture buttons
+
+2. **Statistics Card**
+   - Games owned count with icon
+   - Issues reported count with icon
+   - Comments posted count with icon
+
+3. **Organizations Section**
+   - List of user memberships
+   - Role badges (Admin = primary color, others = default)
+   - Handle empty state appropriately
+
+4. **Owned Games Section**
+   - Detailed machine information
+   - Model name, manufacturer, release year
+   - Location and room details
+   - Handle empty state appropriately
+
+5. **Edit Dialogs**
+   - Profile editing modal (name, bio with character limit)
+   - Picture upload modal with drag & drop
+   - Proper loading states and error handling
+
+**Technical Implementation Details:**
+
+- Use `api.user.getProfile.useQuery()` for data fetching
+- Handle loading states with `CircularProgress`
+- Show error states with `Alert` components
+- Implement optimistic UI updates where appropriate
+- Use proper form validation and error handling
+
+### Phase 5: Testing & Validation
+
+**Required Checks:**
+
+- Run `npm run quick` for development validation
+- Run `npm run validate` for pre-commit checks
+- Test responsive design across screen sizes
+- Verify all navigation flows work correctly
+- Test image upload functionality
+- Validate profile editing workflows
+
+## Technical Specifications
+
+### TypeScript Requirements
+
+- **Zero tolerance**: All TypeScript errors must be fixed (strictest mode)
+- **No `any` types**: Use proper typing throughout
+- **Null safety**: Use optional chaining and proper null checks
+- **Array safety**: Check bounds before array access
+
+### MUI v7 Patterns
+
+```tsx
+// ✅ Correct MUI v7 Grid usage
+<Grid container spacing={3}>
+  <Grid size={{ xs: 12, md: 4 }}>
+    {/* Content */}
+  </Grid>
+</Grid>
+
+// ❌ Deprecated Grid usage
+<Grid container spacing={3}>
+  <Grid item xs={12} md={4}>
+    {/* Content */}
+  </Grid>
+</Grid>
 ```
 
-## 🎨 Design Specifications
+### Import Path Updates
 
-### Visual Design Pattern
+```tsx
+// ✅ Current architecture imports
+import { UserAvatar } from "~/components/ui/UserAvatar";
+import { ProfilePictureUpload } from "~/components/profile/ProfilePictureUpload";
+import { api } from "~/trpc/react";
 
-**Follow Current Dashboard Patterns**:
-
-- **Card Structure**: MUI Card with left border for visual hierarchy
-- **Typography**: Consistent with existing components
-- **Color Scheme**: Use existing theme colors (`#667eea`, etc.)
-
-### Layout Structure
-
-```
-📱 Machine List Page Layout:
-┌─────────────────────────────────────┐
-│ [Header] Machines        [+ Add]    │
-│ ┌─────────┐ ┌─────────┐ ┌─────────┐ │
-│ │Machine 1│ │Machine 2│ │Machine 3│ │
-│ │Model    │ │Model    │ │Model    │ │
-│ │Location │ │Location │ │Location │ │
-│ │Owner    │ │Owner    │ │Owner    │ │
-│ └─────────┘ └─────────┘ └─────────┘ │
-└─────────────────────────────────────┘
+// ❌ Archived imports (needs updating)
+import { UserAvatar } from "~/app/_components/user-avatar";
+import { ProfilePictureUpload } from "~/app/_components/profile-picture-upload";
 ```
 
-### Component Architecture
+### Code Quality Standards
 
-```typescript
-// Machine list component with tRPC data fetching
-interface MachineWithRelations {
-  id: string;
-  name: string;
-  model: { name: string };
-  location: { id: string; name: string };
-  owner?: { id: string; name: string; image: string };
-}
-```
+- **ESLint**: All rules must pass, no `eslint-disable` comments
+- **Prettier**: Auto-formatted code throughout
+- **Component patterns**: Follow existing patterns in current codebase
+- **Error handling**: Proper error boundaries and user feedback
 
-## 📚 Reference Documentation
+## Success Criteria
 
-### Backend API Analysis
+### ✅ Navigation
 
-- **Machine Router**: `src/server/api/routers/machine.ts` - Main router setup
-- **Core Machine API**: `src/server/api/routers/machine.core.ts` - All CRUD operations
-- **Permission System**: `src/server/api/trpc.permission.ts` - Permission procedures
+- Profile link appears in user dropdown menu
+- Navigation to `/profile` works correctly
+- Breadcrumb or back navigation (if applicable)
 
-### Frontend Pattern References
+### ✅ Profile Viewing
 
-- **Dashboard Components**: `src/app/dashboard/_components/` - Current UI patterns
-- **Issue Card Design**: `src/app/dashboard/_components/DetailedIssueCard.tsx` - Card layout reference
-- **AppBar Pattern**: `src/app/dashboard/_components/PrimaryAppBar.tsx` - Navigation structure
-- **Permission Components**: `src/components/permissions/` - Permission-based UI
+- User can view their complete profile information
+- Statistics display correctly
+- Organizations and roles show properly
+- Owned games list with full details
 
-### Architecture Documentation
+### ✅ Profile Editing
 
-- **Current State**: `docs/architecture/current-state.md` - System overview
-- **Permission System**: `docs/architecture/permissions-roles-implementation.md` - RBAC details
+- Edit profile modal opens and functions correctly
+- Name and bio updates work with proper validation
+- Character limits enforced (bio: 500 chars)
+- Success/error feedback provided
 
-## 🔨 Implementation Steps
+### ✅ Image Upload
 
-### Step 1: Create Base Page Structure
+- Profile picture upload modal opens correctly
+- Drag & drop functionality works
+- Image processing and preview work properly
+- Upload success/error handling implemented
 
-**File**: `src/app/machines/page.tsx`
-**Requirements**:
+### ✅ Responsive Design
 
-- Implement container layout with proper spacing
-- Add page header with title and conditional "Add Machine" button
-- Include permission-based action visibility using `usePermissions()` hook
+- Layout works on mobile, tablet, and desktop
+- Components adapt properly to different screen sizes
+- Touch interactions work on mobile devices
 
-### Step 2: Implement Machine List Component
+### ✅ Code Quality
 
-**File**: `src/app/machines/components/MachineList.tsx`
-**Requirements**:
+- All validation commands pass (`npm run quick`, `npm run validate`)
+- TypeScript strictest mode compliance
+- No ESLint errors or warnings
+- Clean, readable, well-organized code
 
-- Fetch machines using `api.machine.core.getAll`
-- Display loading and error states
-- Implement responsive grid layout using MUI Grid v7 syntax
-- Handle empty state gracefully
+## Reference Files
 
-### Step 3: Create Machine Card Component
+### Key Source Files (Archived)
 
-**File**: `src/app/machines/components/MachineCard.tsx`
-**Requirements**:
+- `src/_archived_frontend/profile/page.tsx` - Main profile page implementation
+- `src/_archived_frontend/_components/user-avatar.tsx` - Avatar component
+- `src/_archived_frontend/_components/profile-picture-upload.tsx` - Upload component
 
-- Follow DetailedIssueCard pattern for consistency
-- Display machine name, model, location, and owner
-- Use proper TypeScript types from tRPC router outputs
-- Add visual indicators and hover effects
+### API Endpoints (Already Implemented)
 
-## 🧪 Testing Requirements
+- `src/server/api/routers/user.ts` - User-related tRPC procedures
 
-### Component Testing
+### Current Architecture Examples
 
-- Machine list renders correctly with mock data
-- Permission-based features show/hide appropriately
-- Error states display correctly
+- `src/app/dashboard/page.tsx` - App Router page pattern
+- `src/app/dashboard/_components/PrimaryAppBar.tsx` - Navigation component
+- `src/components/permissions/` - Component organization pattern
 
-### Integration Testing
+### Documentation References
 
-- tRPC integration functions correctly
-- Permission system enforces rules correctly
+- `CLAUDE.md` - Project standards and commands
+- `docs/architecture/current-state.md` - System architecture overview
+- `docs/developer-guides/typescript-strictest-production.md` - TypeScript patterns
 
-## ✅ Success Criteria
+## Development Workflow
 
-### Functional Requirements
+1. **Start**: Run `npm run validate` to ensure clean baseline
+2. **Development**: Use `npm run quick` after significant changes
+3. **Testing**: Validate functionality manually and with validation commands
+4. **Pre-commit**: Run `npm run validate` before any commits (MANDATORY)
+5. **Completion**: All success criteria met and validation passes
 
-- [ ] Users can view all machines in their organization
-- [ ] Permission-based actions work correctly (create/edit/delete visibility)
-- [ ] Machine information displays clearly (name, model, location, owner)
-- [ ] Responsive design works across all screen sizes
+## Notes
 
-### Technical Requirements
+- **Leverage Existing Work**: The archived implementation is comprehensive and well-designed
+- **Focus on Adaptation**: Primary work is updating paths, imports, and MUI syntax
+- **Architecture Compliance**: Follow current patterns and TypeScript standards
+- **User Experience**: Maintain responsive design and proper error handling
+- **Code Quality**: Zero tolerance for TypeScript errors or ESLint violations
 
-- [ ] Zero TypeScript errors (strictest mode compliance)
-- [ ] All ESLint rules pass: `npm run validate`
-- [ ] All tests pass: `npm run test`
-- [ ] Follows existing code patterns and conventions
-
-### User Experience Requirements
-
-- [ ] Consistent with existing PinPoint design patterns
-- [ ] Proper error handling and loading states
-- [ ] Mobile-responsive interface
-
-## 🔗 API Integration Details
-
-### Primary Data Fetching
-
-```typescript
-// Main machine list query
-const { data: machines, isLoading, error } = api.machine.core.getAll.useQuery();
-
-// Expected data structure from API
-type MachineWithRelations = RouterOutputs["machine"]["core"]["getAll"][number];
-```
-
-## 🎨 Design System Integration
-
-### Color Palette
-
-- **Primary Action**: `#667eea` (existing button color)
-- **Border Accents**: Follow priority color patterns from DetailedIssueCard
-
-### Typography Patterns
-
-```typescript
-// Follow existing patterns from DetailedIssueCard
-<Typography variant="h6" fontWeight="medium">Machine Name</Typography>
-<Typography variant="body2" color="text.secondary">Model • Location</Typography>
-```
-
-### Icon Usage
-
-- **Add**: `<Add />` for creation actions
-- **Location**: `<PlaceIcon />` for location indicators
-- **Person**: `<Person />` for owner information
-
-## 🚀 Development Environment
-
-### Worktree Information
-
-- **Path**: `/home/froeht/Code/PinPoint-worktrees/machine-page-implementation`
-- **Branch**: `task/machine-page-implementation`
-- **Database**: Shared local PostgreSQL database (`postgresql://postgres:r9D6fQc2lbEiS_hI@localhost:5432/pinpoint`)
-- **Dev Server**: Port 59111
-
-### Available Commands
-
-```bash
-npm run dev          # Start development server
-npm run validate     # Run all quality checks
-npm run typecheck    # TypeScript validation
-npm run test        # Run test suite
-```
-
-## 📖 Additional Context
-
-### Business Logic Notes
-
-- **Machine Names**: Can be custom or default to model name
-- **Organization Scoping**: All APIs are automatically scoped to user's organization
-- **Owner Assignment**: Optional feature for tracking machine ownership
-
-### Future Considerations
-
-- **Machine Detail Pages**: `/machines/[id]` will be implemented later
-- **Advanced Filtering**: Basic functionality first, enhancement later
-
----
-
-## 📝 Implementation Notes
-
-This task builds upon the complete backend infrastructure that's already implemented. The focus is on creating a polished, permission-aware frontend that integrates seamlessly with existing PinPoint patterns.
-
-**Priority**: Implement basic functionality first (view/list), then add creation/editing features. Ensure each step follows the established design patterns and passes all quality checks before proceeding.
+This task leverages substantial existing work while ensuring it integrates seamlessly with the current PinPoint architecture and coding standards.
