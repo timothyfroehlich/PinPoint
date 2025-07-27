@@ -62,37 +62,12 @@ export async function loginAsUser(
 /**
  * Wait for authentication state to be established
  */
-async function waitForAuthentication(
-  page: Page,
-  timeout: number = 10000,
-): Promise<void> {
-  // Wait for either the page reload to complete or authenticated content to appear
-  try {
-    await page.waitForFunction(
-      () => {
-        // Check if authenticated content is visible
-        const dashboard =
-          document.querySelector('text="My Dashboard"') ||
-          document.querySelector('[data-testid="authenticated-dashboard"]') ||
-          document.querySelector("h1, h2, h3, h4, h5, h6");
+async function waitForAuthentication(page: Page): Promise<void> {
+  // Dev login triggers window.location.reload(), so wait for the page reload
+  await page.waitForLoadState("networkidle");
 
-        // Check if user menu is available (indicates authentication)
-        const userMenu = document.querySelector(
-          'button[aria-label="account of current user"]',
-        );
-
-        // Check if dev login is gone (indicates successful auth)
-        const devLogin = document.querySelector('text="Dev Quick Login"');
-
-        return (dashboard && userMenu) || (userMenu && !devLogin);
-      },
-      { timeout },
-    );
-  } catch (error) {
-    // Fallback: wait for page load state and a bit more
-    await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(2000);
-  }
+  // Wait a bit more for React to rehydrate and render authenticated content
+  await page.waitForTimeout(3000);
 }
 
 /**
