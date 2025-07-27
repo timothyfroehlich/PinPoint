@@ -214,8 +214,9 @@ npm run pre-commit
 
 ### Environment Configuration
 
-- **Development Port**: Each worktree has a unique port configuration in the git-ignored `.env` file (e.g., `PORT=49841`)
-- **Port Assignment**: Worktree setup automatically assigns ports to avoid conflicts between different feature branches
+- **Shared Database**: All worktrees use a single shared development database configured via Vercel environment variables
+- **Unique Ports**: Each worktree has unique Next.js and Prisma Studio ports to avoid conflicts (e.g., `PORT=49841`)
+- **Environment Setup**: Worktree setup uses `vercel env pull` to sync shared environment variables, then adds unique port configurations
 - **Check Your Port**: Run `grep PORT .env` to see your current development server port
 
 ### Agent Protocol Benefits
@@ -290,7 +291,7 @@ For detailed guidance beyond these essentials:
 
 ## Critical Notes
 
-- Database strategy in development: sessions clear on `db:reset`
+- Database strategy in development: shared database across all worktrees, sessions clear on `db:reset`
 - Pre-production: frequent schema changes, no migrations
 - OPDB games: global (no organizationId), custom games: organization-scoped
 - **ESM modules**: Project uses `"type": "module"` with native ESM support - Vitest handles this seamlessly

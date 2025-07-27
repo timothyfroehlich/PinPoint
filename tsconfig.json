@@ -19,7 +19,8 @@
     ".next/types/**/*.ts",
     "middleware.ts",
     "prisma/**/*.ts",
-    "tooling.config.ts"
+    "tooling.config.ts",
+    "scripts/**/*.ts"
   ],
   "exclude": [
     "src/_archived_frontend/**/*",
