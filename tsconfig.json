@@ -18,8 +18,7 @@
     "src/**/*.tsx",
     ".next/types/**/*.ts",
     "middleware.ts",
-    "prisma/**/*.ts",
-    "tooling.config.ts"
+    "prisma/**/*.ts"
   ],
   "exclude": [
     "src/_archived_frontend/**/*",
@@ -27,6 +26,15 @@
     "src/**/*.test.*",
     "src/**/*.spec.*",
     "src/**/__tests__/**/*",
-    "src/integration-tests/**/*"
+    "src/integration-tests/**/*",
+    "*.config.js",
+    "*.config.ts",
+    "eslint.config.js",
+    "prettier.config.js",
+    "tooling.config.*",
+    "playwright.config.ts",
+    "vitest.config.ts",
+    "vite.config.ts",
+    "scripts/**/*"
   ]
 }

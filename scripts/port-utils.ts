@@ -282,6 +282,27 @@ async function generateEnvVarsWithAvailability(
 }
 
 /**
+ * Generate environment variables for development only (excludes DATABASE_URL)
+ * Used when DATABASE_URL comes from external source like Vercel
+ */
+function generateDevOnlyEnvVars(
+  workspacePath: string = process.cwd(),
+): EnvironmentVariables {
+  const ports = calculatePorts(workspacePath);
+
+  const envVars: EnvironmentVariables = {};
+
+  // Only set port variables if we're in a worktree environment
+  if (ports.isWorktree && ports.nextPort && ports.prismaStudioPort) {
+    envVars.PORT = ports.nextPort.toString();
+    envVars.PRISMA_STUDIO_PORT = ports.prismaStudioPort.toString();
+    // Intentionally exclude DATABASE_URL
+  }
+
+  return envVars;
+}
+
+/**
  * CLI interface
  */
 if (import.meta.url === `file://${process.argv[1]}`) {
@@ -324,6 +345,13 @@ if (import.meta.url === `file://${process.argv[1]}`) {
           );
           process.exit(1);
         });
+      break;
+
+    case "env-dev-only":
+      const devOnlyEnvVars = generateDevOnlyEnvVars(workspacePath);
+      for (const [key, value] of Object.entries(devOnlyEnvVars)) {
+        console.log(`${key}=${value}`);
+      }
       break;
 
     case "check":
@@ -381,6 +409,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       );
       console.log(
         "  node port-utils.js env-available [workspace-path]   - Get environment variables with availability checking",
+      );
+      console.log(
+        "  node port-utils.js env-dev-only [workspace-path]    - Get dev environment variables (excludes DATABASE_URL)",
       );
       console.log(
         "  node port-utils.js check [workspace-path]           - Check port assignment",
