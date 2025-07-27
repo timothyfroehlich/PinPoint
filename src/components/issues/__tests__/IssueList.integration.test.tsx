@@ -25,13 +25,21 @@ vi.mock("next/navigation", () => ({
 }));
 
 // Mock tRPC API calls with vi.hoisted - preserve React components
-const { mockRefetch, mockIssuesQuery, mockLocationsQuery, mockStatusesQuery } =
-  vi.hoisted(() => ({
-    mockRefetch: vi.fn(),
-    mockIssuesQuery: vi.fn(),
-    mockLocationsQuery: vi.fn(),
-    mockStatusesQuery: vi.fn(),
-  }));
+const {
+  mockRefetch,
+  mockIssuesQuery,
+  mockLocationsQuery,
+  mockStatusesQuery,
+  mockMachinesQuery,
+  mockUsersQuery,
+} = vi.hoisted(() => ({
+  mockRefetch: vi.fn(),
+  mockIssuesQuery: vi.fn(),
+  mockLocationsQuery: vi.fn(),
+  mockStatusesQuery: vi.fn(),
+  mockMachinesQuery: vi.fn(),
+  mockUsersQuery: vi.fn(),
+}));
 
 vi.mock("~/trpc/react", async () => {
   const actual =
@@ -43,29 +51,52 @@ vi.mock("~/trpc/react", async () => {
       createClient: actual.api.createClient,
       Provider: actual.api.Provider,
       issue: {
+        ...actual.api.issue,
         core: {
+          ...actual.api.issue?.core,
           getAll: {
+            ...actual.api.issue?.core?.getAll,
             useQuery: mockIssuesQuery,
           },
         },
       },
       location: {
+        ...actual.api.location,
         getAll: {
+          ...actual.api.location?.getAll,
           useQuery: mockLocationsQuery,
         },
       },
       issueStatus: {
+        ...actual.api.issueStatus,
         getAll: {
+          ...actual.api.issueStatus?.getAll,
           useQuery: mockStatusesQuery,
         },
       },
+      machine: {
+        ...actual.api.machine,
+        core: {
+          ...actual.api.machine?.core,
+          getAll: {
+            ...actual.api.machine?.core?.getAll,
+            useQuery: mockMachinesQuery,
+          },
+        },
+      },
       user: {
+        ...actual.api.user,
         getCurrentMembership: {
+          ...actual.api.user?.getCurrentMembership,
           useQuery: vi.fn(() => ({
             data: null,
             isLoading: false,
             isError: false,
           })),
+        },
+        getAllInOrganization: {
+          ...actual.api.user?.getAllInOrganization,
+          useQuery: mockUsersQuery,
         },
       },
     },
@@ -256,6 +287,18 @@ describe("IssueList - Integration Tests with tRPC APIs", () => {
     mockStatusesQuery.mockReturnValue({
       data: mockStatusesData,
     });
+
+    mockMachinesQuery.mockReturnValue({
+      data: [],
+      isLoading: false,
+      isError: false,
+    });
+
+    mockUsersQuery.mockReturnValue({
+      data: [],
+      isLoading: false,
+      isError: false,
+    });
   });
 
   describe("API Data Fetching Integration", () => {
@@ -329,12 +372,12 @@ describe("IssueList - Integration Tests with tRPC APIs", () => {
       fireEvent.mouseDown(statusSelect);
 
       await waitFor(() => {
-        expect(screen.getAllByText("New")).toHaveLength(2); // Status option + chip
+        expect(screen.getAllByText("New")).toHaveLength(3); // Status in issue + filter option + filter button
       });
 
-      expect(screen.getAllByText("In Progress")).toHaveLength(2); // Status option + chip
-      expect(screen.getAllByText("Resolved")).toHaveLength(2); // Status option + chip
-      expect(screen.getByText("Closed")).toBeInTheDocument();
+      expect(screen.getAllByText("In Progress")).toHaveLength(3); // Status in issue + filter option + additional reference
+      expect(screen.getAllByText("Resolved")).toHaveLength(3); // Filter option + additional references
+      expect(screen.getAllByText("Closed")).toHaveLength(2); // Filter option + another reference
     });
   });
 
@@ -423,7 +466,7 @@ describe("IssueList - Integration Tests with tRPC APIs", () => {
       // Wait for URL update
       await waitFor(() => {
         expect(mockPush).toHaveBeenCalledWith(
-          expect.stringContaining("statusCategory=NEW"),
+          expect.stringContaining("statusIds="),
         );
       });
     });
@@ -481,7 +524,7 @@ describe("IssueList - Integration Tests with tRPC APIs", () => {
 
       await waitFor(() => {
         expect(mockPush).toHaveBeenCalledWith(
-          expect.stringContaining("statusCategory=RESOLVED"),
+          expect.stringContaining("statusIds="),
         );
       });
     });
