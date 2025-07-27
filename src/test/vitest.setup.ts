@@ -11,27 +11,6 @@ const NodeAbortSignal = globalThis.AbortSignal;
 globalThis.AbortController = NodeAbortController;
 globalThis.AbortSignal = NodeAbortSignal;
 
-// Also patch the global fetch to ensure consistent AbortSignal handling
-const originalFetch = globalThis.fetch;
-globalThis.fetch = function (input: RequestInfo | URL, init?: RequestInit) {
-  // Ensure any AbortSignal passed to fetch is the correct global instance
-  if (init?.signal && init.signal instanceof NodeAbortSignal) {
-    return originalFetch(input, init);
-  } else if (init?.signal) {
-    // Convert the signal to the correct type if it's not already
-    const controller = new NodeAbortController();
-    if (init.signal.aborted) {
-      controller.abort();
-    } else {
-      init.signal.addEventListener("abort", () => {
-        controller.abort();
-      });
-    }
-    return originalFetch(input, { ...init, signal: controller.signal });
-  }
-  return originalFetch(input, init);
-} as typeof fetch;
-
 // Common setup for both environments
 beforeAll(() => {
   // Set test environment variables early (NODE_ENV is set by test runner)
@@ -45,6 +24,8 @@ beforeAll(() => {
     GOOGLE_CLIENT_ID: "test-google-client-id",
     GOOGLE_CLIENT_SECRET: "test-google-client-secret",
   });
+
+  // Note: Fetch patching moved to VitestTestWrapper to avoid Vitest startup conflicts
 });
 
 // MSW setup for both Node and jsdom environments
