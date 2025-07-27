@@ -279,7 +279,6 @@ For detailed guidance beyond these essentials:
   - `docs/architecture/permissions-roles-implementation.md` - Complete RBAC implementation guide
   - `docs/architecture/current-state.md` - Current implementation state and multi-tenant architecture
 - **ESLint Errors**: See `docs/developer-guides/common-errors.md` for specific rule violations and fixes
-- **Betterer Workflow**: See `docs/developer-guides/betterer-workflow.md` for migration workflow and team coordination
 - **Script Usage**: See `scripts/README.md` for TypeScript analysis tools
 
 ## Repository
@@ -298,7 +297,7 @@ For detailed guidance beyond these essentials:
 - **Type Safety**: Project enforces strictest TypeScript + type-aware ESLint rules. All `@typescript-eslint/no-unsafe-*` and `no-explicit-any` violations must be fixed
 - **TypeScript Migration**: ✅ Production code is 100% strict mode compliant! Test files being cleaned up incrementally
 - **Testing Framework**: ✅ Vitest exclusively - Jest migration completed with 7-65x performance improvements
-- **Migration Patterns**: Complete TypeScript migration patterns in `docs/developer-guides/typescript-guide.md`. Betterer prevents regressions
+- **Migration Patterns**: Complete TypeScript migration patterns in `docs/developer-guides/typescript-guide.md`
 
 ## Frontend Development Notes
 
@@ -331,7 +330,7 @@ For detailed guidance beyond these essentials:
 - **Dependency injection transformed permission testing**: PermissionDepsProvider pattern enables precise mocking of session and membership data, leading to more reliable permission component tests
 - **Security boundaries blur with public endpoints**: Public APIs can leak sensitive data through careless Prisma queries - explicit `select` clauses are essential for data security
 - **Test mocks often fail to catch real API issues**: If mocks don't match production API structure exactly, tests give false confidence
-- **Betterer integration success**: Regression prevention through measurable progress tracking proved invaluable for maintaining strictest TypeScript compliance during development
+- **TypeScript migration success**: Achieved 100% strictest TypeScript compliance across all production code through systematic error resolution and validation pipeline enforcement
 
 ## Claude Memories
 

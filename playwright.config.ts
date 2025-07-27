@@ -36,7 +36,7 @@ export default defineConfig({
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
     },
-    // Firefox for local development only (CI optimization)
+    // Other browsers only for local development (CI optimization)
     ...(process.env["CI"]
       ? []
       : [

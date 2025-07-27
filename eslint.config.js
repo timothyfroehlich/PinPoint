@@ -248,7 +248,6 @@ export default tseslint.config(
       "vitest.config.ts",
       "jest.config.js",
       "playwright.config.ts",
-      ".betterer.ts",
     ],
   },
 );
