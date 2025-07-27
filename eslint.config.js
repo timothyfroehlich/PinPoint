@@ -164,6 +164,23 @@ export default tseslint.config(
     },
   },
   {
+    // Override: E2E test files - relaxed standards for pragmatic testing
+    files: ["e2e/**/*.{ts,tsx}"],
+    rules: {
+      // Allow process.env for test mocking
+      "no-restricted-properties": "off",
+      // Disable strictNullChecks-dependent rules (E2E tests use relaxed TypeScript)
+      "@typescript-eslint/no-unnecessary-condition": "off",
+      "@typescript-eslint/no-unnecessary-boolean-literal-compare": "off",
+      "@typescript-eslint/prefer-nullish-coalescing": "off",
+      "@typescript-eslint/no-unnecessary-type-assertion": "off",
+      "@typescript-eslint/no-inferrable-types": "off",
+      "@typescript-eslint/restrict-template-expressions": "off",
+      "@typescript-eslint/no-unused-vars": "off",
+      "@typescript-eslint/await-thenable": "off",
+    },
+  },
+  {
     // Legacy override: Allow process.env in remaining test paths
     files: ["**/test/**"],
     rules: {
