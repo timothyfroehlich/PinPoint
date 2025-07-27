@@ -1,6 +1,6 @@
 "use client";
 
-import { AccountCircle } from "@mui/icons-material";
+import { AccountCircle, Menu as MenuIcon } from "@mui/icons-material";
 import PlaceIcon from "@mui/icons-material/Place";
 import {
   AppBar,
@@ -12,9 +12,13 @@ import {
   Avatar,
   useMediaQuery,
   useTheme,
+  Drawer,
+  List,
+  ListItem,
 } from "@mui/material";
 import { useRouter } from "next/navigation";
 import { signIn, useSession } from "next-auth/react";
+import React, { useState } from "react";
 
 import type { JSX } from "react";
 
@@ -25,8 +29,9 @@ const PrimaryAppBar = (): JSX.Element => {
   const router = useRouter();
   const { data: session, status } = useSession();
   const { hasPermission } = usePermissions();
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
-  // Responsive design: hide navigation items on mobile to make room for user menu
+  // Responsive design: show mobile drawer for navigation on small screens
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
@@ -34,11 +39,28 @@ const PrimaryAppBar = (): JSX.Element => {
     void signIn();
   };
 
+  const handleMobileDrawerToggle = (): void => {
+    setMobileDrawerOpen(!mobileDrawerOpen);
+  };
+
   return (
     <AppBar position="fixed" sx={{ bgcolor: "background.paper" }}>
       <Toolbar
         sx={{ justifyContent: "space-between", minHeight: { xs: 56, sm: 64 } }}
       >
+        {/* Mobile Menu Button */}
+        {isMobile && session && (
+          <IconButton
+            color="inherit"
+            aria-label="open navigation menu"
+            edge="start"
+            onClick={handleMobileDrawerToggle}
+            sx={{ mr: 2 }}
+          >
+            <MenuIcon />
+          </IconButton>
+        )}
+
         {/* Logo & Branding */}
         <Box
           component="a"
@@ -126,31 +148,27 @@ const PrimaryAppBar = (): JSX.Element => {
               <AccountCircle />
             </IconButton>
           ) : session ? (
-            // Authenticated state - show user menu
-            <div>
-              <IconButton
-                size="large"
-                aria-label="account of current user"
-                onClick={() => {
-                  router.push("/profile");
-                }}
-                color="inherit"
-              >
-                {session.user.image ? (
-                  <Avatar
-                    src={session.user.image}
-                    alt={session.user.name ?? "User"}
-                    sx={{ width: 32, height: 32 }}
-                  />
-                ) : (
-                  <Avatar
-                    sx={{ bgcolor: "primary.main", width: 32, height: 32 }}
-                  >
-                    {session.user.name?.charAt(0) ?? "U"}
-                  </Avatar>
-                )}
-              </IconButton>
-            </div>
+            // Authenticated state - navigate to profile on click
+            <IconButton
+              size="large"
+              aria-label="account of current user"
+              onClick={() => {
+                router.push("/profile");
+              }}
+              color="inherit"
+            >
+              {session.user.image ? (
+                <Avatar
+                  src={session.user.image}
+                  alt={session.user.name ?? "User"}
+                  sx={{ width: 32, height: 32 }}
+                />
+              ) : (
+                <Avatar sx={{ bgcolor: "primary.main", width: 32, height: 32 }}>
+                  {session.user.name?.charAt(0) ?? "U"}
+                </Avatar>
+              )}
+            </IconButton>
           ) : (
             // Unauthenticated state - show login button
             <Button
@@ -169,6 +187,59 @@ const PrimaryAppBar = (): JSX.Element => {
           )}
         </Box>
       </Toolbar>
+
+      {/* Mobile Navigation Drawer */}
+      <Drawer
+        anchor="left"
+        open={mobileDrawerOpen}
+        onClose={handleMobileDrawerToggle}
+        sx={{ display: { md: "none" } }}
+      >
+        <Box sx={{ width: 250, pt: 2 }}>
+          <List>
+            <ListItem>
+              <Button
+                fullWidth
+                sx={{ justifyContent: "flex-start" }}
+                onClick={() => {
+                  router.push("/");
+                  handleMobileDrawerToggle();
+                }}
+              >
+                Home
+              </Button>
+            </ListItem>
+            {session && hasPermission("issue:view") && (
+              <ListItem>
+                <Button
+                  fullWidth
+                  sx={{ justifyContent: "flex-start" }}
+                  onClick={() => {
+                    router.push("/issues");
+                    handleMobileDrawerToggle();
+                  }}
+                >
+                  Issues
+                </Button>
+              </ListItem>
+            )}
+            {session && hasPermission("machine:view") && (
+              <ListItem>
+                <Button
+                  fullWidth
+                  sx={{ justifyContent: "flex-start" }}
+                  onClick={() => {
+                    router.push("/machines");
+                    handleMobileDrawerToggle();
+                  }}
+                >
+                  Games
+                </Button>
+              </ListItem>
+            )}
+          </List>
+        </Box>
+      </Drawer>
     </AppBar>
   );
 };
