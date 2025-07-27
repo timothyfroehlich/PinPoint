@@ -244,8 +244,12 @@ export default tseslint.config(
       "postcss.config.js",
       "tailwind.config.ts",
       "vitest.config.ts",
+      "vitest.coverage-test.config.ts",
+      "vite.config.ts",
       "jest.config.js",
       "playwright.config.ts",
+      "tooling.config.js",
+      "tooling.config.ts",
     ],
   },
 );

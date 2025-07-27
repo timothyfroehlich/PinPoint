@@ -12,6 +12,7 @@
 PinPoint uses a **multi-tier configuration system** with different TypeScript and ESLint rules for different code contexts:
 
 - **Production Code**: Strictest standards (`@tsconfig/strictest`)
+- **Config/Build Files**: Moderate standards (relaxed for tooling flexibility)
 - **Test Utilities**: Moderate standards (`@tsconfig/recommended`)
 - **Test Files**: Pragmatic patterns (relaxed for testing effectiveness)
 
@@ -25,6 +26,7 @@ PinPoint uses a **multi-tier configuration system** with different TypeScript an
 tooling.config.ts              ← Master patterns & rules
 ├── tsconfig.base.json         ← Shared foundation
 ├── tsconfig.json              ← Production (strictest)
+├── tsconfig.config.json       ← Config/build files (moderate)
 ├── tsconfig.test-utils.json   ← Test utilities (recommended)
 ├── tsconfig.tests.json        ← Test files (relaxed)
 ├── eslint.config.js           ← Multi-tier rules
@@ -78,7 +80,8 @@ INCLUDE_PATTERNS = {
 ### TypeScript Configs
 
 - **`tsconfig.base.json`**: Shared settings (paths, Next.js plugins, module resolution)
-- **`tsconfig.json`**: Production code - extends base + `@tsconfig/strictest`
+- **`tsconfig.json`**: Production code - extends base + `@tsconfig/strictest`, excludes all config files
+- **`tsconfig.config.json`**: Config/build files - extends base, relaxed standards for tooling
 - **`tsconfig.test-utils.json`**: Test utilities - extends base + `@tsconfig/recommended`
 - **`tsconfig.tests.json`**: Test files - extends base only, relaxed settings
 
@@ -102,7 +105,7 @@ INCLUDE_PATTERNS = {
 ### Validation Commands
 
 ```bash
-npm run typecheck           # Production TypeScript (strictest)
+npm run typecheck           # Production + Config TypeScript checks
 npm run lint               # Multi-context ESLint
 npm run betterer           # Regression check
 npm run validate           # Combined validation
@@ -112,8 +115,9 @@ npm run validate           # Combined validation
 
 ```bash
 # Check specific contexts
-npx tsc -p tsconfig.test-utils.json --noEmit    # Test utilities
-npx tsc -p tsconfig.tests.json --noEmit         # Test files
+npx tsc -p tsconfig.config.json --noEmit       # Config/build files
+npx tsc -p tsconfig.test-utils.json --noEmit   # Test utilities
+npx tsc -p tsconfig.tests.json --noEmit        # Test files
 ```
 
 ---
@@ -154,6 +158,7 @@ npx tsc -p tsconfig.tests.json --noEmit         # Test files
 ### Common Issues
 
 - **"TypeScript errors in test files"**: Check if files match `tsconfig.tests.json` patterns
+- **"Config files checked by strictest rules"**: Ensure config files are properly excluded from `tsconfig.json` and included in `tsconfig.config.json`
 - **"ESLint too strict/loose"**: Verify file context in `INCLUDE_PATTERNS`
 - **"Betterer blocking CI"**: Run `npm run betterer:update` for intentional changes
 - **"IDE wrong errors"**: Restart TypeScript service, check project selection
@@ -200,4 +205,4 @@ To add a new file context (e.g., "scripts"):
 
 **Related Docs**: [TypeScript Base Standards](../developer-guides/typescript-base-standards.md) | [TypeScript Strictest Production](../developer-guides/typescript-strictest-production.md) | [Betterer Workflow](../developer-guides/betterer-workflow.md)
 
-**Last Updated**: July 25, 2025
+**Last Updated**: July 27, 2025
