@@ -11,7 +11,14 @@ import {
   IconButton,
 } from "@mui/material";
 import { signIn } from "next-auth/react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+
+interface DevUser {
+  id: string;
+  name: string | null;
+  email: string;
+  role: string | null;
+}
 
 interface DevLoginCompactProps {
   onLogin?: () => void;
@@ -22,13 +29,60 @@ export function DevLoginCompact({
 }: DevLoginCompactProps): React.ReactNode {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [testUsers, setTestUsers] = useState<DevUser[]>([]);
+  const [fetchingUsers, setFetchingUsers] = useState(false);
 
-  // Mock test users for now - in real implementation this would fetch from API
-  const testUsers = [
-    { id: "1", name: "Test Admin", email: "admin@test.com", role: "admin" },
-    { id: "2", name: "Test Member", email: "member@test.com", role: "member" },
-    { id: "3", name: "Test Player", email: "player@test.com", role: "player" },
-  ];
+  // Fetch test users from API
+  useEffect(() => {
+    const fetchUsers = async (): Promise<void> => {
+      setFetchingUsers(true);
+      try {
+        const response = await fetch("/api/dev/users");
+        if (response.ok) {
+          const data = (await response.json()) as { users: DevUser[] };
+          setTestUsers(data.users);
+        } else {
+          console.warn("Failed to fetch dev users, using fallback");
+          // Fallback to some basic users if API fails
+          setTestUsers([
+            {
+              id: "1",
+              name: "Test Admin",
+              email: "admin@test.com",
+              role: "admin",
+            },
+            {
+              id: "2",
+              name: "Test Member",
+              email: "member@test.com",
+              role: "member",
+            },
+          ]);
+        }
+      } catch (error) {
+        console.error("Error fetching dev users:", error);
+        // Fallback users
+        setTestUsers([
+          {
+            id: "1",
+            name: "Test Admin",
+            email: "admin@test.com",
+            role: "admin",
+          },
+          {
+            id: "2",
+            name: "Test Member",
+            email: "member@test.com",
+            role: "member",
+          },
+        ]);
+      } finally {
+        setFetchingUsers(false);
+      }
+    };
+
+    void fetchUsers();
+  }, []);
 
   async function handleLogin(email: string): Promise<void> {
     setIsLoading(true);
@@ -58,9 +112,9 @@ export function DevLoginCompact({
   }
 
   function getRoleColor(
-    role: string,
+    role: string | null,
   ): "error" | "primary" | "success" | "default" {
-    switch (role) {
+    switch (role?.toLowerCase()) {
       case "admin":
         return "error";
       case "member":
@@ -133,43 +187,52 @@ export function DevLoginCompact({
 
       <Collapse in={isExpanded}>
         <Box sx={{ p: 1, pt: 0, maxHeight: 260, overflow: "auto" }}>
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
-            {testUsers.map((testUser) => (
-              <Box
-                key={testUser.id}
-                sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
-              >
-                <Button
-                  variant="contained"
-                  size="small"
-                  disabled={isLoading}
-                  onClick={() => {
-                    void handleLogin(testUser.email);
-                  }}
-                  sx={{
-                    justifyContent: "flex-start",
-                    textTransform: "none",
-                    fontSize: "0.65rem",
-                    flex: 1,
-                    py: 0.5,
-                    minHeight: "auto",
-                  }}
+          {fetchingUsers ? (
+            <Typography
+              variant="caption"
+              sx={{ textAlign: "center", display: "block", py: 1 }}
+            >
+              Loading users...
+            </Typography>
+          ) : (
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+              {testUsers.map((testUser) => (
+                <Box
+                  key={testUser.id}
+                  sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
                 >
-                  {testUser.name}
-                </Button>
-                <Chip
-                  label={testUser.role.charAt(0).toUpperCase()}
-                  size="small"
-                  color={getRoleColor(testUser.role)}
-                  sx={{
-                    fontSize: "0.5rem",
-                    height: "16px",
-                    minWidth: "20px",
-                  }}
-                />
-              </Box>
-            ))}
-          </Box>
+                  <Button
+                    variant="contained"
+                    size="small"
+                    disabled={isLoading || fetchingUsers}
+                    onClick={() => {
+                      void handleLogin(testUser.email);
+                    }}
+                    sx={{
+                      justifyContent: "flex-start",
+                      textTransform: "none",
+                      fontSize: "0.65rem",
+                      flex: 1,
+                      py: 0.5,
+                      minHeight: "auto",
+                    }}
+                  >
+                    {testUser.name ?? testUser.email}
+                  </Button>
+                  <Chip
+                    label={(testUser.role?.charAt(0) ?? "U").toUpperCase()}
+                    size="small"
+                    color={getRoleColor(testUser.role)}
+                    sx={{
+                      fontSize: "0.5rem",
+                      height: "16px",
+                      minWidth: "20px",
+                    }}
+                  />
+                </Box>
+              ))}
+            </Box>
+          )}
         </Box>
       </Collapse>
     </Paper>
