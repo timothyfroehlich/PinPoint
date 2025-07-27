@@ -23,6 +23,7 @@ import type { JSX } from "react";
 
 import { PermissionButton } from "~/components/permissions/PermissionButton";
 import { usePermissions } from "~/hooks/usePermissions";
+import { PERMISSIONS } from "~/server/auth/permissions.constants";
 
 const PrimaryAppBar = (): JSX.Element => {
   const router = useRouter();
@@ -134,6 +135,25 @@ const PrimaryAppBar = (): JSX.Element => {
                   tooltipText="View and manage games"
                 >
                   Games
+                </PermissionButton>
+                <PermissionButton
+                  permission={PERMISSIONS.ORGANIZATION_MANAGE}
+                  hasPermission={hasPermission}
+                  showWhenDenied={false}
+                  color="inherit"
+                  sx={{
+                    borderRadius: 2,
+                    px: 3,
+                    textTransform: "none",
+                    fontWeight: "medium",
+                    "&:hover": { bgcolor: "rgba(255,255,255,0.1)" },
+                  }}
+                  tooltipText="Organization settings and administration"
+                  onClick={() => {
+                    router.push("/settings");
+                  }}
+                >
+                  Settings
                 </PermissionButton>
               </>
             )}
