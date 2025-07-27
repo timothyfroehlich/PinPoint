@@ -12,8 +12,8 @@ export default defineConfig({
   // Retry on CI only
   retries: process.env["CI"] ? 2 : 0,
 
-  // Opt out of parallel tests on CI
-  ...(process.env["CI"] && { workers: 1 }),
+  // Use optimal workers for CI performance
+  workers: 4,
 
   // Reporter to use
   reporter: "html",
@@ -44,11 +44,12 @@ export default defineConfig({
             name: "firefox",
             use: { ...devices["Desktop Firefox"] },
           },
-          {
-            name: "webkit",
-            use: { ...devices["Desktop Safari"] },
-          },
         ]),
+    // WebKit disabled due to authentication issues (see GitHub issue #162)
+    // {
+    //   name: "webkit",
+    //   use: { ...devices["Desktop Safari"] },
+    // },
   ],
 
   // Automatically start dev server for tests

@@ -29,7 +29,7 @@
     "db:reset": "rm -rf prisma/migrations && npx prisma db push --force-reset && npm run seed",
     "seed": "tsx prisma/seed.ts",
     "_comment_quality": "========== Code Quality ==========",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --project tsconfig.config.json --noEmit",
     "lint": "NODE_ENV=development next lint",
     "lint:fix": "NODE_ENV=development next lint --fix --quiet",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,mdx}\" --cache",
