@@ -44,6 +44,7 @@ interface FormData {
   priorityId: string;
   assignedToId: string;
   reporterEmail: string;
+  submitterName: string;
 }
 
 export function IssueCreateForm({
@@ -64,6 +65,7 @@ export function IssueCreateForm({
     priorityId: "",
     assignedToId: "",
     reporterEmail: "",
+    submitterName: "",
   });
 
   // Mock data for now - TODO: Replace with actual API calls
@@ -137,6 +139,7 @@ export function IssueCreateForm({
           description?: string;
           machineId: string;
           reporterEmail?: string;
+          submitterName?: string;
         } = {
           title: formData.title.trim(),
           machineId: formData.machineId,
@@ -148,6 +151,10 @@ export function IssueCreateForm({
 
         if (formData.reporterEmail.trim()) {
           payload.reporterEmail = formData.reporterEmail.trim();
+        }
+
+        if (formData.submitterName.trim()) {
+          payload.submitterName = formData.submitterName.trim();
         }
 
         await createPublicIssueMutation.mutateAsync(payload);
@@ -163,6 +170,7 @@ export function IssueCreateForm({
         priorityId: "",
         assignedToId: "",
         reporterEmail: "",
+        submitterName: "",
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create issue");
@@ -267,9 +275,7 @@ export function IssueCreateForm({
 
             {/* Severity - Available to everyone */}
             <FormControl component="fieldset" sx={{ mb: 3 }}>
-              <FormLabel component="legend">
-                Severity <Chip label="Required" size="small" sx={{ ml: 1 }} />
-              </FormLabel>
+              <FormLabel component="legend">Severity</FormLabel>
               <RadioGroup
                 row
                 value={formData.severity}
@@ -386,14 +392,22 @@ export function IssueCreateForm({
               <Divider sx={{ mb: 3 }} />
               <Box sx={{ mb: 4 }}>
                 <Typography variant="h6" gutterBottom>
-                  Contact Information
-                  <Chip
-                    label="Anonymous User"
-                    size="small"
-                    color="info"
-                    sx={{ ml: 1 }}
-                  />
+                  Get Email Updates
                 </Typography>
+
+                <TextField
+                  fullWidth
+                  label="Your Name (Optional)"
+                  value={formData.submitterName}
+                  onChange={(e) => {
+                    setFormData((prev) => ({
+                      ...prev,
+                      submitterName: e.target.value,
+                    }));
+                  }}
+                  sx={{ mb: 2 }}
+                  placeholder="How would you like to be identified?"
+                />
 
                 <TextField
                   fullWidth

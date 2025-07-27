@@ -248,6 +248,7 @@ model Issue {
   resolvedAt DateTime?
   // Anonymous reporting support
   reporterEmail String? // For anonymous issue reporting
+  submitterName String? // Optional name for anonymous issue reporting
 
   // Relations
   organizationId String

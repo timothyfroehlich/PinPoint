@@ -21,6 +21,7 @@ export const issueCoreRouter = createTRPCRouter({
         description: z.string().optional(),
         machineId: z.string(),
         reporterEmail: z.email().optional(),
+        submitterName: z.string().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -83,6 +84,7 @@ export const issueCoreRouter = createTRPCRouter({
         title: string;
         description?: string | null;
         reporterEmail?: string | null;
+        submitterName?: string | null;
         createdById?: string | null;
         machineId: string;
         organizationId: string;
@@ -99,6 +101,10 @@ export const issueCoreRouter = createTRPCRouter({
 
       if (input.description) {
         issueData.description = input.description;
+      }
+
+      if (input.submitterName) {
+        issueData.submitterName = input.submitterName;
       }
 
       if (input.reporterEmail) {

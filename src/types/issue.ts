@@ -95,6 +95,7 @@ export interface IssueWithDetails {
   updatedAt: Date;
   resolvedAt?: Date | null;
   reporterEmail?: string | null; // For anonymous issue reporting
+  submitterName?: string | null; // Optional name for anonymous issue reporting
   organizationId: string;
   machineId: string;
   statusId: string;

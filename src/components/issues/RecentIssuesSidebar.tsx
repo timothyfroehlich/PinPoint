@@ -1,11 +1,6 @@
 "use client";
 
 import {
-  QrCode as QrCodeIcon,
-  Share as ShareIcon,
-  Analytics as AnalyticsIcon,
-} from "@mui/icons-material";
-import {
   Box,
   Card,
   CardContent,
@@ -28,48 +23,21 @@ interface RecentIssuesSidebarProps {
   session: Session | null;
 }
 
-interface MockIssue {
-  id: string;
-  title: string;
-  createdAt: string;
-  status: { name: string };
-  priority: { name: string };
-  createdBy: { name: string } | null;
-}
-
 export function RecentIssuesSidebar({
   selectedMachineId,
   session: _session,
 }: RecentIssuesSidebarProps): React.JSX.Element {
-  // Mock data for recent issues - TODO: Replace with real API call
-  const mockRecentIssues: MockIssue[] = selectedMachineId
-    ? [
-        {
-          id: "1",
-          title: "Ball gets stuck in shooter",
-          createdAt: "2024-01-20T10:00:00Z",
-          status: { name: "New" },
-          priority: { name: "High" },
-          createdBy: { name: "John Doe" },
-        },
-        {
-          id: "2",
-          title: "Flipper feels weak",
-          createdAt: "2024-01-19T15:30:00Z",
-          status: { name: "In Progress" },
-          priority: { name: "Medium" },
-          createdBy: null,
-        },
-        {
-          id: "3",
-          title: "Score display flickering",
-          createdAt: "2024-01-18T09:15:00Z",
-          status: { name: "Resolved" },
-          priority: { name: "Low" },
-          createdBy: { name: "Sarah Smith" },
-        },
-      ]
-    : [];
+  // Fetch recent issues for the selected machine
+  const { data: recentIssues } = api.issue.core.getAll.useQuery(
+    {
+      machineId: selectedMachineId ?? undefined,
+      sortBy: "created",
+      sortOrder: "desc",
+    },
+    {
+      enabled: !!selectedMachineId,
+    },
+  );
 
   const { data: machineData } = api.machine.core.getById.useQuery(
     { id: selectedMachineId ?? "" },
@@ -107,10 +75,10 @@ export function RecentIssuesSidebar({
             </Typography>
           )}
 
-          {mockRecentIssues.length > 0 ? (
+          {recentIssues && recentIssues.length > 0 ? (
             <>
               <List disablePadding>
-                {mockRecentIssues.slice(0, 5).map((issue, index) => (
+                {recentIssues.slice(0, 5).map((issue, index) => (
                   <React.Fragment key={issue.id}>
                     {index > 0 && <Divider />}
                     <ListItem disablePadding sx={{ py: 1 }}>
@@ -146,7 +114,17 @@ export function RecentIssuesSidebar({
                               color="text.secondary"
                             >
                               {new Date(issue.createdAt).toLocaleDateString()}{" "}
-                              by {issue.createdBy?.name ?? "Anonymous User"}
+                              by{" "}
+                              {issue.createdBy?.name ??
+                                issue.submitterName ??
+                                "Anonymous User"}
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              sx={{ display: "block", mt: 0.5 }}
+                            >
+                              {issue.machine.name || issue.machine.model.name}
                             </Typography>
                           </Box>
                         }
@@ -156,7 +134,7 @@ export function RecentIssuesSidebar({
                 ))}
               </List>
 
-              {mockRecentIssues.length > 5 && (
+              {recentIssues.length > 5 && (
                 <Button
                   variant="text"
                   size="small"
@@ -164,7 +142,7 @@ export function RecentIssuesSidebar({
                   sx={{ mt: 2 }}
                   href={`/machines/${selectedMachineId}`}
                 >
-                  View All Issues ({mockRecentIssues.length})
+                  View All Issues ({recentIssues.length})
                 </Button>
               )}
             </>
@@ -173,53 +151,6 @@ export function RecentIssuesSidebar({
               No recent issues for this machine
             </Alert>
           )}
-        </CardContent>
-      </Card>
-
-      {/* Quick Actions Card */}
-      <Card>
-        <CardContent sx={{ p: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            Quick Actions
-          </Typography>
-
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={<QrCodeIcon />}
-              fullWidth
-              onClick={() => {
-                // TODO: Show QR code for machine
-                console.log("Show QR code for machine:", selectedMachineId);
-              }}
-            >
-              Get QR Code
-            </Button>
-
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={<ShareIcon />}
-              fullWidth
-              onClick={() => {
-                // TODO: Share machine link
-                console.log("Share machine:", selectedMachineId);
-              }}
-            >
-              Share Machine
-            </Button>
-
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={<AnalyticsIcon />}
-              fullWidth
-              href={`/machines/${selectedMachineId}`}
-            >
-              View Machine Stats
-            </Button>
-          </Box>
         </CardContent>
       </Card>
     </Box>
