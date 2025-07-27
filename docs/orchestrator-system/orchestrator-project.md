@@ -12,12 +12,20 @@
 ## Environment
 
 - **Main Repo**: `/home/froeht/Code/PinPoint`
-- **Worktrees**: `/home/froeht/Code/PinPoint-worktrees/`
+- **Worktrees**: `/home/froeht/Code/PinPoint/worktrees/`
 - **Commands**: `npm run dev:full`, `npm run validate`, `npm run validate`
 
-## Key Procedures
+## Orchestrator Command Variations
 
-### Status Checks
+### Available Commands
+
+- **`/orchestrator-feature <task description>`** - Collaborative feature development (research → design → handoff)
+- **`/orchestrator-bugfix <bug description>`** - Autonomous bug fixing (complete fix within session)
+- **`/orchestrator-checkout <PR# or branch>`** - Environment setup for existing branches
+
+### Key Procedures
+
+#### Status Checks
 
 ```bash
 git fetch origin epic/backend-refactor
@@ -26,7 +34,7 @@ git status
 npm run validate
 ```
 
-### Worktree Management
+#### Worktree Management
 
 ```bash
 ./scripts/create-and-setup-worktree.sh <task-name>
@@ -63,27 +71,22 @@ npm run db:reset      # Reset database
 
 ## Task File Organization
 
-### Agent Workspace Structure
+### Standardized Task File
 
-Each worktree contains an `agent_workspace/` directory with specialized task files:
+Each worktree contains a single standardized task file:
 
-**For TDD Workflow (3-agent system):**
+- **`AGENT_TASK.md`** - Single task file in worktree root
+- Created by all orchestrator variants
+- Checked into branches but auto-cleaned from main
+- Contains complete task context and requirements
 
-- `test-agent-task.md` - Test creation instructions
-- `implementation-agent-task.md` - Implementation instructions
-- `review-agent-task.md` - Code review and PR management
-- `SUBAGENT_TASK.md` - General overview and workflow coordination
+### Task File Content Structure
 
-**For Single Agent Tasks:**
-
-- `task-agent-implementation.md` - Single-agent implementation task
-- Or role-specific files like `fix-typescript-errors-task.md`
-
-**Task File Discovery Protocol:**
-
-- Orchestrator checks for existing specialized files first
-- Falls back to creating appropriate files based on task type
-- Always places files in `agent_workspace/` directory within worktree
+- **Mission Statement** - Clear task description
+- **Context** - Background information and constraints
+- **Implementation Steps** - Detailed step-by-step guide
+- **Quality Requirements** - Standards and validation criteria
+- **Success Criteria** - Definition of completion
 
 ## Post-Completion Tasks
 
