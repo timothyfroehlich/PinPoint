@@ -226,8 +226,19 @@ describe("PrimaryAppBar", () => {
     });
   });
 
-  describe("User Profile Menu", () => {
-    it("should open profile menu when avatar is clicked", () => {
+  describe("User Profile Navigation", () => {
+    it("should navigate to profile page when avatar is clicked", async () => {
+      const mockPush = vi.fn();
+      const { useRouter } = await import("next/navigation");
+      vi.mocked(useRouter).mockReturnValue({
+        push: mockPush,
+        replace: vi.fn(),
+        back: vi.fn(),
+        forward: vi.fn(),
+        refresh: vi.fn(),
+        prefetch: vi.fn(),
+      });
+
       render(
         <VitestTestWrapper>
           <PrimaryAppBar />
@@ -239,31 +250,7 @@ describe("PrimaryAppBar", () => {
       });
       fireEvent.click(profileButton);
 
-      expect(screen.getByText("Logout")).toBeInTheDocument();
-    });
-
-    it("should call signOut when logout is clicked", async () => {
-      const { signOut } = await import("next-auth/react");
-      const mockSignOut = vi.mocked(signOut);
-
-      render(
-        <VitestTestWrapper>
-          <PrimaryAppBar />
-        </VitestTestWrapper>,
-      );
-
-      // Open menu
-      const profileButton = screen.getByRole("button", {
-        name: /account of current user/i,
-      });
-      fireEvent.click(profileButton);
-
-      // Click logout
-      const logoutItem = screen.getByText("Logout");
-      fireEvent.click(logoutItem);
-
-      // Should call signOut
-      expect(mockSignOut).toHaveBeenCalledOnce();
+      expect(mockPush).toHaveBeenCalledWith("/profile");
     });
 
     it("should have proper accessibility attributes", () => {
@@ -280,8 +267,9 @@ describe("PrimaryAppBar", () => {
         "aria-label",
         "account of current user",
       );
-      expect(profileButton).toHaveAttribute("aria-controls", "menu-appbar");
-      expect(profileButton).toHaveAttribute("aria-haspopup", "true");
+      // No dropdown menu attributes expected
+      expect(profileButton).not.toHaveAttribute("aria-controls");
+      expect(profileButton).not.toHaveAttribute("aria-haspopup");
     });
   });
 
