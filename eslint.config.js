@@ -1,18 +1,15 @@
 // eslint.config.js
-// @ts-check - Enable TypeScript checking for this file
 
 import tseslint from "typescript-eslint";
-// @ts-expect-error - No TypeScript declarations available
 import nextPlugin from "@next/eslint-plugin-next";
 import importPlugin from "eslint-plugin-import";
-// @ts-expect-error - No TypeScript declarations available
 import promisePlugin from "eslint-plugin-promise";
 import unusedImportsPlugin from "eslint-plugin-unused-imports";
 import {
   INCLUDE_PATTERNS,
   ESLINT_RULES,
   convertPatterns,
-} from "./tooling.config.ts";
+} from "./tooling.config.js";
 
 export default tseslint.config(
   ...tseslint.configs.recommended,
@@ -29,6 +26,7 @@ export default tseslint.config(
           "./tsconfig.json",
           "./tsconfig.test-utils.json",
           "./tsconfig.tests.json",
+          "./tsconfig.config.json",
         ],
         tsconfigRootDir: import.meta.dirname,
       },

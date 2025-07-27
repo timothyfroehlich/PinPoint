@@ -1,0 +1,23 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    /* Configuration files - moderate standards (similar to test-utils) */
+    "strict": true,
+    "strictNullChecks": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    /* Allow more flexibility than production for build tools */
+    "exactOptionalPropertyTypes": false,
+    "noUncheckedIndexedAccess": false
+  },
+  "include": [
+    "*.config.{ts,js}",
+    "scripts/**/*.{ts,js}",
+    ".betterer.ts",
+    "types/**/*.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "coverage/**/*"
+  ]
+}
