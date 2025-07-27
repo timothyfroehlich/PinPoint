@@ -39,7 +39,7 @@
     "test:watch": "vitest watch",
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",
-    "test:e2e": "playwright test",
+    "test:e2e": "playwright test --headed=false",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
     "_comment_validation": "========== Validation & Pre-commit ==========",
