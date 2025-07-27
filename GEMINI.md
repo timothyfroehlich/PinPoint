@@ -271,7 +271,6 @@ For detailed guidance beyond these essentials:
 - **TypeScript Issues**: See `docs/developer-guides/typescript-guide.md` for comprehensive TypeScript setup, error resolution, and migration patterns
 - **Testing Patterns**: See `docs/testing/vitest-best-practices.md` for Vitest patterns and performance data
 - **ESLint Errors**: See `docs/developer-guides/common-errors.md` for specific rule violations and fixes
-- **Betterer Workflow**: See `docs/developer-guides/betterer-workflow.md` for migration workflow and team coordination
 - **Migration Lessons**: All migration insights now consolidated in `docs/developer-guides/typescript-guide.md`
 - **Script Usage**: See `scripts/README.md` for TypeScript analysis tools
 
@@ -290,7 +289,7 @@ For detailed guidance beyond these essentials:
 - **ESM modules**: Project uses `"type": "module"` with native ESM support - Vitest handles this seamlessly
 - **Type Safety**: Project enforces strictest TypeScript + type-aware ESLint rules. All `@typescript-eslint/no-unsafe-*` and `no-explicit-any` violations must be fixed
 - **TypeScript Migration**: ✅ Production code is 100% strict mode compliant! Test files being cleaned up incrementally
-- **Migration Patterns**: Complete TypeScript migration patterns in `docs/developer-guides/typescript-guide.md`. Betterer prevents regressions
+- **Migration Patterns**: Complete TypeScript migration patterns in `docs/developer-guides/typescript-guide.md`
 
 ## Frontend Development Notes
 

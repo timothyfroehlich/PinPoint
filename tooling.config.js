@@ -11,7 +11,6 @@
  * - Clear separation between production, test utilities, and test files
  * - Follows patterns documented by TypeScript ESLint and Vitest
  */
-
 /**
  * File inclusion patterns for different code contexts
  * These patterns explicitly define what each tool should process
@@ -19,10 +18,8 @@
 export const INCLUDE_PATTERNS = {
   // Production source code - strictest standards
   production: ["./src/**/*.{ts,tsx}"],
-
   // Test utility files - moderate standards (reusable test code)
   testUtils: ["./src/test/**/*.{ts,tsx}"],
-
   // Test files - relaxed standards (pragmatic testing patterns)
   tests: [
     "./src/**/*.test.{ts,tsx}",
@@ -31,11 +28,9 @@ export const INCLUDE_PATTERNS = {
     "./src/integration-tests/**/*.{ts,tsx}",
     "./e2e/**/*.{ts,tsx}",
   ],
-
   // Build and configuration files
   config: ["./*.config.{js,ts}", "./scripts/**/*.{js,ts}", "./prisma/**/*.ts"],
-} as const;
-
+};
 /**
  * Exclusion patterns for production code
  * Used by tools that need to exclude test files from production rules
@@ -48,8 +43,7 @@ export const EXCLUDE_PATTERNS = {
     "./src/**/__tests__/**/*",
     "./src/integration-tests/**/*",
   ],
-} as const;
-
+};
 /**
  * TypeScript compiler configurations for different contexts
  * Based on @tsconfig/* packages for consistency
@@ -64,7 +58,6 @@ export const TYPESCRIPT_CONFIGS = {
     noFallthroughCasesInSwitch: true,
     noUncheckedSideEffectImports: true,
   },
-
   // Test utilities: @tsconfig/recommended equivalent
   testUtils: {
     strict: true,
@@ -75,7 +68,6 @@ export const TYPESCRIPT_CONFIGS = {
     exactOptionalPropertyTypes: false,
     noUncheckedIndexedAccess: false,
   },
-
   // Tests: Relaxed for pragmatic testing
   tests: {
     strict: false,
@@ -85,8 +77,7 @@ export const TYPESCRIPT_CONFIGS = {
     exactOptionalPropertyTypes: false,
     noUncheckedIndexedAccess: false,
   },
-} as const;
-
+};
 /**
  * ESLint rule configurations by context
  */
@@ -101,7 +92,6 @@ export const ESLINT_RULES = {
     "@typescript-eslint/no-unsafe-return": "error",
     "@typescript-eslint/no-unsafe-enum-comparison": "error",
   },
-
   // Test utilities - moderate warnings
   testUtils: {
     "@typescript-eslint/no-explicit-any": "warn",
@@ -112,7 +102,6 @@ export const ESLINT_RULES = {
     "@typescript-eslint/no-unsafe-return": "warn",
     "@typescript-eslint/no-unsafe-enum-comparison": "warn",
   },
-
   // Test files - allow pragmatic patterns
   tests: {
     "@typescript-eslint/no-explicit-any": "off",
@@ -128,8 +117,7 @@ export const ESLINT_RULES = {
     "@typescript-eslint/require-await": "off",
     "@typescript-eslint/no-unused-vars": "off",
   },
-} as const;
-
+};
 /**
  * Helper functions for converting between tool-specific pattern formats
  */
@@ -137,22 +125,20 @@ export const convertPatterns = {
   /**
    * Convert inclusion patterns for ESLint (no './' prefix)
    */
-  forESLint: (patterns: readonly string[]): string[] => {
+  forESLint: (patterns) => {
     return patterns.map((pattern) =>
       pattern.startsWith("./") ? pattern.slice(2) : pattern,
     );
   },
-
   /**
    * Convert inclusion patterns for TypeScript configs (no './' prefix)
    */
-  forTSConfig: (patterns: readonly string[]): string[] => {
+  forTSConfig: (patterns) => {
     return patterns.map((pattern) =>
       pattern.startsWith("./") ? pattern.slice(2) : pattern,
     );
   },
-} as const;
-
+};
 /**
  * Standard severity levels for consistent tooling
  */
@@ -160,9 +146,4 @@ export const SEVERITY = {
   ERROR: "error",
   WARN: "warn",
   OFF: "off",
-} as const;
-
-// Type exports for better IDE support
-export type IncludePatternsKey = keyof typeof INCLUDE_PATTERNS;
-export type TypeScriptConfigKey = keyof typeof TYPESCRIPT_CONFIGS;
-export type ESLintRulesKey = keyof typeof ESLINT_RULES;
+};
