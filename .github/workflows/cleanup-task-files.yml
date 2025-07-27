@@ -18,7 +18,7 @@ jobs:
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -44,7 +44,7 @@ jobs:
       - name: Create cleanup PR
         if: steps.check-files.outputs.found == 'true'
         id: create-pr
-        uses: peter-evans/create-pull-request@c5a7806660adbe173f04e3e038b0ccdcd758773c # v6
+        uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "chore: cleanup AGENT_TASK.md files after merge"
@@ -69,14 +69,14 @@ jobs:
           
       - name: Auto-approve cleanup PR
         if: steps.check-files.outputs.found == 'true'
-        uses: juliangruber/approve-pull-request-action@b71c44fd4d04c3c8252f1cf24bfb50c7e13a64a0 # v2
+        uses: juliangruber/approve-pull-request-action@v2
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           number: ${{ steps.create-pr.outputs.pull-request-number }}
           
       - name: Enable auto-merge
         if: steps.check-files.outputs.found == 'true'
-        uses: peter-evans/enable-pull-request-automerge@a660677d5ad68e9dcc0b29b2d6552c5e66fcd27c # v3
+        uses: peter-evans/enable-pull-request-automerge@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           pull-request-number: ${{ steps.create-pr.outputs.pull-request-number }}

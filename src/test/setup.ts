@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { vi } from "vitest";
+import { vi, afterEach } from "vitest";
 
 // Mock environment variables for testing
 Object.defineProperty(process.env, "NODE_ENV", {
@@ -7,18 +7,22 @@ Object.defineProperty(process.env, "NODE_ENV", {
   writable: true,
   configurable: true,
 });
-process.env.AUTH_SECRET = "test-auth-secret";
-process.env.NEXTAUTH_SECRET = "test-auth-secret"; // Alternative name
-process.env.GOOGLE_CLIENT_ID = "test-google-client-id";
-process.env.GOOGLE_CLIENT_SECRET = "test-google-client-secret";
-process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test";
-process.env.OPDB_API_URL = "https://opdb.org/api";
-process.env.DEFAULT_ORG_SUBDOMAIN = "apc";
-process.env.OPDB_API_KEY = "test-token";
-process.env.IMAGE_STORAGE_PROVIDER = "local";
-process.env.NEXTAUTH_URL = "http://localhost:3000";
-process.env.VERCEL_URL = "";
-process.env.PORT = "3000";
+
+// Use Object.assign to avoid TypeScript/ESLint conflicts with env variable assignment
+Object.assign(process.env, {
+  AUTH_SECRET: "test-auth-secret",
+  NEXTAUTH_SECRET: "test-auth-secret", // Alternative name
+  GOOGLE_CLIENT_ID: "test-google-client-id",
+  GOOGLE_CLIENT_SECRET: "test-google-client-secret",
+  DATABASE_URL: "postgresql://test:test@localhost:5432/test",
+  OPDB_API_URL: "https://opdb.org/api",
+  DEFAULT_ORG_SUBDOMAIN: "apc",
+  OPDB_API_KEY: "test-token",
+  IMAGE_STORAGE_PROVIDER: "local",
+  NEXTAUTH_URL: "http://localhost:3000",
+  VERCEL_URL: "",
+  PORT: "3000",
+});
 
 // Mock fetch globally for tests
 global.fetch = vi.fn();
@@ -217,6 +221,7 @@ global.Request = vi
     url: input,
     method: init?.method ?? "GET",
     headers: new Map(Object.entries(init?.headers ?? {})),
+    signal: init?.signal, // Properly forward AbortSignal for tRPC compatibility
     json: vi.fn().mockResolvedValue({}),
     text: vi.fn().mockResolvedValue(""),
   })) as unknown as typeof Request;
@@ -252,7 +257,6 @@ vi.mock("next/server", () => ({
 }));
 
 // Reset all mocks after each test
-// eslint-disable-next-line @typescript-eslint/no-unsafe-call
 afterEach(() => {
   vi.clearAllMocks();
 });
