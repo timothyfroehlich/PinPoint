@@ -94,16 +94,17 @@ export interface IssueWithDetails {
   createdAt: Date;
   updatedAt: Date;
   resolvedAt?: Date | null;
+  reporterEmail?: string | null; // For anonymous issue reporting
   organizationId: string;
   machineId: string;
   statusId: string;
   priorityId: string;
-  createdById: string;
+  createdById: string | null; // Nullable for anonymous issues
   assignedToId?: string | null;
   machine: Machine;
   priority: Priority;
   status: IssueStatus;
-  createdBy: User;
+  createdBy: User | null; // Nullable for anonymous issues
   assignedTo?: User | null;
   comments: Comment[];
   attachments: Attachment[];

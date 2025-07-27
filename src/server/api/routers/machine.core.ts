@@ -102,6 +102,73 @@ export const machineCoreRouter = createTRPCRouter({
     });
   }),
 
+  // Public endpoint for issue reporting - returns machine details for issue form
+  getByIdPublic: publicProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ ctx, input }) => {
+      // Use the organization resolved from subdomain context
+      const organization = ctx.organization;
+
+      if (!organization) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Organization not found",
+        });
+      }
+
+      const machine = await ctx.db.machine.findFirst({
+        where: {
+          id: input.id,
+          location: {
+            organizationId: organization.id,
+          },
+        },
+        select: {
+          id: true,
+          name: true,
+          model: {
+            select: {
+              id: true,
+              name: true,
+              manufacturer: true,
+              year: true,
+            },
+          },
+          location: {
+            select: {
+              id: true,
+              name: true,
+              street: true,
+              city: true,
+              state: true,
+            },
+          },
+          _count: {
+            select: {
+              issues: {
+                where: {
+                  status: {
+                    category: {
+                      in: ["NEW", "IN_PROGRESS"],
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!machine) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Machine not found",
+        });
+      }
+
+      return machine;
+    }),
+
   // Public endpoint for issue reporting - returns minimal data needed for issue form
   getAllForIssues: publicProcedure.query(({ ctx }) => {
     // Use the organization resolved from subdomain context

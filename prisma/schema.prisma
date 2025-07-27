@@ -246,20 +246,22 @@ model Issue {
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
   resolvedAt DateTime?
+  // Anonymous reporting support
+  reporterEmail String? // For anonymous issue reporting
 
   // Relations
   organizationId String
   machineId      String
   statusId       String
   priorityId     String
-  createdById    String
+  createdById    String?  // Nullable for anonymous issues
   assignedToId   String?
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   machine      Machine      @relation(fields: [machineId], references: [id])
   priority     Priority     @relation(fields: [priorityId], references: [id])
   status       IssueStatus  @relation(fields: [statusId], references: [id])
-  createdBy    User         @relation("CreatedBy", fields: [createdById], references: [id])
+  createdBy    User?        @relation("CreatedBy", fields: [createdById], references: [id])
   assignedTo   User?        @relation("AssignedTo", fields: [assignedToId], references: [id])
 
   comments    Comment[]

@@ -23,6 +23,7 @@ import {
 import type { Session } from "next-auth";
 import type { RouterOutputs } from "~/trpc/react";
 
+import { IssueReportForm } from "~/components/issues/IssueReportForm";
 import { PermissionGate } from "~/components/permissions";
 import { usePermissions } from "~/hooks/usePermissions";
 
@@ -378,6 +379,14 @@ export function MachineDetailView({
           </Card>
         </Grid>
       </Grid>
+
+      {/* Issue Reporting Section */}
+      <Box sx={{ mt: 4 }}>
+        <Typography variant="h5" gutterBottom>
+          Report an Issue
+        </Typography>
+        <IssueReportForm machineId={machineId} />
+      </Box>
     </Container>
   );
 }
