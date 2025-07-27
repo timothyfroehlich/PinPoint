@@ -8,7 +8,6 @@ import {
   Box,
   Typography,
   Avatar,
-  Chip,
   CircularProgress,
 } from "@mui/material";
 import * as React from "react";
@@ -23,13 +22,8 @@ interface MachineSelectorProps {
 
 interface MachineOption {
   id: string;
-  name: string;
+  name: string | null;
   model: {
-    name: string;
-    manufacturer?: string | null;
-    year?: number | null;
-  };
-  location: {
     name: string;
   };
 }
@@ -39,7 +33,8 @@ export function MachineSelector({
   onChange,
   required = false,
 }: MachineSelectorProps): React.JSX.Element {
-  const { data: machines, isLoading } = api.machine.core.getAll.useQuery();
+  const { data: machines, isLoading } =
+    api.machine.core.getAllForIssues.useQuery();
 
   return (
     <FormControl fullWidth required={required}>
@@ -79,22 +74,11 @@ export function MachineSelector({
               </Avatar>
               <Box sx={{ flexGrow: 1 }}>
                 <Typography variant="body2" fontWeight="medium">
-                  {machine.name || machine.model.name}
+                  {machine.name ?? machine.model.name}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
                   {machine.model.name}
-                  {machine.model.manufacturer &&
-                    ` • ${machine.model.manufacturer}`}
-                  {machine.model.year && ` • ${String(machine.model.year)}`}
                 </Typography>
-                <Box sx={{ mt: 0.25 }}>
-                  <Chip
-                    label={machine.location.name}
-                    size="small"
-                    variant="outlined"
-                    sx={{ fontSize: "0.6rem", height: "18px" }}
-                  />
-                </Box>
               </Box>
             </Box>
           </MenuItem>
