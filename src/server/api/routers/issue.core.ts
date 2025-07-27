@@ -13,6 +13,137 @@ import {
 } from "~/server/api/trpc.permission";
 
 export const issueCoreRouter = createTRPCRouter({
+  // Public issue creation for anonymous users (via QR codes)
+  publicCreate: publicProcedure
+    .input(
+      z.object({
+        title: z.string().min(1).max(255),
+        description: z.string().optional(),
+        machineId: z.string(),
+        reporterEmail: z.email().optional(),
+        submitterName: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Organization is guaranteed by publicProcedure middleware via subdomain
+      const organization = ctx.organization;
+
+      if (!organization) {
+        throw new Error("Organization not found");
+      }
+
+      // Verify that the machine belongs to the organization
+      const machine = await ctx.db.machine.findFirst({
+        where: {
+          id: input.machineId,
+        },
+        include: {
+          location: {
+            select: {
+              organizationId: true,
+            },
+          },
+        },
+      });
+
+      if (!machine || machine.location.organizationId !== organization.id) {
+        throw new Error(
+          "Machine not found or does not belong to this organization",
+        );
+      }
+
+      // Get the default "New" status for this organization
+      const newStatus = await ctx.db.issueStatus.findFirst({
+        where: {
+          isDefault: true,
+          organizationId: organization.id,
+        },
+      });
+
+      if (!newStatus) {
+        throw new Error(
+          "Default issue status not found. Please contact an administrator.",
+        );
+      }
+
+      const defaultPriority = await ctx.db.priority.findFirst({
+        where: {
+          isDefault: true,
+          organizationId: organization.id,
+        },
+      });
+
+      if (!defaultPriority) {
+        throw new Error(
+          "Default priority not found. Please contact an administrator.",
+        );
+      }
+
+      // Create the issue without a user (anonymous)
+      const issueData: {
+        title: string;
+        description?: string | null;
+        reporterEmail?: string | null;
+        submitterName?: string | null;
+        createdById?: string | null;
+        machineId: string;
+        organizationId: string;
+        statusId: string;
+        priorityId: string;
+      } = {
+        title: input.title,
+        createdById: null, // Anonymous issue
+        machineId: input.machineId,
+        organizationId: organization.id,
+        statusId: newStatus.id,
+        priorityId: defaultPriority.id,
+      };
+
+      if (input.description) {
+        issueData.description = input.description;
+      }
+
+      if (input.submitterName) {
+        issueData.submitterName = input.submitterName;
+      }
+
+      if (input.reporterEmail) {
+        issueData.reporterEmail = input.reporterEmail;
+      }
+
+      const issue = await ctx.db.issue.create({
+        data: issueData,
+        include: {
+          status: true,
+          createdBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              image: true,
+            },
+          },
+          machine: {
+            include: {
+              model: true,
+              location: true,
+            },
+          },
+        },
+      });
+
+      // Note: Skip activity recording for anonymous issues
+      // Activity service requires actorId, which we don't have for anonymous users
+
+      // Send notifications for new issue
+      const notificationService = ctx.services.createNotificationService();
+      await notificationService.notifyMachineOwnerOfIssue(
+        issue.id,
+        input.machineId,
+      );
+
+      return issue;
+    }),
   // Create issue - requires issue:create permission
   create: issueCreateProcedure
     .input(

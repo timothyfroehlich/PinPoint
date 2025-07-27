@@ -18,26 +18,25 @@ import * as React from "react";
 
 import { api } from "~/trpc/react";
 
-// Interface for public issue data from the publicGetAll endpoint
-// This matches the exact select clause from the publicGetAll query
+// Interface for the public issue data returned by publicGetAll
 interface PublicIssueData {
   id: string;
   title: string;
-  createdAt: Date;
-  submitterName: string | null;
+  createdAt: string | Date;
+  submitterName?: string | null;
   status: {
     id: string;
     name: string;
+    category: "NEW" | "IN_PROGRESS" | "RESOLVED";
     organizationId: string;
     isDefault: boolean;
-    category: "NEW" | "IN_PROGRESS" | "RESOLVED";
   };
   priority: {
     id: string;
     name: string;
     order: number;
-    isDefault: boolean;
     organizationId: string;
+    isDefault: boolean;
   };
   assignedTo: {
     id: string;
@@ -53,15 +52,17 @@ interface PublicIssueData {
   } | null;
   machine: {
     id: string;
-    name: string | null;
-    modelId: string;
-    locationId: string;
+    name: string;
     model: {
+      id: string;
       name: string;
+      manufacturer: string | null;
+      year: number | null;
     };
     location: {
+      id: string;
       name: string;
-      [key: string]: unknown;
+      organizationId: string;
     };
   };
 }
@@ -81,7 +82,7 @@ export function RecentIssuesSidebar({
       machineId: selectedMachineId ?? undefined,
       sortBy: "created",
       sortOrder: "desc",
-      limit: 10, // Limit to 10 recent issues
+      limit: 10,
     },
     {
       enabled: !!selectedMachineId,
@@ -175,7 +176,7 @@ export function RecentIssuesSidebar({
                                 color="text.secondary"
                                 sx={{ display: "block", mt: 0.5 }}
                               >
-                                {issue.machine.name ?? issue.machine.model.name}
+                                {issue.machine.name || issue.machine.model.name}
                               </Typography>
                             </Box>
                           }
