@@ -41,6 +41,20 @@ This project leverages a modern, type-safe, and performant technology stack to e
 - **Database:**(<https://www.postgresql.org/>)
 - **Authentication:** [NextAuth.js](https://next-auth.js.org/)
 
+## Development Prerequisites
+
+For the best development experience, install these tools globally:
+
+- **[TypeScript](https://www.typescriptlang.org/)** - Enables `tsc` command and TypeScript CLI tools
+- **[Vercel CLI](https://vercel.com/cli)** - Essential for deployments and environment management (`vercel env pull`)
+- **[ESLint](https://eslint.org/)** - Code linting and quality checks across projects
+- **[Prettier](https://prettier.io/)** - Code formatting for consistent style
+- **[Vitest](https://vitest.dev/)** - Testing framework with global CLI access
+
+```bash
+npm install -g typescript vercel eslint prettier vitest
+```
+
 ## Roadmap
 
 PinPoint is designed to evolve. Key features planned for future releases include:
