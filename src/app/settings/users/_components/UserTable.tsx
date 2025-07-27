@@ -19,7 +19,7 @@ import {
 interface User {
   id: string;
   name: string | null;
-  email: string;
+  email: string | null;
   profilePicture: string | null;
   emailVerified: Date | null;
   createdAt: Date;
@@ -72,7 +72,7 @@ export function UserTable({
                     sx={{ width: 40, height: 40 }}
                   >
                     {user.name?.[0]?.toUpperCase() ??
-                      user.email[0]?.toUpperCase()}
+                      user.email?.[0]?.toUpperCase()}
                   </Avatar>
                   <Typography variant="body1" fontWeight="medium">
                     {user.name ?? user.email}

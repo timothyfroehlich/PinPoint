@@ -206,6 +206,26 @@ const PrimaryAppBar = (): JSX.Element => {
                 open={open}
                 onClose={handleClose}
               >
+                {hasPermission(PERMISSIONS.ORGANIZATION_MANAGE) && (
+                  <MenuItem
+                    onClick={() => {
+                      handleClose();
+                      router.push("/settings");
+                    }}
+                  >
+                    Organization Settings
+                  </MenuItem>
+                )}
+                {hasPermission(PERMISSIONS.ROLE_MANAGE) && (
+                  <MenuItem
+                    onClick={() => {
+                      handleClose();
+                      router.push("/settings/roles");
+                    }}
+                  >
+                    Roles & Permissions
+                  </MenuItem>
+                )}
                 <MenuItem
                   onClick={() => {
                     void handleLogout();
