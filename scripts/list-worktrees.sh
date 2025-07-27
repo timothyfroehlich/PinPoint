@@ -43,10 +43,11 @@ get_last_commit() {
     fi
 }
 
-# Function to check if worktree is in PinPoint-worktrees directory
+# Function to check if worktree is in project worktrees directory
 is_task_worktree() {
     local path=$1
-    if [[ "$path" == *"PinPoint-worktrees"* ]]; then
+    local project_worktrees="$(git rev-parse --show-toplevel 2>/dev/null)/worktrees"
+    if [[ "$path" == "$project_worktrees"* ]]; then
         echo "true"
     else
         echo "false"
