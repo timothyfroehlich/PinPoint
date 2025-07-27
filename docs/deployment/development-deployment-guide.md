@@ -96,9 +96,10 @@ npm run dev
 # Access application
 # → http://localhost:3000
 
-# View database
-npx prisma studio
-# → http://localhost:5555
+# View database schema
+cat prisma/schema.prisma
+# Query data samples
+psql $DATABASE_URL -c "SELECT * FROM \"Organization\" LIMIT 5;"
 ```
 
 ### Database Operations
@@ -341,7 +342,7 @@ npm run validate  # Husky hooks
 npm run dev              # Start local server
 npm run db:push          # Push schema changes
 npm run seed:dev         # Seed development data
-npx prisma studio        # Open database viewer
+# View database (see CLAUDE.md for efficient query examples)
 
 # Preview Deployment
 vercel                   # Deploy to preview

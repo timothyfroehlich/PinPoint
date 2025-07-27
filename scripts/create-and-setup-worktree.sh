@@ -30,7 +30,7 @@ fi
 
 TASK_NAME=$1
 BASE_BRANCH=${2:-$(git branch --show-current)}
-WORKTREE_DIR="$HOME/Code/PinPoint-worktrees"
+WORKTREE_DIR="$(git rev-parse --show-toplevel)/worktrees"
 BRANCH_NAME="task/$TASK_NAME"
 
 echo -e "${BLUE}🚀 Creating Worktree for Task: $TASK_NAME${NC}"
@@ -90,11 +90,8 @@ fi
 # Change to worktree directory
 cd "$WORKTREE_PATH"
 
-# Create agent_workspace directory if it doesn't exist
-mkdir -p agent_workspace
-
 # Create a basic task file placeholder
-cat > agent_workspace/SUBAGENT_TASK.md << EOF
+cat > AGENT_TASK.md << EOF
 # Task: $TASK_NAME
 
 ## Mission Statement
@@ -126,7 +123,7 @@ When your task is complete:
 *This task file will be updated by the orchestrator with specific details*
 EOF
 
-echo -e "${GREEN}✓ Task file template created at agent_workspace/SUBAGENT_TASK.md${NC}"
+echo -e "${GREEN}✓ Task file template created at AGENT_TASK.md${NC}"
 
 # Run the existing setup script
 echo -e "${YELLOW}⚙️  Running worktree setup...${NC}"
@@ -143,7 +140,7 @@ echo -e "${BLUE}🎉 Worktree Creation Complete!${NC}"
 echo "========================================"
 echo -e "${BLUE}📍 Path:${NC} $WORKTREE_PATH"
 echo -e "${BLUE}🌿 Branch:${NC} $BRANCH_NAME"
-echo -e "${BLUE}📋 Task File:${NC} $WORKTREE_PATH/agent_workspace/SUBAGENT_TASK.md"
+echo -e "${BLUE}📋 Task File:${NC} $WORKTREE_PATH/AGENT_TASK.md"
 echo ""
 echo -e "${BLUE}📝 Next Steps:${NC}"
 echo "1. Update the task file with specific requirements"

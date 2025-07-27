@@ -58,6 +58,13 @@ npm run pre-commit   # Pre-PR validation (MUST PASS)
 npm run db:reset
 npm run db:push
 
+# Database Inspection (Efficient - DON'T USE PRISMA STUDIO)
+# Read schema structure: prisma/schema.prisma
+# Query data samples directly (no GUI needed):
+npx prisma db execute --stdin <<< "SELECT * FROM \"Organization\" LIMIT 5;"
+psql $DATABASE_URL -c "SELECT COUNT(*) FROM \"User\";"
+# DON'T launch Prisma Studio unless debugging specific data issues
+
 # Quick Fixes & Debug
 npm run fix             # Auto-fix lint + format issues
 npm run debug:test      # Verbose test output
@@ -310,6 +317,7 @@ For detailed guidance beyond these essentials:
 
 - **ESLint Disabling**: NEVER add an eslint-disable unless you have exhausted all other options and confirmed with the user that it is the correct thing to do.
 - **E2E Testing**: Use `npm run test:e2e` (headless). NEVER use `test:e2e:headed` or `test:e2e:ui` as they show browser windows and interrupt the user's workflow.
+- **Prisma Studio**: AVOID launching Prisma Studio (`npm run db:studio`) unless absolutely necessary for debugging complex data issues. Use direct SQL queries, schema file reading, or existing component inspection instead.
 
 ## Key Lessons Learned (Non-Obvious Insights)
 
