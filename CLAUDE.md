@@ -72,6 +72,8 @@ npm run debug:lint      # Detailed lint output
 
 # Testing
 npm run test:coverage
+npm run test:e2e         # E2E tests (headless - no browser windows)
+# AVOID: test:e2e:headed, test:e2e:ui (these show browser windows)
 
 # TypeScript Error Filtering
 npm run typecheck                                 # Check entire project (recommended)
@@ -314,6 +316,7 @@ For detailed guidance beyond these essentials:
 ## Development Practices
 
 - **ESLint Disabling**: NEVER add an eslint-disable unless you have exhausted all other options and confirmed with the user that it is the correct thing to do.
+- **E2E Testing**: Use `npm run test:e2e` (headless). NEVER use `test:e2e:headed` or `test:e2e:ui` as they show browser windows and interrupt the user's workflow.
 - **Prisma Studio**: AVOID launching Prisma Studio (`npm run db:studio`) unless absolutely necessary for debugging complex data issues. Use direct SQL queries, schema file reading, or existing component inspection instead.
 
 ## Key Lessons Learned (Non-Obvious Insights)
