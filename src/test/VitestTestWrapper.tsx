@@ -229,7 +229,7 @@ export function VitestTestWrapper({
       }),
   );
 
-  // Create a real tRPC client - MSW will intercept HTTP requests
+  // Create a mock tRPC client to avoid AbortSignal issues in tests
   const [trpcClient] = useState(() => {
     // eslint-disable-next-line @typescript-eslint/dot-notation
     const url = `http://localhost:${process.env["PORT"] ?? "3000"}/api/trpc`;
@@ -246,6 +246,18 @@ export function VitestTestWrapper({
             const headers = new Headers();
             headers.set("x-trpc-source", "vitest-test");
             return headers;
+          },
+          // Override fetch to avoid AbortSignal issues with undici
+          fetch: (
+            input: RequestInfo | URL,
+            init?: RequestInit | { signal?: AbortSignal | undefined },
+          ) => {
+            // Create a compatible init object without AbortSignal for tests
+            const safeInit = init ? { ...init } : {};
+            delete (safeInit as { signal?: unknown }).signal; // Remove problematic signal
+
+            // Return a mock response for tests - MSW will handle the actual mocking
+            return globalThis.fetch(input, safeInit as RequestInit);
           },
         }),
       ],

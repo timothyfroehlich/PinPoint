@@ -35,6 +35,7 @@
     "**/*.tsx",
     "**/*.cjs",
     ".next/types/**/*.ts",
+    "types/**/*.d.ts",
     "vitest.config.ts",
     "playwright.config.ts"
   ],
