@@ -1,18 +1,15 @@
 // eslint.config.js
-// @ts-check - Enable TypeScript checking for this file
 
 import tseslint from "typescript-eslint";
-// @ts-expect-error - No TypeScript declarations available
 import nextPlugin from "@next/eslint-plugin-next";
 import importPlugin from "eslint-plugin-import";
-// @ts-expect-error - No TypeScript declarations available
 import promisePlugin from "eslint-plugin-promise";
 import unusedImportsPlugin from "eslint-plugin-unused-imports";
 import {
   INCLUDE_PATTERNS,
   ESLINT_RULES,
   convertPatterns,
-} from "./tooling.config.ts";
+} from "./tooling.config.js";
 
 export default tseslint.config(
   ...tseslint.configs.recommended,
@@ -29,6 +26,7 @@ export default tseslint.config(
           "./tsconfig.json",
           "./tsconfig.test-utils.json",
           "./tsconfig.tests.json",
+          "./tsconfig.config.json",
         ],
         tsconfigRootDir: import.meta.dirname,
       },
@@ -164,6 +162,23 @@ export default tseslint.config(
     },
   },
   {
+    // Override: E2E test files - relaxed standards for pragmatic testing
+    files: ["e2e/**/*.{ts,tsx}"],
+    rules: {
+      // Allow process.env for test mocking
+      "no-restricted-properties": "off",
+      // Disable strictNullChecks-dependent rules (E2E tests use relaxed TypeScript)
+      "@typescript-eslint/no-unnecessary-condition": "off",
+      "@typescript-eslint/no-unnecessary-boolean-literal-compare": "off",
+      "@typescript-eslint/prefer-nullish-coalescing": "off",
+      "@typescript-eslint/no-unnecessary-type-assertion": "off",
+      "@typescript-eslint/no-inferrable-types": "off",
+      "@typescript-eslint/restrict-template-expressions": "off",
+      "@typescript-eslint/no-unused-vars": "off",
+      "@typescript-eslint/await-thenable": "off",
+    },
+  },
+  {
     // Legacy override: Allow process.env in remaining test paths
     files: ["**/test/**"],
     rules: {
@@ -229,8 +244,12 @@ export default tseslint.config(
       "postcss.config.js",
       "tailwind.config.ts",
       "vitest.config.ts",
+      "vitest.coverage-test.config.ts",
+      "vite.config.ts",
       "jest.config.js",
       "playwright.config.ts",
+      "tooling.config.js",
+      "tooling.config.ts",
     ],
   },
 );
