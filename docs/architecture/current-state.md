@@ -126,6 +126,58 @@ src/server/api/routers/
 4. Organization context matches request
 ```
 
+### Unified Dashboard Progressive Enhancement
+
+PinPoint implements a unified public/authenticated dashboard using a progressive enhancement pattern. This ensures a seamless user experience by:
+
+- **Public-First Content**: Public content loads first without authentication, providing immediate value.
+- **Authentication Enhancement**: Authenticated content enhances the experience when a session exists.
+- **Single Page, Multiple Audiences**: A single page serves both public and authenticated use cases, adapting based on the user's authentication state.
+- **Graceful Degradation**: The system gracefully handles authentication failures or logouts by defaulting to the public view, avoiding "UNAUTHORIZED" screens.
+
+This pattern addresses common authentication flow issues, such as broken logout experiences and forced logins, by prioritizing user experience and content accessibility.
+
+#### Implementation Pattern
+
+```typescript
+const UnifiedDashboard = () => {
+  const { data: session } = useSession();
+  const { data: publicOrg } = api.organization.getCurrent.useQuery(); // Always available
+  const { data: privateData } = api.organization.getPrivate.useQuery(
+    undefined,
+    { enabled: !!session } // Only when authenticated
+  );
+
+  return (
+    <Layout>
+      {/* Public content - always shown */}
+      <PublicOrgInfo organization={publicOrg} />
+      <PublicLocationList />
+
+      {/* Authenticated content - progressive enhancement */}
+      {session && (
+        <>
+          <AuthenticatedDashboard data={privateData} />
+          <PersonalizedContent />
+        </>
+      )}
+    </Layout>
+  );
+};
+```
+
+#### API Endpoint Strategy
+
+- **Public Endpoints**: Use `publicProcedure`, return safe public data, still scoped to organization
+- **Private Endpoints**: Use `protectedProcedure`, return detailed data for authenticated users
+- **Multi-tenant Scoping**: Even public endpoints are scoped to organization via subdomain resolution
+
+#### Benefits
+
+- **User Experience**: No "broken" logout experience, fast initial page load, graceful authentication failures.
+- **SEO & Accessibility**: Public content indexable, works without JavaScript for public features, progressive enhancement improves with better browsers/connection.
+- **Development Benefits**: Easier testing, clearer separation between public and private features, simpler error handling.
+
 ## Authentication & Authorization
 
 ### Current Implementation

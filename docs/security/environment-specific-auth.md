@@ -16,21 +16,25 @@ The system uses `VERCEL_ENV` for Vercel deployments and falls back to `NODE_ENV`
 ## Authentication Providers by Environment
 
 ### Development Environment
+
 - **Google OAuth**: Optional (warnings if not configured)
 - **Credentials Provider**: Enabled as "Development Test Users"
 - **Test Accounts**: Available with `.local` email domains
 
 ### Preview Environment
+
 - **Google OAuth**: Required (errors if not configured)
 - **Credentials Provider**: Enabled as "Demo Users"
 - **Demo Accounts**: Available for stakeholder testing
 
 ### Production Environment
+
 - **Google OAuth**: Required (errors if not configured)
 - **Credentials Provider**: Disabled
 - **No Test Accounts**: Only real users can authenticate
 
 ### Test Environment
+
 - **Google OAuth**: Optional
 - **Credentials Provider**: Enabled as "Test Users"
 - **Mock Accounts**: For automated testing
@@ -79,12 +83,15 @@ npx tsx prisma/seed-production.ts
 ### Validation Functions
 
 ```typescript
-import { validateGoogleOAuth, assertOAuthConfigValid } from '~/server/auth/validation';
+import {
+  validateGoogleOAuth,
+  assertOAuthConfigValid,
+} from "~/server/auth/validation";
 
 // Manual validation
 const result = validateGoogleOAuth();
 if (!result.isValid) {
-  console.error('OAuth validation failed:', result.errors);
+  console.error("OAuth validation failed:", result.errors);
 }
 
 // Automatic validation (throws in production)
@@ -95,12 +102,12 @@ assertOAuthConfigValid();
 
 ### Available Test Users
 
-| Environment | Email Domain | Purpose |
-|-------------|--------------|---------|
-| Development | `@dev.local` | Primary development accounts |
-| Development | `@test.com` | Legacy compatibility accounts |
-| Preview | `@testaccount.dev` | Demo/preview accounts |
-| Test | Various | Automated testing |
+| Environment | Email Domain       | Purpose                       |
+| ----------- | ------------------ | ----------------------------- |
+| Development | `@dev.local`       | Primary development accounts  |
+| Development | `@test.com`        | Legacy compatibility accounts |
+| Preview     | `@testaccount.dev` | Demo/preview accounts         |
+| Test        | Various            | Automated testing             |
 
 ### Test Account Types
 
@@ -121,13 +128,16 @@ assertOAuthConfigValid();
 
 ```typescript
 // Environment detection
-import { isDevelopment, isPreview, isProduction } from '~/lib/environment';
+import { isDevelopment, isPreview, isProduction } from "~/lib/environment";
 
 // Provider configuration
-import { shouldEnableCredentialsProvider, shouldEnableTestLogin } from '~/lib/environment';
+import {
+  shouldEnableCredentialsProvider,
+  shouldEnableTestLogin,
+} from "~/lib/environment";
 
 // Provider creation
-import { createAuthProviders } from '~/server/auth/providers';
+import { createAuthProviders } from "~/server/auth/providers";
 ```
 
 ## Environment Variables
