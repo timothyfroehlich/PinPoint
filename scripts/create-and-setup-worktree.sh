@@ -90,40 +90,8 @@ fi
 # Change to worktree directory
 cd "$WORKTREE_PATH"
 
-# Create a basic task file placeholder
-cat > AGENT_TASK.md << EOF
-# Task: $TASK_NAME
-
-## Mission Statement
-[The orchestrator will fill this in with specific task details]
-
-## Context
-[Background information and constraints will be provided here]
-
-## Implementation Steps
-[Step-by-step instructions will be provided here]
-
-## Quality Requirements
-- All tests must pass: \`npm run test\`
-- TypeScript must compile: \`npm run typecheck\`
-- Pre-commit hooks must pass: \`npm run pre-commit\`
-- Code must follow project conventions
-
-## Success Criteria
-[Specific criteria for task completion will be defined here]
-
-## Completion Instructions
-When your task is complete:
-1. Ensure all quality requirements are met
-2. Commit your changes with descriptive messages
-3. Notify the orchestrator - DO NOT clean up the worktree yourself
-4. The orchestrator will handle worktree cleanup after confirmation
-
----
-*This task file will be updated by the orchestrator with specific details*
-EOF
-
-echo -e "${GREEN}✓ Task file template created at AGENT_TASK.md${NC}"
+# Note: Task specifications are now managed via GitHub issues
+echo -e "${GREEN}✓ Worktree environment ready for GitHub issue-based tasks${NC}"
 
 # Run the existing setup script
 echo -e "${YELLOW}⚙️  Running worktree setup...${NC}"
@@ -140,10 +108,10 @@ echo -e "${BLUE}🎉 Worktree Creation Complete!${NC}"
 echo "========================================"
 echo -e "${BLUE}📍 Path:${NC} $WORKTREE_PATH"
 echo -e "${BLUE}🌿 Branch:${NC} $BRANCH_NAME"
-echo -e "${BLUE}📋 Task File:${NC} $WORKTREE_PATH/AGENT_TASK.md"
+echo -e "${BLUE}📋 Task Management:${NC} Via GitHub issues"
 echo ""
 echo -e "${BLUE}📝 Next Steps:${NC}"
-echo "1. Update the task file with specific requirements"
+echo "1. Use orchestrator to create GitHub issue with task specifications"
 echo "2. Navigate to the worktree: cd $WORKTREE_PATH"
 echo "3. Start development: npm run dev"
 echo ""
