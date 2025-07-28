@@ -1,12 +1,8 @@
 #!/bin/sh
 echo "🚀 Running pre-push validation..."
 
-# Quick format check (in case someone bypassed pre-commit)
-npm run format:ci
-
-# Core validation with concise output (fast checks only)
-npm run typecheck:ci
-npm run lint:ci
+# Quick validation with standardized brief commands
+npm run check:brief
 
 # Lightweight additional checks
 npm run workflow:ci

@@ -50,8 +50,9 @@ npm run dev:clean       # Fresh start with cleanup
 npm run setup:worktree  # Setup new worktree environment
 
 # Validation Protocol (MANDATORY)
-npm run quick        # Development checks + auto-fix (after code changes)
-npm run validate     # Pre-commit validation + auto-fix (MUST PASS)
+npm run check        # Development checks (typecheck + lint + format + audit)
+npm run check:fix    # Development checks + auto-fix (after code changes)
+npm run validate     # Pre-commit validation (MUST PASS)
 npm run pre-commit   # Pre-PR validation (MUST PASS)
 
 # Database
@@ -65,15 +66,40 @@ npx prisma db execute --stdin <<< "SELECT * FROM \"Organization\" LIMIT 5;"
 psql $DATABASE_URL -c "SELECT COUNT(*) FROM \"User\";"
 # DON'T launch Prisma Studio unless debugging specific data issues
 
-# Quick Fixes & Debug
-npm run fix             # Auto-fix lint + format issues
-npm run debug:test      # Verbose test output
-npm run debug:lint      # Detailed lint output
+# Core Commands (Use brief versions unless debugging)
+# PREFERRED: Use :brief variants for daily development - faster, cleaner output
+npm run typecheck:brief # TypeScript type checking (minimal output)
+npm run lint:brief      # ESLint linting (quiet mode)
+npm run format:brief    # Prettier formatting check (minimal output)
+npm run audit:brief     # npm security vulnerability check (table format)
+npm run test:brief      # Vitest unit tests (basic reporter)
+npm run playwright:brief # E2E tests (line reporter, headless)
 
-# Testing
-npm run test:coverage
-npm run test:e2e         # E2E tests (headless - no browser windows)
-# AVOID: test:e2e:headed, test:e2e:ui (these show browser windows)
+# Regular versions - use only when brief fails and you need more detail
+npm run typecheck       # Full TypeScript output
+npm run lint            # Full ESLint output
+npm run format          # Full Prettier output
+npm run audit           # Full vulnerability details
+npm run test            # Full Vitest output
+npm run playwright      # Full E2E output
+
+# Verbose versions - use sparingly, preferably with filters
+# Only use when regular versions don't provide enough diagnostic info
+npm run lint:verbose    # Detailed ESLint diagnostics
+npm run typecheck:verbose # TypeScript with file lists
+
+# Meta Commands
+npm run check:brief     # PREFERRED: Fast validation (all brief variants)
+npm run check           # Full validation when brief shows issues
+npm run check:fix       # Validation with auto-fix
+npm run fix             # Auto-fix lint + format issues
+
+# Test Command Guidelines
+# CRITICAL: Never pass shell redirection operators (2>&1, |, >, etc.) through npm's -- argument separator
+# Shell operations must be outside the npm command
+# ✅ CORRECT: npm run test 2>&1 | head -50
+# ❌ WRONG: npm run test -- --run 2>&1 | head -50
+# If you need extra test arguments beyond filtering, ask the user first
 
 # TypeScript Error Filtering
 npm run typecheck                                 # Check entire project (recommended)
@@ -110,8 +136,11 @@ if (value) data.name = value;
 ### Essential Commands
 
 ```bash
+# Quick validation (check-only, CI-friendly)
+npm run check
+
 # Quick validation with auto-fix
-npm run quick
+npm run check:fix
 
 # Pre-commit validation
 npm run validate
@@ -129,7 +158,7 @@ npm run pre-commit
 ## Development Workflow
 
 1. **Start**: `npm run validate` → `npm run dev:bg`
-2. **During**: Run `npm run quick` after significant code changes
+2. **During**: Run `npm run check` after significant code changes
 3. **Before commit**: `npm run validate` must pass (MANDATORY)
 4. **Before PR**: `npm run pre-commit` must pass (MANDATORY)
 5. **Database changes**: Use `npm run db:reset` (pre-production phase)
@@ -230,7 +259,7 @@ For detailed guidance beyond these essentials:
 
 - **Server Status Checks**: ALWAYS use `npm run dev:bg:status` to check if the development server is running. NEVER use curl commands for server status checks.
 - **ESLint Disabling**: NEVER add an eslint-disable unless you have exhausted all other options and confirmed with the user that it is the correct thing to do.
-- **E2E Testing**: Use `npm run test:e2e` (headless). NEVER use `test:e2e:headed` or `test:e2e:ui` as they show browser windows and interrupt the user's workflow.
+- **E2E Testing**: Use `npm run playwright` (headless). NEVER use `playwright:headed` or `playwright:ui` as they show browser windows and interrupt the user's workflow.
 - **Prisma Studio**: AVOID launching Prisma Studio (`npm run db:studio`) unless absolutely necessary for debugging complex data issues. Use direct SQL queries, schema file reading, or existing component inspection instead.
 
 ## Key Lessons Learned (Non-Obvious Insights)
