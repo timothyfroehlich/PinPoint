@@ -284,8 +284,8 @@ npx prisma migrate deploy
 # 2. Seed with production data
 npm run seed
 
-# 3. Verify data in Prisma Studio
-npx prisma studio
+# 3. Verify data via queries
+psql $DATABASE_URL -c "SELECT COUNT(*) FROM \"Organization\";"
 ```
 
 ### Seed Data Includes
@@ -321,7 +321,7 @@ vercel env add
 # Database operations
 npx prisma migrate deploy
 npm run seed
-npx prisma studio
+# Query data samples (see project CLAUDE.md for examples)
 
 # Monitoring
 vercel logs
