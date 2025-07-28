@@ -228,6 +228,7 @@ For detailed guidance beyond these essentials:
 
 ## Development Practices
 
+- **Server Status Checks**: ALWAYS use `npm run dev:bg:status` to check if the development server is running. NEVER use curl commands for server status checks.
 - **ESLint Disabling**: NEVER add an eslint-disable unless you have exhausted all other options and confirmed with the user that it is the correct thing to do.
 - **E2E Testing**: Use `npm run test:e2e` (headless). NEVER use `test:e2e:headed` or `test:e2e:ui` as they show browser windows and interrupt the user's workflow.
 - **Prisma Studio**: AVOID launching Prisma Studio (`npm run db:studio`) unless absolutely necessary for debugging complex data issues. Use direct SQL queries, schema file reading, or existing component inspection instead.
