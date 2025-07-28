@@ -87,6 +87,37 @@ export function getPreferredImageUrl(machine: OPDBMachine): string | null {
 }
 
 /**
+ * Extract backbox/backglass image URL from OPDB machine data
+ * Prioritizes backglass > cabinet > playfield for card backgrounds
+ */
+export function getBackboxImageUrl(machine: OPDBMachine): string | null {
+  // If machine has extended details with specific image types
+  const extendedMachine = machine as OPDBMachine & {
+    playfield_image?: string;
+    backglass_image?: string;
+    cabinet_image?: string;
+  };
+
+  // Prioritize backglass image for backbox display
+  if (extendedMachine.backglass_image) {
+    return extendedMachine.backglass_image;
+  }
+  if (extendedMachine.cabinet_image) {
+    return extendedMachine.cabinet_image;
+  }
+  if (extendedMachine.playfield_image) {
+    return extendedMachine.playfield_image;
+  }
+
+  // Fallback to generic images array
+  if (machine.images && machine.images.length > 0) {
+    return machine.images[0] ?? null;
+  }
+
+  return null;
+}
+
+/**
  * Format machine name for display
  */
 export function formatMachineName(machine: OPDBMachine): string {
