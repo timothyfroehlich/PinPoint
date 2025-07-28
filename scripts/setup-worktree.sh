@@ -34,7 +34,14 @@ if [[ -d "$MAIN_WORKTREE/.vercel" ]]; then
     echo "Copying Vercel project configuration..."
     cp -r "$MAIN_WORKTREE/.vercel" .
 else
-    echo "Warning: No .vercel directory found in main worktree. You may need to run 'vercel link' manually."
+    echo "No .vercel directory found in main worktree. Linking to Vercel project..."
+    vercel link --yes --project pin-point --scope advacar
+
+    # Now copy the newly created .vercel config to main worktree for future use
+    if [[ -d ".vercel" && "$MAIN_WORKTREE" != "$(pwd)" ]]; then
+        echo "Copying Vercel config back to main worktree for future worktrees..."
+        cp -r .vercel "$MAIN_WORKTREE/"
+    fi
 fi
 
 # Pull environment variables from Vercel
@@ -48,12 +55,12 @@ echo "Configuring ports for worktree: $CURRENT_PATH"
 # Use port utility to generate unique ports if this is a worktree
 if npx tsx scripts/port-utils.ts check "$CURRENT_PATH" | grep -q "Is worktree: true"; then
     echo "Detected worktree environment - configuring unique ports..."
-    
+
     # Generate and append port configuration to .env (excluding DATABASE_URL)
     echo "" >> .env
     echo "# Worktree-specific port configuration (auto-generated)" >> .env
     npx tsx scripts/port-utils.ts env-dev-only "$CURRENT_PATH" >> .env
-    
+
     echo "Port configuration added to .env"
     npx tsx scripts/port-utils.ts check "$CURRENT_PATH"
 else

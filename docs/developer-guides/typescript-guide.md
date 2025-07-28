@@ -1,14 +1,21 @@
 # TypeScript Complete Guide
 
-This comprehensive guide covers PinPoint's TypeScript setup, error resolution patterns, and migration lessons learned. Use this as the single reference for all TypeScript-related development.
+**Status**: ✅ **Active** - Complete TypeScript reference for PinPoint  
+**Audience**: All developers, agents, and contributors  
+**Scope**: Production code, test utilities, and test files
+
+This comprehensive guide consolidates all TypeScript patterns, standards, and configurations used in PinPoint. Use this as the single authoritative reference for TypeScript development.
+
+---
 
 ## 🚀 Quick Start for Agents
 
 ### Current State
 
 - **Production Code**: 100% TypeScript strict mode compliant (`@tsconfig/strictest`)
+- **Test Utilities**: Moderate standards (`@tsconfig/recommended`)
 - **Test Files**: Relaxed standards with pragmatic patterns allowed
-- **Multi-Config**: Different strictness levels for different code contexts
+- **Migration Status**: ✅ Complete - all production code migrated to strictest mode
 
 ### Essential Commands
 
@@ -24,6 +31,10 @@ npm run quick
 
 # Update Betterer baseline after fixes
 npm run betterer:update
+
+# Context-specific checks
+npx tsc --project tsconfig.test-utils.json --noEmit  # Test utilities
+npx tsc --project tsconfig.tests.json --noEmit       # Test files
 ```
 
 ### Most Common Patterns
@@ -38,12 +49,25 @@ const userId = ctx.session.user.id; // Now safe
 // Safe array access
 const firstItem = items[0]?.name ?? "No items";
 
-// Optional property assignment
+// Optional property assignment (exactOptionalPropertyTypes)
 const data: { name?: string } = {};
 if (value) data.name = value;
+
+// Safe record access
+const value = record[key];
+if (value === undefined) {
+  throw new Error(`Key ${key} not found`);
+}
+return value;
 ```
 
+---
+
 ## 🏗️ Multi-Config Architecture
+
+### Overview
+
+PinPoint uses a sophisticated TypeScript configuration strategy with different strictness levels for different code contexts. This approach balances maximum type safety for production code with practical development patterns for testing.
 
 PinPoint uses a tiered TypeScript configuration system balancing strict production standards with pragmatic testing needs:
 
@@ -58,21 +82,25 @@ PinPoint uses a tiered TypeScript configuration system balancing strict producti
 
 #### Production Code (`src/**/*.ts` excluding tests)
 
-- **Config**: `tsconfig.json` (strictest mode)
+- **Config**: `tsconfig.json` (extends `@tsconfig/strictest`)
 - **Standards**: **Zero tolerance** - all TypeScript errors must be fixed
-- **ESLint**: Strict type-safety rules at error level
+- **ESLint**: Strict type-safety rules at error level (`no-explicit-any: "error"`)
+- **Coverage**: 50% global, 60% server/, 70% lib/
+- **Key Rules**: `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`, `restrictTemplateExpressions`
 
 #### Test Utilities (`src/test/**/*.ts`)
 
-- **Config**: `tsconfig.test-utils.json` (recommended mode)
+- **Config**: `tsconfig.test-utils.json` (extends `@tsconfig/recommended`)
 - **Standards**: Moderate - allows practical testing patterns
 - **ESLint**: Type-safety rules at warning level
+- **Purpose**: Reusable test helpers, mock factories, shared test utilities
 
 #### Test Files (`**/*.test.ts`, `**/*.vitest.test.ts`)
 
 - **Config**: `tsconfig.tests.json` (relaxed mode)
 - **Standards**: Pragmatic - allows `any` types and unsafe operations for testing
 - **ESLint**: Type-safety rules disabled
+- **Purpose**: Fast, effective testing without type overhead
 
 ### Development Workflow
 
@@ -810,11 +838,145 @@ npm run validate
 - Preserve existing interfaces when fixing infrastructure
 - Map dependencies before changing shared code
 
+## 🏭 Advanced Production Patterns
+
+### tRPC Procedure Patterns
+
+```typescript
+// ✅ Correct - Fully typed tRPC procedure
+export const getUserById = publicProcedure
+  .input(z.object({ id: z.string() }))
+  .output(
+    z.object({
+      user: UserSchema.nullable(),
+      permissions: z.array(PermissionSchema),
+    }),
+  )
+  .query(
+    async ({
+      input,
+      ctx,
+    }): Promise<{ user: User | null; permissions: Permission[] }> => {
+      const user = await ctx.db.user.findUnique({
+        where: { id: input.id },
+      });
+
+      if (!user) {
+        return { user: null, permissions: [] };
+      }
+
+      const permissions = await getPermissionsForUser(user.id);
+      return { user, permissions };
+    },
+  );
+```
+
+### Multi-Tenant Security Patterns
+
+```typescript
+// ✅ Correct - Organization-scoped queries
+export async function getOrganizationIssues(
+  organizationId: string,
+  userId: string,
+): Promise<Issue[]> {
+  // Verify user belongs to organization
+  const membership = await db.member.findFirst({
+    where: {
+      userId,
+      organizationId,
+    },
+  });
+
+  if (!membership) {
+    throw new Error("User not authorized for this organization");
+  }
+
+  // All queries must be scoped to organization
+  return await db.issue.findMany({
+    where: {
+      machine: {
+        location: {
+          organizationId, // Explicit organization scoping
+        },
+      },
+    },
+  });
+}
+```
+
+### Testing Utility Patterns
+
+```typescript
+// ✅ Good - Typed mock factory
+export function createMockSession(overrides: Partial<Session> = {}): Session {
+  return {
+    id: faker.string.cuid(),
+    userId: faker.string.cuid(),
+    expires: faker.date.future(),
+    sessionToken: faker.string.uuid(),
+    ...overrides,
+  };
+}
+
+// ✅ Good - Custom assertion with type guard
+export function assertIsUser(value: unknown): asserts value is User {
+  if (!value || typeof value !== "object") {
+    throw new Error("Expected User object");
+  }
+  const obj = value as Record<string, unknown>;
+  if (typeof obj.id !== "string" || typeof obj.email !== "string") {
+    throw new Error("Invalid User structure");
+  }
+}
+```
+
+## 📚 Migration Lessons Learned
+
+### Key Insights from Migration
+
+The TypeScript migration revealed several counter-intuitive discoveries:
+
+- **Multi-config complexity paid dividends**: Initial complexity of maintaining 3+ TypeScript configurations proved worthwhile for precise control over different code contexts.
+- **Test pragmatism vs. production strictness**: Allowing pragmatic patterns in tests while maintaining production strictness improved development velocity without sacrificing quality.
+- **Betterer effectiveness**: Regression prevention through measurement proved more effective than trying to maintain perfect state manually.
+- **Incremental migration success**: Production-first approach allowed immediate benefits while test cleanup happened incrementally.
+
+### Impact Assessment
+
+**Quality Improvements**:
+
+- Zero `any` types in production code
+- Comprehensive null safety
+- Enhanced multi-tenant security through strict typing
+- Reduced runtime errors through compile-time checking
+
+**Developer Experience**:
+
+- Context-aware IDE support
+- Clear error messages with actionable fixes
+- Automated quality enforcement
+- Comprehensive documentation and patterns
+
+**Technical Debt Reduction**:
+
+- Eliminated loose typing technical debt
+- Established sustainable quality practices
+- Created comprehensive regression prevention
+- Standardized development patterns
+
 ## 🔗 Related Documentation
 
 - **Quick Reference**: [CLAUDE.md Multi-Config Strategy](../../CLAUDE.md#multi-config-typescript-strategy)
 - **Testing Patterns**: [docs/testing/configuration.md](../testing/configuration.md)
 - **ESLint Setup**: [docs/developer-guides/common-errors.md](./common-errors.md)
-- **Betterer Workflow**: [docs/developer-guides/betterer-workflow.md](./betterer-workflow.md)
+- **Configuration Details**: [docs/configuration/multi-config-strategy.md](../configuration/multi-config-strategy.md)
 
-This guide represents the complete knowledge from the TypeScript migration and should be the single source of truth for all TypeScript development in PinPoint.
+---
+
+**Status**: ✅ **Complete Consolidation** - This guide consolidates patterns from:
+
+- `typescript-base-standards.md` (foundation patterns)
+- `typescript-strictest-production.md` (production patterns)
+- `typescript-migration-completed.md` (migration lessons)
+
+This guide is now the single source of truth for all TypeScript development in PinPoint.

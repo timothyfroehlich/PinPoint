@@ -58,6 +58,13 @@ npm run pre-commit   # Pre-PR validation (MUST PASS)
 npm run db:reset
 npm run db:push
 
+# Database Inspection (Efficient - DON'T USE PRISMA STUDIO)
+# Read schema structure: prisma/schema.prisma
+# Query data samples directly (no GUI needed):
+npx prisma db execute --stdin <<< "SELECT * FROM \"Organization\" LIMIT 5;"
+psql $DATABASE_URL -c "SELECT COUNT(*) FROM \"User\";"
+# DON'T launch Prisma Studio unless debugging specific data issues
+
 # Quick Fixes & Debug
 npm run fix             # Auto-fix lint + format issues
 npm run debug:test      # Verbose test output
@@ -65,6 +72,8 @@ npm run debug:lint      # Detailed lint output
 
 # Testing
 npm run test:coverage
+npm run test:e2e         # E2E tests (headless - no browser windows)
+# AVOID: test:e2e:headed, test:e2e:ui (these show browser windows)
 
 # TypeScript Error Filtering
 npm run typecheck                                 # Check entire project (recommended)
@@ -73,119 +82,32 @@ npm run typecheck | head -10                     # Show first 10 errors
 npm run typecheck | grep "usePermissions"        # Find specific function errors
 ```
 
-## Multi-Config TypeScript Strategy
+## TypeScript Standards
 
-PinPoint uses a tiered TypeScript configuration system for different code contexts, balancing strict production standards with pragmatic testing needs.
+**Complete Reference**: See `@docs/developer-guides/typescript-guide.md` for comprehensive patterns and error solutions.
 
-### Configuration Files
+### Quick Patterns for Agents
 
-1. **`tsconfig.base.json`** - Common settings (paths, module resolution, Next.js plugins)
-2. **`tsconfig.json`** - Production code (extends base + @tsconfig/strictest)
-3. **`tsconfig.test-utils.json`** - Test utilities (extends base + @tsconfig/recommended)
-4. **`tsconfig.tests.json`** - Test files (extends base with relaxed settings)
+```typescript
+// Null safety with optional chaining
+if (!ctx.session?.user?.id) throw new Error("Not authenticated");
+const userId = ctx.session.user.id; // Now safe
 
-### TypeScript Standards by Context
+// Safe array access
+const firstItem = items[0]?.name ?? "No items";
 
-#### Production Code (`src/**/*.ts` excluding tests)
-
-- **Config**: `tsconfig.json` (strictest mode)
-- **Standards**: **Zero tolerance** - all TypeScript errors must be fixed
-- **ESLint**: Strict type-safety rules at error level
-- **Coverage**: 50% global, 60% server/, 70% lib/
-
-#### Test Utilities (`src/test/**/*.ts`)
-
-- **Config**: `tsconfig.test-utils.json` (recommended mode)
-- **Standards**: Moderate - allows practical testing patterns
-- **ESLint**: Type-safety rules at warning level
-
-#### Test Files (`**/*.test.ts`, `**/*.vitest.test.ts`)
-
-- **Config**: `tsconfig.tests.json` (relaxed mode)
-- **Standards**: Pragmatic - allows `any` types and unsafe operations for testing
-- **ESLint**: Type-safety rules disabled
-
-## Quality Standards
-
-- **Production Code**: Zero TypeScript errors, zero `any` usage, strict ESLint
-- **Test Utilities**: Moderate standards, warnings acceptable
-- **Test Files**: Relaxed standards, pragmatic patterns allowed
-- **Consistent formatting** - Auto-formatted with Prettier
-- **Modern patterns** - ES modules, proper TypeScript throughout
-
-## TypeScript Patterns for Production Code
-
-### Key Patterns for `@tsconfig/strictest` Compliance (Production Only)
-
-Production code must follow strictest TypeScript patterns. Test files can use pragmatic patterns.
-
-1. **Optional Properties (`exactOptionalPropertyTypes`)**
-
-   ```typescript
-   // ❌ Production: undefined not assignable to optional
-   const data: { prop?: string } = { prop: value || undefined };
-
-   // ✅ Production: Use conditional assignment
-   const data: { prop?: string } = {};
-   if (value) data.prop = value;
-
-   // ✅ Tests: Relaxed patterns allowed
-   const testData: any = { prop: value || undefined }; // OK in tests
-   ```
-
-2. **Null Checks (`strictNullChecks`)**
-
-   ```typescript
-   // ❌ Production: Object possibly null
-   const id = ctx.session.user.id;
-
-   // ✅ Production: Guard with optional chaining
-   if (!ctx.session?.user?.id) throw new Error("Not authenticated");
-   const id = ctx.session.user.id;
-
-   // ✅ Tests: Can use non-null assertions for mocks
-   const id = mockSession.user!.id; // OK in tests
-   ```
-
-3. **Array Access (`noUncheckedIndexedAccess`)**
-
-   ```typescript
-   // ❌ Production: Array access without bounds check
-   const first = items[0].name;
-
-   // ✅ Production: Safe array access
-   const first = items[0]?.name ?? "Unknown";
-
-   // ✅ Tests: Direct access OK for known test data
-   const first = testItems[0].name; // OK in tests
-   ```
-
-### Multi-Config Benefits
-
-- **Production**: Strictest TypeScript ensures runtime safety
-- **Test Utils**: Moderate standards for reusable test code
-- **Tests**: Pragmatic patterns for effective testing
-- **ESLint**: Pattern-based rules match config strictness levels
-
-## Multi-Config TypeScript Workflow
-
-### ✅ Check Different Contexts
-
-```bash
-# Production code (strictest) - must pass
-npm run typecheck
-
-# Test utilities (recommended) - warnings OK
-npx tsc --project tsconfig.test-utils.json --noEmit
-
-# Test files (relaxed) - very permissive
-npx tsc --project tsconfig.tests.json --noEmit
-
-# Watch mode for development
-npm run dev:typecheck
+// Optional property assignment (exactOptionalPropertyTypes)
+const data: { name?: string } = {};
+if (value) data.name = value;
 ```
 
-### ✅ Validation Commands (Recommended)
+### Multi-Config Strategy
+
+- **Production Code** (`tsconfig.json`): `@tsconfig/strictest` - zero tolerance for errors
+- **Test Utilities** (`tsconfig.test-utils.json`): `@tsconfig/recommended` - moderate standards
+- **Test Files** (`tsconfig.tests.json`): Relaxed - pragmatic patterns allowed
+
+### Essential Commands
 
 ```bash
 # Quick validation with auto-fix
@@ -307,6 +229,8 @@ For detailed guidance beyond these essentials:
 ## Development Practices
 
 - **ESLint Disabling**: NEVER add an eslint-disable unless you have exhausted all other options and confirmed with the user that it is the correct thing to do.
+- **E2E Testing**: Use `npm run test:e2e` (headless). NEVER use `test:e2e:headed` or `test:e2e:ui` as they show browser windows and interrupt the user's workflow.
+- **Prisma Studio**: AVOID launching Prisma Studio (`npm run db:studio`) unless absolutely necessary for debugging complex data issues. Use direct SQL queries, schema file reading, or existing component inspection instead.
 
 ## Key Lessons Learned (Non-Obvious Insights)
 
@@ -331,6 +255,18 @@ For detailed guidance beyond these essentials:
 - **Security boundaries blur with public endpoints**: Public APIs can leak sensitive data through careless Prisma queries - explicit `select` clauses are essential for data security
 - **Test mocks often fail to catch real API issues**: If mocks don't match production API structure exactly, tests give false confidence
 - **TypeScript migration success**: Achieved 100% strictest TypeScript compliance across all production code through systematic error resolution and validation pipeline enforcement
+
+### Unified Dashboard Benefits
+
+- **User Experience**: No "broken" logout experience, fast initial page load, graceful authentication failures.
+- **SEO & Accessibility**: Public content indexable, works without JavaScript for public features, progressive enhancement improves with better browsers/connection.
+- **Development Benefits**: Easier testing, clearer separation between public and private features, simpler error handling.
+
+### Counter-Intuitive Authentication Insights
+
+- **Authentication Isn't Binary**: Traditional thinking: "Either authenticated or not" Reality: "Public experience enhanced by authentication".
+- **Logout Should Preserve Context**: Traditional thinking: "Logout clears everything, redirect to login" Reality: "Logout removes private features, keeps public context".
+- **Single Page, Multiple Audiences**: Traditional thinking: "Different pages for public/private users" Reality: "Same page, different enhancement levels".
 
 ## Claude Memories
 

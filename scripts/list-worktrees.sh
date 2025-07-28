@@ -43,10 +43,11 @@ get_last_commit() {
     fi
 }
 
-# Function to check if worktree is in PinPoint-worktrees directory
+# Function to check if worktree is in project worktrees directory
 is_task_worktree() {
     local path=$1
-    if [[ "$path" == *"PinPoint-worktrees"* ]]; then
+    local project_worktrees="$(git rev-parse --show-toplevel 2>/dev/null)/worktrees"
+    if [[ "$path" == "$project_worktrees"* ]]; then
         echo "true"
     else
         echo "false"
@@ -68,10 +69,10 @@ get_worktree_status() {
     fi
 }
 
-# Function to check if agent_workspace/SUBAGENT_TASK.md exists
+# Function to check if AGENT_TASK.md exists
 check_task_file() {
     local worktree_path=$1
-    if [ -f "$worktree_path/agent_workspace/SUBAGENT_TASK.md" ]; then
+    if [ -f "$worktree_path/AGENT_TASK.md" ]; then
         echo -e "${GREEN}✓ Task file exists${NC}"
     else
         echo -e "${RED}✗ No task file${NC}"
@@ -140,7 +141,7 @@ for worktree in $WORKTREES; do
         fi
         
         # Check if worktree is clean and has no task file
-        if ! [ -f "$worktree/agent_workspace/SUBAGENT_TASK.md" ]; then
+        if ! [ -f "$worktree/AGENT_TASK.md" ]; then
             echo -e "  ${YELLOW}•${NC} $worktree - No task file found"
         fi
     fi

@@ -114,7 +114,7 @@ If modern tools fail, these legacy procedures still work:
 **Automatic Health Checks:**
 
 - **HTTP health endpoint** verification (localhost:3000/api/health)
-- **Prisma Studio** connectivity check (localhost:5555)
+- **Database** connectivity check via direct queries
 - **Database** connection verification
 - **File watchers** active status monitoring
 
@@ -139,4 +139,4 @@ If modern tools fail, these legacy procedures still work:
 1. **Database reset** (`npm run db:reset`) - All sessions cleared
 2. **Fresh environment start** (`npm run dev:clean`) - Option to reset database
 3. **Schema changes** that trigger database regeneration
-4. **Manual session cleanup** via Prisma Studio (localhost:5555)
+4. **Manual session cleanup** via direct database queries (see CLAUDE.md for examples)

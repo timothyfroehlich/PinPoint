@@ -60,6 +60,7 @@ node_modules/
 # Orchestrator multi-agent system
 .claude/SUBAGENT_TASK.md
 .claude/ORCHESTRATOR_NOTES.md
+worktrees/
 
 # Build/lint/test output files
 *-errors.json

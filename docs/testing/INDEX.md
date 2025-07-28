@@ -27,28 +27,23 @@ beforeEach(() => vi.clearAllMocks());
 
 ### Critical Files for Agents
 
-1. **[vitest-best-practices.md](./vitest-best-practices.md)** - Complete patterns & performance data
-2. **[mocking-patterns.md](./mocking-patterns.md)** - MSW-tRPC, service mocking
-3. **[architecture-patterns.md](./architecture-patterns.md)** - Multi-tenant, permission testing
-4. **[troubleshooting.md](./troubleshooting.md)** - Common issues & solutions
+1. **[vitest-guide.md](./vitest-guide.md)** - **NEW CONSOLIDATED GUIDE** - Complete Vitest patterns, performance data, and all mocking strategies
+2. **[architecture-patterns.md](./architecture-patterns.md)** - Multi-tenant, permission testing
+3. **[troubleshooting.md](./troubleshooting.md)** - Common issues & solutions
 
 ---
 
 ## Core Testing Documentation
 
-- **[vitest-best-practices.md](./vitest-best-practices.md)**: **ESSENTIAL FOR AGENTS** - Complete Vitest patterns, performance data, MSW-tRPC integration, and real migration results. Contains all critical info in first 50 lines for quick agent reference.
-- **[codecov-setup.md](./codecov-setup.md)**: **NEW** - Complete Codecov integration guide with tokenless upload configuration, coverage thresholds (50% global, 60% server, 70% lib), and CI/CD pipeline integration.
-- **[configuration.md](./configuration.md)**: This document details the configuration of the testing environment for PinPoint. It covers how different testing frameworks and tools are set up and integrated into the development workflow, ensuring consistency and efficiency in test execution.
+- **[vitest-guide.md](./vitest-guide.md)**: **✅ CONSOLIDATED GUIDE** - Complete reference for all Vitest testing patterns, mocking strategies, and performance insights. Combines former vitest-best-practices.md and mocking-patterns.md into single authoritative source.
+- **[architecture-patterns.md](./architecture-patterns.md)**: Multi-tenant testing patterns, permission-based testing architecture, service layer patterns, and database testing patterns. Based on real migration experience and proven results.
+- **[prisma-patterns.md](./prisma-patterns.md)**: Specific testing patterns for Prisma client mocking, database interactions in tests, and data integrity across test runs.
+- **[codecov-setup.md](./codecov-setup.md)**: Codecov integration guide with coverage thresholds (50% global, 60% server, 70% lib) and CI/CD pipeline integration.
+- **[configuration.md](./configuration.md)**: Testing environment configuration details and framework integration.
 
 ## Current Testing Standards
 
-PinPoint uses **Vitest exclusively** for all testing. Migration from Jest is complete.
-
-## Testing Patterns & Architecture
-
-- **[mocking-patterns.md](./mocking-patterns.md)**: This document details various mocking patterns and strategies used in PinPoint's testing. Enhanced with MSW-tRPC v2.0.1 integration patterns, VitestTestWrapper usage, and version-specific API troubleshooting. Provides guidance on how to effectively mock dependencies, external services, and complex components to ensure isolated and reliable unit tests.
-- **[architecture-patterns.md](./architecture-patterns.md)**: **NEW** - Consolidates proven architecture patterns for testing PinPoint's multi-tenant, permission-based system. Covers multi-tenancy testing patterns, permission-based testing architecture, service layer patterns, database testing patterns, MSW-tRPC integration, and systematic testing approaches. Based on real migration experience and proven results.
-- **[prisma-patterns.md](./prisma-patterns.md)**: This document focuses on specific testing patterns and strategies for working with Prisma in the PinPoint application. It covers how to effectively mock Prisma client, handle database interactions in tests, and ensure data integrity and isolation across test runs. This guide is essential for testing database-dependent logic.
+PinPoint uses **Vitest exclusively** for all testing. Migration from Jest is complete with 7-65x performance improvements.
 
 ## Performance & Troubleshooting
 
@@ -57,10 +52,9 @@ PinPoint uses **Vitest exclusively** for all testing. Migration from Jest is com
 
 ## Quick Reference for Agents
 
-1. **Start with**: `@docs/testing/vitest-best-practices.md` for essential patterns
+1. **Start with**: `@docs/testing/vitest-guide.md` for all essential patterns and mocking strategies
 2. **Reference**: `@docs/testing/architecture-patterns.md` for multi-tenant patterns
 3. **Troubleshoot**: `@docs/testing/troubleshooting.md` for systematic debugging
-4. **Mock Setup**: `@docs/testing/mocking-patterns.md` for MSW-tRPC integration
 
 ## Current State & Achievements
 
