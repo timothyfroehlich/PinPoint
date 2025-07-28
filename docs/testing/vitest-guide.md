@@ -20,7 +20,7 @@ npm run test:watch     # Watch mode
 npm run test:ui        # Interactive UI
 
 # Agent validation
-npm run quick          # Fast validation
+npm run check:brief    # Fast validation
 npm run validate       # Pre-commit check
 ```
 
