@@ -59,6 +59,7 @@ export const userRouter = createTRPCRouter({
       z.object({
         name: z.string().min(1).max(100).optional(),
         bio: z.string().max(500).optional(),
+        onboardingCompleted: z.boolean().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -67,6 +68,9 @@ export const userRouter = createTRPCRouter({
         data: {
           ...(input.name !== undefined && { name: input.name }),
           ...(input.bio !== undefined && { bio: input.bio }),
+          ...(input.onboardingCompleted !== undefined && {
+            onboardingCompleted: input.onboardingCompleted,
+          }),
         },
       });
 

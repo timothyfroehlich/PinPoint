@@ -31,6 +31,10 @@ model User {
   emailNotificationsEnabled Boolean @default(true)
   pushNotificationsEnabled  Boolean @default(false) // For future mobile app
   notificationFrequency     NotificationFrequency @default(IMMEDIATE)
+  
+  // Onboarding and invitation tracking
+  onboardingCompleted Boolean @default(false)
+  invitedBy           String? // userId who invited them
 
   // Relations
   accounts       Account[]
@@ -44,6 +48,7 @@ model User {
   upvotes        Upvote[]
   activityHistory IssueHistory[] @relation("ActivityActor")
   notifications  Notification[] // Add notification relation
+  sentInvitations Invitation[] @relation("UserInvitations")
 }
 
 model Account {
@@ -105,6 +110,7 @@ model Organization {
   issueHistory     IssueHistory[]
   attachments      Attachment[]
   pinballMapConfig PinballMapConfig?
+  invitations      Invitation[]
 }
 
 model Membership {
@@ -133,6 +139,7 @@ model Role {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   memberships  Membership[]
   permissions  Permission[] @relation("RolePermissions")
+  invitations  Invitation[]
 
   @@unique([name, organizationId])
 }
@@ -143,6 +150,37 @@ model Permission {
   description String? // Human-readable description of the permission
 
   roles Role[] @relation("RolePermissions")
+}
+
+// =================================
+// INVITATION SYSTEM
+// =================================
+
+model Invitation {
+  id             String           @id @default(cuid())
+  email          String
+  organizationId String
+  invitedBy      String           // userId who sent invite
+  roleId         String           // role to assign when user joins
+  token          String           @unique
+  status         InvitationStatus @default(PENDING)
+  message        String?          // optional personal message
+  expiresAt      DateTime
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  inviter      User         @relation("UserInvitations", fields: [invitedBy], references: [id], onDelete: Cascade)
+  role         Role         @relation(fields: [roleId], references: [id])
+
+  @@unique([email, organizationId])
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
 }
 
 // =================================
