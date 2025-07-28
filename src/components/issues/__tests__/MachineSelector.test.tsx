@@ -9,7 +9,7 @@ vi.mock("~/trpc/react", () => ({
   api: {
     machine: {
       core: {
-        getAll: {
+        getAllForIssues: {
           useQuery: vi.fn(() => ({
             data: [],
             isLoading: false,
