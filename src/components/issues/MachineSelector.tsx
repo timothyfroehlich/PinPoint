@@ -3,9 +3,12 @@
 import {
   FormControl,
   InputLabel,
-  MenuItem,
   Select,
-  type SelectChangeEvent,
+  MenuItem,
+  Box,
+  Typography,
+  Avatar,
+  CircularProgress,
 } from "@mui/material";
 import * as React from "react";
 
@@ -17,34 +20,67 @@ interface MachineSelectorProps {
   required?: boolean;
 }
 
+interface MachineOption {
+  id: string;
+  name: string | null;
+  model: {
+    name: string;
+  };
+}
+
 export function MachineSelector({
   value,
   onChange,
   required = false,
 }: MachineSelectorProps): React.JSX.Element {
-  // Get all machines for the current organization
-  const { data: machines = [] } = api.machine.core.getAll.useQuery();
-
-  const handleChange = (event: SelectChangeEvent): void => {
-    const selectedValue = event.target.value;
-    onChange(selectedValue === "" ? null : selectedValue);
-  };
+  const { data: machines, isLoading } =
+    api.machine.core.getAllForIssues.useQuery();
 
   return (
     <FormControl fullWidth required={required}>
-      <InputLabel id="machine-selector-label">Select Machine</InputLabel>
+      <InputLabel>Select Machine</InputLabel>
       <Select
-        labelId="machine-selector-label"
-        value={value}
+        value={value || ""}
         label="Select Machine"
-        onChange={handleChange}
+        onChange={(e) => {
+          onChange(e.target.value || null);
+        }}
+        disabled={isLoading}
+        startAdornment={
+          isLoading ? <CircularProgress size={20} sx={{ mr: 1 }} /> : undefined
+        }
+        renderValue={(selectedValue) => {
+          if (!selectedValue) return "";
+          const machine = machines?.find((m) => m.id === selectedValue);
+          return machine ? machine.name || machine.model.name : selectedValue;
+        }}
       >
         <MenuItem value="">
-          <em>Select a machine</em>
+          <em>Select a machine...</em>
         </MenuItem>
-        {machines.map((machine) => (
+        {machines?.map((machine: MachineOption) => (
           <MenuItem key={machine.id} value={machine.id}>
-            {machine.name} ({machine.model.name})
+            <Box sx={{ display: "flex", alignItems: "center", width: "100%" }}>
+              <Avatar
+                sx={{
+                  width: 32,
+                  height: 32,
+                  mr: 2,
+                  bgcolor: "primary.main",
+                  fontSize: "0.75rem",
+                }}
+              >
+                🕹️
+              </Avatar>
+              <Box sx={{ flexGrow: 1 }}>
+                <Typography variant="body2" fontWeight="medium">
+                  {machine.name ?? machine.model.name}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {machine.model.name}
+                </Typography>
+              </Box>
+            </Box>
           </MenuItem>
         ))}
       </Select>
