@@ -58,6 +58,9 @@ export const env = createEnv({
     SEED_ADMIN_NAME: z.string().optional(),
     // Temporary override for production deployment
     FORCE_PREVIEW_BEHAVIOR: z.string().optional(),
+    // Email configuration for magic links
+    RESEND_API_KEY: z.string().optional(),
+    EMAIL_FROM: z.string().optional(),
   },
 
   /**
@@ -91,6 +94,8 @@ export const env = createEnv({
     SEED_ADMIN_NAME: process.env["SEED_ADMIN_NAME"],
     VERCEL_ENV: process.env["VERCEL_ENV"],
     FORCE_PREVIEW_BEHAVIOR: process.env["FORCE_PREVIEW_BEHAVIOR"],
+    RESEND_API_KEY: process.env["RESEND_API_KEY"],
+    EMAIL_FROM: process.env["EMAIL_FROM"],
     // Next.js automatically exposes NODE_ENV to the client
   },
   /**

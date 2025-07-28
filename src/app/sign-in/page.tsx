@@ -1,6 +1,6 @@
 "use client";
 
-import { Google } from "@mui/icons-material";
+import { Google, Email } from "@mui/icons-material";
 import {
   Box,
   Card,
@@ -9,6 +9,7 @@ import {
   Divider,
   Container,
   Alert,
+  TextField,
 } from "@mui/material";
 import { signIn, getProviders } from "next-auth/react";
 import { useEffect, useState } from "react";
@@ -33,6 +34,8 @@ export default function SignInPage(): React.JSX.Element {
   > | null>(null);
   const [isLoading, setIsLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [email, setEmail] = useState<string>("");
+  const [emailSent, setEmailSent] = useState<boolean>(false);
 
   useEffect(() => {
     async function fetchProviders(): Promise<void> {
@@ -71,10 +74,39 @@ export default function SignInPage(): React.JSX.Element {
     }
   }
 
+  async function handleEmailSignIn(e: React.FormEvent): Promise<void> {
+    e.preventDefault();
+    if (!email) return;
+
+    try {
+      setIsLoading("email");
+      setError(null);
+
+      const result = await signIn("resend", {
+        email,
+        callbackUrl: "/dashboard",
+        redirect: false,
+      });
+
+      if (result.error) {
+        setError(`Failed to send magic link: ${result.error}`);
+      } else {
+        setEmailSent(true);
+      }
+    } catch (err) {
+      console.error("Email sign-in error:", err);
+      setError("Failed to send magic link. Please try again.");
+    } finally {
+      setIsLoading(null);
+    }
+  }
+
   function getProviderIcon(providerId: string): React.ReactNode {
     switch (providerId) {
       case "google":
         return <Google />;
+      case "resend":
+        return <Email />;
       default:
         return null;
     }
@@ -86,6 +118,8 @@ export default function SignInPage(): React.JSX.Element {
         return "Continue with Google";
       case "credentials":
         return provider.name || "Continue with Email";
+      case "resend":
+        return "Continue with Email";
       default:
         return `Continue with ${provider.name}`;
     }
@@ -119,9 +153,73 @@ export default function SignInPage(): React.JSX.Element {
           )}
 
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            {/* Magic Link Email Form */}
+            {providers &&
+              Object.values(providers).find((p) => p.id === "resend") && (
+                <>
+                  {emailSent ? (
+                    <Alert severity="success">
+                      Check your email! We've sent you a magic link to sign in.
+                    </Alert>
+                  ) : (
+                    <Box
+                      component="form"
+                      onSubmit={(e) => {
+                        void handleEmailSignIn(e);
+                      }}
+                      sx={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 2,
+                      }}
+                    >
+                      <TextField
+                        type="email"
+                        label="Email address"
+                        value={email}
+                        onChange={(e) => {
+                          setEmail(e.target.value);
+                        }}
+                        required
+                        fullWidth
+                        disabled={isLoading === "email"}
+                        placeholder="Enter your email address"
+                      />
+                      <Button
+                        type="submit"
+                        variant="contained"
+                        size="large"
+                        fullWidth
+                        disabled={isLoading === "email" || !email}
+                        startIcon={<Email />}
+                        sx={{
+                          py: 1.5,
+                          textTransform: "none",
+                          fontSize: "1rem",
+                        }}
+                      >
+                        {isLoading === "email"
+                          ? "Sending magic link..."
+                          : "Send magic link"}
+                      </Button>
+                    </Box>
+                  )}
+
+                  <Divider sx={{ my: 1 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      or
+                    </Typography>
+                  </Divider>
+                </>
+              )}
+
+            {/* OAuth Providers */}
             {providers ? (
               Object.values(providers)
-                .filter((provider) => provider.id !== "credentials") // Show OAuth providers first
+                .filter(
+                  (provider) =>
+                    provider.id !== "credentials" && provider.id !== "resend",
+                ) // Show OAuth providers
                 .map((provider) => (
                   <Button
                     key={provider.id}
