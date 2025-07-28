@@ -46,6 +46,8 @@ next-env.d.ts
 # Temporary files
 /tmp
 .recycle_bin/
+/data/
+index.html
 
 # Playwright
 node_modules/
@@ -53,6 +55,7 @@ node_modules/
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+/trace/
 
 # Orchestrator multi-agent system
 .claude/SUBAGENT_TASK.md

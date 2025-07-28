@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  FilterList,
   ViewList,
   ViewModule,
   Refresh,
@@ -16,10 +15,6 @@ import {
   Chip,
   Avatar,
   Grid,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Button,
   CircularProgress,
   Alert,
@@ -31,10 +26,8 @@ import {
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
-import { AdvancedFiltersDropdown } from "./AdvancedFiltersDropdown";
-import { GameFilterDropdown } from "./GameFilterDropdown";
-import { SearchTextField } from "./SearchTextField";
-import { StatusCategoryMultiSelect } from "./StatusCategoryMultiSelect";
+import { ActiveFilters } from "./ActiveFilters";
+import { FilterToolbar } from "./FilterToolbar";
 
 import { PermissionGate } from "~/components/permissions/PermissionGate";
 import { usePermissions } from "~/hooks/usePermissions";
@@ -138,9 +131,6 @@ export function IssueList({
     refetch,
   } = api.issue.core.getAll.useQuery(filters);
 
-  // Fetch locations for filter dropdown
-  const { data: locations } = api.location.getAll.useQuery();
-
   // Update URL when filters change
   const updateFilters = (newFilters: Partial<IssueFilters>): void => {
     const updated: IssueFilters = { ...filters };
@@ -232,121 +222,26 @@ export function IssueList({
     );
   }
 
+  // Handle clear all filters
+  const handleClearAllFilters = (): void => {
+    setFilters({
+      sortBy: "created",
+      sortOrder: "desc",
+    });
+    router.push("/issues");
+  };
+
   return (
     <Box>
-      {/* Filters */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Box display="flex" alignItems="center" gap={2} mb={2}>
-            <FilterList />
-            <Typography variant="h6">Filters</Typography>
-          </Box>
+      {/* New Filter Toolbar */}
+      <FilterToolbar filters={filters} onFiltersChange={updateFilters} />
 
-          <Grid container spacing={2}>
-            {/* Location Filter */}
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Location</InputLabel>
-                <Select
-                  value={filters.locationId ?? ""}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    updateFilters({
-                      locationId: value === "" ? undefined : value,
-                    });
-                  }}
-                  label="Location"
-                >
-                  <MenuItem value="">All Locations</MenuItem>
-                  {locations?.map((location: { id: string; name: string }) => (
-                    <MenuItem key={location.id} value={location.id}>
-                      {location.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-
-            {/* Status & Category Filter */}
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <StatusCategoryMultiSelect
-                value={filters.statusIds ?? []}
-                onChange={(statusIds) => {
-                  updateFilters({ statusIds });
-                }}
-              />
-            </Grid>
-
-            {/* Machine/Game Filter */}
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <GameFilterDropdown
-                value={filters.machineId ?? ""}
-                onChange={(machineId) => {
-                  updateFilters({
-                    machineId: machineId === "" ? undefined : machineId,
-                  });
-                }}
-              />
-            </Grid>
-
-            {/* Sort By Filter */}
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Sort By</InputLabel>
-                <Select
-                  value={filters.sortBy}
-                  onChange={(e) => {
-                    updateFilters({
-                      sortBy: e.target.value,
-                    });
-                  }}
-                  label="Sort By"
-                >
-                  <MenuItem value="created">Created Date</MenuItem>
-                  <MenuItem value="updated">Updated Date</MenuItem>
-                  <MenuItem value="status">Status</MenuItem>
-                  <MenuItem value="severity">Priority</MenuItem>
-                  <MenuItem value="game">Game</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-
-            {/* Search Field */}
-            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-              <SearchTextField
-                value={filters.search ?? ""}
-                onChange={(search) => {
-                  updateFilters({ search: search === "" ? undefined : search });
-                }}
-              />
-            </Grid>
-
-            {/* Advanced Filters */}
-            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
-              <AdvancedFiltersDropdown
-                assigneeId={filters.assigneeId ?? ""}
-                reporterId={filters.reporterId ?? ""}
-                ownerId={filters.ownerId ?? ""}
-                onAssigneeChange={(assigneeId) => {
-                  updateFilters({
-                    assigneeId: assigneeId === "" ? undefined : assigneeId,
-                  });
-                }}
-                onReporterChange={(reporterId) => {
-                  updateFilters({
-                    reporterId: reporterId === "" ? undefined : reporterId,
-                  });
-                }}
-                onOwnerChange={(ownerId) => {
-                  updateFilters({
-                    ownerId: ownerId === "" ? undefined : ownerId,
-                  });
-                }}
-              />
-            </Grid>
-          </Grid>
-        </CardContent>
-      </Card>
+      {/* Active Filters */}
+      <ActiveFilters
+        filters={filters}
+        onFiltersChange={updateFilters}
+        onClearAll={handleClearAllFilters}
+      />
 
       {/* Bulk Actions Toolbar */}
       {selectedIssues.length > 0 && (
