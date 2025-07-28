@@ -9,6 +9,7 @@ interface StatusTogglePillsProps {
   value: string[];
   onChange: (statusIds: string[]) => void;
   showCounts?: boolean;
+  parentLoading?: boolean;
 }
 
 interface StatusCounts {
@@ -58,6 +59,7 @@ export function StatusTogglePills({
   value,
   onChange,
   showCounts = true,
+  parentLoading = false,
 }: StatusTogglePillsProps): React.JSX.Element {
   const { data: statuses, isLoading: statusesLoading } =
     api.issueStatus.getAll.useQuery();
@@ -79,7 +81,10 @@ export function StatusTogglePills({
     };
 
     statuses.forEach((status) => {
-      statusesByCategory[status.category].push(status);
+      // Only process statuses with valid categories
+      if (status.category in statusesByCategory) {
+        statusesByCategory[status.category].push(status);
+      }
     });
 
     // Calculate counts by category
@@ -91,7 +96,10 @@ export function StatusTogglePills({
 
     allIssues.forEach((issue) => {
       const category = issue.status.category;
-      counts[category]++;
+      // Only count issues with valid status categories
+      if (category in counts) {
+        counts[category]++;
+      }
     });
 
     return { statusesByCategory, counts };
@@ -145,7 +153,7 @@ export function StatusTogglePills({
     );
   };
 
-  if (statusesLoading || issuesLoading || !statusData) {
+  if (parentLoading || statusesLoading || issuesLoading || !statusData) {
     return (
       <Box display="flex" alignItems="center" gap={1}>
         <CircularProgress size={16} />

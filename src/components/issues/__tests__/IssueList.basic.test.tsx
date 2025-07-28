@@ -157,7 +157,65 @@ describe("IssueList Component - Basic Tests", () => {
     });
 
     mockMachinesQuery.mockReturnValue({
-      data: [],
+      data: [
+        {
+          id: "machine-1",
+          name: "Medieval Madness #1",
+          organizationId: "org-1",
+          modelId: "model-mm",
+          locationId: "location-1",
+          ownerId: null,
+          model: {
+            id: "model-mm",
+            name: "Medieval Madness",
+            manufacturer: "Williams",
+            year: 1997,
+          },
+          location: {
+            id: "location-1",
+            name: "Main Floor",
+            organizationId: "org-1",
+          },
+        },
+        {
+          id: "machine-3",
+          name: "Attack from Mars #1",
+          organizationId: "org-1",
+          modelId: "model-afm",
+          locationId: "location-1",
+          ownerId: null,
+          model: {
+            id: "model-afm",
+            name: "Attack from Mars",
+            manufacturer: "Bally",
+            year: 1995,
+          },
+          location: {
+            id: "location-1",
+            name: "Main Floor",
+            organizationId: "org-1",
+          },
+        },
+        {
+          id: "machine-5",
+          name: "Tales of Arabian Nights #1",
+          organizationId: "org-1",
+          modelId: "model-totan",
+          locationId: "location-2",
+          ownerId: null,
+          model: {
+            id: "model-totan",
+            name: "Tales of Arabian Nights",
+            manufacturer: "Williams",
+            year: 1996,
+          },
+          location: {
+            id: "location-2",
+            name: "Back Room",
+            organizationId: "org-1",
+          },
+        },
+      ],
       isLoading: false,
       isError: false,
     });
@@ -181,7 +239,7 @@ describe("IssueList Component - Basic Tests", () => {
         </VitestTestWrapper>,
       );
 
-      expect(screen.getByRole("progressbar")).toBeInTheDocument();
+      expect(screen.getByTestId("main-loading-indicator")).toBeInTheDocument();
     });
 
     it("renders error state with retry functionality", async () => {
@@ -341,7 +399,9 @@ describe("IssueList Component - Basic Tests", () => {
       });
 
       // Expand advanced filters to access location dropdown
-      const expandButton = screen.getByRole("button", { name: "" }); // ExpandMore icon
+      const expandButton = screen.getByRole("button", {
+        name: /show advanced filters/i,
+      });
       await userEvent.click(expandButton);
 
       await waitFor(() => {
@@ -372,7 +432,9 @@ describe("IssueList Component - Basic Tests", () => {
       });
 
       // Expand advanced filters to access location dropdown
-      const expandButton = screen.getByRole("button", { name: "" }); // ExpandMore icon
+      const expandButton = screen.getByRole("button", {
+        name: "Show advanced filters",
+      });
       await userEvent.click(expandButton);
 
       await waitFor(() => {
@@ -452,12 +514,8 @@ describe("IssueList Component - Basic Tests", () => {
       await userEvent.click(firstIssueCheckbox);
 
       expect(screen.getByText("1 issue selected")).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: /assign/i }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: /close/i }),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId("bulk-assign-button")).toBeInTheDocument();
+      expect(screen.getByTestId("bulk-close-button")).toBeInTheDocument();
     });
   });
 

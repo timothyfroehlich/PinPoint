@@ -37,11 +37,13 @@ interface IssueFilters {
 interface FilterToolbarProps {
   filters: IssueFilters;
   onFiltersChange: (newFilters: Partial<IssueFilters>) => void;
+  isLoading?: boolean;
 }
 
 export function FilterToolbar({
   filters,
   onFiltersChange,
+  isLoading = false,
 }: FilterToolbarProps): React.JSX.Element {
   const [showAdvanced, setShowAdvanced] = useState(false);
 
@@ -101,6 +103,7 @@ export function FilterToolbar({
             onChange={(statusIds: string[]) => {
               onFiltersChange({ statusIds });
             }}
+            parentLoading={isLoading}
           />
         </Box>
 
@@ -142,6 +145,9 @@ export function FilterToolbar({
             onClick={() => {
               setShowAdvanced(!showAdvanced);
             }}
+            aria-label={
+              showAdvanced ? "Hide advanced filters" : "Show advanced filters"
+            }
             sx={{
               color: showAdvanced ? "primary.main" : "text.secondary",
               transform: showAdvanced ? "rotate(180deg)" : "rotate(0deg)",
@@ -169,8 +175,9 @@ export function FilterToolbar({
         >
           {/* Location Filter */}
           <FormControl size="small" sx={{ minWidth: 150 }}>
-            <InputLabel>Location</InputLabel>
+            <InputLabel id="location-filter-label">Location</InputLabel>
             <Select
+              labelId="location-filter-label"
               value={filters.locationId ?? ""}
               onChange={(e: SelectChangeEvent) => {
                 const value = e.target.value;
@@ -192,8 +199,9 @@ export function FilterToolbar({
           {/* Sort Controls */}
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             <FormControl size="small" sx={{ minWidth: 130 }}>
-              <InputLabel>Sort By</InputLabel>
+              <InputLabel id="sort-by-filter-label">Sort By</InputLabel>
               <Select
+                labelId="sort-by-filter-label"
                 value={filters.sortBy}
                 onChange={(e: SelectChangeEvent) => {
                   onFiltersChange({

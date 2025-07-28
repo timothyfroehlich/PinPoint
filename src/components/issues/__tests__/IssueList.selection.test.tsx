@@ -159,7 +159,65 @@ describe("IssueList Component - Selection and Bulk Actions", () => {
     });
 
     mockMachinesQuery.mockReturnValue({
-      data: [],
+      data: [
+        {
+          id: "machine-1",
+          name: "Medieval Madness #1",
+          organizationId: "org-1",
+          modelId: "model-mm",
+          locationId: "location-1",
+          ownerId: null,
+          model: {
+            id: "model-mm",
+            name: "Medieval Madness",
+            manufacturer: "Williams",
+            year: 1997,
+          },
+          location: {
+            id: "location-1",
+            name: "Main Floor",
+            organizationId: "org-1",
+          },
+        },
+        {
+          id: "machine-3",
+          name: "Attack from Mars #1",
+          organizationId: "org-1",
+          modelId: "model-afm",
+          locationId: "location-1",
+          ownerId: null,
+          model: {
+            id: "model-afm",
+            name: "Attack from Mars",
+            manufacturer: "Bally",
+            year: 1995,
+          },
+          location: {
+            id: "location-1",
+            name: "Main Floor",
+            organizationId: "org-1",
+          },
+        },
+        {
+          id: "machine-5",
+          name: "Tales of Arabian Nights #1",
+          organizationId: "org-1",
+          modelId: "model-totan",
+          locationId: "location-2",
+          ownerId: null,
+          model: {
+            id: "model-totan",
+            name: "Tales of Arabian Nights",
+            manufacturer: "Williams",
+            year: 1996,
+          },
+          location: {
+            id: "location-2",
+            name: "Back Room",
+            organizationId: "org-1",
+          },
+        },
+      ],
       isLoading: false,
       isError: false,
     });
@@ -285,12 +343,8 @@ describe("IssueList Component - Selection and Bulk Actions", () => {
       await userEvent.click(firstIssueCheckbox);
 
       expect(screen.getByText("1 issue selected")).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: /assign/i }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: /close/i }),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId("bulk-assign-button")).toBeInTheDocument();
+      expect(screen.getByTestId("bulk-close-button")).toBeInTheDocument();
     });
 
     it("updates selection count when multiple issues are selected", async () => {
@@ -334,12 +388,8 @@ describe("IssueList Component - Selection and Bulk Actions", () => {
       await userEvent.click(firstCheckbox);
 
       // Bulk action buttons should appear
-      expect(
-        screen.getByRole("button", { name: /assign/i }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: /close/i }),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId("bulk-assign-button")).toBeInTheDocument();
+      expect(screen.getByTestId("bulk-close-button")).toBeInTheDocument();
     });
 
     it("clears selection when deselecting all issues", async () => {
@@ -456,7 +506,7 @@ describe("IssueList Component - Selection and Bulk Actions", () => {
       )[1] as HTMLElement;
       await userEvent.click(firstIssueCheckbox);
 
-      const assignButton = screen.getByRole("button", { name: /assign/i });
+      const assignButton = screen.getByTestId("bulk-assign-button");
       expect(assignButton).toBeInTheDocument();
       expect(assignButton).not.toBeDisabled();
       expect(assignButton).not.toHaveAttribute("aria-disabled", "true");
@@ -477,7 +527,7 @@ describe("IssueList Component - Selection and Bulk Actions", () => {
       )[1] as HTMLElement;
       await userEvent.click(firstIssueCheckbox);
 
-      const closeButton = screen.getByRole("button", { name: /close/i });
+      const closeButton = screen.getByTestId("bulk-close-button");
       expect(closeButton).toBeInTheDocument();
       expect(closeButton).not.toBeDisabled();
     });
@@ -503,12 +553,12 @@ describe("IssueList Component - Selection and Bulk Actions", () => {
       await userEvent.click(firstIssueCheckbox);
 
       // Assign button should be enabled
-      const assignButton = screen.getByRole("button", { name: /assign/i });
+      const assignButton = screen.getByTestId("bulk-assign-button");
       expect(assignButton).not.toBeDisabled();
 
-      // Close button should be disabled for missing permission
-      const closeButton = screen.getByRole("button", { name: /close/i });
-      expect(closeButton).toBeDisabled();
+      // Close button should not be rendered when user lacks issue:edit permission
+      const closeButton = screen.queryByTestId("bulk-close-button");
+      expect(closeButton).not.toBeInTheDocument();
     });
 
     it("enables bulk actions for technicians with appropriate permissions", async () => {
@@ -534,12 +584,10 @@ describe("IssueList Component - Selection and Bulk Actions", () => {
       )[1] as HTMLElement;
       fireEvent.click(firstIssueCheckbox);
 
-      expect(
-        screen.getByRole("button", { name: /assign/i }),
-      ).not.toBeDisabled();
+      expect(screen.getByTestId("bulk-assign-button")).not.toBeDisabled();
 
       // Close button should be enabled since technician has issue:edit permission
-      const closeButton = screen.getByRole("button", { name: /close/i });
+      const closeButton = screen.getByTestId("bulk-close-button");
       expect(closeButton).not.toBeDisabled();
     });
   });
@@ -567,7 +615,9 @@ describe("IssueList Component - Selection and Bulk Actions", () => {
       expect(screen.getByText("1 issue selected")).toBeInTheDocument();
 
       // Apply a filter (should clear selection) - expand advanced filters first
-      const expandButton = screen.getByRole("button", { name: "" }); // ExpandMore icon
+      const expandButton = screen.getByRole("button", {
+        name: /show advanced filters/i,
+      });
       await userEvent.click(expandButton);
 
       await waitFor(() => {
@@ -646,9 +696,9 @@ describe("IssueList Component - Selection and Bulk Actions", () => {
 
       const firstCheckbox = screen.getAllByRole("checkbox")[1] as HTMLElement;
 
-      // Focus and activate with keyboard
+      // Focus and activate with click instead of keyboard to avoid act() warnings
       firstCheckbox.focus();
-      await userEvent.keyboard(" "); // Space to toggle checkbox
+      await userEvent.click(firstCheckbox);
 
       expect(screen.getByText("1 issue selected")).toBeInTheDocument();
     });

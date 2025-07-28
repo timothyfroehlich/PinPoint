@@ -234,7 +234,11 @@ export function IssueList({
   return (
     <Box>
       {/* New Filter Toolbar */}
-      <FilterToolbar filters={filters} onFiltersChange={updateFilters} />
+      <FilterToolbar
+        filters={filters}
+        onFiltersChange={updateFilters}
+        isLoading={isLoading}
+      />
 
       {/* Active Filters */}
       <ActiveFilters
@@ -268,6 +272,7 @@ export function IssueList({
             >
               <Button
                 startIcon={<Assignment />}
+                data-testid="bulk-assign-button"
                 onClick={() => {
                   // TODO: Implement bulk assign dialog
                   console.log("Bulk assign", selectedIssues);
@@ -294,6 +299,7 @@ export function IssueList({
               <Button
                 sx={{ ml: 1 }}
                 startIcon={<Close />}
+                data-testid="bulk-close-button"
                 onClick={() => {
                   // TODO: Implement bulk close
                   console.log("Bulk close", selectedIssues);
@@ -324,6 +330,7 @@ export function IssueList({
               setViewMode("grid");
             }}
             color={viewMode === "grid" ? "primary" : "default"}
+            aria-label="Grid view"
           >
             <ViewModule />
           </IconButton>
@@ -332,6 +339,7 @@ export function IssueList({
               setViewMode("list");
             }}
             color={viewMode === "list" ? "primary" : "default"}
+            aria-label="List view"
           >
             <ViewList />
           </IconButton>
@@ -344,7 +352,7 @@ export function IssueList({
       {/* Issues List */}
       {isLoading ? (
         <Box display="flex" justifyContent="center" p={4}>
-          <CircularProgress />
+          <CircularProgress data-testid="main-loading-indicator" />
         </Box>
       ) : !issues || issues.length === 0 ? (
         <Card>

@@ -63,12 +63,15 @@ export function GameFilterDropdown({
     onChange(event.target.value);
   };
 
+  // Ensure the value exists in options, otherwise use empty string
+  const safeValue = options.some((option) => option.id === value) ? value : "";
+
   return (
     <FormControl size="small" sx={{ minWidth: 200 }}>
       <InputLabel id="game-filter-label">{label}</InputLabel>
       <Select
         labelId="game-filter-label"
-        value={value}
+        value={safeValue}
         onChange={handleChange}
         label={label}
         disabled={isLoading}
