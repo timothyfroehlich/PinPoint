@@ -1,5 +1,6 @@
 import { organizationRouter } from "./routers/organization";
 
+import { adminRouter } from "~/server/api/routers/admin";
 import { collectionRouter } from "~/server/api/routers/collection";
 import { commentRouter } from "~/server/api/routers/comment";
 import { invitationRouter } from "~/server/api/routers/invitation";
@@ -20,6 +21,7 @@ import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
  * All routers added in /api/routers should be manually added here.
  */
 export const appRouter = createTRPCRouter({
+  admin: adminRouter,
   collection: collectionRouter,
   comment: commentRouter,
   invitation: invitationRouter,

@@ -12,12 +12,20 @@
 ## Environment
 
 - **Main Repo**: `/home/froeht/Code/PinPoint`
-- **Worktrees**: `/home/froeht/Code/PinPoint-worktrees/`
+- **Worktrees**: `/home/froeht/Code/PinPoint/worktrees/`
 - **Commands**: `npm run dev:full`, `npm run validate`, `npm run validate`
 
-## Key Procedures
+## Orchestrator Command Variations
 
-### Status Checks
+### Available Commands
+
+- **`/orchestrator-feature <task description>`** - Collaborative feature development (research → design → handoff)
+- **`/orchestrator-bugfix <bug description>`** - Autonomous bug fixing (complete fix within session)
+- **`/orchestrator-checkout <PR# or branch>`** - Environment setup for existing branches
+
+### Key Procedures
+
+#### Status Checks
 
 ```bash
 git fetch origin epic/backend-refactor
@@ -26,7 +34,7 @@ git status
 npm run validate
 ```
 
-### Worktree Management
+#### Worktree Management
 
 ```bash
 ./scripts/create-and-setup-worktree.sh <task-name>
@@ -61,36 +69,33 @@ npm run db:reset      # Reset database
 - `docs/design-docs/cujs-list.md` - User journeys
 - `docs/architecture/current-state.md` - Current state
 
-## Task File Organization
+## Task Management
 
-### Agent Workspace Structure
+### GitHub Issues for Task Coordination
 
-Each worktree contains an `agent_workspace/` directory with specialized task files:
+All orchestrator variants create GitHub issues for task management:
 
-**For TDD Workflow (3-agent system):**
+- **Issue Creation** - All orchestrator commands use `gh issue create`
+- **Comprehensive Context** - Issues contain complete task specifications
+- **Label Organization** - Consistent labeling (e.g., "orchestrator-task", "feature", "bug")
+- **Agent Dispatch** - Agents receive issue numbers: "Your task is issue #X"
+- **Progress Tracking** - Built-in GitHub issue tracking and status updates
 
-- `test-agent-task.md` - Test creation instructions
-- `implementation-agent-task.md` - Implementation instructions
-- `review-agent-task.md` - Code review and PR management
-- `SUBAGENT_TASK.md` - General overview and workflow coordination
+### Issue Content Structure
 
-**For Single Agent Tasks:**
-
-- `task-agent-implementation.md` - Single-agent implementation task
-- Or role-specific files like `fix-typescript-errors-task.md`
-
-**Task File Discovery Protocol:**
-
-- Orchestrator checks for existing specialized files first
-- Falls back to creating appropriate files based on task type
-- Always places files in `agent_workspace/` directory within worktree
+- **Mission Statement** - Clear task description and title
+- **Context** - Background information and constraints
+- **Implementation Steps** - Detailed step-by-step guide
+- **Quality Requirements** - Standards and validation criteria
+- **Success Criteria** - Definition of completion
+- **Completion Instructions** - Link PR, update status, close when merged
 
 ## Post-Completion Tasks
 
 1. Update `docs/architecture/source-map.md` and `docs/architecture/test-map.md`
-2. Review and close relevant GitHub issues
+2. Close the GitHub issue when PR is merged
 3. Update documentation for any deviations
-4. Mark task as complete
+4. Review related issues that may need updates
 
 ## Library Notes
 

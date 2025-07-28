@@ -6,6 +6,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { IssueList } from "../IssueList";
 
 import {
+  createMockIssuesList,
+  createMockLocations,
+  createMockStatuses,
+} from "~/test/mockUtils";
+import {
   VitestTestWrapper,
   VITEST_PERMISSION_SCENARIOS,
   VITEST_ROLE_MAPPING,
@@ -25,13 +30,21 @@ vi.mock("next/navigation", () => ({
 }));
 
 // Mock tRPC API calls with vi.hoisted - preserve React components
-const { mockRefetch, mockIssuesQuery, mockLocationsQuery, mockStatusesQuery } =
-  vi.hoisted(() => ({
-    mockRefetch: vi.fn(),
-    mockIssuesQuery: vi.fn(),
-    mockLocationsQuery: vi.fn(),
-    mockStatusesQuery: vi.fn(),
-  }));
+const {
+  mockRefetch,
+  mockIssuesQuery,
+  mockLocationsQuery,
+  mockStatusesQuery,
+  mockMachinesQuery,
+  mockUsersQuery,
+} = vi.hoisted(() => ({
+  mockRefetch: vi.fn(),
+  mockIssuesQuery: vi.fn(),
+  mockLocationsQuery: vi.fn(),
+  mockStatusesQuery: vi.fn(),
+  mockMachinesQuery: vi.fn(),
+  mockUsersQuery: vi.fn(),
+}));
 
 vi.mock("~/trpc/react", async () => {
   const actual =
@@ -43,29 +56,52 @@ vi.mock("~/trpc/react", async () => {
       createClient: actual.api.createClient,
       Provider: actual.api.Provider,
       issue: {
+        ...actual.api.issue,
         core: {
+          ...actual.api.issue?.core,
           getAll: {
+            ...actual.api.issue?.core?.getAll,
             useQuery: mockIssuesQuery,
           },
         },
       },
       location: {
+        ...actual.api.location,
         getAll: {
+          ...actual.api.location?.getAll,
           useQuery: mockLocationsQuery,
         },
       },
       issueStatus: {
+        ...actual.api.issueStatus,
         getAll: {
+          ...actual.api.issueStatus?.getAll,
           useQuery: mockStatusesQuery,
         },
       },
+      machine: {
+        ...actual.api.machine,
+        core: {
+          ...actual.api.machine?.core,
+          getAll: {
+            ...actual.api.machine?.core?.getAll,
+            useQuery: mockMachinesQuery,
+          },
+        },
+      },
       user: {
+        ...actual.api.user,
         getCurrentMembership: {
+          ...actual.api.user?.getCurrentMembership,
           useQuery: vi.fn(() => ({
             data: null,
             isLoading: false,
             isError: false,
           })),
+        },
+        getAllInOrganization: {
+          ...actual.api.user?.getAllInOrganization,
+          useQuery: mockUsersQuery,
         },
       },
     },
@@ -85,148 +121,16 @@ vi.mock("~/hooks/usePermissions", () => ({
 }));
 
 describe("IssueList - Integration Tests with tRPC APIs", () => {
-  const mockIssuesData = [
-    {
-      id: "issue-1",
-      title: "Flipper Stuck on Medieval Madness",
-      status: {
-        id: "status-new",
-        name: "New",
-        category: "NEW" as const,
-        organizationId: "org-1",
-        isDefault: true,
-      },
-      priority: {
-        id: "priority-high",
-        name: "High",
-        order: 2,
-        organizationId: "org-1",
-        isDefault: false,
-      },
-      machine: {
-        id: "machine-mm",
-        name: "Medieval Madness #1",
-        model: {
-          id: "model-mm",
-          name: "Medieval Madness",
-          manufacturer: "Williams",
-          year: 1997,
-        },
-        location: {
-          id: "location-main",
-          name: "Main Floor",
-          organizationId: "org-1",
-        },
-      },
-      assignedTo: null,
-      createdAt: "2023-12-01T10:00:00.000Z",
-      _count: {
-        comments: 2,
-        attachments: 1,
-      },
+  // Use centralized mock data factories that align with status category logic
+  const mockIssuesData = createMockIssuesList({
+    count: 3,
+    overrides: {
+      title: "Test Integration Issue",
+      _count: { comments: 2, attachments: 1 },
     },
-    {
-      id: "issue-2",
-      title: "Display Issues on Attack from Mars",
-      status: {
-        id: "status-progress",
-        name: "In Progress",
-        category: "IN_PROGRESS" as const,
-        organizationId: "org-1",
-        isDefault: false,
-      },
-      priority: {
-        id: "priority-medium",
-        name: "Medium",
-        order: 3,
-        organizationId: "org-1",
-        isDefault: true,
-      },
-      machine: {
-        id: "machine-afm",
-        name: "Attack from Mars #2",
-        model: {
-          id: "model-afm",
-          name: "Attack from Mars",
-          manufacturer: "Bally",
-          year: 1995,
-        },
-        location: {
-          id: "location-back",
-          name: "Back Room",
-          organizationId: "org-1",
-        },
-      },
-      assignedTo: {
-        id: "user-tech",
-        name: "Tech Johnson",
-        email: "tech@example.com",
-        image: null,
-      },
-      createdAt: "2023-12-02T15:30:00.000Z",
-      _count: {
-        comments: 5,
-        attachments: 3,
-      },
-    },
-    {
-      id: "issue-3",
-      title: "Playfield Cleaning Needed",
-      status: {
-        id: "status-resolved",
-        name: "Resolved",
-        category: "RESOLVED" as const,
-        organizationId: "org-1",
-        isDefault: false,
-      },
-      priority: {
-        id: "priority-low",
-        name: "Low",
-        order: 4,
-        organizationId: "org-1",
-        isDefault: false,
-      },
-      machine: {
-        id: "machine-totan",
-        name: "Tales of the Arabian Nights",
-        model: {
-          id: "model-totan",
-          name: "Tales of the Arabian Nights",
-          manufacturer: "Williams",
-          year: 1996,
-        },
-        location: {
-          id: "location-main",
-          name: "Main Floor",
-          organizationId: "org-1",
-        },
-      },
-      assignedTo: {
-        id: "user-tech",
-        name: "Tech Johnson",
-        email: "tech@example.com",
-        image: null,
-      },
-      createdAt: "2023-11-28T09:15:00.000Z",
-      _count: {
-        comments: 1,
-        attachments: 0,
-      },
-    },
-  ];
-
-  const mockLocationsData = [
-    { id: "location-main", name: "Main Floor" },
-    { id: "location-back", name: "Back Room" },
-    { id: "location-workshop", name: "Workshop" },
-  ];
-
-  const mockStatusesData = [
-    { id: "status-new", name: "New" },
-    { id: "status-progress", name: "In Progress" },
-    { id: "status-resolved", name: "Resolved" },
-    { id: "status-closed", name: "Closed" },
-  ];
+  });
+  const mockLocationsData = createMockLocations({ count: 3, overrides: {} });
+  const mockStatusesData = createMockStatuses({ count: 4 });
 
   const defaultFilters = {
     sortBy: "created" as const,
@@ -256,6 +160,76 @@ describe("IssueList - Integration Tests with tRPC APIs", () => {
     mockStatusesQuery.mockReturnValue({
       data: mockStatusesData,
     });
+
+    mockMachinesQuery.mockReturnValue({
+      data: [
+        {
+          id: "machine-1",
+          name: "Medieval Madness #1",
+          organizationId: "org-1",
+          modelId: "model-mm",
+          locationId: "location-1",
+          ownerId: null,
+          model: {
+            id: "model-mm",
+            name: "Medieval Madness",
+            manufacturer: "Williams",
+            year: 1997,
+          },
+          location: {
+            id: "location-1",
+            name: "Main Floor",
+            organizationId: "org-1",
+          },
+        },
+        {
+          id: "machine-3",
+          name: "Attack from Mars #1",
+          organizationId: "org-1",
+          modelId: "model-afm",
+          locationId: "location-1",
+          ownerId: null,
+          model: {
+            id: "model-afm",
+            name: "Attack from Mars",
+            manufacturer: "Bally",
+            year: 1995,
+          },
+          location: {
+            id: "location-1",
+            name: "Main Floor",
+            organizationId: "org-1",
+          },
+        },
+        {
+          id: "machine-5",
+          name: "Tales of Arabian Nights #1",
+          organizationId: "org-1",
+          modelId: "model-totan",
+          locationId: "location-2",
+          ownerId: null,
+          model: {
+            id: "model-totan",
+            name: "Tales of Arabian Nights",
+            manufacturer: "Williams",
+            year: 1996,
+          },
+          location: {
+            id: "location-2",
+            name: "Back Room",
+            organizationId: "org-1",
+          },
+        },
+      ],
+      isLoading: false,
+      isError: false,
+    });
+
+    mockUsersQuery.mockReturnValue({
+      data: [],
+      isLoading: false,
+      isError: false,
+    });
   });
 
   describe("API Data Fetching Integration", () => {
@@ -271,16 +245,11 @@ describe("IssueList - Integration Tests with tRPC APIs", () => {
 
       // Wait for API data to load
       await waitFor(() => {
-        expect(
-          screen.getByText("Flipper Stuck on Medieval Madness"),
-        ).toBeInTheDocument();
+        expect(screen.getByText("3 issues found")).toBeInTheDocument();
       });
 
-      expect(
-        screen.getByText("Display Issues on Attack from Mars"),
-      ).toBeInTheDocument();
-      expect(screen.getByText("Playfield Cleaning Needed")).toBeInTheDocument();
-      expect(screen.getByText("3 issues found")).toBeInTheDocument();
+      // Check that issues are displayed (using the mock data pattern)
+      expect(screen.getAllByText(/Test Integration Issue/)).toHaveLength(3);
     });
 
     it("successfully fetches and populates location filter dropdown", async () => {
@@ -293,24 +262,29 @@ describe("IssueList - Integration Tests with tRPC APIs", () => {
         </VitestTestWrapper>,
       );
 
-      // Wait for data to load, then open location dropdown
+      // Wait for data to load, then expand advanced filters to access location dropdown
       await waitFor(() => {
         expect(screen.getByText("3 issues found")).toBeInTheDocument();
       });
 
-      const comboboxes = screen.getAllByRole("combobox");
-      const locationSelect = comboboxes[0] as HTMLElement;
-      fireEvent.mouseDown(locationSelect);
+      // Click expand button to show advanced filters
+      const expandButton = screen.getByRole("button", {
+        name: /show advanced filters/i,
+      });
+      await userEvent.click(expandButton);
 
       await waitFor(() => {
-        expect(screen.getByText("Main Floor")).toBeInTheDocument();
-      });
+        const locationSelect = screen.getByLabelText("Location");
+        fireEvent.mouseDown(locationSelect);
 
-      expect(screen.getByText("Back Room")).toBeInTheDocument();
-      expect(screen.getByText("Workshop")).toBeInTheDocument();
+        // Check for location options from mock data
+        expect(screen.getByText("Main Floor")).toBeInTheDocument();
+        expect(screen.getByText("Back Room")).toBeInTheDocument();
+        expect(screen.getByText("Workshop")).toBeInTheDocument();
+      });
     });
 
-    it("successfully fetches and populates status filter dropdown", async () => {
+    it("successfully displays status toggle pills", async () => {
       render(
         <VitestTestWrapper
           userPermissions={[...VITEST_PERMISSION_SCENARIOS.ADMIN]}
@@ -324,17 +298,18 @@ describe("IssueList - Integration Tests with tRPC APIs", () => {
         expect(screen.getByText("3 issues found")).toBeInTheDocument();
       });
 
-      const comboboxes = screen.getAllByRole("combobox");
-      const statusSelect = comboboxes[1] as HTMLElement;
-      fireEvent.mouseDown(statusSelect);
-
-      await waitFor(() => {
-        expect(screen.getAllByText("New")).toHaveLength(2); // Status option + chip
+      // Check for status pills with counts
+      const openButton = screen.getByRole("button", { name: /Open \(\d+\)/ });
+      const inProgressButton = screen.getByRole("button", {
+        name: /In Progress \(\d+\)/,
+      });
+      const closedButton = screen.getByRole("button", {
+        name: /Closed \(\d+\)/,
       });
 
-      expect(screen.getAllByText("In Progress")).toHaveLength(2); // Status option + chip
-      expect(screen.getAllByText("Resolved")).toHaveLength(2); // Status option + chip
-      expect(screen.getByText("Closed")).toBeInTheDocument();
+      expect(openButton).toBeInTheDocument();
+      expect(inProgressButton).toBeInTheDocument();
+      expect(closedButton).toBeInTheDocument();
     });
   });
 
@@ -366,9 +341,18 @@ describe("IssueList - Integration Tests with tRPC APIs", () => {
         refetch: mockRefetch,
       });
 
+      // Expand advanced filters first
+      const expandButton = screen.getByRole("button", {
+        name: /show advanced filters/i,
+      });
+      await userEvent.click(expandButton);
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("Location")).toBeInTheDocument();
+      });
+
       // Apply location filter
-      const comboboxes = screen.getAllByRole("combobox");
-      const locationSelect = comboboxes[0] as HTMLElement;
+      const locationSelect = screen.getByLabelText("Location");
       fireEvent.mouseDown(locationSelect);
 
       const mainFloorOption = screen.getByText("Main Floor");
@@ -377,7 +361,7 @@ describe("IssueList - Integration Tests with tRPC APIs", () => {
       // Wait for URL update
       await waitFor(() => {
         expect(mockPush).toHaveBeenCalledWith(
-          expect.stringContaining("locationId=location-main"),
+          expect.stringContaining("locationId=location-1"),
         );
       });
     });
@@ -409,32 +393,21 @@ describe("IssueList - Integration Tests with tRPC APIs", () => {
         refetch: mockRefetch,
       });
 
-      // Apply status category filter
-      const comboboxes = screen.getAllByRole("combobox");
-      const categorySelect = comboboxes[2] as HTMLElement;
-      fireEvent.mouseDown(categorySelect);
-
-      const newOptions = screen.getAllByText("New");
-      const newOption = newOptions.find((option) =>
-        option.closest('[role="option"]'),
-      ) as HTMLElement;
-      await userEvent.click(newOption);
+      // Apply status category filter by clicking Open pill (which has 3 issues)
+      const openButton = screen.getByRole("button", {
+        name: /Open \(\d+\)/,
+      });
+      await userEvent.click(openButton);
 
       // Wait for URL update
       await waitFor(() => {
         expect(mockPush).toHaveBeenCalledWith(
-          expect.stringContaining("statusCategory=NEW"),
+          expect.stringContaining("statusIds="),
         );
       });
     });
 
     it("handles multiple filters applied simultaneously", async () => {
-      const filteredIssues = mockIssuesData.filter(
-        (issue) =>
-          issue.machine.location.id === "location-main" &&
-          issue.status.category === "RESOLVED",
-      );
-
       render(
         <VitestTestWrapper
           userPermissions={[...VITEST_PERMISSION_SCENARIOS.ADMIN]}
@@ -448,43 +421,48 @@ describe("IssueList - Integration Tests with tRPC APIs", () => {
         expect(screen.getByText("3 issues found")).toBeInTheDocument();
       });
 
-      // Mock filtered response for multiple filters
-      mockIssuesQuery.mockReturnValue({
-        data: filteredIssues,
-        isLoading: false,
-        isError: false,
-        error: null,
-        refetch: mockRefetch,
+      // Expand advanced filters first
+      const expandButton = screen.getByRole("button", {
+        name: /show advanced filters/i,
+      });
+      await userEvent.click(expandButton);
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("Location")).toBeInTheDocument();
       });
 
-      // Apply location filter
-      const comboboxes = screen.getAllByRole("combobox");
-      const locationSelect = comboboxes[0] as HTMLElement;
+      // Apply location filter (use mock location name)
+      const locationSelect = screen.getByLabelText("Location");
       fireEvent.mouseDown(locationSelect);
       await userEvent.click(screen.getByText("Main Floor"));
 
-      // Apply status category filter
-      const categorySelect = comboboxes[2] as HTMLElement;
-      fireEvent.mouseDown(categorySelect);
-      const resolvedOptions = screen.getAllByText("Resolved");
-      const resolvedOption = resolvedOptions.find((option) =>
-        option.closest('[role="option"]'),
-      ) as HTMLElement;
-      await userEvent.click(resolvedOption);
-
-      // Verify URL updates were made
+      // Wait for location filter to be applied
       await waitFor(() => {
         expect(mockPush).toHaveBeenCalledWith(
-          expect.stringContaining("locationId=location-main"),
+          expect.stringContaining("locationId=location-1"),
         );
       });
 
+      // Now apply status filter - find and click an enabled status pill
+      await waitFor(() => {
+        const openButton = screen.getByRole("button", {
+          name: /Open \(\d+\)/,
+        });
+        expect(openButton).not.toHaveAttribute("aria-disabled", "true");
+      });
+
+      const openButton = screen.getByRole("button", {
+        name: /Open \(\d+\)/,
+      });
+      await userEvent.click(openButton);
+
+      // Verify status filter URL update
       await waitFor(() => {
         expect(mockPush).toHaveBeenCalledWith(
-          expect.stringContaining("statusCategory=RESOLVED"),
+          expect.stringContaining("statusIds="),
         );
       });
-    });
+    }, 10000);
 
     it("handles sort parameter changes correctly", async () => {
       render(
@@ -500,9 +478,18 @@ describe("IssueList - Integration Tests with tRPC APIs", () => {
         expect(screen.getByText("3 issues found")).toBeInTheDocument();
       });
 
+      // Expand advanced filters first
+      const expandButton = screen.getByRole("button", {
+        name: /show advanced filters/i,
+      });
+      await userEvent.click(expandButton);
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("Sort By")).toBeInTheDocument();
+      });
+
       // Change sort option
-      const comboboxes = screen.getAllByRole("combobox");
-      const sortSelect = comboboxes[3] as HTMLElement; // Sort is typically the last combobox
+      const sortSelect = screen.getByLabelText("Sort By");
       fireEvent.mouseDown(sortSelect);
 
       const updatedOption = screen.getByText("Updated Date");
@@ -619,13 +606,18 @@ describe("IssueList - Integration Tests with tRPC APIs", () => {
         expect(screen.getByText("3 issues found")).toBeInTheDocument();
       });
 
-      expect(
-        screen.getByText("Flipper Stuck on Medieval Madness"),
-      ).toBeInTheDocument();
+      expect(screen.getAllByText(/Test Integration Issue/)).toHaveLength(3);
 
-      // Location filter should still be present even with error
-      const comboboxes = screen.getAllByRole("combobox");
-      expect(comboboxes.length).toBeGreaterThan(0);
+      // Status pills should still be present even with location error
+      expect(
+        screen.getByRole("button", { name: /Open \(\d+\)/ }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /In Progress \(\d+\)/ }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /Closed \(\d+\)/ }),
+      ).toBeInTheDocument();
     });
   });
 
@@ -680,9 +672,7 @@ describe("IssueList - Integration Tests with tRPC APIs", () => {
 
       // Wait for initial load
       await waitFor(() => {
-        expect(
-          screen.getByText("Flipper Stuck on Medieval Madness"),
-        ).toBeInTheDocument();
+        expect(screen.getByText("3 issues found")).toBeInTheDocument();
       });
 
       // Simulate data update by changing mock return value

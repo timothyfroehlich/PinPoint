@@ -1,76 +1,132 @@
-# Agent Workspace Documentation
+# GitHub Issues for Agent Task Management
 
 ## Overview
 
-The agent workspace is a standardized directory structure for organizing task files and agent-specific resources in worktrees.
+PinPoint uses GitHub issues for all orchestrator task coordination and agent dispatch.
 
-## Directory Structure
+## GitHub Issues Approach
 
-```
-worktree-root/
-├── agent_workspace/          # Agent task files and resources
-│   ├── SUBAGENT_TASK.md     # Main task file (created by worktree script)
-│   ├── test-agent-task.md   # Test agent specific instructions
-│   ├── implementation-agent-task.md  # Implementation agent instructions
-│   └── review-agent-task.md # Review agent instructions
-└── ... (other project files)
-```
+### Issue Creation
 
-## Task File Locations
+- **Created by**: All orchestrator variants (`orchestrator-feature`, `orchestrator-bugfix`, `orchestrator-checkout`)
+- **Repository**: Issues created in the main PinPoint repository
+- **Labels**: Consistent labeling for categorization and tracking
 
-### Automatic Creation
-
-When creating a new worktree using `./scripts/create-and-setup-worktree.sh`:
-
-- Creates `agent_workspace/` directory
-- Generates `agent_workspace/SUBAGENT_TASK.md` template
-
-### Agent-Specific Task Files
-
-Orchestrator creates specialized task files for TDD workflow:
-
-1. `test-agent-task.md` - For test creation agent
-2. `implementation-agent-task.md` - For implementation agent
-3. `review-agent-task.md` - For code review agent
-
-## Usage by Agents
-
-Agents should look for their task files in:
+### Issue Structure
 
 ```
-/path/to/worktree/agent_workspace/<agent-type>-agent-task.md
+Repository Issues:
+├── #123 (orchestrator-task, feature) - Feature implementation task
+├── #124 (orchestrator-task, bug, fixed) - Bug fix task
+├── #125 (orchestrator-checkout, environment-setup) - Environment setup
+└── ... (other project issues)
 ```
 
-Example:
+## Issue Content
 
-```bash
-# Test agent reads:
-cat agent_workspace/test-agent-task.md
+### Standard Template
 
-# Implementation agent reads:
-cat agent_workspace/implementation-agent-task.md
+```markdown
+# Task: <Task Name>
+
+## Mission Statement
+
+[Clear description of what needs to be accomplished]
+
+## Context
+
+[Background information, constraints, and architectural context]
+
+## Implementation Steps
+
+[Detailed step-by-step instructions for the agent]
+
+## Quality Requirements
+
+- All tests must pass: `npm run test`
+- TypeScript must compile: `npm run typecheck`
+- Pre-commit hooks must pass: `npm run validate`
+- Code must follow project conventions
+
+## Success Criteria
+
+[Specific criteria that define task completion]
+
+## Completion Instructions
+
+When your task is complete:
+
+1. Ensure all quality requirements are met
+2. Commit your changes with descriptive messages
+3. Create PR and link it to this issue
+4. Update issue status and close when PR is merged
 ```
 
-## Benefits
+## Orchestrator-Specific Variations
 
-1. **Visibility**: Task files are easily accessible (not hidden in .claude)
-2. **Organization**: Clear separation of agent instructions
-3. **Flexibility**: Can add additional agent resources as needed
-4. **Consistency**: Standard location across all worktrees
+### Feature Development (`orchestrator-feature`)
 
-## Scripts Updated
+- **Labels**: `orchestrator-task`, `feature`
+- Collaborative design phase documented
+- Complete implementation specifications
+- Agent dispatch instructions
 
-The following scripts have been updated to use `agent_workspace`:
+### Bug Fixing (`orchestrator-bugfix`)
 
-- `scripts/create-and-setup-worktree.sh` - Creates directory and template
-- `scripts/list-worktrees.sh` - Checks for task file existence
+- **Labels**: `orchestrator-task`, `bug`, `fixed`
+- Bug reproduction steps
+- Root cause analysis
+- Autonomous fix implementation plan
+- Comprehensive testing requirements
 
-## Migration
+### Environment Setup (`orchestrator-checkout`)
 
-For existing worktrees with task files in `.claude/`:
+- **Labels**: `orchestrator-checkout`, `environment-setup`
+- Source PR/branch information
+- Environment setup verification
+- Current state assessment
+- Ready-for-agent-work confirmation
 
-```bash
-# Move existing task files
-mkdir -p agent_workspace
-mv .claude/*-agent-task.md agent_workspace/
-```
+## Agent Dispatch Protocol
+
+### Issue-Based Dispatch
+
+1. **Orchestrator creates issue**: Comprehensive task specification
+2. **Issue number provided**: "Your task is issue #X"
+3. **Agent references issue**: Direct GitHub integration
+4. **Progress tracking**: Built-in GitHub issue features
+
+### GitHub Integration Benefits
+
+1. **Visibility**: Issues are visible to all project participants
+2. **Tracking**: Built-in progress tracking and status updates
+3. **Linking**: Easy linking between issues, PRs, and commits
+4. **History**: Permanent record of task context and decisions
+5. **Collaboration**: Comments and updates from multiple participants
+
+## Lifecycle Management
+
+1. **Creation**: Orchestrator creates GitHub issue during task setup
+2. **Assignment**: Agent receives issue number for task work
+3. **Development**: Agent updates issue status and links PR
+4. **Completion**: Issue closed when PR is merged
+5. **Tracking**: Issue remains for historical reference
+
+## Label Organization
+
+### Core Labels
+
+- `orchestrator-task` - Tasks created by orchestrator system
+- `orchestrator-checkout` - Environment setup tasks
+- `feature` - Feature development work
+- `bug` - Bug fix work
+- `fixed` - Bug has been resolved
+- `environment-setup` - Environment configuration tasks
+
+### Benefits
+
+1. **Integration**: Native GitHub workflow integration
+2. **Visibility**: Clear task tracking across the project
+3. **Collaboration**: Multiple participants can comment and update
+4. **Persistence**: Issues provide permanent task history
+5. **Automation**: Easy integration with GitHub Actions and workflows
