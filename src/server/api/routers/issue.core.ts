@@ -435,7 +435,22 @@ export const issueCoreRouter = createTRPCRouter({
 
       return ctx.db.issue.findMany({
         where: whereClause,
-        include: {
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          consistency: true,
+          createdAt: true,
+          updatedAt: true,
+          resolvedAt: true,
+          reporterEmail: true,
+          submitterName: true,
+          organizationId: true,
+          machineId: true,
+          statusId: true,
+          priorityId: true,
+          createdById: true,
+          assignedToId: true,
           status: true,
           priority: true,
           assignedTo: {
@@ -871,5 +886,136 @@ export const issueCoreRouter = createTRPCRouter({
       );
 
       return updatedIssue;
+    }),
+
+  // Public procedure for getting issues (for anonymous users to see recent issues)
+  publicGetAll: publicProcedure
+    .input(
+      z
+        .object({
+          locationId: z.string().optional(),
+          machineId: z.string().optional(),
+          statusId: z.string().optional(),
+          modelId: z.string().optional(),
+          statusCategory: z.enum(["NEW", "IN_PROGRESS", "RESOLVED"]).optional(),
+          sortBy: z
+            .enum(["created", "updated", "status", "severity", "game"])
+            .optional(),
+          sortOrder: z.enum(["asc", "desc"]).optional(),
+          limit: z.number().min(1).max(100).optional(), // Limit for public access
+        })
+        .optional(),
+    )
+    .query(async ({ ctx, input }) => {
+      // Organization is guaranteed by publicProcedure middleware via subdomain
+      const organization = ctx.organization;
+
+      if (!organization) {
+        throw new Error("Organization not found");
+      }
+
+      // Build where clause with proper typing
+      interface WhereClause {
+        organizationId: string;
+        machine?: {
+          locationId?: string;
+          modelId?: string;
+        };
+        machineId?: string;
+        statusId?: string;
+        status?: {
+          category: "NEW" | "IN_PROGRESS" | "RESOLVED";
+        };
+      }
+
+      const whereClause: WhereClause = {
+        organizationId: organization.id,
+      };
+
+      // Apply filters
+      if (input?.locationId) {
+        whereClause.machine = {
+          ...whereClause.machine,
+          locationId: input.locationId,
+        };
+      }
+
+      if (input?.machineId) {
+        whereClause.machineId = input.machineId;
+      }
+
+      if (input?.modelId) {
+        whereClause.machine = {
+          ...whereClause.machine,
+          modelId: input.modelId,
+        };
+      }
+
+      if (input?.statusId) {
+        whereClause.statusId = input.statusId;
+      }
+
+      if (input?.statusCategory) {
+        whereClause.status = {
+          category: input.statusCategory,
+        };
+      }
+
+      // Define sort order
+      const sortBy = input?.sortBy ?? "created";
+      const sortOrder = input?.sortOrder ?? "desc";
+
+      const orderBy = (() => {
+        switch (sortBy) {
+          case "created":
+            return { createdAt: sortOrder };
+          case "updated":
+            return { updatedAt: sortOrder };
+          case "status":
+            return { status: { name: sortOrder } };
+          case "severity":
+            return { priority: { order: sortOrder } };
+          case "game":
+            return { machine: { model: { name: sortOrder } } };
+          default:
+            return { createdAt: "desc" as const };
+        }
+      })();
+
+      return ctx.db.issue.findMany({
+        where: whereClause,
+        select: {
+          id: true,
+          title: true,
+          createdAt: true,
+          submitterName: true,
+          status: true,
+          priority: true,
+          assignedTo: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              image: true,
+            },
+          },
+          createdBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              image: true,
+            },
+          },
+          machine: {
+            include: {
+              model: true,
+              location: true,
+            },
+          },
+        },
+        orderBy,
+        take: input?.limit ?? 20, // Default limit for public access
+      });
     }),
 });

@@ -1,0 +1,196 @@
+
+> pinpoint@0.1.0 test
+> vitest run 2
+
+
+ RUN  v3.2.4 /home/froeht/Code/PinPoint-worktrees/issue-reporting
+      Coverage enabled with v8
+
+ % Coverage report from v8
+-------------------|---------|----------|---------|---------|-------------------
+File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s 
+-------------------|---------|----------|---------|---------|-------------------
+All files          |       0 |    54.19 |   54.19 |       0 |                   
+ app               |       0 |       50 |      50 |       0 |                   
+  layout.tsx       |       0 |        0 |       0 |       0 | 1-23              
+  page.tsx         |       0 |      100 |     100 |       0 | 3-31              
+  providers.tsx    |       0 |      100 |     100 |       0 | 3-28              
+  theme.ts         |       0 |        0 |       0 |       0 | 1-56              
+ app/_components   |       0 |      100 |     100 |       0 |                   
+  ...Dashboard.tsx |       0 |      100 |     100 |       0 | 3-147             
+  ...tedLayout.tsx |       0 |      100 |     100 |       0 | 3-30              
+  ...inCompact.tsx |       0 |      100 |     100 |       0 | 3-240             
+  LoginModal.tsx   |       0 |      100 |     100 |       0 | 3-58              
+  ...Dashboard.tsx |       0 |      100 |     100 |       0 | 3-161             
+ app/_trpc         |       0 |      100 |     100 |       0 |                   
+  Provider.tsx     |       0 |      100 |     100 |       0 | 2                 
+ .../[...nextauth] |       0 |        0 |       0 |       0 |                   
+  route.ts         |       0 |        0 |       0 |       0 | 1-3               
+ app/api/dev/users |       0 |        0 |       0 |       0 |                   
+  route.ts         |       0 |        0 |       0 |       0 | 1-77              
+ app/api/health    |       0 |        0 |       0 |       0 |                   
+  route.ts         |       0 |        0 |       0 |       0 | 1-34              
+ .../qr/[qrCodeId] |       0 |        0 |       0 |       0 |                   
+  route.ts         |       0 |        0 |       0 |       0 | 1-83              
+ ...pi/trpc/[trpc] |       0 |        0 |       0 |       0 |                   
+  route.ts         |       0 |        0 |       0 |       0 | 1-42              
+ app/dashboard     |       0 |      100 |     100 |       0 |                   
+  layout.tsx       |       0 |      100 |     100 |       0 | 3-25              
+  page.tsx         |       0 |      100 |     100 |       0 | 3-132             
+ ...rd/_components |       0 |    66.66 |   66.66 |       0 |                   
+  ...IssueCard.tsx |       0 |        0 |       0 |       0 | 1-100             
+  ...aryAppBar.tsx |       0 |      100 |     100 |       0 | 3-300             
+  ...aryHeader.tsx |       0 |      100 |     100 |       0 | 3-50              
+ app/games         |       0 |        0 |       0 |       0 |                   
+  page.tsx         |       0 |        0 |       0 |       0 | 1-5               
+ app/games/[id]    |       0 |        0 |       0 |       0 |                   
+  page.tsx         |       0 |        0 |       0 |       0 | 1-14              
+ app/issues        |       0 |        0 |       0 |       0 |                   
+  page.tsx         |       0 |        0 |       0 |       0 | 1-83              
+ ...sues/[issueId] |       0 |        0 |       0 |       0 |                   
+  page.tsx         |       0 |        0 |       0 |       0 | 1-65              
+ app/issues/create |       0 |        0 |       0 |       0 |                   
+  page.tsx         |       0 |        0 |       0 |       0 | 1-72              
+ app/machines      |       0 |      100 |     100 |       0 |                   
+  page.tsx         |       0 |      100 |     100 |       0 | 3-46              
+ app/machines/[id] |       0 |        0 |       0 |       0 |                   
+  page.tsx         |       0 |        0 |       0 |       0 | 1-67              
+ ...]/report-issue |       0 |        0 |       0 |       0 |                   
+  page.tsx         |       0 |        0 |       0 |       0 | 1-137             
+ ...nes/components |       0 |      100 |     100 |       0 |                   
+  MachineCard.tsx  |       0 |      100 |     100 |       0 | 3-90              
+  MachineList.tsx  |       0 |      100 |     100 |       0 | 3-53              
+ app/profile       |       0 |      100 |     100 |       0 |                   
+  page.tsx         |       0 |      100 |     100 |       0 | 3-469             
+ app/settings      |       0 |      100 |     100 |       0 |                   
+  layout.tsx       |       0 |      100 |     100 |       0 | 3-50              
+  page.tsx         |       0 |      100 |     100 |       0 | 3-113             
+ ...settings/roles |       0 |      100 |     100 |       0 |                   
+  page.tsx         |       0 |      100 |     100 |       0 | 3-62              
+ ...es/_components |       0 |      100 |     100 |       0 |                   
+  RoleDialog.tsx   |       0 |      100 |     100 |       0 | 3-47              
+  RoleTable.tsx    |       0 |      100 |     100 |       0 | 3-192             
+ ...settings/users |       0 |      100 |     100 |       0 |                   
+  page.tsx         |       0 |      100 |     100 |       0 | 3-61              
+ ...rs/_components |       0 |      100 |     100 |       0 |                   
+  ...serDialog.tsx |       0 |      100 |     100 |       0 | 3-40              
+  UserTable.tsx    |       0 |      100 |     100 |       0 | 3-191             
+ components/issues |       0 |      100 |     100 |       0 |                   
+  IssueActions.tsx |       0 |      100 |     100 |       0 | 3-352             
+  ...eComments.tsx |       0 |      100 |     100 |       0 | 3-203             
+  ...reateForm.tsx |       0 |      100 |     100 |       0 | 3-456             
+  ...reateView.tsx |       0 |      100 |     100 |       0 | 3-59              
+  IssueDetail.tsx  |       0 |      100 |     100 |       0 | 3-146             
+  ...etailView.tsx |       0 |      100 |     100 |       0 | 3-228             
+  IssueList.tsx    |       0 |      100 |     100 |       0 | 3-708             
+  ...eportForm.tsx |       0 |      100 |     100 |       0 | 3-222             
+  ...usControl.tsx |       0 |      100 |     100 |       0 | 3-162             
+  ...eTimeline.tsx |       0 |      100 |     100 |       0 | 3-195             
+  ...eSelector.tsx |       0 |      100 |     100 |       0 | 3-89              
+  ...esSidebar.tsx |       0 |      100 |     100 |       0 | 3-158             
+ ...nents/machines |       0 |      100 |     100 |       0 |                   
+  ...neContext.tsx |       0 |      100 |     100 |       0 | 3-91              
+  ...etailView.tsx |       0 |      100 |     100 |       0 | 3-392             
+ ...ts/permissions |       0 |      100 |     100 |       0 |                   
+  ...ionButton.tsx |       0 |      100 |     100 |       0 | 3-128             
+  ...ssionGate.tsx |       0 |      100 |     100 |       0 | 52-70             
+  index.ts         |       0 |      100 |     100 |       0 | 8-9               
+ ...onents/profile |       0 |      100 |     100 |       0 |                   
+  ...ureUpload.tsx |       0 |      100 |     100 |       0 | 3-229             
+ components/ui     |       0 |      100 |     100 |       0 |                   
+  Breadcrumbs.tsx  |       0 |      100 |     100 |       0 | 3-65              
+  UserAvatar.tsx   |       0 |      100 |     100 |       0 | 3-86              
+ contexts          |       0 |      100 |     100 |       0 |                   
+  ...psContext.tsx |       0 |      100 |     100 |       0 | 3-84              
+ hooks             |       0 |      100 |     100 |       0 |                   
+  ...ermissions.ts |       0 |      100 |     100 |       0 | 3-218             
+ lib               |       0 |      100 |     100 |       0 |                   
+  environment.ts   |       0 |      100 |     100 |       0 | 12-103            
+  ...-overrides.ts |       0 |      100 |     100 |       0 | 14-31             
+ lib/image-storage |       0 |       50 |      50 |       0 |                   
+  index.ts         |       0 |      100 |     100 |       0 | 30-46             
+  local-storage.ts |       0 |        0 |       0 |       0 | 1-158             
+ lib/opdb          |       0 |      100 |     100 |       0 |                   
+  client.ts        |       0 |      100 |     100 |       0 | 8-294             
+  index.ts         |       0 |      100 |     100 |       0 | 8-21              
+  types.ts         |       0 |        0 |       0 |       0 |                   
+  utils.ts         |       0 |      100 |     100 |       0 | 15-175            
+ lib/permissions   |       0 |      100 |     100 |       0 |                   
+  descriptions.ts  |       0 |      100 |     100 |       0 | 8-51              
+ lib/pinballmap    |       0 |      100 |     100 |       0 |                   
+  client.ts        |       0 |      100 |     100 |       0 | 11-103            
+  types.ts         |       0 |        0 |       0 |       0 |                   
+ ...lmap/__tests__ |       0 |      100 |     100 |       0 |                   
+  apiMocker.ts     |       0 |      100 |     100 |       0 | 6-75              
+ lib/types         |       0 |        0 |       0 |       0 |                   
+  gameInstance.ts  |       0 |        0 |       0 |       0 |                   
+ lib/utils         |       0 |        0 |       0 |       0 |                   
+  ...processing.ts |       0 |        0 |       0 |       0 | 1-226             
+ server            |       0 |        0 |       0 |       0 |                   
+  db.ts            |       0 |        0 |       0 |       0 | 1-24              
+ server/api        |       0 |       50 |      50 |       0 |                   
+  root.ts          |       0 |        0 |       0 |       0 | 1-48              
+  trpc.base.ts     |       0 |      100 |     100 |       0 | 9-257             
+  ...permission.ts |       0 |        0 |       0 |       0 | 1-158             
+  trpc.ts          |       0 |      100 |     100 |       0 | 11-20             
+ ...er/api/routers |       0 |        0 |       0 |       0 |                   
+  admin.ts         |       0 |        0 |       0 |       0 | 1-467             
+  collection.ts    |       0 |        0 |       0 |       0 | 1-120             
+  comment.ts       |       0 |        0 |       0 |       0 | 1-111             
+  issue.admin.ts   |       0 |        0 |       0 |       0 | 1-19              
+  ...attachment.ts |       0 |        0 |       0 |       0 | 1-99              
+  issue.comment.ts |       0 |        0 |       0 |       0 | 1-252             
+  issue.core.ts    |       0 |        0 |       0 |       0 | 1-875             
+  issue.status.ts  |       0 |        0 |       0 |       0 | 1-46              
+  ...e.timeline.ts |       0 |        0 |       0 |       0 | 1-31              
+  issue.ts         |       0 |        0 |       0 |       0 | 1-11              
+  issueStatus.ts   |       0 |        0 |       0 |       0 | 1-92              
+  location.ts      |       0 |        0 |       0 |       0 | 1-194             
+  machine.core.ts  |       0 |        0 |       0 |       0 | 1-333             
+  ...e.location.ts |       0 |        0 |       0 |       0 | 1-57              
+  machine.owner.ts |       0 |        0 |       0 |       0 | 1-61              
+  machine.ts       |       0 |        0 |       0 |       0 | 1-7               
+  model.core.ts    |       0 |        0 |       0 |       0 | 1-116             
+  model.opdb.ts    |       0 |        0 |       0 |       0 | 1-111             
+  model.ts         |       0 |        0 |       0 |       0 | 1-7               
+  notification.ts  |       0 |        0 |       0 |       0 | 1-59              
+  organization.ts  |       0 |        0 |       0 |       0 | 1-34              
+  pinballMap.ts    |       0 |        0 |       0 |       0 | 1-75              
+  qrCode.ts        |       0 |        0 |       0 |       0 | 1-97              
+  role.ts          |       0 |        0 |       0 |       0 | 1-258             
+  user.ts          |       0 |        0 |       0 |       0 | 1-291             
+ server/auth       |       0 |       25 |      25 |       0 |                   
+  config.ts        |       0 |        0 |       0 |       0 | 1-116             
+  index.ts         |       0 |        0 |       0 |       0 | 1-13              
+  ....constants.ts |       0 |      100 |     100 |       0 | 8-153             
+  permissions.ts   |       0 |        0 |       0 |       0 | 1-160             
+  providers.ts     |       0 |        0 |       0 |       0 | 1-107             
+  types.ts         |       0 |      100 |     100 |       0 | 57-82             
+  uploadAuth.ts    |       0 |        0 |       0 |       0 | 1-111             
+  validation.ts    |       0 |        0 |       0 |       0 | 1-134             
+ server/constants  |       0 |      100 |     100 |       0 |                   
+  cleanup.ts       |       0 |      100 |     100 |       0 | 4-9               
+ server/db         |       0 |        0 |       0 |       0 |                   
+  provider.ts      |       0 |        0 |       0 |       0 | 1-30              
+ server/services   |       0 |       50 |      50 |       0 |                   
+  ...ionService.ts |       0 |      100 |     100 |       0 | 71-514            
+  ...nupService.ts |       0 |      100 |     100 |       0 | 3-113             
+  factory.ts       |       0 |        0 |       0 |       0 | 1-36              
+  ...ityService.ts |       0 |        0 |       0 |       0 | 1-270             
+  ...ionService.ts |       0 |        0 |       0 |       0 | 1-230             
+  ...ionService.ts |       0 |        0 |       0 |       0 | 1-281             
+  ...mapService.ts |       0 |      100 |     100 |       0 | 20-447            
+  qrCodeService.ts |       0 |        0 |       0 |       0 | 1-299             
+  roleService.ts   |       0 |      100 |     100 |       0 | 2-417             
+  types.ts         |       0 |      100 |     100 |       0 | 17-24             
+ server/utils      |       0 |        0 |       0 |       0 |                   
+  qrCodeUtils.ts   |       0 |        0 |       0 |       0 | 1-10              
+ trpc              |       0 |    33.33 |   33.33 |       0 |                   
+  query-client.ts  |       0 |        0 |       0 |       0 | 1-25              
+  react.tsx        |       0 |      100 |     100 |       0 | 3-89              
+  server.ts        |       0 |        0 |       0 |       0 | 1-31              
+ types             |       0 |        0 |       0 |       0 |                   
+  issue.ts         |       0 |        0 |       0 |       0 |                   
+ utils             |       0 |      100 |     100 |       0 |                   
+  version.ts       |       0 |      100 |     100 |       0 | 12-14             
+-------------------|---------|----------|---------|---------|-------------------

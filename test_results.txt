@@ -1,0 +1,1126 @@
+
+> pinpoint@0.1.0 test
+> vitest run
+
+
+ RUN  v3.2.4 /home/froeht/Code/PinPoint-worktrees/issue-reporting
+      Coverage enabled with v8
+
+ ✓ |jsdom| src/app/issues/__tests__/page.test.tsx (11 tests) 1356ms
+ ✓ |jsdom| src/components/issues/MachineSelector.test.tsx (9 tests) 4998ms
+   ✓ MachineSelector > uses the public getAllForIssues endpoint  474ms
+   ✓ MachineSelector > renders machine options correctly  1392ms
+   ✓ MachineSelector > displays machine name when available, falls back to model name  429ms
+   ✓ MachineSelector > calls onChange when a machine is selected  930ms
+   ✓ MachineSelector > handles loading state  374ms
+   ✓ MachineSelector > handles empty machine list  584ms
+   ✓ MachineSelector > handles clearing selection  531ms
+stdout | src/hooks/__tests__/usePermissions.test.tsx > usePermissions > Basic Permission Checking > should return correct permission checking function for admin user
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/hooks/__tests__/usePermissions.test.tsx > usePermissions > Basic Permission Checking > should return correct permission checking function for member user
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/hooks/__tests__/usePermissions.test.tsx > usePermissions > Basic Permission Checking > should return false for all permissions for unauthenticated user
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+ ✓ |jsdom| src/components/permissions/__tests__/PermissionGate.test.tsx (25 tests) 249ms
+stdout | src/hooks/__tests__/usePermissions.test.tsx > usePermissions > Basic Permission Checking > should handle empty permissions array
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/hooks/__tests__/usePermissions.test.tsx > usePermissions > Hook Return Values > should return complete interface for authenticated user
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/hooks/__tests__/usePermissions.test.tsx > usePermissions > Hook Return Values > should return isAdmin true for Admin role
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/hooks/__tests__/usePermissions.test.tsx > usePermissions > Hook Return Values > should return isAdmin false for non-admin roles
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/hooks/__tests__/usePermissions.test.tsx > usePermissions > Loading States > should handle loading state correctly
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+ >> query #1 user.getCurrentMembership { input: [90mundefined[39m, context: {} }
+
+stdout | src/hooks/__tests__/usePermissions.test.tsx > usePermissions > Loading States > should handle error state correctly
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/hooks/__tests__/usePermissions.test.tsx > usePermissions > Permission Function Behavior > should be stable across re-renders
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/hooks/__tests__/usePermissions.test.tsx > usePermissions > Permission Function Behavior > should update when permissions change
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/hooks/__tests__/usePermissions.test.tsx > usePermissions > Edge Cases > should handle undefined permissions gracefully
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/hooks/__tests__/usePermissions.test.tsx > usePermissions > Edge Cases > should handle null membership gracefully
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/hooks/__tests__/usePermissions.test.tsx > useRequiredPermission > should not redirect when user has required permission
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/hooks/__tests__/usePermissions.test.tsx > useRequiredPermission > should redirect when user lacks required permission
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/hooks/__tests__/usePermissions.test.tsx > useRequiredPermission > should use default redirect path when not specified
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+ ✓ |jsdom| src/hooks/__tests__/usePermissions.test.tsx (20 tests) 751ms
+stdout | src/components/issues/__tests__/IssueList.basic.test.tsx > IssueList Component - Basic Tests > Core Rendering > renders loading state correctly
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.basic.test.tsx > IssueList Component - Basic Tests > Core Rendering > renders error state with retry functionality
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/app/machines/components/__tests__/MachineCard.test.tsx > MachineCard > Basic Rendering > should render machine information correctly
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.basic.test.tsx > IssueList Component - Basic Tests > Core Rendering > renders empty state when no issues found
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/app/machines/components/__tests__/MachineCard.test.tsx > MachineCard > Basic Rendering > should use model name when machine name is not provided
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/app/machines/components/__tests__/MachineCard.test.tsx > MachineCard > Basic Rendering > should not show model name separately when it matches machine name
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/app/machines/components/__tests__/MachineCard.test.tsx > MachineCard > Basic Rendering > should render without owner information when owner is null
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/app/machines/components/__tests__/MachineCard.test.tsx > MachineCard > Basic Rendering > should render model chip at the bottom
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/app/machines/components/__tests__/MachineCard.test.tsx > MachineCard > Basic Rendering > should render location icon
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/app/dashboard/_components/__tests__/PrimaryAppBar.test.tsx > PrimaryAppBar > Basic Rendering > should render the app bar with PinPoint branding
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/app/machines/components/__tests__/MachineCard.test.tsx > MachineCard > Basic Rendering > should render owner avatar when owner has image
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/app/machines/components/__tests__/MachineCard.test.tsx > MachineCard > Basic Rendering > should render owner avatar without image when owner has no image
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.basic.test.tsx > IssueList Component - Basic Tests > Core Rendering > renders issue cards with complete data structure
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/app/machines/components/__tests__/MachineCard.test.tsx > MachineCard > Navigation > should navigate to machine detail page when clicked
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.basic.test.tsx > IssueList Component - Basic Tests > Core Rendering > shows correct issue count
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/app/dashboard/_components/__tests__/PrimaryAppBar.test.tsx > PrimaryAppBar > Basic Rendering > should render user profile menu
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+ ✓ |jsdom| src/components/permissions/__tests__/PermissionButton.test.tsx (10 tests) 610ms
+stdout | src/app/machines/components/__tests__/MachineCard.test.tsx > MachineCard > Navigation > should have cursor pointer styling
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/app/machines/components/__tests__/MachineCard.test.tsx > MachineCard > Navigation > should handle click event correctly
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/app/dashboard/_components/__tests__/PrimaryAppBar.test.tsx > PrimaryAppBar > Basic Rendering > should render logo with correct href
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/app/machines/components/__tests__/MachineCard.test.tsx > MachineCard > Accessibility > should be clickable
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.basic.test.tsx > IssueList Component - Basic Tests > View Mode Controls > toggles between grid and list view modes
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/app/machines/components/__tests__/MachineCard.test.tsx > MachineCard > Accessibility > should have proper alt text for owner avatar
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/app/machines/components/__tests__/MachineCard.test.tsx > MachineCard > Accessibility > should handle owner with no name gracefully
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/app/dashboard/_components/__tests__/PrimaryAppBar.test.tsx > PrimaryAppBar > Permission-based Navigation > should show Issues button for users with issue:view permission
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/app/dashboard/_components/__tests__/PrimaryAppBar.test.tsx > PrimaryAppBar > Permission-based Navigation > should show Games button for users with machine:view permission
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/app/dashboard/_components/__tests__/PrimaryAppBar.test.tsx > PrimaryAppBar > Permission-based Navigation > should hide Issues button for users without issue:view permission
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/app/dashboard/_components/__tests__/PrimaryAppBar.test.tsx > PrimaryAppBar > Permission-based Navigation > should hide Games button for users without machine:view permission
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+ ✓ |jsdom| src/app/machines/components/__tests__/MachineCard.test.tsx (14 tests) 1907ms
+   ✓ MachineCard > Basic Rendering > should render machine information correctly  557ms
+   ✓ MachineCard > Navigation > should have cursor pointer styling  356ms
+stdout | src/components/issues/__tests__/IssueList.technician-workflows.test.tsx > IssueList - Critical Technician User Journeys > CUJ 4.1 - Daily Triage Workflow > allows technician to filter for 'New' reports for daily triage
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/app/dashboard/_components/__tests__/PrimaryAppBar.test.tsx > PrimaryAppBar > Permission-based Navigation > should show both navigation buttons for admin users
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.test.tsx > IssueList Component > Core Rendering > renders loading state correctly
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/app/dashboard/_components/__tests__/PrimaryAppBar.test.tsx > PrimaryAppBar > Permission-based Navigation > should show appropriate buttons for manager users
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.basic.test.tsx > IssueList Component - Basic Tests > View Mode Controls > shows refresh button and works correctly
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.test.tsx > IssueList Component > Core Rendering > renders error state with retry functionality
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.permissions.test.tsx > IssueList - Permission-Based Access Control > Admin Role - Full Access > shows all management features for admin users
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/app/dashboard/_components/__tests__/PrimaryAppBar.test.tsx > PrimaryAppBar > Permission-based Navigation > should show appropriate buttons for member users
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/machines/__tests__/MachineDetailView.test.tsx > MachineDetailView > Basic Rendering > should render machine information correctly
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.basic.test.tsx > IssueList Component - Basic Tests > Filtering Functionality > renders all filter controls
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/app/dashboard/_components/__tests__/PrimaryAppBar.test.tsx > PrimaryAppBar > Permission-based Navigation > should hide all navigation buttons for public users
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.test.tsx > IssueList Component > Core Rendering > renders empty state when no issues found
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/app/dashboard/_components/__tests__/PrimaryAppBar.test.tsx > PrimaryAppBar > User Profile Navigation > should navigate to profile page when avatar is clicked
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/app/dashboard/_components/__tests__/PrimaryAppBar.test.tsx > PrimaryAppBar > User Profile Navigation > should have proper accessibility attributes
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/machines/__tests__/MachineDetailView.test.tsx > MachineDetailView > Basic Rendering > should render QR code when available
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/app/dashboard/_components/__tests__/PrimaryAppBar.test.tsx > PrimaryAppBar > Unauthenticated User Experience > should render basic structure for unauthenticated users
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/app/dashboard/_components/__tests__/PrimaryAppBar.test.tsx > PrimaryAppBar > Unauthenticated User Experience > should hide permission-based navigation for unauthenticated users
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.basic.test.tsx > IssueList Component - Basic Tests > Filtering Functionality > populates location filter dropdown correctly
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.permissions.test.tsx > IssueList - Permission-Based Access Control > Admin Role - Full Access > enables bulk assignment for admin users
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/app/dashboard/_components/__tests__/PrimaryAppBar.test.tsx > PrimaryAppBar > Permission Tooltips > should have correct tooltip for Issues button
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/app/dashboard/_components/__tests__/PrimaryAppBar.test.tsx > PrimaryAppBar > Permission Tooltips > should have correct tooltip for Games button
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/app/machines/[id]/__tests__/page.test.tsx > MachinePage > Successful Data Fetching > should render machine detail page with data
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/machines/__tests__/MachineDetailView.test.tsx > MachineDetailView > Basic Rendering > should show generate QR code button when QR code not available
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/app/machines/[id]/__tests__/page.test.tsx > MachinePage > Successful Data Fetching > should pass correct props to MachineDetailView
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/app/machines/[id]/__tests__/page.test.tsx > MachinePage > Successful Data Fetching > should handle unauthenticated users
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/app/machines/[id]/__tests__/page.test.tsx > MachinePage > Successful Data Fetching > should use model name when machine name is null
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/app/dashboard/_components/__tests__/PrimaryAppBar.test.tsx > PrimaryAppBar > Responsive Design > should maintain proper spacing between navigation elements
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/app/machines/[id]/__tests__/page.test.tsx > MachinePage > Main Element > should render with proper semantic HTML
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.test.tsx > IssueList Component > Core Rendering > renders issue cards with complete data structure
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/app/dashboard/_components/__tests__/PrimaryAppBar.test.tsx > PrimaryAppBar > Integration with Permission System > should properly integrate with usePermissions hook
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/app/dashboard/_components/__tests__/PrimaryAppBar.test.tsx > PrimaryAppBar > Integration with Permission System > should handle empty permissions gracefully
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/app/dashboard/_components/__tests__/PrimaryAppBar.test.tsx > PrimaryAppBar > Error Boundaries > should not crash when permission hook returns undefined permissions
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+ ✓ |jsdom| src/app/machines/[id]/__tests__/page.test.tsx (11 tests) 478ms
+stdout | src/components/issues/__tests__/IssueList.basic.test.tsx > IssueList Component - Basic Tests > Filtering Functionality > updates URL when location filter changes
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/machines/__tests__/MachineDetailView.test.tsx > MachineDetailView > Basic Rendering > should render external links when available
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.test.tsx > IssueList Component > Core Rendering > handles issue data structure correctly with all fields
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+ ✓ |jsdom| src/app/dashboard/_components/__tests__/PrimaryAppBar.test.tsx (21 tests) 3186ms
+   ✓ PrimaryAppBar > Basic Rendering > should render the app bar with PinPoint branding  408ms
+   ✓ PrimaryAppBar > Basic Rendering > should render user profile menu  519ms
+stdout | src/components/machines/__tests__/MachineDetailView.test.tsx > MachineDetailView > Basic Rendering > should render statistics placeholder
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.permissions.test.tsx > IssueList - Permission-Based Access Control > Admin Role - Full Access > enables bulk close for admin users
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.test.tsx > IssueList Component > View Mode Controls > toggles between grid and list view modes
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/machines/__tests__/MachineDetailView.test.tsx > MachineDetailView > Permission-based Actions > should show edit button when user has machines:edit permission
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+ ✓ |jsdom| src/app/api/dev/__tests__/users.test.ts (11 tests) 88ms
+stdout | src/components/issues/__tests__/IssueList.technician-workflows.test.tsx > IssueList - Critical Technician User Journeys > CUJ 4.1 - Daily Triage Workflow > displays issues sorted by priority for effective triage
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.basic.test.tsx > IssueList Component - Basic Tests > Permission-Based Access Control > shows selection controls for users with issue:assign permission
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/machines/__tests__/MachineDetailView.test.tsx > MachineDetailView > Permission-based Actions > should hide edit button when user lacks machines:edit permission
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.test.tsx > IssueList Component > View Mode Controls > adapts card layout based on view mode
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.basic.test.tsx > IssueList Component - Basic Tests > Permission-Based Access Control > hides selection controls for users without issue:assign permission
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/machines/__tests__/MachineDetailView.test.tsx > MachineDetailView > Permission-based Actions > should show delete button when user has machines:delete permission
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.integration.test.tsx > IssueList - Integration Tests with tRPC APIs > API Data Fetching Integration > successfully fetches and displays issues from tRPC API
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.basic.test.tsx > IssueList Component - Basic Tests > Permission-Based Access Control > shows bulk actions when issues are selected
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.permissions.test.tsx > IssueList - Permission-Based Access Control > Admin Role - Full Access > allows admin users to navigate to issue details
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/machines/__tests__/MachineDetailView.test.tsx > MachineDetailView > Permission-based Actions > should hide delete button when user lacks machines:delete permission
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.url-state.test.tsx > IssueList - URL State Management > Initial Filter State from URL > loads with default filters when no URL parameters are present
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.test.tsx > IssueList Component > View Mode Controls > shows refresh button and works correctly
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/machines/__tests__/MachineDetailView.test.tsx > MachineDetailView > Permission-based Actions > should show generate QR code button when user has machines:edit permission and QR code is missing
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.permissions.test.tsx > IssueList - Permission-Based Access Control > Manager Role - Limited Management Access > shows management features for manager users
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.technician-workflows.test.tsx > IssueList - Critical Technician User Journeys > CUJ 4.1 - Daily Triage Workflow > shows issue details needed for triage assessment
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/machines/__tests__/MachineDetailView.test.tsx > MachineDetailView > Permission-based Actions > should hide generate QR code button when user lacks machines:edit permission
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.integration.test.tsx > IssueList - Integration Tests with tRPC APIs > API Data Fetching Integration > successfully fetches and populates location filter dropdown
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+ ✓ |jsdom| src/app/games/[id]/__tests__/page.test.tsx (4 tests) 25ms
+stdout | src/components/issues/__tests__/IssueList.basic.test.tsx > IssueList Component - Basic Tests > Issue Navigation > navigates to issue detail when title is clicked
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.url-state.test.tsx > IssueList - URL State Management > Initial Filter State from URL > loads with filters from URL parameters
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.test.tsx > IssueList Component > View Mode Controls > displays correct issue count
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.technician-workflows.test.tsx > IssueList - Critical Technician User Journeys > CUJ 4.1 - Daily Triage Workflow > allows technician to navigate to issue details for assessment
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.permissions.test.tsx > IssueList - Permission-Based Access Control > Manager Role - Limited Management Access > does not show bulk actions for manager users
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.basic.test.tsx > IssueList Component - Basic Tests > Integration with tRPC APIs > calls issue.core.getAll with correct filter parameters
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.permissions.test.tsx > IssueList - Permission-Based Access Control > Manager Role - Limited Management Access > allows manager users to view and navigate issues
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/machines/__tests__/MachineDetailView.test.tsx > MachineDetailView > Permission-based Actions > should show all action buttons for admin users
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.test.tsx > IssueList Component > View Mode Controls > handles singular issue count correctly
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.url-state.test.tsx > IssueList - URL State Management > Initial Filter State from URL > handles invalid URL parameters gracefully
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stderr | src/components/issues/__tests__/IssueList.url-state.test.tsx > IssueList - URL State Management > Initial Filter State from URL > handles invalid URL parameters gracefully
+MUI: You have provided an out-of-range value `invalid-location` for the select component.
+Consider providing a value that matches one of the available options or ''.
+The available values are ``, `location-1`, `location-2`.
+MUI: You have provided an out-of-range value `INVALID_STATUS` for the select component.
+Consider providing a value that matches one of the available options or ''.
+The available values are ``, `NEW`, `IN_PROGRESS`, `RESOLVED`.
+MUI: You have provided an out-of-range value `invalid-sort` for the select component.
+Consider providing a value that matches one of the available options or ''.
+The available values are `created`, `updated`, `status`, `severity`, `game`.
+MUI: You have provided an out-of-range value `invalid-location` for the select component.
+Consider providing a value that matches one of the available options or ''.
+The available values are ``, `location-1`, `location-2`.
+MUI: You have provided an out-of-range value `INVALID_STATUS` for the select component.
+Consider providing a value that matches one of the available options or ''.
+The available values are ``, `NEW`, `IN_PROGRESS`, `RESOLVED`.
+MUI: You have provided an out-of-range value `invalid-sort` for the select component.
+Consider providing a value that matches one of the available options or ''.
+The available values are `created`, `updated`, `status`, `severity`, `game`.
+
+stdout | src/components/issues/__tests__/IssueList.basic.test.tsx > IssueList Component - Basic Tests > Integration with tRPC APIs > calls location.getAll for filter dropdown
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.technician-workflows.test.tsx > IssueList - Critical Technician User Journeys > CUJ 4.2 - Acknowledging & Closing Issues > allows technician to select multiple issues for bulk acknowledgment
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.permissions.test.tsx > IssueList - Permission-Based Access Control > Member Role - Basic Access > shows read-only view for member users
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/machines/__tests__/MachineDetailView.test.tsx > MachineDetailView > Conditional Content > should handle machine without owner
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.test.tsx > IssueList Component > Filtering Functionality > renders all filter controls
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.url-state.test.tsx > IssueList - URL State Management > Initial Filter State from URL > handles empty string parameters correctly
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.basic.test.tsx > IssueList Component - Basic Tests > Integration with tRPC APIs > calls issueStatus.getAll for filter dropdown
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/machines/__tests__/MachineDetailView.test.tsx > MachineDetailView > Conditional Content > should handle machine without custom name
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.permissions.test.tsx > IssueList - Permission-Based Access Control > Member Role - Basic Access > allows member users to filter and sort issues
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/machines/__tests__/MachineDetailView.test.tsx > MachineDetailView > Conditional Content > should handle machine without external links
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.permissions.test.tsx > IssueList - Permission-Based Access Control > Member Role - Basic Access > allows member users to navigate to issue details
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.integration.test.tsx > IssueList - Integration Tests with tRPC APIs > API Data Fetching Integration > successfully fetches and populates status filter dropdown
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.url-state.test.tsx > IssueList - URL State Management > URL Updates on Filter Changes > updates URL when location filter changes
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+ ✓ |jsdom| src/components/issues/__tests__/IssueList.basic.test.tsx (17 tests) 9416ms
+   ✓ IssueList Component - Basic Tests > Core Rendering > renders loading state correctly  1368ms
+   ✓ IssueList Component - Basic Tests > Core Rendering > renders error state with retry functionality  537ms
+   ✓ IssueList Component - Basic Tests > Core Rendering > renders empty state when no issues found  421ms
+   ✓ IssueList Component - Basic Tests > Core Rendering > renders issue cards with complete data structure  597ms
+   ✓ IssueList Component - Basic Tests > Core Rendering > shows correct issue count  305ms
+   ✓ IssueList Component - Basic Tests > View Mode Controls > toggles between grid and list view modes  652ms
+   ✓ IssueList Component - Basic Tests > View Mode Controls > shows refresh button and works correctly  491ms
+   ✓ IssueList Component - Basic Tests > Filtering Functionality > renders all filter controls  318ms
+   ✓ IssueList Component - Basic Tests > Filtering Functionality > populates location filter dropdown correctly  706ms
+   ✓ IssueList Component - Basic Tests > Filtering Functionality > updates URL when location filter changes  873ms
+   ✓ IssueList Component - Basic Tests > Permission-Based Access Control > shows selection controls for users with issue:assign permission  837ms
+   ✓ IssueList Component - Basic Tests > Permission-Based Access Control > shows bulk actions when issues are selected  918ms
+   ✓ IssueList Component - Basic Tests > Issue Navigation > navigates to issue detail when title is clicked  373ms
+   ✓ IssueList Component - Basic Tests > Integration with tRPC APIs > calls issueStatus.getAll for filter dropdown  328ms
+ ✓ |jsdom| src/app/api/dev/__tests__/users-simple.test.ts (5 tests) 67ms
+ ✓ |jsdom| src/components/machines/__tests__/MachineDetailView.test.tsx (15 tests) 6972ms
+   ✓ MachineDetailView > Basic Rendering > should render machine information correctly  1757ms
+   ✓ MachineDetailView > Basic Rendering > should render QR code when available  321ms
+   ✓ MachineDetailView > Basic Rendering > should show generate QR code button when QR code not available  339ms
+   ✓ MachineDetailView > Basic Rendering > should render external links when available  540ms
+   ✓ MachineDetailView > Basic Rendering > should render statistics placeholder  347ms
+   ✓ MachineDetailView > Permission-based Actions > should show edit button when user has machines:edit permission  547ms
+   ✓ MachineDetailView > Permission-based Actions > should hide edit button when user lacks machines:edit permission  495ms
+   ✓ MachineDetailView > Permission-based Actions > should show delete button when user has machines:delete permission  355ms
+   ✓ MachineDetailView > Permission-based Actions > should hide delete button when user lacks machines:delete permission  301ms
+   ✓ MachineDetailView > Permission-based Actions > should show generate QR code button when user has machines:edit permission and QR code is missing  347ms
+   ✓ MachineDetailView > Permission-based Actions > should hide generate QR code button when user lacks machines:edit permission  313ms
+   ✓ MachineDetailView > Permission-based Actions > should show all action buttons for admin users  456ms
+   ✓ MachineDetailView > Conditional Content > should handle machine without owner  331ms
+   ✓ MachineDetailView > Conditional Content > should handle machine without custom name  323ms
+stdout | src/components/issues/__tests__/IssueList.test.tsx > IssueList Component > Filtering Functionality > populates location filter dropdown correctly
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.technician-workflows.test.tsx > IssueList - Critical Technician User Journeys > CUJ 4.2 - Acknowledging & Closing Issues > provides bulk assignment functionality for acknowledging issues
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.permissions.test.tsx > IssueList - Permission-Based Access Control > Member Role - Basic Access > shows refresh functionality for member users
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/server/api/routers/__tests__/issue-confirmation.test.ts
+🟢 OAuth Google: Configured with warnings
+
+stderr | src/server/api/routers/__tests__/issue-confirmation.test.ts
+🟡 OAuth Google Warning: GOOGLE_CLIENT_ID not configured - Google OAuth will be unavailable
+🟡 OAuth Google Warning: GOOGLE_CLIENT_SECRET not configured - Google OAuth will be unavailable
+
+stdout | src/server/api/routers/__tests__/integration.test.ts
+🟢 OAuth Google: Configured with warnings
+
+stderr | src/server/api/routers/__tests__/integration.test.ts
+🟡 OAuth Google Warning: GOOGLE_CLIENT_ID not configured - Google OAuth will be unavailable
+🟡 OAuth Google Warning: GOOGLE_CLIENT_SECRET not configured - Google OAuth will be unavailable
+
+stdout | src/components/issues/__tests__/IssueList.permissions.test.tsx > IssueList - Permission-Based Access Control > Public/Unauthenticated Users > shows minimal read-only view for public users
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.integration.test.tsx > IssueList - Integration Tests with tRPC APIs > Filter Integration with API > sends correct filter parameters when location filter is applied
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.permissions.test.tsx > IssueList - Permission-Based Access Control > Permission Boundary Edge Cases > handles mixed permissions correctly
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.url-state.test.tsx > IssueList - URL State Management > URL Updates on Filter Changes > updates URL when status filter changes
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.technician-workflows.test.tsx > IssueList - Critical Technician User Journeys > CUJ 4.2 - Acknowledging & Closing Issues > provides bulk assignment functionality for acknowledging issues
+Bulk assign [ [32m'issue-new-1'[39m ]
+
+ ✓ |jsdom| src/app/games/__tests__/page.test.tsx (2 tests) 41ms
+stdout | src/components/issues/__tests__/IssueList.test.tsx > IssueList Component > Filtering Functionality > populates status filter dropdown correctly
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.permissions.test.tsx > IssueList - Permission-Based Access Control > Permission Boundary Edge Cases > shows disabled bulk actions with tooltips for insufficient permissions
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.technician-workflows.test.tsx > IssueList - Critical Technician User Journeys > CUJ 4.2 - Acknowledging & Closing Issues > provides bulk close functionality for invalid/duplicate issues
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.permissions.test.tsx > IssueList - Permission-Based Access Control > Permission Boundary Edge Cases > handles permission loading state
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.permissions.test.tsx > IssueList - Permission-Based Access Control > Permission Boundary Edge Cases > gracefully handles permission check failures
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.test.tsx > IssueList Component > Filtering Functionality > updates URL when filters change
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.url-state.test.tsx > IssueList - URL State Management > URL Updates on Filter Changes > updates URL when status category filter changes
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.technician-workflows.test.tsx > IssueList - Critical Technician User Journeys > CUJ 4.2 - Acknowledging & Closing Issues > provides bulk close functionality for invalid/duplicate issues
+Bulk close [ [32m'issue-new-1'[39m ]
+
+stdout | src/server/api/routers/__tests__/issue.test.ts
+🟢 OAuth Google: Configured with warnings
+
+stderr | src/server/api/routers/__tests__/issue.test.ts
+🟡 OAuth Google Warning: GOOGLE_CLIENT_ID not configured - Google OAuth will be unavailable
+🟡 OAuth Google Warning: GOOGLE_CLIENT_SECRET not configured - Google OAuth will be unavailable
+
+stdout | src/components/issues/__tests__/IssueList.permissions.test.tsx > IssueList - Permission-Based Access Control > Role-Based UI Variations > adapts UI based on technician role capabilities
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.integration.test.tsx > IssueList - Integration Tests with tRPC APIs > Filter Integration with API > sends correct filter parameters when status category filter is applied
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.test.tsx > IssueList Component > Filtering Functionality > handles status category filter correctly
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.url-state.test.tsx > IssueList - URL State Management > URL Updates on Filter Changes > updates URL when sort options change
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.technician-workflows.test.tsx > IssueList - Critical Technician User Journeys > CUJ 4.2 - Acknowledging & Closing Issues > allows technician to select all issues for batch processing
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.permissions.test.tsx > IssueList - Permission-Based Access Control > Role-Based UI Variations > shows machine owner specific permissions
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.test.tsx > IssueList Component > Filtering Functionality > handles sort options correctly
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.permissions.test.tsx > IssueList - Permission-Based Access Control > Multi-Tenant Permission Isolation > enforces organization-scoped permissions
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.url-state.test.tsx > IssueList - URL State Management > URL Updates on Filter Changes > handles multiple filter changes in sequence
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.integration.test.tsx > IssueList - Integration Tests with tRPC APIs > Filter Integration with API > handles multiple filters applied simultaneously
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.test.tsx > IssueList Component > Filtering Functionality > clears filters correctly
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+ ✓ |jsdom| src/components/issues/__tests__/IssueList.permissions.test.tsx (19 tests) 11836ms
+   ✓ IssueList - Permission-Based Access Control > Admin Role - Full Access > shows all management features for admin users  2240ms
+   ✓ IssueList - Permission-Based Access Control > Admin Role - Full Access > enables bulk assignment for admin users  1271ms
+   ✓ IssueList - Permission-Based Access Control > Admin Role - Full Access > enables bulk close for admin users  1493ms
+   ✓ IssueList - Permission-Based Access Control > Admin Role - Full Access > allows admin users to navigate to issue details  532ms
+   ✓ IssueList - Permission-Based Access Control > Manager Role - Limited Management Access > shows management features for manager users  357ms
+   ✓ IssueList - Permission-Based Access Control > Manager Role - Limited Management Access > does not show bulk actions for manager users  494ms
+   ✓ IssueList - Permission-Based Access Control > Member Role - Basic Access > allows member users to filter and sort issues  370ms
+   ✓ IssueList - Permission-Based Access Control > Member Role - Basic Access > allows member users to navigate to issue details  365ms
+   ✓ IssueList - Permission-Based Access Control > Member Role - Basic Access > shows refresh functionality for member users  567ms
+   ✓ IssueList - Permission-Based Access Control > Permission Boundary Edge Cases > shows disabled bulk actions with tooltips for insufficient permissions  552ms
+   ✓ IssueList - Permission-Based Access Control > Role-Based UI Variations > adapts UI based on technician role capabilities  1013ms
+   ✓ IssueList - Permission-Based Access Control > Role-Based UI Variations > shows machine owner specific permissions  624ms
+   ✓ IssueList - Permission-Based Access Control > Multi-Tenant Permission Isolation > enforces organization-scoped permissions  570ms
+stdout | src/components/issues/__tests__/IssueList.technician-workflows.test.tsx > IssueList - Critical Technician User Journeys > CUJ 4.3 - Managing Issue Lifecycle > allows technician to view issues across different lifecycle stages
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.test.tsx > IssueList Component > Permission-Based Access Control > shows selection controls for users with issue:assign permission
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.technician-workflows.test.tsx > IssueList - Critical Technician User Journeys > CUJ 4.3 - Managing Issue Lifecycle > allows filtering by status to manage specific lifecycle stages
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.test.tsx > IssueList Component > Permission-Based Access Control > hides selection controls for users without issue:assign permission
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.url-state.test.tsx > IssueList - URL State Management > URL Parameter Handling > removes parameters when filters are cleared
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.integration.test.tsx > IssueList - Integration Tests with tRPC APIs > Filter Integration with API > handles sort parameter changes correctly
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.test.tsx > IssueList Component > Permission-Based Access Control > shows bulk assign button with proper permission
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.url-state.test.tsx > IssueList - URL State Management > URL Parameter Handling > handles undefined/null filter values correctly
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.integration.test.tsx > IssueList - Integration Tests with tRPC APIs > Error Handling Integration > handles API errors gracefully with retry functionality
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.technician-workflows.test.tsx > IssueList - Critical Technician User Journeys > CUJ 4.3 - Managing Issue Lifecycle > shows assignment status clearly for workflow management
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.integration.test.tsx > IssueList - Integration Tests with tRPC APIs > Error Handling Integration > handles network errors appropriately
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.test.tsx > IssueList Component > Permission-Based Access Control > shows disabled bulk assign button with tooltip for insufficient permissions
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.integration.test.tsx > IssueList - Integration Tests with tRPC APIs > Error Handling Integration > handles partial API failures gracefully
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.technician-workflows.test.tsx > IssueList - Critical Technician User Journeys > CUJ 4.3 - Managing Issue Lifecycle > allows technician to track issue progress through comments and attachments
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.url-state.test.tsx > IssueList - URL State Management > URL Parameter Handling > preserves existing URL structure
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.technician-workflows.test.tsx > IssueList - Critical Technician User Journeys > CUJ 4.3 - Managing Issue Lifecycle > supports filtering by location for site-specific workflow management
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.integration.test.tsx > IssueList - Integration Tests with tRPC APIs > Real-time Data Updates > refetches data when refresh button is clicked
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.test.tsx > IssueList Component > Permission-Based Access Control > shows bulk close button with proper permission
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+ ✓ |node| src/server/api/__tests__/trpc-auth-modern.test.ts (9 tests) 2472ms
+   ✓ Modern tRPC Auth & Permissions System > Group 1: protectedProcedure Middleware > should reject unauthenticated user from protected procedure  438ms
+   ✓ Modern tRPC Auth & Permissions System > Group 3: Permission-based Procedure Tests > should allow access when user has required permission  374ms
+   ✓ Modern tRPC Auth & Permissions System > Group 3: Permission-based Procedure Tests > should reject access when user lacks required permission  399ms
+stdout | src/components/issues/__tests__/IssueList.url-state.test.tsx > IssueList - URL State Management > Shareable URLs > creates bookmarkable URLs with complete filter state
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.integration.test.tsx > IssueList - Integration Tests with tRPC APIs > Real-time Data Updates > handles updated data from API correctly
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.test.tsx > IssueList Component > Permission-Based Access Control > renders in read-only mode for users with only view permission
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+ ✓ |node| src/server/api/__tests__/trpc-auth.test.ts (12 tests) 3797ms
+   ✓ tRPC Authentication Middleware > protectedProcedure middleware > should reject user without valid session user object  445ms
+   ✓ tRPC Authentication Middleware > Multi-tenant security > should prevent access to different organization's data  450ms
+   ✓ tRPC Authentication Middleware > Multi-tenant security > should allow access when user has membership in current organization  326ms
+   ✓ tRPC Authentication Middleware > Role-based access control > should allow admin access to admin procedures  331ms
+   ✓ tRPC Authentication Middleware > Role-based access control > should deny non-admin access to admin procedures  524ms
+   ✓ tRPC Authentication Middleware > Organization context resolution > should resolve organization from subdomain  435ms
+   ✓ tRPC Authentication Middleware > Organization context resolution > should handle localhost without subdomain  304ms
+stdout | src/components/issues/__tests__/IssueList.technician-workflows.test.tsx > IssueList - Critical Technician User Journeys > Technician Efficiency Features > provides quick access to issue details for technical assessment
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.integration.test.tsx > IssueList - Integration Tests with tRPC APIs > Multi-tenant API Integration > ensures all API calls respect organization scoping
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.test.tsx > IssueList Component > Issue Selection > handles individual issue selection
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.url-state.test.tsx > IssueList - URL State Management > Shareable URLs > handles complex filter combinations in URLs
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.technician-workflows.test.tsx > IssueList - Critical Technician User Journeys > Technician Efficiency Features > shows machine and location information for efficient routing
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+ ✓ |jsdom| src/components/issues/__tests__/IssueList.integration.test.tsx (13 tests) 11365ms
+   ✓ IssueList - Integration Tests with tRPC APIs > API Data Fetching Integration > successfully fetches and displays issues from tRPC API  1777ms
+   ✓ IssueList - Integration Tests with tRPC APIs > API Data Fetching Integration > successfully fetches and populates location filter dropdown  1725ms
+   ✓ IssueList - Integration Tests with tRPC APIs > API Data Fetching Integration > successfully fetches and populates status filter dropdown  959ms
+   ✓ IssueList - Integration Tests with tRPC APIs > Filter Integration with API > sends correct filter parameters when location filter is applied  1790ms
+   ✓ IssueList - Integration Tests with tRPC APIs > Filter Integration with API > sends correct filter parameters when status category filter is applied  1851ms
+   ✓ IssueList - Integration Tests with tRPC APIs > Filter Integration with API > handles multiple filters applied simultaneously  1024ms
+   ✓ IssueList - Integration Tests with tRPC APIs > Filter Integration with API > handles sort parameter changes correctly  708ms
+   ✓ IssueList - Integration Tests with tRPC APIs > Real-time Data Updates > refetches data when refresh button is clicked  387ms
+   ✓ IssueList - Integration Tests with tRPC APIs > Real-time Data Updates > handles updated data from API correctly  406ms
+stdout | src/components/issues/__tests__/IssueList.technician-workflows.test.tsx > IssueList - Critical Technician User Journeys > Technician Efficiency Features > supports sorting by creation date for chronological workflow
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.test.tsx > IssueList Component > Issue Selection > handles select all functionality
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.url-state.test.tsx > IssueList - URL State Management > Browser Navigation Integration > supports browser back/forward navigation with filter states
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+ ✓ |node| src/server/api/__tests__/multi-tenant-security.test.ts (10 tests) 3566ms
+   ✓ Multi-Tenant Security Tests > Organization Data Isolation > should only return data for user's organization  319ms
+   ✓ Multi-Tenant Security Tests > Organization Data Isolation > should prevent cross-organization data access  489ms
+   ✓ Multi-Tenant Security Tests > Organization Data Isolation > should isolate data between organizations completely  648ms
+   ✓ Multi-Tenant Security Tests > Cross-Organization Security Violations > should prevent reading another organization's specific issue  433ms
+   ✓ Multi-Tenant Security Tests > Role-Based Multi-Tenant Security > should enforce role restrictions within organization context  501ms
+   ✓ Multi-Tenant Security Tests > Subdomain Resolution Security > should prevent subdomain spoofing  488ms
+stdout | src/components/issues/__tests__/IssueList.technician-workflows.test.tsx > IssueList - Critical Technician User Journeys > Technician Efficiency Features > allows view mode switching for different workflow preferences
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+ ✓ |node| src/server/api/routers/__tests__/issue.test.ts (13 tests) 4368ms
+   ✓ issueRouter - Issue Detail Page > Authenticated Issue Detail Access > should allow authenticated users to view all issue details  340ms
+   ✓ issueRouter - Issue Detail Page > Authenticated Issue Detail Access > should enforce organization isolation  468ms
+   ✓ issueRouter - Issue Detail Page > Permission-based Issue Operations > should allow users with edit permissions to update issues  449ms
+   ✓ issueRouter - Issue Detail Page > Permission-based Issue Operations > should allow users with assign permissions to assign issues  325ms
+   ✓ issueRouter - Issue Detail Page > Issue Status Changes > should allow status changes with proper validation  488ms
+   ✓ issueRouter - Issue Detail Page > Issue Status Changes > should validate status belongs to same organization  464ms
+   ✓ issueRouter - Issue Detail Page > Loading States and Error Handling > should handle database connection errors gracefully  415ms
+stdout | src/components/issues/__tests__/IssueList.url-state.test.tsx > IssueList - URL State Management > Browser Navigation Integration > maintains filter state consistency across page reloads
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+ ✓ |node| src/server/api/routers/__tests__/issue-confirmation.test.ts (18 tests) 6446ms
+   ✓ Issue Confirmation Workflow > Basic vs Full Form Creation > should create unconfirmed issues with basic form  372ms
+   ✓ Issue Confirmation Workflow > Basic vs Full Form Creation > should create confirmed issues with full form by default  455ms
+   ✓ Issue Confirmation Workflow > Basic vs Full Form Creation > should allow explicit override of confirmation status in full form  469ms
+   ✓ Issue Confirmation Workflow > Basic vs Full Form Creation > should require issue:create permission for issue creation  445ms
+   ✓ Issue Confirmation Workflow > Confirmation Status Toggle > should toggle confirmation status with issue:confirm permission  408ms
+   ✓ Issue Confirmation Workflow > Confirmation Status Toggle > should return NOT_FOUND for non-existent issue  518ms
+   ✓ Issue Confirmation Workflow > Confirmation Status Toggle > should toggle confirmation status from true to false  487ms
+   ✓ Issue Confirmation Workflow > Issue Listing with Confirmation Status > should list issues with confirmation status  513ms
+   ✓ Issue Confirmation Workflow > Issue Listing with Confirmation Status > should filter by machine when machineId provided  491ms
+   ✓ Issue Confirmation Workflow > Permission Requirements > should require issue:create permission for basic form  306ms
+   ✓ Issue Confirmation Workflow > Permission Requirements > should require issue:create permission for full form  490ms
+   ✓ Issue Confirmation Workflow > Permission Requirements > should not require additional permissions for basic form beyond issue:create  349ms
+ ✓ |node| src/server/auth/__tests__/config.test.ts (11 tests) 223ms
+stdout | src/components/issues/__tests__/IssueList.url-state.test.tsx > IssueList - URL State Management > URL Encoding and Special Characters > handles special characters in URL parameters correctly
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.technician-workflows.test.tsx > IssueList - Critical Technician User Journeys > Workflow State Persistence > maintains filter state across page navigation
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+ ✓ |node| src/server/api/routers/__tests__/notification.test.ts (7 tests) 2063ms
+   ✓ notificationRouter > gets notifications for user  514ms
+   ✓ notificationRouter > gets unread count  315ms
+   ✓ notificationRouter > marks notification as read  411ms
+   ✓ notificationRouter > enforces multi-tenancy  342ms
+stdout | src/components/issues/__tests__/IssueList.technician-workflows.test.tsx > IssueList - Critical Technician User Journeys > Workflow State Persistence > updates URL parameters for shareable workflow states
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.test.tsx > IssueList Component > Issue Selection > shows indeterminate state for partial selection
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+ ✓ |node| src/server/api/routers/__tests__/integration.test.ts (19 tests) 5975ms
+   ✓ Router Integration Tests > Issue Router Integration > should allow issue creation with proper permissions  510ms
+   ✓ Router Integration Tests > Issue Router Integration > should allow issue editing with proper permissions  455ms
+   ✓ Router Integration Tests > Issue Router Integration > should deny issue editing without proper permissions  379ms
+   ✓ Router Integration Tests > Issue Router Integration > should enforce organization isolation in issue operations  427ms
+   ✓ Router Integration Tests > Machine Router Integration > should deny machine operations without proper permissions  508ms
+   ✓ Router Integration Tests > Location Router Integration > should allow location operations with proper permissions  414ms
+   ✓ Router Integration Tests > Location Router Integration > should deny location operations without proper permissions  426ms
+   ✓ Router Integration Tests > Organization Router Integration > should deny organization operations without proper permissions  498ms
+   ✓ Router Integration Tests > Permission Inheritance and Cascading > should properly restrict permissions based on role limitations  433ms
+stdout | src/server/services/__tests__/pinballmapService.test.ts > PinballMapService > syncLocation > should successfully sync machines from PinballMap
+[MSW] Intercepting: GET https://pinballmap.com/api/v1/locations/26454/machine_details.json
+
+stdout | src/server/services/__tests__/pinballmapService.test.ts > PinballMapService > syncLocation > should successfully sync machines from PinballMap
+[MSW] Unhandled request: GET https://pinballmap.com/api/v1/locations/26454/machine_details.json
+
+stdout | src/server/services/__tests__/pinballmapService.test.ts > PinballMapService > syncLocation > should update lastSyncAt timestamp on successful sync
+[MSW] Intercepting: GET https://pinballmap.com/api/v1/locations/26454/machine_details.json
+
+stdout | src/server/services/__tests__/pinballmapService.test.ts > PinballMapService > syncLocation > should update lastSyncAt timestamp on successful sync
+[MSW] Unhandled request: GET https://pinballmap.com/api/v1/locations/26454/machine_details.json
+
+stdout | src/server/services/__tests__/pinballmapService.test.ts > PinballMapService > Organization Isolation > should only access locations within the organization
+[MSW] Intercepting: GET https://pinballmap.com/api/v1/locations/26454/machine_details.json
+
+stdout | src/server/services/__tests__/pinballmapService.test.ts > PinballMapService > Organization Isolation > should only access locations within the organization
+[MSW] Unhandled request: GET https://pinballmap.com/api/v1/locations/26454/machine_details.json
+
+stdout | src/server/services/__tests__/pinballmapService.test.ts > PinballMapService > API Error Handling > should handle PinballMap API being unavailable
+[MSW] Intercepting: GET https://pinballmap.com/api/v1/locations/26454/machine_details.json
+
+stdout | src/server/services/__tests__/pinballmapService.test.ts > PinballMapService > API Error Handling > should handle PinballMap API being unavailable
+[MSW] Unhandled request: GET https://pinballmap.com/api/v1/locations/26454/machine_details.json
+
+stdout | src/server/services/__tests__/pinballmapService.test.ts > PinballMapService > API Error Handling > should handle HTTP error responses from PinballMap
+[MSW] Intercepting: GET https://pinballmap.com/api/v1/locations/26454/machine_details.json
+
+stdout | src/server/services/__tests__/pinballmapService.test.ts > PinballMapService > API Error Handling > should handle HTTP error responses from PinballMap
+[MSW] Unhandled request: GET https://pinballmap.com/api/v1/locations/26454/machine_details.json
+
+stdout | src/server/services/__tests__/pinballmapService.test.ts > PinballMapService > API Error Handling > should handle malformed JSON responses
+[MSW] Intercepting: GET https://pinballmap.com/api/v1/locations/26454/machine_details.json
+
+stdout | src/server/services/__tests__/pinballmapService.test.ts > PinballMapService > API Error Handling > should handle malformed JSON responses
+[MSW] Unhandled request: GET https://pinballmap.com/api/v1/locations/26454/machine_details.json
+
+ ✓ |node| src/server/services/__tests__/pinballmapService.test.ts (25 tests) 360ms
+ ✓ |node| src/server/api/__tests__/trpc.permission.test.ts (3 tests) 1967ms
+   ✓ tRPC Permission Middleware > requirePermissionForSession > should allow access when user has required permission  305ms
+   ✓ tRPC Permission Middleware > requirePermissionForSession > should deny access when user lacks required permission  778ms
+   ✓ tRPC Permission Middleware > requirePermissionForSession > should deny access when user has no permissions  861ms
+stdout | src/components/issues/__tests__/IssueList.test.tsx > IssueList Component > Issue Selection > shows bulk actions toolbar when issues are selected
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.url-state.test.tsx > IssueList - URL State Management > URL Encoding and Special Characters > handles long parameter values appropriately
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+ ✓ |node| src/server/auth/__tests__/permissions.constants.test.ts (25 tests) 342ms
+ ✓ |node| src/lib/pinballmap/__tests__/client.test.ts (8 tests) 214ms
+ ✓ |jsdom| src/components/issues/__tests__/IssueList.technician-workflows.test.tsx (19 tests) 18635ms
+   ✓ IssueList - Critical Technician User Journeys > CUJ 4.1 - Daily Triage Workflow > allows technician to filter for 'New' reports for daily triage  3936ms
+   ✓ IssueList - Critical Technician User Journeys > CUJ 4.1 - Daily Triage Workflow > displays issues sorted by priority for effective triage  1686ms
+   ✓ IssueList - Critical Technician User Journeys > CUJ 4.1 - Daily Triage Workflow > shows issue details needed for triage assessment  440ms
+   ✓ IssueList - Critical Technician User Journeys > CUJ 4.1 - Daily Triage Workflow > allows technician to navigate to issue details for assessment  468ms
+   ✓ IssueList - Critical Technician User Journeys > CUJ 4.2 - Acknowledging & Closing Issues > allows technician to select multiple issues for bulk acknowledgment  1256ms
+   ✓ IssueList - Critical Technician User Journeys > CUJ 4.2 - Acknowledging & Closing Issues > provides bulk assignment functionality for acknowledging issues  1060ms
+   ✓ IssueList - Critical Technician User Journeys > CUJ 4.2 - Acknowledging & Closing Issues > provides bulk close functionality for invalid/duplicate issues  1617ms
+   ✓ IssueList - Critical Technician User Journeys > CUJ 4.2 - Acknowledging & Closing Issues > allows technician to select all issues for batch processing  1651ms
+   ✓ IssueList - Critical Technician User Journeys > CUJ 4.3 - Managing Issue Lifecycle > allows technician to view issues across different lifecycle stages  346ms
+   ✓ IssueList - Critical Technician User Journeys > CUJ 4.3 - Managing Issue Lifecycle > allows filtering by status to manage specific lifecycle stages  867ms
+   ✓ IssueList - Critical Technician User Journeys > CUJ 4.3 - Managing Issue Lifecycle > shows assignment status clearly for workflow management  316ms
+   ✓ IssueList - Critical Technician User Journeys > CUJ 4.3 - Managing Issue Lifecycle > allows technician to track issue progress through comments and attachments  321ms
+   ✓ IssueList - Critical Technician User Journeys > CUJ 4.3 - Managing Issue Lifecycle > supports filtering by location for site-specific workflow management  783ms
+   ✓ IssueList - Critical Technician User Journeys > Technician Efficiency Features > provides quick access to issue details for technical assessment  429ms
+   ✓ IssueList - Critical Technician User Journeys > Technician Efficiency Features > allows view mode switching for different workflow preferences  476ms
+   ✓ IssueList - Critical Technician User Journeys > Workflow State Persistence > maintains filter state across page navigation  333ms
+   ✓ IssueList - Critical Technician User Journeys > Workflow State Persistence > updates URL parameters for shareable workflow states  2063ms
+ ✓ |node| src/server/auth/__tests__/permissions.test.ts (14 tests) 503ms
+ ✓ |node| src/server/api/routers/__tests__/issue.notification.test.ts (5 tests) 310ms
+ ✓ |node| src/server/services/__tests__/collectionService.test.ts (8 tests) 57ms
+stdout | src/components/issues/__tests__/IssueList.url-state.test.tsx > IssueList - URL State Management > Edge Cases and Error Handling > handles missing required sort parameters gracefully
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stderr | src/components/issues/__tests__/IssueList.url-state.test.tsx > IssueList - URL State Management > Edge Cases and Error Handling > handles missing required sort parameters gracefully
+MUI: You have provided an out-of-range value `undefined` for the select component.
+Consider providing a value that matches one of the available options or ''.
+The available values are `created`, `updated`, `status`, `severity`, `game`.
+MUI: You have provided an out-of-range value `undefined` for the select component.
+Consider providing a value that matches one of the available options or ''.
+The available values are `created`, `updated`, `status`, `severity`, `game`.
+
+stdout | src/components/issues/__tests__/IssueList.url-state.test.tsx > IssueList - URL State Management > Edge Cases and Error Handling > handles URL parameter parsing errors gracefully
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stderr | src/components/issues/__tests__/IssueList.url-state.test.tsx > IssueList - URL State Management > Edge Cases and Error Handling > handles URL parameter parsing errors gracefully
+MUI: You have provided an out-of-range value `[object Object]` for the select component.
+Consider providing a value that matches one of the available options or ''.
+The available values are ``, `NEW`, `IN_PROGRESS`, `RESOLVED`.
+MUI: You have provided an out-of-range value `[object Object]` for the select component.
+Consider providing a value that matches one of the available options or ''.
+The available values are ``, `NEW`, `IN_PROGRESS`, `RESOLVED`.
+
+ ✓ |node| src/server/services/__tests__/permissionService.expandDependencies.test.ts (16 tests) 83ms
+ ✓ |node| src/lib/permissions/__tests__/descriptions.test.ts (15 tests) 104ms
+stdout | src/components/issues/__tests__/IssueList.test.tsx > IssueList Component > Issue Selection > hides bulk actions toolbar when no issues are selected
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+ ✓ |node| src/server/services/__tests__/notificationService.test.ts (17 tests) 68ms
+stdout | src/server/api/__tests__/msw-trpc-validation.test.ts > MSW-tRPC Infrastructure Validation > should create valid handler responses
+Handler creation functions are available and callable
+
+stdout | src/components/issues/__tests__/IssueList.test.tsx > IssueList Component > Issue Navigation > navigates to issue detail when title is clicked
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+ ✓ |node| src/server/api/__tests__/msw-trpc-validation.test.ts (7 tests) 37ms
+stdout | src/components/issues/__tests__/IssueList.test.tsx > IssueList Component > Issue Navigation > applies hover styles to issue titles
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+ ✓ |node| src/server/auth/__tests__/auth-simple.test.ts (10 tests) 177ms
+stdout | src/components/issues/__tests__/IssueList.test.tsx > IssueList Component > Integration with tRPC APIs > calls issue.core.getAll with correct filter parameters
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+ ✓ |jsdom| src/components/issues/__tests__/IssueList.url-state.test.tsx (20 tests) 16414ms
+   ✓ IssueList - URL State Management > Initial Filter State from URL > loads with default filters when no URL parameters are present  2325ms
+   ✓ IssueList - URL State Management > Initial Filter State from URL > loads with filters from URL parameters  524ms
+   ✓ IssueList - URL State Management > Initial Filter State from URL > handles invalid URL parameters gracefully  479ms
+   ✓ IssueList - URL State Management > Initial Filter State from URL > handles empty string parameters correctly  305ms
+   ✓ IssueList - URL State Management > URL Updates on Filter Changes > updates URL when location filter changes  1072ms
+   ✓ IssueList - URL State Management > URL Updates on Filter Changes > updates URL when status filter changes  1002ms
+   ✓ IssueList - URL State Management > URL Updates on Filter Changes > updates URL when status category filter changes  1269ms
+   ✓ IssueList - URL State Management > URL Updates on Filter Changes > updates URL when sort options change  1117ms
+   ✓ IssueList - URL State Management > URL Updates on Filter Changes > handles multiple filter changes in sequence  991ms
+   ✓ IssueList - URL State Management > URL Parameter Handling > removes parameters when filters are cleared  470ms
+   ✓ IssueList - URL State Management > URL Parameter Handling > handles undefined/null filter values correctly  720ms
+   ✓ IssueList - URL State Management > URL Parameter Handling > preserves existing URL structure  477ms
+   ✓ IssueList - URL State Management > Shareable URLs > creates bookmarkable URLs with complete filter state  883ms
+   ✓ IssueList - URL State Management > Browser Navigation Integration > supports browser back/forward navigation with filter states  362ms
+   ✓ IssueList - URL State Management > URL Encoding and Special Characters > handles special characters in URL parameters correctly  1068ms
+   ✓ IssueList - URL State Management > URL Encoding and Special Characters > handles long parameter values appropriately  2243ms
+   ✓ IssueList - URL State Management > Edge Cases and Error Handling > handles missing required sort parameters gracefully  340ms
+ ✓ |node| src/server/services/__tests__/notificationPreferences.test.ts (4 tests) 30ms
+ ✓ |node| src/server/auth/__tests__/auth-environment.test.ts (10 tests) 85ms
+stdout | src/components/issues/__tests__/IssueList.test.tsx > IssueList Component > Integration with tRPC APIs > calls location.getAll for filter dropdown
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+ ✓ |node| src/server/services/__tests__/factory.test.ts (6 tests) 47ms
+stdout | src/components/issues/__tests__/IssueList.test.tsx > IssueList Component > Integration with tRPC APIs > calls issueStatus.getAll for filter dropdown
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.test.tsx > IssueList Component > Integration with tRPC APIs > handles API errors gracefully
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+ ✓ |node| src/server/api/routers/__tests__/collection.test.ts (4 tests) 134ms
+stdout | src/components/issues/__tests__/IssueList.test.tsx > IssueList Component > Permissions Loading State > shows loading spinner when session is loading
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/components/issues/__tests__/IssueList.test.tsx > IssueList Component > Permissions Loading State > shows loading spinner when membership is loading
+[VitestTestWrapper] Creating tRPC client with URL: http://localhost:3000/api/trpc
+
+stdout | src/integration-tests/notification.schema.test.ts > Notification schema integration > enforces required fields and foreign keys
+Skipping integration test - no database available
+
+stdout | src/integration-tests/notification.schema.test.ts > Notification schema integration > validates enums
+Skipping integration test - no database available
+
+stdout | src/integration-tests/notification.schema.test.ts > Notification schema integration > cascades on user delete
+Skipping integration test - no database available
+
+stdout | src/integration-tests/notification.schema.test.ts > Notification schema integration > sets default values
+Skipping integration test - no database available
+
+stdout | src/integration-tests/notification.schema.test.ts > Notification schema integration > creates indexes for performance
+Skipping integration test - no database available
+
+ ✓ |node| src/integration-tests/notification.schema.test.ts (5 tests) 18ms
+ ✓ |node| src/server/db/__tests__/provider.test.ts (2 tests) 42ms
+ ✓ |node| src/lib/opdb/__tests__/utils.test.ts (15 tests) 52ms
+ ✓ |jsdom| src/components/issues/__tests__/IssueList.test.tsx (36 tests) 21189ms
+   ✓ IssueList Component > Core Rendering > renders loading state correctly  1178ms
+   ✓ IssueList Component > Core Rendering > renders issue cards with complete data structure  679ms
+   ✓ IssueList Component > Core Rendering > handles issue data structure correctly with all fields  546ms
+   ✓ IssueList Component > View Mode Controls > toggles between grid and list view modes  1071ms
+   ✓ IssueList Component > View Mode Controls > adapts card layout based on view mode  571ms
+   ✓ IssueList Component > View Mode Controls > shows refresh button and works correctly  560ms
+   ✓ IssueList Component > View Mode Controls > displays correct issue count  482ms
+   ✓ IssueList Component > Filtering Functionality > renders all filter controls  372ms
+   ✓ IssueList Component > Filtering Functionality > populates location filter dropdown correctly  1121ms
+   ✓ IssueList Component > Filtering Functionality > populates status filter dropdown correctly  740ms
+   ✓ IssueList Component > Filtering Functionality > updates URL when filters change  1426ms
+   ✓ IssueList Component > Filtering Functionality > handles status category filter correctly  1207ms
+   ✓ IssueList Component > Filtering Functionality > handles sort options correctly  485ms
+   ✓ IssueList Component > Filtering Functionality > clears filters correctly  387ms
+   ✓ IssueList Component > Permission-Based Access Control > shows bulk assign button with proper permission  739ms
+   ✓ IssueList Component > Permission-Based Access Control > shows disabled bulk assign button with tooltip for insufficient permissions  432ms
+   ✓ IssueList Component > Permission-Based Access Control > shows bulk close button with proper permission  588ms
+   ✓ IssueList Component > Issue Selection > handles individual issue selection  492ms
+   ✓ IssueList Component > Issue Selection > handles select all functionality  728ms
+   ✓ IssueList Component > Issue Selection > shows indeterminate state for partial selection  1318ms
+   ✓ IssueList Component > Issue Selection > shows bulk actions toolbar when issues are selected  2252ms
+   ✓ IssueList Component > Issue Selection > hides bulk actions toolbar when no issues are selected  387ms
+   ✓ IssueList Component > Integration with tRPC APIs > calls issue.core.getAll with correct filter parameters  320ms
+   ✓ IssueList Component > Integration with tRPC APIs > calls location.getAll for filter dropdown  452ms
+   ✓ IssueList Component > Integration with tRPC APIs > calls issueStatus.getAll for filter dropdown  568ms
+
+ Test Files  46 passed (46)
+      Tests  580 passed (580)
+   Start at  22:47:17
+   Duration  48.32s (transform 8.68s, setup 24.80s, collect 206.97s, tests 143.12s, environment 56.15s, prepare 23.44s)
+
+ % Coverage report from v8
+-------------------|---------|----------|---------|---------|-------------------
+File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s 
+-------------------|---------|----------|---------|---------|-------------------
+All files          |   34.95 |    79.87 |   54.13 |   34.95 |                   
+ app               |       0 |       50 |      50 |       0 |                   
+  layout.tsx       |       0 |        0 |       0 |       0 | 1-23              
+  page.tsx         |       0 |      100 |     100 |       0 | 3-31              
+  providers.tsx    |       0 |      100 |     100 |       0 | 3-28              
+  theme.ts         |       0 |        0 |       0 |       0 | 1-56              
+ app/_components   |       0 |      100 |     100 |       0 |                   
+  ...Dashboard.tsx |       0 |      100 |     100 |       0 | 3-147             
+  ...tedLayout.tsx |       0 |      100 |     100 |       0 | 3-30              
+  ...inCompact.tsx |       0 |      100 |     100 |       0 | 3-240             
+  LoginModal.tsx   |       0 |      100 |     100 |       0 | 3-58              
+  ...Dashboard.tsx |       0 |      100 |     100 |       0 | 3-161             
+ app/_trpc         |       0 |      100 |     100 |       0 |                   
+  Provider.tsx     |       0 |      100 |     100 |       0 | 2                 
+ .../[...nextauth] |       0 |        0 |       0 |       0 |                   
+  route.ts         |       0 |        0 |       0 |       0 | 1-3               
+ app/api/dev/users |       0 |        0 |       0 |       0 |                   
+  route.ts         |       0 |        0 |       0 |       0 | 1-77              
+ app/api/health    |       0 |        0 |       0 |       0 |                   
+  route.ts         |       0 |        0 |       0 |       0 | 1-34              
+ .../qr/[qrCodeId] |       0 |        0 |       0 |       0 |                   
+  route.ts         |       0 |        0 |       0 |       0 | 1-83              
+ ...pi/trpc/[trpc] |       0 |        0 |       0 |       0 |                   
+  route.ts         |       0 |        0 |       0 |       0 | 1-42              
+ app/dashboard     |       0 |      100 |     100 |       0 |                   
+  layout.tsx       |       0 |      100 |     100 |       0 | 3-25              
+  page.tsx         |       0 |      100 |     100 |       0 | 3-132             
+ ...rd/_components |   55.36 |     62.5 |   23.07 |   55.36 |                   
+  ...IssueCard.tsx |       0 |        0 |       0 |       0 | 1-100             
+  ...aryAppBar.tsx |    83.4 |    64.28 |   18.18 |    83.4 | ...71-273,285-287 
+  ...aryHeader.tsx |       0 |      100 |     100 |       0 | 3-50              
+ app/games         |     100 |      100 |     100 |     100 |                   
+  page.tsx         |     100 |      100 |     100 |     100 |                   
+ app/games/[id]    |     100 |      100 |     100 |     100 |                   
+  page.tsx         |     100 |      100 |     100 |     100 |                   
+ app/issues        |       0 |        0 |       0 |       0 |                   
+  page.tsx         |       0 |        0 |       0 |       0 | 1-83              
+ ...sues/[issueId] |       0 |        0 |       0 |       0 |                   
+  page.tsx         |       0 |        0 |       0 |       0 | 1-65              
+ app/issues/create |       0 |        0 |       0 |       0 |                   
+  page.tsx         |       0 |        0 |       0 |       0 | 1-72              
+ app/machines      |       0 |      100 |     100 |       0 |                   
+  page.tsx         |       0 |      100 |     100 |       0 | 3-46              
+ app/machines/[id] |     100 |      100 |     100 |     100 |                   
+  page.tsx         |     100 |      100 |     100 |     100 |                   
+ ...]/report-issue |       0 |        0 |       0 |       0 |                   
+  page.tsx         |       0 |        0 |       0 |       0 | 1-137             
+ ...nes/components |   59.37 |      100 |     100 |   59.37 |                   
+  MachineCard.tsx  |     100 |      100 |     100 |     100 |                   
+  MachineList.tsx  |       0 |      100 |     100 |       0 | 3-53              
+ app/profile       |       0 |      100 |     100 |       0 |                   
+  page.tsx         |       0 |      100 |     100 |       0 | 3-469             
+ app/settings      |       0 |      100 |     100 |       0 |                   
+  layout.tsx       |       0 |      100 |     100 |       0 | 3-50              
+  page.tsx         |       0 |      100 |     100 |       0 | 3-113             
+ ...settings/roles |       0 |      100 |     100 |       0 |                   
+  page.tsx         |       0 |      100 |     100 |       0 | 3-62              
+ ...es/_components |       0 |      100 |     100 |       0 |                   
+  RoleDialog.tsx   |       0 |      100 |     100 |       0 | 3-47              
+  RoleTable.tsx    |       0 |      100 |     100 |       0 | 3-192             
+ ...settings/users |       0 |      100 |     100 |       0 |                   
+  page.tsx         |       0 |      100 |     100 |       0 | 3-61              
+ ...rs/_components |       0 |      100 |     100 |       0 |                   
+  ...serDialog.tsx |       0 |      100 |     100 |       0 | 3-40              
+  UserTable.tsx    |       0 |      100 |     100 |       0 | 3-191             
+ components/issues |   34.97 |    83.33 |   72.09 |   34.97 |                   
+  IssueActions.tsx |       0 |      100 |     100 |       0 | 3-352             
+  ...eComments.tsx |       0 |      100 |     100 |       0 | 3-203             
+  ...reateForm.tsx |       0 |      100 |     100 |       0 | 3-456             
+  ...reateView.tsx |       0 |      100 |     100 |       0 | 3-59              
+  IssueDetail.tsx  |       0 |      100 |     100 |       0 | 3-146             
+  ...etailView.tsx |   88.05 |    58.82 |   33.33 |   88.05 | ...02-209,218-219 
+  IssueList.tsx    |    97.2 |    92.23 |   94.73 |    97.2 | ...40-346,388-389 
+  ...eportForm.tsx |    50.3 |     12.5 |      10 |    50.3 | ...61-162,169-197 
+  ...usControl.tsx |       0 |      100 |     100 |       0 | 3-162             
+  ...eTimeline.tsx |       0 |      100 |     100 |       0 | 3-195             
+  ...eSelector.tsx |     100 |    78.57 |     100 |     100 | 53,55             
+  ...esSidebar.tsx |       0 |      100 |     100 |       0 | 3-158             
+ ...nents/machines |   79.32 |       90 |      40 |   79.32 |                   
+  ...neContext.tsx |       0 |      100 |     100 |       0 | 3-91              
+  ...etailView.tsx |   97.93 |    88.88 |      25 |   97.93 | ...,94-95,357-358 
+ ...ts/permissions |     100 |      100 |     100 |     100 |                   
+  ...ionButton.tsx |     100 |      100 |     100 |     100 |                   
+  ...ssionGate.tsx |     100 |      100 |     100 |     100 |                   
+  index.ts         |     100 |      100 |     100 |     100 |                   
+ ...onents/profile |       0 |      100 |     100 |       0 |                   
+  ...ureUpload.tsx |       0 |      100 |     100 |       0 | 3-229             
+ components/ui     |       0 |      100 |     100 |       0 |                   
+  Breadcrumbs.tsx  |       0 |      100 |     100 |       0 | 3-65              
+  UserAvatar.tsx   |       0 |      100 |     100 |       0 | 3-86              
+ contexts          |     100 |      100 |     100 |     100 |                   
+  ...psContext.tsx |     100 |      100 |     100 |     100 |                   
+ hooks             |     100 |      100 |     100 |     100 |                   
+  ...ermissions.ts |     100 |      100 |     100 |     100 |                   
+ lib               |      50 |       90 |   54.54 |      50 |                   
+  environment.ts   |   59.45 |    88.88 |      50 |   59.45 | ...,94-95,102-103 
+  ...-overrides.ts |       0 |      100 |     100 |       0 | 14-31             
+ lib/image-storage |   44.71 |    66.66 |   16.66 |   44.71 |                   
+  index.ts         |     100 |      100 |     100 |     100 |                   
+  local-storage.ts |   37.03 |    66.66 |   16.66 |   37.03 | ...26-127,132-137 
+ lib/opdb          |   10.73 |    94.11 |   58.33 |   10.73 |                   
+  client.ts        |       0 |      100 |     100 |       0 | 8-294             
+  index.ts         |       0 |      100 |     100 |       0 | 8-21              
+  types.ts         |       0 |        0 |       0 |       0 |                   
+  utils.ts         |   31.68 |    92.85 |   44.44 |   31.68 | ...41-145,166-175 
+ lib/permissions   |     100 |      100 |     100 |     100 |                   
+  descriptions.ts  |     100 |      100 |     100 |     100 |                   
+ lib/pinballmap    |   88.05 |    72.22 |     100 |   88.05 |                   
+  client.ts        |   88.05 |    70.58 |     100 |   88.05 | 41-45,51-52,84    
+  types.ts         |       0 |        0 |       0 |       0 |                   
+ ...lmap/__tests__ |   93.33 |    88.88 |   83.33 |   93.33 |                   
+  apiMocker.ts     |   93.33 |    88.88 |   83.33 |   93.33 | 58,73-74          
+ lib/types         |       0 |        0 |       0 |       0 |                   
+  gameInstance.ts  |       0 |        0 |       0 |       0 |                   
+ lib/utils         |    1.22 |      100 |       0 |    1.22 |                   
+  ...processing.ts |    1.22 |      100 |       0 |    1.22 | 12-220,224-226    
+ server            |     100 |    66.66 |     100 |     100 |                   
+  db.ts            |     100 |    66.66 |     100 |     100 | 9                 
+ server/api        |   67.88 |    96.29 |       0 |   67.88 |                   
+  root.ts          |     100 |      100 |     100 |     100 |                   
+  trpc.base.ts     |   62.59 |    91.66 |       0 |   62.59 | ...56-163,185-186 
+  ...permission.ts |   65.46 |      100 |     100 |   65.46 | ...13-120,136-143 
+  trpc.ts          |     100 |      100 |     100 |     100 |                   
+ ...er/api/routers |   40.78 |    44.44 |       0 |   40.78 |                   
+  admin.ts         |   14.73 |      100 |     100 |   14.73 | ...42-390,404-465 
+  collection.ts    |   60.43 |      100 |     100 |   60.43 | ...03-104,116-118 
+  comment.ts       |   25.58 |      100 |     100 |   25.58 | ...,96-98,103-109 
+  issue.admin.ts   |       0 |        0 |       0 |       0 | 1-19              
+  ...attachment.ts |   32.89 |      100 |     100 |   32.89 | 23-60,72-97       
+  issue.comment.ts |   35.96 |    33.33 |     100 |   35.96 | ...33-177,189-250 
+  issue.core.ts    |   73.11 |    46.42 |     100 |   73.11 | ...35-736,805-806 
+  issue.status.ts  |       0 |        0 |       0 |       0 | 1-46              
+  ...e.timeline.ts |       0 |        0 |       0 |       0 | 1-31              
+  issue.ts         |     100 |      100 |     100 |     100 |                   
+  issueStatus.ts   |      50 |      100 |     100 |      50 | ...38,56-65,72-90 
+  location.ts      |   32.94 |      100 |     100 |   32.94 | ...71-179,185-192 
+  machine.core.ts  |   27.97 |       50 |     100 |   27.97 | ...73-282,318-331 
+  ...e.location.ts |       0 |        0 |       0 |       0 | 1-57              
+  machine.owner.ts |       0 |        0 |       0 |       0 | 1-61              
+  machine.ts       |     100 |      100 |     100 |     100 |                   
+  model.core.ts    |   14.73 |      100 |     100 |   14.73 | ...5,42-68,76-114 
+  model.opdb.ts    |       0 |        0 |       0 |       0 | 1-111             
+  model.ts         |     100 |      100 |     100 |     100 |                   
+  notification.ts  |   86.04 |    57.14 |     100 |   86.04 | 26-27,29-30,32-33 
+  organization.ts  |   96.15 |       50 |     100 |   96.15 | 12                
+  pinballMap.ts    |       0 |        0 |       0 |       0 | 1-75              
+  qrCode.ts        |   49.05 |      100 |     100 |   49.05 | ...70,77-78,88-95 
+  role.ts          |   34.05 |      100 |     100 |   34.05 | ...97-200,215-256 
+  user.ts          |   49.58 |       50 |     100 |   49.58 | ...41-244,257-258 
+ server/auth       |   61.08 |    79.03 |    61.9 |   61.08 |                   
+  config.ts        |   26.15 |      100 |   33.33 |   26.15 | 50-82,84-114      
+  index.ts         |     100 |      100 |     100 |     100 |                   
+  ....constants.ts |     100 |      100 |     100 |     100 |                   
+  permissions.ts   |   63.44 |    89.47 |      50 |   63.44 | ...,80-81,112-160 
+  providers.ts     |   82.08 |       75 |     100 |   82.08 | ...45,52-53,63-69 
+  types.ts         |   33.33 |    66.66 |   33.33 |   33.33 | 61,66-71,74-82    
+  uploadAuth.ts    |       0 |        0 |       0 |       0 | 1-111             
+  validation.ts    |   81.01 |    77.27 |     100 |   81.01 | ...99-101,130-133 
+ server/constants  |     100 |      100 |     100 |     100 |                   
+  cleanup.ts       |     100 |      100 |     100 |     100 |                   
+ server/db         |   66.66 |      100 |      50 |   66.66 |                   
+  provider.ts      |   66.66 |      100 |      50 |   66.66 | 12-16,20-21       
+ server/services   |   39.52 |     92.3 |    43.2 |   39.52 |                   
+  ...ionService.ts |   51.57 |    92.85 |   81.81 |   51.57 | ...84-387,393-473 
+  ...nupService.ts |   10.34 |      100 |       0 |   10.34 | ...1,67-74,80-112 
+  factory.ts       |     100 |      100 |     100 |     100 |                   
+  ...ityService.ts |     7.3 |      100 |       0 |     7.3 | ...49-161,164-269 
+  ...ionService.ts |     100 |      100 |     100 |     100 |                   
+  ...ionService.ts |    12.5 |      100 |   22.22 |    12.5 | ...42-265,271-280 
+  ...mapService.ts |   80.37 |    87.27 |      80 |   80.37 | ...25-334,404-447 
+  qrCodeService.ts |    6.96 |      100 |       0 |    6.96 | ...68-271,280-298 
+  roleService.ts   |    5.43 |      100 |       0 |    5.43 | ...86-392,398-416 
+  types.ts         |     100 |      100 |     100 |     100 |                   
+ server/utils      |   14.28 |      100 |       0 |   14.28 |                   
+  qrCodeUtils.ts   |   14.28 |      100 |       0 |   14.28 | 4-10              
+ trpc              |   14.89 |        0 |       0 |   14.89 |                   
+  query-client.ts  |   15.78 |      100 |       0 |   15.78 | 8-25              
+  react.tsx        |      20 |      100 |       0 |      20 | 16-21,25-33,53-89 
+  server.ts        |       0 |        0 |       0 |       0 | 1-31              
+ types             |       0 |        0 |       0 |       0 |                   
+  issue.ts         |       0 |        0 |       0 |       0 |                   
+ utils             |       0 |      100 |     100 |       0 |                   
+  version.ts       |       0 |      100 |     100 |       0 | 12-14             
+-------------------|---------|----------|---------|---------|-------------------
+ERROR: Coverage for lines (43.85%) does not meet "src/server/**" threshold (46%)
+ERROR: Coverage for statements (43.85%) does not meet "src/server/**" threshold (46%)

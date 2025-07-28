@@ -27,12 +27,13 @@ export function RecentIssuesSidebar({
   selectedMachineId,
   session: _session,
 }: RecentIssuesSidebarProps): React.JSX.Element {
-  // Fetch recent issues for the selected machine
-  const { data: recentIssues } = api.issue.core.getAll.useQuery(
+  // Fetch recent issues for the selected machine using public endpoint
+  const { data: recentIssues } = api.issue.core.publicGetAll.useQuery(
     {
       machineId: selectedMachineId ?? undefined,
       sortBy: "created",
       sortOrder: "desc",
+      limit: 10, // Limit to 10 recent issues
     },
     {
       enabled: !!selectedMachineId,
