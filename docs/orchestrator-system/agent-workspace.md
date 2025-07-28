@@ -1,28 +1,28 @@
-# Agent Task File Documentation
+# GitHub Issues for Agent Task Management
 
 ## Overview
 
-PinPoint uses a standardized single task file approach for all orchestrator workflows.
+PinPoint uses GitHub issues for all orchestrator task coordination and agent dispatch.
 
-## Standardized Task File
+## GitHub Issues Approach
 
-### Location
+### Issue Creation
 
-- **File**: `AGENT_TASK.md` in worktree root directory
 - **Created by**: All orchestrator variants (`orchestrator-feature`, `orchestrator-bugfix`, `orchestrator-checkout`)
-- **Lifecycle**: Checked into feature branches, auto-cleaned from main after merge
+- **Repository**: Issues created in the main PinPoint repository
+- **Labels**: Consistent labeling for categorization and tracking
 
-### File Structure
+### Issue Structure
 
 ```
-worktree-root/
-├── AGENT_TASK.md           # Single standardized task file
-├── src/                    # Project source code
-├── docs/                   # Project documentation
-└── ... (other project files)
+Repository Issues:
+├── #123 (orchestrator-task, feature) - Feature implementation task
+├── #124 (orchestrator-task, bug, fixed) - Bug fix task
+├── #125 (orchestrator-checkout, environment-setup) - Environment setup
+└── ... (other project issues)
 ```
 
-## Task File Content
+## Issue Content
 
 ### Standard Template
 
@@ -58,20 +58,22 @@ When your task is complete:
 
 1. Ensure all quality requirements are met
 2. Commit your changes with descriptive messages
-3. Notify the orchestrator - DO NOT clean up the worktree yourself
-4. The orchestrator will handle worktree cleanup after confirmation
+3. Create PR and link it to this issue
+4. Update issue status and close when PR is merged
 ```
 
 ## Orchestrator-Specific Variations
 
 ### Feature Development (`orchestrator-feature`)
 
+- **Labels**: `orchestrator-task`, `feature`
 - Collaborative design phase documented
 - Complete implementation specifications
-- Handoff instructions for specialized agents
+- Agent dispatch instructions
 
 ### Bug Fixing (`orchestrator-bugfix`)
 
+- **Labels**: `orchestrator-task`, `bug`, `fixed`
 - Bug reproduction steps
 - Root cause analysis
 - Autonomous fix implementation plan
@@ -79,38 +81,52 @@ When your task is complete:
 
 ### Environment Setup (`orchestrator-checkout`)
 
+- **Labels**: `orchestrator-checkout`, `environment-setup`
 - Source PR/branch information
 - Environment setup verification
 - Current state assessment
 - Ready-for-agent-work confirmation
 
-## Scripts Integration
+## Agent Dispatch Protocol
 
-### Worktree Creation
+### Issue-Based Dispatch
 
-`scripts/create-and-setup-worktree.sh`:
+1. **Orchestrator creates issue**: Comprehensive task specification
+2. **Issue number provided**: "Your task is issue #X"
+3. **Agent references issue**: Direct GitHub integration
+4. **Progress tracking**: Built-in GitHub issue features
 
-- Creates `AGENT_TASK.md` template in worktree root
-- No subdirectories needed
+### GitHub Integration Benefits
 
-### Worktree Management
-
-`scripts/list-worktrees.sh`:
-
-- Checks for `AGENT_TASK.md` in worktree root
-- Reports task file status for each worktree
+1. **Visibility**: Issues are visible to all project participants
+2. **Tracking**: Built-in progress tracking and status updates
+3. **Linking**: Easy linking between issues, PRs, and commits
+4. **History**: Permanent record of task context and decisions
+5. **Collaboration**: Comments and updates from multiple participants
 
 ## Lifecycle Management
 
-1. **Creation**: Orchestrator creates task file during worktree setup
-2. **Development**: Task file is committed to feature branch
-3. **Completion**: Task file travels with branch through PR process
-4. **Cleanup**: GitHub Actions automatically removes from main after merge
+1. **Creation**: Orchestrator creates GitHub issue during task setup
+2. **Assignment**: Agent receives issue number for task work
+3. **Development**: Agent updates issue status and links PR
+4. **Completion**: Issue closed when PR is merged
+5. **Tracking**: Issue remains for historical reference
 
-## Benefits
+## Label Organization
 
-1. **Simplicity**: Single file per worktree, no directory structure needed
-2. **Visibility**: Task file visible at root level, easy to find
-3. **Standardization**: Consistent format across all orchestrator types
-4. **Clean Main**: Automatic cleanup ensures main branch stays clean
-5. **Version Control**: Task context preserved in branch history
+### Core Labels
+
+- `orchestrator-task` - Tasks created by orchestrator system
+- `orchestrator-checkout` - Environment setup tasks
+- `feature` - Feature development work
+- `bug` - Bug fix work
+- `fixed` - Bug has been resolved
+- `environment-setup` - Environment configuration tasks
+
+### Benefits
+
+1. **Integration**: Native GitHub workflow integration
+2. **Visibility**: Clear task tracking across the project
+3. **Collaboration**: Multiple participants can comment and update
+4. **Persistence**: Issues provide permanent task history
+5. **Automation**: Easy integration with GitHub Actions and workflows

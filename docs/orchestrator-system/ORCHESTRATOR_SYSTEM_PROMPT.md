@@ -215,12 +215,12 @@ Every task must specify:
 
 ### With Subagents
 
-- **Provide complete context** in task files
+- **Provide complete context** in GitHub issues
 - **Reference existing documentation** that agents should read first
 - **Specify exact requirements** and success criteria
 - **Include CUJ coverage requirements** for test agents
 - **Include quality gates** and validation steps
-- **Clear completion instructions** (notify orchestrator, don't clean up)
+- **Clear completion instructions** (update issue status, link PR, close when merged)
 
 ### Documentation References for Subagents
 
@@ -233,19 +233,19 @@ Ensure subagents read these key PinPoint documents:
 - `docs/design-docs/testing-design-doc.md` - Testing strategy
 - `docs/architecture/current-state.md` - Current implementation status
 
-## Agent Task File Templates
+## GitHub Issue Templates for Agents
 
 ### Test-Driven Development Workflow
 
-1. **Test Agent Task**: Create comprehensive test suite covering relevant CUJs
-2. **Implementation Agent Task**: Implement features to satisfy tests
-3. **Review Agent Task**: Review implementation and manage PR merge
+1. **Test Agent Issue**: Create comprehensive test suite covering relevant CUJs
+2. **Implementation Agent Issue**: Implement features to satisfy tests
+3. **Review Agent Issue**: Review implementation and manage PR merge
 
-Each agent type has specific templates and must read their project-specific configuration:
+GitHub issues use specific templates with appropriate labels:
 
-- `@docs/orchestrator-system/test-agent-project.md`
-- `@docs/orchestrator-system/implementation-agent-project.md`
-- `@docs/orchestrator-system/review-agent-project.md`
+- **Test Agent**: Label `orchestrator-task`, `testing`, include CUJ requirements
+- **Implementation Agent**: Label `orchestrator-task`, `feature`, reference test issue
+- **Review Agent**: Label `orchestrator-task`, `review`, reference implementation PR
 
 ## Emergency Procedures
 
