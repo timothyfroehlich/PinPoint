@@ -40,6 +40,9 @@ next-env.d.ts
 # typescript
 *.tsbuildinfo
 
+# caching directories
+.cache/
+
 # idea files
 .idea
 
