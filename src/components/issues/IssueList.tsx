@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  FilterList,
   ViewList,
   ViewModule,
   Refresh,
@@ -16,10 +15,6 @@ import {
   Chip,
   Avatar,
   Grid,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Button,
   CircularProgress,
   Alert,
@@ -30,6 +25,9 @@ import {
 } from "@mui/material";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
+
+import { ActiveFilters } from "./ActiveFilters";
+import { FilterToolbar } from "./FilterToolbar";
 
 import { PermissionGate } from "~/components/permissions/PermissionGate";
 import { usePermissions } from "~/hooks/usePermissions";
@@ -54,8 +52,11 @@ const getStatusColor = (
 interface IssueFilters {
   locationId?: string | undefined;
   machineId?: string | undefined;
-  statusId?: string | undefined;
-  statusCategory?: "NEW" | "IN_PROGRESS" | "RESOLVED" | undefined;
+  statusIds?: string[] | undefined;
+  search?: string | undefined;
+  assigneeId?: string | undefined;
+  reporterId?: string | undefined;
+  ownerId?: string | undefined;
   sortBy: "created" | "updated" | "status" | "severity" | "game";
   sortOrder: "asc" | "desc";
 }
@@ -130,12 +131,6 @@ export function IssueList({
     refetch,
   } = api.issue.core.getAll.useQuery(filters);
 
-  // Fetch locations for filter dropdown
-  const { data: locations } = api.location.getAll.useQuery();
-
-  // Fetch issue statuses for filter dropdown
-  const { data: statuses } = api.issueStatus.getAll.useQuery();
-
   // Update URL when filters change
   const updateFilters = (newFilters: Partial<IssueFilters>): void => {
     const updated: IssueFilters = { ...filters };
@@ -147,11 +142,20 @@ export function IssueList({
     if ("machineId" in newFilters) {
       updated.machineId = newFilters.machineId;
     }
-    if ("statusId" in newFilters) {
-      updated.statusId = newFilters.statusId;
+    if ("statusIds" in newFilters) {
+      updated.statusIds = newFilters.statusIds;
     }
-    if ("statusCategory" in newFilters) {
-      updated.statusCategory = newFilters.statusCategory;
+    if ("search" in newFilters) {
+      updated.search = newFilters.search;
+    }
+    if ("assigneeId" in newFilters) {
+      updated.assigneeId = newFilters.assigneeId;
+    }
+    if ("reporterId" in newFilters) {
+      updated.reporterId = newFilters.reporterId;
+    }
+    if ("ownerId" in newFilters) {
+      updated.ownerId = newFilters.ownerId;
     }
     if ("sortBy" in newFilters) {
       updated.sortBy = newFilters.sortBy;
@@ -167,7 +171,17 @@ export function IssueList({
 
     Object.entries(updated).forEach(([key, value]) => {
       if (value != null && value !== "") {
-        params.set(key, String(value));
+        if (Array.isArray(value)) {
+          // Handle array parameters (like statusIds)
+          params.delete(key); // Clear existing values
+          if (value.length > 0) {
+            value.forEach((item) => {
+              params.append(key, String(item));
+            });
+          }
+        } else {
+          params.set(key, String(value));
+        }
       } else {
         params.delete(key);
       }
@@ -208,114 +222,30 @@ export function IssueList({
     );
   }
 
+  // Handle clear all filters
+  const handleClearAllFilters = (): void => {
+    setFilters({
+      sortBy: "created",
+      sortOrder: "desc",
+    });
+    router.push("/issues");
+  };
+
   return (
     <Box>
-      {/* Filters */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Box display="flex" alignItems="center" gap={2} mb={2}>
-            <FilterList />
-            <Typography variant="h6">Filters</Typography>
-          </Box>
+      {/* New Filter Toolbar */}
+      <FilterToolbar
+        filters={filters}
+        onFiltersChange={updateFilters}
+        isLoading={isLoading}
+      />
 
-          <Grid container spacing={2}>
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Location</InputLabel>
-                <Select
-                  value={filters.locationId ?? ""}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    updateFilters({
-                      locationId: value === "" ? undefined : value,
-                    });
-                  }}
-                  label="Location"
-                >
-                  <MenuItem value="">All Locations</MenuItem>
-                  {locations?.map((location: { id: string; name: string }) => (
-                    <MenuItem key={location.id} value={location.id}>
-                      {location.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Status</InputLabel>
-                <Select
-                  value={filters.statusId ?? ""}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    updateFilters({
-                      statusId: value === "" ? undefined : value,
-                    });
-                  }}
-                  label="Status"
-                >
-                  <MenuItem value="">All Statuses</MenuItem>
-                  {statuses?.map((status: { id: string; name: string }) => (
-                    <MenuItem key={status.id} value={status.id}>
-                      {status.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Category</InputLabel>
-                <Select
-                  value={filters.statusCategory ?? ""}
-                  onChange={(e) => {
-                    const value = e.target.value as string;
-                    if (value === "") {
-                      updateFilters({ statusCategory: undefined });
-                    } else {
-                      updateFilters({
-                        statusCategory: value as
-                          | "NEW"
-                          | "IN_PROGRESS"
-                          | "RESOLVED",
-                      });
-                    }
-                  }}
-                  label="Category"
-                >
-                  <MenuItem value="">All Categories</MenuItem>
-                  <MenuItem value="NEW">New</MenuItem>
-                  <MenuItem value="IN_PROGRESS">In Progress</MenuItem>
-                  <MenuItem value="RESOLVED">Resolved</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Sort By</InputLabel>
-                <Select
-                  value={filters.sortBy}
-                  onChange={(e) => {
-                    updateFilters({
-                      sortBy: e.target.value,
-                    });
-                  }}
-                  label="Sort By"
-                >
-                  <MenuItem value="created">Created Date</MenuItem>
-                  <MenuItem value="updated">Updated Date</MenuItem>
-                  <MenuItem value="status">Status</MenuItem>
-                  <MenuItem value="severity">Priority</MenuItem>
-                  <MenuItem value="game">Game</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-          </Grid>
-        </CardContent>
-      </Card>
+      {/* Active Filters */}
+      <ActiveFilters
+        filters={filters}
+        onFiltersChange={updateFilters}
+        onClearAll={handleClearAllFilters}
+      />
 
       {/* Bulk Actions Toolbar */}
       {selectedIssues.length > 0 && (
@@ -326,9 +256,23 @@ export function IssueList({
               {selectedIssues.length > 1 ? "s" : ""} selected
             </Typography>
 
-            {hasPermission("issue:assign") ? (
+            <PermissionGate
+              permission="issue:assign"
+              hasPermission={hasPermission}
+              fallback={
+                <Tooltip title="Requires issue:assign permission">
+                  <span>
+                    <Button disabled startIcon={<Assignment />}>
+                      Assign
+                    </Button>
+                  </span>
+                </Tooltip>
+              }
+              showFallback
+            >
               <Button
                 startIcon={<Assignment />}
+                data-testid="bulk-assign-button"
                 onClick={() => {
                   // TODO: Implement bulk assign dialog
                   console.log("Bulk assign", selectedIssues);
@@ -336,20 +280,26 @@ export function IssueList({
               >
                 Assign
               </Button>
-            ) : (
-              <Tooltip title="Requires issue:assign permission">
-                <span>
-                  <Button disabled startIcon={<Assignment />}>
-                    Assign
-                  </Button>
-                </span>
-              </Tooltip>
-            )}
+            </PermissionGate>
 
-            {hasPermission("issue:update") ? (
+            <PermissionGate
+              permission="issue:edit"
+              hasPermission={hasPermission}
+              fallback={
+                <Tooltip title="Requires issue:edit permission">
+                  <span>
+                    <Button disabled sx={{ ml: 1 }} startIcon={<Close />}>
+                      Close
+                    </Button>
+                  </span>
+                </Tooltip>
+              }
+              showFallback
+            >
               <Button
                 sx={{ ml: 1 }}
                 startIcon={<Close />}
+                data-testid="bulk-close-button"
                 onClick={() => {
                   // TODO: Implement bulk close
                   console.log("Bulk close", selectedIssues);
@@ -357,15 +307,7 @@ export function IssueList({
               >
                 Close
               </Button>
-            ) : (
-              <Tooltip title="Requires issue:update permission">
-                <span>
-                  <Button disabled sx={{ ml: 1 }} startIcon={<Close />}>
-                    Close
-                  </Button>
-                </span>
-              </Tooltip>
-            )}
+            </PermissionGate>
           </Toolbar>
         </Card>
       )}
@@ -388,6 +330,7 @@ export function IssueList({
               setViewMode("grid");
             }}
             color={viewMode === "grid" ? "primary" : "default"}
+            aria-label="Grid view"
           >
             <ViewModule />
           </IconButton>
@@ -396,6 +339,7 @@ export function IssueList({
               setViewMode("list");
             }}
             color={viewMode === "list" ? "primary" : "default"}
+            aria-label="List view"
           >
             <ViewList />
           </IconButton>
@@ -408,7 +352,7 @@ export function IssueList({
       {/* Issues List */}
       {isLoading ? (
         <Box display="flex" justifyContent="center" p={4}>
-          <CircularProgress />
+          <CircularProgress data-testid="main-loading-indicator" />
         </Box>
       ) : !issues || issues.length === 0 ? (
         <Card>
