@@ -181,12 +181,15 @@ describe("IssueList - Filtering Functionality", () => {
         expect(screen.getByText("3 issues found")).toBeInTheDocument();
       });
 
-      // Check that we have the expected number of comboboxes (4 filters)
-      const comboboxes = screen.getAllByRole("combobox");
-      expect(comboboxes).toHaveLength(4);
+      // Check for status pills (Open, In Progress, Closed)
+      expect(screen.getByText(/Open \(\d+\)/)).toBeInTheDocument();
+      expect(screen.getByText(/In Progress \(\d+\)/)).toBeInTheDocument();
+      expect(screen.getByText(/Closed \(\d+\)/)).toBeInTheDocument();
 
-      // Check for filter section labels - appears in both heading and mobile button
-      expect(screen.getAllByText("Filters")).toHaveLength(2);
+      // Check for search field
+      expect(
+        screen.getByPlaceholderText("Search issues..."),
+      ).toBeInTheDocument();
     });
 
     it("populates location filter dropdown correctly", async () => {
@@ -200,11 +203,15 @@ describe("IssueList - Filtering Functionality", () => {
         expect(screen.getByText("3 issues found")).toBeInTheDocument();
       });
 
-      // Find the first combobox (location filter) by position
-      const comboboxes = screen.getAllByRole("combobox");
-      expect(comboboxes).toHaveLength(4);
+      // Expand advanced filters to access location dropdown
+      const expandButton = screen.getByRole("button", { name: "" }); // ExpandMore icon
+      await userEvent.click(expandButton);
 
-      const locationSelect = comboboxes[0] as HTMLElement;
+      await waitFor(() => {
+        expect(screen.getByLabelText("Location")).toBeInTheDocument();
+      });
+
+      const locationSelect = screen.getByLabelText("Location");
       fireEvent.mouseDown(locationSelect);
 
       await waitFor(() => {
@@ -216,7 +223,7 @@ describe("IssueList - Filtering Functionality", () => {
       expect(screen.getByText("Back Room")).toBeInTheDocument();
     });
 
-    it("populates status filter dropdown correctly", async () => {
+    it("renders status toggle pills correctly", async () => {
       render(
         <VitestTestWrapper userPermissions={["issue:view"]}>
           <IssueList initialFilters={defaultFilters} />
@@ -227,16 +234,18 @@ describe("IssueList - Filtering Functionality", () => {
         expect(screen.getByText("3 issues found")).toBeInTheDocument();
       });
 
-      const comboboxes = screen.getAllByRole("combobox");
-      const statusSelect = comboboxes[1] as HTMLElement;
-      fireEvent.mouseDown(statusSelect);
-
-      await waitFor(() => {
-        expect(screen.getAllByText("New")).toHaveLength(5); // Status in issues + filter option + additional references
+      // Check for status pills with counts
+      const openButton = screen.getByRole("button", { name: /Open \(\d+\)/ });
+      const inProgressButton = screen.getByRole("button", {
+        name: /In Progress \(\d+\)/,
+      });
+      const closedButton = screen.getByRole("button", {
+        name: /Closed \(\d+\)/,
       });
 
-      expect(screen.getAllByText("In Progress")).toHaveLength(3); // Filter option + additional references
-      expect(screen.getAllByText("Resolved")).toHaveLength(2); // Filter option + additional references
+      expect(openButton).toBeInTheDocument();
+      expect(inProgressButton).toBeInTheDocument();
+      expect(closedButton).toBeInTheDocument();
     });
   });
 
@@ -309,7 +318,7 @@ describe("IssueList - Filtering Functionality", () => {
       });
     });
 
-    it("updates URL when status category filter changes", async () => {
+    it("updates URL when status pill is clicked", async () => {
       render(
         <VitestTestWrapper userPermissions={["issue:view"]}>
           <IssueList initialFilters={defaultFilters} />
@@ -320,16 +329,9 @@ describe("IssueList - Filtering Functionality", () => {
         expect(screen.getByText("3 issues found")).toBeInTheDocument();
       });
 
-      // Apply status category filter
-      const comboboxes = screen.getAllByRole("combobox");
-      const categorySelect = comboboxes[2] as HTMLElement;
-      fireEvent.mouseDown(categorySelect);
-
-      const newOptions = screen.getAllByText("New");
-      const newOption = newOptions.find((option) =>
-        option.closest('[role="option"]'),
-      ) as HTMLElement;
-      await userEvent.click(newOption);
+      // Click on Open status pill
+      const openButton = screen.getByRole("button", { name: /Open \(\d+\)/ });
+      await userEvent.click(openButton);
 
       // Wait for URL update
       await waitFor(() => {
@@ -350,25 +352,16 @@ describe("IssueList - Filtering Functionality", () => {
         expect(screen.getByText("3 issues found")).toBeInTheDocument();
       });
 
-      // Apply location filter first
-      const comboboxes = screen.getAllByRole("combobox");
-      const locationSelect = comboboxes[0] as HTMLElement;
+      // Apply location filter first - find location select by label
+      const locationSelect = screen.getByLabelText("Location");
       fireEvent.mouseDown(locationSelect);
       await userEvent.click(screen.getByText("Main Floor"));
 
-      // Apply status filter second (status is typically position 1)
-      const statusSelect = comboboxes[1] as HTMLElement;
-      fireEvent.mouseDown(statusSelect);
-
-      // Wait for dropdown to open and find the resolved option
-      await waitFor(() => {
-        expect(
-          screen.getByRole("option", { name: "Resolved" }),
-        ).toBeInTheDocument();
+      // Apply status filter second - click on Closed status pill
+      const closedButton = screen.getByRole("button", {
+        name: /Closed \(\d+\)/,
       });
-
-      const resolvedOption = screen.getByRole("option", { name: "Resolved" });
-      await userEvent.click(resolvedOption);
+      await userEvent.click(closedButton);
 
       // Verify URL updates were made
       await waitFor(() => {
@@ -403,8 +396,7 @@ describe("IssueList - Filtering Functionality", () => {
       });
 
       // Clear location filter
-      const comboboxes = screen.getAllByRole("combobox");
-      const locationSelect = comboboxes[0] as HTMLElement;
+      const locationSelect = screen.getByLabelText("Location");
       fireEvent.mouseDown(locationSelect);
       await userEvent.click(screen.getByText("All Locations"));
 
@@ -611,9 +603,15 @@ describe("IssueList - Filtering Functionality", () => {
         expect(screen.getByText("3 issues found")).toBeInTheDocument();
       });
 
-      // Change sort option
-      const comboboxes = screen.getAllByRole("combobox");
-      const sortSelect = comboboxes[3] as HTMLElement; // Sort is typically the last combobox
+      // Change sort option - expand advanced filters first
+      const expandButton = screen.getByRole("button", { name: "" }); // ExpandMore icon button
+      await userEvent.click(expandButton);
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("Sort By")).toBeInTheDocument();
+      });
+
+      const sortSelect = screen.getByLabelText("Sort By");
       fireEvent.mouseDown(sortSelect);
 
       const updatedOption = screen.getByText("Updated Date");

@@ -336,24 +336,26 @@ describe("IssueList - Integration Tests with tRPC APIs", () => {
         </VitestTestWrapper>,
       );
 
-      // Wait for data to load, then open location dropdown
+      // Wait for data to load, then expand advanced filters to access location dropdown
       await waitFor(() => {
         expect(screen.getByText("3 issues found")).toBeInTheDocument();
       });
 
-      const comboboxes = screen.getAllByRole("combobox");
-      const locationSelect = comboboxes[0] as HTMLElement;
-      fireEvent.mouseDown(locationSelect);
+      // Click expand button to show advanced filters
+      const expandButton = screen.getByRole("button", { name: "" }); // ExpandMore icon
+      await userEvent.click(expandButton);
 
       await waitFor(() => {
-        expect(screen.getByText("Main Floor")).toBeInTheDocument();
-      });
+        const locationSelect = screen.getByLabelText("Location");
+        fireEvent.mouseDown(locationSelect);
 
-      expect(screen.getByText("Back Room")).toBeInTheDocument();
-      expect(screen.getByText("Workshop")).toBeInTheDocument();
+        expect(screen.getByText("Main Floor")).toBeInTheDocument();
+        expect(screen.getByText("Back Room")).toBeInTheDocument();
+        expect(screen.getByText("Workshop")).toBeInTheDocument();
+      });
     });
 
-    it("successfully fetches and populates status filter dropdown", async () => {
+    it("successfully displays status toggle pills", async () => {
       render(
         <VitestTestWrapper
           userPermissions={[...VITEST_PERMISSION_SCENARIOS.ADMIN]}
@@ -367,17 +369,18 @@ describe("IssueList - Integration Tests with tRPC APIs", () => {
         expect(screen.getByText("3 issues found")).toBeInTheDocument();
       });
 
-      const comboboxes = screen.getAllByRole("combobox");
-      const statusSelect = comboboxes[1] as HTMLElement;
-      fireEvent.mouseDown(statusSelect);
-
-      await waitFor(() => {
-        expect(screen.getAllByText("New")).toHaveLength(3); // Status in issue + filter option + filter button
+      // Check for status pills with counts
+      const openButton = screen.getByRole("button", { name: /Open \(\d+\)/ });
+      const inProgressButton = screen.getByRole("button", {
+        name: /In Progress \(\d+\)/,
+      });
+      const closedButton = screen.getByRole("button", {
+        name: /Closed \(\d+\)/,
       });
 
-      expect(screen.getAllByText("In Progress")).toHaveLength(3); // Status in issue + filter option + additional reference
-      expect(screen.getAllByText("Resolved")).toHaveLength(3); // Filter option + additional references
-      expect(screen.getAllByText("Closed")).toHaveLength(2); // Filter option + another reference
+      expect(openButton).toBeInTheDocument();
+      expect(inProgressButton).toBeInTheDocument();
+      expect(closedButton).toBeInTheDocument();
     });
   });
 
@@ -409,9 +412,16 @@ describe("IssueList - Integration Tests with tRPC APIs", () => {
         refetch: mockRefetch,
       });
 
+      // Expand advanced filters first
+      const expandButton = screen.getByRole("button", { name: "" }); // ExpandMore icon
+      await userEvent.click(expandButton);
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("Location")).toBeInTheDocument();
+      });
+
       // Apply location filter
-      const comboboxes = screen.getAllByRole("combobox");
-      const locationSelect = comboboxes[0] as HTMLElement;
+      const locationSelect = screen.getByLabelText("Location");
       fireEvent.mouseDown(locationSelect);
 
       const mainFloorOption = screen.getByText("Main Floor");
@@ -452,16 +462,9 @@ describe("IssueList - Integration Tests with tRPC APIs", () => {
         refetch: mockRefetch,
       });
 
-      // Apply status category filter
-      const comboboxes = screen.getAllByRole("combobox");
-      const categorySelect = comboboxes[2] as HTMLElement;
-      fireEvent.mouseDown(categorySelect);
-
-      const newOptions = screen.getAllByText("New");
-      const newOption = newOptions.find((option) =>
-        option.closest('[role="option"]'),
-      ) as HTMLElement;
-      await userEvent.click(newOption);
+      // Apply status category filter by clicking Open pill
+      const openButton = screen.getByRole("button", { name: /Open \(\d+\)/ });
+      await userEvent.click(openButton);
 
       // Wait for URL update
       await waitFor(() => {
@@ -500,20 +503,24 @@ describe("IssueList - Integration Tests with tRPC APIs", () => {
         refetch: mockRefetch,
       });
 
+      // Expand advanced filters first
+      const expandButton = screen.getByRole("button", { name: "" }); // ExpandMore icon
+      await userEvent.click(expandButton);
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("Location")).toBeInTheDocument();
+      });
+
       // Apply location filter
-      const comboboxes = screen.getAllByRole("combobox");
-      const locationSelect = comboboxes[0] as HTMLElement;
+      const locationSelect = screen.getByLabelText("Location");
       fireEvent.mouseDown(locationSelect);
       await userEvent.click(screen.getByText("Main Floor"));
 
-      // Apply status category filter
-      const categorySelect = comboboxes[2] as HTMLElement;
-      fireEvent.mouseDown(categorySelect);
-      const resolvedOptions = screen.getAllByText("Resolved");
-      const resolvedOption = resolvedOptions.find((option) =>
-        option.closest('[role="option"]'),
-      ) as HTMLElement;
-      await userEvent.click(resolvedOption);
+      // Apply status category filter by clicking Closed pill
+      const closedButton = screen.getByRole("button", {
+        name: /Closed \(\d+\)/,
+      });
+      await userEvent.click(closedButton);
 
       // Verify URL updates were made
       await waitFor(() => {
@@ -543,9 +550,16 @@ describe("IssueList - Integration Tests with tRPC APIs", () => {
         expect(screen.getByText("3 issues found")).toBeInTheDocument();
       });
 
+      // Expand advanced filters first
+      const expandButton = screen.getByRole("button", { name: "" }); // ExpandMore icon
+      await userEvent.click(expandButton);
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("Sort By")).toBeInTheDocument();
+      });
+
       // Change sort option
-      const comboboxes = screen.getAllByRole("combobox");
-      const sortSelect = comboboxes[3] as HTMLElement; // Sort is typically the last combobox
+      const sortSelect = screen.getByLabelText("Sort By");
       fireEvent.mouseDown(sortSelect);
 
       const updatedOption = screen.getByText("Updated Date");
@@ -666,9 +680,16 @@ describe("IssueList - Integration Tests with tRPC APIs", () => {
         screen.getByText("Flipper Stuck on Medieval Madness"),
       ).toBeInTheDocument();
 
-      // Location filter should still be present even with error
-      const comboboxes = screen.getAllByRole("combobox");
-      expect(comboboxes.length).toBeGreaterThan(0);
+      // Status pills should still be present even with location error
+      expect(
+        screen.getByRole("button", { name: /Open \(\d+\)/ }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /In Progress \(\d+\)/ }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /Closed \(\d+\)/ }),
+      ).toBeInTheDocument();
     });
   });
 

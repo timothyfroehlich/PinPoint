@@ -566,9 +566,15 @@ describe("IssueList Component - Selection and Bulk Actions", () => {
       await userEvent.click(firstCheckbox);
       expect(screen.getByText("1 issue selected")).toBeInTheDocument();
 
-      // Apply a filter (should clear selection)
-      const comboboxes = screen.getAllByRole("combobox");
-      const locationSelect = comboboxes[0] as HTMLElement;
+      // Apply a filter (should clear selection) - expand advanced filters first
+      const expandButton = screen.getByRole("button", { name: "" }); // ExpandMore icon
+      await userEvent.click(expandButton);
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("Location")).toBeInTheDocument();
+      });
+
+      const locationSelect = screen.getByLabelText("Location");
       fireEvent.mouseDown(locationSelect);
 
       await waitFor(() => {

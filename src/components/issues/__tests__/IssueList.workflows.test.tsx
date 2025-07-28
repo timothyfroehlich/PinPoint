@@ -530,9 +530,20 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
       );
 
       // Should see issues in different workflow states
-      expect(screen.getAllByText("New")).toHaveLength(4); // Status appears in multiple places
-      expect(screen.getAllByText("In Progress")).toHaveLength(2); // Active work
+      expect(screen.getAllByText("New")).toHaveLength(3); // Status appears in issue cards
+      expect(screen.getAllByText("In Progress")).toHaveLength(1); // Active work
       expect(screen.getAllByText("Resolved")).toHaveLength(1); // Completed work
+
+      // Should see status pills
+      expect(
+        screen.getByRole("button", { name: /Open \(\d+\)/ }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /In Progress \(\d+\)/ }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /Closed \(\d+\)/ }),
+      ).toBeInTheDocument();
     });
 
     it("allows technician to filter by status for workflow organization", async () => {
@@ -555,18 +566,28 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
         expect(screen.getByText("5 issues found")).toBeInTheDocument();
       });
 
-      // Open status filter
-      const comboboxes = screen.getAllByRole("combobox");
-      const statusSelect = comboboxes[1] as HTMLElement;
-      fireEvent.mouseDown(statusSelect);
-
-      await waitFor(() => {
-        expect(screen.getAllByText("New")).toHaveLength(5); // Status in issues + filter options + button text
+      // Check status pills are available for filtering
+      const openButton = screen.getByRole("button", { name: /Open \(\d+\)/ });
+      const inProgressButton = screen.getByRole("button", {
+        name: /In Progress \(\d+\)/,
+      });
+      const closedButton = screen.getByRole("button", {
+        name: /Closed \(\d+\)/,
       });
 
-      // Filter options should be available for workflow management
-      expect(screen.getAllByText("In Progress")).toHaveLength(4);
-      expect(screen.getAllByText("Resolved")).toHaveLength(3);
+      expect(openButton).toBeInTheDocument();
+      expect(inProgressButton).toBeInTheDocument();
+      expect(closedButton).toBeInTheDocument();
+
+      // Click on In Progress pill to filter
+      await userEvent.click(inProgressButton);
+
+      // Should trigger URL update for status filter
+      await waitFor(() => {
+        expect(mockPush).toHaveBeenCalledWith(
+          expect.stringContaining("statusIds="),
+        );
+      });
     });
 
     it("supports bulk status updates for efficient workflow management", async () => {
@@ -622,9 +643,16 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
         expect(screen.getByText("5 issues found")).toBeInTheDocument();
       });
 
+      // Expand advanced filters to access location filter
+      const expandButton = screen.getByRole("button", { name: "" }); // ExpandMore icon
+      await userEvent.click(expandButton);
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("Location")).toBeInTheDocument();
+      });
+
       // Open location filter for area-based workflow
-      const comboboxes = screen.getAllByRole("combobox");
-      const locationSelect = comboboxes[0] as HTMLElement;
+      const locationSelect = screen.getByLabelText("Location");
       fireEvent.mouseDown(locationSelect);
 
       await waitFor(() => {
@@ -935,9 +963,16 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
       expect(screen.getByText("5 issues found")).toBeInTheDocument();
       expect(screen.getByText("Select All")).toBeInTheDocument();
 
-      // Location-based filtering might be degraded, but core functionality remains
-      const comboboxes = screen.getAllByRole("combobox");
-      expect(comboboxes.length).toBeGreaterThan(0);
+      // Status-based filtering should still work even with location errors
+      expect(
+        screen.getByRole("button", { name: /Open \(\d+\)/ }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /In Progress \(\d+\)/ }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /Closed \(\d+\)/ }),
+      ).toBeInTheDocument();
     });
   });
 });

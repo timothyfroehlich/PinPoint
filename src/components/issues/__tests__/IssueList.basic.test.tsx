@@ -230,8 +230,19 @@ describe("IssueList Component - Basic Tests", () => {
 
       // Check for basic issue content (like the working navigation test)
       expect(screen.getByText("Test Issue 1")).toBeInTheDocument();
-      expect(screen.getAllByText("New")).toHaveLength(2); // One in status filter, one in issue status
+      expect(screen.getAllByText("New")).toHaveLength(1); // One in issue status
       expect(screen.getByText("Medium")).toBeInTheDocument();
+
+      // Check for status pills
+      expect(
+        screen.getByRole("button", { name: /Open \(\d+\)/ }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /In Progress \(\d+\)/ }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /Closed \(\d+\)/ }),
+      ).toBeInTheDocument();
 
       // Use more flexible text matching for machine and location
       expect(screen.getByText(/Medieval Madness/)).toBeInTheDocument();
@@ -301,12 +312,21 @@ describe("IssueList Component - Basic Tests", () => {
         expect(screen.getByText("1 issue found")).toBeInTheDocument();
       });
 
-      // Check that we have the expected number of comboboxes (4 filters)
-      const comboboxes = screen.getAllByRole("combobox");
-      expect(comboboxes).toHaveLength(4);
+      // Check for search field
+      expect(
+        screen.getByPlaceholderText("Search issues..."),
+      ).toBeInTheDocument();
 
-      // Check for filter section labels - appears in both heading and mobile button
-      expect(screen.getAllByText("Filters")).toHaveLength(2);
+      // Check for status pills
+      expect(
+        screen.getByRole("button", { name: /Open \(\d+\)/ }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /In Progress \(\d+\)/ }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /Closed \(\d+\)/ }),
+      ).toBeInTheDocument();
     });
 
     it("populates location filter dropdown correctly", async () => {
@@ -320,11 +340,15 @@ describe("IssueList Component - Basic Tests", () => {
         expect(screen.getByText("1 issue found")).toBeInTheDocument();
       });
 
-      // Find the first combobox (location filter) by position
-      const comboboxes = screen.getAllByRole("combobox");
-      expect(comboboxes).toHaveLength(4);
+      // Expand advanced filters to access location dropdown
+      const expandButton = screen.getByRole("button", { name: "" }); // ExpandMore icon
+      await userEvent.click(expandButton);
 
-      const locationSelect = comboboxes[0] as HTMLElement;
+      await waitFor(() => {
+        expect(screen.getByLabelText("Location")).toBeInTheDocument();
+      });
+
+      const locationSelect = screen.getByLabelText("Location");
       fireEvent.mouseDown(locationSelect);
 
       await waitFor(() => {
@@ -347,8 +371,15 @@ describe("IssueList Component - Basic Tests", () => {
         expect(screen.getByText("1 issue found")).toBeInTheDocument();
       });
 
-      const comboboxes = screen.getAllByRole("combobox");
-      const locationSelect = comboboxes[0] as HTMLElement;
+      // Expand advanced filters to access location dropdown
+      const expandButton = screen.getByRole("button", { name: "" }); // ExpandMore icon
+      await userEvent.click(expandButton);
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("Location")).toBeInTheDocument();
+      });
+
+      const locationSelect = screen.getByLabelText("Location");
       fireEvent.mouseDown(locationSelect);
 
       await waitFor(() => {
