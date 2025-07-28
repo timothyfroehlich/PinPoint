@@ -239,7 +239,7 @@ npm run typecheck -- --watch
 
 ```bash
 # 1. Check what rules are active
-npm run debug:lint 2>&1 | head -50
+npm run lint:verbose 2>&1 | head -50
 
 # 2. Lint specific directories
 npm run lint -- src/server/
@@ -339,7 +339,7 @@ npm run typecheck -- --listFiles
 
 ```bash
 # Detailed ESLint output
-npm run debug:lint
+npm run lint:verbose
 
 # Check rule configuration
 npx eslint --print-config src/server/api/trpc.ts
