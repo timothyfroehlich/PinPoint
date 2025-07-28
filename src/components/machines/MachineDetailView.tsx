@@ -18,7 +18,9 @@ import {
   Button,
   Grid,
   Divider,
+  Link,
 } from "@mui/material";
+import NextLink from "next/link";
 
 import type { Session } from "next-auth";
 import type { RouterOutputs } from "~/trpc/react";
@@ -125,9 +127,20 @@ export function MachineDetailView({
                         Location
                       </Typography>
                     </Box>
-                    <Typography variant="body1" fontWeight="medium">
+                    <Link
+                      component={NextLink}
+                      href={`/locations/${machine.location.id}`}
+                      variant="body1"
+                      fontWeight="medium"
+                      sx={{
+                        textDecoration: "none",
+                        "&:hover": {
+                          textDecoration: "underline",
+                        },
+                      }}
+                    >
                       {machine.location.name}
-                    </Typography>
+                    </Link>
                     {machine.location.street && (
                       <Typography variant="body2" color="text.secondary">
                         {machine.location.street}

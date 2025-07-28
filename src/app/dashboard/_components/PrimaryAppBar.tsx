@@ -137,6 +137,25 @@ const PrimaryAppBar = (): JSX.Element => {
                   Games
                 </PermissionButton>
                 <PermissionButton
+                  permission="location:view"
+                  hasPermission={hasPermission}
+                  showWhenDenied={false}
+                  color="inherit"
+                  onClick={() => {
+                    router.push("/locations");
+                  }}
+                  sx={{
+                    borderRadius: 2,
+                    px: 3,
+                    textTransform: "none",
+                    fontWeight: "medium",
+                    "&:hover": { bgcolor: "rgba(255,255,255,0.1)" },
+                  }}
+                  tooltipText="View locations and their machines"
+                >
+                  Locations
+                </PermissionButton>
+                <PermissionButton
                   permission="organization:manage"
                   hasPermission={hasPermission}
                   showWhenDenied={false}
@@ -253,6 +272,20 @@ const PrimaryAppBar = (): JSX.Element => {
                   }}
                 >
                   Games
+                </Button>
+              </ListItem>
+            )}
+            {session && hasPermission("location:view") && (
+              <ListItem>
+                <Button
+                  fullWidth
+                  sx={{ justifyContent: "flex-start" }}
+                  onClick={() => {
+                    router.push("/locations");
+                    handleMobileDrawerToggle();
+                  }}
+                >
+                  Locations
                 </Button>
               </ListItem>
             )}
