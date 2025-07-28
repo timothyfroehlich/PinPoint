@@ -110,6 +110,44 @@ interface IssueListProps {
   initialFilters: IssueFilters;
 }
 
+// Sanitize filter values to prevent MUI warnings
+function sanitizeFilters(filters: IssueFilters): IssueFilters {
+  const validSortByValues = [
+    "created",
+    "updated",
+    "status",
+    "severity",
+    "game",
+  ];
+  const validSortOrderValues = ["asc", "desc"];
+  const validStatusCategories = ["NEW", "IN_PROGRESS", "RESOLVED"];
+
+  // Ensure string values are actually strings, not objects or other types
+  const sanitizeStringId = (value: unknown): string | undefined => {
+    if (typeof value === "string") {
+      return value; // Keep empty strings as empty strings
+    }
+    return undefined;
+  };
+
+  return {
+    ...filters,
+    locationId: sanitizeStringId(filters.locationId),
+    statusId: sanitizeStringId(filters.statusId),
+    sortBy: validSortByValues.includes(filters.sortBy)
+      ? filters.sortBy
+      : "created",
+    sortOrder: validSortOrderValues.includes(filters.sortOrder)
+      ? filters.sortOrder
+      : "desc",
+    statusCategory:
+      filters.statusCategory &&
+      validStatusCategories.includes(filters.statusCategory)
+        ? filters.statusCategory
+        : undefined,
+  };
+}
+
 export function IssueList({
   initialFilters,
 }: IssueListProps): React.JSX.Element {
@@ -117,7 +155,9 @@ export function IssueList({
   const searchParams = useSearchParams();
   const { hasPermission, isLoading: permissionsLoading } = usePermissions();
 
-  const [filters, setFilters] = useState<IssueFilters>(initialFilters);
+  const [filters, setFilters] = useState<IssueFilters>(
+    sanitizeFilters(initialFilters),
+  );
   const [selectedIssues, setSelectedIssues] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
@@ -135,6 +175,16 @@ export function IssueList({
 
   // Fetch issue statuses for filter dropdown
   const { data: statuses } = api.issueStatus.getAll.useQuery();
+
+  // Helper function to ensure Select values are valid options
+  const getSafeSelectValue = (
+    value: string | undefined,
+    availableOptions: { id: string }[] | undefined,
+  ): string => {
+    if (!value) return "";
+    if (!availableOptions) return "";
+    return availableOptions.some((option) => option.id === value) ? value : "";
+  };
 
   // Update URL when filters change
   const updateFilters = (newFilters: Partial<IssueFilters>): void => {
@@ -223,7 +273,7 @@ export function IssueList({
               <FormControl fullWidth size="small">
                 <InputLabel>Location</InputLabel>
                 <Select
-                  value={filters.locationId ?? ""}
+                  value={getSafeSelectValue(filters.locationId, locations)}
                   onChange={(e) => {
                     const value = e.target.value;
                     updateFilters({
@@ -246,7 +296,7 @@ export function IssueList({
               <FormControl fullWidth size="small">
                 <InputLabel>Status</InputLabel>
                 <Select
-                  value={filters.statusId ?? ""}
+                  value={getSafeSelectValue(filters.statusId, statuses)}
                   onChange={(e) => {
                     const value = e.target.value;
                     updateFilters({

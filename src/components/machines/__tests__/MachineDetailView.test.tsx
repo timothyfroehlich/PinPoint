@@ -19,6 +19,17 @@ import {
   VITEST_PERMISSION_SCENARIOS,
 } from "~/test/VitestTestWrapper";
 
+// Mock next/navigation with vi.hoisted
+const { mockPush } = vi.hoisted(() => ({
+  mockPush: vi.fn(),
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    push: mockPush,
+  }),
+}));
+
 // Mock usePermissions hook
 const mockHasPermission = vi.fn();
 vi.mock("~/hooks/usePermissions", () => ({
