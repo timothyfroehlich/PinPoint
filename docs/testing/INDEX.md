@@ -8,7 +8,7 @@
 npm run test           # Run all tests
 npm run test:coverage  # Coverage report
 npm run test:watch     # Watch mode
-npm run quick    # Fast validation
+npm run check:brief # Fast validation
 ```
 
 ### Core Vitest Pattern

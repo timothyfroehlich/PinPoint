@@ -218,7 +218,7 @@ npm run db:reset        # Complete reset + reseed
 npm run db:push         # Sync schema changes
 
 # Quick Checks
-npm run quick           # Fast typecheck + lint
+npm run check:brief     # Fast validation (typecheck + lint + format + audit)
 npm run fix             # Auto-fix lint + format issues
 npm run typecheck       # TypeScript validation only
 

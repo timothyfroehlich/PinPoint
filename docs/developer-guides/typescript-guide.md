@@ -27,7 +27,7 @@ npm run typecheck
 npm run validate
 
 # Quick checks during development
-npm run quick
+npm run check
 
 # Update Betterer baseline after fixes
 npm run betterer:update
@@ -114,8 +114,9 @@ npx tsc --project tsconfig.test-utils.json --noEmit
 # Test files (very permissive)
 npx tsc --project tsconfig.tests.json --noEmit
 
-# Agent commands (recommended)
-npm run quick        # Quick validation with auto-fix
+# Validation commands (recommended)
+npm run check        # Quick validation (check-only)
+npm run check:fix    # Quick validation with auto-fix
 npm run validate     # Pre-commit validation
 npm run pre-commit # Pre-PR validation
 ```
@@ -782,7 +783,7 @@ npx tsc --project tsconfig.tests.json --noEmit 2>&1 | grep -c "error TS"
 
 ```bash
 # Verify multi-config setup
-npm run quick
+npm run check
 
 # Full validation
 npm run validate
@@ -811,7 +812,8 @@ npm run validate
 
 ### Agent Validation Protocol
 
-- `npm run quick` - Development checks + auto-fix (after code changes)
+- `npm run check` - Development checks (check-only, CI-friendly)
+- `npm run check:fix` - Development checks + auto-fix (after code changes)
 - `npm run validate` - Pre-commit validation + auto-fix (MUST PASS)
 - `npm run pre-commit` - Pre-PR validation (MUST PASS)
 
@@ -826,7 +828,7 @@ npm run validate
 ### For Migration
 
 - Fix errors file by file, not globally
-- Run `npm run quick` after changes
+- Run `npm run check` after changes
 - Keep PR sizes manageable
 - Document type utilities and patterns
 - Monitor error count as primary success metric
