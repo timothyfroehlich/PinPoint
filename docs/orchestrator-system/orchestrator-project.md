@@ -69,31 +69,33 @@ npm run db:reset      # Reset database
 - `docs/design-docs/cujs-list.md` - User journeys
 - `docs/architecture/current-state.md` - Current state
 
-## Task File Organization
+## Task Management
 
-### Standardized Task File
+### GitHub Issues for Task Coordination
 
-Each worktree contains a single standardized task file:
+All orchestrator variants create GitHub issues for task management:
 
-- **`AGENT_TASK.md`** - Single task file in worktree root
-- Created by all orchestrator variants
-- Checked into branches but auto-cleaned from main
-- Contains complete task context and requirements
+- **Issue Creation** - All orchestrator commands use `gh issue create`
+- **Comprehensive Context** - Issues contain complete task specifications
+- **Label Organization** - Consistent labeling (e.g., "orchestrator-task", "feature", "bug")
+- **Agent Dispatch** - Agents receive issue numbers: "Your task is issue #X"
+- **Progress Tracking** - Built-in GitHub issue tracking and status updates
 
-### Task File Content Structure
+### Issue Content Structure
 
-- **Mission Statement** - Clear task description
+- **Mission Statement** - Clear task description and title
 - **Context** - Background information and constraints
 - **Implementation Steps** - Detailed step-by-step guide
 - **Quality Requirements** - Standards and validation criteria
 - **Success Criteria** - Definition of completion
+- **Completion Instructions** - Link PR, update status, close when merged
 
 ## Post-Completion Tasks
 
 1. Update `docs/architecture/source-map.md` and `docs/architecture/test-map.md`
-2. Review and close relevant GitHub issues
+2. Close the GitHub issue when PR is merged
 3. Update documentation for any deviations
-4. Mark task as complete
+4. Review related issues that may need updates
 
 ## Library Notes
 
