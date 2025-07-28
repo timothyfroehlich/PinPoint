@@ -69,13 +69,16 @@ get_worktree_status() {
     fi
 }
 
-# Function to check if AGENT_TASK.md exists
-check_task_file() {
+# Function to check worktree purpose
+check_worktree_purpose() {
     local worktree_path=$1
-    if [ -f "$worktree_path/AGENT_TASK.md" ]; then
-        echo -e "${GREEN}✓ Task file exists${NC}"
+    local branch_name=$(cd "$worktree_path" && git branch --show-current 2>/dev/null || echo "detached")
+    
+    # Check if it's a task worktree based on naming patterns
+    if [[ "$branch_name" =~ ^(feature|bugfix|task|orchestrator) ]]; then
+        echo -e "${GREEN}✓ Task worktree${NC}"
     else
-        echo -e "${RED}✗ No task file${NC}"
+        echo -e "${BLUE}○ Development worktree${NC}"
     fi
 }
 
@@ -98,7 +101,7 @@ for worktree in $WORKTREES; do
     
     # Only show detailed info for task worktrees
     if [ "$is_task" = "true" ]; then
-        echo -e "${BLUE}📋 Task File:${NC} $(check_task_file "$worktree")"
+        echo -e "${BLUE}📋 Purpose:${NC} $(check_worktree_purpose "$worktree")"
         echo -e "${BLUE}📊 Status:${NC} $(get_worktree_status "$worktree")"
         echo -e "${BLUE}🔄 Remote:${NC} $(check_pr_status "$branch")"
         echo -e "${BLUE}💾 Last Commit:${NC} $(get_last_commit "$worktree")"
@@ -140,9 +143,10 @@ for worktree in $WORKTREES; do
             echo -e "  ${YELLOW}•${NC} $worktree - Branch '$branch' has no remote (possibly merged?)"
         fi
         
-        # Check if worktree is clean and has no task file
-        if ! [ -f "$worktree/AGENT_TASK.md" ]; then
-            echo -e "  ${YELLOW}•${NC} $worktree - No task file found"
+        # Check if worktree has uncommitted changes
+        cd "$worktree"
+        if ! git diff --quiet HEAD 2>/dev/null || ! git diff --quiet --cached 2>/dev/null; then
+            echo -e "  ${YELLOW}•${NC} $worktree - Has uncommitted changes"
         fi
     fi
 done
