@@ -313,6 +313,7 @@ export const VITEST_PERMISSION_SCENARIOS = {
     "issue:view",
     "issue:create",
     "issue:update",
+    "issue:edit",
     "issue:delete",
     "issue:assign",
     "machine:view",

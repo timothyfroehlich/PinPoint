@@ -21,8 +21,11 @@ export default async function IssuesPage({
   // Parse search params for filters with TypeScript strictest compliance
   const locationId = params["locationId"];
   const machineId = params["machineId"];
-  const statusId = params["statusId"];
-  const statusCategory = params["statusCategory"];
+  const statusIds = params["statusIds"];
+  const search = params["search"];
+  const assigneeId = params["assigneeId"];
+  const reporterId = params["reporterId"];
+  const ownerId = params["ownerId"];
   const sortBy = params["sortBy"];
   const sortOrder = params["sortOrder"];
 
@@ -30,8 +33,11 @@ export default async function IssuesPage({
   const filters: {
     locationId?: string | undefined;
     machineId?: string | undefined;
-    statusId?: string | undefined;
-    statusCategory?: "NEW" | "IN_PROGRESS" | "RESOLVED" | undefined;
+    statusIds?: string[] | undefined;
+    search?: string | undefined;
+    assigneeId?: string | undefined;
+    reporterId?: string | undefined;
+    ownerId?: string | undefined;
     sortBy: "created" | "updated" | "status" | "severity" | "game";
     sortOrder: "asc" | "desc";
   } = {
@@ -53,17 +59,25 @@ export default async function IssuesPage({
   if (typeof machineId === "string") {
     filters.machineId = machineId;
   }
-  if (typeof statusId === "string") {
-    filters.statusId = statusId;
+  // Handle statusIds array parameter
+  if (Array.isArray(statusIds)) {
+    filters.statusIds = statusIds.filter(
+      (id): id is string => typeof id === "string",
+    );
+  } else if (typeof statusIds === "string") {
+    filters.statusIds = [statusIds];
   }
-  if (
-    typeof statusCategory === "string" &&
-    ["NEW", "IN_PROGRESS", "RESOLVED"].includes(statusCategory)
-  ) {
-    filters.statusCategory = statusCategory as
-      | "NEW"
-      | "IN_PROGRESS"
-      | "RESOLVED";
+  if (typeof search === "string") {
+    filters.search = search;
+  }
+  if (typeof assigneeId === "string") {
+    filters.assigneeId = assigneeId;
+  }
+  if (typeof reporterId === "string") {
+    filters.reporterId = reporterId;
+  }
+  if (typeof ownerId === "string") {
+    filters.ownerId = ownerId;
   }
 
   return (
