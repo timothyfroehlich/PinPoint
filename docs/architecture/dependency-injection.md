@@ -16,9 +16,19 @@ PinPoint uses a sophisticated dependency injection system that balances testabil
 
 ### Service Factory Pattern
 
+> ⚠️ **MIGRATION IN PROGRESS**: The Service Factory pattern is being removed as part of the Drizzle migration.
+>
+> - **Current**: Services instantiated through factory with Prisma dependency
+> - **Target**: Direct service instantiation with Drizzle database client
+> - **Reason**: Simplifies architecture without losing testability
+>
+> For new code, instantiate services directly: `new NotificationService(db)`
+>
+> See [Migration Guide](/docs/migration/supabase-drizzle/) for details.
+
 **Location**: `src/server/services/factory.ts`
 
-PinPoint uses a **Service Factory** to manage business logic dependencies:
+~~PinPoint uses a **Service Factory** to manage business logic dependencies:~~ **(Being Removed)**
 
 ```typescript
 export class ServiceFactory {

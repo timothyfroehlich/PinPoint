@@ -18,4 +18,5 @@ Quick capture of ideas for future consideration.
 
 ## Other Ideas
 
-(To be added as they come up)
+Having recent issues be more like open issues, when repoorting an issue
+Making sure the recent issues is prominant on mobile. - consider it be a

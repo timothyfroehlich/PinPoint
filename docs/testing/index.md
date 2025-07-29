@@ -1,6 +1,24 @@
 # PinPoint Testing Guide
 
-> **Status**: Vitest is the official testing framework. All new tests use Vitest. Jest tests are migrated when modified.
+> ⚠️ **MIGRATION IN PROGRESS**: Testing patterns are changing with the Supabase + Drizzle migration.
+>
+> - **Current**: Heavy mocking with Prisma, unit-test focused
+> - **Target**: Transaction-based testing with real database, integration-test focused
+> - **Philosophy**: Test behavior, not implementation details
+>
+> For migration guide, see [Supabase + Drizzle Migration](../migration/supabase-drizzle/)
+
+> **Status**: Vitest is the official testing framework. All new tests use Vitest. ~~Jest tests are migrated when modified.~~ Jest fully removed.
+
+## New Testing Philosophy
+
+PinPoint is adopting a **integration-first** testing approach:
+
+1. **Real Database Tests**: Use Supabase local with transaction rollback
+2. **Minimal Mocking**: Only mock external services (email, APIs)
+3. **Behavior Testing**: Test user journeys, not implementation
+4. **RLS Validation**: Verify security at database level
+5. **E2E Coverage**: Critical paths tested with Playwright
 
 ## Quick Start
 
@@ -68,9 +86,40 @@ expect(mockDb.gameInstance.findMany).toHaveBeenCalledWith({
 
 ## Common Patterns
 
-### Prisma Mocking
+### Database Testing (NEW)
 
 ```typescript
+import { db } from "~/server/db";
+
+describe("Issue Creation", () => {
+  it("creates issue with proper organization scoping", async () => {
+    // Use transaction for automatic rollback
+    await db.transaction(async (tx) => {
+      const issue = await createIssue(tx, {
+        title: "Test Issue",
+        organizationId: testOrgId,
+      });
+
+      // Verify created correctly
+      expect(issue.title).toBe("Test Issue");
+
+      // Verify RLS works
+      const otherOrgClient = createClientForOrg(otherOrgId);
+      const issues = await otherOrgClient.from("issues").select();
+      expect(issues.data).not.toContainEqual(
+        expect.objectContaining({ id: issue.id }),
+      );
+
+      // Transaction automatically rolls back
+    });
+  });
+});
+```
+
+### ⚠️ DEPRECATED: Prisma Mocking
+
+```typescript
+// ❌ OLD: Heavy mocking approach
 const mockPrisma = {
   user: { findUnique: vi.fn() },
   $accelerate: {
@@ -79,11 +128,11 @@ const mockPrisma = {
   },
 };
 
-// Handle AcceleratePromise
-mockPrisma.user.findUnique.mockImplementation(async () => userData);
+// ✅ NEW: Use real database with transactions
+// See integration-patterns.md for examples
 ```
 
-See [Prisma Patterns](./prisma-patterns.md) for advanced patterns.
+~~See [Prisma Patterns](./prisma-patterns.md) for advanced patterns.~~ **DEPRECATED** - Use [Integration Patterns](./integration-patterns.md) instead.
 
 ### Variable Hoisting
 
@@ -140,12 +189,21 @@ describe('MyComponent', () => {
 
 ## Topic Guides
 
+### Current Approach (Being Replaced)
+
 - **[Configuration](./configuration.md)** - Vitest setup and project configuration
-- **[Mocking Patterns](./mocking-patterns.md)** - Comprehensive mocking strategies
-- **[Prisma Patterns](./prisma-patterns.md)** - Database mocking with Accelerate
+- ⚠️ **[Mocking Patterns](./mocking-patterns.md)** - ~~Comprehensive mocking strategies~~ **DEPRECATED**
+- ⚠️ **[Prisma Patterns](./prisma-patterns.md)** - ~~Database mocking with Accelerate~~ **DEPRECATED**
 - **[Migration Examples](./migration-examples.md)** - Real Jest → Vitest migrations
 - **[Performance](./performance.md)** - Benchmarks and optimization
 - **[Troubleshooting](./troubleshooting.md)** - Common issues and solutions
+
+### New Testing Approach
+
+- **[Unit Patterns](./unit-patterns.md)** - Minimal mocking with Drizzle
+- **[Integration Patterns](./integration-patterns.md)** - Transaction-based testing
+- **[Test Database](./test-database.md)** - Supabase local setup
+- **[RLS Testing](../developer-guides/row-level-security/testing-patterns.md)** - Security validation
 
 ## Migration Guide
 

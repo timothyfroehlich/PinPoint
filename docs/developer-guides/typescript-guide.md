@@ -932,6 +932,109 @@ export function assertIsUser(value: unknown): asserts value is User {
 }
 ```
 
+## 🔄 Drizzle ORM Patterns
+
+> ⚠️ **MIGRATION IN PROGRESS**: PinPoint is migrating from Prisma to Drizzle ORM.
+>
+> These patterns apply to new code using Drizzle. For Prisma patterns, see sections above.
+
+### Schema Type Inference
+
+```typescript
+import { pgTable, text, timestamp } from "drizzle-orm/pg-core";
+
+// Define schema
+export const users = pgTable("users", {
+  id: text("id").primaryKey(),
+  email: text("email").unique().notNull(),
+  name: text("name"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Infer types from schema
+type User = typeof users.$inferSelect; // SELECT type
+type NewUser = typeof users.$inferInsert; // INSERT type
+```
+
+### Query Type Safety
+
+```typescript
+import { eq, and } from "drizzle-orm";
+
+// ✅ Fully typed queries
+const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+// Type: { id: string; email: string; name: string | null; createdAt: Date }[]
+
+// ✅ Type-safe joins
+const issuesWithMachine = await db
+  .select({
+    issue: issues,
+    machine: machines,
+  })
+  .from(issues)
+  .innerJoin(machines, eq(issues.machineId, machines.id))
+  .where(eq(issues.organizationId, orgId));
+// Type: { issue: Issue; machine: Machine }[]
+```
+
+### Transaction Type Safety
+
+```typescript
+// ✅ Transactions maintain type safety
+const result = await db.transaction(async (tx) => {
+  const [user] = await tx.insert(users).values({ email, name }).returning(); // Type: User
+
+  const [membership] = await tx
+    .insert(memberships)
+    .values({ userId: user.id, organizationId })
+    .returning(); // Type: Membership
+
+  return { user, membership }; // Return type inferred
+});
+```
+
+### Drizzle + Zod Integration
+
+```typescript
+import { createInsertSchema, createSelectSchema } from "drizzle-zod";
+
+// Generate Zod schemas from Drizzle tables
+export const insertUserSchema = createInsertSchema(users, {
+  email: z.string().email(), // Custom refinements
+});
+
+export const selectUserSchema = createSelectSchema(users);
+
+// Use in tRPC procedures
+export const userRouter = createTRPCRouter({
+  create: protectedProcedure
+    .input(insertUserSchema.omit({ id: true, createdAt: true }))
+    .mutation(async ({ ctx, input }) => {
+      const [user] = await ctx.db.insert(users).values(input).returning();
+      return user;
+    }),
+});
+```
+
+### Multi-Tenant Patterns with RLS
+
+```typescript
+// ✅ RLS automatically filters - no manual organizationId needed
+const orgIssues = await db
+  .select()
+  .from(issues)
+  .orderBy(desc(issues.createdAt));
+// RLS policy ensures only current org's issues returned
+
+// ❌ Old Prisma pattern - manual filtering
+const orgIssues = await prisma.issue.findMany({
+  where: { organizationId: ctx.organization.id }, // Manual filter
+  orderBy: { createdAt: "desc" },
+});
+```
+
+For complete Drizzle patterns, see [Drizzle Developer Guide](./drizzle/).
+
 ## 📚 Migration Lessons Learned
 
 ### Key Insights from Migration
