@@ -282,6 +282,14 @@ Use memory to quickly recall:
 - **Incremental Updates**: Update one service/component at a time
 - **Test Both Paths**: Ensure tests cover both legacy and new code paths
 
+### PR Requirements During Migration
+
+- **Documentation Updates MANDATORY**: All PRs created during the Supabase + Drizzle + RLS migration MUST include documentation updates
+- **Update Migration Docs**: Changes must be reflected in `@docs/migration/supabase-drizzle/` documentation
+- **Environment Variable Changes**: Document any new or modified environment variables
+- **Pattern Updates**: Update quick reference guides for new patterns or deprecated approaches
+- **Migration Progress Tracking**: Update implementation status and lessons learned
+
 ### Code Patterns
 
 ```typescript
