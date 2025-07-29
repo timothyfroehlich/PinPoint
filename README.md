@@ -41,6 +41,17 @@ This project leverages a modern, type-safe, and performant technology stack to e
 - **Database:**(<https://www.postgresql.org/>)
 - **Authentication:** [NextAuth.js](https://next-auth.js.org/)
 
+### 🚨 Active Migration
+
+PinPoint is currently undergoing a strategic migration to modernize its architecture:
+
+- **Timeline:** 6-week staged migration (currently in Phase 1)
+- **From:** Prisma + NextAuth.js + Manual Security
+- **To:** [Drizzle ORM](https://orm.drizzle.team/) + [Supabase](https://supabase.com/) (Auth, Storage, RLS)
+- **Benefits:** Database-enforced security, 100x faster serverless performance, better developer experience
+
+For details, see the [Migration Guide](./docs/migration/supabase-drizzle/).
+
 ## Development Prerequisites
 
 For the best development experience, install these tools globally:

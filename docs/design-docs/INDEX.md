@@ -1,17 +1,19 @@
-# Index of docs/design-docs
+# Design Documentation
 
-This directory contains design documentation for the PinPoint application.
+Design documents and architectural plans for PinPoint.
 
-- **[cujs-list.md](./cujs-list.md)**: A list of Critical User Journeys (CUJs).
-- **[frontend-phase-1-authentication.md](./frontend-phase-1-authentication.md)**: Design for the first phase of the frontend rebuild, focusing on authentication.
-- **[frontend-phase-2-issue-management.md](./frontend-phase-2-issue-management.md)**: Design for the second phase of the frontend rebuild, focusing on issue management.
-- **[frontend-phase-3-dashboard-enhancement.md](./frontend-phase-3-dashboard-enhancement.md)**: Design for the third phase of the frontend rebuild, focusing on dashboard enhancements.
-- **[frontend-phase-4-user-organization.md](./frontend-phase-4-user-organization.md)**: Design for the fourth phase of the frontend rebuild, focusing on user and organization management.
-- **[frontend-rebuild-roadmap.md](./frontend-rebuild-roadmap.md)**: The roadmap for the frontend rebuild.
-- **[NOTES-FOR-UI-PLAN.md](./NOTES-FOR-UI-PLAN.md)**: Notes for the UI plan.
-- **[roles-permissions-design.md](./roles-permissions-design.md)**: Design for the roles and permissions system.
-- **[subdomain-development-setup.md](./subdomain-development-setup.md)**: Documentation for setting up a subdomain-based development environment.
-- **[technical-design-document.md](./technical-design-document.md)**: The main technical design document.
-- **[testing-design-doc.md](./testing-design-doc.md)**: The design document for testing.
-- **[ui-architecture-plan.md](./ui-architecture-plan.md)**: The plan for the UI architecture.
-- **[z-patterns-ui-analysis.md](./z-patterns-ui-analysis.md)**: Analysis of UI patterns.
+## Migration Impact
+
+- Authentication designs affected by Supabase Auth integration
+- Permissions system moving to RLS-based approach
+- Testing design transitioning to integration-first methodology
+
+## Contents
+
+- **[technical-design-document.md](./technical-design-document.md)** - Main architectural document
+- **[roles-permissions-design.md](./roles-permissions-design.md)** - RBAC system design (pre-RLS)
+- **[frontend-rebuild-roadmap.md](./frontend-rebuild-roadmap.md)** - UI reconstruction phases
+- **[testing-design-doc.md](./testing-design-doc.md)** - Testing strategy (pre-migration)
+- **Phase Documents** - Frontend implementation phases 1-4
+- **[cujs-list.md](./cujs-list.md)** - Critical User Journeys
+- **[ui-architecture-plan.md](./ui-architecture-plan.md)** - Component structure

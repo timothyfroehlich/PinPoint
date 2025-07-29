@@ -1,8 +1,21 @@
-# Index of docs/deployment
+# Deployment Documentation
 
-This directory contains comprehensive documentation related to the deployment of the PinPoint application. It covers various aspects from local development setup to production deployment strategies, ensuring a smooth and efficient deployment process across different environments.
+Deployment guides and environment management for PinPoint.
 
-- **[CLAUDE.md](./CLAUDE.md)**: This file provides specific instructions and context for the Claude AI model, guiding its operations within this deployment documentation directory. It ensures that the AI agent understands its role and responsibilities when interacting with deployment-related tasks and information.
-- **[development-deployment-guide.md](./development-deployment-guide.md)**: This guide provides detailed instructions for setting up development environments and managing preview deployments. It covers prerequisites, environment variable configuration, database setup, and workflows for local development and automatic preview deployments, facilitating efficient testing and development cycles.
-- **[environment-management.md](./environment-management.md)**: This document outlines PinPoint's strategy for managing different environments, including development, preview, and production. It details how environment variables are handled across these stages, the distinct authentication strategies employed for each, and the varying file storage and data seeding approaches to ensure proper isolation and functionality.
-- **[production-deployment-guide.md](./production-deployment-guide.md)**: This comprehensive guide details the process of deploying PinPoint to a production environment. It covers the architecture overview, prerequisites, database setup using Prisma Postgres, and the deployment workflow with Vercel. Additionally, it includes information on environment variables, the build process, monitoring, troubleshooting, and a production readiness checklist to ensure a robust and stable live application.
+## Current Stack
+
+- Vercel hosting with automatic preview deployments
+- PostgreSQL via Vercel Postgres
+- Environment variables via Vercel dashboard
+
+## Migration Impact
+
+- Supabase will provide database hosting
+- Auth environment variables will change
+- File storage moves from local/Vercel Blob to Supabase Storage
+
+## Contents
+
+- **[development-deployment-guide.md](./development-deployment-guide.md)** - Local dev and preview setup
+- **[production-deployment-guide.md](./production-deployment-guide.md)** - Production deployment process
+- **[environment-management.md](./environment-management.md)** - Environment-specific strategies
