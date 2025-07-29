@@ -481,22 +481,7 @@ export const issueCoreRouter = createTRPCRouter({
 
       return ctx.db.issue.findMany({
         where: whereClause,
-        select: {
-          id: true,
-          title: true,
-          description: true,
-          consistency: true,
-          createdAt: true,
-          updatedAt: true,
-          resolvedAt: true,
-          reporterEmail: true,
-          submitterName: true,
-          organizationId: true,
-          machineId: true,
-          statusId: true,
-          priorityId: true,
-          createdById: true,
-          assignedToId: true,
+        include: {
           status: true,
           priority: true,
           assignedTo: {
@@ -1033,6 +1018,7 @@ export const issueCoreRouter = createTRPCRouter({
         select: {
           id: true,
           title: true,
+          description: true,
           createdAt: true,
           submitterName: true,
           status: true,

@@ -89,12 +89,18 @@ export function RecentIssuesSidebar({
     },
   );
 
-  const { data: machineData } = api.machine.core.getById.useQuery(
-    { id: selectedMachineId ?? "" },
+  // Fetch all machines to get machine data for display (fallback when no issues exist)
+  const { data: allMachines } = api.machine.core.getAllForIssues.useQuery(
+    undefined,
     {
       enabled: !!selectedMachineId,
     },
   );
+
+  // Get machine data either from issues or from the machines list
+  const machineData =
+    recentIssues?.[0]?.machine ??
+    allMachines?.find((machine) => machine.id === selectedMachineId);
 
   if (!selectedMachineId) {
     return (
