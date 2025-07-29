@@ -26,7 +26,11 @@ export const env = createEnv({
       getEnvironmentType() === "production"
         ? z.string()
         : z.string().optional(),
-    DATABASE_URL:
+    POSTGRES_PRISMA_URL:
+      getEnvironmentType() === "test"
+        ? z.string().url().optional()
+        : z.string().url(),
+    POSTGRES_URL_NON_POOLING:
       getEnvironmentType() === "test"
         ? z.string().url().optional()
         : z.string().url(),
@@ -75,7 +79,8 @@ export const env = createEnv({
    */
   runtimeEnv: {
     AUTH_SECRET: process.env["AUTH_SECRET"],
-    DATABASE_URL: process.env["DATABASE_URL"],
+    POSTGRES_PRISMA_URL: process.env["POSTGRES_PRISMA_URL"],
+    POSTGRES_URL_NON_POOLING: process.env["POSTGRES_URL_NON_POOLING"],
     NODE_ENV: process.env["NODE_ENV"],
     GOOGLE_CLIENT_ID: process.env["GOOGLE_CLIENT_ID"],
     GOOGLE_CLIENT_SECRET: process.env["GOOGLE_CLIENT_SECRET"],
