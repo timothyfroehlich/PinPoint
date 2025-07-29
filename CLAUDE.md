@@ -166,9 +166,7 @@ npm run pre-commit
 ### Environment Configuration
 
 - **Shared Database**: All worktrees use a single shared development database configured via Vercel environment variables
-- **Unique Ports**: Each worktree has unique Next.js and Prisma Studio ports to avoid conflicts (e.g., `PORT=49841`)
-- **Environment Setup**: Worktree setup uses `vercel env pull` to sync shared environment variables, then adds unique port configurations
-- **Check Your Port**: Run `grep PORT .env` to see your current development server port
+- **Environment Setup**: Worktree setup uses `vercel env pull` to sync shared environment variables
 
 ### Agent Protocol Benefits
 

@@ -23,7 +23,7 @@ This document captures valuable patterns and insights from a coordinated multi-a
 **Benefits:**
 
 - Complete isolation between agents
-- No port conflicts (each gets unique ports)
+- Isolated development environments
 - Parallel development without interference
 - Shared database with proper multi-tenancy scoping
 
@@ -119,9 +119,9 @@ npm run validate   # Must pass
 
 ### 1. Environment Isolation
 
-**Key Learning**: Unique port assignment prevents development conflicts.
+**Key Learning**: Isolated development environments prevent conflicts.
 
-- Each worktree gets auto-assigned ports
+- Each worktree provides complete environment isolation
 - Database sharing requires careful organizationId scoping
 - Environment setup automation critical for consistency
 
@@ -140,7 +140,7 @@ npm run validate   # Must pass
 ```bash
 ./scripts/setup-worktree.sh
 # - Copy .env from main repo
-# - Configure unique ports
+# - Configure environment variables
 # - Install dependencies
 # - Sync database schema
 ```
