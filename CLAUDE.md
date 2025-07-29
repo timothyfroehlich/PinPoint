@@ -10,6 +10,27 @@
 
 **Migration Hub**: `@docs/migration/supabase-drizzle/`
 
+### ⚠️ Supabase Configuration Notes
+
+**Performance Optimizations**: The following Supabase features are currently disabled in `supabase/config.toml` for development performance:
+
+- `db.migrations` - Disabled during development phase
+- `realtime` - Disabled for performance
+- `studio` - Disabled for performance
+
+**🔔 REMINDER**: Re-enable these features in `supabase/config.toml` when ready for beta:
+
+```toml
+[db.migrations]
+enabled = true  # Re-enable for production migrations
+
+[realtime]
+enabled = true  # Re-enable for real-time features
+
+[studio]
+enabled = true  # Re-enable for database management UI
+```
+
 ## Tech Stack (TRANSITIONING)
 
 ### Current Stack (Being Replaced)
