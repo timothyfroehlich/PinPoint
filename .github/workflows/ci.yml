@@ -64,7 +64,8 @@ jobs:
       contents: read
     env:
       AUTH_SECRET: "temp_secret_value" # Temporary value for CI validation only
-      DATABASE_URL: "sqlite://temp_db.sqlite" # Temporary value for CI validation only
+      POSTGRES_PRISMA_URL: "sqlite://temp_db.sqlite" # Temporary value for CI validation only
+      POSTGRES_URL_NON_POOLING: "sqlite://temp_db.sqlite" # Temporary value for CI validation only
       DEFAULT_ORG_SUBDOMAIN: ${{ secrets.DEFAULT_ORG_SUBDOMAIN }}
       GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
       GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
@@ -86,7 +87,8 @@ jobs:
       contents: read
     env:
       AUTH_SECRET: "temp_secret_value" # Temporary value for CI validation only
-      DATABASE_URL: "sqlite://temp_db.sqlite" # Temporary value for CI validation only
+      POSTGRES_PRISMA_URL: "sqlite://temp_db.sqlite" # Temporary value for CI validation only
+      POSTGRES_URL_NON_POOLING: "sqlite://temp_db.sqlite" # Temporary value for CI validation only
       DEFAULT_ORG_SUBDOMAIN: ${{ secrets.DEFAULT_ORG_SUBDOMAIN }}
       GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
       GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
@@ -128,7 +130,8 @@ jobs:
       actions: write
     env:
       AUTH_SECRET: "temp_secret_value" # Temporary value for CI validation only
-      DATABASE_URL: "sqlite://temp_db.sqlite" # Temporary value for CI validation only
+      POSTGRES_PRISMA_URL: "sqlite://temp_db.sqlite" # Temporary value for CI validation only
+      POSTGRES_URL_NON_POOLING: "sqlite://temp_db.sqlite" # Temporary value for CI validation only
       DEFAULT_ORG_SUBDOMAIN: ${{ secrets.DEFAULT_ORG_SUBDOMAIN }}
       GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
       GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
@@ -168,7 +171,8 @@ jobs:
       contents: read
     env:
       AUTH_SECRET: "temp_secret_value" # Temporary value for CI
-      DATABASE_URL: "sqlite://temp_db.sqlite" # Temporary value for CI
+      POSTGRES_PRISMA_URL: "sqlite://temp_db.sqlite" # Temporary value for CI
+      POSTGRES_URL_NON_POOLING: "sqlite://temp_db.sqlite" # Temporary value for CI
       OPDB_API_TOKEN: "temp_opdb_token" # Temporary value for CI
       DEFAULT_ORG_SUBDOMAIN: "apc"
       NODE_ENV: "test"
@@ -264,7 +268,8 @@ jobs:
           --health-retries 5
     env:
       AUTH_SECRET: "temp_secret_value" # Temporary value for CI validation only
-      DATABASE_URL: "postgresql://test_user:test_password@postgres:5432/test_db"
+      POSTGRES_PRISMA_URL: "postgresql://test_user:test_password@postgres:5432/test_db"
+      POSTGRES_URL_NON_POOLING: "postgresql://test_user:test_password@postgres:5432/test_db"
       DEFAULT_ORG_SUBDOMAIN: ${{ secrets.DEFAULT_ORG_SUBDOMAIN }}
       GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
       GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
