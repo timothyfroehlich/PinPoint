@@ -117,7 +117,7 @@ jobs:
           cache: "npm"
       - run: npm ci
       - name: Prettier Check
-        run: npm run format:check
+        run: npm run format
 
   # Job 4: Betterer Regression Check
   betterer:

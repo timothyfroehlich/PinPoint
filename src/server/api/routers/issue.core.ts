@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   createTRPCRouter,
   organizationProcedure,
+  publicProcedure,
   issueEditProcedure,
 } from "~/server/api/trpc";
 import {
@@ -12,6 +13,137 @@ import {
 } from "~/server/api/trpc.permission";
 
 export const issueCoreRouter = createTRPCRouter({
+  // Public issue creation for anonymous users (via QR codes)
+  publicCreate: publicProcedure
+    .input(
+      z.object({
+        title: z.string().min(1).max(255),
+        description: z.string().optional(),
+        machineId: z.string(),
+        reporterEmail: z.email().optional(),
+        submitterName: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Organization is guaranteed by publicProcedure middleware via subdomain
+      const organization = ctx.organization;
+
+      if (!organization) {
+        throw new Error("Organization not found");
+      }
+
+      // Verify that the machine belongs to the organization
+      const machine = await ctx.db.machine.findFirst({
+        where: {
+          id: input.machineId,
+        },
+        include: {
+          location: {
+            select: {
+              organizationId: true,
+            },
+          },
+        },
+      });
+
+      if (!machine || machine.location.organizationId !== organization.id) {
+        throw new Error(
+          "Machine not found or does not belong to this organization",
+        );
+      }
+
+      // Get the default "New" status for this organization
+      const newStatus = await ctx.db.issueStatus.findFirst({
+        where: {
+          isDefault: true,
+          organizationId: organization.id,
+        },
+      });
+
+      if (!newStatus) {
+        throw new Error(
+          "Default issue status not found. Please contact an administrator.",
+        );
+      }
+
+      const defaultPriority = await ctx.db.priority.findFirst({
+        where: {
+          isDefault: true,
+          organizationId: organization.id,
+        },
+      });
+
+      if (!defaultPriority) {
+        throw new Error(
+          "Default priority not found. Please contact an administrator.",
+        );
+      }
+
+      // Create the issue without a user (anonymous)
+      const issueData: {
+        title: string;
+        description?: string | null;
+        reporterEmail?: string | null;
+        submitterName?: string | null;
+        createdById?: string | null;
+        machineId: string;
+        organizationId: string;
+        statusId: string;
+        priorityId: string;
+      } = {
+        title: input.title,
+        createdById: null, // Anonymous issue
+        machineId: input.machineId,
+        organizationId: organization.id,
+        statusId: newStatus.id,
+        priorityId: defaultPriority.id,
+      };
+
+      if (input.description) {
+        issueData.description = input.description;
+      }
+
+      if (input.submitterName) {
+        issueData.submitterName = input.submitterName;
+      }
+
+      if (input.reporterEmail) {
+        issueData.reporterEmail = input.reporterEmail;
+      }
+
+      const issue = await ctx.db.issue.create({
+        data: issueData,
+        include: {
+          status: true,
+          createdBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              image: true,
+            },
+          },
+          machine: {
+            include: {
+              model: true,
+              location: true,
+            },
+          },
+        },
+      });
+
+      // Note: Skip activity recording for anonymous issues
+      // Activity service requires actorId, which we don't have for anonymous users
+
+      // Send notifications for new issue
+      const notificationService = ctx.services.createNotificationService();
+      await notificationService.notifyMachineOwnerOfIssue(
+        issue.id,
+        input.machineId,
+      );
+
+      return issue;
+    }),
   // Create issue - requires issue:create permission
   create: issueCreateProcedure
     .input(
@@ -785,5 +917,137 @@ export const issueCoreRouter = createTRPCRouter({
       );
 
       return updatedIssue;
+    }),
+
+  // Public procedure for getting issues (for anonymous users to see recent issues)
+  publicGetAll: publicProcedure
+    .input(
+      z
+        .object({
+          locationId: z.string().optional(),
+          machineId: z.string().optional(),
+          statusId: z.string().optional(),
+          modelId: z.string().optional(),
+          statusCategory: z.enum(["NEW", "IN_PROGRESS", "RESOLVED"]).optional(),
+          sortBy: z
+            .enum(["created", "updated", "status", "severity", "game"])
+            .optional(),
+          sortOrder: z.enum(["asc", "desc"]).optional(),
+          limit: z.number().min(1).max(100).optional(), // Limit for public access
+        })
+        .optional(),
+    )
+    .query(async ({ ctx, input }) => {
+      // Organization is guaranteed by publicProcedure middleware via subdomain
+      const organization = ctx.organization;
+
+      if (!organization) {
+        throw new Error("Organization not found");
+      }
+
+      // Build where clause with proper typing
+      interface WhereClause {
+        organizationId: string;
+        machine?: {
+          locationId?: string;
+          modelId?: string;
+        };
+        machineId?: string;
+        statusId?: string;
+        status?: {
+          category: "NEW" | "IN_PROGRESS" | "RESOLVED";
+        };
+      }
+
+      const whereClause: WhereClause = {
+        organizationId: organization.id,
+      };
+
+      // Apply filters
+      if (input?.locationId) {
+        whereClause.machine = {
+          ...whereClause.machine,
+          locationId: input.locationId,
+        };
+      }
+
+      if (input?.machineId) {
+        whereClause.machineId = input.machineId;
+      }
+
+      if (input?.modelId) {
+        whereClause.machine = {
+          ...whereClause.machine,
+          modelId: input.modelId,
+        };
+      }
+
+      if (input?.statusId) {
+        whereClause.statusId = input.statusId;
+      }
+
+      if (input?.statusCategory) {
+        whereClause.status = {
+          category: input.statusCategory,
+        };
+      }
+
+      // Define sort order
+      const sortBy = input?.sortBy ?? "created";
+      const sortOrder = input?.sortOrder ?? "desc";
+
+      const orderBy = (() => {
+        switch (sortBy) {
+          case "created":
+            return { createdAt: sortOrder };
+          case "updated":
+            return { updatedAt: sortOrder };
+          case "status":
+            return { status: { name: sortOrder } };
+          case "severity":
+            return { priority: { order: sortOrder } };
+          case "game":
+            return { machine: { model: { name: sortOrder } } };
+          default:
+            return { createdAt: "desc" as const };
+        }
+      })();
+
+      return ctx.db.issue.findMany({
+        where: whereClause,
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          createdAt: true,
+          submitterName: true,
+          status: true,
+          priority: true,
+          assignedTo: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              image: true,
+            },
+          },
+          createdBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              image: true,
+            },
+          },
+          machine: {
+            include: {
+              model: true,
+              location: true,
+            },
+          },
+        },
+        orderBy,
+        take: input?.limit ?? 20, // Default limit for public access
+      });
     }),
 });
