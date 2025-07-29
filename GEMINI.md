@@ -215,9 +215,7 @@ npm run validate:full:agent
 
 ### Environment Configuration
 
-- **Development Port**: Each worktree has a unique port configuration in the git-ignored `.env` file (e.g., `PORT=49841`)
-- **Port Assignment**: Worktree setup automatically assigns ports to avoid conflicts between different feature branches
-- **Check Your Port**: Run `grep PORT .env` to see your current development server port
+- **Environment Setup**: Worktree setup uses `vercel env pull` to sync shared environment variables
 
 ### Agent Protocol Benefits
 
