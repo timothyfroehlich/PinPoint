@@ -1,6 +1,10 @@
 "use client";
 
-import { AccountCircle, Menu as MenuIcon } from "@mui/icons-material";
+import {
+  AccountCircle,
+  Menu as MenuIcon,
+  BugReport as BugReportIcon,
+} from "@mui/icons-material";
 import PlaceIcon from "@mui/icons-material/Place";
 import {
   AppBar,
@@ -96,6 +100,22 @@ const PrimaryAppBar = (): JSX.Element => {
               }}
             >
               Home
+            </Button>
+
+            {/* Report Issue - Available to everyone */}
+            <Button
+              color="inherit"
+              startIcon={<BugReportIcon />}
+              href="/issues/create"
+              sx={{
+                borderRadius: 2,
+                px: 3,
+                textTransform: "none",
+                fontWeight: "medium",
+                "&:hover": { bgcolor: "rgba(255,255,255,0.1)" },
+              }}
+            >
+              Report Issue
             </Button>
 
             {/* Authenticated navigation */}
@@ -248,6 +268,20 @@ const PrimaryAppBar = (): JSX.Element => {
                 }}
               >
                 Home
+              </Button>
+            </ListItem>
+            {/* Report Issue - Available to everyone */}
+            <ListItem>
+              <Button
+                fullWidth
+                startIcon={<BugReportIcon />}
+                sx={{ justifyContent: "flex-start" }}
+                onClick={() => {
+                  router.push("/issues/create");
+                  handleMobileDrawerToggle();
+                }}
+              >
+                Report Issue
               </Button>
             </ListItem>
             {session && hasPermission("issue:view") && (

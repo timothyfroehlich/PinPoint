@@ -214,7 +214,9 @@ export function IssueDetailView({
                   Created By
                 </Typography>
                 <Typography variant="body1" data-testid="issue-created-by">
-                  {currentIssue.createdBy.name}
+                  {currentIssue.createdBy?.name ??
+                    currentIssue.submitterName ??
+                    "Anonymous User"}
                 </Typography>
               </Box>
             </Paper>
