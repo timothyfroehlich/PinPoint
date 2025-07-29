@@ -8,8 +8,7 @@ if [[ "$1" == "--overwrite" ]]; then
 fi
 
 # Safety check: warn if running from main repository
-CURRENT_PATH=$(pwd)
-if ! npx tsx scripts/port-utils.ts check "$CURRENT_PATH" | grep -q "Is worktree: true"; then
+if [ "$(git rev-parse --git-dir)" = "$(git rev-parse --git-common-dir)" ]; then
     echo "⚠️  Warning: This script is designed for Git worktrees."
     echo "   You appear to be in the main repository."
     echo "   Running this may overwrite your .env.local and affect your main development setup."
@@ -48,24 +47,6 @@ fi
 echo "Pulling environment variables from Vercel..."
 vercel env pull .env
 
-# Configure unique ports for this worktree
-CURRENT_PATH=$(pwd)
-echo "Configuring ports for worktree: $CURRENT_PATH"
-
-# Use port utility to generate unique ports if this is a worktree
-if npx tsx scripts/port-utils.ts check "$CURRENT_PATH" | grep -q "Is worktree: true"; then
-    echo "Detected worktree environment - configuring unique ports..."
-
-    # Generate and append port configuration to .env (excluding DATABASE_URL)
-    echo "" >> .env
-    echo "# Worktree-specific port configuration (auto-generated)" >> .env
-    npx tsx scripts/port-utils.ts env-dev-only "$CURRENT_PATH" >> .env
-
-    echo "Port configuration added to .env"
-    npx tsx scripts/port-utils.ts check "$CURRENT_PATH"
-else
-    echo "Using default ports (not a worktree environment)"
-fi
 # Create symlink for .env.local (remove existing first)
 rm -f .env.local
 ln -sf .env .env.local
@@ -77,6 +58,15 @@ npm install
 echo "Setting up database schema..."
 if npm run db:push 2>/dev/null; then
     echo "Database schema synced successfully."
+    
+    # Generate Prisma client types
+    echo "Generating Prisma client types..."
+    if npx prisma generate 2>/dev/null; then
+        echo "Prisma client types generated successfully."
+    else
+        echo "Warning: Could not generate Prisma client types."
+        echo "Run 'npx prisma generate' manually if needed."
+    fi
 else
     echo "Warning: Could not sync database schema."
     echo "Check your database connection and run 'npm run db:push' manually."
