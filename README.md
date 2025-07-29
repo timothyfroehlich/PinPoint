@@ -1,183 +1,89 @@
-# Supabase CLI (v1)
+# PinPoint: Modern Issue Tracking for Arcades & Collectives
 
-[![Coverage Status](https://coveralls.io/repos/github/supabase/cli/badge.svg?branch=main)](https://coveralls.io/github/supabase/cli?branch=main) [![Bitbucket Pipelines](https://img.shields.io/bitbucket/pipelines/supabase-cli/setup-cli/master?style=flat-square&label=Bitbucket%20Canary)](https://bitbucket.org/supabase-cli/setup-cli/pipelines) [![Gitlab Pipeline Status](https://img.shields.io/gitlab/pipeline-status/sweatybridge%2Fsetup-cli?label=Gitlab%20Canary)
-](https://gitlab.com/sweatybridge/setup-cli/-/pipelines)
+[![CI](https://github.com/froeht/PinPoint/actions/workflows/ci.yml/badge.svg)](https://github.com/froeht/PinPoint/actions/workflows/ci.yml)
 
-[Supabase](https://supabase.io) is an open source Firebase alternative. We're building the features of Firebase using enterprise-grade open source tools.
+PinPoint is a full-stack, multi-tenant issue tracking system designed from the ground up to streamline pinball machine and arcade game maintenance. It provides a transparent, high-quality experience for both players and the internal teams responsible for keeping the games running perfectly.
 
-This repository contains all the functionality for Supabase CLI.
+## About The Project
 
-- [x] Running Supabase locally
-- [x] Managing database migrations
-- [x] Creating and deploying Supabase Functions
-- [x] Generating types directly from your database schema
-- [x] Making authenticated HTTP requests to [Management API](https://supabase.com/docs/reference/api/introduction)
+For many pinball collectives and arcade operators, tracking machine issues is a chaotic process involving text messages, Discord threads, and forgotten sticky notes. This disorganization leads to lost reports, delayed repairs, and frustrated players.
 
-## Getting started
+PinPoint solves this by providing a centralized, modern platform for the entire issue lifecycle. It empowers players to easily report problems while giving operators and technicians the tools they need to manage repairs efficiently, track machine history, and ultimately improve uptime. [1]
 
-### Install the CLI
+The system is architected as a multi-tenant SaaS platform, allowing multiple organizations to manage their game fleets in a secure and isolated environment. [1]
 
-Available via [NPM](https://www.npmjs.com) as dev dependency. To install:
+### Key Features
 
-```bash
-npm i supabase --save-dev
-```
+**For Players & Guests:**
 
-To install the beta release channel:
+- **Public Issue Dashboard:** See a list of all known issues at a location to avoid duplicate reports. [1]
+- **Game Status Pages:** Scan a QR code on any machine to view its current status and complete maintenance history. [1]
+- **Simple Issue Reporting:** Use a mobile-friendly form to quickly report problems, complete with photo uploads. [1]
+- **Optional Notifications:** Provide an email to receive a one-time notification when the issue you reported is resolved. [1]
 
-```bash
-npm i supabase@beta --save-dev
-```
+**For Operators & Technicians:**
 
-When installing with yarn 4, you need to disable experimental fetch with the following nodejs config.
+- **Secure, Role-Based Access:** Manage your organization with distinct permissions for `Admins` and `Members`. [1]
+- **Fleet Management:** Define game titles and manage every physical `Game Instance` across one or more `Locations`. [1]
+- **Internal Management Dashboard:** A private dashboard to view, filter, and manage all issues. Update status, severity, and assignees, and hold internal discussions with comments. [1]
+- **Complete Audit Trail:** Every issue features a time-stamped, immutable log of every action taken, providing full accountability. [1]
+- **Advanced Tools:** Merge duplicate issues into a single canonical report and allow registered users to "upvote" issues to help with prioritization. [1]
 
-```
-NODE_OPTIONS=--no-experimental-fetch yarn add supabase
-```
+### Built With
 
-> **Note**
-For Bun versions below v1.0.17, you must add `supabase` as a [trusted dependency](https://bun.sh/guides/install/trusted) before running `bun add -D supabase`.
+This project leverages a modern, type-safe, and performant technology stack to ensure a great developer and user experience. [1]
 
-<details>
-  <summary><b>macOS</b></summary>
+- **Framework:** [Next.js](https://nextjs.org/)
+- **Language:**([https://www.typescriptlang.org/](https://www.typescriptlang.org/))
+- **UI Library:**([https://react.dev/](https://react.dev/))
+- **Styling:**([https://tailwindcss.com/](https://tailwindcss.com/)) & [Material UI (MUI)](https://mui.com/)
+- **Database ORM:** [Prisma](https://www.prisma.io/)
+- **Database:**(<https://www.postgresql.org/>)
+- **Authentication:** [NextAuth.js](https://next-auth.js.org/)
 
-  Available via [Homebrew](https://brew.sh). To install:
+### 🚨 Active Migration
 
-  ```sh
-  brew install supabase/tap/supabase
-  ```
+PinPoint is currently undergoing a strategic migration to modernize its architecture:
 
-  To install the beta release channel:
-  
-  ```sh
-  brew install supabase/tap/supabase-beta
-  brew link --overwrite supabase-beta
-  ```
-  
-  To upgrade:
+- **Timeline:** 6-week staged migration (currently in Phase 1)
+- **From:** Prisma + NextAuth.js + Manual Security
+- **To:** [Drizzle ORM](https://orm.drizzle.team/) + [Supabase](https://supabase.com/) (Auth, Storage, RLS)
+- **Benefits:** Database-enforced security, 100x faster serverless performance, better developer experience
 
-  ```sh
-  brew upgrade supabase
-  ```
-</details>
+For details, see the [Migration Guide](./docs/migration/supabase-drizzle/).
 
-<details>
-  <summary><b>Windows</b></summary>
+## Development Prerequisites
 
-  Available via [Scoop](https://scoop.sh). To install:
+For the best development experience, install these tools globally:
 
-  ```powershell
-  scoop bucket add supabase https://github.com/supabase/scoop-bucket.git
-  scoop install supabase
-  ```
-
-  To upgrade:
-
-  ```powershell
-  scoop update supabase
-  ```
-</details>
-
-<details>
-  <summary><b>Linux</b></summary>
-
-  Available via [Homebrew](https://brew.sh) and Linux packages.
-
-  #### via Homebrew
-
-  To install:
-
-  ```sh
-  brew install supabase/tap/supabase
-  ```
-
-  To upgrade:
-
-  ```sh
-  brew upgrade supabase
-  ```
-
-  #### via Linux packages
-
-  Linux packages are provided in [Releases](https://github.com/supabase/cli/releases). To install, download the `.apk`/`.deb`/`.rpm`/`.pkg.tar.zst` file depending on your package manager and run the respective commands.
-
-  ```sh
-  sudo apk add --allow-untrusted <...>.apk
-  ```
-
-  ```sh
-  sudo dpkg -i <...>.deb
-  ```
-
-  ```sh
-  sudo rpm -i <...>.rpm
-  ```
-
-  ```sh
-  sudo pacman -U <...>.pkg.tar.zst
-  ```
-</details>
-
-<details>
-  <summary><b>Other Platforms</b></summary>
-
-  You can also install the CLI via [go modules](https://go.dev/ref/mod#go-install) without the help of package managers.
-
-  ```sh
-  go install github.com/supabase/cli@latest
-  ```
-
-  Add a symlink to the binary in `$PATH` for easier access:
-
-  ```sh
-  ln -s "$(go env GOPATH)/bin/cli" /usr/bin/supabase
-  ```
-
-  This works on other non-standard Linux distros.
-</details>
-
-<details>
-  <summary><b>Community Maintained Packages</b></summary>
-
-  Available via [pkgx](https://pkgx.sh/). Package script [here](https://github.com/pkgxdev/pantry/blob/main/projects/supabase.com/cli/package.yml).
-  To install in your working directory:
-
-  ```bash
-  pkgx install supabase
-  ```
-
-  Available via [Nixpkgs](https://nixos.org/). Package script [here](https://github.com/NixOS/nixpkgs/blob/master/pkgs/development/tools/supabase-cli/default.nix).
-</details>
-
-### Run the CLI
+- **[TypeScript](https://www.typescriptlang.org/)** - Enables `tsc` command and TypeScript CLI tools
+- **[Vercel CLI](https://vercel.com/cli)** - Essential for deployments and environment management (`vercel env pull`)
+- **[ESLint](https://eslint.org/)** - Code linting and quality checks across projects
+- **[Prettier](https://prettier.io/)** - Code formatting for consistent style
+- **[Vitest](https://vitest.dev/)** - Testing framework with global CLI access
 
 ```bash
-supabase bootstrap
+npm install -g typescript vercel eslint prettier vitest
 ```
 
-Or using npx:
+## Roadmap
 
-```bash
-npx supabase bootstrap
-```
+PinPoint is designed to evolve. Key features planned for future releases include:
 
-The bootstrap command will guide you through the process of setting up a Supabase project using one of the [starter](https://github.com/supabase-community/supabase-samples/blob/main/samples.json) templates.
+- **Interactive Kanban Board:** A visual, drag-and-drop interface for members to manage the issue workflow, allowing for rapid updates to status and assignees.
+- **Parts & Inventory Tracking (v2.0):** A comprehensive module to manage spare parts and supplies. This will allow organizations to track stock levels, associate part consumption with specific repairs, and analyze the true maintenance cost of each game.
 
-## Docs
+This roadmap ensures that PinPoint will grow from a powerful issue tracker into a complete operational management tool for any arcade or collective.
 
-Command & config reference can be found [here](https://supabase.com/docs/reference/cli/about).
+## Multi-Agent Development Workflow
 
-## Breaking changes
+PinPoint uses a coordinated multi-agent development approach for backend implementation tasks. Multiple Claude agents work in parallel using git worktrees to maximize development velocity while maintaining code quality.
 
-We follow semantic versioning for changes that directly impact CLI commands, flags, and configurations.
+**For developers working on backend tasks**: See `docs/backend_impl_tasks/MULTI_AGENT_WORKFLOW.md` for complete coordination guidelines, worktree setup, and synchronization procedures.
 
-However, due to dependencies on other service images, we cannot guarantee that schema migrations, seed.sql, and generated types will always work for the same CLI major version. If you need such guarantees, we encourage you to pin a specific version of CLI in package.json.
+Key features:
 
-## Developing
-
-To run from source:
-
-```sh
-# Go >= 1.22
-go run . help
-```
+- **Parallel Development**: Multiple agents work simultaneously on independent tasks
+- **Git Worktrees**: Isolated environments prevent conflicts between agents
+- **Dependency Management**: Clear coordination for sequential task dependencies
+- **Quality Standards**: All agents maintain strict TypeScript and testing requirements

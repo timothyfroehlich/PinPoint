@@ -6,9 +6,8 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("POSTGRES_URL_NON_POOLING") // Direct connection for migrations
-  directUrl = env("POSTGRES_URL_NON_POOLING") // Direct connection for migrations
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 // =================================
