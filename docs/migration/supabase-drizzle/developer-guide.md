@@ -176,6 +176,44 @@ This is much more secure because the database enforces isolation, not our applic
 
 ---
 
+## Environment Configuration Updates
+
+### New Environment Variables (Stage 0 Complete)
+
+As of PR #223, PinPoint has migrated from Vercel Postgres to Supabase PostgreSQL. This requires new environment variables:
+
+**Required Environment Variables:**
+
+```bash
+# Supabase Database Configuration
+POSTGRES_PRISMA_URL="postgresql://postgres.xxx:[password]@aws-0-us-west-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1"
+POSTGRES_URL_NON_POOLING="postgresql://postgres.xxx:[password]@aws-0-us-west-1.compute.amazonaws.com:5432/postgres"
+
+# Legacy variable no longer used
+# DATABASE_URL - REMOVED in Stage 0
+```
+
+**Environment Variable Usage:**
+
+- **POSTGRES_PRISMA_URL**: Pooled connection for Prisma Client (default for all queries)
+- **POSTGRES_URL_NON_POOLING**: Direct connection for migrations and transactions
+
+**Configuration Notes:**
+
+- Connection pooling is handled by Supabase's pgBouncer
+- Development and production use the same shared database during migration
+- Worktree environments sync variables via `vercel env pull`
+
+**Worktree Setup Enhancement:**
+
+The worktree setup script now includes automatic environment variable synchronization:
+
+```bash
+npm run setup:worktree  # Automatically runs vercel env pull
+```
+
+---
+
 ## The Three-Phase Migration Strategy
 
 ### Why Staged Migration?

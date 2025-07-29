@@ -10,6 +10,27 @@
 
 **Migration Hub**: `@docs/migration/supabase-drizzle/`
 
+### ⚠️ Supabase Configuration Notes
+
+**Performance Optimizations**: The following Supabase features are currently disabled in `supabase/config.toml` for development performance:
+
+- `db.migrations` - Disabled during development phase
+- `realtime` - Disabled for performance
+- `studio` - Disabled for performance
+
+**🔔 REMINDER**: Re-enable these features in `supabase/config.toml` when ready for beta:
+
+```toml
+[db.migrations]
+enabled = true  # Re-enable for production migrations
+
+[realtime]
+enabled = true  # Re-enable for real-time features
+
+[studio]
+enabled = true  # Re-enable for database management UI
+```
+
 ## Tech Stack (TRANSITIONING)
 
 ### Current Stack (Being Replaced)
@@ -281,6 +302,14 @@ Use memory to quickly recall:
 - **Feature Flags**: Use environment variables to toggle between implementations
 - **Incremental Updates**: Update one service/component at a time
 - **Test Both Paths**: Ensure tests cover both legacy and new code paths
+
+### PR Requirements During Migration
+
+- **Documentation Updates MANDATORY**: All PRs created during the Supabase + Drizzle + RLS migration MUST include documentation updates
+- **Update Migration Docs**: Changes must be reflected in `@docs/migration/supabase-drizzle/` documentation
+- **Environment Variable Changes**: Document any new or modified environment variables
+- **Pattern Updates**: Update quick reference guides for new patterns or deprecated approaches
+- **Migration Progress Tracking**: Update implementation status and lessons learned
 
 ### Code Patterns
 
