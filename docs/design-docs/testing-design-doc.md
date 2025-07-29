@@ -5,6 +5,33 @@ last-updated: 2025-01-14
 
 # Testing Design Document
 
+## 🚨 Critical Testing Gap: API Contract Validation
+
+**Problem Discovered:** July 29, 2025 - Issue list broke in production due to API contract changes not caught by tests.
+
+### Root Cause Analysis
+
+The `issue.core.getAll` endpoint was modified from `include` to `select` structure, removing the `_count` field that `IssueList.tsx` depends on. Tests passed because:
+
+1. **Mock Drift**: Component tests use manually maintained mocks in `mockUtils.ts` that didn't reflect API changes
+2. **No Real API Testing**: All tests mock either tRPC calls or Prisma queries - none execute real database queries
+3. **No Contract Validation**: No mechanism ensures API responses match TypeScript interfaces
+
+### Immediate Solutions Required
+
+1. **API Response Schema Validation Tests**: Tests that verify actual API responses match TypeScript interfaces
+2. **Schema-Driven Mock Generation**: Generate mocks from real Prisma queries, not manual maintenance
+3. **Selective Real DB Integration Tests**: Critical endpoints should test against real database
+4. **Mock Validation Pipeline**: CI checks to ensure mocks stay synchronized with real APIs
+
+### Process Improvements
+
+- **Scope Discipline**: Anonymous features should create new endpoints, not modify existing ones
+- **PR Review Checklist**: Flag any changes to existing tRPC endpoints for extra scrutiny
+- **Breaking Change Detection**: Automated detection when API response structure changes
+
+---
+
 **CURRENT PHASE: Unit Tests Only - Rapid Iteration Mode**
 
 This document outlines our testing strategy during the current rapid iteration phase. We are focusing exclusively on **unit tests** for business logic while deferring integration and end-to-end tests until the core functionality stabilizes.

@@ -512,7 +512,7 @@ npm run lint -- --no-fix src/path/to/file.ts
 npm run lint -- --rule "@typescript-eslint/no-explicit-any" --help
 
 # Check what rules are active
-npm run debug:lint
+npm run lint:verbose
 ```
 
 ## Prevention Strategies

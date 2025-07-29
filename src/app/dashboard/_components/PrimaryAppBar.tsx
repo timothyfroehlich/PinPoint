@@ -1,6 +1,10 @@
 "use client";
 
-import { AccountCircle, Menu as MenuIcon } from "@mui/icons-material";
+import {
+  AccountCircle,
+  Menu as MenuIcon,
+  BugReport as BugReportIcon,
+} from "@mui/icons-material";
 import PlaceIcon from "@mui/icons-material/Place";
 import {
   AppBar,
@@ -33,7 +37,10 @@ const PrimaryAppBar = (): JSX.Element => {
 
   // Responsive design: show mobile drawer for navigation on small screens
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+  // Fix hydration mismatch by using noSsr option
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"), {
+    noSsr: true, // Prevents server/client mismatch
+  });
 
   const handleLogin = (): void => {
     void signIn();
@@ -95,6 +102,22 @@ const PrimaryAppBar = (): JSX.Element => {
               Home
             </Button>
 
+            {/* Report Issue - Available to everyone */}
+            <Button
+              color="inherit"
+              startIcon={<BugReportIcon />}
+              href="/issues/create"
+              sx={{
+                borderRadius: 2,
+                px: 3,
+                textTransform: "none",
+                fontWeight: "medium",
+                "&:hover": { bgcolor: "rgba(255,255,255,0.1)" },
+              }}
+            >
+              Report Issue
+            </Button>
+
             {/* Authenticated navigation */}
             {session && (
               <>
@@ -135,6 +158,25 @@ const PrimaryAppBar = (): JSX.Element => {
                   tooltipText="View and manage games"
                 >
                   Games
+                </PermissionButton>
+                <PermissionButton
+                  permission="location:view"
+                  hasPermission={hasPermission}
+                  showWhenDenied={false}
+                  color="inherit"
+                  onClick={() => {
+                    router.push("/locations");
+                  }}
+                  sx={{
+                    borderRadius: 2,
+                    px: 3,
+                    textTransform: "none",
+                    fontWeight: "medium",
+                    "&:hover": { bgcolor: "rgba(255,255,255,0.1)" },
+                  }}
+                  tooltipText="View locations and their machines"
+                >
+                  Locations
                 </PermissionButton>
                 <PermissionButton
                   permission="organization:manage"
@@ -228,6 +270,20 @@ const PrimaryAppBar = (): JSX.Element => {
                 Home
               </Button>
             </ListItem>
+            {/* Report Issue - Available to everyone */}
+            <ListItem>
+              <Button
+                fullWidth
+                startIcon={<BugReportIcon />}
+                sx={{ justifyContent: "flex-start" }}
+                onClick={() => {
+                  router.push("/issues/create");
+                  handleMobileDrawerToggle();
+                }}
+              >
+                Report Issue
+              </Button>
+            </ListItem>
             {session && hasPermission("issue:view") && (
               <ListItem>
                 <Button
@@ -253,6 +309,20 @@ const PrimaryAppBar = (): JSX.Element => {
                   }}
                 >
                   Games
+                </Button>
+              </ListItem>
+            )}
+            {session && hasPermission("location:view") && (
+              <ListItem>
+                <Button
+                  fullWidth
+                  sx={{ justifyContent: "flex-start" }}
+                  onClick={() => {
+                    router.push("/locations");
+                    handleMobileDrawerToggle();
+                  }}
+                >
+                  Locations
                 </Button>
               </ListItem>
             )}
