@@ -1,6 +1,12 @@
-# Index of docs/planning/archive
+# Planning Archive
 
-This directory contains archived planning documents that are no longer current but are retained for historical context. These documents may reflect earlier feature specifications or project overviews that have since been superseded by updated plans and roadmaps. It is important to refer to the most recent documentation for current project details.
+Historical planning documents retained for context.
 
-- **[feature-spec.md](./feature-spec.md)**: This document represents early feature specifications for PinPoint, now superseded by the current roadmap. It details initial plans for OPDB and PinballMap integration, MVP features like multi-tenant backend architecture and user authentication, and core features for Version 1.0 such as advanced issue management and a full notification system. The document also outlines post-1.0 enhancements like full multi-tenancy and multi-location management.
-- **[overview.md](./overview.md)**: This document is an archived initial project overview, superseded by the current roadmap and backend implementation plan. It provides a high-level pitch for PinPoint, outlining its purpose as a modern issue-tracking system for pinball machine maintenance. The document describes features for both public users and internal teams, a basic architecture plan, estimated costs, and future expansion possibilities, serving as a historical record of the project's inception.
+## Status
+
+Superseded by current roadmap and implementation plans.
+
+## Contents
+
+- **[feature-spec.md](./feature-spec.md)** - Early feature specifications (pre-roadmap)
+- **[overview.md](./overview.md)** - Initial project pitch and architecture

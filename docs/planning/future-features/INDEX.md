@@ -1,7 +1,15 @@
-# Index of docs/planning/future-features
+# Future Features
 
-This directory contains draft proposals and ideas for future enhancements and features of the PinPoint application. These documents outline potential additions to the system, such as an enhanced permissions system or video upload capabilities, that are under consideration for post-V1.0 development. They provide a glimpse into the potential evolution of the platform.
+Post-v1.0 feature proposals and enhancements.
 
-- **[enhanced-permissions-system.md](./enhanced-permissions-system.md)**: This document is a draft proposal for a future enhancement to PinPoint's permission system, aiming for more granular control over user actions. It outlines core design principles like implicit ownership rights and explicit permissions for elevated actions, proposes a detailed permission structure, and defines default roles. The document also discusses an issue confirmation workflow and administrative interface requirements, providing a blueprint for a more flexible and secure access control system.
-- **[future-ideas.md](./future-ideas.md)**: This document serves as a quick capture of various ideas for future consideration within the PinPoint project. It includes potential enhancements to the permission system, such as location-scoped permissions and special permissions for machine owners, to allow for more granular control and encourage ownership. This document is a living collection of potential features to be explored and developed in later phases.
-- **[video-upload-strategy.md](./video-upload-strategy.md)**: This document outlines a research-backed strategy for implementing video uploads for issues in a cost-effective and user-friendly manner. It analyzes the trade-offs between simple storage solutions like Vercel Blob and full-featured Digital Asset Management platforms like Cloudinary, ultimately recommending a hybrid solution using Vercel Blob with client-side video processing via `ffmpeg.wasm`. This approach aims to minimize costs while providing a good user experience for video attachments.
+## Migration Context
+
+- Enhanced permissions will leverage RLS capabilities
+- Video uploads will use Supabase Storage instead of Vercel Blob
+- All features designed for multi-tenant architecture
+
+## Contents
+
+- **[enhanced-permissions-system.md](./enhanced-permissions-system.md)** - Granular permission control design
+- **[video-upload-strategy.md](./video-upload-strategy.md)** - Media attachment implementation plan
+- **[future-ideas.md](./future-ideas.md)** - Feature idea collection
