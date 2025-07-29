@@ -33,7 +33,10 @@ const PrimaryAppBar = (): JSX.Element => {
 
   // Responsive design: show mobile drawer for navigation on small screens
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+  // Fix hydration mismatch by using noSsr option
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"), {
+    noSsr: true, // Prevents server/client mismatch
+  });
 
   const handleLogin = (): void => {
     void signIn();

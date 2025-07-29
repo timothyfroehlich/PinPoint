@@ -18,7 +18,14 @@ export default function RootLayout({
       </head>
       <body>
         <InitColorSchemeScript attribute="data" />
-        <AppRouterCacheProvider options={{ enableCssLayer: true }}>
+        <AppRouterCacheProvider
+          options={{
+            key: "mui-app",
+            enableCssLayer: true,
+            prepend: true,
+            speedy: false,
+          }}
+        >
           <Providers>
             <AuthenticatedLayout>{children}</AuthenticatedLayout>
           </Providers>
