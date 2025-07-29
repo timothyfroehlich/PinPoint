@@ -1,6 +1,23 @@
-# Index of docs/security
+# Security Documentation
 
-This directory contains documentation outlining the security guidelines and best practices for the PinPoint application's API layer. It emphasizes a robust approach to authentication, authorization, and data protection, ensuring the integrity and confidentiality of user and organizational data.
+Security patterns and guidelines for PinPoint.
 
-- **[api-security.md](./api-security.md)**: Comprehensive guidelines for securing PinPoint's API, covering both tRPC procedures and limited HTTP API routes. Details core security principles, tRPC security levels (public, protected, organization procedures), input validation, error handling, permission system conventions, multi-tenancy security, and public endpoint security patterns. Includes comprehensive checklist for new procedures and features.
-- **[environment-specific-auth.md](./environment-specific-auth.md)**: **✅ MOVED FROM AUTHENTICATION** - Environment-aware authentication strategy with different providers and user seeding based on deployment environment. Covers development test accounts, OAuth validation, database seeding strategies, and security considerations across development, preview, and production environments.
+## Current Stack (Being Replaced)
+
+- Application-level multi-tenant filtering
+- Manual organizationId validation
+- Complex permission checks in code
+
+## Migration Target
+
+- Database-level Row Level Security (RLS)
+- Automatic tenant isolation via PostgreSQL
+- JWT-based permission claims
+
+## Contents
+
+- **[api-security.md](./api-security.md)** - API security guidelines and tRPC patterns
+- **[environment-specific-auth.md](./environment-specific-auth.md)** - Environment-based auth strategies
+- **[audit-findings.md](./audit-findings.md)** - Security audit results and mitigations
+- **[system-audit.md](./system-audit.md)** - Complete system security assessment
+- **[RLS Testing](../developer-guides/row-level-security/testing-patterns.md)** - Security validation patterns

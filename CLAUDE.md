@@ -1,13 +1,44 @@
 # PinPoint Development Instructions
 
-## Tech Stack
+## 🚨 ACTIVE MIGRATION: Supabase + Drizzle + RLS
+
+**Status**: IN PROGRESS - 6-week staged migration underway
+
+- **Stage 1** (Weeks 1-2): Supabase Auth integration
+- **Stage 2** (Weeks 3-4): Drizzle ORM migration
+- **Stage 3** (Weeks 5-6): Row Level Security activation
+
+**Migration Hub**: `@docs/migration/supabase-drizzle/`
+
+## Tech Stack (TRANSITIONING)
+
+### Current Stack (Being Replaced)
+
+- **Database**: PostgreSQL + Prisma ORM → **Drizzle ORM**
+- **Authentication**: NextAuth.js → **Supabase Auth**
+- **Authorization**: App-level checks → **Row Level Security**
+- **File Storage**: Local/Vercel Blob → **Supabase Storage**
+
+### Stable Stack (Unchanged)
 
 - **Framework**: Next.js + React + TypeScript
-- **Database**: PostgreSQL + Prisma ORM
-- **Authentication**: NextAuth.js (Auth.js v5)
 - **UI**: Material UI (MUI)
 - **API**: tRPC (exclusive - no custom API routes)
-- **Deployment**: Vercel
+- **Deployment**: Vercel (with Supabase cloud services)
+
+## Migration Resources
+
+### Quick References
+
+- **Auth Pattern Mapping**: `@docs/migration/supabase-drizzle/quick-reference/auth-patterns.md`
+- **Prisma → Drizzle**: `@docs/migration/supabase-drizzle/quick-reference/prisma-to-drizzle.md`
+- **Migration Guide**: `@docs/migration/supabase-drizzle/developer-guide.md`
+
+### Technology Guides
+
+- **Supabase Auth**: `@docs/developer-guides/supabase/`
+- **Drizzle ORM**: `@docs/developer-guides/drizzle/`
+- **Row Level Security**: `@docs/developer-guides/row-level-security/`
 
 ## Core Architecture
 
@@ -182,7 +213,7 @@ npm run pre-commit
 - **TypeScript First**: Strict typing, no unsafe operations
 - **Optimistic UI**: Immediate updates, background API calls, revert on failure
 - **Future-Ready**: Design for Kanban board (post-1.0) and inventory (v2.0)
-- **Testing**: Unit tests with mocked dependencies only - database tests require exceptional justification
+- **Testing**: ~~Unit tests with mocked dependencies only~~ → **Integration-first with transactions**
 
 ## MCP Tools Available
 
@@ -215,22 +246,27 @@ Use memory to quickly recall:
 - tRPC router patterns and security
 - Multi-tenant query patterns
 
-## Developer Guides
+## Documentation Hub
 
-For detailed guidance beyond these essentials:
+### All Documentation Indices
 
-- **TypeScript Standards**:
-  - `docs/developer-guides/typescript-guide.md` - Comprehensive TypeScript setup, error resolution, and migration patterns
-  - `docs/developer-guides/typescript-base-standards.md` - Foundation patterns for all code and test utilities
-  - `docs/developer-guides/typescript-strictest-production.md` - Production-specific strictest patterns
-- **Testing Patterns**: See `docs/testing/vitest-best-practices.md` for Vitest patterns and performance data
-- **Configuration**: `docs/configuration/multi-config-strategy.md` - Multi-tier configuration system guide
-- **Architecture**:
-  - `docs/architecture/dependency-injection.md` - DI patterns and testing
-  - `docs/architecture/permissions-roles-implementation.md` - Complete RBAC implementation guide
-  - `docs/architecture/current-state.md` - Current implementation state and multi-tenant architecture
-- **ESLint Errors**: See `docs/developer-guides/common-errors.md` for specific rule violations and fixes
-- **Script Usage**: See `scripts/README.md` for TypeScript analysis tools
+- `@docs/architecture/INDEX.md` - System design and patterns
+- `@docs/developer-guides/INDEX.md` - Technology-specific guides
+- `@docs/testing/INDEX.md` - Testing philosophy and patterns
+- `@docs/migration/INDEX.md` - Active migrations
+- `@docs/planning/INDEX.md` - Roadmap and features
+- `@docs/security/INDEX.md` - Security patterns
+- `@docs/deployment/INDEX.md` - Environment management
+- `@docs/design-docs/INDEX.md` - Design documentation
+- `@docs/lessons-learned/INDEX.md` - Counter-intuitive insights
+- `@docs/orchestrator-system/INDEX.md` - Multi-agent workflow
+
+### Migration-Specific Guides
+
+- **Supabase + Drizzle Migration**: `@docs/migration/supabase-drizzle/`
+- **TypeScript Standards**: `@docs/developer-guides/typescript-guide.md`
+- **Testing Philosophy**: `@docs/testing/` (rewritten for integration-first)
+- **Security**: `@docs/developer-guides/row-level-security/`
 
 ## Repository
 
@@ -239,16 +275,47 @@ For detailed guidance beyond these essentials:
 - **Design Docs**: Available in Notion workspace (`/PinPoint/`)
 - **Protected Main**: Never commit to main, all changes require PRs.
 
+## Migration Best Practices
+
+### During Migration
+
+- **Parallel Development**: Both old and new patterns coexist temporarily
+- **Feature Flags**: Use environment variables to toggle between implementations
+- **Incremental Updates**: Update one service/component at a time
+- **Test Both Paths**: Ensure tests cover both legacy and new code paths
+
+### Code Patterns
+
+```typescript
+// Temporary dual support example
+const user = process.env.USE_SUPABASE_AUTH
+  ? await getSupabaseUser()
+  : await getNextAuthUser();
+```
+
+### Database Commands (Migration Period)
+
+```bash
+# Prisma (current)
+npm run db:push         # Schema sync
+npm run db:reset        # Full reset
+
+# Drizzle (migration target)
+npm run drizzle:push    # Coming in Stage 2
+npm run drizzle:migrate # Coming in Stage 2
+```
+
 ## Critical Notes
 
-- Database strategy in development: shared database across all worktrees, sessions clear on `db:reset`
+- **Active Migration**: Supabase + Drizzle + RLS migration in progress
+- Database strategy: Shared dev database, frequent resets during migration
+- **Testing Evolution**: Moving from mock-heavy to transaction-based integration tests
+- **Security Evolution**: App-level → Database-level (RLS) enforcement
 - Pre-production: frequent schema changes, no migrations
 - OPDB games: global (no organizationId), custom games: organization-scoped
-- **ESM modules**: Project uses `"type": "module"` with native ESM support - Vitest handles this seamlessly
-- **Type Safety**: Project enforces strictest TypeScript + type-aware ESLint rules. All `@typescript-eslint/no-unsafe-*` and `no-explicit-any` violations must be fixed
-- **TypeScript Migration**: ✅ Production code is 100% strict mode compliant! Test files being cleaned up incrementally
-- **Testing Framework**: ✅ Vitest exclusively - Jest migration completed with 7-65x performance improvements
-- **Migration Patterns**: Complete TypeScript migration patterns in `docs/developer-guides/typescript-guide.md`
+- **ESM modules**: Native ESM support throughout
+- **Type Safety**: 100% strictest TypeScript in production code
+- **Testing Framework**: Vitest with 7-65x performance over Jest
 
 ## Frontend Development Notes
 
