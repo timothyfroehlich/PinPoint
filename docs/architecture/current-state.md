@@ -11,6 +11,14 @@ This document describes the current implementation state of the PinPoint archite
 
 PinPoint is a multi-tenant issue tracking system for pinball arcade operators, built with modern TypeScript technologies and deployed on Vercel. The system provides comprehensive machine management, issue tracking, and team collaboration features with strict data isolation between organizations.
 
+> ⚠️ **MIGRATION IN PROGRESS**: PinPoint is actively migrating from Prisma + NextAuth to Supabase + Drizzle with database-level Row Level Security.
+>
+> - **Current Stack**: Prisma ORM + NextAuth.js + Application-level security
+> - **Target Stack**: Drizzle ORM + Supabase (Auth, Storage, RLS) + Database-level security
+> - **Timeline**: 6-week staged migration (Phase 1 in progress)
+>
+> For migration details, see [Migration Guide](/docs/migration/supabase-drizzle/)
+
 ## Technology Stack (As Implemented)
 
 | Component          | Technology                                | Status         |
