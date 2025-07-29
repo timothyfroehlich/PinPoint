@@ -54,6 +54,19 @@ ln -sf .env .env.local
 # Install and setup
 npm install
 
+# Initialize Supabase configuration
+echo "Initializing Supabase configuration..."
+if command -v supabase &> /dev/null; then
+    if [ ! -f "supabase/config.toml" ]; then
+        npx supabase init --create-project false
+        echo "Supabase initialized for worktree."
+    else
+        echo "Supabase already initialized (config.toml exists)."
+    fi
+else
+    echo "Warning: Supabase CLI not found. Install with 'npm install -g supabase' if needed."
+fi
+
 # Set up database schema (using shared online database)
 echo "Setting up database schema..."
 if npm run db:push 2>/dev/null; then
