@@ -94,7 +94,7 @@ export function createAuthProviders(db: ExtendedPrismaClient): Provider[] {
 
   const providers: Provider[] = [];
 
-  // Google OAuth is available in all environments
+  // OAuth providers are available in all environments
   providers.push(createGoogleProvider());
 
   // Credentials provider only in development/preview/test
