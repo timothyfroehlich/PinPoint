@@ -10,11 +10,13 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
 
-import type { Session } from "next-auth";
 import type { ExtendedPrismaClient } from "~/server/db";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseUser } from "../../../lib/supabase/types";
 
+import { createClient } from "../../../lib/supabase/server";
 import { env } from "~/env";
-import { auth } from "~/server/auth";
+import { getSupabaseUser } from "~/server/auth/supabase";
 import { getUserPermissionsForSession } from "~/server/auth/permissions";
 import { getGlobalDatabaseProvider } from "~/server/db/provider";
 import { ServiceFactory } from "~/server/services/factory";
