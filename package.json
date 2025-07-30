@@ -94,6 +94,8 @@
     "@mui/material-nextjs": "^7.2.0",
     "@prisma/client": "^6.12.0",
     "@prisma/extension-accelerate": "^2.0.2",
+    "@supabase/ssr": "^0.6.1",
+    "@supabase/supabase-js": "^2.53.0",
     "@t3-oss/env-nextjs": "^0.13.8",
     "@tanstack/react-query": "^5.83.0",
     "@trpc/client": "^11.0.0",

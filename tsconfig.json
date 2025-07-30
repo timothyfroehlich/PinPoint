@@ -16,6 +16,8 @@
   "include": [
     "src/**/*.ts",
     "src/**/*.tsx",
+    "lib/**/*.ts",
+    "lib/**/*.tsx",
     ".next/types/**/*.ts",
     "middleware.ts",
     "prisma/**/*.ts"

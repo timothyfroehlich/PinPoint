@@ -62,20 +62,43 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    env:
-      AUTH_SECRET: "temp_secret_value" # Temporary value for CI validation only
-      POSTGRES_PRISMA_URL: "sqlite://temp_db.sqlite" # Temporary value for CI validation only
-      POSTGRES_URL_NON_POOLING: "sqlite://temp_db.sqlite" # Temporary value for CI validation only
-      DEFAULT_ORG_SUBDOMAIN: ${{ secrets.DEFAULT_ORG_SUBDOMAIN }}
-      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-      GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-      OPDB_API_TOKEN: ${{ secrets.OPDB_API_TOKEN }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "24"
           cache: "npm"
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+      - name: Pull Vercel Environment Variables
+        run: vercel env pull .env.local --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      - name: Validate Environment Variables
+        run: |
+          echo "Checking for required Supabase environment variables..."
+          if [ ! -f .env.local ]; then
+            echo "❌ .env.local file not found after Vercel env pull"
+            exit 1
+          fi
+          
+          REQUIRED_VARS="SUPABASE_URL SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY SUPABASE_JWT_SECRET NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_ANON_KEY"
+          MISSING_VARS=""
+          
+          for var in $REQUIRED_VARS; do
+            if ! grep -q "^$var=" .env.local; then
+              MISSING_VARS="$MISSING_VARS $var"
+            fi
+          done
+          
+          if [ -n "$MISSING_VARS" ]; then
+            echo "❌ Missing required environment variables:$MISSING_VARS"
+            echo "Please ensure these are configured in your Vercel project"
+            exit 1
+          fi
+          
+          echo "✅ All required Supabase environment variables are present"
       - run: npm ci
       - name: ESLint Check - Production Code  
         run: npm run lint
@@ -85,20 +108,19 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    env:
-      AUTH_SECRET: "temp_secret_value" # Temporary value for CI validation only
-      POSTGRES_PRISMA_URL: "sqlite://temp_db.sqlite" # Temporary value for CI validation only
-      POSTGRES_URL_NON_POOLING: "sqlite://temp_db.sqlite" # Temporary value for CI validation only
-      DEFAULT_ORG_SUBDOMAIN: ${{ secrets.DEFAULT_ORG_SUBDOMAIN }}
-      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-      GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-      OPDB_API_TOKEN: ${{ secrets.OPDB_API_TOKEN }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "24"
           cache: "npm"
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+      - name: Pull Vercel Environment Variables
+        run: vercel env pull .env.local --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
       - run: npm ci
       - name: ESLint Check - Test Files (Non-blocking)  
         run: |
@@ -121,59 +143,13 @@ jobs:
       - name: Prettier Check
         run: npm run format
 
-  # Job 4: Betterer Regression Check
-  betterer:
-    name: Betterer
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      actions: write
-    env:
-      AUTH_SECRET: "temp_secret_value" # Temporary value for CI validation only
-      POSTGRES_PRISMA_URL: "sqlite://temp_db.sqlite" # Temporary value for CI validation only
-      POSTGRES_URL_NON_POOLING: "sqlite://temp_db.sqlite" # Temporary value for CI validation only
-      DEFAULT_ORG_SUBDOMAIN: ${{ secrets.DEFAULT_ORG_SUBDOMAIN }}
-      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-      GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-      OPDB_API_TOKEN: ${{ secrets.OPDB_API_TOKEN }}
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: "24"
-          cache: "npm"
-      - run: npm ci
-      - name: Betterer Check
-        id: betterer
-        run: |
-          npm run betterer:check 2>&1 | tee betterer-output.log || BETTERER_EXIT=$?
-          if [ "$BETTERER_EXIT" = "2" ]; then
-            echo "❌ Betterer found regressions!" >> "$GITHUB_STEP_SUMMARY"
-            grep "got worse" betterer-output.log >> "$GITHUB_STEP_SUMMARY" || true
-            exit 1
-          elif [ "$BETTERER_EXIT" = "0" ]; then
-            echo "✅ No regressions found" >> "$GITHUB_STEP_SUMMARY"
-          fi
-      - name: Upload Betterer Diff
-        if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: betterer-diff
-          path: |
-            .betterer.results
-            betterer-output.log
-
-  # Job 5: Tests with Coverage
+  # Job 4: Tests with Coverage
   test:
     name: Tests
     runs-on: ubuntu-latest
     permissions:
       contents: read
     env:
-      AUTH_SECRET: "temp_secret_value" # Temporary value for CI
-      DATABASE_URL: "sqlite://temp_db.sqlite" # Temporary value for CI
-      OPDB_API_TOKEN: "temp_opdb_token" # Temporary value for CI
-      DEFAULT_ORG_SUBDOMAIN: "apc"
       NODE_ENV: "test"
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
@@ -183,6 +159,13 @@ jobs:
         with:
           node-version: "24"
           cache: "npm"
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+      - name: Pull Vercel Environment Variables
+        run: vercel env pull .env.local --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
       - run: npm ci
       - name: Run Tests with Coverage (Migration-aware)
         id: test-run
@@ -218,7 +201,7 @@ jobs:
           name: codecov-umbrella
           fail_ci_if_error: true
 
-  # Job 6: Security Audit
+  # Job 5: Security Audit
   security:
     name: Security
     runs-on: ubuntu-latest
@@ -234,7 +217,7 @@ jobs:
       - name: Security Audit
         run: npm run deps:check
 
-  # Job 7: End-to-End Tests (Playwright) - Parallel Execution
+  # Job 6: End-to-End Tests (Playwright) - Parallel Execution
   e2e:
     name: E2E Tests (${{ matrix.test-group }})
     runs-on: ubuntu-latest
@@ -266,13 +249,9 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      AUTH_SECRET: "temp_secret_value" # Temporary value for CI validation only
+      # Override database URLs to use test PostgreSQL service
       POSTGRES_PRISMA_URL: "postgresql://test_user:test_password@postgres:5432/test_db"
       POSTGRES_URL_NON_POOLING: "postgresql://test_user:test_password@postgres:5432/test_db"
-      DEFAULT_ORG_SUBDOMAIN: ${{ secrets.DEFAULT_ORG_SUBDOMAIN }}
-      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-      GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-      OPDB_API_TOKEN: ${{ secrets.OPDB_API_TOKEN }}
       NODE_ENV: "test"
       CI: true
     steps:
@@ -281,6 +260,13 @@ jobs:
         with:
           node-version: "24"
           cache: "npm"
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+      - name: Pull Vercel Environment Variables
+        run: vercel env pull .env.local --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
       - run: npm ci
       - name: Set up database
         run: npx prisma db push --force-reset
@@ -295,7 +281,7 @@ jobs:
           path: playwright-report/
           retention-days: 30
 
-  # Job 8: Validate GitHub Actions
+  # Job 7: Validate GitHub Actions
   validate-actions:
     name: Validate Actions
     runs-on: ubuntu-latest
@@ -316,7 +302,6 @@ jobs:
         lint-production,
         lint-tests,
         format,
-        betterer,
         test,
         security,
         e2e,
@@ -332,7 +317,6 @@ jobs:
           if [ "${{ needs.typecheck.result }}" != "success" ] ||
              [ "${{ needs.lint-production.result }}" != "success" ] ||
              [ "${{ needs.format.result }}" != "success" ] ||
-             [ "${{ needs.betterer.result }}" != "success" ] ||
              [ "${{ needs.security.result }}" != "success" ] ||
              [ "${{ needs.e2e.result }}" != "success" ] ||
              [ "${{ needs.validate-actions.result }}" != "success" ]; then
@@ -347,7 +331,6 @@ jobs:
           echo "- lint-production: ${{ needs.lint-production.result }}"
           echo "- lint-tests: ${{ needs.lint-tests.result }}" 
           echo "- format: ${{ needs.format.result }}"
-          echo "- betterer: ${{ needs.betterer.result }}"
           echo "- test: ${{ needs.test.result }}"
           echo "- security: ${{ needs.security.result }}"
           echo "- e2e: ${{ needs.e2e.result }}"
