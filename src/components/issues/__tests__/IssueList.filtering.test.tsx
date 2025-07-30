@@ -8,6 +8,7 @@ import { IssueList } from "../IssueList";
 import {
   createMockIssuesList,
   createMockLocations,
+  createMockMachines,
   createMockStatuses,
   createMockTRPCQueryResult,
 } from "~/test/mockUtils";
@@ -146,83 +147,17 @@ describe("IssueList - Filtering Functionality", () => {
       refetch: mockRefetch,
     });
 
-    mockLocationsQuery.mockReturnValue({
-      data: mockLocations,
-    });
+    mockLocationsQuery.mockReturnValue(
+      createMockTRPCQueryResult(mockLocations),
+    );
 
-    mockStatusesQuery.mockReturnValue({
-      data: mockStatuses,
-    });
+    mockStatusesQuery.mockReturnValue(createMockTRPCQueryResult(mockStatuses));
 
-    mockMachinesQuery.mockReturnValue({
-      data: [
-        {
-          id: "machine-1",
-          name: "Medieval Madness #1",
-          organizationId: "org-1",
-          modelId: "model-mm",
-          locationId: "location-1",
-          ownerId: null,
-          model: {
-            id: "model-mm",
-            name: "Medieval Madness",
-            manufacturer: "Williams",
-            year: 1997,
-          },
-          location: {
-            id: "location-1",
-            name: "Main Floor",
-            organizationId: "org-1",
-          },
-        },
-        {
-          id: "machine-3",
-          name: "Attack from Mars #1",
-          organizationId: "org-1",
-          modelId: "model-afm",
-          locationId: "location-1",
-          ownerId: null,
-          model: {
-            id: "model-afm",
-            name: "Attack from Mars",
-            manufacturer: "Bally",
-            year: 1995,
-          },
-          location: {
-            id: "location-1",
-            name: "Main Floor",
-            organizationId: "org-1",
-          },
-        },
-        {
-          id: "machine-5",
-          name: "Tales of Arabian Nights #1",
-          organizationId: "org-1",
-          modelId: "model-totan",
-          locationId: "location-2",
-          ownerId: null,
-          model: {
-            id: "model-totan",
-            name: "Tales of Arabian Nights",
-            manufacturer: "Williams",
-            year: 1996,
-          },
-          location: {
-            id: "location-2",
-            name: "Back Room",
-            organizationId: "org-1",
-          },
-        },
-      ],
-      isLoading: false,
-      isError: false,
-    });
+    mockMachinesQuery.mockReturnValue(
+      createMockTRPCQueryResult(createMockMachines({ count: 3 })),
+    );
 
-    mockUsersQuery.mockReturnValue({
-      data: [],
-      isLoading: false,
-      isError: false,
-    });
+    mockUsersQuery.mockReturnValue(createMockTRPCQueryResult([]));
 
     mockHasPermission.mockReturnValue(true);
   });
