@@ -3,12 +3,9 @@ import {
   isPinPointSupabaseUser,
   isPinPointSupabaseSession,
   isValidOrganizationContext,
-  isAuthenticationState,
   type PinPointSupabaseUser,
   type PinPointSupabaseSession,
   type OrganizationContext,
-  type AuthenticationState,
-  type PinPointSession,
 } from "../types";
 
 describe("Type Guards", () => {
@@ -151,89 +148,6 @@ describe("Type Guards", () => {
       };
 
       expect(isValidOrganizationContext(context)).toBe(false);
-    });
-  });
-
-  describe("isAuthenticationState", () => {
-    it("should return true for authenticated state", () => {
-      const session: PinPointSession = {
-        user: {
-          id: "user-123",
-          email: "test@example.com",
-          name: "Test User",
-        },
-        organizationId: "org-123",
-        role: "admin",
-        expires: new Date(Date.now() + 3600000).toISOString(),
-      };
-
-      const state: AuthenticationState = {
-        type: "authenticated",
-        session,
-      };
-
-      expect(isAuthenticationState(state)).toBe(true);
-    });
-
-    it("should return true for anonymous state", () => {
-      const state: AuthenticationState = {
-        type: "anonymous",
-        session: null,
-      };
-
-      expect(isAuthenticationState(state)).toBe(true);
-    });
-
-    it("should return true for expired state", () => {
-      const state: AuthenticationState = {
-        type: "expired",
-        session: null,
-      };
-
-      expect(isAuthenticationState(state)).toBe(true);
-    });
-
-    it("should return true for loading state", () => {
-      const state: AuthenticationState = {
-        type: "loading",
-        session: null,
-      };
-
-      expect(isAuthenticationState(state)).toBe(true);
-    });
-
-    it("should return false for null state", () => {
-      expect(isAuthenticationState(null)).toBe(false);
-    });
-
-    it("should return false for undefined state", () => {
-      expect(isAuthenticationState(undefined)).toBe(false);
-    });
-
-    it("should return false for state without type", () => {
-      const state = {
-        session: null,
-      };
-
-      expect(isAuthenticationState(state)).toBe(false);
-    });
-
-    it("should return false for invalid type", () => {
-      const state = {
-        type: "invalid",
-        session: null,
-      };
-
-      expect(isAuthenticationState(state)).toBe(false);
-    });
-
-    it("should return false for authenticated state with null session", () => {
-      const state = {
-        type: "authenticated",
-        session: null,
-      };
-
-      expect(isAuthenticationState(state)).toBe(false);
     });
   });
 });
