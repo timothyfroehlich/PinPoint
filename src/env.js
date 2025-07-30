@@ -51,6 +51,13 @@ export const env = createEnv({
     // Additional environment variables that were accessed directly via process.env
     VERCEL_URL: z.string().optional(),
     PORT: z.string().optional(),
+    // Supabase Authentication Configuration
+    SUPABASE_URL: z.string().url("Supabase URL must be a valid URL"),
+    SUPABASE_ANON_KEY: z.string().min(1, "Supabase anon key is required"),
+    SUPABASE_SERVICE_ROLE_KEY: z
+      .string()
+      .min(1, "Supabase service role key is required"),
+    SUPABASE_JWT_SECRET: z.string().min(1, "Supabase JWT secret is required"),
     // Future API keys mentioned in the issue (optional for now)
     PINBALL_MAP_API_KEY: z.string().optional(),
     OPDB_API_KEY: z.string().optional(),
@@ -70,6 +77,13 @@ export const env = createEnv({
    * `NEXT_PUBLIC_`.
    */
   client: {
+    // Supabase Public Configuration
+    NEXT_PUBLIC_SUPABASE_URL: z
+      .string()
+      .url("Public Supabase URL must be valid"),
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: z
+      .string()
+      .min(1, "Public anon key is required"),
     // Next.js automatically exposes NODE_ENV to the client, no need to manually expose it
   },
 
@@ -96,6 +110,13 @@ export const env = createEnv({
     SEED_ADMIN_NAME: process.env["SEED_ADMIN_NAME"],
     VERCEL_ENV: process.env["VERCEL_ENV"],
     FORCE_PREVIEW_BEHAVIOR: process.env["FORCE_PREVIEW_BEHAVIOR"],
+    // Supabase Configuration
+    SUPABASE_URL: process.env["SUPABASE_URL"],
+    SUPABASE_ANON_KEY: process.env["SUPABASE_ANON_KEY"],
+    SUPABASE_SERVICE_ROLE_KEY: process.env["SUPABASE_SERVICE_ROLE_KEY"],
+    SUPABASE_JWT_SECRET: process.env["SUPABASE_JWT_SECRET"],
+    NEXT_PUBLIC_SUPABASE_URL: process.env["NEXT_PUBLIC_SUPABASE_URL"],
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env["NEXT_PUBLIC_SUPABASE_ANON_KEY"],
     // Next.js automatically exposes NODE_ENV to the client
   },
   /**
