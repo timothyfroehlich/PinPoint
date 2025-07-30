@@ -9,6 +9,7 @@ import {
   createMockIssuesList,
   createMockLocations,
   createMockStatuses,
+  createMockTRPCQueryResult,
 } from "~/test/mockUtils";
 import {
   VitestTestWrapper,
@@ -153,13 +154,13 @@ describe("IssueList - Integration Tests with tRPC APIs", () => {
       refetch: mockRefetch,
     });
 
-    mockLocationsQuery.mockReturnValue({
-      data: mockLocationsData,
-    });
+    mockLocationsQuery.mockReturnValue(
+      createMockTRPCQueryResult(mockLocationsData),
+    );
 
-    mockStatusesQuery.mockReturnValue({
-      data: mockStatusesData,
-    });
+    mockStatusesQuery.mockReturnValue(
+      createMockTRPCQueryResult(mockStatusesData),
+    );
 
     mockMachinesQuery.mockReturnValue({
       data: [
@@ -581,16 +582,16 @@ describe("IssueList - Integration Tests with tRPC APIs", () => {
         refetch: mockRefetch,
       });
 
-      mockLocationsQuery.mockReturnValue({
-        data: undefined,
-        isLoading: false,
-        isError: true,
-        error: new Error("Location service unavailable"),
-      });
+      mockLocationsQuery.mockReturnValue(
+        createMockTRPCQueryResult(undefined, {
+          isError: true,
+          error: new Error("Location service unavailable"),
+        }),
+      );
 
-      mockStatusesQuery.mockReturnValue({
-        data: mockStatusesData,
-      });
+      mockStatusesQuery.mockReturnValue(
+        createMockTRPCQueryResult(mockStatusesData),
+      );
 
       render(
         <VitestTestWrapper
