@@ -147,6 +147,8 @@ import { createAuthProviders } from "~/server/auth/providers";
 ```env
 GOOGLE_CLIENT_ID=your_google_client_id
 GOOGLE_CLIENT_SECRET=your_google_client_secret
+GITHUB_CLIENT_ID=your_github_client_id
+GITHUB_CLIENT_SECRET=your_github_client_secret
 AUTH_SECRET=your_nextauth_secret
 ```
 
@@ -156,6 +158,8 @@ AUTH_SECRET=your_nextauth_secret
 # OAuth (optional in development)
 GOOGLE_CLIENT_ID=optional_dev_client_id
 GOOGLE_CLIENT_SECRET=optional_dev_client_secret
+GITHUB_CLIENT_ID=optional_dev_client_id
+GITHUB_CLIENT_SECRET=optional_dev_client_secret
 
 # NextAuth
 AUTH_SECRET=dev_secret
@@ -245,7 +249,7 @@ npm run db:reset && npm run db:seed
 
 ### Potential Improvements
 
-1. **Additional OAuth providers**: Microsoft, GitHub, etc.
+1. **Additional OAuth providers**: Microsoft, Apple, etc.
 2. **Environment-specific UI**: Different branding per environment
 3. **Advanced test data**: More sophisticated test scenarios
 4. **Automated validation**: CI/CD environment validation
