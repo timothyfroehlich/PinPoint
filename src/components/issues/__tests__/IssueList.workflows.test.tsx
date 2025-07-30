@@ -9,6 +9,7 @@ import {
   createMockIssuesList,
   createMockLocations,
   createMockStatuses,
+  createMockTRPCQueryResult,
   createMockUsers,
   EXTENDED_PERMISSION_SCENARIOS,
 } from "~/test/mockUtils";
@@ -229,13 +230,11 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
       refetch: mockRefetch,
     });
 
-    mockLocationsQuery.mockReturnValue({
-      data: mockLocations,
-    });
+    mockLocationsQuery.mockReturnValue(
+      createMockTRPCQueryResult(mockLocations),
+    );
 
-    mockStatusesQuery.mockReturnValue({
-      data: mockStatuses,
-    });
+    mockStatusesQuery.mockReturnValue(createMockTRPCQueryResult(mockStatuses));
 
     mockMachinesQuery.mockReturnValue({
       data: [
@@ -997,12 +996,12 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
         refetch: mockRefetch,
       });
 
-      mockLocationsQuery.mockReturnValue({
-        data: undefined,
-        isLoading: false,
-        isError: true,
-        error: new Error("Location service temporarily unavailable"),
-      });
+      mockLocationsQuery.mockReturnValue(
+        createMockTRPCQueryResult(undefined, {
+          isError: true,
+          error: new Error("Location service temporarily unavailable"),
+        }),
+      );
 
       render(
         <VitestTestWrapper
