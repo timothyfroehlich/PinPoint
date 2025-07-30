@@ -3,6 +3,7 @@ import { organizationRouter } from "./routers/organization";
 import { adminRouter } from "~/server/api/routers/admin";
 import { collectionRouter } from "~/server/api/routers/collection";
 import { commentRouter } from "~/server/api/routers/comment";
+import { invitationRouter } from "~/server/api/routers/invitation";
 import { issueRouter } from "~/server/api/routers/issue";
 import { issueStatusRouter } from "~/server/api/routers/issueStatus";
 import { locationRouter } from "~/server/api/routers/location";
@@ -23,6 +24,7 @@ export const appRouter = createTRPCRouter({
   admin: adminRouter,
   collection: collectionRouter,
   comment: commentRouter,
+  invitation: invitationRouter,
   model: modelRouter,
   location: locationRouter,
   machine: machineRouter,

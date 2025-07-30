@@ -21,6 +21,8 @@ declare module "next-auth" {
       id: string;
       role?: string;
       organizationId?: string;
+      onboardingCompleted?: boolean;
+      invitedBy?: string;
     } & DefaultSession["user"];
   }
 
@@ -28,6 +30,8 @@ declare module "next-auth" {
     id: string;
     role?: string;
     organizationId?: string;
+    onboardingCompleted?: boolean;
+    invitedBy?: string;
   }
 }
 
@@ -50,6 +54,22 @@ export const createAuthConfig = (db: ExtendedPrismaClient): NextAuthConfig => ({
       if (user && "id" in user && typeof user.id === "string") {
         const userId = user.id;
         token["id"] = userId;
+
+        // Get user data including onboarding status and invitation details
+        const userResult = await db.user.findUnique({
+          where: { id: userId },
+          select: {
+            onboardingCompleted: true,
+            invitedBy: true,
+          },
+        });
+
+        if (userResult) {
+          token["onboardingCompleted"] = userResult.onboardingCompleted;
+          if (userResult.invitedBy) {
+            token["invitedBy"] = userResult.invitedBy;
+          }
+        }
 
         // Get the user's membership in the current organization
         // Note: In JWT callback, we don't have access to request headers/subdomain,
@@ -92,6 +112,8 @@ export const createAuthConfig = (db: ExtendedPrismaClient): NextAuthConfig => ({
         id: string;
         role?: string;
         organizationId?: string;
+        onboardingCompleted?: boolean;
+        invitedBy?: string;
       } = {
         id: typeof token["id"] === "string" ? token["id"] : "",
       };
@@ -102,6 +124,14 @@ export const createAuthConfig = (db: ExtendedPrismaClient): NextAuthConfig => ({
 
       if (typeof token["organizationId"] === "string") {
         userUpdate.organizationId = token["organizationId"];
+      }
+
+      if (typeof token["onboardingCompleted"] === "boolean") {
+        userUpdate.onboardingCompleted = token["onboardingCompleted"];
+      }
+
+      if (typeof token["invitedBy"] === "string") {
+        userUpdate.invitedBy = token["invitedBy"];
       }
 
       return {
