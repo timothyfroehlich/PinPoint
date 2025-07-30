@@ -64,11 +64,13 @@ const protectedProcedure = publicProcedure.use(({ ctx, next }) => {
 // NextAuth
 import { signIn, signOut } from "next-auth/react";
 await signIn("google");
+await signIn("github");
 await signOut();
 
 // Supabase
 const supabase = createBrowserClient();
 await supabase.auth.signInWithOAuth({ provider: "google" });
+await supabase.auth.signInWithOAuth({ provider: "github" });
 await supabase.auth.signOut();
 ```
 

@@ -80,7 +80,6 @@ export function validateAllOAuthProviders(): OAuthValidationResult[] {
 
   // Future providers can be added here:
   // results.push(validateMicrosoftOAuth());
-  // results.push(validateGitHubOAuth());
 
   return results;
 }
