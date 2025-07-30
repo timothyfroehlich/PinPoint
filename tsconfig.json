@@ -10,8 +10,7 @@
     /* Ensure path aliases work for middleware */
     "baseUrl": ".",
     "paths": {
-      "~/*": ["./src/*"],
-      "~/lib/*": ["./lib/*"]
+      "~/*": ["./src/*"]
     }
   },
   "include": [
