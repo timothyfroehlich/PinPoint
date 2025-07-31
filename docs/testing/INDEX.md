@@ -19,7 +19,6 @@ Comprehensive testing patterns and strategies for PinPoint.
 - **[index.md](./index.md)** - Testing philosophy and quick start guide
 - **[unit-patterns.md](./unit-patterns.md)** - Pure function and business logic testing
 - **[integration-patterns.md](./integration-patterns.md)** - Database and API testing with transactions
-- **[supabase-patterns.md](./supabase-patterns.md)** - Supabase Storage and Authentication testing patterns
 - **[test-database.md](./test-database.md)** - Supabase local setup for testing
 - **[configuration.md](./configuration.md)** - Vitest configuration and setup
 - **[performance.md](./performance.md)** - Test execution optimization

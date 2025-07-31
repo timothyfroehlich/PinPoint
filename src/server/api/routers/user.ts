@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { supabaseImageStorageServer } from "~/lib/supabase/storage";
+import { imageStorage } from "~/lib/image-storage/local-storage";
 import { getDefaultAvatarUrl } from "~/lib/utils/image-processing";
 import {
   createTRPCRouter,
@@ -89,10 +89,10 @@ export const userRouter = createTRPCRouter({
         const blob = await response.blob();
         const file = new File([blob], input.filename, { type: blob.type });
 
-        // Upload image using Supabase storage
-        const imagePath = await supabaseImageStorageServer.uploadProfilePicture(
+        // Upload image
+        const imagePath = await imageStorage.uploadImage(
           file,
-          ctx.session.user.id,
+          `user-${ctx.session.user.id}`,
         );
 
         // Delete old profile picture if it exists
@@ -106,9 +106,7 @@ export const userRouter = createTRPCRouter({
           !currentUser.profilePicture.includes("default-avatar")
         ) {
           try {
-            await supabaseImageStorageServer.deleteImage(
-              currentUser.profilePicture,
-            );
+            await imageStorage.deleteImage(currentUser.profilePicture);
           } catch (error) {
             // Ignore deletion errors for old files
             console.warn("Failed to delete old profile picture:", error);
