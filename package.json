@@ -41,7 +41,7 @@
     "lint:verbose": "NODE_ENV=development next lint --format detailed",
     "lint:fix": "NODE_ENV=development next lint --fix",
     "test": "vitest run",
-    "test:brief": "vitest run --reporter=basic",
+    "test:brief": "vitest run --reporter=default --reporter.summary=false",
     "test:verbose": "vitest run --reporter=verbose",
     "test:watch": "vitest watch",
     "test:coverage": "vitest run --coverage",
