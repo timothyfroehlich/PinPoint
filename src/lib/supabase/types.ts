@@ -7,7 +7,7 @@ import type {
  * Core Supabase Authentication Types
  *
  * These types represent the raw Supabase auth responses and are used
- * internally by the session mapping utilities.
+ * throughout the PinPoint application for native Supabase integration.
  */
 
 // Raw Supabase user type (re-exported for convenience)
@@ -32,53 +32,6 @@ export interface PinPointSupabaseUser extends SupabaseUser {
 export interface PinPointSupabaseSession extends SupabaseSession {
   user: PinPointSupabaseUser;
 }
-
-/**
- * PinPoint Session Types
- *
- * These types represent the session format used throughout the PinPoint application
- * and match the existing NextAuth session structure for backward compatibility.
- */
-
-/**
- * PinPoint user session data (compatible with existing NextAuth format)
- */
-export interface PinPointUser {
-  id: string;
-  email: string;
-  name?: string;
-  image?: string;
-}
-
-/**
- * PinPoint session structure (compatible with existing tRPC context expectations)
- */
-export interface PinPointSession {
-  user: PinPointUser;
-  organizationId: string;
-  role: string;
-  expires: string;
-}
-
-/**
- * Authentication States
- *
- * Represents the different states of user authentication
- */
-export type AuthenticationState =
-  | { type: "authenticated"; session: PinPointSession }
-  | { type: "anonymous"; session: null }
-  | { type: "expired"; session: null }
-  | { type: "loading"; session: null };
-
-/**
- * Session Conversion Result
- *
- * Result type for session mapping operations with error handling
- */
-export type SessionConversionResult =
-  | { success: true; session: PinPointSession }
-  | { success: false; error: string; session: null };
 
 /**
  * JWT Payload Structure
@@ -190,25 +143,4 @@ export function isValidOrganizationContext(
     typeof (context as OrganizationContext).organizationId === "string" &&
     typeof (context as OrganizationContext).role === "string"
   );
-}
-
-export function isAuthenticationState(
-  state: unknown,
-): state is AuthenticationState {
-  if (typeof state !== "object" || state === null || !("type" in state)) {
-    return false;
-  }
-
-  const authState = state as AuthenticationState;
-
-  switch (authState.type) {
-    case "authenticated":
-      return typeof authState.session === "object";
-    case "anonymous":
-    case "expired":
-    case "loading":
-      return true; // These states always have session === null by definition
-    default:
-      return false;
-  }
 }

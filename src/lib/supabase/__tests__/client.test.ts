@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 // Mock @supabase/ssr
@@ -44,6 +45,12 @@ describe("Supabase Browser Client", () => {
       expect(mockCreateBrowserClient).toHaveBeenCalledWith(
         "https://test.supabase.co",
         "test-anon-key",
+        expect.objectContaining({
+          cookies: expect.objectContaining({
+            getAll: expect.any(Function),
+            setAll: expect.any(Function),
+          }),
+        }),
       );
     });
 
@@ -100,6 +107,12 @@ describe("Supabase Browser Client", () => {
       expect(mockCreateBrowserClient).toHaveBeenCalledWith(
         "https://test.supabase.co",
         "test-anon-key",
+        expect.objectContaining({
+          cookies: expect.objectContaining({
+            getAll: expect.any(Function),
+            setAll: expect.any(Function),
+          }),
+        }),
       );
     });
   });
