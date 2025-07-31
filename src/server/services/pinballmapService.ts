@@ -3,6 +3,8 @@
  * Handles syncing machine data between PinballMap and PinPoint
  */
 
+import { transformPinballMapMachineToModel } from "../../lib/external/pinballmapTransformer";
+
 import type { ExtendedPrismaClient } from "./types";
 import type {
   PinballMapMachine,
@@ -272,7 +274,7 @@ export class PinballMapService {
     // Look for existing model by IPDB ID if available
     if (pmMachine.ipdb_id) {
       model = await this.prisma.model.findUnique({
-        where: { ipdbId: pmMachine.ipdb_id },
+        where: { ipdbId: pmMachine.ipdb_id.toString() },
       });
 
       if (model) {
@@ -284,39 +286,11 @@ export class PinballMapService {
       return null;
     }
 
-    // Create new global model from PinballMap data
+    // Create new global model from PinballMap data using extracted transformer
     try {
+      const modelData = transformPinballMapMachineToModel(pmMachine);
       model = await this.prisma.model.create({
-        data: {
-          name: pmMachine.machine_name,
-          ...(pmMachine.manufacturer && {
-            manufacturer: pmMachine.manufacturer,
-          }),
-          ...(pmMachine.year && { year: pmMachine.year }),
-
-          // Cross-database references
-          ...(pmMachine.opdb_id && { opdbId: pmMachine.opdb_id }),
-          ...(pmMachine.ipdb_id && { ipdbId: pmMachine.ipdb_id }),
-
-          // Technical details
-          ...(pmMachine.machine_type && {
-            machineType: pmMachine.machine_type,
-          }),
-          ...(pmMachine.machine_display && {
-            machineDisplay: pmMachine.machine_display,
-          }),
-          isActive: pmMachine.is_active ?? true,
-
-          // Metadata and links
-          ...(pmMachine.ipdb_link && { ipdbLink: pmMachine.ipdb_link }),
-          ...(pmMachine.opdb_img && { opdbImgUrl: pmMachine.opdb_img }),
-          ...(pmMachine.kineticist_url && {
-            kineticistUrl: pmMachine.kineticist_url,
-          }),
-
-          // PinPoint-specific
-          isCustom: false, // OPDB games are not custom
-        },
+        data: modelData,
       });
 
       return model;

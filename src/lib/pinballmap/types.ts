@@ -4,12 +4,12 @@
 
 export interface PinballMapMachine {
   id: number;
-  name: string;
-  machine_name: string; // Actual display name
+  name: string; // Display name from API
+  machine_name?: string; // Alternative name field (optional)
   year?: number;
   manufacturer?: string;
   ipdb_link?: string | null;
-  ipdb_id?: string | null; // Change to string to match IPDB format
+  ipdb_id?: number | null; // Number from API, will be converted to string
   kineticist_url?: string;
   opdb_id?: string | null;
 
