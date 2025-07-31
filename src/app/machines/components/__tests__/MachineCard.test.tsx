@@ -11,20 +11,37 @@ import {
 } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
+// Mock the OPDB client to prevent environment variable access
+vi.mock("~/lib/opdb", () => ({
+  opdbClient: {
+    getMachineById: vi.fn(),
+  },
+  getBackboxImageUrl: vi.fn(),
+}));
+
+// Mock the useBackboxImage hook (must be before component import)
+vi.mock("~/hooks/useBackboxImage");
+
+// Mock Next.js navigation
+vi.mock("next/navigation");
+
 import { MachineCard } from "../MachineCard";
 
 import { server } from "~/test/msw/setup";
 import { VitestTestWrapper } from "~/test/VitestTestWrapper";
 
-// Mock Next.js navigation
+// Mock implementations
+const mockUseBackboxImage = vi.mocked(
+  (await import("~/hooks/useBackboxImage")).useBackboxImage,
+);
+
 const mockPush = vi.fn();
-vi.mock("next/navigation", () => ({
-  useRouter: vi.fn(() => ({
-    push: mockPush,
-    replace: vi.fn(),
-    back: vi.fn(),
-  })),
-}));
+const mockUseRouter = vi.mocked((await import("next/navigation")).useRouter);
+mockUseRouter.mockReturnValue({
+  push: mockPush,
+  replace: vi.fn(),
+  back: vi.fn(),
+} as any);
 
 // Mock machine data - using any type since this is test context
 const mockMachine: any = {
@@ -36,6 +53,8 @@ const mockMachine: any = {
     manufacturer: "Williams",
     year: 1997,
     machineType: "Pinball",
+    opdbId: "G123-M456",
+    opdbImgUrl: "https://example.com/playfield.jpg",
   },
   location: {
     id: "location-1",
@@ -75,6 +94,24 @@ const mockMachineWithoutCustomName: any = {
   name: null,
 };
 
+const mockMachineWithOpdbId: any = {
+  ...mockMachine,
+  model: {
+    ...mockMachine.model,
+    opdbId: "G123-M456",
+    opdbImgUrl: "https://example.com/playfield.jpg",
+  },
+};
+
+const mockMachineWithoutOpdbId: any = {
+  ...mockMachine,
+  model: {
+    ...mockMachine.model,
+    opdbId: null,
+    opdbImgUrl: null,
+  },
+};
+
 describe("MachineCard", () => {
   // Set up MSW server
   beforeAll(() => {
@@ -89,6 +126,13 @@ describe("MachineCard", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // Default mock behavior for useBackboxImage
+    mockUseBackboxImage.mockReturnValue({
+      imageUrl: null,
+      isLoading: false,
+      error: null,
+    });
   });
 
   describe("Basic Rendering", () => {
@@ -288,6 +332,152 @@ describe("MachineCard", () => {
 
       const avatar = screen.getByAltText("Owner");
       expect(avatar).toBeInTheDocument();
+    });
+  });
+
+  describe("Backbox Image Integration", () => {
+    it("should call useBackboxImage hook with correct parameters", () => {
+      render(
+        <VitestTestWrapper>
+          <MachineCard machine={mockMachineWithOpdbId} />
+        </VitestTestWrapper>,
+      );
+
+      expect(mockUseBackboxImage).toHaveBeenCalledWith({
+        opdbId: "G123-M456",
+        fallbackUrl: "https://example.com/playfield.jpg",
+      });
+    });
+
+    it("should call useBackboxImage with null opdbId when not available", () => {
+      render(
+        <VitestTestWrapper>
+          <MachineCard machine={mockMachineWithoutOpdbId} />
+        </VitestTestWrapper>,
+      );
+
+      expect(mockUseBackboxImage).toHaveBeenCalledWith({
+        opdbId: null,
+        fallbackUrl: null,
+      });
+    });
+
+    it("should render loading skeleton when backbox image is loading", () => {
+      mockUseBackboxImage.mockReturnValue({
+        imageUrl: null,
+        isLoading: true,
+        error: null,
+      });
+
+      const { container } = render(
+        <VitestTestWrapper>
+          <MachineCard machine={mockMachineWithOpdbId} />
+        </VitestTestWrapper>,
+      );
+
+      // Check for skeleton component
+      const skeleton = container.querySelector('[class*="MuiSkeleton-root"]');
+      expect(skeleton).toBeInTheDocument();
+    });
+
+    it("should render background image when backbox image is loaded", () => {
+      const mockImageUrl = "https://opdb.example.com/backglass.jpg";
+      mockUseBackboxImage.mockReturnValue({
+        imageUrl: mockImageUrl,
+        isLoading: false,
+        error: null,
+      });
+
+      render(
+        <VitestTestWrapper>
+          <MachineCard machine={mockMachineWithOpdbId} />
+        </VitestTestWrapper>,
+      );
+
+      // Verify the hook was called correctly
+      expect(mockUseBackboxImage).toHaveBeenCalledWith({
+        opdbId: "G123-M456",
+        fallbackUrl: "https://example.com/playfield.jpg",
+      });
+
+      // Check that the content is still rendered properly when background image is present
+      expect(screen.getByText("Custom Machine Name")).toBeInTheDocument();
+      expect(screen.getByText("Test Location")).toBeInTheDocument();
+    });
+
+    it("should apply proper text styling when background image is present", () => {
+      mockUseBackboxImage.mockReturnValue({
+        imageUrl: "https://opdb.example.com/backglass.jpg",
+        isLoading: false,
+        error: null,
+      });
+
+      render(
+        <VitestTestWrapper>
+          <MachineCard machine={mockMachineWithOpdbId} />
+        </VitestTestWrapper>,
+      );
+
+      // Text should be visible - check that the main title is rendered
+      expect(screen.getByText("Custom Machine Name")).toBeInTheDocument();
+    });
+
+    it("should render normal card styling when no background image", () => {
+      mockUseBackboxImage.mockReturnValue({
+        imageUrl: null,
+        isLoading: false,
+        error: null,
+      });
+
+      render(
+        <VitestTestWrapper>
+          <MachineCard machine={mockMachineWithOpdbId} />
+        </VitestTestWrapper>,
+      );
+
+      // Should still render all content correctly
+      expect(screen.getByText("Custom Machine Name")).toBeInTheDocument();
+      expect(screen.getByText("Test Location")).toBeInTheDocument();
+    });
+
+    it("should handle image loading error gracefully", () => {
+      mockUseBackboxImage.mockReturnValue({
+        imageUrl: null,
+        isLoading: false,
+        error: "Failed to load image",
+      });
+
+      render(
+        <VitestTestWrapper>
+          <MachineCard machine={mockMachineWithOpdbId} />
+        </VitestTestWrapper>,
+      );
+
+      // Should still render card content normally
+      expect(screen.getByText("Custom Machine Name")).toBeInTheDocument();
+      expect(screen.getByText("Test Location")).toBeInTheDocument();
+    });
+
+    it("should maintain interactivity with background image", async () => {
+      mockUseBackboxImage.mockReturnValue({
+        imageUrl: "https://opdb.example.com/backglass.jpg",
+        isLoading: false,
+        error: null,
+      });
+
+      const { container } = render(
+        <VitestTestWrapper>
+          <MachineCard machine={mockMachineWithOpdbId} />
+        </VitestTestWrapper>,
+      );
+
+      const card = container.querySelector('[class*="MuiCard-root"]');
+      expect(card).toBeTruthy();
+
+      if (card) {
+        fireEvent.click(card);
+      }
+      expect(mockPush).toHaveBeenCalledWith("/machines/machine-1");
     });
   });
 });

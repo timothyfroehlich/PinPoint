@@ -24,6 +24,7 @@ export {
   getGroupIdFromOPDBId,
   buildOPDBId,
   getPreferredImageUrl,
+  getBackboxImageUrl,
   formatMachineName,
   normalizeDescription,
   generateCacheKey,
