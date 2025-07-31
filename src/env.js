@@ -52,12 +52,22 @@ export const env = createEnv({
     VERCEL_URL: z.string().optional(),
     PORT: z.string().optional(),
     // Supabase Authentication Configuration
-    SUPABASE_URL: z.string().url("Supabase URL must be a valid URL"),
-    SUPABASE_ANON_KEY: z.string().min(1, "Supabase anon key is required"),
-    SUPABASE_SERVICE_ROLE_KEY: z
-      .string()
-      .min(1, "Supabase service role key is required"),
-    SUPABASE_JWT_SECRET: z.string().min(1, "Supabase JWT secret is required"),
+    SUPABASE_URL:
+      getEnvironmentType() === "test"
+        ? z.string().url().optional()
+        : z.string().url("Supabase URL must be a valid URL"),
+    SUPABASE_ANON_KEY:
+      getEnvironmentType() === "test"
+        ? z.string().optional()
+        : z.string().min(1, "Supabase anon key is required"),
+    SUPABASE_SERVICE_ROLE_KEY:
+      getEnvironmentType() === "test"
+        ? z.string().optional()
+        : z.string().min(1, "Supabase service role key is required"),
+    SUPABASE_JWT_SECRET:
+      getEnvironmentType() === "test"
+        ? z.string().optional()
+        : z.string().min(1, "Supabase JWT secret is required"),
     // Future API keys mentioned in the issue (optional for now)
     PINBALL_MAP_API_KEY: z.string().optional(),
     OPDB_API_KEY: z.string().optional(),
@@ -78,12 +88,14 @@ export const env = createEnv({
    */
   client: {
     // Supabase Public Configuration
-    NEXT_PUBLIC_SUPABASE_URL: z
-      .string()
-      .url("Public Supabase URL must be valid"),
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: z
-      .string()
-      .min(1, "Public anon key is required"),
+    NEXT_PUBLIC_SUPABASE_URL:
+      getEnvironmentType() === "test"
+        ? z.string().url().optional()
+        : z.string().url("Public Supabase URL must be valid"),
+    NEXT_PUBLIC_SUPABASE_ANON_KEY:
+      getEnvironmentType() === "test"
+        ? z.string().optional()
+        : z.string().min(1, "Public anon key is required"),
     // Next.js automatically exposes NODE_ENV to the client, no need to manually expose it
   },
 

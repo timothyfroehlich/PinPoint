@@ -1,6 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
+import type { CookieOptions } from "@supabase/ssr";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import { env } from "~/env";
 
 /**
@@ -17,31 +20,44 @@ import { env } from "~/env";
  *
  * @returns Promise resolving to Supabase server client instance
  */
-export async function createClient() {
+export async function createClient(): Promise<SupabaseClient> {
+  // These environment variables are required in non-test environments
+  // In test environment, Supabase client creation is mocked at the module level
+  const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error(
+      "Supabase environment variables are required for server client creation",
+    );
+  }
+
   const cookieStore = await cookies();
 
-  return createServerClient(
-    env.NEXT_PUBLIC_SUPABASE_URL,
-    env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options),
-            );
-          } catch {
-            // The `setAll` method was called from a Server Component.
-            // This can be ignored if you have middleware refreshing
-            // user sessions.
-          }
-        },
+  return createServerClient(supabaseUrl, supabaseAnonKey, {
+    cookies: {
+      getAll() {
+        return cookieStore.getAll();
+      },
+      setAll(
+        cookiesToSet: {
+          name: string;
+          value: string;
+          options: CookieOptions;
+        }[],
+      ) {
+        try {
+          cookiesToSet.forEach(({ name, value, options }) =>
+            cookieStore.set(name, value, options),
+          );
+        } catch {
+          // The `setAll` method was called from a Server Component.
+          // This can be ignored if you have middleware refreshing
+          // user sessions.
+        }
       },
     },
-  );
+  });
 }
 
 /**
@@ -61,15 +77,32 @@ export async function createClient() {
  *
  * @returns Promise resolving to Supabase admin client instance
  */
-export async function createAdminClient() {
+export async function createAdminClient(): Promise<SupabaseClient> {
+  // These environment variables are required in non-test environments
+  // In test environment, Supabase client creation is mocked at the module level
+  const supabaseUrl = env.SUPABASE_URL;
+  const supabaseServiceKey = env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    throw new Error(
+      "Supabase admin environment variables are required for admin client creation",
+    );
+  }
+
   const cookieStore = await cookies();
 
-  return createServerClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+  return createServerClient(supabaseUrl, supabaseServiceKey, {
     cookies: {
       getAll() {
         return cookieStore.getAll();
       },
-      setAll(cookiesToSet) {
+      setAll(
+        cookiesToSet: {
+          name: string;
+          value: string;
+          options: CookieOptions;
+        }[],
+      ) {
         try {
           cookiesToSet.forEach(({ name, value, options }) =>
             cookieStore.set(name, value, options),
@@ -88,5 +121,5 @@ export async function createAdminClient() {
 }
 
 // Export types for TypeScript IntelliSense
-export type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
-export type SupabaseAdminClient = Awaited<ReturnType<typeof createAdminClient>>;
+export type SupabaseServerClient = SupabaseClient;
+export type SupabaseAdminClient = SupabaseClient;
