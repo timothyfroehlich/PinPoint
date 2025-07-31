@@ -237,6 +237,9 @@ DIRECT_URL=postgresql://postgres:postgres@localhost:{ports['db']}/postgres
         # Update ports using regex replacement (simpler than full TOML writing)
         self._update_toml_ports(worktree_config, ports)
         
+        # Add worktree-specific warning to the config
+        self._add_worktree_warning_to_config(worktree_config)
+        
         print(f"{Colors.GREEN}✅ Supabase config optimized with ports API:{ports['api']} DB:{ports['db']}{Colors.NC}")
     
     def _start_supabase_services(self, worktree_path: Path) -> None:
@@ -289,6 +292,43 @@ DIRECT_URL=postgresql://postgres:postgres@localhost:{ports['db']}/postgres
             content = re.sub(pattern, replacement, content, flags=re.DOTALL)
         
         # Write back the modified content
+        with open(config_file, 'w') as f:
+            f.write(content)
+    
+    def _add_worktree_warning_to_config(self, config_file: Path) -> None:
+        """Add worktree-specific warning to the Supabase config file."""
+        with open(config_file, 'r') as f:
+            content = f.read()
+        
+        # Replace the main warning with a worktree-specific version
+        worktree_warning = """# ⚠️  IMPORTANT: WORKTREE CONFIGURATION WARNING ⚠️ 
+# 
+# This is a WORKTREE-SPECIFIC Supabase configuration file. When you modify this file:
+# 
+# 🏗️  WORKTREE ISOLATION: Changes here ONLY affect THIS worktree
+# 🚫 NO SYNC TO MAIN: Changes will NOT be copied back to main template
+# 🔄 MAIN UPDATES: Changes to main template won't automatically update this file
+# 
+# 🚨 CRITICAL: Port numbers in this file are AUTO-GENERATED and unique to this worktree
+#     - Don't manually change ports - they're calculated from worktree path hash
+#     - This worktree uses unique ports to avoid conflicts with other worktrees
+#     - Main template uses default ports (54321, 54322, etc.)
+# 
+# 💡 TO UPDATE: If main template changes, run from project root:
+#     `./.claude/worktrees/manage-worktree.py upgrade <worktree-name>`
+# 
+# For detailed configuration reference documentation, visit:
+# https://supabase.com/docs/guides/local-development/cli/config"""
+        
+        # Replace the existing warning (if any) with the worktree-specific one
+        if "WORKTREE CONFIGURATION MANAGEMENT WARNING" in content:
+            # Replace the main warning
+            pattern = r'# ⚠️  IMPORTANT: WORKTREE CONFIGURATION MANAGEMENT WARNING ⚠️.*?# https://supabase\.com/docs/guides/local-development/cli/config'
+            content = re.sub(pattern, worktree_warning, content, flags=re.DOTALL)
+        else:
+            # Add warning at the top if no warning exists
+            content = worktree_warning + "\n" + content
+        
         with open(config_file, 'w') as f:
             f.write(content)
     
