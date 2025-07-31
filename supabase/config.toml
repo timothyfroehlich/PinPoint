@@ -1,3 +1,21 @@
+# ⚠️  IMPORTANT: WORKTREE CONFIGURATION MANAGEMENT WARNING ⚠️ 
+# 
+# This is the MAIN/TEMPLATE Supabase configuration file. When you modify this file:
+# 
+# 🔄 AUTOMATIC SYNC: Changes here are automatically copied to ALL NEW worktrees
+# 🏗️  EXISTING WORKTREES: Run `./.claude/worktrees/manage-worktree.py upgrade <worktree-name>` 
+#     to update existing worktrees with your changes
+# 
+# 📝 WORKTREE-SPECIFIC CHANGES: If you're IN a worktree and modifying this file:
+#     - Your changes will ONLY affect this worktree
+#     - Changes will NOT be copied back to main template
+#     - Use `git status` to see if you're in main or a worktree
+# 
+# 🚨 CRITICAL: Port numbers in worktrees are AUTO-GENERATED and unique per worktree
+#     - Don't manually change ports in worktree configs
+#     - Each worktree gets unique ports (e.g., 54358, 54374, etc.)
+#     - Main template uses default ports (54321, 54322, etc.)
+# 
 # For detailed configuration reference documentation, visit:
 # https://supabase.com/docs/guides/local-development/cli/config
 # A string used to distinguish different Supabase projects on the same host. Defaults to the
