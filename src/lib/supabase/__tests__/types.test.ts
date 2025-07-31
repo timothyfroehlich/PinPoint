@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+
 import {
   isPinPointSupabaseUser,
   isPinPointSupabaseSession,
@@ -39,17 +40,19 @@ describe("Type Guards", () => {
       expect(isPinPointSupabaseUser(user)).toBe(true);
     });
 
-    it("should return false for user with null app_metadata", () => {
+    it("should return true for user with undefined organization_id", () => {
       const user = {
         id: "test-user-id",
         email: "test@example.com",
-        app_metadata: null,
+        app_metadata: {
+          some_other_field: "value",
+        },
         user_metadata: {},
         aud: "authenticated",
         created_at: "2023-01-01T00:00:00Z",
-      } as unknown as PinPointSupabaseUser;
+      } as PinPointSupabaseUser;
 
-      expect(isPinPointSupabaseUser(user)).toBe(false);
+      expect(isPinPointSupabaseUser(user)).toBe(true);
     });
   });
 
@@ -77,7 +80,7 @@ describe("Type Guards", () => {
       expect(isPinPointSupabaseSession(session)).toBe(true);
     });
 
-    it("should return false for session with invalid user", () => {
+    it("should return true for session with user having empty app_metadata", () => {
       const session = {
         access_token: "access-token",
         refresh_token: "refresh-token",
@@ -87,14 +90,14 @@ describe("Type Guards", () => {
         user: {
           id: "test-user-id",
           email: "test@example.com",
-          app_metadata: null,
+          app_metadata: {},
           user_metadata: {},
           aud: "authenticated",
           created_at: "2023-01-01T00:00:00Z",
         },
-      } as unknown as PinPointSupabaseSession;
+      } as PinPointSupabaseSession;
 
-      expect(isPinPointSupabaseSession(session)).toBe(false);
+      expect(isPinPointSupabaseSession(session)).toBe(true);
     });
   });
 

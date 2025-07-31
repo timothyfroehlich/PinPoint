@@ -1,4 +1,5 @@
 import { createBrowserClient } from "@supabase/ssr";
+
 import { env } from "~/env";
 
 /**
