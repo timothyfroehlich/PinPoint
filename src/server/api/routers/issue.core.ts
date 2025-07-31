@@ -210,7 +210,7 @@ export const issueCoreRouter = createTRPCRouter({
       }
 
       // User is guaranteed to exist in protected procedure
-      const createdById = ctx.session.user.id;
+      const createdById = ctx.user.id;
 
       // Create the issue
       const issueData: {
@@ -344,7 +344,7 @@ export const issueCoreRouter = createTRPCRouter({
       await activityService.recordIssueAssigned(
         input.issueId,
         ctx.organization.id,
-        ctx.session.user.id,
+        ctx.user.id,
         input.userId,
       );
 
@@ -619,7 +619,7 @@ export const issueCoreRouter = createTRPCRouter({
 
       const activityService = ctx.services.createIssueActivityService();
       const notificationService = ctx.services.createNotificationService();
-      const userId = ctx.session.user.id;
+      const userId = ctx.user.id;
 
       // Prepare data for tracking changes
       let newStatus = existingIssue.status;
@@ -825,7 +825,7 @@ export const issueCoreRouter = createTRPCRouter({
       await activityService.recordIssueResolved(
         input.id,
         ctx.organization.id,
-        ctx.session.user.id,
+        ctx.user.id,
       );
 
       return updatedIssue;
@@ -931,7 +931,7 @@ export const issueCoreRouter = createTRPCRouter({
       await activityService.recordStatusChange(
         input.id,
         ctx.organization.id,
-        ctx.session.user.id,
+        ctx.user.id,
         existingIssue.status,
         newStatus,
       );

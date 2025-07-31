@@ -20,18 +20,19 @@ import {
   InputLabel,
   Chip,
 } from "@mui/material";
-import { type Session } from "next-auth";
 import * as React from "react";
 import { useState } from "react";
 
 import { MachineSelector } from "./MachineSelector";
+
+import type { PinPointSupabaseUser } from "../../../lib/supabase/types";
 
 import { PermissionGate } from "~/components/permissions";
 import { usePermissions } from "~/hooks/usePermissions";
 import { api } from "~/trpc/react";
 
 interface IssueCreateFormProps {
-  session: Session | null;
+  user: PinPointSupabaseUser | null;
   initialMachineId?: string | undefined;
   onMachineChange: (machineId: string | null) => void;
 }
@@ -48,7 +49,7 @@ interface FormData {
 }
 
 export function IssueCreateForm({
-  session: _session,
+  user: _user,
   initialMachineId,
   onMachineChange,
 }: IssueCreateFormProps): React.JSX.Element {

@@ -1,10 +1,30 @@
 import { organizationProcedure } from "./trpc.base";
 
+import type { PinPointSupabaseUser } from "../../../lib/supabase/types";
+import type { Session } from "next-auth";
+
 import { requirePermissionForSession } from "~/server/auth/permissions";
 
+/**
+ * Convert Supabase user to NextAuth-compatible session for permission system
+ * This is a temporary compatibility layer during the Supabase migration
+ */
+function supabaseUserToSession(user: PinPointSupabaseUser): Session {
+  return {
+    user: {
+      id: user.id,
+      email: user.email ?? "",
+      name: user.user_metadata["name"] as string | undefined,
+      image: user.user_metadata["avatar_url"] as string | undefined,
+    } as Session["user"] & { organizationId?: string },
+    expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
+  } as Session;
+}
+
 export const issueViewProcedure = organizationProcedure.use(async (opts) => {
+  const session = supabaseUserToSession(opts.ctx.user);
   await requirePermissionForSession(
-    opts.ctx.session,
+    session,
     "issue:view",
     opts.ctx.db,
     opts.ctx.organization.id,
@@ -13,8 +33,9 @@ export const issueViewProcedure = organizationProcedure.use(async (opts) => {
 });
 
 export const issueCreateProcedure = organizationProcedure.use(async (opts) => {
+  const session = supabaseUserToSession(opts.ctx.user);
   await requirePermissionForSession(
-    opts.ctx.session,
+    session,
     "issue:create",
     opts.ctx.db,
     opts.ctx.organization.id,
@@ -23,8 +44,9 @@ export const issueCreateProcedure = organizationProcedure.use(async (opts) => {
 });
 
 export const issueEditProcedure = organizationProcedure.use(async (opts) => {
+  const session = supabaseUserToSession(opts.ctx.user);
   await requirePermissionForSession(
-    opts.ctx.session,
+    session,
     "issue:edit",
     opts.ctx.db,
     opts.ctx.organization.id,
@@ -33,8 +55,9 @@ export const issueEditProcedure = organizationProcedure.use(async (opts) => {
 });
 
 export const issueDeleteProcedure = organizationProcedure.use(async (opts) => {
+  const session = supabaseUserToSession(opts.ctx.user);
   await requirePermissionForSession(
-    opts.ctx.session,
+    session,
     "issue:delete",
     opts.ctx.db,
     opts.ctx.organization.id,
@@ -43,8 +66,9 @@ export const issueDeleteProcedure = organizationProcedure.use(async (opts) => {
 });
 
 export const issueAssignProcedure = organizationProcedure.use(async (opts) => {
+  const session = supabaseUserToSession(opts.ctx.user);
   await requirePermissionForSession(
-    opts.ctx.session,
+    session,
     "issue:assign",
     opts.ctx.db,
     opts.ctx.organization.id,
@@ -54,8 +78,9 @@ export const issueAssignProcedure = organizationProcedure.use(async (opts) => {
 
 export const attachmentCreateProcedure = organizationProcedure.use(
   async (opts) => {
+    const session = supabaseUserToSession(opts.ctx.user);
     await requirePermissionForSession(
-      opts.ctx.session,
+      session,
       "attachment:create",
       opts.ctx.db,
       opts.ctx.organization.id,
@@ -66,8 +91,9 @@ export const attachmentCreateProcedure = organizationProcedure.use(
 
 export const attachmentDeleteProcedure = organizationProcedure.use(
   async (opts) => {
+    const session = supabaseUserToSession(opts.ctx.user);
     await requirePermissionForSession(
-      opts.ctx.session,
+      session,
       "attachment:delete",
       opts.ctx.db,
       opts.ctx.organization.id,
@@ -77,8 +103,9 @@ export const attachmentDeleteProcedure = organizationProcedure.use(
 );
 
 export const machineEditProcedure = organizationProcedure.use(async (opts) => {
+  const session = supabaseUserToSession(opts.ctx.user);
   await requirePermissionForSession(
-    opts.ctx.session,
+    session,
     "machine:edit",
     opts.ctx.db,
     opts.ctx.organization.id,
@@ -88,8 +115,9 @@ export const machineEditProcedure = organizationProcedure.use(async (opts) => {
 
 export const machineDeleteProcedure = organizationProcedure.use(
   async (opts) => {
+    const session = supabaseUserToSession(opts.ctx.user);
     await requirePermissionForSession(
-      opts.ctx.session,
+      session,
       "machine:delete",
       opts.ctx.db,
       opts.ctx.organization.id,
@@ -99,8 +127,9 @@ export const machineDeleteProcedure = organizationProcedure.use(
 );
 
 export const locationEditProcedure = organizationProcedure.use(async (opts) => {
+  const session = supabaseUserToSession(opts.ctx.user);
   await requirePermissionForSession(
-    opts.ctx.session,
+    session,
     "location:edit",
     opts.ctx.db,
     opts.ctx.organization.id,
@@ -110,8 +139,9 @@ export const locationEditProcedure = organizationProcedure.use(async (opts) => {
 
 export const locationDeleteProcedure = organizationProcedure.use(
   async (opts) => {
+    const session = supabaseUserToSession(opts.ctx.user);
     await requirePermissionForSession(
-      opts.ctx.session,
+      session,
       "location:delete",
       opts.ctx.db,
       opts.ctx.organization.id,
@@ -122,8 +152,9 @@ export const locationDeleteProcedure = organizationProcedure.use(
 
 export const organizationManageProcedure = organizationProcedure.use(
   async (opts) => {
+    const session = supabaseUserToSession(opts.ctx.user);
     await requirePermissionForSession(
-      opts.ctx.session,
+      session,
       "organization:manage",
       opts.ctx.db,
       opts.ctx.organization.id,
@@ -133,8 +164,9 @@ export const organizationManageProcedure = organizationProcedure.use(
 );
 
 export const roleManageProcedure = organizationProcedure.use(async (opts) => {
+  const session = supabaseUserToSession(opts.ctx.user);
   await requirePermissionForSession(
-    opts.ctx.session,
+    session,
     "role:manage",
     opts.ctx.db,
     opts.ctx.organization.id,
@@ -143,8 +175,9 @@ export const roleManageProcedure = organizationProcedure.use(async (opts) => {
 });
 
 export const userManageProcedure = organizationProcedure.use(async (opts) => {
+  const session = supabaseUserToSession(opts.ctx.user);
   await requirePermissionForSession(
-    opts.ctx.session,
+    session,
     "user:manage",
     opts.ctx.db,
     opts.ctx.organization.id,

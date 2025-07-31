@@ -1,6 +1,7 @@
 import { vi } from "vitest";
 import { mockDeep, mockReset, type DeepMockProxy } from "vitest-mock-extended";
 
+import type { PinPointSupabaseUser } from "../../lib/supabase/types";
 import type { ExtendedPrismaClient } from "~/server/db";
 import type { ServiceFactory } from "~/server/services/factory";
 
@@ -58,18 +59,30 @@ const createMockServiceFactory = (): DeepMockProxy<ServiceFactory> => {
   } as unknown as DeepMockProxy<ServiceFactory>;
 };
 
+// Mock Supabase client
+const mockSupabaseClient = {
+  auth: {
+    getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
+    getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
+    signOut: vi.fn().mockResolvedValue({ error: null }),
+    onAuthStateChange: vi.fn().mockReturnValue({
+      data: { subscription: { unsubscribe: vi.fn() } },
+    }),
+  },
+  from: vi.fn().mockReturnThis(),
+  select: vi.fn().mockReturnThis(),
+  insert: vi.fn().mockReturnThis(),
+  update: vi.fn().mockReturnThis(),
+  delete: vi.fn().mockReturnThis(),
+  eq: vi.fn().mockReturnThis(),
+  single: vi.fn().mockResolvedValue({ data: null, error: null }),
+};
+
 export interface MockContext {
   db: DeepMockProxy<ExtendedPrismaClient>;
   services: DeepMockProxy<ServiceFactory>;
-  session: {
-    user: {
-      id: string;
-      email?: string | null;
-      name?: string | null;
-      image?: string | null;
-    };
-    expires: string;
-  } | null;
+  user: PinPointSupabaseUser | null;
+  supabase: typeof mockSupabaseClient;
   organization: {
     id: string;
     name: string;
@@ -134,28 +147,27 @@ export function createMockContext(): MockContext {
   });
 
   // Set up default comment mock
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-  mockDb.issueComment.create.mockResolvedValue({
+  mockDb.comment.create.mockResolvedValue({
     id: "comment-1",
     content: "Test comment",
-    isInternal: false,
     issueId: "issue-1",
     authorId: "user-1",
     createdAt: new Date(),
     updatedAt: new Date(),
     deletedAt: null,
+    deletedBy: null,
   });
 
   // Set up default status and priority mocks
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-  mockDb.status.findUnique.mockResolvedValue(mockStatus);
+  mockDb.issueStatus.findUnique.mockResolvedValue(mockStatus);
 
   mockDb.priority.findUnique.mockResolvedValue(mockPriority);
 
   return {
     db: mockDb,
     services: mockServices,
-    session: null,
+    user: null,
+    supabase: mockSupabaseClient,
     organization: null,
     headers: new Headers(),
   };
@@ -304,6 +316,8 @@ export const mockIssue = {
   resolvedAt: null,
   consistency: null,
   checklist: null,
+  reporterEmail: null,
+  submitterName: null,
   comments: [],
 };
 

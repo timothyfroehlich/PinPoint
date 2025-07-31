@@ -10,8 +10,9 @@ import {
   Collapse,
   IconButton,
 } from "@mui/material";
-import { signIn } from "next-auth/react";
 import { useState, useEffect } from "react";
+
+import { createClient } from "../../../lib/supabase/client";
 
 interface DevUser {
   id: string;
@@ -89,22 +90,26 @@ export function DevLoginCompact({
     try {
       console.log("Dev login as:", email);
 
-      // Use NextAuth signIn with Credentials provider
-      const result = await signIn("credentials", {
+      // Use Supabase auth with magic link for dev users
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithOtp({
         email,
-        redirect: false, // Don't redirect automatically
+        options: {
+          shouldCreateUser: false, // Only allow existing dev users
+        },
       });
 
-      if (result.error) {
-        console.error("Login failed:", result.error);
-        alert(`Login failed: ${result.error}`);
-      } else if (result.ok) {
-        console.log("Login successful");
-        // Refresh the page to show authenticated content
-        window.location.reload();
+      if (error) {
+        console.error("Login failed:", error.message);
+        alert(`Login failed: ${error.message}`);
+      } else {
+        console.log("Magic link sent - check your email");
+        alert("Magic link sent! Check your email to complete login.");
       }
-    } catch (error) {
-      console.error("Login failed:", error);
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      console.error("Login failed:", errorMessage);
       alert("Login failed - check console for details");
     } finally {
       setIsLoading(false);

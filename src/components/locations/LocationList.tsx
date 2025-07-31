@@ -15,19 +15,19 @@ import {
 } from "@mui/material";
 import { useRouter } from "next/navigation";
 
-import type { Session } from "next-auth";
+import type { PinPointSupabaseUser } from "../../../lib/supabase/types";
 import type { RouterOutputs } from "~/trpc/react";
 
 type LocationWithMachineCount = RouterOutputs["location"]["getPublic"][number];
 
 interface LocationListProps {
   locations: LocationWithMachineCount[];
-  session: Session | null;
+  user: PinPointSupabaseUser | null;
 }
 
 export function LocationList({
   locations,
-  session: _session,
+  user: _user,
 }: LocationListProps): React.ReactElement {
   const router = useRouter();
 

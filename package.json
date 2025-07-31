@@ -84,7 +84,6 @@
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
-    "@auth/prisma-adapter": "^2.7.2",
     "@emotion/cache": "^11.14.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
@@ -103,7 +102,6 @@
     "@trpc/server": "^11.0.0",
     "csv-parser": "^3.2.0",
     "next": "15.4.2",
-    "next-auth": "5.0.0-beta.29",
     "qrcode": "^1.5.4",
     "react": "19.1.0",
     "react-dom": "19.1.0",

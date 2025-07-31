@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 
 import { shouldEnableDevFeatures } from "~/lib/environment";
-import { auth } from "~/server/auth";
+import { getSupabaseUser } from "~/server/auth/supabase";
 import { getGlobalDatabaseProvider } from "~/server/db/provider";
 
 export async function GET(): Promise<NextResponse> {
@@ -14,7 +14,7 @@ export async function GET(): Promise<NextResponse> {
   const dbProvider = getGlobalDatabaseProvider();
   const db = dbProvider.getClient();
   try {
-    const session = await auth();
+    const user = await getSupabaseUser();
 
     // Get the organization to fetch memberships
     const organization = await db.organization.findFirst();
@@ -63,7 +63,7 @@ export async function GET(): Promise<NextResponse> {
 
     return NextResponse.json({
       users: usersWithRoles,
-      currentUser: session?.user,
+      currentUser: user,
     });
   } catch (error) {
     console.error("Error fetching dev users:", error);

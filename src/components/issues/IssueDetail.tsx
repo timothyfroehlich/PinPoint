@@ -1,22 +1,23 @@
 "use client";
 
 import { Box, Typography, Chip, Stack, Card, CardContent } from "@mui/material";
-import { type Session } from "next-auth";
 import * as React from "react";
+
+import type { PinPointSupabaseUser } from "../../../lib/supabase/types";
 
 import { type IssueWithDetails } from "~/types/issue";
 
 interface IssueDetailProps {
   issue: IssueWithDetails;
-  session: Session | null;
+  user: PinPointSupabaseUser | null;
   hasPermission: (permission: string) => boolean;
 }
 
 export function IssueDetail({
   issue,
-  session,
+  user,
 }: IssueDetailProps): React.JSX.Element {
-  const isAuthenticated = !!session?.user;
+  const isAuthenticated = !!user;
 
   return (
     <Box>

@@ -1,16 +1,16 @@
 import { TRPCError } from "@trpc/server";
 import { type NextRequest } from "next/server";
 
+import { getSupabaseUser } from "./supabase";
 import { isValidOrganization, isValidMembership } from "./types";
 
-import type { Session } from "next-auth";
+import type { PinPointSupabaseUser } from "../../../lib/supabase/types";
 import type { ExtendedPrismaClient } from "~/server/db";
 
 import { env } from "~/env";
-import { auth } from "~/server/auth";
 
 export interface UploadAuthContext {
-  session: Session;
+  user: PinPointSupabaseUser;
   organization: {
     id: string;
     name: string;
@@ -35,8 +35,8 @@ export async function getUploadAuthContext(
   db: ExtendedPrismaClient,
 ): Promise<UploadAuthContext> {
   // 1. Verify authentication
-  const session = await auth();
-  if (!session?.user) {
+  const user = await getSupabaseUser();
+  if (!user) {
     throw new TRPCError({
       code: "UNAUTHORIZED",
       message: "Authentication required",
@@ -62,7 +62,7 @@ export async function getUploadAuthContext(
   const membershipResult = await db.membership.findFirst({
     where: {
       organizationId: organizationResult.id,
-      userId: session.user.id,
+      userId: user.id,
     },
     include: {
       role: {
@@ -81,7 +81,7 @@ export async function getUploadAuthContext(
   }
 
   return {
-    session,
+    user,
     organization: organizationResult,
     membership: membershipResult,
     userPermissions: membershipResult.role.permissions.map((p) => p.name),

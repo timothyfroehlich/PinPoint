@@ -1,20 +1,33 @@
 import { vi } from "vitest";
 
+import type { PinPointSupabaseUser } from "../../lib/supabase/types";
 import type { ExtendedPrismaClient } from "~/server/db";
 import type { ServiceFactory } from "~/server/services/factory";
+
+// Mock Supabase client
+const mockSupabaseClient = {
+  auth: {
+    getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
+    getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
+    signOut: vi.fn().mockResolvedValue({ error: null }),
+    onAuthStateChange: vi.fn().mockReturnValue({
+      data: { subscription: { unsubscribe: vi.fn() } },
+    }),
+  },
+  from: vi.fn().mockReturnThis(),
+  select: vi.fn().mockReturnThis(),
+  insert: vi.fn().mockReturnThis(),
+  update: vi.fn().mockReturnThis(),
+  delete: vi.fn().mockReturnThis(),
+  eq: vi.fn().mockReturnThis(),
+  single: vi.fn().mockResolvedValue({ data: null, error: null }),
+};
 
 export interface VitestMockContext {
   db: ExtendedPrismaClient;
   services: ServiceFactory;
-  session: {
-    user: {
-      id: string;
-      email?: string | null;
-      name?: string | null;
-      image?: string | null;
-    };
-    expires: string;
-  } | null;
+  user: PinPointSupabaseUser | null;
+  supabase: typeof mockSupabaseClient;
   organization: {
     id: string;
     name: string;
@@ -177,7 +190,8 @@ export function createVitestMockContext(): VitestMockContext {
   return {
     db: mockDb,
     services: mockServices,
-    session: null,
+    user: null,
+    supabase: mockSupabaseClient,
     organization: null,
     headers: new Headers(),
   };

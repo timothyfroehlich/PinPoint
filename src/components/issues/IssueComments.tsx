@@ -10,8 +10,9 @@ import {
   Alert,
   Divider,
 } from "@mui/material";
-import { type Session } from "next-auth";
 import { useState } from "react";
+
+import type { PinPointSupabaseUser } from "../../../lib/supabase/types";
 
 import { PermissionButton, PermissionGate } from "~/components/permissions";
 import { api } from "~/trpc/react";
@@ -19,14 +20,14 @@ import { type IssueWithDetails, type Comment } from "~/types/issue";
 
 interface IssueCommentsProps {
   issue: IssueWithDetails;
-  session: Session | null;
+  user: PinPointSupabaseUser | null;
   hasPermission: (permission: string) => boolean;
   onError: (error: string) => void;
 }
 
 export function IssueComments({
   issue,
-  session: _session,
+  user: _user,
   hasPermission,
   onError,
 }: IssueCommentsProps): React.JSX.Element {

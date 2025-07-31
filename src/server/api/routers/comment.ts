@@ -66,17 +66,14 @@ export const commentRouter = createTRPCRouter({
       }
 
       const cleanupService = ctx.services.createCommentCleanupService();
-      await cleanupService.softDeleteComment(
-        input.commentId,
-        ctx.session.user.id,
-      );
+      await cleanupService.softDeleteComment(input.commentId, ctx.user.id);
 
       // Record the deletion activity
       const activityService = ctx.services.createIssueActivityService();
       await activityService.recordCommentDeleted(
         comment.issueId,
         ctx.organization.id,
-        ctx.session.user.id,
+        ctx.user.id,
         input.commentId,
       );
 

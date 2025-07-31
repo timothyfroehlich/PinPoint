@@ -1,19 +1,20 @@
 "use client";
 
 import { Box, Grid, useTheme, useMediaQuery } from "@mui/material";
-import { type Session } from "next-auth";
 import * as React from "react";
 
 import { IssueCreateForm } from "./IssueCreateForm";
 import { RecentIssuesSidebar } from "./RecentIssuesSidebar";
 
+import type { PinPointSupabaseUser } from "../../../lib/supabase/types";
+
 interface IssueCreateViewProps {
-  session: Session | null;
+  user: PinPointSupabaseUser | null;
   initialMachineId?: string | undefined;
 }
 
 export function IssueCreateView({
-  session,
+  user,
   initialMachineId,
 }: IssueCreateViewProps): React.JSX.Element {
   const theme = useTheme();
@@ -27,7 +28,7 @@ export function IssueCreateView({
     return (
       <Box>
         <IssueCreateForm
-          session={session}
+          user={user}
           initialMachineId={initialMachineId}
           onMachineChange={setSelectedMachineId}
         />
@@ -41,7 +42,7 @@ export function IssueCreateView({
       {/* Main Form - 2/3 width */}
       <Grid size={{ xs: 12, md: 8 }}>
         <IssueCreateForm
-          session={session}
+          user={user}
           initialMachineId={initialMachineId}
           onMachineChange={setSelectedMachineId}
         />
@@ -51,7 +52,7 @@ export function IssueCreateView({
       <Grid size={{ xs: 12, md: 4 }}>
         <RecentIssuesSidebar
           selectedMachineId={selectedMachineId}
-          session={session}
+          user={user}
         />
       </Grid>
     </Grid>

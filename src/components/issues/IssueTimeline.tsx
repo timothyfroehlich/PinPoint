@@ -8,17 +8,19 @@ import {
   Edit as EditIcon,
 } from "@mui/icons-material";
 import { Box, Typography, Paper, Stack, Chip } from "@mui/material";
-import { type Session } from "next-auth";
+
+import type { PinPointSupabaseUser } from "../../../lib/supabase/types";
 
 import { type IssueWithDetails } from "~/types/issue";
 
 interface IssueTimelineProps {
   issue: IssueWithDetails;
-  session: Session | null;
+  user: PinPointSupabaseUser | null;
 }
 
 export function IssueTimeline({
   issue,
+  user: _user,
 }: IssueTimelineProps): React.JSX.Element {
   // Create timeline activities from available issue data
   const activities = [

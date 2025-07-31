@@ -28,10 +28,12 @@ describe("notificationRouter", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     ctx = createVitestMockContext();
-    ctx.session = {
-      user: { id: mockUser.id },
-      expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-    };
+    ctx.user = {
+      id: mockUser.id,
+      email: mockUser.email,
+      user_metadata: {},
+      app_metadata: { organization_id: "org-1" },
+    } as any; // Simplified mock for tests
 
     // Create a single mock service instance and make createNotificationService return it
     mockNotificationService = {

@@ -33,14 +33,38 @@ import {
   ToggleButton,
   ToggleButtonGroup,
 } from "@mui/material";
-import { signOut } from "next-auth/react";
 import React, { useState } from "react";
 
 import type { JSX } from "react";
 
+import { useAuth } from "~/app/auth-provider";
 import { ProfilePictureUpload } from "~/components/profile/ProfilePictureUpload";
 import { UserAvatar } from "~/components/ui/UserAvatar";
 import { api } from "~/trpc/react";
+
+function SignOutButton(): JSX.Element {
+  const { signOut } = useAuth();
+
+  const handleSignOut = async (): Promise<void> => {
+    try {
+      await signOut();
+      window.location.href = "/";
+    } catch (error) {
+      console.error("Sign out failed:", error);
+    }
+  };
+
+  return (
+    <Button
+      variant="outlined"
+      startIcon={<Logout />}
+      onClick={() => void handleSignOut()}
+      color="error"
+    >
+      Sign Out
+    </Button>
+  );
+}
 
 export default function ProfilePage(): JSX.Element {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -176,16 +200,7 @@ export default function ProfilePage(): JSX.Element {
                   >
                     Change Picture
                   </Button>
-                  <Button
-                    variant="outlined"
-                    startIcon={<Logout />}
-                    onClick={() => {
-                      void signOut({ callbackUrl: "/" });
-                    }}
-                    color="error"
-                  >
-                    Sign Out
-                  </Button>
+                  <SignOutButton />
                 </Box>
               </Box>
             </CardContent>

@@ -86,7 +86,7 @@ const issueConfirmationRouter = createTRPCRouter({
           priorityId: input.priorityId,
           consistency: input.consistency ?? null,
           organizationId: ctx.organization.id,
-          createdById: ctx.session.user.id,
+          createdById: ctx.user.id,
           assignedToId: null,
           // Note: In reality, this would need the schema to be updated first
           // For now, we'll mock this behavior
@@ -112,7 +112,7 @@ const issueConfirmationRouter = createTRPCRouter({
         // Mock the confirmation fields for testing
         isConfirmed: confirmationStatus,
         confirmedAt: confirmationStatus ? new Date() : null,
-        confirmedById: confirmationStatus ? ctx.session.user.id : null,
+        confirmedById: confirmationStatus ? ctx.user.id : null,
       };
     }),
 

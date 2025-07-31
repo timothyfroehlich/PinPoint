@@ -13,10 +13,11 @@ import {
 } from "@mui/material";
 import { type User, type Role } from "@prisma/client";
 import { useRouter } from "next/navigation";
-import { signIn, getProviders } from "next-auth/react";
 import React, { useEffect, useState } from "react";
 
-import { useCurrentUser } from "~/lib/hooks/use-current-user";
+import { createClient } from "../../../lib/supabase/client";
+
+import { useAuth } from "~/app/auth-provider";
 
 type UserWithRole = User & { role: Role | null };
 
@@ -25,27 +26,19 @@ const isDevelopment =
   typeof window !== "undefined" && window.location.hostname === "localhost";
 
 export default function SignInPage(): React.ReactElement | null {
-  const { isAuthenticated } = useCurrentUser();
+  const { user, loading } = useAuth();
   const router = useRouter();
-  const [providers, setProviders] = useState<Record<string, unknown> | null>(
-    null,
-  );
   const [users, setUsers] = useState<UserWithRole[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+
+  const isAuthenticated = !loading && !!user;
 
   useEffect(() => {
     if (isAuthenticated) {
       router.push("/");
       return;
     }
-
-    async function getProvidersData(): Promise<void> {
-      const providersData = await getProviders();
-      setProviders(providersData);
-    }
-
-    void getProvidersData();
   }, [isAuthenticated, router]);
 
   useEffect(() => {
@@ -78,7 +71,16 @@ export default function SignInPage(): React.ReactElement | null {
   async function handleGoogleSignIn(): Promise<void> {
     setIsLoading(true);
     try {
-      await signIn("google", { callbackUrl: "/" });
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/`,
+        },
+      });
+      if (error) {
+        console.error("Google sign in failed:", error.message);
+      }
     } catch (error) {
       console.error("Google sign in failed:", error);
     } finally {
@@ -89,21 +91,24 @@ export default function SignInPage(): React.ReactElement | null {
   async function handleDevLogin(email: string): Promise<void> {
     setIsLoading(true);
     try {
-      const result = await signIn("credentials", {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithOtp({
         email,
-        redirect: false,
+        options: {
+          shouldCreateUser: false,
+        },
       });
 
-      console.log("Sign-in result:", result);
-
-      if (result.ok) {
-        // Redirect manually on success
-        window.location.href = "/";
+      if (error) {
+        console.error("Sign-in failed:", error.message);
+        alert(`Sign-in failed: ${error.message}`);
       } else {
-        console.error("Sign-in failed:", result.error);
+        alert("Magic link sent! Check your email to complete login.");
       }
-    } catch (error) {
-      console.error("Dev login failed:", error);
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      console.error("Dev login failed:", errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -153,19 +158,17 @@ export default function SignInPage(): React.ReactElement | null {
         </Typography>
 
         <Stack spacing={3}>
-          {providers && "google" in providers && (
-            <Button
-              variant="contained"
-              size="large"
-              startIcon={<Google />}
-              onClick={() => void handleGoogleSignIn()}
-              disabled={isLoading}
-              fullWidth
-              sx={{ py: 1.5 }}
-            >
-              Sign in with Google
-            </Button>
-          )}
+          <Button
+            variant="contained"
+            size="large"
+            startIcon={<Google />}
+            onClick={() => void handleGoogleSignIn()}
+            disabled={isLoading}
+            fullWidth
+            sx={{ py: 1.5 }}
+          >
+            Sign in with Google
+          </Button>
 
           {isDevelopment && (
             <>

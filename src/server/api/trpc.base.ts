@@ -10,14 +10,15 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
 
-import type { ExtendedPrismaClient } from "~/server/db";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { SupabaseUser } from "../../../lib/supabase/types";
-
 import { createClient } from "../../../lib/supabase/server";
+
+import type { SupabaseServerClient } from "../../../lib/supabase/server";
+import type { PinPointSupabaseUser } from "../../../lib/supabase/types";
+import type { ExtendedPrismaClient } from "~/server/db";
+
 import { env } from "~/env";
+import { getUserPermissionsForSupabaseUser } from "~/server/auth/permissions";
 import { getSupabaseUser } from "~/server/auth/supabase";
-import { getUserPermissionsForSession } from "~/server/auth/permissions";
 import { getGlobalDatabaseProvider } from "~/server/db/provider";
 import { ServiceFactory } from "~/server/services/factory";
 
@@ -70,7 +71,8 @@ interface Membership {
  */
 export interface TRPCContext {
   db: ExtendedPrismaClient;
-  session: Session | null;
+  user: PinPointSupabaseUser | null;
+  supabase: SupabaseServerClient;
   organization: Organization | null;
   services: ServiceFactory;
   headers: Headers;
@@ -80,9 +82,7 @@ export interface TRPCContext {
  * Enhanced context for protected procedures with authenticated user
  */
 export interface ProtectedTRPCContext extends TRPCContext {
-  session: Session & {
-    user: NonNullable<Session["user"]>;
-  };
+  user: PinPointSupabaseUser;
 }
 
 /**
@@ -105,14 +105,15 @@ export const createTRPCContext = async (
 
   const db = dbProvider.getClient();
   const services = new ServiceFactory(db);
-  const session = await auth();
+  const supabase = await createClient();
+  const user = await getSupabaseUser();
 
   let organization: Organization | null = null;
 
   // If user is authenticated and has organization context, use that
-  if (session?.user.organizationId) {
+  if (user?.app_metadata.organization_id) {
     const org = await db.organization.findUnique({
-      where: { id: session.user.organizationId },
+      where: { id: user.app_metadata.organization_id },
     });
     if (org) {
       organization = org as Organization;
@@ -142,7 +143,8 @@ export const createTRPCContext = async (
 
   return {
     db,
-    session,
+    user,
+    supabase,
     organization,
     services,
     headers: opts.headers,
@@ -198,14 +200,14 @@ export const publicProcedure = t.procedure.use(timingMiddleware);
 export const protectedProcedure = t.procedure
   .use(timingMiddleware)
   .use(({ ctx, next }) => {
-    if (!ctx.session?.user) {
+    if (!ctx.user) {
       throw new TRPCError({ code: "UNAUTHORIZED" });
     }
     return next({
       ctx: {
         ...ctx,
-        // infers the `session` as non-nullable
-        session: { ...ctx.session, user: ctx.session.user },
+        // infers the `user` as non-nullable
+        user: ctx.user,
       } satisfies ProtectedTRPCContext,
     });
   });
@@ -222,7 +224,7 @@ export const organizationProcedure = protectedProcedure.use(
     const membership = await ctx.db.membership.findFirst({
       where: {
         organizationId: ctx.organization.id,
-        userId: ctx.session.user.id,
+        userId: ctx.user.id,
       },
       include: {
         role: {
@@ -241,8 +243,8 @@ export const organizationProcedure = protectedProcedure.use(
     }
 
     // Get user permissions (handles admin role automatically)
-    const userPermissions = await getUserPermissionsForSession(
-      ctx.session,
+    const userPermissions = await getUserPermissionsForSupabaseUser(
+      ctx.user,
       ctx.db,
       ctx.organization.id,
     );
