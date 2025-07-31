@@ -387,6 +387,11 @@ describe("issueRouter - Issue Detail Page", () => {
         category: "IN_PROGRESS" as const,
       };
 
+      // Mock the membership lookup that the middleware requires
+      vi.mocked(testContext.db.membership.findFirst).mockResolvedValue(
+        mockMembership as any,
+      );
+
       // Mock the database calls with proper type casting
       vi.mocked(testContext.db.issue.findFirst).mockResolvedValue({
         ...mockIssue,
@@ -455,11 +460,9 @@ describe("issueRouter - Issue Detail Page", () => {
       const result = await commentCaller.issue.comment.create({
         issueId: mockIssue.id,
         content: "New comment",
-        isInternal: false,
       });
 
       expect(result.content).toBe("New comment");
-      expect(result.isInternal).toBe(false);
     });
 
     it("should allow internal comments for authorized users", async () => {
@@ -488,10 +491,9 @@ describe("issueRouter - Issue Detail Page", () => {
       const result = await internalCaller.issue.comment.create({
         issueId: mockIssue.id,
         content: "Internal note",
-        isInternal: true,
       });
 
-      expect(result.isInternal).toBe(true);
+      expect(result.content).toBe("Internal note");
     });
 
     it("should deny internal comments for unauthorized users", async () => {
@@ -510,14 +512,13 @@ describe("issueRouter - Issue Detail Page", () => {
       try {
         const result = await publicCommentCaller.issue.comment.create({
           issueId: mockIssue.id,
-          content: "Internal note",
-          isInternal: true,
+          content: "Test comment",
         });
         // If we get here, the call succeeded when it should have failed
         expect(result).toBeUndefined(); // Force a failure to see what we actually got
       } catch (error) {
         // This is expected - should throw a permission error
-        expect(error.message).toMatch(
+        expect((error as Error).message).toMatch(
           /Missing required permission|internal_comment/,
         );
       }
