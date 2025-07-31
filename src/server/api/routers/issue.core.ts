@@ -1,6 +1,10 @@
 import { z } from "zod";
 
 import {
+  validateStatusTransition,
+  getStatusChangeEffects,
+} from "~/lib/issues/statusValidation";
+import {
   createTRPCRouter,
   organizationProcedure,
   publicProcedure,
@@ -863,12 +867,36 @@ export const issueCoreRouter = createTRPCRouter({
         throw new Error("Invalid status");
       }
 
+      // Use extracted validation functions
+      // Since this is using issueEditProcedure, user has issue:edit permission
+      const userPermissions = ["issue:edit"] as const;
+      const validationResult = validateStatusTransition(
+        {
+          currentStatus: existingIssue.status,
+          newStatusId: input.statusId,
+          organizationId: ctx.organization.id,
+        },
+        newStatus,
+        {
+          userPermissions,
+          organizationId: ctx.organization.id,
+        },
+      );
+
+      if (!validationResult.valid) {
+        throw new Error(validationResult.error ?? "Invalid status transition");
+      }
+
+      // Get status change effects using extracted function
+      const effects = getStatusChangeEffects(existingIssue.status, newStatus);
+
       // Update the issue
       const updatedIssue = await ctx.db.issue.update({
         where: { id: input.id },
         data: {
           statusId: input.statusId,
-          ...(newStatus.category === "RESOLVED" && { resolvedAt: new Date() }),
+          ...(effects.shouldSetResolvedAt && { resolvedAt: new Date() }),
+          ...(effects.shouldClearResolvedAt && { resolvedAt: null }),
         },
         include: {
           status: true,
