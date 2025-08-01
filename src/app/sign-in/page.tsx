@@ -15,9 +15,8 @@ import { type User, type Role } from "@prisma/client";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 
-import { createClient } from "../../../lib/supabase/client";
-
 import { useAuth } from "~/app/auth-provider";
+import { createClient } from "~/lib/supabase/client";
 
 type UserWithRole = User & { role: Role | null };
 

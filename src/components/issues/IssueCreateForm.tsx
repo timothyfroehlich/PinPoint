@@ -25,7 +25,7 @@ import { useState } from "react";
 
 import { MachineSelector } from "./MachineSelector";
 
-import type { PinPointSupabaseUser } from "../../../lib/supabase/types";
+import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 
 import { PermissionGate } from "~/components/permissions";
 import { usePermissions } from "~/hooks/usePermissions";

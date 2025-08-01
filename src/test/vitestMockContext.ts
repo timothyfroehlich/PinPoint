@@ -1,6 +1,6 @@
 import { vi } from "vitest";
 
-import type { PinPointSupabaseUser } from "../../lib/supabase/types";
+import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 import type { ExtendedPrismaClient } from "~/server/db";
 import type { ServiceFactory } from "~/server/services/factory";
 

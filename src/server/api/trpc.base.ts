@@ -10,13 +10,12 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
 
-import { createClient } from "../../../lib/supabase/server";
-
-import type { SupabaseServerClient } from "../../../lib/supabase/server";
-import type { PinPointSupabaseUser } from "../../../lib/supabase/types";
+import type { SupabaseServerClient } from "~/lib/supabase/server";
+import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 import type { ExtendedPrismaClient } from "~/server/db";
 
 import { env } from "~/env";
+import { createClient } from "~/lib/supabase/server";
 import { getUserPermissionsForSupabaseUser } from "~/server/auth/permissions";
 import { getSupabaseUser } from "~/server/auth/supabase";
 import { getGlobalDatabaseProvider } from "~/server/db/provider";

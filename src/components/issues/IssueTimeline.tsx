@@ -9,7 +9,7 @@ import {
 } from "@mui/icons-material";
 import { Box, Typography, Paper, Stack, Chip } from "@mui/material";
 
-import type { PinPointSupabaseUser } from "../../../lib/supabase/types";
+import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 
 import { type IssueWithDetails } from "~/types/issue";
 

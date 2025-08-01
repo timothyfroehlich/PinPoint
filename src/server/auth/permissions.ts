@@ -6,7 +6,7 @@ import { PermissionService } from "../services/permissionService";
 
 import { SYSTEM_ROLES } from "./permissions.constants";
 
-import type { PinPointSupabaseUser } from "../../../lib/supabase/types";
+import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 
 /**
  * Checks if a given membership has a specific permission.

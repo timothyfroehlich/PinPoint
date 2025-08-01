@@ -1,7 +1,7 @@
 import { organizationProcedure } from "./trpc.base";
 
-import type { PinPointSupabaseUser } from "../../../lib/supabase/types";
 import type { Session } from "next-auth";
+import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 
 import { requirePermissionForSession } from "~/server/auth/permissions";
 

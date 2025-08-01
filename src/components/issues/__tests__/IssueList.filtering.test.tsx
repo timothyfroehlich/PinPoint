@@ -5,168 +5,33 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 import { IssueList } from "../IssueList";
 
+import { createMockTRPCQueryResult } from "~/test/mockUtils";
 import {
-  createMockIssuesList,
-  createMockLocations,
-  createMockMachines,
-  createMockStatuses,
-  createMockTRPCQueryResult,
-} from "~/test/mockUtils";
+  createIssueListMocks,
+  setupIssueListTest,
+} from "~/test/setup/issueListTestSetup";
+import { setupAllIssueListMocks } from "~/test/setup/viTestMocks";
 import { VitestTestWrapper } from "~/test/VitestTestWrapper";
 
-// Mock next/navigation with vi.hoisted
-const { mockPush, mockSearchParams } = vi.hoisted(() => ({
-  mockPush: vi.fn(),
-  mockSearchParams: new URLSearchParams(),
-}));
+// ✅ SHARED MOCK SETUP: Centralized vi.hoisted() mock creation (was ~45 lines of duplication)
+const mocks = createIssueListMocks();
 
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({
-    push: mockPush,
-  }),
-  useSearchParams: () => mockSearchParams,
-}));
-
-// Mock tRPC API calls with vi.hoisted - preserve React components
-const {
-  mockRefetch,
-  mockIssuesQuery,
-  mockLocationsQuery,
-  mockStatusesQuery,
-  mockMachinesQuery,
-  mockUsersQuery,
-} = vi.hoisted(() => ({
-  mockRefetch: vi.fn(),
-  mockIssuesQuery: vi.fn(),
-  mockLocationsQuery: vi.fn(),
-  mockStatusesQuery: vi.fn(),
-  mockMachinesQuery: vi.fn(),
-  mockUsersQuery: vi.fn(),
-}));
-
-vi.mock("~/trpc/react", async () => {
-  const actual =
-    await vi.importActual<typeof import("~/trpc/react")>("~/trpc/react");
-  return {
-    ...actual,
-    api: {
-      ...actual.api,
-      createClient: actual.api.createClient,
-      Provider: actual.api.Provider,
-      issue: {
-        ...actual.api.issue,
-        core: {
-          ...actual.api.issue?.core,
-          getAll: {
-            ...actual.api.issue?.core?.getAll,
-            useQuery: mockIssuesQuery,
-          },
-        },
-      },
-      location: {
-        ...actual.api.location,
-        getAll: {
-          ...actual.api.location?.getAll,
-          useQuery: mockLocationsQuery,
-        },
-      },
-      issueStatus: {
-        ...actual.api.issueStatus,
-        getAll: {
-          ...actual.api.issueStatus?.getAll,
-          useQuery: mockStatusesQuery,
-        },
-      },
-      machine: {
-        ...actual.api.machine,
-        core: {
-          ...actual.api.machine?.core,
-          getAll: {
-            ...actual.api.machine?.core?.getAll,
-            useQuery: mockMachinesQuery,
-          },
-        },
-      },
-      user: {
-        ...actual.api.user,
-        getCurrentMembership: {
-          ...actual.api.user?.getCurrentMembership,
-          useQuery: vi.fn(() => ({
-            data: null,
-            isLoading: false,
-            isError: false,
-          })),
-        },
-        getAllInOrganization: {
-          ...actual.api.user?.getAllInOrganization,
-          useQuery: mockUsersQuery,
-        },
-      },
-    },
-  };
-});
-
-// Mock usePermissions hook with vi.hoisted
-const { mockHasPermission } = vi.hoisted(() => ({
-  mockHasPermission: vi.fn(),
-}));
-
-vi.mock("~/hooks/usePermissions", () => ({
-  usePermissions: () => ({
-    hasPermission: mockHasPermission,
-    isLoading: false,
-  }),
-}));
+setupAllIssueListMocks(mocks);
 
 describe("IssueList - Filtering Functionality", () => {
-  // Use centralized mock data factories
-  const mockIssues = createMockIssuesList({
-    count: 3,
-    overrides: {
-      title: "Test Issue",
-      _count: { comments: 2, attachments: 1 },
-    },
-  });
-  const mockLocations = createMockLocations({ count: 2, overrides: {} });
-  const mockStatuses = createMockStatuses({ count: 3 });
-
-  const defaultFilters = {
-    sortBy: "created" as const,
-    sortOrder: "desc" as const,
-  };
+  // ✅ SHARED TEST SETUP: Use centralized scenario-based mock data
+  const testSetup = setupIssueListTest("FILTERING", mocks);
 
   beforeEach(() => {
-    vi.clearAllMocks();
-
-    // Default API responses
-    mockIssuesQuery.mockReturnValue({
-      data: mockIssues,
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: mockRefetch,
-    });
-
-    mockLocationsQuery.mockReturnValue(
-      createMockTRPCQueryResult(mockLocations),
-    );
-
-    mockStatusesQuery.mockReturnValue(createMockTRPCQueryResult(mockStatuses));
-
-    mockMachinesQuery.mockReturnValue(
-      createMockTRPCQueryResult(createMockMachines({ count: 3 })),
-    );
-
-    mockUsersQuery.mockReturnValue(createMockTRPCQueryResult([]));
-
-    mockHasPermission.mockReturnValue(true);
+    // ✅ SHARED CLEANUP: Centralized mock reset and configuration
+    testSetup.resetMocks();
   });
 
   describe("Filter Controls Rendering", () => {
     it("renders all filter controls", async () => {
       render(
         <VitestTestWrapper userPermissions={["issue:view"]}>
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -188,7 +53,7 @@ describe("IssueList - Filtering Functionality", () => {
     it("populates location filter dropdown correctly", async () => {
       render(
         <VitestTestWrapper userPermissions={["issue:view"]}>
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -221,7 +86,7 @@ describe("IssueList - Filtering Functionality", () => {
     it("renders status toggle pills correctly", async () => {
       render(
         <VitestTestWrapper userPermissions={["issue:view"]}>
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -259,27 +124,27 @@ describe("IssueList - Filtering Functionality", () => {
         </VitestTestWrapper>,
       );
 
-      expect(mockIssuesQuery).toHaveBeenCalledWith(filters);
+      expect(mocks.mockIssuesQuery).toHaveBeenCalledWith(filters);
     });
 
     it("calls location.getAll for filter dropdown", () => {
       render(
         <VitestTestWrapper userPermissions={["issue:view"]}>
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
-      expect(mockLocationsQuery).toHaveBeenCalled();
+      expect(mocks.mockLocationsQuery).toHaveBeenCalled();
     });
 
     it("calls issueStatus.getAll for filter dropdown", () => {
       render(
         <VitestTestWrapper userPermissions={["issue:view"]}>
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
-      expect(mockStatusesQuery).toHaveBeenCalled();
+      expect(mocks.mockStatusesQuery).toHaveBeenCalled();
     });
   });
 
@@ -287,7 +152,7 @@ describe("IssueList - Filtering Functionality", () => {
     it("updates URL when location filter changes", async () => {
       render(
         <VitestTestWrapper userPermissions={["issue:view"]}>
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -316,7 +181,7 @@ describe("IssueList - Filtering Functionality", () => {
       await userEvent.click(locationOption);
 
       await waitFor(() => {
-        expect(mockPush).toHaveBeenCalledWith(
+        expect(mocks.mockPush).toHaveBeenCalledWith(
           expect.stringContaining("locationId=location-1"),
         );
       });
@@ -325,7 +190,7 @@ describe("IssueList - Filtering Functionality", () => {
     it("updates URL when status pill is clicked", async () => {
       render(
         <VitestTestWrapper userPermissions={["issue:view"]}>
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -339,7 +204,7 @@ describe("IssueList - Filtering Functionality", () => {
 
       // Wait for URL update
       await waitFor(() => {
-        expect(mockPush).toHaveBeenCalledWith(
+        expect(mocks.mockPush).toHaveBeenCalledWith(
           expect.stringContaining("statusIds="),
         );
       });
@@ -348,7 +213,7 @@ describe("IssueList - Filtering Functionality", () => {
     it("handles multiple filter changes in sequence", async () => {
       render(
         <VitestTestWrapper userPermissions={["issue:view"]}>
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -379,13 +244,13 @@ describe("IssueList - Filtering Functionality", () => {
 
       // Verify URL updates were made
       await waitFor(() => {
-        expect(mockPush).toHaveBeenCalledWith(
+        expect(mocks.mockPush).toHaveBeenCalledWith(
           expect.stringContaining("locationId=location-1"),
         );
       });
 
       await waitFor(() => {
-        expect(mockPush).toHaveBeenCalledWith(
+        expect(mocks.mockPush).toHaveBeenCalledWith(
           expect.stringContaining("statusIds="),
         );
       });
@@ -426,7 +291,7 @@ describe("IssueList - Filtering Functionality", () => {
 
       await waitFor(() => {
         // URL should be updated without locationId parameter
-        expect(mockPush).toHaveBeenCalledWith(
+        expect(mocks.mockPush).toHaveBeenCalledWith(
           expect.not.stringContaining("locationId="),
         );
       });
@@ -437,12 +302,14 @@ describe("IssueList - Filtering Functionality", () => {
     it("loads with default filters when no URL parameters are present", () => {
       render(
         <VitestTestWrapper userPermissions={["issue:view"]}>
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
       // Should call API with default filters
-      expect(mockIssuesQuery).toHaveBeenCalledWith(defaultFilters);
+      expect(mocks.mockIssuesQuery).toHaveBeenCalledWith(
+        testSetup.defaultFilters,
+      );
     });
 
     it("loads with filters from URL parameters", () => {
@@ -461,7 +328,7 @@ describe("IssueList - Filtering Functionality", () => {
       );
 
       // Should call API with URL-provided filters
-      expect(mockIssuesQuery).toHaveBeenCalledWith(initialFilters);
+      expect(mocks.mockIssuesQuery).toHaveBeenCalledWith(initialFilters);
     });
 
     it("handles invalid URL parameters gracefully", () => {
@@ -493,7 +360,7 @@ describe("IssueList - Filtering Functionality", () => {
         </VitestTestWrapper>,
       );
 
-      expect(mockIssuesQuery).toHaveBeenCalledWith(emptyFilters);
+      expect(mocks.mockIssuesQuery).toHaveBeenCalledWith(emptyFilters);
     });
   });
 
@@ -515,7 +382,7 @@ describe("IssueList - Filtering Functionality", () => {
       );
 
       // Should call API with complex filter combination
-      expect(mockIssuesQuery).toHaveBeenCalledWith(complexFilters);
+      expect(mocks.mockIssuesQuery).toHaveBeenCalledWith(complexFilters);
     });
 
     it("supports browser back/forward navigation with filter states", () => {
@@ -532,16 +399,20 @@ describe("IssueList - Filtering Functionality", () => {
         </VitestTestWrapper>,
       );
 
-      expect(mockIssuesQuery).toHaveBeenCalledWith(initialFilters);
+      expect(mocks.mockIssuesQuery).toHaveBeenCalledWith(initialFilters);
 
       // Unmount and render with different filters (simulating navigation)
       unmount();
       vi.clearAllMocks();
 
       // Setup fresh API responses
-      mockIssuesQuery.mockReturnValue(createMockTRPCQueryResult(mockIssues));
-      mockLocationsQuery.mockReturnValue({ data: mockLocations });
-      mockStatusesQuery.mockReturnValue({ data: mockStatuses });
+      mocks.mockIssuesQuery.mockReturnValue(
+        createMockTRPCQueryResult(testSetup.mockIssues),
+      );
+      mocks.mockLocationsQuery.mockReturnValue({
+        data: testSetup.mockLocations,
+      });
+      mocks.mockStatusesQuery.mockReturnValue({ data: testSetup.mockStatuses });
 
       const newFilters = {
         statusIds: ["status-2"],
@@ -556,7 +427,7 @@ describe("IssueList - Filtering Functionality", () => {
       );
 
       // Should call API with new filters
-      expect(mockIssuesQuery).toHaveBeenCalledWith(newFilters);
+      expect(mocks.mockIssuesQuery).toHaveBeenCalledWith(newFilters);
     });
 
     it("maintains filter state consistency across page reloads", () => {
@@ -575,7 +446,7 @@ describe("IssueList - Filtering Functionality", () => {
       );
 
       // Should maintain exact filter state on reload
-      expect(mockIssuesQuery).toHaveBeenCalledWith(persistedFilters);
+      expect(mocks.mockIssuesQuery).toHaveBeenCalledWith(persistedFilters);
     });
   });
 
@@ -619,7 +490,7 @@ describe("IssueList - Filtering Functionality", () => {
     it("handles sort parameter changes correctly", async () => {
       render(
         <VitestTestWrapper userPermissions={["issue:view"]}>
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -645,7 +516,7 @@ describe("IssueList - Filtering Functionality", () => {
 
       // Wait for URL update with sort parameter
       await waitFor(() => {
-        expect(mockPush).toHaveBeenCalledWith(
+        expect(mocks.mockPush).toHaveBeenCalledWith(
           expect.stringContaining("sortBy=updated"),
         );
       });

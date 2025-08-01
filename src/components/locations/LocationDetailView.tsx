@@ -16,7 +16,7 @@ import {
 
 import { MachineGrid } from "./MachineGrid";
 
-import type { PinPointSupabaseUser } from "../../../lib/supabase/types";
+import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 import type { RouterOutputs } from "~/trpc/react";
 
 import { PermissionGate } from "~/components/permissions";

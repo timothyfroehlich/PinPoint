@@ -1,239 +1,38 @@
 import "@testing-library/jest-dom/vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 
 import { IssueList } from "../IssueList";
 
+import { EXTENDED_PERMISSION_SCENARIOS } from "~/test/mockUtils";
 import {
-  createMockIssuesList,
-  createMockLocations,
-  createMockStatuses,
-  EXTENDED_PERMISSION_SCENARIOS,
-} from "~/test/mockUtils";
+  createIssueListMocks,
+  setupIssueListTest,
+} from "~/test/setup/issueListTestSetup";
+import { setupAllIssueListMocks } from "~/test/setup/viTestMocks";
 import {
   VitestTestWrapper,
   VITEST_PERMISSION_SCENARIOS,
   VITEST_ROLE_MAPPING,
 } from "~/test/VitestTestWrapper";
 
-// Mock next/navigation with vi.hoisted
-const { mockPush, mockSearchParams } = vi.hoisted(() => ({
-  mockPush: vi.fn(),
-  mockSearchParams: new URLSearchParams(),
-}));
-
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({
-    push: mockPush,
-  }),
-  useSearchParams: () => mockSearchParams,
-}));
-
-// Mock tRPC API calls with vi.hoisted - preserve React components
-const {
-  mockRefetch,
-  mockIssuesQuery,
-  mockLocationsQuery,
-  mockStatusesQuery,
-  mockMachinesQuery,
-  mockUsersQuery,
-} = vi.hoisted(() => ({
-  mockRefetch: vi.fn(),
-  mockIssuesQuery: vi.fn(),
-  mockLocationsQuery: vi.fn(),
-  mockStatusesQuery: vi.fn(),
-  mockMachinesQuery: vi.fn(),
-  mockUsersQuery: vi.fn(),
-}));
-
-vi.mock("~/trpc/react", async () => {
-  const actual =
-    await vi.importActual<typeof import("~/trpc/react")>("~/trpc/react");
-  return {
-    ...actual,
-    api: {
-      ...actual.api,
-      createClient: actual.api.createClient,
-      Provider: actual.api.Provider,
-      issue: {
-        ...actual.api.issue,
-        core: {
-          ...actual.api.issue?.core,
-          getAll: {
-            ...actual.api.issue?.core?.getAll,
-            useQuery: mockIssuesQuery,
-          },
-        },
-      },
-      location: {
-        ...actual.api.location,
-        getAll: {
-          ...actual.api.location?.getAll,
-          useQuery: mockLocationsQuery,
-        },
-      },
-      issueStatus: {
-        ...actual.api.issueStatus,
-        getAll: {
-          ...actual.api.issueStatus?.getAll,
-          useQuery: mockStatusesQuery,
-        },
-      },
-      machine: {
-        ...actual.api.machine,
-        core: {
-          ...actual.api.machine?.core,
-          getAll: {
-            ...actual.api.machine?.core?.getAll,
-            useQuery: mockMachinesQuery,
-          },
-        },
-      },
-      user: {
-        ...actual.api.user,
-        getCurrentMembership: {
-          ...actual.api.user?.getCurrentMembership,
-          useQuery: vi.fn(() => ({
-            data: null,
-            isLoading: false,
-            isError: false,
-          })),
-        },
-        getAllInOrganization: {
-          ...actual.api.user?.getAllInOrganization,
-          useQuery: mockUsersQuery,
-        },
-      },
-    },
-  };
-});
-
-// Mock usePermissions hook with vi.hoisted
-const { mockHasPermission } = vi.hoisted(() => ({
-  mockHasPermission: vi.fn(),
-}));
-
-vi.mock("~/hooks/usePermissions", () => ({
-  usePermissions: () => ({
-    hasPermission: mockHasPermission,
-    isLoading: false,
-  }),
-}));
+// ✅ SHARED MOCK SETUP: Centralized vi.hoisted() mock creation (was ~50 lines of duplication)
+const mocks = createIssueListMocks();
+setupAllIssueListMocks(mocks);
 
 describe("IssueList Component - Selection and Bulk Actions", () => {
-  // Use centralized mock data factories
-  const mockIssues = createMockIssuesList({
-    count: 2,
-    overrides: {
-      title: "Test Issue",
-      _count: { comments: 2, attachments: 1 },
-    },
-  });
-  const mockLocations = createMockLocations({ count: 2, overrides: {} });
-  const mockStatuses = createMockStatuses({ count: 3 });
-
-  const defaultFilters = {
-    sortBy: "created" as const,
-    sortOrder: "desc" as const,
-  };
+  // ✅ SHARED TEST SETUP: Use centralized scenario-based mock data
+  const testSetup = setupIssueListTest("SELECTION", mocks);
 
   beforeEach(() => {
-    vi.clearAllMocks();
-
-    // Default API responses
-    mockIssuesQuery.mockReturnValue({
-      data: mockIssues,
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: mockRefetch,
-    });
-
-    mockLocationsQuery.mockReturnValue({
-      data: mockLocations,
-    });
-
-    mockStatusesQuery.mockReturnValue({
-      data: mockStatuses,
-    });
-
-    mockMachinesQuery.mockReturnValue({
-      data: [
-        {
-          id: "machine-1",
-          name: "Medieval Madness #1",
-          organizationId: "org-1",
-          modelId: "model-mm",
-          locationId: "location-1",
-          ownerId: null,
-          model: {
-            id: "model-mm",
-            name: "Medieval Madness",
-            manufacturer: "Williams",
-            year: 1997,
-          },
-          location: {
-            id: "location-1",
-            name: "Main Floor",
-            organizationId: "org-1",
-          },
-        },
-        {
-          id: "machine-3",
-          name: "Attack from Mars #1",
-          organizationId: "org-1",
-          modelId: "model-afm",
-          locationId: "location-1",
-          ownerId: null,
-          model: {
-            id: "model-afm",
-            name: "Attack from Mars",
-            manufacturer: "Bally",
-            year: 1995,
-          },
-          location: {
-            id: "location-1",
-            name: "Main Floor",
-            organizationId: "org-1",
-          },
-        },
-        {
-          id: "machine-5",
-          name: "Tales of Arabian Nights #1",
-          organizationId: "org-1",
-          modelId: "model-totan",
-          locationId: "location-2",
-          ownerId: null,
-          model: {
-            id: "model-totan",
-            name: "Tales of Arabian Nights",
-            manufacturer: "Williams",
-            year: 1996,
-          },
-          location: {
-            id: "location-2",
-            name: "Back Room",
-            organizationId: "org-1",
-          },
-        },
-      ],
-      isLoading: false,
-      isError: false,
-    });
-
-    mockUsersQuery.mockReturnValue({
-      data: [],
-      isLoading: false,
-      isError: false,
-    });
-
-    mockHasPermission.mockReturnValue(true);
+    // ✅ SHARED CLEANUP: Centralized mock reset and configuration
+    testSetup.resetMocks();
   });
 
   describe("Selection Controls Visibility", () => {
     it("shows selection controls for users with issue:assign permission", () => {
-      mockHasPermission.mockImplementation((permission: string) =>
+      mocks.mockHasPermission.mockImplementation((permission: string) =>
         ["issue:view", "issue:assign"].includes(permission),
       );
 
@@ -242,7 +41,7 @@ describe("IssueList Component - Selection and Bulk Actions", () => {
           userPermissions={["issue:view", "issue:assign"]}
           userRole="Admin"
         >
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -251,13 +50,13 @@ describe("IssueList Component - Selection and Bulk Actions", () => {
     });
 
     it("hides selection controls for users without issue:assign permission", () => {
-      mockHasPermission.mockImplementation((permission: string) =>
+      mocks.mockHasPermission.mockImplementation((permission: string) =>
         ["issue:view"].includes(permission),
       );
 
       render(
         <VitestTestWrapper userPermissions={["issue:view"]} userRole="Member">
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -271,7 +70,7 @@ describe("IssueList Component - Selection and Bulk Actions", () => {
           userPermissions={[...VITEST_PERMISSION_SCENARIOS.ADMIN]}
           userRole={VITEST_ROLE_MAPPING.ADMIN}
         >
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -280,7 +79,7 @@ describe("IssueList Component - Selection and Bulk Actions", () => {
     });
 
     it("hides selection controls for manager users without assign permission", () => {
-      mockHasPermission.mockImplementation((permission: string) =>
+      mocks.mockHasPermission.mockImplementation((permission: string) =>
         ([...VITEST_PERMISSION_SCENARIOS.MANAGER] as string[]).includes(
           permission,
         ),
@@ -291,7 +90,7 @@ describe("IssueList Component - Selection and Bulk Actions", () => {
           userPermissions={[...VITEST_PERMISSION_SCENARIOS.MANAGER]}
           userRole={VITEST_ROLE_MAPPING.MANAGER}
         >
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -310,7 +109,7 @@ describe("IssueList Component - Selection and Bulk Actions", () => {
           userPermissions={technicianPermissions}
           userRole="Technician"
         >
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -321,7 +120,7 @@ describe("IssueList Component - Selection and Bulk Actions", () => {
 
   describe("Individual Issue Selection", () => {
     beforeEach(() => {
-      mockHasPermission.mockImplementation((permission: string) =>
+      mocks.mockHasPermission.mockImplementation((permission: string) =>
         ["issue:view", "issue:assign", "issue:edit"].includes(permission),
       );
     });
@@ -332,7 +131,7 @@ describe("IssueList Component - Selection and Bulk Actions", () => {
           userPermissions={["issue:view", "issue:assign", "issue:edit"]}
           userRole="Admin"
         >
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -353,7 +152,7 @@ describe("IssueList Component - Selection and Bulk Actions", () => {
           userPermissions={["issue:view", "issue:assign", "issue:edit"]}
           userRole="Admin"
         >
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -380,7 +179,7 @@ describe("IssueList Component - Selection and Bulk Actions", () => {
           userPermissions={["issue:view", "issue:assign", "issue:edit"]}
           userRole="Admin"
         >
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -398,7 +197,7 @@ describe("IssueList Component - Selection and Bulk Actions", () => {
           userPermissions={["issue:view", "issue:assign", "issue:edit"]}
           userRole="Admin"
         >
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -422,7 +221,7 @@ describe("IssueList Component - Selection and Bulk Actions", () => {
 
   describe("Select All Functionality", () => {
     beforeEach(() => {
-      mockHasPermission.mockImplementation((permission: string) =>
+      mocks.mockHasPermission.mockImplementation((permission: string) =>
         ["issue:view", "issue:assign", "issue:edit"].includes(permission),
       );
     });
@@ -433,7 +232,7 @@ describe("IssueList Component - Selection and Bulk Actions", () => {
           userPermissions={["issue:view", "issue:assign", "issue:edit"]}
           userRole="Admin"
         >
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -459,7 +258,7 @@ describe("IssueList Component - Selection and Bulk Actions", () => {
           userPermissions={["issue:view", "issue:assign", "issue:edit"]}
           userRole="Admin"
         >
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -497,7 +296,7 @@ describe("IssueList Component - Selection and Bulk Actions", () => {
           userPermissions={[...VITEST_PERMISSION_SCENARIOS.ADMIN]}
           userRole={VITEST_ROLE_MAPPING.ADMIN}
         >
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -518,7 +317,7 @@ describe("IssueList Component - Selection and Bulk Actions", () => {
           userPermissions={[...VITEST_PERMISSION_SCENARIOS.ADMIN]}
           userRole={VITEST_ROLE_MAPPING.ADMIN}
         >
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -534,7 +333,7 @@ describe("IssueList Component - Selection and Bulk Actions", () => {
 
     it("shows disabled bulk actions with tooltips for insufficient permissions", async () => {
       // Mock having issue:assign to show selection, but not issue:edit for close
-      mockHasPermission.mockImplementation((permission: string) =>
+      mocks.mockHasPermission.mockImplementation((permission: string) =>
         ["issue:view", "issue:assign"].includes(permission),
       );
 
@@ -543,7 +342,7 @@ describe("IssueList Component - Selection and Bulk Actions", () => {
           userPermissions={["issue:view", "issue:assign"]}
           userRole="Technician"
         >
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -566,7 +365,7 @@ describe("IssueList Component - Selection and Bulk Actions", () => {
         ...EXTENDED_PERMISSION_SCENARIOS.TECHNICIAN,
       ];
 
-      mockHasPermission.mockImplementation((permission) =>
+      mocks.mockHasPermission.mockImplementation((permission) =>
         technicianPermissions.includes(permission),
       );
 
@@ -575,7 +374,7 @@ describe("IssueList Component - Selection and Bulk Actions", () => {
           userPermissions={technicianPermissions}
           userRole="Technician"
         >
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -594,7 +393,7 @@ describe("IssueList Component - Selection and Bulk Actions", () => {
 
   describe("Selection State Management", () => {
     beforeEach(() => {
-      mockHasPermission.mockImplementation((permission: string) =>
+      mocks.mockHasPermission.mockImplementation((permission: string) =>
         ["issue:view", "issue:assign", "issue:edit"].includes(permission),
       );
     });
@@ -605,7 +404,7 @@ describe("IssueList Component - Selection and Bulk Actions", () => {
           userPermissions={["issue:view", "issue:assign", "issue:edit"]}
           userRole="Admin"
         >
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -645,7 +444,7 @@ describe("IssueList Component - Selection and Bulk Actions", () => {
           userPermissions={["issue:view", "issue:assign", "issue:edit"]}
           userRole="Admin"
         >
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -659,7 +458,7 @@ describe("IssueList Component - Selection and Bulk Actions", () => {
 
   describe("Accessibility and Interaction", () => {
     beforeEach(() => {
-      mockHasPermission.mockImplementation((permission: string) =>
+      mocks.mockHasPermission.mockImplementation((permission: string) =>
         ["issue:view", "issue:assign", "issue:edit"].includes(permission),
       );
     });
@@ -670,7 +469,7 @@ describe("IssueList Component - Selection and Bulk Actions", () => {
           userPermissions={["issue:view", "issue:assign", "issue:edit"]}
           userRole="Admin"
         >
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -690,7 +489,7 @@ describe("IssueList Component - Selection and Bulk Actions", () => {
           userPermissions={["issue:view", "issue:assign", "issue:edit"]}
           userRole="Admin"
         >
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -707,7 +506,7 @@ describe("IssueList Component - Selection and Bulk Actions", () => {
   describe("Error Handling", () => {
     it("gracefully handles permission check failures", () => {
       // Mock reduced permissions for fallback behavior
-      mockHasPermission.mockImplementation((permission: string) =>
+      mocks.mockHasPermission.mockImplementation((permission: string) =>
         ["issue:view"].includes(permission),
       );
 
@@ -721,7 +520,7 @@ describe("IssueList Component - Selection and Bulk Actions", () => {
             error: new Error("Permission check failed"),
           }}
         >
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -731,12 +530,12 @@ describe("IssueList Component - Selection and Bulk Actions", () => {
     });
 
     it("handles empty issue list with selection controls", () => {
-      mockIssuesQuery.mockReturnValue({
+      mocks.mockIssuesQuery.mockReturnValue({
         data: [],
         isLoading: false,
         isError: false,
         error: null,
-        refetch: mockRefetch,
+        refetch: mocks.mockRefetch,
       });
 
       render(
@@ -744,7 +543,7 @@ describe("IssueList Component - Selection and Bulk Actions", () => {
           userPermissions={["issue:view", "issue:assign", "issue:edit"]}
           userRole="Admin"
         >
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 

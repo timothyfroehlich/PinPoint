@@ -20,7 +20,7 @@ import { IssueDetail } from "./IssueDetail";
 import { IssueStatusControl } from "./IssueStatusControl";
 import { IssueTimeline } from "./IssueTimeline";
 
-import type { PinPointSupabaseUser } from "../../../lib/supabase/types";
+import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 
 import { PermissionGate } from "~/components/permissions";
 import { usePermissions } from "~/hooks/usePermissions";

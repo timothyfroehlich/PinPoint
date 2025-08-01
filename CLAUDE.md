@@ -355,6 +355,7 @@ npm run drizzle:migrate # Coming in Stage 2
 - **ESLint Disabling**: NEVER add an eslint-disable unless you have exhausted all other options and confirmed with the user that it is the correct thing to do.
 - **E2E Testing**: Use `npm run playwright` (headless). NEVER use `playwright:headed` or `playwright:ui` as they show browser windows and interrupt the user's workflow.
 - **Prisma Studio**: AVOID launching Prisma Studio (`npm run db:studio`) unless absolutely necessary for debugging complex data issues. Use direct SQL queries, schema file reading, or existing component inspection instead.
+- **Import Path Consistency**: ALWAYS use the TypeScript path alias `~/` for internal imports. NEVER use relative paths like `../../../lib/supabase/client`. ESLint enforces this with `no-restricted-imports` rule to prevent deep relative imports.
 
 ## Key Lessons Learned (Non-Obvious Insights)
 
@@ -366,6 +367,7 @@ npm run drizzle:migrate # Coming in Stage 2
 - **Permission system implementation learnings**: Dependency injection pattern for testing permission components proved essential for both authorized and unauthorized state testing
 - **Public endpoints still need multi-tenant scoping**: Even unauthenticated APIs must respect organization boundaries through subdomain resolution, not just skip authentication entirely
 - **"Migration complete" doesn't mean "working"**: Functionality existing in codebase doesn't guarantee it's properly tested or behaves correctly under all conditions
+- **Import path inconsistency can cause cascade failures**: During Supabase migration, 24+ TypeScript errors appeared due to files mixing relative imports (`../../../lib/supabase/client`) with TypeScript aliases (`~/lib/supabase/client`). The modules existed but path resolution failed. Solution: ESLint `no-restricted-imports` rule now prevents deep relative imports, enforcing consistent `~/` alias usage.
 
 ### Performance Insights
 

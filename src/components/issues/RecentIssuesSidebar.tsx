@@ -15,7 +15,7 @@ import {
 } from "@mui/material";
 import * as React from "react";
 
-import type { PinPointSupabaseUser } from "../../../lib/supabase/types";
+import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 
 import { api } from "~/trpc/react";
 

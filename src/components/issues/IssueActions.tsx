@@ -21,7 +21,7 @@ import {
 } from "@mui/material";
 import { useState } from "react";
 
-import type { PinPointSupabaseUser } from "../../../lib/supabase/types";
+import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 
 import { PermissionButton, PermissionGate } from "~/components/permissions";
 import { api } from "~/trpc/react";

@@ -9,17 +9,25 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { httpBatchStreamLink, loggerLink } from "@trpc/client";
-import { SessionProvider } from "next-auth/react";
 import { useState } from "react";
-import superjson from "superjson";
 
 import type { User, NotificationFrequency } from "@prisma/client";
 import type { Session } from "next-auth";
 import type { ReactNode } from "react";
+import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 
 import { PermissionDepsProvider } from "~/contexts/PermissionDepsContext";
-import { api } from "~/trpc/react";
+
+// Mock SessionProvider for testing to avoid next-auth/react hook issues
+function MockSessionProvider({
+  children,
+}: {
+  children: ReactNode;
+  session: Session | null;
+}): React.JSX.Element {
+  // Simple pass-through provider that doesn't use next-auth internals
+  return <>{children}</>;
+}
 
 // Mock data factories following Vitest patterns
 function createMockUser(overrides: Partial<User> = {}): User {
@@ -125,6 +133,86 @@ function createMockMembershipQuery(
 }
 
 /**
+ * Creates mock Supabase user for server-side testing
+ */
+function createMockSupabaseUser(
+  overrides: Partial<PinPointSupabaseUser> = {},
+): PinPointSupabaseUser {
+  return {
+    id: "test-user-id",
+    aud: "authenticated",
+    role: "authenticated",
+    email: "test@example.com",
+    email_confirmed_at: "2023-01-01T00:00:00Z",
+    phone: "",
+    last_sign_in_at: "2023-01-01T00:00:00Z",
+    app_metadata: {
+      provider: "google",
+      organization_id: "test-org-id",
+      role: "Member",
+    },
+    user_metadata: {
+      avatar_url: "",
+      email: "test@example.com",
+      email_verified: true,
+      full_name: "Test User",
+      iss: "https://accounts.google.com",
+      name: "Test User",
+      picture: "",
+      provider_id: "123456789",
+      sub: "123456789",
+    },
+    identities: [],
+    created_at: "2023-01-01T00:00:00Z",
+    updated_at: "2023-01-01T00:00:00Z",
+    is_anonymous: false,
+    ...overrides,
+  };
+}
+
+/**
+ * Server-side mock context for tRPC testing
+ */
+export interface ServerMockContext {
+  session: { user: PinPointSupabaseUser } | null;
+  user: PinPointSupabaseUser | null;
+  membership: {
+    userId: string;
+    organizationId: string;
+    role: { name: string };
+    permissions: string[];
+  } | null;
+  organization: {
+    id: string;
+    name: string;
+  } | null;
+}
+
+/**
+ * Creates mock server context for tRPC testing
+ */
+function createServerMockContext(
+  overrides: Partial<ServerMockContext> = {},
+): ServerMockContext {
+  const mockUser = createMockSupabaseUser();
+  return {
+    session: { user: mockUser },
+    user: mockUser,
+    membership: {
+      userId: mockUser.id,
+      organizationId: mockUser.app_metadata.organization_id ?? "test-org-id",
+      role: { name: mockUser.app_metadata.role ?? "Member" },
+      permissions: ["issue:view"],
+    },
+    organization: {
+      id: mockUser.app_metadata.organization_id ?? "test-org-id",
+      name: "Test Organization",
+    },
+    ...overrides,
+  };
+}
+
+/**
  * VitestTestWrapper - Wrap components with all required providers for testing
  *
  * @example Basic authenticated test
@@ -215,12 +303,14 @@ export function VitestTestWrapper({
   sessionLoading = false,
   membershipLoading = false,
 }: VitestTestWrapperProps): React.JSX.Element {
+  // Create a simple QueryClient for React Query without tRPC complexity
   const [queryClient] = useState(
     () =>
       new QueryClient({
         defaultOptions: {
           queries: {
             retry: false,
+            staleTime: Infinity,
           },
           mutations: {
             retry: false,
@@ -228,41 +318,6 @@ export function VitestTestWrapper({
         },
       }),
   );
-
-  // Create a mock tRPC client to avoid AbortSignal issues in tests
-  const [trpcClient] = useState(() => {
-    // eslint-disable-next-line @typescript-eslint/dot-notation
-    const url = `http://localhost:${process.env["PORT"] ?? "3000"}/api/trpc`;
-    console.log(`[VitestTestWrapper] Creating tRPC client with URL: ${url}`);
-    return api.createClient({
-      links: [
-        loggerLink({
-          enabled: () => true, // Enable logging to see requests
-        }),
-        httpBatchStreamLink({
-          transformer: superjson,
-          url,
-          headers: () => {
-            const headers = new Headers();
-            headers.set("x-trpc-source", "vitest-test");
-            return headers;
-          },
-          // Override fetch to avoid AbortSignal issues with undici
-          fetch: (
-            input: RequestInfo | URL,
-            init?: RequestInit | { signal?: AbortSignal | undefined },
-          ) => {
-            // Create a compatible init object without AbortSignal for tests
-            const safeInit = init ? { ...init } : {};
-            delete (safeInit as { signal?: unknown }).signal; // Remove problematic signal
-
-            // Return a mock response for tests - MSW will handle the actual mocking
-            return globalThis.fetch(input, safeInit as RequestInit);
-          },
-        }),
-      ],
-    });
-  });
 
   // Create mock dependencies for permission injection
   const mockSessionHook = createMockSessionHook(session, sessionLoading);
@@ -278,11 +333,7 @@ export function VitestTestWrapper({
 
   const content = (
     <QueryClientProvider client={queryClient}>
-      <SessionProvider session={session}>
-        <api.Provider client={trpcClient} queryClient={queryClient}>
-          {children}
-        </api.Provider>
-      </SessionProvider>
+      <MockSessionProvider session={session}>{children}</MockSessionProvider>
     </QueryClientProvider>
   );
 
@@ -290,7 +341,7 @@ export function VitestTestWrapper({
   if (injectPermissionDeps) {
     return (
       <PermissionDepsProvider
-        sessionHook={
+        authHook={
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
           mockSessionHook as any
         }
@@ -353,4 +404,9 @@ export const VITEST_ROLE_MAPPING = {
 } as const;
 
 // Export helper functions for use in tests
-export { createMockUser, createMockMembership };
+export {
+  createMockUser,
+  createMockMembership,
+  createMockSupabaseUser,
+  createServerMockContext,
+};

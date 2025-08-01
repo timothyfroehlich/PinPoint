@@ -12,7 +12,7 @@ import {
 } from "@mui/material";
 import { useState, useEffect } from "react";
 
-import { createClient } from "../../../lib/supabase/client";
+import { createClient } from "~/lib/supabase/client";
 
 interface DevUser {
   id: string;

@@ -22,7 +22,7 @@ import {
 } from "@mui/material";
 import NextLink from "next/link";
 
-import type { PinPointSupabaseUser } from "../../../lib/supabase/types";
+import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 import type { RouterOutputs } from "~/trpc/react";
 
 import { PermissionGate } from "~/components/permissions";

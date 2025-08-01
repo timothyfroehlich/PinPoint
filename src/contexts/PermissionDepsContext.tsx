@@ -27,14 +27,6 @@ const PermissionDepsContext = createContext<PermissionDependencies | null>(
 );
 
 /**
- * Production dependencies - uses real hooks and queries
- */
-const productionDependencies: PermissionDependencies = {
-  authHook: useAuth,
-  membershipQuery: api.user.getCurrentMembership.useQuery,
-};
-
-/**
  * Hook to get permission dependencies from context
  * Falls back to production dependencies if no context is provided
  *
@@ -45,7 +37,15 @@ export function usePermissionDependencies(): PermissionDependencies {
 
   // In production, context will be null, so we use real dependencies
   // In tests, context can provide mock dependencies
-  return contextDeps ?? productionDependencies;
+  if (contextDeps) {
+    return contextDeps;
+  }
+
+  // Lazy-load production dependencies to avoid undefined references during module loading
+  return {
+    authHook: useAuth,
+    membershipQuery: api.user.getCurrentMembership.useQuery,
+  };
 }
 
 /**

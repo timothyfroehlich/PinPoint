@@ -14,7 +14,7 @@ import {
 import * as React from "react";
 import { useState } from "react";
 
-import type { PinPointSupabaseUser } from "../../../lib/supabase/types";
+import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 
 import { api } from "~/trpc/react";
 import { type IssueWithDetails, type IssueStatus } from "~/types/issue";

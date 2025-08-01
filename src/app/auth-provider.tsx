@@ -9,9 +9,9 @@ import {
   type JSX,
 } from "react";
 
-import { createClient } from "../../lib/supabase/client";
+import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 
-import type { PinPointSupabaseUser } from "../../lib/supabase/types";
+import { createClient } from "~/lib/supabase/client";
 
 interface AuthContextType {
   user: PinPointSupabaseUser | null;

@@ -4,7 +4,7 @@ import { type NextRequest } from "next/server";
 import { getSupabaseUser } from "./supabase";
 import { isValidOrganization, isValidMembership } from "./types";
 
-import type { PinPointSupabaseUser } from "../../../lib/supabase/types";
+import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 import type { ExtendedPrismaClient } from "~/server/db";
 
 import { env } from "~/env";

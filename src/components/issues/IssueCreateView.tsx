@@ -6,7 +6,7 @@ import * as React from "react";
 import { IssueCreateForm } from "./IssueCreateForm";
 import { RecentIssuesSidebar } from "./RecentIssuesSidebar";
 
-import type { PinPointSupabaseUser } from "../../../lib/supabase/types";
+import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 
 interface IssueCreateViewProps {
   user: PinPointSupabaseUser | null;

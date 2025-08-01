@@ -114,7 +114,7 @@ export default defineConfig({
           name: "jsdom",
           globals: true,
           environment: "jsdom",
-          setupFiles: ["src/test/vitest.setup.ts"],
+          setupFiles: ["vitest.setup.react.ts"],
           pool: "forks",
           typecheck: {
             tsconfig: "./tsconfig.tests.json",

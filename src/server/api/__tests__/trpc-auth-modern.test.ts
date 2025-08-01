@@ -1,18 +1,19 @@
 import { type Session } from "next-auth";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-import { getUserPermissionsForSession } from "../../../server/auth/permissions";
-import { createVitestMockContext } from "../../../test/vitestMockContext";
 import { userRouter } from "../routers/user";
 
-import type { VitestMockContext } from "../../../test/vitestMockContext";
+import type { VitestMockContext } from "~/test/vitestMockContext";
+
+import { getUserPermissionsForSession } from "~/server/auth/permissions";
+import { createVitestMockContext } from "~/test/vitestMockContext";
 
 // Mock all the dependencies to avoid complex module loading
-vi.mock("../../../server/auth", () => ({
+vi.mock("~/server/auth", () => ({
   auth: vi.fn(),
 }));
 
-vi.mock("../../../env", () => ({
+vi.mock("~/env", () => ({
   env: {
     NODE_ENV: "test",
     DATABASE_URL: "postgresql://test",

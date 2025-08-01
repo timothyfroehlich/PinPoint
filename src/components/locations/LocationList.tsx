@@ -15,7 +15,7 @@ import {
 } from "@mui/material";
 import { useRouter } from "next/navigation";
 
-import type { PinPointSupabaseUser } from "../../../lib/supabase/types";
+import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 import type { RouterOutputs } from "~/trpc/react";
 
 type LocationWithMachineCount = RouterOutputs["location"]["getPublic"][number];

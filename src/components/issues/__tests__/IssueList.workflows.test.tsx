@@ -1,317 +1,54 @@
 import "@testing-library/jest-dom/vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 
 import { IssueList } from "../IssueList";
 
 import {
-  createMockIssuesList,
-  createMockLocations,
-  createMockStatuses,
   createMockTRPCQueryResult,
-  createMockUsers,
   EXTENDED_PERMISSION_SCENARIOS,
 } from "~/test/mockUtils";
+import {
+  createIssueListMocks,
+  setupIssueListTest,
+  createWorkflowIssues,
+} from "~/test/setup/issueListTestSetup";
+import { setupAllIssueListMocks } from "~/test/setup/viTestMocks";
 import {
   VitestTestWrapper,
   VITEST_PERMISSION_SCENARIOS,
   VITEST_ROLE_MAPPING,
 } from "~/test/VitestTestWrapper";
 
-// Mock next/navigation with vi.hoisted
-const { mockPush, mockSearchParams } = vi.hoisted(() => ({
-  mockPush: vi.fn(),
-  mockSearchParams: new URLSearchParams(),
-}));
-
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({
-    push: mockPush,
-  }),
-  useSearchParams: () => mockSearchParams,
-}));
-
-// Mock tRPC API calls with vi.hoisted - preserve React components
-const {
-  mockRefetch,
-  mockIssuesQuery,
-  mockLocationsQuery,
-  mockStatusesQuery,
-  mockMachinesQuery,
-  mockUsersQuery,
-} = vi.hoisted(() => ({
-  mockRefetch: vi.fn(),
-  mockIssuesQuery: vi.fn(),
-  mockLocationsQuery: vi.fn(),
-  mockStatusesQuery: vi.fn(),
-  mockMachinesQuery: vi.fn(),
-  mockUsersQuery: vi.fn(),
-}));
-
-vi.mock("~/trpc/react", async () => {
-  const actual =
-    await vi.importActual<typeof import("~/trpc/react")>("~/trpc/react");
-  return {
-    ...actual,
-    api: {
-      ...actual.api,
-      createClient: actual.api.createClient,
-      Provider: actual.api.Provider,
-      issue: {
-        ...actual.api.issue,
-        core: {
-          ...actual.api.issue?.core,
-          getAll: {
-            ...actual.api.issue?.core?.getAll,
-            useQuery: mockIssuesQuery,
-          },
-        },
-      },
-      location: {
-        ...actual.api.location,
-        getAll: {
-          ...actual.api.location?.getAll,
-          useQuery: mockLocationsQuery,
-        },
-      },
-      issueStatus: {
-        ...actual.api.issueStatus,
-        getAll: {
-          ...actual.api.issueStatus?.getAll,
-          useQuery: mockStatusesQuery,
-        },
-      },
-      machine: {
-        ...actual.api.machine,
-        core: {
-          ...actual.api.machine?.core,
-          getAll: {
-            ...actual.api.machine?.core?.getAll,
-            useQuery: mockMachinesQuery,
-          },
-        },
-      },
-      user: {
-        ...actual.api.user,
-        getCurrentMembership: {
-          ...actual.api.user?.getCurrentMembership,
-          useQuery: vi.fn(() => ({
-            data: null,
-            isLoading: false,
-            isError: false,
-          })),
-        },
-        getAllInOrganization: {
-          ...actual.api.user?.getAllInOrganization,
-          useQuery: mockUsersQuery,
-        },
-      },
-    },
-  };
-});
-
-// Mock usePermissions hook with vi.hoisted
-const { mockHasPermission } = vi.hoisted(() => ({
-  mockHasPermission: vi.fn(),
-}));
-
-vi.mock("~/hooks/usePermissions", () => ({
-  usePermissions: () => ({
-    hasPermission: mockHasPermission,
-    isLoading: false,
-  }),
-}));
+// ✅ SHARED MOCK SETUP: Centralized vi.hoisted() mock creation (was ~50 lines of duplication)
+const mocks = createIssueListMocks();
+setupAllIssueListMocks(mocks);
 
 describe("IssueList - Technician Workflows and User Journeys", () => {
-  // Create realistic workflow test data
-  const workflowIssues = createMockIssuesList({
-    count: 5,
-    overrides: {
-      _count: { comments: 2, attachments: 1 },
-    },
-  });
+  // ✅ SHARED TEST SETUP: Use centralized scenario-based mock data with workflow customizations
+  const testSetup = setupIssueListTest("WORKFLOW", mocks);
 
-  // Override specific issues for workflow scenarios
-  const firstIssue = workflowIssues[0];
-  if (!firstIssue) throw new Error("Expected first issue");
-  workflowIssues[0] = {
-    ...firstIssue,
-    title: "Ball stuck in medieval castle",
-    status: {
-      id: "status-new",
-      name: "New",
-      category: "NEW" as const,
-      organizationId: "org-1",
-      isDefault: true,
-    },
-    priority: {
-      id: "priority-high",
-      name: "High",
-      order: 2,
-      organizationId: "org-1",
-      isDefault: false,
-    },
-    assignedTo: null,
-  };
-
-  const secondIssue = workflowIssues[1];
-  if (!secondIssue) throw new Error("Expected second issue");
-  workflowIssues[1] = {
-    ...secondIssue,
-    title: "Display flickering on AFM",
-    status: {
-      id: "status-progress",
-      name: "In Progress",
-      category: "IN_PROGRESS" as const,
-      organizationId: "org-1",
-      isDefault: false,
-    },
-    priority: {
-      id: "priority-medium",
-      name: "Medium",
-      order: 3,
-      organizationId: "org-1",
-      isDefault: true,
-    },
-    assignedTo: {
-      id: "user-tech",
-      name: "Tech Johnson",
-      email: "tech@example.com",
-      image: null,
-    },
-  };
-
-  const thirdIssue = workflowIssues[2];
-  if (!thirdIssue) throw new Error("Expected third issue");
-  workflowIssues[2] = {
-    ...thirdIssue,
-    title: "Routine playfield cleaning",
-    status: {
-      id: "status-resolved",
-      name: "Resolved",
-      category: "RESOLVED" as const,
-      organizationId: "org-1",
-      isDefault: false,
-    },
-    priority: {
-      id: "priority-low",
-      name: "Low",
-      order: 4,
-      organizationId: "org-1",
-      isDefault: false,
-    },
-    assignedTo: {
-      id: "user-tech",
-      name: "Tech Johnson",
-      email: "tech@example.com",
-      image: null,
-    },
-  };
-
-  const mockLocations = createMockLocations({ count: 3, overrides: {} });
-  const mockStatuses = createMockStatuses({ count: 4 });
-  const mockUsers = createMockUsers({ count: 2 });
-
-  const defaultFilters = {
-    sortBy: "created" as const,
-    sortOrder: "desc" as const,
-  };
+  // Create realistic workflow test data using shared utility
+  const workflowIssues = createWorkflowIssues();
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    // ✅ SHARED CLEANUP: Centralized mock reset and configuration
+    testSetup.resetMocks();
 
-    // Default API responses
-    mockIssuesQuery.mockReturnValue({
+    // Override with workflow-specific issues
+    mocks.mockIssuesQuery.mockReturnValue({
       data: workflowIssues,
       isLoading: false,
       isError: false,
       error: null,
-      refetch: mockRefetch,
+      refetch: mocks.mockRefetch,
     });
-
-    mockLocationsQuery.mockReturnValue(
-      createMockTRPCQueryResult(mockLocations),
-    );
-
-    mockStatusesQuery.mockReturnValue(createMockTRPCQueryResult(mockStatuses));
-
-    mockMachinesQuery.mockReturnValue({
-      data: [
-        {
-          id: "machine-1",
-          name: "Medieval Madness #1",
-          organizationId: "org-1",
-          modelId: "model-mm",
-          locationId: "location-1",
-          ownerId: null,
-          model: {
-            id: "model-mm",
-            name: "Medieval Madness",
-            manufacturer: "Williams",
-            year: 1997,
-          },
-          location: {
-            id: "location-1",
-            name: "Main Floor",
-            organizationId: "org-1",
-          },
-        },
-        {
-          id: "machine-3",
-          name: "Attack from Mars #1",
-          organizationId: "org-1",
-          modelId: "model-afm",
-          locationId: "location-1",
-          ownerId: null,
-          model: {
-            id: "model-afm",
-            name: "Attack from Mars",
-            manufacturer: "Bally",
-            year: 1995,
-          },
-          location: {
-            id: "location-1",
-            name: "Main Floor",
-            organizationId: "org-1",
-          },
-        },
-        {
-          id: "machine-5",
-          name: "Tales of Arabian Nights #1",
-          organizationId: "org-1",
-          modelId: "model-totan",
-          locationId: "location-2",
-          ownerId: null,
-          model: {
-            id: "model-totan",
-            name: "Tales of Arabian Nights",
-            manufacturer: "Williams",
-            year: 1996,
-          },
-          location: {
-            id: "location-2",
-            name: "Back Room",
-            organizationId: "org-1",
-          },
-        },
-      ],
-      isLoading: false,
-      isError: false,
-    });
-
-    mockUsersQuery.mockReturnValue({
-      data: mockUsers,
-      isLoading: false,
-      isError: false,
-    });
-
-    mockHasPermission.mockReturnValue(true);
   });
 
   describe("Technician Daily Workflow", () => {
     it("allows technician to view assigned issues", () => {
-      mockHasPermission.mockImplementation((permission: string) =>
+      mocks.mockHasPermission.mockImplementation((permission: string) =>
         (
           EXTENDED_PERMISSION_SCENARIOS.TECHNICIAN as readonly string[]
         ).includes(permission),
@@ -322,7 +59,7 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
           userPermissions={[...EXTENDED_PERMISSION_SCENARIOS.TECHNICIAN]}
           userRole="Technician"
         >
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -342,7 +79,7 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
     });
 
     it("allows technician to select and bulk assign issues to themselves", async () => {
-      mockHasPermission.mockImplementation((permission: string) =>
+      mocks.mockHasPermission.mockImplementation((permission: string) =>
         (
           EXTENDED_PERMISSION_SCENARIOS.TECHNICIAN as readonly string[]
         ).includes(permission),
@@ -353,7 +90,7 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
           userPermissions={[...EXTENDED_PERMISSION_SCENARIOS.TECHNICIAN]}
           userRole="Technician"
         >
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -373,7 +110,7 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
     });
 
     it("shows appropriate bulk actions for technician permissions", async () => {
-      mockHasPermission.mockImplementation((permission: string) =>
+      mocks.mockHasPermission.mockImplementation((permission: string) =>
         (
           EXTENDED_PERMISSION_SCENARIOS.TECHNICIAN as readonly string[]
         ).includes(permission),
@@ -384,7 +121,7 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
           userPermissions={[...EXTENDED_PERMISSION_SCENARIOS.TECHNICIAN]}
           userRole="Technician"
         >
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -399,7 +136,7 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
     });
 
     it("allows technician to filter by their assigned issues", async () => {
-      mockHasPermission.mockImplementation((permission: string) =>
+      mocks.mockHasPermission.mockImplementation((permission: string) =>
         (
           EXTENDED_PERMISSION_SCENARIOS.TECHNICIAN as readonly string[]
         ).includes(permission),
@@ -415,7 +152,7 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
           userPermissions={[...EXTENDED_PERMISSION_SCENARIOS.TECHNICIAN]}
           userRole="Technician"
         >
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -424,12 +161,12 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
       });
 
       // Mock the filtered response when assignee filter is applied
-      mockIssuesQuery.mockReturnValue({
+      mocks.mockIssuesQuery.mockReturnValue({
         data: assignedIssues,
         isLoading: false,
         isError: false,
         error: null,
-        refetch: mockRefetch,
+        refetch: mocks.mockRefetch,
       });
 
       // Test workflow concept: filtering by assignee would reduce results
@@ -443,7 +180,7 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
 
   describe("Issue Navigation Workflows", () => {
     it("allows technician to navigate to issue details for troubleshooting", async () => {
-      mockHasPermission.mockImplementation((permission: string) =>
+      mocks.mockHasPermission.mockImplementation((permission: string) =>
         (
           EXTENDED_PERMISSION_SCENARIOS.TECHNICIAN as readonly string[]
         ).includes(permission),
@@ -454,7 +191,7 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
           userPermissions={[...EXTENDED_PERMISSION_SCENARIOS.TECHNICIAN]}
           userRole="Technician"
         >
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -462,11 +199,11 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
       const issueTitle = screen.getByText("Ball stuck in medieval castle");
       await userEvent.click(issueTitle);
 
-      expect(mockPush).toHaveBeenCalledWith("/issues/issue-1");
+      expect(mocks.mockPush).toHaveBeenCalledWith("/issues/issue-1");
     });
 
     it("supports keyboard navigation for accessibility", async () => {
-      mockHasPermission.mockImplementation((permission: string) =>
+      mocks.mockHasPermission.mockImplementation((permission: string) =>
         (
           EXTENDED_PERMISSION_SCENARIOS.TECHNICIAN as readonly string[]
         ).includes(permission),
@@ -477,7 +214,7 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
           userPermissions={[...EXTENDED_PERMISSION_SCENARIOS.TECHNICIAN]}
           userRole="Technician"
         >
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -498,7 +235,7 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
 
   describe("Priority-Based Workflows", () => {
     it("highlights high-priority issues for immediate attention", () => {
-      mockHasPermission.mockImplementation((permission: string) =>
+      mocks.mockHasPermission.mockImplementation((permission: string) =>
         (
           EXTENDED_PERMISSION_SCENARIOS.TECHNICIAN as readonly string[]
         ).includes(permission),
@@ -509,7 +246,7 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
           userPermissions={[...EXTENDED_PERMISSION_SCENARIOS.TECHNICIAN]}
           userRole="Technician"
         >
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -525,7 +262,7 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
     });
 
     it("allows filtering by priority for workflow organization", async () => {
-      mockHasPermission.mockImplementation((permission: string) =>
+      mocks.mockHasPermission.mockImplementation((permission: string) =>
         (
           EXTENDED_PERMISSION_SCENARIOS.TECHNICIAN as readonly string[]
         ).includes(permission),
@@ -541,7 +278,7 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
           userPermissions={[...EXTENDED_PERMISSION_SCENARIOS.TECHNICIAN]}
           userRole="Technician"
         >
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -550,12 +287,12 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
       });
 
       // Mock filtered response for high priority
-      mockIssuesQuery.mockReturnValue({
+      mocks.mockIssuesQuery.mockReturnValue({
         data: highPriorityIssues,
         isLoading: false,
         isError: false,
         error: null,
-        refetch: mockRefetch,
+        refetch: mocks.mockRefetch,
       });
 
       // This would be triggered by actual priority filter interaction
@@ -567,7 +304,7 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
 
   describe("Status Workflow Transitions", () => {
     it("displays issues across different status categories for workflow management", () => {
-      mockHasPermission.mockImplementation((permission: string) =>
+      mocks.mockHasPermission.mockImplementation((permission: string) =>
         (
           EXTENDED_PERMISSION_SCENARIOS.TECHNICIAN as readonly string[]
         ).includes(permission),
@@ -578,7 +315,7 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
           userPermissions={[...EXTENDED_PERMISSION_SCENARIOS.TECHNICIAN]}
           userRole="Technician"
         >
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -600,7 +337,7 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
     });
 
     it("allows technician to filter by status for workflow organization", async () => {
-      mockHasPermission.mockImplementation((permission: string) =>
+      mocks.mockHasPermission.mockImplementation((permission: string) =>
         (
           EXTENDED_PERMISSION_SCENARIOS.TECHNICIAN as readonly string[]
         ).includes(permission),
@@ -611,7 +348,7 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
           userPermissions={[...EXTENDED_PERMISSION_SCENARIOS.TECHNICIAN]}
           userRole="Technician"
         >
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -637,14 +374,14 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
 
       // Should trigger URL update for status filter
       await waitFor(() => {
-        expect(mockPush).toHaveBeenCalledWith(
+        expect(mocks.mockPush).toHaveBeenCalledWith(
           expect.stringContaining("statusIds="),
         );
       });
     });
 
     it("supports bulk status updates for efficient workflow management", async () => {
-      mockHasPermission.mockImplementation((permission: string) =>
+      mocks.mockHasPermission.mockImplementation((permission: string) =>
         (
           EXTENDED_PERMISSION_SCENARIOS.TECHNICIAN as readonly string[]
         ).includes(permission),
@@ -655,7 +392,7 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
           userPermissions={[...EXTENDED_PERMISSION_SCENARIOS.TECHNICIAN]}
           userRole="Technician"
         >
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -677,7 +414,7 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
 
   describe("Location-Based Workflows", () => {
     it("allows technician to filter by location for area-focused work", async () => {
-      mockHasPermission.mockImplementation((permission: string) =>
+      mocks.mockHasPermission.mockImplementation((permission: string) =>
         (
           EXTENDED_PERMISSION_SCENARIOS.TECHNICIAN as readonly string[]
         ).includes(permission),
@@ -688,7 +425,7 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
           userPermissions={[...EXTENDED_PERMISSION_SCENARIOS.TECHNICIAN]}
           userRole="Technician"
         >
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -723,14 +460,14 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
       await userEvent.click(locationOption);
 
       await waitFor(() => {
-        expect(mockPush).toHaveBeenCalledWith(
+        expect(mocks.mockPush).toHaveBeenCalledWith(
           expect.stringContaining("locationId=location-1"),
         );
       });
     });
 
     it("displays machine information for context in repair workflows", () => {
-      mockHasPermission.mockImplementation((permission: string) =>
+      mocks.mockHasPermission.mockImplementation((permission: string) =>
         (
           EXTENDED_PERMISSION_SCENARIOS.TECHNICIAN as readonly string[]
         ).includes(permission),
@@ -741,7 +478,7 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
           userPermissions={[...EXTENDED_PERMISSION_SCENARIOS.TECHNICIAN]}
           userRole="Technician"
         >
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -753,7 +490,7 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
 
   describe("Manager Override Scenarios", () => {
     it("shows limited functionality for managers without assign permission", () => {
-      mockHasPermission.mockImplementation((permission: string) =>
+      mocks.mockHasPermission.mockImplementation((permission: string) =>
         [...VITEST_PERMISSION_SCENARIOS.MANAGER].includes(permission as never),
       );
 
@@ -762,7 +499,7 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
           userPermissions={[...VITEST_PERMISSION_SCENARIOS.MANAGER]}
           userRole={VITEST_ROLE_MAPPING.MANAGER}
         >
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -778,7 +515,7 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
           userPermissions={[...VITEST_PERMISSION_SCENARIOS.ADMIN]}
           userRole={VITEST_ROLE_MAPPING.ADMIN}
         >
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -791,7 +528,7 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
 
   describe("Real-World Workflow Integration", () => {
     it("maintains workflow state during data refreshes", async () => {
-      mockHasPermission.mockImplementation((permission: string) =>
+      mocks.mockHasPermission.mockImplementation((permission: string) =>
         (
           EXTENDED_PERMISSION_SCENARIOS.TECHNICIAN as readonly string[]
         ).includes(permission),
@@ -802,7 +539,7 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
           userPermissions={[...EXTENDED_PERMISSION_SCENARIOS.TECHNICIAN]}
           userRole="Technician"
         >
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -817,14 +554,14 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
       const refreshButton = screen.getByRole("button", { name: /refresh/i });
       await userEvent.click(refreshButton);
 
-      expect(mockRefetch).toHaveBeenCalledOnce();
+      expect(mocks.mockRefetch).toHaveBeenCalledOnce();
 
       // Workflow state should be preserved during refresh
       // (In practice, this would depend on the component's state management)
     });
 
     it("handles concurrent technician workflows without conflicts", () => {
-      mockHasPermission.mockImplementation((permission: string) =>
+      mocks.mockHasPermission.mockImplementation((permission: string) =>
         (
           EXTENDED_PERMISSION_SCENARIOS.TECHNICIAN as readonly string[]
         ).includes(permission),
@@ -849,12 +586,12 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
               },
       }));
 
-      mockIssuesQuery.mockReturnValue({
+      mocks.mockIssuesQuery.mockReturnValue({
         data: concurrentWorkflowIssues,
         isLoading: false,
         isError: false,
         error: null,
-        refetch: mockRefetch,
+        refetch: mocks.mockRefetch,
       });
 
       render(
@@ -862,7 +599,7 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
           userPermissions={[...EXTENDED_PERMISSION_SCENARIOS.TECHNICIAN]}
           userRole="Technician"
         >
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -873,7 +610,7 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
     });
 
     it("supports emergency escalation workflows for critical issues", async () => {
-      mockHasPermission.mockImplementation((permission: string) =>
+      mocks.mockHasPermission.mockImplementation((permission: string) =>
         (
           EXTENDED_PERMISSION_SCENARIOS.TECHNICIAN as readonly string[]
         ).includes(permission),
@@ -897,12 +634,12 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
 
       const emergencyIssues = [criticalIssue, ...workflowIssues.slice(1)];
 
-      mockIssuesQuery.mockReturnValue({
+      mocks.mockIssuesQuery.mockReturnValue({
         data: emergencyIssues,
         isLoading: false,
         isError: false,
         error: null,
-        refetch: mockRefetch,
+        refetch: mocks.mockRefetch,
       });
 
       render(
@@ -910,7 +647,7 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
           userPermissions={[...EXTENDED_PERMISSION_SCENARIOS.TECHNICIAN]}
           userRole="Technician"
         >
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -932,7 +669,7 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
 
   describe("Error Recovery Workflows", () => {
     it("allows workflow continuation after API errors", async () => {
-      mockHasPermission.mockImplementation((permission: string) =>
+      mocks.mockHasPermission.mockImplementation((permission: string) =>
         (
           EXTENDED_PERMISSION_SCENARIOS.TECHNICIAN as readonly string[]
         ).includes(permission),
@@ -940,12 +677,12 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
 
       // Start with an API error
       const mockError = new Error("Temporary network error");
-      mockIssuesQuery.mockReturnValue({
+      mocks.mockIssuesQuery.mockReturnValue({
         data: undefined,
         isLoading: false,
         isError: true,
         error: mockError,
-        refetch: mockRefetch,
+        refetch: mocks.mockRefetch,
       });
 
       render(
@@ -953,7 +690,7 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
           userPermissions={[...EXTENDED_PERMISSION_SCENARIOS.TECHNICIAN]}
           userRole="Technician"
         >
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 
@@ -968,35 +705,35 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
       const retryButton = screen.getByRole("button", { name: /retry/i });
       await userEvent.click(retryButton);
 
-      expect(mockRefetch).toHaveBeenCalledOnce();
+      expect(mocks.mockRefetch).toHaveBeenCalledOnce();
 
       // After retry, restore normal data for workflow continuation
-      mockIssuesQuery.mockReturnValue({
+      mocks.mockIssuesQuery.mockReturnValue({
         data: workflowIssues,
         isLoading: false,
         isError: false,
         error: null,
-        refetch: mockRefetch,
+        refetch: mocks.mockRefetch,
       });
     });
 
     it("maintains partial functionality during partial API failures", () => {
-      mockHasPermission.mockImplementation((permission: string) =>
+      mocks.mockHasPermission.mockImplementation((permission: string) =>
         (
           EXTENDED_PERMISSION_SCENARIOS.TECHNICIAN as readonly string[]
         ).includes(permission),
       );
 
       // Issues API works, but locations API fails
-      mockIssuesQuery.mockReturnValue({
+      mocks.mockIssuesQuery.mockReturnValue({
         data: workflowIssues,
         isLoading: false,
         isError: false,
         error: null,
-        refetch: mockRefetch,
+        refetch: mocks.mockRefetch,
       });
 
-      mockLocationsQuery.mockReturnValue(
+      mocks.mockLocationsQuery.mockReturnValue(
         createMockTRPCQueryResult(undefined, {
           isError: true,
           error: new Error("Location service temporarily unavailable"),
@@ -1008,7 +745,7 @@ describe("IssueList - Technician Workflows and User Journeys", () => {
           userPermissions={[...EXTENDED_PERMISSION_SCENARIOS.TECHNICIAN]}
           userRole="Technician"
         >
-          <IssueList initialFilters={defaultFilters} />
+          <IssueList initialFilters={testSetup.defaultFilters} />
         </VitestTestWrapper>,
       );
 

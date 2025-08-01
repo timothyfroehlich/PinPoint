@@ -4,9 +4,9 @@
  * This file provides server-side authentication functions for Supabase
  */
 
-import { createClient } from "../../../lib/supabase/server";
+import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 
-import type { PinPointSupabaseUser } from "../../../lib/supabase/types";
+import { createClient } from "~/lib/supabase/server";
 
 /**
  * Get the current authenticated user on the server
