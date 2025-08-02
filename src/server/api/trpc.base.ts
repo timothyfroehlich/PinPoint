@@ -34,7 +34,7 @@ interface CreateTRPCContextOptions {
  */
 interface Organization {
   id: string;
-  subdomain: string;
+  subdomain: string | null;
   name: string;
   // Add other fields as needed
 }
@@ -118,7 +118,12 @@ export const createTRPCContext = async (
       where: { id: user.app_metadata.organization_id },
     });
     if (org) {
-      organization = org as Organization;
+      // Type-safe assignment - Prisma findUnique returns full object
+      organization = {
+        id: org.id,
+        subdomain: org.subdomain,
+        name: org.name,
+      } satisfies Organization;
     }
   }
 
@@ -132,7 +137,12 @@ export const createTRPCContext = async (
       where: { subdomain },
     });
     if (org) {
-      organization = org as Organization;
+      // Type-safe assignment - Prisma findUnique returns full object
+      organization = {
+        id: org.id,
+        subdomain: org.subdomain,
+        name: org.name,
+      } satisfies Organization;
     }
   }
 
@@ -256,7 +266,12 @@ export const organizationProcedure = protectedProcedure.use(
       ctx: {
         ...ctx,
         organization: ctx.organization, // Safe assertion - already checked above
-        membership: membership as Membership,
+        membership: {
+          id: membership.id,
+          organizationId: membership.organizationId,
+          userId: membership.userId,
+          role: membership.role,
+        } satisfies Membership,
         userPermissions,
       } satisfies OrganizationTRPCContext,
     });
