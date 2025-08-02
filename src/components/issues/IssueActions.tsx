@@ -106,7 +106,16 @@ export function IssueActions({
   // };
 
   if (!isAuthenticated) {
-    return null;
+    return (
+      <Box>
+        <Typography variant="h6" gutterBottom>
+          Actions
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          Login required for actions
+        </Typography>
+      </Box>
+    );
   }
 
   return (

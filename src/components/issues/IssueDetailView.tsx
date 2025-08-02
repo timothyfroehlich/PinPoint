@@ -166,7 +166,11 @@ export function IssueDetailView({
             </PermissionGate>
 
             {/* Actions */}
-            <Paper elevation={1} sx={{ p: 2, mb: 2 }}>
+            <Paper
+              elevation={1}
+              sx={{ p: 2, mb: 2 }}
+              data-testid="issue-actions"
+            >
               <IssueActions
                 issue={currentIssue}
                 user={user}

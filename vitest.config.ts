@@ -4,6 +4,10 @@ import react from "@vitejs/plugin-react";
 import tsconfigPaths from "vite-tsconfig-paths";
 import path from "path";
 
+// Smart coverage: enabled in CI, disabled in development for performance
+const enableCoverage =
+  process.env["CI"] === "true" || process.env["COVERAGE"] === "true";
+
 export default defineConfig({
   plugins: [react(), tsconfigPaths()],
   resolve: {
@@ -14,7 +18,7 @@ export default defineConfig({
   },
   test: {
     coverage: {
-      enabled: true,
+      enabled: enableCoverage,
       provider: "v8",
       reporter: ["text", "json", "html", "lcov"],
       reportsDirectory: "./coverage",

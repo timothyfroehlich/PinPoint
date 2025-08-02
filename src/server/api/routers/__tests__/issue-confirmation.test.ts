@@ -13,21 +13,27 @@ vi.mock("next-auth", () => ({
 }));
 
 // Mock permissions system
-vi.mock("~/server/auth/permissions", () => ({
-  getUserPermissionsForSession: vi.fn(),
-  requirePermissionForSession: vi.fn(),
-}));
+vi.mock("~/server/auth/permissions", async () => {
+  const actual = await vi.importActual("~/server/auth/permissions");
+  return {
+    ...actual,
+    getUserPermissionsForSession: vi.fn(),
+    requirePermissionForSession: vi.fn(),
+    getUserPermissionsForSupabaseUser: vi.fn(),
+  };
+});
+
+import type { PinPointSupabaseUser } from "~/lib/supabase/types";
+import type { OrganizationTRPCContext } from "~/server/api/trpc.base";
 
 import { createTRPCRouter, organizationProcedure } from "~/server/api/trpc";
 import { issueCreateProcedure } from "~/server/api/trpc.permission";
 import {
   getUserPermissionsForSession,
   requirePermissionForSession,
+  getUserPermissionsForSupabaseUser,
 } from "~/server/auth/permissions";
-import {
-  createVitestMockContext,
-  type VitestMockContext,
-} from "~/test/vitestMockContext";
+import { createVitestMockContext } from "~/test/vitestMockContext";
 
 // Create issue confirm procedure for testing
 const issueConfirmProcedure = organizationProcedure.use(async (opts) => {
@@ -92,7 +98,7 @@ const issueConfirmationRouter = createTRPCRouter({
           // For now, we'll mock this behavior
           // isConfirmed: confirmationStatus,
           // confirmedAt: confirmationStatus ? new Date() : null,
-          // confirmedById: confirmationStatus ? ctx.session.user.id : null,
+          // confirmedById: confirmationStatus ? ctx.user.id : null,
         },
         include: {
           machine: {
@@ -147,7 +153,7 @@ const issueConfirmationRouter = createTRPCRouter({
           // Note: These fields don't exist in current schema - mocking for tests
           // isConfirmed: input.isConfirmed,
           // confirmedAt: input.isConfirmed ? new Date() : null,
-          // confirmedById: input.isConfirmed ? ctx.session.user.id : null,
+          // confirmedById: input.isConfirmed ? ctx.user.id : null,
         },
         include: {
           machine: {
@@ -167,7 +173,7 @@ const issueConfirmationRouter = createTRPCRouter({
         // Mock the confirmation fields for testing
         isConfirmed: input.isConfirmed,
         confirmedAt: input.isConfirmed ? new Date() : null,
-        confirmedById: input.isConfirmed ? ctx.session.user.id : null,
+        confirmedById: input.isConfirmed ? ctx.user.id : null,
       };
     }),
 
@@ -273,21 +279,27 @@ const issueConfirmationRouter = createTRPCRouter({
 // Mock context helper with different permission sets
 const createMockTRPCContext = (
   permissions: string[] = [],
-): VitestMockContext => {
+): OrganizationTRPCContext => {
   const mockContext = createVitestMockContext();
 
-  // Set up session and organization
-  mockContext.session = {
-    user: {
-      id: "user-1",
-      email: "user@example.com",
+  // Create properly typed Supabase user
+  const mockUser = {
+    id: "user-1",
+    email: "user@example.com",
+    aud: "authenticated",
+    created_at: new Date().toISOString(),
+    user_metadata: {
       name: "Test User",
-      image: null,
+      avatar_url: null,
     },
-    expires: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(),
-  };
+    app_metadata: {
+      organization_id: "org-1",
+      role: "Member",
+    },
+  } as unknown as PinPointSupabaseUser;
 
-  mockContext.organization = {
+  // Create organization
+  const organization = {
     id: "org-1",
     name: "Test Organization",
     subdomain: "test",
@@ -298,19 +310,12 @@ const createMockTRPCContext = (
     id: "membership-1",
     userId: "user-1",
     organizationId: "org-1",
-    roleId: "role-1",
     role: {
       id: "role-1",
       name: "Test Role",
-      organizationId: "org-1",
-      isSystem: false,
-      isDefault: false,
-      createdAt: new Date(),
-      updatedAt: new Date(),
       permissions: permissions.map((name, index) => ({
         id: `perm-${(index + 1).toString()}`,
         name,
-        description: `${name} permission`,
       })),
     },
   };
@@ -322,6 +327,7 @@ const createMockTRPCContext = (
 
   // Mock the permissions system
   vi.mocked(getUserPermissionsForSession).mockResolvedValue(permissions);
+  vi.mocked(getUserPermissionsForSupabaseUser).mockResolvedValue(permissions);
 
   // Mock requirePermissionForSession - it should throw when permission is missing
   vi.mocked(requirePermissionForSession).mockImplementation(
@@ -338,9 +344,11 @@ const createMockTRPCContext = (
 
   return {
     ...mockContext,
+    user: mockUser,
+    organization,
     membership: membershipData,
     userPermissions: permissions,
-  };
+  } as unknown as OrganizationTRPCContext;
 };
 
 describe("Issue Confirmation Workflow", () => {

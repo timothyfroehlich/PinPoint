@@ -36,7 +36,7 @@ interface PermissionButtonProps extends Omit<ButtonProps, "disabled"> {
 function getDefaultTooltipText(permission: string): string {
   const description = PERMISSION_DESCRIPTIONS[permission];
   if (description) {
-    return `This action requires: ${description}`;
+    return `You don't have permission to: ${description}`;
   }
   return `You don't have permission to perform this action (${permission})`;
 }
@@ -108,21 +108,26 @@ export const PermissionButton = forwardRef<
     return null;
   }
 
+  // If button is disabled due to permission (not custom disabled), add title attribute and wrap in tooltip
+  if (!hasRequiredPermission && showWhenDenied) {
+    const tooltip = tooltipText ?? getDefaultTooltipText(permission);
+    const buttonWithTitle = (
+      <Button {...buttonProps} ref={ref} disabled={isDisabled} title={tooltip}>
+        {children}
+      </Button>
+    );
+    return (
+      <Tooltip title={tooltip}>
+        <span>{buttonWithTitle}</span>
+      </Tooltip>
+    );
+  }
+
   const button = (
     <Button {...buttonProps} ref={ref} disabled={isDisabled}>
       {children}
     </Button>
   );
-
-  // If button is disabled due to permission (not custom disabled), wrap in tooltip
-  if (!hasRequiredPermission && showWhenDenied) {
-    const tooltip = tooltipText ?? getDefaultTooltipText(permission);
-    return (
-      <Tooltip title={tooltip}>
-        <span>{button}</span>
-      </Tooltip>
-    );
-  }
 
   return button;
 });

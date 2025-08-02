@@ -112,8 +112,10 @@ describe("notificationRouter", () => {
   });
 
   it("requires authentication", async () => {
-    const caller = appRouter.createCaller({ ...ctx, session: null } as any);
-    await expect(caller.notification.getNotifications({})).rejects.toThrow();
+    const caller = appRouter.createCaller({ ...ctx, user: null } as any);
+    await expect(caller.notification.getNotifications({})).rejects.toThrow(
+      "UNAUTHORIZED",
+    );
   });
 
   it("validates input", async () => {

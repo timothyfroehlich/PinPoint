@@ -12,6 +12,17 @@ import {
   type VitestMockContext,
 } from "~/test/vitestMockContext";
 
+// Import the session conversion function
+function supabaseUserToSession(user: any) {
+  return {
+    user: {
+      id: user?.id ?? "test-user-id",
+      email: user?.email ?? "test@example.com",
+      name: user?.user_metadata?.name ?? "Test User",
+    },
+  };
+}
+
 // Mock environment modules
 vi.mock("~/env", () => ({
   env: {
@@ -31,6 +42,7 @@ vi.mock("~/server/auth", () => ({
 vi.mock("~/server/auth/permissions", () => ({
   requirePermissionForSession: vi.fn(),
   getUserPermissionsForSession: vi.fn(),
+  getUserPermissionsForSupabaseUser: vi.fn(),
 }));
 
 // Mock tRPC context with a simplified membership structure
@@ -95,8 +107,9 @@ const createMockTRPCContext = (
 const testRouter = createTRPCRouter({
   testRequirePermission: organizationProcedure
     .use(async (opts) => {
+      const session = supabaseUserToSession(opts.ctx.user);
       await requirePermissionForSession(
-        opts.ctx.user,
+        session,
         "test:permission",
         opts.ctx.db as any,
         opts.ctx.organization.id,

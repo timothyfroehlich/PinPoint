@@ -212,7 +212,7 @@ const mockIssueData: IssueWithDetails = {
 describe("IssueDetailView - Auth Integration Tests", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Default successful query response
+    // Reset to default successful query response before each test
     mockGetByIdQuery.mockReturnValue({
       data: mockIssueData,
       error: null,
@@ -463,6 +463,18 @@ describe("IssueDetailView - Auth Integration Tests", () => {
         expires: "2024-12-31",
       };
 
+      // Mock the tRPC query to simulate cross-organization access denial
+      mockGetByIdQuery.mockReturnValue({
+        data: null,
+        error: {
+          message: "UNAUTHORIZED - Cross-organization access denied",
+          data: {
+            code: "FORBIDDEN",
+          },
+        },
+        refetch: vi.fn(),
+      });
+
       render(
         <VitestTestWrapper
           session={otherOrgSession}
@@ -561,14 +573,17 @@ describe("IssueDetailView - Auth Integration Tests", () => {
       );
 
       // ✅ Real auth test: Loading state handled
+      // The component should still show the issue content even when auth is loading
       await waitFor(() => {
         expect(
-          screen.getByTestId("auth-loading") ||
-            screen.getByRole("heading", {
-              name: /auth integration test issue/i,
-            }),
+          screen.getByRole("heading", {
+            name: /auth integration test issue/i,
+          }),
         ).toBeInTheDocument();
       });
+
+      // Auth-dependent features should be hidden during loading
+      expect(screen.queryByTestId("issue-timeline")).not.toBeInTheDocument();
     });
 
     it("should handle auth errors appropriately", async () => {

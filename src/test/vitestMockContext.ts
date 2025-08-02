@@ -37,6 +37,20 @@ export interface VitestMockContext {
 }
 
 export function createVitestMockContext(): VitestMockContext {
+  // Create a mock Supabase user with proper metadata structure
+  const mockUser = {
+    id: "user-1", // Changed to match integration test expectations
+    email: "test@example.com",
+    user_metadata: {
+      name: "Test User",
+      avatar_url: "https://example.com/avatar.jpg",
+    },
+    app_metadata: {
+      organization_id: "org-1", // Changed to match integration test expectations
+      role: "Member",
+    },
+  } as unknown as PinPointSupabaseUser;
+
   // Create a mock database client with all the necessary methods
   const mockDb = {
     $accelerate: {
@@ -190,9 +204,13 @@ export function createVitestMockContext(): VitestMockContext {
   return {
     db: mockDb,
     services: mockServices,
-    user: null,
+    user: mockUser,
     supabase: mockSupabaseClient,
-    organization: null,
+    organization: {
+      id: "org-1", // Changed to match integration test expectations
+      name: "Test Organization",
+      subdomain: "test",
+    },
     headers: new Headers(),
   };
 }

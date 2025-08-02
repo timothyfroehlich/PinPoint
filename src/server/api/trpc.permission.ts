@@ -22,13 +22,20 @@ import { requirePermissionForSession } from "~/server/auth/permissions";
  * This is a temporary compatibility layer during the Supabase migration
  */
 function supabaseUserToSession(user: PinPointSupabaseUser): Session {
+  // Handle test contexts where metadata might be undefined despite types
+  // This is a runtime safety check for test mocks
+  const userMetadata =
+    (user.user_metadata as Record<string, unknown> | undefined) ?? {};
+  const appMetadata =
+    (user.app_metadata as Record<string, unknown> | undefined) ?? {};
+
   return {
     user: {
       id: user.id,
       email: user.email ?? "",
-      name: user.user_metadata["name"] as string | undefined,
-      image: user.user_metadata["avatar_url"] as string | undefined,
-      organizationId: user.app_metadata.organization_id,
+      name: userMetadata["name"] as string | undefined,
+      image: userMetadata["avatar_url"] as string | undefined,
+      organizationId: appMetadata["organization_id"] as string | undefined,
     },
     expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
   };

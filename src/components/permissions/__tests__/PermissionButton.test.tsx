@@ -189,10 +189,12 @@ describe("PermissionButton", () => {
         );
 
         const tooltip = screen.getByRole("tooltip");
-        // Use regex pattern for more resilient text matching
+        // Use regex pattern matching the actual format: "You don't have permission to: [description]"
         expect(tooltip).toHaveAttribute(
           "data-tooltip-content",
-          expect.stringMatching(/this action requires.*edit.*issue/i),
+          expect.stringMatching(
+            /you don't have permission to:.*edit existing issues/i,
+          ),
         );
       });
 

@@ -719,6 +719,7 @@ describe("Router Integration Tests", () => {
           organizationId: "org-1",
           isSystem: false,
           isDefault: true,
+          permissions: [], // Added missing permissions array
         },
       };
 
