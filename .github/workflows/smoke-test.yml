@@ -32,14 +32,25 @@ jobs:
 
       - name: Start Supabase Local
         run: |
-          supabase db start
+          supabase start
+          sleep 5  # Wait for services to fully start
+          
+          # Extract keys using the correct supabase status output
+          ANON_KEY=$(supabase status --output env | grep SUPABASE_ANON_KEY | cut -d'=' -f2-)
+          SERVICE_KEY=$(supabase status --output env | grep SUPABASE_SERVICE_ROLE_KEY | cut -d'=' -f2-)
+          
+          # Set environment variables
           {
             echo "POSTGRES_PRISMA_URL=postgresql://postgres:postgres@127.0.0.1:5432/postgres"
-            echo "POSTGRES_URL_NON_POOLING=postgresql://postgres:postgres@127.0.0.1:5432/postgres"
+            echo "POSTGRES_URL_NON_POOLING=postgresql://postgres:postgres@127.0.0.1:5432/postgres" 
             echo "SUPABASE_URL=http://127.0.0.1:54321"
-            echo "SUPABASE_ANON_KEY=$(supabase status -o env | grep SUPABASE_ANON_KEY | cut -d'=' -f2)"
-            echo "SUPABASE_SERVICE_ROLE_KEY=$(supabase status -o env | grep SUPABASE_SERVICE_ROLE_KEY | cut -d'=' -f2)"
+            echo "SUPABASE_ANON_KEY=${ANON_KEY}"
+            echo "SUPABASE_SERVICE_ROLE_KEY=${SERVICE_KEY}"
           } >> "$GITHUB_ENV"
+          
+          # Debug output (keys will be masked in logs)
+          echo "Supabase services started"
+          supabase status
 
       - name: Setup database schema
         run: |
