@@ -4,22 +4,21 @@ import react from "@vitejs/plugin-react";
 import tsconfigPaths from "vite-tsconfig-paths";
 import path from "path";
 
+// Smart coverage: enabled in CI, disabled in development for performance
+const enableCoverage =
+  process.env["CI"] === "true" || process.env["COVERAGE"] === "true";
+
 export default defineConfig({
   plugins: [react(), tsconfigPaths()],
   resolve: {
     alias: {
       "~": path.resolve(__dirname, "./src"),
-      // Fix Next.js module resolution for NextAuth
-      "next/server": path.resolve(__dirname, "./node_modules/next/server.js"),
     },
     conditions: ["node", "import"],
   },
-  ssr: {
-    noExternal: ["next-auth"],
-  },
   test: {
     coverage: {
-      enabled: true,
+      enabled: enableCoverage,
       provider: "v8",
       reporter: ["text", "json", "html", "lcov"],
       reportsDirectory: "./coverage",
@@ -67,11 +66,6 @@ export default defineConfig({
         resolve: {
           alias: {
             "~": path.resolve(__dirname, "./src"),
-            // Fix Next.js module resolution for NextAuth
-            "next/server": path.resolve(
-              __dirname,
-              "./node_modules/next/server.js",
-            ),
           },
         },
         // Node environment for server-side tests
@@ -102,11 +96,6 @@ export default defineConfig({
         resolve: {
           alias: {
             "~": path.resolve(__dirname, "./src"),
-            // Fix Next.js module resolution for NextAuth
-            "next/server": path.resolve(
-              __dirname,
-              "./node_modules/next/server.js",
-            ),
           },
         },
         // jsdom environment for browser/React tests
@@ -114,7 +103,7 @@ export default defineConfig({
           name: "jsdom",
           globals: true,
           environment: "jsdom",
-          setupFiles: ["src/test/vitest.setup.ts"],
+          setupFiles: ["vitest.setup.react.ts"],
           pool: "forks",
           typecheck: {
             tsconfig: "./tsconfig.tests.json",

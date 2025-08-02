@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import * as React from "react";
 
 import { IssueDetailView } from "~/components/issues/IssueDetailView";
-import { auth } from "~/server/auth";
+import { getSupabaseUser } from "~/server/auth/supabase";
 import { api } from "~/trpc/server";
 
 interface IssuePageProps {
@@ -39,7 +39,7 @@ export async function generateMetadata({
 export default async function IssuePage({
   params,
 }: IssuePageProps): Promise<React.JSX.Element> {
-  const session = await auth();
+  const user = await getSupabaseUser();
 
   try {
     // Fetch issue data on the server
@@ -53,7 +53,7 @@ export default async function IssuePage({
       <main aria-label="Issue details">
         <IssueDetailView
           issue={issue}
-          session={session}
+          user={user}
           issueId={resolvedParams.issueId}
         />
       </main>

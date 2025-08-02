@@ -11,11 +11,11 @@ vi.mock("next-auth", () => ({
   })),
 }));
 
+import { appRouter } from "~/server/api/root";
 import {
   createVitestMockContext,
   type VitestMockContext,
-} from "../../../../test/vitestMockContext";
-import { appRouter } from "../../root";
+} from "~/test/vitestMockContext";
 
 // Mock data for tests
 const mockUser = { id: "user-1", email: "test@example.com", name: "Test User" };
@@ -28,10 +28,12 @@ describe("notificationRouter", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     ctx = createVitestMockContext();
-    ctx.session = {
-      user: { id: mockUser.id },
-      expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-    };
+    ctx.user = {
+      id: mockUser.id,
+      email: mockUser.email,
+      user_metadata: {},
+      app_metadata: { organization_id: "org-1" },
+    } as any; // Simplified mock for tests
 
     // Create a single mock service instance and make createNotificationService return it
     mockNotificationService = {
@@ -110,8 +112,10 @@ describe("notificationRouter", () => {
   });
 
   it("requires authentication", async () => {
-    const caller = appRouter.createCaller({ ...ctx, session: null } as any);
-    await expect(caller.notification.getNotifications({})).rejects.toThrow();
+    const caller = appRouter.createCaller({ ...ctx, user: null } as any);
+    await expect(caller.notification.getNotifications({})).rejects.toThrow(
+      "UNAUTHORIZED",
+    );
   });
 
   it("validates input", async () => {

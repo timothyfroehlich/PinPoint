@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 
-import fixtureData from "../../pinballmap/__tests__/fixtures/api_responses/locations/location_26454_machine_details.json";
 import {
   transformPinballMapMachineToModel,
   getModelLookupStrategy,
@@ -11,7 +10,9 @@ import {
   prepareMachineCreateData,
 } from "../pinballmapTransformer";
 
-import type { PinballMapMachine } from "../../pinballmap/types";
+import type { PinballMapMachine } from "~/lib/pinballmap/types";
+
+import fixtureData from "~/lib/pinballmap/__tests__/fixtures/api_responses/locations/location_26454_machine_details.json";
 
 describe("pinballmapTransformer", () => {
   // Use real fixture data for comprehensive testing

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CollectionService } from "../collectionService";
 
-import type { ExtendedPrismaClient } from "../../db";
+import type { ExtendedPrismaClient } from "~/server/db";
 
 // Mock Prisma Client
 const mockPrisma = {

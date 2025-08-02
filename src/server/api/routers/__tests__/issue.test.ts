@@ -64,15 +64,18 @@ const mockMembership = {
 const createAuthenticatedContext = (permissions: string[] = []) => {
   const mockContext = createVitestMockContext();
 
-  // Set up session and organization - matching TRPCContext interface
-  (mockContext as any).session = {
-    user: {
-      id: "user-1",
-      email: "test@example.com",
+  // Override the user with proper test data
+  (mockContext as any).user = {
+    id: "user-1",
+    email: "test@example.com",
+    user_metadata: {
       name: "Test User",
-      image: null,
+      avatar_url: null,
     },
-    expires: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(),
+    app_metadata: {
+      organization_id: "org-1",
+      role: "Member",
+    },
   };
 
   (mockContext as any).organization = {

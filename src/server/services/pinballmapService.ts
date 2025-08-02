@@ -3,13 +3,13 @@
  * Handles syncing machine data between PinballMap and PinPoint
  */
 
-import { transformPinballMapMachineToModel } from "../../lib/external/pinballmapTransformer";
-
 import type { ExtendedPrismaClient } from "./types";
 import type {
   PinballMapMachine,
   PinballMapMachineDetailsResponse,
-} from "../../lib/pinballmap/types";
+} from "~/lib/pinballmap/types";
+
+import { transformPinballMapMachineToModel } from "~/lib/external/pinballmapTransformer";
 
 export interface SyncResult {
   success: boolean;

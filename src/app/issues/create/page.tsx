@@ -4,7 +4,7 @@ import { type Metadata } from "next";
 import * as React from "react";
 
 import { IssueCreateView } from "~/components/issues/IssueCreateView";
-import { auth } from "~/server/auth";
+import { getSupabaseUser } from "~/server/auth/supabase";
 
 interface CreateIssuePageProps {
   searchParams: Promise<{
@@ -25,7 +25,7 @@ export const metadata: Metadata = {
 export default async function CreateIssuePage({
   searchParams,
 }: CreateIssuePageProps): Promise<React.JSX.Element> {
-  const session = await auth();
+  const user = await getSupabaseUser();
   const resolvedSearchParams = await searchParams;
 
   return (
@@ -64,7 +64,7 @@ export default async function CreateIssuePage({
 
       {/* Main Issue Creation View */}
       <IssueCreateView
-        session={session}
+        user={user}
         initialMachineId={resolvedSearchParams.machineId}
       />
     </Container>

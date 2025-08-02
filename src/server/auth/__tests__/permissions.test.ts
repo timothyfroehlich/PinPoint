@@ -2,14 +2,15 @@ import { TRPCError } from "@trpc/server";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 import {
-  createVitestMockContext,
-  type VitestMockContext,
-} from "../../../test/vitestMockContext";
-import {
   hasPermission,
   requirePermission,
   getUserPermissions,
 } from "../permissions";
+
+import {
+  createVitestMockContext,
+  type VitestMockContext,
+} from "~/test/vitestMockContext";
 
 describe("Permission System Core Functions", () => {
   let mockContext: VitestMockContext;

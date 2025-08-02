@@ -1,13 +1,19 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
-import { ROLE_TEMPLATES } from "../../auth/permissions.constants";
-import { RoleService } from "../../services/roleService";
 import { createTRPCRouter } from "../trpc";
 import {
   roleManageProcedure,
   organizationManageProcedure,
 } from "../trpc.permission";
+
+import {
+  validateRoleAssignment,
+  type RoleAssignmentInput,
+  type RoleManagementContext,
+} from "~/lib/users/roleManagementValidation";
+import { ROLE_TEMPLATES } from "~/server/auth/permissions.constants";
+import { RoleService } from "~/server/services/roleService";
 
 export const roleRouter = createTRPCRouter({
   /**
@@ -211,7 +217,7 @@ export const roleRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Verify the role exists in this organization
+      // Get the target role and verify it exists in this organization
       const role = await ctx.db.role.findUnique({
         where: {
           id: input.roleId,
@@ -223,6 +229,114 @@ export const roleRouter = createTRPCRouter({
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Role not found",
+        });
+      }
+
+      // Get the current user membership
+      const currentMembership = await ctx.db.membership.findUnique({
+        where: {
+          userId_organizationId: {
+            userId: input.userId,
+            organizationId: ctx.organization.id,
+          },
+        },
+        include: {
+          user: true,
+          role: true,
+        },
+      });
+
+      if (!currentMembership) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "User is not a member of this organization",
+        });
+      }
+
+      // Get all memberships for validation
+      const allMemberships = await ctx.db.membership.findMany({
+        where: {
+          organizationId: ctx.organization.id,
+        },
+        include: {
+          user: true,
+          role: true,
+        },
+      });
+
+      // Create validation input
+      const validationInput: RoleAssignmentInput = {
+        userId: input.userId,
+        roleId: input.roleId,
+        organizationId: ctx.organization.id,
+      };
+
+      const context: RoleManagementContext = {
+        organizationId: ctx.organization.id,
+        actorUserId: ctx.user.id,
+        userPermissions: ctx.userPermissions,
+      };
+
+      // Convert Prisma result to validation interface
+      const validationMembership = {
+        id: currentMembership.id,
+        userId: currentMembership.userId,
+        organizationId: currentMembership.organizationId,
+        roleId: currentMembership.roleId,
+        user: {
+          id: currentMembership.user.id,
+          name: currentMembership.user.name,
+          email: currentMembership.user.email ?? "",
+        },
+        role: {
+          id: currentMembership.role.id,
+          name: currentMembership.role.name,
+          organizationId: currentMembership.role.organizationId,
+          isSystem: currentMembership.role.isSystem,
+          isDefault: currentMembership.role.isDefault,
+        },
+      };
+
+      const validationAllMemberships = allMemberships.map((m) => ({
+        id: m.id,
+        userId: m.userId,
+        organizationId: m.organizationId,
+        roleId: m.roleId,
+        user: {
+          id: m.user.id,
+          name: m.user.name,
+          email: m.user.email ?? "",
+        },
+        role: {
+          id: m.role.id,
+          name: m.role.name,
+          organizationId: m.role.organizationId,
+          isSystem: m.role.isSystem,
+          isDefault: m.role.isDefault,
+        },
+      }));
+
+      const validationRole = {
+        id: role.id,
+        name: role.name,
+        organizationId: role.organizationId,
+        isSystem: role.isSystem,
+        isDefault: role.isDefault,
+      };
+
+      // Validate the role assignment using pure functions
+      const validation = validateRoleAssignment(
+        validationInput,
+        validationRole,
+        validationMembership,
+        validationAllMemberships,
+        context,
+      );
+
+      if (!validation.valid) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: validation.error ?? "Role assignment validation failed",
         });
       }
 
@@ -248,10 +362,6 @@ export const roleRouter = createTRPCRouter({
           },
         },
       });
-
-      // After role change, ensure we still have at least one admin
-      const roleService = new RoleService(ctx.db, ctx.organization.id);
-      await roleService.ensureAtLeastOneAdmin();
 
       return membership;
     }),

@@ -2,7 +2,7 @@ import { type Metadata } from "next";
 import * as React from "react";
 
 import { LocationList } from "~/components/locations/LocationList";
-import { auth } from "~/server/auth";
+import { getSupabaseUser } from "~/server/auth/supabase";
 import { api } from "~/trpc/server";
 
 export const metadata: Metadata = {
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 };
 
 export default async function LocationsPage(): Promise<React.JSX.Element> {
-  const session = await auth();
+  const user = await getSupabaseUser();
 
   try {
     // Use public endpoint for unified dashboard experience
@@ -24,14 +24,14 @@ export default async function LocationsPage(): Promise<React.JSX.Element> {
 
     return (
       <main aria-label="Locations list">
-        <LocationList locations={locations} session={session} />
+        <LocationList locations={locations} user={user} />
       </main>
     );
   } catch {
     // Fallback for when organization context is not available
     return (
       <main aria-label="Locations list">
-        <LocationList locations={[]} session={session} />
+        <LocationList locations={[]} user={user} />
       </main>
     );
   }

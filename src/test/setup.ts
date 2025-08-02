@@ -11,7 +11,6 @@ Object.defineProperty(process.env, "NODE_ENV", {
 // Use Object.assign to avoid TypeScript/ESLint conflicts with env variable assignment
 Object.assign(process.env, {
   AUTH_SECRET: "test-auth-secret",
-  NEXTAUTH_SECRET: "test-auth-secret", // Alternative name
   GOOGLE_CLIENT_ID: "test-google-client-id",
   GOOGLE_CLIENT_SECRET: "test-google-client-secret",
   DATABASE_URL: "postgresql://test:test@localhost:5432/test",
@@ -19,7 +18,6 @@ Object.assign(process.env, {
   DEFAULT_ORG_SUBDOMAIN: "apc",
   OPDB_API_KEY: "test-token",
   IMAGE_STORAGE_PROVIDER: "local",
-  NEXTAUTH_URL: "http://localhost:3000",
   VERCEL_URL: "",
   PORT: "3000",
 });
@@ -33,8 +31,7 @@ vi.mock("~/env.js", () => ({
     NODE_ENV: "test",
     GOOGLE_CLIENT_ID: "test-google-client-id",
     GOOGLE_CLIENT_SECRET: "test-google-client-secret",
-    NEXTAUTH_URL: "http://localhost:3000",
-    NEXTAUTH_SECRET: "test-auth-secret",
+    AUTH_SECRET: "test-auth-secret",
     DATABASE_URL: "postgresql://test:test@localhost:5432/test",
     OPDB_API_URL: "https://opdb.org/api",
     DEFAULT_ORG_SUBDOMAIN: "apc",
@@ -174,28 +171,54 @@ vi.mock("~/server/db/provider", () => ({
   getGlobalDatabaseProvider: vi.fn().mockReturnValue(mockDatabaseProvider),
 }));
 
-// Mock NextAuth first to avoid import issues
-vi.mock("next-auth", () => ({
-  default: vi.fn().mockImplementation(() => ({
-    auth: vi.fn(),
-    handlers: { GET: vi.fn(), POST: vi.fn() },
-    signIn: vi.fn(),
-    signOut: vi.fn(),
-  })),
+// Mock Supabase client for tests
+const mockSupabaseClient = {
+  auth: {
+    getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
+    getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
+    signOut: vi.fn().mockResolvedValue({ error: null }),
+    onAuthStateChange: vi.fn().mockReturnValue({
+      data: { subscription: { unsubscribe: vi.fn() } },
+    }),
+  },
+  from: vi.fn().mockReturnThis(),
+  select: vi.fn().mockReturnThis(),
+  insert: vi.fn().mockReturnThis(),
+  update: vi.fn().mockReturnThis(),
+  delete: vi.fn().mockReturnThis(),
+  eq: vi.fn().mockReturnThis(),
+  single: vi.fn().mockResolvedValue({ data: null, error: null }),
+};
+
+// Mock Supabase client creation
+vi.mock("~/lib/supabase/client", () => ({
+  createClient: vi.fn(() => mockSupabaseClient),
 }));
 
-// Mock NextAuth React hooks
-vi.mock("next-auth/react", () => ({
-  useSession: vi.fn(() => ({
-    data: null,
-    status: "loading",
+vi.mock("~/lib/supabase/server", () => ({
+  createServerClient: vi.fn(() => mockSupabaseClient),
+}));
+
+// Mock auth provider context
+vi.mock("~/app/auth-provider", () => ({
+  useAuthContext: vi.fn(() => ({
+    user: null,
+    loading: false,
   })),
-  signIn: vi.fn(),
-  signOut: vi.fn(),
-  SessionProvider: vi.fn(
+  AuthProvider: vi.fn(
     ({ children }: { children: React.ReactNode }) => children,
   ),
 }));
+
+// Mock auth permissions functions
+vi.mock("~/server/auth/permissions", async () => {
+  const actual = await vi.importActual("~/server/auth/permissions");
+  return {
+    ...actual,
+    getUserPermissionsForSupabaseUser: vi.fn().mockResolvedValue([]),
+    requirePermissionForSession: vi.fn().mockResolvedValue(undefined),
+  };
+});
 
 // Mock tRPC to prevent server-side imports
 vi.mock("~/trpc/react", () => ({

@@ -1,4 +1,5 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { createContext, useContext, type ReactNode } from "react";
 import {
   describe,
   it,
@@ -13,10 +14,13 @@ import "@testing-library/jest-dom";
 
 import PrimaryAppBar from "../PrimaryAppBar";
 
+import type { PinPointSupabaseUser } from "~/lib/supabase/types";
+
 import { server } from "~/test/msw/setup";
 import {
   VitestTestWrapper,
   VITEST_PERMISSION_SCENARIOS,
+  createMockSupabaseUser,
 } from "~/test/VitestTestWrapper";
 
 // Mock Next.js navigation
@@ -28,14 +32,54 @@ vi.mock("next/navigation", () => ({
   })),
 }));
 
-// Mock NextAuth
-vi.mock("next-auth/react", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("next-auth/react")>();
-  return {
-    ...actual,
-    signOut: vi.fn(),
+// NextAuth mock removed - using Supabase auth
+
+// Mock AuthProvider for components that use useAuth directly
+interface MockAuthContextType {
+  user: PinPointSupabaseUser | null;
+  loading: boolean;
+  signOut: () => Promise<void>;
+}
+
+const MockAuthContext = createContext<MockAuthContextType | undefined>(
+  undefined,
+);
+
+function MockAuthProvider({
+  children,
+  user = createMockSupabaseUser(),
+  loading = false,
+}: {
+  children: ReactNode;
+  user?: PinPointSupabaseUser | null;
+  loading?: boolean;
+}) {
+  const mockSignOut = vi.fn().mockResolvedValue(undefined);
+
+  const value = {
+    user,
+    loading,
+    signOut: mockSignOut,
   };
-});
+
+  return (
+    <MockAuthContext.Provider value={value}>
+      {children}
+    </MockAuthContext.Provider>
+  );
+}
+
+// Mock the useAuth hook to use our mock context
+vi.mock("~/app/auth-provider", () => ({
+  useAuth: () => {
+    const context = useContext(MockAuthContext);
+    if (context === undefined) {
+      throw new Error("useAuth must be used within an AuthProvider");
+    }
+    return context;
+  },
+  AuthProvider: MockAuthProvider,
+}));
 
 describe("PrimaryAppBar", () => {
   // Set up MSW server
@@ -56,20 +100,26 @@ describe("PrimaryAppBar", () => {
   describe("Basic Rendering", () => {
     it("should render the app bar with PinPoint branding", () => {
       render(
-        <VitestTestWrapper>
-          <PrimaryAppBar />
-        </VitestTestWrapper>,
+        <MockAuthProvider>
+          <VitestTestWrapper>
+            <PrimaryAppBar />
+          </VitestTestWrapper>
+        </MockAuthProvider>,
       );
 
-      expect(screen.getByText("PinPoint")).toBeInTheDocument();
-      expect(screen.getByText("Home")).toBeInTheDocument();
+      expect(
+        screen.getByRole("link", { name: /pinpoint/i }),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /home/i })).toBeInTheDocument();
     });
 
     it("should render user profile menu", () => {
       render(
-        <VitestTestWrapper>
-          <PrimaryAppBar />
-        </VitestTestWrapper>,
+        <MockAuthProvider>
+          <VitestTestWrapper>
+            <PrimaryAppBar />
+          </VitestTestWrapper>
+        </MockAuthProvider>,
       );
 
       const profileButton = screen.getByRole("button", {
@@ -80,9 +130,11 @@ describe("PrimaryAppBar", () => {
 
     it("should render logo with correct href", () => {
       render(
-        <VitestTestWrapper>
-          <PrimaryAppBar />
-        </VitestTestWrapper>,
+        <MockAuthProvider>
+          <VitestTestWrapper>
+            <PrimaryAppBar />
+          </VitestTestWrapper>
+        </MockAuthProvider>,
       );
 
       // Get the logo link specifically by finding the link that contains PinPoint text
@@ -94,9 +146,11 @@ describe("PrimaryAppBar", () => {
   describe("Permission-based Navigation", () => {
     it("should show Issues button for users with issue:view permission", async () => {
       render(
-        <VitestTestWrapper userPermissions={["issue:view"]}>
-          <PrimaryAppBar />
-        </VitestTestWrapper>,
+        <MockAuthProvider>
+          <VitestTestWrapper userPermissions={["issue:view"]}>
+            <PrimaryAppBar />
+          </VitestTestWrapper>
+        </MockAuthProvider>,
       );
 
       // Wait for async permission loading
@@ -112,9 +166,11 @@ describe("PrimaryAppBar", () => {
 
     it("should show Games button for users with machine:view permission", async () => {
       render(
-        <VitestTestWrapper userPermissions={["machine:view"]}>
-          <PrimaryAppBar />
-        </VitestTestWrapper>,
+        <MockAuthProvider>
+          <VitestTestWrapper userPermissions={["machine:view"]}>
+            <PrimaryAppBar />
+          </VitestTestWrapper>
+        </MockAuthProvider>,
       );
 
       await waitFor(() => {
@@ -129,9 +185,11 @@ describe("PrimaryAppBar", () => {
 
     it("should hide Issues button for users without issue:view permission", () => {
       render(
-        <VitestTestWrapper userPermissions={[]}>
-          <PrimaryAppBar />
-        </VitestTestWrapper>,
+        <MockAuthProvider>
+          <VitestTestWrapper userPermissions={[]}>
+            <PrimaryAppBar />
+          </VitestTestWrapper>
+        </MockAuthProvider>,
       );
 
       expect(
@@ -141,9 +199,11 @@ describe("PrimaryAppBar", () => {
 
     it("should hide Games button for users without machine:view permission", () => {
       render(
-        <VitestTestWrapper userPermissions={[]}>
-          <PrimaryAppBar />
-        </VitestTestWrapper>,
+        <MockAuthProvider>
+          <VitestTestWrapper userPermissions={[]}>
+            <PrimaryAppBar />
+          </VitestTestWrapper>
+        </MockAuthProvider>,
       );
 
       expect(
@@ -153,11 +213,13 @@ describe("PrimaryAppBar", () => {
 
     it("should show both navigation buttons for admin users", async () => {
       render(
-        <VitestTestWrapper
-          userPermissions={[...VITEST_PERMISSION_SCENARIOS.ADMIN]}
-        >
-          <PrimaryAppBar />
-        </VitestTestWrapper>,
+        <MockAuthProvider>
+          <VitestTestWrapper
+            userPermissions={[...VITEST_PERMISSION_SCENARIOS.ADMIN]}
+          >
+            <PrimaryAppBar />
+          </VitestTestWrapper>
+        </MockAuthProvider>,
       );
 
       await waitFor(() => {
@@ -172,11 +234,13 @@ describe("PrimaryAppBar", () => {
 
     it("should show appropriate buttons for manager users", async () => {
       render(
-        <VitestTestWrapper
-          userPermissions={[...VITEST_PERMISSION_SCENARIOS.MANAGER]}
-        >
-          <PrimaryAppBar />
-        </VitestTestWrapper>,
+        <MockAuthProvider>
+          <VitestTestWrapper
+            userPermissions={[...VITEST_PERMISSION_SCENARIOS.MANAGER]}
+          >
+            <PrimaryAppBar />
+          </VitestTestWrapper>
+        </MockAuthProvider>,
       );
 
       await waitFor(() => {
@@ -191,11 +255,13 @@ describe("PrimaryAppBar", () => {
 
     it("should show appropriate buttons for member users", async () => {
       render(
-        <VitestTestWrapper
-          userPermissions={[...VITEST_PERMISSION_SCENARIOS.MEMBER]}
-        >
-          <PrimaryAppBar />
-        </VitestTestWrapper>,
+        <MockAuthProvider>
+          <VitestTestWrapper
+            userPermissions={[...VITEST_PERMISSION_SCENARIOS.MEMBER]}
+          >
+            <PrimaryAppBar />
+          </VitestTestWrapper>
+        </MockAuthProvider>,
       );
 
       await waitFor(() => {
@@ -210,11 +276,13 @@ describe("PrimaryAppBar", () => {
 
     it("should hide all navigation buttons for public users", () => {
       render(
-        <VitestTestWrapper
-          userPermissions={[...VITEST_PERMISSION_SCENARIOS.PUBLIC]}
-        >
-          <PrimaryAppBar />
-        </VitestTestWrapper>,
+        <MockAuthProvider>
+          <VitestTestWrapper
+            userPermissions={[...VITEST_PERMISSION_SCENARIOS.PUBLIC]}
+          >
+            <PrimaryAppBar />
+          </VitestTestWrapper>
+        </MockAuthProvider>,
       );
 
       expect(
@@ -240,9 +308,11 @@ describe("PrimaryAppBar", () => {
       });
 
       render(
-        <VitestTestWrapper>
-          <PrimaryAppBar />
-        </VitestTestWrapper>,
+        <MockAuthProvider>
+          <VitestTestWrapper>
+            <PrimaryAppBar />
+          </VitestTestWrapper>
+        </MockAuthProvider>,
       );
 
       const profileButton = screen.getByRole("button", {
@@ -255,9 +325,11 @@ describe("PrimaryAppBar", () => {
 
     it("should have proper accessibility attributes", () => {
       render(
-        <VitestTestWrapper>
-          <PrimaryAppBar />
-        </VitestTestWrapper>,
+        <MockAuthProvider>
+          <VitestTestWrapper>
+            <PrimaryAppBar />
+          </VitestTestWrapper>
+        </MockAuthProvider>,
       );
 
       const profileButton = screen.getByRole("button", {
@@ -276,14 +348,18 @@ describe("PrimaryAppBar", () => {
   describe("Unauthenticated User Experience", () => {
     it("should render basic structure for unauthenticated users", () => {
       render(
-        <VitestTestWrapper session={null}>
-          <PrimaryAppBar />
-        </VitestTestWrapper>,
+        <MockAuthProvider user={null}>
+          <VitestTestWrapper session={null}>
+            <PrimaryAppBar />
+          </VitestTestWrapper>
+        </MockAuthProvider>,
       );
 
       // Basic branding should still be there
-      expect(screen.getByText("PinPoint")).toBeInTheDocument();
-      expect(screen.getByText("Home")).toBeInTheDocument();
+      expect(
+        screen.getByRole("link", { name: /pinpoint/i }),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /home/i })).toBeInTheDocument();
 
       // Sign In button should be shown for unauthenticated users
       expect(
@@ -293,9 +369,11 @@ describe("PrimaryAppBar", () => {
 
     it("should hide permission-based navigation for unauthenticated users", () => {
       render(
-        <VitestTestWrapper session={null}>
-          <PrimaryAppBar />
-        </VitestTestWrapper>,
+        <MockAuthProvider user={null}>
+          <VitestTestWrapper session={null}>
+            <PrimaryAppBar />
+          </VitestTestWrapper>
+        </MockAuthProvider>,
       );
 
       expect(
@@ -310,9 +388,11 @@ describe("PrimaryAppBar", () => {
   describe("Permission Tooltips", () => {
     it("should have correct tooltip for Issues button", () => {
       render(
-        <VitestTestWrapper userPermissions={["issue:view"]}>
-          <PrimaryAppBar />
-        </VitestTestWrapper>,
+        <MockAuthProvider>
+          <VitestTestWrapper userPermissions={["issue:view"]}>
+            <PrimaryAppBar />
+          </VitestTestWrapper>
+        </MockAuthProvider>,
       );
 
       const issuesButton = screen.getByRole("button", { name: "Issues" });
@@ -326,9 +406,11 @@ describe("PrimaryAppBar", () => {
 
     it("should have correct tooltip for Games button", () => {
       render(
-        <VitestTestWrapper userPermissions={["machine:view"]}>
-          <PrimaryAppBar />
-        </VitestTestWrapper>,
+        <MockAuthProvider>
+          <VitestTestWrapper userPermissions={["machine:view"]}>
+            <PrimaryAppBar />
+          </VitestTestWrapper>
+        </MockAuthProvider>,
       );
 
       const gamesButton = screen.getByRole("button", { name: "Games" });
@@ -339,16 +421,20 @@ describe("PrimaryAppBar", () => {
   describe("Responsive Design", () => {
     it("should maintain proper spacing between navigation elements", () => {
       render(
-        <VitestTestWrapper
-          userPermissions={[...VITEST_PERMISSION_SCENARIOS.ADMIN]}
-        >
-          <PrimaryAppBar />
-        </VitestTestWrapper>,
+        <MockAuthProvider>
+          <VitestTestWrapper
+            userPermissions={[...VITEST_PERMISSION_SCENARIOS.ADMIN]}
+          >
+            <PrimaryAppBar />
+          </VitestTestWrapper>
+        </MockAuthProvider>,
       );
 
       // All main elements should be present
-      expect(screen.getByText("PinPoint")).toBeInTheDocument();
-      expect(screen.getByText("Home")).toBeInTheDocument();
+      expect(
+        screen.getByRole("link", { name: /pinpoint/i }),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /home/i })).toBeInTheDocument();
       expect(
         screen.getByRole("button", { name: "Issues" }),
       ).toBeInTheDocument();
@@ -364,13 +450,17 @@ describe("PrimaryAppBar", () => {
       // This test verifies that the component doesn't crash when using real hooks
       // The VitestTestWrapper provides the necessary provider context
       render(
-        <VitestTestWrapper userPermissions={["issue:view", "machine:view"]}>
-          <PrimaryAppBar />
-        </VitestTestWrapper>,
+        <MockAuthProvider>
+          <VitestTestWrapper userPermissions={["issue:view", "machine:view"]}>
+            <PrimaryAppBar />
+          </VitestTestWrapper>
+        </MockAuthProvider>,
       );
 
       // Component should render without errors and show expected content
-      expect(screen.getByText("PinPoint")).toBeInTheDocument();
+      expect(
+        screen.getByRole("link", { name: /pinpoint/i }),
+      ).toBeInTheDocument();
       expect(
         screen.getByRole("button", { name: "Issues" }),
       ).toBeInTheDocument();
@@ -379,14 +469,18 @@ describe("PrimaryAppBar", () => {
 
     it("should handle empty permissions gracefully", () => {
       render(
-        <VitestTestWrapper userPermissions={[]}>
-          <PrimaryAppBar />
-        </VitestTestWrapper>,
+        <MockAuthProvider>
+          <VitestTestWrapper userPermissions={[]}>
+            <PrimaryAppBar />
+          </VitestTestWrapper>
+        </MockAuthProvider>,
       );
 
       // Should render basic structure without permission-based buttons
-      expect(screen.getByText("PinPoint")).toBeInTheDocument();
-      expect(screen.getByText("Home")).toBeInTheDocument();
+      expect(
+        screen.getByRole("link", { name: /pinpoint/i }),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /home/i })).toBeInTheDocument();
       expect(
         screen.queryByRole("button", { name: "Issues" }),
       ).not.toBeInTheDocument();
@@ -400,13 +494,17 @@ describe("PrimaryAppBar", () => {
     it("should not crash when permission hook returns undefined permissions", () => {
       // Test edge case where permissions might be undefined
       render(
-        <VitestTestWrapper userPermissions={undefined as any}>
-          <PrimaryAppBar />
-        </VitestTestWrapper>,
+        <MockAuthProvider>
+          <VitestTestWrapper userPermissions={undefined as any}>
+            <PrimaryAppBar />
+          </VitestTestWrapper>
+        </MockAuthProvider>,
       );
 
       // Should still render basic structure
-      expect(screen.getByText("PinPoint")).toBeInTheDocument();
+      expect(
+        screen.getByRole("link", { name: /pinpoint/i }),
+      ).toBeInTheDocument();
     });
   });
 });

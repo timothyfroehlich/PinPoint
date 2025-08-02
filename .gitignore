@@ -63,6 +63,7 @@ node_modules/
 # Orchestrator multi-agent system
 .claude/SUBAGENT_TASK.md
 .claude/ORCHESTRATOR_NOTES.md
+.claude/sub-agent-logs/
 worktrees/
 
 # Build/lint/test output files
@@ -82,3 +83,4 @@ cleanup_analysis/
 .claude/hooks/tsconfig-cache.json
 .betterer.results.backup
 .env*.local
+.worktree-ports
