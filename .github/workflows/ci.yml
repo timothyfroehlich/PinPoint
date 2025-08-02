@@ -231,7 +231,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
           # Exit with actual test result (no longer accept failures)
-          exit $TEST_EXIT_CODE
+          exit "$TEST_EXIT_CODE"
       - name: Upload Coverage
         uses: codecov/codecov-action@18283e04ce6e62d37312384ff67231eb8fd56d24 # v5
         with:
