@@ -93,7 +93,7 @@ jobs:
           npm run seed
 
       - name: Install Playwright Browsers
-        run: npx playwright install chromium
+        run: npx playwright install --with-deps chromium
 
       - name: Run Smoke Test
         run: npm run smoke
