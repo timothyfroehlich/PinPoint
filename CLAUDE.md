@@ -126,6 +126,7 @@ npm run format:brief    # Prettier formatting check (minimal output)
 npm run audit:brief     # npm security vulnerability check (table format)
 npm run test:brief      # Vitest unit tests (basic reporter)
 npm run playwright:brief # E2E tests (line reporter, headless)
+npm run smoke            # Smoke test (complete workflow validation)
 
 # Regular versions - use only when brief fails and you need more detail
 npm run typecheck       # Full TypeScript output
@@ -454,6 +455,7 @@ npm run drizzle:migrate # Coming in Stage 2
 - **Server Status Checks**: ALWAYS use `npm run dev:bg:status` to check if the development server is running. NEVER use curl commands for server status checks.
 - **ESLint Disabling**: NEVER add an eslint-disable unless you have exhausted all other options and confirmed with the user that it is the correct thing to do.
 - **E2E Testing**: Use `npm run playwright` (headless). NEVER use `playwright:headed` or `playwright:ui` as they show browser windows and interrupt the user's workflow.
+- **Smoke Testing**: Use `npm run smoke` for quick end-to-end workflow validation. This tests the complete issue creation → admin management flow in ~2 minutes.
 - **Prisma Studio**: AVOID launching Prisma Studio (`npm run db:studio`) unless absolutely necessary for debugging complex data issues. Use direct SQL queries, schema file reading, or existing component inspection instead.
 - **Import Path Consistency**: ALWAYS use the TypeScript path alias `~/` for internal imports. NEVER use relative paths like `../../../lib/supabase/client`. ESLint enforces this with `no-restricted-imports` rule to prevent deep relative imports.
 

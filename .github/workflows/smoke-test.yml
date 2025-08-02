@@ -1,0 +1,59 @@
+name: Smoke Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  smoke-test:
+    name: End-to-End Smoke Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start Supabase Local
+        run: |
+          supabase db start
+          echo "POSTGRES_PRISMA_URL=postgresql://postgres:postgres@127.0.0.1:5432/postgres" >> $GITHUB_ENV
+          echo "POSTGRES_URL_NON_POOLING=postgresql://postgres:postgres@127.0.0.1:5432/postgres" >> $GITHUB_ENV
+          echo "SUPABASE_URL=http://127.0.0.1:54321" >> $GITHUB_ENV
+          echo "SUPABASE_ANON_KEY=$(supabase status -o env | grep SUPABASE_ANON_KEY | cut -d'=' -f2)" >> $GITHUB_ENV
+          echo "SUPABASE_SERVICE_ROLE_KEY=$(supabase status -o env | grep SUPABASE_SERVICE_ROLE_KEY | cut -d'=' -f2)" >> $GITHUB_ENV
+
+      - name: Setup database schema
+        run: |
+          npm run db:push
+          npm run seed
+
+      - name: Install Playwright Browsers
+        run: npx playwright install chromium
+
+      - name: Run Smoke Test
+        run: npm run smoke
+
+      - name: Upload Playwright Report
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report-smoke
+          path: playwright-report/
+          retention-days: 7
