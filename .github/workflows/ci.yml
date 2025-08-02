@@ -166,10 +166,12 @@ jobs:
       - name: Start Supabase Local
         run: |
           supabase db start
-          echo "POSTGRES_PRISMA_URL=postgresql://postgres:postgres@127.0.0.1:5432/postgres" >> $GITHUB_ENV
-          echo "POSTGRES_URL_NON_POOLING=postgresql://postgres:postgres@127.0.0.1:5432/postgres" >> $GITHUB_ENV
-          echo "SUPABASE_URL=http://127.0.0.1:54321" >> $GITHUB_ENV
-          echo "NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321" >> $GITHUB_ENV
+          {
+            echo "POSTGRES_PRISMA_URL=postgresql://postgres:postgres@127.0.0.1:5432/postgres"
+            echo "POSTGRES_URL_NON_POOLING=postgresql://postgres:postgres@127.0.0.1:5432/postgres"
+            echo "SUPABASE_URL=http://127.0.0.1:54321"
+            echo "NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321"
+          } >> "$GITHUB_ENV"
           
           # Extract keys from supabase status
           SUPABASE_STATUS=$(supabase status -o env)
@@ -177,10 +179,12 @@ jobs:
           SERVICE_ROLE_KEY=$(echo "$SUPABASE_STATUS" | grep SUPABASE_SERVICE_ROLE_KEY | cut -d'=' -f2)
           JWT_SECRET=$(echo "$SUPABASE_STATUS" | grep SUPABASE_JWT_SECRET | cut -d'=' -f2)
           
-          echo "SUPABASE_ANON_KEY=$ANON_KEY" >> $GITHUB_ENV
-          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY" >> $GITHUB_ENV
-          echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY" >> $GITHUB_ENV
-          echo "SUPABASE_JWT_SECRET=$JWT_SECRET" >> $GITHUB_ENV
+          {
+            echo "SUPABASE_ANON_KEY=$ANON_KEY"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
+            echo "SUPABASE_JWT_SECRET=$JWT_SECRET"
+          } >> "$GITHUB_ENV"
           
           echo "✅ Supabase local started with database and auth services"
       
