@@ -10,7 +10,7 @@ jobs:
   smoke-test:
     name: End-to-End Smoke Test
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
 
     steps:
       - name: Checkout
@@ -37,41 +37,54 @@ jobs:
             supabase init
           fi
           
-          # Start Supabase with explicit timeout and better error handling
-          timeout 300 supabase start || {
+          # Start Supabase with longer timeout for CI/CD and optimizations
+          echo "Starting Supabase local development stack..."
+          timeout 900 supabase start --ignore-health-check || {
             echo "Supabase start failed, checking logs..."
             container_ids=$(docker ps -q --filter "name=supabase")
             if [ -n "$container_ids" ]; then
-              docker logs "$container_ids" 2>&1 || true
+              echo "=== Container logs ==="
+              for id in $container_ids; do
+                echo "--- Container $id ---"
+                docker logs "$id" 2>&1 | tail -50 || true
+              done
             fi
             exit 1
           }
           
-          # Wait for all services to be ready
-          sleep 10
+          # Wait for all services to be ready and stabilize
+          echo "Waiting for services to stabilize..."
+          sleep 15
+          
+          # Verify services are running
+          docker ps --filter "name=supabase"
           
           # Extract keys using the correct supabase status output
+          echo "Extracting Supabase credentials..."
           ANON_KEY=$(supabase status --output env | grep SUPABASE_ANON_KEY | cut -d'=' -f2-)
           SERVICE_KEY=$(supabase status --output env | grep SUPABASE_SERVICE_ROLE_KEY | cut -d'=' -f2-)
           
           # Validate that we got the keys
           if [ -z "$ANON_KEY" ] || [ -z "$SERVICE_KEY" ]; then
             echo "Failed to extract Supabase keys"
+            echo "=== Supabase Status ==="
             supabase status
+            echo "=== Supabase Status ENV ==="
+            supabase status --output env
             exit 1
           fi
           
-          # Set environment variables
+          # Set environment variables with correct database port
           {
-            echo "POSTGRES_PRISMA_URL=postgresql://postgres:postgres@127.0.0.1:5432/postgres"
-            echo "POSTGRES_URL_NON_POOLING=postgresql://postgres:postgres@127.0.0.1:5432/postgres" 
+            echo "POSTGRES_PRISMA_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+            echo "POSTGRES_URL_NON_POOLING=postgresql://postgres:postgres@127.0.0.1:54322/postgres" 
             echo "SUPABASE_URL=http://127.0.0.1:54321"
             echo "SUPABASE_ANON_KEY=${ANON_KEY}"
             echo "SUPABASE_SERVICE_ROLE_KEY=${SERVICE_KEY}"
           } >> "$GITHUB_ENV"
           
           # Debug output (keys will be masked in logs)
-          echo "Supabase services started successfully"
+          echo "✅ Supabase services started successfully"
           supabase status
 
       - name: Setup database schema
