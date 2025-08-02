@@ -15,10 +15,11 @@
  * when the user upgrades their Supabase plan.
  */
 
+import { createDevUserAction, type DevUserData } from "./dev-auth-server";
+
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { shouldEnableDevFeatures } from "~/lib/environment";
-import { createAdminClient } from "~/lib/supabase/server";
 
 /**
  * Result of a dev authentication attempt
@@ -28,16 +29,6 @@ export interface DevAuthResult {
   error?: string;
   method?: "created" | "existing" | "signed_in";
   requiresEmailConfirmation?: boolean;
-}
-
-/**
- * Development user data structure
- */
-export interface DevUserData {
-  email: string;
-  name?: string;
-  role?: string;
-  organizationId?: string;
 }
 
 /**
@@ -64,58 +55,6 @@ const ALLOWED_DEV_DOMAINS = [
 function isValidDevEmail(email: string): boolean {
   const domain = email.split("@")[1];
   return domain ? ALLOWED_DEV_DOMAINS.includes(domain.toLowerCase()) : false;
-}
-
-/**
- * Creates a dev user with pre-confirmed email and fixed password
- * Uses Supabase admin API to bypass normal signup flow
- */
-async function createDevUser(
-  adminClient: SupabaseClient,
-  userData: DevUserData,
-): Promise<DevAuthResult> {
-  try {
-    const { error } = await adminClient.auth.admin.createUser({
-      email: userData.email,
-      password: DEV_PASSWORD,
-      email_confirm: true, // Pre-confirm email to skip verification
-      user_metadata: {
-        name: userData.name ?? userData.email.split("@")[0],
-        dev_user: true, // Mark as development user
-        environment: shouldEnableDevFeatures() ? "development" : "production",
-      },
-      app_metadata: {
-        role: userData.role ?? "member",
-        organization_id: userData.organizationId,
-        dev_created: true,
-        created_at: new Date().toISOString(),
-      },
-    });
-
-    if (error) {
-      console.error("Failed to create dev user:", error.message);
-      return {
-        success: false,
-        error: `Failed to create user: ${error.message}`,
-      };
-    }
-
-    console.log(
-      `Dev user created: ${userData.email} (${userData.role ?? "member"})`,
-    );
-    return {
-      success: true,
-      method: "created",
-      requiresEmailConfirmation: false,
-    };
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error("Dev user creation error:", errorMessage);
-    return {
-      success: false,
-      error: `User creation failed: ${errorMessage}`,
-    };
-  }
 }
 
 /**
@@ -195,11 +134,13 @@ export async function authenticateDevUser(
     // User doesn't exist or sign-in failed, create the user
     console.log(`User ${userData.email} doesn't exist, creating...`);
 
-    const adminClient = await createAdminClient();
-    const createResult = await createDevUser(adminClient, userData);
+    const createResult = await createDevUserAction(userData);
 
     if (!createResult.success) {
-      return createResult;
+      return {
+        success: false,
+        error: createResult.error ?? "Failed to create user",
+      };
     }
 
     // Now sign in the newly created user
