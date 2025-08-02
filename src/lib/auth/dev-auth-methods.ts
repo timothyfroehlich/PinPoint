@@ -153,15 +153,22 @@ async function attemptPasswordFallback(
  * 2. Only works with predefined test account emails
  * 3. Test accounts have no real data or permissions
  */
-function generateTestPassword(email: string): string {
-  // Simple but predictable password generation for test accounts
+async function generateTestPassword(email: string): Promise<string> {
+  // Secure, predictable password generation for test accounts
   // Format: test_<hash-of-email>
-  const emailHash = btoa(email)
-    .replace(/[^a-zA-Z0-9]/g, "")
-    .substring(0, 8);
-  return `test_${emailHash}`;
+  const encoder = new TextEncoder();
+  const data = encoder.encode(email);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashHex = arrayBufferToHex(hashBuffer).substring(0, 16); // 16 hex chars = 8 bytes
+  return `test_${hashHex}`;
 }
 
+// Helper to convert ArrayBuffer to hex string
+function arrayBufferToHex(buffer: ArrayBuffer): string {
+  return Array.prototype.map
+    .call(new Uint8Array(buffer), (x: number) => ("00" + x.toString(16)).slice(-2))
+    .join("");
+}
 /**
  * Get user-friendly message for authentication result
  */
