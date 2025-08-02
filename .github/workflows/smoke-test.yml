@@ -33,11 +33,13 @@ jobs:
       - name: Start Supabase Local
         run: |
           supabase db start
-          echo "POSTGRES_PRISMA_URL=postgresql://postgres:postgres@127.0.0.1:5432/postgres" >> $GITHUB_ENV
-          echo "POSTGRES_URL_NON_POOLING=postgresql://postgres:postgres@127.0.0.1:5432/postgres" >> $GITHUB_ENV
-          echo "SUPABASE_URL=http://127.0.0.1:54321" >> $GITHUB_ENV
-          echo "SUPABASE_ANON_KEY=$(supabase status -o env | grep SUPABASE_ANON_KEY | cut -d'=' -f2)" >> $GITHUB_ENV
-          echo "SUPABASE_SERVICE_ROLE_KEY=$(supabase status -o env | grep SUPABASE_SERVICE_ROLE_KEY | cut -d'=' -f2)" >> $GITHUB_ENV
+          {
+            echo "POSTGRES_PRISMA_URL=postgresql://postgres:postgres@127.0.0.1:5432/postgres"
+            echo "POSTGRES_URL_NON_POOLING=postgresql://postgres:postgres@127.0.0.1:5432/postgres"
+            echo "SUPABASE_URL=http://127.0.0.1:54321"
+            echo "SUPABASE_ANON_KEY=$(supabase status -o env | grep SUPABASE_ANON_KEY | cut -d'=' -f2)"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$(supabase status -o env | grep SUPABASE_SERVICE_ROLE_KEY | cut -d'=' -f2)"
+          } >> "$GITHUB_ENV"
 
       - name: Setup database schema
         run: |
