@@ -16,13 +16,16 @@ import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 
 import { useAuth } from "~/app/auth-provider";
+import {
+  attemptDevLogin,
+  getAuthResultMessage,
+  isDevAuthAvailable,
+} from "~/lib/auth/dev-auth-methods";
 import { createClient } from "~/lib/supabase/client";
 
 type UserWithRole = User & { role: Role | null };
 
-// Check if we're in development mode (this runs on client)
-const isDevelopment =
-  typeof window !== "undefined" && window.location.hostname === "localhost";
+// Use environment detection from utilities (works consistently across environments)
 
 export default function SignInPage(): React.ReactElement | null {
   const { user, loading } = useAuth();
@@ -41,7 +44,7 @@ export default function SignInPage(): React.ReactElement | null {
   }, [isAuthenticated, router]);
 
   useEffect(() => {
-    if (isDevelopment) {
+    if (isDevAuthAvailable()) {
       async function fetchTestUsers(): Promise<void> {
         setIsLoadingUsers(true);
         try {
@@ -91,23 +94,22 @@ export default function SignInPage(): React.ReactElement | null {
     setIsLoading(true);
     try {
       const supabase = createClient();
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          shouldCreateUser: false,
-        },
-      });
+      const result = await attemptDevLogin(supabase, email);
 
-      if (error) {
-        console.error("Sign-in failed:", error.message);
-        alert(`Sign-in failed: ${error.message}`);
+      const message = getAuthResultMessage(result);
+
+      if (result.success) {
+        console.log("Dev login successful:", result.method);
+        alert(message);
       } else {
-        alert("Magic link sent! Check your email to complete login.");
+        console.error("Dev login failed:", result.error);
+        alert(message);
       }
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       console.error("Dev login failed:", errorMessage);
+      alert("Login failed - check console for details");
     } finally {
       setIsLoading(false);
     }
@@ -169,7 +171,7 @@ export default function SignInPage(): React.ReactElement | null {
             Sign in with Google
           </Button>
 
-          {isDevelopment && (
+          {isDevAuthAvailable() && (
             <>
               <Divider sx={{ my: 3 }}>
                 <Typography variant="body2" color="text.secondary">
