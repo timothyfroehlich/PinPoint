@@ -144,6 +144,28 @@ This document maps test files to the specific source files they test, organized 
 | File Uploads       | 90%             | `upload.test.ts`, `file-upload.test.ts`         |
 | External APIs      | 75%             | `opdb.test.ts`, `pinballmap.test.ts`            |
 
+## Database Migration Tests (Phase 2A)
+
+### Drizzle ORM Test Coverage
+
+| Test File                                                 | Source Files Tested                             | Coverage Focus                                |
+| --------------------------------------------------------- | ----------------------------------------------- | --------------------------------------------- |
+| `src/server/db/drizzle-crud-validation.test.ts`          | `src/server/db/schema/*`, `src/server/db/drizzle.ts` | CRUD operations, transactions, multi-tenancy  |
+| `src/server/api/routers/__tests__/drizzle-integration.test.ts` | `src/server/api/trpc.base.ts`, `src/test/vitestMockContext.ts` | tRPC + Drizzle integration, dual-ORM support |
+
+### Test Statistics
+
+- **27 CRUD tests**: INSERT (5), SELECT (4), UPDATE (3), DELETE (3), Transactions (3), Multi-tenancy (9)
+- **12 integration tests**: Context validation (3), Schema exports (3), Error handling (2), Type safety (2), Mock validation (2)
+- **Total Phase 2A tests**: 39 comprehensive tests validating foundation
+
+### Key Test Patterns
+
+- **Dual-ORM mocking**: Both Prisma and Drizzle clients in test context
+- **Transaction testing**: Rollback scenarios and constraint violations
+- **Multi-tenant isolation**: Cross-organization data access prevention
+- **Type safety validation**: Full TypeScript strictest mode compliance
+
 ## Test Execution Commands
 
 ```bash
@@ -154,6 +176,10 @@ npm run test:coverage
 npm test -- --testPathPattern="unit"
 npm test -- --testPathPattern="integration"
 npm test -- --testPathPattern="e2e"
+
+# Run Drizzle-specific tests
+npm test drizzle-crud-validation
+npm test drizzle-integration
 
 # Run tests for specific feature
 npm test -- --testNamePattern="issue"

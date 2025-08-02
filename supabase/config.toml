@@ -16,6 +16,24 @@
 # 
 # For detailed configuration reference documentation, visit:
 # https://supabase.com/docs/guides/local-development/cli/config
+# ⚠️  IMPORTANT: WORKTREE CONFIGURATION WARNING ⚠️ 
+# 
+# This is a WORKTREE-SPECIFIC Supabase configuration file. When you modify this file:
+# 
+# 🏗️  WORKTREE ISOLATION: Changes here ONLY affect THIS worktree
+# 🚫 NO SYNC TO MAIN: Changes will NOT be copied back to main template
+# 🔄 MAIN UPDATES: Changes to main template won't automatically update this file
+# 
+# 🚨 CRITICAL: Port numbers in this file are AUTO-GENERATED and unique to this worktree
+#     - Don't manually change ports - they're calculated from worktree path hash
+#     - This worktree uses unique ports to avoid conflicts with other worktrees
+#     - Main template uses default ports (54321, 54322, etc.)
+# 
+# 💡 TO UPDATE: If main template changes, run from project root:
+#     `./.claude/worktrees/manage-worktree.py upgrade <worktree-name>`
+# 
+# For detailed configuration reference documentation, visit:
+# https://supabase.com/docs/guides/local-development/cli/config
 # A string used to distinguish different Supabase projects on the same host. Defaults to the
 # working directory name when running `supabase init`.
 # project_id = "supa-db-migration" # Commented out to use working directory name
@@ -23,7 +41,7 @@
 [api]
 enabled = true
 # Port to use for the API URL.
-port = 54420
+port = 54338
 # Schemas to expose in your API. Tables, views and stored procedures in this schema will get API
 # endpoints. `public` and `graphql_public` schemas are included by default.
 schemas = ["public", "graphql_public"]
@@ -39,9 +57,9 @@ enabled = false
 
 [db]
 # Port to use for the local database URL.
-port = 54421
+port = 54339
 # Port used by db diff command to initialize the shadow database.
-shadow_port = 54419
+shadow_port = 54337
 # The database major version to use. This has to be the same as your remote database's. Run `SHOW
 # server_version;` on the remote database to check.
 major_version = 17
@@ -98,7 +116,7 @@ enabled = false
 # Disabled for performance during development
 enabled = false
 # Port to use for Supabase Studio.
-port = 54422
+port = 54340
 # External URL of the API server that frontend connects to.
 api_url = "http://127.0.0.1"
 # OpenAI API Key to use for Supabase AI in the Supabase Studio.
@@ -109,7 +127,7 @@ openai_api_key = "env(OPENAI_API_KEY)"
 [inbucket]
 enabled = true
 # Port to use for the email testing server web interface.
-port = 54423
+port = 54341
 # Uncomment to expose additional ports for testing user applications that send emails.
 # smtp_port = 54325
 # pop3_port = 54326
@@ -326,7 +344,7 @@ enabled = true
 # Use `oneshot` for hot reload, or `per_worker` for load testing.
 policy = "oneshot"
 # Port to attach the Chrome inspector for debugging edge functions.
-inspector_port = 54520
+inspector_port = 54438
 # The Deno major version to use.
 deno_version = 1
 
@@ -335,7 +353,7 @@ deno_version = 1
 
 [analytics]
 enabled = true
-port = 54620
+port = 54538
 # Configure one of the supported backends: `postgres`, `bigquery`.
 backend = "postgres"
 

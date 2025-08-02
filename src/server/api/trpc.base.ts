@@ -13,6 +13,7 @@ import { ZodError } from "zod";
 import type { SupabaseServerClient } from "~/lib/supabase/server";
 import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 import type { ExtendedPrismaClient } from "~/server/db";
+import type { DrizzleClient } from "~/server/db/drizzle";
 
 import { env } from "~/env";
 import { createClient } from "~/lib/supabase/server";
@@ -70,6 +71,7 @@ interface Membership {
  */
 export interface TRPCContext {
   db: ExtendedPrismaClient;
+  drizzle: DrizzleClient;
   user: PinPointSupabaseUser | null;
   supabase: SupabaseServerClient;
   organization: Organization | null;
@@ -103,6 +105,7 @@ export const createTRPCContext = async (
   const dbProvider = getGlobalDatabaseProvider();
 
   const db = dbProvider.getClient();
+  const drizzle = dbProvider.getDrizzleClient();
   const services = new ServiceFactory(db);
   const supabase = await createClient();
   const user = await getSupabaseUser();
@@ -142,6 +145,7 @@ export const createTRPCContext = async (
 
   return {
     db,
+    drizzle,
     user,
     supabase,
     organization,

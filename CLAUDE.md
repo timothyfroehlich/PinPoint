@@ -2,13 +2,22 @@
 
 ## 🚨 ACTIVE MIGRATION: Supabase + Drizzle + RLS
 
-**Status**: IN PROGRESS - 6-week staged migration underway
+**Status**: IN PROGRESS - Week 4 of 6
 
-- **Stage 1** (Weeks 1-2): Supabase Auth integration
+- **Stage 1** (Weeks 1-2): Supabase Auth integration ✅ COMPLETE
 - **Stage 2** (Weeks 3-4): Drizzle ORM migration
+  - Phase 2A: Drizzle Foundation ✅ COMPLETE (2025-08-02)
+  - Phase 2B-E: Router Migrations 🔄 IN PROGRESS
 - **Stage 3** (Weeks 5-6): Row Level Security activation
 
 **Migration Hub**: `@docs/migration/supabase-drizzle/`
+
+### ✅ Phase 2A Achievements
+- Complete Drizzle schema with 1:1 Prisma parity
+- Dual-ORM support in tRPC context
+- 39 comprehensive tests validating foundation
+- Essential multi-tenant performance indexes
+- Hot-reload optimization with singleton pattern
 
 ### ⚠️ Supabase Configuration Notes
 
@@ -240,6 +249,29 @@ npm run pre-commit
 - **Playwright**: Browser automation, E2E testing
 - **Context7**: Library documentation lookup
 - **Memory**: Knowledge graph for storing and retrieving coding patterns
+
+### Agent Planning System
+
+**Directory**: `.claude/agent-plans/` (gitignored - transient work files)
+
+**Purpose**: Agents should create detailed planning documents before starting complex implementation work. This ensures thorough analysis and provides a clear roadmap for execution.
+
+**When to Use**:
+- Complex migrations or refactoring tasks
+- Multi-step implementation requiring coordination
+- Schema changes or architectural modifications
+- Any task that benefits from detailed upfront planning
+
+**Required Agent Workflow**:
+1. **Check for existing plans**: Always read any existing files in `.claude/agent-plans/` when starting work
+2. **Create planning documents**: Write comprehensive analysis and implementation plans before coding
+3. **Document decisions**: Record architectural choices, trade-offs, and rationale
+4. **Update progress**: Maintain plans as living documents throughout implementation
+
+**Example Planning Documents**:
+- `phase-2a-drizzle-schema-analysis.md` - Detailed schema migration analysis
+- `database-connection-strategy.md` - Database integration approach
+- `type-migration-plan.md` - TypeScript type compatibility strategy
 
 ### Memory Server Usage
 

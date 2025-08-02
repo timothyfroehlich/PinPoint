@@ -6,8 +6,18 @@ This document maps source files by subsystem/feature to help agents quickly find
 
 These files are referenced across multiple subsystems and should be understood for most development work:
 
-- **Schema**: `prisma/schema.prisma` - Database schema and relationships
-- **Database Client**: `src/server/db.ts` - Prisma client with multi-tenant extensions
+- **Prisma Schema**: `prisma/schema.prisma` - Original database schema (being migrated)
+- **Drizzle Schema**: `src/server/db/schema/` - New modular Drizzle schemas
+  - `auth.ts` - User, Account, Session, VerificationToken
+  - `organizations.ts` - Organization, Membership, Role, Permission
+  - `machines.ts` - Location, Model, Machine
+  - `issues.ts` - Issue, IssueStatus, IssueHistory, Comment
+  - `collections.ts` - Collection, Notification, PinballMapConfig
+  - `index.ts` - Relations and exports
+- **Database Clients**: 
+  - `src/server/db.ts` - Prisma client with multi-tenant extensions
+  - `src/server/db/drizzle.ts` - Drizzle client with singleton pattern
+- **Database Provider**: `src/server/db/provider.tsx` - Dual-ORM provider
 - **Environment**: `src/env.js` - Environment variable validation
 - **Root Config**: `CLAUDE.md`, `package.json`, `tsconfig.json` - Project configuration
 
@@ -23,7 +33,9 @@ These files are referenced across multiple subsystems and should be understood f
 
 - `src/server/api/routers/auth.ts` - Authentication tRPC procedures
 - `src/server/api/trpc.ts` - Auth middleware and procedure definitions
-- `src/lib/auth.ts` - NextAuth.js configuration
+- `src/server/api/trpc.base.ts` - tRPC context with dual-ORM support
+- `src/lib/supabase/client.ts` - Supabase client configuration
+- `src/lib/supabase/server.ts` - Supabase server-side utilities
 - `middleware.ts` - Request middleware for subdomain routing
 
 ### Database Models
@@ -263,6 +275,25 @@ These files are referenced across multiple subsystems and should be understood f
 
 - `e2e/` - End-to-end Playwright tests
 - `src/test/` - Test utilities and setup files
+- `src/test/vitestMockContext.ts` - Mock context with dual-ORM support
+
+## Database Testing (Phase 2A)
+
+### Drizzle CRUD Validation
+
+- `src/server/db/drizzle-crud-validation.test.ts` - Comprehensive CRUD operations
+- `scripts/validate-drizzle-crud.ts` - CRUD validation script
+
+### Drizzle Integration Testing
+
+- `src/server/api/routers/__tests__/drizzle-integration.test.ts` - tRPC + Drizzle integration
+
+### Test Coverage
+
+- 27 CRUD tests: INSERT, SELECT, UPDATE, DELETE, transactions
+- 12 integration tests: Context validation, schema exports, error handling
+- Multi-tenant isolation validation
+- Transaction rollback scenarios
 
 ---
 

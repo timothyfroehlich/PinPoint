@@ -2,6 +2,7 @@ import { vi } from "vitest";
 
 import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 import type { ExtendedPrismaClient } from "~/server/db";
+import type { DrizzleClient } from "~/server/db/drizzle";
 import type { ServiceFactory } from "~/server/services/factory";
 
 // Mock Supabase client
@@ -23,8 +24,22 @@ const mockSupabaseClient = {
   single: vi.fn().mockResolvedValue({ data: null, error: null }),
 };
 
+// Mock Drizzle client for tests
+const mockDrizzleClient = {
+  select: vi.fn().mockReturnThis(),
+  from: vi.fn().mockReturnThis(),
+  where: vi.fn().mockReturnThis(),
+  insert: vi.fn().mockReturnThis(),
+  update: vi.fn().mockReturnThis(),
+  delete: vi.fn().mockReturnThis(),
+  values: vi.fn().mockReturnThis(),
+  set: vi.fn().mockReturnThis(),
+  execute: vi.fn().mockResolvedValue([]),
+} as unknown as DrizzleClient;
+
 export interface VitestMockContext {
   db: ExtendedPrismaClient;
+  drizzle: DrizzleClient;
   services: ServiceFactory;
   user: PinPointSupabaseUser | null;
   supabase: typeof mockSupabaseClient;
@@ -203,6 +218,7 @@ export function createVitestMockContext(): VitestMockContext {
 
   return {
     db: mockDb,
+    drizzle: mockDrizzleClient,
     services: mockServices,
     user: mockUser,
     supabase: mockSupabaseClient,
