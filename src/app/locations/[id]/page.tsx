@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import * as React from "react";
 
 import { LocationDetailView } from "~/components/locations/LocationDetailView";
-import { auth } from "~/server/auth";
+import { getSupabaseUser } from "~/server/auth/supabase";
 import { api } from "~/trpc/server";
 
 interface LocationPageProps {
@@ -39,7 +39,7 @@ export async function generateMetadata({
 export default async function LocationPage({
   params,
 }: LocationPageProps): Promise<React.JSX.Element> {
-  const session = await auth();
+  const user = await getSupabaseUser();
 
   try {
     // Fetch location data on the server
@@ -50,7 +50,7 @@ export default async function LocationPage({
       <main aria-label="Location details">
         <LocationDetailView
           location={location}
-          session={session}
+          user={user}
           locationId={resolvedParams.id}
         />
       </main>

@@ -19,8 +19,9 @@ import {
   TextField,
   Divider,
 } from "@mui/material";
-import { type Session } from "next-auth";
 import { useState } from "react";
+
+import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 
 import { PermissionButton, PermissionGate } from "~/components/permissions";
 import { api } from "~/trpc/react";
@@ -28,14 +29,14 @@ import { type IssueWithDetails } from "~/types/issue";
 
 interface IssueActionsProps {
   issue: IssueWithDetails;
-  session: Session | null;
+  user: PinPointSupabaseUser | null;
   hasPermission: (permission: string) => boolean;
   onError: (error: string) => void;
 }
 
 export function IssueActions({
   issue,
-  session,
+  user,
   hasPermission,
   onError,
 }: IssueActionsProps): React.JSX.Element | null {
@@ -73,7 +74,7 @@ export function IssueActions({
 
   // Delete functionality not implemented - API endpoint doesn't exist
 
-  const isAuthenticated = !!session?.user;
+  const isAuthenticated = !!user;
 
   const handleEditSave = (): void => {
     updateIssue.mutate({
@@ -90,7 +91,7 @@ export function IssueActions({
   const handleAssignToSelf = (): void => {
     updateIssue.mutate({
       id: issue.id,
-      assignedToId: session?.user.id,
+      assignedToId: user?.id,
     });
     setAssignDialogOpen(false);
   };
@@ -105,7 +106,16 @@ export function IssueActions({
   // };
 
   if (!isAuthenticated) {
-    return null;
+    return (
+      <Box>
+        <Typography variant="h6" gutterBottom>
+          Actions
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          Login required for actions
+        </Typography>
+      </Box>
+    );
   }
 
   return (

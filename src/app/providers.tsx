@@ -3,9 +3,9 @@
 import CssBaseline from "@mui/material/CssBaseline";
 import GlobalStyles from "@mui/material/GlobalStyles";
 import { ThemeProvider } from "@mui/material/styles";
-import { SessionProvider } from "next-auth/react";
 import { type ReactNode, type JSX } from "react";
 
+import { AuthProvider } from "./auth-provider";
 import theme from "./theme";
 
 import { TRPCReactProvider } from "~/trpc/react";
@@ -16,7 +16,7 @@ export default function Providers({
   children: ReactNode;
 }): JSX.Element {
   return (
-    <SessionProvider>
+    <AuthProvider>
       <TRPCReactProvider>
         <ThemeProvider theme={theme}>
           <GlobalStyles
@@ -29,6 +29,6 @@ export default function Providers({
           {children}
         </ThemeProvider>
       </TRPCReactProvider>
-    </SessionProvider>
+    </AuthProvider>
   );
 }

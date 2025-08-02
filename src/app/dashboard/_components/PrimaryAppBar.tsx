@@ -21,17 +21,17 @@ import {
   ListItem,
 } from "@mui/material";
 import { useRouter } from "next/navigation";
-import { signIn, useSession } from "next-auth/react";
 import React, { useState } from "react";
 
 import type { JSX } from "react";
 
+import { useAuth } from "~/app/auth-provider";
 import { PermissionButton } from "~/components/permissions/PermissionButton";
 import { usePermissions } from "~/hooks/usePermissions";
 
 const PrimaryAppBar = (): JSX.Element => {
   const router = useRouter();
-  const { data: session, status } = useSession();
+  const { user, loading } = useAuth();
   const { hasPermission } = usePermissions();
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
@@ -43,7 +43,7 @@ const PrimaryAppBar = (): JSX.Element => {
   });
 
   const handleLogin = (): void => {
-    void signIn();
+    router.push("/sign-in");
   };
 
   const handleMobileDrawerToggle = (): void => {
@@ -56,7 +56,7 @@ const PrimaryAppBar = (): JSX.Element => {
         sx={{ justifyContent: "space-between", minHeight: { xs: 56, sm: 64 } }}
       >
         {/* Mobile Menu Button */}
-        {isMobile && session && (
+        {isMobile && user && (
           <IconButton
             color="inherit"
             aria-label="open navigation menu"
@@ -119,7 +119,7 @@ const PrimaryAppBar = (): JSX.Element => {
             </Button>
 
             {/* Authenticated navigation */}
-            {session && (
+            {user && (
               <>
                 <PermissionButton
                   permission="issue:view"
@@ -204,11 +204,11 @@ const PrimaryAppBar = (): JSX.Element => {
 
         {/* Authentication Controls */}
         <Box>
-          {status === "loading" ? (
+          {loading ? (
             <IconButton color="inherit" disabled>
               <AccountCircle />
             </IconButton>
-          ) : session ? (
+          ) : user ? (
             // Authenticated state - navigate to profile on click
             <IconButton
               size="large"
@@ -218,17 +218,29 @@ const PrimaryAppBar = (): JSX.Element => {
               }}
               color="inherit"
             >
-              {session.user.image ? (
-                <Avatar
-                  src={session.user.image}
-                  alt={session.user.name ?? "User"}
-                  sx={{ width: 32, height: 32 }}
-                />
-              ) : (
-                <Avatar sx={{ bgcolor: "primary.main", width: 32, height: 32 }}>
-                  {session.user.name?.charAt(0) ?? "U"}
-                </Avatar>
-              )}
+              {(() => {
+                const avatarUrl = user.user_metadata["avatar_url"] as
+                  | string
+                  | undefined;
+                const userName =
+                  (user.user_metadata["name"] as string | undefined) ??
+                  (user.user_metadata["full_name"] as string | undefined) ??
+                  "User";
+
+                return avatarUrl ? (
+                  <Avatar
+                    src={avatarUrl}
+                    alt={userName}
+                    sx={{ width: 32, height: 32 }}
+                  />
+                ) : (
+                  <Avatar
+                    sx={{ bgcolor: "primary.main", width: 32, height: 32 }}
+                  >
+                    {userName.charAt(0)}
+                  </Avatar>
+                );
+              })()}
             </IconButton>
           ) : (
             // Unauthenticated state - show login button
@@ -284,7 +296,7 @@ const PrimaryAppBar = (): JSX.Element => {
                 Report Issue
               </Button>
             </ListItem>
-            {session && hasPermission("issue:view") && (
+            {user && hasPermission("issue:view") && (
               <ListItem>
                 <Button
                   fullWidth
@@ -298,7 +310,7 @@ const PrimaryAppBar = (): JSX.Element => {
                 </Button>
               </ListItem>
             )}
-            {session && hasPermission("machine:view") && (
+            {user && hasPermission("machine:view") && (
               <ListItem>
                 <Button
                   fullWidth
@@ -312,7 +324,7 @@ const PrimaryAppBar = (): JSX.Element => {
                 </Button>
               </ListItem>
             )}
-            {session && hasPermission("location:view") && (
+            {user && hasPermission("location:view") && (
               <ListItem>
                 <Button
                   fullWidth

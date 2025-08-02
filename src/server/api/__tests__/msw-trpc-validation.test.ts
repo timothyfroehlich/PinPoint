@@ -1,9 +1,9 @@
 import { TRPCError } from "@trpc/server";
 import { describe, it, expect } from "vitest";
 
-import { handlers } from "../../../test/msw/handlers";
-import { server } from "../../../test/msw/setup";
-import { trpcMsw } from "../../../test/msw/setup";
+import { handlers } from "~/test/msw/handlers";
+import { server } from "~/test/msw/setup";
+import { trpcMsw } from "~/test/msw/setup";
 
 describe("MSW-tRPC Infrastructure Validation", () => {
   it("should create tRPC MSW instance with correct configuration", () => {

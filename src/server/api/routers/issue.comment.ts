@@ -33,7 +33,7 @@ export const issueCommentRouter = createTRPCRouter({
       const membership = await ctx.db.membership.findUnique({
         where: {
           userId_organizationId: {
-            userId: ctx.session.user.id,
+            userId: ctx.user.id,
             organizationId: ctx.organization.id,
           },
         },
@@ -47,7 +47,7 @@ export const issueCommentRouter = createTRPCRouter({
         data: {
           content: input.content,
           issueId: input.issueId,
-          authorId: ctx.session.user.id,
+          authorId: ctx.user.id,
         },
         include: {
           author: {
@@ -89,7 +89,7 @@ export const issueCommentRouter = createTRPCRouter({
       const membership = await ctx.db.membership.findUnique({
         where: {
           userId_organizationId: {
-            userId: ctx.session.user.id,
+            userId: ctx.user.id,
             organizationId: ctx.organization.id,
           },
         },
@@ -103,7 +103,7 @@ export const issueCommentRouter = createTRPCRouter({
         data: {
           content: input.content,
           issueId: input.issueId,
-          authorId: ctx.session.user.id,
+          authorId: ctx.user.id,
         },
         include: {
           author: {
@@ -152,7 +152,7 @@ export const issueCommentRouter = createTRPCRouter({
       }
 
       // Only the author can edit their own comment
-      if (comment.authorId !== ctx.session.user.id) {
+      if (comment.authorId !== ctx.user.id) {
         throw new Error("You can only edit your own comments");
       }
 
@@ -211,7 +211,7 @@ export const issueCommentRouter = createTRPCRouter({
       const membership = await ctx.db.membership.findUnique({
         where: {
           userId_organizationId: {
-            userId: ctx.session.user.id,
+            userId: ctx.user.id,
             organizationId: ctx.organization.id,
           },
         },
@@ -222,7 +222,7 @@ export const issueCommentRouter = createTRPCRouter({
       }
 
       const canDelete =
-        comment.authorId === ctx.session.user.id ||
+        comment.authorId === ctx.user.id ||
         ctx.userPermissions.includes("issue:delete");
 
       if (!canDelete) {
@@ -234,7 +234,7 @@ export const issueCommentRouter = createTRPCRouter({
         where: { id: input.commentId },
         data: {
           deletedAt: new Date(),
-          deletedBy: ctx.session.user.id,
+          deletedBy: ctx.user.id,
         },
       });
 
@@ -243,7 +243,7 @@ export const issueCommentRouter = createTRPCRouter({
       await activityService.recordCommentDeleted(
         comment.issue.id,
         ctx.organization.id,
-        ctx.session.user.id,
+        ctx.user.id,
         input.commentId,
       );
 

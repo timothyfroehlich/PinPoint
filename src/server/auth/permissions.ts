@@ -1,10 +1,19 @@
 import { TRPCError } from "@trpc/server";
-import { type Session } from "next-auth";
+
+// Legacy session type for backward compatibility
+type Session = {
+  user: {
+    id: string;
+    [key: string]: unknown;
+  };
+} | null;
 
 import { type ExtendedPrismaClient } from "../db";
 import { PermissionService } from "../services/permissionService";
 
 import { SYSTEM_ROLES } from "./permissions.constants";
+
+import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 
 /**
  * Checks if a given membership has a specific permission.
@@ -157,4 +166,24 @@ export async function getUserPermissionsForSession(
 ): Promise<string[]> {
   const permissionService = new PermissionService(prisma);
   return permissionService.getUserPermissions(session, organizationId);
+}
+
+/**
+ * Get all permissions for a Supabase user
+ *
+ * @param user - The Supabase user
+ * @param prisma - The Prisma client instance
+ * @param organizationId - The ID of the organization.
+ * @returns A string array of all granted permissions.
+ */
+export async function getUserPermissionsForSupabaseUser(
+  user: PinPointSupabaseUser | null,
+  prisma: ExtendedPrismaClient,
+  organizationId?: string,
+): Promise<string[]> {
+  const permissionService = new PermissionService(prisma);
+  return permissionService.getUserPermissionsForSupabaseUser(
+    user,
+    organizationId,
+  );
 }

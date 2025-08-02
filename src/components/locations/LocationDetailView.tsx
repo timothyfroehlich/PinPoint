@@ -16,7 +16,7 @@ import {
 
 import { MachineGrid } from "./MachineGrid";
 
-import type { Session } from "next-auth";
+import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 import type { RouterOutputs } from "~/trpc/react";
 
 import { PermissionGate } from "~/components/permissions";
@@ -26,13 +26,13 @@ type LocationWithDetails = RouterOutputs["location"]["getById"];
 
 interface LocationDetailViewProps {
   location: LocationWithDetails;
-  session: Session | null;
+  user: PinPointSupabaseUser | null;
   locationId: string;
 }
 
 export function LocationDetailView({
   location,
-  session: _session,
+  user: _user,
   locationId,
 }: LocationDetailViewProps): React.ReactElement {
   const { hasPermission } = usePermissions();

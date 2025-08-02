@@ -13,8 +13,9 @@ import {
   Divider,
   Alert,
 } from "@mui/material";
-import { type Session } from "next-auth";
 import * as React from "react";
+
+import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 
 import { api } from "~/trpc/react";
 
@@ -69,12 +70,12 @@ interface PublicIssueData {
 
 interface RecentIssuesSidebarProps {
   selectedMachineId: string | null;
-  session: Session | null;
+  user: PinPointSupabaseUser | null;
 }
 
 export function RecentIssuesSidebar({
   selectedMachineId,
-  session: _session,
+  user: _user,
 }: RecentIssuesSidebarProps): React.JSX.Element {
   // Fetch recent issues for the selected machine using public endpoint
   const { data: recentIssues } = api.issue.core.publicGetAll.useQuery(
