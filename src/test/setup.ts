@@ -11,7 +11,6 @@ Object.defineProperty(process.env, "NODE_ENV", {
 // Use Object.assign to avoid TypeScript/ESLint conflicts with env variable assignment
 Object.assign(process.env, {
   AUTH_SECRET: "test-auth-secret",
-  NEXTAUTH_SECRET: "test-auth-secret", // Alternative name
   GOOGLE_CLIENT_ID: "test-google-client-id",
   GOOGLE_CLIENT_SECRET: "test-google-client-secret",
   DATABASE_URL: "postgresql://test:test@localhost:5432/test",
@@ -19,7 +18,6 @@ Object.assign(process.env, {
   DEFAULT_ORG_SUBDOMAIN: "apc",
   OPDB_API_KEY: "test-token",
   IMAGE_STORAGE_PROVIDER: "local",
-  NEXTAUTH_URL: "http://localhost:3000",
   VERCEL_URL: "",
   PORT: "3000",
 });
@@ -33,8 +31,7 @@ vi.mock("~/env.js", () => ({
     NODE_ENV: "test",
     GOOGLE_CLIENT_ID: "test-google-client-id",
     GOOGLE_CLIENT_SECRET: "test-google-client-secret",
-    NEXTAUTH_URL: "http://localhost:3000",
-    NEXTAUTH_SECRET: "test-auth-secret",
+    AUTH_SECRET: "test-auth-secret",
     DATABASE_URL: "postgresql://test:test@localhost:5432/test",
     OPDB_API_URL: "https://opdb.org/api",
     DEFAULT_ORG_SUBDOMAIN: "apc",
@@ -172,29 +169,6 @@ const mockDatabaseProvider = {
 vi.mock("~/server/db/provider", () => ({
   DatabaseProvider: vi.fn().mockImplementation(() => mockDatabaseProvider),
   getGlobalDatabaseProvider: vi.fn().mockReturnValue(mockDatabaseProvider),
-}));
-
-// Mock NextAuth first to avoid import issues
-vi.mock("next-auth", () => ({
-  default: vi.fn().mockImplementation(() => ({
-    auth: vi.fn(),
-    handlers: { GET: vi.fn(), POST: vi.fn() },
-    signIn: vi.fn(),
-    signOut: vi.fn(),
-  })),
-}));
-
-// Mock NextAuth React hooks
-vi.mock("next-auth/react", () => ({
-  useSession: vi.fn(() => ({
-    data: null,
-    status: "loading",
-  })),
-  signIn: vi.fn(),
-  signOut: vi.fn(),
-  SessionProvider: vi.fn(
-    ({ children }: { children: React.ReactNode }) => children,
-  ),
 }));
 
 // Mock tRPC to prevent server-side imports

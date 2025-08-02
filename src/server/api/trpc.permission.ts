@@ -1,7 +1,19 @@
 import { organizationProcedure } from "./trpc.base";
 
-import type { Session } from "next-auth";
 import type { PinPointSupabaseUser } from "~/lib/supabase/types";
+
+// Legacy session type for backward compatibility
+type Session = {
+  user: {
+    id: string;
+    email?: string | undefined;
+    name?: string | undefined;
+    image?: string | undefined;
+    organizationId?: string | undefined;
+    [key: string]: unknown;
+  };
+  expires: string;
+} | null;
 
 import { requirePermissionForSession } from "~/server/auth/permissions";
 
@@ -16,9 +28,10 @@ function supabaseUserToSession(user: PinPointSupabaseUser): Session {
       email: user.email ?? "",
       name: user.user_metadata["name"] as string | undefined,
       image: user.user_metadata["avatar_url"] as string | undefined,
-    } as Session["user"] & { organizationId?: string },
+      organizationId: user.app_metadata.organization_id,
+    },
     expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
-  } as Session;
+  };
 }
 
 export const issueViewProcedure = organizationProcedure.use(async (opts) => {

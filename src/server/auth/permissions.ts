@@ -1,5 +1,12 @@
 import { TRPCError } from "@trpc/server";
-import { type Session } from "next-auth";
+
+// Legacy session type for backward compatibility
+type Session = {
+  user: {
+    id: string;
+    [key: string]: unknown;
+  };
+} | null;
 
 import { type ExtendedPrismaClient } from "../db";
 import { PermissionService } from "../services/permissionService";

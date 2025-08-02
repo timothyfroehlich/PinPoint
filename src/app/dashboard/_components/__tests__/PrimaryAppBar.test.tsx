@@ -32,14 +32,7 @@ vi.mock("next/navigation", () => ({
   })),
 }));
 
-// Mock NextAuth
-vi.mock("next-auth/react", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("next-auth/react")>();
-  return {
-    ...actual,
-    signOut: vi.fn(),
-  };
-});
+// NextAuth mock removed - using Supabase auth
 
 // Mock AuthProvider for components that use useAuth directly
 interface MockAuthContextType {

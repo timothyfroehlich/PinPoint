@@ -12,13 +12,22 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 
 import type { User, NotificationFrequency } from "@prisma/client";
-import type { Session } from "next-auth";
 import type { ReactNode } from "react";
 import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 
 import { PermissionDepsProvider } from "~/contexts/PermissionDepsContext";
 
-// Mock SessionProvider for testing to avoid next-auth/react hook issues
+// Legacy session type for backward compatibility in tests
+type Session = {
+  user: {
+    id: string;
+    name: string | null;
+    email: string | null;
+  };
+  expires: string;
+} | null;
+
+// Mock SessionProvider for testing to avoid auth hook issues
 function MockSessionProvider({
   children,
 }: {

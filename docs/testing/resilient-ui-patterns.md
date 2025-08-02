@@ -431,6 +431,46 @@ When writing new tests or refactoring existing ones:
 
 ---
 
+## Advanced Pattern: Anchored Regex for Disambiguation
+
+### 🎯 Pattern: Exact Text vs Dynamic Text Distinction
+
+When you need to match exact text but avoid matching that same text within dynamic content:
+
+**Problem**: Distinguishing "Machines" heading from "5 Machines" count
+
+**❌ Ambiguous Pattern:**
+
+```typescript
+screen.getByText("Machines"); // Could match heading or "5 Machines"
+```
+
+**✅ Anchored Regex Pattern:**
+
+```typescript
+// Matches exactly "Machines" but not "5 Machines"
+screen.getByRole("heading", { name: /^Machines$/i });
+
+// For non-headings, use anchored text pattern
+screen.getByText(/^Machines$/i);
+```
+
+**Pattern Library:**
+
+```typescript
+// Exact section headings
+/^Settings$/i
+/^Profile$/i
+/^Machines$/i
+
+// Exact button text
+/^Save$/i
+/^Cancel$/i
+/^Submit$/i
+```
+
+---
+
 ## Pattern Evolution
 
 These patterns evolved through systematic analysis of 113+ test failures and successful transformations. Key insights:
@@ -440,5 +480,6 @@ These patterns evolved through systematic analysis of 113+ test failures and suc
 3. **Regex Flexibility Pays Off**: Case and punctuation variations are common
 4. **Semantic Meaning Lasts**: User intent outlasts implementation details
 5. **TypeScript Safety Matters**: Null checks prevent test runtime errors
+6. **Anchored Regex Solves Ambiguity**: Use `^text$` patterns when exact matching is needed to avoid dynamic content collisions
 
 **Success Metrics**: Tests using these patterns showed 96% average resilience to UI changes while maintaining 100% functional coverage.

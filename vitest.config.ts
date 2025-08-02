@@ -9,13 +9,8 @@ export default defineConfig({
   resolve: {
     alias: {
       "~": path.resolve(__dirname, "./src"),
-      // Fix Next.js module resolution for NextAuth
-      "next/server": path.resolve(__dirname, "./node_modules/next/server.js"),
     },
     conditions: ["node", "import"],
-  },
-  ssr: {
-    noExternal: ["next-auth"],
   },
   test: {
     coverage: {
@@ -67,11 +62,6 @@ export default defineConfig({
         resolve: {
           alias: {
             "~": path.resolve(__dirname, "./src"),
-            // Fix Next.js module resolution for NextAuth
-            "next/server": path.resolve(
-              __dirname,
-              "./node_modules/next/server.js",
-            ),
           },
         },
         // Node environment for server-side tests
@@ -102,11 +92,6 @@ export default defineConfig({
         resolve: {
           alias: {
             "~": path.resolve(__dirname, "./src"),
-            // Fix Next.js module resolution for NextAuth
-            "next/server": path.resolve(
-              __dirname,
-              "./node_modules/next/server.js",
-            ),
           },
         },
         // jsdom environment for browser/React tests
