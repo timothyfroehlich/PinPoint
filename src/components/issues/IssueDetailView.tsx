@@ -11,7 +11,6 @@ import {
   useMediaQuery,
 } from "@mui/material";
 import Grid from "@mui/material/Grid";
-import { type Session } from "next-auth";
 import * as React from "react";
 import { useState } from "react";
 
@@ -21,6 +20,8 @@ import { IssueDetail } from "./IssueDetail";
 import { IssueStatusControl } from "./IssueStatusControl";
 import { IssueTimeline } from "./IssueTimeline";
 
+import type { PinPointSupabaseUser } from "~/lib/supabase/types";
+
 import { PermissionGate } from "~/components/permissions";
 import { usePermissions } from "~/hooks/usePermissions";
 import { api } from "~/trpc/react";
@@ -28,13 +29,13 @@ import { type IssueWithDetails } from "~/types/issue";
 
 interface IssueDetailViewProps {
   issue: IssueWithDetails;
-  session: Session | null;
+  user: PinPointSupabaseUser | null;
   issueId: string;
 }
 
 export function IssueDetailView({
   issue: initialIssue,
-  session,
+  user,
   issueId,
 }: IssueDetailViewProps): React.JSX.Element {
   const theme = useTheme();
@@ -123,7 +124,7 @@ export function IssueDetailView({
           <Paper elevation={1} sx={{ p: 3, mb: 3 }}>
             <IssueDetail
               issue={currentIssue}
-              session={session}
+              user={user}
               hasPermission={hasPermission}
             />
           </Paper>
@@ -131,7 +132,7 @@ export function IssueDetailView({
           <Paper elevation={1} sx={{ p: 3, mb: 3 }}>
             <IssueComments
               issue={currentIssue}
-              session={session}
+              user={user}
               hasPermission={hasPermission}
               onError={setError}
             />
@@ -139,7 +140,7 @@ export function IssueDetailView({
 
           {isAuthenticated && (
             <Paper elevation={1} sx={{ p: 3 }}>
-              <IssueTimeline issue={currentIssue} session={session} />
+              <IssueTimeline issue={currentIssue} user={user} />
             </Paper>
           )}
         </Grid>
@@ -157,7 +158,7 @@ export function IssueDetailView({
               <Paper elevation={1} sx={{ p: 2, mb: 2 }}>
                 <IssueStatusControl
                   issue={currentIssue}
-                  session={session}
+                  user={user}
                   hasPermission={hasPermission}
                   onError={setError}
                 />
@@ -165,10 +166,14 @@ export function IssueDetailView({
             </PermissionGate>
 
             {/* Actions */}
-            <Paper elevation={1} sx={{ p: 2, mb: 2 }}>
+            <Paper
+              elevation={1}
+              sx={{ p: 2, mb: 2 }}
+              data-testid="issue-actions"
+            >
               <IssueActions
                 issue={currentIssue}
-                session={session}
+                user={user}
                 hasPermission={hasPermission}
                 onError={setError}
               />

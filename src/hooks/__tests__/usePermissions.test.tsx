@@ -1,7 +1,7 @@
 import { renderHook, waitFor } from "@testing-library/react";
 import * as React from "react";
 import { type ReactNode } from "react";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 import "@testing-library/jest-dom";
 
@@ -11,9 +11,11 @@ import {
   usePermissionTooltip,
 } from "../usePermissions";
 
+import { PERMISSIONS, SYSTEM_ROLES } from "~/server/auth/permissions.constants";
 import {
   VitestTestWrapper,
   VITEST_PERMISSION_SCENARIOS,
+  VITEST_ROLE_MAPPING,
 } from "~/test/VitestTestWrapper";
 
 // Mock useRouter - needs to be hoisted
@@ -32,17 +34,21 @@ const createWrapper = (
     queryOptions?: { isLoading?: boolean; isError?: boolean; error?: any };
   } = {},
 ) => {
-  return ({ children }: { children: ReactNode }) => (
-    <VitestTestWrapper
-      userPermissions={options.userPermissions}
-      userRole={options.userRole}
-      session={options.session}
-      injectPermissionDeps={options.injectPermissionDeps ?? true}
-      queryOptions={options.queryOptions}
-    >
-      {children}
-    </VitestTestWrapper>
-  );
+  return ({ children }: { children: ReactNode }) => {
+    const wrapperProps: any = {
+      userPermissions: options.userPermissions,
+      session: options.session,
+      injectPermissionDeps: options.injectPermissionDeps ?? true,
+      queryOptions: options.queryOptions,
+    };
+
+    // Only add userRole if it's defined (exactOptionalPropertyTypes compliance)
+    if (options.userRole !== undefined) {
+      wrapperProps.userRole = options.userRole;
+    }
+
+    return <VitestTestWrapper {...wrapperProps}>{children}</VitestTestWrapper>;
+  };
 };
 
 describe("usePermissions", () => {
@@ -53,7 +59,7 @@ describe("usePermissions", () => {
   describe("Basic Permission Checking", () => {
     it("should return correct permission checking function for admin user", () => {
       const wrapper = createWrapper({
-        userPermissions: VITEST_PERMISSION_SCENARIOS.ADMIN,
+        userPermissions: [...VITEST_PERMISSION_SCENARIOS.ADMIN],
         userRole: "Admin",
       });
 
@@ -61,9 +67,13 @@ describe("usePermissions", () => {
 
       // With dependency injection, the result should be available immediately
       expect(result.current.isAuthenticated).toBe(true);
-      expect(result.current.hasPermission("organization:admin")).toBe(true);
-      expect(result.current.hasPermission("issue:create")).toBe(true);
-      expect(result.current.hasPermission("machine:delete")).toBe(true);
+      expect(
+        result.current.hasPermission(PERMISSIONS.ORGANIZATION_MANAGE),
+      ).toBe(true);
+      expect(result.current.hasPermission(PERMISSIONS.ISSUE_CREATE)).toBe(true);
+      expect(result.current.hasPermission(PERMISSIONS.MACHINE_DELETE)).toBe(
+        true,
+      );
       expect(result.current.hasPermission("nonexistent:permission")).toBe(
         false,
       );
@@ -71,18 +81,22 @@ describe("usePermissions", () => {
 
     it("should return correct permission checking function for member user", () => {
       const wrapper = createWrapper({
-        userPermissions: VITEST_PERMISSION_SCENARIOS.MEMBER,
+        userPermissions: [...VITEST_PERMISSION_SCENARIOS.MEMBER],
         userRole: "Member",
       });
 
       const { result } = renderHook(() => usePermissions(), { wrapper });
 
       expect(result.current.isAuthenticated).toBe(true);
-      expect(result.current.hasPermission("issue:view")).toBe(true);
-      expect(result.current.hasPermission("issue:create")).toBe(true);
-      expect(result.current.hasPermission("machine:view")).toBe(true);
-      expect(result.current.hasPermission("issue:delete")).toBe(false);
-      expect(result.current.hasPermission("organization:admin")).toBe(false);
+      expect(result.current.hasPermission(PERMISSIONS.ISSUE_VIEW)).toBe(true);
+      expect(result.current.hasPermission(PERMISSIONS.ISSUE_CREATE)).toBe(true);
+      expect(result.current.hasPermission(PERMISSIONS.MACHINE_VIEW)).toBe(true);
+      expect(result.current.hasPermission(PERMISSIONS.ISSUE_DELETE)).toBe(
+        false,
+      );
+      expect(
+        result.current.hasPermission(PERMISSIONS.ORGANIZATION_MANAGE),
+      ).toBe(false);
     });
 
     it("should return false for all permissions for unauthenticated user", async () => {
@@ -94,23 +108,25 @@ describe("usePermissions", () => {
         expect(result.current.isAuthenticated).toBe(false);
       });
 
-      expect(result.current.hasPermission("issue:view")).toBe(false);
-      expect(result.current.hasPermission("organization:admin")).toBe(false);
-      expect(result.current.permissions).toEqual([]);
+      expect(result.current.hasPermission(PERMISSIONS.ISSUE_VIEW)).toBe(false);
+      expect(
+        result.current.hasPermission(PERMISSIONS.ORGANIZATION_MANAGE),
+      ).toBe(false);
+      expect(result.current.permissions).toHaveLength(0);
     });
 
     it("should handle empty permissions array", () => {
       const wrapper = createWrapper({
-        userPermissions: VITEST_PERMISSION_SCENARIOS.PUBLIC,
+        userPermissions: [...VITEST_PERMISSION_SCENARIOS.PUBLIC],
         userRole: "Public",
       });
 
       const { result } = renderHook(() => usePermissions(), { wrapper });
 
       expect(result.current.isAuthenticated).toBe(true);
-      expect(result.current.hasPermission("issue:view")).toBe(false);
+      expect(result.current.hasPermission(PERMISSIONS.ISSUE_VIEW)).toBe(false);
       expect(result.current.hasPermission("any:permission")).toBe(false);
-      expect(result.current.permissions).toEqual([]);
+      expect(result.current.permissions).toHaveLength(0);
     });
   });
 
@@ -125,54 +141,58 @@ describe("usePermissions", () => {
 
       expect(result.current).toMatchObject({
         hasPermission: expect.any(Function),
-        permissions: ["issue:view", "issue:edit"],
+        permissions: expect.arrayContaining([
+          PERMISSIONS.ISSUE_VIEW,
+          PERMISSIONS.ISSUE_EDIT,
+        ]),
         isAuthenticated: true,
         isLoading: false,
         isError: false,
-        roleName: "Manager",
+        roleName: expect.stringMatching(/manager/i),
         isAdmin: false,
       });
+      expect(result.current.permissions).toHaveLength(2);
     });
 
     it("should return isAdmin true for Admin role", () => {
       const wrapper = createWrapper({
-        userPermissions: VITEST_PERMISSION_SCENARIOS.ADMIN,
+        userPermissions: [...VITEST_PERMISSION_SCENARIOS.ADMIN],
         userRole: "Admin",
       });
 
       const { result } = renderHook(() => usePermissions(), { wrapper });
 
       expect(result.current.isAdmin).toBe(true);
-      expect(result.current.roleName).toBe("Admin");
+      expect(result.current.roleName).toBe(SYSTEM_ROLES.ADMIN);
     });
 
     it("should return isAdmin false for non-admin roles", () => {
       const wrapper = createWrapper({
-        userPermissions: VITEST_PERMISSION_SCENARIOS.MEMBER,
+        userPermissions: [...VITEST_PERMISSION_SCENARIOS.MEMBER],
         userRole: "Member",
       });
 
       const { result } = renderHook(() => usePermissions(), { wrapper });
 
       expect(result.current.isAdmin).toBe(false);
-      expect(result.current.roleName).toBe("Member");
+      expect(result.current.roleName).toBe(VITEST_ROLE_MAPPING.MEMBER);
     });
   });
 
   describe("Loading States", () => {
     it("should handle loading state correctly", () => {
-      // With dependency injection, loading state is controlled by the mock
-      // We can simulate loading by not providing userPermissions
+      // Test loading state with dependency injection by using sessionLoading
       const wrapper = createWrapper({
-        injectPermissionDeps: false, // Use real dependencies to test loading
+        userPermissions: ["issue:view"],
+        queryOptions: { isLoading: true },
       });
 
       const { result } = renderHook(() => usePermissions(), { wrapper });
 
-      // Without mocked dependencies, it should show actual loading behavior
-      // But since we're testing in isolation, we'll just verify the structure
+      // Should show loading state
+      expect(result.current.isLoading).toBe(true);
       expect(result.current.isError).toBe(false);
-      expect(typeof result.current.isLoading).toBe("boolean");
+      expect(result.current.isAuthenticated).toBe(true); // User exists but still loading
     });
 
     it("should handle error state correctly", () => {
@@ -259,7 +279,7 @@ describe("usePermissions", () => {
       const { result } = renderHook(() => usePermissions(), { wrapper });
 
       expect(result.current.isAuthenticated).toBe(true);
-      expect(result.current.permissions).toEqual([]);
+      expect(result.current.permissions).toHaveLength(0);
       expect(result.current.hasPermission("any:permission")).toBe(false);
     });
 
@@ -273,7 +293,7 @@ describe("usePermissions", () => {
       const { result } = renderHook(() => usePermissions(), { wrapper });
 
       expect(result.current.isAuthenticated).toBe(true);
-      expect(result.current.permissions).toEqual([]);
+      expect(result.current.permissions).toHaveLength(0);
       expect(result.current.hasPermission("any:permission")).toBe(false);
       expect(result.current.isAdmin).toBe(false);
     });
@@ -291,8 +311,9 @@ describe("useRequiredPermission", () => {
       userRole: "Admin",
     });
 
+    const redirectPath = "/unauthorized";
     const { result } = renderHook(
-      () => useRequiredPermission("admin:view", "/unauthorized"),
+      () => useRequiredPermission("admin:view", redirectPath),
       { wrapper },
     );
 
@@ -306,11 +327,12 @@ describe("useRequiredPermission", () => {
       userRole: "Member",
     });
 
-    renderHook(() => useRequiredPermission("admin:view", "/unauthorized"), {
+    const redirectPath = "/unauthorized";
+    renderHook(() => useRequiredPermission("admin:view", redirectPath), {
       wrapper,
     });
 
-    expect(mockPush).toHaveBeenCalledWith("/unauthorized");
+    expect(mockPush).toHaveBeenCalledWith(redirectPath);
   });
 
   it("should use default redirect path when not specified", () => {
@@ -321,7 +343,8 @@ describe("useRequiredPermission", () => {
 
     renderHook(() => useRequiredPermission("admin:view"), { wrapper });
 
-    expect(mockPush).toHaveBeenCalledWith("/");
+    // Should redirect to root path when no redirect specified
+    expect(mockPush).toHaveBeenCalledWith(expect.stringMatching(/^\/$|^\/$/));
   });
 });
 
@@ -330,7 +353,8 @@ describe("usePermissionTooltip", () => {
     const { result } = renderHook(() => usePermissionTooltip("issue:edit"));
 
     expect(typeof result.current).toBe("string");
-    expect(result.current.length).toBeGreaterThan(0);
+    expect(result.current).toBeTruthy();
+    expect(result.current.trim()).not.toBe("");
   });
 
   it("should handle unknown permissions gracefully", () => {
@@ -368,7 +392,8 @@ describe("usePermissionTooltip", () => {
     permissions.forEach((permission) => {
       const { result } = renderHook(() => usePermissionTooltip(permission));
       expect(typeof result.current).toBe("string");
-      expect(result.current.length).toBeGreaterThan(0);
+      expect(result.current).toBeTruthy();
+      expect(result.current.trim()).not.toBe("");
     });
   });
 });

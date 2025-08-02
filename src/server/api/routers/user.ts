@@ -13,7 +13,7 @@ export const userRouter = createTRPCRouter({
   // Get current user's profile
   getProfile: protectedProcedure.query(async ({ ctx }) => {
     const user = await ctx.db.user.findUnique({
-      where: { id: ctx.session.user.id },
+      where: { id: ctx.user.id },
       include: {
         ownedMachines: {
           include: {
@@ -64,7 +64,7 @@ export const userRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const updatedUser = await ctx.db.user.update({
-        where: { id: ctx.session.user.id },
+        where: { id: ctx.user.id },
         data: {
           ...(input.name !== undefined && { name: input.name }),
           ...(input.bio !== undefined && { bio: input.bio }),
@@ -92,12 +92,12 @@ export const userRouter = createTRPCRouter({
         // Upload image
         const imagePath = await imageStorage.uploadImage(
           file,
-          `user-${ctx.session.user.id}`,
+          `user-${ctx.user.id}`,
         );
 
         // Delete old profile picture if it exists
         const currentUser = await ctx.db.user.findUnique({
-          where: { id: ctx.session.user.id },
+          where: { id: ctx.user.id },
           select: { profilePicture: true },
         });
 
@@ -115,7 +115,7 @@ export const userRouter = createTRPCRouter({
 
         // Update user's profile picture
         const updatedUser = await ctx.db.user.update({
-          where: { id: ctx.session.user.id },
+          where: { id: ctx.user.id },
           data: { profilePicture: imagePath },
         });
 
@@ -204,7 +204,7 @@ export const userRouter = createTRPCRouter({
   // Assign default avatar to user (used during account creation)
   assignDefaultAvatar: protectedProcedure.mutation(async ({ ctx }) => {
     const user = await ctx.db.user.findUnique({
-      where: { id: ctx.session.user.id },
+      where: { id: ctx.user.id },
       select: { profilePicture: true },
     });
 
@@ -213,7 +213,7 @@ export const userRouter = createTRPCRouter({
       const defaultAvatarUrl = getDefaultAvatarUrl();
 
       await ctx.db.user.update({
-        where: { id: ctx.session.user.id },
+        where: { id: ctx.user.id },
         data: { profilePicture: defaultAvatarUrl },
       });
 

@@ -11,22 +11,24 @@ import {
   Chip,
   CircularProgress,
 } from "@mui/material";
-import { type Session } from "next-auth";
 import * as React from "react";
 import { useState } from "react";
+
+import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 
 import { api } from "~/trpc/react";
 import { type IssueWithDetails, type IssueStatus } from "~/types/issue";
 
 interface IssueStatusControlProps {
   issue: IssueWithDetails;
-  session: Session | null;
+  user: PinPointSupabaseUser | null;
   hasPermission: (permission: string) => boolean;
   onError: (error: string) => void;
 }
 
 export function IssueStatusControl({
   issue,
+  user: _user,
   hasPermission,
   onError,
 }: IssueStatusControlProps): React.JSX.Element {

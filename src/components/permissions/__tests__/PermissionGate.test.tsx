@@ -4,6 +4,94 @@ import "@testing-library/jest-dom";
 
 import { PermissionGate } from "../PermissionGate";
 
+import { PERMISSIONS } from "~/server/auth/permissions.constants";
+
+// Test permission constants for consistency and maintainability
+const TEST_PERMISSIONS = {
+  BASIC: "test:permission",
+  ISSUE_EDIT: PERMISSIONS.ISSUE_EDIT,
+  ADMIN: "organization:admin",
+  MACHINE_CREATE: PERMISSIONS.MACHINE_CREATE,
+  EMPTY: "",
+} as const;
+
+// Test content components for reusability - using semantic elements
+const TestContent = {
+  Protected: () => (
+    <main role="main" aria-label="Protected Content">
+      Protected Content
+    </main>
+  ),
+  EditButton: () => <button type="button">Edit Issue</button>,
+  AdminPanel: () => (
+    <section role="region" aria-label="Admin Panel">
+      Admin Panel
+    </section>
+  ),
+  CreateMachine: () => <button type="button">Add Machine</button>,
+  Fallback: () => (
+    <div role="alert" aria-label="Access Denied">
+      Access Denied
+    </div>
+  ),
+};
+
+// Assertion helpers for common patterns - using semantic queries
+const expectProtectedContentVisible = () => {
+  expect(
+    screen.getByRole("main", { name: /protected content/i }),
+  ).toBeInTheDocument();
+};
+
+const expectProtectedContentHidden = () => {
+  expect(
+    screen.queryByRole("main", { name: /protected content/i }),
+  ).not.toBeInTheDocument();
+};
+
+const expectEditButtonVisible = () => {
+  expect(
+    screen.getByRole("button", { name: /edit issue/i }),
+  ).toBeInTheDocument();
+};
+
+const expectAdminPanelHidden = () => {
+  expect(
+    screen.queryByRole("region", { name: /admin panel/i }),
+  ).not.toBeInTheDocument();
+};
+
+const expectCreateMachineVisible = () => {
+  expect(
+    screen.getByRole("button", { name: /add machine/i }),
+  ).toBeInTheDocument();
+};
+
+const expectFallbackVisible = () => {
+  expect(
+    screen.getByRole("alert", { name: /access denied/i }),
+  ).toBeInTheDocument();
+};
+
+const expectFallbackHidden = () => {
+  expect(
+    screen.queryByRole("alert", { name: /access denied/i }),
+  ).not.toBeInTheDocument();
+};
+
+const expectPermissionCalled = (
+  mock: ReturnType<typeof vi.fn>,
+  permission: string,
+  times = 1,
+) => {
+  expect(mock).toHaveBeenCalledTimes(times);
+  expect(mock).toHaveBeenCalledWith(permission);
+};
+
+const expectEmptyBody = () => {
+  expect(document.body).toHaveTextContent("");
+};
+
 describe("PermissionGate", () => {
   const mockHasPermission = vi.fn();
 
@@ -17,15 +105,15 @@ describe("PermissionGate", () => {
 
       render(
         <PermissionGate
-          permission="test:permission"
+          permission={TEST_PERMISSIONS.BASIC}
           hasPermission={mockHasPermission}
         >
-          <div data-testid="protected-content">Protected Content</div>
+          <TestContent.Protected />
         </PermissionGate>,
       );
 
-      expect(screen.getByTestId("protected-content")).toBeInTheDocument();
-      expect(mockHasPermission).toHaveBeenCalledWith("test:permission");
+      expectProtectedContentVisible();
+      expectPermissionCalled(mockHasPermission, TEST_PERMISSIONS.BASIC);
     });
 
     it("should not render children when user lacks required permission", () => {
@@ -33,15 +121,15 @@ describe("PermissionGate", () => {
 
       render(
         <PermissionGate
-          permission="test:permission"
+          permission={TEST_PERMISSIONS.BASIC}
           hasPermission={mockHasPermission}
         >
-          <div data-testid="protected-content">Protected Content</div>
+          <TestContent.Protected />
         </PermissionGate>,
       );
 
-      expect(screen.queryByTestId("protected-content")).not.toBeInTheDocument();
-      expect(mockHasPermission).toHaveBeenCalledWith("test:permission");
+      expectProtectedContentHidden();
+      expectPermissionCalled(mockHasPermission, TEST_PERMISSIONS.BASIC);
     });
   });
 
@@ -51,18 +139,20 @@ describe("PermissionGate", () => {
 
       render(
         <PermissionGate
-          permission="test:permission"
+          permission={TEST_PERMISSIONS.BASIC}
           hasPermission={mockHasPermission}
-          fallback={<div data-testid="fallback-content">Access Denied</div>}
+          fallback={<TestContent.Fallback />}
           showFallback={true}
         >
-          <div data-testid="protected-content">Protected Content</div>
+          <TestContent.Protected />
         </PermissionGate>,
       );
 
-      expect(screen.queryByTestId("protected-content")).not.toBeInTheDocument();
-      expect(screen.getByTestId("fallback-content")).toBeInTheDocument();
-      expect(screen.getByText("Access Denied")).toBeInTheDocument();
+      expectProtectedContentHidden();
+      expectFallbackVisible();
+      expect(
+        screen.getByRole("alert", { name: /access denied/i }),
+      ).toHaveTextContent(/access denied/i);
     });
 
     it("should not render fallback when showFallback is false (default)", () => {
@@ -70,33 +160,34 @@ describe("PermissionGate", () => {
 
       render(
         <PermissionGate
-          permission="test:permission"
+          permission={TEST_PERMISSIONS.BASIC}
           hasPermission={mockHasPermission}
-          fallback={<div data-testid="fallback-content">Access Denied</div>}
+          fallback={<TestContent.Fallback />}
         >
-          <div data-testid="protected-content">Protected Content</div>
+          <TestContent.Protected />
         </PermissionGate>,
       );
 
-      expect(screen.queryByTestId("protected-content")).not.toBeInTheDocument();
-      expect(screen.queryByTestId("fallback-content")).not.toBeInTheDocument();
+      expectProtectedContentHidden();
+      expectFallbackHidden();
     });
 
     it("should not render fallback when showFallback is true but no fallback is provided", () => {
       mockHasPermission.mockReturnValue(false);
 
-      const { container } = render(
+      render(
         <PermissionGate
-          permission="test:permission"
+          permission={TEST_PERMISSIONS.BASIC}
           hasPermission={mockHasPermission}
           showFallback={true}
         >
-          <div data-testid="protected-content">Protected Content</div>
+          <TestContent.Protected />
         </PermissionGate>,
       );
 
-      expect(screen.queryByTestId("protected-content")).not.toBeInTheDocument();
-      expect(container.firstChild).toBeNull();
+      expectProtectedContentHidden();
+      // Should render nothing when no fallback is provided
+      expectEmptyBody();
     });
 
     it("should render children instead of fallback when permission is granted", () => {
@@ -104,17 +195,17 @@ describe("PermissionGate", () => {
 
       render(
         <PermissionGate
-          permission="test:permission"
+          permission={TEST_PERMISSIONS.BASIC}
           hasPermission={mockHasPermission}
-          fallback={<div data-testid="fallback-content">Access Denied</div>}
+          fallback={<TestContent.Fallback />}
           showFallback={true}
         >
-          <div data-testid="protected-content">Protected Content</div>
+          <TestContent.Protected />
         </PermissionGate>,
       );
 
-      expect(screen.getByTestId("protected-content")).toBeInTheDocument();
-      expect(screen.queryByTestId("fallback-content")).not.toBeInTheDocument();
+      expectProtectedContentVisible();
+      expectFallbackHidden();
     });
   });
 
@@ -124,15 +215,15 @@ describe("PermissionGate", () => {
 
       render(
         <PermissionGate
-          permission="issue:edit"
+          permission={TEST_PERMISSIONS.ISSUE_EDIT}
           hasPermission={mockHasPermission}
         >
-          <button data-testid="edit-button">Edit Issue</button>
+          <TestContent.EditButton />
         </PermissionGate>,
       );
 
-      expect(screen.getByTestId("edit-button")).toBeInTheDocument();
-      expect(mockHasPermission).toHaveBeenCalledWith("issue:edit");
+      expectEditButtonVisible();
+      expectPermissionCalled(mockHasPermission, TEST_PERMISSIONS.ISSUE_EDIT);
     });
 
     it("should handle admin permissions correctly", () => {
@@ -140,15 +231,15 @@ describe("PermissionGate", () => {
 
       render(
         <PermissionGate
-          permission="organization:admin"
+          permission={TEST_PERMISSIONS.ADMIN}
           hasPermission={mockHasPermission}
         >
-          <div data-testid="admin-panel">Admin Panel</div>
+          <TestContent.AdminPanel />
         </PermissionGate>,
       );
 
-      expect(screen.queryByTestId("admin-panel")).not.toBeInTheDocument();
-      expect(mockHasPermission).toHaveBeenCalledWith("organization:admin");
+      expectAdminPanelHidden();
+      expectPermissionCalled(mockHasPermission, TEST_PERMISSIONS.ADMIN);
     });
 
     it("should handle machine permissions correctly", () => {
@@ -156,15 +247,18 @@ describe("PermissionGate", () => {
 
       render(
         <PermissionGate
-          permission="machine:create"
+          permission={TEST_PERMISSIONS.MACHINE_CREATE}
           hasPermission={mockHasPermission}
         >
-          <button data-testid="create-machine">Add Machine</button>
+          <TestContent.CreateMachine />
         </PermissionGate>,
       );
 
-      expect(screen.getByTestId("create-machine")).toBeInTheDocument();
-      expect(mockHasPermission).toHaveBeenCalledWith("machine:create");
+      expectCreateMachineVisible();
+      expectPermissionCalled(
+        mockHasPermission,
+        TEST_PERMISSIONS.MACHINE_CREATE,
+      );
     });
   });
 
@@ -174,7 +268,7 @@ describe("PermissionGate", () => {
 
       render(
         <PermissionGate
-          permission="test:permission"
+          permission={TEST_PERMISSIONS.BASIC}
           hasPermission={mockHasPermission}
         >
           <div data-testid="parent">
@@ -188,9 +282,13 @@ describe("PermissionGate", () => {
       );
 
       expect(screen.getByTestId("parent")).toBeInTheDocument();
-      expect(screen.getByText("Title")).toBeInTheDocument();
-      expect(screen.getByText("Some content")).toBeInTheDocument();
-      expect(screen.getByText("Action Button")).toBeInTheDocument();
+      expect(
+        screen.getByRole("heading", { name: /title/i }),
+      ).toBeInTheDocument();
+      expect(screen.getByText(/some content/i)).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /action button/i }),
+      ).toBeInTheDocument();
     });
 
     it("should handle React fragments as children", () => {
@@ -198,7 +296,7 @@ describe("PermissionGate", () => {
 
       render(
         <PermissionGate
-          permission="test:permission"
+          permission={TEST_PERMISSIONS.BASIC}
           hasPermission={mockHasPermission}
         >
           <>
@@ -217,7 +315,7 @@ describe("PermissionGate", () => {
 
       render(
         <PermissionGate
-          permission="test:permission"
+          permission={TEST_PERMISSIONS.BASIC}
           hasPermission={mockHasPermission}
         >
           <div data-testid="child-1">Child 1</div>
@@ -235,61 +333,64 @@ describe("PermissionGate", () => {
       mockHasPermission.mockReturnValue(false);
 
       render(
-        <PermissionGate permission="" hasPermission={mockHasPermission}>
+        <PermissionGate
+          permission={TEST_PERMISSIONS.EMPTY}
+          hasPermission={mockHasPermission}
+        >
           <div data-testid="content">Content</div>
         </PermissionGate>,
       );
 
-      expect(screen.queryByTestId("content")).not.toBeInTheDocument();
-      expect(mockHasPermission).toHaveBeenCalledWith("");
+      expect(screen.queryByText(/content/i)).not.toBeInTheDocument();
+      expectPermissionCalled(mockHasPermission, TEST_PERMISSIONS.EMPTY);
     });
 
     it("should handle null children gracefully", () => {
       mockHasPermission.mockReturnValue(true);
 
-      const { container } = render(
+      render(
         <PermissionGate
-          permission="test:permission"
+          permission={TEST_PERMISSIONS.BASIC}
           hasPermission={mockHasPermission}
         >
           {null}
         </PermissionGate>,
       );
 
-      // Should not crash and render nothing
-      expect(container.firstChild).toBeNull();
+      // Should not crash and render nothing - no content should be visible
+      expectEmptyBody();
     });
 
     it("should handle undefined children gracefully", () => {
       mockHasPermission.mockReturnValue(true);
 
-      const { container } = render(
+      render(
         <PermissionGate
-          permission="test:permission"
+          permission={TEST_PERMISSIONS.BASIC}
           hasPermission={mockHasPermission}
         >
           {undefined}
         </PermissionGate>,
       );
 
-      // Should not crash and render nothing
-      expect(container.firstChild).toBeNull();
+      // Should not crash and render nothing - no content should be visible
+      expectEmptyBody();
     });
 
     it("should handle false children gracefully", () => {
       mockHasPermission.mockReturnValue(true);
 
-      const { container } = render(
+      render(
         <PermissionGate
-          permission="test:permission"
+          permission={TEST_PERMISSIONS.BASIC}
           hasPermission={mockHasPermission}
         >
           {false}
         </PermissionGate>,
       );
 
-      // Should not crash and render nothing
-      expect(container.firstChild).toBeNull();
+      // Should not crash and render nothing - no content should be visible
+      expectEmptyBody();
     });
 
     it("should handle string children", () => {
@@ -297,14 +398,14 @@ describe("PermissionGate", () => {
 
       render(
         <PermissionGate
-          permission="test:permission"
+          permission={TEST_PERMISSIONS.BASIC}
           hasPermission={mockHasPermission}
         >
           Simple text content
         </PermissionGate>,
       );
 
-      expect(screen.getByText("Simple text content")).toBeInTheDocument();
+      expect(screen.getByText(/simple text content/i)).toBeInTheDocument();
     });
 
     it("should handle number children", () => {
@@ -312,14 +413,14 @@ describe("PermissionGate", () => {
 
       render(
         <PermissionGate
-          permission="test:permission"
+          permission={TEST_PERMISSIONS.BASIC}
           hasPermission={mockHasPermission}
         >
           {42}
         </PermissionGate>,
       );
 
-      expect(screen.getByText("42")).toBeInTheDocument();
+      expect(screen.getByText(/42/)).toBeInTheDocument();
     });
   });
 
@@ -329,15 +430,14 @@ describe("PermissionGate", () => {
 
       render(
         <PermissionGate
-          permission="test:permission"
+          permission={TEST_PERMISSIONS.BASIC}
           hasPermission={mockHasPermission}
         >
           <div>Content</div>
         </PermissionGate>,
       );
 
-      expect(mockHasPermission).toHaveBeenCalledTimes(1);
-      expect(mockHasPermission).toHaveBeenCalledWith("test:permission");
+      expectPermissionCalled(mockHasPermission, TEST_PERMISSIONS.BASIC, 1);
     });
 
     it("should handle hasPermission function that throws", () => {
@@ -371,7 +471,7 @@ describe("PermissionGate", () => {
       );
 
       // Truthy value should allow rendering
-      expect(screen.getByTestId("content")).toBeInTheDocument();
+      expect(screen.getByText(/content/i)).toBeInTheDocument();
     });
 
     it("should handle hasPermission function that returns falsy non-boolean", () => {
@@ -387,7 +487,7 @@ describe("PermissionGate", () => {
       );
 
       // Falsy value should prevent rendering
-      expect(screen.queryByTestId("content")).not.toBeInTheDocument();
+      expect(screen.queryByText(/content/i)).not.toBeInTheDocument();
     });
   });
 

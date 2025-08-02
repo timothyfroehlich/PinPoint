@@ -49,7 +49,7 @@ export class SupabaseError extends Error {
   /**
    * Converts the error to a JSON-serializable object for logging.
    */
-  public toJSON() {
+  public toJSON(): Record<string, unknown> {
     return {
       name: this.name,
       type: this.type,

@@ -22,7 +22,7 @@ import {
 } from "@mui/material";
 import NextLink from "next/link";
 
-import type { Session } from "next-auth";
+import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 import type { RouterOutputs } from "~/trpc/react";
 
 import { PermissionGate } from "~/components/permissions";
@@ -32,13 +32,13 @@ type MachineWithDetails = RouterOutputs["machine"]["core"]["getById"];
 
 interface MachineDetailViewProps {
   machine: MachineWithDetails;
-  session: Session | null;
+  user: PinPointSupabaseUser | null;
   machineId: string;
 }
 
 export function MachineDetailView({
   machine,
-  session: _session,
+  user: _user,
   machineId,
 }: MachineDetailViewProps): React.ReactElement {
   const { hasPermission } = usePermissions();
@@ -67,7 +67,7 @@ export function MachineDetailView({
         {/* Action Buttons */}
         <Box display="flex" gap={2}>
           <PermissionGate
-            permission="machines:edit"
+            permission="machine:edit"
             hasPermission={hasPermission}
           >
             <Button
@@ -83,7 +83,7 @@ export function MachineDetailView({
           </PermissionGate>
 
           <PermissionGate
-            permission="machines:delete"
+            permission="machine:delete"
             hasPermission={hasPermission}
           >
             <Button
@@ -358,7 +358,7 @@ export function MachineDetailView({
                     QR code not available
                   </Typography>
                   <PermissionGate
-                    permission="machines:edit"
+                    permission="machine:edit"
                     hasPermission={hasPermission}
                   >
                     <Button

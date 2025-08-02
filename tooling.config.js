@@ -28,8 +28,13 @@ export const INCLUDE_PATTERNS = {
     "./src/integration-tests/**/*.{ts,tsx}",
     "./e2e/**/*.{ts,tsx}",
   ],
-  // Build and configuration files
-  config: ["./*.config.{js,ts}", "./scripts/**/*.{js,ts}", "./prisma/**/*.ts"],
+  // Build and configuration files (including test setup)
+  config: [
+    "./*.config.{js,ts}",
+    "./vitest.setup.*.ts",
+    "./scripts/**/*.{js,ts}",
+    "./prisma/**/*.ts",
+  ],
 };
 /**
  * Exclusion patterns for production code

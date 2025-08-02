@@ -1,10 +1,10 @@
 "use client";
 
-import { useSession } from "next-auth/react";
 import { createContext, useContext } from "react";
 
 import type { ReactNode, ReactElement } from "react";
 
+import { useAuth } from "~/app/auth-provider";
 import { api } from "~/trpc/react";
 
 /**
@@ -12,8 +12,8 @@ import { api } from "~/trpc/react";
  * This allows for dependency injection in tests while keeping production code clean
  */
 export interface PermissionDependencies {
-  /** Hook for getting NextAuth session */
-  sessionHook: typeof useSession;
+  /** Hook for getting Supabase auth */
+  authHook: typeof useAuth;
   /** tRPC query for getting current user membership */
   membershipQuery: typeof api.user.getCurrentMembership.useQuery;
 }
@@ -27,14 +27,6 @@ const PermissionDepsContext = createContext<PermissionDependencies | null>(
 );
 
 /**
- * Production dependencies - uses real hooks and queries
- */
-const productionDependencies: PermissionDependencies = {
-  sessionHook: useSession,
-  membershipQuery: api.user.getCurrentMembership.useQuery,
-};
-
-/**
  * Hook to get permission dependencies from context
  * Falls back to production dependencies if no context is provided
  *
@@ -45,7 +37,15 @@ export function usePermissionDependencies(): PermissionDependencies {
 
   // In production, context will be null, so we use real dependencies
   // In tests, context can provide mock dependencies
-  return contextDeps ?? productionDependencies;
+  if (contextDeps) {
+    return contextDeps;
+  }
+
+  // Lazy-load production dependencies to avoid undefined references during module loading
+  return {
+    authHook: useAuth,
+    membershipQuery: api.user.getCurrentMembership.useQuery,
+  };
 }
 
 /**
@@ -57,22 +57,22 @@ export function usePermissionDependencies(): PermissionDependencies {
  * const mockSessionHook = () => ({ data: mockSession, status: "authenticated" });
  * const mockMembershipQuery = () => ({ data: mockMembership, isLoading: false });
  *
- * <PermissionDepsProvider sessionHook={mockSessionHook} membershipQuery={mockMembershipQuery}>
+ * <PermissionDepsProvider authHook={mockAuthHook} membershipQuery={mockMembershipQuery}>
  *   <ComponentUnderTest />
  * </PermissionDepsProvider>
  * ```
  */
 export function PermissionDepsProvider({
   children,
-  sessionHook,
+  authHook,
   membershipQuery,
 }: {
   children: ReactNode;
-  sessionHook: typeof useSession;
+  authHook: typeof useAuth;
   membershipQuery: typeof api.user.getCurrentMembership.useQuery;
 }): ReactElement {
   const dependencies: PermissionDependencies = {
-    sessionHook,
+    authHook,
     membershipQuery,
   };
 

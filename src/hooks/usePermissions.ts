@@ -79,7 +79,7 @@ export interface UsePermissionsReturn {
  * ```tsx
  * // In tests, wrap with PermissionDepsProvider to inject mocks
  * <PermissionDepsProvider
- *   sessionHook={() => ({ data: mockSession, status: "authenticated" })}
+ *   authHook={() => ({ user: mockUser, loading: false })}
  *   membershipQuery={() => ({ data: mockMembership, isLoading: false })}
  * >
  *   <ComponentUnderTest />
@@ -88,10 +88,10 @@ export interface UsePermissionsReturn {
  */
 export function usePermissions(): UsePermissionsReturn {
   // Get dependencies from context (allows injection in tests)
-  const { sessionHook, membershipQuery } = usePermissionDependencies();
+  const { authHook, membershipQuery } = usePermissionDependencies();
 
-  const { data: session, status } = sessionHook();
-  const isAuthenticated = status === "authenticated" && !!session;
+  const { user, loading } = authHook();
+  const isAuthenticated = !loading && !!user;
 
   // Get current membership and permissions (only if authenticated)
   const {
@@ -127,7 +127,7 @@ export function usePermissions(): UsePermissionsReturn {
     hasPermission,
     permissions,
     isAuthenticated,
-    isLoading: status === "loading" || isLoading,
+    isLoading: loading || isLoading,
     isError,
     isAdmin,
   };

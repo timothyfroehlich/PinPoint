@@ -1,20 +1,21 @@
 "use client";
 
 import { Box } from "@mui/material";
-import { useSession } from "next-auth/react";
 
 import { AuthenticatedDashboard } from "./_components/AuthenticatedDashboard";
 import { DevLoginCompact } from "./_components/DevLoginCompact";
 import { PublicDashboard } from "./_components/PublicDashboard";
 
+import { useAuth } from "~/app/auth-provider";
+
 export default function HomePage(): React.ReactNode {
-  const { data: session } = useSession();
+  const { user } = useAuth();
 
   // Always show public content
   const publicContent = <PublicDashboard />;
 
   // Show additional authenticated content if logged in
-  const authenticatedContent = session ? <AuthenticatedDashboard /> : null;
+  const authenticatedContent = user ? <AuthenticatedDashboard /> : null;
 
   return (
     <Box>

@@ -32,8 +32,13 @@ export const INCLUDE_PATTERNS = {
     "./e2e/**/*.{ts,tsx}",
   ],
 
-  // Build and configuration files
-  config: ["./*.config.{js,ts}", "./scripts/**/*.{js,ts}", "./prisma/**/*.ts"],
+  // Build and configuration files (including test setup)
+  config: [
+    "./*.config.{js,ts}",
+    "./vitest.setup.*.ts",
+    "./scripts/**/*.{js,ts}",
+    "./prisma/**/*.ts",
+  ],
 } as const;
 
 /**

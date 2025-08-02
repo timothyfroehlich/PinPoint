@@ -89,6 +89,20 @@ export default tseslint.config(
         },
       ],
 
+      // Prevent deep relative imports - encourage use of ~/path aliases
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["../../*", "../../../*", "../../../../*"],
+              message:
+                "Use the '~/' path alias instead of deep relative imports (../../). This improves maintainability and prevents broken imports when files are moved.",
+            },
+          ],
+        },
+      ],
+
       // Rules for promises
       "promise/catch-or-return": ["error", { allowFinally: true }],
       "promise/no-nesting": "warn",
@@ -134,6 +148,21 @@ export default tseslint.config(
     files: ["src/utils/version.ts"],
     rules: {
       "no-restricted-properties": "off",
+    },
+  },
+  {
+    // Override: Config files - moderate standards for build/setup files
+    files: convertPatterns.forESLint(INCLUDE_PATTERNS.config),
+    rules: {
+      // Use test utilities rules for config files (moderate standards)
+      ...ESLINT_RULES.testUtils,
+      // Allow process.env for config files
+      "no-restricted-properties": "off",
+      // Disable strictNullChecks-dependent rules (config files may not use strict settings)
+      "@typescript-eslint/no-unnecessary-condition": "off",
+      "@typescript-eslint/no-unnecessary-boolean-literal-compare": "off",
+      "@typescript-eslint/prefer-nullish-coalescing": "off",
+      "@typescript-eslint/explicit-function-return-type": "off",
     },
   },
   {
