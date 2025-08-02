@@ -13,21 +13,21 @@ vi.mock("next-auth", () => ({
 }));
 
 // Mock permissions system
-vi.mock("../../../auth/permissions", () => ({
+vi.mock("~/server/auth/permissions", () => ({
   getUserPermissionsForSession: vi.fn(),
   requirePermissionForSession: vi.fn(),
 }));
 
-import {
-  createVitestMockContext,
-  type VitestMockContext,
-} from "../../../../test/vitestMockContext";
+import { createTRPCRouter, organizationProcedure } from "~/server/api/trpc";
+import { issueCreateProcedure } from "~/server/api/trpc.permission";
 import {
   getUserPermissionsForSession,
   requirePermissionForSession,
-} from "../../../auth/permissions";
-import { createTRPCRouter, organizationProcedure } from "../../trpc";
-import { issueCreateProcedure } from "../../trpc.permission";
+} from "~/server/auth/permissions";
+import {
+  createVitestMockContext,
+  type VitestMockContext,
+} from "~/test/vitestMockContext";
 
 // Create issue confirm procedure for testing
 const issueConfirmProcedure = organizationProcedure.use(async (opts) => {

@@ -826,7 +826,6 @@ export const ISSUE_LIST_SCENARIOS = {
     createMockIssuesList({
       count,
       overrides: {
-        title: "Test Issue",
         _count: { comments: 2, attachments: 1 },
       },
     }),
@@ -838,7 +837,6 @@ export const ISSUE_LIST_SCENARIOS = {
     createMockIssuesList({
       count,
       overrides: {
-        title: "Test Issue",
         _count: { comments: 2, attachments: 1 },
       },
     }),
@@ -850,7 +848,6 @@ export const ISSUE_LIST_SCENARIOS = {
     createMockIssuesList({
       count,
       overrides: {
-        title: "Test Integration Issue",
         _count: { comments: 2, attachments: 1 },
       },
     }),

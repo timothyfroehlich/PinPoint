@@ -1,15 +1,16 @@
 import { TRPCError } from "@trpc/server";
 import { describe, it, expect, vi } from "vitest";
 
-import {
-  createVitestMockContext,
-  type VitestMockContext,
-} from "../../../test/vitestMockContext";
+import { createTRPCRouter, organizationProcedure } from "../trpc";
+
 import {
   requirePermissionForSession,
   getUserPermissionsForSession,
-} from "../../auth/permissions";
-import { createTRPCRouter, organizationProcedure } from "../trpc";
+} from "~/server/auth/permissions";
+import {
+  createVitestMockContext,
+  type VitestMockContext,
+} from "~/test/vitestMockContext";
 
 // Mock environment modules
 vi.mock("~/env", () => ({
@@ -27,7 +28,7 @@ vi.mock("~/server/auth", () => ({
 }));
 
 // Mock permissions system
-vi.mock("../../auth/permissions", () => ({
+vi.mock("~/server/auth/permissions", () => ({
   requirePermissionForSession: vi.fn(),
   getUserPermissionsForSession: vi.fn(),
 }));
@@ -62,22 +63,23 @@ const createMockTRPCContext = (
   };
 
   // Mock the membership lookup for PermissionService (uses findUnique with compound key)
-  mockContext.db.membership.findUnique.mockResolvedValue(mockMembership as any);
+  vi.mocked(mockContext.db.membership.findUnique).mockResolvedValue(
+    mockMembership as any,
+  );
 
   // Mock the membership lookup for organizationProcedure (uses findFirst)
-  mockContext.db.membership.findFirst.mockResolvedValue(mockMembership as any);
+  vi.mocked(mockContext.db.membership.findFirst).mockResolvedValue(
+    mockMembership as any,
+  );
 
   return {
     ...mockContext,
-    session: {
-      user: {
-        id: "user-1",
-        email: "test@example.com",
-        name: "Test User",
-        image: null,
-      },
-      expires: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(),
-    },
+    user: {
+      id: "user-1",
+      email: "test@example.com",
+      user_metadata: { name: "Test User" },
+      app_metadata: { organization_id: "org-1" },
+    } as any,
     organization: {
       id: "org-1",
       name: "Test Organization",
@@ -94,7 +96,7 @@ const testRouter = createTRPCRouter({
   testRequirePermission: organizationProcedure
     .use(async (opts) => {
       await requirePermissionForSession(
-        opts.ctx.session,
+        opts.ctx.user,
         "test:permission",
         opts.ctx.db as any,
         opts.ctx.organization.id,

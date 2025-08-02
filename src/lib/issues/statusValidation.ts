@@ -3,7 +3,7 @@
  * Extracted from tRPC procedures for better testability and performance
  */
 
-import type { IssueStatus } from "../../types/issue";
+import type { IssueStatus } from "~/types/issue";
 
 // =============================================================================
 // TYPE DEFINITIONS

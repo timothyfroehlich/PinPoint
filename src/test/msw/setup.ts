@@ -2,12 +2,12 @@ import { setupServer } from "msw/node";
 import { createTRPCMsw, httpLink } from "msw-trpc";
 import superjson from "superjson";
 
-import type { AppRouter } from "../../server/api/root";
+import type { AppRouter } from "~/server/api/root";
 
-// Helper function to get base URL for testing (matches production getBaseUrl pattern)
+// Helper function to get base URL for testing (test environment specific)
 function getTestBaseUrl(): string {
-  const port = process.env.PORT ?? "3000";
-  return `http://localhost:${port}/api/trpc`;
+  // Use fixed port for tests to avoid environment variable conflicts
+  return "http://localhost:3000/api/trpc";
 }
 
 // Create tRPC-specific MSW instance (matches production client config)

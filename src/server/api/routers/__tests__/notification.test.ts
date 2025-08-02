@@ -11,11 +11,11 @@ vi.mock("next-auth", () => ({
   })),
 }));
 
+import { appRouter } from "~/server/api/root";
 import {
   createVitestMockContext,
   type VitestMockContext,
-} from "../../../../test/vitestMockContext";
-import { appRouter } from "../../root";
+} from "~/test/vitestMockContext";
 
 // Mock data for tests
 const mockUser = { id: "user-1", email: "test@example.com", name: "Test User" };

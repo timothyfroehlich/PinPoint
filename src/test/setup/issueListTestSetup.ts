@@ -208,8 +208,8 @@ export function setupIssueListTest(
   const mockIssues = createMockIssuesList({
     count: config.issueCount,
     overrides: {
-      title:
-        scenario === "INTEGRATION" ? "Test Integration Issue" : "Test Issue",
+      // Only override title for INTEGRATION scenario, let others use default numbering
+      ...(scenario === "INTEGRATION" && { title: "Test Integration Issue" }),
       _count: { comments: 2, attachments: 1 },
     },
   });

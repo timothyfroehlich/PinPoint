@@ -1,6 +1,13 @@
 import { z } from "zod";
 
 import {
+  validateIssueAssignment,
+  validateIssueCreation,
+  type IssueAssignmentInput,
+  type IssueCreationInput,
+  type AssignmentValidationContext,
+} from "~/lib/issues/assignmentValidation";
+import {
   validateStatusTransition,
   getStatusChangeEffects,
 } from "~/lib/issues/statusValidation";
@@ -36,7 +43,7 @@ export const issueCoreRouter = createTRPCRouter({
         throw new Error("Organization not found");
       }
 
-      // Verify that the machine belongs to the organization
+      // Get machine, status, and priority for validation
       const machine = await ctx.db.machine.findFirst({
         where: {
           id: input.machineId,
@@ -50,25 +57,12 @@ export const issueCoreRouter = createTRPCRouter({
         },
       });
 
-      if (!machine || machine.location.organizationId !== organization.id) {
-        throw new Error(
-          "Machine not found or does not belong to this organization",
-        );
-      }
-
-      // Get the default "New" status for this organization
-      const newStatus = await ctx.db.issueStatus.findFirst({
+      const defaultStatus = await ctx.db.issueStatus.findFirst({
         where: {
           isDefault: true,
           organizationId: organization.id,
         },
       });
-
-      if (!newStatus) {
-        throw new Error(
-          "Default issue status not found. Please contact an administrator.",
-        );
-      }
 
       const defaultPriority = await ctx.db.priority.findFirst({
         where: {
@@ -77,10 +71,45 @@ export const issueCoreRouter = createTRPCRouter({
         },
       });
 
+      // Create validation input (handle exactOptionalPropertyTypes)
+      const baseValidationInput = {
+        title: input.title,
+        machineId: input.machineId,
+        organizationId: organization.id,
+      };
+
+      const validationInput: IssueCreationInput = {
+        ...baseValidationInput,
+        ...(input.description && { description: input.description }),
+        ...(input.reporterEmail && { reporterEmail: input.reporterEmail }),
+        ...(input.submitterName && { submitterName: input.submitterName }),
+      };
+
+      const context: AssignmentValidationContext = {
+        organizationId: organization.id,
+        actorUserId: "anonymous", // Anonymous user
+        userPermissions: ["issue:create"], // Anonymous creation allowed
+      };
+
+      // Validate issue creation using pure functions
+      const validation = validateIssueCreation(
+        validationInput,
+        machine,
+        defaultStatus,
+        defaultPriority,
+        context,
+      );
+
+      if (!validation.valid) {
+        throw new Error(validation.error ?? "Issue creation validation failed");
+      }
+
+      // Validation passed, so defaultStatus and defaultPriority are guaranteed to be non-null
+      if (!defaultStatus) {
+        throw new Error("Default status validation failed");
+      }
       if (!defaultPriority) {
-        throw new Error(
-          "Default priority not found. Please contact an administrator.",
-        );
+        throw new Error("Default priority validation failed");
       }
 
       // Create the issue without a user (anonymous)
@@ -99,7 +128,7 @@ export const issueCoreRouter = createTRPCRouter({
         createdById: null, // Anonymous issue
         machineId: input.machineId,
         organizationId: organization.id,
-        statusId: newStatus.id,
+        statusId: defaultStatus.id,
         priorityId: defaultPriority.id,
       };
 
@@ -162,7 +191,7 @@ export const issueCoreRouter = createTRPCRouter({
       // Organization is guaranteed by organizationProcedure middleware
       const organization = ctx.organization;
 
-      // Verify that the game instance belongs to the organization
+      // Get machine, status, and priority for validation
       const machine = await ctx.db.machine.findFirst({
         where: {
           id: input.machineId,
@@ -176,25 +205,12 @@ export const issueCoreRouter = createTRPCRouter({
         },
       });
 
-      if (!machine || machine.location.organizationId !== organization.id) {
-        throw new Error(
-          "Game instance not found or does not belong to this organization",
-        );
-      }
-
-      // Get the default "New" status for this organization
-      const newStatus = await ctx.db.issueStatus.findFirst({
+      const defaultStatus = await ctx.db.issueStatus.findFirst({
         where: {
           isDefault: true,
           organizationId: organization.id,
         },
       });
-
-      if (!newStatus) {
-        throw new Error(
-          "Default issue status not found. Please contact an administrator.",
-        );
-      }
 
       const defaultPriority = await ctx.db.priority.findFirst({
         where: {
@@ -203,10 +219,44 @@ export const issueCoreRouter = createTRPCRouter({
         },
       });
 
+      // Create validation input (handle exactOptionalPropertyTypes)
+      const baseValidationInput = {
+        title: input.title,
+        machineId: input.machineId,
+        organizationId: organization.id,
+        createdById: ctx.user.id,
+      };
+
+      const validationInput: IssueCreationInput = {
+        ...baseValidationInput,
+        ...(input.description && { description: input.description }),
+      };
+
+      const context: AssignmentValidationContext = {
+        organizationId: organization.id,
+        actorUserId: ctx.user.id,
+        userPermissions: ctx.userPermissions,
+      };
+
+      // Validate issue creation using pure functions
+      const validation = validateIssueCreation(
+        validationInput,
+        machine,
+        defaultStatus,
+        defaultPriority,
+        context,
+      );
+
+      if (!validation.valid) {
+        throw new Error(validation.error ?? "Issue creation validation failed");
+      }
+
+      // Validation passed, so defaultStatus and defaultPriority are guaranteed to be non-null
+      if (!defaultStatus) {
+        throw new Error("Default status validation failed");
+      }
       if (!defaultPriority) {
-        throw new Error(
-          "Default priority not found. Please contact an administrator.",
-        );
+        throw new Error("Default priority validation failed");
       }
 
       // User is guaranteed to exist in protected procedure
@@ -226,7 +276,7 @@ export const issueCoreRouter = createTRPCRouter({
         createdById,
         machineId: input.machineId,
         organizationId: organization.id,
-        statusId: newStatus.id,
+        statusId: defaultStatus.id,
         priorityId: defaultPriority.id,
       };
 
@@ -282,7 +332,7 @@ export const issueCoreRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Verify the issue exists and belongs to the organization
+      // Get issue and membership for validation
       const issue = await ctx.db.issue.findFirst({
         where: {
           id: input.issueId,
@@ -290,13 +340,6 @@ export const issueCoreRouter = createTRPCRouter({
         },
       });
 
-      if (!issue) {
-        throw new Error(
-          "Issue not found or does not belong to this organization",
-        );
-      }
-
-      // Verify the user is a member of the organization
       const membership = await ctx.db.membership.findUnique({
         where: {
           userId_organizationId: {
@@ -307,8 +350,46 @@ export const issueCoreRouter = createTRPCRouter({
         include: { user: true },
       });
 
-      if (!membership) {
-        throw new Error("User is not a member of this organization");
+      // Create validation input
+      const validationInput: IssueAssignmentInput = {
+        issueId: input.issueId,
+        userId: input.userId,
+        organizationId: ctx.organization.id,
+      };
+
+      const context: AssignmentValidationContext = {
+        organizationId: ctx.organization.id,
+        actorUserId: ctx.user.id,
+        userPermissions: ctx.userPermissions,
+      };
+
+      // Convert membership to validation format
+      const validationMembership = membership
+        ? {
+            id: membership.id,
+            userId: membership.userId,
+            organizationId: membership.organizationId,
+            roleId: membership.roleId,
+            user: {
+              id: membership.user.id,
+              name: membership.user.name,
+              email: membership.user.email ?? "",
+            },
+          }
+        : null;
+
+      // Validate issue assignment using pure functions
+      const validation = validateIssueAssignment(
+        validationInput,
+        issue,
+        validationMembership,
+        context,
+      );
+
+      if (!validation.valid) {
+        throw new Error(
+          validation.error ?? "Issue assignment validation failed",
+        );
       }
 
       // Update the issue assignment

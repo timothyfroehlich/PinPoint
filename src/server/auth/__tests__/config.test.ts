@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-import { type ExtendedPrismaClient } from "../../db";
 import { createAuthConfig } from "../config";
 
 import type { Provider } from "next-auth/providers";
+
+import { type ExtendedPrismaClient } from "~/server/db";
 
 // Use vi.hoisted to properly handle variable hoisting
 const { mockEnv, setNodeEnv, mockUserFindUnique } = vi.hoisted(() => {

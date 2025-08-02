@@ -67,7 +67,7 @@ export function MachineDetailView({
         {/* Action Buttons */}
         <Box display="flex" gap={2}>
           <PermissionGate
-            permission="machines:edit"
+            permission="machine:edit"
             hasPermission={hasPermission}
           >
             <Button
@@ -83,7 +83,7 @@ export function MachineDetailView({
           </PermissionGate>
 
           <PermissionGate
-            permission="machines:delete"
+            permission="machine:delete"
             hasPermission={hasPermission}
           >
             <Button
@@ -358,7 +358,7 @@ export function MachineDetailView({
                     QR code not available
                   </Typography>
                   <PermissionGate
-                    permission="machines:edit"
+                    permission="machine:edit"
                     hasPermission={hasPermission}
                   >
                     <Button

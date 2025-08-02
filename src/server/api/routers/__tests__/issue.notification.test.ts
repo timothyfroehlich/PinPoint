@@ -14,7 +14,7 @@ vi.mock("next-auth", () => ({
 import {
   createVitestMockContext,
   type VitestMockContext,
-} from "../../../../test/vitestMockContext";
+} from "~/test/vitestMockContext";
 
 // Mock data for tests
 const mockUser = {

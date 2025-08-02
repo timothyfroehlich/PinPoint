@@ -265,6 +265,106 @@ Use memory to quickly recall:
 - tRPC router patterns and security
 - Multi-tenant query patterns
 
+## Test-Architect Agent Usage
+
+The test-architect agent specializes in improving individual test files. It's self-directed and will discover necessary context.
+
+### When to Use
+
+- Writing new tests
+- Fixing failing tests
+- Improving test quality (fragility, performance, coverage)
+- Modernizing old test patterns
+
+### Workflow
+
+1. **Single File Assignment**: Always assign one test file at a time
+2. **Self-Discovery**: Agent will find and read relevant docs/examples
+3. **Recommendations**: If agent returns improvement recommendations:
+   ```
+   Agent: { type: "test-improvement-recommendation", ... }
+   You: Present recommendation to user with clear justification
+   User: Approves/Declines
+   You: If approved, implement then re-run agent with context
+        If declined, re-run agent with "skip: [specific recommendation]"
+   ```
+4. **Completion**: Summarize what the agent accomplished
+
+### Example Interaction
+
+```
+User: "Fix the tests in src/components/issues/__tests__/IssueCard.test.tsx"
+
+You: "I'll use the test-architect agent to analyze and improve the IssueCard tests."
+
+[Agent discovers it's a component test, reads relevant docs, identifies fragile patterns]
+
+[If recommendation]: "The test-architect identified an opportunity to create a shared
+issue test data factory that would benefit 6 test files. Should I implement this?"
+
+[On completion]: "Test improvements complete:
+- Replaced 12 fragile text assertions with semantic queries
+- Removed 2 unnecessary mocks (now testing real components)
+- Added auth scenario testing (unauthenticated, member, admin)
+- All 8 tests passing, 40% faster execution"
+```
+
+### Recommendation Handling Example
+
+```
+User: "Fix the IssueCard tests"
+
+You: "I'll use the test-architect agent to improve those tests."
+
+[Test-architect returns recommendation about creating shared test factory]
+
+You: "The test-architect discovered an improvement opportunity before completing the test fixes. It found 6 test files using similar issue mock data and recommends creating a shared test factory. This would:
+- Reduce ~120 lines of duplicate code
+- Provide a single source of truth for issue test data
+- Make future test updates easier
+
+Should I implement this improvement first?"
+
+User: "Yes, go ahead"
+
+You: [Implement the test factory]
+You: "I've created the shared test factory. Now I'll have the test-architect complete the IssueCard test improvements using this new utility."
+
+[Call test-architect again, it will now use the new factory]
+
+--- OR ---
+
+User: "No, just fix the tests as-is"
+
+You: "Understood. I'll have the test-architect complete the test fixes without creating the shared factory."
+
+[Call test-architect with: "Continue with IssueCard.test.tsx improvements. Skip creating the issue test factory - user prefers to keep current pattern."]
+```
+
+### Logging and Audit Trail
+
+**CRITICAL: Always check the log file after each test-architect run**
+
+The test-architect agent creates detailed logs at `.claude/sub-agent-logs/test-architect-{timestamp}.log`:
+
+- Every file read during context gathering
+- Analysis findings and decision points
+- All transformations applied with before/after examples
+- Validation results (test runs, lint, typecheck)
+- Any errors encountered and their resolutions
+- Final completion summary
+
+**Workflow requirement**: After each agent run, read the log file to:
+
+1. Verify all expected actions were completed
+2. Review any issues or errors encountered
+3. Understand what context files were examined
+4. Confirm test results and validations
+
+### Map Maintenance
+
+The test-architect will update `test-map.md` and `source-map.md` as it works. These maps may be outdated, so the agent uses them as guides, not gospel.
+
 ## Documentation Hub
 
 ### All Documentation Indices

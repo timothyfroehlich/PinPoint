@@ -11,7 +11,7 @@ import {
   getStatusChangeEffects,
 } from "../statusValidation";
 
-import type { IssueStatus } from "../../../types/issue";
+import type { IssueStatus } from "~/types/issue";
 
 // =============================================================================
 // TEST DATA FACTORIES

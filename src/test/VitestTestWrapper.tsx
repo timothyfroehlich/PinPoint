@@ -81,12 +81,16 @@ function createMockMembership(
 
 /**
  * Creates mock session hook for testing
+ * Updated for Supabase auth format: { user, loading }
  */
 function createMockSessionHook(
   session: Session | null,
   sessionLoading = false,
 ) {
   return () => ({
+    user: sessionLoading ? null : (session?.user ?? null),
+    loading: sessionLoading,
+    // Legacy NextAuth format for backward compatibility
     data: sessionLoading ? null : session,
     status: sessionLoading
       ? "loading"
@@ -370,7 +374,8 @@ export const VITEST_PERMISSION_SCENARIOS = {
     "machine:view",
     "machine:create",
     "machine:update",
-    "machine:delete",
+    "machine:edit", // Standard singular form used throughout codebase
+    "machine:delete", // Standard singular form used throughout codebase
     "location:view",
     "location:create",
     "location:update",
