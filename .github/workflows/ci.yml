@@ -64,6 +64,17 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      
+      # Clean environment setup to prevent cache issues
+      - name: Clean Environment Setup
+        run: |
+          echo "🧹 Cleaning CI environment..."
+          # Remove any duplicate lockfiles that cause warnings
+          find . -name "package-lock.json" -not -path "./package-lock.json" -delete || true
+          # Clear npm cache to prevent stale artifacts
+          npm cache clean --force || true
+          echo "✅ Environment cleaned"
+          
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "24"
@@ -99,9 +110,19 @@ jobs:
           fi
           
           echo "✅ All required Supabase environment variables are present"
-      - run: npm ci
+      
+      # Clean npm install with cache verification
+      - name: Install Dependencies
+        run: |
+          echo "📦 Installing dependencies with clean cache..."
+          rm -rf node_modules/.cache || true
+          npm ci --prefer-offline --no-audit
+          echo "✅ Dependencies installed"
+          
       - name: ESLint Check - Production Code  
-        run: npm run lint
+        run: |
+          echo "🔍 Running ESLint on production code..."
+          npm run lint
 
   lint-tests:
     name: ESLint (Tests)
@@ -165,7 +186,28 @@ jobs:
       # Start Supabase local services and configure environment
       - name: Start Supabase Local
         run: |
-          supabase db start
+          # Initialize Supabase project if config doesn't exist (handles fresh CI environment)
+          if [ ! -f "supabase/config.toml" ]; then
+            echo "🔧 Initializing Supabase project..."
+            supabase init --skip-prom
+          fi
+          
+          # Start Supabase with timeout to prevent hanging
+          echo "🚀 Starting Supabase local services..."
+          if ! timeout 900 supabase start; then
+            echo "❌ Supabase startup failed or timed out"
+            echo "📋 Docker container status:"
+            docker ps -a || true
+            echo "📋 Supabase container logs:"
+            docker logs supabase-db 2>&1 | tail -50 || true
+            exit 1
+          fi
+          
+          # Wait for services to stabilize
+          echo "⏱️ Waiting for services to stabilize..."
+          sleep 15
+          
+          # Set database connection environment variables
           {
             echo "POSTGRES_PRISMA_URL=postgresql://postgres:postgres@127.0.0.1:5432/postgres"
             echo "POSTGRES_URL_NON_POOLING=postgresql://postgres:postgres@127.0.0.1:5432/postgres"
@@ -173,12 +215,32 @@ jobs:
             echo "NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321"
           } >> "$GITHUB_ENV"
           
-          # Extract keys from supabase status
-          SUPABASE_STATUS=$(supabase status -o env)
+          # Extract and validate Supabase credentials
+          echo "🔑 Extracting Supabase credentials..."
+          SUPABASE_STATUS=$(supabase status --output env)
+          
+          if [ -z "$SUPABASE_STATUS" ]; then
+            echo "❌ Failed to get Supabase status"
+            supabase status
+            exit 1
+          fi
+          
           ANON_KEY=$(echo "$SUPABASE_STATUS" | grep SUPABASE_ANON_KEY | cut -d'=' -f2)
           SERVICE_ROLE_KEY=$(echo "$SUPABASE_STATUS" | grep SUPABASE_SERVICE_ROLE_KEY | cut -d'=' -f2)
           JWT_SECRET=$(echo "$SUPABASE_STATUS" | grep SUPABASE_JWT_SECRET | cut -d'=' -f2)
           
+          # Validate extracted keys
+          if [ -z "$ANON_KEY" ] || [ -z "$SERVICE_ROLE_KEY" ] || [ -z "$JWT_SECRET" ]; then
+            echo "❌ Failed to extract Supabase credentials"
+            echo "ANON_KEY: ${ANON_KEY:-MISSING}"
+            echo "SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY:-MISSING}"
+            echo "JWT_SECRET: ${JWT_SECRET:-MISSING}"
+            echo "Raw status output:"
+            echo "$SUPABASE_STATUS"
+            exit 1
+          fi
+          
+          # Set Supabase environment variables
           {
             echo "SUPABASE_ANON_KEY=$ANON_KEY"
             echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY"
@@ -187,6 +249,7 @@ jobs:
           } >> "$GITHUB_ENV"
           
           echo "✅ Supabase local started with database and auth services"
+          echo "🔗 Database URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres"
       
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -199,7 +262,40 @@ jobs:
       - name: Setup Database Schema
         run: |
           echo "📋 Applying Prisma schema to Supabase local database..."
-          npm run db:push
+          
+          # Verify database connectivity before schema push
+          echo "🔗 Testing database connection..."
+          MAX_RETRIES=5
+          RETRY_COUNT=0
+          
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            if psql "postgresql://postgres:postgres@127.0.0.1:5432/postgres" -c "SELECT 1;" >/dev/null 2>&1; then
+              echo "✅ Database connection verified"
+              break
+            else
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+              echo "⏳ Database not ready yet (attempt $RETRY_COUNT/$MAX_RETRIES), waiting 5 seconds..."
+              sleep 5
+            fi
+          done
+          
+          if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+            echo "❌ Database connection failed after $MAX_RETRIES attempts"
+            echo "📋 Supabase status:"
+            supabase status || true
+            echo "📋 Docker containers:"
+            docker ps -a || true
+            exit 1
+          fi
+          
+          # Apply schema with retry logic
+          echo "🔄 Applying database schema..."
+          if ! npm run db:push; then
+            echo "⚠️ Schema push failed, retrying once..."
+            sleep 5
+            npm run db:push
+          fi
+          
           echo "✅ Database schema applied successfully"
       - name: Run Tests with Coverage (With Supabase Database)
         id: test-run
