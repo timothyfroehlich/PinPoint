@@ -4,6 +4,16 @@
  */
 
 // =============================================================================
+// CONSTANTS
+// =============================================================================
+
+/** Maximum allowed length for comment content */
+export const MAX_COMMENT_LENGTH = 1000;
+
+/** Default time window (in minutes) for editing comments after creation */
+export const DEFAULT_COMMENT_EDIT_MINUTES = 60;
+
+// =============================================================================
 // TYPE DEFINITIONS
 // =============================================================================
 
@@ -69,10 +79,10 @@ export function validateCommentContent(content: string): ValidationResult {
     };
   }
 
-  if (content.length > 1000) {
+  if (content.length > MAX_COMMENT_LENGTH) {
     return {
       valid: false,
-      error: "Comment must be 1000 characters or less",
+      error: `Comment must be ${MAX_COMMENT_LENGTH.toString()} characters or less`,
     };
   }
 
@@ -486,7 +496,7 @@ export function getCommentAgeInMinutes(comment: CommentWithIssue): number {
  */
 export function canEditCommentByTime(
   comment: CommentWithIssue,
-  maxEditMinutes = 60,
+  maxEditMinutes = DEFAULT_COMMENT_EDIT_MINUTES,
 ): boolean {
   return getCommentAgeInMinutes(comment) <= maxEditMinutes;
 }
@@ -498,7 +508,7 @@ export function canEditCommentByTime(
 export function validateCommentEditWithTimeLimit(
   comment: CommentWithIssue | null,
   context: CommentAccessContext,
-  maxEditMinutes = 60,
+  maxEditMinutes = DEFAULT_COMMENT_EDIT_MINUTES,
 ): ValidationResult<CommentWithIssue> {
   // First run standard edit validation
   const standardValidation = validateCommentEditPermissions(comment, context);

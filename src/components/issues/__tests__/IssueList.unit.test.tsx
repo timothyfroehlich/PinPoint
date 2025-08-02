@@ -133,7 +133,11 @@ vi.mock("~/hooks/usePermissions", () => ({
 
 describe("IssueList Unit Tests", () => {
   // ✅ SHARED TEST SETUP: Use centralized scenario-based mock data
-  const testSetup = setupIssueListTest("FILTERING", mocks); // Use FILTERING for 3 issues
+  // Use the "FILTERING" scenario, which provides 3 issues with diverse attributes.
+  // This scenario is optimal for unit tests that need to verify filtering and sorting logic,
+  // as it ensures predictable, controlled data that covers multiple filter/sort cases.
+  // Other scenarios may have too few or too many issues, or lack the necessary diversity for thorough testing.
+  const testSetup = setupIssueListTest("FILTERING", mocks);
 
   beforeEach(() => {
     // ✅ SHARED CLEANUP: Centralized mock reset and configuration
