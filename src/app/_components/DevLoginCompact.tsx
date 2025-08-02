@@ -12,6 +12,11 @@ import {
 } from "@mui/material";
 import { useState, useEffect } from "react";
 
+import {
+  attemptDevLogin,
+  getAuthResultMessage,
+  isDevAuthAvailable,
+} from "~/lib/auth/dev-auth-methods";
 import { createClient } from "~/lib/supabase/client";
 
 interface DevUser {
@@ -90,21 +95,17 @@ export function DevLoginCompact({
     try {
       console.log("Dev login as:", email);
 
-      // Use Supabase auth with magic link for dev users
       const supabase = createClient();
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          shouldCreateUser: false, // Only allow existing dev users
-        },
-      });
+      const result = await attemptDevLogin(supabase, email);
 
-      if (error) {
-        console.error("Login failed:", error.message);
-        alert(`Login failed: ${error.message}`);
+      const message = getAuthResultMessage(result);
+
+      if (result.success) {
+        console.log("Dev login successful:", result.method);
+        alert(message);
       } else {
-        console.log("Magic link sent - check your email");
-        alert("Magic link sent! Check your email to complete login.");
+        console.error("Login failed:", result.error);
+        alert(message);
       }
     } catch (error: unknown) {
       const errorMessage =
@@ -132,20 +133,9 @@ export function DevLoginCompact({
   }
 
   // Only show in development or preview environments
-  // In local dev: localhost
-  // In preview: vercel.app domains
   // Hide in production deployments
-  if (typeof window !== "undefined") {
-    const hostname = window.location.hostname;
-    const isLocalDev =
-      hostname === "localhost" || hostname.includes("127.0.0.1");
-    const isPreview =
-      hostname.includes("vercel.app") &&
-      !hostname.includes("pin-point.vercel.app");
-
-    if (!isLocalDev && !isPreview) {
-      return null;
-    }
+  if (!isDevAuthAvailable()) {
+    return null;
   }
 
   return (
