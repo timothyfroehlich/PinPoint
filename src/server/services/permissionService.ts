@@ -1,5 +1,12 @@
 import { TRPCError } from "@trpc/server";
-import { type Session } from "next-auth";
+
+// Legacy session type for backward compatibility
+type Session = {
+  user: {
+    id: string;
+    [key: string]: unknown;
+  };
+} | null;
 
 import {
   PERMISSION_DEPENDENCIES,
@@ -7,6 +14,8 @@ import {
   UNAUTHENTICATED_PERMISSIONS,
   ALL_PERMISSIONS,
 } from "../auth/permissions.constants";
+
+import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 
 import { type ExtendedPrismaClient } from "~/server/db";
 
@@ -132,6 +141,46 @@ export class PermissionService {
     // Admin role has all permissions
     if (membership.role.name === SYSTEM_ROLES.ADMIN) {
       // Admin gets all permissions - use constants for consistency
+      return ALL_PERMISSIONS;
+    }
+
+    // Get role permissions with dependencies
+    const rolePermissions = membership.role.permissions.map(
+      (p: { name: string }) => p.name,
+    );
+    return this.expandPermissionsWithDependencies(rolePermissions);
+  }
+
+  /**
+   * Get all permissions for a Supabase user
+   *
+   * @param user - Supabase user (null for unauthenticated users)
+   * @param organizationId - Organization context
+   * @returns Promise<string[]> - Array of permission names
+   */
+  async getUserPermissionsForSupabaseUser(
+    user: PinPointSupabaseUser | null,
+    organizationId?: string,
+  ): Promise<string[]> {
+    // Handle unauthenticated users
+    if (!user) {
+      return this.getUnauthenticatedPermissions(organizationId);
+    }
+
+    // Get the organization ID from user metadata or parameter
+    const finalOrgId = organizationId ?? user.app_metadata.organization_id;
+    if (!finalOrgId) {
+      throw new Error("Organization ID is required");
+    }
+
+    const membership = await this.getUserMembership(user.id, finalOrgId);
+
+    if (!membership?.role) {
+      return [];
+    }
+
+    // Admin role has all permissions
+    if (membership.role.name === SYSTEM_ROLES.ADMIN) {
       return ALL_PERMISSIONS;
     }
 

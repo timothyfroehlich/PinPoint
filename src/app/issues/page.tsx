@@ -2,16 +2,16 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
 import { IssueList } from "~/components/issues/IssueList";
-import { auth } from "~/server/auth";
+import { getSupabaseUser } from "~/server/auth/supabase";
 
 export default async function IssuesPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }): Promise<React.JSX.Element> {
-  const session = await auth();
+  const user = await getSupabaseUser();
 
-  if (!session?.user.id) {
+  if (!user?.id) {
     redirect("/");
   }
 

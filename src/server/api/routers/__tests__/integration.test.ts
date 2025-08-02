@@ -22,17 +22,16 @@ vi.mock("~/server/auth/permissions", async () => {
   };
 });
 
-import {
-  createVitestMockContext,
-  type VitestMockContext,
-} from "../../../../test/vitestMockContext";
-import { appRouter } from "../../root";
-import { createCallerFactory } from "../../trpc";
-
+import { appRouter } from "~/server/api/root";
+import { createCallerFactory } from "~/server/api/trpc";
 import {
   getUserPermissionsForSession,
   requirePermissionForSession,
 } from "~/server/auth/permissions";
+import {
+  createVitestMockContext,
+  type VitestMockContext,
+} from "~/test/vitestMockContext";
 
 // Type assertions for relaxed test mode - allows any type usage
 // Using any types is acceptable in test files per multi-config strategy
@@ -720,6 +719,7 @@ describe("Router Integration Tests", () => {
           organizationId: "org-1",
           isSystem: false,
           isDefault: true,
+          permissions: [], // Added missing permissions array
         },
       };
 

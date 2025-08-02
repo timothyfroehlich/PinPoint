@@ -32,13 +32,13 @@ export const notificationRouter = createTRPCRouter({
         options.offset = input.offset;
       }
 
-      return service.getUserNotifications(ctx.session.user.id, options);
+      return service.getUserNotifications(ctx.user.id, options);
     }),
 
   // Get unread count
   getUnreadCount: protectedProcedure.query(async ({ ctx }) => {
     const service = ctx.services.createNotificationService();
-    return service.getUnreadCount(ctx.session.user.id);
+    return service.getUnreadCount(ctx.user.id);
   }),
 
   // Mark notification as read
@@ -46,14 +46,14 @@ export const notificationRouter = createTRPCRouter({
     .input(z.object({ notificationId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const service = ctx.services.createNotificationService();
-      await service.markAsRead(input.notificationId, ctx.session.user.id);
+      await service.markAsRead(input.notificationId, ctx.user.id);
       return { success: true };
     }),
 
   // Mark all as read
   markAllAsRead: protectedProcedure.mutation(async ({ ctx }) => {
     const service = ctx.services.createNotificationService();
-    await service.markAllAsRead(ctx.session.user.id);
+    await service.markAllAsRead(ctx.user.id);
     return { success: true };
   }),
 });

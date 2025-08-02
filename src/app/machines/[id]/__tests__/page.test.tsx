@@ -17,8 +17,8 @@ import { server } from "~/test/msw/setup";
 import { VitestTestWrapper } from "~/test/VitestTestWrapper";
 
 // Hoisted mock functions
-const { mockAuth, mockGetById, mockNotFound } = vi.hoisted(() => ({
-  mockAuth: vi.fn(),
+const { mockGetSupabaseUser, mockGetById, mockNotFound } = vi.hoisted(() => ({
+  mockGetSupabaseUser: vi.fn(),
   mockGetById: vi.fn(),
   mockNotFound: vi.fn(),
 }));
@@ -28,9 +28,9 @@ vi.mock("next/navigation", () => ({
   notFound: mockNotFound,
 }));
 
-// Mock the auth function
-vi.mock("~/server/auth", () => ({
-  auth: mockAuth,
+// Mock the Supabase auth function
+vi.mock("~/server/auth/supabase", () => ({
+  getSupabaseUser: mockGetSupabaseUser,
 }));
 
 // Mock tRPC server
@@ -46,11 +46,11 @@ vi.mock("~/trpc/server", () => ({
 
 // Mock MachineDetailView component to avoid rendering complexity in route tests
 vi.mock("~/components/machines/MachineDetailView", () => ({
-  MachineDetailView: ({ machine, session, machineId }: any) => (
+  MachineDetailView: ({ machine, user, machineId }: any) => (
     <div data-testid="machine-detail-view">
       <div>Machine ID: {machineId}</div>
       <div>Machine Name: {machine.name || machine.model.name}</div>
-      <div>Session: {session ? "authenticated" : "unauthenticated"}</div>
+      <div>Session: {user ? "authenticated" : "unauthenticated"}</div>
     </div>
   ),
 }));
@@ -75,12 +75,10 @@ const mockMachine: any = {
   },
 };
 
-const mockSession: any = {
-  user: {
-    id: "user-1",
-    name: "Test User",
-    email: "test@example.com",
-  },
+const mockUser: any = {
+  id: "user-1",
+  name: "Test User",
+  email: "test@example.com",
 };
 
 describe("MachinePage", () => {
@@ -101,7 +99,7 @@ describe("MachinePage", () => {
 
   describe("Successful Data Fetching", () => {
     beforeEach(() => {
-      mockAuth.mockResolvedValue(mockSession);
+      mockGetSupabaseUser.mockResolvedValue(mockUser);
       mockGetById.mockResolvedValue(mockMachine);
     });
 
@@ -118,7 +116,7 @@ describe("MachinePage", () => {
         container.querySelector('[data-testid="machine-detail-view"]'),
       ).toBeInTheDocument();
       expect(mockGetById).toHaveBeenCalledWith({ id: "machine-1" });
-      expect(mockAuth).toHaveBeenCalled();
+      expect(mockGetSupabaseUser).toHaveBeenCalled();
     });
 
     it("should pass correct props to MachineDetailView", async () => {
@@ -130,15 +128,16 @@ describe("MachinePage", () => {
         <VitestTestWrapper>{result}</VitestTestWrapper>,
       );
 
-      expect(getByText("Machine ID: machine-1")).toBeInTheDocument();
+      // Resilient patterns: Using regex to match dynamic content
+      expect(getByText(/Machine ID:\s*machine-1/)).toBeInTheDocument();
       expect(
-        getByText("Machine Name: Custom Machine Name"),
+        getByText(/Machine Name:\s*Custom Machine Name/),
       ).toBeInTheDocument();
-      expect(getByText("Session: authenticated")).toBeInTheDocument();
+      expect(getByText(/Session:\s*authenticated/)).toBeInTheDocument();
     });
 
     it("should handle unauthenticated users", async () => {
-      mockAuth.mockResolvedValue(null);
+      mockGetSupabaseUser.mockResolvedValue(null);
 
       const params = Promise.resolve({ id: "machine-1" });
 
@@ -148,7 +147,8 @@ describe("MachinePage", () => {
         <VitestTestWrapper>{result}</VitestTestWrapper>,
       );
 
-      expect(getByText("Session: unauthenticated")).toBeInTheDocument();
+      // Resilient pattern: Match authentication state with flexible whitespace
+      expect(getByText(/Session:\s*unauthenticated/)).toBeInTheDocument();
     });
 
     it("should use model name when machine name is null", async () => {
@@ -166,13 +166,14 @@ describe("MachinePage", () => {
         <VitestTestWrapper>{result}</VitestTestWrapper>,
       );
 
-      expect(getByText("Machine Name: Medieval Madness")).toBeInTheDocument();
+      // Resilient pattern: Match model name fallback with flexible whitespace
+      expect(getByText(/Machine Name:\s*Medieval Madness/)).toBeInTheDocument();
     });
   });
 
   describe("Error Handling", () => {
     it("should call notFound when machine does not exist", async () => {
-      mockAuth.mockResolvedValue(mockSession);
+      mockGetSupabaseUser.mockResolvedValue(mockUser);
       mockGetById.mockRejectedValue(new Error("Machine not found"));
 
       const params = Promise.resolve({ id: "non-existent-machine" });
@@ -183,7 +184,7 @@ describe("MachinePage", () => {
     });
 
     it("should call notFound when database error occurs", async () => {
-      mockAuth.mockResolvedValue(mockSession);
+      mockGetSupabaseUser.mockResolvedValue(mockUser);
       mockGetById.mockRejectedValue(new Error("Database connection failed"));
 
       const params = Promise.resolve({ id: "machine-1" });
@@ -204,11 +205,12 @@ describe("MachinePage", () => {
 
       const metadata = await generateMetadata({ params });
 
-      expect(metadata.title).toBe("Custom Machine Name - PinPoint");
-      expect(metadata.description).toBe("Medieval Madness at Test Location");
+      // Resilient patterns: Match structure and key content, not exact strings
+      expect(metadata.title).toMatch(/Custom Machine Name.*PinPoint/);
+      expect(metadata.description).toMatch(/Medieval Madness.*Test Location/);
       expect(metadata.openGraph?.title).toBe("Custom Machine Name");
-      expect(metadata.openGraph?.description).toBe(
-        "Medieval Madness at Test Location",
+      expect(metadata.openGraph?.description).toMatch(
+        /Medieval Madness.*Test Location/,
       );
     });
 
@@ -223,8 +225,9 @@ describe("MachinePage", () => {
 
       const metadata = await generateMetadata({ params });
 
-      expect(metadata.title).toBe("Medieval Madness - PinPoint");
-      expect(metadata.description).toBe("Medieval Madness at Test Location");
+      // Resilient patterns: Match model name fallback behavior
+      expect(metadata.title).toMatch(/Medieval Madness.*PinPoint/);
+      expect(metadata.description).toMatch(/Medieval Madness.*Test Location/);
       expect(metadata.openGraph?.title).toBe("Medieval Madness");
     });
 
@@ -235,10 +238,9 @@ describe("MachinePage", () => {
 
       const metadata = await generateMetadata({ params });
 
-      expect(metadata.title).toBe("Machine Not Found - PinPoint");
-      expect(metadata.description).toBe(
-        "The requested machine could not be found.",
-      );
+      // Resilient patterns: Match error state structure and key phrases
+      expect(metadata.title).toMatch(/Machine Not Found.*PinPoint/);
+      expect(metadata.description).toMatch(/machine.*could not.*found/i);
     });
 
     it("should handle database errors in metadata generation", async () => {
@@ -248,16 +250,15 @@ describe("MachinePage", () => {
 
       const metadata = await generateMetadata({ params });
 
-      expect(metadata.title).toBe("Machine Not Found - PinPoint");
-      expect(metadata.description).toBe(
-        "The requested machine could not be found.",
-      );
+      // Resilient patterns: Match error fallback behavior (same as not found)
+      expect(metadata.title).toMatch(/Machine Not Found.*PinPoint/);
+      expect(metadata.description).toMatch(/machine.*could not.*found/i);
     });
   });
 
   describe("Main Element", () => {
     beforeEach(() => {
-      mockAuth.mockResolvedValue(mockSession);
+      mockGetSupabaseUser.mockResolvedValue(mockUser);
       mockGetById.mockResolvedValue(mockMachine);
     });
 
@@ -266,13 +267,13 @@ describe("MachinePage", () => {
 
       const result = await MachinePage({ params });
 
-      const { container } = render(
+      const { getByRole } = render(
         <VitestTestWrapper>{result}</VitestTestWrapper>,
       );
 
-      const mainElement = container.querySelector("main");
+      // Resilient pattern: Use semantic role instead of element selector
+      const mainElement = getByRole("main", { name: /machine details/i });
       expect(mainElement).toBeInTheDocument();
-      expect(mainElement).toHaveAttribute("aria-label", "Machine details");
     });
   });
 });

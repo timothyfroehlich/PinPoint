@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import * as React from "react";
 
 import { MachineDetailView } from "~/components/machines/MachineDetailView";
-import { auth } from "~/server/auth";
+import { getSupabaseUser } from "~/server/auth/supabase";
 import { api } from "~/trpc/server";
 
 interface MachinePageProps {
@@ -41,7 +41,7 @@ export async function generateMetadata({
 export default async function MachinePage({
   params,
 }: MachinePageProps): Promise<React.JSX.Element> {
-  const session = await auth();
+  const user = await getSupabaseUser();
 
   try {
     // Fetch machine data on the server
@@ -55,7 +55,7 @@ export default async function MachinePage({
       <main aria-label="Machine details">
         <MachineDetailView
           machine={machine}
-          session={session}
+          user={user}
           machineId={resolvedParams.id}
         />
       </main>

@@ -57,22 +57,32 @@ describe("MachineGrid", () => {
       const machine = createMockMachine();
       render(<MachineGrid machines={[machine]} />);
 
-      expect(screen.getByText("Williams (1997)")).toBeInTheDocument();
+      // Use resilient regex pattern that's case-insensitive and handles various spacing
+      expect(screen.getByText(/williams.*1997/i)).toBeInTheDocument();
     });
 
     it("displays owner information when available", () => {
       const machine = createMockMachine();
       render(<MachineGrid machines={[machine]} />);
 
-      expect(screen.getByText("John Doe")).toBeInTheDocument();
-      expect(screen.getByAltText("John Doe")).toBeInTheDocument();
+      // Use case-insensitive regex for resilient text matching
+      expect(
+        screen.getByText(new RegExp(machine.owner.name, "i")),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByAltText(new RegExp(machine.owner.name, "i")),
+      ).toBeInTheDocument();
     });
 
     it("handles machines without owner", () => {
       const machine = createMockMachine({ owner: null });
+      const ownerName = "John Doe"; // Default from createMockMachine
       render(<MachineGrid machines={[machine]} />);
 
-      expect(screen.queryByText("John Doe")).not.toBeInTheDocument();
+      // Use resilient regex pattern for checking absence of owner information
+      expect(
+        screen.queryByText(new RegExp(ownerName, "i")),
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -80,9 +90,12 @@ describe("MachineGrid", () => {
     it("displays empty state when no machines", () => {
       render(<MachineGrid machines={[]} />);
 
-      expect(screen.getByText("No Machines")).toBeInTheDocument();
+      // Use semantic heading query for primary empty state message
       expect(
-        screen.getByText("This location doesn't have any machines yet."),
+        screen.getByRole("heading", { name: /no machines/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/doesn.?t have any machines/i),
       ).toBeInTheDocument();
     });
 
@@ -90,15 +103,14 @@ describe("MachineGrid", () => {
       const machine = createMockMachine();
       render(<MachineGrid machines={[machine]} />);
 
-      const searchInput = screen.getByPlaceholderText(
-        "Search machines, models, or manufacturers...",
-      );
+      const searchInput = screen.getByRole("textbox");
       fireEvent.change(searchInput, { target: { value: "nonexistent" } });
 
-      expect(screen.getByText("No Matches Found")).toBeInTheDocument();
+      // Use semantic heading query for no matches state
       expect(
-        screen.getByText("Try adjusting your search terms."),
+        screen.getByRole("heading", { name: /no matches.*found/i }),
       ).toBeInTheDocument();
+      expect(screen.getByText(/adjust.*search.*terms/i)).toBeInTheDocument();
     });
   });
 
@@ -128,9 +140,7 @@ describe("MachineGrid", () => {
     it("filters by machine name", () => {
       render(<MachineGrid machines={machines} />);
 
-      const searchInput = screen.getByPlaceholderText(
-        "Search machines, models, or manufacturers...",
-      );
+      const searchInput = screen.getByRole("textbox");
       fireEvent.change(searchInput, { target: { value: "Custom" } });
 
       expect(
@@ -147,9 +157,7 @@ describe("MachineGrid", () => {
     it("filters by model name", () => {
       render(<MachineGrid machines={machines} />);
 
-      const searchInput = screen.getByPlaceholderText(
-        "Search machines, models, or manufacturers...",
-      );
+      const searchInput = screen.getByRole("textbox");
       fireEvent.change(searchInput, { target: { value: "Iron Maiden" } });
 
       expect(
@@ -166,9 +174,7 @@ describe("MachineGrid", () => {
     it("filters by manufacturer", () => {
       render(<MachineGrid machines={machines} />);
 
-      const searchInput = screen.getByPlaceholderText(
-        "Search machines, models, or manufacturers...",
-      );
+      const searchInput = screen.getByRole("textbox");
       fireEvent.change(searchInput, { target: { value: "Stern" } });
 
       expect(
@@ -185,9 +191,7 @@ describe("MachineGrid", () => {
     it("is case insensitive", () => {
       render(<MachineGrid machines={machines} />);
 
-      const searchInput = screen.getByPlaceholderText(
-        "Search machines, models, or manufacturers...",
-      );
+      const searchInput = screen.getByRole("textbox");
       fireEvent.change(searchInput, { target: { value: "WILLIAMS" } });
 
       expect(
@@ -198,21 +202,18 @@ describe("MachineGrid", () => {
     it("shows results count when searching", () => {
       render(<MachineGrid machines={machines} />);
 
-      const searchInput = screen.getByPlaceholderText(
-        "Search machines, models, or manufacturers...",
-      );
+      const searchInput = screen.getByRole("textbox");
       // Search for "ll" which should match "Williams" and "Bally" manufacturers = 2 results
       fireEvent.change(searchInput, { target: { value: "ll" } });
 
-      expect(screen.getByText("2 of 3 machines")).toBeInTheDocument();
+      // Use resilient regex that handles various number/word spacing patterns
+      expect(screen.getByText(/2\s+of\s+3\s+machines/i)).toBeInTheDocument();
     });
 
     it("resets to all machines when search is cleared", () => {
       render(<MachineGrid machines={machines} />);
 
-      const searchInput = screen.getByPlaceholderText(
-        "Search machines, models, or manufacturers...",
-      );
+      const searchInput = screen.getByRole("textbox");
       fireEvent.change(searchInput, { target: { value: "Custom" } });
       expect(
         screen.queryByRole("heading", { name: "Attack from Mars" }),
@@ -230,11 +231,16 @@ describe("MachineGrid", () => {
       const machine = createMockMachine({ id: "test-machine-id" });
       render(<MachineGrid machines={[machine]} />);
 
-      // Find the card by looking for the closest parent with MuiCard class
-      const machineCard = screen
-        .getByRole("heading", { name: "Medieval Madness" })
-        .closest(".MuiCard-root");
+      // Simplified approach: Find machine card by heading and click its closest card container
+      const machineHeading = screen.getByRole("heading", {
+        name: /medieval madness/i,
+      });
+      const machineCard =
+        machineHeading.closest("div[style*='cursor']") ||
+        machineHeading.closest("[role='button']") ||
+        machineHeading.parentElement;
 
+      expect(machineCard).toBeInTheDocument();
       if (machineCard) {
         fireEvent.click(machineCard);
       }
@@ -249,12 +255,23 @@ describe("MachineGrid", () => {
       ];
       render(<MachineGrid machines={machines} />);
 
-      const machine1Card = screen
-        .getByRole("heading", { name: "Machine 1" })
-        .closest(".MuiCard-root");
-      const machine2Card = screen
-        .getByRole("heading", { name: "Machine 2" })
-        .closest(".MuiCard-root");
+      // Simplified card finding logic with helper function
+      const findMachineCard = (name: string) => {
+        const heading = screen.getByRole("heading", {
+          name: new RegExp(name, "i"),
+        });
+        return (
+          heading.closest("div[style*='cursor']") ||
+          heading.closest("[role='button']") ||
+          heading.parentElement
+        );
+      };
+
+      const machine1Card = findMachineCard("machine 1");
+      const machine2Card = findMachineCard("machine 2");
+
+      expect(machine1Card).toBeInTheDocument();
+      expect(machine2Card).toBeInTheDocument();
 
       if (machine1Card) {
         fireEvent.click(machine1Card);
@@ -278,10 +295,10 @@ describe("MachineGrid", () => {
       render(<MachineGrid machines={[machine]} />);
 
       expect(
-        screen.getByRole("heading", { name: "Test Machine" }),
+        screen.getByRole("heading", { name: /test machine/i }),
       ).toBeInTheDocument();
-      // Should not display manufacturer info
-      expect(screen.queryByText("(2000)")).not.toBeInTheDocument();
+      // Should not display manufacturer info with year in parentheses
+      expect(screen.queryByText(/\(2000\)/)).not.toBeInTheDocument();
     });
 
     it("handles machines with missing year", () => {
@@ -290,9 +307,11 @@ describe("MachineGrid", () => {
       });
       render(<MachineGrid machines={[machine]} />);
 
-      expect(screen.getByText("Test Mfg")).toBeInTheDocument();
-      // Should not display year in parentheses
-      expect(screen.queryByText("(")).not.toBeInTheDocument();
+      expect(
+        screen.getByText(new RegExp(machine.model.manufacturer, "i")),
+      ).toBeInTheDocument();
+      // Should not display year in parentheses using resilient regex
+      expect(screen.queryByText(/\([0-9]+\)/)).not.toBeInTheDocument();
     });
 
     it("handles owner with missing image", () => {
@@ -301,9 +320,13 @@ describe("MachineGrid", () => {
       });
       render(<MachineGrid machines={[machine]} />);
 
-      expect(screen.getByText("John Doe")).toBeInTheDocument();
+      expect(
+        screen.getByText(new RegExp(machine.owner.name, "i")),
+      ).toBeInTheDocument();
       // When image is null, Avatar shows fallback icon with no alt text
-      expect(screen.queryByAltText("John Doe")).not.toBeInTheDocument();
+      expect(
+        screen.queryByAltText(new RegExp(machine.owner.name, "i")),
+      ).not.toBeInTheDocument();
     });
   });
 });

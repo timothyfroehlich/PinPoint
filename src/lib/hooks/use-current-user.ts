@@ -1,11 +1,10 @@
-import { useSession } from "next-auth/react";
-
+import { useAuth } from "~/app/auth-provider";
 import { api } from "~/trpc/react";
 
 /**
  * Custom hook that returns the current user, accounting for development impersonation.
- * In development, it checks if there's an impersonated user and returns that instead of the real session.
- * In production, it just returns the session user.
+ * In development, it checks if there's an impersonated user and returns that instead of the real user.
+ * In production, it just returns the authenticated user.
  */
 export function useCurrentUser(): {
   user: {
@@ -17,12 +16,12 @@ export function useCurrentUser(): {
   isLoading: boolean;
   isAuthenticated: boolean;
 } {
-  const { data: session, status } = useSession();
+  const { user, loading } = useAuth();
 
   // Try to get the current user profile through tRPC, which handles impersonation
   const { data: userProfile, isLoading: isProfileLoading } =
     api.user.getProfile.useQuery(undefined, {
-      enabled: status === "authenticated" && Boolean(session.user),
+      enabled: Boolean(user),
       retry: false,
     });
 
@@ -42,14 +41,21 @@ export function useCurrentUser(): {
     };
   }
 
-  // If tRPC query failed or is loading, fall back to session
-  if (session?.user) {
+  // If tRPC query failed or is loading, fall back to Supabase user
+  if (user) {
+    const name =
+      (user.user_metadata["name"] as string | undefined) ??
+      (user.user_metadata["full_name"] as string | undefined) ??
+      null;
+    const image =
+      (user.user_metadata["avatar_url"] as string | undefined) ?? null;
+
     return {
       user: {
-        id: session.user.id,
-        name: session.user.name ?? null,
-        email: session.user.email ?? null,
-        image: session.user.image ?? null,
+        id: user.id,
+        name,
+        email: user.email ?? null,
+        image,
       },
       isLoading: false,
       isAuthenticated: true,
@@ -58,7 +64,7 @@ export function useCurrentUser(): {
 
   return {
     user: null,
-    isLoading: status === "loading" || isProfileLoading,
+    isLoading: loading || isProfileLoading,
     isAuthenticated: false,
   };
 }

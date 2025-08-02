@@ -799,6 +799,127 @@ export function createRealisticIssueDataSet(): {
 }
 
 // =============================================================================
+// ISSUE LIST TEST SCENARIO FACTORIES
+// =============================================================================
+
+/**
+ * Scenario-specific mock data generators for IssueList tests
+ * These complement the shared mock setup utilities to reduce duplication
+ */
+export const ISSUE_LIST_SCENARIOS = {
+  /**
+   * Basic test scenario - single issue for core functionality testing
+   */
+  BASIC: (count = 1) =>
+    createMockIssuesList({
+      count,
+      overrides: {
+        title: "Test Issue 1",
+        _count: { comments: 2, attachments: 1 },
+      },
+    }),
+
+  /**
+   * Filtering test scenario - multiple issues with varied properties
+   */
+  FILTERING: (count = 3) =>
+    createMockIssuesList({
+      count,
+      overrides: {
+        _count: { comments: 2, attachments: 1 },
+      },
+    }),
+
+  /**
+   * Selection test scenario - two issues for bulk action testing
+   */
+  SELECTION: (count = 2) =>
+    createMockIssuesList({
+      count,
+      overrides: {
+        _count: { comments: 2, attachments: 1 },
+      },
+    }),
+
+  /**
+   * Integration test scenario - matches Phase 1.3 auth integration patterns
+   */
+  INTEGRATION: (count = 3) =>
+    createMockIssuesList({
+      count,
+      overrides: {
+        _count: { comments: 2, attachments: 1 },
+      },
+    }),
+
+  /**
+   * Workflow test scenario - realistic workflow data with custom issues
+   */
+  WORKFLOW: () => {
+    const baseIssues = createMockIssuesList({
+      count: 5,
+      overrides: {
+        _count: { comments: 2, attachments: 1 },
+      },
+    });
+
+    // Customize specific issues for workflow scenarios
+    const workflowIssues = [...baseIssues];
+
+    if (workflowIssues[0]) {
+      workflowIssues[0] = {
+        ...workflowIssues[0],
+        title: "Ball stuck in medieval castle",
+        status: {
+          id: "status-new",
+          name: "New",
+          category: "NEW" as const,
+          organizationId: "org-1",
+          isDefault: true,
+        },
+        priority: {
+          id: "priority-high",
+          name: "High",
+          order: 2,
+          organizationId: "org-1",
+          isDefault: false,
+        },
+        assignedTo: null,
+      };
+    }
+
+    if (workflowIssues[1]) {
+      workflowIssues[1] = {
+        ...workflowIssues[1],
+        title: "Display flickering on AFM",
+        status: {
+          id: "status-progress",
+          name: "In Progress",
+          category: "IN_PROGRESS" as const,
+          organizationId: "org-1",
+          isDefault: false,
+        },
+        priority: {
+          id: "priority-medium",
+          name: "Medium",
+          order: 3,
+          organizationId: "org-1",
+          isDefault: true,
+        },
+        assignedTo: {
+          id: "user-tech",
+          name: "Tech Johnson",
+          email: "tech@example.com",
+          image: null,
+        },
+      };
+    }
+
+    return workflowIssues;
+  },
+} as const;
+
+// =============================================================================
 // EXPORTS
 // =============================================================================
 
