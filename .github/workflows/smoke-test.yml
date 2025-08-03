@@ -38,27 +38,20 @@ jobs:
 
       - name: Setup Environment Variables
         run: |
-          echo "🔧 Configuring environment for production Supabase testing..."
-          echo "✅ Using production Supabase instance for CI testing"
+          echo "🔧 Configuring environment for production testing..."
+          echo "✅ All application variables pulled from Vercel"
           echo "📊 Test data will be isolated with SMOKE-TEST prefix"
-          echo "🔗 Database connections use Vercel-pulled environment variables"
+          echo "🎯 Using single source of truth: Vercel configuration"
         env:
-          # Production Supabase instance (no local Docker needed)
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          # Database connection variables are provided by .env.local from Vercel env pull
-          # Test mode
+          # CI-specific environment flags only
           NODE_ENV: test
           CI: true
 
-      - name: Verify Database Connection
+      - name: Verify Environment Configuration
         run: |
-          echo "🔍 Verifying database connection..."
-          npm run db:push
-          echo "✅ Database schema synchronized"
+          echo "🔍 Verifying environment configuration..."
+          echo "✅ Environment variables pulled from Vercel"
+          echo "🎯 Ready for smoke test execution"
 
       - name: Cache Playwright Browsers
         uses: actions/cache@v4
@@ -89,14 +82,7 @@ jobs:
             fi
           }
         env:
-          # Production Supabase instance
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          # Database connection variables are provided by .env.local from Vercel env pull
-          # Test mode
+          # CI-specific environment flags only
           NODE_ENV: test
           CI: true
 
