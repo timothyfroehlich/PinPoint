@@ -111,8 +111,7 @@ jobs:
             AND \"createdAt\" < NOW() - INTERVAL '1 hour';
           " || echo "⚠️  Cleanup query failed, but continuing..."
           echo "✅ Test data cleanup completed"
-        env:
-          # Database connection variable is provided by .env.local from Vercel env pull
+          # Note: Database connection variables are provided by .env.local from Vercel env pull
 
       - name: Upload Playwright Report
         uses: actions/upload-artifact@v4
