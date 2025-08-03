@@ -6,6 +6,7 @@
 
 import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 
+import { logger } from "~/lib/logger";
 import { createClient } from "~/lib/supabase/server";
 
 /**
@@ -21,13 +22,32 @@ export async function getSupabaseUser(): Promise<PinPointSupabaseUser | null> {
     } = await supabase.auth.getUser();
 
     if (error) {
-      console.error("Error getting Supabase user:", error);
+      logger.error({
+        msg: "Error getting Supabase user",
+        component: "auth.supabase.getSupabaseUser",
+        context: {
+          operation: "get_user",
+        },
+        error: {
+          message: error.message,
+          code: error.code,
+        },
+      });
       return null;
     }
 
     return user as PinPointSupabaseUser | null;
   } catch (error) {
-    console.error("Failed to create Supabase client:", error);
+    logger.error({
+      msg: "Failed to create Supabase client",
+      component: "auth.supabase.getSupabaseUser",
+      context: {
+        operation: "create_client",
+      },
+      error: {
+        message: error instanceof Error ? error.message : String(error),
+      },
+    });
     return null;
   }
 }

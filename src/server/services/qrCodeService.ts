@@ -3,6 +3,7 @@ import * as QRCode from "qrcode";
 import { type Machine, type ExtendedPrismaClient } from "./types";
 
 import { imageStorage } from "~/lib/image-storage/local-storage";
+import { logger } from "~/lib/logger";
 import { constructReportUrl } from "~/server/utils/qrCodeUtils";
 
 export interface QRCodeInfo {
@@ -144,7 +145,18 @@ export class QRCodeService {
         await imageStorage.deleteImage(machine.qrCodeUrl);
       } catch (error) {
         // Log error but don't fail regeneration
-        console.warn(`Failed to delete old QR code image: ${String(error)}`);
+        logger.warn({
+          msg: "Failed to delete old QR code image",
+          component: "qrCodeService.regenerateQRCode",
+          context: {
+            machineId,
+            qrCodeUrl: machine.qrCodeUrl,
+            operation: "delete_old_qr_image",
+          },
+          error: {
+            message: error instanceof Error ? error.message : String(error),
+          },
+        });
       }
     }
 
@@ -219,10 +231,19 @@ export class QRCodeService {
         await this.generateQRCode(machine.id);
         generated++;
       } catch (error) {
-        console.error(
-          `Failed to generate QR code for machine ${String(machine.id)}:`,
-          error,
-        );
+        logger.error({
+          msg: "Failed to generate QR code for machine",
+          component: "qrCodeService.generateQRCodesForOrganization",
+          context: {
+            organizationId,
+            machineId: machine.id,
+            operation: "bulk_generate",
+            stats: { generated, failed, total },
+          },
+          error: {
+            message: error instanceof Error ? error.message : String(error),
+          },
+        });
         failed++;
       }
     }
@@ -250,10 +271,19 @@ export class QRCodeService {
         await this.regenerateQRCode(machine.id);
         generated++;
       } catch (error) {
-        console.error(
-          `Failed to regenerate QR code for machine ${String(machine.id)}:`,
-          error,
-        );
+        logger.error({
+          msg: "Failed to regenerate QR code for machine",
+          component: "qrCodeService.regenerateQRCodesForOrganization",
+          context: {
+            organizationId,
+            machineId: machine.id,
+            operation: "bulk_regenerate",
+            stats: { generated, failed, total },
+          },
+          error: {
+            message: error instanceof Error ? error.message : String(error),
+          },
+        });
         failed++;
       }
     }

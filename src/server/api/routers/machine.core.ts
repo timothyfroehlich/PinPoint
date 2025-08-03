@@ -73,10 +73,18 @@ export const machineCoreRouter = createTRPCRouter({
         await qrCodeService.generateQRCode(machine.id);
       } catch (error) {
         // Log error but don't fail machine creation
-        console.warn(
-          `Failed to generate QR code for machine ${machine.id}:`,
-          error,
-        );
+        ctx.logger.warn({
+          msg: "Failed to generate QR code for machine",
+          component: "machineRouter.create",
+          context: {
+            machineId: machine.id,
+            machineName: machine.name,
+            operation: "qr_code_generation",
+          },
+          error: {
+            message: error instanceof Error ? error.message : String(error),
+          },
+        });
       }
 
       return machine;
