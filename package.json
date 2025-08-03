@@ -14,7 +14,7 @@
     "dev": "dotenv -- next dev --turbo",
     "dev:full": "concurrently -n 'server,typecheck' -c 'blue,yellow' --kill-others 'npm run dev:server' 'npm run dev:typecheck'",
     "dev:clean": "node scripts/cleanup-dev.cjs && npm run dev:full",
-    "dev:server": "nodemon --config nodemon.server.json",
+    "dev:server": "dotenv -e .env -e .env.development -- nodemon --config nodemon.server.json",
     "dev:db:studio": "dotenv -- sh -c 'prisma studio --port ${PRISMA_STUDIO_PORT:-5555}'",
     "dev:typecheck": "tsc --noEmit --watch --preserveWatchOutput",
     "dev:bg": "./scripts/dev-background.sh start",
