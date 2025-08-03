@@ -79,6 +79,10 @@ export const env = createEnv({
     SEED_ADMIN_NAME: z.string().optional(),
     // Temporary override for production deployment
     FORCE_PREVIEW_BEHAVIOR: z.string().optional(),
+    // Logging configuration
+    LOG_LEVEL: z
+      .enum(["trace", "debug", "info", "warn", "error", "fatal"])
+      .optional(),
   },
 
   /**
@@ -129,6 +133,8 @@ export const env = createEnv({
     SUPABASE_JWT_SECRET: process.env["SUPABASE_JWT_SECRET"],
     NEXT_PUBLIC_SUPABASE_URL: process.env["NEXT_PUBLIC_SUPABASE_URL"],
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env["NEXT_PUBLIC_SUPABASE_ANON_KEY"],
+    // Logging configuration
+    LOG_LEVEL: process.env["LOG_LEVEL"],
     // Next.js automatically exposes NODE_ENV to the client
   },
   /**
