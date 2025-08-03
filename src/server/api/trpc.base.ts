@@ -16,6 +16,10 @@ import type { ExtendedPrismaClient } from "~/server/db";
 
 import { env } from "~/env";
 import { logger } from "~/lib/logger";
+import {
+  ERROR_MESSAGE_TRUNCATE_LENGTH,
+  SLOW_OPERATION_THRESHOLD_MS,
+} from "~/lib/logger-constants";
 import { createClient } from "~/lib/supabase/server";
 import { createTraceContext, traceStorage } from "~/lib/tracing";
 import { getUserPermissionsForSupabaseUser } from "~/server/auth/permissions";
@@ -222,7 +226,7 @@ const loggingMiddleware = t.middleware(async ({ path, type, next, ctx }) => {
       const duration = Date.now() - start;
 
       // Log slow operations
-      if (duration > 1000) {
+      if (duration > SLOW_OPERATION_THRESHOLD_MS) {
         contextLogger.warn({
           msg: `Slow ${type} ${path} completed`,
           context: {
@@ -252,7 +256,7 @@ const loggingMiddleware = t.middleware(async ({ path, type, next, ctx }) => {
           code: (error as { code?: string }).code ?? "UNKNOWN",
           message:
             error instanceof Error
-              ? error.message.substring(0, 200)
+              ? error.message.substring(0, ERROR_MESSAGE_TRUNCATE_LENGTH)
               : "Unknown error",
         },
         context: {

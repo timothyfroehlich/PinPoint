@@ -1,6 +1,7 @@
 import pino from "pino";
 
 import { env } from "~/env.js";
+import { ERROR_MESSAGE_TRUNCATE_LENGTH } from "~/lib/logger-constants";
 
 const isDev = env.NODE_ENV === "development";
 const today = new Date().toISOString().split("T")[0] ?? "";
@@ -18,24 +19,17 @@ function hasCodeAndMessage(
   return "code" in error && "message" in error;
 }
 
+// Define logger interface for type safety
+interface LoggerInterface {
+  info: (obj: object) => void;
+  warn: (obj: object) => void;
+  error: (obj: object) => void;
+  debug: (obj: object) => void;
+  child: (options: object) => LoggerInterface;
+}
+
 // Create safe logger configuration without problematic worker threads
-function createLogger():
-  | pino.Logger
-  | {
-      info: (obj: object) => void;
-      warn: (obj: object) => void;
-      error: (obj: object) => void;
-      debug: (obj: object) => void;
-      child: () =>
-        | pino.Logger
-        | {
-            info: (obj: object) => void;
-            warn: (obj: object) => void;
-            error: (obj: object) => void;
-            debug: (obj: object) => void;
-            child: () => unknown;
-          };
-    } {
+function createLogger(): pino.Logger | LoggerInterface {
   try {
     // Base configuration for all environments
     const baseConfig = {
@@ -55,7 +49,10 @@ function createLogger():
               return {
                 ...object,
                 errorCode: error.code,
-                errorMessage: message.substring(0, 200),
+                errorMessage: message.substring(
+                  0,
+                  ERROR_MESSAGE_TRUNCATE_LENGTH,
+                ),
               };
             }
           }
@@ -125,7 +122,9 @@ function createLogger():
       debug: (obj: object) => {
         console.debug("DEBUG:", obj);
       },
-      child: () => createLogger(), // Return self for child loggers
+      child: function (_options: object): LoggerInterface {
+        return this;
+      }, // Return self for child loggers
     };
   }
 }
@@ -153,7 +152,10 @@ if (isDev) {
               return {
                 ...object,
                 errorCode: error.code,
-                errorMessage: message.substring(0, 200),
+                errorMessage: message.substring(
+                  0,
+                  ERROR_MESSAGE_TRUNCATE_LENGTH,
+                ),
               };
             }
           }
@@ -222,7 +224,34 @@ export const logger = {
         mainChild.debug(obj);
         if (fileChild) fileChild.debug(obj);
       },
-      child: (childOptions: object) => mainChild.child(childOptions),
+      child: (childOptions: object): LoggerInterface => {
+        const mainChildLogger = mainChild.child(
+          childOptions,
+        ) as LoggerInterface;
+        const fileChildLogger = fileChild?.child(childOptions) as
+          | LoggerInterface
+          | undefined;
+        return {
+          info: (obj: object) => {
+            mainChildLogger.info(obj);
+            if (fileChildLogger) fileChildLogger.info(obj);
+          },
+          warn: (obj: object) => {
+            mainChildLogger.warn(obj);
+            if (fileChildLogger) fileChildLogger.warn(obj);
+          },
+          error: (obj: object) => {
+            mainChildLogger.error(obj);
+            if (fileChildLogger) fileChildLogger.error(obj);
+          },
+          debug: (obj: object) => {
+            mainChildLogger.debug(obj);
+            if (fileChildLogger) fileChildLogger.debug(obj);
+          },
+          child: (nestedOptions: object): LoggerInterface =>
+            mainChildLogger.child(nestedOptions),
+        };
+      },
     };
   },
 };
