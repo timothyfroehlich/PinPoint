@@ -120,13 +120,14 @@ class HealthChecker {
     const httpChecks = await Promise.all([
       this.checkHttpService(
         "Next.js Server",
-        "http://localhost:3000/api/health",
+        `http://localhost:${process.env.PORT || 49200}/api/health`,
       ),
       this.checkHttpService("Prisma Studio", "http://localhost:5555"),
     ]);
 
     // Check port usage
-    const port3000InUse = await this.checkPortInUse(3000);
+    const devPort = parseInt(process.env.PORT || '49200', 10);
+    const devPortInUse = await this.checkPortInUse(devPort);
     const port5555InUse = await this.checkPortInUse(5555);
 
     // Check running processes
@@ -136,9 +137,9 @@ class HealthChecker {
     this.results = [
       ...httpChecks,
       {
-        service: "Port 3000",
-        status: port3000InUse ? "in-use" : "free",
-        details: port3000InUse ? "Port occupied" : "Port available",
+        service: `Port ${devPort}`,
+        status: devPortInUse ? "in-use" : "free",
+        details: devPortInUse ? "Port occupied" : "Port available",
       },
       {
         service: "Port 5555",

@@ -52,19 +52,82 @@ PinPoint is currently undergoing a strategic migration to modernize its architec
 
 For details, see the [Migration Guide](./docs/migration/supabase-drizzle/).
 
-## Development Prerequisites
+## Getting Started
 
-For the best development experience, install these tools globally:
+### Quick Start
 
-- **[TypeScript](https://www.typescriptlang.org/)** - Enables `tsc` command and TypeScript CLI tools
-- **[Vercel CLI](https://vercel.com/cli)** - Essential for deployments and environment management (`vercel env pull`)
-- **[ESLint](https://eslint.org/)** - Code linting and quality checks across projects
-- **[Prettier](https://prettier.io/)** - Code formatting for consistent style
-- **[Vitest](https://vitest.dev/)** - Testing framework with global CLI access
+All development tools are included in `devDependencies` - no global installs required!
 
 ```bash
-npm install -g typescript vercel eslint prettier vitest
+# 1. Clone and install dependencies
+git clone https://github.com/timothyfroehlich/PinPoint.git
+cd PinPoint
+npm install
+
+# 2. Set up environment variables
+vercel env pull  # Downloads shared development environment from Vercel
+
+# 3. Start Supabase and initialize database
+supabase start
+npm run db:reset
+
+# 4. Start development server (background mode)
+npm run dev:bg
+
+# 5. Validate setup
+npm run check
 ```
+
+Your development server will be running at **http://localhost:49200**
+
+### Development Workflow
+
+**Essential Commands:**
+
+- `npm run dev:bg` - Start development server in background
+- `npm run dev:bg:status` - Check if server is running
+- `npm run dev:bg:stop` - Stop background server
+- `npm run check` - Run all quality checks (typecheck, lint, format, audit)
+- `npm run validate` - Full validation including tests (run before commits)
+
+**Database Commands:**
+
+- `npm run db:reset` - Reset database with fresh schema and seed data
+- `npm run db:push` - Sync schema changes without reset
+
+### Prerequisites
+
+**Required Global Installs:**
+
+- **[Vercel CLI](https://vercel.com/cli)** - Essential for environment management (`vercel env pull`)
+- **[Supabase CLI](https://supabase.com/docs/guides/cli)** - Required for local database (`supabase start`)
+
+```bash
+# Vercel CLI via npm
+npm install -g vercel
+
+# Supabase CLI via Homebrew (npm global install not supported)
+brew install supabase/tap/supabase
+
+# Alternative for Supabase: See https://github.com/supabase/cli#install-the-cli
+```
+
+**Optional Global Tools** (for convenience - all available via npm scripts):
+
+- **[TypeScript](https://www.typescriptlang.org/)** - Direct `tsc` access (or use `npm run typecheck`)
+- **[ESLint](https://eslint.org/)** - Direct `eslint` access (or use `npm run lint`)
+- **[Prettier](https://prettier.io/)** - Direct `prettier` access (or use `npm run format`)
+- **[Vitest](https://vitest.dev/)** - Direct `vitest` access (or use `npm run test`)
+
+### Troubleshooting
+
+If you encounter issues, see [docs/troubleshooting.md](./docs/troubleshooting.md) for detailed solutions.
+
+**Quick fixes:**
+
+- **Server not responding**: `npm run dev:bg:status` then `npm run dev:clean`
+- **Database issues**: `npm run db:reset`
+- **Dependency problems**: `npm run clean` then `npm install`
 
 ## Roadmap
 

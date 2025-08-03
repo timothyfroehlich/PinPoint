@@ -13,6 +13,20 @@ jobs:
     name: End-to-End Smoke Test
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - name: Checkout
@@ -31,7 +45,7 @@ jobs:
         run: npm install --global vercel@latest
 
       - name: Pull Vercel Environment Variables
-        run: vercel env pull .env.local --token=${{ secrets.VERCEL_TOKEN }}
+        run: vercel env pull .env.local --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
@@ -82,22 +96,20 @@ jobs:
             fi
           }
         env:
-          # CI-specific environment flags only
+          # Override to use ephemeral PostgreSQL container instead of cloud database
+          DATABASE_URL: "postgresql://test_user:test_password@localhost:5432/test_db"
+          POSTGRES_PRISMA_URL: "postgresql://test_user:test_password@localhost:5432/test_db"
+          POSTGRES_URL_NON_POOLING: "postgresql://test_user:test_password@localhost:5432/test_db"
+          # CI-specific environment flags
           NODE_ENV: test
           CI: true
 
       - name: Cleanup Test Data
         if: always()
         run: |
-          echo "🧹 Cleaning up smoke test data..."
-          # Clean up test issues and related data
-          npx prisma db execute --stdin <<< "
-            DELETE FROM \"Issue\" 
-            WHERE title LIKE 'SMOKE-TEST-%' 
-            AND \"createdAt\" < NOW() - INTERVAL '1 hour';
-          " || echo "⚠️  Cleanup query failed, but continuing..."
-          echo "✅ Test data cleanup completed"
-          # Note: Database connection variables are provided by .env.local from Vercel env pull
+          echo "🧹 Ephemeral database cleanup..."
+          echo "✅ No cleanup needed - using ephemeral PostgreSQL container"
+          echo "🗑️  Container will be automatically destroyed after job completion"
 
       - name: Upload Playwright Report
         uses: actions/upload-artifact@v4

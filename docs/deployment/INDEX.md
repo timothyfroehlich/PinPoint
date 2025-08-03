@@ -19,3 +19,4 @@ Deployment guides and environment management for PinPoint.
 - **[development-deployment-guide.md](./development-deployment-guide.md)** - Local dev and preview setup
 - **[production-deployment-guide.md](./production-deployment-guide.md)** - Production deployment process
 - **[environment-management.md](./environment-management.md)** - Environment-specific strategies
+- **[vercel-environment-configuration.md](./vercel-environment-configuration.md)** - Vercel Dashboard environment variable setup

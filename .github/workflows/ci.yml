@@ -71,7 +71,7 @@ jobs:
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
       - name: Pull Vercel Environment Variables
-        run: vercel env pull .env.local --token=${{ secrets.VERCEL_TOKEN }}
+        run: vercel env pull .env.local --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
@@ -117,7 +117,7 @@ jobs:
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
       - name: Pull Vercel Environment Variables
-        run: vercel env pull .env.local --token=${{ secrets.VERCEL_TOKEN }}
+        run: vercel env pull .env.local --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
@@ -149,6 +149,20 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
       NODE_ENV: "test"
     steps:
@@ -162,13 +176,18 @@ jobs:
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
       - name: Pull Vercel Environment Variables
-        run: vercel env pull .env.local --token=${{ secrets.VERCEL_TOKEN }}
+        run: vercel env pull .env.local --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
       - run: npm ci
       - name: Run Tests with Coverage (Migration-aware)
         id: test-run
+        env:
+          # Override to use ephemeral PostgreSQL container instead of cloud database
+          DATABASE_URL: "postgresql://test_user:test_password@localhost:5432/test_db"
+          POSTGRES_PRISMA_URL: "postgresql://test_user:test_password@localhost:5432/test_db"
+          POSTGRES_URL_NON_POOLING: "postgresql://test_user:test_password@localhost:5432/test_db"
         run: |
           npm run test:coverage 2>&1 | tee test-output.log || true
           TEST_EXIT_CODE=${PIPESTATUS[0]}

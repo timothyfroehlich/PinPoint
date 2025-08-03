@@ -30,8 +30,12 @@ next-env.d.ts
 *.log
 
 # local env files
-# do not commit any .env files to git, except for the .env.example file. https://create.t3.gg/en/usage/env-variables#using-environment-variables
-.env*
+# Environment variables - commit safe defaults, ignore files with secrets
+# https://create.t3.gg/en/usage/env-variables#using-environment-variables
+.env.local
+.env.*.local
+!.env
+!.env.development
 !.env.example
 
 # vercel
@@ -82,5 +86,4 @@ cleanup_analysis/
 .claude/hooks/.quality-check.json.swp
 .claude/hooks/tsconfig-cache.json
 .betterer.results.backup
-.env*.local
 .worktree-ports

@@ -81,7 +81,6 @@
     "reset": "npm run clean && npm run db:push && npm run seed",
     "setup:worktree": "bash scripts/setup-worktree.sh",
     "kill:all": "node scripts/kill-dev-processes.cjs",
-    "port:free": "node scripts/free-ports.cjs 3000 5555",
     "deps:check": "npm audit --audit-level=high",
     "deps:fix": "npm audit fix",
     "deps:update": "npm update && npm audit",

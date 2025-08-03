@@ -21,7 +21,7 @@ export default defineConfig({
   // Shared settings for all the projects below
   use: {
     // Base URL to use in actions like `await page.goto('/')`
-    baseURL: `http://apc.localhost:${process.env["PORT"] ?? "3000"}`,
+    baseURL: `http://apc.localhost:${process.env["PORT"] ?? "49200"}`,
 
     // Collect trace when retrying the failed test
     trace: "on-first-retry",
@@ -55,7 +55,7 @@ export default defineConfig({
   // Automatically start dev server for tests
   webServer: {
     command: "npm run dev",
-    url: `http://localhost:${process.env["PORT"] ?? "3000"}`,
+    url: `http://localhost:${process.env["PORT"] ?? "49200"}`,
     reuseExistingServer: !process.env["CI"],
     timeout: 120000,
   },

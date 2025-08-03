@@ -91,6 +91,11 @@ export const env = createEnv({
     NEXT_PUBLIC_VERCEL_ENV: z
       .enum(["development", "preview", "production"])
       .optional(),
+    // Dev features toggle (client-safe)
+    NEXT_PUBLIC_ENABLE_DEV_FEATURES: z
+      .string()
+      .transform((s) => s === "true")
+      .default(false),
     // Supabase Public Configuration
     NEXT_PUBLIC_SUPABASE_URL:
       getEnvironmentType() === "test"
@@ -135,6 +140,8 @@ export const env = createEnv({
     NEXT_PUBLIC_VERCEL_ENV: process.env["NEXT_PUBLIC_VERCEL_ENV"],
     NEXT_PUBLIC_SUPABASE_URL: process.env["NEXT_PUBLIC_SUPABASE_URL"],
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env["NEXT_PUBLIC_SUPABASE_ANON_KEY"],
+    NEXT_PUBLIC_ENABLE_DEV_FEATURES:
+      process.env["NEXT_PUBLIC_ENABLE_DEV_FEATURES"],
     // Next.js automatically exposes NODE_ENV to the client
   },
   /**
