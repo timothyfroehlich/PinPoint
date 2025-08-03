@@ -1,5 +1,6 @@
 import { env } from "~/env.js";
 import { isProduction, isPreview } from "~/lib/environment";
+import { logger } from "~/lib/logger";
 
 /**
  * Validation results for OAuth provider configuration
@@ -95,13 +96,29 @@ export function validateAndLogOAuthConfig(): boolean {
   for (const result of results) {
     // Log errors
     for (const error of result.errors) {
-      console.error(`🔴 OAuth ${result.provider} Error: ${error}`);
+      logger.error({
+        msg: `OAuth ${result.provider} Error`,
+        component: "auth.validation",
+        context: {
+          provider: result.provider,
+          error,
+          validation: "oauth",
+        },
+      });
       allValid = false;
     }
 
     // Log warnings
     for (const warning of result.warnings) {
-      console.warn(`🟡 OAuth ${result.provider} Warning: ${warning}`);
+      logger.warn({
+        msg: `OAuth ${result.provider} Warning`,
+        component: "auth.validation",
+        context: {
+          provider: result.provider,
+          warning,
+          validation: "oauth",
+        },
+      });
     }
 
     // Only log success in development and only if there are warnings
@@ -110,7 +127,15 @@ export function validateAndLogOAuthConfig(): boolean {
       result.errors.length === 0 &&
       result.warnings.length > 0
     ) {
-      console.log(`🟢 OAuth ${result.provider}: Configured with warnings`);
+      logger.info({
+        msg: `OAuth ${result.provider} configured with warnings`,
+        component: "auth.validation",
+        context: {
+          provider: result.provider,
+          status: "configured_with_warnings",
+          validation: "oauth",
+        },
+      });
     }
   }
 

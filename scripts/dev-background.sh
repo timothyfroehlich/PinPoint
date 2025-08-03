@@ -19,13 +19,13 @@ case "$1" in
         rm -f "$PID_FILE"
       fi
     fi
-    
+
     echo "Starting PinPoint dev server in background..."
     npm run dev:server > "$LOG_FILE" 2>&1 &
     echo $! > "$PID_FILE"
     echo "Dev server started (PID: $(cat $PID_FILE))"
     echo "Logs: tail -f $LOG_FILE"
-    
+
     # Wait a moment for server to start and extract URL from logs
     sleep 2
     if [ -f "$LOG_FILE" ]; then
@@ -37,7 +37,7 @@ case "$1" in
       fi
     fi
     ;;
-  
+
   stop)
     if [ -f "$PID_FILE" ]; then
       PID=$(cat "$PID_FILE")
@@ -48,7 +48,7 @@ case "$1" in
       echo "No PID file found"
     fi
     ;;
-  
+
   status)
     if [ -f "$PID_FILE" ]; then
       PID=$(cat "$PID_FILE")
@@ -71,11 +71,11 @@ case "$1" in
       echo "Dev server not running"
     fi
     ;;
-  
+
   logs)
     tail -f "$LOG_FILE"
     ;;
-  
+
   *)
     echo "Usage: $0 {start|stop|status|logs}"
     exit 1

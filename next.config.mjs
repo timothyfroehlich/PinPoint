@@ -18,6 +18,15 @@ const config = {
     // your project has ESLint errors.
     ignoreDuringBuilds: true,
   },
+  
+  // Fix pino logging worker thread issues with Turbopack
+  serverExternalPackages: [
+    'pino',
+    'pino-pretty', 
+    'thread-stream',
+    'pino-abstract-transport',
+    'on-exit-leak-free'
+  ],
 };
 
 export default config;

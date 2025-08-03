@@ -109,7 +109,18 @@ export const userRouter = createTRPCRouter({
             await imageStorage.deleteImage(currentUser.profilePicture);
           } catch (error) {
             // Ignore deletion errors for old files
-            console.warn("Failed to delete old profile picture:", error);
+            ctx.logger.warn({
+              msg: "Failed to delete old profile picture",
+              component: "userRouter.uploadProfilePicture",
+              context: {
+                userId: ctx.user.id,
+                oldProfilePicture: currentUser.profilePicture,
+                operation: "delete_old_image",
+              },
+              error: {
+                message: error instanceof Error ? error.message : String(error),
+              },
+            });
           }
         }
 
@@ -121,7 +132,18 @@ export const userRouter = createTRPCRouter({
 
         return { success: true, profilePicture: updatedUser.profilePicture };
       } catch (error) {
-        console.error("Profile picture upload error:", error);
+        ctx.logger.error({
+          msg: "Profile picture upload error",
+          component: "userRouter.uploadProfilePicture",
+          context: {
+            userId: ctx.user.id,
+            filename: input.filename,
+            operation: "upload_profile_picture",
+          },
+          error: {
+            message: error instanceof Error ? error.message : String(error),
+          },
+        });
         throw new Error("Failed to upload profile picture");
       }
     }),

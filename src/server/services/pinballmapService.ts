@@ -10,6 +10,7 @@ import type {
 } from "~/lib/pinballmap/types";
 
 import { transformPinballMapMachineToModel } from "~/lib/external/pinballmapTransformer";
+import { logger } from "~/lib/logger";
 
 export interface SyncResult {
   success: boolean;
@@ -217,10 +218,19 @@ export class PinballMapService {
           added++;
         }
       } catch (error) {
-        console.error(
-          `Error processing machine ${pmMachine.opdb_id ?? "unknown"}:`,
-          error,
-        );
+        logger.error({
+          msg: "Error processing PinballMap machine",
+          component: "pinballMapService.syncLocation",
+          context: {
+            locationId,
+            organizationId,
+            machineOpdbId: pmMachine.opdb_id ?? "unknown",
+            operation: "sync_machine",
+          },
+          error: {
+            message: error instanceof Error ? error.message : String(error),
+          },
+        });
         // Continue processing other machines
       }
     }
@@ -326,7 +336,17 @@ export class PinballMapService {
       const result: unknown = await response.json();
       return result as PinballMapMachineDetailsResponse;
     } catch (error) {
-      console.error("Failed to fetch PinballMap data:", error);
+      logger.error({
+        msg: "Failed to fetch PinballMap data",
+        component: "pinballMapService.fetchPinballMapData",
+        context: {
+          pinballMapId,
+          operation: "api_fetch",
+        },
+        error: {
+          message: error instanceof Error ? error.message : String(error),
+        },
+      });
       return null;
     }
   }
