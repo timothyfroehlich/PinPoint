@@ -87,3 +87,4 @@ cleanup_analysis/
 .claude/hooks/tsconfig-cache.json
 .betterer.results.backup
 .worktree-ports
+.env*.local
