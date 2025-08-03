@@ -126,7 +126,7 @@ file_size_limit = "50MiB"
 # enabled = true
 
 # Configure PinPoint storage bucket
-[storage.buckets.pinpoint-storage]
+[storage.buckets.pinpoint-storage-main]
 public = true
 file_size_limit = "10MiB"
 allowed_mime_types = ["image/png", "image/jpeg", "image/webp"]

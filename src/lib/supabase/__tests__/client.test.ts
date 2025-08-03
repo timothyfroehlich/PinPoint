@@ -37,7 +37,7 @@ describe("Supabase Browser Client", () => {
   });
 
   describe("createClient", () => {
-    it("should create a browser client with correct configuration", async () => {
+    it("should create a browser client with correct URL and key", async () => {
       const { createClient } = await import("../client");
 
       createClient();
@@ -45,12 +45,6 @@ describe("Supabase Browser Client", () => {
       expect(mockCreateBrowserClient).toHaveBeenCalledWith(
         "https://test.supabase.co",
         "test-anon-key",
-        expect.objectContaining({
-          cookies: expect.objectContaining({
-            getAll: expect.any(Function),
-            setAll: expect.any(Function),
-          }),
-        }),
       );
     });
 
@@ -99,7 +93,7 @@ describe("Supabase Browser Client", () => {
   });
 
   describe("Environment Integration", () => {
-    it("should use environment variables correctly", async () => {
+    it("should use environment variables for URL and key", async () => {
       const { createClient } = await import("../client");
 
       createClient();
@@ -107,12 +101,6 @@ describe("Supabase Browser Client", () => {
       expect(mockCreateBrowserClient).toHaveBeenCalledWith(
         "https://test.supabase.co",
         "test-anon-key",
-        expect.objectContaining({
-          cookies: expect.objectContaining({
-            getAll: expect.any(Function),
-            setAll: expect.any(Function),
-          }),
-        }),
       );
     });
   });

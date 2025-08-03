@@ -6,6 +6,9 @@ import * as React from "react";
 import { IssueCreateView } from "~/components/issues/IssueCreateView";
 import { getSupabaseUser } from "~/server/auth/supabase";
 
+// Force dynamic rendering for auth-dependent content
+export const dynamic = "force-dynamic";
+
 interface CreateIssuePageProps {
   searchParams: Promise<{
     machineId?: string;

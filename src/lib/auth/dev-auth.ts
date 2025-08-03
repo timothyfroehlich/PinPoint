@@ -19,7 +19,7 @@ import { createDevUserAction, type DevUserData } from "./dev-auth-server";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { shouldEnableDevFeatures } from "~/lib/environment";
+import { shouldEnableDevFeatures } from "~/lib/environment-client";
 
 /**
  * Result of a dev authentication attempt

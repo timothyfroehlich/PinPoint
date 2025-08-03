@@ -8,9 +8,10 @@ import { env } from "~/env";
  * Creates a Supabase client for use in browser (client) components.
  *
  * This client is designed for Next.js 15 with the App Router and uses:
- * - Cookie-based session persistence with getAll/setAll methods
+ * - Modern @supabase/ssr browser client with built-in cookie handling
  * - Type-safe client configuration with environment validation
- * - Proper SSR cookie handling for browser environments
+ * - Automatic session management compatible with SSR
+ * - Safe browser-only execution with proper guards
  *
  * @returns Supabase browser client instance
  */
@@ -26,47 +27,9 @@ export function createClient(): SupabaseClient {
     );
   }
 
-  return createBrowserClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      getAll() {
-        return document.cookie
-          .split(";")
-          .map((cookie) => cookie.trim().split("="))
-          .filter(([name]) => Boolean(name))
-          .map(([name, value]) => ({
-            name: name ?? "",
-            value: decodeURIComponent(value ?? ""),
-          }))
-          .filter(({ name }) => name !== "");
-      },
-      setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value, options }) => {
-          let cookieString = `${name}=${encodeURIComponent(value)}`;
-
-          if (options.maxAge !== undefined) {
-            cookieString += `; Max-Age=${String(options.maxAge)}`;
-          }
-          if (options.domain) {
-            cookieString += `; Domain=${options.domain}`;
-          }
-          if (options.path) {
-            cookieString += `; Path=${options.path}`;
-          }
-          if (options.sameSite) {
-            cookieString += `; SameSite=${String(options.sameSite)}`;
-          }
-          if (options.secure) {
-            cookieString += "; Secure";
-          }
-          if (options.httpOnly) {
-            cookieString += "; HttpOnly";
-          }
-
-          document.cookie = cookieString;
-        });
-      },
-    },
-  });
+  // Use the modern @supabase/ssr createBrowserClient which handles
+  // cookie management automatically and is SSR-safe
+  return createBrowserClient(supabaseUrl, supabaseAnonKey);
 }
 
 // Export a default client instance for convenience

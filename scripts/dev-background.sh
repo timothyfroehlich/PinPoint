@@ -25,6 +25,17 @@ case "$1" in
     echo $! > "$PID_FILE"
     echo "Dev server started (PID: $(cat $PID_FILE))"
     echo "Logs: tail -f $LOG_FILE"
+    
+    # Wait a moment for server to start and extract URL from logs
+    sleep 2
+    if [ -f "$LOG_FILE" ]; then
+      URL=$(grep -o "http://.*" "$LOG_FILE" | head -1)
+      if [ -n "$URL" ]; then
+        # Replace localhost with apc.localhost for subdomain routing
+        SUBDOMAIN_URL=$(echo "$URL" | sed 's/localhost/apc.localhost/')
+        echo "URL: $SUBDOMAIN_URL"
+      fi
+    fi
     ;;
   
   stop)
@@ -43,6 +54,15 @@ case "$1" in
       PID=$(cat "$PID_FILE")
       if ps -p $PID > /dev/null 2>&1; then
         echo "Dev server running (PID: $PID)"
+        # Extract URL from logs if available
+        if [ -f "$LOG_FILE" ]; then
+          URL=$(grep -o "http://.*" "$LOG_FILE" | head -1)
+          if [ -n "$URL" ]; then
+            # Replace localhost with apc.localhost for subdomain routing
+            SUBDOMAIN_URL=$(echo "$URL" | sed 's/localhost/apc.localhost/')
+            echo "URL: $SUBDOMAIN_URL"
+          fi
+        fi
       else
         echo "PID file exists but process not running"
         rm -f "$PID_FILE"

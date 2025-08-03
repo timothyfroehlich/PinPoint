@@ -21,7 +21,7 @@ export default defineConfig({
   // Shared settings for all the projects below
   use: {
     // Base URL to use in actions like `await page.goto('/')`
-    baseURL: `http://localhost:${process.env["PORT"] ?? "3000"}`,
+    baseURL: `http://apc.localhost:${process.env["PORT"] ?? "3000"}`,
 
     // Collect trace when retrying the failed test
     trace: "on-first-retry",

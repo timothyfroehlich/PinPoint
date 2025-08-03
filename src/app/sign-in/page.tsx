@@ -16,11 +16,8 @@ import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 
 import { useAuth } from "~/app/auth-provider";
-import {
-  authenticateDevUser,
-  getAuthResultMessage,
-  isDevAuthAvailable,
-} from "~/lib/auth/dev-auth";
+import { authenticateDevUser, getAuthResultMessage } from "~/lib/auth/dev-auth";
+import { isDevAuthAvailable } from "~/lib/environment-client";
 import { createClient } from "~/lib/supabase/client";
 
 type UserWithRole = User & { role: Role | null };

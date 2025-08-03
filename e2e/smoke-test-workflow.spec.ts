@@ -43,24 +43,20 @@ test.describe("Smoke Test: Complete Issue Workflow", () => {
     // Step 3: Pick a Game
     console.log("🧪 SMOKE TEST - Step 3: Selecting first available game");
 
-    // Wait for the form to load and select the first machine
-    const machineSelect = page
-      .locator('select[name="machineId"], select[name="machine"]')
-      .first();
+    // Wait for the MUI Select component to load
+    const machineSelect = page.locator('[role="combobox"]').first();
     await expect(machineSelect).toBeVisible({ timeout: 10000 });
 
-    // Get all options and select the first non-empty one
-    const options = await machineSelect.locator("option").all();
-    let selectedMachine = "";
-    for (const option of options) {
-      const value = await option.getAttribute("value");
-      const text = await option.textContent();
-      if (value && value !== "" && text && text.trim() !== "") {
-        await machineSelect.selectOption(value);
-        selectedMachine = text.trim();
-        break;
-      }
-    }
+    // Click to open the dropdown
+    await machineSelect.click();
+
+    // Wait for the dropdown menu to appear and select the first non-empty option
+    const firstOption = page.locator('[role="option"]').nth(1); // Skip placeholder at index 0
+    await expect(firstOption).toBeVisible({ timeout: 5000 });
+
+    // Get the text content before clicking
+    const selectedMachine = await firstOption.textContent();
+    await firstOption.click();
 
     expect(selectedMachine).toBeTruthy();
     console.log(
