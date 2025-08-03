@@ -98,7 +98,19 @@ export const modelOpdbRouter = createTRPCRouter({
           syncedCount++;
         }
       } catch (error) {
-        console.error(`Failed to sync game ${title.name}:`, error);
+        ctx.logger.error({
+          msg: "Failed to sync OPDB game",
+          component: "modelRouter.syncOPDBGames",
+          context: {
+            gameTitle: title.name,
+            gameId: title.id,
+            opdbId: title.opdbId,
+            operation: "opdb_sync",
+          },
+          error: {
+            message: error instanceof Error ? error.message : String(error),
+          },
+        });
       }
     }
 
