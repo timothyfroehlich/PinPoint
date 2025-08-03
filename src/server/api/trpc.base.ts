@@ -10,6 +10,7 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
 
+import type { LoggerInterface } from "~/lib/logger";
 import type { SupabaseServerClient } from "~/lib/supabase/server";
 import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 import type { ExtendedPrismaClient } from "~/server/db";
@@ -81,12 +82,7 @@ export interface TRPCContext {
   organization: Organization | null;
   services: ServiceFactory;
   headers: Headers;
-  logger: {
-    info: (obj: object) => void;
-    warn: (obj: object) => void;
-    error: (obj: object) => void;
-    debug: (obj: object) => void;
-  };
+  logger: LoggerInterface;
   traceId?: string;
   requestId?: string;
 }

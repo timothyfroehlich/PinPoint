@@ -20,7 +20,7 @@ function hasCodeAndMessage(
 }
 
 // Define logger interface for type safety
-interface LoggerInterface {
+export interface LoggerInterface {
   info: (obj: object) => void;
   warn: (obj: object) => void;
   error: (obj: object) => void;
@@ -113,23 +113,28 @@ function createLogger(): pino.Logger | LoggerInterface {
   }
 }
 
-// Simple factory function for fallback logger
-function createFallbackLogger(): LoggerInterface {
+// Simple factory function for fallback logger with context support
+function createFallbackLogger(context: object = {}): LoggerInterface {
+  // Helper to merge context and log object
+  function mergeContext(obj: object): object {
+    return { ...context, ...obj };
+  }
+
   return {
     info: (obj: object) => {
-      console.log("INFO:", obj);
+      console.log("INFO:", mergeContext(obj));
     },
     warn: (obj: object) => {
-      console.warn("WARN:", obj);
+      console.warn("WARN:", mergeContext(obj));
     },
     error: (obj: object) => {
-      console.error("ERROR:", obj);
+      console.error("ERROR:", mergeContext(obj));
     },
     debug: (obj: object) => {
-      console.debug("DEBUG:", obj);
+      console.debug("DEBUG:", mergeContext(obj));
     },
-    child: function (_options: object): LoggerInterface {
-      return createFallbackLogger();
+    child: function (options: object): LoggerInterface {
+      return createFallbackLogger({ ...context, ...options });
     },
   };
 }
@@ -242,32 +247,6 @@ export const logger = {
   child: (options: object) => {
     const mainChild = mainLogger.child(options);
     const fileChild = fileLogger?.child(options);
-    return {
-      info: (obj: object) => {
-        mainChild.info(obj);
-        if (fileChild) fileChild.info(obj);
-      },
-      warn: (obj: object) => {
-        mainChild.warn(obj);
-        if (fileChild) fileChild.warn(obj);
-      },
-      error: (obj: object) => {
-        mainChild.error(obj);
-        if (fileChild) fileChild.error(obj);
-      },
-      debug: (obj: object) => {
-        mainChild.debug(obj);
-        if (fileChild) fileChild.debug(obj);
-      },
-      child: (childOptions: object): LoggerInterface => {
-        const mainChildLogger = mainChild.child(
-          childOptions,
-        ) as LoggerInterface;
-        const fileChildLogger = fileChild?.child(childOptions) as
-          | LoggerInterface
-          | undefined;
-        return createDualChildLogger(mainChildLogger, fileChildLogger);
-      },
-    };
+    return createDualChildLogger(mainChild, fileChild);
   },
 };
