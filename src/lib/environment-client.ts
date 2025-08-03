@@ -2,28 +2,39 @@
  * Client-Safe Environment Detection Utilities
  *
  * These functions are safe to use in client components and during SSR/build.
- * They use runtime detection instead of server-side environment variables
- * to avoid SSR/build issues.
+ * They use the validated env schema for reliable environment detection.
  *
- * IMPORTANT: These are simplified client-safe versions.
- * For server-side logic, use ~/lib/environment.ts which has access to VERCEL_ENV.
+ * Uses VERCEL_ENV for proper preview deployment detection on Vercel.
  */
+
+import { env } from "~/env";
 
 /**
- * Runtime environment detection that works during SSR/build
- * Uses typeof checks to detect build vs runtime environment
+ * Runtime environment detection using validated environment variables
+ * Uses VERCEL_ENV for accurate preview deployment detection
  */
-function getClientEnvironment(): "development" | "production" | "test" {
-  // During build/SSR, we can't reliably detect environment
-  // Default to production for safety during static generation
-  if (typeof window === "undefined") {
-    return "production";
+function getClientEnvironment():
+  | "development"
+  | "production"
+  | "preview"
+  | "test" {
+  // Check for test environment first
+  if (env.NODE_ENV === "test") {
+    return "test";
   }
 
-  // At runtime, check for development indicators
-  const isDev =
-    typeof window !== "undefined" && window.location.hostname === "localhost";
-  return isDev ? "development" : "production";
+  // Use VERCEL_ENV if available (official Vercel environment detection)
+  if (env.VERCEL_ENV) {
+    return env.VERCEL_ENV;
+  }
+
+  // Fallback to NODE_ENV
+  if (env.NODE_ENV === "development") {
+    return "development";
+  }
+
+  // Default to production for safety
+  return "production";
 }
 
 /**
@@ -49,11 +60,26 @@ export function isTest(): boolean {
 }
 
 /**
+ * Check if running in preview environment (Vercel preview deployments)
+ */
+export function isPreview(): boolean {
+  return getClientEnvironment() === "preview";
+}
+
+/**
  * Check if running in development or test environment
  * Useful for features that should be available in both local dev and testing
  */
 export function isDevelopmentOrTest(): boolean {
   return isDevelopment() || isTest();
+}
+
+/**
+ * Check if running in development or preview environment
+ * Useful for features that should be available in both local dev and preview deployments
+ */
+export function isDevelopmentOrPreview(): boolean {
+  return isDevelopment() || isPreview();
 }
 
 /**
@@ -67,11 +93,10 @@ export function getEnvironmentName(): string {
  * Check if dev features should be enabled
  * This includes dev login, debug menus, etc.
  *
- * NOTE: This is a simplified client-safe version.
- * For server-side logic, use ~/lib/environment.ts for full VERCEL_ENV support.
+ * Enabled in both development and preview environments for testing
  */
 export function shouldEnableDevFeatures(): boolean {
-  return isDevelopment();
+  return isDevelopmentOrPreview();
 }
 
 /**
