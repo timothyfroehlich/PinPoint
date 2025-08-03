@@ -42,7 +42,13 @@ case "$1" in
     if [ -f "$PID_FILE" ]; then
       PID=$(cat "$PID_FILE")
       if ps -p $PID > /dev/null 2>&1; then
-        echo "Dev server running (PID: $PID)"
+        # Extract port from log file (look for "Local:" line)
+        PORT=$(grep -E "Local:\s+http://localhost:" "$LOG_FILE" 2>/dev/null | tail -1 | sed -E 's/.*http:\/\/localhost:([0-9]+).*/\1/')
+        if [ -n "$PORT" ]; then
+          echo "Dev server running (PID: $PID) at http://localhost:$PORT"
+        else
+          echo "Dev server running (PID: $PID) - port detection failed"
+        fi
       else
         echo "PID file exists but process not running"
         rm -f "$PID_FILE"

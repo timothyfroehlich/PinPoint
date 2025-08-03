@@ -10,12 +10,19 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
 
+import type { LoggerInterface } from "~/lib/logger";
 import type { SupabaseServerClient } from "~/lib/supabase/server";
 import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 import type { ExtendedPrismaClient } from "~/server/db";
 
 import { env } from "~/env";
+import { logger } from "~/lib/logger";
+import {
+  ERROR_MESSAGE_TRUNCATE_LENGTH,
+  SLOW_OPERATION_THRESHOLD_MS,
+} from "~/lib/logger-constants";
 import { createClient } from "~/lib/supabase/server";
+import { createTraceContext, traceStorage } from "~/lib/tracing";
 import { getUserPermissionsForSupabaseUser } from "~/server/auth/permissions";
 import { getSupabaseUser } from "~/server/auth/supabase";
 import { getGlobalDatabaseProvider } from "~/server/db/provider";
@@ -75,6 +82,9 @@ export interface TRPCContext {
   organization: Organization | null;
   services: ServiceFactory;
   headers: Headers;
+  logger: LoggerInterface;
+  traceId?: string;
+  requestId?: string;
 }
 
 /**
@@ -147,6 +157,7 @@ export const createTRPCContext = async (
     organization,
     services,
     headers: opts.headers,
+    logger,
   };
 };
 
@@ -170,34 +181,100 @@ export const createCallerFactory = t.createCallerFactory;
 export const createTRPCRouter = t.router;
 
 /**
- * Timing middleware
+ * Enhanced logging middleware with trace correlation
  */
-const timingMiddleware = t.middleware(async ({ next, path }) => {
+const loggingMiddleware = t.middleware(async ({ path, type, next, ctx }) => {
   const start = Date.now();
+  const traceContext = createTraceContext();
 
-  if (t._config.isDev) {
-    // artificial delay in dev
-    const waitMs = Math.floor(Math.random() * 400) + 100;
-    await new Promise((resolve) => setTimeout(resolve, waitMs));
-  }
+  const contextLogger = logger.child({
+    component: `tRPC.${type}.${path}`,
+    traceId: traceContext.traceId,
+    requestId: traceContext.requestId,
+    organizationId: ctx.organization?.id,
+    userId: ctx.user?.id,
+  });
 
-  const result = await next();
+  return traceStorage.run(traceContext, async () => {
+    const enhancedCtx = {
+      ...ctx,
+      logger: contextLogger,
+      traceId: traceContext.traceId,
+      requestId: traceContext.requestId,
+    };
 
-  const end = Date.now();
-  if (env.NODE_ENV !== "test") {
-    console.log(`[TRPC] ${path} took ${String(end - start)}ms to execute`);
-  }
+    try {
+      contextLogger.info({
+        msg: `${type} ${path} started`,
+        context: {
+          operation: path,
+          hasAuth: !!ctx.user,
+          hasOrg: !!ctx.organization,
+        },
+      });
 
-  return result;
+      if (t._config.isDev) {
+        // artificial delay in dev
+        const waitMs = Math.floor(Math.random() * 400) + 100;
+        await new Promise((resolve) => setTimeout(resolve, waitMs));
+      }
+
+      const result = await next({ ctx: enhancedCtx });
+      const duration = Date.now() - start;
+
+      // Log slow operations
+      if (duration > SLOW_OPERATION_THRESHOLD_MS) {
+        contextLogger.warn({
+          msg: `Slow ${type} ${path} completed`,
+          context: {
+            duration,
+            operation: path,
+            performance: "slow",
+          },
+        });
+      } else {
+        contextLogger.info({
+          msg: `${type} ${path} completed`,
+          context: {
+            duration,
+            operation: path,
+          },
+        });
+      }
+
+      return result;
+    } catch (error) {
+      const duration = Date.now() - start;
+
+      contextLogger.error({
+        msg: `${type} ${path} failed`,
+        error: {
+          type: error instanceof Error ? error.constructor.name : "Unknown",
+          code: (error as { code?: string }).code ?? "UNKNOWN",
+          message:
+            error instanceof Error
+              ? error.message.substring(0, ERROR_MESSAGE_TRUNCATE_LENGTH)
+              : "Unknown error",
+        },
+        context: {
+          duration,
+          operation: path,
+          success: false,
+        },
+      });
+
+      throw error;
+    }
+  });
 });
 
 /**
  * Base procedures
  */
-export const publicProcedure = t.procedure.use(timingMiddleware);
+export const publicProcedure = t.procedure.use(loggingMiddleware);
 
 export const protectedProcedure = t.procedure
-  .use(timingMiddleware)
+  .use(loggingMiddleware)
   .use(({ ctx, next }) => {
     if (!ctx.user) {
       throw new TRPCError({ code: "UNAUTHORIZED" });
