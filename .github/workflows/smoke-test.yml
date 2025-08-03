@@ -71,7 +71,7 @@ jobs:
           npm run smoke || {
             echo "🔍 Checking if we achieved minimum success criteria..."
             if grep -q "Step 3 Complete: Selected machine" test-results/*/error-context.md 2>/dev/null || \
-               grep -q "✅ SMOKE TEST - Step 3 Complete" *.log 2>/dev/null; then
+               grep -q "✅ SMOKE TEST - Step 3 Complete" ./*.log 2>/dev/null; then
               echo "✅ MINIMUM SUCCESS: Machine selection working - SSR fixes validated"
               exit 0
             else
