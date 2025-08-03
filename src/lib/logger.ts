@@ -109,24 +109,59 @@ function createLogger(): pino.Logger | LoggerInterface {
       "Failed to initialize pino logger, falling back to console:",
       error,
     );
-    return {
-      info: (obj: object) => {
-        console.log("INFO:", obj);
-      },
-      warn: (obj: object) => {
-        console.warn("WARN:", obj);
-      },
-      error: (obj: object) => {
-        console.error("ERROR:", obj);
-      },
-      debug: (obj: object) => {
-        console.debug("DEBUG:", obj);
-      },
-      child: function (_options: object): LoggerInterface {
-        return this;
-      }, // Return self for child loggers
-    };
+    return createFallbackLogger();
   }
+}
+
+// Simple factory function for fallback logger
+function createFallbackLogger(): LoggerInterface {
+  return {
+    info: (obj: object) => {
+      console.log("INFO:", obj);
+    },
+    warn: (obj: object) => {
+      console.warn("WARN:", obj);
+    },
+    error: (obj: object) => {
+      console.error("ERROR:", obj);
+    },
+    debug: (obj: object) => {
+      console.debug("DEBUG:", obj);
+    },
+    child: function (_options: object): LoggerInterface {
+      return createFallbackLogger();
+    },
+  };
+}
+
+// Simple helper for dual child logger creation
+function createDualChildLogger(
+  mainChild: LoggerInterface,
+  fileChild?: LoggerInterface,
+): LoggerInterface {
+  return {
+    info: (obj: object) => {
+      mainChild.info(obj);
+      if (fileChild) fileChild.info(obj);
+    },
+    warn: (obj: object) => {
+      mainChild.warn(obj);
+      if (fileChild) fileChild.warn(obj);
+    },
+    error: (obj: object) => {
+      mainChild.error(obj);
+      if (fileChild) fileChild.error(obj);
+    },
+    debug: (obj: object) => {
+      mainChild.debug(obj);
+      if (fileChild) fileChild.debug(obj);
+    },
+    child: (options: object): LoggerInterface =>
+      createDualChildLogger(
+        mainChild.child(options),
+        fileChild?.child(options),
+      ),
+  };
 }
 
 // Create the main logger (console in dev, file in prod)
@@ -231,26 +266,7 @@ export const logger = {
         const fileChildLogger = fileChild?.child(childOptions) as
           | LoggerInterface
           | undefined;
-        return {
-          info: (obj: object) => {
-            mainChildLogger.info(obj);
-            if (fileChildLogger) fileChildLogger.info(obj);
-          },
-          warn: (obj: object) => {
-            mainChildLogger.warn(obj);
-            if (fileChildLogger) fileChildLogger.warn(obj);
-          },
-          error: (obj: object) => {
-            mainChildLogger.error(obj);
-            if (fileChildLogger) fileChildLogger.error(obj);
-          },
-          debug: (obj: object) => {
-            mainChildLogger.debug(obj);
-            if (fileChildLogger) fileChildLogger.debug(obj);
-          },
-          child: (nestedOptions: object): LoggerInterface =>
-            mainChildLogger.child(nestedOptions),
-        };
+        return createDualChildLogger(mainChildLogger, fileChildLogger);
       },
     };
   },

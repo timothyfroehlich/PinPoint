@@ -81,7 +81,7 @@ export interface TRPCContext {
   organization: Organization | null;
   services: ServiceFactory;
   headers: Headers;
-  logger?: {
+  logger: {
     info: (obj: object) => void;
     warn: (obj: object) => void;
     error: (obj: object) => void;
@@ -161,6 +161,7 @@ export const createTRPCContext = async (
     organization,
     services,
     headers: opts.headers,
+    logger,
   };
 };
 
