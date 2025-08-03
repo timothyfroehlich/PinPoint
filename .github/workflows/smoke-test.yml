@@ -41,6 +41,7 @@ jobs:
           echo "🔧 Configuring environment for production Supabase testing..."
           echo "✅ Using production Supabase instance for CI testing"
           echo "📊 Test data will be isolated with SMOKE-TEST prefix"
+          echo "🔗 Database connections use Vercel-pulled environment variables"
         env:
           # Production Supabase instance (no local Docker needed)
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -48,10 +49,7 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          # Database connection
-          POSTGRES_PRISMA_URL: ${{ secrets.DATABASE_URL }}
-          POSTGRES_URL_NON_POOLING: ${{ secrets.DATABASE_URL }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          # Database connection variables are provided by .env.local from Vercel env pull
           # Test mode
           NODE_ENV: test
           CI: true
@@ -97,10 +95,7 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          # Database connection
-          POSTGRES_PRISMA_URL: ${{ secrets.DATABASE_URL }}
-          POSTGRES_URL_NON_POOLING: ${{ secrets.DATABASE_URL }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          # Database connection variables are provided by .env.local from Vercel env pull
           # Test mode
           NODE_ENV: test
           CI: true
@@ -117,7 +112,7 @@ jobs:
           " || echo "⚠️  Cleanup query failed, but continuing..."
           echo "✅ Test data cleanup completed"
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          # Database connection variable is provided by .env.local from Vercel env pull
 
       - name: Upload Playwright Report
         uses: actions/upload-artifact@v4
