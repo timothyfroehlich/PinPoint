@@ -111,18 +111,25 @@ export function DevLoginCompact({
 
       if (result.success) {
         console.log("Dev login successful:", result.method);
-        alert(message);
-        // Refresh the page to update auth state
-        window.location.reload();
+        // Only use browser APIs if running in browser
+        if (typeof window !== "undefined") {
+          alert(message);
+          // Refresh the page to update auth state
+          window.location.reload();
+        }
       } else {
         console.error("Login failed:", result.error);
-        alert(message);
+        if (typeof window !== "undefined") {
+          alert(message);
+        }
       }
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       console.error("Login failed:", errorMessage);
-      alert(`Login failed: ${errorMessage}`);
+      if (typeof window !== "undefined") {
+        alert(`Login failed: ${errorMessage}`);
+      }
     } finally {
       setIsLoading(false);
     }

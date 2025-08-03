@@ -10,30 +10,40 @@
 import { env } from "~/env";
 
 /**
- * Runtime environment detection using validated environment variables
- * Uses VERCEL_ENV for accurate preview deployment detection
+ * Runtime environment detection using client-safe public environment variables
+ * Uses NEXT_PUBLIC_VERCEL_ENV which is automatically set by next.config.mjs
+ * from VERCEL_ENV (Vercel deployments) or NODE_ENV (local development)
  */
 function getClientEnvironment():
   | "development"
   | "production"
   | "preview"
   | "test" {
-  // Check for test environment first
-  if (env.NODE_ENV === "test") {
-    return "test";
+  // Primary: Use NEXT_PUBLIC_VERCEL_ENV (automatically set by Next.js config)
+  if (env.NEXT_PUBLIC_VERCEL_ENV) {
+    // Validate the value is one of our expected types
+    if (
+      ["development", "production", "preview", "test"].includes(
+        env.NEXT_PUBLIC_VERCEL_ENV,
+      )
+    ) {
+      return env.NEXT_PUBLIC_VERCEL_ENV as
+        | "development"
+        | "production"
+        | "preview"
+        | "test";
+    }
   }
 
-  // Use VERCEL_ENV if available (official Vercel environment detection)
-  if (env.VERCEL_ENV) {
-    return env.VERCEL_ENV;
+  // Fallback 1: Browser-based detection for localhost
+  if (typeof window !== "undefined") {
+    const hostname = window.location.hostname;
+    if (hostname === "localhost" || hostname.includes("127.0.0.1")) {
+      return "development";
+    }
   }
 
-  // Fallback to NODE_ENV
-  if (env.NODE_ENV === "development") {
-    return "development";
-  }
-
-  // Default to production for safety
+  // Fallback 2: Default to production for safety
   return "production";
 }
 
@@ -54,9 +64,22 @@ export function isProduction(): boolean {
 
 /**
  * Check if running in test environment
+ * Note: Test detection needs special handling since it's not available via public env vars
  */
 export function isTest(): boolean {
-  return getClientEnvironment() === "test";
+  // In test environment, we can safely check NODE_ENV since tests run in Node.js
+  if (typeof process !== "undefined" && typeof window === "undefined") {
+    // Server-side: use validated env for test detection
+    try {
+      return env.NODE_ENV === "test";
+    } catch {
+      // Fallback if env access fails
+      return false;
+    }
+  }
+
+  // Client-side: tests don't typically run in browser, so default to false
+  return false;
 }
 
 /**
