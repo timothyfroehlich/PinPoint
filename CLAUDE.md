@@ -31,6 +31,32 @@ enabled = true  # Re-enable for real-time features
 enabled = true  # Re-enable for database management UI
 ```
 
+## 🚨 DATABASE SCHEMA COORDINATION WARNING
+
+**CRITICAL**: PinPoint uses a **SINGLE SHARED** local Supabase instance across all worktrees.
+
+**⚠️ BEFORE making database schema changes:**
+
+- **Check other worktrees**: Coordinate with any other development work
+- **Announce changes**: Let Tim know if you're about to modify schema
+- **Consider impact**: Schema changes affect ALL active worktrees immediately
+- **Test thoroughly**: Changes cannot be isolated to single worktree
+
+**🔧 Safe Development Pattern:**
+
+1. Check active worktrees: `./scripts/list-worktrees.sh`
+2. Announce schema change intention
+3. Make changes in ONE worktree only
+4. Test across all affected worktrees
+5. Update other developers if working collaboratively
+
+**🗃️ Database Architecture:**
+
+- **Local Development**: Single shared Supabase instance (ports 54321-54324)
+- **All Worktrees**: Connect to same local database
+- **Schema Changes**: Immediately visible across all worktrees
+- **Data Changes**: Shared across all local development work
+
 ## Tech Stack (TRANSITIONING)
 
 ### Current Stack (Being Replaced)
@@ -49,7 +75,14 @@ enabled = true  # Re-enable for database management UI
 
 ## Migration Resources
 
-### Quick References
+### Quick References (Auto-Loaded)
+
+- **TypeScript Strictest Patterns**: `@docs/quick-reference/typescript-strictest-patterns.md`
+- **Testing Patterns**: `@docs/quick-reference/testing-patterns.md`
+- **API Security Patterns**: `@docs/quick-reference/api-security-patterns.md`
+- **Migration Patterns**: `@docs/quick-reference/migration-patterns.md`
+
+### Migration-Specific References
 
 - **Auth Pattern Mapping**: `@docs/migration/supabase-drizzle/quick-reference/auth-patterns.md`
 - **Prisma → Drizzle**: `@docs/migration/supabase-drizzle/quick-reference/prisma-to-drizzle.md`
@@ -163,44 +196,13 @@ npm run typecheck | grep "usePermissions"        # Find specific function errors
 
 ## TypeScript Standards
 
-**Complete Reference**: See `@docs/developer-guides/typescript-guide.md` for comprehensive patterns and error solutions.
-
-### Quick Patterns for Agents
-
-```typescript
-// Null safety with optional chaining
-if (!ctx.session?.user?.id) throw new Error("Not authenticated");
-const userId = ctx.session.user.id; // Now safe
-
-// Safe array access
-const firstItem = items[0]?.name ?? "No items";
-
-// Optional property assignment (exactOptionalPropertyTypes)
-const data: { name?: string } = {};
-if (value) data.name = value;
-```
+**Complete Reference**: See `@docs/quick-reference/typescript-strictest-patterns.md` (auto-loaded) for patterns and error solutions.
 
 ### Multi-Config Strategy
 
 - **Production Code** (`tsconfig.json`): `@tsconfig/strictest` - zero tolerance for errors
 - **Test Utilities** (`tsconfig.test-utils.json`): `@tsconfig/recommended` - moderate standards
 - **Test Files** (`tsconfig.tests.json`): Relaxed - pragmatic patterns allowed
-
-### Essential Commands
-
-```bash
-# Quick validation (check-only, CI-friendly)
-npm run check
-
-# Quick validation with auto-fix
-npm run check:fix
-
-# Pre-commit validation
-npm run validate
-
-# Full pre-PR validation
-npm run pre-commit
-```
 
 ### Config-Specific Commands
 
@@ -244,27 +246,13 @@ npm run pre-commit
 
 ### Memory Server Usage
 
-The Memory MCP server stores critical coding standards and patterns as a knowledge graph. Key entities include:
-
-- **PinPoint Tech Stack**: Core technologies and configuration
-- **TypeScript Strictest Standards**: Zero-tolerance rules and patterns
-- **Multi-Tenancy Architecture**: Row-level security and org scoping
-- **API Security Patterns**: tRPC procedures and permission checks
-- **Testing Best Practices**: Mock patterns and coverage requirements
-- **Common TypeScript Fixes**: Solutions for strictest mode errors
+The Memory MCP server stores critical coding standards and patterns as a knowledge graph. Use for complex pattern lookup beyond the auto-loaded quick references.
 
 Quick commands:
 
 - `mcp__memory__search_nodes` - Search for patterns by keyword
 - `mcp__memory__open_nodes` - Get specific entity details
 - `mcp__memory__read_graph` - See all stored knowledge
-
-Use memory to quickly recall:
-
-- Specific TypeScript error fixes
-- Prisma mock patterns with $accelerate
-- tRPC router patterns and security
-- Multi-tenant query patterns
 
 ## Test-Architect Agent Usage
 
@@ -412,15 +400,6 @@ The test-architect will update `test-map.md` and `source-map.md` as it works. Th
 - **Pattern Updates**: Update quick reference guides for new patterns or deprecated approaches
 - **Migration Progress Tracking**: Update implementation status and lessons learned
 
-### Code Patterns
-
-```typescript
-// Temporary dual support example
-const user = process.env.USE_SUPABASE_AUTH
-  ? await getSupabaseUser()
-  : await getNextAuthUser();
-```
-
 ### Database Commands (Migration Period)
 
 ```bash
@@ -459,42 +438,16 @@ npm run drizzle:migrate # Coming in Stage 2
 - **Prisma Studio**: AVOID launching Prisma Studio (`npm run db:studio`) unless absolutely necessary for debugging complex data issues. Use direct SQL queries, schema file reading, or existing component inspection instead.
 - **Import Path Consistency**: ALWAYS use the TypeScript path alias `~/` for internal imports. NEVER use relative paths like `../../../lib/supabase/client`. ESLint enforces this with `no-restricted-imports` rule to prevent deep relative imports.
 
-## Key Lessons Learned (Non-Obvious Insights)
+## Key Lessons Learned (Project-Specific)
 
-### Counter-Intuitive Discoveries
+**Complete Reference**: See `@docs/lessons-learned/INDEX.md` for comprehensive insights and counter-intuitive discoveries.
 
-- **Mock data accuracy was critical for test reliability**: Initial test failures weren't due to logic bugs but because mocks returned full objects while APIs used Prisma `select` clauses - mocks must simulate exact response structure
-- **Explicit dependency mocking forces better architecture**: What initially seemed like Vitest being "more work" actually drove better dependency injection patterns and cleaner service boundaries
-- **Multi-config TypeScript complexity vs. benefits**: Sophisticated 4-tier TypeScript setup provides precise control but requires careful agent guidance to navigate effectively
-- **Permission system implementation learnings**: Dependency injection pattern for testing permission components proved essential for both authorized and unauthorized state testing
-- **Public endpoints still need multi-tenant scoping**: Even unauthenticated APIs must respect organization boundaries through subdomain resolution, not just skip authentication entirely
-- **"Migration complete" doesn't mean "working"**: Functionality existing in codebase doesn't guarantee it's properly tested or behaves correctly under all conditions
-- **Import path inconsistency can cause cascade failures**: During Supabase migration, 24+ TypeScript errors appeared due to files mixing relative imports (`../../../lib/supabase/client`) with TypeScript aliases (`~/lib/supabase/client`). The modules existed but path resolution failed. Solution: ESLint `no-restricted-imports` rule now prevents deep relative imports, enforcing consistent `~/` alias usage.
+### Critical Project Insights
 
-### Performance Insights
-
-- **7-65x performance improvements**: Not just marketing - real measured improvements from Jest → Vitest migration with the biggest gains on pure functions (65x) and service layer tests (12-19x)
-- **ESM transformation overhead is significant**: Native ESM support eliminated a major performance bottleneck that wasn't obvious until measuring before/after
-
-### Security & Testing Revelations
-
-- **Permission UI testing requires both states**: Testing permission-based components for authorized state isn't enough - must test unauthorized state with proper fallbacks/tooltips
-- **Dependency injection transformed permission testing**: PermissionDepsProvider pattern enables precise mocking of session and membership data, leading to more reliable permission component tests
-- **Security boundaries blur with public endpoints**: Public APIs can leak sensitive data through careless Prisma queries - explicit `select` clauses are essential for data security
-- **Test mocks often fail to catch real API issues**: If mocks don't match production API structure exactly, tests give false confidence
-- **TypeScript migration success**: Achieved 100% strictest TypeScript compliance across all production code through systematic error resolution and validation pipeline enforcement
-
-### Unified Dashboard Benefits
-
-- **User Experience**: No "broken" logout experience, fast initial page load, graceful authentication failures.
-- **SEO & Accessibility**: Public content indexable, works without JavaScript for public features, progressive enhancement improves with better browsers/connection.
-- **Development Benefits**: Easier testing, clearer separation between public and private features, simpler error handling.
-
-### Counter-Intuitive Authentication Insights
-
-- **Authentication Isn't Binary**: Traditional thinking: "Either authenticated or not" Reality: "Public experience enhanced by authentication".
-- **Logout Should Preserve Context**: Traditional thinking: "Logout clears everything, redirect to login" Reality: "Logout removes private features, keeps public context".
-- **Single Page, Multiple Audiences**: Traditional thinking: "Different pages for public/private users" Reality: "Same page, different enhancement levels".
+- **Shared database coordination**: Single Supabase instance across worktrees requires careful schema change coordination
+- **Migration staged approach works**: 6-week phased migration (Auth → Drizzle → RLS) preventing big-bang failures
+- **Import path consistency prevents cascade failures**: TypeScript alias enforcement (`~/`) essential for migration stability
+- **Multi-config TypeScript complexity**: 4-tier setup requires careful agent guidance but provides precise control
 
 ## Claude Memories
 
