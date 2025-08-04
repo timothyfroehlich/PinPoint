@@ -261,6 +261,11 @@ export default tseslint.config(
     },
   },
   {
+    // Disable type-aware linting for scripts to avoid tsconfig issues
+    files: ["scripts/**/*.ts"],
+    ...tseslint.configs.disableTypeChecked,
+  },
+  {
     // Override: Allow drizzle-orm patterns in schema files
     // Drizzle ORM requires patterns that conflict with @tsconfig/strictest
     files: ["src/server/db/schema/*.ts"],

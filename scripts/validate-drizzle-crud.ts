@@ -16,6 +16,7 @@
 import { eq, and, sql } from "drizzle-orm";
 import { createDrizzleClient } from "~/server/db/drizzle";
 import * as schema from "~/server/db/schema";
+import { env } from "~/env.js";
 
 // Type imports for validation
 import type { DrizzleClient } from "~/server/db/drizzle";
@@ -34,10 +35,53 @@ class DrizzleCRUDValidator {
   private results: CRUDTestResult[] = [];
   private testOrgId = `test-org-${Date.now()}`;
   private testUserId = `test-user-${Date.now()}`;
+  private testModelId = `test-model-${Date.now()}`;
+  private isMinimalMode: boolean;
 
-  constructor() {
-    console.log("🔧 Initializing Drizzle CRUD Validator...");
+  constructor(minimalMode = false) {
+    this.isMinimalMode = minimalMode;
+    if (minimalMode) {
+      console.log("🔧 Initializing Drizzle CRUD Validator (Minimal Mode)...");
+    } else {
+      console.log("🔧 Initializing Drizzle CRUD Validator (Full Mode)...");
+    }
     this.db = createDrizzleClient();
+  }
+
+  /**
+   * Test basic database connectivity before running validation tests
+   */
+  async testConnection(): Promise<boolean> {
+    const startTime = Date.now();
+    try {
+      // Simple ping test using a basic SQL query
+      await this.db.execute(sql`SELECT 1 as ping`);
+
+      await this.recordResult(
+        "CONNECTION_TEST",
+        "database",
+        startTime,
+        undefined,
+        "Database connection successful",
+      );
+      return true;
+    } catch (error) {
+      await this.recordResult(
+        "CONNECTION_TEST",
+        "database",
+        startTime,
+        error as Error,
+      );
+
+      console.log("\n💡 Connection troubleshooting:");
+      console.log("   - Check if Supabase is running: npm run dev:bg:status");
+      console.log("   - Verify DATABASE_URL in your environment");
+      console.log(
+        `   - Connection string: ${env.POSTGRES_PRISMA_URL?.replace(/\/\/[^@]*@/, "//***:***@")}`,
+      );
+
+      return false;
+    }
   }
 
   private async recordResult(
@@ -132,7 +176,7 @@ class DrizzleCRUDValidator {
         .values({
           id: `test-location-${Date.now()}`,
           name: "Test Location",
-          address: "123 Test Street",
+          street: "123 Test Street",
           organizationId: this.testOrgId,
         })
         .returning();
@@ -159,11 +203,10 @@ class DrizzleCRUDValidator {
       const [model] = await this.db
         .insert(schema.models)
         .values({
-          id: `test-model-${Date.now()}`,
+          id: this.testModelId,
           name: "Test Pinball Model",
           manufacturer: "Drizzle Games Inc",
           year: 2024,
-          organizationId: this.testOrgId,
         })
         .returning();
 
@@ -255,19 +298,14 @@ class DrizzleCRUDValidator {
           locationCount: sql<number>`count(${schema.locations.id})`.as(
             "location_count",
           ),
-          modelCount: sql<number>`count(distinct ${schema.models.id})`.as(
-            "model_count",
-          ),
+          // Note: Model count removed as models are not organization-scoped
         })
         .from(schema.organizations)
         .leftJoin(
           schema.locations,
           eq(schema.organizations.id, schema.locations.organizationId),
         )
-        .leftJoin(
-          schema.models,
-          eq(schema.organizations.id, schema.models.organizationId),
-        )
+        // Note: Models are global entities, no organization scoping
         .where(eq(schema.organizations.id, this.testOrgId))
         .groupBy(schema.organizations.id);
 
@@ -276,7 +314,7 @@ class DrizzleCRUDValidator {
         "organizations",
         startAggregate,
         undefined,
-        `Org stats: ${orgStats?.locationCount} locations, ${orgStats?.modelCount} models`,
+        `Org stats: ${orgStats?.locationCount} locations`,
       );
     } catch (error) {
       await this.recordResult(
@@ -361,7 +399,7 @@ class DrizzleCRUDValidator {
       const result = await this.db
         .update(schema.locations)
         .set({
-          address: "Updated Test Address",
+          street: "Updated Test Address",
         })
         .where(eq(schema.locations.organizationId, this.testOrgId))
         .returning();
@@ -394,7 +432,7 @@ class DrizzleCRUDValidator {
     try {
       const result = await this.db
         .delete(schema.models)
-        .where(eq(schema.models.organizationId, this.testOrgId))
+        .where(eq(schema.models.id, this.testModelId))
         .returning();
 
       await this.recordResult(
@@ -530,12 +568,16 @@ class DrizzleCRUDValidator {
       );
 
       // Cleanup
-      await this.db
-        .delete(schema.users)
-        .where(eq(schema.users.id, result.user!.id));
-      await this.db
-        .delete(schema.organizations)
-        .where(eq(schema.organizations.id, result.org!.id));
+      if (result.user?.id) {
+        await this.db
+          .delete(schema.users)
+          .where(eq(schema.users.id, result.user.id));
+      }
+      if (result.org?.id) {
+        await this.db
+          .delete(schema.organizations)
+          .where(eq(schema.organizations.id, result.org.id));
+      }
     } catch (error) {
       await this.recordResult(
         "TRANSACTION SUCCESS",
@@ -550,7 +592,7 @@ class DrizzleCRUDValidator {
     try {
       await this.db.transaction(async (tx) => {
         // Create user successfully
-        const [user] = await tx
+        await tx
           .insert(schema.users)
           .values({
             id: `rollback-user-${Date.now()}`,
@@ -576,7 +618,7 @@ class DrizzleCRUDValidator {
         startRollbackTransaction,
         new Error("Transaction should have been rolled back"),
       );
-    } catch (error) {
+    } catch {
       // This is expected - verify no data was committed
       const users = await this.db
         .select()
@@ -637,22 +679,28 @@ class DrizzleCRUDValidator {
     }
 
     console.log(`\n⚡ PERFORMANCE:`);
-    const avgDuration =
-      this.results.reduce((sum, r) => sum + r.duration, 0) / totalTests;
-    const slowestTest = this.results.reduce((max, r) =>
-      r.duration > max.duration ? r : max,
-    );
-    const fastestTest = this.results.reduce((min, r) =>
-      r.duration < min.duration ? r : min,
-    );
+    if (totalTests > 0) {
+      const avgDuration =
+        this.results.reduce((sum, r) => sum + r.duration, 0) / totalTests;
+      const slowestTest = this.results.reduce((max, r) =>
+        r.duration > max.duration ? r : max,
+      );
+      const fastestTest = this.results.reduce((min, r) =>
+        r.duration < min.duration ? r : min,
+      );
 
-    console.log(`   Average: ${avgDuration.toFixed(1)}ms`);
-    console.log(
-      `   Fastest: ${fastestTest.operation} ${fastestTest.table} (${fastestTest.duration}ms)`,
-    );
-    console.log(
-      `   Slowest: ${slowestTest.operation} ${slowestTest.table} (${slowestTest.duration}ms)`,
-    );
+      console.log(`   Average: ${avgDuration.toFixed(1)}ms`);
+      console.log(
+        `   Fastest: ${fastestTest.operation} ${fastestTest.table} (${fastestTest.duration}ms)`,
+      );
+      console.log(
+        `   Slowest: ${slowestTest.operation} ${slowestTest.table} (${slowestTest.duration}ms)`,
+      );
+    } else {
+      console.log(
+        `   No performance data available - all tests failed to execute`,
+      );
+    }
 
     console.log(`\n📊 BY OPERATION TYPE:`);
     const operationTypes = [...new Set(this.results.map((r) => r.operation))];
@@ -670,14 +718,107 @@ class DrizzleCRUDValidator {
   }
 
   /**
+   * Run minimal connectivity and basic operations test
+   */
+  async runMinimalTests(): Promise<void> {
+    console.log("🚀 Starting Drizzle CRUD Validation (Minimal)...");
+    console.log(`Environment: ${env.NODE_ENV}`);
+    console.log(
+      `Database: ${env.POSTGRES_PRISMA_URL?.split("@")[1] ?? "Unknown"}`,
+    );
+
+    try {
+      // Step 1: Test basic connection first
+      const connectionSuccess = await this.testConnection();
+      if (!connectionSuccess) {
+        console.error("\n💥 Connection test failed - skipping remaining tests");
+        this.generateReport();
+        return;
+      }
+
+      // Step 2: Basic data query (no data modification)
+      const startConnectivity = Date.now();
+      try {
+        const userCount = await this.db
+          .select({ count: sql<number>`count(*)` })
+          .from(schema.users);
+
+        await this.recordResult(
+          "DATA_QUERY",
+          "users",
+          startConnectivity,
+          undefined,
+          `Found ${userCount[0]?.count ?? 0} users`,
+        );
+      } catch (error) {
+        await this.recordResult(
+          "DATA_QUERY",
+          "users",
+          startConnectivity,
+          error as Error,
+        );
+      }
+
+      // Step 3: Schema validation (verify all tables exist)
+      const tables = [
+        { table: schema.users, name: "users" },
+        { table: schema.organizations, name: "organizations" },
+        { table: schema.locations, name: "locations" },
+        { table: schema.models, name: "models" },
+        { table: schema.machines, name: "machines" },
+      ];
+
+      for (const { table, name } of tables) {
+        const startSchema = Date.now();
+        try {
+          await this.db.select().from(table).limit(1);
+          await this.recordResult(
+            "SCHEMA_CHECK",
+            name,
+            startSchema,
+            undefined,
+            "Table accessible",
+          );
+        } catch (error) {
+          await this.recordResult(
+            "SCHEMA_CHECK",
+            name,
+            startSchema,
+            error as Error,
+          );
+        }
+      }
+    } catch (error) {
+      console.error("\n💥 Minimal validation failed:", error);
+    }
+
+    this.generateReport();
+  }
+
+  /**
    * Run all CRUD validation tests
    */
   async runAllTests(): Promise<void> {
-    console.log("🚀 Starting Drizzle CRUD Validation...");
+    console.log("🚀 Starting Drizzle CRUD Validation (Full)...");
     console.log(`Environment: ${env.NODE_ENV}`);
-    console.log(`Database: ${env.DATABASE_URL?.split("@")[1] ?? "Unknown"}`);
+    console.log(
+      `Database: ${env.POSTGRES_PRISMA_URL?.split("@")[1] ?? "Unknown"}`,
+    );
 
     try {
+      if (this.isMinimalMode) {
+        await this.runMinimalTests();
+        return;
+      }
+
+      // Test connection first before running full CRUD tests
+      const connectionSuccess = await this.testConnection();
+      if (!connectionSuccess) {
+        console.error("\n💥 Connection test failed - skipping remaining tests");
+        this.generateReport();
+        return;
+      }
+
       await this.testInsertOperations();
       await this.testSelectOperations();
       await this.testUpdateOperations();
@@ -693,10 +834,14 @@ class DrizzleCRUDValidator {
 
 // Main execution
 async function main() {
-  const validator = new DrizzleCRUDValidator();
+  // Check if minimal mode is requested via environment variable or CLI arg
+  const isMinimalMode =
+    process.env["DB_VALIDATE_MINIMAL"] === "true" ||
+    process.argv.includes("--minimal");
+
+  const validator = new DrizzleCRUDValidator(isMinimalMode);
   await validator.runAllTests();
 }
 
-if (require.main === module) {
-  main().catch(console.error);
-}
+// Execute when run directly
+main().catch(console.error);

@@ -14,12 +14,18 @@ function createDrizzleClientInternal() {
     throw new Error("POSTGRES_PRISMA_URL is required for Drizzle client");
   }
 
-  // Create postgres-js connection with Supabase-optimized settings
+  // Determine SSL configuration based on environment
+  const isLocalhost =
+    connectionString.includes("localhost") ||
+    connectionString.includes("127.0.0.1");
+  const sslConfig = isLocalhost && isDevelopment() ? false : "require";
+
+  // Create postgres-js connection with environment-optimized settings
   const sql = postgres(connectionString, {
     max: 1, // Serverless optimization - single connection
-    idle_timeout: 20, // Close idle connections quickly
-    connect_timeout: 10, // Fast connection timeout
-    ssl: "require", // Supabase requires SSL
+    idle_timeout: isDevelopment() ? 60 : 20, // Longer timeout for development
+    connect_timeout: isDevelopment() ? 30 : 10, // More generous timeout for dev
+    ssl: sslConfig, // Conditional SSL based on environment
   });
 
   return drizzle(sql, {
@@ -54,11 +60,17 @@ export const createDrizzleClient = (): DrizzleClient => {
       throw new Error("POSTGRES_PRISMA_URL is required for Drizzle client");
     }
 
+    // Determine SSL configuration based on environment
+    const isLocalhost =
+      connectionString.includes("localhost") ||
+      connectionString.includes("127.0.0.1");
+    const sslConfig = isLocalhost && isDevelopment() ? false : "require";
+
     const sql = postgres(connectionString, {
       max: 1, // Single connection for development
-      idle_timeout: 20,
-      connect_timeout: 10,
-      ssl: "require",
+      idle_timeout: isDevelopment() ? 60 : 20, // Longer timeout for development
+      connect_timeout: isDevelopment() ? 30 : 10, // More generous timeout for dev
+      ssl: sslConfig, // Conditional SSL based on environment
     });
 
     global.__sql = sql;

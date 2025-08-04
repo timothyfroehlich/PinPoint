@@ -146,7 +146,52 @@ jobs:
           name: codecov-umbrella
           fail_ci_if_error: true
 
-  # Job 5: Security Audit
+  # Job 5: Database Validation (Drizzle ORM)
+  database-validation:
+    name: Database Validation
+    runs-on: ubuntu-latest
+    needs: test  # Run after tests pass
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NODE_ENV: "test"
+      POSTGRES_PRISMA_URL: "postgresql://test_user:test_password@localhost:5432/test_db"
+      POSTGRES_URL_NON_POOLING: "postgresql://test_user:test_password@localhost:5432/test_db"
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+          cache: "npm"
+      - run: npm ci
+      - name: Setup Database Schema
+        run: npm run db:push
+      - name: Run Database CRUD Validation
+        run: npm run db:validate:ci
+        timeout-minutes: 5
+      - name: Upload Database Validation Report
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: database-validation-report
+          path: database-validation.log
+          retention-days: 7
+
+  # Job 6: Security Audit
   security:
     name: Security
     runs-on: ubuntu-latest
@@ -162,7 +207,7 @@ jobs:
       - name: Security Audit
         run: npm run deps:check
 
-  # Job 6: End-to-End Tests (Playwright) - DISABLED during Supabase migration
+  # Job 7: End-to-End Tests (Playwright) - DISABLED during Supabase migration
   # Uncomment the section below when E2E tests are ready to be re-enabled
   #
   # e2e:
@@ -228,7 +273,7 @@ jobs:
   #         path: playwright-report/
   #         retention-days: 30
 
-  # Job 7: Validate GitHub Actions
+  # Job 8: Validate GitHub Actions
   validate-actions:
     name: Validate Actions
     runs-on: ubuntu-latest
@@ -249,6 +294,7 @@ jobs:
         lint,
         format,
         test,
+        database-validation,
         security,
         # e2e,  # DISABLED during Supabase migration
         validate-actions,
@@ -264,6 +310,7 @@ jobs:
              [ "${{ needs.lint.result }}" != "success" ] ||
              [ "${{ needs.format.result }}" != "success" ] ||
              [ "${{ needs.test.result }}" != "success" ] ||
+             [ "${{ needs.database-validation.result }}" != "success" ] ||
              [ "${{ needs.security.result }}" != "success" ] ||
              [ "${{ needs.validate-actions.result }}" != "success" ]; then
             echo "❌ One or more required checks failed"
@@ -277,6 +324,7 @@ jobs:
           echo "- lint: ${{ needs.lint.result }}"
           echo "- format: ${{ needs.format.result }}"
           echo "- test: ${{ needs.test.result }}"
+          echo "- database-validation: ${{ needs.database-validation.result }}"
           echo "- security: ${{ needs.security.result }}"
           echo "- validate-actions: ${{ needs.validate-actions.result }}"
           echo ""

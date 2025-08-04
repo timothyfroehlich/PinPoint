@@ -83,7 +83,7 @@ export const notifications = pgTable("Notification", {
 });
 
 // TODO: Notification indexes temporarily disabled due to Drizzle nullable field issue
-// Will be re-enabled after resolving index compatibility
+// Target: Phase 2B index optimization (Issue #246) - Q1 2025
 // export const notificationUserReadIndex = index(
 //   "Notification_userId_read_idx",
 // ).on(notifications.userId, notifications.read);
@@ -115,7 +115,7 @@ export const pinballMapConfigs = pgTable("PinballMapConfig", {
 // =================================
 
 // TODO: All collection indexes temporarily disabled due to Drizzle compatibility issues
-// Will be re-enabled after resolving index field compatibility
+// Target: Phase 2B index optimization (Issue #246) - Q1 2025
 
 // Multi-tenancy: organizationId filtering (most critical)
 // export const collectionTypeOrgIndex = index(
