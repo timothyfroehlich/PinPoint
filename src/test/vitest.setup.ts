@@ -332,20 +332,23 @@ beforeAll(() => {
 });
 
 // MSW setup for both Node and jsdom environments
-const { server } = await import("./msw/setup");
+let server: ReturnType<(typeof import("msw/node"))["setupServer"]> | null =
+  null;
 
-beforeAll(() => {
+beforeAll(async () => {
+  const { server: mswServer } = await import("./msw/setup");
+  server = mswServer;
   server.listen({
     onUnhandledRequest: "warn", // Warn on unhandled requests
   });
 });
 
 afterEach(() => {
-  server.resetHandlers();
+  server?.resetHandlers();
 });
 
 afterAll(() => {
-  server.close();
+  server?.close();
 });
 
 afterEach(() => {
