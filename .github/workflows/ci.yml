@@ -56,9 +56,9 @@ jobs:
           name: typescript-errors
           path: typescript-output.log
 
-  # Job 2: ESLint Linting (Split into production and test)
-  lint-production:
-    name: ESLint (Production)
+  # Job 2: ESLint Linting
+  lint:
+    name: ESLint
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -79,74 +79,9 @@ jobs:
         with:
           node-version: "24"
           cache: "npm"
-      - name: Install Vercel CLI
-        run: npm install --global vercel@latest
-      - name: Pull Vercel Environment Variables
-        run: vercel env pull .env.local --token=${{ secrets.VERCEL_TOKEN }}
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-      - name: Validate Environment Variables
-        run: |
-          echo "Checking for required Supabase environment variables..."
-          if [ ! -f .env.local ]; then
-            echo "❌ .env.local file not found after Vercel env pull"
-            exit 1
-          fi
-          
-          REQUIRED_VARS="SUPABASE_URL SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY SUPABASE_JWT_SECRET NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_ANON_KEY"
-          MISSING_VARS=""
-          
-          for var in $REQUIRED_VARS; do
-            if ! grep -q "^$var=" .env.local; then
-              MISSING_VARS="$MISSING_VARS $var"
-            fi
-          done
-          
-          if [ -n "$MISSING_VARS" ]; then
-            echo "❌ Missing required environment variables:$MISSING_VARS"
-            echo "Please ensure these are configured in your Vercel project"
-            exit 1
-          fi
-          
-          echo "✅ All required Supabase environment variables are present"
-      
-      # Clean npm install with cache verification
-      - name: Install Dependencies
-        run: |
-          echo "📦 Installing dependencies with clean cache..."
-          rm -rf node_modules/.cache || true
-          npm ci --prefer-offline --no-audit
-          echo "✅ Dependencies installed"
-          
-      - name: ESLint Check - Production Code  
-        run: |
-          echo "🔍 Running ESLint on production code..."
-          npm run lint
-
-  lint-tests:
-    name: ESLint (Tests)
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: "24"
-          cache: "npm"
-      - name: Install Vercel CLI
-        run: npm install --global vercel@latest
-      - name: Pull Vercel Environment Variables
-        run: vercel env pull .env.local --token=${{ secrets.VERCEL_TOKEN }}
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
       - run: npm ci
-      - name: ESLint Check - Test Files (Non-blocking)  
-        run: |
-          npm run lint 2>&1 | tee eslint-test-output.log || true
-          echo "✅ Test linting completed (warnings/errors are non-blocking)" >> "$GITHUB_STEP_SUMMARY"
+      - name: ESLint Check
+        run: npm run lint
 
   # Job 3: Prettier Formatting
   format:
@@ -164,25 +99,42 @@ jobs:
       - name: Prettier Check
         run: npm run format
 
-  # Job 4: Tests with Coverage (Temporarily Disabled - Supabase CI integration in progress)
-  # Will be re-enabled once Supabase local CI setup is stabilized in PR #254
-  #
-  # test:
-  #   name: Tests
-  #   runs-on: ubuntu-latest
-  #   permissions:
-  #     contents: read
-  #   env:
-  #     NODE_ENV: "test"
-  #   steps:
-  #     - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-  #     - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-  #       with:
-  #         node-version: "24"
-  #         cache: "npm"
-  #     - run: npm ci
-  #     - name: Run Tests with Coverage
-  #       run: npm run test:coverage
+  # Job 4: Tests with Coverage
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NODE_ENV: "test"
+      DATABASE_URL: "postgresql://test_user:test_password@localhost:5432/test_db"
+      POSTGRES_PRISMA_URL: "postgresql://test_user:test_password@localhost:5432/test_db"
+      POSTGRES_URL_NON_POOLING: "postgresql://test_user:test_password@localhost:5432/test_db"
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+          cache: "npm"
+      - run: npm ci
+      - name: Setup Database Schema
+        run: npm run db:push
+      - name: Run Tests with Coverage
+        run: npm run test:coverage
 
   # Job 5: Security Audit
   security:
@@ -284,10 +236,9 @@ jobs:
     needs:
       [
         typecheck,
-        lint-production,
-        lint-tests,
+        lint,
         format,
-        # test,  # DISABLED - Supabase CI integration in progress (PR #254)
+        test,
         security,
         # e2e,  # DISABLED during Supabase migration
         validate-actions,
@@ -300,8 +251,9 @@ jobs:
         run: |
           # Core checks that must pass
           if [ "${{ needs.typecheck.result }}" != "success" ] ||
-             [ "${{ needs.lint-production.result }}" != "success" ] ||
+             [ "${{ needs.lint.result }}" != "success" ] ||
              [ "${{ needs.format.result }}" != "success" ] ||
+             [ "${{ needs.test.result }}" != "success" ] ||
              [ "${{ needs.security.result }}" != "success" ] ||
              [ "${{ needs.validate-actions.result }}" != "success" ]; then
             echo "❌ One or more required checks failed"
@@ -312,12 +264,12 @@ jobs:
           echo "## CI Status: ✅ ALL REQUIRED CHECKS PASSING"
           echo "## Job Results:"
           echo "- typecheck: ${{ needs.typecheck.result }}"
-          echo "- lint-production: ${{ needs.lint-production.result }}"
-          echo "- lint-tests: ${{ needs.lint-tests.result }}" 
+          echo "- lint: ${{ needs.lint.result }}"
           echo "- format: ${{ needs.format.result }}"
+          echo "- test: ${{ needs.test.result }}"
           echo "- security: ${{ needs.security.result }}"
           echo "- validate-actions: ${{ needs.validate-actions.result }}"
           echo ""
-          echo "✅ All required checks passed successfully!"
-          echo ""  
-          echo "📝 **Note**: Test job temporarily disabled - Supabase CI integration in progress (PR #254)"
+          echo "✅ All checks passed successfully!"
+          echo ""
+          echo "📝 **Note**: E2E tests are temporarily disabled during Supabase migration"
