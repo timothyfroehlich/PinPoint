@@ -42,6 +42,15 @@ logs/
 !.env.development
 !.env.example
 
+# Secret leak prevention (bulletproof patterns)
+.env.production.local
+.env.development.local
+*.key
+*.p12
+*.pfx
+**/.env -> *
+**/secrets -> *
+
 # vercel
 .vercel
 
