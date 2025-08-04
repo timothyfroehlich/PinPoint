@@ -144,9 +144,7 @@ test.describe("Smoke Test: Complete Issue Workflow", () => {
     await page.waitForLoadState("networkidle");
 
     // Search for the issue
-    const searchInput = page
-      .locator('input[name="search"], input[placeholder*="search" i]')
-      .first();
+    const searchInput = page.locator('[data-testid="issue-search-input"]');
     if (await searchInput.isVisible()) {
       await searchInput.fill("SMOKE-TEST");
       // Wait for search results to update (look for our specific issue)
@@ -183,40 +181,47 @@ test.describe("Smoke Test: Complete Issue Workflow", () => {
     console.log("🧪 SMOKE TEST - Step 9: Adding admin comment");
 
     const commentText = "Admin reviewed this issue";
-    const commentTextarea = page
-      .locator('textarea[name="comment"], textarea[placeholder*="comment" i]')
-      .first();
-    await expect(commentTextarea).toBeVisible();
-    await commentTextarea.fill(commentText);
+    const commentTextarea = page.locator('[data-testid="comment-textarea"]');
+    try {
+      await expect(commentTextarea).toBeVisible();
+      await commentTextarea.fill(commentText);
+    } catch (error) {
+      throw new Error(`Step 9 FAILED: Comment textarea not found. Check if user has proper permissions and the comment form is displayed. Error: ${error}`);
+    }
 
     // Submit comment
-    const commentSubmit = page
-      .locator(
-        'button:has-text("Add"), button:has-text("Submit"), button:has-text("Comment")',
-      )
-      .first();
-    await commentSubmit.click();
+    const commentSubmit = page.locator('[data-testid="submit-comment-button"]');
+    try {
+      await commentSubmit.click();
+    } catch (error) {
+      throw new Error(`Step 9 FAILED: Comment submit button not found or could not be clicked. Error: ${error}`);
+    }
 
     // Verify comment appears
-    await expect(page.locator(`text="${commentText}"`)).toBeVisible({
-      timeout: 10000,
-    });
+    try {
+      await expect(page.locator(`text="${commentText}"`)).toBeVisible({
+        timeout: 10000,
+      });
+    } catch (error) {
+      throw new Error(`Step 9 FAILED: Comment did not appear after submission. The comment creation may have failed. Error: ${error}`);
+    }
     console.log("✅ SMOKE TEST - Step 9 Complete: Comment added and verified");
 
     // Step 10: Close Issue
     console.log("🧪 SMOKE TEST - Step 10: Closing the issue");
 
     // Find status dropdown or close button
-    const statusSelect = page
-      .locator('select[name="status"], select[name="statusId"]')
-      .first();
+    const statusSelect = page.locator('[data-testid="status-dropdown"]');
     if (await statusSelect.isVisible()) {
-      // Select a closed status (try multiple common names)
-      const closedOptions = ["Fixed", "Closed", "Resolved", "Complete"];
+      // Click to open the MUI Select dropdown
+      await statusSelect.click();
+      
+      // Wait for dropdown options to appear and select a closed status
+      const closedOptions = ["fixed", "closed", "resolved", "complete"];
       for (const status of closedOptions) {
-        const option = statusSelect.locator(`option:has-text("${status}")`);
+        const option = page.locator(`[data-testid="status-option-${status}"]`);
         if ((await option.count()) > 0) {
-          await statusSelect.selectOption({ label: status });
+          await option.click();
           break;
         }
       }
