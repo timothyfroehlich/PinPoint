@@ -8,7 +8,7 @@ import { env } from "~/env";
  */
 export const testSupabaseAdmin = createClient(
   env.NEXT_PUBLIC_SUPABASE_URL ?? "http://localhost:54321",
-  env.SUPABASE_SERVICE_ROLE_KEY ?? "",
+  env.SUPABASE_SECRET_KEY ?? "",
   {
     auth: {
       autoRefreshToken: false,
@@ -23,7 +23,7 @@ export const testSupabaseAdmin = createClient(
  */
 export const testSupabaseAnon = createClient(
   env.NEXT_PUBLIC_SUPABASE_URL ?? "http://localhost:54321",
-  env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
+  env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "",
 );
 
 /**

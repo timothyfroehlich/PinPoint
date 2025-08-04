@@ -182,7 +182,7 @@ class DevCleaner {
 
     try {
       // Step 1: Kill processes on development ports
-      await this.killProcessesOnPorts([3000, 5555]);
+      await this.killProcessesOnPorts([49200, 5555]);
 
       // Step 2: Clear caches
       await this.clearNextCache();

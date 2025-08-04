@@ -12,6 +12,11 @@ import {
 } from "@mui/material";
 import { useState, useEffect } from "react";
 
+import {
+  authenticateDevUser,
+  getAuthResultMessage,
+  isDevAuthAvailable,
+} from "~/lib/auth/dev-auth";
 import { createClient } from "~/lib/supabase/client";
 
 interface DevUser {
@@ -88,29 +93,43 @@ export function DevLoginCompact({
   async function handleLogin(email: string): Promise<void> {
     setIsLoading(true);
     try {
-      console.log("Dev login as:", email);
+      console.log("Dev immediate login as:", email);
 
-      // Use Supabase auth with magic link for dev users
+      // Find the user to get their role
+      const user = testUsers.find((u) => u.email === email);
       const supabase = createClient();
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          shouldCreateUser: false, // Only allow existing dev users
-        },
-      });
 
-      if (error) {
-        console.error("Login failed:", error.message);
-        alert(`Login failed: ${error.message}`);
+      const userData: { email: string; name?: string; role?: string } = {
+        email,
+      };
+      if (user?.name) userData.name = user.name;
+      if (user?.role) userData.role = user.role;
+
+      const result = await authenticateDevUser(supabase, userData);
+
+      const message = getAuthResultMessage(result);
+
+      if (result.success) {
+        console.log("Dev login successful:", result.method);
+        // Only use browser APIs if running in browser
+        if (typeof window !== "undefined") {
+          alert(message);
+          // Refresh the page to update auth state
+          window.location.reload();
+        }
       } else {
-        console.log("Magic link sent - check your email");
-        alert("Magic link sent! Check your email to complete login.");
+        console.error("Login failed:", result.error);
+        if (typeof window !== "undefined") {
+          alert(message);
+        }
       }
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       console.error("Login failed:", errorMessage);
-      alert("Login failed - check console for details");
+      if (typeof window !== "undefined") {
+        alert(`Login failed: ${errorMessage}`);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -131,21 +150,9 @@ export function DevLoginCompact({
     }
   }
 
-  // Only show in development or preview environments
-  // In local dev: localhost
-  // In preview: vercel.app domains
-  // Hide in production deployments
-  if (typeof window !== "undefined") {
-    const hostname = window.location.hostname;
-    const isLocalDev =
-      hostname === "localhost" || hostname.includes("127.0.0.1");
-    const isPreview =
-      hostname.includes("vercel.app") &&
-      !hostname.includes("pin-point.vercel.app");
-
-    if (!isLocalDev && !isPreview) {
-      return null;
-    }
+  // Only show when dev authentication is available
+  if (!isDevAuthAvailable()) {
+    return null;
   }
 
   return (
