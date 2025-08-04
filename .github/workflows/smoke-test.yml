@@ -45,13 +45,26 @@ jobs:
         run: npm install --global vercel@latest
 
       - name: Pull Vercel Environment Variables
-        run: vercel env pull .env.local --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set -e  # Exit on any error
+          # Validate required secrets are present
+          [[ -n "${{ secrets.VERCEL_TOKEN }}" ]] || { echo "❌ VERCEL_TOKEN secret not set"; exit 1; }
+          [[ -n "${{ secrets.VERCEL_ORG_ID }}" ]] || { echo "❌ VERCEL_ORG_ID secret not set"; exit 1; }
+          [[ -n "${{ secrets.VERCEL_PROJECT_ID }}" ]] || { echo "❌ VERCEL_PROJECT_ID secret not set"; exit 1; }
+          
+          # Pull environment variables
+          vercel env pull .env.local --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+          
+          # Verify the .env.local file was created
+          [[ -f .env.local ]] || { echo "❌ .env.local file not created"; exit 1; }
+          echo "✅ Environment variables successfully pulled from Vercel"
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
       - name: Setup Environment Variables
         run: |
+          set -e  # Exit on any error
           echo "🔧 Configuring environment for production testing..."
           echo "✅ All application variables pulled from Vercel"
           echo "📊 Test data will be isolated with SMOKE-TEST prefix"
@@ -63,6 +76,7 @@ jobs:
 
       - name: Verify Environment Configuration
         run: |
+          set -e  # Exit on any error
           echo "🔍 Verifying environment configuration..."
           echo "✅ Environment variables pulled from Vercel"
           echo "🎯 Ready for smoke test execution"
@@ -83,6 +97,11 @@ jobs:
 
       - name: Run Smoke Test
         run: |
+          set -e  # Exit on any error
+          # Validate critical environment variables are set
+          [[ -n "$DATABASE_URL" ]] || { echo "❌ DATABASE_URL not set"; exit 1; }
+          [[ "$DATABASE_URL" == *"localhost:5432"* ]] || { echo "❌ DATABASE_URL not pointing to ephemeral container"; exit 1; }
+          
           # Run smoke test and capture success up to machine selection
           npm run smoke || {
             echo "🔍 Checking if we achieved minimum success criteria..."
@@ -103,10 +122,13 @@ jobs:
           # CI-specific environment flags
           NODE_ENV: test
           CI: true
+          # Skip env validation to avoid conflicts with Vercel env vs CI overrides
+          SKIP_ENV_VALIDATION: true
 
       - name: Cleanup Test Data
         if: always()
         run: |
+          set -e  # Exit on any error (but step always runs due to if: always())
           echo "🧹 Ephemeral database cleanup..."
           echo "✅ No cleanup needed - using ephemeral PostgreSQL container"
           echo "🗑️  Container will be automatically destroyed after job completion"

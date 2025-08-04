@@ -128,12 +128,12 @@ if (isProduction()) {
 1. **Secret Management Documentation** - ✅ FIXED - Added clear file hierarchy guide
 2. **Breaking Environment Variable Changes** - ✅ FIXED - Documentation updated with migration notes
 
-### 🟢 Low Priority Issues Found: 4
+### ✅ Low Priority Issues RESOLVED: 4
 
-1. **example.com Domain Usage** - Security concern, widely used in tests
-2. **Hard-coded Timeouts** - Test reliability issue in smoke test
-3. **Hard-coded Subdomain** - Configuration issue in playwright.config.ts
-4. **CI Shell Pipeline** - Needs verification
+1. **example.com Domain Usage** - ✅ FIXED - Replaced with test.local
+2. **Hard-coded Timeouts** - ✅ FIXED - Replaced with proper wait conditions
+3. **Hard-coded Subdomain** - ✅ FIXED - Made configurable via DEFAULT_ORG_SUBDOMAIN
+4. **CI Shell Pipeline** - ✅ FIXED - Added set -e and validation checks
 
 ### ✅ Issues Resolved/Not Current: 1
 
@@ -224,61 +224,77 @@ if (typeof process !== "undefined" && typeof window === "undefined") {
 
 ### Low Priority Copilot Issues
 
-#### 5. ✅ CONFIRMED - Security: example.com Domain Usage
+#### 5. ✅ FIXED - Security: example.com Domain Usage
 
-**Status**: 🟡 LOW  
-**Files**: `src/lib/auth/dev-auth.ts`, `src/lib/auth/dev-auth-server.ts`, `e2e/smoke-test-workflow.spec.ts`, and many test files  
+**Status**: ✅ RESOLVED  
+**Files**: `src/lib/auth/dev-auth.ts`, `src/lib/auth/dev-auth-server.ts`, `e2e/smoke-test-workflow.spec.ts`
 **Issue**: Using `example.com` could cause issues if domain gets registered
 
-**Current State**: ❌ Widely used throughout codebase:
+**Changes Made**:
 
-- In `ALLOWED_DEV_DOMAINS` arrays
-- In smoke test: `"smoketest@example.com"`
-- In many test files as mock emails
+- ✅ Replaced `example.com` with `test.local` in both dev auth files
+- ✅ Updated smoke test to use `smoketest@test.local`
+- ✅ Fixed hard-coded timeout while updating smoke test
 
 **Action Items**:
 
-- [ ] Replace `example.com` with `example.local` or `test.local` in ALLOWED_DEV_DOMAINS
-- [ ] Update smoke test to use safer domain
-- [ ] Consider bulk replace in test files (lower priority)
+- [x] Replace `example.com` with `test.local` in ALLOWED_DEV_DOMAINS
+- [x] Update smoke test to use safer domain
+- [ ] Consider bulk replace in test files (lower priority - not blocking)
 
-#### 6. ✅ CONFIRMED - Test Reliability: Hard-coded Timeouts
+#### 6. ✅ FIXED - Test Reliability: Hard-coded Timeouts
 
-**Status**: 🟡 LOW  
+**Status**: ✅ RESOLVED  
 **File**: `e2e/smoke-test-workflow.spec.ts`  
 **Issue**: `waitForTimeout(1000)` can cause flaky tests
 
-**Current State**: ❌ Found: `await page.waitForTimeout(1000); // Wait for search to filter`
+**Changes Made**:
+
+- ✅ Replaced `await page.waitForTimeout(1000)` with `await expect(page.locator(`text="${issueTitle}"`)).toBeVisible({ timeout: 5000 })`
+- ✅ Now waits for the specific search result instead of arbitrary time
+- ✅ More reliable test execution with proper wait conditions
 
 **Action Items**:
 
-- [ ] Replace with `expect().toBeVisible()` or `waitForFunction()`
-- [ ] Use proper selectors instead of time-based waits
+- [x] Replace with `expect().toBeVisible()` with proper selector
+- [x] Use proper selectors instead of time-based waits
 
-#### 7. ✅ CONFIRMED - Configuration: Hard-coded Values
+#### 7. ✅ FIXED - Configuration: Hard-coded Values
 
-**Status**: 🟡 LOW  
+**Status**: ✅ RESOLVED  
 **File**: `playwright.config.ts`  
 **Issue**: Hard-coded 'apc' subdomain in baseURL
 
-**Current State**: ❌ Found: `baseURL: \`http://apc.localhost:${process.env["PORT"] ?? "49200"}\``
+**Changes Made**:
+
+- ✅ Replaced hard-coded 'apc' with `process.env["DEFAULT_ORG_SUBDOMAIN"] ?? "apc"`
+- ✅ Now uses same environment variable as the rest of the application
+- ✅ Consistent configuration across all components
 
 **Action Items**:
 
-- [ ] Make configurable via environment variable
-- [ ] Use `process.env["ORG_SUBDOMAIN"] ?? "apc"`
+- [x] Make configurable via environment variable
+- [x] Use existing `DEFAULT_ORG_SUBDOMAIN` environment variable
 
-#### 8. ⚠️ NEEDS VERIFICATION - CI: Shell Pipeline Error Handling
+#### 8. ✅ FIXED - CI: Shell Pipeline Error Handling
 
-**Status**: 🟡 LOW  
+**Status**: ✅ RESOLVED  
 **File**: `.github/workflows/smoke-test.yml`  
 **Issue**: Shell pipeline could fail silently
 
+**Changes Made**:
+
+- ✅ Added `set -e` to all bash script blocks for immediate failure on errors
+- ✅ Added validation checks for critical environment variables
+- ✅ Added verification that DATABASE_URL points to ephemeral container
+- ✅ Added validation for Vercel secrets before using them
+- ✅ Added file existence check after pulling environment variables
+
 **Action Items**:
 
-- [ ] Review smoke-test.yml for shell pipeline issues
-- [ ] Add `set -e` if needed to ensure workflow fails on errors
-- [ ] Add proper error handling for key extraction
+- [x] Review smoke-test.yml for shell pipeline issues
+- [x] Add `set -e` to ensure workflow fails on errors
+- [x] Add proper error handling and validation checks
 
 ---
 

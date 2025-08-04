@@ -44,7 +44,7 @@ const DEV_PASSWORD = "dev-login-123";
 const ALLOWED_DEV_DOMAINS = [
   "dev.local",
   "test.com",
-  "example.com",
+  "test.local",
   "localhost",
   "pinpoint.dev",
 ];

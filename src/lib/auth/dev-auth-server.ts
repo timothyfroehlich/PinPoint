@@ -31,7 +31,7 @@ const ALLOWED_DEV_DOMAINS = [
   "dev.local",
   "test.com",
   "pinpoint.dev",
-  "example.com",
+  "test.local",
 ];
 
 /**

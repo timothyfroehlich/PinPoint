@@ -18,7 +18,7 @@ test.describe("Smoke Test: Complete Issue Workflow", () => {
     const timestamp = Date.now();
     const branch = "main"; // Could be dynamic if needed
     const issueTitle = `SMOKE-TEST-${branch}-${timestamp}`;
-    const testEmail = "smoketest@example.com";
+    const testEmail = "smoketest@test.local";
 
     console.log(`🧪 SMOKE TEST - Starting workflow with issue: ${issueTitle}`);
 
@@ -140,7 +140,10 @@ test.describe("Smoke Test: Complete Issue Workflow", () => {
       .first();
     if (await searchInput.isVisible()) {
       await searchInput.fill("SMOKE-TEST");
-      await page.waitForTimeout(1000); // Wait for search to filter
+      // Wait for search results to update (look for our specific issue)
+      await expect(page.locator(`text="${issueTitle}"`)).toBeVisible({
+        timeout: 5000,
+      });
     }
 
     console.log(
