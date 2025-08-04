@@ -77,6 +77,12 @@ export default defineConfig({
           typecheck: {
             tsconfig: "./tsconfig.tests.json",
           },
+          // Serialize database tests to prevent connection conflicts
+          poolOptions: {
+            threads: {
+              singleThread: true,
+            },
+          },
           include: [
             "src/lib/**/*.test.{ts,tsx}",
             "src/server/**/*.test.{ts,tsx}",
