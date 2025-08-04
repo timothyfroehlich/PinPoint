@@ -94,7 +94,7 @@ export async function createDevUserAction(
     }
 
     console.log(
-      `Dev user created: ${userData.email} (${userData.role ?? "member"})`,
+      `Dev user created: ${userData.email.replace(/\n|\r/g, "")} (${(userData.role ?? "member").replace(/\n|\r/g, "")})`,
     );
     return {
       success: true,

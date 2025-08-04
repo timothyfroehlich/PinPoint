@@ -79,7 +79,7 @@ async function signInDevUser(
       };
     }
 
-    console.log(`Dev user signed in: ${email}`);
+    console.log(`Dev user signed in: ${email.replace(/\n|\r/g, "")}`);
     return {
       success: true,
       method: "signed_in",
@@ -132,7 +132,9 @@ export async function authenticateDevUser(
     }
 
     // User doesn't exist or sign-in failed, create the user
-    console.log(`User ${userData.email} doesn't exist, creating...`);
+    console.log(
+      `User ${userData.email.replace(/\n|\r/g, "")} doesn't exist, creating...`,
+    );
 
     const createResult = await createDevUserAction(userData);
 
