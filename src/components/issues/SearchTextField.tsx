@@ -59,6 +59,7 @@ export function SearchTextField({
       placeholder={placeholder}
       size="small"
       fullWidth
+      data-testid="issue-search-input"
       slotProps={{
         input: {
           startAdornment: (
