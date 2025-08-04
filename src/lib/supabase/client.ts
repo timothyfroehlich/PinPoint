@@ -8,9 +8,10 @@ import { env } from "~/env";
  * Creates a Supabase client for use in browser (client) components.
  *
  * This client is designed for Next.js 15 with the App Router and uses:
- * - Cookie-based session persistence with getAll/setAll methods
+ * - Modern @supabase/ssr browser client with built-in cookie handling
  * - Type-safe client configuration with environment validation
- * - Proper SSR cookie handling for browser environments
+ * - Automatic session management compatible with SSR
+ * - Safe browser-only execution with proper guards
  *
  * @returns Supabase browser client instance
  */
@@ -18,55 +19,17 @@ export function createClient(): SupabaseClient {
   // These environment variables are required in non-test environments
   // In test environment, Supabase client creation is mocked at the module level
   const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const supabasePublishableKey = env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
-  if (!supabaseUrl || !supabaseAnonKey) {
+  if (!supabaseUrl || !supabasePublishableKey) {
     throw new Error(
       "Supabase environment variables are required for client creation",
     );
   }
 
-  return createBrowserClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      getAll() {
-        return document.cookie
-          .split(";")
-          .map((cookie) => cookie.trim().split("="))
-          .filter(([name]) => Boolean(name))
-          .map(([name, value]) => ({
-            name: name ?? "",
-            value: decodeURIComponent(value ?? ""),
-          }))
-          .filter(({ name }) => name !== "");
-      },
-      setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value, options }) => {
-          let cookieString = `${name}=${encodeURIComponent(value)}`;
-
-          if (options.maxAge !== undefined) {
-            cookieString += `; Max-Age=${String(options.maxAge)}`;
-          }
-          if (options.domain) {
-            cookieString += `; Domain=${options.domain}`;
-          }
-          if (options.path) {
-            cookieString += `; Path=${options.path}`;
-          }
-          if (options.sameSite) {
-            cookieString += `; SameSite=${String(options.sameSite)}`;
-          }
-          if (options.secure) {
-            cookieString += "; Secure";
-          }
-          if (options.httpOnly) {
-            cookieString += "; HttpOnly";
-          }
-
-          document.cookie = cookieString;
-        });
-      },
-    },
-  });
+  // Use the modern @supabase/ssr createBrowserClient which handles
+  // cookie management automatically and is SSR-safe
+  return createBrowserClient(supabaseUrl, supabasePublishableKey);
 }
 
 // Export a default client instance for convenience

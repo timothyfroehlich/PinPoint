@@ -16,13 +16,14 @@ import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 
 import { useAuth } from "~/app/auth-provider";
+import { authenticateDevUser, getAuthResultMessage } from "~/lib/auth/dev-auth";
+import { isDevAuthAvailable } from "~/lib/environment-client";
 import { createClient } from "~/lib/supabase/client";
 
 type UserWithRole = User & { role: Role | null };
 
-// Check if we're in development mode (this runs on client)
-const isDevelopment =
-  typeof window !== "undefined" && window.location.hostname === "localhost";
+// Check if dev features are available
+const shouldShowDevLogin = isDevAuthAvailable();
 
 export default function SignInPage(): React.ReactElement | null {
   const { user, loading } = useAuth();
@@ -41,7 +42,7 @@ export default function SignInPage(): React.ReactElement | null {
   }, [isAuthenticated, router]);
 
   useEffect(() => {
-    if (isDevelopment) {
+    if (shouldShowDevLogin) {
       async function fetchTestUsers(): Promise<void> {
         setIsLoadingUsers(true);
         try {
@@ -90,24 +91,36 @@ export default function SignInPage(): React.ReactElement | null {
   async function handleDevLogin(email: string): Promise<void> {
     setIsLoading(true);
     try {
-      const supabase = createClient();
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          shouldCreateUser: false,
-        },
-      });
+      console.log("Dev immediate login as:", email);
 
-      if (error) {
-        console.error("Sign-in failed:", error.message);
-        alert(`Sign-in failed: ${error.message}`);
+      // Find the user to get their role
+      const testUser = users.find((u) => u.email === email);
+      const supabase = createClient();
+
+      const userData: { email: string; name?: string; role?: string } = {
+        email,
+      };
+      if (testUser?.name) userData.name = testUser.name;
+      if (testUser?.role?.name) userData.role = testUser.role.name;
+
+      const result = await authenticateDevUser(supabase, userData);
+
+      const message = getAuthResultMessage(result);
+
+      if (result.success) {
+        console.log("Dev login successful:", result.method);
+        alert(message);
+        // Refresh the page to update auth state
+        window.location.reload();
       } else {
-        alert("Magic link sent! Check your email to complete login.");
+        console.error("Login failed:", result.error);
+        alert(message);
       }
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       console.error("Dev login failed:", errorMessage);
+      alert(`Login failed: ${errorMessage}`);
     } finally {
       setIsLoading(false);
     }
@@ -169,7 +182,7 @@ export default function SignInPage(): React.ReactElement | null {
             Sign in with Google
           </Button>
 
-          {isDevelopment && (
+          {shouldShowDevLogin && (
             <>
               <Divider sx={{ my: 3 }}>
                 <Typography variant="body2" color="text.secondary">

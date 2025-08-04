@@ -22,6 +22,8 @@ jobs:
     permissions:
       contents: read
       actions: write
+    env:
+      NODE_ENV: "test"
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -39,15 +41,15 @@ jobs:
             grep "error TS" production-typescript.log | head -10 >> "$GITHUB_STEP_SUMMARY" || true
             exit 1
           fi
-          
+
           # Check test utilities separately (warnings only)
           echo "=== Checking Test Utils (Recommended) ==="
           npx tsc --project tsconfig.test-utils.json --noEmit 2>&1 | tee test-utils-typescript.log || true
-          
-          # Check test files separately (warnings only) 
+
+          # Check test files separately (warnings only)
           echo "=== Checking Test Files (Relaxed) ==="
           npx tsc --project tsconfig.tests.json --noEmit 2>&1 | tee tests-typescript.log || true
-          
+
           echo "✅ Multi-config TypeScript check completed!" >> "$GITHUB_STEP_SUMMARY"
       - name: Upload TypeScript Error Report
         if: failure()
@@ -100,6 +102,7 @@ jobs:
         run: npm run format
 
   # Job 4: Tests with Coverage
+  # Uses simple PostgreSQL container (Supabase local doesn't work well in CI)
   test:
     name: Tests
     runs-on: ubuntu-latest
@@ -135,6 +138,13 @@ jobs:
         run: npm run db:push
       - name: Run Tests with Coverage
         run: npm run test:coverage
+      - name: Upload Coverage
+        uses: codecov/codecov-action@18283e04ce6e62d37312384ff67231eb8fd56d24 # v5
+        with:
+          files: ./coverage/lcov.info
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: true
 
   # Job 5: Security Audit
   security:
@@ -168,7 +178,7 @@ jobs:
   #     matrix:
   #       test-group:
   #         - "auth-flow"
-  #         - "dashboard" 
+  #         - "dashboard"
   #         - "roles-permissions"
   #         - "location-browsing"
   #         - "issue-confirmation"
