@@ -24,16 +24,19 @@ const mockSupabaseClient = {
   single: vi.fn().mockResolvedValue({ data: null, error: null }),
 };
 
-// Mock Drizzle client for tests
+// Mock Drizzle client for tests - supports complex chaining patterns
+// Use simpler approach to avoid TypeScript/ESLint conflicts
 const mockDrizzleClient = {
   select: vi.fn().mockReturnThis(),
   from: vi.fn().mockReturnThis(),
   where: vi.fn().mockReturnThis(),
+  orderBy: vi.fn().mockReturnThis(),
   insert: vi.fn().mockReturnThis(),
   update: vi.fn().mockReturnThis(),
   delete: vi.fn().mockReturnThis(),
   values: vi.fn().mockReturnThis(),
   set: vi.fn().mockReturnThis(),
+  returning: vi.fn().mockResolvedValue([]), // Returns array for destructuring [result]
   execute: vi.fn().mockResolvedValue([]),
 } as unknown as DrizzleClient;
 

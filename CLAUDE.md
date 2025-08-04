@@ -13,6 +13,7 @@
 **Migration Hub**: `@docs/migration/supabase-drizzle/`
 
 ### ✅ Phase 2A Achievements
+
 - Complete Drizzle schema with 1:1 Prisma parity
 - Dual-ORM support in tRPC context
 - 39 comprehensive tests validating foundation
@@ -260,18 +261,21 @@ npm run typecheck | grep "usePermissions"        # Find specific function errors
 **Purpose**: Agents should create detailed planning documents before starting complex implementation work. This ensures thorough analysis and provides a clear roadmap for execution.
 
 **When to Use**:
+
 - Complex migrations or refactoring tasks
 - Multi-step implementation requiring coordination
 - Schema changes or architectural modifications
 - Any task that benefits from detailed upfront planning
 
 **Required Agent Workflow**:
+
 1. **Check for existing plans**: Always read any existing files in `.claude/agent-plans/` when starting work
 2. **Create planning documents**: Write comprehensive analysis and implementation plans before coding
 3. **Document decisions**: Record architectural choices, trade-offs, and rationale
 4. **Update progress**: Maintain plans as living documents throughout implementation
 
 **Example Planning Documents**:
+
 - `phase-2a-drizzle-schema-analysis.md` - Detailed schema migration analysis
 - `database-connection-strategy.md` - Database integration approach
 - `type-migration-plan.md` - TypeScript type compatibility strategy
@@ -385,6 +389,45 @@ The test-architect agent creates detailed logs at `.claude/sub-agent-logs/test-a
 ### Map Maintenance
 
 The test-architect will update `test-map.md` and `source-map.md` as it works. These maps may be outdated, so the agent uses them as guides, not gospel.
+
+## Agent Work Review Protocol
+
+**MANDATORY**: After any agent completes work that modifies code or creates files, you MUST:
+
+### 1. Immediate Review Checklist
+
+- ✅ **Check git status**: `git status --porcelain` to see all modified/created files
+- ✅ **Review each change**: Use `git diff` to examine modifications
+- ✅ **Validate file creation**: Ensure any new files were authorized
+- ✅ **Check scope compliance**: Verify agent stayed within assigned task boundaries
+
+### 2. Quality Validation
+
+- ✅ **Run validation**: `npm run typecheck:brief && npm run lint:brief`
+- ✅ **Test impact**: Run relevant tests to ensure no regressions
+- ✅ **Business logic**: Verify functional requirements were preserved
+- ✅ **Security patterns**: Confirm multi-tenant isolation and permission checks
+
+### 3. Rule Compliance Check
+
+- ✅ **Documentation policy**: Agents should NOT create .md files without explicit permission
+- ✅ **Scope boundaries**: Agents should only modify files within their assigned domain
+- ✅ **Project guidelines**: All changes must follow established patterns and standards
+
+### 4. Agent Accountability
+
+- ✅ **Task completion**: Verify agent accomplished the assigned objective
+- ✅ **Quality standards**: Check that work meets production quality requirements
+- ✅ **Boundary respect**: Ensure agent didn't exceed authorized scope
+
+**If Issues Found**: Document the problem, update agent instructions to prevent recurrence, and decide whether to keep, modify, or revert the agent's work.
+
+**Agent Domains**:
+
+- **drizzle-migration**: Router file migration (implementation only)
+- **test-architect**: Test files and test infrastructure (NO documentation creation)
+- **github-pr-reviewer**: PR analysis and review comments
+- **typescript-lint-fixer**: Type errors and lint violations
 
 ## Documentation Hub
 
