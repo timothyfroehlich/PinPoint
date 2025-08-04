@@ -5,6 +5,9 @@ import { LocationList } from "~/components/locations/LocationList";
 import { getSupabaseUser } from "~/server/auth/supabase";
 import { api } from "~/trpc/server";
 
+// Force dynamic rendering for auth-dependent content
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Locations - PinPoint",
   description: "Browse locations and their pinball machines",

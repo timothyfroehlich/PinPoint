@@ -109,7 +109,7 @@ for worktree in $WORKTREES; do
         # Check if there's a dev server running
         if [ -f "$worktree/.env" ]; then
             # Try to extract port from .env
-            port=$(grep "^PORT=" "$worktree/.env" 2>/dev/null | cut -d'=' -f2 || echo "3000")
+            port=$(grep "^PORT=" "$worktree/.env" 2>/dev/null | cut -d'=' -f2 | tr -d '"' || echo "49200")
             if lsof -i :$port >/dev/null 2>&1; then
                 echo -e "${BLUE}🚀 Dev Server:${NC} ${GREEN}Running on port $port${NC}"
             else

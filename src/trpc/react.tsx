@@ -9,6 +9,8 @@ import superjson from "superjson";
 
 import { createQueryClient } from "./query-client";
 
+import { env } from "~/env";
+import { isTest } from "~/lib/environment-client";
 import { type AppRouter } from "~/server/api/root";
 
 // Client-safe development detection
@@ -58,10 +60,10 @@ export function TRPCReactProvider(props: {
       links: [
         loggerLink({
           enabled: (op) =>
-            (isClientDevelopment() && process.env.NODE_ENV !== "test") ||
+            (isClientDevelopment() && !isTest()) ||
             (op.direction === "down" &&
               op.result instanceof Error &&
-              process.env.NODE_ENV !== "test"),
+              !isTest()),
         }),
         httpBatchStreamLink({
           transformer: superjson,
@@ -87,5 +89,5 @@ export function TRPCReactProvider(props: {
 
 function getBaseUrl(): string {
   if (typeof window !== "undefined") return ""; // browser should use relative url
-  return `http://localhost:${process.env["PORT"] ?? "3000"}`;
+  return `http://localhost:${env.PORT ?? "3000"}`;
 }

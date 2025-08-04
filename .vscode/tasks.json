@@ -63,7 +63,10 @@
       "type": "shell",
       "command": "npm",
       "args": ["run", "validate"],
-      "group": "build",
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
       "presentation": {
         "echo": true,
         "reveal": "always",
@@ -162,10 +165,7 @@
       "type": "shell",
       "command": "npm",
       "args": ["run", "test"],
-      "group": {
-        "kind": "test",
-        "isDefault": true
-      },
+      "group": "test",
       "presentation": {
         "echo": true,
         "reveal": "always",
