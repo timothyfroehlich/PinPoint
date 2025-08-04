@@ -46,6 +46,7 @@ export function MachineSelector({
           onChange(e.target.value || null);
         }}
         disabled={isLoading}
+        data-testid="machine-selector"
         startAdornment={
           isLoading ? <CircularProgress size={20} sx={{ mr: 1 }} /> : undefined
         }

@@ -102,18 +102,9 @@ jobs:
           [[ -n "$DATABASE_URL" ]] || { echo "❌ DATABASE_URL not set"; exit 1; }
           [[ "$DATABASE_URL" == *"localhost:5432"* ]] || { echo "❌ DATABASE_URL not pointing to ephemeral container"; exit 1; }
           
-          # Run smoke test and capture success up to machine selection
-          npm run smoke || {
-            echo "🔍 Checking if we achieved minimum success criteria..."
-            if grep -q "Step 3 Complete: Selected machine" test-results/*/error-context.md 2>/dev/null || \
-               grep -q "✅ SMOKE TEST - Step 3 Complete" ./*.log 2>/dev/null; then
-              echo "✅ MINIMUM SUCCESS: Machine selection working - SSR fixes validated"
-              exit 0
-            else
-              echo "❌ CRITICAL FAILURE: Could not complete machine selection"
-              exit 1
-            fi
-          }
+          # Run smoke test - must pass completely for CI success
+          echo "🧪 Running smoke test - full workflow must complete successfully"
+          npm run smoke
         env:
           # Override ONLY database URLs to use ephemeral PostgreSQL container
           # All other environment variables (including Supabase) come from Vercel preview
