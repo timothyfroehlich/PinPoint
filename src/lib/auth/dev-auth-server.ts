@@ -24,7 +24,7 @@ export interface DevUserCreationResult {
 }
 
 // Fixed development password for all dev users
-const DEV_PASSWORD = "dev-password-123";
+const DEV_PASSWORD = "dev-login-123";
 
 // Allowed email domains for dev users
 const ALLOWED_DEV_DOMAINS = [
