@@ -4,6 +4,9 @@ import { Suspense } from "react";
 import { IssueList } from "~/components/issues/IssueList";
 import { getSupabaseUser } from "~/server/auth/supabase";
 
+// Force dynamic rendering for auth-dependent content
+export const dynamic = "force-dynamic";
+
 export default async function IssuesPage({
   searchParams,
 }: {

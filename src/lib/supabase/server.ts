@@ -24,9 +24,9 @@ export async function createClient(): Promise<SupabaseClient> {
   // These environment variables are required in non-test environments
   // In test environment, Supabase client creation is mocked at the module level
   const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const supabasePublishableKey = env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
-  if (!supabaseUrl || !supabaseAnonKey) {
+  if (!supabaseUrl || !supabasePublishableKey) {
     throw new Error(
       "Supabase environment variables are required for server client creation",
     );
@@ -34,7 +34,7 @@ export async function createClient(): Promise<SupabaseClient> {
 
   const cookieStore = await cookies();
 
-  return createServerClient(supabaseUrl, supabaseAnonKey, {
+  return createServerClient(supabaseUrl, supabasePublishableKey, {
     cookies: {
       getAll() {
         return cookieStore.getAll();
@@ -81,9 +81,9 @@ export async function createAdminClient(): Promise<SupabaseClient> {
   // These environment variables are required in non-test environments
   // In test environment, Supabase client creation is mocked at the module level
   const supabaseUrl = env.SUPABASE_URL;
-  const supabaseServiceKey = env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseSecretKey = env.SUPABASE_SECRET_KEY;
 
-  if (!supabaseUrl || !supabaseServiceKey) {
+  if (!supabaseUrl || !supabaseSecretKey) {
     throw new Error(
       "Supabase admin environment variables are required for admin client creation",
     );
@@ -91,7 +91,7 @@ export async function createAdminClient(): Promise<SupabaseClient> {
 
   const cookieStore = await cookies();
 
-  return createServerClient(supabaseUrl, supabaseServiceKey, {
+  return createServerClient(supabaseUrl, supabaseSecretKey, {
     cookies: {
       getAll() {
         return cookieStore.getAll();
