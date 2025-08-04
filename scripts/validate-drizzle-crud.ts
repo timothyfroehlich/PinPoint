@@ -14,7 +14,10 @@
  */
 
 import { eq, and, sql } from "drizzle-orm";
-import { createDrizzleClient } from "~/server/db/drizzle";
+import {
+  createDrizzleClient,
+  closeDrizzleConnection,
+} from "~/server/db/drizzle";
 import * as schema from "~/server/db/schema";
 import { env } from "~/env.js";
 
@@ -841,7 +844,18 @@ async function main() {
 
   const validator = new DrizzleCRUDValidator(isMinimalMode);
   await validator.runAllTests();
+
+  // Close database connections to prevent hanging
+  await closeDrizzleConnection();
 }
 
 // Execute when run directly
-main().catch(console.error);
+main()
+  .then(() => {
+    // Ensure the process exits after completion
+    process.exit(0);
+  })
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
