@@ -56,10 +56,6 @@ export const env = createEnv({
       getEnvironmentType() === "test"
         ? z.string().url().optional()
         : z.string().url("Supabase URL must be a valid URL"),
-    SUPABASE_PUBLISHABLE_KEY:
-      getEnvironmentType() === "test"
-        ? z.string().optional()
-        : z.string().min(1, "Supabase publishable key is required"),
     SUPABASE_SECRET_KEY:
       getEnvironmentType() === "test"
         ? z.string().optional()
@@ -137,7 +133,6 @@ export const env = createEnv({
     FORCE_PREVIEW_BEHAVIOR: process.env["FORCE_PREVIEW_BEHAVIOR"],
     // Supabase Configuration
     SUPABASE_URL: process.env["SUPABASE_URL"],
-    SUPABASE_PUBLISHABLE_KEY: process.env["SUPABASE_PUBLISHABLE_KEY"],
     SUPABASE_SECRET_KEY: process.env["SUPABASE_SECRET_KEY"],
     SUPABASE_JWT_SECRET: process.env["SUPABASE_JWT_SECRET"],
     // Client-side environment variables
