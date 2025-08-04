@@ -24,6 +24,7 @@ vi.mock("~/env", () => ({
     // Client-side accessible vars (these should work)
     NEXT_PUBLIC_SUPABASE_URL: "http://localhost:54321",
     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "test-publishable-key",
+    NEXT_PUBLIC_ENABLE_DEV_FEATURES: true,
 
     // Server-side vars that should throw when accessed from client
     get NODE_ENV() {
