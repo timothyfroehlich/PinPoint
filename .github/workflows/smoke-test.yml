@@ -119,6 +119,10 @@ jobs:
           DATABASE_URL: "postgresql://test_user:test_password@localhost:5432/test_db"
           POSTGRES_PRISMA_URL: "postgresql://test_user:test_password@localhost:5432/test_db"
           POSTGRES_URL_NON_POOLING: "postgresql://test_user:test_password@localhost:5432/test_db"
+          # Supabase client environment variables (from GitHub secrets)
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           # CI-specific environment flags
           NODE_ENV: test
           CI: true
