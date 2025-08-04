@@ -54,9 +54,10 @@ export function getEnvironmentName(): string {
 /**
  * Check if dev features should be enabled
  * This includes dev login, debug menus, etc.
+ * Now explicitly controlled by NEXT_PUBLIC_ENABLE_DEV_FEATURES environment variable
  */
 export function shouldEnableDevFeatures(): boolean {
-  return isDevelopmentOrPreview();
+  return env.NEXT_PUBLIC_ENABLE_DEV_FEATURES;
 }
 
 /**

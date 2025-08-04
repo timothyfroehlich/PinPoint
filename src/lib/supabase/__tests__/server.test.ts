@@ -39,9 +39,9 @@ vi.mock("@supabase/ssr", () => ({
 vi.mock("~/env", () => ({
   env: {
     NEXT_PUBLIC_SUPABASE_URL: "https://test.supabase.co",
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: "test-anon-key",
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "test-publishable-key",
     SUPABASE_URL: "https://test.supabase.co",
-    SUPABASE_SERVICE_ROLE_KEY: "test-service-role-key",
+    SUPABASE_SECRET_KEY: "test-secret-key",
   },
 }));
 
@@ -58,7 +58,7 @@ describe("Supabase Server Client", () => {
 
       expect(mockCreateServerClient).toHaveBeenCalledWith(
         "https://test.supabase.co",
-        "test-anon-key",
+        "test-publishable-key",
         expect.any(Object),
       );
     });
@@ -92,7 +92,7 @@ describe("Supabase Server Client", () => {
 
       expect(mockCreateServerClient).toHaveBeenCalledWith(
         "https://test.supabase.co",
-        "test-service-role-key",
+        "test-secret-key",
         expect.any(Object),
       );
     });
@@ -114,7 +114,7 @@ describe("Supabase Server Client", () => {
 
       expect(mockCreateServerClient).toHaveBeenCalledWith(
         "https://test.supabase.co",
-        "test-anon-key",
+        "test-publishable-key",
         expect.any(Object),
       );
     });
@@ -126,7 +126,7 @@ describe("Supabase Server Client", () => {
 
       expect(mockCreateServerClient).toHaveBeenCalledWith(
         "https://test.supabase.co",
-        "test-service-role-key",
+        "test-secret-key",
         expect.any(Object),
       );
     });

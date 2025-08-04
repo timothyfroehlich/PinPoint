@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Worktree Cleanup Script
-# Safely tears down the current worktree environment and its services
+# Safely tears down the current worktree environment
 
 # Colors for output
 RED='\033[0;31m'
@@ -16,6 +16,7 @@ NC='\033[0m' # No Color
 FORCE=false
 KEEP_WORKTREE=false
 QUIET=false
+STOP_SHARED_SERVICES=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -31,14 +32,21 @@ while [[ $# -gt 0 ]]; do
             QUIET=true
             shift
             ;;
+        --stop-services|-s)
+            STOP_SHARED_SERVICES=true
+            shift
+            ;;
         --help|-h)
             echo "Usage: $0 [OPTIONS]"
             echo ""
             echo "Options:"
             echo "  --force, -f         Force cleanup without confirmation"
-            echo "  --keep-worktree, -k Keep worktree directory (only cleanup services)"
+            echo "  --keep-worktree, -k Keep worktree directory (only cleanup files)"
+            echo "  --stop-services, -s Stop shared Supabase services (affects ALL worktrees)"
             echo "  --quiet, -q         Minimal output"
             echo "  --help, -h          Show this help message"
+            echo ""
+            echo "⚠️  Warning: --stop-services affects the shared Supabase instance used by all worktrees"
             exit 0
             ;;
         *)
@@ -52,19 +60,7 @@ done
 if [[ "$QUIET" != true ]]; then
     echo -e "${BLUE}🧹 PinPoint Worktree Cleanup${NC}"
     echo "=============================="
-fi
-
-# Load port configuration if available
-if [[ -f ".worktree-ports" ]]; then
-    source .worktree-ports
-    if [[ "$QUIET" != true ]]; then
-        echo -e "📍 Detected ports: API($API_PORT) DB($DB_PORT) Studio($STUDIO_PORT) Email($INBUCKET_PORT)"
-    fi
-else
-    if [[ "$QUIET" != true ]]; then
-        echo -e "${YELLOW}⚠️  No port configuration found (.worktree-ports missing)${NC}"
-        echo "Will attempt cleanup using process discovery..."
-    fi
+    echo -e "📍 Using standard Supabase ports: API(54321) DB(54322) Studio(54323) Email(54324)"
 fi
 
 # Safety check: ensure we're in a worktree
@@ -88,9 +84,13 @@ if [[ "$FORCE" != true && "$QUIET" != true ]]; then
     echo -e "   🌿 Branch: $CURRENT_BRANCH"
     
     if [[ "$KEEP_WORKTREE" == true ]]; then
-        echo -e "   🔧 Action: Stop services only (keep worktree)"
+        echo -e "   🔧 Action: Clean files only (keep worktree)"
     else
         echo -e "   🔧 Action: Full cleanup (remove worktree)"
+    fi
+    
+    if [[ "$STOP_SHARED_SERVICES" == true ]]; then
+        echo -e "   🚨 ${RED}WARNING: Will stop shared Supabase services (affects ALL worktrees)${NC}"
     fi
     
     echo ""
@@ -104,74 +104,51 @@ fi
 
 cleanup_errors=()
 
-# 1. Stop Supabase services
-if [[ "$QUIET" != true ]]; then
-    echo -e "\n${PURPLE}🛑 Stopping Supabase Services${NC}"
-fi
-
-if command -v supabase &> /dev/null; then
-    if [[ "$QUIET" == true ]]; then
-        supabase stop --no-backup > /dev/null 2>&1
-        cleanup_result=$?
-    else
-        echo -n "   Stopping Supabase... "
-        supabase stop --no-backup
-        cleanup_result=$?
+# 1. Stop Supabase services (only if explicitly requested)
+if [[ "$STOP_SHARED_SERVICES" == true ]]; then
+    if [[ "$QUIET" != true ]]; then
+        echo -e "\n${PURPLE}🛑 Stopping Shared Supabase Services${NC}"
+        echo -e "   ${RED}⚠️  This will affect ALL worktrees using the shared instance${NC}"
     fi
-    
-    if [[ $cleanup_result -eq 0 ]]; then
-        if [[ "$QUIET" != true ]]; then
-            echo -e "✅ Supabase services stopped"
+
+    if command -v supabase &> /dev/null; then
+        if [[ "$QUIET" == true ]]; then
+            supabase stop --no-backup > /dev/null 2>&1
+            cleanup_result=$?
+        else
+            echo -n "   Stopping Supabase... "
+            supabase stop --no-backup
+            cleanup_result=$?
+        fi
+        
+        if [[ $cleanup_result -eq 0 ]]; then
+            if [[ "$QUIET" != true ]]; then
+                echo -e "✅ Supabase services stopped"
+            fi
+        else
+            if [[ "$QUIET" != true ]]; then
+                echo -e "${YELLOW}⚠️  Supabase stop reported issues (may already be stopped)${NC}"
+            fi
         fi
     else
         if [[ "$QUIET" != true ]]; then
-            echo -e "${YELLOW}⚠️  Supabase stop reported issues (may already be stopped)${NC}"
+            echo -e "${YELLOW}⚠️  Supabase CLI not found, skipping service stop${NC}"
         fi
     fi
 else
     if [[ "$QUIET" != true ]]; then
-        echo -e "${YELLOW}⚠️  Supabase CLI not found, skipping service stop${NC}"
+        echo -e "\n${PURPLE}🔗 Shared Services${NC}"
+        echo -e "   Keeping shared Supabase instance running (use --stop-services to stop)"
     fi
 fi
 
-# 2. Kill any remaining processes on our ports (if we know them)
-if [[ -n "$API_PORT" ]]; then
-    if [[ "$QUIET" != true ]]; then
-        echo -e "\n${PURPLE}🔌 Cleaning Up Port Usage${NC}"
-    fi
-    
-    for port in "$API_PORT" "$DB_PORT" "$STUDIO_PORT" "$INBUCKET_PORT"; do
-        if [[ -n "$port" ]]; then
-            # Find and kill processes using our ports
-            PIDS=$(lsof -t -i:$port 2>/dev/null || true)
-            if [[ -n "$PIDS" ]]; then
-                if [[ "$QUIET" != true ]]; then
-                    echo -n "   Freeing port $port... "
-                fi
-                echo $PIDS | xargs kill -TERM 2>/dev/null || true
-                sleep 1
-                # Force kill if still running
-                REMAINING_PIDS=$(lsof -t -i:$port 2>/dev/null || true)
-                if [[ -n "$REMAINING_PIDS" ]]; then
-                    echo $REMAINING_PIDS | xargs kill -KILL 2>/dev/null || true
-                fi
-                if [[ "$QUIET" != true ]]; then
-                    echo -e "${GREEN}✅${NC}"
-                fi
-            elif [[ "$QUIET" != true ]]; then
-                echo -e "   Port $port: ${GREEN}already free${NC}"
-            fi
-        fi
-    done
-fi
-
-# 3. Clean up temporary files and configuration
+# 2. Clean up temporary files and configuration
 if [[ "$QUIET" != true ]]; then
-    echo -e "\n${PURPLE}🗑️  Cleaning Temporary Files${NC}"
+    echo -e "\n${PURPLE}🗑️  Cleaning Worktree Files${NC}"
 fi
 
-# Remove generated files
-files_to_remove=(".worktree-ports" "supabase/config.toml" ".env.local")
+# Remove worktree-specific files (legacy cleanup)
+files_to_remove=(".worktree-ports" ".env.local")
 for file in "${files_to_remove[@]}"; do
     if [[ -f "$file" ]]; then
         rm -f "$file"
@@ -181,6 +158,17 @@ for file in "${files_to_remove[@]}"; do
     fi
 done
 
+# Clean up any legacy custom config files
+if [[ -f "supabase/config.toml" ]]; then
+    # Check if it's a custom generated config (contains worktree-specific text)
+    if grep -q "Auto-generated by setup-worktree.sh" "supabase/config.toml" 2>/dev/null; then
+        rm -f "supabase/config.toml"
+        if [[ "$QUIET" != true ]]; then
+            echo -e "   Removed: legacy supabase/config.toml"
+        fi
+    fi
+fi
+
 # Clean up Supabase data directory if it exists
 if [[ -d "supabase/.temp" ]]; then
     rm -rf "supabase/.temp"
@@ -189,8 +177,8 @@ if [[ -d "supabase/.temp" ]]; then
     fi
 fi
 
-# 4. Clean up Docker containers and volumes (optional, careful!)
-if command -v docker &> /dev/null; then
+# 3. Clean up Docker containers and volumes (only if stopping services)
+if [[ "$STOP_SHARED_SERVICES" == true ]] && command -v docker &> /dev/null; then
     if [[ "$QUIET" != true ]]; then
         echo -e "\n${PURPLE}🐳 Docker Cleanup${NC}"
     fi
@@ -219,13 +207,16 @@ if command -v docker &> /dev/null; then
             echo -e "${GREEN}✅${NC}"
         fi
     fi
-else
-    if [[ "$QUIET" != true ]]; then
+elif [[ "$QUIET" != true ]]; then
+    if [[ "$STOP_SHARED_SERVICES" != true ]]; then
+        echo -e "\n${PURPLE}🐳 Docker${NC}"
+        echo -e "   Keeping shared Docker containers running"
+    else
         echo -e "${YELLOW}⚠️  Docker not available, skipping container cleanup${NC}"
     fi
 fi
 
-# 5. Worktree removal (if requested)
+# 4. Worktree removal (if requested)
 if [[ "$KEEP_WORKTREE" != true ]]; then
     if [[ "$QUIET" != true ]]; then
         echo -e "\n${PURPLE}🗂️  Worktree Removal${NC}"
@@ -261,16 +252,22 @@ if [[ "$KEEP_WORKTREE" != true ]]; then
     git worktree prune > /dev/null 2>&1 || true
 fi
 
-# 6. Summary
+# 5. Summary
 if [[ "$QUIET" != true ]]; then
     echo -e "\n${PURPLE}📋 Cleanup Summary${NC}"
     
     if [[ ${#cleanup_errors[@]} -eq 0 ]]; then
         echo -e "🎉 ${GREEN}Cleanup completed successfully!${NC}"
         if [[ "$KEEP_WORKTREE" == true ]]; then
-            echo "   Services stopped, worktree preserved"
+            echo "   Files cleaned, worktree preserved"
         else
-            echo "   Worktree and all services cleaned up"
+            echo "   Worktree removed"
+        fi
+        
+        if [[ "$STOP_SHARED_SERVICES" == true ]]; then
+            echo "   Shared Supabase services stopped"
+        else
+            echo "   Shared Supabase services still running"
         fi
     else
         echo -e "⚠️  ${YELLOW}Cleanup completed with some issues:${NC}"
