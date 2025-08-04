@@ -37,7 +37,7 @@ This document contains detailed troubleshooting procedures for development and d
 1. **Check status**: `npm run dev:status` (shows health of all services)
 2. **Graceful restart**: `npm run dev:clean` (cleanup + fresh start)
 3. **Emergency stop**: `npm run kill:all` (intelligent process cleanup)
-4. **Port cleanup**: `npm run port:free` (free stuck ports: 3000, 5555)
+4. **Port cleanup**: If needed, manually reboot or kill processes on development ports (49200, 5555)
 
 ### Problem: Services starting but not responding
 

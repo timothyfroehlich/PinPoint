@@ -1,12 +1,51 @@
+import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+
+import { env } from "~/env";
 import { isDevelopment } from "~/lib/environment";
 
-export function middleware(request: NextRequest): NextResponse {
+export async function middleware(request: NextRequest): Promise<NextResponse> {
   const url = request.nextUrl.clone();
   const host = request.headers.get("host") ?? "";
 
   console.log(`[MIDDLEWARE] Request to: ${host}${url.pathname}`);
+
+  // Create Supabase response for session management
+  let supabaseResponse = NextResponse.next({
+    request,
+  });
+
+  // Handle Supabase session refresh
+  try {
+    const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabasePublishableKey = env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+
+    if (supabaseUrl && supabasePublishableKey) {
+      const supabase = createServerClient(supabaseUrl, supabasePublishableKey, {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll();
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value }) =>
+              request.cookies.set(name, value),
+            );
+            supabaseResponse = NextResponse.next({ request });
+            cookiesToSet.forEach(({ name, value, options }) =>
+              supabaseResponse.cookies.set(name, value, options),
+            );
+          },
+        },
+      });
+
+      // CRITICAL: Always call getUser() to refresh session
+      await supabase.auth.getUser();
+    }
+  } catch (error) {
+    console.warn("[MIDDLEWARE] Supabase session refresh failed:", error);
+    // Continue with subdomain handling even if auth refresh fails
+  }
 
   // Extract subdomain
   const subdomain = getSubdomain(host);
@@ -24,11 +63,10 @@ export function middleware(request: NextRequest): NextResponse {
   }
 
   // Add subdomain to headers for organization resolution
-  const response = NextResponse.next();
-  response.headers.set("x-subdomain", subdomain);
+  supabaseResponse.headers.set("x-subdomain", subdomain);
 
   console.log(`[MIDDLEWARE] Setting x-subdomain header: ${subdomain}`);
-  return response;
+  return supabaseResponse;
 }
 
 function getSubdomain(host: string): string | null {

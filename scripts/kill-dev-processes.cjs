@@ -146,7 +146,7 @@ async function main() {
 
   try {
     // Kill processes on development ports
-    await killProcessesOnPorts([3000, 5555]);
+    await killProcessesOnPorts([49200, 5555]);
 
     // Kill any remaining development processes
     await killNodeProcesses();

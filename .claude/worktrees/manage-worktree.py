@@ -237,8 +237,16 @@ DIRECT_URL=postgresql://postgres:postgres@localhost:{ports['db']}/postgres
         # Update ports using regex replacement (simpler than full TOML writing)
         self._update_toml_ports(worktree_config, ports)
         
+        # Make bucket name unique to avoid CLI collision prompts
+        self._update_bucket_name(worktree_config, worktree_path.name)
+        
         # Add worktree-specific warning to the config
         self._add_worktree_warning_to_config(worktree_config)
+        
+        # Create storage directory required by the bucket configuration
+        storage_dir = supabase_dir / "storage"
+        storage_dir.mkdir(parents=True, exist_ok=True)
+        print(f"{Colors.GREEN}✅ Created storage directory: {storage_dir}{Colors.NC}")
         
         print(f"{Colors.GREEN}✅ Supabase config optimized with ports API:{ports['api']} DB:{ports['db']}{Colors.NC}")
     
@@ -294,6 +302,25 @@ DIRECT_URL=postgresql://postgres:postgres@localhost:{ports['db']}/postgres
         # Write back the modified content
         with open(config_file, 'w') as f:
             f.write(content)
+    
+    def _update_bucket_name(self, config_file: Path, worktree_name: str) -> None:
+        """Update bucket name to be unique per worktree to avoid CLI collision prompts."""
+        with open(config_file, 'r') as f:
+            content = f.read()
+        
+        # Replace the bucket name with a worktree-specific name
+        # Pattern matches: [storage.buckets.pinpoint-storage]
+        unique_bucket_name = f"pinpoint-storage-{worktree_name}"
+        pattern = r'(\[storage\.buckets\.)pinpoint-storage(\])'
+        replacement = rf'\g<1>{unique_bucket_name}\g<2>'
+        
+        content = re.sub(pattern, replacement, content)
+        
+        # Write back the modified content
+        with open(config_file, 'w') as f:
+            f.write(content)
+        
+        print(f"{Colors.GREEN}✅ Bucket configured as: {unique_bucket_name}{Colors.NC}")
     
     def _add_worktree_warning_to_config(self, config_file: Path) -> None:
         """Add worktree-specific warning to the Supabase config file."""

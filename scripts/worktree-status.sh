@@ -12,19 +12,11 @@ PURPLE='\033[0;35m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
-# Load port configuration if available
-if [[ -f ".worktree-ports" ]]; then
-    source .worktree-ports
-else
-    # Fallback: calculate ports from current directory
-    WORKTREE_HASH=$(echo "$(pwd)" | md5sum | cut -c1-4)
-    PORT_OFFSET=$((0x$WORKTREE_HASH % 100))
-    BASE_PORT=$((54320 + $PORT_OFFSET))
-    API_PORT=$((BASE_PORT + 1))
-    DB_PORT=$((BASE_PORT + 2))
-    STUDIO_PORT=$((BASE_PORT + 3))
-    INBUCKET_PORT=$((BASE_PORT + 4))
-fi
+# Standard Supabase ports (shared across all worktrees)
+API_PORT=54321
+DB_PORT=54322
+STUDIO_PORT=54323
+INBUCKET_PORT=54324
 
 echo -e "${BLUE}🔍 PinPoint Worktree Status Report${NC}"
 echo "==============================================="
@@ -70,7 +62,7 @@ else
 fi
 
 # 2. Service Health Status
-echo -e "\n${PURPLE}🚀 Service Health${NC}"
+echo -e "\n${PURPLE}🚀 Service Health (Shared Instance)${NC}"
 SERVICE_HEALTHY=true
 
 # Check Supabase API
@@ -159,7 +151,23 @@ else
     echo -e "   Database connectivity... ${YELLOW}⏭️  Skipped (services not healthy)${NC}"
 fi
 
-# 5. Summary
+# 5. Shared Infrastructure Status
+echo -e "\n${PURPLE}🔗 Shared Infrastructure${NC}"
+echo -e "🚨 ${YELLOW}Database Coordination:${NC} All worktrees share the same local Supabase instance"
+echo -e "⚠️  ${YELLOW}Schema Changes:${NC} Database modifications affect ALL active worktrees"
+
+# Check for other active worktrees
+if command -v git &> /dev/null; then
+    WORKTREE_COUNT=$(git worktree list | wc -l)
+    if [[ $WORKTREE_COUNT -gt 1 ]]; then
+        echo -e "👥 ${CYAN}Active Worktrees:${NC} $WORKTREE_COUNT worktrees detected"
+        echo "   Use 'git worktree list' to see all worktrees"
+    else
+        echo -e "👤 ${GREEN}Single Worktree:${NC} Only this worktree is active"
+    fi
+fi
+
+# 6. Summary
 echo -e "\n${PURPLE}📋 Summary${NC}"
 if [[ "$SERVICE_HEALTHY" == true && "$INTEGRATION_TESTS_PASSED" == true && "$MODIFIED_FILES" -eq 0 ]]; then
     echo -e "🎉 ${GREEN}Environment Status: Excellent${NC}"
@@ -176,7 +184,7 @@ else
 fi
 
 # Port information
-echo -e "\n${PURPLE}🔌 Port Configuration${NC}"
+echo -e "\n${PURPLE}🔌 Port Configuration (Shared)${NC}"
 echo -e "API: ${CYAN}$API_PORT${NC} | DB: ${CYAN}$DB_PORT${NC} | Studio: ${CYAN}$STUDIO_PORT${NC} | Email: ${CYAN}$INBUCKET_PORT${NC}"
 
 # Quick commands reference  
@@ -186,5 +194,6 @@ echo "   View logs: supabase logs"
 echo "   Reset DB: npm run db:reset"
 echo "   Run tests: npm run test"
 echo "   Cleanup: ./scripts/worktree-cleanup.sh"
+echo "   List worktrees: git worktree list"
 
 echo "==============================================="
