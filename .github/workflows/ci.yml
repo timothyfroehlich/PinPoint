@@ -66,7 +66,7 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-      
+
       # Clean environment setup to prevent cache issues
       - name: Clean Environment Setup
         run: |
@@ -76,7 +76,7 @@ jobs:
           # Clear npm cache to prevent stale artifacts
           npm cache clean --force || true
           echo "✅ Environment cleaned"
-          
+
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "24"
@@ -150,7 +150,6 @@ jobs:
   database-validation:
     name: Database Validation
     runs-on: ubuntu-latest
-    needs: test  # Run after tests pass
     permissions:
       contents: read
     services:
@@ -283,51 +282,3 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - name: Validate GitHub workflows
         uses: raven-actions/actionlint@3a24062651993d40fed1019b58ac6fbdfbf276cc # v2
-
-  # Summary job to ensure all checks pass
-  ci-summary:
-    name: CI Summary
-    runs-on: ubuntu-latest
-    needs:
-      [
-        typecheck,
-        lint,
-        format,
-        test,
-        database-validation,
-        security,
-        # e2e,  # DISABLED during Supabase migration
-        validate-actions,
-      ]
-    if: always()
-    permissions:
-      contents: read
-    steps:
-      - name: Check Results (All checks must pass)
-        run: |
-          # Core checks that must pass
-          if [ "${{ needs.typecheck.result }}" != "success" ] ||
-             [ "${{ needs.lint.result }}" != "success" ] ||
-             [ "${{ needs.format.result }}" != "success" ] ||
-             [ "${{ needs.test.result }}" != "success" ] ||
-             [ "${{ needs.database-validation.result }}" != "success" ] ||
-             [ "${{ needs.security.result }}" != "success" ] ||
-             [ "${{ needs.validate-actions.result }}" != "success" ]; then
-            echo "❌ One or more required checks failed"
-            exit 1
-          fi
-
-          # Report on all job statuses
-          echo "## CI Status: ✅ ALL REQUIRED CHECKS PASSING"
-          echo "## Job Results:"
-          echo "- typecheck: ${{ needs.typecheck.result }}"
-          echo "- lint: ${{ needs.lint.result }}"
-          echo "- format: ${{ needs.format.result }}"
-          echo "- test: ${{ needs.test.result }}"
-          echo "- database-validation: ${{ needs.database-validation.result }}"
-          echo "- security: ${{ needs.security.result }}"
-          echo "- validate-actions: ${{ needs.validate-actions.result }}"
-          echo ""
-          echo "✅ All checks passed successfully!"
-          echo ""
-          echo "📝 **Note**: E2E tests are temporarily disabled during Supabase migration"
