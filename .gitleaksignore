@@ -1,0 +1,5 @@
+# Safe local development keys - these are public demo keys from Supabase
+# Format: file:rule:line
+.env.development:jwt:15
+.env.development:jwt:16
+.env.development:jwt:17

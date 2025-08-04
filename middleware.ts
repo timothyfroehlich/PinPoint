@@ -19,10 +19,10 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   // Handle Supabase session refresh
   try {
     const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const supabasePublishableKey = env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
-    if (supabaseUrl && supabaseAnonKey) {
-      const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+    if (supabaseUrl && supabasePublishableKey) {
+      const supabase = createServerClient(supabaseUrl, supabasePublishableKey, {
         cookies: {
           getAll() {
             return request.cookies.getAll();

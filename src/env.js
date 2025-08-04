@@ -56,14 +56,14 @@ export const env = createEnv({
       getEnvironmentType() === "test"
         ? z.string().url().optional()
         : z.string().url("Supabase URL must be a valid URL"),
-    SUPABASE_ANON_KEY:
+    SUPABASE_PUBLISHABLE_KEY:
       getEnvironmentType() === "test"
         ? z.string().optional()
-        : z.string().min(1, "Supabase anon key is required"),
-    SUPABASE_SERVICE_ROLE_KEY:
+        : z.string().min(1, "Supabase publishable key is required"),
+    SUPABASE_SECRET_KEY:
       getEnvironmentType() === "test"
         ? z.string().optional()
-        : z.string().min(1, "Supabase service role key is required"),
+        : z.string().min(1, "Supabase secret key is required"),
     SUPABASE_JWT_SECRET:
       getEnvironmentType() === "test"
         ? z.string().optional()
@@ -105,10 +105,10 @@ export const env = createEnv({
       getEnvironmentType() === "test"
         ? z.string().url().optional()
         : z.string().url("Public Supabase URL must be valid"),
-    NEXT_PUBLIC_SUPABASE_ANON_KEY:
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:
       getEnvironmentType() === "test"
         ? z.string().optional()
-        : z.string().min(1, "Public anon key is required"),
+        : z.string().min(1, "Public publishable key is required"),
     // Next.js automatically exposes NODE_ENV to the client, no need to manually expose it
   },
 
@@ -137,13 +137,14 @@ export const env = createEnv({
     FORCE_PREVIEW_BEHAVIOR: process.env["FORCE_PREVIEW_BEHAVIOR"],
     // Supabase Configuration
     SUPABASE_URL: process.env["SUPABASE_URL"],
-    SUPABASE_ANON_KEY: process.env["SUPABASE_ANON_KEY"],
-    SUPABASE_SERVICE_ROLE_KEY: process.env["SUPABASE_SERVICE_ROLE_KEY"],
+    SUPABASE_PUBLISHABLE_KEY: process.env["SUPABASE_PUBLISHABLE_KEY"],
+    SUPABASE_SECRET_KEY: process.env["SUPABASE_SECRET_KEY"],
     SUPABASE_JWT_SECRET: process.env["SUPABASE_JWT_SECRET"],
     // Client-side environment variables
     NEXT_PUBLIC_VERCEL_ENV: process.env["NEXT_PUBLIC_VERCEL_ENV"],
     NEXT_PUBLIC_SUPABASE_URL: process.env["NEXT_PUBLIC_SUPABASE_URL"],
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env["NEXT_PUBLIC_SUPABASE_ANON_KEY"],
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:
+      process.env["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"],
     // Logging configuration
     LOG_LEVEL: process.env["LOG_LEVEL"],
     NEXT_PUBLIC_ENABLE_DEV_FEATURES:

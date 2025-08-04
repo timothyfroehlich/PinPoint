@@ -23,7 +23,7 @@ vi.mock("~/env", () => ({
   env: {
     // Client-side accessible vars (these should work)
     NEXT_PUBLIC_SUPABASE_URL: "http://localhost:54321",
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: "test-anon-key",
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "test-publishable-key",
 
     // Server-side vars that should throw when accessed from client
     get NODE_ENV() {
@@ -93,7 +93,9 @@ describe("Client-Safe Environment Variable Access", () => {
     // Demonstrate that client vars are accessible via the mocked env
     const { env } = await import("~/env");
     expect(env.NEXT_PUBLIC_SUPABASE_URL).toBe("http://localhost:54321");
-    expect(env.NEXT_PUBLIC_SUPABASE_ANON_KEY).toBe("test-anon-key");
+    expect(env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY).toBe(
+      "test-publishable-key",
+    );
   });
 
   it("should show that server env vars throw when accessed", async () => {

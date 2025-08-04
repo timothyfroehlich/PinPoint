@@ -27,7 +27,7 @@ vi.mock("@supabase/ssr", () => ({
 vi.mock("~/env", () => ({
   env: {
     NEXT_PUBLIC_SUPABASE_URL: "https://test.supabase.co",
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: "test-anon-key",
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "test-publishable-key",
   },
 }));
 
@@ -44,7 +44,7 @@ describe("Supabase Browser Client", () => {
 
       expect(mockCreateBrowserClient).toHaveBeenCalledWith(
         "https://test.supabase.co",
-        "test-anon-key",
+        "test-publishable-key",
       );
     });
 
@@ -100,7 +100,7 @@ describe("Supabase Browser Client", () => {
 
       expect(mockCreateBrowserClient).toHaveBeenCalledWith(
         "https://test.supabase.co",
-        "test-anon-key",
+        "test-publishable-key",
       );
     });
   });
