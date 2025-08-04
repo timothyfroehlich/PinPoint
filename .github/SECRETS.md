@@ -7,8 +7,12 @@ The smoke test workflow requires the following secrets to be configured in your 
 ### Supabase Configuration
 
 - `SUPABASE_URL` - Your Supabase project URL (e.g., `https://your-project-ref.supabase.co`)
-- `SUPABASE_ANON_KEY` - Public anonymous key for client-side operations
-- `SUPABASE_SERVICE_ROLE_KEY` - Service role key for admin operations
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` - Public publishable key for client-side operations
+- `SUPABASE_SECRET_KEY` - Secret key for admin operations
+
+> **⚠️ Migration Note**: Updated from legacy `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY`
+> to match new Supabase API key naming convention. Existing deployments need to update
+> their environment variables to use the new names.
 
 ### Database Connection
 
@@ -23,10 +27,11 @@ The smoke test workflow requires the following secrets to be configured in your 
 
 ## Security Notes
 
-- These secrets allow CI to test against your production Supabase instance
-- Test data is isolated using `SMOKE-TEST-` prefixes and timestamps
+- **⚠️ CI uses ephemeral database**: Smoke tests run against a temporary PostgreSQL container, not production
+- Environment variables are pulled from Vercel but DATABASE_URL is overridden to use localhost:5432
+- Test data isolation: `SMOKE-TEST-` prefixes and timestamps for any data that might reach production
 - Cleanup step removes test data after each run (1-hour safety window)
-- All test operations are non-destructive to production data
+- All test operations are designed to be non-destructive
 
 ## Alternative: Staging Instance
 
