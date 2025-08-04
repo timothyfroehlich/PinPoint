@@ -23,10 +23,11 @@ export class DatabaseProvider {
 
   // Updated for dual-ORM support
   async disconnect(): Promise<void> {
-    await Promise.all([
-      this.prismaInstance?.$disconnect(),
-      closeDrizzleConnection(), // Close Drizzle connection
-    ]);
+    const promises: Promise<void>[] = [closeDrizzleConnection()];
+    if (this.prismaInstance) {
+      promises.push(this.prismaInstance.$disconnect());
+    }
+    await Promise.all(promises);
     delete this.prismaInstance;
     delete this.drizzleInstance;
   }

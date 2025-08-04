@@ -261,6 +261,17 @@ export default tseslint.config(
     },
   },
   {
+    // Override: Allow drizzle-orm patterns in schema files
+    // Drizzle ORM requires patterns that conflict with @tsconfig/strictest
+    files: ["src/server/db/schema/*.ts"],
+    rules: {
+      "@typescript-eslint/no-unsafe-assignment": "off",
+      "@typescript-eslint/no-unsafe-call": "off",
+      "@typescript-eslint/no-unsafe-member-access": "off",
+      "@typescript-eslint/no-unsafe-return": "off",
+    },
+  },
+  {
     // Global ignores
     ignores: [
       ".next/",
