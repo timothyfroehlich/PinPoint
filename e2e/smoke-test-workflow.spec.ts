@@ -7,7 +7,8 @@ import { logout } from "./helpers/unified-dashboard";
  * Tests the entire user journey from issue creation through admin management.
  * This serves as a comprehensive smoke test to catch major regressions.
  *
- * Designed to be resilient to UI changes and serve as a required GitHub Action check.
+ * Uses robust data-testid selectors to minimize flakiness from UI changes.
+ * Provides clear error context when failures occur.
  */
 
 test.describe("Smoke Test: Complete Issue Workflow", () => {
@@ -44,8 +45,12 @@ test.describe("Smoke Test: Complete Issue Workflow", () => {
     console.log("🧪 SMOKE TEST - Step 3: Selecting first available game");
 
     // Wait for the MUI Select component to load
-    const machineSelect = page.locator('[role="combobox"]').first();
-    await expect(machineSelect).toBeVisible({ timeout: 10000 });
+    const machineSelect = page.locator('[data-testid="machine-selector"]');
+    try {
+      await expect(machineSelect).toBeVisible({ timeout: 10000 });
+    } catch (error) {
+      throw new Error(`Step 3 FAILED: Machine selector not found. The page may not have loaded properly or the machine selector component failed to render. Error: ${error}`);
+    }
 
     // Click to open the dropdown
     await machineSelect.click();
@@ -67,20 +72,22 @@ test.describe("Smoke Test: Complete Issue Workflow", () => {
     console.log("🧪 SMOKE TEST - Step 4: Filling issue form");
 
     // Fill in the issue title
-    const titleInput = page
-      .locator('input[name="title"], input[placeholder*="title" i]')
-      .first();
-    await expect(titleInput).toBeVisible();
-    await titleInput.fill(issueTitle);
+    const titleInput = page.locator('[data-testid="issue-title-input"]');
+    try {
+      await expect(titleInput).toBeVisible();
+      await titleInput.fill(issueTitle);
+    } catch (error) {
+      throw new Error(`Step 4 FAILED: Issue title input not found or could not be filled. Check if the form rendered properly. Error: ${error}`);
+    }
 
     // Fill in the email
-    const emailInput = page
-      .locator(
-        'input[name="email"], input[type="email"], input[placeholder*="email" i]',
-      )
-      .first();
-    await expect(emailInput).toBeVisible();
-    await emailInput.fill(testEmail);
+    const emailInput = page.locator('[data-testid="issue-email-input"]');
+    try {
+      await expect(emailInput).toBeVisible();
+      await emailInput.fill(testEmail);
+    } catch (error) {
+      throw new Error(`Step 4 FAILED: Email input not found or could not be filled. Check if the anonymous user form section rendered properly. Error: ${error}`);
+    }
 
     console.log(
       `✅ SMOKE TEST - Step 4 Complete: Form filled with title "${issueTitle}" and email "${testEmail}"`,
@@ -90,20 +97,22 @@ test.describe("Smoke Test: Complete Issue Workflow", () => {
     console.log("🧪 SMOKE TEST - Step 5: Submitting issue");
 
     // Find and click submit button
-    const submitButton = page
-      .locator(
-        'button[type="submit"], button:has-text("Submit"), button:has-text("Create")',
-      )
-      .first();
-    await expect(submitButton).toBeVisible();
-    await submitButton.click();
+    const submitButton = page.locator('[data-testid="issue-submit-button"]');
+    try {
+      await expect(submitButton).toBeVisible();
+      await submitButton.click();
+    } catch (error) {
+      throw new Error(`Step 5 FAILED: Submit button not found or could not be clicked. Check if the form is properly rendered and enabled. Error: ${error}`);
+    }
 
     // Wait for success indication
-    await expect(
-      page
-        .locator(':text("success"), :text("created"), .success, .toast-success')
-        .first(),
-    ).toBeVisible({ timeout: 10000 });
+    try {
+      await expect(
+        page.locator('[data-testid="issue-success-message"]')
+      ).toBeVisible({ timeout: 10000 });
+    } catch (error) {
+      throw new Error(`Step 5 FAILED: Success message not displayed after form submission. The issue creation may have failed on the backend. Error: ${error}`);
+    }
 
     console.log(
       "✅ SMOKE TEST - Step 5 Complete: Issue submitted successfully",
