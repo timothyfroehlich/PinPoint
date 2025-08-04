@@ -45,7 +45,7 @@ test.describe("Smoke Test: Complete Issue Workflow", () => {
     console.log("🧪 SMOKE TEST - Step 3: Selecting first available game");
 
     // Wait for the MUI Select component to load
-    const machineSelect = page.locator('[data-testid="machine-selector"]');
+    const machineSelect = page.locator('[role="combobox"]').first();
     try {
       await expect(machineSelect).toBeVisible({ timeout: 10000 });
     } catch (error) {
@@ -72,7 +72,7 @@ test.describe("Smoke Test: Complete Issue Workflow", () => {
     console.log("🧪 SMOKE TEST - Step 4: Filling issue form");
 
     // Fill in the issue title
-    const titleInput = page.locator('[data-testid="issue-title-input"]');
+    const titleInput = page.getByRole('textbox', { name: 'Issue Title' });
     try {
       await expect(titleInput).toBeVisible();
       await titleInput.fill(issueTitle);
@@ -81,7 +81,7 @@ test.describe("Smoke Test: Complete Issue Workflow", () => {
     }
 
     // Fill in the email
-    const emailInput = page.locator('[data-testid="issue-email-input"]');
+    const emailInput = page.getByRole('textbox', { name: 'Your Email (Optional)' });
     try {
       await expect(emailInput).toBeVisible();
       await emailInput.fill(testEmail);
@@ -97,7 +97,7 @@ test.describe("Smoke Test: Complete Issue Workflow", () => {
     console.log("🧪 SMOKE TEST - Step 5: Submitting issue");
 
     // Find and click submit button
-    const submitButton = page.locator('[data-testid="issue-submit-button"]');
+    const submitButton = page.getByRole('button', { name: 'Create Issue' });
     try {
       await expect(submitButton).toBeVisible();
       await submitButton.click();
@@ -108,7 +108,7 @@ test.describe("Smoke Test: Complete Issue Workflow", () => {
     // Wait for success indication
     try {
       await expect(
-        page.locator('[data-testid="issue-success-message"]')
+        page.locator(':text("success"), :text("created"), :text("Issue Created"), .success, .toast-success').first()
       ).toBeVisible({ timeout: 10000 });
     } catch (error) {
       throw new Error(`Step 5 FAILED: Success message not displayed after form submission. The issue creation may have failed on the backend. Error: ${error}`);
@@ -144,7 +144,7 @@ test.describe("Smoke Test: Complete Issue Workflow", () => {
     await page.waitForLoadState("networkidle");
 
     // Search for the issue
-    const searchInput = page.locator('[data-testid="issue-search-input"]');
+    const searchInput = page.getByRole('textbox', { name: /search/i });
     if (await searchInput.isVisible()) {
       await searchInput.fill("SMOKE-TEST");
       // Wait for search results to update (look for our specific issue)
@@ -181,7 +181,7 @@ test.describe("Smoke Test: Complete Issue Workflow", () => {
     console.log("🧪 SMOKE TEST - Step 9: Adding admin comment");
 
     const commentText = "Admin reviewed this issue";
-    const commentTextarea = page.locator('[data-testid="comment-textarea"]');
+    const commentTextarea = page.getByRole('textbox', { name: /comment/i });
     try {
       await expect(commentTextarea).toBeVisible();
       await commentTextarea.fill(commentText);
@@ -190,7 +190,7 @@ test.describe("Smoke Test: Complete Issue Workflow", () => {
     }
 
     // Submit comment
-    const commentSubmit = page.locator('[data-testid="submit-comment-button"]');
+    const commentSubmit = page.getByRole('button', { name: /add|submit|comment/i });
     try {
       await commentSubmit.click();
     } catch (error) {
@@ -211,15 +211,15 @@ test.describe("Smoke Test: Complete Issue Workflow", () => {
     console.log("🧪 SMOKE TEST - Step 10: Closing the issue");
 
     // Find status dropdown or close button
-    const statusSelect = page.locator('[data-testid="status-dropdown"]');
+    const statusSelect = page.getByRole('combobox', { name: /status|change status/i });
     if (await statusSelect.isVisible()) {
       // Click to open the MUI Select dropdown
       await statusSelect.click();
       
       // Wait for dropdown options to appear and select a closed status
-      const closedOptions = ["fixed", "closed", "resolved", "complete"];
+      const closedOptions = ["Fixed", "Closed", "Resolved", "Complete"];
       for (const status of closedOptions) {
-        const option = page.locator(`[data-testid="status-option-${status}"]`);
+        const option = page.getByRole('option', { name: new RegExp(status, 'i') });
         if ((await option.count()) > 0) {
           await option.click();
           break;
