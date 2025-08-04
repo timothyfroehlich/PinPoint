@@ -39,13 +39,13 @@ export const env = createEnv({
       .default("development"),
     VERCEL_ENV: z.enum(["development", "preview", "production"]).optional(),
     GOOGLE_CLIENT_ID:
-      getEnvironmentType() === "development" || getEnvironmentType() === "test"
-        ? z.string().optional()
-        : z.string(),
+      getEnvironmentType() === "production"
+        ? z.string()
+        : z.string().optional(),
     GOOGLE_CLIENT_SECRET:
-      getEnvironmentType() === "development" || getEnvironmentType() === "test"
-        ? z.string().optional()
-        : z.string(),
+      getEnvironmentType() === "production"
+        ? z.string()
+        : z.string().optional(),
     OPDB_API_URL: z.string().url().default("https://opdb.org/api"),
     DEFAULT_ORG_SUBDOMAIN: z.string().default("apc"),
     // Additional environment variables that were accessed directly via process.env

@@ -70,37 +70,6 @@ jobs:
         with:
           node-version: "24"
           cache: "npm"
-      - name: Install Vercel CLI
-        run: npm install --global vercel@latest
-      - name: Pull Vercel Environment Variables
-        run: vercel env pull .env.local --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-      - name: Validate Environment Variables
-        run: |
-          echo "Checking for required Supabase environment variables..."
-          if [ ! -f .env.local ]; then
-            echo "❌ .env.local file not found after Vercel env pull"
-            exit 1
-          fi
-          
-          REQUIRED_VARS="SUPABASE_URL SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY SUPABASE_JWT_SECRET NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_ANON_KEY"
-          MISSING_VARS=""
-          
-          for var in $REQUIRED_VARS; do
-            if ! grep -q "^$var=" .env.local; then
-              MISSING_VARS="$MISSING_VARS $var"
-            fi
-          done
-          
-          if [ -n "$MISSING_VARS" ]; then
-            echo "❌ Missing required environment variables:$MISSING_VARS"
-            echo "Please ensure these are configured in your Vercel project"
-            exit 1
-          fi
-          
-          echo "✅ All required Supabase environment variables are present"
       - run: npm ci
       - name: ESLint Check - Production Code  
         run: npm run lint
@@ -116,13 +85,6 @@ jobs:
         with:
           node-version: "24"
           cache: "npm"
-      - name: Install Vercel CLI
-        run: npm install --global vercel@latest
-      - name: Pull Vercel Environment Variables
-        run: vercel env pull .env.local --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
       - run: npm ci
       - name: ESLint Check - Test Files (Non-blocking)  
         run: |
@@ -146,6 +108,8 @@ jobs:
         run: npm run format
 
   # Job 4: Tests with Coverage
+  # Uses hybrid approach: Vercel environment configuration + local Postgres container
+  # This provides configuration consistency with deployments while keeping resource usage low
   test:
     name: Tests
     runs-on: ubuntu-latest

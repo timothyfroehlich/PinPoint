@@ -1,5 +1,5 @@
 import { env } from "~/env.js";
-import { isProduction, isPreview } from "~/lib/environment";
+import { isProduction } from "~/lib/environment";
 import { logger } from "~/lib/logger";
 
 /**
@@ -27,12 +27,12 @@ export function validateGoogleOAuth(): OAuthValidationResult {
 
   const clientId = env.GOOGLE_CLIENT_ID;
   const clientSecret = env.GOOGLE_CLIENT_SECRET;
-  const requiresOAuth = isProduction() || isPreview();
+  const requiresOAuth = isProduction();
 
   // Check client ID
   if (requiresOAuth && !clientId) {
     result.errors.push(
-      "GOOGLE_CLIENT_ID is required in production and preview environments",
+      "GOOGLE_CLIENT_ID is required in production environments",
     );
     result.isValid = false;
   } else if (!clientId) {
@@ -44,7 +44,7 @@ export function validateGoogleOAuth(): OAuthValidationResult {
   // Check client secret
   if (requiresOAuth && !clientSecret) {
     result.errors.push(
-      "GOOGLE_CLIENT_SECRET is required in production and preview environments",
+      "GOOGLE_CLIENT_SECRET is required in production environments",
     );
     result.isValid = false;
   } else if (!clientSecret) {
@@ -143,16 +143,16 @@ export function validateAndLogOAuthConfig(): boolean {
 }
 
 /**
- * Throws an error if OAuth configuration is invalid in production/preview
- * In development, logs warnings but allows continuation
+ * Throws an error if OAuth configuration is invalid in production
+ * In development and preview, logs warnings but allows continuation
  */
 export function assertOAuthConfigValid(): void {
   const isValid = validateAndLogOAuthConfig();
-  const requiresStrictValidation = isProduction() || isPreview();
+  const requiresStrictValidation = isProduction();
 
   if (!isValid && requiresStrictValidation) {
     throw new Error(
-      "OAuth configuration validation failed in production/preview environment. Check your environment variables.",
+      "OAuth configuration validation failed in production environment. Check your environment variables.",
     );
   }
 }
