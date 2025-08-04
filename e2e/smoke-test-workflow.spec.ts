@@ -49,7 +49,9 @@ test.describe("Smoke Test: Complete Issue Workflow", () => {
     try {
       await expect(machineSelect).toBeVisible({ timeout: 10000 });
     } catch (error) {
-      throw new Error(`Step 3 FAILED: Machine selector not found. The page may not have loaded properly or the machine selector component failed to render. Error: ${error}`);
+      throw new Error(
+        `Step 3 FAILED: Machine selector not found. The page may not have loaded properly or the machine selector component failed to render. Error: ${error}`,
+      );
     }
 
     // Click to open the dropdown
@@ -72,21 +74,27 @@ test.describe("Smoke Test: Complete Issue Workflow", () => {
     console.log("🧪 SMOKE TEST - Step 4: Filling issue form");
 
     // Fill in the issue title
-    const titleInput = page.getByRole('textbox', { name: 'Issue Title' });
+    const titleInput = page.getByRole("textbox", { name: "Issue Title" });
     try {
       await expect(titleInput).toBeVisible();
       await titleInput.fill(issueTitle);
     } catch (error) {
-      throw new Error(`Step 4 FAILED: Issue title input not found or could not be filled. Check if the form rendered properly. Error: ${error}`);
+      throw new Error(
+        `Step 4 FAILED: Issue title input not found or could not be filled. Check if the form rendered properly. Error: ${error}`,
+      );
     }
 
     // Fill in the email
-    const emailInput = page.getByRole('textbox', { name: 'Your Email (Optional)' });
+    const emailInput = page.getByRole("textbox", {
+      name: "Your Email (Optional)",
+    });
     try {
       await expect(emailInput).toBeVisible();
       await emailInput.fill(testEmail);
     } catch (error) {
-      throw new Error(`Step 4 FAILED: Email input not found or could not be filled. Check if the anonymous user form section rendered properly. Error: ${error}`);
+      throw new Error(
+        `Step 4 FAILED: Email input not found or could not be filled. Check if the anonymous user form section rendered properly. Error: ${error}`,
+      );
     }
 
     console.log(
@@ -97,21 +105,29 @@ test.describe("Smoke Test: Complete Issue Workflow", () => {
     console.log("🧪 SMOKE TEST - Step 5: Submitting issue");
 
     // Find and click submit button
-    const submitButton = page.getByRole('button', { name: 'Create Issue' });
+    const submitButton = page.getByRole("button", { name: "Create Issue" });
     try {
       await expect(submitButton).toBeVisible();
       await submitButton.click();
     } catch (error) {
-      throw new Error(`Step 5 FAILED: Submit button not found or could not be clicked. Check if the form is properly rendered and enabled. Error: ${error}`);
+      throw new Error(
+        `Step 5 FAILED: Submit button not found or could not be clicked. Check if the form is properly rendered and enabled. Error: ${error}`,
+      );
     }
 
     // Wait for success indication
     try {
       await expect(
-        page.locator(':text("success"), :text("created"), :text("Issue Created"), .success, .toast-success').first()
+        page
+          .locator(
+            ':text("success"), :text("created"), :text("Issue Created"), .success, .toast-success',
+          )
+          .first(),
       ).toBeVisible({ timeout: 10000 });
     } catch (error) {
-      throw new Error(`Step 5 FAILED: Success message not displayed after form submission. The issue creation may have failed on the backend. Error: ${error}`);
+      throw new Error(
+        `Step 5 FAILED: Success message not displayed after form submission. The issue creation may have failed on the backend. Error: ${error}`,
+      );
     }
 
     console.log(
@@ -122,20 +138,20 @@ test.describe("Smoke Test: Complete Issue Workflow", () => {
     );
 
     // Step 6: Dev Login
-    console.log("🧪 SMOKE TEST - Step 6: Logging in as Test Admin");
+    console.log("🧪 SMOKE TEST - Step 6: Logging in as Dev Admin");
 
     await page.goto("/");
     await page.waitForLoadState("networkidle");
 
     // Use dev quick login
     await page.locator('text="Dev Quick Login"').click();
-    await page.locator('button:has-text("Test Admin")').click();
+    await page.locator('button:has-text("Dev Admin")').click();
 
     // Wait for authentication
     await expect(page.locator('text="My Dashboard"')).toBeVisible({
       timeout: 15000,
     });
-    console.log("✅ SMOKE TEST - Step 6 Complete: Logged in as Test Admin");
+    console.log("✅ SMOKE TEST - Step 6 Complete: Logged in as Dev Admin");
 
     // Step 7: Find Issue
     console.log("🧪 SMOKE TEST - Step 7: Navigating to issues and searching");
@@ -144,7 +160,7 @@ test.describe("Smoke Test: Complete Issue Workflow", () => {
     await page.waitForLoadState("networkidle");
 
     // Search for the issue
-    const searchInput = page.getByRole('textbox', { name: /search/i });
+    const searchInput = page.getByRole("textbox", { name: /search/i });
     if (await searchInput.isVisible()) {
       await searchInput.fill("SMOKE-TEST");
       // Wait for search results to update (look for our specific issue)
@@ -181,20 +197,26 @@ test.describe("Smoke Test: Complete Issue Workflow", () => {
     console.log("🧪 SMOKE TEST - Step 9: Adding admin comment");
 
     const commentText = "Admin reviewed this issue";
-    const commentTextarea = page.getByRole('textbox', { name: /comment/i });
+    const commentTextarea = page.getByRole("textbox", { name: /comment/i });
     try {
       await expect(commentTextarea).toBeVisible();
       await commentTextarea.fill(commentText);
     } catch (error) {
-      throw new Error(`Step 9 FAILED: Comment textarea not found. Check if user has proper permissions and the comment form is displayed. Error: ${error}`);
+      throw new Error(
+        `Step 9 FAILED: Comment textarea not found. Check if user has proper permissions and the comment form is displayed. Error: ${error}`,
+      );
     }
 
     // Submit comment
-    const commentSubmit = page.getByRole('button', { name: /add|submit|comment/i });
+    const commentSubmit = page.getByRole("button", {
+      name: /add|submit|comment/i,
+    });
     try {
       await commentSubmit.click();
     } catch (error) {
-      throw new Error(`Step 9 FAILED: Comment submit button not found or could not be clicked. Error: ${error}`);
+      throw new Error(
+        `Step 9 FAILED: Comment submit button not found or could not be clicked. Error: ${error}`,
+      );
     }
 
     // Verify comment appears
@@ -203,7 +225,9 @@ test.describe("Smoke Test: Complete Issue Workflow", () => {
         timeout: 10000,
       });
     } catch (error) {
-      throw new Error(`Step 9 FAILED: Comment did not appear after submission. The comment creation may have failed. Error: ${error}`);
+      throw new Error(
+        `Step 9 FAILED: Comment did not appear after submission. The comment creation may have failed. Error: ${error}`,
+      );
     }
     console.log("✅ SMOKE TEST - Step 9 Complete: Comment added and verified");
 
@@ -211,15 +235,19 @@ test.describe("Smoke Test: Complete Issue Workflow", () => {
     console.log("🧪 SMOKE TEST - Step 10: Closing the issue");
 
     // Find status dropdown or close button
-    const statusSelect = page.getByRole('combobox', { name: /status|change status/i });
+    const statusSelect = page.getByRole("combobox", {
+      name: /status|change status/i,
+    });
     if (await statusSelect.isVisible()) {
       // Click to open the MUI Select dropdown
       await statusSelect.click();
-      
+
       // Wait for dropdown options to appear and select a closed status
       const closedOptions = ["Fixed", "Closed", "Resolved", "Complete"];
       for (const status of closedOptions) {
-        const option = page.getByRole('option', { name: new RegExp(status, 'i') });
+        const option = page.getByRole("option", {
+          name: new RegExp(status, "i"),
+        });
         if ((await option.count()) > 0) {
           await option.click();
           break;

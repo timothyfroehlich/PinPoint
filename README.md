@@ -52,6 +52,20 @@ PinPoint is currently undergoing a strategic migration to modernize its architec
 
 For details, see the [Migration Guide](./docs/migration/supabase-drizzle/).
 
+### 🚨 Beta Development User Reset Warning
+
+**CRITICAL DURING BETA**: PinPoint development seeding **DELETES AND RECREATES ALL SUPABASE AUTH USERS** on every `npm run db:reset`.
+
+**⚠️ THIS MEANS:**
+- **ALL AUTH USERS ARE WIPED** every time you reset the database
+- **DEV LOGIN USERS**: Dev Admin, Dev Member, Dev Player - all recreated fresh
+- **PINBALL PERSONALITIES**: Roger Sharpe, Gary Stern, etc. - all recreated fresh
+- **ANY MANUAL TEST USERS**: Will be deleted and need recreation
+
+**🔔 BETA-ONLY BEHAVIOR**: This aggressive user reset is **TEMPORARY** for rapid development iteration. In production, user accounts will be preserved.
+
+**🚨 BEFORE PRODUCTION**: We MUST update the seeding system to preserve existing users and only create missing ones.
+
 ## Getting Started
 
 ### Quick Start

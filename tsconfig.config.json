@@ -16,6 +16,7 @@
     "*.config.{ts,js}",
     "vitest.setup.*.ts",
     "scripts/**/*.{ts,js}",
+    "scripts/seed/*.ts",
     ".betterer.ts",
     "types/**/*.d.ts"
   ],

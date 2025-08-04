@@ -184,9 +184,9 @@ export function IssueCreateForm({
     return (
       <Card>
         <CardContent sx={{ p: 4, textAlign: "center" }}>
-          <Typography 
-            variant="h5" 
-            color="success.main" 
+          <Typography
+            variant="h5"
+            color="success.main"
             gutterBottom
             data-testid="issue-success-message"
           >

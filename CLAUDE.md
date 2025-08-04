@@ -41,6 +41,20 @@ enabled = true  # Re-enable for real-time features
 enabled = true  # Re-enable for database management UI
 ```
 
+## 🚨 BETA DEVELOPMENT USER RESET WARNING
+
+**CRITICAL DURING BETA**: PinPoint development seeding **DELETES AND RECREATES ALL SUPABASE AUTH USERS** on every `npm run db:reset`.
+
+**⚠️ THIS MEANS:**
+- **ALL AUTH USERS ARE WIPED** every time you reset the database
+- **DEV LOGIN USERS**: Dev Admin, Dev Member, Dev Player - all recreated fresh
+- **PINBALL PERSONALITIES**: Roger Sharpe, Gary Stern, etc. - all recreated fresh
+- **ANY MANUAL TEST USERS**: Will be deleted and need recreation
+
+**🔔 BETA-ONLY BEHAVIOR**: This aggressive user reset is **TEMPORARY** for rapid development iteration. In production, user accounts will be preserved.
+
+**🚨 BEFORE PRODUCTION**: We MUST update the seeding system to preserve existing users and only create missing ones.
+
 ## 🚨 DATABASE SCHEMA COORDINATION WARNING
 
 **CRITICAL**: PinPoint uses a **SINGLE SHARED** local Supabase instance across all worktrees.
