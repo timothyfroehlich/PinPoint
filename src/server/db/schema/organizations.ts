@@ -9,7 +9,7 @@ export const organizations = pgTable(
   {
     id: text("id").primaryKey(),
     name: text("name").notNull(),
-    subdomain: text("subdomain").unique(), // For V1.0 subdomain feature
+    subdomain: text("subdomain").unique().notNull(), // For V1.0 subdomain feature
     logoUrl: text("logoUrl"),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().notNull(),

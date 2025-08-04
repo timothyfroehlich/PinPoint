@@ -89,7 +89,7 @@ model VerificationToken {
 model Organization {
   id        String   @id @default(cuid())
   name      String
-  subdomain String?  @unique // For V1.0 subdomain feature
+  subdomain String   @unique // For V1.0 subdomain feature
   logoUrl   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

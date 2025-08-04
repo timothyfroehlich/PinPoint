@@ -253,6 +253,186 @@ vi.mock("@mui/material/Button");
 vi.mock("~/lib/api/issues");
 ```
 
+## MSW Debugging Guide
+
+PinPoint uses MSW (Mock Service Worker) with tRPC for HTTP request interception in tests. The setup can be complex, so here's how to debug issues.
+
+### Quick Debugging Checklist
+
+1. **Check MSW Setup**: Ensure MSW server is running in test environment
+2. **Verify Handler Registration**: Confirm your test handlers are registered
+3. **Check Request Matching**: Use built-in logging to see what's intercepted
+4. **Validate tRPC Configuration**: Ensure MSW-tRPC config matches client config
+
+### Built-in Request Logging
+
+MSW is configured with automatic request logging. Enable it by running tests with logging:
+
+```bash
+# Run tests with MSW request logging visible
+npm run test -- --reporter=verbose
+
+# Or check specific test file
+npm run test ComponentName.test.tsx -- --reporter=verbose
+```
+
+**Log Output Example:**
+
+```bash
+[MSW] Intercepting: POST http://localhost:3000/api/trpc/issues.create
+[MSW] Handler matched: POST http://localhost:3000/api/trpc/issues.create
+[MSW Handler] mockCurrentMembership called with: { userId: "user-1", organizationId: "org-1" }
+```
+
+### Common MSW Issues and Solutions
+
+#### 1. "Request not intercepted"
+
+**Symptoms**: Test makes real HTTP requests instead of using mock
+
+```bash
+[MSW] Unhandled request: POST http://localhost:3000/api/trpc/issues.create
+```
+
+**Solutions**:
+
+```typescript
+// ✅ Ensure MSW is enabled in test wrapper
+render(
+  <VitestTestWrapper setupMSW={true}>  {/* Don't disable MSW */}
+    <Component />
+  </VitestTestWrapper>
+);
+
+// ✅ Check handler is registered in your test
+import { server } from "~/test/msw/setup";
+beforeEach(() => {
+  server.use(/* your handlers here */);
+});
+```
+
+#### 2. "Handler not found for procedure"
+
+**Symptoms**: tRPC procedure not mocked, test fails with "procedure not found"
+
+**Solutions**:
+
+```typescript
+// ✅ Use trpcMsw to create handlers
+import { trpcMsw } from "~/test/msw/setup";
+
+const issueHandlers = [
+  trpcMsw.issues.create.mutation(({ input }) => {
+    return { id: "new-issue", ...input };
+  }),
+  trpcMsw.issues.list.query(() => []),
+];
+
+beforeEach(() => {
+  server.use(...issueHandlers);
+});
+```
+
+#### 3. "Transformer mismatch"
+
+**Symptoms**: Superjson serialization errors in MSW responses
+
+**Solutions**:
+
+```typescript
+// ✅ Ensure MSW config matches client transformer
+// MSW setup (already configured in src/test/msw/setup.ts):
+export const trpcMsw = createTRPCMsw<AppRouter>({
+  transformer: { input: superjson, output: superjson }, // Must match client
+});
+
+// ✅ Return proper types from handlers
+trpcMsw.issues.create.mutation(({ input }) => {
+  return {
+    id: "issue-123",
+    createdAt: new Date(), // Superjson handles Date serialization
+    ...input,
+  };
+});
+```
+
+#### 4. "Test hanging or timing out"
+
+**Symptoms**: Test never completes, hangs waiting for response
+
+**Solutions**:
+
+```typescript
+// ✅ Use waitFor for async operations
+await waitFor(() => {
+  expect(screen.getByText("Success")).toBeInTheDocument();
+});
+
+// ✅ Add timeout debugging
+import { waitFor } from "@testing-library/react";
+await waitFor(
+  () => expect(screen.getByText("Loading...")).not.toBeInTheDocument(),
+  { timeout: 5000 }, // Increase timeout for debugging
+);
+```
+
+### MSW Handler Patterns
+
+#### Basic Query Handler
+
+```typescript
+trpcMsw.issues.list.query(() => [
+  { id: "1", title: "Test Issue", status: "OPEN" },
+]);
+```
+
+#### Mutation with Input Validation
+
+```typescript
+trpcMsw.issues.create.mutation(({ input }) => {
+  expect(input.title).toBeDefined();
+  return { id: "new-id", ...input, createdAt: new Date() };
+});
+```
+
+#### Error Response Handler
+
+```typescript
+trpcMsw.issues.create.mutation(() => {
+  throw new TRPCError({
+    code: "BAD_REQUEST",
+    message: "Title is required",
+  });
+});
+```
+
+#### Dynamic Handler Based on Input
+
+```typescript
+trpcMsw.issues.update.mutation(({ input }) => {
+  if (input.id === "forbidden-id") {
+    throw new TRPCError({ code: "FORBIDDEN" });
+  }
+  return { ...input, updatedAt: new Date() };
+});
+```
+
+### Debugging Workflow
+
+1. **Start with logging**: Run test with verbose output to see MSW activity
+2. **Check handler registration**: Verify your handlers are actually registered
+3. **Validate request matching**: Ensure URL and method match exactly
+4. **Test handler in isolation**: Create minimal test to verify handler works
+5. **Check component integration**: Verify component makes expected requests
+
+### MSW + tRPC Best Practices
+
+- **Use TypeScript**: MSW handlers are fully typed with AppRouter
+- **Mock at HTTP level**: MSW intercepts actual HTTP, providing realistic testing
+- **Handler isolation**: Each test should register its own handlers
+- **Cleanup handlers**: Use `server.resetHandlers()` between tests
+- **Match production config**: MSW transformer must match client transformer
+
 ## Commands
 
 ```bash

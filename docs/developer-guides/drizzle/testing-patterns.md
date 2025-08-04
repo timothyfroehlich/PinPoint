@@ -29,12 +29,12 @@ During migration, test contexts must provide both Prisma and Drizzle clients:
 ```typescript
 // src/test/vitestMockContext.ts
 export interface VitestMockContext {
-  db: ExtendedPrismaClient;      // Existing Prisma mock
-  drizzle: DrizzleClient;         // New Drizzle mock
+  db: ExtendedPrismaClient; // Existing Prisma mock
+  drizzle: DrizzleClient; // New Drizzle mock
   services: ServiceFactory;
   user: PinPointSupabaseUser | null;
   supabase: typeof mockSupabaseClient;
-  organization: { id: string; name: string; subdomain: string; } | null;
+  organization: { id: string; name: string; subdomain: string } | null;
   headers: Headers;
 }
 
@@ -52,8 +52,8 @@ export function createVitestMockContext(): VitestMockContext {
   } as unknown as DrizzleClient;
 
   return {
-    db: mockDb,              // Existing Prisma mock
-    drizzle: mockDrizzleClient,  // Drizzle mock
+    db: mockDb, // Existing Prisma mock
+    drizzle: mockDrizzleClient, // Drizzle mock
     // ... other properties
   };
 }
@@ -79,7 +79,9 @@ describe("Drizzle CRUD Operations", () => {
     // Cleanup test data
     try {
       await db.delete(schema.users).where(eq(schema.users.id, testUserId));
-      await db.delete(schema.organizations).where(eq(schema.organizations.id, testOrgId));
+      await db
+        .delete(schema.organizations)
+        .where(eq(schema.organizations.id, testOrgId));
     } catch (error) {
       console.warn("Cleanup warning:", error);
     }
@@ -133,12 +135,16 @@ describe("Transaction Operations", () => {
     const result = await db.transaction(async (tx) => {
       const [user] = await tx
         .insert(schema.users)
-        .values({ /* ... */ })
+        .values({
+          /* ... */
+        })
         .returning();
 
       const [org] = await tx
         .insert(schema.organizations)
-        .values({ /* ... */ })
+        .values({
+          /* ... */
+        })
         .returning();
 
       return { user, org };
@@ -153,7 +159,7 @@ describe("Transaction Operations", () => {
 
     try {
       await db.transaction(async (tx) => {
-        await tx.insert(schema.users).values({ id: txUserId, /* ... */ });
+        await tx.insert(schema.users).values({ id: txUserId /* ... */ });
         throw new Error("Intentional rollback test");
       });
     } catch (error) {
@@ -165,7 +171,7 @@ describe("Transaction Operations", () => {
       .select()
       .from(schema.users)
       .where(eq(schema.users.id, txUserId));
-    
+
     expect(users).toHaveLength(0);
   });
 });
@@ -182,7 +188,7 @@ describe("Drizzle tRPC Integration", () => {
 
   beforeEach(() => {
     mockDrizzleClient = createMockDrizzleClient();
-    
+
     const baseContext = createVitestMockContext();
     mockContext = {
       ...baseContext,
@@ -191,8 +197,8 @@ describe("Drizzle tRPC Integration", () => {
   });
 
   it("should have both ORMs available in context", () => {
-    expect(mockContext.db).toBeDefined();        // Prisma
-    expect(mockContext.drizzle).toBeDefined();   // Drizzle
+    expect(mockContext.db).toBeDefined(); // Prisma
+    expect(mockContext.drizzle).toBeDefined(); // Drizzle
     expect(mockContext.db).not.toBe(mockContext.drizzle);
   });
 
@@ -215,9 +221,9 @@ describe("Drizzle tRPC Integration", () => {
     } as unknown as TRPCContext;
 
     const caller = testRouter.createCaller(contextWithoutDrizzle);
-    
+
     await expect(caller.testProcedure()).rejects.toThrow(
-      "Drizzle client not available"
+      "Drizzle client not available",
     );
   });
 });
@@ -238,8 +244,16 @@ describe("Multi-Tenancy Isolation", () => {
     ]);
 
     await db.insert(schema.locations).values([
-      { id: `loc1-${Date.now()}`, name: "Tenant 1 Location", organizationId: org1Id },
-      { id: `loc2-${Date.now()}`, name: "Tenant 2 Location", organizationId: org2Id },
+      {
+        id: `loc1-${Date.now()}`,
+        name: "Tenant 1 Location",
+        organizationId: org1Id,
+      },
+      {
+        id: `loc2-${Date.now()}`,
+        name: "Tenant 2 Location",
+        organizationId: org2Id,
+      },
     ]);
   });
 
@@ -278,13 +292,20 @@ describe("Multi-Tenancy Isolation", () => {
 ```typescript
 export function validateDrizzleSchemaExports() {
   const requiredExports = [
-    'users', 'organizations', 'locations', 'machines', 'models',
-    'issues', 'memberships', 'roles', 'permissions'
+    "users",
+    "organizations",
+    "locations",
+    "machines",
+    "models",
+    "issues",
+    "memberships",
+    "roles",
+    "permissions",
   ];
 
-  requiredExports.forEach(exportName => {
+  requiredExports.forEach((exportName) => {
     expect(schema[exportName]).toBeDefined();
-    expect(schema[exportName]).toHaveProperty('id');
+    expect(schema[exportName]).toHaveProperty("id");
   });
 }
 ```
@@ -301,7 +322,7 @@ export const createMockUser = (overrides?: Partial<NewUser>): NewUser => ({
 });
 
 export const createMockOrganization = (
-  overrides?: Partial<NewOrganization>
+  overrides?: Partial<NewOrganization>,
 ): NewOrganization => ({
   id: `org-${Date.now()}`,
   name: "Test Organization",
@@ -345,6 +366,160 @@ it("should validate organizationId indexes work efficiently", async () => {
 3. **Missing Multi-Tenant Tests**: Critical for data isolation validation
 4. **Over-Mocking**: Some tests benefit from real database interactions
 5. **Ignoring TypeScript Errors**: Strict mode catches real issues
+
+## CRUD Validation Script
+
+PinPoint includes a comprehensive CRUD validation script to test Drizzle operations across all tables. The script supports two modes for different validation needs.
+
+### Script Usage
+
+```bash
+# Full mode (default) - comprehensive testing
+npx tsx scripts/validate-drizzle-crud.ts
+npm run db:validate
+
+# Minimal mode - quick connectivity check
+npx tsx scripts/validate-drizzle-crud.ts --minimal
+npm run db:validate:minimal
+
+# Environment variable control
+DB_VALIDATE_MINIMAL=true npx tsx scripts/validate-drizzle-crud.ts
+```
+
+### Validation Modes
+
+#### Full Mode (Default)
+
+- **Purpose**: Comprehensive testing of all CRUD operations
+- **Duration**: ~2-5 minutes (depending on data size)
+- **Operations Tested**:
+  - Database connectivity and schema validation
+  - INSERT operations across all tables with relationships
+  - Complex SELECT queries with joins and filters
+  - UPDATE operations with conditional logic
+  - DELETE operations with cascade handling
+  - Transaction commit and rollback scenarios
+  - Multi-tenant data isolation validation
+  - Performance index effectiveness checks
+
+```typescript
+// Example full mode test sequence
+async runAllTests(): Promise<void> {
+  await this.testConnection();
+  await this.testInsertOperations();
+  await this.testSelectOperations();
+  await this.testUpdateOperations();
+  await this.testDeleteOperations();
+  await this.testTransactionOperations();
+  await this.testComplexQueries();
+  this.generateReport();
+}
+```
+
+#### Minimal Mode
+
+- **Purpose**: Quick connectivity and basic operations check
+- **Duration**: ~10-30 seconds
+- **Operations Tested**:
+  - Database connection establishment
+  - Basic schema accessibility
+  - Simple count query on users table
+  - Database connection cleanup
+
+```typescript
+// Example minimal mode test sequence
+async runMinimalTests(): Promise<void> {
+  const connectionSuccess = await this.testConnection();
+  if (!connectionSuccess) return;
+
+  // Simple data query test
+  const userCount = await this.db
+    .select({ count: sql<number>`count(*)` })
+    .from(schema.users);
+
+  console.log(`✅ Database accessible, ${userCount[0]?.count ?? 0} users found`);
+}
+```
+
+### When to Use Each Mode
+
+#### Use Full Mode When:
+
+- **Setting up new development environment** - verify complete schema
+- **After schema migrations** - ensure all operations still work
+- **Before major deployments** - comprehensive pre-production validation
+- **Investigating database issues** - detailed error reporting
+- **Performance regression testing** - validate index effectiveness
+
+#### Use Minimal Mode When:
+
+- **Quick development environment check** - "Is the database working?"
+- **CI/CD pipeline health checks** - fast validation step
+- **Hot-reload development cycles** - rapid feedback loop
+- **Database connectivity troubleshooting** - isolate connection issues
+- **Automated monitoring scripts** - lightweight health checks
+
+### Output and Reporting
+
+Both modes provide structured output:
+
+```bash
+🔧 Initializing Drizzle CRUD Validator (Full Mode)...
+Environment: development
+Database: localhost:54321/postgres
+
+🚀 Starting Drizzle CRUD Validation...
+✅ CONNECTION test passed (45ms)
+✅ INSERT organizations passed (123ms)
+✅ INSERT users passed (89ms)
+✅ SELECT with joins passed (67ms)
+...
+
+📊 CRUD Validation Summary:
+Total operations: 47
+✅ Passed: 47 (100.0%)
+❌ Failed: 0 (0.0%)
+⚡ Average time: 98ms
+🔥 Slowest operation: UPDATE issues (456ms)
+```
+
+### Integration with Development Workflow
+
+```bash
+# Development startup validation
+npm run dev:bg          # Start dev server
+npm run db:validate:minimal  # Quick check database is working
+
+# Pre-commit validation
+npm run validate        # Includes full db:validate
+npm run pre-commit      # Comprehensive validation
+
+# Schema change validation
+npm run db:push         # Apply schema changes
+npm run db:validate     # Verify all operations work
+```
+
+### Error Handling and Debugging
+
+The validation script provides detailed error information:
+
+```typescript
+interface CRUDTestResult {
+  operation: string;
+  table: string;
+  status: "success" | "error";
+  duration: number;
+  details?: string; // Success details
+  error?: string; // Error details
+}
+```
+
+Common error patterns and solutions:
+
+- **Connection failures**: Check DATABASE_URL and Supabase status
+- **Schema mismatches**: Run `npm run db:push` to sync schema
+- **Permission errors**: Verify database user permissions
+- **Transaction conflicts**: Check for concurrent database access
 
 ## Migration Testing Strategy
 

@@ -41,7 +41,7 @@ interface CreateTRPCContextOptions {
  */
 interface Organization {
   id: string;
-  subdomain: string | null;
+  subdomain: string;
   name: string;
   // Add other fields as needed
 }
