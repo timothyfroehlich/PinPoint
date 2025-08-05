@@ -7,7 +7,8 @@ import { logout } from "./helpers/unified-dashboard";
  * Tests the entire user journey from issue creation through admin management.
  * This serves as a comprehensive smoke test to catch major regressions.
  *
- * Designed to be resilient to UI changes and serve as a required GitHub Action check.
+ * Uses robust data-testid selectors to minimize flakiness from UI changes.
+ * Provides clear error context when failures occur.
  */
 
 test.describe("Smoke Test: Complete Issue Workflow", () => {
@@ -45,7 +46,13 @@ test.describe("Smoke Test: Complete Issue Workflow", () => {
 
     // Wait for the MUI Select component to load
     const machineSelect = page.locator('[role="combobox"]').first();
-    await expect(machineSelect).toBeVisible({ timeout: 10000 });
+    try {
+      await expect(machineSelect).toBeVisible({ timeout: 10000 });
+    } catch (error) {
+      throw new Error(
+        `Step 3 FAILED: Machine selector not found. The page may not have loaded properly or the machine selector component failed to render. Error: ${error}`,
+      );
+    }
 
     // Click to open the dropdown
     await machineSelect.click();
@@ -67,20 +74,28 @@ test.describe("Smoke Test: Complete Issue Workflow", () => {
     console.log("🧪 SMOKE TEST - Step 4: Filling issue form");
 
     // Fill in the issue title
-    const titleInput = page
-      .locator('input[name="title"], input[placeholder*="title" i]')
-      .first();
-    await expect(titleInput).toBeVisible();
-    await titleInput.fill(issueTitle);
+    const titleInput = page.getByRole("textbox", { name: "Issue Title" });
+    try {
+      await expect(titleInput).toBeVisible();
+      await titleInput.fill(issueTitle);
+    } catch (error) {
+      throw new Error(
+        `Step 4 FAILED: Issue title input not found or could not be filled. Check if the form rendered properly. Error: ${error}`,
+      );
+    }
 
     // Fill in the email
-    const emailInput = page
-      .locator(
-        'input[name="email"], input[type="email"], input[placeholder*="email" i]',
-      )
-      .first();
-    await expect(emailInput).toBeVisible();
-    await emailInput.fill(testEmail);
+    const emailInput = page.getByRole("textbox", {
+      name: "Your Email (Optional)",
+    });
+    try {
+      await expect(emailInput).toBeVisible();
+      await emailInput.fill(testEmail);
+    } catch (error) {
+      throw new Error(
+        `Step 4 FAILED: Email input not found or could not be filled. Check if the anonymous user form section rendered properly. Error: ${error}`,
+      );
+    }
 
     console.log(
       `✅ SMOKE TEST - Step 4 Complete: Form filled with title "${issueTitle}" and email "${testEmail}"`,
@@ -90,20 +105,30 @@ test.describe("Smoke Test: Complete Issue Workflow", () => {
     console.log("🧪 SMOKE TEST - Step 5: Submitting issue");
 
     // Find and click submit button
-    const submitButton = page
-      .locator(
-        'button[type="submit"], button:has-text("Submit"), button:has-text("Create")',
-      )
-      .first();
-    await expect(submitButton).toBeVisible();
-    await submitButton.click();
+    const submitButton = page.getByRole("button", { name: "Create Issue" });
+    try {
+      await expect(submitButton).toBeVisible();
+      await submitButton.click();
+    } catch (error) {
+      throw new Error(
+        `Step 5 FAILED: Submit button not found or could not be clicked. Check if the form is properly rendered and enabled. Error: ${error}`,
+      );
+    }
 
     // Wait for success indication
-    await expect(
-      page
-        .locator(':text("success"), :text("created"), .success, .toast-success')
-        .first(),
-    ).toBeVisible({ timeout: 10000 });
+    try {
+      await expect(
+        page
+          .locator(
+            ':text("success"), :text("created"), :text("Issue Created"), .success, .toast-success',
+          )
+          .first(),
+      ).toBeVisible({ timeout: 10000 });
+    } catch (error) {
+      throw new Error(
+        `Step 5 FAILED: Success message not displayed after form submission. The issue creation may have failed on the backend. Error: ${error}`,
+      );
+    }
 
     console.log(
       "✅ SMOKE TEST - Step 5 Complete: Issue submitted successfully",
@@ -113,20 +138,20 @@ test.describe("Smoke Test: Complete Issue Workflow", () => {
     );
 
     // Step 6: Dev Login
-    console.log("🧪 SMOKE TEST - Step 6: Logging in as Test Admin");
+    console.log("🧪 SMOKE TEST - Step 6: Logging in as Dev Admin");
 
     await page.goto("/");
     await page.waitForLoadState("networkidle");
 
     // Use dev quick login
     await page.locator('text="Dev Quick Login"').click();
-    await page.locator('button:has-text("Test Admin")').click();
+    await page.locator('button:has-text("Dev Admin")').click();
 
     // Wait for authentication
     await expect(page.locator('text="My Dashboard"')).toBeVisible({
       timeout: 15000,
     });
-    console.log("✅ SMOKE TEST - Step 6 Complete: Logged in as Test Admin");
+    console.log("✅ SMOKE TEST - Step 6 Complete: Logged in as Dev Admin");
 
     // Step 7: Find Issue
     console.log("🧪 SMOKE TEST - Step 7: Navigating to issues and searching");
@@ -135,9 +160,7 @@ test.describe("Smoke Test: Complete Issue Workflow", () => {
     await page.waitForLoadState("networkidle");
 
     // Search for the issue
-    const searchInput = page
-      .locator('input[name="search"], input[placeholder*="search" i]')
-      .first();
+    const searchInput = page.getByRole("textbox", { name: /search/i });
     if (await searchInput.isVisible()) {
       await searchInput.fill("SMOKE-TEST");
       // Wait for search results to update (look for our specific issue)
@@ -174,40 +197,59 @@ test.describe("Smoke Test: Complete Issue Workflow", () => {
     console.log("🧪 SMOKE TEST - Step 9: Adding admin comment");
 
     const commentText = "Admin reviewed this issue";
-    const commentTextarea = page
-      .locator('textarea[name="comment"], textarea[placeholder*="comment" i]')
-      .first();
-    await expect(commentTextarea).toBeVisible();
-    await commentTextarea.fill(commentText);
+    const commentTextarea = page.getByRole("textbox", { name: /comment/i });
+    try {
+      await expect(commentTextarea).toBeVisible();
+      await commentTextarea.fill(commentText);
+    } catch (error) {
+      throw new Error(
+        `Step 9 FAILED: Comment textarea not found. Check if user has proper permissions and the comment form is displayed. Error: ${error}`,
+      );
+    }
 
     // Submit comment
-    const commentSubmit = page
-      .locator(
-        'button:has-text("Add"), button:has-text("Submit"), button:has-text("Comment")',
-      )
-      .first();
-    await commentSubmit.click();
+    const commentSubmit = page.getByRole("button", {
+      name: /add|submit|comment/i,
+    });
+    try {
+      await commentSubmit.click();
+    } catch (error) {
+      throw new Error(
+        `Step 9 FAILED: Comment submit button not found or could not be clicked. Error: ${error}`,
+      );
+    }
 
     // Verify comment appears
-    await expect(page.locator(`text="${commentText}"`)).toBeVisible({
-      timeout: 10000,
-    });
+    try {
+      await expect(page.locator(`text="${commentText}"`)).toBeVisible({
+        timeout: 10000,
+      });
+    } catch (error) {
+      throw new Error(
+        `Step 9 FAILED: Comment did not appear after submission. The comment creation may have failed. Error: ${error}`,
+      );
+    }
     console.log("✅ SMOKE TEST - Step 9 Complete: Comment added and verified");
 
     // Step 10: Close Issue
     console.log("🧪 SMOKE TEST - Step 10: Closing the issue");
 
     // Find status dropdown or close button
-    const statusSelect = page
-      .locator('select[name="status"], select[name="statusId"]')
-      .first();
+    const statusSelect = page.getByRole("combobox", {
+      name: /status|change status/i,
+    });
     if (await statusSelect.isVisible()) {
-      // Select a closed status (try multiple common names)
+      // Click to open the MUI Select dropdown
+      await statusSelect.click();
+
+      // Wait for dropdown options to appear and select a closed status
       const closedOptions = ["Fixed", "Closed", "Resolved", "Complete"];
       for (const status of closedOptions) {
-        const option = statusSelect.locator(`option:has-text("${status}")`);
+        const option = page.getByRole("option", {
+          name: new RegExp(status, "i"),
+        });
         if ((await option.count()) > 0) {
-          await statusSelect.selectOption({ label: status });
+          await option.click();
           break;
         }
       }

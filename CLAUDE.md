@@ -41,6 +41,24 @@ enabled = true  # Re-enable for real-time features
 enabled = true  # Re-enable for database management UI
 ```
 
+## 🔒 SEEDING SAFETY: ENVIRONMENT-AWARE USER MANAGEMENT
+
+**NEW SAFER BEHAVIOR**: PinPoint seeding now uses environment-aware user management for enhanced safety.
+
+**🏗️ BEHAVIOR BY ENVIRONMENT:**
+
+- **Local Development**: **PRESERVES existing users** - only creates missing ones
+- **Preview Environment**: **Aggressive reset** for clean demos - deletes and recreates all users
+- **Production**: **PRESERVES existing users** - only creates missing ones
+
+**⚠️ PREVIEW ENVIRONMENT ONLY:**
+
+- **ALL AUTH USERS ARE WIPED** during preview environment seeding for clean demonstrations
+- **DEV LOGIN USERS**: Dev Admin, Dev Member, Dev Player - recreated fresh in preview
+- **PINBALL PERSONALITIES**: Roger Sharpe, Gary Stern, etc. - recreated fresh in preview
+
+**🔒 SAFE BY DEFAULT**: Local development and production environments preserve existing users while only creating missing ones.
+
 ## 🚨 DATABASE SCHEMA COORDINATION WARNING
 
 **CRITICAL**: PinPoint uses a **SINGLE SHARED** local Supabase instance across all worktrees.
