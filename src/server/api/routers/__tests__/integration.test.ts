@@ -615,12 +615,34 @@ describe("Router Integration Tests", () => {
         name: "Updated Organization Name",
       };
 
+      // Mock Prisma operation (existing pattern)
       vi.mocked(mockContext.db.organization.findUnique).mockResolvedValue(
         mockOrganization,
       );
       vi.mocked(mockContext.db.organization.update).mockResolvedValue(
         updatedOrganization,
       );
+
+      // Mock Drizzle operation chain for parallel validation
+      // Create a mock chain that matches the exact pattern used in organization router
+      const mockDrizzleChain = {
+        update: vi.fn().mockReturnThis(),
+        set: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        returning: vi.fn().mockResolvedValue([
+          {
+            id: "org-1",
+            name: "Updated Organization Name",
+            subdomain: "test",
+            logoUrl: null,
+            createdAt: expect.any(Date),
+            updatedAt: expect.any(Date),
+          },
+        ]),
+      };
+
+      // Replace the mock drizzle client's update method to return our chain
+      vi.mocked(mockContext.drizzle.update).mockReturnValue(mockDrizzleChain);
 
       // Act
       const result = await caller.organization.update({
@@ -642,6 +664,14 @@ describe("Router Integration Tests", () => {
           }),
         }),
       );
+
+      // Verify Drizzle operations were called for parallel validation
+      expect(mockContext.drizzle.update).toHaveBeenCalled();
+      expect(mockDrizzleChain.set).toHaveBeenCalledWith({
+        name: "Updated Organization Name",
+      });
+      expect(mockDrizzleChain.where).toHaveBeenCalled();
+      expect(mockDrizzleChain.returning).toHaveBeenCalled();
     });
 
     it("should deny organization operations without proper permissions", async () => {
