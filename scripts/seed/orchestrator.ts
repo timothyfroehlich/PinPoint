@@ -146,13 +146,13 @@ export async function main(): Promise<void> {
 
     // 3. Auth users seeding (Supabase auth + automatic profile creation)
     console.log("\n[SEED] 👥 Step 2: Auth Users");
-    if (isPreview()) {
+    if (!isProduction()) {
       console.log(
-        "[SEED] ⚠️  PREVIEW ENVIRONMENT: Aggressive user reset enabled for clean demos",
+        "[SEED] ⚠️  DEV/PREVIEW ENVIRONMENT: Aggressive user reset enabled for clean demos",
       );
     } else {
       console.log(
-        "[SEED] 🔒 SAFE MODE: Preserving existing users, creating only missing ones",
+        "[SEED] 🔒 PRODUCTION MODE: Preserving existing users, creating only missing ones",
       );
     }
     await seedAuthUsers([...strategy.users], organization.id);

@@ -37,17 +37,18 @@ This project leverages a modern, type-safe, and performant technology stack to e
 - **Language:**([https://www.typescriptlang.org/](https://www.typescriptlang.org/))
 - **UI Library:**([https://react.dev/](https://react.dev/))
 - **Styling:**([https://tailwindcss.com/](https://tailwindcss.com/)) & [Material UI (MUI)](https://mui.com/)
-- **Database ORM:** [Prisma](https://www.prisma.io/)
-- **Database:**(<https://www.postgresql.org/>)
-- **Authentication:** [NextAuth.js](https://next-auth.js.org/)
+- **Database ORM:** [Drizzle ORM](https://orm.drizzle.team/)
+- **Database:** [PostgreSQL](https://www.postgresql.org/) via [Supabase](https://supabase.com/)
+- **Authentication:** [Supabase Auth](https://supabase.com/auth)
 
 ### 🚨 Active Migration
 
 PinPoint is currently undergoing a strategic migration to modernize its architecture:
 
-- **Timeline:** 6-week staged migration (currently in Phase 1)
-- **From:** Prisma + NextAuth.js + Manual Security
-- **To:** [Drizzle ORM](https://orm.drizzle.team/) + [Supabase](https://supabase.com/) (Auth, Storage, RLS)
+- **Timeline:** 6-week staged migration (currently in Week 4 - Phase 2)
+- **Stage 1** ✅ **COMPLETE**: Supabase Auth integration
+- **Stage 2** 🔄 **IN PROGRESS**: Drizzle ORM migration (Phase 2A foundation complete)
+- **Stage 3** ⏳ **UPCOMING**: Row Level Security activation
 - **Benefits:** Database-enforced security, 100x faster serverless performance, better developer experience
 
 For details, see the [Migration Guide](./docs/migration/supabase-drizzle/).

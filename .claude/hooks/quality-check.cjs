@@ -621,7 +621,12 @@ class QualityChecker {
   constructor(filePath) {
     this.filePath = filePath;
     this.fileType = this.detectFileType(filePath);
-    this.errors = [];
+    this.problemCounts = {
+      typescript: 0,
+      eslint: 0,
+      prettier: 0,
+      common: 0
+    };
     this.autofixes = [];
   }
 
@@ -651,14 +656,13 @@ class QualityChecker {
 
   /**
    * Run all quality checks
-   * @returns {Promise<{errors: string[], autofixes: string[]}>} Check results
+   * @returns {Promise<{problemCounts: object, autofixes: string[]}>} Check results
    */
   async checkAll() {
     // This should never happen now since we filter out non-source files earlier,
     // but keeping for consistency with shell version
     if (this.fileType === 'unknown') {
-      log.info('Unknown file type, skipping detailed checks');
-      return { errors: [], autofixes: [] };
+      return { problemCounts: this.problemCounts, autofixes: [] };
     }
 
     // Run all checks in parallel for speed
@@ -680,13 +684,8 @@ class QualityChecker {
 
     await Promise.all(checkPromises);
 
-    // Skip test suggestions unless debug mode
-    if (config.debug) {
-      await this.suggestRelatedTests();
-    }
-
     return {
-      errors: this.errors,
+      problemCounts: this.problemCounts,
       autofixes: this.autofixes,
     };
   }
@@ -768,7 +767,6 @@ class QualityChecker {
       return;
     }
 
-    if (config.debug) log.info('Running TypeScript compilation check...');
 
     try {
       // Get intelligent config for this file
@@ -810,44 +808,10 @@ class QualityChecker {
         }
       });
 
-      // Report edited file first
+      // Count TypeScript errors in the edited file
       const editedFileDiagnostics = diagnosticsByFile.get(this.filePath) || [];
       if (editedFileDiagnostics.length > 0) {
-        this.errors.push(`TypeScript errors in edited file (using ${path.basename(configPath)})`);
-        editedFileDiagnostics.forEach((diagnostic) => {
-          const message = ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n');
-          const { line, character } = diagnostic.file.getLineAndCharacterOfPosition(
-            diagnostic.start
-          );
-          console.error(
-            `  ❌ ${diagnostic.file.fileName}:${line + 1}:${character + 1} - ${message}`
-          );
-        });
-      }
-
-      // Report dependencies separately (as warnings, not errors) - only if enabled
-      if (config.showDependencyErrors) {
-        let hasDepErrors = false;
-        diagnosticsByFile.forEach((diags, fileName) => {
-          if (fileName !== this.filePath) {
-            if (!hasDepErrors) {
-              console.error('\n[DEPENDENCY ERRORS] Files imported by your edited file:');
-              hasDepErrors = true;
-            }
-            console.error(`  ⚠️ ${fileName}:`);
-            diags.forEach((diagnostic) => {
-              const message = ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n');
-              const { line, character } = diagnostic.file.getLineAndCharacterOfPosition(
-                diagnostic.start
-              );
-              console.error(`     Line ${line + 1}:${character + 1} - ${message}`);
-            });
-          }
-        });
-      }
-
-      if (diagnostics.length === 0 && config.debug) {
-        log.success('TypeScript compilation passed');
+        this.problemCounts.typescript += editedFileDiagnostics.length;
       }
     } catch (error) {
       log.debug(`TypeScript check error: ${error.message}`);
@@ -863,7 +827,6 @@ class QualityChecker {
       return;
     }
 
-    if (config.debug) log.info('Running ESLint...');
 
     try {
       const eslint = new ESLint({
@@ -876,8 +839,6 @@ class QualityChecker {
 
       if (result.errorCount > 0 || result.warningCount > 0) {
         if (config.eslintAutofix) {
-          log.warning('ESLint issues found, attempting auto-fix...');
-
           // Write the fixed output
           if (result.output) {
             await fs.writeFile(this.filePath, result.output);
@@ -887,34 +848,20 @@ class QualityChecker {
             const resultAfterFix = resultsAfterFix[0];
 
             if (resultAfterFix.errorCount === 0 && resultAfterFix.warningCount === 0) {
-              log.success('ESLint auto-fixed all issues!');
               if (config.autofixSilent) {
                 this.autofixes.push('ESLint auto-fixed formatting/style issues');
               } else {
-                this.errors.push('ESLint issues were auto-fixed - verify the changes');
+                this.problemCounts.eslint += 1; // Count as resolved but flagged
               }
             } else {
-              this.errors.push(
-                `ESLint found issues that couldn't be auto-fixed in ${this.filePath}`
-              );
-              const formatter = await eslint.loadFormatter('stylish');
-              const output = formatter.format(resultsAfterFix);
-              console.error(output);
+              this.problemCounts.eslint += resultAfterFix.errorCount + resultAfterFix.warningCount;
             }
           } else {
-            this.errors.push(`ESLint found issues in ${this.filePath}`);
-            const formatter = await eslint.loadFormatter('stylish');
-            const output = formatter.format(results);
-            console.error(output);
+            this.problemCounts.eslint += result.errorCount + result.warningCount;
           }
         } else {
-          this.errors.push(`ESLint found issues in ${this.filePath}`);
-          const formatter = await eslint.loadFormatter('stylish');
-          const output = formatter.format(results);
-          console.error(output);
+          this.problemCounts.eslint += result.errorCount + result.warningCount;
         }
-      } else if (config.debug) {
-        log.success('ESLint passed');
       }
     } catch (error) {
       log.debug(`ESLint check error: ${error.message}`);
@@ -930,7 +877,6 @@ class QualityChecker {
       return;
     }
 
-    if (config.debug) log.info('Running Prettier check...');
 
     try {
       const fileContent = await fs.readFile(this.filePath, 'utf8');
@@ -943,27 +889,21 @@ class QualityChecker {
 
       if (!isFormatted) {
         if (config.prettierAutofix) {
-          log.warning('Prettier formatting issues found, auto-fixing...');
-
           const formatted = await prettier.format(fileContent, {
             ...prettierConfig,
             filepath: this.filePath,
           });
 
           await fs.writeFile(this.filePath, formatted);
-          log.success('Prettier auto-formatted the file!');
 
           if (config.autofixSilent) {
             this.autofixes.push('Prettier auto-formatted the file');
           } else {
-            this.errors.push('Prettier formatting was auto-fixed - verify the changes');
+            this.problemCounts.prettier += 1; // Count as resolved but flagged
           }
         } else {
-          this.errors.push(`Prettier formatting issues in ${this.filePath}`);
-          console.error('Run prettier --write to fix');
+          this.problemCounts.prettier += 1;
         }
-      } else if (config.debug) {
-        log.success('Prettier formatting correct');
       }
     } catch (error) {
       log.debug(`Prettier check error: ${error.message}`);
@@ -975,12 +915,10 @@ class QualityChecker {
    * @returns {Promise<void>}
    */
   async checkCommonIssues() {
-    if (config.debug) log.info('Checking for common issues...');
 
     try {
       const content = await fs.readFile(this.filePath, 'utf8');
       const lines = content.split('\n');
-      let foundIssues = false;
 
       // Check for 'as any' in TypeScript files
       const asAnyRule = config._fileConfig.rules?.asAny || {};
@@ -991,16 +929,8 @@ class QualityChecker {
         lines.forEach((line, index) => {
           if (line.includes('as any')) {
             const severity = asAnyRule.severity || 'error';
-            const message =
-              asAnyRule.message || 'Prefer proper types or "as unknown" for type assertions';
-
             if (severity === 'error') {
-              this.errors.push(`Found 'as any' usage in ${this.filePath} - ${message}`);
-              console.error(`  Line ${index + 1}: ${line.trim()}`);
-              foundIssues = true;
-            } else if (config.debug) {
-              // Warning level - just warn, don't block
-              log.warning(`'as any' usage at line ${index + 1}: ${message}`);
+              this.problemCounts.common += 1;
             }
           }
         });
@@ -1044,32 +974,13 @@ class QualityChecker {
         lines.forEach((line, index) => {
           if (/console\./.test(line)) {
             const severity = consoleRule.severity || 'info';
-            const message = consoleRule.message || 'Consider using a logging library';
-
             if (severity === 'error') {
-              this.errors.push(`Found console statements in ${this.filePath} - ${message}`);
-              console.error(`  Line ${index + 1}: ${line.trim()}`);
-              foundIssues = true;
-            } else if (config.debug) {
-              // Info level - just warn, don't block
-              log.warning(`Console usage at line ${index + 1}: ${message}`);
+              this.problemCounts.common += 1;
             }
           }
         });
       }
 
-      // Check for TODO/FIXME comments (debug only)
-      if (config.debug) {
-        lines.forEach((line, index) => {
-          if (/TODO|FIXME/.test(line)) {
-            log.warning(`Found TODO/FIXME comment at line ${index + 1}`);
-          }
-        });
-      }
-
-      if (!foundIssues && config.debug) {
-        log.success('No common issues found');
-      }
     } catch (error) {
       log.debug(`Common issues check error: ${error.message}`);
     }
@@ -1183,16 +1094,28 @@ function isSourceFile(filePath) {
 }
 
 /**
- * Print summary of errors and autofixes
- * @param {string[]} errors - List of errors
+ * Print concise summary of problems by tool
+ * @param {object} problemCounts - Problem counts by tool
  * @param {string[]} autofixes - List of autofixes
  */
-function printSummary(errors, autofixes) {
-  // Only show errors - much more concise
-  if (errors.length > 0) {
-    errors.forEach((error) => {
-      console.error(`${colors.red}❌${colors.reset} ${error}`);
-    });
+function printSummary(problemCounts, autofixes) {
+  const problems = [];
+  
+  if (problemCounts.typescript > 0) {
+    problems.push(`TypeScript: ${problemCounts.typescript} error${problemCounts.typescript > 1 ? 's' : ''}`);
+  }
+  if (problemCounts.eslint > 0) {
+    problems.push(`ESLint: ${problemCounts.eslint} issue${problemCounts.eslint > 1 ? 's' : ''}`);
+  }
+  if (problemCounts.prettier > 0) {
+    problems.push(`Prettier: ${problemCounts.prettier} issue${problemCounts.prettier > 1 ? 's' : ''}`);
+  }
+  if (problemCounts.common > 0) {
+    problems.push(`Code issues: ${problemCounts.common} problem${problemCounts.common > 1 ? 's' : ''}`);
+  }
+  
+  if (problems.length > 0) {
+    console.error(problems.join(', '));
   }
 }
 
@@ -1201,44 +1124,22 @@ function printSummary(errors, autofixes) {
  * @returns {Promise<void>}
  */
 async function main() {
-  // Only show header in debug mode
-  if (config.debug) {
-    const hookVersion = config._fileConfig.version || '1.0.0';
-    console.error('');
-    console.error(`⚛️  React App Quality Check v${hookVersion} - Starting...`);
-    console.error('────────────────────────────────────────────');
-  }
-
-  // Debug: show loaded configuration
-  log.debug(`Loaded config: ${JSON.stringify(config, null, 2)}`);
 
   // Parse input
   const input = await parseJsonInput();
   const filePath = extractFilePath(input);
 
   if (!filePath) {
-    log.warning('No file path found in JSON input. Tool might not be file-related.');
-    log.debug(`JSON input was: ${JSON.stringify(input)}`);
-    console.error(
-      `\n${colors.yellow}👉 No file to check - tool may not be file-related.${colors.reset}`
-    );
     process.exit(0);
   }
 
   // Check if file exists
   if (!(await fileExists(filePath))) {
-    log.info(`File does not exist: ${filePath} (may have been deleted)`);
-    console.error(`\n${colors.yellow}👉 File skipped - doesn't exist.${colors.reset}`);
     process.exit(0);
   }
 
   // For non-source files, exit successfully without checks (matching shell behavior)
   if (!isSourceFile(filePath)) {
-    log.info(`Skipping non-source file: ${filePath}`);
-    console.error(`\n${colors.yellow}👉 File skipped - not a source file.${colors.reset}`);
-    console.error(
-      `\n${colors.green}✅ No checks needed for ${path.basename(filePath)}${colors.reset}`
-    );
     process.exit(0);
   }
 
@@ -1259,48 +1160,43 @@ async function main() {
   // Analyze file context to see if we should skip
   const contextAnalysis = analyzeFileContext(filePath, fileContent);
   if (contextAnalysis.shouldSkip) {
-    console.error(`${colors.yellow}⏸️  Skipping ${path.basename(filePath)} (WIP)${colors.reset}`);
     process.exit(0);
   }
 
-  // Minimal validation indicator
-  if (config.debug) {
-    console.error(`🔍 ${path.basename(filePath)}`);
-  }
 
   // Run quality checks
   const checker = new QualityChecker(filePath);
-  const { errors, autofixes } = await checker.checkAll();
+  const { problemCounts, autofixes } = await checker.checkAll();
 
-  // Print summary
-  printSummary(errors, autofixes);
+  // Calculate total problems
+  const totalProblems = problemCounts.typescript + problemCounts.eslint + problemCounts.prettier + problemCounts.common;
 
-  // Separate edited file errors from other issues
-  const editedFileErrors = errors.filter(
-    (e) =>
-      e.includes('edited file') ||
-      e.includes('ESLint found issues') ||
-      e.includes('Prettier formatting issues') ||
-      e.includes('console statements') ||
-      e.includes("'as any' usage") ||
-      e.includes('were auto-fixed')
-  );
-
-  const dependencyWarnings = errors.filter((e) => !editedFileErrors.includes(e));
-
-  // Exit with appropriate code
-  if (editedFileErrors.length > 0) {
+  // Print summary if problems found
+  if (totalProblems > 0) {
+    printSummary(problemCounts, autofixes);
+    console.error(`${colors.yellow}⚠️ Agent must resolve all issues in this file before moving to the next task${colors.reset}`);
+    
+    // Generate specific commands for this file
+    const relativePath = path.relative(projectRoot, filePath);
+    const commands = [];
+    
+    if (problemCounts.typescript > 0) {
+      commands.push(`npm run typecheck:brief`);
+    }
+    if (problemCounts.eslint > 0) {
+      commands.push(`npx eslint "${relativePath}"`);
+    }
+    if (problemCounts.prettier > 0) {
+      commands.push(`npx prettier --check "${relativePath}"`);
+    }
+    
+    if (commands.length > 0) {
+      console.error(`${colors.blue}💡 Run: ${commands.join(' && ')}${colors.reset}`);
+    }
+    
     console.error(`${colors.red}✗ ${path.basename(filePath)} - fix issues${colors.reset}`);
     process.exit(2);
-  } else if (dependencyWarnings.length > 0) {
-    if (config.debug) {
-      console.error(`${colors.yellow}⚠️  ${path.basename(filePath)} - dependency warnings${colors.reset}`);
-    }
-    process.exit(0);
   } else {
-    if (config.debug) {
-      console.error(`${colors.green}✓ ${path.basename(filePath)}${colors.reset}`);
-    }
     process.exit(0);
   }
 }

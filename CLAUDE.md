@@ -89,7 +89,7 @@ enabled = true  # Re-enable for database management UI
 
 ### Current Stack (Being Replaced)
 
-- **Database**: PostgreSQL + Prisma ORM → **Drizzle ORM**
+- **Database**: PostgreSQL + **Drizzle ORM** (via Supabase)
 - **Authentication**: NextAuth.js → **Supabase Auth**
 - **Authorization**: App-level checks → **Row Level Security**
 - **File Storage**: Local/Vercel Blob → **Supabase Storage**
@@ -172,12 +172,12 @@ npm run pre-commit   # Pre-PR validation (MUST PASS)
 npm run db:reset
 npm run db:push
 
-# Database Inspection (Efficient - DON'T USE PRISMA STUDIO)
-# Read schema structure: prisma/schema.prisma
+# Database Inspection (Efficient - Use Direct SQL)
+# Read schema structure: src/server/db/schema/
 # Query data samples directly (no GUI needed):
-npx prisma db execute --stdin <<< "SELECT * FROM \"Organization\" LIMIT 5;"
+psql $DATABASE_URL -c "SELECT * FROM \"Organization\" LIMIT 5;"
 psql $DATABASE_URL -c "SELECT COUNT(*) FROM \"User\";"
-# DON'T launch Prisma Studio unless debugging specific data issues
+# Use Drizzle Studio for visual inspection: npx drizzle-kit studio
 
 # Core Commands (Use brief versions unless debugging)
 # PREFERRED: Use :brief variants for daily development - faster, cleaner output
@@ -244,7 +244,7 @@ npm run typecheck | grep "usePermissions"        # Find specific function errors
 2. **During**: Run `npm run check` after significant code changes
 3. **Before commit**: `npm run validate` must pass (MANDATORY)
 4. **Before PR**: `npm run pre-commit` must pass (MANDATORY)
-5. **Database changes**: Use `npm run db:reset` (pre-production phase)
+5. **Database changes**: Use `npm run db:reset` for complete reset or `npm run db:push` for schema-only changes
 
 ### Environment Configuration
 
@@ -493,16 +493,20 @@ The test-architect will update `test-map.md` and `source-map.md` as it works. Th
 - **Pattern Updates**: Update quick reference guides for new patterns or deprecated approaches
 - **Migration Progress Tracking**: Update implementation status and lessons learned
 
-### Database Commands (Migration Period)
+### Database Commands (Drizzle ORM)
 
 ```bash
-# Prisma (current)
-npm run db:push         # Schema sync
-npm run db:reset        # Full reset
+# Core database operations
+npm run db:push         # Push schema changes (development)
+npm run db:reset        # Complete reset with seeding
+npm run db:rebuild      # Drop all tables, push schema, seed
 
-# Drizzle (migration target)
-npm run drizzle:push    # Coming in Stage 2
-npm run drizzle:migrate # Coming in Stage 2
+# Debugging and inspection
+npm run db:push:inspect # Inspect schema changes before applying
+npm run db:drop         # Drop all tables (destructive)
+
+# Seeding
+npm run seed            # Run seeding only
 ```
 
 ## Critical Notes
@@ -528,7 +532,7 @@ npm run drizzle:migrate # Coming in Stage 2
 - **ESLint Disabling**: NEVER add an eslint-disable unless you have exhausted all other options and confirmed with the user that it is the correct thing to do.
 - **E2E Testing**: Use `npm run playwright` (headless). NEVER use `playwright:headed` or `playwright:ui` as they show browser windows and interrupt the user's workflow.
 - **Smoke Testing**: Use `npm run smoke` for quick end-to-end workflow validation. This tests the complete issue creation → admin management flow in ~2 minutes.
-- **Prisma Studio**: AVOID launching Prisma Studio (`npm run db:studio`) unless absolutely necessary for debugging complex data issues. Use direct SQL queries, schema file reading, or existing component inspection instead.
+- **Database Studio**: Use `npx drizzle-kit studio` for visual database inspection when needed. Prefer direct SQL queries for simple data checks.
 - **Import Path Consistency**: ALWAYS use the TypeScript path alias `~/` for internal imports. NEVER use relative paths like `../../../lib/supabase/client`. ESLint enforces this with `no-restricted-imports` rule to prevent deep relative imports.
 
 ## Key Lessons Learned (Project-Specific)

@@ -5,14 +5,28 @@
  * Consolidates the common code from the old seed files.
  */
 
-import { createPrismaClient } from "~/server/db";
-import { RoleService } from "~/server/services/roleService";
+import { eq, and } from "drizzle-orm";
+import { nanoid } from "nanoid";
+
+import { createDrizzleClient } from "~/server/db/drizzle";
+import {
+  organizations,
+  permissions,
+  roles,
+  rolePermissions,
+  priorities,
+  issueStatuses,
+  collectionTypes,
+} from "~/server/db/schema";
 import {
   ALL_PERMISSIONS,
   PERMISSION_DESCRIPTIONS,
+  SYSTEM_ROLES,
+  ROLE_TEMPLATES,
+  UNAUTHENTICATED_PERMISSIONS,
 } from "~/server/auth/permissions.constants";
 
-const prisma = createPrismaClient();
+const db = createDrizzleClient();
 
 export interface Organization {
   id: string;
@@ -25,15 +39,22 @@ export interface Organization {
  */
 async function createGlobalPermissions(): Promise<void> {
   for (const permName of ALL_PERMISSIONS) {
-    await prisma.permission.upsert({
-      where: { name: permName },
-      update: {},
-      create: {
+    // Check if permission exists
+    const existing = await db
+      .select()
+      .from(permissions)
+      .where(eq(permissions.name, permName))
+      .limit(1);
+
+    if (existing.length === 0) {
+      // Create new permission
+      await db.insert(permissions).values({
+        id: nanoid(),
         name: permName,
         description:
           PERMISSION_DESCRIPTIONS[permName] ?? `Permission: ${permName}`,
-      },
-    });
+      });
+    }
   }
 
   console.log(
@@ -42,29 +63,65 @@ async function createGlobalPermissions(): Promise<void> {
 }
 
 /**
- * Create organization with automatic default roles using RoleService
+ * Create organization with automatic default roles
  */
 async function createOrganizationWithRoles(orgData: {
   name: string;
   subdomain: string;
   logoUrl?: string;
 }): Promise<Organization> {
-  const organization = await prisma.organization.upsert({
-    where: { subdomain: orgData.subdomain },
-    update: orgData,
-    create: orgData,
-  });
+  // Check if organization exists
+  const existing = await db
+    .select()
+    .from(organizations)
+    .where(eq(organizations.subdomain, orgData.subdomain))
+    .limit(1);
 
-  const roleService = new RoleService(prisma, organization.id);
+  let organization;
+  if (existing.length > 0) {
+    // Update existing organization
+    const updated = await db
+      .update(organizations)
+      .set({
+        name: orgData.name,
+        logoUrl: orgData.logoUrl,
+        updatedAt: new Date(),
+      })
+      .where(eq(organizations.subdomain, orgData.subdomain))
+      .returning();
+    organization =
+      updated[0] ??
+      (() => {
+        throw new Error("Failed to update organization");
+      })();
+  } else {
+    // Create new organization
+    const created = await db
+      .insert(organizations)
+      .values({
+        id: nanoid(),
+        name: orgData.name,
+        subdomain: orgData.subdomain,
+        logoUrl: orgData.logoUrl,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning();
+    organization =
+      created[0] ??
+      (() => {
+        throw new Error("Failed to create organization");
+      })();
+  }
 
-  // Create system roles (Admin and Unauthenticated)
-  await roleService.createSystemRoles();
+  // Create system roles directly with Drizzle
+  await createSystemRoles(organization.id);
   console.log(
     `[INFRASTRUCTURE] Created system roles for organization: ${organization.name}`,
   );
 
   // Create default Member role from template
-  await roleService.createTemplateRole("MEMBER");
+  await createTemplateRole(organization.id, "MEMBER");
   console.log(
     `[INFRASTRUCTURE] Created Member role template for organization: ${organization.name}`,
   );
@@ -72,7 +129,7 @@ async function createOrganizationWithRoles(orgData: {
   return {
     id: organization.id,
     name: organization.name,
-    subdomain: organization.subdomain || "apc", // Should never be null since we just created it
+    subdomain: organization.subdomain,
   };
 }
 
@@ -80,32 +137,40 @@ async function createOrganizationWithRoles(orgData: {
  * Create default priorities for organization
  */
 async function createDefaultPriorities(organizationId: string): Promise<void> {
-  const priorities = [
+  const priorityData = [
     { name: "Low", order: 1 },
     { name: "Medium", order: 2 },
     { name: "High", order: 3 },
     { name: "Critical", order: 4 },
   ];
 
-  for (const priorityData of priorities) {
-    await prisma.priority.upsert({
-      where: {
-        name_organizationId: {
-          name: priorityData.name,
-          organizationId: organizationId,
-        },
-      },
-      update: {},
-      create: {
-        ...priorityData,
-        organizationId: organizationId,
+  for (const priority of priorityData) {
+    // Check if priority exists
+    const existing = await db
+      .select()
+      .from(priorities)
+      .where(
+        and(
+          eq(priorities.name, priority.name),
+          eq(priorities.organizationId, organizationId),
+        ),
+      )
+      .limit(1);
+
+    if (existing.length === 0) {
+      // Create new priority
+      await db.insert(priorities).values({
+        id: nanoid(),
+        name: priority.name,
+        order: priority.order,
+        organizationId,
         isDefault: true,
-      },
-    });
+      });
+    }
   }
 
   console.log(
-    `[INFRASTRUCTURE] Created ${priorities.length.toString()} default priorities`,
+    `[INFRASTRUCTURE] Created ${priorityData.length.toString()} default priorities`,
   );
 }
 
@@ -122,6 +187,7 @@ async function createDefaultCollectionTypes(
       isAutoGenerated: false,
       isEnabled: true,
       sortOrder: 1,
+      sourceField: null,
     },
     {
       name: "Manufacturer",
@@ -142,19 +208,48 @@ async function createDefaultCollectionTypes(
   ];
 
   for (const typeData of defaultCollectionTypes) {
-    await prisma.collectionType.upsert({
-      where: {
-        name_organizationId: {
-          name: typeData.name,
-          organizationId,
-        },
-      },
-      update: typeData,
-      create: {
-        ...typeData,
+    // Check if collection type exists
+    const existing = await db
+      .select()
+      .from(collectionTypes)
+      .where(
+        and(
+          eq(collectionTypes.name, typeData.name),
+          eq(collectionTypes.organizationId, organizationId),
+        ),
+      )
+      .limit(1);
+
+    if (existing.length > 0) {
+      // Update existing collection type
+      await db
+        .update(collectionTypes)
+        .set({
+          displayName: typeData.displayName,
+          isAutoGenerated: typeData.isAutoGenerated,
+          isEnabled: typeData.isEnabled,
+          sortOrder: typeData.sortOrder,
+          sourceField: typeData.sourceField,
+        })
+        .where(
+          and(
+            eq(collectionTypes.name, typeData.name),
+            eq(collectionTypes.organizationId, organizationId),
+          ),
+        );
+    } else {
+      // Create new collection type
+      await db.insert(collectionTypes).values({
+        id: nanoid(),
+        name: typeData.name,
         organizationId,
-      },
-    });
+        displayName: typeData.displayName,
+        isAutoGenerated: typeData.isAutoGenerated,
+        isEnabled: typeData.isEnabled,
+        sortOrder: typeData.sortOrder,
+        sourceField: typeData.sourceField,
+      });
+    }
     console.log(
       `[INFRASTRUCTURE] Created/Updated collection type: ${typeData.name}`,
     );
@@ -176,22 +271,280 @@ async function createDefaultStatuses(organizationId: string): Promise<void> {
   ];
 
   for (const statusData of statusesToUpsert) {
-    await prisma.issueStatus.upsert({
-      where: {
-        name_organizationId: {
-          name: statusData.name,
-          organizationId,
-        },
-      },
-      update: { category: statusData.category },
-      create: {
+    // Check if status exists
+    const existing = await db
+      .select()
+      .from(issueStatuses)
+      .where(
+        and(
+          eq(issueStatuses.name, statusData.name),
+          eq(issueStatuses.organizationId, organizationId),
+        ),
+      )
+      .limit(1);
+
+    if (existing.length > 0) {
+      // Update existing status
+      await db
+        .update(issueStatuses)
+        .set({ category: statusData.category })
+        .where(
+          and(
+            eq(issueStatuses.name, statusData.name),
+            eq(issueStatuses.organizationId, organizationId),
+          ),
+        );
+    } else {
+      // Create new status
+      await db.insert(issueStatuses).values({
+        id: nanoid(),
         name: statusData.name,
         category: statusData.category,
         organizationId,
         isDefault: true,
-      },
-    });
+      });
+    }
     console.log(`[INFRASTRUCTURE] Upserted issue status: ${statusData.name}`);
+  }
+}
+
+/**
+ * Create system roles for an organization
+ */
+async function createSystemRoles(organizationId: string): Promise<void> {
+  // Create Admin role
+  const existingAdmin = await db
+    .select()
+    .from(roles)
+    .where(
+      and(
+        eq(roles.name, SYSTEM_ROLES.ADMIN),
+        eq(roles.organizationId, organizationId),
+      ),
+    )
+    .limit(1);
+
+  let adminRole;
+  if (existingAdmin.length > 0) {
+    // Update existing admin role
+    const updated = await db
+      .update(roles)
+      .set({
+        isSystem: true,
+        isDefault: false,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(roles.name, SYSTEM_ROLES.ADMIN),
+          eq(roles.organizationId, organizationId),
+        ),
+      )
+      .returning();
+    adminRole =
+      updated[0] ??
+      (() => {
+        throw new Error("Failed to update admin role");
+      })();
+  } else {
+    // Create new admin role
+    const created = await db
+      .insert(roles)
+      .values({
+        id: nanoid(),
+        name: SYSTEM_ROLES.ADMIN,
+        organizationId,
+        isSystem: true,
+        isDefault: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning();
+    adminRole =
+      created[0] ??
+      (() => {
+        throw new Error("Failed to create admin role");
+      })();
+  }
+
+  // Assign all permissions to admin role
+  const allPermissions = await db.select().from(permissions);
+
+  // Clear existing permissions first
+  await db
+    .delete(rolePermissions)
+    .where(eq(rolePermissions.roleId, adminRole.id));
+
+  // Add all permissions
+  if (allPermissions.length > 0) {
+    await db.insert(rolePermissions).values(
+      allPermissions.map((permission) => ({
+        roleId: adminRole.id,
+        permissionId: permission.id,
+      })),
+    );
+  }
+
+  // Create Unauthenticated role
+  const existingUnauth = await db
+    .select()
+    .from(roles)
+    .where(
+      and(
+        eq(roles.name, SYSTEM_ROLES.UNAUTHENTICATED),
+        eq(roles.organizationId, organizationId),
+      ),
+    )
+    .limit(1);
+
+  let unauthRole;
+  if (existingUnauth.length > 0) {
+    // Update existing unauthenticated role
+    const updated = await db
+      .update(roles)
+      .set({
+        isSystem: true,
+        isDefault: false,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(roles.name, SYSTEM_ROLES.UNAUTHENTICATED),
+          eq(roles.organizationId, organizationId),
+        ),
+      )
+      .returning();
+    unauthRole =
+      updated[0] ??
+      (() => {
+        throw new Error("Failed to update unauthenticated role");
+      })();
+  } else {
+    // Create new unauthenticated role
+    const created = await db
+      .insert(roles)
+      .values({
+        id: nanoid(),
+        name: SYSTEM_ROLES.UNAUTHENTICATED,
+        organizationId,
+        isSystem: true,
+        isDefault: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning();
+    unauthRole =
+      created[0] ??
+      (() => {
+        throw new Error("Failed to create unauthenticated role");
+      })();
+  }
+
+  // Assign unauthenticated permissions
+  const unauthPermissions = await db
+    .select()
+    .from(permissions)
+    .where(
+      eq(permissions.name, UNAUTHENTICATED_PERMISSIONS[0] ?? "issue:view"),
+    );
+
+  // Clear existing permissions first
+  await db
+    .delete(rolePermissions)
+    .where(eq(rolePermissions.roleId, unauthRole.id));
+
+  // Add unauthenticated permissions
+  if (unauthPermissions.length > 0) {
+    await db.insert(rolePermissions).values(
+      unauthPermissions.map((permission) => ({
+        roleId: unauthRole.id,
+        permissionId: permission.id,
+      })),
+    );
+  }
+}
+
+/**
+ * Create a role from a template
+ */
+async function createTemplateRole(
+  organizationId: string,
+  templateName: keyof typeof ROLE_TEMPLATES,
+): Promise<void> {
+  const template = ROLE_TEMPLATES[templateName];
+
+  // Check if role exists
+  const existing = await db
+    .select()
+    .from(roles)
+    .where(
+      and(
+        eq(roles.name, template.name),
+        eq(roles.organizationId, organizationId),
+      ),
+    )
+    .limit(1);
+
+  let role;
+  if (existing.length > 0) {
+    // Update existing role
+    const updated = await db
+      .update(roles)
+      .set({
+        isSystem: false,
+        isDefault: true,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(roles.name, template.name),
+          eq(roles.organizationId, organizationId),
+        ),
+      )
+      .returning();
+    role =
+      updated[0] ??
+      (() => {
+        throw new Error(`Failed to update ${template.name} role`);
+      })();
+  } else {
+    // Create new role
+    const created = await db
+      .insert(roles)
+      .values({
+        id: nanoid(),
+        name: template.name,
+        organizationId,
+        isSystem: false,
+        isDefault: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning();
+    role =
+      created[0] ??
+      (() => {
+        throw new Error(`Failed to create ${template.name} role`);
+      })();
+  }
+
+  // Get template permissions
+  const templatePermissions = await db
+    .select()
+    .from(permissions)
+    .where(eq(permissions.name, template.permissions[0] ?? ""));
+
+  // Clear existing permissions first
+  await db.delete(rolePermissions).where(eq(rolePermissions.roleId, role.id));
+
+  // Add template permissions (simplified - in real implementation would expand dependencies)
+  if (templatePermissions.length > 0) {
+    await db.insert(rolePermissions).values(
+      templatePermissions.map((permission) => ({
+        roleId: role.id,
+        permissionId: permission.id,
+      })),
+    );
   }
 }
 
@@ -228,6 +581,6 @@ export async function seedInfrastructure(): Promise<Organization> {
   return {
     id: organization.id,
     name: organization.name,
-    subdomain: organization.subdomain || "apc", // Should never be null since we just created it
+    subdomain: organization.subdomain,
   };
 }

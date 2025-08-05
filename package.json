@@ -23,12 +23,14 @@
     "dev:bg:logs": "./scripts/dev-background.sh logs",
     "dev:killall": "./scripts/kill-dev-processes.cjs",
     "_comment_database": "========== Database ==========",
-    "db:generate": "dotenv -e .env -e .env.development -- prisma migrate dev",
-    "db:migrate": "dotenv -e .env -e .env.development -- prisma migrate deploy",
-    "db:push": "dotenv -e .env -e .env.development -- prisma db push",
-    "db:studio": "echo '⚠️  Consider using direct SQL queries instead (see CLAUDE.md)' && dotenv -e .env -e .env.development -- prisma studio",
-    "db:reset": "dotenv -e .env -e .env.development -- sh -c 'rm -rf prisma/migrations && npx prisma db push --force-reset && npm run seed'",
+    "db:generate": "drizzle-kit generate --config=drizzle.config.dev.ts",
+    "db:generate:prod": "drizzle-kit generate --config=drizzle.config.prod.ts",
+    "db:push": "drizzle-kit push --config=drizzle.config.dev.ts",
+    "db:push:prod": "drizzle-kit push --config=drizzle.config.prod.ts",
+    "db:reset": "npm run db:generate && supabase db reset",
     "seed": "dotenv -e .env -e .env.development -- tsx scripts/seed/orchestrator.ts",
+    "db:studio": "drizzle-kit studio --config=drizzle.config.dev.ts",
+    "db:studio:prod": "drizzle-kit studio --config=drizzle.config.prod.ts",
     "db:validate": "dotenv -e .env -e .env.development -- tsx scripts/validate-drizzle-crud.ts",
     "db:validate:minimal": "dotenv -e .env -e .env.development -- cross-env DB_VALIDATE_MINIMAL=true tsx scripts/validate-drizzle-crud.ts",
     "db:validate:ci": "tsx scripts/validate-drizzle-crud.ts",
@@ -95,9 +97,6 @@
     "deps:update": "npm update && npm audit",
     "_comment_external": "========== External API ==========",
     "pinballmap:update-fixture": "curl -o src/lib/pinballmap/__tests__/fixtures/api_responses/locations/location_26454_machine_details.json https://pinballmap.com/api/v1/locations/26454/machine_details.json"
-  },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
     "@emotion/cache": "^11.14.0",

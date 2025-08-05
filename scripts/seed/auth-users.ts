@@ -8,11 +8,14 @@
  */
 
 import { createClient } from "@supabase/supabase-js";
+import { eq, and } from "drizzle-orm";
+import { nanoid } from "nanoid";
 
-import { createPrismaClient } from "~/server/db";
-import { isPreview } from "~/lib/environment";
+import { createDrizzleClient } from "~/server/db/drizzle";
+import { users, roles, memberships } from "~/server/db/schema";
+import { isProduction } from "~/lib/environment";
 
-const prisma = createPrismaClient();
+const db = createDrizzleClient();
 
 export interface UserData {
   name: string;
@@ -56,28 +59,60 @@ async function createUserMembership(
   roleName: string,
 ): Promise<void> {
   // Find the role created by infrastructure.ts
-  const role = await prisma.role.findFirst({
-    where: { name: roleName, organizationId },
-  });
+  const roleResults = await db
+    .select()
+    .from(roles)
+    .where(
+      and(eq(roles.name, roleName), eq(roles.organizationId, organizationId)),
+    )
+    .limit(1);
 
-  if (!role) {
+  if (roleResults.length === 0) {
     throw new Error(
       `Role ${roleName} not found for organization ${organizationId}`,
     );
   }
 
-  // Create membership record
-  await prisma.membership.upsert({
-    where: {
-      userId_organizationId: { userId, organizationId },
-    },
-    update: { roleId: role.id },
-    create: {
+  const role =
+    roleResults[0] ??
+    (() => {
+      throw new Error(
+        `Role ${roleName} not found for organization ${organizationId}`,
+      );
+    })();
+
+  // Check if membership exists
+  const existingMembership = await db
+    .select()
+    .from(memberships)
+    .where(
+      and(
+        eq(memberships.userId, userId),
+        eq(memberships.organizationId, organizationId),
+      ),
+    )
+    .limit(1);
+
+  if (existingMembership.length > 0) {
+    // Update existing membership
+    await db
+      .update(memberships)
+      .set({ roleId: role.id })
+      .where(
+        and(
+          eq(memberships.userId, userId),
+          eq(memberships.organizationId, organizationId),
+        ),
+      );
+  } else {
+    // Create new membership
+    await db.insert(memberships).values({
+      id: nanoid(),
       userId,
       organizationId,
       roleId: role.id,
-    },
-  });
+    });
+  }
 
   console.log(
     `[AUTH] Created membership: ${userId} → ${roleName} in ${organizationId}`,
@@ -148,14 +183,14 @@ async function createSupabaseAuthUser(
  * Process batch of users with error handling
  */
 async function processBatchUsers(
-  users: UserData[],
+  userList: UserData[],
   organizationId: string,
 ): Promise<{ successCount: number; errorCount: number; errors: string[] }> {
   let successCount = 0;
   let errorCount = 0;
   const errors: string[] = [];
 
-  for (const userData of users) {
+  for (const userData of userList) {
     try {
       // Create Supabase auth user
       const authResult = await createSupabaseAuthUser({
@@ -180,16 +215,25 @@ async function processBatchUsers(
         await new Promise((resolve) => setTimeout(resolve, 100));
 
         // Ensure User record exists (auth trigger should create it, but verify)
-        await prisma.user.upsert({
-          where: { id: authResult.userId },
-          update: {}, // No updates needed if exists
-          create: {
+        const existingUser = await db
+          .select()
+          .from(users)
+          .where(eq(users.id, authResult.userId))
+          .limit(1);
+
+        if (existingUser.length === 0) {
+          // Create new user record
+          await db.insert(users).values({
             id: authResult.userId,
             name: userData.name,
             email: userData.email,
             emailVerified: new Date(),
-          },
-        });
+            image: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+        }
+        // If user exists, no updates needed
 
         await createUserMembership(
           authResult.userId,
@@ -216,18 +260,18 @@ async function processBatchUsers(
 }
 
 /**
- * Delete existing dev users from both Supabase auth and database (PREVIEW ONLY)
- * This aggressive reset is only enabled in preview environments for clean demos.
- * Local development and production environments preserve existing users for safety.
+ * Delete existing dev users from both Supabase auth and database (DEV + PREVIEW)
+ * This aggressive reset is enabled in development and preview environments for clean demos.
+ * Production environments preserve existing users for safety.
  */
-async function deleteExistingDevUsers(users: UserData[]): Promise<void> {
+async function deleteExistingDevUsers(userList: UserData[]): Promise<void> {
   const supabase = createServiceRoleClient();
 
   console.log(
-    "[AUTH] 🗑️  BETA: Deleting existing dev users for clean reset...",
+    "[AUTH] 🗑️  DEV/PREVIEW: Deleting existing dev users for clean reset...",
   );
 
-  for (const userData of users) {
+  for (const userData of userList) {
     try {
       // Get user by email first
       const { data: userList, error: listError } =
@@ -248,9 +292,7 @@ async function deleteExistingDevUsers(users: UserData[]): Promise<void> {
       if (existingUser) {
         // Delete from database first (cascades to memberships)
         try {
-          await prisma.user.delete({
-            where: { id: existingUser.id },
-          });
+          await db.delete(users).where(eq(users.id, existingUser.id));
           console.log(`[AUTH] 🗑️  Deleted database user: ${userData.email}`);
         } catch (dbError) {
           console.warn(
@@ -294,15 +336,15 @@ export async function seedAuthUsers(
   );
 
   try {
-    // PREVIEW ONLY: Delete existing users for clean reset
-    if (isPreview()) {
+    // DEV + PREVIEW: Delete existing users for clean reset
+    if (!isProduction()) {
       console.log(
-        "[AUTH] 🔄 PREVIEW ENVIRONMENT: Performing aggressive user reset for clean demos",
+        "[AUTH] 🔄 DEV/PREVIEW ENVIRONMENT: Performing aggressive user reset for clean demos",
       );
       await deleteExistingDevUsers(users);
     } else {
       console.log(
-        "[AUTH] 🔒 NON-PREVIEW ENVIRONMENT: Preserving existing users, creating only missing ones",
+        "[AUTH] 🔒 PRODUCTION ENVIRONMENT: Preserving existing users, creating only missing ones",
       );
     }
 

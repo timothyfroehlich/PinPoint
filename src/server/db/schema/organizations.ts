@@ -63,8 +63,12 @@ export const permissions = pgTable("Permission", {
 export const rolePermissions = pgTable(
   "_RolePermissions",
   {
-    roleId: text("A").notNull(),
-    permissionId: text("B").notNull(),
+    roleId: text("A")
+      .notNull()
+      .references(() => roles.id, { onDelete: "cascade" }),
+    permissionId: text("B")
+      .notNull()
+      .references(() => permissions.id, { onDelete: "cascade" }),
   },
   (table) => [
     // Permission system: role-permission lookups

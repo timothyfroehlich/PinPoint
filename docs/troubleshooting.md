@@ -49,20 +49,21 @@ This document contains detailed troubleshooting procedures for development and d
 
 ## Database Issues
 
-### Problem: Prisma schema out of sync
+### Problem: Drizzle schema out of sync
 
 **Solutions**:
 
-1. **Quick fix**: Run `npx prisma db push` to sync schema
-2. **Complete reset**: Run `npm run db:reset` to wipe everything and start fresh
-3. Regenerate client: `npx prisma generate`
+1. **Quick fix**: Run `npm run db:push` to sync schema changes
+2. **Inspect changes**: Run `npm run db:push:inspect` to preview changes before applying
+3. **Complete reset**: Run `npm run db:reset` to wipe everything and start fresh
+4. **Rebuild from scratch**: Run `npm run db:rebuild` for complete table recreation
 
 ### Problem: Database has old/inconsistent data
 
 **Solutions**:
 
 1. **Recommended**: Run `npm run db:reset` for clean slate
-2. Manual cleanup: Run `npm run seed` to add fresh data (preserves existing data)
+2. Manual cleanup: Run `npm run seed` to add fresh data using the modern seeding orchestrator
 
 ### Problem: Database sessions not clearing
 
@@ -103,7 +104,7 @@ If modern tools fail, these legacy procedures still work:
 
 **File Change Detection:**
 
-- **Schema changes** (`prisma/schema.prisma`) → Full restart + Prisma regeneration
+- **Schema changes** (`src/server/db/schema/`) → Full restart + Drizzle schema push
 - **Environment changes** (`.env`) → Full restart with validation
 - **Server code changes** (`src/server/`) → Graceful server restart only
 - **Frontend changes** (`src/app/`) → No restart (Next.js HMR handles it)
