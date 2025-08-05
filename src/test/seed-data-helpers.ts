@@ -13,38 +13,14 @@
 
 /* eslint-disable @typescript-eslint/explicit-function-return-type */
 
-import { eq, desc, ilike } from "drizzle-orm";
-
 import { createDrizzleClient } from "~/server/db/drizzle";
-import {
-  users,
-  memberships,
-  roles,
-  permissions,
-  rolePermissions,
-  organizations,
-  locations,
-  machines,
-  models,
-  issues,
-  issueStatuses,
-  priorities,
-} from "~/server/db/schema";
+import { priorities, issueStatuses } from "~/server/db/schema";
 
-const db = createDrizzleClient();
+const testDb = createDrizzleClient();
 
 // Type exports for compatibility
 export type IssueStatus = typeof issueStatuses.$inferSelect;
 export type Priority = typeof priorities.$inferSelect;
-
-// User type with basic info (can be extended as needed)
-export type SeededUser = typeof users.$inferSelect & {
-  memberships?: (typeof memberships.$inferSelect & {
-    role: typeof roles.$inferSelect & {
-      permissions: (typeof permissions.$inferSelect)[];
-    };
-  })[];
-};
 
 // Cache for frequently accessed seed data to improve test performance
 const seedDataCache = new Map<string, unknown>();
@@ -77,81 +53,25 @@ export function clearSeedDataCache(): void {
 // =============================================================================
 
 /**
- * Get a user by email with their membership, role, and permissions
- */
-async function getUserWithRoles(email: string): Promise<SeededUser> {
-  // First get the user
-  const userResults = await db
-    .select()
-    .from(users)
-    .where(eq(users.email, email))
-    .limit(1);
-
-  if (userResults.length === 0) {
-    throw new Error(`User not found: ${email}`);
-  }
-
-  const user = userResults[0];
-  // TypeScript knows this check is redundant, but it's for runtime safety
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-  if (!user) {
-    throw new Error(`User not found: ${email}`);
-  }
-
-  // Get memberships with roles and permissions
-  const membershipResults = await db
-    .select({
-      membership: memberships,
-      role: roles,
-      permission: permissions,
-    })
-    .from(memberships)
-    .leftJoin(roles, eq(memberships.roleId, roles.id))
-    .leftJoin(rolePermissions, eq(roles.id, rolePermissions.roleId))
-    .leftJoin(permissions, eq(rolePermissions.permissionId, permissions.id))
-    .where(eq(memberships.userId, user.id));
-
-  // Group permissions by membership
-  type MembershipWithRole = NonNullable<SeededUser["memberships"]>[0];
-  const membershipMap = new Map<string, MembershipWithRole>();
-
-  for (const result of membershipResults) {
-    const membershipId = result.membership.id;
-
-    if (!membershipMap.has(membershipId)) {
-      if (!result.role) {
-        throw new Error(`Role not found for membership ${membershipId}`);
-      }
-      membershipMap.set(membershipId, {
-        ...result.membership,
-        role: {
-          ...result.role,
-          permissions: [],
-        },
-      });
-    }
-
-    if (result.permission) {
-      const membership = membershipMap.get(membershipId);
-      if (membership) {
-        membership.role.permissions.push(result.permission);
-      }
-    }
-  }
-
-  return {
-    ...user,
-    memberships: Array.from(membershipMap.values()),
-  };
-}
-
-/**
  * Get the seeded admin user (admin@dev.local)
  * Has full admin permissions for Austin Pinball Collective
  */
-export async function getSeededAdmin(): Promise<SeededUser> {
+export async function getSeededAdmin() {
   return getCachedSeedData("admin-user", async () => {
-    return await getUserWithRoles("admin@dev.local");
+    return await testDb.user.findFirstOrThrow({
+      where: { email: "admin@dev.local" },
+      include: {
+        memberships: {
+          include: {
+            role: {
+              include: {
+                permissions: true,
+              },
+            },
+          },
+        },
+      },
+    });
   });
 }
 
@@ -159,9 +79,22 @@ export async function getSeededAdmin(): Promise<SeededUser> {
  * Get the seeded member user (member@dev.local)
  * Has standard member permissions for Austin Pinball Collective
  */
-export async function getSeededMember(): Promise<SeededUser> {
+export async function getSeededMember() {
   return getCachedSeedData("member-user", async () => {
-    return await getUserWithRoles("member@dev.local");
+    return await testDb.user.findFirstOrThrow({
+      where: { email: "member@dev.local" },
+      include: {
+        memberships: {
+          include: {
+            role: {
+              include: {
+                permissions: true,
+              },
+            },
+          },
+        },
+      },
+    });
   });
 }
 
@@ -169,18 +102,44 @@ export async function getSeededMember(): Promise<SeededUser> {
  * Get a seeded player user (player@dev.local)
  * Has minimal permissions for Austin Pinball Collective
  */
-export async function getSeededPlayer(): Promise<SeededUser> {
+export async function getSeededPlayer() {
   return getCachedSeedData("player-user", async () => {
-    return await getUserWithRoles("player@dev.local");
+    return await testDb.user.findFirstOrThrow({
+      where: { email: "player@dev.local" },
+      include: {
+        memberships: {
+          include: {
+            role: {
+              include: {
+                permissions: true,
+              },
+            },
+          },
+        },
+      },
+    });
   });
 }
 
 /**
  * Get a user by email (for legacy test users)
  */
-export async function getSeededUserByEmail(email: string): Promise<SeededUser> {
+export async function getSeededUserByEmail(email: string) {
   return getCachedSeedData(`user-${email}`, async () => {
-    return await getUserWithRoles(email);
+    return await testDb.user.findFirstOrThrow({
+      where: { email },
+      include: {
+        memberships: {
+          include: {
+            role: {
+              include: {
+                permissions: true,
+              },
+            },
+          },
+        },
+      },
+    });
   });
 }
 
@@ -188,196 +147,122 @@ export async function getSeededUserByEmail(email: string): Promise<SeededUser> {
 // ORGANIZATION HELPERS - Access development organization
 // =============================================================================
 
-export type SeededOrganization = typeof organizations.$inferSelect & {
-  locations?: (typeof locations.$inferSelect & {
-    machines?: (typeof machines.$inferSelect & {
-      model: typeof models.$inferSelect;
-      issues?: (typeof issues.$inferSelect & {
-        status: typeof issueStatuses.$inferSelect;
-        priority: typeof priorities.$inferSelect;
-        createdBy: typeof users.$inferSelect;
-      })[];
-    })[];
-  })[];
-};
-
 /**
  * Get the seeded Austin Pinball Collective organization
  * Subdomain: "apc", with full location/machine/issue hierarchy
  */
-export async function getSeededOrganization(): Promise<SeededOrganization> {
+export async function getSeededOrganization() {
   return getCachedSeedData("apc-organization", async () => {
-    // Get organization
-    const orgResults = await db
-      .select()
-      .from(organizations)
-      .where(eq(organizations.subdomain, "apc"))
-      .limit(1);
-
-    if (orgResults.length === 0) {
-      throw new Error("Austin Pinball Collective organization not found");
-    }
-
-    const org = orgResults[0];
-    // TypeScript knows this check is redundant, but it's for runtime safety
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    if (!org) {
-      throw new Error("Austin Pinball Collective organization not found");
-    }
-
-    // Get locations with machines and issues (simplified for now)
-    const locationResults = await db
-      .select()
-      .from(locations)
-      .where(eq(locations.organizationId, org.id));
-
-    return {
-      ...org,
-      locations: locationResults,
-    };
+    return await testDb.organization.findFirstOrThrow({
+      where: { subdomain: "apc" },
+      include: {
+        locations: {
+          include: {
+            machines: {
+              include: {
+                model: true,
+                issues: {
+                  include: {
+                    status: true,
+                    priority: true,
+                    createdBy: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
   });
 }
 
 // =============================================================================
-// ISSUE HELPERS - Access realistic seeded issues (simplified for now)
+// ISSUE HELPERS - Access realistic seeded issues
 // =============================================================================
-
-export type SeededIssue = typeof issues.$inferSelect & {
-  machine: typeof machines.$inferSelect & {
-    model: typeof models.$inferSelect;
-    location: typeof locations.$inferSelect;
-  };
-  status: typeof issueStatuses.$inferSelect;
-  priority: typeof priorities.$inferSelect;
-  createdBy: typeof users.$inferSelect;
-  assignedTo?: typeof users.$inferSelect;
-};
 
 /**
  * Get a seeded issue by title (partial match)
  * Useful for testing specific issue scenarios from sample-issues.json
  */
-export async function getSeededIssue(
-  titleContains: string,
-): Promise<SeededIssue> {
+export async function getSeededIssue(titleContains: string) {
   return getCachedSeedData(`issue-${titleContains}`, async () => {
-    const results = await db
-      .select({
-        issue: issues,
-        machine: machines,
-        model: models,
-        location: locations,
-        status: issueStatuses,
-        priority: priorities,
-        createdBy: users,
-      })
-      .from(issues)
-      .leftJoin(machines, eq(issues.machineId, machines.id))
-      .leftJoin(models, eq(machines.modelId, models.id))
-      .leftJoin(locations, eq(machines.locationId, locations.id))
-      .leftJoin(issueStatuses, eq(issues.statusId, issueStatuses.id))
-      .leftJoin(priorities, eq(issues.priorityId, priorities.id))
-      .leftJoin(users, eq(issues.createdById, users.id))
-      .where(ilike(issues.title, `%${titleContains}%`))
-      .limit(1);
-
-    if (results.length === 0) {
-      throw new Error(
-        `Issue not found with title containing: ${titleContains}`,
-      );
-    }
-
-    const result = results[0];
-    // TypeScript knows this check is redundant, but it's for runtime safety
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    if (!result) {
-      throw new Error(
-        `Issue not found with title containing: ${titleContains}`,
-      );
-    }
-
-    if (
-      !result.machine ||
-      !result.model ||
-      !result.location ||
-      !result.status ||
-      !result.priority ||
-      !result.createdBy
-    ) {
-      throw new Error(
-        `Incomplete issue data for title containing: ${titleContains}`,
-      );
-    }
-
-    return {
-      ...result.issue,
-      machine: {
-        ...result.machine,
-        model: result.model,
-        location: result.location,
+    return await testDb.issue.findFirstOrThrow({
+      where: {
+        title: { contains: titleContains, mode: "insensitive" },
       },
-      status: result.status,
-      priority: result.priority,
-      createdBy: result.createdBy,
-    };
+      include: {
+        machine: {
+          include: {
+            model: true,
+            location: true,
+          },
+        },
+        status: true,
+        priority: true,
+        createdBy: true,
+        assignedTo: true,
+        comments: {
+          include: {
+            author: true,
+          },
+        },
+        attachments: true,
+      },
+    });
   });
 }
 
 /**
  * Get multiple seeded issues for list testing
  */
-export async function getSeededIssues(limit = 10): Promise<SeededIssue[]> {
+export async function getSeededIssues(limit = 10) {
   return getCachedSeedData(`issues-${String(limit)}`, async () => {
-    const results = await db
-      .select({
-        issue: issues,
-        machine: machines,
-        model: models,
-        location: locations,
-        status: issueStatuses,
-        priority: priorities,
-        createdBy: users,
-      })
-      .from(issues)
-      .leftJoin(machines, eq(issues.machineId, machines.id))
-      .leftJoin(models, eq(machines.modelId, models.id))
-      .leftJoin(locations, eq(machines.locationId, locations.id))
-      .leftJoin(issueStatuses, eq(issues.statusId, issueStatuses.id))
-      .leftJoin(priorities, eq(issues.priorityId, priorities.id))
-      .leftJoin(users, eq(issues.createdById, users.id))
-      .orderBy(desc(issues.createdAt))
-      .limit(limit);
-
-    return results
-      .filter(
-        (
-          result,
-        ): result is typeof result & {
-          machine: NonNullable<typeof result.machine>;
-          model: NonNullable<typeof result.model>;
-          location: NonNullable<typeof result.location>;
-          status: NonNullable<typeof result.status>;
-          priority: NonNullable<typeof result.priority>;
-          createdBy: NonNullable<typeof result.createdBy>;
-        } =>
-          !!result.machine &&
-          !!result.model &&
-          !!result.location &&
-          !!result.status &&
-          !!result.priority &&
-          !!result.createdBy,
-      )
-      .map((result) => ({
-        ...result.issue,
+    return await testDb.issue.findMany({
+      take: limit,
+      include: {
         machine: {
-          ...result.machine,
-          model: result.model,
-          location: result.location,
+          include: {
+            model: true,
+            location: true,
+          },
         },
-        status: result.status,
-        priority: result.priority,
-        createdBy: result.createdBy,
-      }));
+        status: true,
+        priority: true,
+        createdBy: true,
+        assignedTo: true,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+  });
+}
+
+/**
+ * Get issues by status for filtering tests
+ */
+export async function getSeededIssuesByStatus(statusName: string) {
+  return getCachedSeedData(`issues-status-${statusName}`, async () => {
+    return await testDb.issue.findMany({
+      where: {
+        status: {
+          name: statusName,
+        },
+      },
+      include: {
+        machine: {
+          include: {
+            model: true,
+            location: true,
+          },
+        },
+        status: true,
+        priority: true,
+        createdBy: true,
+        assignedTo: true,
+      },
+    });
   });
 }
 
@@ -400,10 +285,9 @@ export async function getSeededOrganizationId(): Promise<string> {
 export async function getSeededIssueStatuses(): Promise<IssueStatus[]> {
   return getCachedSeedData("issue-statuses", async () => {
     const orgId = await getSeededOrganizationId();
-    return await db
-      .select()
-      .from(issueStatuses)
-      .where(eq(issueStatuses.organizationId, orgId));
+    return await testDb.issueStatus.findMany({
+      where: { organizationId: orgId },
+    });
   });
 }
 
@@ -413,16 +297,15 @@ export async function getSeededIssueStatuses(): Promise<IssueStatus[]> {
 export async function getSeededPriorities(): Promise<Priority[]> {
   return getCachedSeedData("priorities", async () => {
     const orgId = await getSeededOrganizationId();
-    return await db
-      .select()
-      .from(priorities)
-      .where(eq(priorities.organizationId, orgId))
-      .orderBy(priorities.order);
+    return await testDb.priority.findMany({
+      where: { organizationId: orgId },
+      orderBy: { order: "asc" },
+    });
   });
 }
 
 // =============================================================================
-// SUPABASE USER CONVERSION - Convert Drizzle users to Supabase format
+// SUPABASE USER CONVERSION - Convert Prisma users to Supabase format
 // =============================================================================
 
 interface SupabaseUser {
@@ -450,16 +333,32 @@ interface SupabaseUser {
 }
 
 /**
- * Convert a seeded user to Supabase user format for VitestTestWrapper
+ * Convert a seeded Prisma user to Supabase user format for VitestTestWrapper
  * Handles the proper app_metadata structure that Supabase expects
  */
-export function createSupabaseUserFromSeeded(user: SeededUser): SupabaseUser {
-  const membership = user.memberships?.[0];
+export function createSupabaseUserFromSeeded(prismaUser: {
+  id: string;
+  email: string | null;
+  emailVerified: Date | null;
+  name: string | null;
+  bio: string | null;
+  profilePicture: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  memberships?: {
+    organizationId: string;
+    role: {
+      name: string;
+      permissions: { name: string }[];
+    };
+  }[];
+}): SupabaseUser {
+  const membership = prismaUser.memberships?.[0];
   const permissions = membership?.role.permissions.map((p) => p.name) ?? [];
 
   const result: SupabaseUser = {
-    id: user.id,
-    email: user.email ?? undefined,
+    id: prismaUser.id,
+    email: prismaUser.email ?? undefined,
     phone: null,
     phone_confirmed_at: null,
     last_sign_in_at: new Date().toISOString(),
@@ -467,20 +366,20 @@ export function createSupabaseUserFromSeeded(user: SeededUser): SupabaseUser {
       permissions,
     },
     user_metadata: {
-      name: user.name,
-      bio: user.bio,
-      profilePicture: user.profilePicture,
+      name: prismaUser.name,
+      bio: prismaUser.bio,
+      profilePicture: prismaUser.profilePicture,
     },
     aud: "authenticated",
     role: "authenticated",
-    created_at: user.createdAt.toISOString(),
-    updated_at: user.updatedAt.toISOString(),
+    created_at: prismaUser.createdAt.toISOString(),
+    updated_at: prismaUser.updatedAt.toISOString(),
   };
 
   // Only add optional properties if they have values
-  if (user.emailVerified) {
-    result.email_confirmed_at = user.emailVerified.toISOString();
-    result.confirmed_at = user.emailVerified.toISOString();
+  if (prismaUser.emailVerified) {
+    result.email_confirmed_at = prismaUser.emailVerified.toISOString();
+    result.confirmed_at = prismaUser.emailVerified.toISOString();
   }
 
   if (membership?.organizationId) {
@@ -524,7 +423,7 @@ export async function getSeededPlayerSupabaseUser(): Promise<SupabaseUser> {
 
 /**
  * Setup common test data for auth integration tests
- * Returns users in both Drizzle and Supabase formats + organization data
+ * Returns users in both Prisma and Supabase formats + organization data
  */
 export async function setupAuthTestData() {
   const [organization, adminUser, memberUser, playerUser] = await Promise.all([
@@ -538,15 +437,15 @@ export async function setupAuthTestData() {
     organization,
     users: {
       admin: {
-        drizzle: adminUser,
+        prisma: adminUser,
         supabase: createSupabaseUserFromSeeded(adminUser),
       },
       member: {
-        drizzle: memberUser,
+        prisma: memberUser,
         supabase: createSupabaseUserFromSeeded(memberUser),
       },
       player: {
-        drizzle: playerUser,
+        prisma: playerUser,
         supabase: createSupabaseUserFromSeeded(playerUser),
       },
     },
@@ -555,9 +454,9 @@ export async function setupAuthTestData() {
 
 /**
  * Clean up function to call between test files
- * Clears cache - database connection is managed by Drizzle
+ * Clears cache and closes database connection
  */
-export function cleanupSeedDataHelpers(): void {
+export async function cleanupSeedDataHelpers(): Promise<void> {
   clearSeedDataCache();
-  // Note: Drizzle doesn't require explicit disconnect like Prisma
+  await testDb.$disconnect();
 }
