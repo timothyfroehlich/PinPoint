@@ -69,8 +69,8 @@ npm run seed
 # Database reset with complete reseed
 npm run db:reset
 
-# Direct script execution (if needed)
-tsx scripts/seed/orchestrator.ts
+# Seeding via npm script (preferred)
+npm run seed
 ```
 
 ## OAuth Configuration Validation

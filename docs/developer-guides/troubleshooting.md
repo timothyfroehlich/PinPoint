@@ -187,12 +187,12 @@ git commit -m "fix: emergency commit" --no-verify
 rm -f prisma/dev.db*
 npm run db:push
 
-# 2. Check schema file
-npx prisma validate
+# 2. Validate database operations
+npm run db:validate
 
 # 3. Reset with fresh generation
 npm run db:reset
-npx prisma generate
+npm run db:generate
 ```
 
 ### Service Dependencies Not Found

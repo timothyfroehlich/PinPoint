@@ -78,11 +78,11 @@ DEFAULT_ORG_SUBDOMAIN="apc"
 # - Create new database for development
 # - Copy connection strings to .env.local
 
-# 2. Run migrations
-npx prisma migrate dev
+# 2. Push schema changes
+npm run db:push
 
-# 3. Generate Prisma client
-npx prisma generate
+# 3. Generate Drizzle types
+npm run db:generate
 ```
 
 ## Development Workflow
@@ -97,7 +97,7 @@ npm run dev
 # → http://localhost:3000
 
 # View database schema
-cat prisma/schema.prisma
+ls src/server/db/schema/
 # Query data samples
 psql $DATABASE_URL -c "SELECT * FROM \"Organization\" LIMIT 5;"
 ```
@@ -107,9 +107,6 @@ psql $DATABASE_URL -c "SELECT * FROM \"Organization\" LIMIT 5;"
 ```bash
 # Push schema changes (development)
 npm run db:push
-
-# Create migration (when ready)
-npx prisma migrate dev --name your-migration-name
 
 # Reset database (development only)
 npm run db:reset
@@ -176,12 +173,11 @@ npm run seed:beta
 ### Custom Development Seeding
 
 ```bash
-# Seed with custom organization
-npx prisma db seed -- --env=development --org="Test Org" --subdomain="test"
-
 # Reset and reseed development data
 npm run db:reset
-npm run seed:dev
+
+# Or just run seeding (uses environment-aware orchestrator)
+npm run seed
 ```
 
 ### Seeding for Preview Deployments
@@ -269,10 +265,10 @@ vercel env add --environment preview
 
    ```bash
    # Check database connectivity
-   npx prisma db pull
+   # Database schema is managed via Drizzle - no pull needed
 
-   # Verify environment variables
-   npx prisma migrate status
+   # Verify database operations
+   npm run db:validate
    ```
 
 2. **Authentication Issues**:

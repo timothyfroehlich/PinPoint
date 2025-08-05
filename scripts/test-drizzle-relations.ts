@@ -4,10 +4,10 @@
  * Test Drizzle Relations and Foreign Keys
  */
 
-import { config } from "dotenv";
 import { eq } from "drizzle-orm";
 
-config();
+// Load environment variables using the development env-loader
+import "~/lib/env-loaders/development";
 
 async function testDrizzleRelations() {
   console.log("🔗 Testing Drizzle Relations and Foreign Keys...\n");

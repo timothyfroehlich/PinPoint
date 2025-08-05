@@ -6,11 +6,10 @@
  * REAL testing - actually connects to database and runs operations
  */
 
-import { config } from "dotenv";
 import { sql } from "drizzle-orm";
 
-// Load environment variables first
-config();
+// Load environment variables using the development env-loader
+import "~/lib/env-loaders/development";
 
 async function testDrizzleConnectivity() {
   console.log("🔧 Testing Real Drizzle Database Connectivity...\n");

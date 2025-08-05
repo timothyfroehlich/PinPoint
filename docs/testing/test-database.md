@@ -264,11 +264,11 @@ seed().catch(console.error);
 Run seeds:
 
 ```bash
-# Run test seeds
-tsx supabase/seed.test.ts
+# Run main seeding (recommended for most tests)
+npm run seed
 
-# Or add to package.json
-"db:seed:test": "tsx supabase/seed.test.ts"
+# Test-specific seeding would require direct script execution if needed
+# (Currently no dedicated test seeding command)
 ```
 
 ## RLS Testing Setup

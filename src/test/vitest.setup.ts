@@ -316,7 +316,7 @@ globalThis.AbortSignal = NodeAbortSignal;
 
 // Common setup for both environments
 beforeAll(() => {
-  // Environment variables are now loaded by src/test/env-loader.ts from .env.test
+  // Environment variables are now loaded by src/lib/env-loaders/test.ts from .env.test
   // No manual environment variable assignment needed
   // Note: Fetch patching moved to VitestTestWrapper to avoid Vitest startup conflicts
 });

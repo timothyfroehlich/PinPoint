@@ -6,7 +6,7 @@ This document maps source files by subsystem/feature to help agents quickly find
 
 These files are referenced across multiple subsystems and should be understood for most development work:
 
-- **Prisma Schema**: `prisma/schema.prisma` - Original database schema (being migrated)
+- **Prisma Schema**: `prisma/schema.prisma` - Original database schema (deprecated, being migrated)
 - **Drizzle Schema**: `src/server/db/schema/` - New modular Drizzle schemas
   - `auth.ts` - User, Account, Session, VerificationToken
   - `organizations.ts` - Organization, Membership, Role, Permission
@@ -14,7 +14,7 @@ These files are referenced across multiple subsystems and should be understood f
   - `issues.ts` - Issue, IssueStatus, IssueHistory, Comment
   - `collections.ts` - Collection, Notification, PinballMapConfig
   - `index.ts` - Relations and exports
-- **Database Clients**: 
+- **Database Clients**:
   - `src/server/db.ts` - Prisma client with multi-tenant extensions
   - `src/server/db/drizzle.ts` - Drizzle client with singleton pattern
 - **Database Provider**: `src/server/db/provider.tsx` - Dual-ORM provider
@@ -40,9 +40,9 @@ These files are referenced across multiple subsystems and should be understood f
 
 ### Database Models
 
-- `User` model in schema.prisma
-- `Organization` model in schema.prisma
-- `Membership` model in schema.prisma
+- `User` model in src/server/db/schema/
+- `Organization` model in src/server/db/schema/
+- `Membership` model in src/server/db/schema/
 
 ### Tests
 
@@ -65,8 +65,8 @@ These files are referenced across multiple subsystems and should be understood f
 
 ### Database Models
 
-- `Issue` model in schema.prisma
-- `IssueHistory` model in schema.prisma (audit trail)
+- `Issue` model in src/server/db/schema/
+- `IssueHistory` model in src/server/db/schema/ (audit trail)
 
 ### Tests
 
@@ -89,8 +89,8 @@ These files are referenced across multiple subsystems and should be understood f
 
 ### Database Models
 
-- `Machine` model in schema.prisma
-- `Model` model in schema.prisma (OPDB machine types)
+- `Machine` model in src/server/db/schema/
+- `Model` model in src/server/db/schema/ (OPDB machine types)
 
 ### Tests
 
@@ -111,7 +111,7 @@ These files are referenced across multiple subsystems and should be understood f
 
 ### Database Models
 
-- `Location` model in schema.prisma
+- `Location` model in src/server/db/schema/
 
 ### Tests
 
@@ -131,7 +131,7 @@ These files are referenced across multiple subsystems and should be understood f
 
 ### Database Models
 
-- `Comment` model in schema.prisma (with soft delete fields)
+- `Comment` model in src/server/db/schema/ (with soft delete fields)
 
 ### Tests
 
@@ -152,7 +152,7 @@ These files are referenced across multiple subsystems and should be understood f
 
 ### Database Models
 
-- `Attachment` model in schema.prisma
+- `Attachment` model in src/server/db/schema/
 
 ### Tests
 
@@ -172,8 +172,8 @@ These files are referenced across multiple subsystems and should be understood f
 
 ### Database Models
 
-- `Notification` model in schema.prisma
-- `NotificationPreference` model in schema.prisma
+- `Notification` model in src/server/db/schema/
+- `NotificationPreference` model in src/server/db/schema/
 
 ### Tests
 
@@ -195,8 +195,8 @@ These files are referenced across multiple subsystems and should be understood f
 
 ### Database Models
 
-- `Organization` model in schema.prisma
-- `Membership` model in schema.prisma (roles and permissions)
+- `Organization` model in src/server/db/schema/
+- `Membership` model in src/server/db/schema/ (roles and permissions)
 
 ### Tests
 
@@ -217,7 +217,7 @@ These files are referenced across multiple subsystems and should be understood f
 
 ### Database Models
 
-- `User` model in schema.prisma
+- `User` model in src/server/db/schema/
 
 ### Tests
 

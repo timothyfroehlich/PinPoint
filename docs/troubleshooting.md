@@ -54,9 +54,9 @@ This document contains detailed troubleshooting procedures for development and d
 **Solutions**:
 
 1. **Quick fix**: Run `npm run db:push` to sync schema changes
-2. **Inspect changes**: Run `npm run db:push:inspect` to preview changes before applying
+2. **Generate types**: Run `npm run db:generate` to update Drizzle types
 3. **Complete reset**: Run `npm run db:reset` to wipe everything and start fresh
-4. **Rebuild from scratch**: Run `npm run db:rebuild` for complete table recreation
+4. **Validate operations**: Run `npm run db:validate` to test database operations
 
 ### Problem: Database has old/inconsistent data
 

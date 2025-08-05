@@ -177,7 +177,7 @@ npm run db:push
 # Query data samples directly (no GUI needed):
 psql $DATABASE_URL -c "SELECT * FROM \"Organization\" LIMIT 5;"
 psql $DATABASE_URL -c "SELECT COUNT(*) FROM \"User\";"
-# Use Drizzle Studio for visual inspection: npx drizzle-kit studio
+# Use Drizzle Studio for visual inspection: npm run db:studio
 
 # Core Commands (Use brief versions unless debugging)
 # PREFERRED: Use :brief variants for daily development - faster, cleaner output
@@ -499,11 +499,11 @@ The test-architect will update `test-map.md` and `source-map.md` as it works. Th
 # Core database operations
 npm run db:push         # Push schema changes (development)
 npm run db:reset        # Complete reset with seeding
-npm run db:rebuild      # Drop all tables, push schema, seed
+npm run db:generate     # Generate Drizzle types
 
-# Debugging and inspection
-npm run db:push:inspect # Inspect schema changes before applying
-npm run db:drop         # Drop all tables (destructive)
+# Database inspection and management
+npm run db:studio       # Open Drizzle Studio for visual inspection
+npm run db:validate     # Validate database operations
 
 # Seeding
 npm run seed            # Run seeding only
@@ -532,7 +532,7 @@ npm run seed            # Run seeding only
 - **ESLint Disabling**: NEVER add an eslint-disable unless you have exhausted all other options and confirmed with the user that it is the correct thing to do.
 - **E2E Testing**: Use `npm run playwright` (headless). NEVER use `playwright:headed` or `playwright:ui` as they show browser windows and interrupt the user's workflow.
 - **Smoke Testing**: Use `npm run smoke` for quick end-to-end workflow validation. This tests the complete issue creation → admin management flow in ~2 minutes.
-- **Database Studio**: Use `npx drizzle-kit studio` for visual database inspection when needed. Prefer direct SQL queries for simple data checks.
+- **Database Studio**: Use `npm run db:studio` for visual database inspection when needed. Prefer direct SQL queries for simple data checks.
 - **Import Path Consistency**: ALWAYS use the TypeScript path alias `~/` for internal imports. NEVER use relative paths like `../../../lib/supabase/client`. ESLint enforces this with `no-restricted-imports` rule to prevent deep relative imports.
 
 ## Key Lessons Learned (Project-Specific)

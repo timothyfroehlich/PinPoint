@@ -5,7 +5,7 @@ import tsconfigPaths from "vite-tsconfig-paths";
 import path from "path";
 
 // Load environment variables before any tests run
-import "./src/test/env-loader";
+import "./src/lib/env-loaders/test";
 
 // Smart coverage: enabled in CI, disabled in development for performance
 const enableCoverage =

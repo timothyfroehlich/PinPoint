@@ -4,11 +4,10 @@
  * Check current database schema to understand conflicts
  */
 
-import { config } from "dotenv";
 import { sql } from "drizzle-orm";
 
-// Load environment variables first
-config();
+// Load environment variables using the development env-loader
+import "~/lib/env-loaders/development";
 
 async function checkCurrentSchema() {
   console.log("🔍 Checking Current Database Schema...\n");

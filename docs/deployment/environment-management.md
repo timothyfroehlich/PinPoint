@@ -95,10 +95,10 @@ export function isDevelopmentOrPreview(): boolean {
 function getEnvironmentType() {
   // Test environment - set by test runners
   if (process.env["NODE_ENV"] === "test") return "test";
-  
+
   // Use VERCEL_ENV if available (Vercel deployments)
   if (process.env["VERCEL_ENV"]) return process.env["VERCEL_ENV"];
-  
+
   // Fallback to NODE_ENV for local development
   return process.env["NODE_ENV"] || "development";
 }
@@ -154,8 +154,8 @@ function getEnvironmentType() {
 
 ### Development Environment
 
-**Seed File**: `prisma/seed-dev.ts`
-**Command**: `npm run seed:dev`
+**Seed Orchestrator**: `scripts/seed/orchestrator.ts`
+**Command**: `npm run seed`
 **Data**:
 
 - 5-10 fake users with various roles (admin, member, guest)
@@ -166,8 +166,8 @@ function getEnvironmentType() {
 
 ### Preview Environment
 
-**Seed File**: `prisma/seed-preview.ts`
-**Command**: `npm run seed:preview`
+**Seed Orchestrator**: `scripts/seed/orchestrator.ts`
+**Command**: `npm run seed`
 **Data**:
 
 - 3-5 demo users with realistic profiles
@@ -178,8 +178,8 @@ function getEnvironmentType() {
 
 ### Production Environment
 
-**Seed File**: `prisma/seed-prod.ts`
-**Command**: `npm run seed:prod`
+**Seed Orchestrator**: `scripts/seed/orchestrator.ts`
+**Command**: `npm run seed`
 **Data**:
 
 - Austin Pinball Collective organization

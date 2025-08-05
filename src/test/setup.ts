@@ -1,7 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 import { vi, afterEach } from "vitest";
 
-// Environment variables are now loaded from .env.test via src/test/env-loader.ts
+// Environment variables are now loaded from .env.test via src/lib/env-loaders/test.ts
 // No manual environment variable assignment needed
 
 // Mock fetch globally for tests

@@ -6,11 +6,10 @@
  * Test that Drizzle can read/write to existing Prisma tables
  */
 
-import { config } from "dotenv";
 import { sql } from "drizzle-orm";
 
-// Load environment variables first
-config();
+// Load environment variables using the development env-loader
+import "~/lib/env-loaders/development";
 
 async function testDrizzleCrud() {
   console.log("🧪 Testing Drizzle CRUD Operations...\n");
