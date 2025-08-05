@@ -41,19 +41,23 @@ enabled = true  # Re-enable for real-time features
 enabled = true  # Re-enable for database management UI
 ```
 
-## 🚨 BETA DEVELOPMENT USER RESET WARNING
+## 🔒 SEEDING SAFETY: ENVIRONMENT-AWARE USER MANAGEMENT
 
-**CRITICAL DURING BETA**: PinPoint development seeding **DELETES AND RECREATES ALL SUPABASE AUTH USERS** on every `npm run db:reset`.
+**NEW SAFER BEHAVIOR**: PinPoint seeding now uses environment-aware user management for enhanced safety.
 
-**⚠️ THIS MEANS:**
-- **ALL AUTH USERS ARE WIPED** every time you reset the database
-- **DEV LOGIN USERS**: Dev Admin, Dev Member, Dev Player - all recreated fresh
-- **PINBALL PERSONALITIES**: Roger Sharpe, Gary Stern, etc. - all recreated fresh
-- **ANY MANUAL TEST USERS**: Will be deleted and need recreation
+**🏗️ BEHAVIOR BY ENVIRONMENT:**
 
-**🔔 BETA-ONLY BEHAVIOR**: This aggressive user reset is **TEMPORARY** for rapid development iteration. In production, user accounts will be preserved.
+- **Local Development**: **PRESERVES existing users** - only creates missing ones
+- **Preview Environment**: **Aggressive reset** for clean demos - deletes and recreates all users
+- **Production**: **PRESERVES existing users** - only creates missing ones
 
-**🚨 BEFORE PRODUCTION**: We MUST update the seeding system to preserve existing users and only create missing ones.
+**⚠️ PREVIEW ENVIRONMENT ONLY:**
+
+- **ALL AUTH USERS ARE WIPED** during preview environment seeding for clean demonstrations
+- **DEV LOGIN USERS**: Dev Admin, Dev Member, Dev Player - recreated fresh in preview
+- **PINBALL PERSONALITIES**: Roger Sharpe, Gary Stern, etc. - recreated fresh in preview
+
+**🔒 SAFE BY DEFAULT**: Local development and production environments preserve existing users while only creating missing ones.
 
 ## 🚨 DATABASE SCHEMA COORDINATION WARNING
 

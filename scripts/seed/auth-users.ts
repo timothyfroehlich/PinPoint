@@ -10,6 +10,7 @@
 import { createClient } from "@supabase/supabase-js";
 
 import { createPrismaClient } from "~/server/db";
+import { isPreview } from "~/lib/environment";
 
 const prisma = createPrismaClient();
 
@@ -215,8 +216,9 @@ async function processBatchUsers(
 }
 
 /**
- * Delete existing dev users from both Supabase auth and database (BETA ONLY)
- * This is a temporary aggressive reset for rapid development iteration
+ * Delete existing dev users from both Supabase auth and database (PREVIEW ONLY)
+ * This aggressive reset is only enabled in preview environments for clean demos.
+ * Local development and production environments preserve existing users for safety.
  */
 async function deleteExistingDevUsers(users: UserData[]): Promise<void> {
   const supabase = createServiceRoleClient();
@@ -292,8 +294,17 @@ export async function seedAuthUsers(
   );
 
   try {
-    // BETA: Delete existing users for clean reset
-    await deleteExistingDevUsers(users);
+    // PREVIEW ONLY: Delete existing users for clean reset
+    if (isPreview()) {
+      console.log(
+        "[AUTH] 🔄 PREVIEW ENVIRONMENT: Performing aggressive user reset for clean demos",
+      );
+      await deleteExistingDevUsers(users);
+    } else {
+      console.log(
+        "[AUTH] 🔒 NON-PREVIEW ENVIRONMENT: Preserving existing users, creating only missing ones",
+      );
+    }
 
     // Process users in batch
     const results = await processBatchUsers(users, organizationId);

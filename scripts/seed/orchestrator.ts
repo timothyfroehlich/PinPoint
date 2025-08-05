@@ -6,6 +6,7 @@
  */
 
 import { env } from "~/env";
+import { isPreview, isProduction, getEnvironmentName } from "~/lib/environment";
 import { seedInfrastructure } from "./infrastructure";
 import { seedAuthUsers } from "./auth-users";
 import { seedSampleData } from "./sample-data";
@@ -95,15 +96,13 @@ export const SEED_STRATEGIES = {
 } as const;
 
 /**
- * Environment detection with fallback
+ * Environment detection using proper Vercel environment detection
  */
 function getEnvironment(): keyof typeof SEED_STRATEGIES {
-  const nodeEnv = process.env["NODE_ENV"];
+  if (isProduction()) return "production";
+  if (isPreview()) return "beta"; // Preview maps to beta strategy
 
-  if (nodeEnv === "production") return "production";
-  if (nodeEnv === "beta") return "beta";
-
-  // Default to development for local, test, preview environments
+  // Local development and test environments
   return "development";
 }
 
@@ -122,7 +121,7 @@ function validateEnvironment(environment: keyof typeof SEED_STRATEGIES): void {
     }
   }
 
-  console.log(`[SEED] Environment: ${environment.toUpperCase()}`);
+  console.log(`[SEED] Environment: ${getEnvironmentName().toUpperCase()}`);
   console.log(`[SEED] Users to create: ${strategy.users.length.toString()}`);
   console.log(`[SEED] Sample data: ${strategy.sampleData ? "YES" : "NO"}`);
   console.log(`[SEED] Reset allowed: ${strategy.resetDatabase ? "YES" : "NO"}`);
@@ -147,6 +146,15 @@ export async function main(): Promise<void> {
 
     // 3. Auth users seeding (Supabase auth + automatic profile creation)
     console.log("\n[SEED] 👥 Step 2: Auth Users");
+    if (isPreview()) {
+      console.log(
+        "[SEED] ⚠️  PREVIEW ENVIRONMENT: Aggressive user reset enabled for clean demos",
+      );
+    } else {
+      console.log(
+        "[SEED] 🔒 SAFE MODE: Preserving existing users, creating only missing ones",
+      );
+    }
     await seedAuthUsers([...strategy.users], organization.id);
 
     // 4. Sample data seeding (development only)
