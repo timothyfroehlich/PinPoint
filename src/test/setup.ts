@@ -1,46 +1,11 @@
 import "@testing-library/jest-dom/vitest";
 import { vi, afterEach } from "vitest";
 
-// Mock environment variables for testing
-Object.defineProperty(process.env, "NODE_ENV", {
-  value: "test",
-  writable: true,
-  configurable: true,
-});
-
-// Use Object.assign to avoid TypeScript/ESLint conflicts with env variable assignment
-Object.assign(process.env, {
-  AUTH_SECRET: "test-auth-secret",
-  GOOGLE_CLIENT_ID: "test-google-client-id",
-  GOOGLE_CLIENT_SECRET: "test-google-client-secret",
-  DATABASE_URL: "postgresql://test:test@localhost:5432/test",
-  OPDB_API_URL: "https://opdb.org/api",
-  DEFAULT_ORG_SUBDOMAIN: "apc",
-  OPDB_API_KEY: "test-token",
-  IMAGE_STORAGE_PROVIDER: "local",
-  VERCEL_URL: "",
-  PORT: "3000",
-});
+// Environment variables are now loaded from .env.test via src/test/env-loader.ts
+// No manual environment variable assignment needed
 
 // Mock fetch globally for tests
 global.fetch = vi.fn();
-
-// Mock env.js module to prevent server-side environment access in client tests
-vi.mock("~/env.js", () => ({
-  env: {
-    NODE_ENV: "test",
-    GOOGLE_CLIENT_ID: "test-google-client-id",
-    GOOGLE_CLIENT_SECRET: "test-google-client-secret",
-    AUTH_SECRET: "test-auth-secret",
-    DATABASE_URL: "postgresql://test:test@localhost:5432/test",
-    OPDB_API_URL: "https://opdb.org/api",
-    DEFAULT_ORG_SUBDOMAIN: "apc",
-    OPDB_API_KEY: "test-token",
-    IMAGE_STORAGE_PROVIDER: "local",
-    VERCEL_URL: "",
-    PORT: "3000",
-  },
-}));
 
 // Create a mock Prisma client
 const mockPrismaClient = {

@@ -4,6 +4,9 @@ import react from "@vitejs/plugin-react";
 import tsconfigPaths from "vite-tsconfig-paths";
 import path from "path";
 
+// Load environment variables before any tests run
+import "./src/test/env-loader";
+
 // Smart coverage: enabled in CI, disabled in development for performance
 const enableCoverage =
   process.env["CI"] === "true" || process.env["COVERAGE"] === "true";

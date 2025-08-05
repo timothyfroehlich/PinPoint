@@ -316,18 +316,8 @@ globalThis.AbortSignal = NodeAbortSignal;
 
 // Common setup for both environments
 beforeAll(() => {
-  // Set test environment variables early (NODE_ENV is set by test runner)
-  // Use Object.assign to avoid TypeScript/ESLint conflicts with env variable assignment
-  Object.assign(process.env, {
-    DATABASE_URL: "postgresql://test:test@localhost:5432/test",
-    AUTH_SECRET: "test-auth-secret",
-    NEXTAUTH_URL: "http://localhost:3000",
-    PUBLIC_URL: "http://localhost:3000",
-    // Google OAuth credentials for test environment
-    GOOGLE_CLIENT_ID: "test-google-client-id",
-    GOOGLE_CLIENT_SECRET: "test-google-client-secret",
-  });
-
+  // Environment variables are now loaded by src/test/env-loader.ts from .env.test
+  // No manual environment variable assignment needed
   // Note: Fetch patching moved to VitestTestWrapper to avoid Vitest startup conflicts
 });
 

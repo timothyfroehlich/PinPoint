@@ -1,26 +1,8 @@
 # For detailed configuration reference documentation, visit:
 # https://supabase.com/docs/guides/local-development/cli/config
-# ⚠️  IMPORTANT: WORKTREE CONFIGURATION WARNING ⚠️ 
-# 
-# This is a WORKTREE-SPECIFIC Supabase configuration file. When you modify this file:
-# 
-# 🏗️  WORKTREE ISOLATION: Changes here ONLY affect THIS worktree
-# 🚫 NO SYNC TO MAIN: Changes will NOT be copied back to main template
-# 🔄 MAIN UPDATES: Changes to main template won't automatically update this file
-# 
-# 🚨 CRITICAL: Port numbers in this file are AUTO-GENERATED and unique to this worktree
-#     - Don't manually change ports - they're calculated from worktree path hash
-#     - This worktree uses unique ports to avoid conflicts with other worktrees
-#     - Main template uses default ports (54321, 54322, etc.)
-# 
-# 💡 TO UPDATE: If main template changes, run from project root:
-#     `./.claude/worktrees/manage-worktree.py upgrade <worktree-name>`
-# 
-# For detailed configuration reference documentation, visit:
-# https://supabase.com/docs/guides/local-development/cli/config
 # A string used to distinguish different Supabase projects on the same host. Defaults to the
 # working directory name when running `supabase init`.
-# project_id = "supa-db-migration" # Commented out to use working directory name
+ project_id = "pinpoint-singleton" # Commented out to use working directory name
 
 [api]
 enabled = true
