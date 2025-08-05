@@ -13,6 +13,9 @@
  * Run with: npx tsx scripts/validate-drizzle-crud.ts
  */
 
+// Load development environment variables for standalone script execution
+import "../src/lib/env-loaders/development";
+
 import { eq, and, sql } from "drizzle-orm";
 import {
   createDrizzleClient,

@@ -41,34 +41,36 @@ The system uses `VERCEL_ENV` for Vercel deployments and falls back to `NODE_ENV`
 
 ## Database Seeding Strategy
 
-### Environment-Specific Seed Files
+### Modern Seeding Architecture
 
-1. **`prisma/seed.ts`** (Main Router)
-   - Detects current environment
-   - Executes appropriate environment-specific seed file
-   - Provides unified seeding interface
+1. **`scripts/seed/orchestrator.ts`** (Main Orchestrator)
+   - Environment auto-detection using Vercel patterns
+   - Coordinates infrastructure, auth, and sample data seeding
+   - Provides unified seeding interface across all environments
 
-2. **`prisma/seed-development.ts`**
-   - Creates test organization "Development Test Organization"
-   - Seeds comprehensive test data (users, machines, issues)
-   - Includes both `.local` and legacy test accounts
-   - Provides full development dataset
+2. **Development Environment Seeding**
+   - Organization: "Austin Pinball Collective"
+   - Users: Dev accounts (@dev.local) + Pinball personalities
+   - Sample Data: Full machine and issue dataset for testing
+   - User Reset: Aggressive cleanup for clean development demos
 
-3. **`prisma/seed-production.ts`**
-   - Creates production organization "Austin Pinball Collective"
-   - Seeds minimal production data structure
-   - No test accounts - only real user data
-   - Optimized for production deployment
+3. **Production/Preview Environment Seeding**
+   - Organization: "Austin Pinball Collective"
+   - Users: Admin account only (from environment variables)
+   - Sample Data: None - clean production environment
+   - User Reset: Preserves existing users, creates only missing ones
 
 ### Seeding Commands
 
 ```bash
 # Environment auto-detection (recommended)
-npm run db:seed
+npm run seed
 
-# Specific environment seeding
-npx tsx prisma/seed-development.ts
-npx tsx prisma/seed-production.ts
+# Database reset with complete reseed
+npm run db:reset
+
+# Direct script execution (if needed)
+tsx scripts/seed/orchestrator.ts
 ```
 
 ## OAuth Configuration Validation

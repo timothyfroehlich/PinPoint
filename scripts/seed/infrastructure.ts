@@ -11,6 +11,7 @@ import { nanoid } from "nanoid";
 import { createDrizzleClient } from "~/server/db/drizzle";
 import {
   organizations,
+  locations,
   permissions,
   roles,
   rolePermissions,
@@ -549,6 +550,43 @@ async function createTemplateRole(
 }
 
 /**
+ * Create default location for organization
+ */
+async function createDefaultLocation(organizationId: string): Promise<void> {
+  // Check if location exists
+  const existing = await db
+    .select()
+    .from(locations)
+    .where(
+      and(
+        eq(locations.name, "Austin Pinball Collective"),
+        eq(locations.organizationId, organizationId),
+      ),
+    )
+    .limit(1);
+
+  if (existing.length === 0) {
+    // Create new location
+    await db.insert(locations).values({
+      id: nanoid(),
+      name: "Austin Pinball Collective",
+      street: "8777 Research Blvd",
+      city: "Austin",
+      state: "TX",
+      zip: "78758",
+      organizationId,
+    });
+    console.log(
+      "[INFRASTRUCTURE] Created default location: Austin Pinball Collective",
+    );
+  } else {
+    console.log(
+      "[INFRASTRUCTURE] Default location already exists: Austin Pinball Collective",
+    );
+  }
+}
+
+/**
  * Main infrastructure seeding function
  */
 export async function seedInfrastructure(): Promise<Organization> {
@@ -573,6 +611,9 @@ export async function seedInfrastructure(): Promise<Organization> {
 
   // 5. Create default issue statuses
   await createDefaultStatuses(organization.id);
+
+  // 6. Create default location
+  await createDefaultLocation(organization.id);
 
   console.log(
     `[INFRASTRUCTURE] ✅ Infrastructure seeding complete for ${organization.name}`,

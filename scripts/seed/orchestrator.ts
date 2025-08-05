@@ -5,6 +5,9 @@
  * Replaces the old duplicate seed-development.ts, seed-production.ts, seed-beta.ts
  */
 
+// Load development environment variables for standalone script execution
+import "../../src/lib/env-loaders/development";
+
 import { env } from "~/env";
 import { isPreview, isProduction, getEnvironmentName } from "~/lib/environment";
 import { seedInfrastructure } from "./infrastructure";

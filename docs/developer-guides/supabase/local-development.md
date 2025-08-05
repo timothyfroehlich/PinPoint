@@ -201,55 +201,48 @@ WITH CHECK (bucket_id = 'pinpoint-storage' AND auth.uid() IS NOT NULL);
 
 ## Seeding Data
 
-### Create Seed File
+### Modern Seeding Architecture
+
+PinPoint uses a modern seeding architecture with environment-aware coordination:
 
 ```typescript
-// supabase/seed.ts
-import { createClient } from "@supabase/supabase-js";
+// scripts/seed/orchestrator.ts (simplified)
+import { seedInfrastructure } from "./infrastructure";
+import { seedAuthUsers } from "./auth-users";
+import { seedSampleData } from "./sample-data";
 
-const supabase = createClient(
-  "http://localhost:54321",
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-);
+export async function main(): Promise<void> {
+  // 1. Infrastructure (organizations, permissions, roles)
+  const organization = await seedInfrastructure();
 
-async function seed() {
-  // Create organizations
-  const { data: org } = await supabase
-    .from("organizations")
-    .insert({
-      name: "Test Organization",
-      slug: "test-org",
-    })
-    .select()
-    .single();
+  // 2. Auth users (Supabase auth + profile creation)
+  await seedAuthUsers(STRATEGY.users, organization.id);
 
-  // Create users with proper metadata
-  await supabase.auth.admin.createUser({
-    email: "admin@test.com",
-    password: "password123",
-    email_confirm: true,
-    app_metadata: {
-      organizationId: org.id,
-      permissions: ["admin"],
-    },
-  });
-
-  console.log("Seed complete!");
+  // 3. Sample data (development only)
+  if (strategy.sampleData) {
+    await seedSampleData(organization.id);
+  }
 }
-
-seed().catch(console.error);
 ```
 
-### Run Seed
+**Key Features:**
+
+- **Environment Detection**: Auto-detects development/preview/production
+- **Drizzle ORM**: Native PostgreSQL operations with type safety
+- **Supabase Integration**: Creates both auth users and database profiles
+- **Safe User Management**: Preserves existing users in production
+
+### Run Seeding
 
 ```bash
-# Add to package.json
-"scripts": {
-  "db:seed": "tsx supabase/seed.ts"
-}
+# Environment auto-detection (recommended)
+npm run seed
 
-# Run seed
-npm run db:seed
+# Complete database reset + reseed
+npm run db:reset
+
+# Database validation
+npm run db:validate
 ```
 
 ## Development Workflow
