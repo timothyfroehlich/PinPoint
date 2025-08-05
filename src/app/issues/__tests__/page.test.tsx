@@ -273,7 +273,7 @@ describe("IssueDetailView - Auth Integration Tests", () => {
 
       const memberSupabase = createMockSupabaseUser({
         id: "member-user-id",
-        email: "member@test.local",
+        email: "member@dev.local",
         app_metadata: {
           organization_id: "org-1",
           role: "Member",
@@ -282,7 +282,7 @@ describe("IssueDetailView - Auth Integration Tests", () => {
         user_metadata: {
           full_name: "Test Member",
           name: "Test Member",
-          email: "member@test.local",
+          email: "member@dev.local",
           avatar_url: "",
           email_verified: true,
           iss: "https://accounts.google.com",
@@ -296,7 +296,7 @@ describe("IssueDetailView - Auth Integration Tests", () => {
         user: createMockUser({
           id: "member-user-id",
           name: "Test Member",
-          email: "member@test.local",
+          email: "member@dev.local",
         }),
         expires: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(),
       };
@@ -349,7 +349,7 @@ describe("IssueDetailView - Auth Integration Tests", () => {
 
       const adminSupabase = createMockSupabaseUser({
         id: "admin-user-id",
-        email: "admin@test.local",
+        email: "admin@dev.local",
         app_metadata: {
           organization_id: "org-1",
           role: "Admin",
@@ -358,7 +358,7 @@ describe("IssueDetailView - Auth Integration Tests", () => {
         user_metadata: {
           full_name: "Test Admin",
           name: "Test Admin",
-          email: "admin@test.local",
+          email: "admin@dev.local",
           avatar_url: "",
           email_verified: true,
           iss: "https://accounts.google.com",
@@ -372,7 +372,7 @@ describe("IssueDetailView - Auth Integration Tests", () => {
         user: createMockUser({
           id: "admin-user-id",
           name: "Test Admin",
-          email: "admin@test.local",
+          email: "admin@dev.local",
         }),
         expires: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(),
       };

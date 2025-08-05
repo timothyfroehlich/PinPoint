@@ -1,7 +1,7 @@
 /**
  * Seed Data Helpers - Access development seed data for testing
  *
- * These helpers provide access to the rich seed data created by prisma/seed-development.ts
+ * These helpers provide access to the rich seed data created by scripts/seed/orchestrator.ts
  * for use in integration tests that need real auth context and relationships.
  *
  * Benefits over mocks:
@@ -13,11 +13,14 @@
 
 /* eslint-disable @typescript-eslint/explicit-function-return-type */
 
-import type { IssueStatus, Priority } from "@prisma/client";
+import { createDrizzleClient } from "~/server/db/drizzle";
+import { priorities, issueStatuses } from "~/server/db/schema";
 
-import { createPrismaClient } from "~/server/db";
+const testDb = createDrizzleClient();
 
-const testDb = createPrismaClient();
+// Type exports for compatibility
+export type IssueStatus = typeof issueStatuses.$inferSelect;
+export type Priority = typeof priorities.$inferSelect;
 
 // Cache for frequently accessed seed data to improve test performance
 const seedDataCache = new Map<string, unknown>();

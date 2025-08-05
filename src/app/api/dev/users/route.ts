@@ -39,7 +39,6 @@ export async function GET(): Promise<NextResponse> {
       where: {
         OR: [
           { email: { endsWith: "@dev.local" } },
-          { email: { endsWith: "@test.com" } },
           { email: { endsWith: "@pinpoint.dev" } },
         ],
       },

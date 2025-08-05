@@ -218,7 +218,7 @@ describe("LocationDetailView", () => {
   describe("👤 Member User Experience", () => {
     const mockMemberUser = createMockSupabaseUser({
       id: "member-user-id",
-      email: "member@test.local",
+      email: "member@dev.local",
       app_metadata: {
         organization_id: "org-1",
         role: "Member",
@@ -226,7 +226,7 @@ describe("LocationDetailView", () => {
       },
       user_metadata: {
         full_name: "Test Member",
-        email: "member@test.local",
+        email: "member@dev.local",
       },
     });
 
@@ -265,7 +265,7 @@ describe("LocationDetailView", () => {
   describe("👑 Admin User Experience", () => {
     const mockAdminUser = createMockSupabaseUser({
       id: "admin-user-id",
-      email: "admin@test.local",
+      email: "admin@dev.local",
       app_metadata: {
         organization_id: "org-1",
         role: "Admin",
@@ -273,7 +273,7 @@ describe("LocationDetailView", () => {
       },
       user_metadata: {
         full_name: "Test Admin",
-        email: "admin@test.local",
+        email: "admin@dev.local",
       },
     });
 
