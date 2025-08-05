@@ -18,19 +18,26 @@ function createDrizzleClientInternal() {
   const isLocalhost =
     connectionString.includes("localhost") ||
     connectionString.includes("127.0.0.1");
-  const sslConfig = isLocalhost && isDevelopment() ? false : "require";
+  const isCI = env.NODE_ENV === "test";
+  // Disable SSL for localhost AND CI environments to prevent TLS connection failures
+  const sslConfig = isLocalhost || isCI ? false : "require";
 
   // Create postgres-js connection with environment-optimized settings
   const sql = postgres(connectionString, {
-    max: 1, // Serverless optimization - single connection
-    idle_timeout: isDevelopment() ? 60 : 20, // Longer timeout for development
-    connect_timeout: isDevelopment() ? 30 : 10, // More generous timeout for dev
+    max: isCI ? 2 : 1, // Slightly higher pool for CI stability
+    idle_timeout: isCI ? 30 : isDevelopment() ? 60 : 20,
+    connect_timeout: isCI ? 20 : isDevelopment() ? 30 : 10,
     ssl: sslConfig, // Conditional SSL based on environment
+    // CI-specific optimizations
+    ...(isCI && {
+      prepare: false, // Disable prepared statements in CI
+      transform: { undefined: null }, // Handle undefined values
+    }),
   });
 
   return drizzle(sql, {
     schema,
-    logger: isDevelopment(), // Match Prisma logging behavior
+    logger: isDevelopment() && !isCI, // Disable logging in CI for performance
   });
 }
 
@@ -64,19 +71,26 @@ export const createDrizzleClient = (): DrizzleClient => {
     const isLocalhost =
       connectionString.includes("localhost") ||
       connectionString.includes("127.0.0.1");
-    const sslConfig = isLocalhost && isDevelopment() ? false : "require";
+    const isCI = env.NODE_ENV === "test";
+    // Disable SSL for localhost AND CI environments to prevent TLS connection failures
+    const sslConfig = isLocalhost || isCI ? false : "require";
 
     const sql = postgres(connectionString, {
-      max: 1, // Single connection for development
-      idle_timeout: isDevelopment() ? 60 : 20, // Longer timeout for development
-      connect_timeout: isDevelopment() ? 30 : 10, // More generous timeout for dev
+      max: isCI ? 2 : 1, // Slightly higher pool for CI stability
+      idle_timeout: isCI ? 30 : isDevelopment() ? 60 : 20,
+      connect_timeout: isCI ? 20 : isDevelopment() ? 30 : 10,
       ssl: sslConfig, // Conditional SSL based on environment
+      // CI-specific optimizations
+      ...(isCI && {
+        prepare: false, // Disable prepared statements in CI
+        transform: { undefined: null }, // Handle undefined values
+      }),
     });
 
     global.__sql = sql;
     global.__drizzle = drizzle(sql, {
       schema,
-      logger: isDevelopment(),
+      logger: isDevelopment() && !isCI,
     });
   }
 

@@ -124,6 +124,7 @@ jobs:
           --health-retries 5
     env:
       NODE_ENV: "test"
+      CI: "true"
       DATABASE_URL: "postgresql://test_user:test_password@localhost:5432/test_db"
       POSTGRES_PRISMA_URL: "postgresql://test_user:test_password@localhost:5432/test_db"
       POSTGRES_URL_NON_POOLING: "postgresql://test_user:test_password@localhost:5432/test_db"
@@ -168,6 +169,8 @@ jobs:
           --health-retries 5
     env:
       NODE_ENV: "test"
+      CI: "true"
+      DATABASE_URL: "postgresql://test_user:test_password@localhost:5432/test_db"
       POSTGRES_PRISMA_URL: "postgresql://test_user:test_password@localhost:5432/test_db"
       POSTGRES_URL_NON_POOLING: "postgresql://test_user:test_password@localhost:5432/test_db"
     steps:
