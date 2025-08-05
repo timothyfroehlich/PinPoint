@@ -187,9 +187,9 @@ test.describe("Smoke Test: Complete Issue Workflow", () => {
 
     // Verify we're on the issue detail page
     await expect(
-      page.locator(
-        `h1:has-text("${issueTitle}"), h2:has-text("${issueTitle}"), text="${issueTitle}"`,
-      ),
+      page
+        .locator(`h1:has-text("${issueTitle}"), h2:has-text("${issueTitle}")`)
+        .or(page.getByText(issueTitle)),
     ).toBeVisible();
     console.log("✅ SMOKE TEST - Step 8 Complete: Opened issue detail page");
 
