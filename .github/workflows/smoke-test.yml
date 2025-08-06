@@ -66,8 +66,10 @@ jobs:
           mkdir -p supabase/storage/pinpoint-storage-main
           echo "📁 Created storage bucket directories"
 
-          # Start Supabase services (auth, database, storage, etc.)
-          supabase start
+          # Start Supabase services with optimized exclusions for CI performance
+          # Excludes: studio, realtime, storage-api, edge-runtime, logflare, vector, imgproxy, supavisor, postgres-meta, mailpit
+          # Keeps: PostgreSQL, PostgREST (API), GoTrue (auth), Kong (gateway) - all essential services
+          supabase start -x studio,realtime,storage-api,edge-runtime,logflare,vector,imgproxy,supavisor,postgres-meta,mailpit
 
           # Wait for services to be ready with proper health checks
           echo "⏳ Waiting for Supabase services to be ready..."
