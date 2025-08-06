@@ -1,5 +1,6 @@
 import { vi } from "vitest";
 
+import type { LoggerInterface } from "~/lib/logger";
 import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 import type { ExtendedPrismaClient } from "~/server/db";
 import type { DrizzleClient } from "~/server/db/drizzle";
@@ -52,6 +53,7 @@ export interface VitestMockContext {
     subdomain: string;
   } | null;
   headers: Headers;
+  logger: LoggerInterface;
 }
 
 export function createVitestMockContext(): VitestMockContext {
@@ -219,6 +221,20 @@ export function createVitestMockContext(): VitestMockContext {
     createQRCodeService: vi.fn(),
   } as unknown as ServiceFactory;
 
+  // Create mock logger
+  const mockLogger = {
+    error: vi.fn(),
+    warn: vi.fn(),
+    info: vi.fn(),
+    debug: vi.fn(),
+    trace: vi.fn(),
+    child: vi.fn(() => mockLogger),
+    withRequest: vi.fn(() => mockLogger),
+    withUser: vi.fn(() => mockLogger),
+    withOrganization: vi.fn(() => mockLogger),
+    withContext: vi.fn(() => mockLogger),
+  } as unknown as LoggerInterface;
+
   return {
     db: mockDb,
     drizzle: mockDrizzleClient,
@@ -231,5 +247,6 @@ export function createVitestMockContext(): VitestMockContext {
       subdomain: "test",
     },
     headers: new Headers(),
+    logger: mockLogger,
   };
 }

@@ -37,6 +37,10 @@ jobs:
           set -e  # Exit on any error
           echo "🚀 Starting local Supabase stack for CI testing..."
           
+          # Create storage bucket directories required by config.toml
+          mkdir -p supabase/storage/pinpoint-storage-main
+          echo "📁 Created storage bucket directories"
+          
           # Start Supabase services (auth, database, storage, etc.)
           supabase start
           
