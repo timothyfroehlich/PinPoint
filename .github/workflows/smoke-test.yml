@@ -17,6 +17,7 @@ jobs:
       NODE_ENV: test
       SKIP_ENV_VALIDATION: true
       CI: true
+      SEED_ADMIN_EMAIL: admin@ci.local
 
     steps:
       - name: Checkout

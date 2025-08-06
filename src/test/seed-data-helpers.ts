@@ -350,7 +350,16 @@ export async function getSeededIssues(limit = 10): Promise<SeededIssue[]> {
 
     return results
       .filter(
-        (result) =>
+        (
+          result,
+        ): result is typeof result & {
+          machine: NonNullable<typeof result.machine>;
+          model: NonNullable<typeof result.model>;
+          location: NonNullable<typeof result.location>;
+          status: NonNullable<typeof result.status>;
+          priority: NonNullable<typeof result.priority>;
+          createdBy: NonNullable<typeof result.createdBy>;
+        } =>
           result.machine &&
           result.model &&
           result.location &&
