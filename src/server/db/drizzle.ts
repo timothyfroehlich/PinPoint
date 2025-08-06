@@ -43,24 +43,30 @@ function createDrizzleClientInternal() {
 
 export type DrizzleClient = ReturnType<typeof createDrizzleClientInternal>;
 
-// Global declaration for development singleton pattern
-declare global {
-  var __drizzle: DrizzleClient | undefined;
-  var __sql: ReturnType<typeof postgres> | undefined;
-}
-
 /**
- * Creates Drizzle database client with singleton pattern for development hot-reload
- * Uses shared connection pool with existing Supabase infrastructure
+ * Controlled singleton pattern for development hot-reload optimization.
+ * Avoids global namespace pollution while maintaining connection reuse benefits.
  */
-export const createDrizzleClient = (): DrizzleClient => {
-  if (env.NODE_ENV === "production") {
-    // Production: create fresh instance each time
-    return createDrizzleClientInternal();
+class DrizzleSingleton {
+  private static instance: DrizzleSingleton | undefined;
+  private _client: DrizzleClient | null = null;
+  private _sql: ReturnType<typeof postgres> | null = null;
+
+  private constructor() {
+    // Private constructor ensures singleton pattern
   }
 
-  // Development: reuse connection across hot reloads to prevent connection exhaustion
-  if (!global.__drizzle) {
+  static getInstance(): DrizzleSingleton {
+    DrizzleSingleton.instance ??= new DrizzleSingleton();
+    return DrizzleSingleton.instance;
+  }
+
+  getClient(): DrizzleClient {
+    this._client ??= this.createClient();
+    return this._client;
+  }
+
+  private createClient(): DrizzleClient {
     const connectionString = env.POSTGRES_PRISMA_URL;
 
     if (!connectionString) {
@@ -87,14 +93,40 @@ export const createDrizzleClient = (): DrizzleClient => {
       }),
     });
 
-    global.__sql = sql;
-    global.__drizzle = drizzle(sql, {
+    this._sql = sql;
+    return drizzle(sql, {
       schema,
       logger: isDevelopment() && !isCI,
     });
   }
 
-  return global.__drizzle;
+  async cleanup(): Promise<void> {
+    if (this._sql) {
+      await this._sql.end();
+      this._sql = null;
+      this._client = null;
+    }
+  }
+
+  reset(): void {
+    // For development hot-reload: reset without cleanup
+    this._client = null;
+    this._sql = null;
+  }
+}
+
+/**
+ * Creates Drizzle database client with singleton pattern for development hot-reload
+ * Uses shared connection pool with existing Supabase infrastructure
+ */
+export const createDrizzleClient = (): DrizzleClient => {
+  if (env.NODE_ENV === "production") {
+    // Production: create fresh instance each time
+    return createDrizzleClientInternal();
+  }
+
+  // Development: reuse connection across hot reloads to prevent connection exhaustion
+  return DrizzleSingleton.getInstance().getClient();
 };
 
 /**
@@ -102,9 +134,5 @@ export const createDrizzleClient = (): DrizzleClient => {
  * Call this when the application is shutting down
  */
 export const closeDrizzleConnection = async (): Promise<void> => {
-  if (global.__sql) {
-    await global.__sql.end();
-    global.__sql = undefined;
-    global.__drizzle = undefined;
-  }
+  await DrizzleSingleton.getInstance().cleanup();
 };

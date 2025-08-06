@@ -9,12 +9,27 @@ import { fileURLToPath } from "url";
 import { config } from "dotenv";
 
 /**
- * Load environment variables with proper precedence for testing
- * Follows Next.js environment loading behavior with test-specific additions:
- * 1. .env (shared defaults)
- * 2. .env.development (for development features)
- * 3. .env.test (test-specific overrides, highest precedence for tests)
- * 4. .env.local (local overrides, ignored by git)
+ * Load environment variables with proper precedence for testing.
+ *
+ * This environment loading ensures consistent database configuration across test environments
+ * by establishing a clear precedence hierarchy that respects both CI and local development needs.
+ *
+ * **Loading Order (earlier files provide defaults, later files override):**
+ * 1. `.env` - Shared defaults for all environments
+ * 2. `.env.development` - Development features needed in tests
+ * 3. `.env.test` - Test-specific overrides (DATABASE_URL, etc.)
+ * 4. `.env.local` - Developer-specific local overrides
+ *
+ * **CI/CD Behavior:**
+ * - CI environment variables have highest precedence (override: false preserves them)
+ * - Local .env files only set variables that don't already exist
+ * - Ensures ephemeral CI database URLs aren't overridden by local configs
+ *
+ * **Why This Pattern:**
+ * - **Consistency**: Same database config across unit, integration, and E2E tests
+ * - **Flexibility**: Developers can override locally without affecting CI
+ * - **Safety**: CI database URLs take precedence over potentially stale local configs
+ * - **Next.js Compliance**: Follows Next.js 15 environment loading patterns
  */
 export function loadTestEnvironment(): void {
   const __filename = fileURLToPath(import.meta.url);

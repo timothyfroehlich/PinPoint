@@ -47,19 +47,48 @@ This starts:
 
 ### Environment Setup
 
-Create `.env.test.local`:
+The `.env.test` file (committed to repo) provides test environment configuration:
 
 ```env
-# Test Database
-TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:54322/postgres
-TEST_DIRECT_URL=postgresql://postgres:postgres@localhost:54322/postgres
+# Test environment configuration
+# This file contains environment variables specific to running tests
 
-# Test Supabase
-TEST_SUPABASE_URL=http://localhost:54321
-TEST_SUPABASE_ANON_KEY=your-local-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-local-service-key
+# Test environment marker
+NODE_ENV="test"
 
-# Get keys from supabase start output
+# Use local Supabase instance for integration tests
+DATABASE_URL="postgresql://postgres:postgres@localhost:54322/postgres"
+DIRECT_URL="postgresql://postgres:postgres@localhost:54322/postgres"
+POSTGRES_PRISMA_URL="postgresql://postgres:postgres@localhost:54322/postgres"
+POSTGRES_URL_NON_POOLING="postgresql://postgres:postgres@localhost:54322/postgres"
+
+# Supabase test configuration
+NEXT_PUBLIC_SUPABASE_URL="http://localhost:54321"
+SUPABASE_URL="http://localhost:54321"
+SUPABASE_API_URL="http://localhost:54321"
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="your-supabase-anon-key-here"
+SUPABASE_SECRET_KEY="your-supabase-service-role-key-here"
+SUPABASE_JWT_SECRET="super-secret-jwt-token-with-at-least-32-characters-long"
+
+# Authentication test configuration
+AUTH_SECRET="test-auth-secret-with-at-least-32-characters-for-testing-purposes"
+```
+
+### Environment Loading
+
+Environment variables are loaded by `src/lib/env-loaders/test.ts` with override behavior:
+
+```typescript
+// src/lib/env-loaders/test.ts
+import { config } from "dotenv";
+
+export function loadTestEnvironment(): void {
+  // Load in order of precedence (later files override earlier ones)
+  config({ path: resolve(projectRoot, ".env"), override: true });
+  config({ path: resolve(projectRoot, ".env.development"), override: true });
+  config({ path: resolve(projectRoot, ".env.test"), override: true }); // Highest precedence
+  config({ path: resolve(projectRoot, ".env.local"), override: true });
+}
 ```
 
 ### Database Schema
@@ -74,106 +103,120 @@ supabase db reset
 
 ## Vitest Configuration
 
-### vitest.config.ts
+### Multi-Project Setup
+
+PinPoint uses a 3-project Vitest configuration for different test types:
 
 ```typescript
-import { defineConfig } from "vitest/config";
-import { loadEnv } from "vite";
-
+// vitest.config.ts
 export default defineConfig({
   test: {
-    // Load test environment
-    env: loadEnv("test", process.cwd(), ""),
-
-    // Separate pools for different test types
-    poolOptions: {
-      threads: {
-        singleThread: true, // Run DB tests serially
+    projects: [
+      {
+        // Unit tests with database mocking
+        test: {
+          name: "node",
+          environment: "node",
+          setupFiles: ["src/test/vitest.setup.ts"], // With mocking
+          include: [
+            "src/lib/**/*.test.{ts,tsx}",
+            "src/server/**/*.test.{ts,tsx}",
+          ],
+          exclude: ["src/integration-tests"],
+        },
       },
-    },
-
-    // Global setup
-    globalSetup: "./src/test/global-setup.ts",
-    setupFiles: ["./src/test/setup.ts"],
-
-    // Test isolation
-    isolate: true,
-
-    // Timeouts for DB operations
-    testTimeout: 10000,
-    hookTimeout: 10000,
+      {
+        // Integration tests with real database
+        test: {
+          name: "integration",
+          environment: "node",
+          setupFiles: ["src/test/vitest.integration.setup.ts"], // No mocking
+          poolOptions: {
+            threads: { singleThread: true }, // Prevent connection conflicts
+          },
+          include: ["src/integration-tests/**/*.test.{ts,tsx}"],
+        },
+      },
+      {
+        // React component tests
+        test: {
+          name: "jsdom",
+          environment: "jsdom",
+          setupFiles: ["vitest.setup.react.ts"],
+          include: [
+            "src/app/**/*.test.{ts,tsx}",
+            "src/components/**/*.test.{ts,tsx}",
+          ],
+        },
+      },
+    ],
   },
 });
 ```
 
-### Global Setup
+### Integration Test Setup
 
 ```typescript
-// src/test/global-setup.ts
-import { execSync } from "child_process";
+// src/test/vitest.integration.setup.ts
+import { beforeAll, afterAll, afterEach } from "vitest";
 
-export async function setup() {
-  console.log("🚀 Starting Supabase local...");
-
-  try {
-    // Check if already running
-    execSync("supabase status", { stdio: "ignore" });
-  } catch {
-    // Start if not running
-    execSync("supabase start", { stdio: "inherit" });
-  }
-
-  // Reset database to clean state
-  console.log("🔄 Resetting test database...");
-  execSync("supabase db reset", { stdio: "inherit" });
-
-  console.log("✅ Test environment ready");
-}
-
-export async function teardown() {
-  // Optional: Stop Supabase after tests
-  // execSync("supabase stop", { stdio: "inherit" });
-}
-```
-
-### Test Setup
-
-```typescript
-// src/test/setup.ts
-import { beforeAll, afterAll, beforeEach } from "vitest";
-import { testSql } from "./test-db";
+// NO database mocking - uses real Supabase database
 
 beforeAll(async () => {
-  // Verify database connection
-  await testSql`SELECT 1`;
-});
+  // Hard failure if database unavailable - NO SKIPPING
+  if (!process.env.DATABASE_URL) {
+    throw new Error(
+      "DATABASE_URL is required for integration tests. Ensure Supabase is running.",
+    );
+  }
 
-beforeEach(async () => {
-  // Clear test data between tests (if not using transactions)
-  if (process.env.CLEAR_DB_BETWEEN_TESTS === "true") {
-    await clearTestData();
+  // Reject test/mock URLs - integration tests need real database
+  if (
+    process.env.DATABASE_URL.includes("test://") ||
+    process.env.DATABASE_URL.includes("postgresql://test:test@")
+  ) {
+    throw new Error(
+      "Integration tests require a real database URL, not a test/mock URL. Check .env.test configuration.",
+    );
   }
 });
 
-afterAll(async () => {
-  // Close connections
-  await testSql.end();
+afterEach(() => {
+  // Cleanup handled by individual tests using transactions
 });
 
-async function clearTestData() {
-  // Delete in correct order (respecting foreign keys)
-  await testSql`TRUNCATE TABLE 
-    notifications,
-    activities,
-    comments,
-    attachments,
-    issues,
-    machines,
-    memberships,
-    users,
-    organizations
-  CASCADE`;
-}
+afterAll(() => {
+  // Global cleanup
+});
+```
+
+### Unit Test Setup (With Mocking)
+
+```typescript
+// src/test/vitest.setup.ts
+import { beforeAll, afterAll, afterEach, vi } from "vitest";
+
+// Mock Prisma client for unit tests
+vi.mock("@prisma/client", () => ({
+  PrismaClient: vi.fn(() => ({
+    $connect: vi.fn(),
+    $disconnect: vi.fn(),
+    user: { findUnique: vi.fn(), create: vi.fn() },
+    // ... comprehensive mocking
+  })),
+}));
+
+beforeAll(() => {
+  // Environment variables loaded by src/lib/env-loaders/test.ts
+});
+
+afterEach(() => {
+  vi.clearAllMocks();
+});
+
+afterAll(() => {
+  // Cleanup mocks
+});
 ```
 
 ## Database Migrations
@@ -504,10 +547,28 @@ jobs:
 
 ## Best Practices
 
-1. **Always use transactions** for test isolation
-2. **Reset database** before test runs in CI
-3. **Use service role key** for admin operations only
-4. **Test with RLS enabled** to catch security issues
-5. **Cache test data** for performance
-6. **Clean up resources** in afterEach/afterAll
-7. **Use realistic data** with factories
+1. **Use correct test projects**: Unit tests in `src/server/`, integration tests in `src/integration-tests/`
+2. **Never mock in integration tests**: Use real database connections and operations
+3. **Hard failures for missing database**: Integration tests should fail immediately, never skip
+4. **Always use transactions** for test isolation in integration tests
+5. **Use service role key** for admin operations only in integration tests
+6. **Test with RLS enabled** to catch security issues
+7. **Clean up resources** with transactions (automatic rollback)
+8. **Use realistic data** with factories
+9. **Run integration tests with Supabase started**: `supabase start` before running tests
+
+## Running Different Test Types
+
+```bash
+# Unit tests (mocked database)
+npm run test -- --project=node
+
+# Integration tests (real database - requires Supabase)
+npm run test -- --project=integration
+
+# React component tests
+npm run test -- --project=jsdom
+
+# All tests
+npm run test
+```

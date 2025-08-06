@@ -1,4 +1,5 @@
 import { eq, count, asc, and } from "drizzle-orm";
+import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
 
 import {
@@ -7,6 +8,20 @@ import {
   organizationManageProcedure,
 } from "~/server/api/trpc";
 import * as schema from "~/server/db/schema";
+
+/**
+ * Generate UUID with environment fallback support.
+ * Uses crypto.randomUUID() when available (Node 14.17+), falls back to uuid library.
+ */
+function generateId(): string {
+  // In Node.js 19+ crypto.randomUUID is always available
+  // Keep fallback for older environments during development/testing
+  try {
+    return crypto.randomUUID();
+  } catch {
+    return uuidv4();
+  }
+}
 
 export const issueStatusRouter = createTRPCRouter({
   getAll: organizationProcedure.query(async ({ ctx }) => {
@@ -28,7 +43,7 @@ export const issueStatusRouter = createTRPCRouter({
       const [result] = await ctx.drizzle
         .insert(schema.issueStatuses)
         .values({
-          id: crypto.randomUUID(),
+          id: generateId(),
           name: input.name,
           category: input.category,
           organizationId: ctx.organization.id,

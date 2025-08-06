@@ -433,12 +433,75 @@ trpcMsw.issues.update.mutation(({ input }) => {
 - **Cleanup handlers**: Use `server.resetHandlers()` between tests
 - **Match production config**: MSW transformer must match client transformer
 
+## Integration Testing Patterns
+
+### Test Project Types
+
+```typescript
+// Unit Tests (src/server/**/*.test.ts) - Mocked Database
+describe("UserService", () => {
+  // Uses vi.mock("@prisma/client") from vitest.setup.ts
+  it("creates user", async () => {
+    mockPrisma.user.create.mockResolvedValue({ id: "1", name: "Test" });
+    // Test business logic with mocked DB
+  });
+});
+
+// Integration Tests (src/integration-tests/**/*.test.ts) - Real Database
+describe("User Integration", () => {
+  // Uses real Supabase database from vitest.integration.setup.ts
+  it("creates user with constraints", async () => {
+    const db = createDrizzleClient(); // Real connection
+    const [user] = await db.insert(users).values({...}).returning();
+    // Tests with real database constraints, RLS policies
+  });
+});
+```
+
+### Hard Failure Pattern
+
+Integration tests fail immediately when database unavailable:
+
+```typescript
+// ❌ OLD: Silent skipping
+it("creates user", async () => {
+  if (!db) {
+    console.log("Skipping - no database");
+    return; // WRONG - tests should never skip
+  }
+});
+
+// ✅ NEW: Hard failure in setup
+beforeAll(async () => {
+  if (!process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL required. Run: supabase start");
+  }
+});
+```
+
+### Prerequisites Check
+
+```bash
+# Before running integration tests
+supabase status        # Check if running
+supabase start        # Start if needed
+
+# Integration test commands
+npm run test -- --project=integration
+npm run test src/integration-tests/
+```
+
 ## Commands
 
 ```bash
-# Run tests
-npm run test:brief       # Fast, minimal output
-npm run test            # Full output when debugging
+# Test by project type
+npm run test -- --project=node         # Unit tests (mocked DB)
+npm run test -- --project=integration  # Integration tests (real DB)
+npm run test -- --project=jsdom        # Component tests
+
+# All tests
+npm run test            # Full test suite
+npm run test:brief      # Fast, minimal output
 npm run test:coverage   # Coverage report
 
 # Debugging

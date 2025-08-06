@@ -321,7 +321,26 @@ beforeAll(() => {
   // Note: Fetch patching moved to VitestTestWrapper to avoid Vitest startup conflicts
 });
 
-// MSW setup for both Node and jsdom environments
+/**
+ * MSW server setup for both Node and jsdom environments.
+ *
+ * This pattern uses nullable initialization and dynamic imports for several critical reasons:
+ *
+ * 1. **Prevent test runner startup conflicts**: Static imports of MSW can conflict with Vitest's
+ *    global fetch patching, causing "fetch is not defined" errors during test startup.
+ *
+ * 2. **Environment compatibility**: Both Node and jsdom environments need MSW, but static imports
+ *    may cause module loading errors when switching between environments in the same process.
+ *
+ * 3. **Avoid circular dependencies**: Static imports in setup files can create circular dependency
+ *    issues with modules that also import test utilities.
+ *
+ * 4. **Conditional loading**: Allows MSW to be loaded only when actually needed, preventing
+ *    unnecessary overhead in tests that don't require HTTP mocking.
+ *
+ * The nullable server pattern ensures graceful handling if MSW import fails and allows
+ * proper cleanup without assuming the server was successfully initialized.
+ */
 let server: ReturnType<(typeof import("msw/node"))["setupServer"]> | null =
   null;
 

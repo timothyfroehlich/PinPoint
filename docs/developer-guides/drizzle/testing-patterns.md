@@ -367,6 +367,169 @@ it("should validate organizationId indexes work efficiently", async () => {
 4. **Over-Mocking**: Some tests benefit from real database interactions
 5. **Ignoring TypeScript Errors**: Strict mode catches real issues
 
+## Fixed Integration Test Patterns
+
+### Hard Failure Pattern (No Silent Skipping)
+
+**Issue**: Integration tests previously skipped silently when database unavailable.  
+**Fix**: Tests now fail immediately with clear error messages.
+
+```typescript
+// ❌ OLD: Silent skipping pattern
+describe("Drizzle CRUD Operations", () => {
+  beforeEach(async () => {
+    try {
+      db = createDrizzleClient();
+      hasDatabase = true;
+    } catch {
+      console.log("Skipping Drizzle CRUD tests - no database connection");
+      db = null;
+      hasDatabase = false;
+    }
+  });
+
+  it("should perform aggregate query", async () => {
+    if (!db || !hasDatabase) {
+      console.log("Skipping integration test - no database available");
+      return; // WRONG: Silent skip
+    }
+    // Test logic...
+  });
+});
+
+// ✅ NEW: Hard failure pattern
+describe("Drizzle CRUD Operations", () => {
+  beforeEach(async () => {
+    // Hard failure with helpful error message
+    if (!process.env.DATABASE_URL) {
+      throw new Error(
+        "DATABASE_URL is required for integration tests. Ensure Supabase is running."
+      );
+    }
+
+    if (process.env.DATABASE_URL.includes("test://")) {
+      throw new Error(
+        "Integration tests require a real database URL. Check .env.test configuration."
+      );
+    }
+
+    try {
+      db = createDrizzleClient();
+    } catch (error) {
+      throw new Error(
+        `Failed to connect to database: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  });
+
+  it("should perform aggregate query", async () => {
+    // No skip logic - test always runs or fails at setup
+    const [stats] = await db.select({...}).from(schema.organizations);
+    expect(stats).toBeDefined();
+  });
+});
+```
+
+### Aggregate Query Type Coercion
+
+**Issue**: SQL `count()` functions return strings, but tests expected numbers.  
+**Fix**: Properly handle string return types from SQL aggregate functions.
+
+```typescript
+// ❌ WRONG: Expecting number from SQL count
+const [stats] = await db
+  .select({
+    organizationId: schema.organizations.id,
+    locationCount: sql<number>`count(${schema.locations.id})`.as(
+      "location_count",
+    ),
+  })
+  .from(schema.organizations)
+  .groupBy(schema.organizations.id);
+
+expect(stats?.locationCount).toBe(1); // Fails: expects number, gets "1"
+
+// ✅ FIXED: Proper string type handling
+const [stats] = await db
+  .select({
+    organizationId: schema.organizations.id,
+    locationCount: sql<string>`count(${schema.locations.id})`.as(
+      "location_count",
+    ),
+  })
+  .from(schema.organizations)
+  .groupBy(schema.organizations.id);
+
+expect(stats?.locationCount).toBe("1"); // Works: expects string "1"
+
+// ✅ ALTERNATIVE: Convert to number if needed
+const [stats] = await db
+  .select({
+    organizationId: schema.organizations.id,
+    locationCount: sql<string>`count(${schema.locations.id})`.as(
+      "location_count",
+    ),
+  })
+  .from(schema.organizations)
+  .groupBy(schema.organizations.id);
+
+expect(parseInt(stats?.locationCount ?? "0")).toBe(1); // Convert string to number
+```
+
+### Environment Variable Loading Fix
+
+**Issue**: Environment variables not reaching test environment due to dotenv default behavior.  
+**Fix**: Use `override: true` in dotenv configuration.
+
+```typescript
+// src/lib/env-loaders/test.ts - FIXED
+export function loadTestEnvironment(): void {
+  // Load with override: true to ensure test environment wins
+  config({ path: resolve(projectRoot, ".env"), override: true });
+  config({ path: resolve(projectRoot, ".env.development"), override: true });
+  config({ path: resolve(projectRoot, ".env.test"), override: true });
+  config({ path: resolve(projectRoot, ".env.local"), override: true });
+}
+```
+
+### Integration Test Project Configuration
+
+Integration tests now run in dedicated Vitest project with real database:
+
+```typescript
+// vitest.config.ts - Integration project
+{
+  test: {
+    name: "integration",
+    environment: "node",
+    setupFiles: ["src/test/vitest.integration.setup.ts"], // No mocking
+    include: ["src/integration-tests/**/*.test.{ts,tsx}"],
+    poolOptions: {
+      threads: { singleThread: true }, // Prevent connection conflicts
+    },
+  }
+}
+```
+
+### Running Fixed Integration Tests
+
+```bash
+# Prerequisites (required)
+supabase status          # Verify running
+supabase start          # Start if needed
+
+# Run integration tests (will fail hard if DB unavailable)
+npm run test -- --project=integration
+npm run test src/integration-tests/
+npm run test src/server/db/drizzle-crud-validation.test.ts
+
+# Expected behavior:
+# ✅ Immediate clear failure if database unavailable
+# ✅ Real database operations with actual constraints
+# ✅ Proper type handling for SQL aggregate functions
+# ❌ No silent skipping of tests
+```
+
 ## CRUD Validation Script
 
 PinPoint includes a comprehensive CRUD validation script to test Drizzle operations across all tables. The script supports two modes for different validation needs.
