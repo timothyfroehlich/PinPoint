@@ -109,6 +109,7 @@ jobs:
           # Override ONLY database URLs to use ephemeral PostgreSQL container
           # All other environment variables (including Supabase) come from Vercel preview
           DATABASE_URL: "postgresql://test_user:test_password@localhost:5432/test_db"
+          DIRECT_URL: "postgresql://test_user:test_password@localhost:5432/test_db"
           POSTGRES_PRISMA_URL: "postgresql://test_user:test_password@localhost:5432/test_db"
           POSTGRES_URL_NON_POOLING: "postgresql://test_user:test_password@localhost:5432/test_db"
           # CI-specific environment flags

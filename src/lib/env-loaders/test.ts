@@ -21,18 +21,19 @@ export function loadTestEnvironment(): void {
   const __dirname = dirname(__filename);
   const projectRoot = resolve(__dirname, "../../../");
 
-  // Load in order of precedence (later files override earlier ones)
+  // Load in order of precedence (CI environment variables have highest precedence)
+  // Only set variables if they don't already exist (preserve CI environment)
   // 1. Base configuration
-  config({ path: resolve(projectRoot, ".env"), override: true });
+  config({ path: resolve(projectRoot, ".env"), override: false });
 
   // 2. Development configuration (for development features in tests)
-  config({ path: resolve(projectRoot, ".env.development"), override: true });
+  config({ path: resolve(projectRoot, ".env.development"), override: false });
 
-  // 3. Test-specific configuration (highest precedence for test environment)
-  config({ path: resolve(projectRoot, ".env.test"), override: true });
+  // 3. Test-specific configuration
+  config({ path: resolve(projectRoot, ".env.test"), override: false });
 
   // 4. Local overrides (if they exist, for developer-specific test settings)
-  config({ path: resolve(projectRoot, ".env.local"), override: true });
+  config({ path: resolve(projectRoot, ".env.local"), override: false });
 
   // Ensure test environment has NODE_ENV set
   // eslint-disable-next-line no-restricted-properties, @typescript-eslint/dot-notation, @typescript-eslint/no-unnecessary-condition

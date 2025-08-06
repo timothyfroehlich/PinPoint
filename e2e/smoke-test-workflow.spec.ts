@@ -178,11 +178,11 @@ test.describe("Smoke Test: Complete Issue Workflow", () => {
 
     // Find and click the issue title to navigate to detail page
     // Try both heading role and direct text locator for robustness
-    const issueTitle = page.locator(`text="${issueTitle}"`).first();
-    await expect(issueTitle).toBeVisible({ timeout: 10000 });
+    const issueTitleElement = page.locator(`text="${issueTitle}"`).first();
+    await expect(issueTitleElement).toBeVisible({ timeout: 10000 });
 
     console.log(`🔍 SMOKE TEST - Current URL before click: ${page.url()}`);
-    await issueTitle.click();
+    await issueTitleElement.click();
 
     // Wait for navigation to complete
     await page.waitForLoadState("networkidle");
