@@ -4,6 +4,7 @@ import { z } from "zod";
 /**
  * Environment Detection Helper
  * Uses VERCEL_ENV for proper deployment environment detection
+ * SECURITY: Defaults to production mode for fail-secure behavior
  */
 function getEnvironmentType() {
   // Test environment - set by test runners
@@ -12,8 +13,12 @@ function getEnvironmentType() {
   // Use VERCEL_ENV if available (Vercel deployments)
   if (process.env["VERCEL_ENV"]) return process.env["VERCEL_ENV"];
 
-  // Fallback to NODE_ENV for local development
-  return process.env["NODE_ENV"] || "development";
+  // Local development - must be explicitly set
+  if (process.env["NODE_ENV"] === "development") return "development";
+
+  // SECURITY: Default to production mode (fail-secure)
+  // This prevents accidentally enabling dev features in production
+  return "production";
 }
 
 export const env = createEnv({
