@@ -13,20 +13,6 @@ jobs:
     name: End-to-End Smoke Test
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: test_user
-          POSTGRES_PASSWORD: test_password
-          POSTGRES_DB: test_db
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
 
     steps:
       - name: Checkout
@@ -40,6 +26,32 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start Supabase Local Stack
+        run: |
+          set -e  # Exit on any error
+          echo "🚀 Starting local Supabase stack for CI testing..."
+          
+          # Start Supabase services (auth, database, storage, etc.)
+          supabase start
+          
+          # Wait for services to be ready
+          echo "⏳ Waiting for Supabase services to be ready..."
+          sleep 5
+          
+          # Export Supabase environment variables automatically
+          echo "🔧 Configuring environment variables from Supabase CLI..."
+          supabase status -o env >> $GITHUB_ENV
+          
+          # Verify services are running
+          supabase status
+          
+          echo "✅ Supabase local stack ready for testing"
 
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
@@ -95,36 +107,47 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps chromium
 
+      - name: Setup Database Schema and Seed Data
+        run: |
+          set -e  # Exit on any error
+          echo "🗃️ Setting up database schema and seed data with local Supabase..."
+          
+          # Push schema to local Supabase database
+          npm run db:push
+          
+          # Seed database with full auth + database users (like local dev)
+          npm run seed
+          
+          echo "✅ Database setup complete - ready for smoke test"
+        env:
+          # Use local Supabase stack (URLs configured by Supabase CLI automatically)
+          # Note: SUPABASE_URL and SUPABASE_SECRET_KEY are set by previous step via $GITHUB_ENV
+          NODE_ENV: test
+          SKIP_ENV_VALIDATION: true
+
       - name: Run Smoke Test
         run: |
           set -e  # Exit on any error
-          # Validate critical environment variables are set
-          [[ -n "$DATABASE_URL" ]] || { echo "❌ DATABASE_URL not set"; exit 1; }
-          [[ "$DATABASE_URL" == *"localhost:5432"* ]] || { echo "❌ DATABASE_URL not pointing to ephemeral container"; exit 1; }
+          # Validate critical environment variables are set by Supabase CLI
+          [[ -n "$SUPABASE_URL" ]] || { echo "❌ SUPABASE_URL not set by Supabase CLI"; exit 1; }
+          [[ -n "$SUPABASE_ANON_KEY" ]] || { echo "❌ SUPABASE_ANON_KEY not set by Supabase CLI"; exit 1; }
           
           # Run smoke test - must pass completely for CI success
-          echo "🧪 Running smoke test - full workflow must complete successfully"
+          echo "🧪 Running smoke test with local Supabase stack"
           npm run smoke
         env:
-          # Override ONLY database URLs to use ephemeral PostgreSQL container
-          # All other environment variables (including Supabase) come from Vercel preview
-          DATABASE_URL: "postgresql://test_user:test_password@localhost:5432/test_db"
-          DIRECT_URL: "postgresql://test_user:test_password@localhost:5432/test_db"
-          POSTGRES_PRISMA_URL: "postgresql://test_user:test_password@localhost:5432/test_db"
-          POSTGRES_URL_NON_POOLING: "postgresql://test_user:test_password@localhost:5432/test_db"
-          # CI-specific environment flags
+          # Use local Supabase stack (URLs and tokens set automatically by Supabase CLI)
+          # Note: All SUPABASE_* variables are configured by previous step via $GITHUB_ENV
           NODE_ENV: test
-          CI: true
-          # Skip env validation because we're mixing Vercel preview + local database overrides
           SKIP_ENV_VALIDATION: true
 
       - name: Cleanup Test Data
         if: always()
         run: |
           set -e  # Exit on any error (but step always runs due to if: always())
-          echo "🧹 Ephemeral database cleanup..."
-          echo "✅ No cleanup needed - using ephemeral PostgreSQL container"
-          echo "🗑️  Container will be automatically destroyed after job completion"
+          echo "🧹 Local Supabase cleanup..."
+          echo "✅ No cleanup needed - using local Supabase stack"
+          echo "🗑️  Local stack will be automatically destroyed after job completion"
 
       - name: Upload Playwright Report
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
