@@ -69,9 +69,16 @@ jobs:
           # Start Supabase services (auth, database, storage, etc.)
           supabase start
 
-          # Wait for services to be ready
+          # Wait for services to be ready with proper health checks
           echo "⏳ Waiting for Supabase services to be ready..."
-          sleep 5
+          for i in {1..30}; do
+            if curl -s --fail http://localhost:54321/health > /dev/null 2>&1; then
+              echo "✅ Supabase API server is ready!"
+              break
+            fi
+            echo "🔄 Services not ready yet, waiting... (attempt $i/30)"
+            sleep 2
+          done
 
           # Export Supabase environment variables automatically
           echo "🔧 Configuring environment variables from Supabase CLI..."
