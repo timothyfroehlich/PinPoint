@@ -46,7 +46,7 @@ jobs:
           
           # Export Supabase environment variables automatically
           echo "🔧 Configuring environment variables from Supabase CLI..."
-          supabase status -o env >> $GITHUB_ENV
+          supabase status -o env >> "$GITHUB_ENV"
           
           # Verify services are running
           supabase status
