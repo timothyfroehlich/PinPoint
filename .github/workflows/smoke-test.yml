@@ -13,6 +13,10 @@ jobs:
     name: End-to-End Smoke Test
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    env:
+      NODE_ENV: test
+      SKIP_ENV_VALIDATION: true
+      CI: true
 
     steps:
       - name: Checkout
@@ -27,36 +31,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
-        with:
-          version: latest
-
-      - name: Start Supabase Local Stack
-        run: |
-          set -e  # Exit on any error
-          echo "🚀 Starting local Supabase stack for CI testing..."
-          
-          # Create storage bucket directories required by config.toml
-          mkdir -p supabase/storage/pinpoint-storage-main
-          echo "📁 Created storage bucket directories"
-          
-          # Start Supabase services (auth, database, storage, etc.)
-          supabase start
-          
-          # Wait for services to be ready
-          echo "⏳ Waiting for Supabase services to be ready..."
-          sleep 5
-          
-          # Export Supabase environment variables automatically
-          echo "🔧 Configuring environment variables from Supabase CLI..."
-          supabase status -o env >> "$GITHUB_ENV"
-          
-          # Verify services are running
-          supabase status
-          
-          echo "✅ Supabase local stack ready for testing"
-
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
 
@@ -67,10 +41,10 @@ jobs:
           [[ -n "${{ secrets.VERCEL_TOKEN }}" ]] || { echo "❌ VERCEL_TOKEN secret not set"; exit 1; }
           [[ -n "${{ secrets.VERCEL_ORG_ID }}" ]] || { echo "❌ VERCEL_ORG_ID secret not set"; exit 1; }
           [[ -n "${{ secrets.VERCEL_PROJECT_ID }}" ]] || { echo "❌ VERCEL_PROJECT_ID secret not set"; exit 1; }
-          
+
           # Pull environment variables
           vercel env pull .env.local --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
-          
+
           # Verify the .env.local file was created
           [[ -f .env.local ]] || { echo "❌ .env.local file not created"; exit 1; }
           echo "✅ Environment variables successfully pulled from Vercel"
@@ -78,24 +52,36 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
-      - name: Setup Environment Variables
-        run: |
-          set -e  # Exit on any error
-          echo "🔧 Configuring environment for production testing..."
-          echo "✅ All application variables pulled from Vercel"
-          echo "📊 Test data will be isolated with SMOKE-TEST prefix"
-          echo "🎯 Using single source of truth: Vercel configuration"
-        env:
-          # CI-specific environment flags only
-          NODE_ENV: test
-          CI: true
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
 
-      - name: Verify Environment Configuration
+      - name: Start Supabase Local Stack
         run: |
           set -e  # Exit on any error
-          echo "🔍 Verifying environment configuration..."
-          echo "✅ Environment variables pulled from Vercel"
-          echo "🎯 Ready for smoke test execution"
+          echo "🚀 Starting local Supabase stack for CI testing..."
+
+          # Create storage bucket directories required by config.toml
+          mkdir -p supabase/storage/pinpoint-storage-main
+          echo "📁 Created storage bucket directories"
+
+          # Start Supabase services (auth, database, storage, etc.)
+          supabase start
+
+          # Wait for services to be ready
+          echo "⏳ Waiting for Supabase services to be ready..."
+          sleep 5
+
+          # Export Supabase environment variables automatically
+          echo "🔧 Configuring environment variables from Supabase CLI..."
+          supabase status -o env >> "$GITHUB_ENV"
+
+          # Verify services are running
+          supabase status
+
+          echo "✅ Supabase local stack ready for testing"
+
 
       - name: Cache Playwright Browsers
         uses: actions/cache@v4
@@ -115,19 +101,14 @@ jobs:
         run: |
           set -e  # Exit on any error
           echo "🗃️ Setting up database schema and seed data with local Supabase..."
-          
+
           # Push schema to local Supabase database
           npm run db:push
-          
+
           # Seed database with full auth + database users (like local dev)
           npm run seed
-          
+
           echo "✅ Database setup complete - ready for smoke test"
-        env:
-          # Use local Supabase stack (URLs configured by Supabase CLI automatically)
-          # Note: SUPABASE_URL and SUPABASE_SECRET_KEY are set by previous step via $GITHUB_ENV
-          NODE_ENV: test
-          SKIP_ENV_VALIDATION: true
 
       - name: Run Smoke Test
         run: |
@@ -135,23 +116,10 @@ jobs:
           # Validate critical environment variables are set by Supabase CLI
           [[ -n "$SUPABASE_URL" ]] || { echo "❌ SUPABASE_URL not set by Supabase CLI"; exit 1; }
           [[ -n "$SUPABASE_ANON_KEY" ]] || { echo "❌ SUPABASE_ANON_KEY not set by Supabase CLI"; exit 1; }
-          
+
           # Run smoke test - must pass completely for CI success
           echo "🧪 Running smoke test with local Supabase stack"
           npm run smoke
-        env:
-          # Use local Supabase stack (URLs and tokens set automatically by Supabase CLI)
-          # Note: All SUPABASE_* variables are configured by previous step via $GITHUB_ENV
-          NODE_ENV: test
-          SKIP_ENV_VALIDATION: true
-
-      - name: Cleanup Test Data
-        if: always()
-        run: |
-          set -e  # Exit on any error (but step always runs due to if: always())
-          echo "🧹 Local Supabase cleanup..."
-          echo "✅ No cleanup needed - using local Supabase stack"
-          echo "🗑️  Local stack will be automatically destroyed after job completion"
 
       - name: Upload Playwright Report
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
