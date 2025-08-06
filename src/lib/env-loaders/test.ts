@@ -23,16 +23,16 @@ export function loadTestEnvironment(): void {
 
   // Load in order of precedence (later files override earlier ones)
   // 1. Base configuration
-  config({ path: resolve(projectRoot, ".env") });
+  config({ path: resolve(projectRoot, ".env"), override: true });
 
   // 2. Development configuration (for development features in tests)
-  config({ path: resolve(projectRoot, ".env.development") });
+  config({ path: resolve(projectRoot, ".env.development"), override: true });
 
   // 3. Test-specific configuration (highest precedence for test environment)
-  config({ path: resolve(projectRoot, ".env.test") });
+  config({ path: resolve(projectRoot, ".env.test"), override: true });
 
   // 4. Local overrides (if they exist, for developer-specific test settings)
-  config({ path: resolve(projectRoot, ".env.local") });
+  config({ path: resolve(projectRoot, ".env.local"), override: true });
 
   // Ensure test environment has NODE_ENV set
   // eslint-disable-next-line no-restricted-properties, @typescript-eslint/dot-notation, @typescript-eslint/no-unnecessary-condition

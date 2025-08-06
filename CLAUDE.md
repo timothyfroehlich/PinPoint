@@ -496,17 +496,24 @@ The test-architect will update `test-map.md` and `source-map.md` as it works. Th
 ### Database Commands (Drizzle ORM)
 
 ```bash
+# Single-shot workflows (recommended)
+npm run db:reset        # Reset local database + automatic seeding
+npm run db:reset:preview # Reset preview database + automatic seeding
+
 # Core database operations
 npm run db:push         # Push schema changes (development)
-npm run db:reset        # Complete reset with seeding
-npm run db:generate     # Generate Drizzle types
+npm run db:push:preview # Push schema changes (preview environment)
+npm run db:generate     # Generate Drizzle types (development)
+npm run db:generate:preview # Generate Drizzle types (preview)
 
 # Database inspection and management
-npm run db:studio       # Open Drizzle Studio for visual inspection
+npm run db:studio       # Open Drizzle Studio (development)
+npm run db:studio:preview # Open Drizzle Studio (preview)
 npm run db:validate     # Validate database operations
 
-# Seeding
-npm run seed            # Run seeding only
+# Manual seeding (if needed)
+npm run seed            # Seed development database
+npm run seed:preview    # Seed preview environment
 ```
 
 ## Critical Notes

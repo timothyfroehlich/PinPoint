@@ -71,7 +71,7 @@ export default defineConfig({
             "~": path.resolve(__dirname, "./src"),
           },
         },
-        // Node environment for server-side tests
+        // Node environment for server-side tests (with database mocking)
         test: {
           name: "node",
           globals: true,
@@ -89,8 +89,40 @@ export default defineConfig({
           include: [
             "src/lib/**/*.test.{ts,tsx}",
             "src/server/**/*.test.{ts,tsx}",
-            "src/integration-tests/**/*.test.{ts,tsx}",
           ],
+          exclude: [
+            "node_modules",
+            "src/_archived_frontend",
+            "src/integration-tests",
+            "e2e",
+            "playwright-report",
+            "test-results",
+          ],
+        },
+      },
+      {
+        plugins: [react(), tsconfigPaths()],
+        resolve: {
+          alias: {
+            "~": path.resolve(__dirname, "./src"),
+          },
+        },
+        // Integration test environment (real database, no mocking)
+        test: {
+          name: "integration",
+          globals: true,
+          environment: "node",
+          setupFiles: ["src/test/vitest.integration.setup.ts"],
+          typecheck: {
+            tsconfig: "./tsconfig.tests.json",
+          },
+          // Serialize database tests to prevent connection conflicts
+          poolOptions: {
+            threads: {
+              singleThread: true,
+            },
+          },
+          include: ["src/integration-tests/**/*.test.{ts,tsx}"],
           exclude: [
             "node_modules",
             "src/_archived_frontend",

@@ -176,28 +176,31 @@ test.describe("Smoke Test: Complete Issue Workflow", () => {
     // Step 8: Open Issue
     console.log("🧪 SMOKE TEST - Step 8: Opening the created issue");
 
-    // Find the issue row and click it
-    const issueRow = page
-      .locator(
-        `tr:has-text("${issueTitle}"), div:has-text("${issueTitle}"), a:has-text("${issueTitle}")`,
-      )
-      .first();
-    await expect(issueRow).toBeVisible({ timeout: 10000 });
-    await issueRow.click();
+    // Find and click the issue title to navigate to detail page
+    // Try both heading role and direct text locator for robustness
+    const issueTitle = page.locator(`text="${issueTitle}"`).first();
+    await expect(issueTitle).toBeVisible({ timeout: 10000 });
 
-    // Verify we're on the issue detail page
-    await expect(
-      page
-        .locator(`h1:has-text("${issueTitle}"), h2:has-text("${issueTitle}")`)
-        .or(page.getByText(issueTitle)),
-    ).toBeVisible();
+    console.log(`🔍 SMOKE TEST - Current URL before click: ${page.url()}`);
+    await issueTitle.click();
+
+    // Wait for navigation to complete
+    await page.waitForLoadState("networkidle");
+    console.log(`🔍 SMOKE TEST - Current URL after click: ${page.url()}`);
+
+    // Verify we're on the issue detail page by checking for Comments section
+    await expect(page.getByText("Comments", { exact: true })).toBeVisible({
+      timeout: 15000,
+    });
     console.log("✅ SMOKE TEST - Step 8 Complete: Opened issue detail page");
 
     // Step 9: Add Comment
     console.log("🧪 SMOKE TEST - Step 9: Adding admin comment");
 
     const commentText = "Admin reviewed this issue";
-    const commentTextarea = page.getByRole("textbox", { name: /comment/i });
+    const commentTextarea = page.getByRole("textbox", {
+      name: "Write your comment...",
+    });
     try {
       await expect(commentTextarea).toBeVisible();
       await commentTextarea.fill(commentText);
@@ -208,9 +211,7 @@ test.describe("Smoke Test: Complete Issue Workflow", () => {
     }
 
     // Submit comment
-    const commentSubmit = page.getByRole("button", {
-      name: /add|submit|comment/i,
-    });
+    const commentSubmit = page.getByTestId("submit-comment-button");
     try {
       await commentSubmit.click();
     } catch (error) {
