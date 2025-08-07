@@ -109,9 +109,9 @@ Your development server will be running at **http://localhost:49200**
 
 **Database Commands:**
 
-- `npm run reset:local` - Reset database with fresh schema and seed data
-- `npm run db:push` - Sync schema changes without reset
-- `npm run seed` - Seed data only (local Supabase)
+- `npm run db:reset:local:sb` - Reset database with fresh schema and seed data
+- `npm run db:push:local` - Sync schema changes without reset
+- `npm run db:seed:local:sb` - Seed data only (local Supabase)
 
 ### Prerequisites
 

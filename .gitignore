@@ -94,10 +94,6 @@ betterer-output.log
 agent_workspace/
 cleanup_analysis/
 
-# Placeholder test files (temporary ignore)
-src/lib/env-loaders/__tests__/
-src/server/db/__tests__/
-
 # Claude hooks cache files
 .claude/hooks/.quality-check.js.swp
 .claude/hooks/.quality-check.json.swp

@@ -102,7 +102,12 @@ class DrizzleSingleton {
 
   async cleanup(): Promise<void> {
     if (this._sql) {
-      await this._sql.end();
+      try {
+        await this._sql.end();
+      } catch (error) {
+        // Log cleanup errors but don't throw - we want cleanup to complete
+        console.warn("Database cleanup error (non-fatal):", error);
+      }
       this._sql = null;
       this._client = null;
     }

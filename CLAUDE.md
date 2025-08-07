@@ -169,12 +169,12 @@ npm run validate     # Pre-commit validation (MUST PASS)
 npm run pre-commit   # Pre-PR validation (MUST PASS)
 
 # Database Management
-npm run db:push         # Push schema changes only
-npm run seed            # Seed local Supabase (default)
-npm run seed:local:pg   # Seed PostgreSQL-only (CI tests)
-npm run seed:preview    # Seed remote preview environment
-npm run reset:local     # Full local reset (schema + data)
-npm run reset:preview   # Full preview reset (schema + data)
+npm run db:push:local       # Push schema changes only (universal PostgreSQL)
+npm run db:seed:local:sb    # Seed local Supabase (default)
+npm run db:seed:local:pg    # Seed PostgreSQL-only (CI tests)
+npm run db:seed:preview     # Seed remote preview environment
+npm run db:reset:local:sb   # Full local reset (schema + data)
+npm run db:reset:preview    # Full preview reset (schema + data)
 
 # Database Inspection (Efficient - Use Direct SQL)
 # Read schema structure: src/server/db/schema/
@@ -248,7 +248,7 @@ npm run typecheck | grep "usePermissions"        # Find specific function errors
 2. **During**: Run `npm run check` after significant code changes
 3. **Before commit**: `npm run validate` must pass (MANDATORY)
 4. **Before PR**: `npm run pre-commit` must pass (MANDATORY)
-5. **Database changes**: Use `npm run reset:local` for complete reset or `npm run db:push` for schema-only changes
+5. **Database changes**: Use `npm run db:reset:local:sb` for complete reset or `npm run db:push:local` for schema-only changes
 
 ### Environment Configuration
 
@@ -501,14 +501,14 @@ The test-architect will update `test-map.md` and `source-map.md` as it works. Th
 
 ```bash
 # Single-shot workflows (recommended)
-npm run reset:local     # Reset local database + automatic seeding
-npm run reset:preview   # Reset preview database + automatic seeding
+npm run db:reset:local:sb   # Reset local database + automatic seeding
+npm run db:reset:preview    # Reset preview database + automatic seeding
 
 # Core database operations
-npm run db:push         # Push schema changes (development)
-npm run db:push:preview # Push schema changes (preview environment)
-npm run db:generate     # Generate Drizzle types (development)
-npm run db:generate:preview # Generate Drizzle types (preview)
+npm run db:push:local:sb    # Push schema changes (development)
+npm run db:push:preview     # Push schema changes (preview environment)
+npm run db:generate:local:sb # Generate Drizzle types (development)
+npm run db:generate:preview  # Generate Drizzle types (preview)
 
 # Database inspection and management
 npm run db:studio       # Open Drizzle Studio (development)

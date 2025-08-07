@@ -84,7 +84,7 @@ fi
 
 # Set up database schema (using shared local database)
 echo "Setting up database schema..."
-if npm run db:push 2>/dev/null; then
+if npm run db:push:local 2>/dev/null; then
     echo "Database schema synced successfully."
     
     # Generate Prisma client types
@@ -97,7 +97,7 @@ if npm run db:push 2>/dev/null; then
     fi
 else
     echo "Warning: Could not sync database schema."
-    echo "Check your database connection and run 'npm run db:push' manually."
+    echo "Check your database connection and run 'npm run db:push:local' manually."
 fi
 
 # Health check function

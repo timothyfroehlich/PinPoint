@@ -143,9 +143,9 @@ jobs:
           cache: "npm"
       - run: npm ci
       - name: Setup Database Schema
-        run: npm run db:push
+        run: npm run db:push:local
       - name: Seed Database for Tests
-        run: npm run seed:local:pg
+        run: npm run db:seed:local:pg
       - name: Run Tests with Coverage
         run: npm run test:coverage
       - name: Upload Coverage
@@ -189,7 +189,7 @@ jobs:
           cache: "npm"
       - run: npm ci
       - name: Setup Database Schema
-        run: npm run db:push
+        run: npm run db:push:local
       - name: Run Database CRUD Validation
         run: npm run db:validate:ci
         timeout-minutes: 5
