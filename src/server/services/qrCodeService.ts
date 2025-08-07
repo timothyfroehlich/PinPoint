@@ -26,7 +26,7 @@ export interface MachineFromQRCode {
   };
   organization: {
     name: string;
-    subdomain: string | null;
+    subdomain: string; // Non-null to match database schema
   };
 }
 
@@ -295,7 +295,7 @@ export class QRCodeService {
    * Generate the QR code content URL based on machine and organization
    */
   private generateQRCodeContent(
-    machine: Machine & { organization: { subdomain: string | null } },
+    machine: Machine & { organization: { subdomain: string } },
   ): string {
     return constructReportUrl(machine);
   }

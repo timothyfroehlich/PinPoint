@@ -21,7 +21,10 @@ export default defineConfig({
   // Shared settings for all the projects below
   use: {
     // Base URL to use in actions like `await page.goto('/')`
-    baseURL: `http://${process.env["DEFAULT_ORG_SUBDOMAIN"] ?? "apc"}.localhost:${process.env["PORT"] ?? "49200"}`,
+    // In CI, use localhost without subdomain to avoid DNS resolution issues
+    baseURL: process.env["CI"]
+      ? `http://localhost:${process.env["PORT"] ?? "49200"}`
+      : `http://${process.env["DEFAULT_ORG_SUBDOMAIN"] ?? "apc"}.localhost:${process.env["PORT"] ?? "49200"}`,
 
     // Collect trace when retrying the failed test
     trace: "on-first-retry",

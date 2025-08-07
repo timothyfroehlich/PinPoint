@@ -1,16 +1,22 @@
 # Migration Reports
 
-Jest to Vitest migration benchmarks and patterns.
+Technical migration reports documenting insights, patterns, and performance improvements.
 
-## Performance Results
+## Recent Migrations
 
-- Overall: 18.5x improvement
-- Pure functions: Up to 65x faster
-- Service layer: 12-19x improvement
+### Phase 2A: Drizzle Foundation (2025-08-02)
+- **[phase-2a-drizzle-foundation.md](./phase-2a-drizzle-foundation.md)** - Complete Drizzle ORM foundation implementation
+- Key discoveries: Index syntax requirements, pgbouncer compatibility, dual-ORM patterns
+- Result: 39 tests validating complete schema with 1:1 Prisma parity
+
+### Vitest Migration (2025-07-24)
+- **[2025-07-24-authentication-migration-summary.md](./2025-07-24-authentication-migration-summary.md)** - Complete auth migration analysis
+- Performance: 18.5x overall improvement, up to 65x for pure functions
+- Key patterns: VitestMockContext, vi.hoisted() for env vars
 
 ## Contents
 
 - **[README.md](./README.md)** - Report generation and usage guide
-- **[2025-07-24-authentication-migration-summary.md](./2025-07-24-authentication-migration-summary.md)** - Complete auth migration analysis
-- **Individual Reports** - File-specific migration details
-- **Key Patterns** - VitestMockContext, vi.hoisted() for env vars
+- **Migration Reports** - Chronological technical migration documentation
+- **Performance Data** - Benchmarks and optimization results
+- **Pattern Evolution** - How our approaches have improved over time

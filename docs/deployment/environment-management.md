@@ -95,10 +95,10 @@ export function isDevelopmentOrPreview(): boolean {
 function getEnvironmentType() {
   // Test environment - set by test runners
   if (process.env["NODE_ENV"] === "test") return "test";
-  
+
   // Use VERCEL_ENV if available (Vercel deployments)
   if (process.env["VERCEL_ENV"]) return process.env["VERCEL_ENV"];
-  
+
   // Fallback to NODE_ENV for local development
   return process.env["NODE_ENV"] || "development";
 }
@@ -154,9 +154,12 @@ function getEnvironmentType() {
 
 ### Development Environment
 
-**Seed File**: `prisma/seed-dev.ts`
-**Command**: `npm run seed:dev`
-**Data**:
+**Seeding Commands**:
+
+- `npm run db:seed:local:sb` (local Supabase, default)
+- `npm run db:seed:local:sb` (explicit local Supabase)
+- `npm run db:seed:local:pg` (PostgreSQL-only for CI)
+  **Data**:
 
 - 5-10 fake users with various roles (admin, member, guest)
 - 20-30 sample issues with different statuses
@@ -166,8 +169,7 @@ function getEnvironmentType() {
 
 ### Preview Environment
 
-**Seed File**: `prisma/seed-preview.ts`
-**Command**: `npm run seed:preview`
+**Seeding Command**: `npm run seed:preview`
 **Data**:
 
 - 3-5 demo users with realistic profiles
@@ -178,8 +180,8 @@ function getEnvironmentType() {
 
 ### Production Environment
 
-**Seed File**: `prisma/seed-prod.ts`
-**Command**: `npm run seed:prod`
+**Seeding**: Manual process only (no automated commands for safety)
+**Process**: See `docs/deployment/production-deployment-guide.md`
 **Data**:
 
 - Austin Pinball Collective organization

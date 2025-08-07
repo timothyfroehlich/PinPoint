@@ -214,8 +214,8 @@ npm run validate     # Before starting work
 npm run validate     # Before every commit (MUST PASS)
 
 # Database
-npm run db:reset        # Complete reset + reseed
-npm run db:push         # Sync schema changes
+npm run db:reset:local:sb # Complete reset + reseed
+npm run db:push:local         # Sync schema changes
 
 # Quick Checks
 npm run check:brief     # Fast validation (typecheck + lint + format + audit)
@@ -242,7 +242,7 @@ During the pre-production phase, the following practices apply:
 
 - **Database strategy** - Frequent schema changes, no migrations
 - **Sessions** - Clear on `db:reset` (expected behavior)
-- **Schema evolution** - Use `npm run db:reset` for clean state
+- **Schema evolution** - Use `npm run db:reset:local:sb` for clean state
 - **OPDB games** - Global (no organizationId)
 - **Custom games** - Organization-scoped
 

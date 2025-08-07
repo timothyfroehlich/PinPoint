@@ -50,7 +50,7 @@ export function createMockUser(overrides: Partial<User> = {}): User {
 }
 ```
 
-### Vitest Configuration with Multi-Config
+### Vitest Configuration with Multi-Project Setup
 
 ```typescript
 // vitest.config.ts
@@ -58,27 +58,65 @@ export default defineConfig({
   test: {
     projects: [
       {
+        // Node environment for server-side tests (with database mocking)
         test: {
           name: "node",
+          globals: true,
+          environment: "node",
+          setupFiles: ["src/test/vitest.setup.ts"],
           typecheck: {
             tsconfig: "./tsconfig.tests.json", // Relaxed for tests
           },
+          // Serialize database tests to prevent connection conflicts
+          poolOptions: {
+            threads: { singleThread: true },
+          },
           include: [
-            "src/lib/**/*.vitest.test.{ts,tsx}",
-            "src/server/**/*.vitest.test.{ts,tsx}",
+            "src/lib/**/*.test.{ts,tsx}",
+            "src/server/**/*.test.{ts,tsx}",
+          ],
+          exclude: [
+            "node_modules",
+            "src/_archived_frontend",
+            "src/integration-tests",
+            "e2e",
           ],
         },
       },
       {
+        // Integration test environment (real database, no mocking)
+        test: {
+          name: "integration",
+          globals: true,
+          environment: "node",
+          setupFiles: ["src/test/vitest.integration.setup.ts"],
+          typecheck: {
+            tsconfig: "./tsconfig.tests.json",
+          },
+          // Serialize database tests to prevent connection conflicts
+          poolOptions: {
+            threads: { singleThread: true },
+          },
+          include: ["src/integration-tests/**/*.test.{ts,tsx}"],
+          exclude: ["node_modules", "src/_archived_frontend", "e2e"],
+        },
+      },
+      {
+        // jsdom environment for browser/React tests
         test: {
           name: "jsdom",
+          globals: true,
+          environment: "jsdom",
+          setupFiles: ["vitest.setup.react.ts"],
           typecheck: {
             tsconfig: "./tsconfig.tests.json", // Relaxed for tests
           },
           include: [
-            "src/app/**/*.vitest.test.{ts,tsx}",
-            "src/components/**/*.vitest.test.{ts,tsx}",
+            "src/app/**/*.test.{ts,tsx}",
+            "src/components/**/*.test.{ts,tsx}",
+            "src/hooks/**/*.test.{ts,tsx}",
           ],
+          exclude: ["node_modules", "src/_archived_frontend", "e2e"],
         },
       },
     ],
@@ -118,41 +156,93 @@ All tests now use Vitest exclusively.
 
 ### 4. Setup Files
 
-Common setup in `src/test/vitest.setup.ts`:
+#### Unit Test Setup (`src/test/vitest.setup.ts`)
+
+Unit tests with database mocking:
+
+```typescript
+import { beforeAll, afterAll, afterEach, vi } from "vitest";
+
+// Mock Prisma client for unit tests
+vi.mock("@prisma/client", () => ({
+  PrismaClient: vi.fn(() => ({
+    // Comprehensive mock implementation
+    $connect: vi.fn(),
+    $disconnect: vi.fn(),
+    user: { findUnique: vi.fn(), create: vi.fn() },
+    // ... other mocked methods
+  })),
+}));
+
+beforeAll(() => {
+  // Environment variables loaded by src/lib/env-loaders/test.ts
+});
+
+afterEach(() => {
+  vi.clearAllMocks();
+});
+```
+
+#### Integration Test Setup (`src/test/vitest.integration.setup.ts`)
+
+Integration tests with real database - **NO mocking**:
 
 ```typescript
 import { beforeAll, afterAll, afterEach } from "vitest";
 
-// Set test environment variables
-process.env.NODE_ENV = "test";
-process.env.DATABASE_URL = "postgresql://test";
+// No database mocking - uses real Supabase database
 
 beforeAll(() => {
-  // Global setup
+  // Ensure database is available for integration tests
+  if (!process.env.DATABASE_URL) {
+    throw new Error(
+      "DATABASE_URL is required for integration tests. Ensure Supabase is running.",
+    );
+  }
+
+  // Reject test/mock URLs - integration tests need real database
+  if (process.env.DATABASE_URL.includes("test://")) {
+    throw new Error(
+      "Integration tests require a real database URL. Check .env.test configuration.",
+    );
+  }
 });
 
 afterEach(() => {
-  // Cleanup after each test
+  // Cleanup handled by individual tests using transactions
 });
 
 afterAll(() => {
-  // Global teardown
+  // Global cleanup
 });
 ```
 
 ## Environment-Specific Configuration
 
-### Node Environment
+### Node Environment (Unit Tests)
 
-- For server-side code, API routes, services
-- No DOM globals
-- Direct file system access
+- **Purpose**: Server-side code, API routes, services with mocked database
+- **Setup**: `src/test/vitest.setup.ts` with comprehensive database mocking
+- **Database**: Mocked Prisma/Drizzle clients
+- **Features**: No DOM globals, direct file system access
+- **Files**: `src/lib/**/*.test.ts`, `src/server/**/*.test.ts`
+
+### Integration Environment (Real Database)
+
+- **Purpose**: Full integration tests with real database operations
+- **Setup**: `src/test/vitest.integration.setup.ts` with NO mocking
+- **Database**: Real Supabase database (requires `supabase start`)
+- **Features**: Real database constraints, RLS policies, transactions
+- **Files**: `src/integration-tests/**/*.test.ts`
+- **Requirement**: Supabase must be running locally
 
 ### jsdom Environment
 
-- For React components, hooks, browser code
-- DOM globals available
-- Browser-like environment
+- **Purpose**: React components, hooks, browser code
+- **Setup**: `vitest.setup.react.ts` with React testing utilities
+- **Database**: Mocked (for component tests)
+- **Features**: DOM globals available, browser-like environment
+- **Files**: `src/app/**/*.test.tsx`, `src/components/**/*.test.tsx`
 
 ## Coverage Configuration
 
@@ -173,20 +263,25 @@ coverage: {
 ## CLI Usage
 
 ```bash
-# Run all tests
-npm run test:vitest
+# Run all tests (unit, integration, and component tests)
+npm run test
 
 # Run specific project
-npm run test:vitest -- --project=node
+npm run test -- --project=node         # Unit tests with mocked database
+npm run test -- --project=integration  # Integration tests with real database
+npm run test -- --project=jsdom        # React component tests
+
+# Run integration tests specifically (requires Supabase running)
+npm run test src/integration-tests/ src/server/db/drizzle-crud-validation.test.ts
 
 # Run with coverage
-npm run test:vitest:coverage
+npm run test:coverage
 
 # Watch mode
-npm run test:vitest:watch
+npm run test -- --watch
 
 # UI mode
-npm run test:vitest:ui
+npm run test -- --ui
 ```
 
 ## Deprecated Patterns
@@ -258,3 +353,25 @@ If tests fail with "window is not defined":
 
 - Check the test is in the correct project (jsdom vs node)
 - Verify the file glob patterns match your test location
+
+### Integration Test Issues
+
+If integration tests fail with "DATABASE_URL is required":
+
+- Ensure Supabase is running: `supabase status`
+- Start Supabase if needed: `supabase start`
+- Check `.env.test` has correct DATABASE_URL
+
+If integration tests are being skipped:
+
+- **This is now an error** - integration tests never skip
+- Tests will fail hard with clear error messages about database connectivity
+- Fix the database connection rather than expecting tests to skip
+
+### Project Configuration Issues
+
+If specific project tests aren't running:
+
+- Check file patterns match the project's `include` glob
+- Use `npm run test -- --project=integration` to run specific project
+- Verify setup files exist and are correctly referenced

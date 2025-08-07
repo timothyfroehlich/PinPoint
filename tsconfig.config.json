@@ -14,8 +14,10 @@
   },
   "include": [
     "*.config.{ts,js}",
+    "drizzle.config.*.ts",
     "vitest.setup.*.ts",
     "scripts/**/*.{ts,js}",
+    "scripts/seed/*.ts",
     ".betterer.ts",
     "types/**/*.d.ts"
   ],

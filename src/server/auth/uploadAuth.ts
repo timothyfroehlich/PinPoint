@@ -14,7 +14,7 @@ export interface UploadAuthContext {
   organization: {
     id: string;
     name: string;
-    subdomain: string | null;
+    subdomain: string;
   };
   membership: {
     id: string;

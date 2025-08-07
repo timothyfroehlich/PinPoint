@@ -413,7 +413,7 @@ createdAt DateTime @default(now())
 1. Move existing frontend code out of compilation path
 2. Delete Playwright tests (frontend will be rebuilt)
 3. Replace schema.prisma with complete V1.0 schema
-4. Update seed.ts for new schema (default roles created automatically on org creation)
+4. Update seeding architecture for new schema (explicit target-based seeding)
 5. Rebuild tRPC authorization middleware for permission-based system
 6. Update existing backend tests for new schema
 

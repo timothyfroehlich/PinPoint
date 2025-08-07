@@ -1,6 +1,6 @@
 export function constructReportUrl(machine: {
   id: string;
-  organization: { subdomain: string | null };
+  organization: { subdomain: string };
 }): string {
   const domain = machine.organization.subdomain
     ? `${machine.organization.subdomain}.pinpoint.app`
