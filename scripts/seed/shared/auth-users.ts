@@ -256,7 +256,7 @@ async function upsertSupabaseAuthUser(
 }
 
 /**
- * Process batch of users with idempotent upsert approach
+ * Process batch of users with idempotent upsert approach and optimized database operations
  */
 async function processBatchUsers(
   userList: UserData[],
@@ -292,7 +292,22 @@ async function processBatchUsers(
     };
   }
 
-  // Process each user with idempotent approach
+  // Get existing database users and memberships in batch
+  const existingDbUsers = await db
+    .select({ id: users.id, email: users.email })
+    .from(users);
+  const dbUsersMap = new Map(existingDbUsers.map(u => [u.email ?? "", u.id]));
+
+  const existingMemberships = await db
+    .select({ userId: memberships.userId })
+    .from(memberships)
+    .where(eq(memberships.organizationId, organizationId));
+  const membershipSet = new Set(existingMemberships.map(m => m.userId));
+
+  // Process each user with optimized database operations
+  const usersToCreateInDb: any[] = [];
+  const membershipsToCreate: any[] = [];
+
   for (const userData of userList) {
     try {
       // Upsert Supabase auth user (idempotent)
@@ -312,29 +327,15 @@ async function processBatchUsers(
       // Track creation vs existing
       if (authResult.wasCreated) {
         createdCount++;
+        // Wait a moment for auth trigger to potentially create User record
+        await new Promise((resolve) => setTimeout(resolve, 100));
       } else {
         existedCount++;
       }
 
-      // Ensure app database User record exists and create membership
-      // Wait a moment for auth trigger to create User record (for new users)
-      if (authResult.wasCreated) {
-        await new Promise((resolve) => setTimeout(resolve, 100));
-      }
-
-      // Ensure User record exists (auth trigger should create it, but verify)
-      const existingDbUser = await db
-        .select()
-        .from(users)
-        .where(eq(users.id, authResult.userId))
-        .limit(1);
-
-      if (existingDbUser.length === 0) {
-        // Create new user record
-        console.log(
-          `[AUTH] Creating app database User record for ${userData.email}`,
-        );
-        await db.insert(users).values({
+      // Check if database User record needs to be created
+      if (!dbUsersMap.has(userData.email)) {
+        usersToCreateInDb.push({
           id: authResult.userId,
           name: userData.name,
           email: userData.email,
@@ -343,14 +344,30 @@ async function processBatchUsers(
           createdAt: new Date(),
           updatedAt: new Date(),
         });
+        dbUsersMap.set(userData.email, authResult.userId); // Update map
       }
 
-      // Always ensure membership exists (idempotent)
-      await createUserMembership(
-        authResult.userId,
-        organizationId,
-        userData.role,
-      );
+      // Check if membership needs to be created
+      if (!membershipSet.has(authResult.userId)) {
+        // Find the role for membership
+        const roleResults = await db
+          .select({ id: roles.id })
+          .from(roles)
+          .where(
+            and(eq(roles.name, userData.role), eq(roles.organizationId, organizationId)),
+          )
+          .limit(1);
+
+        if (roleResults.length > 0 && roleResults[0]) {
+          membershipsToCreate.push({
+            id: nanoid(),
+            userId: authResult.userId,
+            organizationId,
+            roleId: roleResults[0].id,
+          });
+          membershipSet.add(authResult.userId); // Update set
+        }
+      }
 
       successCount++;
       console.log(
@@ -363,6 +380,30 @@ async function processBatchUsers(
       const fullError = `Error processing ${userData.email}: ${errorMessage}`;
       errors.push(fullError);
       console.error(`[AUTH] ❌ ${fullError}`);
+    }
+  }
+
+  // Batch create database User records
+  if (usersToCreateInDb.length > 0) {
+    try {
+      await db.insert(users).values(usersToCreateInDb);
+      console.log(
+        `[AUTH] ✅ Created ${usersToCreateInDb.length.toString()} User records via batch insert`,
+      );
+    } catch (error) {
+      console.error(`[AUTH] ❌ Failed to batch create User records:`, error);
+    }
+  }
+
+  // Batch create memberships
+  if (membershipsToCreate.length > 0) {
+    try {
+      await db.insert(memberships).values(membershipsToCreate);
+      console.log(
+        `[AUTH] ✅ Created ${membershipsToCreate.length.toString()} memberships via batch insert`,
+      );
+    } catch (error) {
+      console.error(`[AUTH] ❌ Failed to batch create memberships:`, error);
     }
   }
 
@@ -441,6 +482,7 @@ export async function seedAuthUsers(
   organizationId: string,
   target: SeedTarget,
 ): Promise<void> {
+  const startTime = Date.now();
   const users = STANDARD_USERS;
   console.log(
     `[AUTH] Creating ${users.length.toString()} auth users for organization ${organizationId}...`,
@@ -464,8 +506,9 @@ export async function seedAuthUsers(
     const results = await processBatchUsers(users, organizationId);
 
     // Report results with detailed breakdown
+    const duration = Date.now() - startTime;
     console.log(
-      `[AUTH] ✅ Auth user seeding complete: ${results.successCount.toString()} total processed`,
+      `[AUTH] ✅ Auth user seeding complete: ${results.successCount.toString()} total processed in ${duration}ms`,
     );
     console.log(
       `[AUTH]   📊 Created: ${results.createdCount.toString()}, Already existed: ${results.existedCount.toString()}, Errors: ${results.errorCount.toString()}`,

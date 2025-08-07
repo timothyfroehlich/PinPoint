@@ -149,35 +149,44 @@ function parseGameTitle(title: string): {
 }
 
 /**
- * Create OPDB models from unique games
+ * Create OPDB models from unique games with batch operations
  */
 async function createModels(games: UniqueGame[]): Promise<void> {
   console.log(`[SAMPLE] Creating ${games.length.toString()} OPDB models...`);
 
   try {
-    for (const game of games) {
-      // Use upsert pattern - insert if not exists, skip if exists
-      const existingModel = await db
-        .select({ id: models.id })
-        .from(models)
-        .where(eq(models.opdbId, game.opdbId))
-        .limit(1);
+    if (games.length === 0) {
+      console.log(`[SAMPLE] No games to process`);
+      return;
+    }
 
-      if (existingModel.length === 0) {
-        await db.insert(models).values({
-          id: `model_${game.opdbId}`, // Deterministic ID generation
-          name: game.name,
-          manufacturer: game.manufacturer,
-          year: game.year,
-          opdbId: game.opdbId,
-          isCustom: false, // OPDB games are not custom
-          isActive: true,
-        });
+    // Get existing models for all game OPDB IDs in one query
+    const gameOpdbIds = games.map(g => g.opdbId);
+    const existingModels = await db
+      .select({ opdbId: models.opdbId })
+      .from(models);
 
-        console.log(`[SAMPLE] ✅ Created model: ${game.name}`);
-      } else {
-        console.log(`[SAMPLE] ⏭️  Model exists: ${game.name}`);
-      }
+    const existingSet = new Set(existingModels.map(m => m.opdbId));
+
+    // Find models that need to be created
+    const modelsToCreate = games.filter(
+      game => !existingSet.has(game.opdbId)
+    ).map(game => ({
+      id: `model_${game.opdbId}`, // Deterministic ID generation
+      name: game.name,
+      manufacturer: game.manufacturer,
+      year: game.year,
+      opdbId: game.opdbId,
+      isCustom: false, // OPDB games are not custom
+      isActive: true,
+    }));
+
+    // Batch create all missing models
+    if (modelsToCreate.length > 0) {
+      await db.insert(models).values(modelsToCreate);
+      console.log(`[SAMPLE] ✅ Created ${modelsToCreate.length.toString()} models via batch insert`);
+    } else {
+      console.log(`[SAMPLE] ⏭️  All ${games.length.toString()} models already exist`);
     }
 
     console.log(`[SAMPLE] ✅ Model creation completed`);
@@ -189,7 +198,7 @@ async function createModels(games: UniqueGame[]): Promise<void> {
 }
 
 /**
- * Create machines for all models at the organization's location
+ * Create machines for all models at the organization's location with batch operations
  */
 async function createMachines(
   organizationId: string,
@@ -200,6 +209,11 @@ async function createMachines(
   );
 
   try {
+    if (games.length === 0) {
+      console.log(`[SAMPLE] No games to process for machine creation`);
+      return;
+    }
+
     // Find the Austin Pinball Collective location
     const location = await db
       .select({ id: locations.id, name: locations.name })
@@ -235,55 +249,51 @@ async function createMachines(
     const devUser = devUsers[0];
     const ownerId = devUser?.id;
 
-    // Create machines for each model
-    let machineCount = 0;
-    for (const game of games) {
-      // Find the model we created
-      const model = await db
-        .select({ id: models.id })
-        .from(models)
-        .where(eq(models.opdbId, game.opdbId))
-        .limit(1);
+    // Get all models by OPDB ID in one query
+    const gameOpdbIds = games.map(g => g.opdbId);
+    const modelsData = await db
+      .select({ id: models.id, opdbId: models.opdbId, name: models.name })
+      .from(models);
 
-      if (model.length === 0) {
+    const modelsMap = new Map(modelsData.map(m => [m.opdbId, m]));
+
+    // Get existing machines for this organization and location
+    const existingMachines = await db
+      .select({ modelId: machines.modelId })
+      .from(machines)
+      .where(
+        and(
+          eq(machines.organizationId, organizationId),
+          eq(machines.locationId, locationId),
+        ),
+      );
+
+    const existingMachineModelIds = new Set(existingMachines.map(m => m.modelId));
+
+    // Build machines to create
+    const machinesToCreate = [];
+    let machineCount = 0;
+
+    for (const game of games) {
+      const model = modelsMap.get(game.opdbId);
+      if (!model) {
         console.warn(
           `[SAMPLE] ⚠️  Model not found for ${game.name}, skipping machine`,
         );
         continue;
       }
 
-      const modelRecord = model[0];
-      if (!modelRecord) {
-        console.warn(
-          `[SAMPLE] ⚠️  Model record unexpectedly undefined for ${game.name}, skipping machine`,
-        );
-        continue;
-      }
-      const modelId = modelRecord.id;
-
-      // Check if machine already exists
-      const existingMachine = await db
-        .select({ id: machines.id })
-        .from(machines)
-        .where(
-          and(
-            eq(machines.organizationId, organizationId),
-            eq(machines.locationId, locationId),
-            eq(machines.modelId, modelId),
-          ),
-        )
-        .limit(1);
-
-      if (existingMachine.length === 0) {
+      // Check if machine already exists for this model
+      if (!existingMachineModelIds.has(model.id)) {
         machineCount++;
         const qrCodeId = `qr-${game.name.toLowerCase().replace(/\s+/g, "-")}-${machineCount}`;
 
-        await db.insert(machines).values({
-          id: `machine_${modelId}_${locationId}`, // Deterministic ID
+        machinesToCreate.push({
+          id: `machine_${model.id}_${locationId}`, // Deterministic ID
           name: `${game.name} #${machineCount}`,
           organizationId,
           locationId,
-          modelId,
+          modelId: model.id,
           ownerId,
           qrCodeId,
           ownerNotificationsEnabled: true,
@@ -291,17 +301,23 @@ async function createMachines(
           notifyOnStatusChanges: true,
           notifyOnComments: false,
         });
-
-        console.log(
-          `[SAMPLE] ✅ Created machine: ${game.name} #${machineCount}`,
-        );
-      } else {
-        console.log(`[SAMPLE] ⏭️  Machine exists: ${game.name}`);
       }
     }
 
+    // Batch create all missing machines
+    if (machinesToCreate.length > 0) {
+      await db.insert(machines).values(machinesToCreate);
+      console.log(
+        `[SAMPLE] ✅ Created ${machinesToCreate.length.toString()} machines via batch insert`,
+      );
+    } else {
+      console.log(
+        `[SAMPLE] ⏭️  All machines for ${games.length.toString()} models already exist`,
+      );
+    }
+
     console.log(
-      `[SAMPLE] ✅ Machine creation completed (${machineCount} machines)`,
+      `[SAMPLE] ✅ Machine creation completed (${machinesToCreate.length} new machines)`,
     );
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -325,7 +341,7 @@ function mapSeverityToPriority(severity: string): string {
 }
 
 /**
- * Create sample issues mapped to machines
+ * Create sample issues mapped to machines with batch operations
  */
 async function createSampleIssues(
   organizationId: string,
@@ -355,7 +371,7 @@ async function createSampleIssues(
       `[SAMPLE] Creating ${sampleIssues.length.toString()} sample issues...`,
     );
 
-    // Get priority and status mappings
+    // Get priority and status mappings in batch
     const priorityMap = new Map<string, string>();
     const allPriorities = await db
       .select({ id: priorities.id, name: priorities.name })
@@ -388,33 +404,38 @@ async function createSampleIssues(
       }
     }
 
-    // Create issues
-    let issueCount = 0;
+    // Get machines with models in batch
+    const machineData = await db
+      .select({
+        id: machines.id,
+        name: machines.name,
+        opdbId: models.opdbId,
+      })
+      .from(machines)
+      .innerJoin(models, eq(machines.modelId, models.id))
+      .where(eq(machines.organizationId, organizationId));
+
+    const machineMap = new Map(machineData.map(m => [m.opdbId, m]));
+
+    // Get existing issues to avoid duplicates
+    const existingIssues = await db
+      .select({ title: issues.title, machineId: issues.machineId })
+      .from(issues)
+      .where(eq(issues.organizationId, organizationId));
+
+    const existingIssuesSet = new Set(
+      existingIssues.map(i => `${i.machineId}_${i.title}`)
+    );
+
+    // Build issues to create
+    const issuesToCreate = [];
     let skippedCount = 0;
 
     for (const issueData of sampleIssues) {
       try {
         // Find machine by OPDB ID
-        const machine = await db
-          .select({
-            id: machines.id,
-            name: machines.name,
-            model: {
-              name: models.name,
-              opdbId: models.opdbId,
-            },
-          })
-          .from(machines)
-          .innerJoin(models, eq(machines.modelId, models.id))
-          .where(
-            and(
-              eq(machines.organizationId, organizationId),
-              eq(models.opdbId, issueData.gameOpdbId),
-            ),
-          )
-          .limit(1);
-
-        if (machine.length === 0) {
+        const machine = machineMap.get(issueData.gameOpdbId);
+        if (!machine) {
           console.warn(
             `[SAMPLE] ⚠️  Machine not found for OPDB ID ${issueData.gameOpdbId}, skipping issue`,
           );
@@ -422,15 +443,12 @@ async function createSampleIssues(
           continue;
         }
 
-        const machineRecord = machine[0];
-        if (!machineRecord) {
-          console.warn(
-            `[SAMPLE] ⚠️  Machine record unexpectedly undefined for OPDB ID ${issueData.gameOpdbId}, skipping issue`,
-          );
-          skippedCount++;
+        // Check if issue already exists
+        const issueKey = `${machine.id}_${issueData.title}`;
+        if (existingIssuesSet.has(issueKey)) {
+          console.log(`[SAMPLE] ⏭️  Issue exists: ${issueData.title}`);
           continue;
         }
-        const machineId = machineRecord.id;
 
         // Map priority
         const priorityName = mapSeverityToPriority(issueData.severity);
@@ -463,50 +481,40 @@ async function createSampleIssues(
           continue;
         }
 
-        // Check if issue already exists (basic duplicate prevention)
-        const existingIssue = await db
-          .select({ id: issues.id })
-          .from(issues)
-          .where(
-            and(
-              eq(issues.organizationId, organizationId),
-              eq(issues.machineId, machineId),
-              eq(issues.title, issueData.title),
-            ),
-          )
-          .limit(1);
-
-        if (existingIssue.length === 0) {
-          await db.insert(issues).values({
-            id: `issue_${issueCount}_${Date.now()}`, // Unique ID
-            title: issueData.title,
-            description: issueData.description,
-            consistency: issueData.consistency,
-            organizationId,
-            machineId,
-            statusId,
-            priorityId,
-            createdById,
-            createdAt: new Date(issueData.createdAt),
-            updatedAt: new Date(issueData.updatedAt),
-          });
-
-          issueCount++;
-          console.log(`[SAMPLE] ✅ Created issue: ${issueData.title}`);
-        } else {
-          console.log(`[SAMPLE] ⏭️  Issue exists: ${issueData.title}`);
-        }
+        issuesToCreate.push({
+          id: `issue_${issuesToCreate.length}_${Date.now()}`, // Unique ID
+          title: issueData.title,
+          description: issueData.description,
+          consistency: issueData.consistency,
+          organizationId,
+          machineId: machine.id,
+          statusId,
+          priorityId,
+          createdById,
+          createdAt: new Date(issueData.createdAt),
+          updatedAt: new Date(issueData.updatedAt),
+        });
       } catch (error) {
         console.warn(
-          `[SAMPLE] ⚠️  Failed to create issue '${issueData.title}':`,
+          `[SAMPLE] ⚠️  Failed to process issue '${issueData.title}':`,
           error,
         );
         skippedCount++;
       }
     }
 
+    // Batch create all issues
+    if (issuesToCreate.length > 0) {
+      await db.insert(issues).values(issuesToCreate);
+      console.log(
+        `[SAMPLE] ✅ Created ${issuesToCreate.length.toString()} issues via batch insert`,
+      );
+    } else {
+      console.log(`[SAMPLE] ⏭️  No new issues to create`);
+    }
+
     console.log(
-      `[SAMPLE] ✅ Issue creation completed: ${issueCount} created, ${skippedCount} skipped`,
+      `[SAMPLE] ✅ Issue creation completed: ${issuesToCreate.length} created, ${skippedCount} skipped`,
     );
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -522,6 +530,7 @@ export async function seedSampleData(
   organizationId: string,
   dataAmount: DataAmount,
 ): Promise<void> {
+  const startTime = Date.now();
   console.log(
     `[SAMPLE] 🎮 Starting sample data seeding for organization ${organizationId}...`,
   );
@@ -542,7 +551,8 @@ export async function seedSampleData(
     // Phase 4: Create sample issues mapped to machines
     await createSampleIssues(organizationId, dataAmount);
 
-    console.log(`[SAMPLE] ✅ Sample data seeding completed successfully!`);
+    const duration = Date.now() - startTime;
+    console.log(`[SAMPLE] ✅ Sample data seeding completed successfully in ${duration}ms!`);
     console.log(`[SAMPLE] 📊 Summary:`);
     console.log(`[SAMPLE]   - Games: ${uniqueGames.length} unique OPDB models`);
     console.log(
