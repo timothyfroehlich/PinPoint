@@ -16,7 +16,7 @@ PinPoint implements a comprehensive Role-Based Access Control (RBAC) system with
 
 ### Core Models
 
-**Location**: `prisma/schema.prisma`
+**Location**: `src/server/db/schema/organizations.ts`
 
 #### Role Model
 

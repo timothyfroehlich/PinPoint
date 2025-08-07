@@ -1,7 +1,9 @@
 import { vi } from "vitest";
 
+import type { LoggerInterface } from "~/lib/logger";
 import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 import type { ExtendedPrismaClient } from "~/server/db";
+import type { DrizzleClient } from "~/server/db/drizzle";
 import type { ServiceFactory } from "~/server/services/factory";
 
 // Mock Supabase client
@@ -23,8 +25,25 @@ const mockSupabaseClient = {
   single: vi.fn().mockResolvedValue({ data: null, error: null }),
 };
 
+// Mock Drizzle client for tests - supports complex chaining patterns
+// Use simpler approach to avoid TypeScript/ESLint conflicts
+const mockDrizzleClient = {
+  select: vi.fn().mockReturnThis(),
+  from: vi.fn().mockReturnThis(),
+  where: vi.fn().mockReturnThis(),
+  orderBy: vi.fn().mockReturnThis(),
+  insert: vi.fn().mockReturnThis(),
+  update: vi.fn().mockReturnThis(),
+  delete: vi.fn().mockReturnThis(),
+  values: vi.fn().mockReturnThis(),
+  set: vi.fn().mockReturnThis(),
+  returning: vi.fn().mockResolvedValue([]), // Returns array for destructuring [result]
+  execute: vi.fn().mockResolvedValue([]),
+} as unknown as DrizzleClient;
+
 export interface VitestMockContext {
   db: ExtendedPrismaClient;
+  drizzle: DrizzleClient;
   services: ServiceFactory;
   user: PinPointSupabaseUser | null;
   supabase: typeof mockSupabaseClient;
@@ -34,6 +53,7 @@ export interface VitestMockContext {
     subdomain: string;
   } | null;
   headers: Headers;
+  logger: LoggerInterface;
 }
 
 export function createVitestMockContext(): VitestMockContext {
@@ -201,8 +221,23 @@ export function createVitestMockContext(): VitestMockContext {
     createQRCodeService: vi.fn(),
   } as unknown as ServiceFactory;
 
+  // Create mock logger
+  const mockLogger = {
+    error: vi.fn(),
+    warn: vi.fn(),
+    info: vi.fn(),
+    debug: vi.fn(),
+    trace: vi.fn(),
+    child: vi.fn(() => mockLogger),
+    withRequest: vi.fn(() => mockLogger),
+    withUser: vi.fn(() => mockLogger),
+    withOrganization: vi.fn(() => mockLogger),
+    withContext: vi.fn(() => mockLogger),
+  } as unknown as LoggerInterface;
+
   return {
     db: mockDb,
+    drizzle: mockDrizzleClient,
     services: mockServices,
     user: mockUser,
     supabase: mockSupabaseClient,
@@ -212,5 +247,6 @@ export function createVitestMockContext(): VitestMockContext {
       subdomain: "test",
     },
     headers: new Headers(),
+    logger: mockLogger,
   };
 }

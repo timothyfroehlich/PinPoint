@@ -27,12 +27,7 @@ export interface DevUserCreationResult {
 const DEV_PASSWORD = "dev-login-123";
 
 // Allowed email domains for dev users
-const ALLOWED_DEV_DOMAINS = [
-  "dev.local",
-  "test.com",
-  "pinpoint.dev",
-  "test.local",
-];
+const ALLOWED_DEV_DOMAINS = ["dev.local", "pinpoint.dev"];
 
 /**
  * Validates if an email is allowed for dev user creation

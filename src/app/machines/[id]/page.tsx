@@ -6,6 +6,9 @@ import { MachineDetailView } from "~/components/machines/MachineDetailView";
 import { getSupabaseUser } from "~/server/auth/supabase";
 import { api } from "~/trpc/server";
 
+// Next.js automatically serializes Date objects to ISO strings when passing
+// from server components to client components, so we can safely cast the type
+
 interface MachinePageProps {
   params: Promise<{
     id: string;

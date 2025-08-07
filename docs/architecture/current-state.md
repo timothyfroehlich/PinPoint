@@ -13,9 +13,10 @@ PinPoint is a multi-tenant issue tracking system for pinball arcade operators, b
 
 > ⚠️ **MIGRATION IN PROGRESS**: PinPoint is actively migrating from Prisma + NextAuth to Supabase + Drizzle with database-level Row Level Security.
 >
-> - **Current Stack**: Prisma ORM + NextAuth.js + Application-level security
+> - **Current Stack**: Dual-ORM (Prisma + Drizzle) + Supabase Auth + Application-level security
 > - **Target Stack**: Drizzle ORM + Supabase (Auth, Storage, RLS) + Database-level security
-> - **Timeline**: 6-week staged migration (Phase 1 in progress)
+> - **Progress**: Phase 1 (Supabase Auth) ✅ Complete | Phase 2A (Drizzle Foundation) ✅ Complete | Phase 2B-E 🔄 In Progress
+> - **Timeline**: 6-week staged migration (Week 4 of 6)
 >
 > For migration details, see [Migration Guide](/docs/migration/supabase-drizzle/)
 
@@ -27,8 +28,8 @@ PinPoint is a multi-tenant issue tracking system for pinball arcade operators, b
 | **Framework**      | Next.js 14 (App Router)                   | ✅ Implemented |
 | **UI Library**     | Material UI (MUI) v7 (yes, it's released) | ✅ Implemented |
 | **Database**       | PostgreSQL                                | ✅ Implemented |
-| **ORM**            | Prisma with extensions                    | ✅ Implemented |
-| **Authentication** | NextAuth.js (Auth.js v5)                  | ✅ Implemented |
+| **ORM**            | Prisma + Drizzle (dual-ORM migration)     | 🔄 Migrating   |
+| **Authentication** | Supabase Auth                             | ✅ Implemented |
 | **API Layer**      | tRPC (exclusive)                          | ✅ Implemented |
 | **File Storage**   | Local (dev) / Vercel Blob (prod)          | ✅ Implemented |
 | **External APIs**  | OPDB, PinballMap                          | 🔄 In Progress |
@@ -133,6 +134,37 @@ src/server/api/routers/
 3. User's role has required permission
 4. Organization context matches request
 ```
+
+### Dual-ORM Architecture (Migration Phase)
+
+During the migration from Prisma to Drizzle, PinPoint maintains both ORMs in parallel:
+
+#### tRPC Context Integration
+
+```typescript
+export interface TRPCContext {
+  db: ExtendedPrismaClient; // Existing Prisma client
+  drizzle: DrizzleClient; // New Drizzle client
+  user: PinPointSupabaseUser | null;
+  supabase: SupabaseServerClient;
+  organization: Organization | null;
+  // ... other properties
+}
+```
+
+#### Benefits
+
+- **Gradual Migration**: Convert procedures one at a time
+- **Zero Downtime**: Both ORMs work simultaneously
+- **Rollback Safety**: Can revert individual procedures if needed
+- **Type Safety**: Full TypeScript support for both ORMs
+
+#### Current Status (Phase 2A Complete)
+
+- ✅ Complete Drizzle schema with 1:1 Prisma parity
+- ✅ Both clients available in all tRPC procedures
+- ✅ 39 tests validate dual-ORM functionality
+- 🔄 Router migrations in progress (Phase 2B-E)
 
 ### Unified Dashboard Progressive Enhancement
 
@@ -254,8 +286,9 @@ npm run validate      # Run before starting work
 npm run validate    # Must pass before commits
 
 # Database
-npm run db:reset      # Reset and reseed
-npm run db:push       # Push schema changes
+npm run db:reset:local:sb   # Reset and reseed
+npm run db:push:local       # Push schema changes
+npm run db:seed:local:sb          # Seed data only
 
 # Testing
 npm run test:coverage # Run tests with coverage report

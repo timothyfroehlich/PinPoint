@@ -184,7 +184,12 @@ export function IssueCreateForm({
     return (
       <Card>
         <CardContent sx={{ p: 4, textAlign: "center" }}>
-          <Typography variant="h5" color="success.main" gutterBottom>
+          <Typography
+            variant="h5"
+            color="success.main"
+            gutterBottom
+            data-testid="issue-success-message"
+          >
             ✅ Issue Created Successfully!
           </Typography>
           <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
@@ -256,6 +261,7 @@ export function IssueCreateForm({
               required
               sx={{ mb: 3 }}
               placeholder="Brief description of the problem"
+              data-testid="issue-title-input"
             />
 
             <TextField
@@ -423,6 +429,7 @@ export function IssueCreateForm({
                   }}
                   sx={{ mb: 2 }}
                   placeholder="Get notified when your issue is resolved"
+                  data-testid="issue-email-input"
                 />
 
                 <Alert severity="info" sx={{ mb: 3 }}>
@@ -446,6 +453,7 @@ export function IssueCreateForm({
               type="submit"
               variant="contained"
               disabled={isSubmitting || !formData.machineId || !formData.title}
+              data-testid="issue-submit-button"
             >
               {isSubmitting ? "Creating..." : "Create Issue"}
             </Button>

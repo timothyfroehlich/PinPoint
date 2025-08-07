@@ -5,10 +5,23 @@ updates:
     schedule:
       interval: "daily"
     target-branch: "main"
+    versioning-strategy: increase
+    open-pull-requests-limit: 5
+    rebase-strategy: "auto"
+    commit-message:
+      prefix: "chore"
+      prefix-development: "chore"
+      include: "scope"
     groups:
       minor-patch-updates:
         applies-to: version-updates
         update-types:
+          - "minor"
+          - "patch"
+      security-updates:
+        applies-to: security-updates
+        update-types:
+          - "major"
           - "minor"
           - "patch"
     # Auto-merge for all npm updates (minor, patch, and major)
@@ -24,6 +37,13 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly" # Check for updates weekly
+    versioning-strategy: increase
+    open-pull-requests-limit: 5
+    rebase-strategy: "auto"
+    commit-message:
+      prefix: "chore"
+      prefix-development: "chore"
+      include: "scope"
     # Auto-merge for all GitHub Actions updates
     auto-merge: true
     labels:

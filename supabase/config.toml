@@ -2,7 +2,7 @@
 # https://supabase.com/docs/guides/local-development/cli/config
 # A string used to distinguish different Supabase projects on the same host. Defaults to the
 # working directory name when running `supabase init`.
-# project_id = "supa-db-migration" # Commented out to use working directory name
+ project_id = "pinpoint-singleton" # Commented out to use working directory name
 
 [api]
 enabled = true
@@ -310,7 +310,7 @@ enabled = true
 # Use `oneshot` for hot reload, or `per_worker` for load testing.
 policy = "oneshot"
 # Port to attach the Chrome inspector for debugging edge functions.
-inspector_port = 54520
+inspector_port = 54438
 # The Deno major version to use.
 deno_version = 1
 
@@ -319,7 +319,7 @@ deno_version = 1
 
 [analytics]
 enabled = true
-port = 54620
+port = 54538
 # Configure one of the supported backends: `postgres`, `bigquery`.
 backend = "postgres"
 

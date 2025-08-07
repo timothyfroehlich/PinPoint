@@ -61,7 +61,7 @@ Before starting, read these project documents (paths will be project-specific):
 ### Database Changes (if applicable)
 
 - **Schema modifications**: [Describe any Prisma schema changes needed]
-- **Migration notes**: Use `npm run db:push` for schema sync (pre-production)
+- **Migration notes**: Use `npm run db:push:local` for schema sync (pre-production)
 - **Seed data**: [Any seed data requirements]
 
 ### Frontend Changes (if applicable)

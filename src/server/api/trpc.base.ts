@@ -14,6 +14,7 @@ import type { LoggerInterface } from "~/lib/logger";
 import type { SupabaseServerClient } from "~/lib/supabase/server";
 import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 import type { ExtendedPrismaClient } from "~/server/db";
+import type { DrizzleClient } from "~/server/db/drizzle";
 
 import { env } from "~/env";
 import { logger } from "~/lib/logger";
@@ -77,6 +78,7 @@ interface Membership {
  */
 export interface TRPCContext {
   db: ExtendedPrismaClient;
+  drizzle: DrizzleClient;
   user: PinPointSupabaseUser | null;
   supabase: SupabaseServerClient;
   organization: Organization | null;
@@ -113,6 +115,7 @@ export const createTRPCContext = async (
   const dbProvider = getGlobalDatabaseProvider();
 
   const db = dbProvider.getClient();
+  const drizzle = dbProvider.getDrizzleClient();
   const services = new ServiceFactory(db);
   const supabase = await createClient();
   const user = await getSupabaseUser();
@@ -125,7 +128,12 @@ export const createTRPCContext = async (
       where: { id: user.app_metadata.organization_id },
     });
     if (org) {
-      organization = org as Organization;
+      // Type-safe assignment - Prisma findUnique returns full object
+      organization = {
+        id: org.id,
+        subdomain: org.subdomain,
+        name: org.name,
+      } satisfies Organization;
     }
   }
 
@@ -139,7 +147,12 @@ export const createTRPCContext = async (
       where: { subdomain },
     });
     if (org) {
-      organization = org as Organization;
+      // Type-safe assignment - Prisma findUnique returns full object
+      organization = {
+        id: org.id,
+        subdomain: org.subdomain,
+        name: org.name,
+      } satisfies Organization;
     }
   }
 
@@ -152,6 +165,7 @@ export const createTRPCContext = async (
 
   return {
     db,
+    drizzle,
     user,
     supabase,
     organization,
@@ -329,7 +343,12 @@ export const organizationProcedure = protectedProcedure.use(
       ctx: {
         ...ctx,
         organization: ctx.organization, // Safe assertion - already checked above
-        membership: membership as Membership,
+        membership: {
+          id: membership.id,
+          organizationId: membership.organizationId,
+          userId: membership.userId,
+          role: membership.role,
+        } satisfies Membership,
         userPermissions,
       } satisfies OrganizationTRPCContext,
     });

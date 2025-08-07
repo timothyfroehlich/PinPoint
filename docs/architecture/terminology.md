@@ -137,4 +137,4 @@ These terms may appear in older documentation but are no longer current:
 
 - [Current Architecture](../architecture/current-state.md)
 - [Backend Implementation Plan](../planning/backend_impl_plan.md)
-- [Database Schema](../../prisma/schema.prisma)
+- [Database Schema](../../src/server/db/schema/)

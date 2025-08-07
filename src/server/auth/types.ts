@@ -15,7 +15,7 @@ export interface PrismaUser {
 export interface PrismaOrganization {
   id: string;
   name: string;
-  subdomain: string | null;
+  subdomain: string; // Non-null to match database schema
   createdAt: Date;
   updatedAt: Date;
 }

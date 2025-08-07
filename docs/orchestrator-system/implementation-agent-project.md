@@ -22,7 +22,7 @@
 npm run dev:full      # Development with monitoring
 npm run validate    # Must pass before committing
 npm run typecheck     # TypeScript validation
-npm run db:push       # Push schema changes
+npm run db:push:local       # Push schema changes
 ```
 
 ## TDD Process

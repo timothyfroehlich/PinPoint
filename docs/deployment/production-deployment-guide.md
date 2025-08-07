@@ -50,7 +50,7 @@ Prisma Postgres is a fully managed PostgreSQL service that integrates seamlessly
 
 - **Managed PostgreSQL**: No server management required
 - **Vercel Integration**: Automatic environment variable injection
-- **Prisma Studio**: Built-in database explorer
+- **Drizzle Studio**: Built-in database explorer
 - **Query Optimization**: AI-powered query analysis
 - **Connection Pooling**: Built-in for serverless environments
 
@@ -90,11 +90,11 @@ Prisma Postgres is a fully managed PostgreSQL service that integrates seamlessly
 
 ```bash
 # Development
-npm run db:push          # For schema changes during development
-npm run db:migrate       # For production-ready migrations
+npm run db:push:local          # For schema changes during development
+npm run db:generate:local:sb     # Generate Drizzle types
 
-# Production (handled by build process)
-prisma migrate deploy    # Runs automatically in `npm run build`
+# Production (schema is pushed directly via Drizzle)
+npm run db:push:prod     # Production schema deployment
 ```
 
 ## Deployment Workflow
@@ -180,7 +180,7 @@ SENTRY_AUTH_TOKEN="your-sentry-auth-token"
 ```json
 {
   "scripts": {
-    "build": "prisma migrate deploy && next build"
+    "build": "npm run db:push:prod && next build"
   }
 }
 ```
@@ -189,7 +189,7 @@ SENTRY_AUTH_TOKEN="your-sentry-auth-token"
 
 1. **Dependencies**: `npm install`
 2. **Prisma**: `prisma generate` (post-install)
-3. **Database**: `prisma migrate deploy`
+3. **Database**: `npm run db:push:prod`
 4. **Next.js**: `next build`
 5. **Optimization**: Static generation + server functions
 
@@ -203,7 +203,7 @@ SENTRY_AUTH_TOKEN="your-sentry-auth-token"
 
 ### Database Management
 
-- **Prisma Studio**: Available in Prisma Cloud dashboard
+- **Drizzle Studio**: Available via npm run db:studio
 - **Query Analysis**: AI-powered optimization suggestions
 - **Connection Pooling**: Automatic scaling
 
@@ -213,10 +213,10 @@ SENTRY_AUTH_TOKEN="your-sentry-auth-token"
 
    ```bash
    # Check database connectivity
-   npx prisma db pull
+   # Database schema is managed via Drizzle - no pull needed
 
    # Verify migrations
-   npx prisma migrate status
+   npm run db:validate  # Validate database operations
    ```
 
 2. **Environment Variables**:
@@ -279,33 +279,46 @@ SENTRY_AUTH_TOKEN="your-sentry-auth-token"
 
 ```bash
 # 1. Run database migrations
-npx prisma migrate deploy
+npm run db:push:prod
 
-# 2. Seed with production data
-npm run seed
+# 2. Create admin user manually via Supabase Dashboard or CLI
+supabase auth admin create-user \
+  --email $SEED_ADMIN_EMAIL \
+  --password <secure-password>
 
-# 3. Verify data via queries
+# 3. Verify setup via queries
 psql $DATABASE_URL -c "SELECT COUNT(*) FROM \"Organization\";"
 ```
 
-### Seed Data Includes
+### Production Data Strategy
 
-- **Organizations**: Austin Pinball Collective (apc)
-- **Roles & Permissions**: Admin, Member, Guest roles
-- **Collection Types**: Manufacturer, Era, Theme collections
-- **OPDB Games**: 1000+ pinball machines from OPDB
-- **Locations**: Sample locations with machines
-- **Sample Issues**: Demonstration issue tracking
+**⚠️ NO AUTOMATED SEEDING FOR PRODUCTION**
 
-### Custom Seeding
+Production seeding is intentionally manual for safety:
+
+- **Organizations**: Created via application UI by admin
+- **Roles & Permissions**: Set up automatically via schema
+- **Users**: Created via Supabase Auth (manual process)
+- **NO sample data**: Production should not have test data
+- **NO reset commands**: Production data is never wiped
+
+### Manual Production Setup
 
 ```bash
-# For custom organization setup
-npx prisma db seed -- --org="Your Org Name" --subdomain="yourorg"
+# Connect to production project
+supabase projects list
+supabase link --project-ref <prod-project-ref>
 
-# Reset and reseed
-npm run db:reset
-npm run seed
+# Verify environment
+echo $SUPABASE_URL  # Should point to production project
+
+# Create admin user via Supabase CLI
+supabase auth admin create-user \
+  --email admin@yourorg.com \
+  --password <secure-password>
+
+# Admin creates organization via PinPoint UI
+# All other setup happens through the application
 ```
 
 ## Quick Reference
@@ -319,8 +332,8 @@ vercel env ls
 vercel env add
 
 # Database operations
-npx prisma migrate deploy
-npm run seed
+npm run db:push:prod
+# Manual user creation via Supabase Dashboard/CLI
 # Query data samples (see project CLAUDE.md for examples)
 
 # Monitoring

@@ -316,36 +316,48 @@ globalThis.AbortSignal = NodeAbortSignal;
 
 // Common setup for both environments
 beforeAll(() => {
-  // Set test environment variables early (NODE_ENV is set by test runner)
-  // Use Object.assign to avoid TypeScript/ESLint conflicts with env variable assignment
-  Object.assign(process.env, {
-    DATABASE_URL: "postgresql://test:test@localhost:5432/test",
-    AUTH_SECRET: "test-auth-secret",
-    NEXTAUTH_URL: "http://localhost:3000",
-    PUBLIC_URL: "http://localhost:3000",
-    // Google OAuth credentials for test environment
-    GOOGLE_CLIENT_ID: "test-google-client-id",
-    GOOGLE_CLIENT_SECRET: "test-google-client-secret",
-  });
-
+  // Environment variables are now loaded by src/lib/env-loaders/test.ts from .env.test
+  // No manual environment variable assignment needed
   // Note: Fetch patching moved to VitestTestWrapper to avoid Vitest startup conflicts
 });
 
-// MSW setup for both Node and jsdom environments
-const { server } = await import("./msw/setup");
+/**
+ * MSW server setup for both Node and jsdom environments.
+ *
+ * This pattern uses nullable initialization and dynamic imports for several critical reasons:
+ *
+ * 1. **Prevent test runner startup conflicts**: Static imports of MSW can conflict with Vitest's
+ *    global fetch patching, causing "fetch is not defined" errors during test startup.
+ *
+ * 2. **Environment compatibility**: Both Node and jsdom environments need MSW, but static imports
+ *    may cause module loading errors when switching between environments in the same process.
+ *
+ * 3. **Avoid circular dependencies**: Static imports in setup files can create circular dependency
+ *    issues with modules that also import test utilities.
+ *
+ * 4. **Conditional loading**: Allows MSW to be loaded only when actually needed, preventing
+ *    unnecessary overhead in tests that don't require HTTP mocking.
+ *
+ * The nullable server pattern ensures graceful handling if MSW import fails and allows
+ * proper cleanup without assuming the server was successfully initialized.
+ */
+let server: ReturnType<(typeof import("msw/node"))["setupServer"]> | null =
+  null;
 
-beforeAll(() => {
+beforeAll(async () => {
+  const { server: mswServer } = await import("./msw/setup");
+  server = mswServer;
   server.listen({
     onUnhandledRequest: "warn", // Warn on unhandled requests
   });
 });
 
 afterEach(() => {
-  server.resetHandlers();
+  server?.resetHandlers();
 });
 
 afterAll(() => {
-  server.close();
+  server?.close();
 });
 
 afterEach(() => {

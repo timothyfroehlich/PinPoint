@@ -3,6 +3,10 @@ permissions:
   pull-requests: write
 name: CI
 
+env:
+  CI: true
+  NODE_ENV: test
+
 on:
   push:
     branches: [main]
@@ -22,8 +26,6 @@ jobs:
     permissions:
       contents: read
       actions: write
-    env:
-      NODE_ENV: "test"
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -36,20 +38,26 @@ jobs:
         run: |
           # Production code (strictest) - must pass
           echo "=== Checking Production Code (Strictest) ==="
-          if ! npm run typecheck 2>&1 | tee production-typescript.log; then
+          set +e  # Allow commands to fail temporarily
+          npm run typecheck > production-typescript.log 2>&1
+          TYPECHECK_EXIT_CODE=$?
+          set -e  # Re-enable exit on error
+          
+          if [ $TYPECHECK_EXIT_CODE -ne 0 ]; then
             echo "❌ Production code has TypeScript errors!" >> "$GITHUB_STEP_SUMMARY"
+            cat production-typescript.log
             grep "error TS" production-typescript.log | head -10 >> "$GITHUB_STEP_SUMMARY" || true
             exit 1
           fi
-          
+
           # Check test utilities separately (warnings only)
           echo "=== Checking Test Utils (Recommended) ==="
-          npx tsc --project tsconfig.test-utils.json --noEmit 2>&1 | tee test-utils-typescript.log || true
-          
-          # Check test files separately (warnings only) 
+          npx tsc --project tsconfig.test-utils.json --noEmit > test-utils-typescript.log 2>&1 || true
+
+          # Check test files separately (warnings only)
           echo "=== Checking Test Files (Relaxed) ==="
-          npx tsc --project tsconfig.tests.json --noEmit 2>&1 | tee tests-typescript.log || true
-          
+          npx tsc --project tsconfig.tests.json --noEmit > tests-typescript.log 2>&1 || true
+
           echo "✅ Multi-config TypeScript check completed!" >> "$GITHUB_STEP_SUMMARY"
       - name: Upload TypeScript Error Report
         if: failure()
@@ -58,38 +66,32 @@ jobs:
           name: typescript-errors
           path: typescript-output.log
 
-  # Job 2: ESLint Linting (Split into production and test)
-  lint-production:
-    name: ESLint (Production)
+  # Job 2: ESLint Linting
+  lint:
+    name: ESLint
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: "24"
-          cache: "npm"
-      - run: npm ci
-      - name: ESLint Check - Production Code  
-        run: npm run lint
 
-  lint-tests:
-    name: ESLint (Tests)
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      # Clean environment setup to prevent cache issues
+      - name: Clean Environment Setup
+        run: |
+          echo "🧹 Cleaning CI environment..."
+          # Remove any duplicate lockfiles that cause warnings
+          find . -name "package-lock.json" -not -path "./package-lock.json" -delete || true
+          # Clear npm cache to prevent stale artifacts
+          npm cache clean --force || true
+          echo "✅ Environment cleaned"
+
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "24"
           cache: "npm"
       - run: npm ci
-      - name: ESLint Check - Test Files (Non-blocking)  
-        run: |
-          npm run lint 2>&1 | tee eslint-test-output.log || true
-          echo "✅ Test linting completed (warnings/errors are non-blocking)" >> "$GITHUB_STEP_SUMMARY"
+      - name: ESLint Check
+        run: npm run lint
 
   # Job 3: Prettier Formatting
   format:
@@ -108,8 +110,7 @@ jobs:
         run: npm run format
 
   # Job 4: Tests with Coverage
-  # Uses hybrid approach: Vercel environment configuration + local Postgres container
-  # This provides configuration consistency with deployments while keeping resource usage low
+  # Uses simple PostgreSQL container (Supabase local doesn't work well in CI)
   test:
     name: Tests
     runs-on: ubuntu-latest
@@ -130,54 +131,23 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      NODE_ENV: "test"
+      DATABASE_URL: "postgresql://test_user:test_password@localhost:5432/test_db"
+      DIRECT_URL: "postgresql://test_user:test_password@localhost:5432/test_db"
+      POSTGRES_PRISMA_URL: "postgresql://test_user:test_password@localhost:5432/test_db"
+      POSTGRES_URL_NON_POOLING: "postgresql://test_user:test_password@localhost:5432/test_db"
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-        with:
-          fetch-depth: 0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "24"
           cache: "npm"
-      - name: Install Vercel CLI
-        run: npm install --global vercel@latest
-      - name: Pull Vercel Environment Variables
-        run: vercel env pull .env.local --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
       - run: npm ci
-      - name: Run Tests with Coverage (Migration-aware)
-        id: test-run
-        env:
-          # Override to use ephemeral PostgreSQL container instead of cloud database
-          DATABASE_URL: "postgresql://test_user:test_password@localhost:5432/test_db"
-          POSTGRES_PRISMA_URL: "postgresql://test_user:test_password@localhost:5432/test_db"
-          POSTGRES_URL_NON_POOLING: "postgresql://test_user:test_password@localhost:5432/test_db"
-        run: |
-          npm run test:coverage 2>&1 | tee test-output.log || true
-          TEST_EXIT_CODE=${PIPESTATUS[0]}
-
-          # Count failed vs passed tests
-          FAILED_TESTS=$(grep -c "FAIL\|failing" test-output.log || echo "0")
-          PASSED_TESTS=$(grep -c "PASS\|passing" test-output.log || echo "0")
-
-          {
-            echo "## Test Results"
-            echo "- **Passed Tests**: $PASSED_TESTS"
-            echo "- **Failed Tests**: $FAILED_TESTS"
-            echo "- **Exit Code**: $TEST_EXIT_CODE"
-            echo ""
-            if [ "$TEST_EXIT_CODE" -eq 0 ]; then
-              echo "✅ All tests passed successfully!"
-            else
-              echo "⚠️ Some tests failed - this is acceptable during TypeScript migration"
-              echo "Failed tests are tracked but don't block CI during migration phase"
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
-
-          echo "Tests job: SUCCESS (failures acceptable during TypeScript migration)"
-          exit 0
+      - name: Setup Database Schema
+        run: npm run db:push:local
+      - name: Seed Database for Tests
+        run: npm run db:seed:local:pg
+      - name: Run Tests with Coverage
+        run: npm run test:coverage
       - name: Upload Coverage
         uses: codecov/codecov-action@18283e04ce6e62d37312384ff67231eb8fd56d24 # v5
         with:
@@ -186,7 +156,52 @@ jobs:
           name: codecov-umbrella
           fail_ci_if_error: true
 
-  # Job 5: Security Audit
+  # Job 5: Database Validation (Drizzle ORM)
+  database-validation:
+    name: Database Validation
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: "postgresql://test_user:test_password@localhost:5432/test_db"
+      DIRECT_URL: "postgresql://test_user:test_password@localhost:5432/test_db"
+      POSTGRES_PRISMA_URL: "postgresql://test_user:test_password@localhost:5432/test_db"
+      POSTGRES_URL_NON_POOLING: "postgresql://test_user:test_password@localhost:5432/test_db"
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+          cache: "npm"
+      - run: npm ci
+      - name: Setup Database Schema
+        run: npm run db:push:local
+      - name: Run Database CRUD Validation
+        run: npm run db:validate:ci
+        timeout-minutes: 5
+      - name: Upload Database Validation Report
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: database-validation-report
+          path: database-validation.log
+          retention-days: 7
+
+  # Job 6: Security Audit
   security:
     name: Security
     runs-on: ubuntu-latest
@@ -202,7 +217,7 @@ jobs:
       - name: Security Audit
         run: npm run deps:check
 
-  # Job 6: End-to-End Tests (Playwright) - DISABLED during Supabase migration
+  # Job 7: End-to-End Tests (Playwright) - DISABLED during Supabase migration
   # Uncomment the section below when E2E tests are ready to be re-enabled
   #
   # e2e:
@@ -218,7 +233,7 @@ jobs:
   #     matrix:
   #       test-group:
   #         - "auth-flow"
-  #         - "dashboard" 
+  #         - "dashboard"
   #         - "roles-permissions"
   #         - "location-browsing"
   #         - "issue-confirmation"
@@ -268,7 +283,7 @@ jobs:
   #         path: playwright-report/
   #         retention-days: 30
 
-  # Job 7: Validate GitHub Actions
+  # Job 8: Validate GitHub Actions
   validate-actions:
     name: Validate Actions
     runs-on: ubuntu-latest
@@ -278,50 +293,3 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - name: Validate GitHub workflows
         uses: raven-actions/actionlint@3a24062651993d40fed1019b58ac6fbdfbf276cc # v2
-
-  # Summary job to ensure all checks pass
-  ci-summary:
-    name: CI Summary
-    runs-on: ubuntu-latest
-    needs:
-      [
-        typecheck,
-        lint-production,
-        lint-tests,
-        format,
-        test,
-        security,
-        # e2e,  # DISABLED during Supabase migration
-        validate-actions,
-      ]
-    if: always()
-    permissions:
-      contents: read
-    steps:
-      - name: Check Results (All checks must pass)
-        run: |
-          # Core checks that must pass
-          if [ "${{ needs.typecheck.result }}" != "success" ] ||
-             [ "${{ needs.lint-production.result }}" != "success" ] ||
-             [ "${{ needs.format.result }}" != "success" ] ||
-             [ "${{ needs.security.result }}" != "success" ] ||
-             [ "${{ needs.validate-actions.result }}" != "success" ]; then
-            echo "❌ One or more required checks failed"
-            exit 1
-          fi
-
-          # Report on all job statuses
-          echo "## CI Status: ✅ ALL CHECKS PASSING"
-          echo "## Job Results:"
-          echo "- typecheck: ${{ needs.typecheck.result }}"
-          echo "- lint-production: ${{ needs.lint-production.result }}"
-          echo "- lint-tests: ${{ needs.lint-tests.result }}" 
-          echo "- format: ${{ needs.format.result }}"
-          echo "- test: ${{ needs.test.result }}"
-          echo "- security: ${{ needs.security.result }}"
-          # echo "- e2e: (DISABLED during migration)"
-          echo "- validate-actions: ${{ needs.validate-actions.result }}"
-          echo ""
-          echo "✅ All checks passed successfully!"
-          echo ""  
-          echo "📝 **Note**: E2E tests are temporarily disabled during Supabase migration"
