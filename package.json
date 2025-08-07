@@ -120,7 +120,7 @@
     "csv-parser": "^3.2.0",
     "drizzle-orm": "^0.44.4",
     "drizzle-seed": "^0.3.1",
-    "next": "15.4.2",
+    "next": "15.4.6",
     "pino": "^9.7.0",
     "pino-pretty": "^13.1.1",
     "postgres": "^3.4.7",
