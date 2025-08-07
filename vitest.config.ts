@@ -80,10 +80,10 @@ export default defineConfig({
           typecheck: {
             tsconfig: "./tsconfig.tests.json",
           },
-          // Serialize database tests to prevent connection conflicts
+          // Remove singleThread to restore proper test isolation
           poolOptions: {
             threads: {
-              singleThread: true,
+              isolate: true,
             },
           },
           include: [
@@ -116,10 +116,10 @@ export default defineConfig({
           typecheck: {
             tsconfig: "./tsconfig.tests.json",
           },
-          // Serialize database tests to prevent connection conflicts
+          // Remove singleThread to restore proper test isolation
           poolOptions: {
             threads: {
-              singleThread: true,
+              isolate: true,
             },
           },
           include: ["src/integration-tests/**/*.test.{ts,tsx}"],
