@@ -178,21 +178,21 @@ git commit -m "fix: emergency commit" --no-verify
 
 ### Database Reset Issues
 
-**Symptom**: `npm run reset:local` fails or leaves inconsistent state.
+**Symptom**: `npm run db:reset:local:sb` fails or leaves inconsistent state.
 
 **Solutions**:
 
 ```bash
 # 1. Force reset with cleanup
 rm -f prisma/dev.db*
-npm run db:push
+npm run db:push:local
 
 # 2. Validate database operations
 npm run db:validate
 
 # 3. Reset with fresh generation
-npm run reset:local
-npm run db:generate
+npm run db:reset:local:sb
+npm run db:generate:local:sb
 ```
 
 ### Service Dependencies Not Found

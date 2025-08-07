@@ -56,8 +56,8 @@ npm run validate:full:agent # Pre-PR validation (MUST PASS)
 # npm run pre-commit    # REMOVED - use validate
 
 # Database
-npm run db:reset
-npm run db:push
+npm run db:reset:local:sb
+npm run db:push:local
 
 # Quick Fixes & Debug
 npm run fix             # Auto-fix lint + format issues
@@ -211,7 +211,7 @@ npm run validate:full:agent
 2. **During**: Run `npm run quick` after significant code changes
 3. **Before commit**: `npm run validate` must pass (MANDATORY)
 4. **Before PR**: `npm run validate:full:agent` must pass (MANDATORY)
-5. **Database changes**: Use `npm run db:reset` (pre-production phase)
+5. **Database changes**: Use `npm run db:reset:local:sb:local:sb` (pre-production phase)
 
 ### Environment Configuration
 

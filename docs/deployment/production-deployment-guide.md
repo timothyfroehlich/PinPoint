@@ -90,8 +90,8 @@ Prisma Postgres is a fully managed PostgreSQL service that integrates seamlessly
 
 ```bash
 # Development
-npm run db:push          # For schema changes during development
-npm run db:generate     # Generate Drizzle types
+npm run db:push:local          # For schema changes during development
+npm run db:generate:local:sb     # Generate Drizzle types
 
 # Production (schema is pushed directly via Drizzle)
 npm run db:push:prod     # Production schema deployment

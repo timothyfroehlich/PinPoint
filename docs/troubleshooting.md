@@ -53,23 +53,23 @@ This document contains detailed troubleshooting procedures for development and d
 
 **Solutions**:
 
-1. **Quick fix**: Run `npm run db:push` to sync schema changes
-2. **Generate types**: Run `npm run db:generate` to update Drizzle types
-3. **Complete reset**: Run `npm run reset:local` to wipe everything and start fresh
+1. **Quick fix**: Run `npm run db:push:local` to sync schema changes
+2. **Generate types**: Run `npm run db:generate:local:sb` to update Drizzle types
+3. **Complete reset**: Run `npm run db:reset:local:sb` to wipe everything and start fresh
 4. **Validate operations**: Run `npm run db:validate` to test database operations
 
 ### Problem: Database has old/inconsistent data
 
 **Solutions**:
 
-1. **Recommended**: Run `npm run reset:local` for clean slate
-2. Manual cleanup: Run `npm run seed` to add fresh data
+1. **Recommended**: Run `npm run db:reset:local:sb` for clean slate
+2. Manual cleanup: Run `npm run db:seed:local:sb` to add fresh data
 
 ### Problem: Database sessions not clearing
 
 **Solutions**:
 
-1. **Database reset**: `npm run reset:local` (clears all sessions automatically)
+1. **Database reset**: `npm run db:reset:local:sb` (clears all sessions automatically)
 2. **Verify strategy**: Check that development uses database session strategy
 3. **Manual check**: Verify `Session` table is empty after reset
 
@@ -80,7 +80,7 @@ This document contains detailed troubleshooting procedures for development and d
 1. **Check Git Status**: `git status` to see what changed
 2. **Revert Recent Changes**: `git checkout -- .` to discard unstaged changes
 3. **Clean Install**: Delete `node_modules` and `package-lock.json`, run `npm install`
-4. **Database Reset**: If needed, reset database and run `npm run seed`
+4. **Database Reset**: If needed, reset database and run `npm run db:seed:local:sb`
 5. **Validate Clean State**: Run `npm run validate` and `npm run build`
 
 ### If Dependencies Are Broken
@@ -132,12 +132,12 @@ If modern tools fail, these legacy procedures still work:
 
 - **Development environment** uses database sessions for automatic clearing
 - **Sessions stored** in database `Session` table, not encrypted JWT tokens
-- **Automatic cleanup** when running `npm run reset:local`
+- **Automatic cleanup** when running `npm run db:reset:local:sb`
 - **Fresh login required** after database resets (intentional for testing)
 
 ### When Sessions Clear Automatically
 
-1. **Database reset** (`npm run reset:local`) - All sessions cleared
+1. **Database reset** (`npm run db:reset:local:sb`) - All sessions cleared
 2. **Fresh environment start** (`npm run dev:clean`) - Option to reset database
 3. **Schema changes** that trigger database regeneration
 4. **Manual session cleanup** via direct database queries (see CLAUDE.md for examples)

@@ -239,13 +239,12 @@ export async function main(): Promise<void> {
 
 ```bash
 # Explicit target seeding
-npm run seed            # Local Supabase (default)
-npm run seed:local:sb   # Local Supabase (explicit)
-npm run seed:local:pg   # PostgreSQL-only (CI)
-npm run seed:preview    # Remote preview
+npm run db:seed:local:sb   # Local Supabase (explicit)
+npm run db:seed:local:pg   # PostgreSQL-only (CI)
+npm run db:seed:preview    # Remote preview
 
 # Complete database reset + reseed
-npm run reset:local     # Local Supabase reset
+npm run db:reset:local:sb  # Local Supabase reset
 
 # Database validation
 npm run db:validate

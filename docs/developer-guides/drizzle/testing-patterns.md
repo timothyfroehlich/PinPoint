@@ -658,7 +658,7 @@ npm run validate        # Includes full db:validate
 npm run pre-commit      # Comprehensive validation
 
 # Schema change validation
-npm run db:push         # Apply schema changes
+npm run db:push:local         # Apply schema changes
 npm run db:validate     # Verify all operations work
 ```
 
@@ -680,7 +680,7 @@ interface CRUDTestResult {
 Common error patterns and solutions:
 
 - **Connection failures**: Check DATABASE_URL and Supabase status
-- **Schema mismatches**: Run `npm run db:push` to sync schema
+- **Schema mismatches**: Run `npm run db:push:local` to sync schema
 - **Permission errors**: Verify database user permissions
 - **Transaction conflicts**: Check for concurrent database access
 

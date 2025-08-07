@@ -79,10 +79,10 @@ DEFAULT_ORG_SUBDOMAIN="apc"
 # - Copy connection strings to .env.local
 
 # 2. Push schema changes
-npm run db:push
+npm run db:push:local
 
 # 3. Generate Drizzle types
-npm run db:generate
+npm run db:generate:local:sb
 ```
 
 ## Development Workflow
@@ -106,10 +106,10 @@ psql $DATABASE_URL -c "SELECT * FROM \"Organization\" LIMIT 5;"
 
 ```bash
 # Push schema changes (development)
-npm run db:push
+npm run db:push:local
 
 # Reset database (development only)
-npm run reset:local
+npm run db:reset:local:sb
 ```
 
 ## Preview Deployments
@@ -154,13 +154,13 @@ Preview deployments automatically use the "Preview" environment variables set in
 
 ```bash
 # Seed local Supabase (default)
-npm run seed
+npm run db:seed:local:sb
 
 # Explicit local Supabase seeding
-npm run seed:local:sb
+npm run db:seed:local:sb
 
 # PostgreSQL-only seeding (for CI)
-npm run seed:local:pg
+npm run db:seed:local:pg
 
 # Preview environment seeding
 npm run seed:preview
@@ -180,10 +180,10 @@ npm run seed:preview
 
 ```bash
 # Reset and reseed development data
-npm run reset:local
+npm run db:reset:local:sb
 
 # Or just run seeding
-npm run seed
+npm run db:seed:local:sb
 ```
 
 ### Seeding for Preview Deployments
@@ -342,8 +342,8 @@ npm run validate  # Husky hooks
 ```bash
 # Development
 npm run dev              # Start local server
-npm run db:push          # Push schema changes
-npm run seed             # Seed development data
+npm run db:push:local          # Push schema changes
+npm run db:seed:local:sb             # Seed development data
 # View database (see CLAUDE.md for efficient query examples)
 
 # Preview Deployment

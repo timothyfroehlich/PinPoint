@@ -156,9 +156,9 @@ function getEnvironmentType() {
 
 **Seeding Commands**:
 
-- `npm run seed` (local Supabase, default)
-- `npm run seed:local:sb` (explicit local Supabase)
-- `npm run seed:local:pg` (PostgreSQL-only for CI)
+- `npm run db:seed:local:sb` (local Supabase, default)
+- `npm run db:seed:local:sb` (explicit local Supabase)
+- `npm run db:seed:local:pg` (PostgreSQL-only for CI)
   **Data**:
 
 - 5-10 fake users with various roles (admin, member, guest)

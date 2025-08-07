@@ -92,7 +92,6 @@
     "workflow:lint": "actionlint .github/workflows/*.yml",
     "_comment_maintenance": "========== Maintenance ==========",
     "clean": "rm -rf .next node_modules/.cache .turbo && npm install",
-    "reset": "npm run clean && npm run db:push:local && npm run db:seed:local:sb",
     "setup:worktree": "bash scripts/setup-worktree.sh",
     "kill:all": "node scripts/kill-dev-processes.cjs",
     "deps:check": "npm audit --audit-level=high",

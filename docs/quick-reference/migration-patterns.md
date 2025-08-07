@@ -232,10 +232,10 @@ supabase start
 supabase status
 
 # Stage 2: Drizzle ORM ✅ COMPLETE
-npm run reset:local    # Using Drizzle
-npm run db:push        # Schema changes
-npm run db:generate    # Type generation
-npm run seed           # Explicit seeding
+npm run db:reset:local:sb  # Using Drizzle
+npm run db:push:local      # Schema changes
+npm run db:generate:local:sb # Type generation
+npm run db:seed:local:sb   # Explicit seeding
 
 # Stage 3: RLS activation (future)
 supabase db migrate up

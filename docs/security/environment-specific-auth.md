@@ -64,13 +64,13 @@ The system uses `VERCEL_ENV` for Vercel deployments and falls back to `NODE_ENV`
 
 ```bash
 # Environment auto-detection (recommended)
-npm run seed
+npm run db:seed:local:sb
 
 # Database reset with complete reseed
-npm run db:reset
+npm run db:reset:local:sb
 
 # Seeding via npm script (preferred)
-npm run seed
+npm run db:seed:local:sb
 ```
 
 ## OAuth Configuration Validation
@@ -244,7 +244,7 @@ node -e "console.log('ENV:', process.env.VERCEL_ENV || process.env.NODE_ENV)"
 npm run dev # Check console for OAuth validation messages
 
 # Test database seeding
-npm run db:reset && npm run db:seed
+npm run db:reset:local:sb:local:sb
 ```
 
 ## Future Enhancements

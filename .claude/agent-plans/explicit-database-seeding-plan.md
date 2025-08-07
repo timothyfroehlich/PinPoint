@@ -26,7 +26,7 @@ npm run reset:preview    # Full preview environment reset
 
 # Backward compatibility (temporary)
 npm run seed            # Alias to seed:local:sb
-npm run db:reset        # Alias to reset:local (deprecation warning)
+npm run db:reset:local:sb # Local database reset (current standard)
 ```
 
 **NO PRODUCTION COMMANDS** - Intentionally inconvenient for safety

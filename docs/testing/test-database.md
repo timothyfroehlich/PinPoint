@@ -308,7 +308,7 @@ Run seeds:
 
 ```bash
 # Run main seeding (recommended for most tests)
-npm run seed
+npm run db:seed:local:sb
 
 # Test-specific seeding would require direct script execution if needed
 # (Currently no dedicated test seeding command)

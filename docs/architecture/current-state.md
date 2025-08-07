@@ -286,9 +286,9 @@ npm run validate      # Run before starting work
 npm run validate    # Must pass before commits
 
 # Database
-npm run reset:local   # Reset and reseed
-npm run db:push       # Push schema changes
-npm run seed          # Seed data only
+npm run db:reset:local:sb   # Reset and reseed
+npm run db:push:local       # Push schema changes
+npm run db:seed:local:sb          # Seed data only
 
 # Testing
 npm run test:coverage # Run tests with coverage report

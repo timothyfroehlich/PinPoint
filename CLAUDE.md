@@ -153,7 +153,7 @@ See `docs/architecture/api-routes.md` for details on legitimate exceptions.
 
 ## Essential Commands
 
-```bash
+````bash
 # Development (RECOMMENDED)
 npm run dev:bg          # Start dev server in background
 npm run dev:bg:stop     # Stop background server
@@ -176,54 +176,94 @@ npm run db:seed:preview     # Seed remote preview environment
 npm run db:reset:local:sb   # Full local reset (schema + data)
 npm run db:reset:preview    # Full preview reset (schema + data)
 
+### 🔧 Database Troubleshooting
+
+**When dev users aren't loading or smoke tests fail:**
+
+```bash
+npm run db:reset:local:sb   # ONE-SHOT: Full reset + fresh seeding
+````
+
+**What this does:**
+
+1. Wipes Supabase auth users (clears login conflicts)
+2. Resets database schema completely
+3. Pushes latest Drizzle schema
+4. Seeds fresh dev users (admin@dev.local, member@dev.local, player@dev.local)
+5. Creates sample data for testing
+
+**Use when:**
+
+- Dev quick login buttons not appearing
+- Auth user conflicts (email_exists errors)
+- Smoke test authentication failures
+- Need completely fresh development environment
+
 # Database Inspection (Efficient - Use Direct SQL)
+
 # Read schema structure: src/server/db/schema/
+
 # Query data samples directly (no GUI needed):
-psql $DATABASE_URL -c "SELECT * FROM \"Organization\" LIMIT 5;"
-psql $DATABASE_URL -c "SELECT COUNT(*) FROM \"User\";"
+
+psql $DATABASE_URL -c "SELECT _ FROM \"Organization\" LIMIT 5;"
+psql $DATABASE_URL -c "SELECT COUNT(_) FROM \"User\";"
+
 # Use Drizzle Studio for visual inspection: npm run db:studio
 
 # Core Commands (Use brief versions unless debugging)
+
 # PREFERRED: Use :brief variants for daily development - faster, cleaner output
+
 npm run typecheck:brief # TypeScript type checking (minimal output)
-npm run lint:brief      # ESLint linting (quiet mode)
-npm run format:brief    # Prettier formatting check (minimal output)
-npm run audit:brief     # npm security vulnerability check (table format)
-npm run test:brief      # Vitest unit tests (basic reporter)
+npm run lint:brief # ESLint linting (quiet mode)
+npm run format:brief # Prettier formatting check (minimal output)
+npm run audit:brief # npm security vulnerability check (table format)
+npm run test:brief # Vitest unit tests (basic reporter)
 npm run playwright:brief # E2E tests (line reporter, headless)
-npm run smoke            # Smoke test (complete workflow validation)
+npm run smoke # Smoke test (complete workflow validation)
 
 # Regular versions - use only when brief fails and you need more detail
-npm run typecheck       # Full TypeScript output
-npm run lint            # Full ESLint output
-npm run format          # Full Prettier output
-npm run audit           # Full vulnerability details
-npm run test            # Full Vitest output
-npm run playwright      # Full E2E output
+
+npm run typecheck # Full TypeScript output
+npm run lint # Full ESLint output
+npm run format # Full Prettier output
+npm run audit # Full vulnerability details
+npm run test # Full Vitest output
+npm run playwright # Full E2E output
 
 # Verbose versions - use sparingly, preferably with filters
+
 # Only use when regular versions don't provide enough diagnostic info
-npm run lint:verbose    # Detailed ESLint diagnostics
+
+npm run lint:verbose # Detailed ESLint diagnostics
 npm run typecheck:verbose # TypeScript with file lists
 
 # Meta Commands
-npm run check:brief     # PREFERRED: Fast validation (all brief variants)
-npm run check           # Full validation when brief shows issues
-npm run check:fix       # Validation with auto-fix
-npm run fix             # Auto-fix lint + format issues
+
+npm run check:brief # PREFERRED: Fast validation (all brief variants)
+npm run check # Full validation when brief shows issues
+npm run check:fix # Validation with auto-fix
+npm run fix # Auto-fix lint + format issues
 
 # Test Command Guidelines
+
 # CRITICAL: Never pass shell redirection operators (2>&1, |, >, etc.) through npm's -- argument separator
+
 # Shell operations must be outside the npm command
+
 # ✅ CORRECT: npm run test 2>&1 | head -50
+
 # ❌ WRONG: npm run test -- --run 2>&1 | head -50
+
 # If you need extra test arguments beyond filtering, ask the user first
 
 # TypeScript Error Filtering
-npm run typecheck                                 # Check entire project (recommended)
-npm run typecheck | grep "pattern"               # Filter errors by pattern
-npm run typecheck | head -10                     # Show first 10 errors
-npm run typecheck | grep "usePermissions"        # Find specific function errors
+
+npm run typecheck # Check entire project (recommended)
+npm run typecheck | grep "pattern" # Filter errors by pattern
+npm run typecheck | head -10 # Show first 10 errors
+npm run typecheck | grep "usePermissions" # Find specific function errors
+
 ```
 
 ## TypeScript Standards
@@ -328,19 +368,22 @@ The test-architect agent specializes in improving individual test files. It's se
 1. **Single File Assignment**: Always assign one test file at a time
 2. **Self-Discovery**: Agent will find and read relevant docs/examples
 3. **Recommendations**: If agent returns improvement recommendations:
-   ```
-   Agent: { type: "test-improvement-recommendation", ... }
-   You: Present recommendation to user with clear justification
-   User: Approves/Declines
-   You: If approved, implement then re-run agent with context
-        If declined, re-run agent with "skip: [specific recommendation]"
-   ```
+```
+
+Agent: { type: "test-improvement-recommendation", ... }
+You: Present recommendation to user with clear justification
+User: Approves/Declines
+You: If approved, implement then re-run agent with context
+If declined, re-run agent with "skip: [specific recommendation]"
+
+```
 4. **Completion**: Summarize what the agent accomplished
 
 ### Example Interaction
 
 ```
-User: "Fix the tests in src/components/issues/__tests__/IssueCard.test.tsx"
+
+User: "Fix the tests in src/components/issues/**tests**/IssueCard.test.tsx"
 
 You: "I'll use the test-architect agent to analyze and improve the IssueCard tests."
 
@@ -350,15 +393,18 @@ You: "I'll use the test-architect agent to analyze and improve the IssueCard tes
 issue test data factory that would benefit 6 test files. Should I implement this?"
 
 [On completion]: "Test improvements complete:
+
 - Replaced 12 fragile text assertions with semantic queries
 - Removed 2 unnecessary mocks (now testing real components)
 - Added auth scenario testing (unauthenticated, member, admin)
 - All 8 tests passing, 40% faster execution"
+
 ```
 
 ### Recommendation Handling Example
 
 ```
+
 User: "Fix the IssueCard tests"
 
 You: "I'll use the test-architect agent to improve those tests."
@@ -366,6 +412,7 @@ You: "I'll use the test-architect agent to improve those tests."
 [Test-architect returns recommendation about creating shared test factory]
 
 You: "The test-architect discovered an improvement opportunity before completing the test fixes. It found 6 test files using similar issue mock data and recommends creating a shared test factory. This would:
+
 - Reduce ~120 lines of duplicate code
 - Provide a single source of truth for issue test data
 - Make future test updates easier
@@ -386,7 +433,8 @@ User: "No, just fix the tests as-is"
 You: "Understood. I'll have the test-architect complete the test fixes without creating the shared factory."
 
 [Call test-architect with: "Continue with IssueCard.test.tsx improvements. Skip creating the issue test factory - user prefers to keep current pattern."]
-```
+
+````
 
 ### Logging and Audit Trail
 
@@ -505,7 +553,7 @@ npm run db:reset:local:sb   # Reset local database + automatic seeding
 npm run db:reset:preview    # Reset preview database + automatic seeding
 
 # Core database operations
-npm run db:push:local:sb    # Push schema changes (development)
+npm run db:push:local       # Push schema changes (universal PostgreSQL)
 npm run db:push:preview     # Push schema changes (preview environment)
 npm run db:generate:local:sb # Generate Drizzle types (development)
 npm run db:generate:preview  # Generate Drizzle types (preview)
@@ -520,7 +568,7 @@ npm run seed            # Seed local Supabase (default)
 npm run seed:local:pg   # Seed PostgreSQL-only (CI tests)
 npm run seed:local:sb   # Seed local Supabase (explicit)
 npm run seed:preview    # Seed remote preview environment
-```
+````
 
 ## Critical Notes
 
