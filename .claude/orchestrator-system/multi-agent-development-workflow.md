@@ -13,7 +13,7 @@ This document captures valuable patterns and insights from a coordinated multi-a
 ```
 ~/Code/
 ├── PinPoint/                          # Main repository (epic/backend-refactor)
-└── PinPoint-worktrees/                # Isolated worktree environments
+└── PinPoint-{task-name}/              # Isolated worktree environments (git default sibling pattern)
     ├── task-07-fix-issue-history-model/
     ├── task-08-implement-comment-soft-delete/
     ├── task-09-fix-upload-authorization/

@@ -75,7 +75,7 @@ fi
 
 # Check PostgreSQL
 if command -v pg_isready &> /dev/null; then
-    if pg_isready -p $DB_PORT -h localhost > /dev/null 2>&1; then
+    if pg_isready -p "$DB_PORT" -h localhost > /dev/null 2>&1; then
         echo -e "✅ PostgreSQL (${CYAN}$DB_PORT${NC}): ${GREEN}Healthy${NC}"
     else
         echo -e "❌ PostgreSQL (${CYAN}$DB_PORT${NC}): ${RED}Not responding${NC}"

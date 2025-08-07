@@ -29,9 +29,6 @@ npm run validate
 # Quick checks during development
 npm run check
 
-# Update Betterer baseline after fixes
-npm run betterer:update
-
 # Context-specific checks
 npx tsc --project tsconfig.test-utils.json --noEmit  # Test utilities
 npx tsc --project tsconfig.tests.json --noEmit       # Test files
@@ -662,16 +659,18 @@ const config = {
 };
 ```
 
-## 📋 Migration Workflow
+## 🔧 Error Resolution Workflow
 
-### 1. Analyze Errors
+### 1. Identify Error Types
+
+Use the standard validation commands to identify issues:
 
 ```bash
-# Check specific file
-./scripts/migrate-test-file.sh src/path/to/file.ts
+# Check TypeScript errors
+npm run typecheck
 
-# Check directory
-./scripts/migrate-test-directory.sh src/path/to/dir/
+# Check ESLint violations
+npm run lint
 ```
 
 ### 2. Fix by Error Type
@@ -692,14 +691,14 @@ npm run validate
 npm run debug:typecheck
 ```
 
-### 4. Update Baselines
+### 4. Validate Changes
 
 ```bash
-# Update Betterer baseline after fixes
-npm run betterer:update
+# Ensure all changes pass validation
+npm run validate
 
-# Update migration stats
-./scripts/update-typescript-stats.sh
+# Run full test suite to verify no regressions
+npm run test
 ```
 
 ## 🔍 Troubleshooting
@@ -797,18 +796,6 @@ npm run validate
 - `npm run lint` - Check ESLint warnings
 - `npm run validate` - Full validation with auto-fix
 - `npm run debug:typecheck` - Detailed TypeScript output
-
-### Migration Scripts
-
-- `./scripts/migrate-test-file.sh <file>` - Analyze single file
-- `./scripts/migrate-test-directory.sh <dir>` - Analyze directory
-- `./scripts/update-typescript-stats.sh` - Update progress tracking
-
-### Betterer Commands
-
-- `npm run betterer` - Run Betterer checks
-- `npm run betterer:update` - Update baseline after fixes
-- `npm run betterer:check` - CI-style check
 
 ### Agent Validation Protocol
 
