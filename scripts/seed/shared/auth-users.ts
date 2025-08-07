@@ -173,252 +173,184 @@ async function createUserMembership(
 }
 
 /**
- * Create Supabase auth user with dev login compatibility
+ * Get existing Supabase auth users by email
+ * Returns a map of email -> user for efficient lookups
  */
-async function createSupabaseAuthUser(
-  params: CreateUserParams,
-): Promise<{ success: boolean; userId?: string; error?: string }> {
+async function getExistingAuthUsers(): Promise<Map<string, any>> {
   const supabase = createServiceRoleClient();
+  const { data: userList, error } = await supabase.auth.admin.listUsers();
 
-  try {
-    const { data, error } = await supabase.auth.admin.createUser({
-      email: params.email,
-      password: "dev-login-123", // Matches existing DEV_PASSWORD for dev login compatibility
-      email_confirm: true, // Skip email verification for development
-      user_metadata: {
-        name: params.profile.name,
-        bio: params.profile.bio,
-        dev_user: true, // Compatible with dev detection
-        environment: "development",
-      },
-      app_metadata: {
-        organization_id: params.organizationId, // Critical for multi-tenancy and RLS
-        role: params.role, // For dev panel display
-        dev_created: true, // Mark as dev user
-        created_via: "seeding", // Audit trail
-      },
-    });
-
-    if (error) {
-      // Handle "user already exists" gracefully (expected in re-seeding)
-      if (
-        error.message.includes("User already registered") ||
-        error.message.includes("email_exists")
-      ) {
-        console.log(
-          `[AUTH] User ${params.email} already exists, retrieving ID...`,
-        );
-
-        // Get the existing user's ID so we can still create app database records
-        const supabase = createServiceRoleClient();
-        try {
-          const { data: userList, error: listError } =
-            await supabase.auth.admin.listUsers();
-          if (listError) {
-            console.error(
-              `[AUTH] Could not list users to find ${params.email}:`,
-              listError.message,
-            );
-            return {
-              success: false,
-              error: `Could not retrieve existing user ${params.email}: ${listError.message}`,
-            };
-          }
-
-          const existingUser = userList.users.find(
-            (u) => u.email === params.email,
-          );
-          if (existingUser) {
-            console.log(
-              `[AUTH] Found existing user ID for ${params.email}: ${existingUser.id}`,
-            );
-            console.log(
-              `[AUTH] Will ensure app database records exist for existing user`,
-            );
-            return { success: true, userId: existingUser.id }; // Return the existing user ID
-          } else {
-            console.warn(
-              `[AUTH] User ${params.email} should exist but not found in list`,
-            );
-            return {
-              success: false,
-              error: `User ${params.email} exists in auth but not found in user list`,
-            };
-          }
-        } catch (lookupError) {
-          console.error(
-            `[AUTH] Error looking up existing user ${params.email}:`,
-            lookupError,
-          );
-          const errorMessage =
-            lookupError instanceof Error
-              ? lookupError.message
-              : String(lookupError);
-          return {
-            success: false,
-            error: `Failed to lookup existing user: ${errorMessage}`,
-          };
-        }
-      }
-
-      console.error(`[AUTH] Failed to create user ${params.email}:`, error);
-      return {
-        success: false,
-        error: `Failed to create user ${params.email}: ${error.message}`,
-      };
-    }
-
-    if (!data.user) {
-      return {
-        success: false,
-        error: `User creation succeeded but no user data returned for ${params.email}`,
-      };
-    }
-
-    console.log(`[AUTH] Created Supabase auth user: ${params.email}`);
-    return { success: true, userId: data.user.id };
-  } catch (error) {
-    // Handle AuthApiError exceptions for "user already exists"
-    if (error instanceof Error) {
-      if (
-        error.message.includes("email address has already been registered") ||
-        error.message.includes("email_exists") ||
-        error.message.includes("User already registered")
-      ) {
-        console.log(
-          `[AUTH] User ${params.email} already exists (caught exception), retrieving ID...`,
-        );
-
-        // Get the existing user's ID so we can still create app database records
-        const supabase = createServiceRoleClient();
-        try {
-          const { data: userList, error: listError } =
-            await supabase.auth.admin.listUsers();
-          if (listError) {
-            console.error(
-              `[AUTH] Could not list users to find ${params.email}:`,
-              listError.message,
-            );
-            return {
-              success: false,
-              error: `Could not retrieve existing user ${params.email}: ${listError.message}`,
-            };
-          }
-
-          const existingUser = userList.users.find(
-            (u) => u.email === params.email,
-          );
-          if (existingUser) {
-            console.log(
-              `[AUTH] Found existing user ID for ${params.email}: ${existingUser.id}`,
-            );
-            console.log(
-              `[AUTH] Will ensure app database records exist for existing user`,
-            );
-            return { success: true, userId: existingUser.id }; // Return the existing user ID
-          } else {
-            console.warn(
-              `[AUTH] User ${params.email} should exist but not found in list`,
-            );
-            return {
-              success: false,
-              error: `User ${params.email} exists in auth but not found in user list`,
-            };
-          }
-        } catch (lookupError) {
-          console.error(
-            `[AUTH] Error looking up existing user ${params.email}:`,
-            lookupError,
-          );
-          const errorMessage =
-            lookupError instanceof Error
-              ? lookupError.message
-              : String(lookupError);
-          return {
-            success: false,
-            error: `Failed to lookup existing user: ${errorMessage}`,
-          };
-        }
-      }
-    }
-
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error(`[AUTH] Error creating user ${params.email}:`, errorMessage);
-    return {
-      success: false,
-      error: `User creation failed: ${errorMessage}`,
-    };
+  if (error) {
+    throw new Error(`Failed to list existing users: ${error.message}`);
   }
+
+  const userMap = new Map();
+  for (const user of userList.users) {
+    if (user.email) {
+      userMap.set(user.email, user);
+    }
+  }
+
+  return userMap;
 }
 
 /**
- * Process batch of users with error handling
+ * Create Supabase auth user using idempotent approach
+ * Check first, create only if missing
+ */
+async function upsertSupabaseAuthUser(
+  params: CreateUserParams,
+  existingUsers: Map<string, any>,
+): Promise<{ success: boolean; userId: string; wasCreated: boolean }> {
+  const supabase = createServiceRoleClient();
+
+  // Check if user already exists
+  const existingUser = existingUsers.get(params.email);
+  if (existingUser) {
+    console.log(
+      `[AUTH] ✓ User ${params.email} already exists: ${existingUser.id}`,
+    );
+
+    // TODO: Could update metadata here if needed
+    // await supabase.auth.admin.updateUserById(existingUser.id, { ... })
+
+    return {
+      success: true,
+      userId: existingUser.id,
+      wasCreated: false,
+    };
+  }
+
+  // User doesn't exist, create new one
+  console.log(`[AUTH] Creating new user: ${params.email}`);
+  const { data, error } = await supabase.auth.admin.createUser({
+    email: params.email,
+    password: "dev-login-123", // Matches existing DEV_PASSWORD for dev login compatibility
+    email_confirm: true, // Skip email verification for development
+    user_metadata: {
+      name: params.profile.name,
+      bio: params.profile.bio,
+      dev_user: true, // Compatible with dev detection
+      environment: "development",
+    },
+    app_metadata: {
+      organization_id: params.organizationId, // Critical for multi-tenancy and RLS
+      role: params.role, // For dev panel display
+      dev_created: true, // Mark as dev user
+      created_via: "seeding", // Audit trail
+    },
+  });
+
+  if (error || !data.user) {
+    throw new Error(
+      `Failed to create user ${params.email}: ${error?.message || "No user data returned"}`,
+    );
+  }
+
+  console.log(`[AUTH] ✓ Created new user: ${params.email} (${data.user.id})`);
+  return {
+    success: true,
+    userId: data.user.id,
+    wasCreated: true,
+  };
+}
+
+/**
+ * Process batch of users with idempotent upsert approach
  */
 async function processBatchUsers(
   userList: UserData[],
   organizationId: string,
-): Promise<{ successCount: number; errorCount: number; errors: string[] }> {
+): Promise<{
+  successCount: number;
+  createdCount: number;
+  existedCount: number;
+  errorCount: number;
+  errors: string[];
+}> {
   let successCount = 0;
+  let createdCount = 0;
+  let existedCount = 0;
   let errorCount = 0;
   const errors: string[] = [];
 
+  // Get all existing auth users once upfront (efficient)
+  console.log("[AUTH] Checking existing auth users...");
+  let existingUsers: Map<string, any>;
+  try {
+    existingUsers = await getExistingAuthUsers();
+    console.log(`[AUTH] Found ${existingUsers.size} existing auth users`);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`[AUTH] Failed to get existing users: ${errorMessage}`);
+    return {
+      successCount: 0,
+      createdCount: 0,
+      existedCount: 0,
+      errorCount: userList.length,
+      errors: [errorMessage],
+    };
+  }
+
+  // Process each user with idempotent approach
   for (const userData of userList) {
     try {
-      // Create Supabase auth user
-      const authResult = await createSupabaseAuthUser({
-        email: userData.email,
-        organizationId,
-        role: userData.role,
-        profile: {
-          name: userData.name,
-          bio: userData.bio,
-        },
-      });
-
-      if (!authResult.success) {
-        errorCount++;
-        errors.push(authResult.error || `Unknown error for ${userData.email}`);
-        continue;
-      }
-
-      // If we got a userId, ensure User record exists and create membership
-      if (authResult.userId) {
-        // Wait a moment for auth trigger to create User record
-        await new Promise((resolve) => setTimeout(resolve, 100));
-
-        // Ensure User record exists (auth trigger should create it, but verify)
-        const existingUser = await db
-          .select()
-          .from(users)
-          .where(eq(users.id, authResult.userId))
-          .limit(1);
-
-        if (existingUser.length === 0) {
-          // Create new user record
-          console.log(
-            `[AUTH] Creating app database User record for ${userData.email}`,
-          );
-          await db.insert(users).values({
-            id: authResult.userId,
-            name: userData.name,
-            email: userData.email,
-            emailVerified: new Date(),
-            image: null,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          });
-        } else {
-          console.log(
-            `[AUTH] App database User record already exists for ${userData.email}`,
-          );
-        }
-
-        await createUserMembership(
-          authResult.userId,
+      // Upsert Supabase auth user (idempotent)
+      const authResult = await upsertSupabaseAuthUser(
+        {
+          email: userData.email,
           organizationId,
-          userData.role,
-        );
+          role: userData.role,
+          profile: {
+            name: userData.name,
+            bio: userData.bio,
+          },
+        },
+        existingUsers,
+      );
+
+      // Track creation vs existing
+      if (authResult.wasCreated) {
+        createdCount++;
+      } else {
+        existedCount++;
       }
+
+      // Ensure app database User record exists and create membership
+      // Wait a moment for auth trigger to create User record (for new users)
+      if (authResult.wasCreated) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+
+      // Ensure User record exists (auth trigger should create it, but verify)
+      const existingDbUser = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, authResult.userId))
+        .limit(1);
+
+      if (existingDbUser.length === 0) {
+        // Create new user record
+        console.log(
+          `[AUTH] Creating app database User record for ${userData.email}`,
+        );
+        await db.insert(users).values({
+          id: authResult.userId,
+          name: userData.name,
+          email: userData.email,
+          emailVerified: new Date(),
+          image: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+      }
+
+      // Always ensure membership exists (idempotent)
+      await createUserMembership(
+        authResult.userId,
+        organizationId,
+        userData.role,
+      );
 
       successCount++;
       console.log(
@@ -434,7 +366,7 @@ async function processBatchUsers(
     }
   }
 
-  return { successCount, errorCount, errors };
+  return { successCount, createdCount, existedCount, errorCount, errors };
 }
 
 /**
@@ -531,9 +463,12 @@ export async function seedAuthUsers(
     // Process users in batch
     const results = await processBatchUsers(users, organizationId);
 
-    // Report results
+    // Report results with detailed breakdown
     console.log(
-      `[AUTH] ✅ Auth user seeding complete: ${results.successCount.toString()} successful, ${results.errorCount.toString()} failed`,
+      `[AUTH] ✅ Auth user seeding complete: ${results.successCount.toString()} total processed`,
+    );
+    console.log(
+      `[AUTH]   📊 Created: ${results.createdCount.toString()}, Already existed: ${results.existedCount.toString()}, Errors: ${results.errorCount.toString()}`,
     );
 
     if (results.errors.length > 0) {
@@ -542,8 +477,8 @@ export async function seedAuthUsers(
         console.error(`[AUTH]   - ${error}`);
       }
 
-      // Fail if more than half the users failed (indicates systemic issue)
-      if (results.errorCount > results.successCount) {
+      // Only fail if there were actual errors (not expected conditions)
+      if (results.errorCount > 0) {
         throw new Error(
           `Auth user seeding failed: ${results.errorCount.toString()} errors out of ${users.length.toString()} users`,
         );
