@@ -10,7 +10,7 @@ case "$1" in
     # Check if server is already running
     if [ -f "$PID_FILE" ]; then
       PID=$(cat "$PID_FILE")
-      if ps -p $PID > /dev/null 2>&1; then
+      if ps -p "$PID" > /dev/null 2>&1; then
         echo "Dev server already running (PID: $PID)"
         echo "Use 'npm run dev:bg:stop' to stop it first"
         exit 1
@@ -23,7 +23,7 @@ case "$1" in
     echo "Starting PinPoint dev server in background..."
     npm run dev:server > "$LOG_FILE" 2>&1 &
     echo $! > "$PID_FILE"
-    echo "Dev server started (PID: $(cat $PID_FILE))"
+    echo "Dev server started (PID: $(cat "$PID_FILE"))"
     echo "Logs: tail -f $LOG_FILE"
 
     # Wait a moment for server to start and extract URL from logs
@@ -32,7 +32,7 @@ case "$1" in
       URL=$(grep -o "http://.*" "$LOG_FILE" | head -1)
       if [ -n "$URL" ]; then
         # Replace localhost with apc.localhost for subdomain routing
-        SUBDOMAIN_URL=$(echo "$URL" | sed 's/localhost/apc.localhost/')
+        SUBDOMAIN_URL=${URL//localhost/apc.localhost}
         echo "URL: $SUBDOMAIN_URL"
       fi
     fi
@@ -42,7 +42,7 @@ case "$1" in
     if [ -f "$PID_FILE" ]; then
       PID=$(cat "$PID_FILE")
       echo "Stopping dev server (PID: $PID)..."
-      kill $PID 2>/dev/null || echo "Process not found"
+      kill "$PID" 2>/dev/null || echo "Process not found"
       rm -f "$PID_FILE"
     else
       echo "No PID file found"
@@ -52,14 +52,14 @@ case "$1" in
   status)
     if [ -f "$PID_FILE" ]; then
       PID=$(cat "$PID_FILE")
-      if ps -p $PID > /dev/null 2>&1; then
+      if ps -p "$PID" > /dev/null 2>&1; then
         echo "Dev server running (PID: $PID)"
         # Extract URL from logs if available
         if [ -f "$LOG_FILE" ]; then
           URL=$(grep -o "http://.*" "$LOG_FILE" | head -1)
           if [ -n "$URL" ]; then
             # Replace localhost with apc.localhost for subdomain routing
-            SUBDOMAIN_URL=$(echo "$URL" | sed 's/localhost/apc.localhost/')
+            SUBDOMAIN_URL=${URL//localhost/apc.localhost}
             echo "URL: $SUBDOMAIN_URL"
           fi
         fi

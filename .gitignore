@@ -81,7 +81,6 @@ node_modules/
 .claude/SUBAGENT_TASK.md
 .claude/ORCHESTRATOR_NOTES.md
 .claude/sub-agent-logs/
-worktrees/
 
 # Build/lint/test output files
 *-errors.json

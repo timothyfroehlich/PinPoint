@@ -283,7 +283,22 @@ jobs:
   #         path: playwright-report/
   #         retention-days: 30
 
-  # Job 8: Validate GitHub Actions
+  # Job 8: Shell Script Linting
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - name: Run ShellCheck
+        uses: ludeeus/action-shellcheck@94e0aab03ca135d11a35e5bfc14e6746dc56e7e9 # v2.0.0
+        with:
+          scandir: './scripts'
+          additional_files: 'start-database.sh'
+          severity: error
+
+  # Job 9: Validate GitHub Actions
   validate-actions:
     name: Validate Actions
     runs-on: ubuntu-latest
