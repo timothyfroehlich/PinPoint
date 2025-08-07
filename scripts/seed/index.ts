@@ -14,11 +14,21 @@
 // Load development environment variables for standalone script execution
 import "../../src/lib/env-loaders/development";
 
+import { getEnvironmentName } from "../../src/lib/environment";
 import { seedInfrastructure } from "./shared/infrastructure";
 import { seedAuthUsers } from "./shared/auth-users";
 import { seedSampleData } from "./shared/sample-data";
 
 type SeedTarget = "local:pg" | "local:sb" | "preview";
+
+/**
+ * Get environment type using official detection logic
+ * Uses the centralized environment detection from src/lib/environment.js
+ */
+function getEnvironmentType() {
+  // Use official environment detection
+  return getEnvironmentName();
+}
 
 /**
  * Validate target parameter
@@ -72,7 +82,65 @@ async function main(): Promise<void> {
       process.exit(1);
     }
 
-    // 2. Environment validation
+    // 2. Debug logging - capture calling context
+    const officialEnv = getEnvironmentType();
+    const supabaseUrl = process.env["SUPABASE_URL"] || "not-set";
+
+    console.log("\n[DEBUG] 🔍 Environment Detection Debug Info:");
+    console.log(`[DEBUG] Command line args: ${process.argv.join(" ")}`);
+    console.log(`[DEBUG] Requested target: ${target}`);
+    console.log(`[DEBUG] Official environment: ${officialEnv}`);
+    console.log(`[DEBUG] NODE_ENV: ${process.env["NODE_ENV"] || "not-set"}`);
+    console.log(
+      `[DEBUG] VERCEL_ENV: ${process.env["VERCEL_ENV"] || "not-set"}`,
+    );
+    console.log(
+      `[DEBUG] SUPABASE_URL: ${supabaseUrl.substring(0, 50)}${supabaseUrl.length > 50 ? "..." : ""}`,
+    );
+    console.log(`[DEBUG] Process working directory: ${process.cwd()}`);
+    console.log(
+      `[DEBUG] Parent process: ${process.env["PARENT_PID"] || "unknown"}`,
+    );
+
+    // 3. Safety checks - prevent accidental destructive operations
+    if (target === "preview") {
+      console.log(
+        "\n⚠️  [SAFETY] PREVIEW MODE DETECTED - DESTRUCTIVE OPERATION WARNING!",
+      );
+      console.log("[SAFETY] This mode will DELETE ALL existing dev users!");
+      console.log(
+        "[SAFETY] Users to be deleted: admin@dev.local, member@dev.local, player@dev.local, and pinball personalities",
+      );
+
+      // Cross-validate with official environment detection
+      if (officialEnv === "development") {
+        console.error(
+          "\n❌ [SAFETY] BLOCKED: Preview mode blocked in development environment!",
+        );
+        console.error(
+          "[SAFETY] Target 'preview' is not allowed when NODE_ENV=development",
+        );
+        console.error("[SAFETY] Use 'local:sb' for local development instead");
+        console.error("");
+        console.error("Environment Detection Details:");
+        console.error(`  Requested Target: ${target}`);
+        console.error(`  Detected Environment: ${officialEnv}`);
+        console.error(`  NODE_ENV: ${process.env["NODE_ENV"]}`);
+        console.error(
+          `  VERCEL_ENV: ${process.env["VERCEL_ENV"] || "not-set"}`,
+        );
+        process.exit(1);
+      }
+
+      // Warn about preview mode even in valid environments
+      console.log("[SAFETY] Preview mode requires remote Supabase URL");
+      console.log("[SAFETY] Continuing in 3 seconds... (Ctrl+C to abort)");
+
+      // Add a brief delay for manual cancellation
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+    }
+
+    // 4. Environment validation
     validateEnvironment(target);
 
     // 3. Infrastructure seeding (organizations, permissions, roles, statuses)

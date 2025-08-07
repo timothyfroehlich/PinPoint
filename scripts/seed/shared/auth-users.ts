@@ -202,8 +202,60 @@ async function createSupabaseAuthUser(
     if (error) {
       // Handle "user already exists" gracefully (expected in re-seeding)
       if (error.message.includes("User already registered")) {
-        console.log(`[AUTH] User ${params.email} already exists, skipping...`);
-        return { success: true }; // Treat as success for idempotent seeding
+        console.log(
+          `[AUTH] User ${params.email} already exists, retrieving ID...`,
+        );
+
+        // Get the existing user's ID so we can still create app database records
+        const supabase = createServiceRoleClient();
+        try {
+          const { data: userList, error: listError } =
+            await supabase.auth.admin.listUsers();
+          if (listError) {
+            console.error(
+              `[AUTH] Could not list users to find ${params.email}:`,
+              listError.message,
+            );
+            return {
+              success: false,
+              error: `Could not retrieve existing user ${params.email}: ${listError.message}`,
+            };
+          }
+
+          const existingUser = userList.users.find(
+            (u) => u.email === params.email,
+          );
+          if (existingUser) {
+            console.log(
+              `[AUTH] Found existing user ID for ${params.email}: ${existingUser.id}`,
+            );
+            console.log(
+              `[AUTH] Will ensure app database records exist for existing user`,
+            );
+            return { success: true, userId: existingUser.id }; // Return the existing user ID
+          } else {
+            console.warn(
+              `[AUTH] User ${params.email} should exist but not found in list`,
+            );
+            return {
+              success: false,
+              error: `User ${params.email} exists in auth but not found in user list`,
+            };
+          }
+        } catch (lookupError) {
+          console.error(
+            `[AUTH] Error looking up existing user ${params.email}:`,
+            lookupError,
+          );
+          const errorMessage =
+            lookupError instanceof Error
+              ? lookupError.message
+              : String(lookupError);
+          return {
+            success: false,
+            error: `Failed to lookup existing user: ${errorMessage}`,
+          };
+        }
       }
 
       console.error(`[AUTH] Failed to create user ${params.email}:`, error);
@@ -276,6 +328,9 @@ async function processBatchUsers(
 
         if (existingUser.length === 0) {
           // Create new user record
+          console.log(
+            `[AUTH] Creating app database User record for ${userData.email}`,
+          );
           await db.insert(users).values({
             id: authResult.userId,
             name: userData.name,
@@ -285,8 +340,11 @@ async function processBatchUsers(
             createdAt: new Date(),
             updatedAt: new Date(),
           });
+        } else {
+          console.log(
+            `[AUTH] App database User record already exists for ${userData.email}`,
+          );
         }
-        // If user exists, no updates needed
 
         await createUserMembership(
           authResult.userId,
