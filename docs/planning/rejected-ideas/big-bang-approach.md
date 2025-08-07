@@ -29,7 +29,7 @@ This document outlines a unified migration strategy to transform PinPoint from P
 - Intuitive query syntax (`include`, `select`)
 - Excellent error messages
 - Large community and extensive documentation
-- Prisma Studio for database exploration
+- Drizzle Studio for database exploration
 
 **2. NextAuth Flexibility**
 

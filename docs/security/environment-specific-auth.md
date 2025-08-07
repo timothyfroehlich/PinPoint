@@ -41,34 +41,36 @@ The system uses `VERCEL_ENV` for Vercel deployments and falls back to `NODE_ENV`
 
 ## Database Seeding Strategy
 
-### Environment-Specific Seed Files
+### Modern Seeding Architecture
 
-1. **`prisma/seed.ts`** (Main Router)
-   - Detects current environment
-   - Executes appropriate environment-specific seed file
-   - Provides unified seeding interface
+1. **`scripts/seed/index.ts`** (Explicit Target Seeding)
+   - Target-based seeding with explicit commands
+   - Coordinates infrastructure, auth, and sample data seeding
+   - Commands: `seed:local:pg`, `seed:local:sb`, `seed:preview`
 
-2. **`prisma/seed-development.ts`**
-   - Creates test organization "Development Test Organization"
-   - Seeds comprehensive test data (users, machines, issues)
-   - Includes both `.local` and legacy test accounts
-   - Provides full development dataset
+2. **Development Environment Seeding**
+   - Organization: "Austin Pinball Collective"
+   - Users: Dev accounts (@dev.local) + Pinball personalities
+   - Sample Data: Full machine and issue dataset for testing
+   - User Reset: Aggressive cleanup for clean development demos
 
-3. **`prisma/seed-production.ts`**
-   - Creates production organization "Austin Pinball Collective"
-   - Seeds minimal production data structure
-   - No test accounts - only real user data
-   - Optimized for production deployment
+3. **Production/Preview Environment Seeding**
+   - Organization: "Austin Pinball Collective"
+   - Users: Admin account only (from environment variables)
+   - Sample Data: None - clean production environment
+   - User Reset: Preserves existing users, creates only missing ones
 
 ### Seeding Commands
 
 ```bash
 # Environment auto-detection (recommended)
-npm run db:seed
+npm run db:seed:local:sb
 
-# Specific environment seeding
-npx tsx prisma/seed-development.ts
-npx tsx prisma/seed-production.ts
+# Database reset with complete reseed
+npm run db:reset:local:sb
+
+# Seeding via npm script (preferred)
+npm run db:seed:local:sb
 ```
 
 ## OAuth Configuration Validation
@@ -242,7 +244,7 @@ node -e "console.log('ENV:', process.env.VERCEL_ENV || process.env.NODE_ENV)"
 npm run dev # Check console for OAuth validation messages
 
 # Test database seeding
-npm run db:reset && npm run db:seed
+npm run db:reset:local:sb:local:sb
 ```
 
 ## Future Enhancements

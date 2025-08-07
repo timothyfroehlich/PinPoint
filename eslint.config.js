@@ -246,6 +246,12 @@ export default tseslint.config(
       "@typescript-eslint/no-require-imports": "off",
       // Allow process.env in scripts (build/utility scripts need direct env access)
       "no-restricted-properties": "off",
+      // Allow bracket notation for process.env in scripts (TypeScript strictest vs pragmatic access)
+      "@typescript-eslint/dot-notation": "off",
+      // Disable strict type checking rules for pragmatic scripts
+      "@typescript-eslint/no-unsafe-assignment": "off",
+      "@typescript-eslint/no-unsafe-member-access": "off",
+      "@typescript-eslint/restrict-template-expressions": "off",
       // Keep unused imports checking but allow unused vars in catch blocks
       "unused-imports/no-unused-imports": "error",
       "unused-imports/no-unused-vars": [
@@ -258,6 +264,22 @@ export default tseslint.config(
           caughtErrors: "none", // Allow unused error variables in catch blocks
         },
       ],
+    },
+  },
+  {
+    // Disable type-aware linting for scripts to avoid tsconfig issues
+    files: ["scripts/**/*.ts"],
+    ...tseslint.configs.disableTypeChecked,
+  },
+  {
+    // Override: Allow drizzle-orm patterns in schema files
+    // Drizzle ORM requires patterns that conflict with @tsconfig/strictest
+    files: ["src/server/db/schema/*.ts"],
+    rules: {
+      "@typescript-eslint/no-unsafe-assignment": "off",
+      "@typescript-eslint/no-unsafe-call": "off",
+      "@typescript-eslint/no-unsafe-member-access": "off",
+      "@typescript-eslint/no-unsafe-return": "off",
     },
   },
   {

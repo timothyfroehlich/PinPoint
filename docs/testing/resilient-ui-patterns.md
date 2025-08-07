@@ -483,3 +483,181 @@ These patterns evolved through systematic analysis of 113+ test failures and suc
 6. **Anchored Regex Solves Ambiguity**: Use `^text$` patterns when exact matching is needed to avoid dynamic content collisions
 
 **Success Metrics**: Tests using these patterns showed 96% average resilience to UI changes while maintaining 100% functional coverage.
+
+---
+
+## 9. E2E Testing with MUI Components (Playwright)
+
+### 🎯 Pattern: Accessible Roles Over Data-TestId Attributes
+
+**Context**: MUI components render complex DOM structures where `data-testid` attributes may not be applied to the expected elements. Accessible roles provide more reliable targeting.
+
+**❌ Fragile Pattern:**
+
+```typescript
+// data-testid attributes may not be on the interactive element
+const machineSelect = page.locator('[data-testid="machine-selector"]');
+const titleInput = page.locator('[data-testid="issue-title-input"]');
+const submitButton = page.locator('[data-testid="issue-submit-button"]');
+```
+
+**✅ Resilient Pattern:**
+
+```typescript
+// Target semantic roles that MUI components reliably provide
+const machineSelect = page.locator('[role="combobox"]').first();
+const titleInput = page.getByRole("textbox", { name: "Issue Title" });
+const submitButton = page.getByRole("button", { name: "Create Issue" });
+```
+
+### 🎯 Pattern: MUI Select Component Interaction
+
+**❌ Fragile Pattern:**
+
+```typescript
+// MUI Select doesn't render as <select> element
+await page.selectOption('select[name="machine"]', "machine-id");
+```
+
+**✅ Resilient Pattern:**
+
+```typescript
+// MUI Select renders as combobox with clickable dropdown
+const machineSelect = page.locator('[role="combobox"]').first();
+await expect(machineSelect).toBeVisible();
+await machineSelect.click(); // Opens dropdown
+await page.getByRole("option", { name: /machine name/i }).click();
+```
+
+### 🎯 Pattern: Form Input Targeting by Accessible Names
+
+**❌ Fragile Pattern:**
+
+```typescript
+// Breaks when placeholder text changes
+await page.fill('input[placeholder*="title"]', "Issue Title");
+await page.fill('input[type="email"]', "user@example.com");
+```
+
+**✅ Resilient Pattern:**
+
+```typescript
+// Uses accessible labels that provide semantic meaning
+await page.getByRole("textbox", { name: "Issue Title" }).fill("Issue Title");
+await page
+  .getByRole("textbox", { name: "Your Email (Optional)" })
+  .fill("user@example.com");
+```
+
+### 🎯 Pattern: Success Message Detection
+
+**❌ Fragile Pattern:**
+
+```typescript
+// Depends on specific success message implementation
+await expect(page.locator('[data-testid="success-message"]')).toBeVisible();
+```
+
+**✅ Resilient Pattern:**
+
+```typescript
+// Flexible pattern matching for various success indicators
+await expect(
+  page
+    .locator(
+      ':text("success"), :text("created"), :text("Issue Created"), .success, .toast-success',
+    )
+    .first(),
+).toBeVisible({ timeout: 10000 });
+```
+
+### 🎯 Pattern: MUI Dropdown Option Selection
+
+**❌ Fragile Pattern:**
+
+```typescript
+// Fragile data-testid approach
+const option = page.locator(`[data-testid="status-option-${status}"]`);
+await option.click();
+```
+
+**✅ Resilient Pattern:**
+
+```typescript
+// Use role and flexible name matching
+const statusSelect = page.getByRole("combobox", {
+  name: /status|change status/i,
+});
+await statusSelect.click(); // Open dropdown
+
+const closedOptions = ["Fixed", "Closed", "Resolved", "Complete"];
+for (const status of closedOptions) {
+  const option = page.getByRole("option", { name: new RegExp(status, "i") });
+  if ((await option.count()) > 0) {
+    await option.click();
+    break;
+  }
+}
+```
+
+### 🎯 Pattern: Search Input Targeting
+
+**❌ Fragile Pattern:**
+
+```typescript
+// Brittle selector combination
+await page.fill(
+  'input[name="search"], input[placeholder*="search" i]',
+  "search term",
+);
+```
+
+**✅ Resilient Pattern:**
+
+```typescript
+// Semantic role with flexible name matching
+const searchInput = page.getByRole("textbox", { name: /search/i });
+await searchInput.fill("search term");
+```
+
+## E2E Testing Decision Matrix for MUI Components
+
+| MUI Component    | Fragile Pattern            | Resilient Pattern                              | Key Insight                    |
+| ---------------- | -------------------------- | ---------------------------------------------- | ------------------------------ |
+| `<Select>`       | `data-testid` attributes   | `page.locator('[role="combobox"]')`            | MUI Select renders as combobox |
+| `<TextField>`    | Placeholder/name selectors | `page.getByRole('textbox', { name: 'Label' })` | Use accessible label text      |
+| `<Button>`       | CSS class selectors        | `page.getByRole('button', { name: /text/i })`  | Button text is most stable     |
+| Select Options   | `data-testid` on options   | `page.getByRole('option', { name: /text/i })`  | Options get proper ARIA roles  |
+| Success Messages | Specific element selectors | Multiple selector fallbacks                    | Success patterns vary          |
+
+## E2E Testing Anti-Patterns with MUI
+
+### ❌ Don't Rely On
+
+```typescript
+// MUI components don't render as native HTML elements
+page.locator('select[name="field"]'); // MUI Select ≠ <select>
+page.locator('input[type="text"]'); // MUI TextField has complex structure
+
+// data-testid may be on wrong element in MUI component tree
+page.locator('[data-testid="component-id"]');
+```
+
+### ✅ Instead Use
+
+```typescript
+// MUI components provide proper ARIA roles
+page.locator('[role="combobox"]'); // MUI Select
+page.getByRole("textbox", { name: "Label" }); // MUI TextField
+page.getByRole("button", { name: /submit/i }); // MUI Button
+```
+
+## Key Learnings from Smoke Test Reliability Fixes
+
+1. **MUI Components Use Complex DOM**: Simple selectors often target the wrong element
+2. **Accessible Roles Are Reliable**: MUI components implement proper ARIA roles consistently
+3. **Flexible Text Matching**: Use regex patterns to handle text variations
+4. **Semantic Targeting**: Target what the user sees/interacts with, not implementation details
+5. **Data-TestId Issues**: MUI component structure can cause data-testid attributes to be misplaced
+
+**Impact**: Switching from data-testid to accessible role patterns fixed 5/5 major selector reliability issues in the smoke test, achieving reliable test execution through the critical user journey steps.

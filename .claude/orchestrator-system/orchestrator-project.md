@@ -59,7 +59,7 @@ See `docs/design-docs/cujs-list.md` for complete CUJ definitions.
 npm run validate      # Before starting work
 npm run dev:full      # Development with monitoring
 npm run validate    # Must pass before commits
-npm run db:reset      # Reset database
+npm run db:reset:local:sb # Reset database
 ```
 
 ## Key Documentation
@@ -107,4 +107,4 @@ All orchestrator variants create GitHub issues for task management:
 
 - **Worktree issues**: `./scripts/create-and-setup-worktree.sh <task-name>`
 - **Branch conflicts**: `git rebase origin/epic/backend-refactor`
-- **Database issues**: `npm run db:reset && npm run dev:clean`
+- **Database issues**: `npm run db:reset:local:sb && npm run dev:clean`

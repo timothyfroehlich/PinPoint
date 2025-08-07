@@ -261,13 +261,13 @@ describe("IssueDetailView - Auth Integration Tests", () => {
         user: createMockUser({
           id: "member-user-id",
           name: "Test Member",
-          email: "member@test.local",
+          email: "member@dev.local",
         }),
         expires: "2024-12-31",
       };
       const memberSupabase = createMockSupabaseUser({
         id: "member-user-id",
-        email: "member@test.local",
+        email: "member@dev.local",
         app_metadata: {
           organization_id: "org-1",
           role: "member",
@@ -276,7 +276,7 @@ describe("IssueDetailView - Auth Integration Tests", () => {
         user_metadata: {
           full_name: "Test Member",
           name: "Test Member",
-          email: "member@test.local",
+          email: "member@dev.local",
         },
       });
 
@@ -324,7 +324,7 @@ describe("IssueDetailView - Auth Integration Tests", () => {
         user: createMockUser({
           id: "member-user-id",
           name: "Test Member",
-          email: "member@test.local",
+          email: "member@dev.local",
         }),
         expires: "2024-12-31",
       };
@@ -372,7 +372,7 @@ describe("IssueDetailView - Auth Integration Tests", () => {
         user: createMockUser({
           id: "admin-user-id",
           name: "Test Admin",
-          email: "admin@test.local",
+          email: "admin@dev.local",
         }),
         expires: "2024-12-31",
       };
@@ -411,7 +411,7 @@ describe("IssueDetailView - Auth Integration Tests", () => {
         user: createMockUser({
           id: "admin-user-id",
           name: "Test Admin",
-          email: "admin@test.local",
+          email: "admin@dev.local",
         }),
         expires: "2024-12-31",
       };
@@ -514,7 +514,7 @@ describe("IssueDetailView - Auth Integration Tests", () => {
         user: createMockUser({
           id: "member-user-id",
           name: "Test Member",
-          email: "member@test.local",
+          email: "member@dev.local",
         }),
         expires: "2024-12-31",
       };
