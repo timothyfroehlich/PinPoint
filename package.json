@@ -125,7 +125,7 @@
     "pino-pretty": "^13.1.1",
     "postgres": "^3.4.7",
     "qrcode": "^1.5.4",
-    "react": "19.1.0",
+    "react": "19.1.1",
     "react-dom": "19.1.0",
     "server-only": "^0.0.1",
     "superjson": "^2.2.1",
