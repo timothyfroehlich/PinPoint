@@ -1,116 +1,82 @@
-# TypeScript Migration Scripts
+# Development Scripts
 
-This directory contains helper scripts for the TypeScript strict mode migration.
+This directory contains utility scripts for PinPoint development workflows.
 
-## Available Scripts
+## Core Development Scripts
 
-### migrate-test-file.sh
+### Development Server Management
 
-Analyzes a single test file for strict mode compatibility.
+- **`dev-background.sh`** - Manage development server in background
+  ```bash
+  npm run dev:bg        # Start server in background
+  npm run dev:bg:stop   # Stop background server
+  npm run dev:bg:status # Check server status
+  npm run dev:bg:logs   # View server logs
+  ```
+
+### Worktree Management
+
+- **`create-and-setup-worktree.sh`** - Create new Git worktrees with full environment setup
+- **`setup-worktree.sh`** - Set up environment for existing worktree
+- **`list-worktrees.sh`** - List all worktrees with status information
+- **`worktree-status.sh`** - Detailed status of worktree environments
+- **`worktree-cleanup.sh`** - Clean up abandoned worktrees and containers
+
+### Database Validation
+
+- **`validate-drizzle-crud.ts`** - Comprehensive database operation validation
+- **`validate-drizzle-foundation.ts`** - Core database foundation tests
+- **`test-drizzle-*.ts`** - Specific database connectivity and CRUD tests
+
+## Utility Scripts
+
+### CI and Development
+
+- **`ci-typecheck-filter.sh`** - Filter TypeScript errors for CI reporting
+- **`cleanup-dev.cjs`** - Clean up development processes and files
+- **`health-check.cjs`** - System health monitoring
+- **`kill-dev-processes.cjs`** - Stop all development processes
+- **`summarize-validation.mjs`** - Summarize validation results
+
+### Agent Workflow
+
+- **`agent-*.cjs`** - Scripts for automated agent workflows (dependencies, smoke tests, fixes)
+
+### Database Management
+
+- **`check-database.ts`** - Database connectivity verification
+- **`check-current-schema.ts`** - Schema validation utilities
+
+## Usage Patterns
+
+### Starting Development
 
 ```bash
-./scripts/migrate-test-file.sh src/server/api/__tests__/trpc-auth.test.ts
+npm run dev:bg        # Start development server
+npm run dev:bg:status # Verify it's running
 ```
 
-Shows:
-
-- All TypeScript strict mode errors
-- All ESLint type-safety violations
-- Next steps for migration
-
-### migrate-test-directory.sh
-
-Provides overview of all test files in a directory.
+### Database Validation
 
 ```bash
-./scripts/migrate-test-directory.sh src/server/api/__tests__/
+npm run db:validate   # Run comprehensive database tests
+npm run db:push:local # Push schema changes
 ```
 
-Shows:
-
-- List of all test files
-- Error counts for each file
-- Total errors in the directory
-
-### update-typescript-stats.sh
-
-Updates the TYPESCRIPT_MIGRATION.md file with current error counts.
+### Worktree Workflow
 
 ```bash
-./scripts/update-typescript-stats.sh
+./scripts/create-and-setup-worktree.sh feature-branch
+cd ../worktrees/feature-branch
+npm run dev:bg
 ```
 
-Automatically:
+## Related Commands
 
-- Runs typecheck and lint
-- Counts errors by type
-- Updates migration tracking document
-- Preserves error history
+Most scripts are wrapped in package.json commands. Use `npm run` commands when available:
 
-### process-csv-issues.ts
+- `npm run dev:bg*` - Background development server
+- `npm run db:*` - Database operations
+- `npm run setup:worktree` - Worktree initialization
 
-Processes CSV exports from GitHub issues for bulk operations.
-
-```bash
-npm run process-csv-issues
-```
-
-## Migration Workflow
-
-1. Choose a test file or directory to migrate
-2. Run the analysis script to see current errors
-3. Fix TypeScript errors first (they often resolve ESLint issues)
-4. Remove the file from ESLint test overrides
-5. Run `npm run validate` to verify
-6. Update Betterer baseline: `npm run betterer:update`
-7. Commit changes
-
-## Tips
-
-- Start with files that have fewer errors
-- Focus on one error type at a time
-- Use proper Jest mock typing patterns (see TYPESCRIPT_MIGRATION.md)
-- Ask for help if you encounter complex type issues
-
-## TypeScript Error Patterns
-
-### Common Test File Issues
-
-1. **Mock Type Definitions**
-
-   ```typescript
-   // ❌ Bad
-   const mockFn = jest.fn() as jest.Mock<any>;
-
-   // ✅ Good
-   const mockFn = jest.fn<ReturnType, [Parameters]>();
-   ```
-
-2. **Prisma Mock with Accelerate**
-
-   ```typescript
-   // ✅ Include $accelerate for ExtendedPrismaClient
-   const mockPrisma = {
-     user: { findUnique: jest.fn() },
-     $accelerate: {
-       invalidate: jest.fn(),
-       invalidateAll: jest.fn(),
-     },
-   };
-   ```
-
-3. **exactOptionalPropertyTypes**
-
-   ```typescript
-   // ❌ Bad
-   const obj: { prop?: string } = { prop: value || undefined };
-
-   // ✅ Good
-   const obj: { prop?: string } = value ? { prop: value } : {};
-   ```
-
-## Related Documentation
-
-- [TypeScript Migration Tracker](../TYPESCRIPT_MIGRATION.md)
-- [Betterer Integration Plan](../docs/typescript-migration/betterer-integration-plan.md)
-- [ESLint Configuration](../eslint.config.js)
+See package.json scripts section for the complete list of available commands.

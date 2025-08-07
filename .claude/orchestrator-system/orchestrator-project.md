@@ -12,7 +12,7 @@
 ## Environment
 
 - **Main Repo**: `/home/froeht/Code/PinPoint`
-- **Worktrees**: `/home/froeht/Code/PinPoint/worktrees/`
+- **Worktrees**: `/home/froeht/Code/PinPoint-{task-name}/` (sibling directories)
 - **Commands**: `npm run dev:full`, `npm run validate`, `npm run validate`
 
 ## Orchestrator Command Variations

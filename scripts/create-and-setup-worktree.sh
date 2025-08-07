@@ -30,7 +30,9 @@ fi
 
 TASK_NAME=$1
 BASE_BRANCH=${2:-$(git branch --show-current)}
-WORKTREE_DIR="$(git rev-parse --show-toplevel)/worktrees"
+REPO_DIR="$(git rev-parse --show-toplevel)"
+REPO_NAME="$(basename "$REPO_DIR")"
+WORKTREE_PATH="$(dirname "$REPO_DIR")/${REPO_NAME}-${TASK_NAME}"
 BRANCH_NAME="task/$TASK_NAME"
 
 echo -e "${BLUE}🚀 Creating Worktree for Task: $TASK_NAME${NC}"
@@ -53,16 +55,13 @@ echo -e "${YELLOW}📡 Fetching latest changes...${NC}"
 git fetch origin
 
 # Check if base branch exists
-if ! git show-ref --verify --quiet refs/heads/$BASE_BRANCH && ! git show-ref --verify --quiet refs/remotes/origin/$BASE_BRANCH; then
+if ! git show-ref --verify --quiet refs/heads/"$BASE_BRANCH" && ! git show-ref --verify --quiet refs/remotes/origin/"$BASE_BRANCH"; then
     echo -e "${RED}Error: Base branch '$BASE_BRANCH' does not exist${NC}"
     exit 1
 fi
 
-# Create worktree directory if it doesn't exist
-mkdir -p "$WORKTREE_DIR"
-
-# Full path for the new worktree
-WORKTREE_PATH="$WORKTREE_DIR/$TASK_NAME"
+# Note: Using git's default sibling directory pattern
+# No need to create parent directory - git worktree handles this
 
 # Check if worktree already exists
 if [ -d "$WORKTREE_PATH" ]; then
@@ -72,7 +71,7 @@ if [ -d "$WORKTREE_PATH" ]; then
 fi
 
 # Check if branch already exists
-if git show-ref --verify --quiet refs/heads/$BRANCH_NAME; then
+if git show-ref --verify --quiet refs/heads/"$BRANCH_NAME"; then
     echo -e "${RED}Error: Branch '$BRANCH_NAME' already exists${NC}"
     echo "Use a different task name or delete the existing branch first"
     exit 1
