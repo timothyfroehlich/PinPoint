@@ -16,9 +16,9 @@ import * as schema from "~/server/db/schema";
 function generateId(): string {
   // In Node.js 19+ crypto.randomUUID is always available
   // Keep fallback for older environments during development/testing
-  try {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
-  } catch {
+  } else {
     return uuidv4();
   }
 }
