@@ -23,7 +23,8 @@ fi
 # Function to check if a branch has a remote PR
 check_pr_status() {
     local branch=$1
-    local remote_exists=$(git ls-remote --heads origin "$branch" 2>/dev/null)
+    local remote_exists
+    remote_exists=$(git ls-remote --heads origin "$branch" 2>/dev/null)
     if [ -n "$remote_exists" ]; then
         echo "Remote branch exists"
     else
@@ -35,7 +36,8 @@ check_pr_status() {
 get_last_commit() {
     local worktree_path=$1
     cd "$worktree_path"
-    local last_commit=$(git log -1 --pretty=format:"%h %s" 2>/dev/null)
+    local last_commit
+    last_commit=$(git log -1 --pretty=format:"%h %s" 2>/dev/null)
     if [ -n "$last_commit" ]; then
         echo "$last_commit"
     else
@@ -46,7 +48,8 @@ get_last_commit() {
 # Function to check if worktree is in project worktrees directory
 is_task_worktree() {
     local path=$1
-    local project_worktrees="$(git rev-parse --show-toplevel 2>/dev/null)/worktrees"
+    local project_worktrees
+    project_worktrees="$(git rev-parse --show-toplevel 2>/dev/null)/worktrees"
     if [[ "$path" == "$project_worktrees"* ]]; then
         echo "true"
     else
@@ -72,7 +75,8 @@ get_worktree_status() {
 # Function to check worktree purpose
 check_worktree_purpose() {
     local worktree_path=$1
-    local branch_name=$(cd "$worktree_path" && git branch --show-current 2>/dev/null || echo "detached")
+    local branch_name
+    branch_name=$(cd "$worktree_path" && git branch --show-current 2>/dev/null || echo "detached")
     
     # Check if it's a task worktree based on naming patterns
     if [[ "$branch_name" =~ ^(feature|bugfix|task|orchestrator) ]]; then
@@ -110,7 +114,7 @@ for worktree in $WORKTREES; do
         if [ -f "$worktree/.env" ]; then
             # Try to extract port from .env
             port=$(grep "^PORT=" "$worktree/.env" 2>/dev/null | cut -d'=' -f2 | tr -d '"' || echo "49200")
-            if lsof -i :$port >/dev/null 2>&1; then
+            if lsof -i :"$port" >/dev/null 2>&1; then
                 echo -e "${BLUE}🚀 Dev Server:${NC} ${GREEN}Running on port $port${NC}"
             else
                 echo -e "${BLUE}🚀 Dev Server:${NC} ${RED}Not running${NC}"
