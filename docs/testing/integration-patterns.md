@@ -2,38 +2,100 @@
 
 ## Overview
 
-Integration tests in PinPoint use a real database with transactions for test isolation. This approach provides confidence that features work correctly with actual database constraints, RLS policies, and multi-table operations.
+Integration tests in PinPoint use a real database with dedicated Vitest project configuration for test isolation. This approach provides confidence that features work correctly with actual database constraints, RLS policies, and multi-table operations.
 
 ## Core Principles
 
-1. **Real Database**: Use Supabase local instance
-2. **Transaction Isolation**: Each test runs in a rolled-back transaction
-3. **Minimal Mocking**: Only mock external services (email, APIs)
-4. **User Journey Focus**: Test complete workflows
-5. **RLS Validation**: Verify security policies work
+1. **Real Database**: Use Supabase local instance (never mocked)
+2. **Hard Failures**: Tests fail immediately if database unavailable (no skipping)
+3. **Dedicated Project**: Separate Vitest project configuration for integration tests
+4. **Transaction Isolation**: Each test runs in a rolled-back transaction
+5. **Minimal Mocking**: Only mock external services (email, APIs)
+6. **User Journey Focus**: Test complete workflows
+7. **RLS Validation**: Verify security policies work
+
+## Vitest Project Configuration
+
+Integration tests run in a dedicated Vitest project:
+
+```typescript
+// vitest.config.ts - Integration project
+{
+  test: {
+    name: "integration",
+    globals: true,
+    environment: "node",
+    setupFiles: ["src/test/vitest.integration.setup.ts"], // No database mocking
+    typecheck: {
+      tsconfig: "./tsconfig.tests.json",
+    },
+    poolOptions: {
+      threads: { singleThread: true }, // Prevent connection conflicts
+    },
+    include: [
+      "src/integration-tests/**/*.test.{ts,tsx}",
+    ],
+  },
+}
+```
 
 ## Test Database Setup
 
-### Base Test Configuration
+### Integration Test Setup
+
+The integration test setup ensures database availability and provides real connections:
 
 ```typescript
-// src/test/integration-setup.ts
+// src/test/vitest.integration.setup.ts
+import { beforeAll, afterAll, afterEach } from "vitest";
+
+// NO database mocking - uses real Supabase database
+
+beforeAll(async () => {
+  // Hard failure if database unavailable
+  if (!process.env.DATABASE_URL) {
+    throw new Error(
+      "DATABASE_URL is required for integration tests. Ensure Supabase is running.",
+    );
+  }
+
+  // Reject test/mock URLs - integration tests need real database
+  if (
+    process.env.DATABASE_URL.includes("test://") ||
+    process.env.DATABASE_URL.includes("postgresql://test:test@")
+  ) {
+    throw new Error(
+      "Integration tests require a real database URL, not a test/mock URL. Check .env.test configuration.",
+    );
+  }
+});
+
+afterEach(() => {
+  // Cleanup handled by individual tests using transactions
+});
+
+afterAll(() => {
+  // Global cleanup
+});
+```
+
+### Database Connection Helpers
+
+```typescript
+// src/test/integration-helpers.ts
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { createClient } from "@supabase/supabase-js";
 
-// Test database connection
-const testDbUrl =
-  process.env.TEST_DATABASE_URL ??
-  "postgresql://postgres:postgres@localhost:54322/postgres";
-
+// Real database connection (no mocking)
+const testDbUrl = process.env.DATABASE_URL!; // From .env.test
 export const testSql = postgres(testDbUrl, { max: 1 });
 export const testDb = drizzle(testSql);
 
-// Test Supabase clients
+// Supabase clients for integration testing
 export const testSupabaseAdmin = createClient(
-  process.env.TEST_SUPABASE_URL ?? "http://localhost:54321",
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  process.env.SUPABASE_URL ?? "http://localhost:54321",
+  process.env.SUPABASE_SECRET_KEY!,
   {
     auth: {
       autoRefreshToken: false,
@@ -41,41 +103,6 @@ export const testSupabaseAdmin = createClient(
     },
   },
 );
-
-// Helper to create authenticated client for a user
-export async function createAuthenticatedClient(
-  userId: string,
-  organizationId: string,
-  permissions: string[] = [],
-) {
-  // Create/update user with proper metadata
-  await testSupabaseAdmin.auth.admin.updateUserById(userId, {
-    app_metadata: {
-      organizationId,
-      permissions,
-    },
-  });
-
-  // Get access token
-  const {
-    data: { session },
-  } = await testSupabaseAdmin.auth.admin.generateLink({
-    type: "magiclink",
-    email: `test-${userId}@example.com`,
-  });
-
-  return createClient(
-    process.env.TEST_SUPABASE_URL!,
-    process.env.SUPABASE_ANON_KEY!,
-    {
-      global: {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      },
-    },
-  );
-}
 ```
 
 ### Transaction Test Wrapper
@@ -480,6 +507,34 @@ describe("Performance Integration Tests", () => {
 
 ## Common Pitfalls
 
+### Running Integration Tests Without Database
+
+```typescript
+// ❌ BAD: Expecting tests to skip
+// Integration tests will fail hard if database unavailable
+
+// ✅ GOOD: Ensure Supabase is running
+// Run `supabase start` before integration tests
+// Check `supabase status` to verify
+```
+
+### Mixing Unit and Integration Test Patterns
+
+```typescript
+// ❌ BAD: Using mocks in integration tests
+it("creates issue", async () => {
+  // This is in src/integration-tests/ but trying to mock
+  vi.mock("~/server/db/drizzle"); // Wrong for integration tests!
+});
+
+// ✅ GOOD: Use real database in integration tests
+it("creates issue", async () => {
+  // No mocking - real database operations
+  const db = createDrizzleClient();
+  const issue = await db.insert(issues).values({...});
+});
+```
+
 ### Forgetting Transaction Wrapper
 
 ```typescript
@@ -498,40 +553,74 @@ it("creates issue", async () => {
 });
 ```
 
-### Testing Without RLS Context
+### Wrong Project Configuration
 
 ```typescript
-// ❌ BAD: Bypasses RLS
-const issues = await db.select().from(issues);
+// ❌ BAD: Integration test in wrong location
+// File: src/server/api/routers/__tests__/issues.integration.test.ts
+// This will run with mocked database (wrong project)
 
-// ✅ GOOD: Tests with proper auth context
-const client = await createAuthenticatedClient(userId, orgId);
-const { data: issues } = await client.from("issues").select();
+// ✅ GOOD: Integration test in correct location
+// File: src/integration-tests/issues.integration.test.ts
+// This will run with real database (integration project)
 ```
 
-### Over-Mocking
+## Running Integration Tests
 
-```typescript
-// ❌ BAD: Mocking database
-vi.mock("~/server/db");
+### Prerequisites
 
-// ✅ GOOD: Use real database with transactions
-await withTransaction(async (tx) => {
-  // Real queries with real constraints
-});
+1. **Supabase must be running locally:**
+
+   ```bash
+   supabase status    # Check status
+   supabase start     # Start if needed
+   ```
+
+2. **Environment configured:**
+   - `.env.test` file with correct `DATABASE_URL`
+   - Environment loaded with `override: true` by `src/lib/env-loaders/test.ts`
+
+### Commands
+
+```bash
+# Run all integration tests
+npm run test -- --project=integration
+
+# Run specific integration test files
+npm run test src/integration-tests/notification.schema.test.ts
+
+# Run both integration test files
+npm run test src/integration-tests/ src/server/db/drizzle-crud-validation.test.ts
+
+# Watch mode for integration tests
+npm run test -- --project=integration --watch
 ```
+
+### Hard Failure Behavior
+
+Integration tests **always fail hard** when database unavailable:
+
+- ❌ **No skipping**: Tests never skip silently
+- ✅ **Clear errors**: Immediate failure with helpful error messages
+- ✅ **Fast feedback**: Fail at setup, not during individual tests
+
+Example error messages:
+
+- `"DATABASE_URL is required for integration tests. Ensure Supabase is running."`
+- `"Integration tests require a real database URL, not a test/mock URL."`
 
 ## Debugging Integration Tests
 
 ```bash
-# Run single test file
-npm run test:integration -- issue.integration.test.ts
+# Run single integration test
+npm run test -- --project=integration notification.schema.test.ts
 
-# Enable SQL logging
-TEST_LOG_SQL=true npm run test:integration
+# Enable debug output
+DEBUG=* npm run test -- --project=integration
 
-# Use specific test database
-TEST_DATABASE_URL=postgresql://... npm run test:integration
+# Check database connectivity
+supabase status
+psql $DATABASE_URL -c "SELECT 1;"
 ```
 
 ## Migration from Mock-Based Tests

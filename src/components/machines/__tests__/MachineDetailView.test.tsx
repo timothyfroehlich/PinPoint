@@ -90,7 +90,7 @@ const mockMachineWithoutQR: any = {
 // Mock Supabase users for different auth scenarios
 const mockMemberUser = createMockSupabaseUser({
   id: "member-user-id",
-  email: "member@test.local",
+  email: "member@dev.local",
   app_metadata: {
     organization_id: "org-1",
     role: "Member",
@@ -98,13 +98,13 @@ const mockMemberUser = createMockSupabaseUser({
   },
   user_metadata: {
     full_name: "Test Member",
-    email: "member@test.local",
+    email: "member@dev.local",
   },
 });
 
 const mockAdminUser = createMockSupabaseUser({
   id: "admin-user-id",
-  email: "admin@test.local",
+  email: "admin@dev.local",
   app_metadata: {
     organization_id: "org-1",
     role: "Admin",
@@ -112,7 +112,7 @@ const mockAdminUser = createMockSupabaseUser({
   },
   user_metadata: {
     full_name: "Test Admin",
-    email: "admin@test.local",
+    email: "admin@dev.local",
   },
 });
 

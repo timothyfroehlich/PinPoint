@@ -201,55 +201,53 @@ WITH CHECK (bucket_id = 'pinpoint-storage' AND auth.uid() IS NOT NULL);
 
 ## Seeding Data
 
-### Create Seed File
+### Modern Seeding Architecture
+
+PinPoint uses explicit target-based seeding with simplified commands:
 
 ```typescript
-// supabase/seed.ts
-import { createClient } from "@supabase/supabase-js";
+// scripts/seed/index.ts (simplified)
+import { seedInfrastructure } from "./shared/infrastructure";
+import { seedAuthUsers } from "./shared/auth-users";
+import { seedSampleData } from "./shared/sample-data";
 
-const supabase = createClient(
-  "http://localhost:54321",
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-);
+const target = process.argv[2]; // 'local:pg', 'local:sb', 'preview'
 
-async function seed() {
-  // Create organizations
-  const { data: org } = await supabase
-    .from("organizations")
-    .insert({
-      name: "Test Organization",
-      slug: "test-org",
-    })
-    .select()
-    .single();
+export async function main(): Promise<void> {
+  // 1. Infrastructure (organizations, permissions, roles)
+  const organization = await seedInfrastructure();
 
-  // Create users with proper metadata
-  await supabase.auth.admin.createUser({
-    email: "admin@test.com",
-    password: "password123",
-    email_confirm: true,
-    app_metadata: {
-      organizationId: org.id,
-      permissions: ["admin"],
-    },
-  });
+  // 2. Auth users (skip for PostgreSQL-only)
+  if (target !== 'local:pg') {
+    await seedAuthUsers(organization.id);
 
-  console.log("Seed complete!");
+  // 3. Sample data (development only)
+  if (strategy.sampleData) {
+    await seedSampleData(organization.id);
+  }
 }
-
-seed().catch(console.error);
 ```
 
-### Run Seed
+**Key Features:**
+
+- **Environment Detection**: Auto-detects development/preview/production
+- **Drizzle ORM**: Native PostgreSQL operations with type safety
+- **Supabase Integration**: Creates both auth users and database profiles
+- **Safe User Management**: Preserves existing users in production
+
+### Run Seeding
 
 ```bash
-# Add to package.json
-"scripts": {
-  "db:seed": "tsx supabase/seed.ts"
-}
+# Explicit target seeding
+npm run db:seed:local:sb   # Local Supabase (explicit)
+npm run db:seed:local:pg   # PostgreSQL-only (CI)
+npm run db:seed:preview    # Remote preview
 
-# Run seed
-npm run db:seed
+# Complete database reset + reseed
+npm run db:reset:local:sb  # Local Supabase reset
+
+# Database validation
+npm run db:validate
 ```
 
 ## Development Workflow

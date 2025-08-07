@@ -422,13 +422,7 @@ export function IssueList({
                       permission="issue:assign"
                       hasPermission={hasPermission}
                     >
-                      <Box
-                        display="flex"
-                        alignItems="center"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                        }}
-                      >
+                      <Box display="flex" alignItems="center">
                         <Checkbox
                           checked={selectedIssues.includes(issue.id)}
                           onChange={(e) => {

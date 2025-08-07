@@ -40,10 +40,12 @@ describe("Authentication Core Logic", () => {
   });
 
   describe("Development Authentication", () => {
-    it("should enable credentials provider in development", () => {
-      const isDevelopment = process.env.NODE_ENV === "development";
+    it("should enable credentials provider in development", async () => {
+      // Use official environment detection
+      const { isDevelopment } = await import("~/lib/environment.js");
+      const isDev = isDevelopment();
       // In development, credentials provider should be available
-      expect(typeof isDevelopment).toBe("boolean");
+      expect(typeof isDev).toBe("boolean");
     });
 
     it("should include test user emails for development", () => {

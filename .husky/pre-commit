@@ -1,12 +1,3 @@
 #!/bin/sh
-echo "🔍 Scanning for secrets..."
-gitleaks protect --staged --verbose
-
-if [ $? -ne 0 ]; then
-    echo "❌ SECRET DETECTED! Commit blocked."
-    echo "Remove secrets before committing."
-    exit 1
-fi
-
-echo "🎨 Formatting staged files..."
-npx lint-staged
+echo "🔧 Running pre-commit checks in parallel..."
+npm run pre-commit:all

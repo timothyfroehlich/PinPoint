@@ -227,14 +227,15 @@ describe("Data Migration", () => {
 ## Common Migration Commands
 
 ```bash
-# Stage 1: Supabase setup
+# Stage 1: Supabase setup ✅ COMPLETE
 supabase start
 supabase status
-npm run db:reset  # Still using Prisma
 
-# Stage 2: Drizzle preparation (future)
-npm run drizzle:generate
-npm run drizzle:migrate
+# Stage 2: Drizzle ORM ✅ COMPLETE
+npm run db:reset:local:sb  # Using Drizzle
+npm run db:push:local      # Schema changes
+npm run db:generate:local:sb # Type generation
+npm run db:seed:local:sb   # Explicit seeding
 
 # Stage 3: RLS activation (future)
 supabase db migrate up

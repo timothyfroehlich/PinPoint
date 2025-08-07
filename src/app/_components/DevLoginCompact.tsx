@@ -48,40 +48,14 @@ export function DevLoginCompact({
           const data = (await response.json()) as { users: DevUser[] };
           setTestUsers(data.users);
         } else {
-          console.warn("Failed to fetch dev users, using fallback");
-          // Fallback to some basic users if API fails
-          setTestUsers([
-            {
-              id: "1",
-              name: "Test Admin",
-              email: "admin@test.com",
-              role: "admin",
-            },
-            {
-              id: "2",
-              name: "Test Member",
-              email: "member@test.com",
-              role: "member",
-            },
-          ]);
+          console.error(
+            "Failed to fetch dev users - seeding may not be complete",
+          );
+          setTestUsers([]);
         }
       } catch (error) {
         console.error("Error fetching dev users:", error);
-        // Fallback users
-        setTestUsers([
-          {
-            id: "1",
-            name: "Test Admin",
-            email: "admin@test.com",
-            role: "admin",
-          },
-          {
-            id: "2",
-            name: "Test Member",
-            email: "member@test.com",
-            role: "member",
-          },
-        ]);
+        setTestUsers([]);
       } finally {
         setFetchingUsers(false);
       }
