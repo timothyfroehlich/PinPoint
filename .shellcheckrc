@@ -1,0 +1,20 @@
+# ShellCheck configuration for PinPoint project
+
+# Look for sourced files relative to the checked script
+source-path=SCRIPTDIR
+source-path=scripts
+
+# Allow opening any 'source'd file, even if not specified as input
+external-sources=true
+
+# Disable common false positives for Node.js/development projects
+disable=SC1091  # Not following: file was not specified as input (for sourced .env files)
+disable=SC2034  # Variable appears unused (common in config files with exported vars)
+disable=SC2148  # Tips depend on target shell (for files without explicit shebang)
+
+# Enable additional checks for better code quality
+enable=quote-safe-variables
+enable=check-unassigned-uppercase
+
+# Set shell dialect (default to bash for our scripts)
+shell=bash
