@@ -83,7 +83,19 @@ class DrizzleCRUDValidator {
       console.log("   - Check if Supabase is running: npm run dev:bg:status");
       console.log("   - Verify DATABASE_URL in your environment");
       console.log(
-        `   - Connection string: ${env.POSTGRES_PRISMA_URL?.replace(/\/\/[^@]*@/, "//***:***@")}`,
+        `   - Connection string: ${
+          (() => {
+            try {
+              if (!env.POSTGRES_PRISMA_URL) return "";
+              const url = new URL(env.POSTGRES_PRISMA_URL);
+              url.username = "***";
+              url.password = "***";
+              return url.toString();
+            } catch {
+              return "";
+            }
+          })()
+        }`,
       );
 
       return false;
