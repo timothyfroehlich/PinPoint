@@ -177,11 +177,27 @@ test.describe("Smoke Test: Complete Issue Workflow", () => {
     console.log("🧪 SMOKE TEST - Step 8: Opening the created issue");
 
     // Find and click the issue title to navigate to detail page
-    // Try both heading role and direct text locator for robustness
-    const issueTitleElement = page.locator(`text="${issueTitle}"`).first();
-    await expect(issueTitleElement).toBeVisible({ timeout: 10000 });
+    // The h3 is inside a Typography component that has the click handler
+    // Target the Typography parent element that wraps the h3
+    const issueTitleHeading = page
+      .locator("h3")
+      .filter({ hasText: issueTitle })
+      .first();
+    await expect(issueTitleHeading).toBeVisible({ timeout: 10000 });
+
+    // Get the parent Typography element that has the actual click handler
+    const issueTitleElement = issueTitleHeading.locator("..");
 
     console.log(`🔍 SMOKE TEST - Current URL before click: ${page.url()}`);
+
+    // Debug: Check what element we're targeting
+    const elementTag = await issueTitleElement.evaluate((el) => el.tagName);
+    const elementText = await issueTitleElement.textContent();
+    console.log(
+      `🔍 SMOKE TEST - Clicking element: ${elementTag} with text: "${elementText}"`,
+    );
+
+    // Click on the Typography parent element that has the onClick handler
     await issueTitleElement.click();
 
     // Wait for navigation to complete
