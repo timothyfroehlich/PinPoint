@@ -18,6 +18,11 @@ function getEnvironmentType() {
 
   // SECURITY: Default to production mode (fail-secure)
   // This prevents accidentally enabling dev features in production
+  console.warn(
+    "[env] WARNING: Defaulting to 'production' environment because neither NODE_ENV nor VERCEL_ENV are set. " +
+    "This may indicate a misconfiguration in your development environment. " +
+    "Set NODE_ENV to 'development' or VERCEL_ENV appropriately to avoid this warning."
+  );
   return "production";
 }
 
