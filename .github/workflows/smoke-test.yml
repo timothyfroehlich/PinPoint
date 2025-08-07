@@ -125,8 +125,8 @@ jobs:
         run: |
           set -e  # Exit on any error
           # Validate critical environment variables are set by Supabase CLI
-          [[ -n "$SUPABASE_URL" ]] || { echo "❌ SUPABASE_URL not set by Supabase CLI"; exit 1; }
-          [[ -n "$SUPABASE_ANON_KEY" ]] || { echo "❌ SUPABASE_ANON_KEY not set by Supabase CLI"; exit 1; }
+          [[ -n "$API_URL" ]] || { echo "❌ API_URL not set by Supabase CLI"; exit 1; }
+          [[ -n "$ANON_KEY" ]] || { echo "❌ ANON_KEY not set by Supabase CLI"; exit 1; }
 
           # Run smoke test - must pass completely for CI success
           echo "🧪 Running smoke test with local Supabase stack"
