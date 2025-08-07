@@ -38,7 +38,7 @@ test.describe("Smoke Test: Complete Issue Workflow", () => {
     await page.waitForLoadState("networkidle");
 
     // Verify we're on the create page
-    await expect(page.locator("h1")).toContainText("Create");
+    await expect(page.locator("h1")).toContainText("Create New Issue");
     console.log("✅ SMOKE TEST - Step 2 Complete: On issue creation page");
 
     // Step 3: Pick a Game
