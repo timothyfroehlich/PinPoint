@@ -143,11 +143,45 @@ test.describe("Smoke Test: Complete Issue Workflow", () => {
     await page.goto("/");
     await page.waitForLoadState("networkidle");
 
-    // Use dev quick login
-    await page.locator('text="Dev Quick Login"').click();
-    await page.locator('button:has-text("Dev Admin")').click();
+    // Find and click dev quick login section to expand it
+    console.log("🔍 SMOKE TEST - Looking for Dev Quick Login...");
+    const devLoginSection = page.locator('text="Dev Quick Login"');
+    await expect(devLoginSection).toBeVisible({ timeout: 5000 });
+    await devLoginSection.click();
 
-    // Wait for authentication
+    // Wait for the section to expand and users to load
+    console.log("🔍 SMOKE TEST - Waiting for dev users to load...");
+
+    // First, wait for loading to finish (if "Loading users..." appears)
+    const loadingText = page.locator('text="Loading users..."');
+    if (await loadingText.isVisible().catch(() => false)) {
+      await expect(loadingText).not.toBeVisible({ timeout: 10000 });
+    }
+
+    // Then look for any button containing "Dev Admin" or "admin@dev.local"
+    console.log("🔍 SMOKE TEST - Looking for Dev Admin button...");
+    const devAdminButton = page
+      .locator("button", {
+        hasText: /Dev Admin|admin@dev\.local/i,
+      })
+      .first();
+
+    // Add some debug info if button not found
+    if (!(await devAdminButton.isVisible().catch(() => false))) {
+      const allButtons = await page.locator("button").allTextContents();
+      console.log("🔍 SMOKE TEST - Available buttons:", allButtons);
+      const pageContent = await page.textContent("body");
+      console.log(
+        "🔍 SMOKE TEST - Page content:",
+        pageContent?.substring(0, 1000),
+      );
+    }
+
+    await expect(devAdminButton).toBeVisible({ timeout: 10000 });
+    await devAdminButton.click();
+
+    // Wait for authentication to complete
+    console.log("🔍 SMOKE TEST - Waiting for authentication...");
     await expect(page.locator('text="My Dashboard"')).toBeVisible({
       timeout: 15000,
     });
@@ -334,34 +368,49 @@ test.describe("Smoke Test: Complete Issue Workflow", () => {
     // Step 10: Close Issue
     console.log("🧪 SMOKE TEST - Step 10: Closing the issue");
 
-    // Find status dropdown or close button
-    const statusSelect = page.getByRole("combobox", {
-      name: /status|change status/i,
-    });
-    if (await statusSelect.isVisible()) {
-      // Click to open the MUI Select dropdown
-      await statusSelect.click();
+    // Look for the close button first (this is the primary action)
+    const closeButton = page.getByTestId("close-issue-button");
+    if (await closeButton.isVisible()) {
+      console.log("🔍 SMOKE TEST - Found Close Issue button, clicking...");
+      await closeButton.click();
 
-      // Wait for dropdown options to appear and select a closed status
-      const closedOptions = ["Fixed", "Closed", "Resolved", "Complete"];
-      for (const status of closedOptions) {
-        const option = page.getByRole("option", {
-          name: new RegExp(status, "i"),
-        });
-        if ((await option.count()) > 0) {
-          await option.click();
-          break;
-        }
-      }
+      // Wait for the button to show "Closing..." then return to enabled state
+      await expect(closeButton).toContainText("Closing...");
+      console.log(
+        "🔍 SMOKE TEST - Button shows 'Closing...', waiting for completion...",
+      );
+
+      // Wait for the operation to complete (button text changes back and becomes enabled)
+      await expect(closeButton).not.toContainText("Closing...", {
+        timeout: 10000,
+      });
+      await expect(closeButton).toBeEnabled({ timeout: 5000 });
+      console.log("🔍 SMOKE TEST - Close operation completed");
     } else {
-      // Look for a close button
-      const closeButton = page
-        .locator(
-          'button:has-text("Close"), button:has-text("Fixed"), button:has-text("Resolve")',
-        )
-        .first();
-      if (await closeButton.isVisible()) {
-        await closeButton.click();
+      // Fallback: Look for status dropdown
+      const statusSelect = page.getByRole("combobox", {
+        name: /status|change status/i,
+      });
+      if (await statusSelect.isVisible()) {
+        console.log("🔍 SMOKE TEST - Using status dropdown as fallback...");
+        // Click to open the MUI Select dropdown
+        await statusSelect.click();
+
+        // Wait for dropdown options to appear and select a closed status
+        const closedOptions = ["Fixed", "Closed", "Resolved", "Complete"];
+        for (const status of closedOptions) {
+          const option = page.getByRole("option", {
+            name: new RegExp(status, "i"),
+          });
+          if ((await option.count()) > 0) {
+            await option.click();
+            break;
+          }
+        }
+      } else {
+        throw new Error(
+          "Step 10 FAILED: Could not find close button or status dropdown",
+        );
       }
     }
 
@@ -370,27 +419,69 @@ test.describe("Smoke Test: Complete Issue Workflow", () => {
     // Step 11: Verify Closure
     console.log("🧪 SMOKE TEST - Step 11: Verifying issue is closed");
 
+    // Wait a moment for UI to update after the close operation
+    await page.waitForTimeout(1000);
+
     // Look for indicators that the issue is closed
-    const closedIndicators = [
-      'text="Fixed"',
-      'text="Closed"',
-      'text="Resolved"',
-      ".status-closed",
-      '.badge:has-text("Fixed")',
-      '.badge:has-text("Closed")',
-    ];
+    // Based on the seeding data, "Fixed" is the resolved status name
+    console.log("🔍 SMOKE TEST - Looking for closure indicators...");
 
     let foundClosure = false;
-    for (const indicator of closedIndicators) {
-      if (
-        await page
-          .locator(indicator)
-          .isVisible()
-          .catch(() => false)
-      ) {
+    let foundIndicator = "";
+
+    // Primary indicators: Status chips/badges with "Fixed" text
+    const statusChip = page.locator('text="Fixed"').first();
+    if (await statusChip.isVisible().catch(() => false)) {
+      foundClosure = true;
+      foundIndicator = "Status chip with 'Fixed'";
+    }
+
+    // Secondary: Look in status section
+    if (!foundClosure) {
+      const statusSection = page
+        .locator('[data-testid*="status"], .status')
+        .locator('text="Fixed"');
+      if (await statusSection.isVisible().catch(() => false)) {
         foundClosure = true;
-        break;
+        foundIndicator = "Status section with 'Fixed'";
       }
+    }
+
+    // Tertiary: Any element containing fixed/closed/resolved
+    if (!foundClosure) {
+      const closedIndicators = [
+        'text="Fixed"',
+        'text="Closed"',
+        'text="Resolved"',
+        ':has-text("Fixed")',
+        ':has-text("Closed")',
+        ':has-text("Resolved")',
+      ];
+
+      for (const indicator of closedIndicators) {
+        if (
+          await page
+            .locator(indicator)
+            .isVisible()
+            .catch(() => false)
+        ) {
+          foundClosure = true;
+          foundIndicator = `Indicator: ${indicator}`;
+          break;
+        }
+      }
+    }
+
+    console.log(
+      `🔍 SMOKE TEST - Closure check result: ${foundClosure ? "✅ FOUND" : "❌ NOT FOUND"}`,
+    );
+    if (foundClosure) {
+      console.log(`🔍 SMOKE TEST - Found via: ${foundIndicator}`);
+    } else {
+      // Debug: Show what's actually on the page
+      const pageContent = await page.textContent("body");
+      console.log("🔍 SMOKE TEST - Page content for debugging:");
+      console.log(pageContent?.substring(0, 500) + "...");
     }
 
     expect(foundClosure).toBe(true);
