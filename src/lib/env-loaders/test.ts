@@ -51,10 +51,8 @@ export function loadTestEnvironment(): void {
   config({ path: resolve(projectRoot, ".env.local"), override: false });
 
   // Ensure test environment has NODE_ENV set
-  // eslint-disable-next-line no-restricted-properties, @typescript-eslint/dot-notation, @typescript-eslint/no-unnecessary-condition
-  if (!process.env["NODE_ENV"]) {
-    // eslint-disable-next-line no-restricted-properties, @typescript-eslint/dot-notation
-    (process.env as { NODE_ENV?: string })["NODE_ENV"] = "test";
+  if (!process.env.NODE_ENV) {
+    process.env.NODE_ENV = "test";
   }
 }
 
