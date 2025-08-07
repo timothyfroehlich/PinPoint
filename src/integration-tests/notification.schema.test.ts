@@ -4,6 +4,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 describe("Notification schema integration", () => {
   let prisma: PrismaClient;
   let userId: string;
+  const createdUserIds: string[] = []; // Track users created by this test
 
   beforeAll(async () => {
     // Ensure database is available for integration tests
@@ -30,6 +31,7 @@ describe("Notification schema integration", () => {
         data: { email: "schematest@example.com", name: "Schema Test" },
       });
       userId = user.id;
+      createdUserIds.push(user.id); // Track this user for cleanup
     } catch (error) {
       throw new Error(
         `Failed to connect to database for integration tests: ${error instanceof Error ? error.message : String(error)}`,
@@ -40,8 +42,14 @@ describe("Notification schema integration", () => {
   afterAll(async () => {
     if (!prisma) return;
     try {
-      await prisma.notification.deleteMany();
-      await prisma.user.deleteMany();
+      // Delete only notifications created by our test users
+      await prisma.notification.deleteMany({
+        where: { userId: { in: createdUserIds } },
+      });
+      // Delete only users created by this test, not ALL users
+      await prisma.user.deleteMany({
+        where: { id: { in: createdUserIds } },
+      });
       await prisma.$disconnect();
     } catch {
       // Ignore cleanup errors in test environment
@@ -86,6 +94,7 @@ describe("Notification schema integration", () => {
     const testUser = await prisma.user.create({
       data: { email: "cascade-test@example.com", name: "Cascade Test User" },
     });
+    createdUserIds.push(testUser.id); // Track this user for cleanup
 
     // Create notification for test user
     const notification = await prisma.notification.create({
@@ -117,6 +126,7 @@ describe("Notification schema integration", () => {
     const user = await prisma.user.create({
       data: { email: "schematest2@example.com", name: "Schema Test 2" },
     });
+    createdUserIds.push(user.id); // Track this user for cleanup
     const notification = await prisma.notification.create({
       data: {
         userId: user.id,
