@@ -658,17 +658,14 @@ export async function seedInfrastructure(): Promise<Organization> {
   });
   console.log(`[INFRASTRUCTURE] Created organization: ${organization.name}`);
 
-  // 3. Create default priorities
-  await createDefaultPriorities(organization.id);
-
-  // 4. Create default collection types
-  await createDefaultCollectionTypes(organization.id);
-
-  // 5. Create default issue statuses
-  await createDefaultStatuses(organization.id);
-
-  // 6. Create default location
-  await createDefaultLocation(organization.id);
+  // 3-6. Create organization-specific data in parallel where safe
+  console.log(`[INFRASTRUCTURE] Creating organization data...`);
+  await Promise.all([
+    createDefaultPriorities(organization.id),
+    createDefaultCollectionTypes(organization.id),
+    createDefaultStatuses(organization.id),
+    createDefaultLocation(organization.id)
+  ]);
 
   const duration = Date.now() - startTime;
   console.log(

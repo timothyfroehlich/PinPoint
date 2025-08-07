@@ -149,7 +149,7 @@ function parseGameTitle(title: string): {
 }
 
 /**
- * Create OPDB models from unique games with batch operations
+ * Create OPDB models from unique games with optimized upsert operations
  */
 async function createModels(games: UniqueGame[]): Promise<void> {
   console.log(`[SAMPLE] Creating ${games.length.toString()} OPDB models...`);
@@ -160,18 +160,8 @@ async function createModels(games: UniqueGame[]): Promise<void> {
       return;
     }
 
-    // Get existing models for all game OPDB IDs in one query
-    const gameOpdbIds = games.map(g => g.opdbId);
-    const existingModels = await db
-      .select({ opdbId: models.opdbId })
-      .from(models);
-
-    const existingSet = new Set(existingModels.map(m => m.opdbId));
-
-    // Find models that need to be created
-    const modelsToCreate = games.filter(
-      game => !existingSet.has(game.opdbId)
-    ).map(game => ({
+    // Build all models to create
+    const modelsToCreate = games.map(game => ({
       id: `model_${game.opdbId}`, // Deterministic ID generation
       name: game.name,
       manufacturer: game.manufacturer,
@@ -181,12 +171,14 @@ async function createModels(games: UniqueGame[]): Promise<void> {
       isActive: true,
     }));
 
-    // Batch create all missing models
+    // Use PostgreSQL upsert pattern - insert all, ignore conflicts on opdbId
     if (modelsToCreate.length > 0) {
-      await db.insert(models).values(modelsToCreate);
-      console.log(`[SAMPLE] ✅ Created ${modelsToCreate.length.toString()} models via batch insert`);
-    } else {
-      console.log(`[SAMPLE] ⏭️  All ${games.length.toString()} models already exist`);
+      const result = await db
+        .insert(models)
+        .values(modelsToCreate)
+        .onConflictDoNothing({ target: models.opdbId });
+
+      console.log(`[SAMPLE] ✅ Processed ${modelsToCreate.length.toString()} models via optimized upsert (conflicts ignored)`);
     }
 
     console.log(`[SAMPLE] ✅ Model creation completed`);

@@ -24,10 +24,18 @@ function createDrizzleClientInternal() {
 
   // Create postgres-js connection with environment-optimized settings
   const sql = postgres(connectionString, {
-    max: isCI ? 2 : 1, // Slightly higher pool for CI stability
+    // Optimized for seeding operations
+    max: isCI ? 2 : isDevelopment() ? 5 : 10, // Higher pool for seeding operations
     idle_timeout: isCI ? 30 : isDevelopment() ? 60 : 20,
     connect_timeout: isCI ? 20 : isDevelopment() ? 30 : 10,
     ssl: sslConfig, // Conditional SSL based on environment
+    // Seeding-optimized configurations
+    prepare: !isCI, // Enable prepared statements for better performance (except CI)
+    transform: { undefined: null }, // Handle undefined values consistently
+    // Connection reuse optimizations
+    connection: {
+      application_name: isCI ? 'pinpoint_ci_seeding' : 'pinpoint_seeding', // Better connection tracking
+    },
     // CI-specific optimizations
     ...(isCI && {
       prepare: false, // Disable prepared statements in CI
@@ -82,10 +90,18 @@ class DrizzleSingleton {
     const sslConfig = isLocalhost || isCI ? false : "require";
 
     const sql = postgres(connectionString, {
-      max: isCI ? 2 : 1, // Slightly higher pool for CI stability
+      // Optimized for seeding operations  
+      max: isCI ? 2 : isDevelopment() ? 5 : 10, // Higher pool for seeding operations
       idle_timeout: isCI ? 30 : isDevelopment() ? 60 : 20,
       connect_timeout: isCI ? 20 : isDevelopment() ? 30 : 10,
       ssl: sslConfig, // Conditional SSL based on environment
+      // Seeding-optimized configurations
+      prepare: !isCI, // Enable prepared statements for better performance (except CI)
+      transform: { undefined: null }, // Handle undefined values consistently
+      // Connection reuse optimizations
+      connection: {
+        application_name: isCI ? 'pinpoint_ci_seeding' : 'pinpoint_seeding', // Better connection tracking
+      },
       // CI-specific optimizations
       ...(isCI && {
         prepare: false, // Disable prepared statements in CI
