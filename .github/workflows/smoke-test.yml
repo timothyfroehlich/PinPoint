@@ -2,6 +2,10 @@ name: Smoke Test
 permissions:
   contents: read
 
+env:
+  CI: true
+  NODE_ENV: test
+
 on:
   push:
     branches: [main]
@@ -13,27 +17,15 @@ jobs:
     name: End-to-End Smoke Test
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: test_user
-          POSTGRES_PASSWORD: test_password
-          POSTGRES_DB: test_db
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+    env:
+      SKIP_ENV_VALIDATION: true
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 20
           cache: npm
@@ -51,10 +43,10 @@ jobs:
           [[ -n "${{ secrets.VERCEL_TOKEN }}" ]] || { echo "❌ VERCEL_TOKEN secret not set"; exit 1; }
           [[ -n "${{ secrets.VERCEL_ORG_ID }}" ]] || { echo "❌ VERCEL_ORG_ID secret not set"; exit 1; }
           [[ -n "${{ secrets.VERCEL_PROJECT_ID }}" ]] || { echo "❌ VERCEL_PROJECT_ID secret not set"; exit 1; }
-          
+
           # Pull environment variables
           vercel env pull .env.local --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
-          
+
           # Verify the .env.local file was created
           [[ -f .env.local ]] || { echo "❌ .env.local file not created"; exit 1; }
           echo "✅ Environment variables successfully pulled from Vercel"
@@ -62,24 +54,45 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
-      - name: Setup Environment Variables
-        run: |
-          set -e  # Exit on any error
-          echo "🔧 Configuring environment for production testing..."
-          echo "✅ All application variables pulled from Vercel"
-          echo "📊 Test data will be isolated with SMOKE-TEST prefix"
-          echo "🎯 Using single source of truth: Vercel configuration"
-        env:
-          # CI-specific environment flags only
-          NODE_ENV: test
-          CI: true
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
 
-      - name: Verify Environment Configuration
+      - name: Start Supabase Local Stack
         run: |
           set -e  # Exit on any error
-          echo "🔍 Verifying environment configuration..."
-          echo "✅ Environment variables pulled from Vercel"
-          echo "🎯 Ready for smoke test execution"
+          echo "🚀 Starting local Supabase stack for CI testing..."
+
+          # Create storage bucket directories required by config.toml
+          mkdir -p supabase/storage/pinpoint-storage-main
+          echo "📁 Created storage bucket directories"
+
+          # Start Supabase services with optimized exclusions for CI performance
+          # Excludes: studio, realtime, storage-api, edge-runtime, logflare, vector, imgproxy, supavisor, postgres-meta, mailpit
+          # Keeps: PostgreSQL, PostgREST (API), GoTrue (auth), Kong (gateway) - all essential services
+          supabase start -x studio,realtime,storage-api,edge-runtime,logflare,vector,imgproxy,supavisor,postgres-meta,mailpit
+
+          # Wait for services to be ready with proper health checks
+          echo "⏳ Waiting for Supabase services to be ready..."
+          for i in {1..30}; do
+            if curl -s --fail http://localhost:54321/health > /dev/null 2>&1; then
+              echo "✅ Supabase API server is ready!"
+              break
+            fi
+            echo "🔄 Services not ready yet, waiting... (attempt $i/30)"
+            sleep 2
+          done
+
+          # Export Supabase environment variables automatically
+          echo "🔧 Configuring environment variables from Supabase CLI..."
+          supabase status -o env >> "$GITHUB_ENV"
+
+          # Verify services are running
+          supabase status
+
+          echo "✅ Supabase local stack ready for testing"
+
 
       - name: Cache Playwright Browsers
         uses: actions/cache@v4
@@ -95,47 +108,32 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps chromium
 
+      - name: Setup Database Schema and Seed Data
+        run: |
+          set -e  # Exit on any error
+          echo "🗃️ Setting up database schema and seed data with local Supabase..."
+
+          # Push schema to local Supabase database
+          npm run db:push:local
+
+          # Seed database with full auth + database users (like local dev)
+          npm run db:seed:local:sb
+
+          echo "✅ Database setup complete - ready for smoke test"
+
       - name: Run Smoke Test
         run: |
           set -e  # Exit on any error
-          # Validate critical environment variables are set
-          [[ -n "$DATABASE_URL" ]] || { echo "❌ DATABASE_URL not set"; exit 1; }
-          [[ "$DATABASE_URL" == *"localhost:5432"* ]] || { echo "❌ DATABASE_URL not pointing to ephemeral container"; exit 1; }
-          
-          # Run smoke test and capture success up to machine selection
-          npm run smoke || {
-            echo "🔍 Checking if we achieved minimum success criteria..."
-            if grep -q "Step 3 Complete: Selected machine" test-results/*/error-context.md 2>/dev/null || \
-               grep -q "✅ SMOKE TEST - Step 3 Complete" ./*.log 2>/dev/null; then
-              echo "✅ MINIMUM SUCCESS: Machine selection working - SSR fixes validated"
-              exit 0
-            else
-              echo "❌ CRITICAL FAILURE: Could not complete machine selection"
-              exit 1
-            fi
-          }
-        env:
-          # Override ONLY database URLs to use ephemeral PostgreSQL container
-          # All other environment variables (including Supabase) come from Vercel preview
-          DATABASE_URL: "postgresql://test_user:test_password@localhost:5432/test_db"
-          POSTGRES_PRISMA_URL: "postgresql://test_user:test_password@localhost:5432/test_db"
-          POSTGRES_URL_NON_POOLING: "postgresql://test_user:test_password@localhost:5432/test_db"
-          # CI-specific environment flags
-          NODE_ENV: test
-          CI: true
-          # Skip env validation because we're mixing Vercel preview + local database overrides
-          SKIP_ENV_VALIDATION: true
+          # Validate critical environment variables are set by Supabase CLI
+          [[ -n "$API_URL" ]] || { echo "❌ API_URL not set by Supabase CLI"; exit 1; }
+          [[ -n "$ANON_KEY" ]] || { echo "❌ ANON_KEY not set by Supabase CLI"; exit 1; }
 
-      - name: Cleanup Test Data
-        if: always()
-        run: |
-          set -e  # Exit on any error (but step always runs due to if: always())
-          echo "🧹 Ephemeral database cleanup..."
-          echo "✅ No cleanup needed - using ephemeral PostgreSQL container"
-          echo "🗑️  Container will be automatically destroyed after job completion"
+          # Run smoke test - must pass completely for CI success
+          echo "🧪 Running smoke test with local Supabase stack"
+          npm run smoke
 
       - name: Upload Playwright Report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: failure()
         with:
           name: playwright-report-smoke

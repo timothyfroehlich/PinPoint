@@ -37,20 +37,36 @@ This project leverages a modern, type-safe, and performant technology stack to e
 - **Language:**([https://www.typescriptlang.org/](https://www.typescriptlang.org/))
 - **UI Library:**([https://react.dev/](https://react.dev/))
 - **Styling:**([https://tailwindcss.com/](https://tailwindcss.com/)) & [Material UI (MUI)](https://mui.com/)
-- **Database ORM:** [Prisma](https://www.prisma.io/)
-- **Database:**(<https://www.postgresql.org/>)
-- **Authentication:** [NextAuth.js](https://next-auth.js.org/)
+- **Database ORM:** [Drizzle ORM](https://orm.drizzle.team/)
+- **Database:** [PostgreSQL](https://www.postgresql.org/) via [Supabase](https://supabase.com/)
+- **Authentication:** [Supabase Auth](https://supabase.com/auth)
 
 ### 🚨 Active Migration
 
 PinPoint is currently undergoing a strategic migration to modernize its architecture:
 
-- **Timeline:** 6-week staged migration (currently in Phase 1)
-- **From:** Prisma + NextAuth.js + Manual Security
-- **To:** [Drizzle ORM](https://orm.drizzle.team/) + [Supabase](https://supabase.com/) (Auth, Storage, RLS)
+- **Timeline:** 6-week staged migration (currently in Week 4 - Phase 2)
+- **Stage 1** ✅ **COMPLETE**: Supabase Auth integration
+- **Stage 2** 🔄 **IN PROGRESS**: Drizzle ORM migration (Phase 2A foundation complete)
+- **Stage 3** ⏳ **UPCOMING**: Row Level Security activation
 - **Benefits:** Database-enforced security, 100x faster serverless performance, better developer experience
 
 For details, see the [Migration Guide](./docs/migration/supabase-drizzle/).
+
+### 🚨 Development User Reset Warning
+
+**CRITICAL DURING DEVELOPMENT**: PinPoint development seeding **DELETES AND RECREATES ALL SUPABASE AUTH USERS** on every `npm run reset:local`.
+
+**⚠️ THIS MEANS:**
+
+- **ALL AUTH USERS ARE WIPED** every time you reset the database
+- **DEV LOGIN USERS**: Dev Admin, Dev Member, Dev Player - all recreated fresh
+- **PINBALL PERSONALITIES**: Roger Sharpe, Gary Stern, etc. - all recreated fresh
+- **ANY MANUAL TEST USERS**: Will be deleted and need recreation
+
+**🔔 BETA-ONLY BEHAVIOR**: This aggressive user reset is **TEMPORARY** for rapid development iteration. In production, user accounts will be preserved.
+
+**🚨 BEFORE PRODUCTION**: We MUST update the seeding system to preserve existing users and only create missing ones.
 
 ## Getting Started
 
@@ -70,7 +86,7 @@ vercel env pull  # Downloads shared development environment from Vercel
 
 # 3. Start Supabase and initialize database
 supabase start
-npm run db:reset
+npm run reset:local
 
 # 4. Start development server (background mode)
 npm run dev:bg
@@ -93,8 +109,9 @@ Your development server will be running at **http://localhost:49200**
 
 **Database Commands:**
 
-- `npm run db:reset` - Reset database with fresh schema and seed data
-- `npm run db:push` - Sync schema changes without reset
+- `npm run db:reset:local:sb` - Reset database with fresh schema and seed data
+- `npm run db:push:local` - Sync schema changes without reset
+- `npm run db:seed:local:sb` - Seed data only (local Supabase)
 
 ### Prerequisites
 
@@ -127,7 +144,7 @@ If you encounter issues, see [docs/troubleshooting.md](./docs/troubleshooting.md
 **Quick fixes:**
 
 - **Server not responding**: `npm run dev:bg:status` then `npm run dev:clean`
-- **Database issues**: `npm run db:reset`
+- **Database issues**: `npm run reset:local`
 - **Dependency problems**: `npm run clean` then `npm install`
 
 ## Roadmap

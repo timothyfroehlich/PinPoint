@@ -1,9 +1,10 @@
 import pino from "pino";
 
 import { env } from "~/env.js";
+import { isDevelopment } from "~/lib/environment";
 import { ERROR_MESSAGE_TRUNCATE_LENGTH } from "~/lib/logger-constants";
 
-const isDev = env.NODE_ENV === "development";
+const isDev = isDevelopment();
 const today = new Date().toISOString().split("T")[0] ?? "";
 
 // Type guard for error objects

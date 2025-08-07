@@ -85,7 +85,7 @@ To test with multiple organizations:
 - User sessions still work across subdomains
 - Organization context is resolved per request
 - Users can potentially access multiple organizations (future feature)
-- **Development**: Uses database sessions - sessions automatically clear when running `npm run db:reset`
+- **Development**: Uses database sessions - sessions automatically clear when running `npm run db:reset:local:sb`
 - **Production**: Uses JWT sessions for better performance - sessions persist across server restarts
 
 ## Production Deployment
@@ -115,7 +115,7 @@ No additional environment variables needed. The middleware automatically detects
 ### Organization Not Found Error
 
 - Check that the "apc" organization exists in your database
-- Run `npm run seed` to ensure test data is properly seeded
+- Run `npm run db:seed:local:sb` to ensure test data is properly seeded
 - Check browser network tab for the actual host being sent
 
 ### Redirect Loop

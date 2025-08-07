@@ -78,11 +78,11 @@ DEFAULT_ORG_SUBDOMAIN="apc"
 # - Create new database for development
 # - Copy connection strings to .env.local
 
-# 2. Run migrations
-npx prisma migrate dev
+# 2. Push schema changes
+npm run db:push:local
 
-# 3. Generate Prisma client
-npx prisma generate
+# 3. Generate Drizzle types
+npm run db:generate:local:sb
 ```
 
 ## Development Workflow
@@ -97,7 +97,7 @@ npm run dev
 # → http://localhost:3000
 
 # View database schema
-cat prisma/schema.prisma
+ls src/server/db/schema/
 # Query data samples
 psql $DATABASE_URL -c "SELECT * FROM \"Organization\" LIMIT 5;"
 ```
@@ -106,13 +106,10 @@ psql $DATABASE_URL -c "SELECT * FROM \"Organization\" LIMIT 5;"
 
 ```bash
 # Push schema changes (development)
-npm run db:push
-
-# Create migration (when ready)
-npx prisma migrate dev --name your-migration-name
+npm run db:push:local
 
 # Reset database (development only)
-npm run db:reset
+npm run db:reset:local:sb
 ```
 
 ## Preview Deployments
@@ -156,11 +153,17 @@ Preview deployments automatically use the "Preview" environment variables set in
 ### Development Data Seeding
 
 ```bash
-# Seed development database
-npm run seed:dev
+# Seed local Supabase (default)
+npm run db:seed:local:sb
 
-# Or use beta seeding (smaller dataset)
-npm run seed:beta
+# Explicit local Supabase seeding
+npm run db:seed:local:sb
+
+# PostgreSQL-only seeding (for CI)
+npm run db:seed:local:pg
+
+# Preview environment seeding
+npm run seed:preview
 ```
 
 ### Development Seed Data Includes
@@ -176,12 +179,11 @@ npm run seed:beta
 ### Custom Development Seeding
 
 ```bash
-# Seed with custom organization
-npx prisma db seed -- --env=development --org="Test Org" --subdomain="test"
-
 # Reset and reseed development data
-npm run db:reset
-npm run seed:dev
+npm run db:reset:local:sb
+
+# Or just run seeding
+npm run db:seed:local:sb
 ```
 
 ### Seeding for Preview Deployments
@@ -189,10 +191,10 @@ npm run seed:dev
 ```bash
 # After preview deployment, seed the preview database
 vercel env pull .env.preview
-npm run seed:beta
+npm run seed:preview
 
 # Or run seeding command on deployed preview
-vercel exec -- npm run seed:beta
+vercel exec -- npm run seed:preview
 ```
 
 ## Testing Setup
@@ -269,10 +271,10 @@ vercel env add --environment preview
 
    ```bash
    # Check database connectivity
-   npx prisma db pull
+   # Database schema is managed via Drizzle - no pull needed
 
-   # Verify environment variables
-   npx prisma migrate status
+   # Verify database operations
+   npm run db:validate
    ```
 
 2. **Authentication Issues**:
@@ -340,8 +342,8 @@ npm run validate  # Husky hooks
 ```bash
 # Development
 npm run dev              # Start local server
-npm run db:push          # Push schema changes
-npm run seed:dev         # Seed development data
+npm run db:push:local          # Push schema changes
+npm run db:seed:local:sb             # Seed development data
 # View database (see CLAUDE.md for efficient query examples)
 
 # Preview Deployment

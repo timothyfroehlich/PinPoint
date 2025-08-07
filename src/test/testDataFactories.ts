@@ -196,7 +196,7 @@ export const createUserRoles = {
     createUserFactory({
       overrides: {
         name: "Admin User",
-        email: "admin@test.com",
+        email: "admin@dev.local",
         permissions: [
           "issues:read",
           "issues:edit",
@@ -215,7 +215,7 @@ export const createUserRoles = {
     createUserFactory({
       overrides: {
         name: "Technician User",
-        email: "technician@test.com",
+        email: "technician@dev.local",
         permissions: [
           "issues:read",
           "issues:edit",
@@ -233,7 +233,7 @@ export const createUserRoles = {
     createUserFactory({
       overrides: {
         name: "Member User",
-        email: "member@test.com",
+        email: "member@dev.local",
         permissions: ["issues:read", "issues:comment"],
         role: createRoleFactory({ overrides: { name: "Member" } }),
         ...overrides,
@@ -244,7 +244,7 @@ export const createUserRoles = {
     createUserFactory({
       overrides: {
         name: "Machine Owner",
-        email: "owner@test.com",
+        email: "owner@dev.local",
         permissions: [
           "issues:read",
           "issues:comment",

@@ -2,13 +2,23 @@
 
 ## 🚨 ACTIVE MIGRATION: Supabase + Drizzle + RLS
 
-**Status**: IN PROGRESS - 6-week staged migration underway
+**Status**: IN PROGRESS - Week 4 of 6
 
-- **Stage 1** (Weeks 1-2): Supabase Auth integration
+- **Stage 1** (Weeks 1-2): Supabase Auth integration ✅ COMPLETE
 - **Stage 2** (Weeks 3-4): Drizzle ORM migration
+  - Phase 2A: Drizzle Foundation ✅ COMPLETE (2025-08-02)
+  - Phase 2B-E: Router Migrations 🔄 IN PROGRESS
 - **Stage 3** (Weeks 5-6): Row Level Security activation
 
 **Migration Hub**: `@docs/migration/supabase-drizzle/`
+
+### ✅ Phase 2A Achievements
+
+- Complete Drizzle schema with 1:1 Prisma parity
+- Dual-ORM support in tRPC context
+- 39 comprehensive tests validating foundation
+- Essential multi-tenant performance indexes
+- Hot-reload optimization with singleton pattern
 
 ### ⚠️ Supabase Configuration Notes
 
@@ -18,7 +28,7 @@
 - `realtime` - Disabled for performance
 - `studio` - Disabled for performance
 
-**🔔 REMINDER**: Re-enable these features in `supabase/config.toml` when ready for beta:
+**🔔 REMINDER**: Re-enable these features in `supabase/config.toml` when ready for production:
 
 ```toml
 [db.migrations]
@@ -30,6 +40,24 @@ enabled = true  # Re-enable for real-time features
 [studio]
 enabled = true  # Re-enable for database management UI
 ```
+
+## 🔒 SEEDING SAFETY: ENVIRONMENT-AWARE USER MANAGEMENT
+
+**NEW SAFER BEHAVIOR**: PinPoint seeding now uses environment-aware user management for enhanced safety.
+
+**🏗️ BEHAVIOR BY ENVIRONMENT:**
+
+- **Local Development**: **PRESERVES existing users** - only creates missing ones
+- **Preview Environment**: **Aggressive reset** for clean demos - deletes and recreates all users
+- **Production**: **PRESERVES existing users** - only creates missing ones
+
+**⚠️ PREVIEW ENVIRONMENT ONLY:**
+
+- **ALL AUTH USERS ARE WIPED** during preview environment seeding for clean demonstrations
+- **DEV LOGIN USERS**: Dev Admin, Dev Member, Dev Player - recreated fresh in preview
+- **PINBALL PERSONALITIES**: Roger Sharpe, Gary Stern, etc. - recreated fresh in preview
+
+**🔒 SAFE BY DEFAULT**: Local development and production environments preserve existing users while only creating missing ones.
 
 ## 🚨 DATABASE SCHEMA COORDINATION WARNING
 
@@ -61,7 +89,7 @@ enabled = true  # Re-enable for database management UI
 
 ### Current Stack (Being Replaced)
 
-- **Database**: PostgreSQL + Prisma ORM → **Drizzle ORM**
+- **Database**: PostgreSQL + **Drizzle ORM** (via Supabase)
 - **Authentication**: NextAuth.js → **Supabase Auth**
 - **Authorization**: App-level checks → **Row Level Security**
 - **File Storage**: Local/Vercel Blob → **Supabase Storage**
@@ -125,7 +153,7 @@ See `docs/architecture/api-routes.md` for details on legitimate exceptions.
 
 ## Essential Commands
 
-```bash
+````bash
 # Development (RECOMMENDED)
 npm run dev:bg          # Start dev server in background
 npm run dev:bg:stop     # Stop background server
@@ -140,58 +168,102 @@ npm run check:fix    # Development checks + auto-fix (after code changes)
 npm run validate     # Pre-commit validation (MUST PASS)
 npm run pre-commit   # Pre-PR validation (MUST PASS)
 
-# Database
-npm run db:reset
-npm run db:push
+# Database Management
+npm run db:push:local       # Push schema changes only (universal PostgreSQL)
+npm run db:seed:local:sb    # Seed local Supabase (default)
+npm run db:seed:local:pg    # Seed PostgreSQL-only (CI tests)
+npm run db:seed:preview     # Seed remote preview environment
+npm run db:reset:local:sb   # Full local reset (schema + data)
+npm run db:reset:preview    # Full preview reset (schema + data)
 
-# Database Inspection (Efficient - DON'T USE PRISMA STUDIO)
-# Read schema structure: prisma/schema.prisma
+### 🔧 Database Troubleshooting
+
+**When dev users aren't loading or smoke tests fail:**
+
+```bash
+npm run db:reset:local:sb   # ONE-SHOT: Full reset + fresh seeding
+````
+
+**What this does:**
+
+1. Wipes Supabase auth users (clears login conflicts)
+2. Resets database schema completely
+3. Pushes latest Drizzle schema
+4. Seeds fresh dev users (admin@dev.local, member@dev.local, player@dev.local)
+5. Creates sample data for testing
+
+**Use when:**
+
+- Dev quick login buttons not appearing
+- Auth user conflicts (email_exists errors)
+- Smoke test authentication failures
+- Need completely fresh development environment
+
+# Database Inspection (Efficient - Use Direct SQL)
+
+# Read schema structure: src/server/db/schema/
+
 # Query data samples directly (no GUI needed):
-npx prisma db execute --stdin <<< "SELECT * FROM \"Organization\" LIMIT 5;"
-psql $DATABASE_URL -c "SELECT COUNT(*) FROM \"User\";"
-# DON'T launch Prisma Studio unless debugging specific data issues
+
+psql $DATABASE_URL -c "SELECT _ FROM \"Organization\" LIMIT 5;"
+psql $DATABASE_URL -c "SELECT COUNT(_) FROM \"User\";"
+
+# Use Drizzle Studio for visual inspection: npm run db:studio
 
 # Core Commands (Use brief versions unless debugging)
+
 # PREFERRED: Use :brief variants for daily development - faster, cleaner output
+
 npm run typecheck:brief # TypeScript type checking (minimal output)
-npm run lint:brief      # ESLint linting (quiet mode)
-npm run format:brief    # Prettier formatting check (minimal output)
-npm run audit:brief     # npm security vulnerability check (table format)
-npm run test:brief      # Vitest unit tests (basic reporter)
+npm run lint:brief # ESLint linting (quiet mode)
+npm run format:brief # Prettier formatting check (minimal output)
+npm run audit:brief # npm security vulnerability check (table format)
+npm run test:brief # Vitest unit tests (basic reporter)
 npm run playwright:brief # E2E tests (line reporter, headless)
-npm run smoke            # Smoke test (complete workflow validation)
+npm run smoke # Smoke test (complete workflow validation)
 
 # Regular versions - use only when brief fails and you need more detail
-npm run typecheck       # Full TypeScript output
-npm run lint            # Full ESLint output
-npm run format          # Full Prettier output
-npm run audit           # Full vulnerability details
-npm run test            # Full Vitest output
-npm run playwright      # Full E2E output
+
+npm run typecheck # Full TypeScript output
+npm run lint # Full ESLint output
+npm run format # Full Prettier output
+npm run audit # Full vulnerability details
+npm run test # Full Vitest output
+npm run playwright # Full E2E output
 
 # Verbose versions - use sparingly, preferably with filters
+
 # Only use when regular versions don't provide enough diagnostic info
-npm run lint:verbose    # Detailed ESLint diagnostics
+
+npm run lint:verbose # Detailed ESLint diagnostics
 npm run typecheck:verbose # TypeScript with file lists
 
 # Meta Commands
-npm run check:brief     # PREFERRED: Fast validation (all brief variants)
-npm run check           # Full validation when brief shows issues
-npm run check:fix       # Validation with auto-fix
-npm run fix             # Auto-fix lint + format issues
+
+npm run check:brief # PREFERRED: Fast validation (all brief variants)
+npm run check # Full validation when brief shows issues
+npm run check:fix # Validation with auto-fix
+npm run fix # Auto-fix lint + format issues
 
 # Test Command Guidelines
+
 # CRITICAL: Never pass shell redirection operators (2>&1, |, >, etc.) through npm's -- argument separator
+
 # Shell operations must be outside the npm command
+
 # ✅ CORRECT: npm run test 2>&1 | head -50
+
 # ❌ WRONG: npm run test -- --run 2>&1 | head -50
+
 # If you need extra test arguments beyond filtering, ask the user first
 
 # TypeScript Error Filtering
-npm run typecheck                                 # Check entire project (recommended)
-npm run typecheck | grep "pattern"               # Filter errors by pattern
-npm run typecheck | head -10                     # Show first 10 errors
-npm run typecheck | grep "usePermissions"        # Find specific function errors
+
+npm run typecheck # Check entire project (recommended)
+npm run typecheck | grep "pattern" # Filter errors by pattern
+npm run typecheck | head -10 # Show first 10 errors
+npm run typecheck | grep "usePermissions" # Find specific function errors
+
 ```
 
 ## TypeScript Standards
@@ -216,7 +288,7 @@ npm run typecheck | grep "usePermissions"        # Find specific function errors
 2. **During**: Run `npm run check` after significant code changes
 3. **Before commit**: `npm run validate` must pass (MANDATORY)
 4. **Before PR**: `npm run pre-commit` must pass (MANDATORY)
-5. **Database changes**: Use `npm run db:reset` (pre-production phase)
+5. **Database changes**: Use `npm run db:reset:local:sb` for complete reset or `npm run db:push:local` for schema-only changes
 
 ### Environment Configuration
 
@@ -244,6 +316,32 @@ npm run typecheck | grep "usePermissions"        # Find specific function errors
 - **Context7**: Library documentation lookup
 - **Memory**: Knowledge graph for storing and retrieving coding patterns
 
+### Agent Planning System
+
+**Directory**: `.claude/agent-plans/` (gitignored - transient work files)
+
+**Purpose**: Agents should create detailed planning documents before starting complex implementation work. This ensures thorough analysis and provides a clear roadmap for execution.
+
+**When to Use**:
+
+- Complex migrations or refactoring tasks
+- Multi-step implementation requiring coordination
+- Schema changes or architectural modifications
+- Any task that benefits from detailed upfront planning
+
+**Required Agent Workflow**:
+
+1. **Check for existing plans**: Always read any existing files in `.claude/agent-plans/` when starting work
+2. **Create planning documents**: Write comprehensive analysis and implementation plans before coding
+3. **Document decisions**: Record architectural choices, trade-offs, and rationale
+4. **Update progress**: Maintain plans as living documents throughout implementation
+
+**Example Planning Documents**:
+
+- `phase-2a-drizzle-schema-analysis.md` - Detailed schema migration analysis
+- `database-connection-strategy.md` - Database integration approach
+- `type-migration-plan.md` - TypeScript type compatibility strategy
+
 ### Memory Server Usage
 
 The Memory MCP server stores critical coding standards and patterns as a knowledge graph. Use for complex pattern lookup beyond the auto-loaded quick references.
@@ -270,19 +368,22 @@ The test-architect agent specializes in improving individual test files. It's se
 1. **Single File Assignment**: Always assign one test file at a time
 2. **Self-Discovery**: Agent will find and read relevant docs/examples
 3. **Recommendations**: If agent returns improvement recommendations:
-   ```
-   Agent: { type: "test-improvement-recommendation", ... }
-   You: Present recommendation to user with clear justification
-   User: Approves/Declines
-   You: If approved, implement then re-run agent with context
-        If declined, re-run agent with "skip: [specific recommendation]"
-   ```
+```
+
+Agent: { type: "test-improvement-recommendation", ... }
+You: Present recommendation to user with clear justification
+User: Approves/Declines
+You: If approved, implement then re-run agent with context
+If declined, re-run agent with "skip: [specific recommendation]"
+
+```
 4. **Completion**: Summarize what the agent accomplished
 
 ### Example Interaction
 
 ```
-User: "Fix the tests in src/components/issues/__tests__/IssueCard.test.tsx"
+
+User: "Fix the tests in src/components/issues/**tests**/IssueCard.test.tsx"
 
 You: "I'll use the test-architect agent to analyze and improve the IssueCard tests."
 
@@ -292,15 +393,18 @@ You: "I'll use the test-architect agent to analyze and improve the IssueCard tes
 issue test data factory that would benefit 6 test files. Should I implement this?"
 
 [On completion]: "Test improvements complete:
+
 - Replaced 12 fragile text assertions with semantic queries
 - Removed 2 unnecessary mocks (now testing real components)
 - Added auth scenario testing (unauthenticated, member, admin)
 - All 8 tests passing, 40% faster execution"
+
 ```
 
 ### Recommendation Handling Example
 
 ```
+
 User: "Fix the IssueCard tests"
 
 You: "I'll use the test-architect agent to improve those tests."
@@ -308,6 +412,7 @@ You: "I'll use the test-architect agent to improve those tests."
 [Test-architect returns recommendation about creating shared test factory]
 
 You: "The test-architect discovered an improvement opportunity before completing the test fixes. It found 6 test files using similar issue mock data and recommends creating a shared test factory. This would:
+
 - Reduce ~120 lines of duplicate code
 - Provide a single source of truth for issue test data
 - Make future test updates easier
@@ -328,7 +433,8 @@ User: "No, just fix the tests as-is"
 You: "Understood. I'll have the test-architect complete the test fixes without creating the shared factory."
 
 [Call test-architect with: "Continue with IssueCard.test.tsx improvements. Skip creating the issue test factory - user prefers to keep current pattern."]
-```
+
+````
 
 ### Logging and Audit Trail
 
@@ -353,6 +459,45 @@ The test-architect agent creates detailed logs at `.claude/sub-agent-logs/test-a
 ### Map Maintenance
 
 The test-architect will update `test-map.md` and `source-map.md` as it works. These maps may be outdated, so the agent uses them as guides, not gospel.
+
+## Agent Work Review Protocol
+
+**MANDATORY**: After any agent completes work that modifies code or creates files, you MUST:
+
+### 1. Immediate Review Checklist
+
+- ✅ **Check git status**: `git status --porcelain` to see all modified/created files
+- ✅ **Review each change**: Use `git diff` to examine modifications
+- ✅ **Validate file creation**: Ensure any new files were authorized
+- ✅ **Check scope compliance**: Verify agent stayed within assigned task boundaries
+
+### 2. Quality Validation
+
+- ✅ **Run validation**: `npm run typecheck:brief && npm run lint:brief`
+- ✅ **Test impact**: Run relevant tests to ensure no regressions
+- ✅ **Business logic**: Verify functional requirements were preserved
+- ✅ **Security patterns**: Confirm multi-tenant isolation and permission checks
+
+### 3. Rule Compliance Check
+
+- ✅ **Documentation policy**: Agents should NOT create .md files without explicit permission
+- ✅ **Scope boundaries**: Agents should only modify files within their assigned domain
+- ✅ **Project guidelines**: All changes must follow established patterns and standards
+
+### 4. Agent Accountability
+
+- ✅ **Task completion**: Verify agent accomplished the assigned objective
+- ✅ **Quality standards**: Check that work meets production quality requirements
+- ✅ **Boundary respect**: Ensure agent didn't exceed authorized scope
+
+**If Issues Found**: Document the problem, update agent instructions to prevent recurrence, and decide whether to keep, modify, or revert the agent's work.
+
+**Agent Domains**:
+
+- **drizzle-migration**: Router file migration (implementation only)
+- **test-architect**: Test files and test infrastructure (NO documentation creation)
+- **github-pr-reviewer**: PR analysis and review comments
+- **typescript-lint-fixer**: Type errors and lint violations
 
 ## Documentation Hub
 
@@ -400,17 +545,30 @@ The test-architect will update `test-map.md` and `source-map.md` as it works. Th
 - **Pattern Updates**: Update quick reference guides for new patterns or deprecated approaches
 - **Migration Progress Tracking**: Update implementation status and lessons learned
 
-### Database Commands (Migration Period)
+### Database Commands (Drizzle ORM)
 
 ```bash
-# Prisma (current)
-npm run db:push         # Schema sync
-npm run db:reset        # Full reset
+# Single-shot workflows (recommended)
+npm run db:reset:local:sb   # Reset local database + automatic seeding
+npm run db:reset:preview    # Reset preview database + automatic seeding
 
-# Drizzle (migration target)
-npm run drizzle:push    # Coming in Stage 2
-npm run drizzle:migrate # Coming in Stage 2
-```
+# Core database operations
+npm run db:push:local       # Push schema changes (universal PostgreSQL)
+npm run db:push:preview     # Push schema changes (preview environment)
+npm run db:generate:local:sb # Generate Drizzle types (development)
+npm run db:generate:preview  # Generate Drizzle types (preview)
+
+# Database inspection and management
+npm run db:studio       # Open Drizzle Studio (development)
+npm run db:studio:preview # Open Drizzle Studio (preview)
+npm run db:validate     # Validate database operations
+
+# Seeding commands (explicit targets)
+npm run seed            # Seed local Supabase (default)
+npm run seed:local:pg   # Seed PostgreSQL-only (CI tests)
+npm run seed:local:sb   # Seed local Supabase (explicit)
+npm run seed:preview    # Seed remote preview environment
+````
 
 ## Critical Notes
 
@@ -435,7 +593,7 @@ npm run drizzle:migrate # Coming in Stage 2
 - **ESLint Disabling**: NEVER add an eslint-disable unless you have exhausted all other options and confirmed with the user that it is the correct thing to do.
 - **E2E Testing**: Use `npm run playwright` (headless). NEVER use `playwright:headed` or `playwright:ui` as they show browser windows and interrupt the user's workflow.
 - **Smoke Testing**: Use `npm run smoke` for quick end-to-end workflow validation. This tests the complete issue creation → admin management flow in ~2 minutes.
-- **Prisma Studio**: AVOID launching Prisma Studio (`npm run db:studio`) unless absolutely necessary for debugging complex data issues. Use direct SQL queries, schema file reading, or existing component inspection instead.
+- **Database Studio**: Use `npm run db:studio` for visual database inspection when needed. Prefer direct SQL queries for simple data checks.
 - **Import Path Consistency**: ALWAYS use the TypeScript path alias `~/` for internal imports. NEVER use relative paths like `../../../lib/supabase/client`. ESLint enforces this with `no-restricted-imports` rule to prevent deep relative imports.
 
 ## Key Lessons Learned (Project-Specific)

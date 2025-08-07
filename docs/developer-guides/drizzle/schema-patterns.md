@@ -4,21 +4,40 @@
 
 Drizzle schemas define your database structure using TypeScript. Unlike Prisma's custom schema language, Drizzle uses pure TypeScript, providing better type inference and IDE support.
 
+## PinPoint Schema Architecture
+
+PinPoint organizes schemas into 5 domain-specific modules for better maintainability:
+
+```typescript
+// src/server/db/schema/index.ts
+export * from "./auth";
+export * from "./organizations";  
+export * from "./machines";
+export * from "./issues";
+export * from "./collections";
+```
+
 ## Basic Table Definition
 
 ```typescript
-import { pgTable, text, timestamp, uuid, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean } from "drizzle-orm/pg-core";
 import { createId } from "@paralleldrive/cuid2";
 
-export const users = pgTable("users", {
+// IMPORTANT: Use exact Prisma table names for compatibility
+export const users = pgTable("User", {  // Note: "User" not "users"
   id: text("id")
     .primaryKey()
     .$defaultFn(() => createId()),
   email: text("email").unique().notNull(),
   name: text("name"),
   image: text("image"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { mode: "date" })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updatedAt", { mode: "date" })
+    .notNull()
+    .defaultNow()
+    .$onUpdateFn(() => new Date()),
 });
 
 // Type inference
@@ -91,32 +110,71 @@ export const issuesRelations = relations(issues, ({ one }) => ({
 }));
 ```
 
-## Indexes and Constraints
+## Indexes and Constraints ⚠️ CRITICAL PATTERN
 
 ```typescript
 import { index, uniqueIndex } from "drizzle-orm/pg-core";
 
+// ✅ CORRECT: Indexes MUST be defined in table callback
 export const memberships = pgTable(
-  "memberships",
+  "Membership",
   {
     id: text("id")
       .primaryKey()
       .$defaultFn(() => createId()),
-    userId: text("user_id").notNull(),
-    organizationId: text("organization_id").notNull(),
-    roleId: text("role_id").notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
+    userId: text("userId").notNull(),
+    organizationId: text("organizationId").notNull(),
+    roleId: text("roleId").notNull(),
+    createdAt: timestamp("createdAt", { mode: "date" })
+      .notNull()
+      .defaultNow(),
   },
-  (table) => ({
+  (table) => [  // Array syntax for multiple indexes
     // Unique constraint
-    userOrgUnique: uniqueIndex("memberships_user_org_unique").on(
+    uniqueIndex("Membership_userId_organizationId_key").on(
       table.userId,
       table.organizationId,
     ),
     // Performance indexes
-    orgIdIdx: index("memberships_org_id_idx").on(table.organizationId),
-    userIdIdx: index("memberships_user_id_idx").on(table.userId),
-  }),
+    index("Membership_organizationId_idx").on(table.organizationId),
+    index("Membership_userId_idx").on(table.userId),
+  ],
+);
+
+// ❌ WRONG: Do NOT use separate exports (causes compatibility issues)
+// export const membershipIndexes = {
+//   orgIdIdx: index("memberships_org_id_idx").on(memberships.organizationId),
+// };
+```
+
+### PinPoint Index Patterns
+
+Essential multi-tenant indexes implemented:
+
+```typescript
+export const machines = pgTable(
+  "Machine",
+  {
+    id: text("id").primaryKey().$defaultFn(() => createId()),
+    qrCodeId: text("qrCodeId").unique().notNull(),
+    organizationId: text("organizationId").notNull(),
+    locationId: text("locationId").notNull(),
+    modelId: text("modelId").notNull(),
+    ownerId: text("ownerId"), // Nullable field
+  },
+  (table) => [
+    // QR code scanning optimization
+    index("Machine_qrCodeId_idx").on(table.qrCodeId),
+    // Multi-tenant filtering
+    index("Machine_organizationId_idx").on(table.organizationId),
+    // Composite indexes for common queries
+    index("Machine_organizationId_locationId_idx").on(
+      table.organizationId,
+      table.locationId,
+    ),
+    // Nullable field index
+    index("Machine_ownerId_idx").on(table.ownerId),
+  ],
 );
 ```
 
@@ -230,22 +288,57 @@ ALTER TABLE issues ADD CONSTRAINT issues_priority_id_fkey
 CREATE INDEX issues_priority_id_idx ON issues(priority_id);
 ```
 
+## Junction Table Pattern (Prisma Compatibility)
+
+PinPoint maintains Prisma's junction table pattern for exact migration compatibility:
+
+```typescript
+// Prisma-style junction table for many-to-many relationships
+export const rolePermissions = pgTable(
+  "_RolePermissions",  // Prisma naming convention
+  {
+    roleId: text("A").notNull(),  // Prisma uses A/B naming
+    permissionId: text("B").notNull(),
+  },
+  (table) => [
+    // Composite primary key
+    primaryKey({ columns: [table.roleId, table.permissionId] }),
+    // Foreign key constraints
+    foreignKey({
+      columns: [table.roleId],
+      foreignColumns: [roles.id],
+      onDelete: "cascade",
+    }),
+    foreignKey({
+      columns: [table.permissionId],
+      foreignColumns: [permissions.id],
+      onDelete: "cascade",
+    }),
+    // Performance indexes
+    index("_RolePermissions_B_index").on(table.permissionId),
+  ],
+);
+```
+
 ## Schema Organization
 
 ```typescript
 // src/server/db/schema/index.ts
-export * from "./users";
+export * from "./auth";
 export * from "./organizations";
 export * from "./issues";
 export * from "./machines";
+export * from "./collections";
 
-// src/server/db/schema/users.ts
-export const users = pgTable("users", {...});
-export const usersRelations = relations(users, {...});
+// Relations must be exported from index
+export { authRelations } from "./auth";
+export { organizationRelations } from "./organizations";
+export { machineRelations } from "./machines";
+export { issueRelations } from "./issues";
 
 // src/server/db/schema/organizations.ts
-export const organizations = pgTable("organizations", {...});
-export const organizationsRelations = relations(organizations, {...});
+export const organizations = pgTable("Organization", {...});
+export const organizationRelations = relations(organizations, {...});
 ```
 
 ## ⚠️ MIGRATION: Prisma Schema Patterns
