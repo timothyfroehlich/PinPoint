@@ -4,42 +4,6 @@ This guide covers common development issues beyond environment setup. For enviro
 
 ## TypeScript Issues
 
-### Betterer Fails Unexpectedly
-
-**Symptom**: `npm run betterer:check` fails but TypeScript check passes.
-
-**Solutions**:
-
-```bash
-# 1. Clear Node modules and reinstall
-rm -rf node_modules package-lock.json
-npm install
-
-# 2. Reset Betterer baseline
-rm .betterer.results
-npm run betterer
-git add .betterer.results
-
-# 3. Check for configuration changes
-git diff .betterer.ts tsconfig.json eslint.config.js
-```
-
-### TypeScript Errors Don't Match Betterer
-
-**Symptom**: `npm run typecheck` shows different errors than Betterer.
-
-**Cause**: Different TypeScript configurations or include patterns.
-
-**Solutions**:
-
-```bash
-# Check Betterer uses correct tsconfig
-cat .betterer.ts | grep typescript
-
-# Verify include patterns match
-npm run typecheck -- --listFiles | head -20
-```
-
 ### ESLint Type-Aware Rules Failing
 
 **Symptom**: ESLint can't parse TypeScript or type information.
@@ -265,61 +229,6 @@ npm test -- --verbose
 npm test -- --testPathPattern=user.test.ts
 ```
 
-## Migration Workflow Issues
-
-### Merge Conflicts in .betterer.results
-
-**Symptom**: Git conflicts when merging branches with Betterer changes.
-
-**Resolution**:
-
-```bash
-# 1. Take the incoming version (usually main)
-git checkout --theirs .betterer.results
-
-# 2. Verify no regressions were introduced
-npm run betterer:check
-
-# 3. If check fails, you introduced new errors
-npm run typecheck | head -20
-# Fix the errors, then update baseline
-npm run betterer:update
-```
-
-### Betterer Baseline Drift
-
-**Symptom**: Baseline file keeps changing without code changes.
-
-**Causes & Solutions**:
-
-```bash
-# 1. Check for non-deterministic tests
-DEBUG=betterer npm run betterer:check
-
-# 2. Verify include/exclude patterns
-cat .betterer.ts | grep -A 3 -B 3 include
-
-# 3. Check for file system case sensitivity issues
-git config core.ignorecase
-```
-
-### Migration Progress Tracking Issues
-
-**Symptom**: Stats in TYPESCRIPT_MIGRATION.md don't match reality.
-
-**Solutions**:
-
-```bash
-# 1. Update stats manually
-./scripts/update-typescript-stats.sh
-
-# 2. Verify script is working correctly
-npm run typecheck 2>&1 | grep "error TS" | wc -l
-
-# 3. Check git tracking of stats file
-git status TYPESCRIPT_MIGRATION.md
-```
-
 ## Debugging Tools
 
 ### TypeScript Diagnostics
@@ -348,19 +257,6 @@ npx eslint --print-config src/server/api/trpc.ts
 npx eslint --rule "@typescript-eslint/no-explicit-any" src/server/
 ```
 
-### Betterer Diagnostics
-
-```bash
-# Verbose Betterer output
-DEBUG=betterer npm run betterer:check
-
-# Check specific test
-npm run betterer -- --filter "typescript strict mode"
-
-# List all tracked tests
-npm run betterer -- --help
-```
-
 ## Emergency Procedures
 
 ### Bypass All Checks (Emergency Only)
@@ -368,11 +264,6 @@ npm run betterer -- --help
 ```bash
 # Skip pre-commit hooks
 git commit -m "emergency: bypass checks" --no-verify
-
-# Skip Betterer for one commit
-rm .betterer.results
-git add .betterer.results
-git commit -m "emergency: reset betterer baseline"
 ```
 
 ### Restore Known Good State
@@ -416,7 +307,7 @@ git --version
 # Project state
 npm run typecheck 2>&1 | head -10
 npm run lint 2>&1 | head -10
-npm run betterer:check 2>&1
+npm run validate 2>&1
 
 # Git state
 git status --porcelain
@@ -436,7 +327,7 @@ git log --oneline -5
   echo "=== ESLint Errors ==="
   npm run lint 2>&1 | head -20
   echo "=== Betterer Status ==="
-  npm run betterer:check 2>&1
+  npm run validate 2>&1
 } > debug-report.txt
 ```
 
@@ -445,4 +336,3 @@ git log --oneline -5
 - **Environment Setup**: [docs/troubleshooting.md](../troubleshooting.md)
 - **TypeScript Patterns**: [typescript-strictest-production.md](./typescript-strictest-production.md)
 - **Testing Issues**: [docs/testing/troubleshooting.md](../testing/troubleshooting.md)
-- **Migration Workflow**: [betterer-workflow.md](./betterer-workflow.md)

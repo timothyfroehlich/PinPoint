@@ -9,7 +9,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 PURPLE='\033[0;35m'
-CYAN='\033[0;36m'
+# CYAN='\033[0;36m' # Unused variable
 NC='\033[0m' # No Color
 
 # Parse command line options
@@ -189,7 +189,7 @@ if [[ "$STOP_SHARED_SERVICES" == true ]] && command -v docker &> /dev/null; then
         if [[ "$QUIET" != true ]]; then
             echo -n "   Stopping Supabase containers... "
         fi
-        echo $SUPABASE_CONTAINERS | xargs docker stop > /dev/null 2>&1 || true
+        echo "$SUPABASE_CONTAINERS" | xargs docker stop > /dev/null 2>&1 || true
         if [[ "$QUIET" != true ]]; then
             echo -e "${GREEN}✅${NC}"
         fi
@@ -227,7 +227,7 @@ if [[ "$KEEP_WORKTREE" != true ]]; then
     WORKTREE_NAME=$(basename "$CURRENT_DIR")
     
     # Move up one directory to safely remove the worktree
-    cd "$PARENT_DIR"
+    cd "$PARENT_DIR" || exit
     
     # Remove the worktree using git
     if git worktree remove "$WORKTREE_NAME" --force > /dev/null 2>&1; then
