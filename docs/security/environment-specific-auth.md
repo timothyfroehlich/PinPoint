@@ -43,10 +43,10 @@ The system uses `VERCEL_ENV` for Vercel deployments and falls back to `NODE_ENV`
 
 ### Modern Seeding Architecture
 
-1. **`scripts/seed/orchestrator.ts`** (Main Orchestrator)
-   - Environment auto-detection using Vercel patterns
+1. **`scripts/seed/index.ts`** (Explicit Target Seeding)
+   - Target-based seeding with explicit commands
    - Coordinates infrastructure, auth, and sample data seeding
-   - Provides unified seeding interface across all environments
+   - Commands: `seed:local:pg`, `seed:local:sb`, `seed:preview`
 
 2. **Development Environment Seeding**
    - Organization: "Austin Pinball Collective"

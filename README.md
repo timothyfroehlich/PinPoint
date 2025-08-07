@@ -53,9 +53,9 @@ PinPoint is currently undergoing a strategic migration to modernize its architec
 
 For details, see the [Migration Guide](./docs/migration/supabase-drizzle/).
 
-### 🚨 Beta Development User Reset Warning
+### 🚨 Development User Reset Warning
 
-**CRITICAL DURING BETA**: PinPoint development seeding **DELETES AND RECREATES ALL SUPABASE AUTH USERS** on every `npm run db:reset`.
+**CRITICAL DURING DEVELOPMENT**: PinPoint development seeding **DELETES AND RECREATES ALL SUPABASE AUTH USERS** on every `npm run reset:local`.
 
 **⚠️ THIS MEANS:**
 
@@ -86,7 +86,7 @@ vercel env pull  # Downloads shared development environment from Vercel
 
 # 3. Start Supabase and initialize database
 supabase start
-npm run db:reset
+npm run reset:local
 
 # 4. Start development server (background mode)
 npm run dev:bg
@@ -109,8 +109,9 @@ Your development server will be running at **http://localhost:49200**
 
 **Database Commands:**
 
-- `npm run db:reset` - Reset database with fresh schema and seed data
+- `npm run reset:local` - Reset database with fresh schema and seed data
 - `npm run db:push` - Sync schema changes without reset
+- `npm run seed` - Seed data only (local Supabase)
 
 ### Prerequisites
 
@@ -143,7 +144,7 @@ If you encounter issues, see [docs/troubleshooting.md](./docs/troubleshooting.md
 **Quick fixes:**
 
 - **Server not responding**: `npm run dev:bg:status` then `npm run dev:clean`
-- **Database issues**: `npm run db:reset`
+- **Database issues**: `npm run reset:local`
 - **Dependency problems**: `npm run clean` then `npm install`
 
 ## Roadmap

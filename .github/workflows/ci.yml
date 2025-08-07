@@ -38,19 +38,25 @@ jobs:
         run: |
           # Production code (strictest) - must pass
           echo "=== Checking Production Code (Strictest) ==="
-          if ! npm run typecheck 2>&1 | tee production-typescript.log; then
+          set +e  # Allow commands to fail temporarily
+          npm run typecheck > production-typescript.log 2>&1
+          TYPECHECK_EXIT_CODE=$?
+          set -e  # Re-enable exit on error
+          
+          if [ $TYPECHECK_EXIT_CODE -ne 0 ]; then
             echo "❌ Production code has TypeScript errors!" >> "$GITHUB_STEP_SUMMARY"
+            cat production-typescript.log
             grep "error TS" production-typescript.log | head -10 >> "$GITHUB_STEP_SUMMARY" || true
             exit 1
           fi
 
           # Check test utilities separately (warnings only)
           echo "=== Checking Test Utils (Recommended) ==="
-          npx tsc --project tsconfig.test-utils.json --noEmit 2>&1 | tee test-utils-typescript.log || true
+          npx tsc --project tsconfig.test-utils.json --noEmit > test-utils-typescript.log 2>&1 || true
 
           # Check test files separately (warnings only)
           echo "=== Checking Test Files (Relaxed) ==="
-          npx tsc --project tsconfig.tests.json --noEmit 2>&1 | tee tests-typescript.log || true
+          npx tsc --project tsconfig.tests.json --noEmit > tests-typescript.log 2>&1 || true
 
           echo "✅ Multi-config TypeScript check completed!" >> "$GITHUB_STEP_SUMMARY"
       - name: Upload TypeScript Error Report

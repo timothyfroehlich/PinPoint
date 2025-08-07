@@ -281,31 +281,44 @@ SENTRY_AUTH_TOKEN="your-sentry-auth-token"
 # 1. Run database migrations
 npm run db:push:prod
 
-# 2. Seed with production data
-npm run seed
+# 2. Create admin user manually via Supabase Dashboard or CLI
+supabase auth admin create-user \
+  --email $SEED_ADMIN_EMAIL \
+  --password <secure-password>
 
-# 3. Verify data via queries
+# 3. Verify setup via queries
 psql $DATABASE_URL -c "SELECT COUNT(*) FROM \"Organization\";"
 ```
 
-### Seed Data Includes
+### Production Data Strategy
 
-- **Organizations**: Austin Pinball Collective (apc)
-- **Roles & Permissions**: Admin, Member, Guest roles
-- **Collection Types**: Manufacturer, Era, Theme collections
-- **OPDB Games**: 1000+ pinball machines from OPDB
-- **Locations**: Sample locations with machines
-- **Sample Issues**: Demonstration issue tracking
+**⚠️ NO AUTOMATED SEEDING FOR PRODUCTION**
 
-### Custom Seeding
+Production seeding is intentionally manual for safety:
+
+- **Organizations**: Created via application UI by admin
+- **Roles & Permissions**: Set up automatically via schema
+- **Users**: Created via Supabase Auth (manual process)
+- **NO sample data**: Production should not have test data
+- **NO reset commands**: Production data is never wiped
+
+### Manual Production Setup
 
 ```bash
-# For custom organization setup
-npm run seed  # Uses environment-aware orchestrator
+# Connect to production project
+supabase projects list
+supabase link --project-ref <prod-project-ref>
 
-# Reset and reseed
-npm run db:reset
-npm run seed
+# Verify environment
+echo $SUPABASE_URL  # Should point to production project
+
+# Create admin user via Supabase CLI
+supabase auth admin create-user \
+  --email admin@yourorg.com \
+  --password <secure-password>
+
+# Admin creates organization via PinPoint UI
+# All other setup happens through the application
 ```
 
 ## Quick Reference
@@ -320,7 +333,7 @@ vercel env add
 
 # Database operations
 npm run db:push:prod
-npm run seed
+# Manual user creation via Supabase Dashboard/CLI
 # Query data samples (see project CLAUDE.md for examples)
 
 # Monitoring

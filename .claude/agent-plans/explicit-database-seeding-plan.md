@@ -2,118 +2,129 @@
 
 ## Replace Orchestration with Explicit Commands
 
-### New Command Structure
+### Simplified Architecture - Final Design
+
+**Key Decisions:**
+
+- ✅ Single index.ts script with target parameter
+- ✅ Minimal validation (almost none for local:pg)
+- ✅ No backward compatibility needed - clean break
+- ✅ No production commands for safety
+- ✅ Reuse existing modules with minor updates
+
+### Final Command Structure
 
 ```bash
-npm run db:seed:local:pg    # Local PostgreSQL container (CI tests)
-npm run db:seed:local:sb    # Local Supabase stack (dev, smoke tests)
-npm run db:seed:preview     # Remote Supabase preview environment
-npm run db:seed:prod        # Remote Supabase production (manual only)
+# Seeding commands (data only, no schema changes)
+npm run seed:local:pg    # PostgreSQL-only for CI tests
+npm run seed:local:sb    # Local Supabase (default for dev)
+npm run seed:preview     # Remote Supabase preview environment
+
+# Reset commands (full wipe + schema + seed)
+npm run reset:local      # Full local Supabase reset
+npm run reset:preview    # Full preview environment reset
+
+# Backward compatibility (temporary)
+npm run seed            # Alias to seed:local:sb
+npm run db:reset        # Alias to reset:local (deprecation warning)
 ```
 
-### Implementation Strategy
+**NO PRODUCTION COMMANDS** - Intentionally inconvenient for safety
 
-**1. Replace Current Orchestrator**
+### Implementation Strategy - Simplified
 
-- Remove `scripts/seed/orchestrator.ts` auto-detection logic
-- Create 4 explicit seeding scripts with clear purposes
-- Each validates connection to expected backend BEFORE seeding
-
-**2. Script Architecture**
+**1. Single Entry Point**
 
 ```
 scripts/seed/
-  local-postgres.ts      # PostgreSQL-only: DB records, no auth users, minimal data
-  local-supabase.ts      # Full Supabase: Auth + DB users, minimal sample data
-  preview.ts             # Remote Supabase: Auth + DB users, full sample data
-  production.ts          # Remote Supabase: Admin only, requires confirmation
+  index.ts               # Single script with target parameter
   shared/
-    infrastructure.ts    # Common org/permissions/roles seeding
-    validation.ts        # Connection validation utilities
-    types.ts            # Shared interfaces
+    infrastructure.ts    # Move from scripts/seed/
+    auth-users.ts       # Move from scripts/seed/, remove isProduction()
+    sample-data.ts      # Move from scripts/seed/, add minimal/full param
 ```
 
-**3. Connection Validation (Before Any Seeding)**
+**2. index.ts Implementation**
 
-**Local PostgreSQL (`local-postgres.ts`)**:
+```typescript
+#!/usr/bin/env tsx
+import { seedInfrastructure } from "./shared/infrastructure";
+import { seedAuthUsers } from "./shared/auth-users";
+import { seedSampleData } from "./shared/sample-data";
 
-- Verify `DATABASE_URL` points to localhost PostgreSQL
-- Confirm NO Supabase auth environment variables exist
-- Test PostgreSQL connection with simple query
+const target = process.argv[2];
 
-**Local Supabase (`local-supabase.ts`)**:
+if (!["local:pg", "local:sb", "preview"].includes(target)) {
+  console.error("Usage: tsx scripts/seed/index.ts <local:pg|local:sb|preview>");
+  process.exit(1);
+}
 
-- Verify `SUPABASE_URL` points to localhost:54321
-- Confirm Supabase auth environment variables exist
-- Test both PostgreSQL and auth API connectivity
+// Minimal validation only for preview
+if (
+  target === "preview" &&
+  !process.env.SUPABASE_URL?.includes("supabase.co")
+) {
+  throw new Error("Preview requires remote Supabase URL");
+}
 
-**Preview (`preview.ts`)**:
+console.log(`🌱 Seeding ${target} environment...`);
 
-- Verify `SUPABASE_URL` points to remote Supabase project
-- Test remote connectivity
-- **Note**: Same Supabase project as production currently
+// Always seed infrastructure
+const org = await seedInfrastructure();
 
-**Production (`production.ts`)**:
+// Conditionally seed auth users (skip for PostgreSQL-only)
+if (target !== "local:pg") {
+  await seedAuthUsers(org.id);
+}
 
-- Verify `SUPABASE_URL` points to remote Supabase project
-- **BLOCK if `CI=true`** (agents can't run this)
-- Require `SEED_ADMIN_EMAIL` environment variable
-- **Interactive confirmation** (not bypassable with --yes):
+// Seed sample data with amount based on target
+const dataAmount = target === "preview" ? "full" : "minimal";
+await seedSampleData(org.id, dataAmount);
 
-  ```
-  ⚠️  PRODUCTION SEEDING
-  You are about to seed the PRODUCTION database.
-  This will create/modify users in the live system.
+console.log(`✅ Seeding complete for ${target}`);
+```
 
-  Type "CONFIRM PRODUCTION SEEDING" to continue:
-  ```
+**3. Minimal Validation**
+
+- **local:pg**: No validation needed, CI controls environment
+- **local:sb**: No validation needed, errors will surface naturally
+- **preview**: Check for remote Supabase URL (contains 'supabase.co')
+- **production**: No script provided - document manual process only
 
 **4. Seeding Strategies by Target**
 
-| Target   | Auth Users | DB Users      | Sample Data | Reset Allowed |
-| -------- | ---------- | ------------- | ----------- | ------------- |
-| local:pg | ❌ Skip    | ✅ Dev users  | ✅ Minimal  | ✅ Yes        |
-| local:sb | ✅ Create  | ✅ Dev users  | ✅ Minimal  | ✅ Yes        |
-| preview  | ✅ Create  | ✅ Dev users  | ✅ Full     | ✅ Yes        |
-| prod     | ✅ Create  | ✅ Admin only | ❌ None     | ❌ Preserve   |
+| Target   | Auth Users | DB Users     | Sample Data | Reset Allowed |
+| -------- | ---------- | ------------ | ----------- | ------------- |
+| local:pg | ❌ Skip    | ✅ Dev users | ✅ Minimal  | N/A (CI only) |
+| local:sb | ✅ Create  | ✅ Dev users | ✅ Minimal  | ✅ Yes        |
+| preview  | ✅ Create  | ✅ Dev users | ✅ Full     | ✅ Yes        |
 
 **5. Update Package.json**
 
 ```json
 {
   "scripts": {
-    "db:seed:local:pg": "tsx scripts/seed/local-postgres.ts",
-    "db:seed:local:sb": "tsx scripts/seed/local-supabase.ts",
-    "db:seed:preview": "tsx scripts/seed/preview.ts",
-    "db:seed:prod": "tsx scripts/seed/production.ts",
+    // Seeding commands
+    "seed": "tsx scripts/seed/index.ts local:sb",
+    "seed:local:pg": "tsx scripts/seed/index.ts local:pg",
+    "seed:local:sb": "tsx scripts/seed/index.ts local:sb",
+    "seed:preview": "tsx scripts/seed/index.ts preview",
 
-    // Maintain backward compatibility temporarily
-    "seed": "npm run db:seed:local:sb"
+    // Reset commands
+    "reset:local": "supabase db reset && npm run seed:local:sb",
+    "reset:preview": "supabase db reset --linked && npm run seed:preview"
+
+    // REMOVE old commands
+    // "db:reset", "db:reset:preview", "db:seed:*"
   }
 }
 ```
 
 **6. Update CI Workflows**
 
-- **ci.yml tests**: Use `npm run db:seed:local:pg`
-- **smoke-test.yml**: Use `npm run db:seed:local:sb`
+- **ci.yml tests**: Use `npm run seed:local:pg`
+- **smoke-test.yml**: Use `npm run seed:local:sb` or just `npm run seed`
 - Remove all environment detection complexity
-
-**7. Safety Features**
-
-**Production Script Guards**:
-
-- Exit immediately if `process.env.CI === 'true'`
-- Require exact phrase confirmation (prevent automation)
-- Log all production seeding actions to audit trail
-- Validate admin email format before proceeding
-
-**All Scripts**:
-
-- Connection validation before any operations
-- Clear logging of what target is being seeded
-- Graceful error handling with specific error messages
-- Dry-run mode option for testing
 
 ### User Data by Target
 
@@ -196,31 +207,83 @@ const users = [
 // Create single admin user only, no sample data
 ```
 
-### Benefits
+### Production Seeding (Manual Process)
 
-✅ **Explicit**: Command name tells you exactly what gets seeded
-✅ **Safe**: Connection validation prevents wrong-target accidents
-✅ **Secure**: Production requires manual, non-automatable confirmation
-✅ **Clear**: No environment detection magic, just direct commands
-✅ **Maintainable**: Each script has single, clear responsibility
-✅ **Agent-Safe**: Agents can't accidentally seed production
+**Document in `docs/deployment/production-seeding.md`:**
 
-### Migration Path
+```bash
+# Manual production seeding process
+# 1. Verify you're connected to production
+supabase projects list
+supabase link --project-ref <prod-ref>
 
-1. Create new explicit scripts in `scripts/seed/`
-2. Update CI workflows to use new commands
-3. Test each command thoroughly
-4. Update documentation
-5. Remove old orchestrator.ts
-6. Update package.json to use new commands by default
+# 2. Create admin user via Supabase dashboard or CLI
+supabase auth admin create-user \
+  --email $SEED_ADMIN_EMAIL \
+  --password <secure-password>
+
+# 3. No sample data for production
+```
+
+### Benefits of Simplified Approach
+
+✅ **Simple**: One script, clear parameters
+✅ **Explicit**: Command names clearly indicate target
+✅ **Safe**: No production commands available
+✅ **Clean**: No environment detection or complex validation
+✅ **Maintainable**: All seeding logic in one place
+✅ **Reusable**: Existing modules with minor updates
+
+### Implementation Task List
+
+**Documentation Updates (23 files):**
+
+1. ✅ `.claude/agent-plans/explicit-database-seeding-plan.md` - DONE
+2. `CLAUDE.md` - Update essential commands section
+3. `package.json` - New command structure
+4. `.github/workflows/ci.yml` - Change to `seed:local:pg`
+5. `.github/workflows/smoke-test.yml` - Change to `seed:local:sb`
+6. `docs/testing/test-database.md` - Update seeding references
+7. `docs/deployment/environment-management.md` - New commands
+8. `docs/deployment/development-deployment-guide.md` - New workflow
+9. `docs/deployment/production-deployment-guide.md` - Manual process
+10. `docs/developer-guides/troubleshooting.md` - Update commands
+11. `docs/security/environment-specific-auth.md` - Remove beta refs
+12. `docs/troubleshooting.md` - Update seeding issues
+13. `docs/developer-guides/supabase/local-development.md` - New reset
+14. `README.md` - Update quick start
+15. `scripts/worktree-status.sh` - If it references seeding
+16. `docs/quick-reference/migration-patterns.md` - Update examples
+17. `docs/architecture/current-state.md` - Update seeding section
+18. `docs/orchestrator-system/orchestrator-project.md` - Remove/update
+19. `docs/design-docs/*.md` - Update references
+20. `docs/README.md` - Update overview
+21. `GEMINI.md` - If present, update
+22. `.claude/orchestrator-system/orchestrator-project.md` - Remove
+
+**Code Implementation:**
+
+1. Create `scripts/seed/index.ts` with single entry point
+2. Move `infrastructure.ts` → `shared/infrastructure.ts`
+3. Move `auth-users.ts` → `shared/auth-users.ts` (remove isProduction)
+4. Move `sample-data.ts` → `shared/sample-data.ts` (add minimal/full)
+5. Delete `scripts/seed/orchestrator.ts`
+6. Update `src/lib/environment.ts` - Remove unused functions
+7. Update `src/test/seed-data-helpers.ts` if needed
+
+**Testing:**
+
+1. Test `npm run seed:local:pg` (CI simulation)
+2. Test `npm run seed:local:sb` (local dev)
+3. Test `npm run seed:preview` (with preview env)
+4. Test `npm run reset:local`
+5. Test `npm run reset:preview`
+6. Verify CI workflows still pass
 
 ### Current Shared Supabase Project Note
 
 Since preview and production currently use the same Supabase project:
 
-- Preview seeding will affect production data
-- Production confirmation is critical to prevent accidental overwrites
-- When separate projects are created, update connection validation accordingly
-- Consider adding project ID validation once projects are separated
-
-This eliminates all auto-detection complexity while making seeding targets completely explicit and safe.
+- Be careful with `seed:preview` as it affects production data
+- Document manual production process clearly
+- When separate projects are created, update validation

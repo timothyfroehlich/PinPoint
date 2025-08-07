@@ -360,12 +360,12 @@ export async function getSeededIssues(limit = 10): Promise<SeededIssue[]> {
           priority: NonNullable<typeof result.priority>;
           createdBy: NonNullable<typeof result.createdBy>;
         } =>
-          result.machine &&
-          result.model &&
-          result.location &&
-          result.status &&
-          result.priority &&
-          result.createdBy,
+          !!result.machine &&
+          !!result.model &&
+          !!result.location &&
+          !!result.status &&
+          !!result.priority &&
+          !!result.createdBy,
       )
       .map((result) => ({
         ...result.issue,

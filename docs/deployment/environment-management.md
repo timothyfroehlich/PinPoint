@@ -154,9 +154,12 @@ function getEnvironmentType() {
 
 ### Development Environment
 
-**Seed Orchestrator**: `scripts/seed/orchestrator.ts`
-**Command**: `npm run seed`
-**Data**:
+**Seeding Commands**:
+
+- `npm run seed` (local Supabase, default)
+- `npm run seed:local:sb` (explicit local Supabase)
+- `npm run seed:local:pg` (PostgreSQL-only for CI)
+  **Data**:
 
 - 5-10 fake users with various roles (admin, member, guest)
 - 20-30 sample issues with different statuses
@@ -166,8 +169,7 @@ function getEnvironmentType() {
 
 ### Preview Environment
 
-**Seed Orchestrator**: `scripts/seed/orchestrator.ts`
-**Command**: `npm run seed`
+**Seeding Command**: `npm run seed:preview`
 **Data**:
 
 - 3-5 demo users with realistic profiles
@@ -178,8 +180,8 @@ function getEnvironmentType() {
 
 ### Production Environment
 
-**Seed Orchestrator**: `scripts/seed/orchestrator.ts`
-**Command**: `npm run seed`
+**Seeding**: Manual process only (no automated commands for safety)
+**Process**: See `docs/deployment/production-deployment-guide.md`
 **Data**:
 
 - Austin Pinball Collective organization

@@ -61,16 +61,30 @@ export const createMockMembership = (
 
 // User profile handler - returns full user profile with relationships
 export const mockUserProfile = (user: Partial<User> = {}) =>
-  trpcMsw.user.getProfile.query(() => ({
-    ...createMockUser(user),
-    ownedMachines: [],
-    memberships: [],
-    _count: {
-      issuesCreated: 0,
-      comments: 0,
-      ownedMachines: 0,
-    },
-  }));
+  trpcMsw.user.getProfile.query(() => {
+    const now = new Date();
+    return {
+      id: user.id ?? "user-1",
+      name: user.name ?? "Test User",
+      email: user.email ?? "user@example.com",
+      emailVerified: user.emailVerified ?? null,
+      image: user.image ?? null,
+      createdAt: user.createdAt ?? now,
+      updatedAt: user.updatedAt ?? now,
+      bio: user.bio ?? null,
+      profilePicture: user.profilePicture ?? null,
+      emailNotificationsEnabled: user.emailNotificationsEnabled ?? true,
+      pushNotificationsEnabled: user.pushNotificationsEnabled ?? false,
+      notificationFrequency: user.notificationFrequency ?? "IMMEDIATE",
+      ownedMachines: [],
+      memberships: [],
+      _count: {
+        issuesCreated: 0,
+        comments: 0,
+        ownedMachines: 0,
+      },
+    };
+  });
 
 // Current membership handler - returns membership info for organization procedures
 export const mockCurrentMembership = (

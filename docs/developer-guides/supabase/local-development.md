@@ -203,20 +203,23 @@ WITH CHECK (bucket_id = 'pinpoint-storage' AND auth.uid() IS NOT NULL);
 
 ### Modern Seeding Architecture
 
-PinPoint uses a modern seeding architecture with environment-aware coordination:
+PinPoint uses explicit target-based seeding with simplified commands:
 
 ```typescript
-// scripts/seed/orchestrator.ts (simplified)
-import { seedInfrastructure } from "./infrastructure";
-import { seedAuthUsers } from "./auth-users";
-import { seedSampleData } from "./sample-data";
+// scripts/seed/index.ts (simplified)
+import { seedInfrastructure } from "./shared/infrastructure";
+import { seedAuthUsers } from "./shared/auth-users";
+import { seedSampleData } from "./shared/sample-data";
+
+const target = process.argv[2]; // 'local:pg', 'local:sb', 'preview'
 
 export async function main(): Promise<void> {
   // 1. Infrastructure (organizations, permissions, roles)
   const organization = await seedInfrastructure();
 
-  // 2. Auth users (Supabase auth + profile creation)
-  await seedAuthUsers(STRATEGY.users, organization.id);
+  // 2. Auth users (skip for PostgreSQL-only)
+  if (target !== 'local:pg') {
+    await seedAuthUsers(organization.id);
 
   // 3. Sample data (development only)
   if (strategy.sampleData) {
@@ -235,11 +238,14 @@ export async function main(): Promise<void> {
 ### Run Seeding
 
 ```bash
-# Environment auto-detection (recommended)
-npm run seed
+# Explicit target seeding
+npm run seed            # Local Supabase (default)
+npm run seed:local:sb   # Local Supabase (explicit)
+npm run seed:local:pg   # PostgreSQL-only (CI)
+npm run seed:preview    # Remote preview
 
 # Complete database reset + reseed
-npm run db:reset
+npm run reset:local     # Local Supabase reset
 
 # Database validation
 npm run db:validate

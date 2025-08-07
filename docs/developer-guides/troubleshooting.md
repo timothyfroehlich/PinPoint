@@ -178,7 +178,7 @@ git commit -m "fix: emergency commit" --no-verify
 
 ### Database Reset Issues
 
-**Symptom**: `npm run db:reset` fails or leaves inconsistent state.
+**Symptom**: `npm run reset:local` fails or leaves inconsistent state.
 
 **Solutions**:
 
@@ -191,7 +191,7 @@ npm run db:push
 npm run db:validate
 
 # 3. Reset with fresh generation
-npm run db:reset
+npm run reset:local
 npm run db:generate
 ```
 

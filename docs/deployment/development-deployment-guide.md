@@ -109,7 +109,7 @@ psql $DATABASE_URL -c "SELECT * FROM \"Organization\" LIMIT 5;"
 npm run db:push
 
 # Reset database (development only)
-npm run db:reset
+npm run reset:local
 ```
 
 ## Preview Deployments
@@ -153,11 +153,17 @@ Preview deployments automatically use the "Preview" environment variables set in
 ### Development Data Seeding
 
 ```bash
-# Seed development database
-npm run seed:dev
+# Seed local Supabase (default)
+npm run seed
 
-# Or use beta seeding (smaller dataset)
-npm run seed:beta
+# Explicit local Supabase seeding
+npm run seed:local:sb
+
+# PostgreSQL-only seeding (for CI)
+npm run seed:local:pg
+
+# Preview environment seeding
+npm run seed:preview
 ```
 
 ### Development Seed Data Includes
@@ -174,9 +180,9 @@ npm run seed:beta
 
 ```bash
 # Reset and reseed development data
-npm run db:reset
+npm run reset:local
 
-# Or just run seeding (uses environment-aware orchestrator)
+# Or just run seeding
 npm run seed
 ```
 
@@ -185,10 +191,10 @@ npm run seed
 ```bash
 # After preview deployment, seed the preview database
 vercel env pull .env.preview
-npm run seed:beta
+npm run seed:preview
 
 # Or run seeding command on deployed preview
-vercel exec -- npm run seed:beta
+vercel exec -- npm run seed:preview
 ```
 
 ## Testing Setup
@@ -337,7 +343,7 @@ npm run validate  # Husky hooks
 # Development
 npm run dev              # Start local server
 npm run db:push          # Push schema changes
-npm run seed:dev         # Seed development data
+npm run seed             # Seed development data
 # View database (see CLAUDE.md for efficient query examples)
 
 # Preview Deployment

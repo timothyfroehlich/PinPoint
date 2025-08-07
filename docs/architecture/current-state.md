@@ -140,10 +140,11 @@ src/server/api/routers/
 During the migration from Prisma to Drizzle, PinPoint maintains both ORMs in parallel:
 
 #### tRPC Context Integration
+
 ```typescript
 export interface TRPCContext {
-  db: ExtendedPrismaClient;      // Existing Prisma client
-  drizzle: DrizzleClient;        // New Drizzle client
+  db: ExtendedPrismaClient; // Existing Prisma client
+  drizzle: DrizzleClient; // New Drizzle client
   user: PinPointSupabaseUser | null;
   supabase: SupabaseServerClient;
   organization: Organization | null;
@@ -152,12 +153,14 @@ export interface TRPCContext {
 ```
 
 #### Benefits
+
 - **Gradual Migration**: Convert procedures one at a time
 - **Zero Downtime**: Both ORMs work simultaneously
 - **Rollback Safety**: Can revert individual procedures if needed
 - **Type Safety**: Full TypeScript support for both ORMs
 
 #### Current Status (Phase 2A Complete)
+
 - ✅ Complete Drizzle schema with 1:1 Prisma parity
 - ✅ Both clients available in all tRPC procedures
 - ✅ 39 tests validate dual-ORM functionality
@@ -283,8 +286,9 @@ npm run validate      # Run before starting work
 npm run validate    # Must pass before commits
 
 # Database
-npm run db:reset      # Reset and reseed
+npm run reset:local   # Reset and reseed
 npm run db:push       # Push schema changes
+npm run seed          # Seed data only
 
 # Testing
 npm run test:coverage # Run tests with coverage report

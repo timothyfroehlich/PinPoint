@@ -28,7 +28,7 @@
 - `realtime` - Disabled for performance
 - `studio` - Disabled for performance
 
-**🔔 REMINDER**: Re-enable these features in `supabase/config.toml` when ready for beta:
+**🔔 REMINDER**: Re-enable these features in `supabase/config.toml` when ready for production:
 
 ```toml
 [db.migrations]
@@ -168,9 +168,13 @@ npm run check:fix    # Development checks + auto-fix (after code changes)
 npm run validate     # Pre-commit validation (MUST PASS)
 npm run pre-commit   # Pre-PR validation (MUST PASS)
 
-# Database
-npm run db:reset
-npm run db:push
+# Database Management
+npm run db:push         # Push schema changes only
+npm run seed            # Seed local Supabase (default)
+npm run seed:local:pg   # Seed PostgreSQL-only (CI tests)
+npm run seed:preview    # Seed remote preview environment
+npm run reset:local     # Full local reset (schema + data)
+npm run reset:preview   # Full preview reset (schema + data)
 
 # Database Inspection (Efficient - Use Direct SQL)
 # Read schema structure: src/server/db/schema/
@@ -244,7 +248,7 @@ npm run typecheck | grep "usePermissions"        # Find specific function errors
 2. **During**: Run `npm run check` after significant code changes
 3. **Before commit**: `npm run validate` must pass (MANDATORY)
 4. **Before PR**: `npm run pre-commit` must pass (MANDATORY)
-5. **Database changes**: Use `npm run db:reset` for complete reset or `npm run db:push` for schema-only changes
+5. **Database changes**: Use `npm run reset:local` for complete reset or `npm run db:push` for schema-only changes
 
 ### Environment Configuration
 
@@ -497,8 +501,8 @@ The test-architect will update `test-map.md` and `source-map.md` as it works. Th
 
 ```bash
 # Single-shot workflows (recommended)
-npm run db:reset        # Reset local database + automatic seeding
-npm run db:reset:preview # Reset preview database + automatic seeding
+npm run reset:local     # Reset local database + automatic seeding
+npm run reset:preview   # Reset preview database + automatic seeding
 
 # Core database operations
 npm run db:push         # Push schema changes (development)
@@ -511,9 +515,11 @@ npm run db:studio       # Open Drizzle Studio (development)
 npm run db:studio:preview # Open Drizzle Studio (preview)
 npm run db:validate     # Validate database operations
 
-# Manual seeding (if needed)
-npm run seed            # Seed development database
-npm run seed:preview    # Seed preview environment
+# Seeding commands (explicit targets)
+npm run seed            # Seed local Supabase (default)
+npm run seed:local:pg   # Seed PostgreSQL-only (CI tests)
+npm run seed:local:sb   # Seed local Supabase (explicit)
+npm run seed:preview    # Seed remote preview environment
 ```
 
 ## Critical Notes
