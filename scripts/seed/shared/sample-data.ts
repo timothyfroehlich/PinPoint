@@ -26,6 +26,8 @@ import {
 
 const db = createDrizzleClient();
 
+type DataAmount = "minimal" | "full";
+
 interface SampleIssue {
   title: string;
   description: string;
@@ -49,11 +51,13 @@ interface UniqueGame {
 /**
  * Extract unique games from sample issues JSON
  */
-async function extractUniqueGames(): Promise<UniqueGame[]> {
+async function extractUniqueGames(
+  dataAmount: DataAmount,
+): Promise<UniqueGame[]> {
   try {
     // Import sample issues JSON
     const sampleIssuesModule = await import(
-      "../../prisma/seeds/sample-issues.json"
+      "../../../prisma/seeds/sample-issues.json"
     );
     const sampleIssues: SampleIssue[] = sampleIssuesModule.default;
 
@@ -78,8 +82,17 @@ async function extractUniqueGames(): Promise<UniqueGame[]> {
       }
     }
 
-    const uniqueGames = Array.from(gameMap.values());
+    let uniqueGames = Array.from(gameMap.values());
     console.log(`[SAMPLE] Found ${uniqueGames.length.toString()} unique games`);
+
+    // Limit data for minimal mode (for CI tests and local development)
+    if (dataAmount === "minimal") {
+      const MINIMAL_GAME_LIMIT = 4;
+      uniqueGames = uniqueGames.slice(0, MINIMAL_GAME_LIMIT);
+      console.log(
+        `[SAMPLE] Limited to ${uniqueGames.length.toString()} games for minimal seeding`,
+      );
+    }
 
     return uniqueGames;
   } catch (error) {
@@ -314,13 +327,29 @@ function mapSeverityToPriority(severity: string): string {
 /**
  * Create sample issues mapped to machines
  */
-async function createSampleIssues(organizationId: string): Promise<void> {
+async function createSampleIssues(
+  organizationId: string,
+  dataAmount: DataAmount,
+): Promise<void> {
   try {
     // Import sample issues JSON
     const sampleIssuesModule = await import(
-      "../../prisma/seeds/sample-issues.json"
+      "../../../prisma/seeds/sample-issues.json"
     );
-    const sampleIssues: SampleIssue[] = sampleIssuesModule.default;
+    let sampleIssues: SampleIssue[] = sampleIssuesModule.default;
+
+    console.log(
+      `[SAMPLE] Found ${sampleIssues.length.toString()} sample issues...`,
+    );
+
+    // Limit issues for minimal mode (for CI tests and local development)
+    if (dataAmount === "minimal") {
+      const MINIMAL_ISSUE_LIMIT = 10;
+      sampleIssues = sampleIssues.slice(0, MINIMAL_ISSUE_LIMIT);
+      console.log(
+        `[SAMPLE] Limited to ${sampleIssues.length.toString()} issues for minimal seeding`,
+      );
+    }
 
     console.log(
       `[SAMPLE] Creating ${sampleIssues.length.toString()} sample issues...`,
@@ -489,14 +518,20 @@ async function createSampleIssues(organizationId: string): Promise<void> {
 /**
  * Main sample data seeding function
  */
-export async function seedSampleData(organizationId: string): Promise<void> {
+export async function seedSampleData(
+  organizationId: string,
+  dataAmount: DataAmount,
+): Promise<void> {
   console.log(
     `[SAMPLE] 🎮 Starting sample data seeding for organization ${organizationId}...`,
+  );
+  console.log(
+    `[SAMPLE] Data amount: ${dataAmount.toUpperCase()} (${dataAmount === "minimal" ? "limited for CI/dev" : "full dataset for preview"})`,
   );
 
   try {
     // Phase 1: Extract unique games from sample issues
-    const uniqueGames = await extractUniqueGames();
+    const uniqueGames = await extractUniqueGames(dataAmount);
 
     // Phase 2: Create OPDB models
     await createModels(uniqueGames);
@@ -505,7 +540,7 @@ export async function seedSampleData(organizationId: string): Promise<void> {
     await createMachines(organizationId, uniqueGames);
 
     // Phase 4: Create sample issues mapped to machines
-    await createSampleIssues(organizationId);
+    await createSampleIssues(organizationId, dataAmount);
 
     console.log(`[SAMPLE] ✅ Sample data seeding completed successfully!`);
     console.log(`[SAMPLE] 📊 Summary:`);
@@ -513,7 +548,9 @@ export async function seedSampleData(organizationId: string): Promise<void> {
     console.log(
       `[SAMPLE]   - Machines: ${uniqueGames.length} machines created`,
     );
-    console.log(`[SAMPLE]   - Issues: Rich sample data from curated JSON`);
+    console.log(
+      `[SAMPLE]   - Issues: ${dataAmount === "minimal" ? "Limited" : "Rich"} sample data from curated JSON`,
+    );
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error(`[SAMPLE] ❌ Sample data seeding failed: ${errorMessage}`);

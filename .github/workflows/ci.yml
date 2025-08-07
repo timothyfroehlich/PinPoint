@@ -3,6 +3,10 @@ permissions:
   pull-requests: write
 name: CI
 
+env:
+  CI: true
+  NODE_ENV: test
+
 on:
   push:
     branches: [main]
@@ -22,8 +26,6 @@ jobs:
     permissions:
       contents: read
       actions: write
-    env:
-      NODE_ENV: "test"
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -123,9 +125,6 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      NODE_ENV: "test"
-      CI: "true"
-      SEED_ADMIN_EMAIL: "admin@ci.local"
       DATABASE_URL: "postgresql://test_user:test_password@localhost:5432/test_db"
       DIRECT_URL: "postgresql://test_user:test_password@localhost:5432/test_db"
       POSTGRES_PRISMA_URL: "postgresql://test_user:test_password@localhost:5432/test_db"
@@ -139,6 +138,8 @@ jobs:
       - run: npm ci
       - name: Setup Database Schema
         run: npm run db:push
+      - name: Seed Database for Tests
+        run: npm run seed:local:pg
       - name: Run Tests with Coverage
         run: npm run test:coverage
       - name: Upload Coverage
@@ -170,9 +171,6 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      NODE_ENV: "test"
-      CI: "true"
-      SEED_ADMIN_EMAIL: "admin@ci.local"
       DATABASE_URL: "postgresql://test_user:test_password@localhost:5432/test_db"
       DIRECT_URL: "postgresql://test_user:test_password@localhost:5432/test_db"
       POSTGRES_PRISMA_URL: "postgresql://test_user:test_password@localhost:5432/test_db"

@@ -13,7 +13,6 @@ import { nanoid } from "nanoid";
 
 import { createDrizzleClient } from "~/server/db/drizzle";
 import { users, roles, memberships } from "~/server/db/schema";
-import { isProduction } from "~/lib/environment";
 
 const db = createDrizzleClient();
 
@@ -23,6 +22,60 @@ export interface UserData {
   role: string;
   bio: string;
 }
+
+type SeedTarget = "local:pg" | "local:sb" | "preview";
+
+/**
+ * Standard user set for all environments
+ * Consistent across development, preview, and production
+ */
+const STANDARD_USERS: UserData[] = [
+  // Dev Users (3) - for development and testing
+  {
+    name: "Dev Admin",
+    email: "admin@dev.local",
+    role: "Admin",
+    bio: "Development admin test account.",
+  },
+  {
+    name: "Dev Member",
+    email: "member@dev.local",
+    role: "Member",
+    bio: "Development member test account.",
+  },
+  {
+    name: "Dev Player",
+    email: "player@dev.local",
+    role: "Member",
+    bio: "Development player test account.",
+  },
+
+  // Pinball Personalities (4) - industry figures for realistic data
+  {
+    name: "Roger Sharpe",
+    email: "roger.sharpe@pinpoint.dev",
+    role: "Admin",
+    bio: "Pinball ambassador and historian.",
+  },
+  {
+    name: "Gary Stern",
+    email: "gary.stern@pinpoint.dev",
+    role: "Member",
+    bio: "Founder of Stern Pinball.",
+  },
+  {
+    name: "Steve Ritchie",
+    email: "steve.ritchie@pinpoint.dev",
+    role: "Member",
+    bio: "Legendary pinball designer.",
+  },
+  {
+    name: "Keith Elwin",
+    email: "keith.elwin@pinpoint.dev",
+    role: "Member",
+    bio: "Modern pinball design innovator.",
+  },
+];
 
 interface CreateUserParams {
   email: string;
@@ -328,23 +381,25 @@ async function deleteExistingDevUsers(userList: UserData[]): Promise<void> {
  * Main auth users seeding function
  */
 export async function seedAuthUsers(
-  users: UserData[],
   organizationId: string,
+  target: SeedTarget,
 ): Promise<void> {
+  const users = STANDARD_USERS;
   console.log(
     `[AUTH] Creating ${users.length.toString()} auth users for organization ${organizationId}...`,
   );
 
   try {
-    // DEV + PREVIEW: Delete existing users for clean reset
-    if (!isProduction()) {
+    // PREVIEW: Aggressive reset for clean demos
+    // LOCAL/OTHER: Preserve existing users for safety
+    if (target === "preview") {
       console.log(
-        "[AUTH] 🔄 DEV/PREVIEW ENVIRONMENT: Performing aggressive user reset for clean demos",
+        "[AUTH] 🔄 PREVIEW ENVIRONMENT: Performing aggressive user reset for clean demos",
       );
       await deleteExistingDevUsers(users);
     } else {
       console.log(
-        "[AUTH] 🔒 PRODUCTION ENVIRONMENT: Preserving existing users, creating only missing ones",
+        "[AUTH] 🔒 LOCAL/PRODUCTION MODE: Preserving existing users, creating only missing ones",
       );
     }
 
