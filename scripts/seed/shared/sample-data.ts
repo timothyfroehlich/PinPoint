@@ -298,10 +298,15 @@ async function createMachines(
 
     // Batch create all missing machines
     if (machinesToCreate.length > 0) {
-      await db.insert(machines).values(machinesToCreate);
-      console.log(
-        `[SAMPLE] ✅ Created ${machinesToCreate.length.toString()} machines via batch insert`,
-      );
+      try {
+        await db.insert(machines).values(machinesToCreate);
+        console.log(
+          `[SAMPLE] ✅ Created ${machinesToCreate.length.toString()} machines via batch insert`,
+        );
+      } catch (error) {
+        console.error(`[SAMPLE] ❌ Failed to batch create machines:`, error);
+        throw new Error(`Machine creation failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
     } else {
       console.log(
         `[SAMPLE] ⏭️  All machines for ${games.length.toString()} models already exist`,
@@ -497,10 +502,15 @@ async function createSampleIssues(
 
     // Batch create all issues
     if (issuesToCreate.length > 0) {
-      await db.insert(issues).values(issuesToCreate);
-      console.log(
-        `[SAMPLE] ✅ Created ${issuesToCreate.length.toString()} issues via batch insert`,
-      );
+      try {
+        await db.insert(issues).values(issuesToCreate);
+        console.log(
+          `[SAMPLE] ✅ Created ${issuesToCreate.length.toString()} issues via batch insert`,
+        );
+      } catch (error) {
+        console.error(`[SAMPLE] ❌ Failed to batch create issues:`, error);
+        throw new Error(`Issue creation failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
     } else {
       console.log(`[SAMPLE] ⏭️  No new issues to create`);
     }

@@ -255,6 +255,43 @@ async function upsertSupabaseAuthUser(
   };
 }
 
+// Constants for polling configuration
+const USER_RECORD_POLL_TIMEOUT_MS = 5000; // 5 seconds max wait for auth trigger
+const USER_RECORD_POLL_INTERVAL_MS = 50; // Check every 50ms (20 times per second)
+const MAX_POLL_ATTEMPTS = Math.floor(USER_RECORD_POLL_TIMEOUT_MS / USER_RECORD_POLL_INTERVAL_MS);
+
+// Batch processing constants
+const BATCH_SIZE = 50; // Process users in batches to avoid overwhelming the database
+
+/**
+ * Wait for database User record to exist (created by auth trigger)
+ * This validates that the auth trigger is working correctly
+ */
+async function waitForUserRecord(userId: string, email: string): Promise<boolean> {
+  for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
+    try {
+      const existingUser = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1);
+
+      if (existingUser.length > 0) {
+        return true;
+      }
+
+      // Wait before next attempt
+      await new Promise(resolve => setTimeout(resolve, USER_RECORD_POLL_INTERVAL_MS));
+    } catch (error) {
+      console.warn(`[AUTH] Error checking for user record ${email}:`, error);
+      // Continue trying despite query errors
+    }
+  }
+
+  console.error(`[AUTH] ❌ CRITICAL: Auth trigger failed - User record not created after ${USER_RECORD_POLL_TIMEOUT_MS}ms for ${email}`);
+  return false;
+}
+
 /**
  * Process batch of users with idempotent upsert approach and optimized database operations
  */
@@ -305,7 +342,6 @@ async function processBatchUsers(
   const membershipSet = new Set(existingMemberships.map(m => m.userId));
 
   // Process each user with optimized database operations
-  const usersToCreateInDb: any[] = [];
   const membershipsToCreate: any[] = [];
 
   for (const userData of userList) {
@@ -327,24 +363,34 @@ async function processBatchUsers(
       // Track creation vs existing
       if (authResult.wasCreated) {
         createdCount++;
-        // Wait a moment for auth trigger to potentially create User record
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        // Wait for auth trigger to create User record - this MUST work
+        const userRecordExists = await waitForUserRecord(authResult.userId, userData.email);
+        
+        if (!userRecordExists) {
+          // Auth trigger failed - this is a critical infrastructure problem
+          const error = `Auth trigger failed to create User record for ${userData.email}. This indicates a problem with the database trigger 'handle_new_user()'.`;
+          console.error(`[AUTH] ❌ CRITICAL: ${error}`);
+          errorCount++;
+          errors.push(error);
+          continue; // Skip this user and continue with others
+        }
+        
+        dbUsersMap.set(userData.email, authResult.userId); // Update map
       } else {
         existedCount++;
-      }
-
-      // Check if database User record needs to be created
-      if (!dbUsersMap.has(userData.email)) {
-        usersToCreateInDb.push({
-          id: authResult.userId,
-          name: userData.name,
-          email: userData.email,
-          emailVerified: new Date(),
-          image: null,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
-        dbUsersMap.set(userData.email, authResult.userId); // Update map
+        // Existing user should already have a User record
+        if (!dbUsersMap.has(userData.email)) {
+          // Verify existing auth user has corresponding User record
+          const userRecordExists = await waitForUserRecord(authResult.userId, userData.email);
+          if (!userRecordExists) {
+            const error = `Existing auth user ${userData.email} missing User record. Database inconsistency detected.`;
+            console.error(`[AUTH] ❌ CRITICAL: ${error}`);
+            errorCount++;
+            errors.push(error);
+            continue; // Skip this user and continue with others
+          }
+          dbUsersMap.set(userData.email, authResult.userId); // Update map
+        }
       }
 
       // Check if membership needs to be created
@@ -383,27 +429,27 @@ async function processBatchUsers(
     }
   }
 
-  // Batch create database User records
+  // No manual User record creation - auth trigger must handle this
+  // If we reach this point with usersToCreateInDb having entries, 
+  // it means auth triggers are not working correctly
   if (usersToCreateInDb.length > 0) {
-    try {
-      await db.insert(users).values(usersToCreateInDb);
-      console.log(
-        `[AUTH] ✅ Created ${usersToCreateInDb.length.toString()} User records via batch insert`,
-      );
-    } catch (error) {
-      console.error(`[AUTH] ❌ Failed to batch create User records:`, error);
-    }
+    const error = `CRITICAL: Auth triggers failed for ${usersToCreateInDb.length} users. Database infrastructure needs fixing.`;
+    console.error(`[AUTH] ❌ ${error}`);
+    errorCount += usersToCreateInDb.length;
+    errors.push(error);
   }
 
   // Batch create memberships
   if (membershipsToCreate.length > 0) {
     try {
-      await db.insert(memberships).values(membershipsToCreate);
+      await db.insert(memberships).values(membershipsToCreate).onConflictDoNothing();
       console.log(
         `[AUTH] ✅ Created ${membershipsToCreate.length.toString()} memberships via batch insert`,
       );
     } catch (error) {
       console.error(`[AUTH] ❌ Failed to batch create memberships:`, error);
+      errorCount += membershipsToCreate.length;
+      errors.push(`Batch membership creation failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -515,16 +561,11 @@ export async function seedAuthUsers(
     );
 
     if (results.errors.length > 0) {
-      console.error("[AUTH] Errors encountered:");
-      for (const error of results.errors) {
-        console.error(`[AUTH]   - ${error}`);
-      }
-
-      // Only fail if there were actual errors (not expected conditions)
+      console.error("[AUTH] Errors:");
+      results.errors.forEach(error => console.error(`[AUTH]   ${error}`));
+      
       if (results.errorCount > 0) {
-        throw new Error(
-          `Auth user seeding failed: ${results.errorCount.toString()} errors out of ${users.length.toString()} users`,
-        );
+        throw new Error(`Auth trigger failures: ${results.errorCount}/${users.length} users failed`);
       }
     }
 
