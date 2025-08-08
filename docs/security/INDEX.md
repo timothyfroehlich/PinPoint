@@ -20,4 +20,5 @@ Security patterns and guidelines for PinPoint.
 - **[environment-specific-auth.md](./environment-specific-auth.md)** - Environment-based auth strategies
 - **[audit-findings.md](./audit-findings.md)** - Security audit results and mitigations
 - **[system-audit.md](./system-audit.md)** - Complete system security assessment
+- **[SARIF Code Scanning](../developer-guides/sarif-integration.md)** - Static analysis results integration with GitHub Security
 - **[RLS Testing](../developer-guides/row-level-security/testing-patterns.md)** - Security validation patterns
