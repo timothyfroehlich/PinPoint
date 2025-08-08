@@ -1,6 +1,7 @@
 permissions:
   contents: read
   pull-requests: write
+  security-events: write
 name: CI
 
 env:
@@ -72,6 +73,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      security-events: write
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
@@ -92,6 +94,15 @@ jobs:
       - run: npm ci
       - name: ESLint Check
         run: npm run lint
+      - name: ESLint SARIF Report
+        run: npm run lint:sarif
+        continue-on-error: true
+      - name: Upload ESLint SARIF results
+        uses: github/codeql-action/upload-sarif@181d5eefc20863364f96762470ba6f862bdef56b # v3
+        if: always()
+        with:
+          sarif_file: eslint-results.sarif
+          category: eslint
 
   # Job 3: Prettier Formatting
   format:
@@ -283,12 +294,13 @@ jobs:
   #         path: playwright-report/
   #         retention-days: 30
 
-  # Job 8: Shell Script Linting
+  # Job 8: Shell Script Linting with SARIF
   shellcheck:
     name: ShellCheck
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      security-events: write
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - name: Run ShellCheck
@@ -297,6 +309,33 @@ jobs:
           scandir: './scripts'
           additional_files: 'start-database.sh'
           severity: error
+      - name: Generate ShellCheck SARIF
+        run: |
+          # Create empty results file to start
+          echo "[]" > shellcheck-raw.json
+          
+          # Run ShellCheck on all shell scripts in scripts directory
+          if find scripts -name "*.sh" -type f | head -1 | grep -q .; then
+            find scripts -name "*.sh" -type f -exec shellcheck -f json {} + >> shellcheck-raw.json 2>/dev/null || true
+          fi
+          
+          # Also check additional files from the ShellCheck action config
+          if [ -f "start-database.sh" ]; then
+            shellcheck -f json start-database.sh >> shellcheck-raw.json 2>/dev/null || true
+          fi
+          
+          # Convert ShellCheck JSON output to SARIF format
+          node scripts/shellcheck-to-sarif.cjs shellcheck-raw.json shellcheck-results.sarif
+          
+          # Clean up temporary files
+          rm -f shellcheck-raw.json
+        continue-on-error: true
+      - name: Upload ShellCheck SARIF results
+        uses: github/codeql-action/upload-sarif@181d5eefc20863364f96762470ba6f862bdef56b # v3
+        if: always()
+        with:
+          sarif_file: shellcheck-results.sarif
+          category: shellcheck
 
   # Job 9: Validate GitHub Actions
   validate-actions:
