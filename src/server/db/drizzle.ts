@@ -34,7 +34,7 @@ function createDrizzleClientInternal() {
     transform: { undefined: null }, // Handle undefined values consistently
     // Connection reuse optimizations
     connection: {
-      application_name: isCI ? 'pinpoint_ci_seeding' : 'pinpoint_seeding', // Better connection tracking
+      application_name: isCI ? "pinpoint_ci_seeding" : "pinpoint_seeding", // Better connection tracking
     },
     // CI-specific optimizations
     ...(isCI && {
@@ -90,7 +90,7 @@ class DrizzleSingleton {
     const sslConfig = isLocalhost || isCI ? false : "require";
 
     const sql = postgres(connectionString, {
-      // Optimized for seeding operations  
+      // Optimized for seeding operations
       max: isCI ? 2 : isDevelopment() ? 5 : 10, // Higher pool for seeding operations
       idle_timeout: isCI ? 30 : isDevelopment() ? 60 : 20,
       connect_timeout: isCI ? 20 : isDevelopment() ? 30 : 10,
@@ -100,7 +100,7 @@ class DrizzleSingleton {
       transform: { undefined: null }, // Handle undefined values consistently
       // Connection reuse optimizations
       connection: {
-        application_name: isCI ? 'pinpoint_ci_seeding' : 'pinpoint_seeding', // Better connection tracking
+        application_name: isCI ? "pinpoint_ci_seeding" : "pinpoint_seeding", // Better connection tracking
       },
       // CI-specific optimizations
       ...(isCI && {

@@ -161,7 +161,7 @@ async function createModels(games: UniqueGame[]): Promise<void> {
     }
 
     // Build all models to create
-    const modelsToCreate = games.map(game => ({
+    const modelsToCreate = games.map((game) => ({
       id: `model_${game.opdbId}`, // Deterministic ID generation
       name: game.name,
       manufacturer: game.manufacturer,
@@ -173,12 +173,14 @@ async function createModels(games: UniqueGame[]): Promise<void> {
 
     // Use PostgreSQL upsert pattern - insert all, ignore conflicts on opdbId
     if (modelsToCreate.length > 0) {
-      const result = await db
+      await db
         .insert(models)
         .values(modelsToCreate)
         .onConflictDoNothing({ target: models.opdbId });
 
-      console.log(`[SAMPLE] ✅ Processed ${modelsToCreate.length.toString()} models via optimized upsert (conflicts ignored)`);
+      console.log(
+        `[SAMPLE] ✅ Processed ${modelsToCreate.length.toString()} models via optimized upsert (conflicts ignored)`,
+      );
     }
 
     console.log(`[SAMPLE] ✅ Model creation completed`);
@@ -242,12 +244,11 @@ async function createMachines(
     const ownerId = devUser?.id;
 
     // Get all models by OPDB ID in one query
-    const gameOpdbIds = games.map(g => g.opdbId);
     const modelsData = await db
       .select({ id: models.id, opdbId: models.opdbId, name: models.name })
       .from(models);
 
-    const modelsMap = new Map(modelsData.map(m => [m.opdbId, m]));
+    const modelsMap = new Map(modelsData.map((m) => [m.opdbId, m]));
 
     // Get existing machines for this organization and location
     const existingMachines = await db
@@ -260,7 +261,9 @@ async function createMachines(
         ),
       );
 
-    const existingMachineModelIds = new Set(existingMachines.map(m => m.modelId));
+    const existingMachineModelIds = new Set(
+      existingMachines.map((m) => m.modelId),
+    );
 
     // Build machines to create
     const machinesToCreate = [];
@@ -305,7 +308,9 @@ async function createMachines(
         );
       } catch (error) {
         console.error(`[SAMPLE] ❌ Failed to batch create machines:`, error);
-        throw new Error(`Machine creation failed: ${error instanceof Error ? error.message : String(error)}`);
+        throw new Error(
+          `Machine creation failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     } else {
       console.log(
@@ -412,7 +417,7 @@ async function createSampleIssues(
       .innerJoin(models, eq(machines.modelId, models.id))
       .where(eq(machines.organizationId, organizationId));
 
-    const machineMap = new Map(machineData.map(m => [m.opdbId, m]));
+    const machineMap = new Map(machineData.map((m) => [m.opdbId, m]));
 
     // Get existing issues to avoid duplicates
     const existingIssues = await db
@@ -421,7 +426,7 @@ async function createSampleIssues(
       .where(eq(issues.organizationId, organizationId));
 
     const existingIssuesSet = new Set(
-      existingIssues.map(i => `${i.machineId}_${i.title}`)
+      existingIssues.map((i) => `${i.machineId}_${i.title}`),
     );
 
     // Build issues to create
@@ -509,7 +514,9 @@ async function createSampleIssues(
         );
       } catch (error) {
         console.error(`[SAMPLE] ❌ Failed to batch create issues:`, error);
-        throw new Error(`Issue creation failed: ${error instanceof Error ? error.message : String(error)}`);
+        throw new Error(
+          `Issue creation failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     } else {
       console.log(`[SAMPLE] ⏭️  No new issues to create`);
@@ -554,7 +561,9 @@ export async function seedSampleData(
     await createSampleIssues(organizationId, dataAmount);
 
     const duration = Date.now() - startTime;
-    console.log(`[SAMPLE] ✅ Sample data seeding completed successfully in ${duration}ms!`);
+    console.log(
+      `[SAMPLE] ✅ Sample data seeding completed successfully in ${duration}ms!`,
+    );
     console.log(`[SAMPLE] 📊 Summary:`);
     console.log(`[SAMPLE]   - Games: ${uniqueGames.length} unique OPDB models`);
     console.log(

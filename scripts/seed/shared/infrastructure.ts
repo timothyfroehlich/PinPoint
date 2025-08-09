@@ -43,13 +43,13 @@ async function createGlobalPermissions(): Promise<void> {
   const existingPermissions = await db
     .select({ name: permissions.name })
     .from(permissions);
-  
-  const existingSet = new Set(existingPermissions.map(p => p.name));
-  
+
+  const existingSet = new Set(existingPermissions.map((p) => p.name));
+
   // Find permissions that need to be created
   const permissionsToCreate = ALL_PERMISSIONS.filter(
-    permName => !existingSet.has(permName)
-  ).map(permName => ({
+    (permName) => !existingSet.has(permName),
+  ).map((permName) => ({
     id: nanoid(),
     name: permName,
     description: PERMISSION_DESCRIPTIONS[permName] ?? `Permission: ${permName}`,
@@ -63,8 +63,13 @@ async function createGlobalPermissions(): Promise<void> {
         `[INFRASTRUCTURE] Created ${permissionsToCreate.length.toString()} new permissions via batch insert`,
       );
     } catch (error) {
-      console.error(`[INFRASTRUCTURE] ❌ Failed to batch create permissions:`, error);
-      throw new Error(`Permission creation failed: ${error instanceof Error ? error.message : String(error)}`);
+      console.error(
+        `[INFRASTRUCTURE] ❌ Failed to batch create permissions:`,
+        error,
+      );
+      throw new Error(
+        `Permission creation failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   } else {
     console.log(
@@ -161,18 +166,18 @@ async function createDefaultPriorities(organizationId: string): Promise<void> {
     .from(priorities)
     .where(eq(priorities.organizationId, organizationId));
 
-  const existingSet = new Set(existingPriorities.map(p => p.name));
+  const existingSet = new Set(existingPriorities.map((p) => p.name));
 
   // Find priorities that need to be created
-  const prioritiesToCreate = priorityData.filter(
-    priority => !existingSet.has(priority.name)
-  ).map(priority => ({
-    id: nanoid(),
-    name: priority.name,
-    order: priority.order,
-    organizationId,
-    isDefault: true,
-  }));
+  const prioritiesToCreate = priorityData
+    .filter((priority) => !existingSet.has(priority.name))
+    .map((priority) => ({
+      id: nanoid(),
+      name: priority.name,
+      order: priority.order,
+      organizationId,
+      isDefault: true,
+    }));
 
   // Batch create all missing priorities
   if (prioritiesToCreate.length > 0) {
@@ -182,8 +187,13 @@ async function createDefaultPriorities(organizationId: string): Promise<void> {
         `[INFRASTRUCTURE] Created ${prioritiesToCreate.length.toString()} new priorities via batch insert`,
       );
     } catch (error) {
-      console.error(`[INFRASTRUCTURE] ❌ Failed to batch create priorities:`, error);
-      throw new Error(`Priority creation failed: ${error instanceof Error ? error.message : String(error)}`);
+      console.error(
+        `[INFRASTRUCTURE] ❌ Failed to batch create priorities:`,
+        error,
+      );
+      throw new Error(
+        `Priority creation failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   } else {
     console.log(
@@ -231,7 +241,7 @@ async function createDefaultCollectionTypes(
     .from(collectionTypes)
     .where(eq(collectionTypes.organizationId, organizationId));
 
-  const existingSet = new Set(existingTypes.map(t => t.name));
+  const existingSet = new Set(existingTypes.map((t) => t.name));
 
   // Separate types to create vs update
   const typesToCreate: typeof defaultCollectionTypes = [];
@@ -248,7 +258,7 @@ async function createDefaultCollectionTypes(
   // Batch create new collection types
   if (typesToCreate.length > 0) {
     try {
-      const createValues = typesToCreate.map(typeData => ({
+      const createValues = typesToCreate.map((typeData) => ({
         id: nanoid(),
         name: typeData.name,
         organizationId,
@@ -264,8 +274,13 @@ async function createDefaultCollectionTypes(
         `[INFRASTRUCTURE] Created ${typesToCreate.length.toString()} new collection types via batch insert`,
       );
     } catch (error) {
-      console.error(`[INFRASTRUCTURE] ❌ Failed to batch create collection types:`, error);
-      throw new Error(`Collection type creation failed: ${error instanceof Error ? error.message : String(error)}`);
+      console.error(
+        `[INFRASTRUCTURE] ❌ Failed to batch create collection types:`,
+        error,
+      );
+      throw new Error(
+        `Collection type creation failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -287,12 +302,15 @@ async function createDefaultCollectionTypes(
             eq(collectionTypes.organizationId, organizationId),
           ),
         );
-      console.log(
-        `[INFRASTRUCTURE] Updated collection type: ${typeData.name}`,
-      );
+      console.log(`[INFRASTRUCTURE] Updated collection type: ${typeData.name}`);
     } catch (error) {
-      console.error(`[INFRASTRUCTURE] ❌ Failed to update collection type ${typeData.name}:`, error);
-      throw new Error(`Collection type update failed: ${error instanceof Error ? error.message : String(error)}`);
+      console.error(
+        `[INFRASTRUCTURE] ❌ Failed to update collection type ${typeData.name}:`,
+        error,
+      );
+      throw new Error(
+        `Collection type update failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -323,7 +341,7 @@ async function createDefaultStatuses(organizationId: string): Promise<void> {
     .from(issueStatuses)
     .where(eq(issueStatuses.organizationId, organizationId));
 
-  const existingSet = new Set(existingStatuses.map(s => s.name));
+  const existingSet = new Set(existingStatuses.map((s) => s.name));
 
   // Separate statuses to create vs update
   const statusesToCreate: typeof statusesToUpsert = [];
@@ -340,7 +358,7 @@ async function createDefaultStatuses(organizationId: string): Promise<void> {
   // Batch create new issue statuses
   if (statusesToCreate.length > 0) {
     try {
-      const createValues = statusesToCreate.map(statusData => ({
+      const createValues = statusesToCreate.map((statusData) => ({
         id: nanoid(),
         name: statusData.name,
         category: statusData.category,
@@ -353,8 +371,13 @@ async function createDefaultStatuses(organizationId: string): Promise<void> {
         `[INFRASTRUCTURE] Created ${statusesToCreate.length.toString()} new issue statuses via batch insert`,
       );
     } catch (error) {
-      console.error(`[INFRASTRUCTURE] ❌ Failed to batch create issue statuses:`, error);
-      throw new Error(`Issue status creation failed: ${error instanceof Error ? error.message : String(error)}`);
+      console.error(
+        `[INFRASTRUCTURE] ❌ Failed to batch create issue statuses:`,
+        error,
+      );
+      throw new Error(
+        `Issue status creation failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -372,8 +395,13 @@ async function createDefaultStatuses(organizationId: string): Promise<void> {
         );
       console.log(`[INFRASTRUCTURE] Updated issue status: ${statusData.name}`);
     } catch (error) {
-      console.error(`[INFRASTRUCTURE] ❌ Failed to update issue status ${statusData.name}:`, error);
-      throw new Error(`Issue status update failed: ${error instanceof Error ? error.message : String(error)}`);
+      console.error(
+        `[INFRASTRUCTURE] ❌ Failed to update issue status ${statusData.name}:`,
+        error,
+      );
+      throw new Error(
+        `Issue status update failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -444,7 +472,9 @@ async function createSystemRoles(organizationId: string): Promise<void> {
   }
 
   // Assign all permissions to admin role with batch operations
-  const allPermissions = await db.select({ id: permissions.id }).from(permissions);
+  const allPermissions = await db
+    .select({ id: permissions.id })
+    .from(permissions);
 
   // Clear existing permissions first
   await db
@@ -458,14 +488,19 @@ async function createSystemRoles(organizationId: string): Promise<void> {
         roleId: adminRole.id,
         permissionId: permission.id,
       }));
-      
+
       await db.insert(rolePermissions).values(rolePermissionValues);
       console.log(
         `[INFRASTRUCTURE] Assigned ${allPermissions.length.toString()} permissions to Admin role via batch insert`,
       );
     } catch (error) {
-      console.error(`[INFRASTRUCTURE] ❌ Failed to assign permissions to Admin role:`, error);
-      throw new Error(`Admin role permission assignment failed: ${error instanceof Error ? error.message : String(error)}`);
+      console.error(
+        `[INFRASTRUCTURE] ❌ Failed to assign permissions to Admin role:`,
+        error,
+      );
+      throw new Error(
+        `Admin role permission assignment failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -540,18 +575,25 @@ async function createSystemRoles(organizationId: string): Promise<void> {
   // Add unauthenticated permissions in batch
   if (unauthPermissions.length > 0) {
     try {
-      const unauthRolePermissionValues = unauthPermissions.map((permission) => ({
-        roleId: unauthRole.id,
-        permissionId: permission.id,
-      }));
-      
+      const unauthRolePermissionValues = unauthPermissions.map(
+        (permission) => ({
+          roleId: unauthRole.id,
+          permissionId: permission.id,
+        }),
+      );
+
       await db.insert(rolePermissions).values(unauthRolePermissionValues);
       console.log(
         `[INFRASTRUCTURE] Assigned ${unauthPermissions.length.toString()} permissions to Unauthenticated role via batch insert`,
       );
     } catch (error) {
-      console.error(`[INFRASTRUCTURE] ❌ Failed to assign permissions to Unauthenticated role:`, error);
-      throw new Error(`Unauthenticated role permission assignment failed: ${error instanceof Error ? error.message : String(error)}`);
+      console.error(
+        `[INFRASTRUCTURE] ❌ Failed to assign permissions to Unauthenticated role:`,
+        error,
+      );
+      throw new Error(
+        `Unauthenticated role permission assignment failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 }
@@ -632,18 +674,25 @@ async function createTemplateRole(
   // Add template permissions in batch (simplified - in real implementation would expand dependencies)
   if (templatePermissions.length > 0) {
     try {
-      const templateRolePermissionValues = templatePermissions.map((permission) => ({
-        roleId: role.id,
-        permissionId: permission.id,
-      }));
-      
+      const templateRolePermissionValues = templatePermissions.map(
+        (permission) => ({
+          roleId: role.id,
+          permissionId: permission.id,
+        }),
+      );
+
       await db.insert(rolePermissions).values(templateRolePermissionValues);
       console.log(
         `[INFRASTRUCTURE] Assigned ${templatePermissions.length.toString()} permissions to ${template.name} role via batch insert`,
       );
     } catch (error) {
-      console.error(`[INFRASTRUCTURE] ❌ Failed to assign permissions to ${template.name} role:`, error);
-      throw new Error(`Template role permission assignment failed: ${error instanceof Error ? error.message : String(error)}`);
+      console.error(
+        `[INFRASTRUCTURE] ❌ Failed to assign permissions to ${template.name} role:`,
+        error,
+      );
+      throw new Error(
+        `Template role permission assignment failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 }
@@ -709,7 +758,7 @@ export async function seedInfrastructure(): Promise<Organization> {
     createDefaultPriorities(organization.id),
     createDefaultCollectionTypes(organization.id),
     createDefaultStatuses(organization.id),
-    createDefaultLocation(organization.id)
+    createDefaultLocation(organization.id),
   ]);
 
   const duration = Date.now() - startTime;
