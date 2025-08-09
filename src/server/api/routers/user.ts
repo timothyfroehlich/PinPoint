@@ -21,26 +21,19 @@ import {
 export const userRouter = createTRPCRouter({
   // Get current user's profile
   getProfile: protectedProcedure.query(async ({ ctx }) => {
-    const user = await ctx.db.user.findUnique({
-      where: { id: ctx.user.id },
-      include: {
+    const user = await ctx.drizzle.query.users.findFirst({
+      where: eq(users.id, ctx.user.id),
+      with: {
         ownedMachines: {
-          include: {
+          with: {
             model: true,
             location: true,
           },
         },
         memberships: {
-          include: {
+          with: {
             organization: true,
             role: true,
-          },
-        },
-        _count: {
-          select: {
-            issuesCreated: true,
-            comments: true,
-            ownedMachines: true,
           },
         },
       },
@@ -50,7 +43,31 @@ export const userRouter = createTRPCRouter({
       throw new Error("User not found");
     }
 
-    return user;
+    // Get counts separately since _count is Prisma-specific
+    const [ownedMachinesCount, issuesCreatedCount, commentsCount] =
+      await Promise.all([
+        ctx.drizzle
+          .select({ count: count() })
+          .from(machines)
+          .where(eq(machines.ownerId, ctx.user.id)),
+        ctx.drizzle
+          .select({ count: count() })
+          .from(issues)
+          .where(eq(issues.createdById, ctx.user.id)),
+        ctx.drizzle
+          .select({ count: count() })
+          .from(comments)
+          .where(eq(comments.authorId, ctx.user.id)),
+      ]);
+
+    return {
+      ...user,
+      _count: {
+        ownedMachines: ownedMachinesCount[0]?.count ?? 0,
+        issuesCreated: issuesCreatedCount[0]?.count ?? 0,
+        comments: commentsCount[0]?.count ?? 0,
+      },
+    };
   }),
 
   // Get current user's membership info in the current organization
@@ -72,10 +89,7 @@ export const userRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // PARALLEL VALIDATION: Execute both Prisma and Drizzle queries during migration
-      // This ensures exact functional parity before switching fully to Drizzle
-
-      // Prepare update data (same logic for both ORMs)
+      // Prepare update data
       const updateData: { name?: string; bio?: string } = {};
       if (input.name !== undefined) {
         updateData.name = input.name;
@@ -84,40 +98,17 @@ export const userRouter = createTRPCRouter({
         updateData.bio = input.bio;
       }
 
-      // Execute Prisma query (current implementation)
-      const prismaUser = await ctx.db.user.update({
-        where: { id: ctx.user.id },
-        data: updateData,
-      });
-
-      // Execute Drizzle query (new implementation)
-      const [drizzleUser] = await ctx.drizzle
+      const [user] = await ctx.drizzle
         .update(users)
         .set(updateData)
         .where(eq(users.id, ctx.user.id))
         .returning();
 
-      // Validation: Ensure both queries return equivalent results
-      if (!drizzleUser) {
-        throw new Error("User update failed - no result returned from Drizzle");
+      if (!user) {
+        throw new Error("User update failed");
       }
 
-      // Compare critical fields to ensure parity
-      if (
-        prismaUser.id !== drizzleUser.id ||
-        prismaUser.name !== drizzleUser.name ||
-        prismaUser.bio !== drizzleUser.bio
-      ) {
-        console.error("MIGRATION WARNING: Prisma and Drizzle results differ", {
-          prisma: prismaUser,
-          drizzle: drizzleUser,
-        });
-        // For now, log the discrepancy but don't fail - return Prisma result for consistency
-      }
-
-      // Return Prisma result to maintain current behavior during parallel validation
-      // TODO: Switch to drizzleUser after validation period
-      return prismaUser;
+      return user;
     }),
 
   // Upload profile picture
@@ -141,42 +132,19 @@ export const userRouter = createTRPCRouter({
           `user-${ctx.user.id}`,
         );
 
-        // PARALLEL VALIDATION: Execute both Prisma and Drizzle queries during migration
-        // This ensures exact functional parity before switching fully to Drizzle
-
         // Delete old profile picture if it exists
-        const prismaCurrentUser = await ctx.db.user.findUnique({
-          where: { id: ctx.user.id },
-          select: { profilePicture: true },
-        });
-
-        // Execute equivalent Drizzle query for current user lookup
-        const [drizzleCurrentUser] = await ctx.drizzle
+        const [currentUser] = await ctx.drizzle
           .select({ profilePicture: users.profilePicture })
           .from(users)
           .where(eq(users.id, ctx.user.id))
           .limit(1);
 
-        // Validation: Ensure both queries return equivalent results
         if (
-          prismaCurrentUser?.profilePicture !==
-          drizzleCurrentUser?.profilePicture
-        ) {
-          console.error(
-            "MIGRATION WARNING: Prisma and Drizzle profile picture lookup differ",
-            {
-              prisma: prismaCurrentUser,
-              drizzle: drizzleCurrentUser,
-            },
-          );
-        }
-
-        if (
-          prismaCurrentUser?.profilePicture &&
-          !prismaCurrentUser.profilePicture.includes("default-avatar")
+          currentUser?.profilePicture &&
+          !currentUser.profilePicture.includes("default-avatar")
         ) {
           try {
-            await imageStorage.deleteImage(prismaCurrentUser.profilePicture);
+            await imageStorage.deleteImage(currentUser.profilePicture);
           } catch (error) {
             // Ignore deletion errors for old files
             ctx.logger.warn({
@@ -184,7 +152,7 @@ export const userRouter = createTRPCRouter({
               component: "userRouter.uploadProfilePicture",
               context: {
                 userId: ctx.user.id,
-                oldProfilePicture: prismaCurrentUser.profilePicture,
+                oldProfilePicture: currentUser.profilePicture,
                 operation: "delete_old_image",
               },
               error: {
@@ -195,43 +163,19 @@ export const userRouter = createTRPCRouter({
         }
 
         // Update user's profile picture
-        const prismaUpdatedUser = await ctx.db.user.update({
-          where: { id: ctx.user.id },
-          data: { profilePicture: imagePath },
-        });
-
-        // Execute equivalent Drizzle query for profile picture update
-        const [drizzleUpdatedUser] = await ctx.drizzle
+        const [updatedUser] = await ctx.drizzle
           .update(users)
           .set({ profilePicture: imagePath })
           .where(eq(users.id, ctx.user.id))
           .returning();
 
-        // Validation: Ensure both update queries return equivalent results
-        if (!drizzleUpdatedUser) {
-          throw new Error(
-            "Profile picture update failed - no result returned from Drizzle",
-          );
+        if (!updatedUser) {
+          throw new Error("Profile picture update failed");
         }
 
-        if (
-          prismaUpdatedUser.id !== drizzleUpdatedUser.id ||
-          prismaUpdatedUser.profilePicture !== drizzleUpdatedUser.profilePicture
-        ) {
-          console.error(
-            "MIGRATION WARNING: Prisma and Drizzle profile picture update differ",
-            {
-              prisma: prismaUpdatedUser,
-              drizzle: drizzleUpdatedUser,
-            },
-          );
-        }
-
-        // Return Prisma result to maintain current behavior during parallel validation
-        // TODO: Switch to drizzleUpdatedUser after validation period
         return {
           success: true,
-          profilePicture: prismaUpdatedUser.profilePicture,
+          profilePicture: updatedUser.profilePicture,
         };
       } catch (error) {
         ctx.logger.error({
@@ -254,39 +198,8 @@ export const userRouter = createTRPCRouter({
   getUser: organizationProcedure
     .input(z.object({ userId: z.string() }))
     .query(async ({ ctx, input }) => {
-      // PARALLEL VALIDATION: Execute both Prisma and Drizzle queries during migration
-      // This ensures exact functional parity before switching fully to Drizzle
-
       // Verify user is a member of the current organization
-      const prismaMembership = await ctx.db.membership.findUnique({
-        where: {
-          userId_organizationId: {
-            userId: input.userId,
-            organizationId: ctx.membership.organizationId,
-          },
-        },
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              bio: true,
-              profilePicture: true,
-              createdAt: true,
-              _count: {
-                select: {
-                  ownedMachines: true,
-                  issuesCreated: true,
-                  comments: true,
-                },
-              },
-            },
-          },
-        },
-      });
-
-      // Execute equivalent Drizzle query with joins and counts
-      const [drizzleMembership] = await ctx.drizzle
+      const [membership] = await ctx.drizzle
         .select({
           user: {
             id: users.id,
@@ -306,7 +219,11 @@ export const userRouter = createTRPCRouter({
         )
         .limit(1);
 
-      // Get counts separately for Drizzle (since _count is a Prisma-specific feature)
+      if (!membership) {
+        throw new Error("User not found in this organization");
+      }
+
+      // Get counts separately (since _count is a Prisma-specific feature)
       const [ownedMachinesCount, issuesCreatedCount, commentsCount] =
         await Promise.all([
           ctx.drizzle
@@ -323,110 +240,20 @@ export const userRouter = createTRPCRouter({
             .where(eq(comments.authorId, input.userId)),
         ]);
 
-      // Validation: Check if user was found in both queries
-      if (!prismaMembership && !drizzleMembership) {
-        throw new Error("User not found in this organization");
-      }
-
-      if (!!prismaMembership !== !!drizzleMembership) {
-        console.error(
-          "MIGRATION WARNING: Prisma and Drizzle membership lookup differ",
-          {
-            prismaFound: !!prismaMembership,
-            drizzleFound: !!drizzleMembership,
-            userId: input.userId,
-            organizationId: ctx.membership.organizationId,
-          },
-        );
-      }
-
-      if (!prismaMembership) {
-        throw new Error("User not found in this organization");
-      }
-
-      // Validation: Compare the user data structure
-      if (drizzleMembership) {
-        const prismaUser = prismaMembership.user;
-        const drizzleUser = drizzleMembership.user;
-
-        if (
-          prismaUser.id !== drizzleUser.id ||
-          prismaUser.name !== drizzleUser.name ||
-          prismaUser.bio !== drizzleUser.bio ||
-          prismaUser.profilePicture !== drizzleUser.profilePicture
-        ) {
-          console.error(
-            "MIGRATION WARNING: Prisma and Drizzle user data differ",
-            {
-              prisma: prismaUser,
-              drizzle: drizzleUser,
-            },
-          );
-        }
-
-        // Validation: Compare counts
-        const prismaCounts = prismaMembership.user._count;
-        const drizzleCounts = {
+      return {
+        ...membership.user,
+        _count: {
           ownedMachines: ownedMachinesCount[0]?.count ?? 0,
           issuesCreated: issuesCreatedCount[0]?.count ?? 0,
           comments: commentsCount[0]?.count ?? 0,
-        };
-
-        if (
-          prismaCounts.ownedMachines !== drizzleCounts.ownedMachines ||
-          prismaCounts.issuesCreated !== drizzleCounts.issuesCreated ||
-          prismaCounts.comments !== drizzleCounts.comments
-        ) {
-          console.error(
-            "MIGRATION WARNING: Prisma and Drizzle user counts differ",
-            {
-              prisma: prismaCounts,
-              drizzle: drizzleCounts,
-            },
-          );
-        }
-      }
-
-      // Return Prisma result to maintain current behavior during parallel validation
-      // TODO: Switch to drizzle result after validation period
-      return prismaMembership.user;
+        },
+      };
     }),
 
   // Get all users in the current organization
   getAllInOrganization: organizationProcedure.query(async ({ ctx }) => {
-    // PARALLEL VALIDATION: Execute both Prisma and Drizzle queries during migration
-    // This ensures exact functional parity before switching fully to Drizzle
-
-    const prismaMemberships = await ctx.db.membership.findMany({
-      where: { organizationId: ctx.membership.organizationId },
-      include: {
-        role: true,
-        user: {
-          select: {
-            id: true,
-            name: true,
-            bio: true,
-            profilePicture: true,
-            createdAt: true,
-            _count: {
-              select: {
-                ownedMachines: true,
-                issuesCreated: true,
-                comments: true,
-              },
-            },
-          },
-        },
-      },
-      orderBy: {
-        user: {
-          name: "asc",
-        },
-      },
-    });
-
-    // Execute equivalent Drizzle query with joins and ordering
-    const drizzleMemberships = await ctx.drizzle
+    // Get memberships with user and role data
+    const membershipData = await ctx.drizzle
       .select({
         user: {
           id: users.id,
@@ -445,8 +272,8 @@ export const userRouter = createTRPCRouter({
       .where(eq(memberships.organizationId, ctx.membership.organizationId))
       .orderBy(asc(users.name));
 
-    // For Drizzle, get counts for each user (batched approach)
-    const userIds = drizzleMemberships.map((m) => m.user.id);
+    // Get counts for each user (batched approach for performance)
+    const userIds = membershipData.map((m) => m.user.id);
     const userCounts = new Map<
       string,
       { ownedMachines: number; issuesCreated: number; comments: number }
@@ -483,7 +310,7 @@ export const userRouter = createTRPCRouter({
         ]);
 
       // Initialize counts for all users
-      userIds.forEach((userId) => {
+      userIds.forEach((userId: string) => {
         userCounts.set(userId, {
           ownedMachines: 0,
           issuesCreated: 0,
@@ -510,112 +337,48 @@ export const userRouter = createTRPCRouter({
       });
     }
 
-    // Validation: Compare results
-    if (prismaMemberships.length !== drizzleMemberships.length) {
-      console.error(
-        "MIGRATION WARNING: Prisma and Drizzle membership count differ",
-        {
-          prismaCount: prismaMemberships.length,
-          drizzleCount: drizzleMemberships.length,
-        },
-      );
-    }
+    // Combine user data with counts
+    return membershipData.map((m) => {
+      const counts = userCounts.get(m.user.id) ?? {
+        ownedMachines: 0,
+        issuesCreated: 0,
+        comments: 0,
+      };
 
-    // Validation: Compare user data for the first few entries
-    const sampleSize = Math.min(3, prismaMemberships.length);
-    for (let i = 0; i < sampleSize; i++) {
-      const prismaItem = prismaMemberships[i];
-      const drizzleItem = drizzleMemberships[i];
-
-      if (
-        prismaItem?.user.id !== drizzleItem?.user.id ||
-        prismaItem?.user.name !== drizzleItem?.user.name ||
-        prismaItem?.role.name !== drizzleItem?.role.name
-      ) {
-        console.error(
-          `MIGRATION WARNING: Prisma and Drizzle membership ${i.toString()} differ`,
-          {
-            prisma: prismaItem,
-            drizzle: drizzleItem,
-          },
-        );
-      }
-    }
-
-    // Return Prisma result to maintain current behavior during parallel validation
-    // TODO: Switch to drizzle result after validation period
-    return prismaMemberships.map((m) => ({
-      ...m.user,
-      role: m.role.name,
-    }));
+      return {
+        ...m.user,
+        _count: counts,
+        role: m.role.name,
+      };
+    });
   }),
 
   // Assign default avatar to user (used during account creation)
   assignDefaultAvatar: protectedProcedure.mutation(async ({ ctx }) => {
-    // PARALLEL VALIDATION: Execute both Prisma and Drizzle queries during migration
-    // This ensures exact functional parity before switching fully to Drizzle
-
-    const prismaUser = await ctx.db.user.findUnique({
-      where: { id: ctx.user.id },
-      select: { profilePicture: true },
-    });
-
-    // Execute equivalent Drizzle query for current user lookup
-    const [drizzleUser] = await ctx.drizzle
+    const [user] = await ctx.drizzle
       .select({ profilePicture: users.profilePicture })
       .from(users)
       .where(eq(users.id, ctx.user.id))
       .limit(1);
 
-    // Validation: Ensure both queries return equivalent results
-    if (prismaUser?.profilePicture !== drizzleUser?.profilePicture) {
-      console.error(
-        "MIGRATION WARNING: Prisma and Drizzle assignDefaultAvatar lookup differ",
-        {
-          prisma: prismaUser,
-          drizzle: drizzleUser,
-        },
-      );
-    }
-
     // Only assign if user doesn't already have a profile picture
-    if (!prismaUser?.profilePicture) {
+    if (!user?.profilePicture) {
       const defaultAvatarUrl = getDefaultAvatarUrl();
 
-      // Execute Prisma update
-      await ctx.db.user.update({
-        where: { id: ctx.user.id },
-        data: { profilePicture: defaultAvatarUrl },
-      });
-
-      // Execute equivalent Drizzle update
-      const [drizzleUpdatedUser] = await ctx.drizzle
+      const [updatedUser] = await ctx.drizzle
         .update(users)
         .set({ profilePicture: defaultAvatarUrl })
         .where(eq(users.id, ctx.user.id))
         .returning({ profilePicture: users.profilePicture });
 
-      // Validation: Ensure both update queries succeed
-      if (!drizzleUpdatedUser) {
-        throw new Error(
-          "Default avatar assignment failed - no result returned from Drizzle",
-        );
+      if (!updatedUser) {
+        throw new Error("Default avatar assignment failed");
       }
 
-      if (drizzleUpdatedUser.profilePicture !== defaultAvatarUrl) {
-        console.error(
-          "MIGRATION WARNING: Prisma and Drizzle default avatar assignment differ",
-          {
-            expected: defaultAvatarUrl,
-            drizzleResult: drizzleUpdatedUser.profilePicture,
-          },
-        );
-      }
-
-      return { profilePicture: defaultAvatarUrl };
+      return { profilePicture: updatedUser.profilePicture };
     }
 
-    return { profilePicture: prismaUser.profilePicture };
+    return { profilePicture: user.profilePicture };
   }),
 
   // Update user membership (role assignment)
@@ -628,9 +391,11 @@ export const userRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       // Verify the role exists and belongs to the current organization
-      const role = await ctx.db.role.findUnique({
-        where: { id: input.roleId },
-      });
+      const [role] = await ctx.drizzle
+        .select({ organizationId: roles.organizationId })
+        .from(roles)
+        .where(eq(roles.id, input.roleId))
+        .limit(1);
 
       if (!role || role.organizationId !== ctx.organization.id) {
         throw new Error(
@@ -639,47 +404,71 @@ export const userRouter = createTRPCRouter({
       }
 
       // Verify the user is a member of the current organization
-      const membership = await ctx.db.membership.findUnique({
-        where: {
-          userId_organizationId: {
-            userId: input.userId,
-            organizationId: ctx.organization.id,
-          },
-        },
-      });
+      const [membership] = await ctx.drizzle
+        .select({ userId: memberships.userId })
+        .from(memberships)
+        .where(
+          and(
+            eq(memberships.userId, input.userId),
+            eq(memberships.organizationId, ctx.organization.id),
+          ),
+        )
+        .limit(1);
 
       if (!membership) {
         throw new Error("User is not a member of this organization");
       }
 
       // Update the membership
-      const updatedMembership = await ctx.db.membership.update({
-        where: {
-          userId_organizationId: {
-            userId: input.userId,
-            organizationId: ctx.organization.id,
-          },
-        },
-        data: { roleId: input.roleId },
-        include: {
-          role: true,
+      const [updatedMembership] = await ctx.drizzle
+        .update(memberships)
+        .set({ roleId: input.roleId })
+        .where(
+          and(
+            eq(memberships.userId, input.userId),
+            eq(memberships.organizationId, ctx.organization.id),
+          ),
+        )
+        .returning();
+
+      if (!updatedMembership) {
+        throw new Error("Failed to update membership");
+      }
+
+      // Get the updated role and user details for response
+      const [membershipDetails] = await ctx.drizzle
+        .select({
+          userId: memberships.userId,
+          roleId: memberships.roleId,
+          roleName: roles.name,
           user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
+            id: users.id,
+            name: users.name,
+            email: users.email,
           },
-        },
-      });
+        })
+        .from(memberships)
+        .innerJoin(roles, eq(memberships.roleId, roles.id))
+        .innerJoin(users, eq(memberships.userId, users.id))
+        .where(
+          and(
+            eq(memberships.userId, input.userId),
+            eq(memberships.organizationId, ctx.organization.id),
+          ),
+        )
+        .limit(1);
+
+      if (!membershipDetails) {
+        throw new Error("Failed to retrieve updated membership details");
+      }
 
       return {
         success: true,
         membership: {
-          userId: updatedMembership.userId,
-          roleId: updatedMembership.roleId,
-          role: updatedMembership.role.name,
-          user: updatedMembership.user,
+          userId: membershipDetails.userId,
+          roleId: membershipDetails.roleId,
+          role: membershipDetails.roleName,
+          user: membershipDetails.user,
         },
       };
     }),
