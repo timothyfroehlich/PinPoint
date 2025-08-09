@@ -55,6 +55,7 @@
     "lint:brief": "NODE_ENV=development dotenv -e .env -e .env.development -e .env.local -- next lint --quiet",
     "lint:verbose": "NODE_ENV=development dotenv -e .env -e .env.development -e .env.local -- next lint --format=stylish",
     "lint:fix": "NODE_ENV=development dotenv -e .env -e .env.development -e .env.local -- next lint --fix",
+    "lint:sarif": "NODE_ENV=development dotenv -e .env -e .env.development -e .env.local -- next lint --format @microsoft/eslint-formatter-sarif --output-file eslint-results.sarif",
     "test": "vitest run",
     "test:brief": "vitest run --reporter=dot",
     "test:quiet": "vitest run --reporter=dot --silent",
@@ -136,6 +137,7 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
     "@faker-js/faker": "^9.9.0",
+    "@microsoft/eslint-formatter-sarif": "^3.1.0",
     "@playwright/test": "^1.54.1",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.6.4",
