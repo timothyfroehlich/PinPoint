@@ -1174,7 +1174,7 @@ async function main() {
   // Print summary if problems found
   if (totalProblems > 0) {
     printSummary(problemCounts, autofixes);
-    console.error(`${colors.yellow}💡 Remember to resolve the issues before moving on to another file${colors.reset}`);
+    console.error(`${colors.yellow}⚠️ Agent must resolve all issues in this file before moving to the next task${colors.reset}`);
     
     // Generate specific commands for this file
     const relativePath = path.relative(projectRoot, filePath);
@@ -1194,8 +1194,8 @@ async function main() {
       console.error(`${colors.blue}💡 Run: ${commands.join(' && ')}${colors.reset}`);
     }
     
-    console.error(`${colors.yellow}⚠ ${path.basename(filePath)} - has issues to resolve${colors.reset}`);
-    process.exit(0); // Advisory only - don't block workflow
+    console.error(`${colors.red}✗ ${path.basename(filePath)} - fix issues${colors.reset}`);
+    process.exit(2);
   } else {
     process.exit(0);
   }
