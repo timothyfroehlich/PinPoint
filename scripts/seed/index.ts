@@ -147,22 +147,21 @@ async function main(): Promise<void> {
     console.log("\n[SEED] 🏗️  Step 1: Infrastructure");
     const organization = await seedInfrastructure();
 
-    // 4 & 5. Auth users and Sample data seeding in parallel (where safe)
+    // 4 & 5. Auth users and Sample data seeding sequentially (dependencies)
     if (target !== "local:pg") {
       console.log(
-        "\n[SEED] 👥🎮 Step 2 & 3: Auth Users + Sample Data (parallel optimization)",
+        "\n[SEED] 👥🎮 Step 2 & 3: Auth Users + Sample Data (sequential for dependencies)",
       );
       const dataAmount = target === "preview" ? "full" : "minimal";
 
       try {
-        // Run auth users and sample data in parallel since they're independent
-        await Promise.all([
-          seedAuthUsers(organization.id, target),
-          seedSampleData(organization.id, dataAmount),
-        ]);
-        console.log("[SEED] ✅ Parallel processing completed successfully");
+        // First, create auth users (required for sample data user references)
+        await seedAuthUsers(organization.id, target);
+        // Then create sample data (depends on users existing)
+        await seedSampleData(organization.id, dataAmount);
+        console.log("[SEED] ✅ Sequential processing completed successfully");
       } catch (error) {
-        console.error("[SEED] ❌ Parallel processing failed:", error);
+        console.error("[SEED] ❌ Sequential processing failed:", error);
         throw error;
       }
     } else {
