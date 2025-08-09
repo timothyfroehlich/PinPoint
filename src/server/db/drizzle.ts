@@ -6,6 +6,48 @@ import * as schema from "./schema";
 import { env } from "~/env";
 import { isDevelopment } from "~/lib/environment";
 
+// Environment-specific database configuration
+interface DatabaseConfig {
+  max: number;
+  idle_timeout: number;
+  connect_timeout: number;
+  prepare: boolean;
+  application_name: string;
+}
+
+function getDatabaseConfig(): DatabaseConfig {
+  const isTest = env.NODE_ENV === "test";
+
+  if (isTest) {
+    return {
+      max: 2, // Conservative pool size for resource-constrained CI
+      idle_timeout: 30, // Shorter idle timeout to free resources quickly
+      connect_timeout: 20, // Faster timeout to fail fast in CI
+      prepare: false, // Disable prepared statements for CI compatibility
+      application_name: "pinpoint_ci_seeding",
+    };
+  }
+
+  if (isDevelopment()) {
+    return {
+      max: 5, // Moderate pool size for local development
+      idle_timeout: 60, // Longer timeout for debugging sessions
+      connect_timeout: 30, // Generous timeout for local database startup
+      prepare: true, // Enable prepared statements for better dev performance
+      application_name: "pinpoint_seeding",
+    };
+  }
+
+  // Production configuration
+  return {
+    max: 10, // Higher pool size for production load
+    idle_timeout: 20, // Balanced timeout for resource management
+    connect_timeout: 10, // Fast timeout for production responsiveness
+    prepare: true, // Enable prepared statements for performance
+    application_name: "pinpoint_seeding",
+  };
+}
+
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 function createDrizzleClientInternal() {
   const connectionString = env.POSTGRES_PRISMA_URL;
@@ -18,26 +60,28 @@ function createDrizzleClientInternal() {
   const isLocalhost =
     connectionString.includes("localhost") ||
     connectionString.includes("127.0.0.1");
-  const isCI = env.NODE_ENV === "test";
-  // Disable SSL for localhost AND CI environments to prevent TLS connection failures
-  const sslConfig = isLocalhost || isCI ? false : "require";
+  const isTest = env.NODE_ENV === "test";
+  const sslConfig = isLocalhost || isTest ? false : "require";
+
+  // Get environment-specific configuration
+  const config = getDatabaseConfig();
 
   // Create postgres-js connection with environment-optimized settings
   const sql = postgres(connectionString, {
-    max: isCI ? 2 : 1, // Slightly higher pool for CI stability
-    idle_timeout: isCI ? 30 : isDevelopment() ? 60 : 20,
-    connect_timeout: isCI ? 20 : isDevelopment() ? 30 : 10,
-    ssl: sslConfig, // Conditional SSL based on environment
-    // CI-specific optimizations
-    ...(isCI && {
-      prepare: false, // Disable prepared statements in CI
-      transform: { undefined: null }, // Handle undefined values
-    }),
+    max: config.max,
+    idle_timeout: config.idle_timeout,
+    connect_timeout: config.connect_timeout,
+    ssl: sslConfig,
+    prepare: config.prepare,
+    transform: { undefined: null }, // Handle undefined values consistently
+    connection: {
+      application_name: config.application_name,
+    },
   });
 
   return drizzle(sql, {
     schema,
-    logger: isDevelopment() && !isCI, // Disable logging in CI for performance
+    logger: isDevelopment() && !isTest, // Disable logging in CI for performance
   });
 }
 
@@ -77,26 +121,28 @@ class DrizzleSingleton {
     const isLocalhost =
       connectionString.includes("localhost") ||
       connectionString.includes("127.0.0.1");
-    const isCI = env.NODE_ENV === "test";
-    // Disable SSL for localhost AND CI environments to prevent TLS connection failures
-    const sslConfig = isLocalhost || isCI ? false : "require";
+    const isTest = env.NODE_ENV === "test";
+    const sslConfig = isLocalhost || isTest ? false : "require";
+
+    // Get environment-specific configuration
+    const config = getDatabaseConfig();
 
     const sql = postgres(connectionString, {
-      max: isCI ? 2 : 1, // Slightly higher pool for CI stability
-      idle_timeout: isCI ? 30 : isDevelopment() ? 60 : 20,
-      connect_timeout: isCI ? 20 : isDevelopment() ? 30 : 10,
-      ssl: sslConfig, // Conditional SSL based on environment
-      // CI-specific optimizations
-      ...(isCI && {
-        prepare: false, // Disable prepared statements in CI
-        transform: { undefined: null }, // Handle undefined values
-      }),
+      max: config.max,
+      idle_timeout: config.idle_timeout,
+      connect_timeout: config.connect_timeout,
+      ssl: sslConfig,
+      prepare: config.prepare,
+      transform: { undefined: null }, // Handle undefined values consistently
+      connection: {
+        application_name: config.application_name,
+      },
     });
 
     this._sql = sql;
     return drizzle(sql, {
       schema,
-      logger: isDevelopment() && !isCI,
+      logger: isDevelopment() && !isTest,
     });
   }
 
