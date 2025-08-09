@@ -280,10 +280,12 @@ async function processBatchUsers(
 
   // Process each user with optimized database operations
   const membershipsToCreate: {
+    id: string;
     userId: string;
     roleId: string;
     organizationId: string;
   }[] = [];
+  const usersToCreateInDb: string[] = [];
 
   for (const userData of userList) {
     try {

@@ -266,7 +266,7 @@ async function createMachines(
     );
 
     // Build machines to create
-    const machinesToCreate = [];
+    const machinesToCreate: (typeof machines.$inferInsert)[] = [];
     let machineCount = 0;
 
     for (const game of games) {
@@ -430,7 +430,7 @@ async function createSampleIssues(
     );
 
     // Build issues to create
-    const issuesToCreate = [];
+    const issuesToCreate: (typeof issues.$inferInsert)[] = [];
     let skippedCount = 0;
 
     for (const issueData of sampleIssues) {
