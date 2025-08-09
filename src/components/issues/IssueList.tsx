@@ -275,7 +275,6 @@ export function IssueList({
                 data-testid="bulk-assign-button"
                 onClick={() => {
                   // TODO: Implement bulk assign dialog
-                  console.log("Bulk assign", selectedIssues);
                 }}
               >
                 Assign
@@ -302,7 +301,6 @@ export function IssueList({
                 data-testid="bulk-close-button"
                 onClick={() => {
                   // TODO: Implement bulk close
-                  console.log("Bulk close", selectedIssues);
                 }}
               >
                 Close
@@ -426,7 +424,13 @@ export function IssueList({
                         <Checkbox
                           checked={selectedIssues.includes(issue.id)}
                           onChange={(e) => {
+                            // Prevent event propagation to parent elements
+                            e.stopPropagation();
                             handleSelectIssue(issue.id, e.target.checked);
+                          }}
+                          onClick={(e) => {
+                            // Prevent click from bubbling up and triggering card/navigation clicks
+                            e.stopPropagation();
                           }}
                           sx={{ p: 0.5 }} // Reduce checkbox padding
                         />
@@ -458,7 +462,9 @@ export function IssueList({
                             whiteSpace: "nowrap",
                             minWidth: 0,
                           }}
-                          onClick={() => {
+                          onClick={(e) => {
+                            // Prevent event propagation to parent elements
+                            e.stopPropagation();
                             router.push(`/issues/${issue.id}`);
                           }}
                         >
