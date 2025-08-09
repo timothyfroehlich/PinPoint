@@ -53,14 +53,14 @@ Take boring meta changes and LAUNCH THEM INTO PRODUCTION with the power of autom
 
 6. **Run the quick tests** (because we're not _completely_ reckless):
    ```bash
-   npm run quick
+   npm run check:brief
    ```
 7. **If tests fail**:
 
    ```
    💥 HOUSTON, WE HAVE A PROBLEM! 💥
 
-   The quick tests are angry! Fix them first, then come back.
+   The quick checks are angry! Fix them first, then come back.
    Ship It! only ships working stuff (usually).
    ```
 

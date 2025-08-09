@@ -275,7 +275,13 @@ describe("Drizzle Client Singleton Pattern", () => {
         expect(mockPostgres).toHaveBeenCalledWith(
           expect.any(String),
           expect.objectContaining({
-            max: 1, // Development should use max: 1
+            max: 5, // Development should use max: 5
+            idle_timeout: 60,
+            connect_timeout: 30,
+            prepare: true,
+            connection: {
+              application_name: "pinpoint_seeding",
+            },
           }),
         );
       });
@@ -291,8 +297,13 @@ describe("Drizzle Client Singleton Pattern", () => {
         expect(mockPostgres).toHaveBeenCalledWith(
           expect.any(String),
           expect.objectContaining({
+            max: 2,
             idle_timeout: 30,
             connect_timeout: 20,
+            prepare: false,
+            connection: {
+              application_name: "pinpoint_ci_seeding",
+            },
           }),
         );
 
@@ -309,8 +320,13 @@ describe("Drizzle Client Singleton Pattern", () => {
         expect(mockPostgres).toHaveBeenCalledWith(
           expect.any(String),
           expect.objectContaining({
+            max: 5,
             idle_timeout: 60,
             connect_timeout: 30,
+            prepare: true,
+            connection: {
+              application_name: "pinpoint_seeding",
+            },
           }),
         );
 
@@ -327,8 +343,13 @@ describe("Drizzle Client Singleton Pattern", () => {
         expect(mockPostgres).toHaveBeenCalledWith(
           expect.any(String),
           expect.objectContaining({
+            max: 10,
             idle_timeout: 20,
             connect_timeout: 10,
+            prepare: true,
+            connection: {
+              application_name: "pinpoint_seeding",
+            },
           }),
         );
       });
@@ -719,10 +740,16 @@ describe("Drizzle Client Singleton Pattern", () => {
         expect.any(String),
         expect.objectContaining({
           max: 2, // Pool limit for CI
+          idle_timeout: 30,
+          connect_timeout: 20,
+          prepare: false,
+          connection: {
+            application_name: "pinpoint_ci_seeding",
+          },
         }),
       );
 
-      // Test production environment with max: 1
+      // Test production environment with max: 10
       resetSingleton();
       vi.clearAllMocks();
 
@@ -735,7 +762,13 @@ describe("Drizzle Client Singleton Pattern", () => {
       expect(mockPostgres).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
-          max: 1, // Different pool limit for production (via non-CI path)
+          max: 10, // Higher pool limit for production
+          idle_timeout: 20,
+          connect_timeout: 10,
+          prepare: true,
+          connection: {
+            application_name: "pinpoint_seeding",
+          },
         }),
       );
     });
