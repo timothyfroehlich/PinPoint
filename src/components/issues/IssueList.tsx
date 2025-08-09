@@ -426,7 +426,13 @@ export function IssueList({
                         <Checkbox
                           checked={selectedIssues.includes(issue.id)}
                           onChange={(e) => {
+                            // Prevent event propagation to parent elements
+                            e.stopPropagation();
                             handleSelectIssue(issue.id, e.target.checked);
+                          }}
+                          onClick={(e) => {
+                            // Prevent click from bubbling up and triggering card/navigation clicks
+                            e.stopPropagation();
                           }}
                           sx={{ p: 0.5 }} // Reduce checkbox padding
                         />
@@ -458,7 +464,12 @@ export function IssueList({
                             whiteSpace: "nowrap",
                             minWidth: 0,
                           }}
-                          onClick={() => {
+                          onClick={(e) => {
+                            // Prevent event propagation to parent elements
+                            e.stopPropagation();
+                            console.log(
+                              `[DEBUG] Navigating to issue ${issue.id}: ${issue.title}`,
+                            );
                             router.push(`/issues/${issue.id}`);
                           }}
                         >

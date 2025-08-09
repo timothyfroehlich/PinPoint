@@ -28,6 +28,67 @@ const db = createDrizzleClient();
 
 type DataAmount = "minimal" | "full";
 
+/**
+ * Wait for auth users to synchronize from Supabase Auth to database
+ * This prevents the race condition where sample issues are created before
+ * auth users appear in the users table via database triggers
+ */
+async function waitForAuthUserSync(requiredEmails: string[]): Promise<void> {
+  const MAX_ATTEMPTS = 10;
+  const INITIAL_DELAY_MS = 1000; // Start with 1 second
+  const MAX_DELAY_MS = 8000; // Cap at 8 seconds
+
+  console.log(
+    `[SAMPLE] 🔄 Waiting for ${requiredEmails.length} auth users to sync to database...`,
+  );
+  console.log(`[SAMPLE] Required users: ${requiredEmails.join(", ")}`);
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    // Query for users in database
+    const foundUsers = await db
+      .select({ id: users.id, email: users.email })
+      .from(users)
+      .where(inArray(users.email, requiredEmails));
+
+    const foundEmails = foundUsers
+      .map((u) => u.email)
+      .filter(Boolean) as string[];
+    const missingEmails = requiredEmails.filter(
+      (email) => !foundEmails.includes(email),
+    );
+
+    console.log(
+      `[SAMPLE] 🔍 Attempt ${attempt}/${MAX_ATTEMPTS}: Found ${foundEmails.length}/${requiredEmails.length} users`,
+    );
+
+    if (missingEmails.length === 0) {
+      console.log(
+        `[SAMPLE] ✅ All required users found in database after ${attempt} attempts`,
+      );
+      return;
+    }
+
+    if (attempt === MAX_ATTEMPTS) {
+      const errorMsg = `Auth user synchronization failed after ${MAX_ATTEMPTS} attempts. Missing users: ${missingEmails.join(", ")}. This indicates that Supabase auth triggers are not working or auth users were not created properly.`;
+      console.error(`[SAMPLE] ❌ ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+
+    // Exponential backoff with jitter
+    const baseDelay = Math.min(
+      INITIAL_DELAY_MS * Math.pow(1.5, attempt - 1),
+      MAX_DELAY_MS,
+    );
+    const jitter = Math.random() * 0.3; // ±30% jitter
+    const delay = Math.floor(baseDelay * (1 + jitter));
+
+    console.log(
+      `[SAMPLE] ⏳ Missing users: ${missingEmails.join(", ")} - waiting ${delay}ms before retry`,
+    );
+    await new Promise((resolve) => setTimeout(resolve, delay));
+  }
+}
+
 interface SampleIssue {
   title: string;
   description: string;
@@ -411,11 +472,27 @@ async function createSampleIssues(
       statusMap.set(status.name, status.id);
     }
 
+    // Wait for auth users to sync from Supabase Auth to database
+    // This prevents race condition where sample issues try to reference users
+    // that don't exist yet in the database (even though they exist in auth)
+    const requiredDevUsers = [
+      "admin@dev.local",
+      "member@dev.local",
+      "player@dev.local",
+    ];
+    await waitForAuthUserSync(requiredDevUsers);
+
     // Get user mappings for creators
     const userMap = new Map<string, string>();
     const allUsers = await db
       .select({ id: users.id, email: users.email })
       .from(users);
+
+    console.log(`[SAMPLE] 📋 Found ${allUsers.length} total users in database`);
+    const devUserEmails = allUsers
+      .filter((u) => u.email?.includes("@dev.local"))
+      .map((u) => u.email);
+    console.log(`[SAMPLE] 🔧 Dev users available: ${devUserEmails.join(", ")}`);
 
     for (const user of allUsers) {
       if (user.email) {
@@ -490,11 +567,19 @@ async function createSampleIssues(
           continue;
         }
 
-        // Map creator
+        // Map creator - fail fast for dev users, skip gracefully for sample data users
         const createdById = userMap.get(issueData.reporterEmail);
         if (!createdById) {
-          console.warn(
-            `[SAMPLE] ⚠️  User '${issueData.reporterEmail}' not found, skipping issue`,
+          // Fail fast if this is a dev user that should exist
+          if (issueData.reporterEmail.includes("@dev.local")) {
+            const errorMsg = `Critical: Required dev user '${issueData.reporterEmail}' not found in database. This indicates auth user synchronization failed.`;
+            console.error(`[SAMPLE] ❌ ${errorMsg}`);
+            throw new Error(errorMsg);
+          }
+
+          // Skip gracefully for sample data users (these are from the JSON and may not exist)
+          console.log(
+            `[SAMPLE] ⏭️  Sample user '${issueData.reporterEmail}' not found, skipping issue "${issueData.title}"`,
           );
           skippedCount++;
           continue;
