@@ -148,13 +148,10 @@ export function setTestEnvironmentVars(vars: Record<string, string>): void {
  * ```
  */
 export function simulateEnvFileContents(files: EnvFileContents): void {
-  let callCount = 0;
-
   const { mockDotenvConfig } = configureDotenvMocks();
 
   mockDotenvConfig.mockImplementation(
     (options?: { path?: string; override?: boolean }) => {
-      callCount++;
       const path = options?.path || "";
 
       // Determine which file is being loaded based on call order and path
