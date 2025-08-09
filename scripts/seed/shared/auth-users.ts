@@ -316,7 +316,7 @@ async function processBatchUsers(
 
         if (!userRecordExists) {
           // Auth trigger failed - this is a critical infrastructure problem
-          const error = `Auth trigger failed to create User record for ${userData.email}. This indicates a problem with the database trigger 'handle_new_user()'.`;
+          const error = `Auth trigger failed to create User record for ${userData.email}. This indicates a problem with the database trigger 'handle_new_user()'. Check: 1) Trigger exists and is enabled, 2) Database connectivity, 3) Trigger function permissions.`;
           console.error(`[AUTH] ❌ CRITICAL: ${error}`);
           errorCount++;
           errors.push(error);
@@ -387,7 +387,7 @@ async function processBatchUsers(
   // If we reach this point with usersToCreateInDb having entries,
   // it means auth triggers are not working correctly
   if (usersToCreateInDb.length > 0) {
-    const error = `CRITICAL: Auth triggers failed for ${usersToCreateInDb.length} users. Database infrastructure needs fixing.`;
+    const error = `CRITICAL: Auth triggers failed for ${usersToCreateInDb.length} users. Database infrastructure needs fixing. Run: 1) Check 'SELECT * FROM information_schema.triggers WHERE trigger_name = \\'on_auth_user_created\\';', 2) Verify 'handle_new_user()' function exists, 3) Test database connectivity.`;
     console.error(`[AUTH] ❌ ${error}`);
     errorCount += usersToCreateInDb.length;
     errors.push(error);

@@ -275,7 +275,6 @@ export function IssueList({
                 data-testid="bulk-assign-button"
                 onClick={() => {
                   // TODO: Implement bulk assign dialog
-                  console.log("Bulk assign", selectedIssues);
                 }}
               >
                 Assign
@@ -302,7 +301,6 @@ export function IssueList({
                 data-testid="bulk-close-button"
                 onClick={() => {
                   // TODO: Implement bulk close
-                  console.log("Bulk close", selectedIssues);
                 }}
               >
                 Close
@@ -467,9 +465,6 @@ export function IssueList({
                           onClick={(e) => {
                             // Prevent event propagation to parent elements
                             e.stopPropagation();
-                            console.log(
-                              `[DEBUG] Navigating to issue ${issue.id}: ${issue.title}`,
-                            );
                             router.push(`/issues/${issue.id}`);
                           }}
                         >

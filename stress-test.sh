@@ -1,4 +1,4 @@
-#\!/bin/bash
+#!/bin/bash
 
 # PinPoint Database + Testing Stress Test
 # Tests various combinations of db operations and test suites to catch race conditions

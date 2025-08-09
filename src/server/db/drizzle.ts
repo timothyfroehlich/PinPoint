@@ -16,9 +16,9 @@ interface DatabaseConfig {
 }
 
 function getDatabaseConfig(): DatabaseConfig {
-  const isCI = env.NODE_ENV === "test";
+  const isTest = env.NODE_ENV === "test";
 
-  if (isCI) {
+  if (isTest) {
     return {
       max: 2, // Conservative pool size for resource-constrained CI
       idle_timeout: 30, // Shorter idle timeout to free resources quickly
@@ -60,8 +60,8 @@ function createDrizzleClientInternal() {
   const isLocalhost =
     connectionString.includes("localhost") ||
     connectionString.includes("127.0.0.1");
-  const isCI = env.NODE_ENV === "test";
-  const sslConfig = isLocalhost || isCI ? false : "require";
+  const isTest = env.NODE_ENV === "test";
+  const sslConfig = isLocalhost || isTest ? false : "require";
 
   // Get environment-specific configuration
   const config = getDatabaseConfig();
@@ -81,7 +81,7 @@ function createDrizzleClientInternal() {
 
   return drizzle(sql, {
     schema,
-    logger: isDevelopment() && !isCI, // Disable logging in CI for performance
+    logger: isDevelopment() && !isTest, // Disable logging in CI for performance
   });
 }
 
@@ -121,8 +121,8 @@ class DrizzleSingleton {
     const isLocalhost =
       connectionString.includes("localhost") ||
       connectionString.includes("127.0.0.1");
-    const isCI = env.NODE_ENV === "test";
-    const sslConfig = isLocalhost || isCI ? false : "require";
+    const isTest = env.NODE_ENV === "test";
+    const sslConfig = isLocalhost || isTest ? false : "require";
 
     // Get environment-specific configuration
     const config = getDatabaseConfig();
@@ -142,7 +142,7 @@ class DrizzleSingleton {
     this._sql = sql;
     return drizzle(sql, {
       schema,
-      logger: isDevelopment() && !isCI,
+      logger: isDevelopment() && !isTest,
     });
   }
 
