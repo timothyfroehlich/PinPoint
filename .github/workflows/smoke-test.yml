@@ -64,10 +64,6 @@ jobs:
           set -e  # Exit on any error
           echo "🚀 Starting local Supabase stack for CI testing..."
 
-          # Create storage bucket directories required by config.toml
-          mkdir -p supabase/storage/pinpoint-storage-main
-          echo "📁 Created storage bucket directories"
-
           # Start Supabase services with optimized exclusions for CI performance
           # Excludes: studio, realtime, storage-api, edge-runtime, logflare, vector, imgproxy, supavisor, postgres-meta, mailpit
           # Keeps: PostgreSQL, PostgREST (API), GoTrue (auth), Kong (gateway) - all essential services
