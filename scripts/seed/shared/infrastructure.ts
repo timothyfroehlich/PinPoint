@@ -752,13 +752,13 @@ export async function seedInfrastructure(): Promise<Organization> {
   });
   console.log(`[INFRASTRUCTURE] Created organization: ${organization.name}`);
 
-  // 3-6. Create organization-specific data in parallel where safe
+  // 3-6. Create organization-specific data in parallel (safe - no interdependencies)
   console.log(`[INFRASTRUCTURE] Creating organization data...`);
   await Promise.all([
-    createDefaultPriorities(organization.id),
-    createDefaultCollectionTypes(organization.id),
-    createDefaultStatuses(organization.id),
-    createDefaultLocation(organization.id),
+    createDefaultPriorities(organization.id), // Independent - creates priority records only
+    createDefaultCollectionTypes(organization.id), // Independent - creates collection types only
+    createDefaultStatuses(organization.id), // Independent - creates status records only
+    createDefaultLocation(organization.id), // Independent - creates location record only
   ]);
 
   const duration = Date.now() - startTime;

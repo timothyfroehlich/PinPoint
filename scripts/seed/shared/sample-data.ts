@@ -11,7 +11,7 @@
  * - Modern error handling with detailed logging
  */
 
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 
 import { createDrizzleClient } from "~/server/db/drizzle";
 import {
@@ -173,13 +173,30 @@ async function createModels(games: UniqueGame[]): Promise<void> {
 
     // Use PostgreSQL upsert pattern - insert all, ignore conflicts on opdbId
     if (modelsToCreate.length > 0) {
+      // Check existing models to provide better logging
+      const existingModelOpdbIds = await db
+        .select({ opdbId: models.opdbId })
+        .from(models)
+        .where(
+          inArray(
+            models.opdbId,
+            modelsToCreate.map((m) => m.opdbId),
+          ),
+        );
+      const existingOpdbIdSet = new Set(
+        existingModelOpdbIds.map((m) => m.opdbId),
+      );
+      const actualNewModels = modelsToCreate.filter(
+        (m) => !existingOpdbIdSet.has(m.opdbId),
+      );
+
       await db
         .insert(models)
         .values(modelsToCreate)
         .onConflictDoNothing({ target: models.opdbId });
 
       console.log(
-        `[SAMPLE] ✅ Processed ${modelsToCreate.length.toString()} models via optimized upsert (conflicts ignored)`,
+        `[SAMPLE] ✅ Inserted ${actualNewModels.length} new models (out of ${modelsToCreate.length}) via optimized upsert (${modelsToCreate.length - actualNewModels.length} conflicts ignored)`,
       );
     }
 

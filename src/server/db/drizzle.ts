@@ -6,6 +6,48 @@ import * as schema from "./schema";
 import { env } from "~/env";
 import { isDevelopment } from "~/lib/environment";
 
+// Environment-specific database configuration
+interface DatabaseConfig {
+  max: number;
+  idle_timeout: number;
+  connect_timeout: number;
+  prepare: boolean;
+  application_name: string;
+}
+
+function getDatabaseConfig(): DatabaseConfig {
+  const isCI = env.NODE_ENV === "test";
+
+  if (isCI) {
+    return {
+      max: 2, // Conservative pool size for resource-constrained CI
+      idle_timeout: 30, // Shorter idle timeout to free resources quickly
+      connect_timeout: 20, // Faster timeout to fail fast in CI
+      prepare: false, // Disable prepared statements for CI compatibility
+      application_name: "pinpoint_ci_seeding",
+    };
+  }
+
+  if (isDevelopment()) {
+    return {
+      max: 5, // Moderate pool size for local development
+      idle_timeout: 60, // Longer timeout for debugging sessions
+      connect_timeout: 30, // Generous timeout for local database startup
+      prepare: true, // Enable prepared statements for better dev performance
+      application_name: "pinpoint_seeding",
+    };
+  }
+
+  // Production configuration
+  return {
+    max: 10, // Higher pool size for production load
+    idle_timeout: 20, // Balanced timeout for resource management
+    connect_timeout: 10, // Fast timeout for production responsiveness
+    prepare: true, // Enable prepared statements for performance
+    application_name: "pinpoint_seeding",
+  };
+}
+
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 function createDrizzleClientInternal() {
   const connectionString = env.POSTGRES_PRISMA_URL;
@@ -19,28 +61,22 @@ function createDrizzleClientInternal() {
     connectionString.includes("localhost") ||
     connectionString.includes("127.0.0.1");
   const isCI = env.NODE_ENV === "test";
-  // Disable SSL for localhost AND CI environments to prevent TLS connection failures
   const sslConfig = isLocalhost || isCI ? false : "require";
+
+  // Get environment-specific configuration
+  const config = getDatabaseConfig();
 
   // Create postgres-js connection with environment-optimized settings
   const sql = postgres(connectionString, {
-    // Optimized for seeding operations
-    max: isCI ? 2 : isDevelopment() ? 5 : 10, // Higher pool for seeding operations
-    idle_timeout: isCI ? 30 : isDevelopment() ? 60 : 20,
-    connect_timeout: isCI ? 20 : isDevelopment() ? 30 : 10,
-    ssl: sslConfig, // Conditional SSL based on environment
-    // Seeding-optimized configurations
-    prepare: !isCI, // Enable prepared statements for better performance (except CI)
+    max: config.max,
+    idle_timeout: config.idle_timeout,
+    connect_timeout: config.connect_timeout,
+    ssl: sslConfig,
+    prepare: config.prepare,
     transform: { undefined: null }, // Handle undefined values consistently
-    // Connection reuse optimizations
     connection: {
-      application_name: isCI ? "pinpoint_ci_seeding" : "pinpoint_seeding", // Better connection tracking
+      application_name: config.application_name,
     },
-    // CI-specific optimizations
-    ...(isCI && {
-      prepare: false, // Disable prepared statements in CI
-      transform: { undefined: null }, // Handle undefined values
-    }),
   });
 
   return drizzle(sql, {
@@ -86,27 +122,21 @@ class DrizzleSingleton {
       connectionString.includes("localhost") ||
       connectionString.includes("127.0.0.1");
     const isCI = env.NODE_ENV === "test";
-    // Disable SSL for localhost AND CI environments to prevent TLS connection failures
     const sslConfig = isLocalhost || isCI ? false : "require";
 
+    // Get environment-specific configuration
+    const config = getDatabaseConfig();
+
     const sql = postgres(connectionString, {
-      // Optimized for seeding operations
-      max: isCI ? 2 : isDevelopment() ? 5 : 10, // Higher pool for seeding operations
-      idle_timeout: isCI ? 30 : isDevelopment() ? 60 : 20,
-      connect_timeout: isCI ? 20 : isDevelopment() ? 30 : 10,
-      ssl: sslConfig, // Conditional SSL based on environment
-      // Seeding-optimized configurations
-      prepare: !isCI, // Enable prepared statements for better performance (except CI)
+      max: config.max,
+      idle_timeout: config.idle_timeout,
+      connect_timeout: config.connect_timeout,
+      ssl: sslConfig,
+      prepare: config.prepare,
       transform: { undefined: null }, // Handle undefined values consistently
-      // Connection reuse optimizations
       connection: {
-        application_name: isCI ? "pinpoint_ci_seeding" : "pinpoint_seeding", // Better connection tracking
+        application_name: config.application_name,
       },
-      // CI-specific optimizations
-      ...(isCI && {
-        prepare: false, // Disable prepared statements in CI
-        transform: { undefined: null }, // Handle undefined values
-      }),
     });
 
     this._sql = sql;

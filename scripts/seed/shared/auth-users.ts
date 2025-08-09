@@ -186,8 +186,10 @@ async function upsertSupabaseAuthUser(
   };
 }
 
-// Constants for polling configuration
-const USER_RECORD_POLL_TIMEOUT_MS = 5000; // 5 seconds max wait for auth trigger
+// Constants for polling configuration (configurable via environment variables)
+const USER_RECORD_POLL_TIMEOUT_MS = process.env.USER_RECORD_POLL_TIMEOUT_MS
+  ? parseInt(process.env.USER_RECORD_POLL_TIMEOUT_MS, 10)
+  : 5000; // 5 seconds max wait for auth trigger (configurable via env)
 const USER_RECORD_POLL_INTERVAL_MS = 50; // Check every 50ms (20 times per second)
 const MAX_POLL_ATTEMPTS = Math.floor(
   USER_RECORD_POLL_TIMEOUT_MS / USER_RECORD_POLL_INTERVAL_MS,
@@ -224,7 +226,7 @@ async function waitForUserRecord(
   }
 
   console.error(
-    `[AUTH] ❌ CRITICAL: Auth trigger failed - User record not created after ${USER_RECORD_POLL_TIMEOUT_MS}ms for ${email}`,
+    `[AUTH] ❌ CRITICAL: Auth trigger failed - User record not created after ${USER_RECORD_POLL_TIMEOUT_MS}ms for ${email}. Please check if the database trigger 'handle_new_user()' is properly configured and verify database connectivity. Refer to the documentation for troubleshooting steps.`,
   );
   return false;
 }
