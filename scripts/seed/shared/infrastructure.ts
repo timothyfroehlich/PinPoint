@@ -599,7 +599,8 @@ export async function seedInfrastructure(): Promise<Organization> {
   const organization = await createOrganizationWithRoles({
     name: "Austin Pinball Collective",
     subdomain: "apc",
-    logoUrl: "/images/logos/austinpinballcollective-logo-outline.png",
+    logoUrl:
+      "/supabase/storage/pinpoint-storage-main/austinpinballcollective-logo-outline.png",
   });
   console.log(`[INFRASTRUCTURE] Created organization: ${organization.name}`);
 
