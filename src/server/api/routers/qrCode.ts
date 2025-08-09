@@ -1,3 +1,4 @@
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import {
@@ -7,6 +8,11 @@ import {
   machineEditProcedure,
   organizationManageProcedure,
 } from "~/server/api/trpc";
+import { machines } from "~/server/db/schema";
+import {
+  getSingleRecordWithLimit,
+  COMMON_ERRORS,
+} from "~/server/db/utils/common-queries";
 
 export const qrCodeRouter = createTRPCRouter({
   /**
@@ -28,15 +34,21 @@ export const qrCodeRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       // Verify machine belongs to organization
 
-      const machine = await ctx.db.machine.findUnique({
-        where: {
-          id: input.machineId,
-          organizationId: ctx.organization.id,
-        },
-      });
+      const machine = await getSingleRecordWithLimit(
+        ctx.drizzle
+          .select()
+          .from(machines)
+          .where(
+            and(
+              eq(machines.id, input.machineId),
+              eq(machines.organizationId, ctx.organization.id),
+            ),
+          )
+          .$dynamic(),
+      );
 
       if (!machine) {
-        throw new Error("Machine not found");
+        throw new Error(COMMON_ERRORS.NOT_IN_ORGANIZATION);
       }
 
       const qrCodeService = ctx.services.createQRCodeService();

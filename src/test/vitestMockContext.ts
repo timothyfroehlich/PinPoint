@@ -26,7 +26,7 @@ const mockSupabaseClient = {
 };
 
 // Mock Drizzle client for tests - supports complex chaining patterns
-// Use simpler approach to avoid TypeScript/ESLint conflicts
+// Enhanced to support joins, limits, and additional operators used in converted routers
 const mockDrizzleClient = {
   select: vi.fn().mockReturnThis(),
   from: vi.fn().mockReturnThis(),
@@ -39,6 +39,15 @@ const mockDrizzleClient = {
   set: vi.fn().mockReturnThis(),
   returning: vi.fn().mockResolvedValue([]), // Returns array for destructuring [result]
   execute: vi.fn().mockResolvedValue([]),
+  // Additional methods for converted routers
+  innerJoin: vi.fn().mockReturnThis(),
+  leftJoin: vi.fn().mockReturnThis(),
+  limit: vi.fn().mockReturnThis(),
+  offset: vi.fn().mockReturnThis(),
+  groupBy: vi.fn().mockReturnThis(),
+  having: vi.fn().mockReturnThis(),
+  // Transaction support
+  transaction: vi.fn(),
 } as unknown as DrizzleClient;
 
 export interface VitestMockContext {

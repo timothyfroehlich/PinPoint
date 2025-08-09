@@ -1,5 +1,6 @@
 import { type Role } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
+import { eq } from "drizzle-orm";
 
 import {
   SYSTEM_ROLES,
@@ -12,6 +13,13 @@ import {
 import { PermissionService } from "./permissionService";
 
 import { type ExtendedPrismaClient } from "~/server/db";
+import { type DrizzleClient } from "~/server/db/drizzle";
+import {
+  roles,
+  permissions,
+  rolePermissions,
+  memberships,
+} from "~/server/db/schema";
 
 /**
  * Role Service
@@ -25,6 +33,7 @@ export class RoleService {
   constructor(
     private prisma: ExtendedPrismaClient,
     private organizationId: string,
+    private drizzle?: DrizzleClient,
   ) {
     this.permissionService = new PermissionService(prisma);
   }
@@ -311,6 +320,10 @@ export class RoleService {
    * Get all roles for the organization
    *
    * @returns Promise<Role[]> - Array of roles with permissions and member counts
+   *
+   * OPTIMIZATION NOTE: Currently uses junction table for Prisma parity.
+   * Future optimization: Consider JSONB column for permissions to reduce joins.
+   * Example JSONB query: ctx.drizzle.select().from(roles).where(sql`permissions @> '["issue:create"]'`)
    */
   async getRoles(): Promise<
     (Role & {
@@ -318,6 +331,62 @@ export class RoleService {
       _count: { memberships: number };
     })[]
   > {
+    // Use Drizzle if available, otherwise fallback to Prisma
+    if (this.drizzle) {
+      const drizzleDb = this.drizzle;
+
+      // Drizzle implementation with explicit joins and subqueries
+      const rolesWithPermissions = await drizzleDb
+        .select({
+          id: roles.id,
+          name: roles.name,
+          organizationId: roles.organizationId,
+          isSystem: roles.isSystem,
+          isDefault: roles.isDefault,
+          createdAt: roles.createdAt,
+          updatedAt: roles.updatedAt,
+        })
+        .from(roles)
+        .where(eq(roles.organizationId, this.organizationId))
+        .orderBy(roles.isSystem, roles.name);
+
+      // Get permissions for each role
+      const rolesWithDetails = await Promise.all(
+        rolesWithPermissions.map(async (role) => {
+          // PERFORMANCE: Get permissions and count memberships in parallel
+          const [rolePermissionsList, membershipCount] = await Promise.all([
+            drizzleDb
+              .select({
+                id: permissions.id,
+                name: permissions.name,
+              })
+              .from(rolePermissions)
+              .innerJoin(
+                permissions,
+                eq(rolePermissions.permissionId, permissions.id),
+              )
+              .where(eq(rolePermissions.roleId, role.id)),
+            drizzleDb
+              .select()
+              .from(memberships)
+              .where(eq(memberships.roleId, role.id)),
+          ]);
+
+          return {
+            ...role,
+            permissions: rolePermissionsList,
+            _count: { memberships: membershipCount.length },
+          };
+        }),
+      );
+
+      return rolesWithDetails as (Role & {
+        permissions: { id: string; name: string }[];
+        _count: { memberships: number };
+      })[];
+    }
+
+    // Prisma fallback (existing implementation)
     return this.prisma.role.findMany({
       where: { organizationId: this.organizationId },
       include: {
