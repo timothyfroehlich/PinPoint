@@ -426,6 +426,7 @@ function mapSeverityToPriority(severity: string): string {
 async function createSampleIssues(
   organizationId: string,
   dataAmount: DataAmount,
+  skipAuthUsers = false,
 ): Promise<void> {
   try {
     // Import sample issues JSON
@@ -475,12 +476,19 @@ async function createSampleIssues(
     // Wait for auth users to sync from Supabase Auth to database
     // This prevents race condition where sample issues try to reference users
     // that don't exist yet in the database (even though they exist in auth)
-    const requiredDevUsers = [
-      "admin@dev.local",
-      "member@dev.local",
-      "player@dev.local",
-    ];
-    await waitForAuthUserSync(requiredDevUsers);
+    // Skip this step for PostgreSQL-only mode where auth users aren't created
+    if (!skipAuthUsers) {
+      const requiredDevUsers = [
+        "admin@dev.local",
+        "member@dev.local",
+        "player@dev.local",
+      ];
+      await waitForAuthUserSync(requiredDevUsers);
+    } else {
+      console.log(
+        "[SAMPLE] ⏭️  Skipping auth user synchronization (PostgreSQL-only mode)",
+      );
+    }
 
     // Get user mappings for creators
     const userMap = new Map<string, string>();
@@ -640,6 +648,7 @@ async function createSampleIssues(
 export async function seedSampleData(
   organizationId: string,
   dataAmount: DataAmount,
+  skipAuthUsers = false,
 ): Promise<void> {
   const startTime = Date.now();
   console.log(
@@ -660,7 +669,7 @@ export async function seedSampleData(
     await createMachines(organizationId, uniqueGames);
 
     // Phase 4: Create sample issues mapped to machines
-    await createSampleIssues(organizationId, dataAmount);
+    await createSampleIssues(organizationId, dataAmount, skipAuthUsers);
 
     const duration = Date.now() - startTime;
     console.log(

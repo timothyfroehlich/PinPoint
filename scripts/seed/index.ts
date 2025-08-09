@@ -172,7 +172,7 @@ async function main(): Promise<void> {
       // 5. Sample data seeding only
       console.log("\n[SEED] 🎮 Step 3: Sample Data");
       const dataAmount = "minimal"; // PostgreSQL-only always uses minimal
-      await seedSampleData(organization.id, dataAmount);
+      await seedSampleData(organization.id, dataAmount, true); // Skip auth users for PostgreSQL-only
     }
 
     // 6. Success summary
