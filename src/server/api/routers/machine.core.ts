@@ -2,6 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { eq, and, sql, asc } from "drizzle-orm";
 import { z } from "zod";
 
+import { generatePrefixedId } from "~/lib/utils/id-generation";
 import {
   createTRPCRouter,
   organizationProcedure,
@@ -44,8 +45,8 @@ export const machineCoreRouter = createTRPCRouter({
       }
 
       // Generate unique IDs
-      const machineId = `machine_${Date.now().toString()}_${Math.random().toString(36).substring(2, 11)}`;
-      const qrCodeId = `qr_${Date.now().toString()}_${Math.random().toString(36).substring(2, 11)}`;
+      const machineId = generatePrefixedId("machine");
+      const qrCodeId = generatePrefixedId("qr");
 
       // Create machine
       const [machine] = await ctx.drizzle

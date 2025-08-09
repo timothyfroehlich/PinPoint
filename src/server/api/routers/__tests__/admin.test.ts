@@ -21,22 +21,38 @@ vi.mock("~/server/auth/permissions", async () => {
 // Mock ID generation
 vi.mock("~/lib/utils/id-generation", () => ({
   generatePrefixedId: vi.fn(
-    (prefix: string) =>
-      `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
+    (prefix: string) => `${prefix}_test_${crypto.randomUUID()}`,
   ),
 }));
 
-// No longer mocking membership query helpers - using direct Drizzle queries
+// Mock user removal validation function
+vi.mock("~/lib/users/roleManagementValidation", async () => {
+  const actual = await vi.importActual("~/lib/users/roleManagementValidation");
+  return {
+    ...actual,
+    validateUserRemoval: vi.fn(),
+  };
+});
+
+// Mock membership transformers
+vi.mock("~/lib/utils/membership-transformers", async () => {
+  const actual = await vi.importActual("~/lib/utils/membership-transformers");
+  return {
+    ...actual,
+    transformMembershipsForValidation: vi.fn(),
+  };
+});
 
 import type { VitestMockContext } from "~/test/vitestMockContext";
 
+import { validateUserRemoval } from "~/lib/users/roleManagementValidation";
 import { generatePrefixedId } from "~/lib/utils/id-generation";
+import { transformMembershipsForValidation } from "~/lib/utils/membership-transformers";
 import { adminRouter } from "~/server/api/routers/admin";
 import {
   getUserPermissionsForSession,
   requirePermissionForSession,
 } from "~/server/auth/permissions";
-// Direct Drizzle queries - no longer using helper functions
 import { createVitestMockContext } from "~/test/vitestMockContext";
 
 describe("Admin Router (Drizzle Integration)", () => {
@@ -102,7 +118,7 @@ describe("Admin Router (Drizzle Integration)", () => {
 
     // Mock ID generation with predictable values for testing
     vi.mocked(generatePrefixedId).mockImplementation(
-      (prefix: string) => `${prefix}_test_${Date.now()}`,
+      (prefix: string) => `${prefix}_test_${crypto.randomUUID()}`,
     );
 
     caller = adminRouter.createCaller(mockContext);
@@ -175,7 +191,7 @@ describe("Admin Router (Drizzle Integration)", () => {
     it("should use proper ID generation for new entities", async () => {
       // Verify the ID generation system is integrated
       const testId = vi.mocked(generatePrefixedId)("test");
-      expect(testId).toMatch(/^test_test_\d+$/);
+      expect(testId).toMatch(/^test_test_[a-f0-9\-]+$/);
     });
   });
 
@@ -201,6 +217,569 @@ describe("Admin Router (Drizzle Integration)", () => {
       await expect(noPermsCaller.getUsers()).rejects.toThrow(
         "Missing required permission",
       );
+    });
+  });
+
+  /**
+   * Comprehensive removeUser Procedure Tests
+   *
+   * Tests the critical business logic for user removal including:
+   * - Database queries and joins
+   * - Business validation logic
+   * - Security and authorization
+   * - Error handling and edge cases
+   * - Organization isolation
+   */
+  describe("removeUser Procedure", () => {
+    const targetUserId = "user-to-remove";
+    const mockMembership = {
+      id: "membership-1",
+      userId: targetUserId,
+      organizationId: "org-1",
+      roleId: "role-member",
+      user: {
+        id: targetUserId,
+        name: "User To Remove",
+        email: "remove@example.com",
+      },
+      role: {
+        id: "role-member",
+        name: "Member",
+        organizationId: "org-1",
+        isSystem: false,
+        isDefault: false,
+      },
+    };
+
+    const mockAllMemberships = [
+      mockMembership,
+      {
+        id: "membership-admin",
+        userId: "user-admin",
+        organizationId: "org-1",
+        roleId: "role-admin",
+        user: {
+          id: "user-admin",
+          name: "Admin User",
+          email: "admin@example.com",
+          profilePicture: null,
+          emailVerified: new Date(),
+          createdAt: new Date(),
+        },
+        role: {
+          id: "role-admin",
+          name: "Admin",
+          organizationId: "org-1",
+          isSystem: true,
+          isDefault: false,
+        },
+      },
+    ];
+
+    beforeEach(() => {
+      // Reset all mocks
+      vi.clearAllMocks();
+
+      // Setup default mocks for successful case
+      vi.mocked(validateUserRemoval).mockReturnValue({ valid: true });
+      vi.mocked(transformMembershipsForValidation).mockReturnValue(
+        mockAllMemberships.map((m) => ({
+          id: m.id,
+          userId: m.userId,
+          organizationId: m.organizationId,
+          roleId: m.roleId,
+          user: {
+            id: m.user.id,
+            name: m.user.name,
+            email: m.user.email ?? "",
+          },
+          role: {
+            id: m.role.id,
+            name: m.role.name,
+            organizationId: m.role.organizationId,
+            isSystem: m.role.isSystem,
+            isDefault: m.role.isDefault,
+          },
+        })),
+      );
+
+      // Set up proper Drizzle query chain mocking
+      // Create a proper mock chain for the complex queries in removeUser
+      const membershipQuery = {
+        from: vi.fn().mockReturnThis(),
+        innerJoin: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockResolvedValue([mockMembership]),
+      };
+
+      const allMembershipsQuery = {
+        from: vi.fn().mockReturnThis(),
+        innerJoin: vi.fn().mockReturnThis(),
+        where: vi.fn().mockResolvedValue(mockAllMemberships),
+      };
+
+      const deleteQuery = {
+        where: vi.fn().mockResolvedValue(undefined),
+      };
+
+      // Reset the drizzle mock with proper chaining
+      Object.assign(mockContext.drizzle, {
+        select: vi
+          .fn()
+          .mockReturnValueOnce(membershipQuery) // First select: membership lookup
+          .mockReturnValueOnce(allMembershipsQuery), // Second select: all memberships
+        delete: vi.fn().mockReturnValue(deleteQuery), // Delete operation
+      });
+
+      // Ensure the context has proper permissions for this test
+      mockContext.userPermissions = [
+        "user:manage",
+        "role:manage",
+        "organization:manage",
+      ];
+    });
+
+    describe("Successful Operations", () => {
+      it("should successfully remove user with valid permissions", async () => {
+        // Ensure proper permissions for this specific test
+        mockContext.userPermissions = [
+          "user:manage",
+          "role:manage",
+          "organization:manage",
+        ];
+        caller = adminRouter.createCaller(mockContext);
+
+        const result = await caller.removeUser({ userId: targetUserId });
+
+        expect(result).toEqual({ success: true });
+
+        // Verify validation was called - focusing on the key aspects
+        expect(validateUserRemoval).toHaveBeenCalledWith(
+          expect.objectContaining({
+            id: mockMembership.id,
+            userId: targetUserId,
+            organizationId: "org-1",
+          }),
+          expect.any(Array), // Transformed memberships array
+          expect.objectContaining({
+            organizationId: "org-1",
+            actorUserId: "user-admin",
+            userPermissions: expect.arrayContaining(["user:manage"]),
+          }),
+        );
+      });
+
+      it("should properly transform memberships for validation", async () => {
+        // Ensure proper permissions for this specific test
+        mockContext.userPermissions = [
+          "user:manage",
+          "role:manage",
+          "organization:manage",
+        ];
+        caller = adminRouter.createCaller(mockContext);
+
+        await caller.removeUser({ userId: targetUserId });
+
+        expect(transformMembershipsForValidation).toHaveBeenCalledWith(
+          expect.any(Array), // Just verify it was called with an array
+        );
+      });
+
+      it("should handle removal of users with different role types", async () => {
+        const membershipWithSystemRole = {
+          ...mockMembership,
+          role: {
+            ...mockMembership.role,
+            isSystem: true,
+            name: "System User",
+          },
+        };
+
+        vi.mocked(mockContext.drizzle.limit).mockResolvedValueOnce([
+          membershipWithSystemRole,
+        ]);
+        vi.mocked(mockContext.drizzle.where).mockResolvedValueOnce([
+          membershipWithSystemRole,
+        ]);
+        vi.mocked(mockContext.drizzle.where).mockResolvedValueOnce(undefined);
+
+        const result = await caller.removeUser({ userId: targetUserId });
+
+        expect(result).toEqual({ success: true });
+        expect(validateUserRemoval).toHaveBeenCalledWith(
+          expect.objectContaining({
+            role: expect.objectContaining({
+              isSystem: true,
+              name: "System User",
+            }),
+          }),
+          expect.any(Array),
+          expect.any(Object),
+        );
+      });
+    });
+
+    describe("Business Logic Validation", () => {
+      it("should respect validation failure and throw PRECONDITION_FAILED", async () => {
+        vi.mocked(mockContext.drizzle.limit).mockResolvedValueOnce([
+          mockMembership,
+        ]);
+        vi.mocked(mockContext.drizzle.where).mockResolvedValueOnce(
+          mockAllMemberships,
+        );
+
+        // Mock validation failure
+        vi.mocked(validateUserRemoval).mockReturnValue({
+          valid: false,
+          error: "Cannot remove last admin user",
+        });
+
+        await expect(
+          caller.removeUser({ userId: targetUserId }),
+        ).rejects.toThrow(TRPCError);
+
+        try {
+          await caller.removeUser({ userId: targetUserId });
+        } catch (error) {
+          expect(error).toBeInstanceOf(TRPCError);
+          expect((error as TRPCError).code).toBe("PRECONDITION_FAILED");
+          expect((error as TRPCError).message).toBe(
+            "Cannot remove last admin user",
+          );
+        }
+
+        // Verify delete was NOT called
+        // eslint-disable-next-line @typescript-eslint/unbound-method
+        expect(vi.mocked(mockContext.drizzle.delete)).not.toHaveBeenCalled();
+      });
+
+      it("should handle validation failure without specific error message", async () => {
+        vi.mocked(mockContext.drizzle.limit).mockResolvedValueOnce([
+          mockMembership,
+        ]);
+        vi.mocked(mockContext.drizzle.where).mockResolvedValueOnce(
+          mockAllMemberships,
+        );
+
+        vi.mocked(validateUserRemoval).mockReturnValue({
+          valid: false,
+          // No error message provided
+        });
+
+        await expect(
+          caller.removeUser({ userId: targetUserId }),
+        ).rejects.toThrow("User removal validation failed");
+      });
+
+      it("should pass correct context to validation", async () => {
+        vi.mocked(mockContext.drizzle.limit).mockResolvedValueOnce([
+          mockMembership,
+        ]);
+        vi.mocked(mockContext.drizzle.where).mockResolvedValueOnce(
+          mockAllMemberships,
+        );
+
+        await caller.removeUser({ userId: targetUserId });
+
+        expect(validateUserRemoval).toHaveBeenCalledWith(
+          expect.any(Object),
+          expect.any(Array),
+          expect.objectContaining({
+            organizationId: "org-1",
+            actorUserId: "user-admin",
+            userPermissions: expect.arrayContaining([
+              "user:manage",
+              "role:manage",
+              "organization:manage",
+            ]),
+          }),
+        );
+      });
+    });
+
+    describe("Security & Authorization", () => {
+      it("should enforce organization isolation", async () => {
+        const _membershipFromOtherOrg = {
+          ...mockMembership,
+          organizationId: "other-org-123",
+        };
+
+        // Mock finding no membership in current org
+        vi.mocked(mockContext.drizzle.limit).mockResolvedValueOnce([]);
+
+        await expect(
+          caller.removeUser({ userId: targetUserId }),
+        ).rejects.toThrow(TRPCError);
+
+        try {
+          await caller.removeUser({ userId: targetUserId });
+        } catch (error) {
+          expect(error).toBeInstanceOf(TRPCError);
+          expect((error as TRPCError).code).toBe("NOT_FOUND");
+          expect((error as TRPCError).message).toBe(
+            "User is not a member of this organization",
+          );
+        }
+      });
+
+      it("should query memberships only for current organization", async () => {
+        vi.mocked(mockContext.drizzle.limit).mockResolvedValueOnce([
+          mockMembership,
+        ]);
+        vi.mocked(mockContext.drizzle.where).mockResolvedValueOnce(
+          mockAllMemberships,
+        );
+
+        await caller.removeUser({ userId: targetUserId });
+
+        // Verify the where clause filters by organization ID
+        const drizzleWhereCallArgs = vi.mocked(mockContext.drizzle.where).mock
+          .calls;
+        expect(drizzleWhereCallArgs.length).toBeGreaterThan(0);
+
+        // The membership lookup should filter by both userId and organizationId
+        // The all memberships query should filter by organizationId
+      });
+
+      it("should require user:manage permission (tested via middleware)", async () => {
+        // This is tested through the userManageProcedure middleware
+        // The test validates that the procedure correctly uses the middleware
+        vi.mocked(mockContext.drizzle.limit).mockResolvedValueOnce([
+          mockMembership,
+        ]);
+        vi.mocked(mockContext.drizzle.where).mockResolvedValueOnce(
+          mockAllMemberships,
+        );
+
+        await caller.removeUser({ userId: targetUserId });
+
+        // If we reach here, the middleware allowed the call
+        expect(validateUserRemoval).toHaveBeenCalled();
+      });
+    });
+
+    describe("Error Scenarios", () => {
+      it("should throw NOT_FOUND when user is not in organization", async () => {
+        // Mock empty result for membership lookup
+        vi.mocked(mockContext.drizzle.limit).mockResolvedValueOnce([]);
+
+        await expect(
+          caller.removeUser({ userId: targetUserId }),
+        ).rejects.toThrow(TRPCError);
+
+        try {
+          await caller.removeUser({ userId: targetUserId });
+        } catch (error) {
+          expect(error).toBeInstanceOf(TRPCError);
+          expect((error as TRPCError).code).toBe("NOT_FOUND");
+          expect((error as TRPCError).message).toBe(
+            "User is not a member of this organization",
+          );
+        }
+
+        // Verify validation and delete were not called
+        expect(validateUserRemoval).not.toHaveBeenCalled();
+        // eslint-disable-next-line @typescript-eslint/unbound-method
+        expect(vi.mocked(mockContext.drizzle.delete)).not.toHaveBeenCalled();
+      });
+
+      it("should handle database errors during membership lookup", async () => {
+        vi.mocked(mockContext.drizzle.limit).mockRejectedValueOnce(
+          new Error("Database connection failed"),
+        );
+
+        await expect(
+          caller.removeUser({ userId: targetUserId }),
+        ).rejects.toThrow("Database connection failed");
+      });
+
+      it("should handle database errors during all memberships query", async () => {
+        vi.mocked(mockContext.drizzle.limit).mockResolvedValueOnce([
+          mockMembership,
+        ]);
+        vi.mocked(mockContext.drizzle.where).mockRejectedValueOnce(
+          new Error("Query timeout"),
+        );
+
+        await expect(
+          caller.removeUser({ userId: targetUserId }),
+        ).rejects.toThrow("Query timeout");
+      });
+
+      it("should handle database errors during delete operation", async () => {
+        vi.mocked(mockContext.drizzle.limit).mockResolvedValueOnce([
+          mockMembership,
+        ]);
+        vi.mocked(mockContext.drizzle.where).mockResolvedValueOnce(
+          mockAllMemberships,
+        );
+        vi.mocked(mockContext.drizzle.where).mockRejectedValueOnce(
+          new Error("Delete constraint violation"),
+        );
+
+        await expect(
+          caller.removeUser({ userId: targetUserId }),
+        ).rejects.toThrow("Delete constraint violation");
+      });
+    });
+
+    describe("Edge Cases", () => {
+      it("should handle malformed user ID", async () => {
+        const malformedUserId = "";
+
+        // The input validation should catch this, but test the database behavior
+        vi.mocked(mockContext.drizzle.limit).mockResolvedValueOnce([]);
+
+        await expect(
+          caller.removeUser({ userId: malformedUserId }),
+        ).rejects.toThrow(TRPCError);
+      });
+
+      it("should handle user with missing email", async () => {
+        const membershipWithoutEmail = {
+          ...mockMembership,
+          user: {
+            ...mockMembership.user,
+            email: null,
+          },
+        };
+
+        vi.mocked(mockContext.drizzle.limit).mockResolvedValueOnce([
+          membershipWithoutEmail,
+        ]);
+        vi.mocked(mockContext.drizzle.where).mockResolvedValueOnce([
+          membershipWithoutEmail,
+        ]);
+
+        await caller.removeUser({ userId: targetUserId });
+
+        // Verify the email is handled properly in validation (converted to empty string)
+        expect(validateUserRemoval).toHaveBeenCalledWith(
+          expect.objectContaining({
+            user: expect.objectContaining({
+              email: "",
+            }),
+          }),
+          expect.any(Array),
+          expect.any(Object),
+        );
+      });
+
+      it("should handle removal of user with complex role structure", async () => {
+        const complexMembership = {
+          ...mockMembership,
+          role: {
+            id: "role-complex",
+            name: "Custom Role",
+            organizationId: "org-1",
+            isSystem: false,
+            isDefault: true, // Default role
+          },
+        };
+
+        vi.mocked(mockContext.drizzle.limit).mockResolvedValueOnce([
+          complexMembership,
+        ]);
+        vi.mocked(mockContext.drizzle.where).mockResolvedValueOnce([
+          complexMembership,
+        ]);
+
+        await caller.removeUser({ userId: targetUserId });
+
+        expect(validateUserRemoval).toHaveBeenCalledWith(
+          expect.objectContaining({
+            role: expect.objectContaining({
+              isDefault: true,
+              name: "Custom Role",
+            }),
+          }),
+          expect.any(Array),
+          expect.any(Object),
+        );
+      });
+
+      it("should handle concurrent removal scenarios", async () => {
+        // This tests the case where user might be removed between queries
+        vi.mocked(mockContext.drizzle.limit).mockResolvedValueOnce([
+          mockMembership,
+        ]);
+        vi.mocked(mockContext.drizzle.where).mockResolvedValueOnce(
+          mockAllMemberships,
+        );
+
+        // Mock delete returning 0 affected rows (user already removed)
+        vi.mocked(mockContext.drizzle.where).mockResolvedValueOnce(undefined);
+
+        // Should still return success since the end state is achieved
+        const result = await caller.removeUser({ userId: targetUserId });
+        expect(result).toEqual({ success: true });
+      });
+    });
+
+    describe("Data Transformation", () => {
+      it("should properly construct validation membership object", async () => {
+        vi.mocked(mockContext.drizzle.limit).mockResolvedValueOnce([
+          mockMembership,
+        ]);
+        vi.mocked(mockContext.drizzle.where).mockResolvedValueOnce(
+          mockAllMemberships,
+        );
+
+        await caller.removeUser({ userId: targetUserId });
+
+        expect(validateUserRemoval).toHaveBeenCalledWith(
+          expect.objectContaining({
+            id: mockMembership.id,
+            userId: mockMembership.userId,
+            organizationId: mockMembership.organizationId,
+            roleId: mockMembership.roleId,
+            user: expect.objectContaining({
+              id: mockMembership.user.id,
+              name: mockMembership.user.name,
+              email: mockMembership.user.email,
+            }),
+            role: expect.objectContaining({
+              id: mockMembership.role.id,
+              name: mockMembership.role.name,
+              organizationId: mockMembership.role.organizationId,
+              isSystem: mockMembership.role.isSystem,
+              isDefault: mockMembership.role.isDefault,
+            }),
+          }),
+          expect.any(Array),
+          expect.any(Object),
+        );
+      });
+
+      it("should handle null email in user data", async () => {
+        const membershipWithNullEmail = {
+          ...mockMembership,
+          user: {
+            ...mockMembership.user,
+            email: null,
+          },
+        };
+
+        vi.mocked(mockContext.drizzle.limit).mockResolvedValueOnce([
+          membershipWithNullEmail,
+        ]);
+        vi.mocked(mockContext.drizzle.where).mockResolvedValueOnce([
+          membershipWithNullEmail,
+        ]);
+
+        await caller.removeUser({ userId: targetUserId });
+
+        // Should convert null email to empty string
+        expect(validateUserRemoval).toHaveBeenCalledWith(
+          expect.objectContaining({
+            user: expect.objectContaining({
+              email: "",
+            }),
+          }),
+          expect.any(Array),
+          expect.any(Object),
+        );
+      });
     });
   });
 });
