@@ -2,6 +2,8 @@ import { TRPCError } from "@trpc/server";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
+import type { OrganizationTRPCContext } from "~/server/api/trpc.base";
+
 import { generateId } from "~/lib/utils/id-generation";
 import {
   createTRPCRouter,
@@ -10,6 +12,98 @@ import {
   issueEditProcedure,
 } from "~/server/api/trpc";
 import { comments, issues, memberships, users } from "~/server/db/schema";
+
+// Helper function to create a comment with author details
+async function createCommentWithAuthor(
+  ctx: OrganizationTRPCContext,
+  input: { issueId: string; content: string },
+) {
+  // Verify the issue belongs to this organization
+  const [existingIssue] = await ctx.drizzle
+    .select({
+      id: issues.id,
+      organizationId: issues.organizationId,
+    })
+    .from(issues)
+    .where(
+      and(
+        eq(issues.id, input.issueId),
+        eq(issues.organizationId, ctx.organization.id),
+      ),
+    )
+    .limit(1);
+
+  if (!existingIssue) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Issue not found",
+    });
+  }
+
+  // Verify the user is a member of this organization
+  const [membership] = await ctx.drizzle
+    .select({
+      id: memberships.id,
+    })
+    .from(memberships)
+    .where(
+      and(
+        eq(memberships.userId, ctx.user.id),
+        eq(memberships.organizationId, ctx.organization.id),
+      ),
+    )
+    .limit(1);
+
+  if (!membership) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "User is not a member of this organization",
+    });
+  }
+
+  // Insert the comment
+  const [comment] = await ctx.drizzle
+    .insert(comments)
+    .values({
+      id: generateId(),
+      content: input.content,
+      issueId: input.issueId,
+      authorId: ctx.user.id,
+    })
+    .returning({
+      id: comments.id,
+      content: comments.content,
+      createdAt: comments.createdAt,
+      updatedAt: comments.updatedAt,
+      issueId: comments.issueId,
+      authorId: comments.authorId,
+    });
+
+  // Fetch the comment with author details
+  // Note: comment.id is guaranteed to exist since Drizzle .returning() throws on failure
+  const [commentWithAuthor] = await ctx.drizzle
+    .select({
+      id: comments.id,
+      content: comments.content,
+      createdAt: comments.createdAt,
+      updatedAt: comments.updatedAt,
+      issueId: comments.issueId,
+      authorId: comments.authorId,
+      author: {
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        image: users.image,
+      },
+    })
+    .from(comments)
+    .innerJoin(users, eq(comments.authorId, users.id))
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Drizzle .returning() guarantees non-null
+    .where(eq(comments.id, comment!.id))
+    .limit(1);
+
+  return commentWithAuthor;
+}
 
 export const issueCommentRouter = createTRPCRouter({
   // Add comment to an issue (for members/admins)
@@ -21,102 +115,7 @@ export const issueCommentRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Verify the issue belongs to this organization
-      const [existingIssue] = await ctx.drizzle
-        .select({
-          id: issues.id,
-          organizationId: issues.organizationId,
-        })
-        .from(issues)
-        .where(
-          and(
-            eq(issues.id, input.issueId),
-            eq(issues.organizationId, ctx.organization.id),
-          ),
-        )
-        .limit(1);
-
-      if (!existingIssue) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Issue not found",
-        });
-      }
-
-      // Verify the user is a member of this organization
-      const [membership] = await ctx.drizzle
-        .select({
-          id: memberships.id,
-        })
-        .from(memberships)
-        .where(
-          and(
-            eq(memberships.userId, ctx.user.id),
-            eq(memberships.organizationId, ctx.organization.id),
-          ),
-        )
-        .limit(1);
-
-      if (!membership) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "User is not a member of this organization",
-        });
-      }
-
-      const [comment] = await ctx.drizzle
-        .insert(comments)
-        .values({
-          id: generateId(),
-          content: input.content,
-          issueId: input.issueId,
-          authorId: ctx.user.id,
-        })
-        .returning({
-          id: comments.id,
-          content: comments.content,
-          createdAt: comments.createdAt,
-          updatedAt: comments.updatedAt,
-          issueId: comments.issueId,
-          authorId: comments.authorId,
-        });
-
-      if (!comment) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to create comment",
-        });
-      }
-
-      // Fetch the comment with author details
-      const [commentWithAuthor] = await ctx.drizzle
-        .select({
-          id: comments.id,
-          content: comments.content,
-          createdAt: comments.createdAt,
-          updatedAt: comments.updatedAt,
-          issueId: comments.issueId,
-          authorId: comments.authorId,
-          author: {
-            id: users.id,
-            name: users.name,
-            email: users.email,
-            image: users.image,
-          },
-        })
-        .from(comments)
-        .innerJoin(users, eq(comments.authorId, users.id))
-        .where(eq(comments.id, comment.id))
-        .limit(1);
-
-      if (!commentWithAuthor) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to fetch created comment",
-        });
-      }
-
-      return commentWithAuthor;
+      return createCommentWithAuthor(ctx, input);
     }),
 
   // Alias for addComment (for backward compatibility with tests)
@@ -128,102 +127,7 @@ export const issueCommentRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Verify the issue belongs to this organization
-      const [existingIssue] = await ctx.drizzle
-        .select({
-          id: issues.id,
-          organizationId: issues.organizationId,
-        })
-        .from(issues)
-        .where(
-          and(
-            eq(issues.id, input.issueId),
-            eq(issues.organizationId, ctx.organization.id),
-          ),
-        )
-        .limit(1);
-
-      if (!existingIssue) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Issue not found",
-        });
-      }
-
-      // Verify the user is a member of this organization
-      const [membership] = await ctx.drizzle
-        .select({
-          id: memberships.id,
-        })
-        .from(memberships)
-        .where(
-          and(
-            eq(memberships.userId, ctx.user.id),
-            eq(memberships.organizationId, ctx.organization.id),
-          ),
-        )
-        .limit(1);
-
-      if (!membership) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "User is not a member of this organization",
-        });
-      }
-
-      const [comment] = await ctx.drizzle
-        .insert(comments)
-        .values({
-          id: generateId(),
-          content: input.content,
-          issueId: input.issueId,
-          authorId: ctx.user.id,
-        })
-        .returning({
-          id: comments.id,
-          content: comments.content,
-          createdAt: comments.createdAt,
-          updatedAt: comments.updatedAt,
-          issueId: comments.issueId,
-          authorId: comments.authorId,
-        });
-
-      if (!comment) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to create comment",
-        });
-      }
-
-      // Fetch the comment with author details
-      const [commentWithAuthor] = await ctx.drizzle
-        .select({
-          id: comments.id,
-          content: comments.content,
-          createdAt: comments.createdAt,
-          updatedAt: comments.updatedAt,
-          issueId: comments.issueId,
-          authorId: comments.authorId,
-          author: {
-            id: users.id,
-            name: users.name,
-            email: users.email,
-            image: users.image,
-          },
-        })
-        .from(comments)
-        .innerJoin(users, eq(comments.authorId, users.id))
-        .where(eq(comments.id, comment.id))
-        .limit(1);
-
-      if (!commentWithAuthor) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to fetch created comment",
-        });
-      }
-
-      return commentWithAuthor;
+      return createCommentWithAuthor(ctx, input);
     }),
 
   // Edit comment (users can only edit their own comments)
@@ -301,14 +205,8 @@ export const issueCommentRouter = createTRPCRouter({
           authorId: comments.authorId,
         });
 
-      if (!updatedComment) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to update comment",
-        });
-      }
-
       // Fetch the updated comment with author details
+      // Note: updatedComment.id is guaranteed to exist since Drizzle .returning() throws on failure
       const [commentWithAuthor] = await ctx.drizzle
         .select({
           id: comments.id,
@@ -326,15 +224,9 @@ export const issueCommentRouter = createTRPCRouter({
         })
         .from(comments)
         .innerJoin(users, eq(comments.authorId, users.id))
-        .where(eq(comments.id, updatedComment.id))
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Drizzle .returning() guarantees non-null
+        .where(eq(comments.id, updatedComment!.id))
         .limit(1);
-
-      if (!commentWithAuthor) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to fetch updated comment",
-        });
-      }
 
       return commentWithAuthor;
     }),
