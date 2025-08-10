@@ -444,21 +444,47 @@ describe("issueRouter - Issue Detail Page", () => {
       ]);
       const commentCaller = appRouter.createCaller(commentCtx);
 
-      const newComment = {
+      // Mock the issue lookup query: select().from().where().limit()
+      const existingIssue = {
+        id: mockIssue.id,
+        organizationId: mockIssue.organizationId,
+      };
+      vi.mocked(commentCtx.drizzle.limit)
+        .mockResolvedValueOnce([existingIssue]) // First call: issue lookup
+        .mockResolvedValueOnce([mockMembership]); // Second call: membership lookup
+
+      // Mock the insert operation: insert().values().returning()
+      const insertedComment = {
         id: "comment-new",
         content: "New comment",
-        isInternal: false,
-        issueId: mockIssue.id,
-        createdById: mockUser.id,
         createdAt: new Date(),
         updatedAt: new Date(),
+        issueId: mockIssue.id,
+        authorId: mockUser.id,
       };
+      vi.mocked(commentCtx.drizzle.returning).mockResolvedValue([
+        insertedComment,
+      ]);
 
-      commentCtx.db.issue.findFirst.mockResolvedValue(mockIssue as any);
-      commentCtx.db.membership.findUnique.mockResolvedValue(
-        mockMembership as any,
-      );
-      commentCtx.db.comment.create.mockResolvedValue(newComment as any);
+      // Mock the final query to get comment with author: select().from().innerJoin().where().limit()
+      const commentWithAuthor = {
+        id: "comment-new",
+        content: "New comment",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        issueId: mockIssue.id,
+        authorId: mockUser.id,
+        author: {
+          id: mockUser.id,
+          name: mockUser.name,
+          email: mockUser.email,
+          image: null,
+        },
+      };
+      // Third limit call for final comment with author
+      vi.mocked(commentCtx.drizzle.limit).mockResolvedValueOnce([
+        commentWithAuthor,
+      ]);
 
       const result = await commentCaller.issue.comment.create({
         issueId: mockIssue.id,
@@ -466,65 +492,82 @@ describe("issueRouter - Issue Detail Page", () => {
       });
 
       expect(result.content).toBe("New comment");
+      expect(result.author).toBeDefined();
+      expect(result.author.id).toBe(mockUser.id);
     });
 
-    it("should allow internal comments for authorized users", async () => {
-      const internalCtx = createAuthenticatedContext([
-        "issue:create",
-        "issue:internal_comment",
-      ]);
-      const internalCaller = appRouter.createCaller(internalCtx);
-
-      const internalComment = {
-        id: "comment-internal",
-        content: "Internal note",
-        isInternal: true,
-        issueId: mockIssue.id,
-        createdById: mockUser.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
-      internalCtx.db.issue.findFirst.mockResolvedValue(mockIssue as any);
-      internalCtx.db.membership.findUnique.mockResolvedValue(
-        mockMembership as any,
-      );
-      internalCtx.db.comment.create.mockResolvedValue(internalComment as any);
-
-      const result = await internalCaller.issue.comment.create({
-        issueId: mockIssue.id,
-        content: "Internal note",
-      });
-
-      expect(result.content).toBe("Internal note");
-    });
-
-    it("should deny internal comments for unauthorized users", async () => {
-      const publicCommentCtx = createAuthenticatedContext([
+    it("should allow creating comments with valid permissions", async () => {
+      const authorizedCtx = createAuthenticatedContext([
         "issue:create",
         "issue:comment",
       ]);
-      const publicCommentCaller = appRouter.createCaller(publicCommentCtx);
+      const authorizedCaller = appRouter.createCaller(authorizedCtx);
 
-      publicCommentCtx.db.issue.findFirst.mockResolvedValue(mockIssue as any);
-      publicCommentCtx.db.membership.findUnique.mockResolvedValue(
-        mockMembership as any,
-      );
+      // Mock the issue lookup query: select().from().where().limit()
+      const existingIssue = {
+        id: mockIssue.id,
+        organizationId: mockIssue.organizationId,
+      };
+      vi.mocked(authorizedCtx.drizzle.limit)
+        .mockResolvedValueOnce([existingIssue]) // First call: issue lookup
+        .mockResolvedValueOnce([mockMembership]); // Second call: membership lookup
 
-      // Try the call and see what happens
-      try {
-        const result = await publicCommentCaller.issue.comment.create({
+      // Mock the insert operation: insert().values().returning()
+      const insertedComment = {
+        id: "comment-authorized",
+        content: "Authorized comment",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        issueId: mockIssue.id,
+        authorId: mockUser.id,
+      };
+      vi.mocked(authorizedCtx.drizzle.returning).mockResolvedValue([
+        insertedComment,
+      ]);
+
+      // Mock the final query to get comment with author: select().from().innerJoin().where().limit()
+      const commentWithAuthor = {
+        id: "comment-authorized",
+        content: "Authorized comment",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        issueId: mockIssue.id,
+        authorId: mockUser.id,
+        author: {
+          id: mockUser.id,
+          name: mockUser.name,
+          email: mockUser.email,
+          image: null,
+        },
+      };
+      // Third limit call for final comment with author
+      vi.mocked(authorizedCtx.drizzle.limit).mockResolvedValueOnce([
+        commentWithAuthor,
+      ]);
+
+      const result = await authorizedCaller.issue.comment.create({
+        issueId: mockIssue.id,
+        content: "Authorized comment",
+      });
+
+      expect(result.content).toBe("Authorized comment");
+      expect(result.author).toBeDefined();
+      expect(result.author.id).toBe(mockUser.id);
+    });
+
+    it("should deny comment creation for users without proper permissions", async () => {
+      const unauthorizedCtx = createAuthenticatedContext([
+        "issue:view", // Only view permission, not create/comment
+      ]);
+      const unauthorizedCaller = appRouter.createCaller(unauthorizedCtx);
+
+      // Should throw permission error before even reaching the database
+      await expect(
+        unauthorizedCaller.issue.comment.create({
           issueId: mockIssue.id,
           content: "Test comment",
-        });
-        // If we get here, the call succeeded when it should have failed
-        expect(result).toBeUndefined(); // Force a failure to see what we actually got
-      } catch (error) {
-        // This is expected - should throw a permission error
-        expect((error as Error).message).toMatch(
-          /Missing required permission|internal_comment/,
-        );
-      }
+        }),
+      ).rejects.toThrow("Missing required permission: issue:create");
     });
   });
 
