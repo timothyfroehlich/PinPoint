@@ -357,7 +357,7 @@ describe("Drizzle CRUD Operations", () => {
     beforeEach(async () => {
       await db.insert(schema.users).values({
         id: testUserId,
-        email: "delete-test@example.com",
+        email: `delete-test-${Date.now()}@example.com`,
         name: "Delete Test User",
       });
 
