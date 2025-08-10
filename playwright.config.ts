@@ -31,6 +31,12 @@ export default defineConfig({
 
     // Capture screenshot on failure
     screenshot: "only-on-failure",
+
+    // Set consistent color scheme to prevent hydration issues
+    colorScheme: "dark",
+
+    // Wait for network to be idle to ensure React hydration completes
+    waitUntil: "networkidle",
   },
 
   // Configure projects for major browsers
