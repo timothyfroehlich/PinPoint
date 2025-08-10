@@ -1,3 +1,5 @@
+import { TRPCError } from "@trpc/server";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import {
@@ -5,6 +7,7 @@ import {
   publicProcedure,
   organizationManageProcedure,
 } from "~/server/api/trpc";
+import { organizations } from "~/server/db/schema";
 
 export const organizationRouter = createTRPCRouter({
   getCurrent: publicProcedure.query(({ ctx }) => {
@@ -20,15 +23,28 @@ export const organizationRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const organization = await ctx.db.organization.update({
-        where: {
-          id: ctx.organization.id,
-        },
-        data: {
-          name: input.name,
-          ...(input.logoUrl && { logoUrl: input.logoUrl }),
-        },
-      });
+      // Prepare update data
+      const updateData: { name: string; logoUrl?: string } = {
+        name: input.name,
+      };
+      if (input.logoUrl) {
+        updateData.logoUrl = input.logoUrl;
+      }
+
+      // Execute Drizzle update
+      const [organization] = await ctx.drizzle
+        .update(organizations)
+        .set(updateData)
+        .where(eq(organizations.id, ctx.organization.id))
+        .returning();
+
+      if (!organization) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Organization not found or update failed",
+        });
+      }
+
       return organization;
     }),
 });
