@@ -48,6 +48,18 @@ vi.mock("~/lib/utils/membership-transformers", async () => {
 
 import type { VitestMockContext } from "~/test/vitestMockContext";
 
+// Extend the mock context with our test utilities
+interface AdminTestMockContext extends VitestMockContext {
+  setupRemoveUserMocks: (options?: {
+    membershipResult?: any[];
+    allMembershipsResult?: any[];
+    validationResult?: { valid: boolean; error?: string };
+    shouldThrowOnMembership?: boolean;
+    shouldThrowOnAllMemberships?: boolean;
+    shouldThrowOnDelete?: boolean;
+  }) => void;
+}
+
 import { validateUserRemoval } from "~/lib/users/roleManagementValidation";
 import { generatePrefixedId } from "~/lib/utils/id-generation";
 import { transformMembershipsForValidation } from "~/lib/utils/membership-transformers";
@@ -60,12 +72,12 @@ import {
 import { createVitestMockContext } from "~/test/vitestMockContext";
 
 describe("Admin Router (Drizzle Integration)", () => {
-  let mockContext: VitestMockContext;
+  let mockContext: AdminTestMockContext;
   let caller: ReturnType<typeof adminRouter.createCaller>;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockContext = createVitestMockContext();
+    mockContext = createVitestMockContext() as AdminTestMockContext;
 
     const permissions = ["user:manage", "role:manage", "organization:manage"];
 
@@ -466,7 +478,7 @@ describe("Admin Router (Drizzle Integration)", () => {
       };
 
       // Store the helper function for individual tests to use
-      (mockContext as any).setupRemoveUserMocks = setupRemoveUserMocks;
+      mockContext.setupRemoveUserMocks = setupRemoveUserMocks;
 
       // Note: Each test is responsible for setting up its own mocks
       // No default setup to avoid conflicts
@@ -482,7 +494,7 @@ describe("Admin Router (Drizzle Integration)", () => {
     describe("Successful Operations", () => {
       it("should successfully remove user with valid permissions", async () => {
         // Set up successful mock
-        (mockContext as any).setupRemoveUserMocks();
+        mockContext.setupRemoveUserMocks();
 
         const result = await caller.removeUser({ userId: targetUserId });
 
@@ -507,7 +519,7 @@ describe("Admin Router (Drizzle Integration)", () => {
 
       it("should properly transform memberships for validation", async () => {
         // Set up successful mock
-        (mockContext as any).setupRemoveUserMocks();
+        mockContext.setupRemoveUserMocks();
 
         await caller.removeUser({ userId: targetUserId });
 
@@ -528,7 +540,7 @@ describe("Admin Router (Drizzle Integration)", () => {
         };
 
         // Set up proper mock chain for this test case
-        (mockContext as any).setupRemoveUserMocks({
+        mockContext.setupRemoveUserMocks({
           membershipResult: [membershipWithSystemRole],
           allMembershipsResult: [
             membershipWithSystemRole,
@@ -555,7 +567,7 @@ describe("Admin Router (Drizzle Integration)", () => {
     describe("Business Logic Validation", () => {
       it("should respect validation failure and throw PRECONDITION_FAILED", async () => {
         // Set up mock with validation failure
-        (mockContext as any).setupRemoveUserMocks({
+        mockContext.setupRemoveUserMocks({
           validationResult: {
             valid: false,
             error: "Cannot remove last admin user",
@@ -576,7 +588,7 @@ describe("Admin Router (Drizzle Integration)", () => {
 
       it("should handle validation failure without specific error message", async () => {
         // Set up successful query chains
-        (mockContext as any).setupRemoveUserMocks();
+        mockContext.setupRemoveUserMocks();
 
         vi.mocked(validateUserRemoval).mockReturnValue({
           valid: false,
@@ -590,7 +602,7 @@ describe("Admin Router (Drizzle Integration)", () => {
 
       it("should pass correct context to validation", async () => {
         // Set up successful query chains
-        (mockContext as any).setupRemoveUserMocks();
+        mockContext.setupRemoveUserMocks();
 
         await caller.removeUser({ userId: targetUserId });
 
@@ -613,7 +625,7 @@ describe("Admin Router (Drizzle Integration)", () => {
     describe("Security & Authorization", () => {
       it("should enforce organization isolation", async () => {
         // Set up mock with empty membership result (user not found in org)
-        (mockContext as any).setupRemoveUserMocks({
+        mockContext.setupRemoveUserMocks({
           membershipResult: [], // Empty result - user not found in org
         });
 
@@ -631,7 +643,7 @@ describe("Admin Router (Drizzle Integration)", () => {
 
       it("should query memberships only for current organization", async () => {
         // Set up successful query chains
-        (mockContext as any).setupRemoveUserMocks();
+        mockContext.setupRemoveUserMocks();
 
         await caller.removeUser({ userId: targetUserId });
 
@@ -648,7 +660,7 @@ describe("Admin Router (Drizzle Integration)", () => {
         // The test validates that the procedure correctly uses the middleware
 
         // Set up successful query chains
-        (mockContext as any).setupRemoveUserMocks();
+        mockContext.setupRemoveUserMocks();
 
         await caller.removeUser({ userId: targetUserId });
 
@@ -660,7 +672,7 @@ describe("Admin Router (Drizzle Integration)", () => {
     describe("Error Scenarios", () => {
       it("should throw NOT_FOUND when user is not in organization", async () => {
         // Set up mock with empty membership result (user not found in org)
-        (mockContext as any).setupRemoveUserMocks({
+        mockContext.setupRemoveUserMocks({
           membershipResult: [], // Empty result - user not found in org
         });
 
@@ -681,7 +693,7 @@ describe("Admin Router (Drizzle Integration)", () => {
 
       it("should handle database errors during membership lookup", async () => {
         // Set up mock to throw error on membership lookup
-        (mockContext as any).setupRemoveUserMocks({
+        mockContext.setupRemoveUserMocks({
           shouldThrowOnMembership: true,
         });
 
@@ -692,7 +704,7 @@ describe("Admin Router (Drizzle Integration)", () => {
 
       it("should handle database errors during all memberships query", async () => {
         // Set up mock to throw error on all memberships query
-        (mockContext as any).setupRemoveUserMocks({
+        mockContext.setupRemoveUserMocks({
           shouldThrowOnAllMemberships: true,
         });
 
@@ -703,7 +715,7 @@ describe("Admin Router (Drizzle Integration)", () => {
 
       it("should handle database errors during delete operation", async () => {
         // Set up mock to throw error on delete operation
-        (mockContext as any).setupRemoveUserMocks({
+        mockContext.setupRemoveUserMocks({
           shouldThrowOnDelete: true,
         });
 
@@ -735,7 +747,7 @@ describe("Admin Router (Drizzle Integration)", () => {
         };
 
         // Set up mock chain for this test case
-        (mockContext as any).setupRemoveUserMocks({
+        mockContext.setupRemoveUserMocks({
           membershipResult: [membershipWithoutEmail],
           allMembershipsResult: [membershipWithoutEmail, mockAllMemberships[1]],
         });
@@ -767,7 +779,7 @@ describe("Admin Router (Drizzle Integration)", () => {
         };
 
         // Set up mock chain for this test case
-        (mockContext as any).setupRemoveUserMocks({
+        mockContext.setupRemoveUserMocks({
           membershipResult: [complexMembership],
           allMembershipsResult: [complexMembership, mockAllMemberships[1]],
         });
@@ -800,7 +812,7 @@ describe("Admin Router (Drizzle Integration)", () => {
     describe("Data Transformation", () => {
       it("should properly construct validation membership object", async () => {
         // Set up successful query chains
-        (mockContext as any).setupRemoveUserMocks();
+        mockContext.setupRemoveUserMocks();
 
         await caller.removeUser({ userId: targetUserId });
 
@@ -838,7 +850,7 @@ describe("Admin Router (Drizzle Integration)", () => {
         };
 
         // Set up mock chain for this test case
-        (mockContext as any).setupRemoveUserMocks({
+        mockContext.setupRemoveUserMocks({
           membershipResult: [membershipWithNullEmail],
           allMembershipsResult: [
             membershipWithNullEmail,
