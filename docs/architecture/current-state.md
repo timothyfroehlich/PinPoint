@@ -16,7 +16,7 @@ PinPoint is a multi-tenant issue tracking system for pinball arcade operators, b
 > - **Current Stack**: Dual-ORM (Prisma + Drizzle) + Supabase Auth + Application-level security
 > - **Target Stack**: Drizzle ORM + Supabase (Auth, Storage, RLS) + Database-level security
 > - **Progress**: Phase 1 (Supabase Auth) ✅ Complete | Phase 2A (Drizzle Foundation) ✅ Complete | Phase 2B-E 🔄 In Progress
-> - **Timeline**: 6-week staged migration (Week 4 of 6)
+> - **Timeline**: 2-3 week direct conversion migration (Week 1 of 3)
 >
 > For migration details, see [Migration Guide](/docs/migration/supabase-drizzle/)
 
