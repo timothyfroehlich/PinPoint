@@ -5,8 +5,8 @@ import { v4 as uuidv4 } from "uuid";
  * Uses crypto.randomUUID() when available (Node 14.17+), falls back to uuid library.
  */
 export function generateId(): string {
-  // In Node.js 19+ crypto.randomUUID is always available
-  // Keep fallback for older environments during development/testing
+  // In all currently supported Node.js versions (14.17+ as of 2025), crypto.randomUUID is available
+  // Keep fallback for legacy or non-Node environments during development/testing
   if (
     typeof crypto !== "undefined" &&
     typeof crypto.randomUUID === "function"

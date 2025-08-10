@@ -19,6 +19,7 @@ export function transformMembershipForValidation(
     user: {
       id: membership.user.id,
       name: membership.user.name,
+      // Convert null emails to empty string to match validation interface expectations
       email: membership.user.email ?? "",
     },
     role: {

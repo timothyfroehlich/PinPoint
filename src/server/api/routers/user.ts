@@ -310,7 +310,7 @@ export const userRouter = createTRPCRouter({
         ]);
 
       // Initialize counts for all users
-      userIds.forEach((userId: string) => {
+      userIds.forEach((userId) => {
         userCounts.set(userId, {
           ownedMachines: 0,
           issuesCreated: 0,
@@ -321,19 +321,19 @@ export const userRouter = createTRPCRouter({
       // Populate actual counts
       machinesCountRows.forEach((row) => {
         if (row.userId) {
-          const existing = userCounts.get(row.userId);
-          if (existing) existing.ownedMachines = row.count;
+          const existingCounts = userCounts.get(row.userId);
+          if (existingCounts) existingCounts.ownedMachines = row.count;
         }
       });
       issuesCountRows.forEach((row) => {
         if (row.userId) {
-          const existing = userCounts.get(row.userId);
-          if (existing) existing.issuesCreated = row.count;
+          const existingCounts = userCounts.get(row.userId);
+          if (existingCounts) existingCounts.issuesCreated = row.count;
         }
       });
       commentsCountRows.forEach((row) => {
-        const existing = userCounts.get(row.userId);
-        if (existing) existing.comments = row.count;
+        const existingCounts = userCounts.get(row.userId);
+        if (existingCounts) existingCounts.comments = row.count;
       });
     }
 
