@@ -2,10 +2,11 @@
 
 ## 🚨 Active Migration
 
-PinPoint is undergoing a major architectural migration from Prisma + NextAuth to Supabase + Drizzle + Row Level Security.
+PinPoint is completing a direct conversion migration from Prisma to Drizzle optimized for solo development velocity.
 
-**Migration Status**: Stage 1 of 3 (Supabase Auth Integration)  
-**Timeline**: 6 weeks total  
+**Migration Status**: Phase 2B-E (Router Conversions)  
+**Progress**: Phase 2A Drizzle Foundation Complete, 3 routers converted  
+**Timeline**: 2-3 weeks total direct conversion approach  
 **Details**: [`migration/supabase-drizzle/`](./migration/supabase-drizzle/)
 
 ## Quick Start
@@ -51,15 +52,15 @@ See [`CLAUDE.md`](../CLAUDE.md) for the complete command reference.
 
 ### Migration Patterns
 
-- **Auth**: NextAuth → Supabase Auth ([patterns](./migration/supabase-drizzle/quick-reference/auth-patterns.md))
-- **ORM**: Prisma → Drizzle ([patterns](./migration/supabase-drizzle/quick-reference/prisma-to-drizzle.md))
-- **Testing**: Mocks → Transactions ([philosophy](./testing/))
+- **ORM**: Prisma → Drizzle Direct Conversion ([patterns](./migration/supabase-drizzle/quick-reference/prisma-to-drizzle.md))
+- **Approach**: Direct router conversion without parallel validation ([guide](./developer-guides/drizzle/dual-orm-migration.md))
+- **Testing**: Existing test patterns maintained during migration ([philosophy](./testing/))
 
 ### Architecture Principles
 
-1. **Multi-tenant by design** - Row-level security enforcement
-2. **Type-safe throughout** - Strictest TypeScript standards
-3. **Integration-first testing** - Real database, transaction isolation
+1. **Multi-tenant by design** - Application-level organization_id filtering
+2. **Type-safe throughout** - Strictest TypeScript standards with tRPC + Drizzle
+3. **Direct conversion approach** - Clean Drizzle implementations without validation overhead
 4. **Progressive enhancement** - Public features work without auth
 
 ## Contributing
