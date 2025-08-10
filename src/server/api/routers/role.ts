@@ -20,7 +20,11 @@ export const roleRouter = createTRPCRouter({
    * List all roles in the organization
    */
   list: organizationManageProcedure.query(async ({ ctx }) => {
-    const roleService = new RoleService(ctx.db, ctx.organization.id);
+    const roleService = new RoleService(
+      ctx.db,
+      ctx.organization.id,
+      ctx.drizzle,
+    );
     const roles = await roleService.getRoles();
 
     return roles.map(
@@ -63,7 +67,11 @@ export const roleRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const roleService = new RoleService(ctx.db, ctx.organization.id);
+      const roleService = new RoleService(
+        ctx.db,
+        ctx.organization.id,
+        ctx.drizzle,
+      );
 
       // If template is specified, create from template
       if (input.template) {
@@ -106,7 +114,11 @@ export const roleRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const roleService = new RoleService(ctx.db, ctx.organization.id);
+      const roleService = new RoleService(
+        ctx.db,
+        ctx.organization.id,
+        ctx.drizzle,
+      );
 
       const updateData: {
         name?: string;
@@ -132,7 +144,11 @@ export const roleRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const roleService = new RoleService(ctx.db, ctx.organization.id);
+      const roleService = new RoleService(
+        ctx.db,
+        ctx.organization.id,
+        ctx.drizzle,
+      );
 
       // Ensure we maintain at least one admin before deletion
       await roleService.ensureAtLeastOneAdmin();

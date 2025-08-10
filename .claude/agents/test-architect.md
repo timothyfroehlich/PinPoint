@@ -38,11 +38,14 @@ When given a test file to work on, follow this discovery process:
 
 Based on test type, read appropriate docs from `docs/testing/`:
 
-- ALL: test-utilities-guide.md, troubleshooting.md
-- Unit: unit-patterns.md, vitest-guide.md
-- Integration: integration-patterns.md, test-database.md
-- Component: architecture-patterns.md, vitest-guide.md
-- E2E: e2e-test-status.md
+- **ALL**: test-utilities-guide.md, troubleshooting.md, vitest-guide.md
+- **Unit**: unit-patterns.md, advanced-mock-patterns.md
+- **Integration**: integration-patterns.md, test-database.md
+- **Component**: architecture-patterns.md, vitest-guide.md (MSW-tRPC v2.0.1 patterns)
+- **Router/tRPC**: drizzle-router-testing-guide.md, advanced-mock-patterns.md
+- **E2E**: e2e-test-status.md
+
+**CRITICAL**: Always read `vitest-guide.md` for current MSW-tRPC v2.0.1 patterns before working on component tests.
 
 ### 3. Update Architecture Maps
 
@@ -308,9 +311,10 @@ Log file should contain:
 
 ### Vitest + TypeScript
 
-- Use `vi.hoisted()` at file top for mock setup
+- Use `vi.hoisted()` when mocks need to be available during module resolution
 - Apply proper TypeScript types to all mocks
 - Leverage `satisfies` for type-safe test data
+- Use `vi.stubEnv()` for environment variable testing
 
 ### Material UI Components
 
@@ -324,11 +328,157 @@ Log file should contain:
 - Mock at the procedure level, not HTTP
 - Test input validation and auth checks
 
+### tRPC Component Testing (CRITICAL)
+
+**Required Reading**: `docs/testing/vitest-guide.md` - MSW-tRPC v2.0.1 patterns
+
+**Key Requirements**:
+
+- **MSW-tRPC v2.0.1** requires `links` array configuration
+- **Partial Mocking** requires `vi.importActual()` to preserve React integration
+- **Provider Testing** needs proper client setup with transformer configuration
+
+**Critical Pattern**: When partially mocking tRPC in components, always preserve `createClient` and `Provider` from actual implementation to prevent React rendering errors.
+
 ### Supabase Auth
 
 - Use VitestTestWrapper for auth contexts
 - Test permission boundaries explicitly
 - Verify multi-tenant isolation
+
+### Drizzle ORM Testing (CRITICAL)
+
+**IMPORTANT**: Complex Drizzle query chains require special testing approaches that differ from standard mocking patterns.
+
+**Key Challenge**: Traditional method-by-method mocking of Drizzle chains is extremely brittle and causes multiple failure points.
+
+**Required Reading**:
+
+- **`docs/testing/advanced-mock-patterns.md`** - Section "Drizzle ORM Complex Query Chain Mocking" for detailed patterns
+- **`docs/testing/drizzle-router-testing-guide.md`** - Section "Critical Lessons Learned: Complex Router Testing"
+
+**Essential Patterns to Apply**:
+
+1. **Call Counting Mock Pattern** - Use single mock functions with call counting instead of complex chain mocking
+2. **Infrastructure Preservation** - Never use `vi.clearAllMocks()` as it breaks tRPC/auth mocks
+3. **Single Call Error Testing** - Avoid double function calls that contaminate mock state
+4. **Setup Helper Functions** - Create centralized mock configuration for complex scenarios
+
+**When to Use**: Any router test involving multiple database operations, joins, or complex business logic validation.
+
+**Modern Drizzle Testing**: For newer Drizzle versions, consider `drizzle.mock()` method and factory patterns like `@praha/drizzle-factory` when available.
+
+### Complex Router Testing
+
+**For routers with multiple queries + validation logic:**
+
+**Required Reading**:
+
+- **`docs/testing/drizzle-router-testing-guide.md`** - Sections "Updated Testing Pattern for Complex Routers" and "Best Practices for Complex Router Testing"
+- **`docs/testing/advanced-mock-patterns.md`** - Section "Usage in Complex Router Tests"
+
+**Core Principles**:
+
+1. **Create Setup Helper** - Centralized mock configuration functions
+2. **Use Call Counting** - Handle multiple DB operations in sequence
+3. **Test Error Scenarios** - Database, validation, and permission errors systematically
+4. **Preserve Infrastructure** - Don't disrupt tRPC/auth mocks with `vi.clearAllMocks()`
+
+**Critical Success Factors**:
+
+- Single function call pattern for error testing (avoid double calls)
+- Selective mock clearing to preserve authentication infrastructure
+- Test one scenario completely before moving to the next
+
+## Critical Mock Management
+
+### Mock Lifecycle (CRITICAL)
+
+**Context-Dependent Approach**: Mock clearing strategy depends on test type and infrastructure complexity.
+
+**Required Reading**:
+
+- **`docs/testing/advanced-mock-patterns.md`** - Section "Mock Lifecycle Management" for detailed patterns
+- **`docs/testing/drizzle-router-testing-guide.md`** - Section "Best Practices for Complex Router Testing"
+
+**Router Tests (Complex Infrastructure)**:
+
+- **AVOID** `vi.clearAllMocks()` - destroys tRPC, auth, and permission infrastructure mocks
+- **USE** selective mock clearing for controlled mocks only
+- **RE-ESTABLISH** critical infrastructure mocks after selective clearing
+
+**Component Tests (Simpler Setup)**:
+
+- **ACCEPTABLE** to use `vi.clearAllMocks()` when infrastructure is simpler
+- **CONFIGURE** `clearMocks: true` in Vitest config for global mock clearing
+- **VERIFY** critical mocks are properly restored after clearing
+
+**Essential Practices**:
+
+1. **Mock State Isolation** - Each test should have clean, isolated mock state
+2. **Single Call Error Testing** - Avoid double function calls that contaminate mock state
+3. **Infrastructure Assessment** - Evaluate complexity before choosing clearing strategy
+
+### Error Testing Structure (CRITICAL)
+
+**Problem**: Double function calls in error tests contaminate mock state and cause false failures.
+
+**Solution**: Use single try/catch pattern with explicit error expectations instead of `expect().rejects.toThrow()` followed by additional calls.
+
+**Reference**: See `docs/testing/advanced-mock-patterns.md` section "Critical Test Structure Pattern" for detailed examples.
+
+## Debugging Protocol
+
+### When Tests Throw Unexpected Errors
+
+**Required Reading**:
+
+- **`docs/testing/advanced-mock-patterns.md`** - Section "Debugging Protocol" for step-by-step debugging approach
+- **`docs/testing/drizzle-router-testing-guide.md`** - Section "Key Breakthrough: Test Structure Fix" for common issues
+
+**Systematic Debugging Steps**:
+
+1. **Add Debug Logging** - Log error types, messages, codes, and full error objects
+2. **Verify Mock State** - Check mock call counts and results
+3. **Check Infrastructure Mocks** - Ensure auth/permission mocks are active
+4. **Validate Test Structure** - Confirm single function call pattern
+
+### Common Error Patterns
+
+**Reference Documentation for Solutions**:
+
+- **`INTERNAL_SERVER_ERROR` instead of expected code** → Mock not intercepting calls properly
+- **"Cannot read property" errors** → Infrastructure mocks destroyed by `vi.clearAllMocks()`
+- **Unexpected mock call counts** → Double function calls or state contamination
+- **Permission errors in working tests** → Infrastructure disruption from improper mock clearing
+
+**Solution Lookup**: See `docs/testing/advanced-mock-patterns.md` section "Common Error Patterns" for detailed solutions to each type.
+
+## Current Testing Considerations (2025)
+
+### Modern Vitest Features
+
+**Environment Variables**: Use `vi.stubEnv()` for environment variable mocking instead of process.env manipulation.
+
+**Browser Testing**: Consider Vitest browser mode with Playwright/WebDriver for integration testing when needed.
+
+**Configuration**: Leverage `clearMocks: true` in Vitest config for component tests with simple infrastructure.
+
+### Framework Updates
+
+**MSW-tRPC v2.0.1**: Always use `links` array configuration - see `vitest-guide.md` for current patterns.
+
+**React Integration**: Use `vi.importActual()` when partially mocking tRPC to preserve React component rendering.
+
+**Drizzle Evolution**: Stay current with `drizzle.mock()` and factory patterns as they mature.
+
+### Performance Optimization
+
+**File Organization**: Consider test file splitting for files >500 lines to improve AI agent processing and maintainability.
+
+**Mock Scope**: Minimize mock scope - only mock what's necessary for the specific test scenario.
+
+**Parallel Execution**: Structure tests to support Vitest's parallel execution capabilities.
 
 ## Quality Checklist
 
