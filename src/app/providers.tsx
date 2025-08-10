@@ -22,11 +22,6 @@ export default function Providers({
     setMounted(true);
   }, []);
 
-  // Show nothing on server/initial render to prevent hydration mismatch
-  if (!mounted) {
-    return <div style={{ visibility: "hidden" }}>{children}</div>;
-  }
-
   return (
     <AuthProvider>
       <TRPCReactProvider>
@@ -38,7 +33,12 @@ export default function Providers({
           />
           {/* CssBaseline kickstart an elegant, consistent, and simple baseline to build upon. */}
           <CssBaseline />
-          {children}
+          {/* Apply hydration safety inside providers to maintain context */}
+          {mounted ? (
+            children
+          ) : (
+            <div style={{ visibility: "hidden" }}>{children}</div>
+          )}
         </ThemeProvider>
       </TRPCReactProvider>
     </AuthProvider>
