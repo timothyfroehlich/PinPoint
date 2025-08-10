@@ -148,7 +148,7 @@ export function setTestEnvironmentVars(vars: Record<string, string>): void {
  * ```
  */
 export function simulateEnvFileContents(files: EnvFileContents): void {
-  let callCount = 0;
+  const _callCount = 0;
 
   const { mockDotenvConfig } = configureDotenvMocks();
 

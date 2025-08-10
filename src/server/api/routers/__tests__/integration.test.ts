@@ -676,7 +676,7 @@ describe("Router Integration Tests", () => {
         notifications: [],
       };
 
-      const mockRole = {
+      const _mockRole = {
         id: "role-2",
         name: "Admin Role",
         organizationId: "org-1",

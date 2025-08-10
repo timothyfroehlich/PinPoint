@@ -5,6 +5,8 @@
  * Covers complex user management, role assignments, invitations, and bulk operations.
  */
 
+/* eslint-disable @typescript-eslint/unbound-method */
+
 import { TRPCError } from "@trpc/server";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
@@ -14,6 +16,7 @@ vi.mock("~/server/auth/permissions", async () => {
   return {
     ...actual,
     getUserPermissionsForSession: vi.fn(),
+    getUserPermissionsForSupabaseUser: vi.fn(),
     requirePermissionForSession: vi.fn(),
   };
 });
@@ -51,6 +54,7 @@ import { transformMembershipsForValidation } from "~/lib/utils/membership-transf
 import { adminRouter } from "~/server/api/routers/admin";
 import {
   getUserPermissionsForSession,
+  getUserPermissionsForSupabaseUser,
   requirePermissionForSession,
 } from "~/server/auth/permissions";
 import { createVitestMockContext } from "~/test/vitestMockContext";
@@ -103,6 +107,9 @@ describe("Admin Router (Drizzle Integration)", () => {
 
     // Mock getUserPermissionsForSession to return our test permissions
     vi.mocked(getUserPermissionsForSession).mockResolvedValue(permissions);
+
+    // Mock getUserPermissionsForSupabaseUser (used by organizationProcedure)
+    vi.mocked(getUserPermissionsForSupabaseUser).mockResolvedValue(permissions);
 
     // Mock requirePermissionForSession to check if permission is in our list
     vi.mocked(requirePermissionForSession).mockImplementation(
@@ -280,6 +287,29 @@ describe("Admin Router (Drizzle Integration)", () => {
       // Reset all mocks
       vi.clearAllMocks();
 
+      // Re-establish permission system mocks after clearing
+      const permissions = ["user:manage", "role:manage", "organization:manage"];
+
+      // Mock getUserPermissionsForSession to return our test permissions
+      vi.mocked(getUserPermissionsForSession).mockResolvedValue(permissions);
+
+      // Mock getUserPermissionsForSupabaseUser (used by organizationProcedure)
+      vi.mocked(getUserPermissionsForSupabaseUser).mockResolvedValue(
+        permissions,
+      );
+
+      // Mock requirePermissionForSession to check if permission is in our list
+      vi.mocked(requirePermissionForSession).mockImplementation(
+        async (_session, permission) => {
+          if (!permissions.includes(permission)) {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: `Missing required permission: ${permission}`,
+            });
+          }
+        },
+      );
+
       // Setup default mocks for successful case
       vi.mocked(validateUserRemoval).mockReturnValue({ valid: true });
       vi.mocked(transformMembershipsForValidation).mockReturnValue(
@@ -303,33 +333,50 @@ describe("Admin Router (Drizzle Integration)", () => {
         })),
       );
 
-      // Set up proper Drizzle query chain mocking
-      // Create a proper mock chain for the complex queries in removeUser
-      const membershipQuery = {
-        from: vi.fn().mockReturnThis(),
-        innerJoin: vi.fn().mockReturnThis(),
-        where: vi.fn().mockReturnThis(),
-        limit: vi.fn().mockResolvedValue([mockMembership]),
+      // Helper function to set up successful Drizzle query chains for removeUser
+      const setupSuccessfulRemoveUserChain = (
+        membershipResult = [mockMembership],
+        allMembershipsResult = mockAllMemberships,
+      ) => {
+        const membershipChain = {
+          from: vi.fn().mockReturnThis(),
+          innerJoin: vi.fn().mockReturnValue({
+            innerJoin: vi.fn().mockReturnValue({
+              where: vi.fn().mockReturnValue({
+                limit: vi.fn().mockResolvedValue(membershipResult),
+              }),
+            }),
+          }),
+        };
+
+        const allMembershipsChain = {
+          from: vi.fn().mockReturnThis(),
+          innerJoin: vi.fn().mockReturnValue({
+            innerJoin: vi.fn().mockReturnValue({
+              where: vi.fn().mockResolvedValue(allMembershipsResult),
+            }),
+          }),
+        };
+
+        const deleteChain = {
+          where: vi.fn().mockResolvedValue(undefined),
+        };
+
+        const drizzleMock = vi.mocked(mockContext.drizzle);
+        const selectMock = drizzleMock.select;
+        const deleteMock = drizzleMock.delete;
+        selectMock
+          .mockReturnValueOnce(membershipChain)
+          .mockReturnValueOnce(allMembershipsChain);
+        deleteMock.mockReturnValue(deleteChain);
       };
 
-      const allMembershipsQuery = {
-        from: vi.fn().mockReturnThis(),
-        innerJoin: vi.fn().mockReturnThis(),
-        where: vi.fn().mockResolvedValue(mockAllMemberships),
-      };
+      // Set up default successful behavior for removeUser
+      setupSuccessfulRemoveUserChain();
 
-      const deleteQuery = {
-        where: vi.fn().mockResolvedValue(undefined),
-      };
-
-      // Reset the drizzle mock with proper chaining
-      Object.assign(mockContext.drizzle, {
-        select: vi
-          .fn()
-          .mockReturnValueOnce(membershipQuery) // First select: membership lookup
-          .mockReturnValueOnce(allMembershipsQuery), // Second select: all memberships
-        delete: vi.fn().mockReturnValue(deleteQuery), // Delete operation
-      });
+      // Store the helper function for individual tests to use
+      (mockContext as any).setupSuccessfulRemoveUserChain =
+        setupSuccessfulRemoveUserChain;
 
       // Ensure the context has proper permissions for this test
       mockContext.userPermissions = [
@@ -341,6 +388,39 @@ describe("Admin Router (Drizzle Integration)", () => {
 
     describe("Successful Operations", () => {
       it("should successfully remove user with valid permissions", async () => {
+        // Set up successful Drizzle query chain
+        const successfulMembershipChain = {
+          from: vi.fn().mockReturnThis(),
+          innerJoin: vi.fn().mockReturnValue({
+            innerJoin: vi.fn().mockReturnValue({
+              where: vi.fn().mockReturnValue({
+                limit: vi.fn().mockResolvedValue([mockMembership]),
+              }),
+            }),
+          }),
+        };
+
+        const successfulAllMembershipsChain = {
+          from: vi.fn().mockReturnThis(),
+          innerJoin: vi.fn().mockReturnValue({
+            innerJoin: vi.fn().mockReturnValue({
+              where: vi.fn().mockResolvedValue(mockAllMemberships),
+            }),
+          }),
+        };
+
+        const successfulDeleteChain = {
+          where: vi.fn().mockResolvedValue(undefined),
+        };
+
+        const drizzleMock = vi.mocked(mockContext.drizzle);
+        const selectMock = drizzleMock.select;
+        const deleteMock = drizzleMock.delete;
+        selectMock
+          .mockReturnValueOnce(successfulMembershipChain)
+          .mockReturnValueOnce(successfulAllMembershipsChain);
+        deleteMock.mockReturnValue(successfulDeleteChain);
+
         // Ensure proper permissions for this specific test
         mockContext.userPermissions = [
           "user:manage",
@@ -370,6 +450,9 @@ describe("Admin Router (Drizzle Integration)", () => {
       });
 
       it("should properly transform memberships for validation", async () => {
+        // Set up successful Drizzle chain
+        (mockContext as any).setupSuccessfulRemoveUserChain();
+
         // Ensure proper permissions for this specific test
         mockContext.userPermissions = [
           "user:manage",
@@ -449,7 +532,6 @@ describe("Admin Router (Drizzle Integration)", () => {
         }
 
         // Verify delete was NOT called
-        // eslint-disable-next-line @typescript-eslint/unbound-method
         expect(vi.mocked(mockContext.drizzle.delete)).not.toHaveBeenCalled();
       });
 
@@ -504,8 +586,11 @@ describe("Admin Router (Drizzle Integration)", () => {
           organizationId: "other-org-123",
         };
 
-        // Mock finding no membership in current org
-        vi.mocked(mockContext.drizzle.limit).mockResolvedValueOnce([]);
+        // Set up chain that returns no membership (empty array) - user not found in org
+        (mockContext as any).setupSuccessfulRemoveUserChain(
+          [],
+          mockAllMemberships,
+        );
 
         await expect(
           caller.removeUser({ userId: targetUserId }),
@@ -560,8 +645,11 @@ describe("Admin Router (Drizzle Integration)", () => {
 
     describe("Error Scenarios", () => {
       it("should throw NOT_FOUND when user is not in organization", async () => {
-        // Mock empty result for membership lookup
-        vi.mocked(mockContext.drizzle.limit).mockResolvedValueOnce([]);
+        // Set up chain that returns no membership (empty array) - user not found in org
+        (mockContext as any).setupSuccessfulRemoveUserChain(
+          [],
+          mockAllMemberships,
+        );
 
         await expect(
           caller.removeUser({ userId: targetUserId }),
@@ -579,14 +667,27 @@ describe("Admin Router (Drizzle Integration)", () => {
 
         // Verify validation and delete were not called
         expect(validateUserRemoval).not.toHaveBeenCalled();
-        // eslint-disable-next-line @typescript-eslint/unbound-method
         expect(vi.mocked(mockContext.drizzle.delete)).not.toHaveBeenCalled();
       });
 
       it("should handle database errors during membership lookup", async () => {
-        vi.mocked(mockContext.drizzle.limit).mockRejectedValueOnce(
-          new Error("Database connection failed"),
-        );
+        // Create a failing select chain for the membership lookup (first query)
+        const failingMembershipChain = {
+          from: vi.fn().mockReturnThis(),
+          innerJoin: vi.fn().mockReturnValue({
+            innerJoin: vi.fn().mockReturnValue({
+              where: vi.fn().mockReturnValue({
+                limit: vi
+                  .fn()
+                  .mockRejectedValue(new Error("Database connection failed")),
+              }),
+            }),
+          }),
+        };
+
+        const drizzleMock = vi.mocked(mockContext.drizzle);
+        const selectMock = drizzleMock.select;
+        selectMock.mockReturnValueOnce(failingMembershipChain);
 
         await expect(
           caller.removeUser({ userId: targetUserId }),
@@ -594,12 +695,33 @@ describe("Admin Router (Drizzle Integration)", () => {
       });
 
       it("should handle database errors during all memberships query", async () => {
-        vi.mocked(mockContext.drizzle.limit).mockResolvedValueOnce([
-          mockMembership,
-        ]);
-        vi.mocked(mockContext.drizzle.where).mockRejectedValueOnce(
-          new Error("Query timeout"),
-        );
+        // First query succeeds (membership lookup)
+        const successfulMembershipChain = {
+          from: vi.fn().mockReturnThis(),
+          innerJoin: vi.fn().mockReturnValue({
+            innerJoin: vi.fn().mockReturnValue({
+              where: vi.fn().mockReturnValue({
+                limit: vi.fn().mockResolvedValue([mockMembership]),
+              }),
+            }),
+          }),
+        };
+
+        // Second query fails (all memberships query)
+        const failingAllMembershipsChain = {
+          from: vi.fn().mockReturnThis(),
+          innerJoin: vi.fn().mockReturnValue({
+            innerJoin: vi.fn().mockReturnValue({
+              where: vi.fn().mockRejectedValue(new Error("Query timeout")),
+            }),
+          }),
+        };
+
+        const drizzleMock = vi.mocked(mockContext.drizzle);
+        const selectMock = drizzleMock.select;
+        selectMock
+          .mockReturnValueOnce(successfulMembershipChain)
+          .mockReturnValueOnce(failingAllMembershipsChain);
 
         await expect(
           caller.removeUser({ userId: targetUserId }),
@@ -607,15 +729,42 @@ describe("Admin Router (Drizzle Integration)", () => {
       });
 
       it("should handle database errors during delete operation", async () => {
-        vi.mocked(mockContext.drizzle.limit).mockResolvedValueOnce([
-          mockMembership,
-        ]);
-        vi.mocked(mockContext.drizzle.where).mockResolvedValueOnce(
-          mockAllMemberships,
-        );
-        vi.mocked(mockContext.drizzle.where).mockRejectedValueOnce(
-          new Error("Delete constraint violation"),
-        );
+        // First query succeeds (membership lookup)
+        const successfulMembershipChain = {
+          from: vi.fn().mockReturnThis(),
+          innerJoin: vi.fn().mockReturnValue({
+            innerJoin: vi.fn().mockReturnValue({
+              where: vi.fn().mockReturnValue({
+                limit: vi.fn().mockResolvedValue([mockMembership]),
+              }),
+            }),
+          }),
+        };
+
+        // Second query succeeds (all memberships query)
+        const successfulAllMembershipsChain = {
+          from: vi.fn().mockReturnThis(),
+          innerJoin: vi.fn().mockReturnValue({
+            innerJoin: vi.fn().mockReturnValue({
+              where: vi.fn().mockResolvedValue(mockAllMemberships),
+            }),
+          }),
+        };
+
+        // Delete operation fails
+        const failingDeleteChain = {
+          where: vi
+            .fn()
+            .mockRejectedValue(new Error("Delete constraint violation")),
+        };
+
+        const drizzleMock = vi.mocked(mockContext.drizzle);
+        const selectMock = drizzleMock.select;
+        const deleteMock = drizzleMock.delete;
+        selectMock
+          .mockReturnValueOnce(successfulMembershipChain)
+          .mockReturnValueOnce(successfulAllMembershipsChain);
+        deleteMock.mockReturnValue(failingDeleteChain);
 
         await expect(
           caller.removeUser({ userId: targetUserId }),

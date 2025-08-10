@@ -63,6 +63,7 @@ export interface VitestMockContext {
   } | null;
   headers: Headers;
   logger: LoggerInterface;
+  userPermissions: string[];
 }
 
 export function createVitestMockContext(): VitestMockContext {
@@ -257,5 +258,6 @@ export function createVitestMockContext(): VitestMockContext {
     },
     headers: new Headers(),
     logger: mockLogger,
+    userPermissions: [],
   };
 }
