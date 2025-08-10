@@ -59,7 +59,7 @@ export default defineConfig({
   webServer: {
     command: "npm run dev",
     url: `http://localhost:${process.env["PORT"] ?? "49200"}`,
-    reuseExistingServer: true, // Always reuse existing server (started in CI workflow)
+    reuseExistingServer: !process.env["CI"],
     timeout: 120000,
   },
 });

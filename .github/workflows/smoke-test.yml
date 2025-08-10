@@ -117,35 +117,6 @@ jobs:
 
           echo "✅ Database setup complete - ready for smoke test"
 
-      - name: Start Next.js Development Server
-        run: |
-          set -e  # Exit on any error
-          echo "🚀 Starting Next.js development server..."
-          
-          # Start the Next.js dev server in the background
-          npm run dev &
-          DEV_SERVER_PID=$!
-          echo "📝 Dev server started with PID: $DEV_SERVER_PID"
-          
-          # Wait for the dev server to be ready
-          echo "⏳ Waiting for Next.js dev server to be ready..."
-          for i in {1..30}; do
-            if curl -s --fail http://localhost:49200 > /dev/null 2>&1; then
-              echo "✅ Next.js dev server is ready!"
-              break
-            fi
-            echo "🔄 Dev server not ready yet, waiting... (attempt $i/30)"
-            sleep 2
-          done
-          
-          # Verify the server is actually responding
-          if ! curl -s --fail http://localhost:49200 > /dev/null 2>&1; then
-            echo "❌ Next.js dev server failed to start properly"
-            exit 1
-          fi
-          
-          echo "✅ Next.js development server ready for testing"
-
       - name: Run Smoke Test
         run: |
           set -e  # Exit on any error
