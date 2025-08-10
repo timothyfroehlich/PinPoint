@@ -1,6 +1,8 @@
 import { TRPCError } from "@trpc/server";
+import { eq, and, sql, asc } from "drizzle-orm";
 import { z } from "zod";
 
+import { generatePrefixedId } from "~/lib/utils/id-generation";
 import {
   createTRPCRouter,
   organizationProcedure,
@@ -8,6 +10,7 @@ import {
   machineEditProcedure,
   machineDeleteProcedure,
 } from "~/server/api/trpc";
+import { machines, models, locations, users } from "~/server/db/schema";
 
 export const machineCoreRouter = createTRPCRouter({
   create: machineEditProcedure
@@ -19,57 +22,105 @@ export const machineCoreRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Verify that the model and room belong to the same organization
+      // Verify that the model and location belong to the same organization
+      const [model] = await ctx.drizzle
+        .select()
+        .from(models)
+        .where(eq(models.id, input.modelId))
+        .limit(1);
 
-      const model = await ctx.db.model.findFirst({
-        where: {
-          id: input.modelId,
-        },
-      });
-
-      const location = await ctx.db.location.findFirst({
-        where: {
-          id: input.locationId,
-          organizationId: ctx.organization.id,
-        },
-      });
+      const [location] = await ctx.drizzle
+        .select()
+        .from(locations)
+        .where(
+          and(
+            eq(locations.id, input.locationId),
+            eq(locations.organizationId, ctx.organization.id),
+          ),
+        )
+        .limit(1);
 
       if (!model || !location) {
         throw new Error("Invalid game title or location");
       }
 
-      const machine = await ctx.db.machine.create({
-        data: {
+      // Generate unique IDs
+      const machineId = generatePrefixedId("machine");
+      const qrCodeId = generatePrefixedId("qr");
+
+      // Create machine
+      const [machine] = await ctx.drizzle
+        .insert(machines)
+        .values({
+          id: machineId,
           name: input.name ?? model.name,
           modelId: input.modelId,
           locationId: input.locationId,
           organizationId: ctx.organization.id,
-        },
-        include: {
+          qrCodeId: qrCodeId,
+        })
+        .returning();
+
+      if (!machine) {
+        throw new Error("Failed to create machine");
+      }
+
+      // Get machine with all relationships for return
+      const [machineWithRelations] = await ctx.drizzle
+        .select({
+          id: machines.id,
+          name: machines.name,
+          modelId: machines.modelId,
+          locationId: machines.locationId,
+          organizationId: machines.organizationId,
+          ownerId: machines.ownerId,
+          qrCodeId: machines.qrCodeId,
+          qrCodeUrl: machines.qrCodeUrl,
+          qrCodeGeneratedAt: machines.qrCodeGeneratedAt,
+          ownerNotificationsEnabled: machines.ownerNotificationsEnabled,
+          notifyOnNewIssues: machines.notifyOnNewIssues,
+          notifyOnStatusChanges: machines.notifyOnStatusChanges,
+          notifyOnComments: machines.notifyOnComments,
           model: {
-            include: {
-              _count: {
-                select: {
-                  machines: true,
-                },
-              },
-            },
+            id: models.id,
+            name: models.name,
+            manufacturer: models.manufacturer,
+            year: models.year,
+            ipdbId: models.ipdbId,
+            opdbId: models.opdbId,
+            machineType: models.machineType,
+            machineDisplay: models.machineDisplay,
+            isActive: models.isActive,
+            ipdbLink: models.ipdbLink,
+            opdbImgUrl: models.opdbImgUrl,
+            kineticistUrl: models.kineticistUrl,
+            isCustom: models.isCustom,
+            machinesCount: sql<number>`(
+              SELECT COUNT(*) FROM ${machines} 
+              WHERE ${machines.modelId} = ${models.id}
+            )`,
           },
-          location: true,
+          location: locations,
           owner: {
-            select: {
-              id: true,
-              name: true,
-              image: true,
-            },
+            id: users.id,
+            name: users.name,
+            image: users.image,
           },
-        },
-      });
+        })
+        .from(machines)
+        .innerJoin(models, eq(machines.modelId, models.id))
+        .innerJoin(locations, eq(machines.locationId, locations.id))
+        .leftJoin(users, eq(machines.ownerId, users.id))
+        .where(eq(machines.id, machine.id))
+        .limit(1);
+
+      if (!machineWithRelations) {
+        throw new Error("Failed to retrieve created machine");
+      }
 
       // Auto-generate QR code for the new machine
       try {
         const qrCodeService = ctx.services.createQRCodeService();
-
         await qrCodeService.generateQRCode(machine.id);
       } catch (error) {
         // Log error but don't fail machine creation
@@ -87,31 +138,45 @@ export const machineCoreRouter = createTRPCRouter({
         });
       }
 
-      return machine;
+      return machineWithRelations;
     }),
 
-  getAll: organizationProcedure.query(({ ctx }) => {
-    return ctx.db.machine.findMany({
-      where: {
-        organizationId: ctx.organization.id,
-      },
-      include: {
-        model: true,
-        location: true,
+  getAll: organizationProcedure.query(async ({ ctx }) => {
+    const machinesWithRelations = await ctx.drizzle
+      .select({
+        id: machines.id,
+        name: machines.name,
+        modelId: machines.modelId,
+        locationId: machines.locationId,
+        organizationId: machines.organizationId,
+        ownerId: machines.ownerId,
+        qrCodeId: machines.qrCodeId,
+        qrCodeUrl: machines.qrCodeUrl,
+        qrCodeGeneratedAt: machines.qrCodeGeneratedAt,
+        ownerNotificationsEnabled: machines.ownerNotificationsEnabled,
+        notifyOnNewIssues: machines.notifyOnNewIssues,
+        notifyOnStatusChanges: machines.notifyOnStatusChanges,
+        notifyOnComments: machines.notifyOnComments,
+        model: models,
+        location: locations,
         owner: {
-          select: {
-            id: true,
-            name: true,
-            image: true,
-          },
+          id: users.id,
+          name: users.name,
+          image: users.image,
         },
-      },
-      orderBy: { model: { name: "asc" } },
-    });
+      })
+      .from(machines)
+      .innerJoin(models, eq(machines.modelId, models.id))
+      .innerJoin(locations, eq(machines.locationId, locations.id))
+      .leftJoin(users, eq(machines.ownerId, users.id))
+      .where(eq(machines.organizationId, ctx.organization.id))
+      .orderBy(asc(models.name));
+
+    return machinesWithRelations;
   }),
 
   // Public endpoint for issue reporting - returns minimal data needed for issue form
-  getAllForIssues: publicProcedure.query(({ ctx }) => {
+  getAllForIssues: publicProcedure.query(async ({ ctx }) => {
     // Use the organization resolved from subdomain context
     const organization = ctx.organization;
 
@@ -122,57 +187,83 @@ export const machineCoreRouter = createTRPCRouter({
       });
     }
 
-    return ctx.db.machine.findMany({
-      where: {
-        organizationId: organization.id,
-      },
-      select: {
-        id: true,
-        name: true,
+    const machinesForIssues = await ctx.drizzle
+      .select({
+        id: machines.id,
+        name: machines.name,
         model: {
-          select: {
-            name: true,
-          },
+          name: models.name,
         },
-      },
-      orderBy: { model: { name: "asc" } },
-    });
+      })
+      .from(machines)
+      .innerJoin(models, eq(machines.modelId, models.id))
+      .where(eq(machines.organizationId, organization.id))
+      .orderBy(asc(models.name));
+
+    return machinesForIssues;
   }),
 
   getById: organizationProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
-      const machine = await ctx.db.machine.findFirst({
-        where: {
-          id: input.id,
-          organizationId: ctx.organization.id,
-        },
-        include: {
+      const [machineWithRelations] = await ctx.drizzle
+        .select({
+          id: machines.id,
+          name: machines.name,
+          modelId: machines.modelId,
+          locationId: machines.locationId,
+          organizationId: machines.organizationId,
+          ownerId: machines.ownerId,
+          qrCodeId: machines.qrCodeId,
+          qrCodeUrl: machines.qrCodeUrl,
+          qrCodeGeneratedAt: machines.qrCodeGeneratedAt,
+          ownerNotificationsEnabled: machines.ownerNotificationsEnabled,
+          notifyOnNewIssues: machines.notifyOnNewIssues,
+          notifyOnStatusChanges: machines.notifyOnStatusChanges,
+          notifyOnComments: machines.notifyOnComments,
           model: {
-            include: {
-              _count: {
-                select: {
-                  machines: true,
-                },
-              },
-            },
+            id: models.id,
+            name: models.name,
+            manufacturer: models.manufacturer,
+            year: models.year,
+            ipdbId: models.ipdbId,
+            opdbId: models.opdbId,
+            machineType: models.machineType,
+            machineDisplay: models.machineDisplay,
+            isActive: models.isActive,
+            ipdbLink: models.ipdbLink,
+            opdbImgUrl: models.opdbImgUrl,
+            kineticistUrl: models.kineticistUrl,
+            isCustom: models.isCustom,
+            machinesCount: sql<number>`(
+              SELECT COUNT(*) FROM ${machines} 
+              WHERE ${machines.modelId} = ${models.id}
+            )`,
           },
-          location: true,
+          location: locations,
           owner: {
-            select: {
-              id: true,
-              name: true,
-              image: true,
-            },
+            id: users.id,
+            name: users.name,
+            image: users.image,
           },
-        },
-      });
+        })
+        .from(machines)
+        .innerJoin(models, eq(machines.modelId, models.id))
+        .innerJoin(locations, eq(machines.locationId, locations.id))
+        .leftJoin(users, eq(machines.ownerId, users.id))
+        .where(
+          and(
+            eq(machines.id, input.id),
+            eq(machines.organizationId, ctx.organization.id),
+          ),
+        )
+        .limit(1);
 
-      if (!machine) {
+      if (!machineWithRelations) {
         throw new Error("Game instance not found");
       }
 
-      return machine;
+      return machineWithRelations;
     }),
 
   update: machineEditProcedure
@@ -186,89 +277,177 @@ export const machineCoreRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       // First verify the game instance belongs to this organization
+      const [existingMachine] = await ctx.drizzle
+        .select()
+        .from(machines)
+        .where(
+          and(
+            eq(machines.id, input.id),
+            eq(machines.organizationId, ctx.organization.id),
+          ),
+        )
+        .limit(1);
 
-      const existingInstance = await ctx.db.machine.findFirst({
-        where: {
-          id: input.id,
-          organizationId: ctx.organization.id,
-        },
-      });
-
-      if (!existingInstance) {
-        throw new Error("Game instance not found");
+      if (!existingMachine) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Machine not found or not accessible",
+        });
       }
 
       // If updating model or location, verify they belong to the organization
       if (input.modelId) {
-        const model = await ctx.db.model.findFirst({
-          where: {
-            id: input.modelId,
-          },
-        });
+        const [model] = await ctx.drizzle
+          .select()
+          .from(models)
+          .where(eq(models.id, input.modelId))
+          .limit(1);
+
         if (!model) {
-          throw new Error("Invalid game title");
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Game title not found",
+          });
         }
       }
 
       if (input.locationId) {
-        const location = await ctx.db.location.findFirst({
-          where: {
-            id: input.locationId,
-            organizationId: ctx.organization.id,
-          },
-        });
+        const [location] = await ctx.drizzle
+          .select()
+          .from(locations)
+          .where(
+            and(
+              eq(locations.id, input.locationId),
+              eq(locations.organizationId, ctx.organization.id),
+            ),
+          )
+          .limit(1);
+
         if (!location) {
-          throw new Error("Invalid location");
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Location not found or not accessible",
+          });
         }
       }
 
-      return ctx.db.machine.update({
-        where: { id: input.id },
-        data: {
-          ...(input.name && { name: input.name }),
-          ...(input.modelId && { modelId: input.modelId }),
-          ...(input.locationId && { locationId: input.locationId }),
-        },
-        include: {
+      // Prepare update data
+      const updateData: {
+        name?: string;
+        modelId?: string;
+        locationId?: string;
+      } = {};
+      if (input.name) updateData.name = input.name;
+      if (input.modelId) updateData.modelId = input.modelId;
+      if (input.locationId) updateData.locationId = input.locationId;
+
+      // Update machine with organization scoping
+      const [updatedMachine] = await ctx.drizzle
+        .update(machines)
+        .set(updateData)
+        .where(
+          and(
+            eq(machines.id, input.id),
+            eq(machines.organizationId, ctx.organization.id),
+          ),
+        )
+        .returning();
+
+      if (!updatedMachine) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Machine not found or not accessible",
+        });
+      }
+
+      // Get updated machine with all relationships
+      const [machineWithRelations] = await ctx.drizzle
+        .select({
+          id: machines.id,
+          name: machines.name,
+          modelId: machines.modelId,
+          locationId: machines.locationId,
+          organizationId: machines.organizationId,
+          ownerId: machines.ownerId,
+          qrCodeId: machines.qrCodeId,
+          qrCodeUrl: machines.qrCodeUrl,
+          qrCodeGeneratedAt: machines.qrCodeGeneratedAt,
+          ownerNotificationsEnabled: machines.ownerNotificationsEnabled,
+          notifyOnNewIssues: machines.notifyOnNewIssues,
+          notifyOnStatusChanges: machines.notifyOnStatusChanges,
+          notifyOnComments: machines.notifyOnComments,
           model: {
-            include: {
-              _count: {
-                select: {
-                  machines: true,
-                },
-              },
-            },
+            id: models.id,
+            name: models.name,
+            manufacturer: models.manufacturer,
+            year: models.year,
+            ipdbId: models.ipdbId,
+            opdbId: models.opdbId,
+            machineType: models.machineType,
+            machineDisplay: models.machineDisplay,
+            isActive: models.isActive,
+            ipdbLink: models.ipdbLink,
+            opdbImgUrl: models.opdbImgUrl,
+            kineticistUrl: models.kineticistUrl,
+            isCustom: models.isCustom,
+            machinesCount: sql<number>`(
+              SELECT COUNT(*) FROM ${machines} 
+              WHERE ${machines.modelId} = ${models.id}
+            )`,
           },
-          location: true,
+          location: locations,
           owner: {
-            select: {
-              id: true,
-              name: true,
-              image: true,
-            },
+            id: users.id,
+            name: users.name,
+            image: users.image,
           },
-        },
-      });
+        })
+        .from(machines)
+        .innerJoin(models, eq(machines.modelId, models.id))
+        .innerJoin(locations, eq(machines.locationId, locations.id))
+        .leftJoin(users, eq(machines.ownerId, users.id))
+        .where(eq(machines.id, input.id))
+        .limit(1);
+
+      if (!machineWithRelations) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to retrieve updated machine",
+        });
+      }
+
+      return machineWithRelations;
     }),
 
   delete: machineDeleteProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       // Verify the game instance belongs to this organization
+      const [existingMachine] = await ctx.drizzle
+        .select()
+        .from(machines)
+        .where(
+          and(
+            eq(machines.id, input.id),
+            eq(machines.organizationId, ctx.organization.id),
+          ),
+        )
+        .limit(1);
 
-      const existingInstance = await ctx.db.machine.findFirst({
-        where: {
-          id: input.id,
-          organizationId: ctx.organization.id,
-        },
-      });
-
-      if (!existingInstance) {
+      if (!existingMachine) {
         throw new Error("Game instance not found");
       }
 
-      return ctx.db.machine.delete({
-        where: { id: input.id },
-      });
+      // Delete the machine
+      const [deletedMachine] = await ctx.drizzle
+        .delete(machines)
+        .where(eq(machines.id, input.id))
+        .returning();
+
+      if (!deletedMachine) {
+        throw new Error("Failed to delete machine");
+      }
+
+      return deletedMachine;
     }),
 });

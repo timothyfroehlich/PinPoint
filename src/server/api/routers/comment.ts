@@ -1,4 +1,5 @@
 import { TRPCError } from "@trpc/server";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import {
@@ -8,46 +9,57 @@ import {
   organizationManageProcedure,
 } from "~/server/api/trpc";
 import { COMMENT_CLEANUP_CONFIG } from "~/server/constants/cleanup";
+import { comments, issues, users } from "~/server/db/schema";
+import { excludeSoftDeleted } from "~/server/db/utils/common-queries";
 
 export const commentRouter = createTRPCRouter({
   // Get comments for an issue (excludes deleted)
   getForIssue: organizationProcedure
     .input(z.object({ issueId: z.string() }))
     .query(({ ctx, input }) => {
-      return ctx.db.comment.findMany({
-        where: {
-          issueId: input.issueId,
-          deletedAt: null,
-        },
-        include: {
+      return ctx.drizzle
+        .select({
+          id: comments.id,
+          content: comments.content,
+          createdAt: comments.createdAt,
+          updatedAt: comments.updatedAt,
+          deletedAt: comments.deletedAt,
+          deletedBy: comments.deletedBy,
+          issueId: comments.issueId,
+          authorId: comments.authorId,
           author: {
-            select: {
-              id: true,
-              name: true,
-              profilePicture: true,
-            },
+            id: users.id,
+            name: users.name,
+            profilePicture: users.profilePicture,
           },
-        },
-        orderBy: {
-          createdAt: "asc",
-        },
-      });
+        })
+        .from(comments)
+        .innerJoin(users, eq(comments.authorId, users.id))
+        .where(
+          and(
+            eq(comments.issueId, input.issueId),
+            excludeSoftDeleted(comments.deletedAt),
+          ),
+        )
+        .orderBy(comments.createdAt);
     }),
 
   // Soft delete a comment
   delete: issueDeleteProcedure
     .input(z.object({ commentId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      const comment = await ctx.db.comment.findUnique({
-        where: { id: input.commentId },
-        include: {
+      const [comment] = await ctx.drizzle
+        .select({
+          id: comments.id,
+          issueId: comments.issueId,
           issue: {
-            select: {
-              organizationId: true,
-            },
+            organizationId: issues.organizationId,
           },
-        },
-      });
+        })
+        .from(comments)
+        .innerJoin(issues, eq(comments.issueId, issues.id))
+        .where(eq(comments.id, input.commentId))
+        .limit(1);
 
       if (!comment) {
         throw new TRPCError({
