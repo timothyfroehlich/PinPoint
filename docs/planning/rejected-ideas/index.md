@@ -22,4 +22,4 @@ Initial exploration of Supabase features and benefits. Contains valuable learnin
 
 ## Current Approach
 
-The active migration uses a staged approach with independent, rollback-safe phases. See [Active Migration Plan](../../migration/supabase-drizzle/).
+The active migration uses a direct conversion approach optimized for solo development velocity. See [Active Migration Plan](../../migration/supabase-drizzle/).

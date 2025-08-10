@@ -4,7 +4,7 @@ Strategic planning and roadmap documents for PinPoint.
 
 ## Active Planning
 
-- **[Supabase + Drizzle Migration](../migration/supabase-drizzle/)** - Current architectural evolution
+- **[Prisma to Drizzle Migration](../migration/supabase-drizzle/)** - Direct conversion approach (Phase 2B-E in progress)
 - **[Production Readiness](./production-readiness-tasks.md)** - Launch preparation checklist
 
 ## Contents
