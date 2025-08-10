@@ -3,7 +3,7 @@
 import CssBaseline from "@mui/material/CssBaseline";
 import GlobalStyles from "@mui/material/GlobalStyles";
 import { ThemeProvider } from "@mui/material/styles";
-import { type ReactNode, type JSX } from "react";
+import { type ReactNode, type JSX, useEffect, useState } from "react";
 
 import { AuthProvider } from "./auth-provider";
 import theme from "./theme";
@@ -15,6 +15,13 @@ export default function Providers({
 }: {
   children: ReactNode;
 }): JSX.Element {
+  // Prevent hydration mismatch by ensuring client-side rendering consistency
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   return (
     <AuthProvider>
       <TRPCReactProvider>
@@ -26,7 +33,12 @@ export default function Providers({
           />
           {/* CssBaseline kickstart an elegant, consistent, and simple baseline to build upon. */}
           <CssBaseline />
-          {children}
+          {/* Apply hydration safety inside providers to maintain context */}
+          {mounted ? (
+            children
+          ) : (
+            <div style={{ visibility: "hidden" }}>{children}</div>
+          )}
         </ThemeProvider>
       </TRPCReactProvider>
     </AuthProvider>
