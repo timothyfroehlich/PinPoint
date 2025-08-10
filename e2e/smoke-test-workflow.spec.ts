@@ -21,6 +21,7 @@ test.describe("Smoke Test: Complete Issue Workflow", () => {
     const issueTitle = `SMOKE-TEST-${branch}-${timestamp}`;
     const testEmail = "smoketest@test.local";
 
+    // Enhanced debugging version - monitoring CI behavior
     console.log(`🧪 SMOKE TEST - Starting workflow with issue: ${issueTitle}`);
 
     // Step 1: Start Clean
@@ -37,9 +38,57 @@ test.describe("Smoke Test: Complete Issue Workflow", () => {
     await page.goto("/issues/create");
     await page.waitForLoadState("networkidle");
 
+    // Enhanced debugging for CI failures
+    const currentUrl = page.url();
+    const pageTitle = await page.title();
+    console.log(`🔍 SMOKE TEST - Current URL: ${currentUrl}`);
+    console.log(`🔍 SMOKE TEST - Page title: ${pageTitle}`);
+
+    // Check for error indicators
+    const errorElements = await page
+      .locator('[data-testid="error"], .error, [role="alert"]')
+      .count();
+    if (errorElements > 0) {
+      const errorText = await page
+        .locator('[data-testid="error"], .error, [role="alert"]')
+        .first()
+        .textContent();
+      console.log(`🚨 SMOKE TEST - Error found on page: ${errorText}`);
+    }
+
+    // Check what h1 elements actually exist
+    const h1Elements = await page.locator("h1").all();
+    console.log(`🔍 SMOKE TEST - Found ${h1Elements.length} h1 elements`);
+    for (let i = 0; i < h1Elements.length; i++) {
+      const text = await h1Elements[i].textContent();
+      console.log(`🔍 SMOKE TEST - h1[${i}]: "${text}"`);
+    }
+
+    // If no h1 found, check page content structure
+    if (h1Elements.length === 0) {
+      const bodyText = await page.locator("body").textContent();
+      console.log(
+        `🔍 SMOKE TEST - Page body text (first 500 chars): ${bodyText?.substring(0, 500)}`,
+      );
+
+      // Check if page has any content at all
+      const allText = await page.textContent("body");
+      if (!allText || allText.trim().length === 0) {
+        console.log(`🚨 SMOKE TEST - Page appears to be empty or not loaded`);
+      }
+    }
+
     // Verify we're on the create page
-    await expect(page.locator("h1")).toContainText("Create New Issue");
-    console.log("✅ SMOKE TEST - Step 2 Complete: On issue creation page");
+    try {
+      await expect(page.locator("h1")).toContainText("Create New Issue", {
+        timeout: 10000,
+      });
+      console.log("✅ SMOKE TEST - Step 2 Complete: On issue creation page");
+    } catch (error) {
+      console.log(`🚨 SMOKE TEST - Failed to find 'Create New Issue' heading`);
+      console.log(`🚨 SMOKE TEST - Error: ${error}`);
+      throw error;
+    }
 
     // Step 3: Pick a Game
     console.log("🧪 SMOKE TEST - Step 3: Selecting first available game");
