@@ -479,7 +479,7 @@ describe("Role Router (Drizzle Integration)", () => {
       ).rejects.toThrow(
         expect.objectContaining({
           code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to create role",
+          message: 'Failed to create role "Failed Role" for organization org-1',
         }),
       );
     });
@@ -840,7 +840,9 @@ describe("Role Router (Drizzle Integration)", () => {
               if (shouldThrowOnUpdate) {
                 throw new Error("Update failed");
               }
-              return Promise.resolve([updatedMembership]);
+              return Promise.resolve(
+                updatedMembership ? [updatedMembership] : [],
+              );
             }),
           }),
         }),
@@ -947,7 +949,7 @@ describe("Role Router (Drizzle Integration)", () => {
         expect(error).toBeInstanceOf(TRPCError);
         expect((error as TRPCError).code).toBe("INTERNAL_SERVER_ERROR");
         expect((error as TRPCError).message).toBe(
-          "Failed to update membership",
+          "Failed to update membership for userId=target-user, roleId=new-role, organizationId=org-1",
         );
       }
     });
@@ -964,7 +966,7 @@ describe("Role Router (Drizzle Integration)", () => {
       } catch (error) {
         expect(error).toBeInstanceOf(TRPCError);
         expect((error as TRPCError).code).toBe("INTERNAL_SERVER_ERROR");
-        expect((error as TRPCError).message).toBe(
+        expect((error as TRPCError).message).toContain(
           "Failed to retrieve updated membership",
         );
       }

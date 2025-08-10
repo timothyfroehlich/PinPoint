@@ -85,7 +85,7 @@ export const roleRouter = createTRPCRouter({
       }
 
       // Otherwise create custom role
-      const [role] = await ctx.drizzle
+      const insertedRoles = await ctx.drizzle
         .insert(roles)
         .values({
           id: generatePrefixedId("role"),
@@ -96,10 +96,18 @@ export const roleRouter = createTRPCRouter({
         })
         .returning();
 
+      if (insertedRoles.length === 0) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Failed to create role "${input.name}" for organization ${ctx.organization.id}`,
+        });
+      }
+
+      const role = insertedRoles[0];
       if (!role) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to create role",
+          message: `Role creation returned empty result for "${input.name}"`,
         });
       }
 
@@ -373,7 +381,7 @@ export const roleRouter = createTRPCRouter({
       }
 
       // Update the user's membership
-      const [updatedMembership] = await ctx.drizzle
+      const updatedMemberships = await ctx.drizzle
         .update(memberships)
         .set({ roleId: input.roleId })
         .where(
@@ -384,10 +392,18 @@ export const roleRouter = createTRPCRouter({
         )
         .returning();
 
+      if (updatedMemberships.length === 0) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Failed to update membership for userId=${input.userId}, roleId=${input.roleId}, organizationId=${ctx.organization.id}`,
+        });
+      }
+
+      const updatedMembership = updatedMemberships[0];
       if (!updatedMembership) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to update membership",
+          message: `Membership update returned empty result for userId=${input.userId}`,
         });
       }
 
@@ -409,7 +425,7 @@ export const roleRouter = createTRPCRouter({
       if (!membership) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to retrieve updated membership",
+          message: `Failed to retrieve updated membership (membershipId: ${updatedMembership.id}, userId: ${input.userId}, organizationId: ${ctx.organization.id})`,
         });
       }
 
