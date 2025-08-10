@@ -348,3 +348,200 @@ afterEach(() => {
   );
 });
 ```
+
+## Drizzle ORM Complex Query Chain Mocking
+
+### Problem: Complex Query Chain Brittleness
+
+During Phase 2B migration, we discovered that mocking individual methods in complex Drizzle query chains is extremely brittle:
+
+```typescript
+// ❌ Avoid: Complex nested method mocking
+const complexChainMock = {
+  from: vi.fn().mockReturnThis(),
+  innerJoin: vi.fn().mockReturnValue({
+    innerJoin: vi.fn().mockReturnValue({
+      where: vi.fn().mockReturnValue({
+        limit: vi.fn().mockResolvedValue(result),
+      }),
+    }),
+  }),
+};
+```
+
+**Issues with this approach:**
+
+- Multiple failure points in chain
+- Mock state contamination between calls
+- Difficult to handle different scenarios
+- Infrastructure disruption with `vi.clearAllMocks()`
+
+### Solution: Call Counting Mock Pattern
+
+```typescript
+// ✅ Preferred: Single mock function with call counting
+const createDrizzleMockWithCallCounting = (
+  scenarios: {
+    firstCallResult?: any;
+    secondCallResult?: any;
+    thirdCallResult?: any;
+    firstCallShouldThrow?: boolean;
+    secondCallShouldThrow?: boolean;
+    thirdCallShouldThrow?: boolean;
+  } = {},
+) => {
+  const {
+    firstCallResult = defaultFirstResult,
+    secondCallResult = defaultSecondResult,
+    thirdCallResult = undefined,
+    firstCallShouldThrow = false,
+    secondCallShouldThrow = false,
+    thirdCallShouldThrow = false,
+  } = scenarios;
+
+  let callCount = 0;
+  const mockQuery = vi.fn().mockImplementation(() => {
+    callCount++;
+
+    if (callCount === 1) {
+      if (firstCallShouldThrow) {
+        throw new Error("First call failed");
+      }
+      return Promise.resolve(firstCallResult);
+    } else if (callCount === 2) {
+      if (secondCallShouldThrow) {
+        throw new Error("Second call failed");
+      }
+      return Promise.resolve(secondCallResult);
+    } else {
+      if (thirdCallShouldThrow) {
+        throw new Error("Third call failed");
+      }
+      return Promise.resolve(thirdCallResult);
+    }
+  });
+
+  // Simple chain structure that all lead to our single mock function
+  const createMockChain = (hasFinalMethod = "limit") => ({
+    from: vi.fn().mockReturnThis(),
+    innerJoin: vi.fn().mockReturnThis(),
+    where: vi.fn().mockReturnThis(),
+    [hasFinalMethod]: mockQuery,
+  });
+
+  return { mockQuery, createMockChain };
+};
+```
+
+### Usage in Complex Router Tests
+
+```typescript
+describe("Admin Router removeUser", () => {
+  let mockContext: VitestMockContext;
+  let setupRemoveUserMocks: Function;
+
+  beforeEach(() => {
+    mockContext = createVitestMockContext();
+
+    setupRemoveUserMocks = (options = {}) => {
+      const { mockQuery, createMockChain } = createDrizzleMockWithCallCounting({
+        firstCallResult: options.membershipResult || [mockMembership],
+        secondCallResult: options.allMembershipsResult || mockAllMemberships,
+        thirdCallResult: undefined, // Delete operation
+        firstCallShouldThrow: options.shouldThrowOnMembership,
+        secondCallShouldThrow: options.shouldThrowOnAllMemberships,
+        thirdCallShouldThrow: options.shouldThrowOnDelete,
+      });
+
+      // Setup Drizzle mocks using our chain creators
+      vi.mocked(mockContext.drizzle.select)
+        .mockReturnValueOnce(createMockChain("limit")) // Membership lookup
+        .mockReturnValueOnce(createMockChain("where")); // All memberships
+
+      vi.mocked(mockContext.drizzle.delete).mockReturnValue(
+        createMockChain("where"),
+      ); // Delete operation
+
+      // Setup validation mocks
+      vi.mocked(validateUserRemoval).mockReturnValue(
+        options.validationResult || { valid: true },
+      );
+    };
+  });
+
+  it("should handle validation failure", async () => {
+    setupRemoveUserMocks({
+      validationResult: {
+        valid: false,
+        error: "Cannot remove last admin user",
+      },
+    });
+
+    try {
+      await caller.removeUser({ userId: "test-user" });
+      throw new Error("Expected function to throw");
+    } catch (error) {
+      expect(error).toBeInstanceOf(TRPCError);
+      expect((error as TRPCError).code).toBe("PRECONDITION_FAILED");
+    }
+  });
+
+  it("should handle database errors on first query", async () => {
+    setupRemoveUserMocks({
+      shouldThrowOnMembership: true,
+    });
+
+    await expect(caller.removeUser({ userId: "test-user" })).rejects.toThrow(
+      "First call failed",
+    );
+  });
+});
+```
+
+### Key Benefits of Call Counting Pattern
+
+1. **Single Point of Control**: All query results controlled by one function
+2. **Scenario Flexibility**: Easy to test different error conditions
+3. **Reduced Brittleness**: No complex nested mock structures
+4. **Infrastructure Preservation**: Doesn't disrupt tRPC/auth mocks
+5. **Debugging Friendly**: Easy to trace which call is causing issues
+
+### Critical Test Structure Pattern
+
+```typescript
+// ❌ Avoid: Double function calls that contaminate mock state
+await expect(caller.removeUser({ userId })).rejects.toThrow(TRPCError);
+try {
+  await caller.removeUser({ userId }); // This call uses contaminated state
+  // assertions...
+}
+
+// ✅ Preferred: Single call with proper error handling
+try {
+  await caller.removeUser({ userId });
+  throw new Error("Expected function to throw, but it didn't");
+} catch (error) {
+  expect(error).toBeInstanceOf(TRPCError);
+  expect((error as TRPCError).code).toBe("PRECONDITION_FAILED");
+}
+```
+
+### Mock Lifecycle Management
+
+```typescript
+beforeEach(() => {
+  // ❌ Don't use vi.clearAllMocks() - breaks infrastructure
+  // vi.clearAllMocks();
+
+  // ✅ Clear only specific mocks you control
+  vi.mocked(mockContext.drizzle.select).mockClear();
+  vi.mocked(mockContext.drizzle.delete).mockClear();
+  vi.mocked(validateUserRemoval).mockClear();
+
+  // Re-establish critical infrastructure mocks
+  setupPermissionMocks();
+  setupAuthMocks();
+});
+```
+
+This pattern has been battle-tested on complex admin router procedures with multiple database queries, validation logic, and error scenarios.
