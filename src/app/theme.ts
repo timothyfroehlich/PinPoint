@@ -3,7 +3,7 @@ import { createTheme } from "@mui/material/styles";
 // Create a theme instance matching the PinPoint target design
 const theme = createTheme({
   palette: {
-    mode: "dark",
+    // Remove mode to prevent colorScheme script injection that causes hydration mismatch in CI
     primary: {
       main: "#667eea", // Purple-blue for primary actions and user avatar
     },
