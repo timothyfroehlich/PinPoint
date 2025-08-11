@@ -449,43 +449,50 @@ export async function getIssuesCursor(
 }
 ```
 
-## ⚠️ MIGRATION: Prisma Query Patterns
+## Direct Conversion: Prisma to Drizzle Patterns
 
-### Basic Query Differences
+### Migration Philosophy
+
+PinPoint uses a direct conversion approach from Prisma to Drizzle, focusing on clean, idiomatic Drizzle implementations rather than preserving Prisma patterns.
+
+### Basic Query Conversion
 
 ```typescript
-// OLD: Prisma
-const user = await prisma.user.findUnique({
+// ❌ OLD: Prisma
+const user = await ctx.db.user.findUnique({
   where: { id: userId },
   include: { memberships: true },
 });
 
-// NEW: Drizzle (with joins)
-const userWithMemberships = await db
-  .select()
-  .from(users)
-  .leftJoin(memberships, eq(users.id, memberships.userId))
-  .where(eq(users.id, userId));
-
-// NEW: Drizzle (with query API - coming soon)
-const user = await db.query.users.findFirst({
+// ✅ NEW: Clean Drizzle (preferred - relational query API)
+const user = await ctx.drizzle.query.users.findFirst({
   where: eq(users.id, userId),
   with: { memberships: true },
 });
+
+// ✅ ALTERNATIVE: Explicit joins when more control needed
+const userWithMemberships = await ctx.drizzle
+  .select({
+    user: users,
+    memberships: memberships,
+  })
+  .from(users)
+  .leftJoin(memberships, eq(users.id, memberships.userId))
+  .where(eq(users.id, userId));
 ```
 
-### Transaction Differences
+### Transaction Conversion
 
 ```typescript
-// OLD: Prisma $transaction
-const result = await prisma.$transaction(async (tx) => {
+// ❌ OLD: Prisma $transaction
+const result = await ctx.db.$transaction(async (tx) => {
   const user = await tx.user.create({ data });
   const membership = await tx.membership.create({ data });
   return { user, membership };
 });
 
-// NEW: Drizzle transaction
-const result = await db.transaction(async (tx) => {
+// ✅ NEW: Drizzle transaction with .returning()
+const result = await ctx.drizzle.transaction(async (tx) => {
   const [user] = await tx.insert(users).values(data).returning();
   const [membership] = await tx
     .insert(memberships)
@@ -495,11 +502,11 @@ const result = await db.transaction(async (tx) => {
 });
 ```
 
-### Include vs Join
+### Complex Query Conversion
 
 ```typescript
-// OLD: Prisma include
-const issueWithAll = await prisma.issue.findUnique({
+// ❌ OLD: Prisma with nested includes
+const issueWithAll = await ctx.db.issue.findUnique({
   where: { id },
   include: {
     machine: {
@@ -513,15 +520,40 @@ const issueWithAll = await prisma.issue.findUnique({
   },
 });
 
-// NEW: Drizzle joins
-const issueWithAll = await db
+// ✅ NEW: Drizzle relational query (preferred)
+const issueWithAll = await ctx.drizzle.query.issues.findFirst({
+  where: eq(issues.id, id),
+  with: {
+    machine: {
+      with: {
+        model: true,
+        location: true,
+      },
+    },
+    status: true,
+    createdBy: {
+      columns: {
+        id: true,
+        name: true,
+        email: true,
+      },
+    },
+  },
+});
+
+// ✅ ALTERNATIVE: Explicit joins for complex cases
+const issueWithAll = await ctx.drizzle
   .select({
     issue: issues,
     machine: machines,
     model: models,
     location: locations,
     status: issueStatuses,
-    createdBy: users,
+    createdBy: {
+      id: users.id,
+      name: users.name,
+      email: users.email,
+    },
   })
   .from(issues)
   .innerJoin(machines, eq(issues.machineId, machines.id))
