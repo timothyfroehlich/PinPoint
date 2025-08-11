@@ -1005,6 +1005,8 @@ export const userRouter = createTRPCRouter({
 
 ### Multi-Tenant Patterns with RLS
 
+> **Note**: This section describes a future architectural goal. The current migration focuses on replacing Prisma with Drizzle, but manual organization ID filtering is still in use. RLS is not yet implemented.
+
 ```typescript
 // ✅ RLS automatically filters - no manual organizationId needed
 const orgIssues = await db

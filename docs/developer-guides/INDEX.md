@@ -2,17 +2,22 @@
 
 In-depth technical guides for PinPoint development.
 
-## Current Stack (Being Replaced)
+## Current Stack (Migration In Progress)
+
+**Legacy (Being Replaced):**
 
 - TypeScript with Prisma type generation
 - NextAuth session patterns
-- Heavy mocking test approach
 
-## Migration Target
+**New Stack (Current):**
 
 - TypeScript with Drizzle type inference
-- Supabase JWT-based auth
-- Integration testing with real database
+- Supabase server-centric auth (@supabase/ssr)
+- Generated columns for computed fields
+- Server Components + Server Actions
+- Modern ES Module mocking patterns
+
+**🚨 CRITICAL**: See [`../latest-updates/`](../latest-updates/) for post-training breaking changes
 
 ## Contents
 
@@ -23,3 +28,4 @@ In-depth technical guides for PinPoint development.
 - **[drizzle/](./drizzle/)** - Drizzle ORM patterns and migrations
 - **[row-level-security/](./row-level-security/)** - RLS implementation and testing
 - **[trpc/](./trpc/)** - tRPC context patterns with new stack
+- **[drizzle-migration-review-procedure.md](./drizzle-migration-review-procedure.md)** - AI-powered review checklist for Drizzle migrations
