@@ -19,6 +19,7 @@ PinPoint is completing a direct conversion migration from Prisma to Drizzle opti
 
 ### For Migration Participants
 
+- **🚨 CRITICAL**: [`latest-updates/`](./latest-updates/) - Post-training breaking changes and new patterns
 - **Migration Hub**: [`migration/supabase-drizzle/`](./migration/supabase-drizzle/)
 - **Quick References**: [`migration/supabase-drizzle/quick-reference/`](./migration/supabase-drizzle/quick-reference/)
 - **New Stack Guides**: [`developer-guides/`](./developer-guides/) (Supabase, Drizzle, RLS)
@@ -27,6 +28,7 @@ PinPoint is completing a direct conversion migration from Prisma to Drizzle opti
 
 ### Core Documentation
 
+- [`latest-updates/`](./latest-updates/) - **CRITICAL**: Post-training tech stack updates (August 2025)
 - [`architecture/`](./architecture/) - System design, patterns, and current state
 - [`developer-guides/`](./developer-guides/) - Technology-specific implementation guides
 - [`testing/`](./testing/) - Testing philosophy and patterns (now integration-first)
