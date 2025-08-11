@@ -15,27 +15,38 @@ $ARGUMENTS can be:
 
 - PR number (e.g., `123`) → Full PR review
 - File path (e.g., `src/server/api/routers/issues.ts`) → Deep file analysis
-- Empty → Review current working directory changes
+- Empty → Review current branch changes vs main
 
 **Detecting Review Mode:**
 
 ```bash
-echo "🔍 Migration Review for: ${ARGUMENTS:-working directory}"
-git status --porcelain
-```
-
-**If reviewing a PR (number):**
-
-```bash
-gh pr view $ARGUMENTS
-gh pr diff $ARGUMENTS --name-only
-```
-
-**If reviewing a specific file:**
-
-```bash
-git log --oneline -5 -- $ARGUMENTS
-git diff HEAD~1..HEAD -- $ARGUMENTS
+# Detect review mode and get relevant files
+if [[ "$ARGUMENTS" =~ ^[0-9]+$ ]]; then
+  echo "🔍 PR Review Mode: #$ARGUMENTS"
+  !gh pr view $ARGUMENTS
+  !gh pr diff $ARGUMENTS --name-only
+elif [[ "$ARGUMENTS" == *.ts ]] || [[ "$ARGUMENTS" == *.tsx ]] || [[ "$ARGUMENTS" == *.md ]]; then
+  echo "📄 Single File Review Mode: $ARGUMENTS"
+  !git log --oneline -5 -- "$ARGUMENTS"
+  !git diff HEAD~1..HEAD -- "$ARGUMENTS" || git show HEAD:"$ARGUMENTS" | head -50
+else
+  CURRENT_BRANCH=$(git branch --show-current)
+  if [ "$CURRENT_BRANCH" = "main" ]; then
+    echo "📁 Main Branch - Reviewing recent changes"
+    !git log --oneline -10
+    !git diff HEAD~5..HEAD --name-only
+  else
+    echo "🔍 Branch Review Mode: $CURRENT_BRANCH vs main"
+    !git log main..HEAD --oneline
+    !git diff main...HEAD --name-only
+    if git diff main...HEAD --quiet; then
+      echo "ℹ️ No changes found on branch vs main"
+    else
+      echo "📋 Files changed on branch:"
+      !git diff main...HEAD --stat
+    fi
+  fi
+fi
 ```
 
 ## File Analysis & Categorization
