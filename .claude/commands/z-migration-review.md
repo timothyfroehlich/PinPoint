@@ -17,7 +17,7 @@ $ARGUMENTS can be:
 
 - PR number (e.g., `123`) → Full PR review
 - File path (e.g., `src/server/api/routers/issues.ts`) → Deep file analysis
-- Empty → Review current working directory changes
+- Empty → Review current branch changes vs main
 
 ```bash
 # Detect review mode and get relevant files
@@ -30,9 +30,22 @@ elif [[ "$ARGUMENTS" == *.ts ]] || [[ "$ARGUMENTS" == *.tsx ]] || [[ "$ARGUMENTS
   !git log --oneline -5 -- "$ARGUMENTS"
   !git diff HEAD~1..HEAD -- "$ARGUMENTS" || git show HEAD:"$ARGUMENTS" | head -50
 else
-  echo "📁 Working Directory Review Mode"
-  !git status
-  !git diff --name-only
+  CURRENT_BRANCH=$(git branch --show-current)
+  if [ "$CURRENT_BRANCH" = "main" ]; then
+    echo "📁 Main Branch - Reviewing recent changes"
+    !git log --oneline -10
+    !git diff HEAD~5..HEAD --name-only
+  else
+    echo "🔍 Branch Review Mode: $CURRENT_BRANCH vs main"
+    !git log main..HEAD --oneline
+    !git diff main...HEAD --name-only
+    if git diff main...HEAD --quiet; then
+      echo "ℹ️ No changes found on branch vs main"
+    else
+      echo "📋 Files changed on branch:"
+      !git diff main...HEAD --stat
+    fi
+  fi
 fi
 ```
 
