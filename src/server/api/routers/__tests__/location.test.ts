@@ -465,6 +465,7 @@ describe("Location Router (Drizzle Conversion)", () => {
       );
       expect(mockContext.drizzle.set).toHaveBeenCalledWith({
         name: "Updated Location",
+        updatedAt: expect.any(Date), // Drizzle auto-adds updatedAt
       });
       expect(mockContext.drizzle.where).toHaveBeenCalledWith(
         expect.any(Object), // and() clause with id and organization filters
@@ -480,7 +481,9 @@ describe("Location Router (Drizzle Conversion)", () => {
 
       await caller.update({ id: "location-1" }); // No name provided
 
-      expect(mockContext.drizzle.set).toHaveBeenCalledWith({});
+      expect(mockContext.drizzle.set).toHaveBeenCalledWith({
+        updatedAt: expect.any(Date), // Drizzle auto-adds updatedAt even for partial updates
+      });
     });
 
     it("should throw error when location not found or access denied", async () => {

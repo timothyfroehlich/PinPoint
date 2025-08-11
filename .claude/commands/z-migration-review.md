@@ -1,8 +1,6 @@
 ---
 description: "Comprehensive Drizzle migration review for PR or specific files"
 argument-hint: "[pr-number|file-path]"
-model: "sonnet"
-allowed-tools: "Bash(gh:*), Bash(git:*), Bash(npm:*), Bash(rg:*)"
 ---
 
 # AI-Powered Drizzle Migration Review
@@ -19,21 +17,25 @@ $ARGUMENTS can be:
 - File path (e.g., `src/server/api/routers/issues.ts`) → Deep file analysis
 - Empty → Review current working directory changes
 
+**Detecting Review Mode:**
+
 ```bash
-# Detect review mode and get relevant files
-if [[ "$ARGUMENTS" =~ ^[0-9]+$ ]]; then
-  echo "🔍 PR Review Mode: #$ARGUMENTS"
-  !gh pr view $ARGUMENTS
-  !gh pr diff $ARGUMENTS --name-only
-elif [[ "$ARGUMENTS" == *.ts ]] || [[ "$ARGUMENTS" == *.tsx ]] || [[ "$ARGUMENTS" == *.md ]]; then
-  echo "📄 Single File Review Mode: $ARGUMENTS"
-  !git log --oneline -5 -- "$ARGUMENTS"
-  !git diff HEAD~1..HEAD -- "$ARGUMENTS" || git show HEAD:"$ARGUMENTS" | head -50
-else
-  echo "📁 Working Directory Review Mode"
-  !git status
-  !git diff --name-only
-fi
+echo "🔍 Migration Review for: ${ARGUMENTS:-working directory}"
+git status --porcelain
+```
+
+**If reviewing a PR (number):**
+
+```bash
+gh pr view $ARGUMENTS
+gh pr diff $ARGUMENTS --name-only
+```
+
+**If reviewing a specific file:**
+
+```bash
+git log --oneline -5 -- $ARGUMENTS
+git diff HEAD~1..HEAD -- $ARGUMENTS
 ```
 
 ## File Analysis & Categorization
@@ -51,14 +53,21 @@ Analyze each file and categorize as:
 
 ### 🗄️ For ROUTER Files - Direct Conversion
 
+**For router files, run these checks:**
+
 ```bash
-# Deep router analysis if reviewing router file
-if [[ "$ARGUMENTS" =~ routers.*\.ts$ ]]; then
-  echo "🔧 Deep Router Analysis for: $ARGUMENTS"
-  !rg -n "ctx\.(db|prisma)" "$ARGUMENTS" || echo "✅ No Prisma references"
-  !rg -n "ctx\.drizzle|db\.query\." "$ARGUMENTS" || echo "❌ Missing Drizzle usage"
-  !rg -n "eq\(.*organizationId.*ctx\." "$ARGUMENTS" || echo "⚠️ Check organization scoping"
-fi
+echo "🔧 Deep Router Analysis"
+rg -n "ctx\.(db|prisma)" $ARGUMENTS
+```
+
+```bash
+echo "Checking for Drizzle usage:"
+rg -n "ctx\.drizzle|db\.query\." $ARGUMENTS
+```
+
+```bash
+echo "Checking organization scoping:"
+rg -n "eq\(.*organizationId.*ctx\." $ARGUMENTS
 ```
 
 **Critical Requirements:**
@@ -100,9 +109,9 @@ fi
 ```bash
 # Run comprehensive quality checks
 echo "🔍 Running Quality Gates..."
-!npm run typecheck:brief && echo "✅ TypeScript" || echo "❌ TypeScript FAILED"
-!npm run lint:brief && echo "✅ ESLint" || echo "❌ ESLint FAILED"
-!npm run test:brief && echo "✅ Tests" || echo "❌ Tests FAILED"
+npm run typecheck:brief && echo "✅ TypeScript" || echo "❌ TypeScript FAILED"
+npm run lint:brief && echo "✅ ESLint" || echo "❌ ESLint FAILED"
+npm run test:brief && echo "✅ Tests" || echo "❌ Tests FAILED"
 ```
 
 ## Security & Performance Analysis
@@ -111,8 +120,8 @@ echo "🔍 Running Quality Gates..."
 
 ```bash
 # Critical security checks
-!rg -n "organizationId" "$ARGUMENTS" || echo "⚠️ Multi-tenancy check needed"
-!rg -n "TRPCError.*UNAUTHORIZED\|FORBIDDEN" "$ARGUMENTS" || echo "Check auth patterns"
+rg -n "organizationId" "$ARGUMENTS" || echo "⚠️ Multi-tenancy check needed"
+rg -n "TRPCError.*UNAUTHORIZED\|FORBIDDEN" "$ARGUMENTS" || echo "Check auth patterns"
 ```
 
 **Security Requirements:**

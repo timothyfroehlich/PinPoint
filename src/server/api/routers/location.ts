@@ -135,7 +135,9 @@ export const locationRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const updates: { name?: string } = {};
+      const updates: { name?: string; updatedAt: Date } = {
+        updatedAt: new Date(),
+      };
       if (input.name) {
         updates.name = input.name;
       }
