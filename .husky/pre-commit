@@ -1,3 +1,12 @@
 #!/bin/sh
+# Prevent commits to main branch
+branch=$(git rev-parse --abbrev-ref HEAD)
+if [ "$branch" = "main" ]; then
+  echo "🚨 BLOCKED: Direct commits to main are not allowed!"
+  echo "💡 Use a feature branch and create a PR, or use /ship-it for meta changes"
+  echo "🔧 Create a branch: git checkout -b feature/your-changes"
+  exit 1
+fi
+
 echo "🔧 Running pre-commit checks in parallel..."
 npm run pre-commit:all
