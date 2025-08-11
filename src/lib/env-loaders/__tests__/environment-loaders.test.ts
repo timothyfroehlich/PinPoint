@@ -115,7 +115,7 @@ describe("Environment Loaders", () => {
       it("should handle missing .env.local gracefully", async () => {
         // Mock .env.local as non-existent
         mockExistsSync.mockImplementation((path: string) => {
-          return !path.toString().endsWith(".env.local");
+          return !path.endsWith(".env.local");
         });
 
         // Import should not throw even if .env.local doesn't exist
