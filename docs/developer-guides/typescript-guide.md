@@ -342,6 +342,24 @@ function processResponse(response: ApiResponse) {
 }
 ```
 
+#### tRPC Query Parameter Type Inference
+
+**Error**: Unsafe member access on tRPC query results
+
+**Root Cause**: Empty object parameters `{}` in tRPC queries can cause TypeScript to infer less strict types, leading to unsafe member access errors.
+
+```typescript
+// ❌ Bad - Empty object parameter causes type inference issues
+const { data: issues } = api.issue.core.getAll.useQuery({});
+const openIssues = issues?.filter(issue => issue.status.category !== "RESOLVED"); // Error: unsafe member access
+
+// ✅ Good - No parameter for optional input allows proper type inference
+const { data: issues } = api.issue.core.getAll.useQuery();
+const openIssues = issues?.filter(issue => issue.status.category !== "RESOLVED"); // Works correctly
+```
+
+**Best Practice**: For tRPC procedures with optional inputs, omit the parameter entirely instead of passing an empty object.
+
 ## 🧪 Test File Patterns
 
 ### Configuration-Specific Patterns

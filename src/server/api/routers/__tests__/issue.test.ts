@@ -169,6 +169,12 @@ describe("issueRouter - Issue Detail Page", () => {
             content: "Internal note",
             isInternal: true,
             createdBy: mockUser,
+            author: {
+              // Add author field for null safety
+              id: mockUser.id,
+              name: mockUser.name,
+              profilePicture: null,
+            },
             createdAt: new Date(),
           },
           {
@@ -176,14 +182,21 @@ describe("issueRouter - Issue Detail Page", () => {
             content: "Public comment",
             isInternal: false,
             createdBy: mockUser,
+            author: {
+              // Add author field for null safety
+              id: mockUser.id,
+              name: mockUser.name,
+              profilePicture: null,
+            },
             createdAt: new Date(),
           },
         ],
       };
 
-      // Mock both findUnique and findFirst since different procedures use different methods
-      authCtx.db.issue.findUnique.mockResolvedValue(issueWithDetails as any);
-      authCtx.db.issue.findFirst.mockResolvedValue(issueWithDetails as any);
+      // Mock Drizzle query API instead of Prisma
+      vi.mocked(authCtx.drizzle.query.issues.findFirst).mockResolvedValue(
+        issueWithDetails as any,
+      );
 
       const result = await authCaller.issue.core.getById({ id: mockIssue.id });
 
@@ -202,7 +215,8 @@ describe("issueRouter - Issue Detail Page", () => {
         machine: { ...mockMachine, organizationId: "other-org" },
       };
 
-      authCtx.db.issue.findUnique.mockResolvedValue(otherOrgIssue as any);
+      // Mock Drizzle to return null (simulating organization isolation)
+      vi.mocked(authCtx.drizzle.query.issues.findFirst).mockResolvedValue(null);
 
       await expect(
         authCaller.issue.core.getById({ id: mockIssue.id }),
@@ -229,15 +243,30 @@ describe("issueRouter - Issue Detail Page", () => {
         mockNotificationService as any,
       );
 
-      editCtx.db.issue.findFirst.mockResolvedValue({
-        ...mockIssue,
-        status: mockStatus,
-        assignedTo: null,
-      } as any);
-      editCtx.db.issue.update.mockResolvedValue({
-        ...mockIssue,
-        title: "Updated Title",
-      } as any);
+      // Mock Drizzle update operation chain
+      vi.mocked(editCtx.drizzle.update).mockReturnValue(editCtx.drizzle);
+      vi.mocked(editCtx.drizzle.set).mockReturnValue(editCtx.drizzle);
+      vi.mocked(editCtx.drizzle.where).mockReturnValue(editCtx.drizzle);
+      vi.mocked(editCtx.drizzle.returning).mockResolvedValue([
+        {
+          ...mockIssue,
+          title: "Updated Title",
+        },
+      ] as any);
+
+      // Mock Drizzle query API - first call for validation, second call for final response
+      vi.mocked(editCtx.drizzle.query.issues.findFirst)
+        .mockResolvedValueOnce({
+          ...mockIssue,
+          status: mockStatus,
+          assignedTo: null,
+        } as any) // First call: validation check
+        .mockResolvedValueOnce({
+          ...mockIssue,
+          title: "Updated Title",
+          status: mockStatus,
+          assignedTo: null,
+        } as any); // Second call: final response with updated data
 
       const result = await editCaller.issue.core.update({
         id: mockIssue.id,
@@ -245,10 +274,11 @@ describe("issueRouter - Issue Detail Page", () => {
       });
 
       expect(result.title).toBe("Updated Title");
-      expect(editCtx.db.issue.update).toHaveBeenCalledWith(
+      // Verify Drizzle update operations were called
+      expect(editCtx.drizzle.update).toHaveBeenCalled();
+      expect(editCtx.drizzle.set).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: mockIssue.id },
-          data: expect.objectContaining({ title: "Updated Title" }),
+          title: "Updated Title",
         }),
       );
     });
@@ -274,23 +304,39 @@ describe("issueRouter - Issue Detail Page", () => {
         name: "Resolved",
         category: "RESOLVED",
       };
-      closeCtx.db.issueStatus.findFirst.mockResolvedValue(
-        resolvedStatus as any,
-      );
-      closeCtx.db.issue.update.mockResolvedValue({
+      vi.mocked(
+        closeCtx.drizzle.query.issueStatuses.findFirst,
+      ).mockResolvedValue(resolvedStatus as any);
+
+      // Mock Drizzle update chain for close operation
+      vi.mocked(closeCtx.drizzle.update).mockReturnValue(closeCtx.drizzle);
+      vi.mocked(closeCtx.drizzle.set).mockReturnValue(closeCtx.drizzle);
+      vi.mocked(closeCtx.drizzle.where).mockReturnValue(closeCtx.drizzle);
+      vi.mocked(closeCtx.drizzle.returning).mockResolvedValue([
+        {
+          ...mockIssue,
+          resolvedAt: new Date(),
+        },
+      ] as any);
+
+      // Mock Drizzle query API - there's only one call to get the final issue with relations
+      const resolvedDate = new Date();
+      vi.mocked(closeCtx.drizzle.query.issues.findFirst).mockResolvedValue({
         ...mockIssue,
-        resolvedAt: new Date(),
-      } as any);
+        resolvedAt: resolvedDate,
+        status: resolvedStatus,
+      } as any); // Final response with resolvedAt and new status
 
       const result = await closeCaller.issue.core.close({
         id: mockIssue.id,
       });
 
       expect(result.resolvedAt).toBeTruthy();
-      expect(closeCtx.db.issue.update).toHaveBeenCalledWith(
+      // Verify Drizzle update operations were called
+      expect(closeCtx.drizzle.update).toHaveBeenCalled();
+      expect(closeCtx.drizzle.set).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: mockIssue.id },
-          data: expect.objectContaining({ resolvedAt: expect.any(Date) }),
+          resolvedAt: expect.any(Date),
         }),
       );
     });
@@ -307,16 +353,36 @@ describe("issueRouter - Issue Detail Page", () => {
         mockActivityService as any,
       );
 
-      assignCtx.db.issue.findFirst.mockResolvedValue(mockIssue as any);
-      assignCtx.db.membership.findUnique.mockResolvedValue({
+      // Mock Drizzle queries for assign operation
+      vi.mocked(assignCtx.drizzle.query.issues.findFirst).mockResolvedValue(
+        mockIssue as any,
+      );
+      vi.mocked(
+        assignCtx.drizzle.query.memberships.findFirst,
+      ).mockResolvedValue({
         ...mockMembership,
         user: mockUser,
       } as any);
-      assignCtx.db.issue.update.mockResolvedValue({
-        ...mockIssue,
-        assignedToId: mockUser.id,
-        assignedTo: mockUser,
-      } as any);
+
+      // Mock Drizzle update chain for assign operation
+      vi.mocked(assignCtx.drizzle.update).mockReturnValue(assignCtx.drizzle);
+      vi.mocked(assignCtx.drizzle.set).mockReturnValue(assignCtx.drizzle);
+      vi.mocked(assignCtx.drizzle.where).mockReturnValue(assignCtx.drizzle);
+      vi.mocked(assignCtx.drizzle.returning).mockResolvedValue([
+        {
+          ...mockIssue,
+          assignedToId: mockUser.id,
+        },
+      ] as any);
+
+      // Mock second query for getting updated issue with relations
+      vi.mocked(assignCtx.drizzle.query.issues.findFirst)
+        .mockResolvedValueOnce(mockIssue as any) // First call for validation
+        .mockResolvedValueOnce({
+          ...mockIssue,
+          assignedToId: mockUser.id,
+          assignedTo: mockUser,
+        } as any); // Second call for response
 
       const result = await assignCaller.issue.core.assign({
         issueId: mockIssue.id,
@@ -324,64 +390,19 @@ describe("issueRouter - Issue Detail Page", () => {
       });
 
       expect(result.issue.assignedToId).toBe(mockUser.id);
-      expect(assignCtx.db.issue.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: mockIssue.id },
-          data: { assignedToId: mockUser.id },
-        }),
-      );
+      // Verify Drizzle update operations were called
+      expect(assignCtx.drizzle.update).toHaveBeenCalled();
+      expect(assignCtx.drizzle.set).toHaveBeenCalledWith({
+        assignedToId: mockUser.id,
+      });
     });
   });
 
   describe("Issue Status Changes", () => {
     it("should allow status changes with proper validation", async () => {
-      // Create a minimal context that satisfies tRPC requirements
-      const mockDb = createVitestMockContext().db;
-      const mockServices = createVitestMockContext().services;
-
-      // Create a proper PinPointSupabaseUser
-      const supabaseUser = {
-        id: "user-1",
-        aud: "authenticated",
-        role: "authenticated",
-        email: "test@example.com",
-        email_confirmed_at: "2023-01-01T00:00:00Z",
-        phone: "",
-        last_sign_in_at: "2023-01-01T00:00:00Z",
-        app_metadata: {
-          provider: "google",
-          organization_id: "org-1",
-        },
-        user_metadata: {
-          name: "Test User",
-        },
-        identities: [],
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-
-      const testContext = {
-        db: mockDb,
-        services: mockServices,
-        headers: new Headers(),
-        session: {
-          user: {
-            id: "user-1",
-            email: "test@example.com",
-            name: "Test User",
-            image: null,
-          },
-          expires: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(),
-        },
-        organization: {
-          id: "org-1",
-          name: "Test Organization",
-          subdomain: "test",
-        },
-        user: supabaseUser,
-      };
-
-      const statusCaller = appRouter.createCaller(testContext as any);
+      // Use standard authenticated context instead of custom minimal context
+      const statusCtx = createAuthenticatedContext(["issue:edit"]);
+      const statusCaller = appRouter.createCaller(statusCtx);
 
       const newStatus = {
         ...mockStatus,
@@ -390,27 +411,32 @@ describe("issueRouter - Issue Detail Page", () => {
         category: "IN_PROGRESS" as const,
       };
 
-      // Mock the membership lookup that the middleware requires
-      vi.mocked(testContext.db.membership.findFirst).mockResolvedValue(
-        mockMembership as any,
-      );
+      // Mock Drizzle update chain for status change
+      vi.mocked(statusCtx.drizzle.update).mockReturnValue(statusCtx.drizzle);
+      vi.mocked(statusCtx.drizzle.set).mockReturnValue(statusCtx.drizzle);
+      vi.mocked(statusCtx.drizzle.where).mockReturnValue(statusCtx.drizzle);
+      vi.mocked(statusCtx.drizzle.returning).mockResolvedValue([
+        {
+          ...mockIssue,
+          statusId: newStatus.id,
+        },
+      ] as any);
 
-      // Mock the database calls with proper type casting
-      vi.mocked(testContext.db.issue.findFirst).mockResolvedValue({
-        ...mockIssue,
-        status: mockStatus,
-      } as any);
-      vi.mocked(testContext.db.issueStatus.findFirst).mockResolvedValue(
-        newStatus as any,
-      );
-      vi.mocked(testContext.db.issue.update).mockResolvedValue({
-        ...mockIssue,
-        statusId: newStatus.id,
-      } as any);
+      // Mock Drizzle query API calls
+      vi.mocked(statusCtx.drizzle.query.issues.findFirst)
+        .mockResolvedValueOnce({
+          ...mockIssue,
+          status: mockStatus,
+        } as any) // First call: validation check
+        .mockResolvedValueOnce({
+          ...mockIssue,
+          statusId: newStatus.id,
+          status: newStatus,
+        } as any); // Second call: final response with new status
 
-      // Mock the permission system to allow the test to pass
-      vi.mocked(getUserPermissionsForSession).mockResolvedValue(["issue:edit"]);
-      vi.mocked(requirePermissionForSession).mockResolvedValue();
+      vi.mocked(
+        statusCtx.drizzle.query.issueStatuses.findFirst,
+      ).mockResolvedValue(newStatus as any);
 
       const result = await statusCaller.issue.core.updateStatus({
         id: mockIssue.id,
@@ -424,8 +450,14 @@ describe("issueRouter - Issue Detail Page", () => {
       const statusCtx = createAuthenticatedContext(["issue:edit"]);
       const statusCaller = appRouter.createCaller(statusCtx);
 
-      statusCtx.db.issue.findFirst.mockResolvedValue(mockIssue as any);
-      statusCtx.db.issueStatus.findFirst.mockResolvedValue(null); // Status not found
+      // Mock Drizzle queries for status validation test
+      vi.mocked(statusCtx.drizzle.query.issues.findFirst).mockResolvedValue({
+        ...mockIssue,
+        status: mockStatus,
+      } as any);
+      vi.mocked(
+        statusCtx.drizzle.query.issueStatuses.findFirst,
+      ).mockResolvedValue(null); // Status not found
 
       await expect(
         statusCaller.issue.core.updateStatus({
@@ -506,8 +538,11 @@ describe("issueRouter - Issue Detail Page", () => {
       ]);
       const publicCommentCaller = appRouter.createCaller(publicCommentCtx);
 
-      publicCommentCtx.db.issue.findFirst.mockResolvedValue(mockIssue as any);
-      publicCommentCtx.db.membership.findUnique.mockResolvedValue(
+      // Mock Prisma queries for comment creation test (issue.comment.ts still uses Prisma)
+      vi.mocked(publicCommentCtx.db.issue.findFirst).mockResolvedValue(
+        mockIssue as any,
+      );
+      vi.mocked(publicCommentCtx.db.membership.findUnique).mockResolvedValue(
         mockMembership as any,
       );
 
@@ -546,10 +581,26 @@ describe("issueRouter - Issue Detail Page", () => {
       const concurrentCtx = createAuthenticatedContext(["issue:edit"]);
       const concurrentCaller = appRouter.createCaller(concurrentCtx);
 
-      // Simulate optimistic locking scenario
-      concurrentCtx.db.issue.findFirst.mockResolvedValue(mockIssue as any);
-      concurrentCtx.db.issue.update.mockRejectedValue(
+      // Mock Drizzle update chain to reject with concurrent modification error
+      vi.mocked(concurrentCtx.drizzle.update).mockReturnValue(
+        concurrentCtx.drizzle,
+      );
+      vi.mocked(concurrentCtx.drizzle.set).mockReturnValue(
+        concurrentCtx.drizzle,
+      );
+      vi.mocked(concurrentCtx.drizzle.where).mockReturnValue(
+        concurrentCtx.drizzle,
+      );
+      vi.mocked(concurrentCtx.drizzle.returning).mockRejectedValue(
         new Error("Concurrent modification"),
+      );
+
+      // Mock Drizzle query API - first call should succeed (validation), update should fail
+      vi.mocked(concurrentCtx.drizzle.query.issues.findFirst).mockResolvedValue(
+        {
+          ...mockIssue,
+          status: mockStatus,
+        } as any,
       );
 
       await expect(

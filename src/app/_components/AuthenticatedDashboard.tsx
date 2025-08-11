@@ -11,7 +11,7 @@ type IssueStatus = "new" | "in progress" | "acknowledged" | "resolved";
 type IssuePriority = "high" | "medium" | "low";
 
 export function AuthenticatedDashboard(): React.ReactNode {
-  const { data: issues, isLoading, error } = api.issue.core.getAll.useQuery({});
+  const { data: issues, isLoading, error } = api.issue.core.getAll.useQuery();
 
   if (isLoading) {
     return (

@@ -22,7 +22,7 @@ type IssuePriority = "high" | "medium" | "low";
 const newlyReported = [{ location: "Pinballz Arcade", count: 2 }];
 
 export default function DashboardPage(): JSX.Element {
-  const { data: issues, isLoading, error } = api.issue.core.getAll.useQuery({});
+  const { data: issues, isLoading, error } = api.issue.core.getAll.useQuery();
 
   if (isLoading) {
     return <CircularProgress />;

@@ -240,14 +240,17 @@ describe("Router Integration Tests", () => {
           description: "Test description",
         }),
       );
-      expect(mockContext.db.issue.create).toHaveBeenCalledWith(
+      // With Drizzle conversion, check that insert was called with proper data
+      expect(mockContext.drizzle.insert).toHaveBeenCalledWith(
+        expect.anything(),
+      );
+      expect(mockContext.drizzle.values).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
-            title: "Test Issue",
-            description: "Test description",
-            organizationId: "org-1",
-            createdById: "user-1",
-          }),
+          title: "Test Issue",
+          description: "Test description",
+          organizationId: "org-1",
+          createdById: "user-1",
+          id: expect.any(String), // Generated ID
         }),
       );
     });
@@ -325,8 +328,20 @@ describe("Router Integration Tests", () => {
         description: "Updated description",
       };
 
-      vi.mocked(mockContext.db.issue.findFirst).mockResolvedValue(mockIssue);
-      vi.mocked(mockContext.db.issue.update).mockResolvedValue(updatedIssue);
+      // Mock Drizzle query API for finding the existing issue
+      vi.mocked(mockContext.drizzle.query.issues.findFirst)
+        .mockResolvedValueOnce(mockIssue) // First call for validation
+        .mockResolvedValueOnce(updatedIssue); // Second call for final response with relations
+
+      // Mock Drizzle update operation
+      vi.mocked(mockContext.drizzle.update).mockReturnValue(
+        mockContext.drizzle,
+      );
+      vi.mocked(mockContext.drizzle.set).mockReturnValue(mockContext.drizzle);
+      vi.mocked(mockContext.drizzle.where).mockReturnValue(mockContext.drizzle);
+      vi.mocked(mockContext.drizzle.returning).mockResolvedValue([
+        updatedIssue,
+      ]);
 
       // Act
       const result = await caller.issue.core.update({
@@ -343,13 +358,12 @@ describe("Router Integration Tests", () => {
           description: "Updated description",
         }),
       );
-      expect(mockContext.db.issue.update).toHaveBeenCalledWith(
+      // Verify Drizzle update operations were called
+      expect(mockContext.drizzle.update).toHaveBeenCalled();
+      expect(mockContext.drizzle.set).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: "issue-1" },
-          data: expect.objectContaining({
-            title: "Updated Title",
-            description: "Updated description",
-          }),
+          title: "Updated Title",
+          description: "Updated description",
         }),
       );
     });
@@ -390,7 +404,10 @@ describe("Router Integration Tests", () => {
         assignedToId: null,
       };
 
-      vi.mocked(mockContext.db.issue.findUnique).mockResolvedValue(mockIssue);
+      // Mock that the issue is NOT found (simulating org isolation)
+      vi.mocked(mockContext.drizzle.query.issues.findFirst).mockResolvedValue(
+        null,
+      );
 
       // Act & Assert
       await expect(
@@ -832,27 +849,50 @@ describe("Router Integration Tests", () => {
         mockContext.services.createIssueActivityService,
       ).mockReturnValue(mockActivityService);
 
-      vi.mocked(mockContext.db.issue.findFirst).mockResolvedValue(mockIssue);
-      vi.mocked(mockContext.db.membership.findUnique).mockResolvedValue({
+      // Mock Drizzle queries for issue assignment
+      vi.mocked(mockContext.drizzle.query.issues.findFirst).mockResolvedValue(
+        mockIssue,
+      );
+      vi.mocked(
+        mockContext.drizzle.query.memberships.findFirst,
+      ).mockResolvedValue({
         id: "membership-2",
         userId: "user-2",
         organizationId: "org-1",
         roleId: "role-1",
-        createdAt: new Date(),
-        updatedAt: new Date(),
         user: {
           id: "user-2",
           name: "Test User 2",
           email: "user2@example.com",
         },
       });
-      vi.mocked(mockContext.db.issue.update).mockResolvedValue({
-        success: true,
-        issue: {
+
+      // Mock Drizzle update operation
+      vi.mocked(mockContext.drizzle.update).mockReturnValue(
+        mockContext.drizzle,
+      );
+      vi.mocked(mockContext.drizzle.set).mockReturnValue(mockContext.drizzle);
+      vi.mocked(mockContext.drizzle.where).mockReturnValue(mockContext.drizzle);
+      vi.mocked(mockContext.drizzle.returning).mockResolvedValue([
+        {
           ...mockIssue,
           assignedToId: "user-2",
         },
-      });
+      ]);
+
+      // Mock second query for getting updated issue with relations
+      vi.mocked(mockContext.drizzle.query.issues.findFirst)
+        .mockResolvedValueOnce(mockIssue) // First call for validation
+        .mockResolvedValueOnce({
+          // Second call for response
+          ...mockIssue,
+          assignedToId: "user-2",
+          assignedTo: {
+            id: "user-2",
+            name: "Test User 2",
+            email: "user2@example.com",
+          },
+        });
 
       // Act - Admin should be able to perform all operations
       const result = await caller.issue.core.assign({
@@ -860,16 +900,13 @@ describe("Router Integration Tests", () => {
         userId: "user-2",
       });
 
-      // Assert - The result has a nested structure where the actual result is wrapped
+      // Assert - The result structure from assign procedure
       expect(result).toEqual({
         success: true,
-        issue: {
-          success: true,
-          issue: expect.objectContaining({
-            id: "issue-1",
-            assignedToId: "user-2",
-          }),
-        },
+        issue: expect.objectContaining({
+          id: "issue-1",
+          assignedToId: "user-2",
+        }),
       });
     });
 

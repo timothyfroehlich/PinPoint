@@ -25,30 +25,274 @@ const mockSupabaseClient = {
   single: vi.fn().mockResolvedValue({ data: null, error: null }),
 };
 
-// Mock Drizzle client for tests - supports complex chaining patterns
-// Enhanced to support joins, limits, and additional operators used in converted routers
-const mockDrizzleClient = {
-  select: vi.fn().mockReturnThis(),
-  from: vi.fn().mockReturnThis(),
-  where: vi.fn().mockReturnThis(),
-  orderBy: vi.fn().mockReturnThis(),
-  insert: vi.fn().mockReturnThis(),
-  update: vi.fn().mockReturnThis(),
-  delete: vi.fn().mockReturnThis(),
-  values: vi.fn().mockReturnThis(),
-  set: vi.fn().mockReturnThis(),
-  returning: vi.fn().mockResolvedValue([]), // Returns array for destructuring [result]
-  execute: vi.fn().mockResolvedValue([]),
-  // Additional methods for converted routers
-  innerJoin: vi.fn().mockReturnThis(),
-  leftJoin: vi.fn().mockReturnThis(),
-  limit: vi.fn().mockReturnThis(),
-  offset: vi.fn().mockReturnThis(),
-  groupBy: vi.fn().mockReturnThis(),
-  having: vi.fn().mockReturnThis(),
-  // Transaction support
-  transaction: vi.fn(),
-} as unknown as DrizzleClient;
+// Create a stateful mock data store that can be updated during tests
+const createMockDataStore = () => {
+  const store: Record<string, Record<string, any>> = {
+    machine: {
+      "machine-1": {
+        id: "machine-1",
+        name: "Test Machine",
+        organizationId: "org-1",
+        locationId: "location-1",
+        modelId: "model-1",
+        ownerId: "user-1",
+        location: {
+          organizationId: "org-1",
+        },
+        model: {
+          id: "model-1",
+          name: "Test Model",
+        },
+        owner: {
+          id: "user-1",
+          name: "Test User",
+          email: "test@example.com",
+        },
+      },
+    },
+    issueStatus: {
+      "status-1": {
+        id: "status-1",
+        name: "New",
+        category: "NEW",
+        organizationId: "org-1",
+        isDefault: true,
+      },
+    },
+    priority: {
+      "priority-1": {
+        id: "priority-1",
+        name: "Medium",
+        organizationId: "org-1",
+        isDefault: true,
+        order: 2,
+      },
+    },
+    issue: {
+      "issue-1": {
+        id: "issue-1",
+        title: "Test Issue",
+        description: "Test description",
+        machineId: "machine-1",
+        statusId: "status-1",
+        priorityId: "priority-1",
+        organizationId: "org-1",
+        createdById: "user-1",
+        assignedToId: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        resolvedAt: null,
+        status: {
+          id: "status-1",
+          name: "New",
+          category: "NEW",
+        },
+        priority: {
+          id: "priority-1",
+          name: "Medium",
+          order: 2,
+        },
+        createdBy: {
+          id: "user-1",
+          name: "Test User",
+          email: "test@example.com",
+          profilePicture: null,
+        },
+        assignedTo: null,
+        machine: {
+          id: "machine-1",
+          name: "Test Machine",
+          model: {
+            id: "model-1",
+            name: "Test Model",
+          },
+          location: {
+            id: "location-1",
+            name: "Test Location",
+          },
+        },
+      },
+    },
+    membership: {
+      "membership-1": {
+        id: "membership-1",
+        userId: "user-2",
+        organizationId: "org-1",
+        roleId: "role-1",
+        user: {
+          id: "user-2",
+          name: "Test User 2",
+          email: "test2@example.com",
+        },
+      },
+    },
+  };
+
+  return {
+    get: (tableName: string, id?: string) => {
+      if (!(tableName in store)) return null;
+      if (!id) return Object.values(store[tableName]);
+      return store[tableName][id] ?? null;
+    },
+    set: (tableName: string, id: string, data: any) => {
+      if (!(tableName in store)) store[tableName] = {};
+      store[tableName][id] = data;
+    },
+    update: (tableName: string, id: string, updates: any) => {
+      if (tableName in store && id in store[tableName]) {
+        store[tableName][id] = { ...store[tableName][id], ...updates };
+        return store[tableName][id];
+      }
+      return null;
+    },
+  };
+};
+
+// Mock Drizzle query API methods for each table
+// These methods will delegate to the corresponding Prisma mock when available
+const createMockTableQuery = (
+  tableName: string,
+  mockDb: any,
+  dataStore: ReturnType<typeof createMockDataStore>,
+) => ({
+  findFirst: vi.fn().mockImplementation(async (options) => {
+    // Try to use the Prisma mock if available and it has a mock implementation
+    if (
+      mockDb[tableName]?.findFirst &&
+      vi.isMockFunction(mockDb[tableName].findFirst) &&
+      mockDb[tableName].findFirst.getMockImplementation()
+    ) {
+      const prismaResult = await mockDb[tableName].findFirst(options);
+      if (prismaResult) return prismaResult;
+    }
+
+    // Fallback to stateful data store
+    const records = dataStore.get(tableName);
+    if (Array.isArray(records) && records.length > 0) {
+      return records[0];
+    }
+    return null;
+  }),
+  findMany: vi.fn().mockImplementation(async (options) => {
+    // Try to use the Prisma mock if available
+    if (
+      mockDb[tableName]?.findMany &&
+      vi.isMockFunction(mockDb[tableName].findMany) &&
+      mockDb[tableName].findMany.getMockImplementation()
+    ) {
+      const prismaResult = await mockDb[tableName].findMany(options);
+      if (prismaResult) return prismaResult;
+    }
+
+    // Fallback to stateful data store
+    const records = dataStore.get(tableName);
+    return Array.isArray(records) ? records : [];
+  }),
+  findUnique: vi.fn().mockImplementation(async (options) => {
+    // Try to use the Prisma mock if available
+    if (
+      mockDb[tableName]?.findUnique &&
+      vi.isMockFunction(mockDb[tableName].findUnique) &&
+      mockDb[tableName].findUnique.getMockImplementation()
+    ) {
+      const prismaResult = await mockDb[tableName].findUnique(options);
+      if (prismaResult) return prismaResult;
+    }
+
+    return null;
+  }),
+});
+
+// Create Drizzle client with proper mock setup that integrates with Prisma mocks
+function createMockDrizzleClient(mockDb: any): DrizzleClient {
+  const dataStore = createMockDataStore();
+  return {
+    select: vi.fn().mockReturnThis(),
+    from: vi.fn().mockReturnThis(),
+    where: vi.fn().mockReturnThis(),
+    orderBy: vi.fn().mockReturnThis(),
+    insert: vi.fn().mockReturnThis(),
+    update: vi.fn().mockReturnThis(),
+    delete: vi.fn().mockReturnThis(),
+    values: vi.fn().mockReturnThis(),
+    set: vi.fn().mockReturnThis(),
+    returning: vi.fn().mockImplementation(() => {
+      // For create operations, return a mock issue with proper ID
+      return [
+        {
+          id: "issue-1",
+          title: "Test Issue",
+          description: "Test description",
+          machineId: "machine-1",
+          statusId: "status-1",
+          priorityId: "priority-1",
+          organizationId: "org-1",
+          createdById: "user-1",
+          assignedToId: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          resolvedAt: null,
+        },
+      ];
+    }),
+    execute: vi.fn().mockResolvedValue([]),
+    // Additional methods for converted routers
+    innerJoin: vi.fn().mockReturnThis(),
+    leftJoin: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockReturnThis(),
+    offset: vi.fn().mockReturnThis(),
+    groupBy: vi.fn().mockReturnThis(),
+    having: vi.fn().mockReturnThis(),
+    // Transaction support
+    transaction: vi.fn(),
+    // Query API support for the new Drizzle pattern
+    query: {
+      // Auth tables
+      users: createMockTableQuery("user", mockDb, dataStore),
+      accounts: createMockTableQuery("account", mockDb, dataStore),
+      sessions: createMockTableQuery("session", mockDb, dataStore),
+
+      // Organization tables
+      organizations: createMockTableQuery("organization", mockDb, dataStore),
+      memberships: createMockTableQuery("membership", mockDb, dataStore),
+      roles: createMockTableQuery("role", mockDb, dataStore),
+      permissions: createMockTableQuery("permission", mockDb, dataStore),
+      rolePermissions: createMockTableQuery(
+        "rolePermission",
+        mockDb,
+        dataStore,
+      ),
+
+      // Machine tables
+      machines: createMockTableQuery("machine", mockDb, dataStore),
+      models: createMockTableQuery("model", mockDb, dataStore),
+      locations: createMockTableQuery("location", mockDb, dataStore),
+
+      // Issue tables
+      issues: createMockTableQuery("issue", mockDb, dataStore),
+      issueStatuses: createMockTableQuery("issueStatus", mockDb, dataStore),
+      priorities: createMockTableQuery("priority", mockDb, dataStore),
+      comments: createMockTableQuery("comment", mockDb, dataStore),
+      attachments: createMockTableQuery("attachment", mockDb, dataStore),
+      issueHistory: createMockTableQuery("issueHistory", mockDb, dataStore),
+      upvotes: createMockTableQuery("upvote", mockDb, dataStore),
+
+      // Collection tables
+      collections: createMockTableQuery("collection", mockDb, dataStore),
+      collectionTypes: createMockTableQuery(
+        "collectionType",
+        mockDb,
+        dataStore,
+      ),
+      notifications: createMockTableQuery("notification", mockDb, dataStore),
+      pinballMapConfigs: createMockTableQuery(
+        "pinballMapConfig",
+        mockDb,
+        dataStore,
+      ),
+    },
+  } as unknown as DrizzleClient;
+}
 
 export interface VitestMockContext {
   db: ExtendedPrismaClient;
@@ -247,7 +491,7 @@ export function createVitestMockContext(): VitestMockContext {
 
   return {
     db: mockDb,
-    drizzle: mockDrizzleClient,
+    drizzle: createMockDrizzleClient(mockDb),
     services: mockServices,
     user: mockUser,
     supabase: mockSupabaseClient,

@@ -95,7 +95,7 @@ export function StatusTogglePills({
     };
 
     allIssues.forEach((issue) => {
-      const category = issue.status.category;
+      const category = issue.status.category as keyof StatusCounts;
       // Only count issues with valid status categories
       if (category in counts) {
         counts[category]++;
