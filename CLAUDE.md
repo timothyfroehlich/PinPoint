@@ -84,18 +84,47 @@ Latest updates for our migration: @docs/latest-updates/quick-reference.md
 - We use husky for precommits and preuploads
 - We run shellcheck against our scripts
 
-## Command Line Tools
+## 🚨🚨🚨 CRITICAL COMMAND RESTRICTIONS 🚨🚨🚨
+
+### ⛔ ABSOLUTELY FORBIDDEN: npm test with Redirection
+
+**🔥 NEVER EVER USE THESE COMMANDS 🔥**
+
+```bash
+npm test 2>&1          # ❌ BREAKS VITEST
+npm test > file.txt    # ❌ BREAKS VITEST
+npm test >> file.txt   # ❌ BREAKS VITEST
+npm run test:* 2>&1    # ❌ BREAKS VITEST
+vitest 2>&1            # ❌ BREAKS VITEST
+```
+
+**💥 WHY THIS BREAKS EVERYTHING:**
+
+- Vitest interprets `2>&1`, `>`, `>>` as **test name filters**
+- Instead of redirecting output, Vitest searches for tests matching "2>&1"
+- This causes bizarre test behavior and broken output
+- **NO REDIRECTION WORKS** with Vitest CLI commands
+
+**✅ USE THESE INSTEAD:**
+
+```bash
+npm run test:brief     # ✅ Fast, minimal output
+npm run test:quiet     # ✅ Suppress console logs
+npm run test:verbose   # ✅ Detailed output
+npm run test:coverage  # ✅ With coverage report
+```
+
+### ⛔ Other Command Restrictions
 
 - **NEVER use the `find` command** - it's dangerous due to the `-exec` flag which can execute arbitrary commands
-- **NEVER use stream redirection with npm test commands** - redirection like `2>&1` gets passed as arguments to Vitest, causing it to interpret them as test filters instead of shell redirection
-- Use safe alternatives instead:
-  - **ripgrep (rg)** - for content searching and file discovery: `rg --files | rg "pattern"`, `rg -l "content" --type js`
-  - **fd/fdfind** - for file system traversal: `fd "*.js"`, `fd --type f --changed-within 1day`
-  - **git ls-files** - for git repositories: `git ls-files | grep "\.js$"`
-  - **Enhanced ls** - for basic directory listing with tools like `exa` or `lsd`
-- For test output control, use the existing npm scripts: `test:brief`, `test:quiet`, `test:verbose`
+
+### ✅ Safe Command Alternatives
+
+- **ripgrep (rg)** - for content searching: `rg --files | rg "pattern"`, `rg -l "content" --type js`
+- **fd/fdfind** - for file discovery: `fd "*.js"`, `fd --type f --changed-within 1day`
+- **git ls-files** - for repo files: `git ls-files | grep "\.js$"`
 - Prefer rg (ripgrep) to find or grep
-- If trying to use a tool that is not installed, suggest installation of the tool with `brew` (preferred) or `apt`
+- Install missing tools with `brew` (preferred) or `apt`
 
 ## 📚 Quick Reference (Auto-Loaded)
 

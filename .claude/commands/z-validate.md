@@ -17,6 +17,26 @@ Arguments: $ARGUMENTS (optional: "fix" for auto-fixing issues)
 
 ## Phase 1: Core System Health
 
+### Git & Remote Sync Status
+
+Check repository synchronization and branch status:
+
+**Fetch latest from remote:**
+!`git fetch --all`
+
+**Check current branch and remote tracking:**
+!`git branch -vv`
+
+**Check if current branch is up to date with remote:**
+!`git status -uno`
+
+**Check relationship to main branch:**
+!`git log --oneline main..HEAD`
+!`git log --oneline HEAD..main`
+
+**Uncommitted changes check:**
+!`git status --porcelain`
+
 ### Project Overview
 
 Get comprehensive status across all major systems:
@@ -58,6 +78,7 @@ Based on all the structured status data above, analyze and provide:
 
 **System Status Breakdown:**
 
+- **Git Sync:** [Remote sync status, branch relationship to main, uncommitted changes]
 - **Dependencies:** [Status from overview + context]
 - **Build/TypeScript:** [Status from overview + context]
 - **Tests:** [Status from overview + context]
