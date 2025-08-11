@@ -36,7 +36,7 @@ async function createCommentWithAuthor(
   author: {
     id: string;
     name: string | null;
-    email: string;
+    email: string | null;
     image: string | null;
   };
 }> {
@@ -123,6 +123,13 @@ async function createCommentWithAuthor(
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Drizzle .returning() guarantees non-null
     .where(eq(comments.id, comment!.id))
     .limit(1);
+
+  if (!commentWithAuthor) {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Failed to fetch comment with author details",
+    });
+  }
 
   return commentWithAuthor;
 }
