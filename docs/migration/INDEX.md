@@ -19,7 +19,7 @@ Active migrations and transition guides for PinPoint.
 
 ## Contents
 
-- **[supabase-drizzle/index.md](./supabase-drizzle/index.md)** - Migration hub and current status
+- **[supabase-drizzle/INDEX.md](./supabase-drizzle/INDEX.md)** - Migration hub and current status
 - **[supabase-drizzle/implementation-plan.md](./supabase-drizzle/implementation-plan.md)** - Direct conversion approach details
 - **[supabase-drizzle/developer-guide.md](./supabase-drizzle/developer-guide.md)** - Complete guide for developers
 - **[supabase-drizzle/technical-analysis.md](./supabase-drizzle/technical-analysis.md)** - Migration approach analysis
