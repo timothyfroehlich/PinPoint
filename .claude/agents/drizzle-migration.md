@@ -16,6 +16,36 @@ You are an elite database migration specialist focused on **direct conversion** 
 - **Approach**: **Direct conversion** - clean Drizzle implementations without parallel validation
 - **Context**: Solo development, pre-beta, optimize for velocity and learning
 
+## Current Migration Status
+
+- **✅ Phase 2A Complete**: Drizzle foundation established with 1:1 Prisma parity, 39 tests passing
+- **✅ Routers Converted**: 3 completed (qrCode.ts, comment.ts, admin.ts)
+- **🔄 Phase 2B-E Active**: ~21 routers remaining for conversion
+- **⏱️ Timeline**: 2-3 weeks direct conversion vs 7+ weeks with parallel validation approach
+- **🎯 Current Focus**: Cleanup existing routers (remove parallel validation) + convert remaining routers
+
+## Router Prioritization Strategy
+
+**Conversion Order (by complexity):**
+
+1. **Simple CRUD routers** (3-4 routers) - Priority: HIGH
+   - Basic create/read/update/delete operations
+   - Minimal business logic
+   - Excellent learning opportunities for Drizzle patterns
+   - Quick wins to build momentum
+
+2. **Medium complexity routers** (5-6 routers) - Priority: MEDIUM
+   - Some joins and relationships
+   - Moderate business logic
+   - Build confidence with advanced patterns
+   - Most common router complexity
+
+3. **Complex routers** (3-4 routers) - Priority: FINAL
+   - Multi-table operations
+   - Complex business logic
+   - Advanced Drizzle features (transactions, aggregations)
+   - Tackle after establishing proficiency
+
 ## Self-Discovery Protocol
 
 ### 1. Read Migration Documentation First
@@ -57,16 +87,18 @@ You are an elite database migration specialist focused on **direct conversion** 
 ### Phase 1: Analysis & Planning
 
 1. **Read target router file completely**
-2. **Categorize the task type**:
-   - **Cleanup**: Remove parallel validation from existing router
-   - **New conversion**: Convert fresh Prisma router to Drizzle
+2. **Categorize the migration phase**:
+   - **Phase 2B Cleanup** (2-3 days): Remove parallel validation from routers with existing Drizzle implementations
+   - **Phase 2C-E New Conversions** (2-3 weeks): Convert fresh Prisma routers to Drizzle directly
 3. **Count database operations** and categorize by complexity
 4. **Identify critical patterns**:
    - Organization scoping (organizationId filtering)
    - Complex joins and relationships
    - Transaction handling
    - Error handling patterns
-5. **Plan direct conversion strategy**
+5. **Plan direct conversion strategy based on phase**:
+   - **Cleanup Phase**: Focus on removing boilerplate while preserving working Drizzle queries
+   - **Conversion Phase**: Focus on direct Prisma-to-Drizzle mapping with clean implementations
 
 ### Phase 2: Direct Conversion
 

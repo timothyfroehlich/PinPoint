@@ -1,31 +1,37 @@
 # Drizzle ORM Developer Guide
 
-Drizzle is a TypeScript ORM that provides type-safe database queries with a SQL-like syntax. It offers excellent TypeScript integration, zero dependencies, and generates highly optimized SQL queries. PinPoint is migrating to Drizzle as a modern alternative to Prisma.
+Drizzle is a TypeScript ORM that provides type-safe database queries with a SQL-like syntax. It offers excellent TypeScript integration, zero dependencies, and generates highly optimized SQL queries. PinPoint has migrated to Drizzle using a direct conversion approach optimized for solo development velocity.
 
-## Migration Status (Phase 2A Complete)
+## Migration Status (Phase 2B-E In Progress)
 
-As of 2025-08-02, PinPoint has successfully completed Phase 2A: Drizzle Foundation with:
+**Phase 2A Complete (2025-08-02)**: Drizzle Foundation established with:
 
 - ✅ Complete schema implementation with 1:1 Prisma parity
-- ✅ Dual-ORM architecture supporting gradual migration
 - ✅ 39 comprehensive tests validating foundation
 - ✅ Essential performance indexes for multi-tenancy
-- 🔄 Router migrations in progress (Phase 2B-E)
+- ✅ 3 initial router conversions completed (qrCode, comment, admin)
+
+**Phase 2B-E Current**: Direct conversion of remaining routers using enhanced migration agent
+
+- 🔄 Cleanup of existing routers (remove parallel validation boilerplate)
+- 🔄 Direct conversion of 13 remaining routers
+- 🎯 Target: 2-3 weeks total vs 7+ weeks with staged approach
 
 ## Architecture Overview
 
-### Dual-ORM Support
-During migration, both Prisma and Drizzle are available in tRPC context:
+### Single ORM Context (Post-Migration)
+
+PinPoint uses Drizzle as the primary ORM with clean, direct implementations:
 
 ```typescript
 export interface TRPCContext {
-  db: ExtendedPrismaClient;      // Existing Prisma client
-  drizzle: DrizzleClient;        // New Drizzle client
+  drizzle: DrizzleClient; // Primary database client
   // ... other properties
 }
 ```
 
 ### Modular Schema Organization
+
 Drizzle schemas are organized into 5 domain-specific files:
 
 ```
@@ -41,9 +47,9 @@ src/server/db/schema/
 ## Guides
 
 - [Schema Patterns](./schema-patterns.md) - Table definitions, relations, migrations, PinPoint-specific patterns
-- [Query Patterns](./query-patterns.md) - Common queries, joins, transactions, dual-ORM patterns
+- [Query Patterns](./query-patterns.md) - Common queries, joins, transactions, Drizzle patterns
 - [Testing Patterns](./testing-patterns.md) - Mock strategies, CRUD validation, integration testing
-- [Dual-ORM Migration](./dual-orm-migration.md) - Gradual migration strategies, type management
+- [Direct Conversion Migration](./dual-orm-migration.md) - Direct conversion strategies from Prisma to Drizzle
 - [Drizzle + Zod Validation](./drizzle-zod-validation.md) - Input validation with generated schemas
 
 ## Key Implementation Decisions
@@ -63,6 +69,7 @@ src/server/db/schema/
 ## Known Issues & Workarounds
 
 ### pgbouncer Compatibility
+
 - **Issue**: `drizzle-kit push` hangs with connection pooling
 - **Cause**: pgbouncer interferes with schema introspection
 - **Workaround**: Use direct database connection for schema operations
