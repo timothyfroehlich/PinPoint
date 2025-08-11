@@ -1,508 +1,302 @@
-# Testing Patterns Quick Reference
+# Testing Patterns: Modern Vitest & Direct Conversion
 
-Essential test patterns for PinPoint development. Auto-loaded by Claude Code agents.
+Testing strategies aligned with direct conversion approach. Focus on fast feedback over comprehensive coverage.
 
-## Essential Imports
+## 🎯 Testing Philosophy for Direct Conversion
+
+**Core Principles:**
+
+- Fast feedback loops over extensive test suites
+- Integration testing with PGlite for database logic
+- Mock at the right level (module > individual functions)
+- TypeScript compilation as primary safety net
+- Manual testing for complex business logic
+
+---
+
+## 🧪 Modern Vitest Patterns
+
+### Type-Safe Partial Mocking
 
 ```typescript
-import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import "@testing-library/jest-dom";
+import type * as AuthModule from "@/utils/auth";
 
-import {
-  VitestTestWrapper,
-  VITEST_PERMISSION_SCENARIOS,
-} from "~/test/VitestTestWrapper";
+vi.mock("@/utils/auth", async (importOriginal) => {
+  const actual = await importOriginal<typeof AuthModule>();
+  return {
+    ...actual,
+    // Only mock what you need
+    getUser: vi.fn().mockResolvedValue({ id: "123", name: "Test User" }),
+    // hasPermission keeps original implementation
+  };
+});
 ```
 
-## Component Test Template
+### Hoisted Mock Variables
 
 ```typescript
-describe("ComponentName", () => {
+const mocks = vi.hoisted(() => ({
+  mockCreateClient: vi.fn(),
+  mockQuery: vi.fn(),
+  mockAuth: {
+    getUser: vi.fn(),
+    signOut: vi.fn(),
+  },
+}));
+
+vi.mock("@/utils/supabase/server", () => ({
+  createClient: () => ({
+    auth: mocks.mockAuth,
+    from: () => ({ select: mocks.mockQuery }),
+  }),
+}));
+
+test("uses hoisted mocks", () => {
+  mocks.mockAuth.getUser.mockResolvedValue({ data: { user: null } });
+  // Test logic here
+});
+```
+
+### Configuration Migration
+
+```typescript
+// vitest.config.ts - Updated for v4.0
+export default defineConfig({
+  test: {
+    // OLD: workspace (deprecated)
+    // NEW: projects
+    projects: [
+      {
+        name: "unit",
+        testMatch: ["**/*.test.ts"],
+      },
+      {
+        name: "integration",
+        testMatch: ["**/*.integration.test.ts"],
+      },
+    ],
+  },
+});
+```
+
+---
+
+## 🗄️ Database Testing with PGlite
+
+### Setup In-Memory PostgreSQL
+
+```typescript
+// vitest.setup.ts
+import { vi } from "vitest";
+import * as schema from "./src/db/schema";
+
+vi.mock("./src/db/index.ts", async (importOriginal) => {
+  const { PGlite } = await vi.importActual<
+    typeof import("@electric-sql/pglite")
+  >("@electric-sql/pglite");
+  const { drizzle } =
+    await vi.importActual<typeof import("drizzle-orm/pglite")>(
+      "drizzle-orm/pglite",
+    );
+  const { migrate } = await vi.importActual<
+    typeof import("drizzle-orm/pglite/migrator")
+  >("drizzle-orm/pglite/migrator");
+
+  const client = new PGlite();
+  const testDb = drizzle(client, { schema });
+
+  // Apply migrations
+  await migrate(testDb, { migrationsFolder: "./drizzle" });
+
+  const originalModule =
+    await importOriginal<typeof import("./src/db/index.ts")>();
+  return {
+    ...originalModule,
+    db: testDb,
+  };
+});
+```
+
+### Integration Test Pattern
+
+```typescript
+// router.integration.test.ts
+import { createTRPCMsw } from "msw-trpc";
+import { appRouter } from "@/server/api/root";
+
+describe("User Router Integration", () => {
   beforeEach(() => {
+    // Fresh database for each test
     vi.clearAllMocks();
   });
 
-  it("renders correctly", () => {
-    render(
-      <VitestTestWrapper>
-        <ComponentName />
-      </VitestTestWrapper>
-    );
+  test("creates user with organizational scoping", async () => {
+    const caller = appRouter.createCaller(mockContext);
 
-    expect(screen.getByRole("button")).toBeInTheDocument();
-  });
+    const user = await caller.user.create({
+      name: "Test User",
+      email: "test@example.com",
+    });
 
-  it("handles user interaction", async () => {
-    const user = userEvent.setup();
-    render(
-      <VitestTestWrapper>
-        <ComponentName onAction={mockFn} />
-      </VitestTestWrapper>
-    );
-
-    await user.click(screen.getByRole("button"));
-    expect(mockFn).toHaveBeenCalledOnce();
+    expect(user.organizationId).toBe(mockContext.user.organizationId);
   });
 });
 ```
 
-## Permission Testing Patterns
+---
+
+## 🔐 Authentication Testing
+
+### Supabase Server Component Mocks
 
 ```typescript
-// Test with different permission scenarios
-describe("PermissionComponent", () => {
-  it("shows content for admin users", () => {
-    render(
-      <VitestTestWrapper
-        permissionScenario={VITEST_PERMISSION_SCENARIOS.ADMIN}
-      >
-        <PermissionComponent />
-      </VitestTestWrapper>
-    );
-
-    expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument();
-  });
-
-  it("hides content for regular members", () => {
-    render(
-      <VitestTestWrapper
-        permissionScenario={VITEST_PERMISSION_SCENARIOS.MEMBER}
-      >
-        <PermissionComponent />
-      </VitestTestWrapper>
-    );
-
-    expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
-  });
-
-  it("shows login prompt for unauthenticated users", () => {
-    render(
-      <VitestTestWrapper
-        permissionScenario={VITEST_PERMISSION_SCENARIOS.UNAUTHENTICATED}
-      >
-        <PermissionComponent />
-      </VitestTestWrapper>
-    );
-
-    expect(screen.getByText(/sign in/i)).toBeInTheDocument();
-  });
-});
-```
-
-## tRPC Mocking Patterns
-
-```typescript
-// Mock tRPC router
-const mockTrpc = {
-  issues: {
-    list: vi.fn().mockResolvedValue([]),
-    create: vi.fn().mockResolvedValue({ id: "test-id" }),
-    update: vi.fn().mockResolvedValue({ id: "test-id" }),
-  },
-};
-
-// Use with wrapper
-<VitestTestWrapper trpcMocks={mockTrpc}>
-  <ComponentWithTrpc />
-</VitestTestWrapper>
-```
-
-## Async Testing
-
-```typescript
-// Wait for async operations
-it("loads data asynchronously", async () => {
-  render(<DataComponent />);
-
-  // Wait for loading to complete
-  await waitFor(() => {
-    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
-  });
-
-  // Assert final state
-  expect(screen.getByText("Data loaded")).toBeInTheDocument();
-});
-
-// Test error states
-it("handles loading errors", async () => {
-  mockTrpc.issues.list.mockRejectedValue(new Error("Network error"));
-
-  render(<IssuesList />);
-
-  await waitFor(() => {
-    expect(screen.getByText(/error/i)).toBeInTheDocument();
-  });
-});
-```
-
-## Form Testing
-
-```typescript
-it("submits form with valid data", async () => {
-  const user = userEvent.setup();
-  const mockSubmit = vi.fn();
-
-  render(<IssueForm onSubmit={mockSubmit} />);
-
-  // Fill form
-  await user.type(screen.getByLabelText("Title"), "Test Issue");
-  await user.type(screen.getByLabelText("Description"), "Test description");
-
-  // Submit
-  await user.click(screen.getByRole("button", { name: "Submit" }));
-
-  // Verify submission
-  expect(mockSubmit).toHaveBeenCalledWith({
-    title: "Test Issue",
-    description: "Test description",
-  });
-});
-```
-
-## Service Layer Testing
-
-```typescript
-// Test service functions directly
-describe("issueService", () => {
-  it("creates issue with organization scoping", async () => {
-    const mockData = {
-      title: "Test Issue",
-      machineId: "machine-1",
-      organizationId: "org-1",
-    };
-
-    const result = await issueService.create(mockData);
-
-    expect(result).toEqual(
-      expect.objectContaining({
-        id: expect.any(String),
-        organizationId: "org-1",
-      }),
-    );
-  });
-});
-```
-
-## Common Patterns
-
-### Error Boundary Testing
-
-```typescript
-it("catches and displays errors", () => {
-  const ThrowError = () => {
-    throw new Error("Test error");
-  };
-
-  render(
-    <VitestTestWrapper>
-      <ErrorBoundary>
-        <ThrowError />
-      </ErrorBoundary>
-    </VitestTestWrapper>
-  );
-
-  expect(screen.getByText(/something went wrong/i)).toBeInTheDocument();
-});
-```
-
-### Mock Cleanup
-
-```typescript
-describe("Component", () => {
-  beforeEach(() => {
-    vi.clearAllMocks(); // Clear call history
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks(); // Restore original implementations
-  });
-});
-```
-
-### Custom Matchers
-
-```typescript
-// Use jest-dom matchers
-expect(element).toBeInTheDocument();
-expect(element).toBeVisible();
-expect(element).toHaveClass("active");
-expect(element).toHaveAttribute("aria-expanded", "true");
-```
-
-## Anti-Patterns to Avoid
-
-```typescript
-// ❌ Don't: Test implementation details
-expect(wrapper.state().count).toBe(1);
-
-// ✅ Do: Test user-facing behavior
-expect(screen.getByText("Count: 1")).toBeInTheDocument();
-
-// ❌ Don't: Use generic selectors
-expect(container.querySelector(".button")).toBeInTheDocument();
-
-// ✅ Do: Use semantic queries
-expect(screen.getByRole("button", { name: "Submit" })).toBeInTheDocument();
-
-// ❌ Don't: Mock everything
-vi.mock("@mui/material/Button");
-
-// ✅ Do: Mock external dependencies only
-vi.mock("~/lib/api/issues");
-```
-
-## MSW Debugging Guide
-
-PinPoint uses MSW (Mock Service Worker) with tRPC for HTTP request interception in tests. The setup can be complex, so here's how to debug issues.
-
-### Quick Debugging Checklist
-
-1. **Check MSW Setup**: Ensure MSW server is running in test environment
-2. **Verify Handler Registration**: Confirm your test handlers are registered
-3. **Check Request Matching**: Use built-in logging to see what's intercepted
-4. **Validate tRPC Configuration**: Ensure MSW-tRPC config matches client config
-
-### Built-in Request Logging
-
-MSW is configured with automatic request logging. Enable it by running tests with logging:
-
-```bash
-# Run tests with MSW request logging visible
-npm run test -- --reporter=verbose
-
-# Or check specific test file
-npm run test ComponentName.test.tsx -- --reporter=verbose
-```
-
-**Log Output Example:**
-
-```bash
-[MSW] Intercepting: POST http://localhost:3000/api/trpc/issues.create
-[MSW] Handler matched: POST http://localhost:3000/api/trpc/issues.create
-[MSW Handler] mockCurrentMembership called with: { userId: "user-1", organizationId: "org-1" }
-```
-
-### Common MSW Issues and Solutions
-
-#### 1. "Request not intercepted"
-
-**Symptoms**: Test makes real HTTP requests instead of using mock
-
-```bash
-[MSW] Unhandled request: POST http://localhost:3000/api/trpc/issues.create
-```
-
-**Solutions**:
-
-```typescript
-// ✅ Ensure MSW is enabled in test wrapper
-render(
-  <VitestTestWrapper setupMSW={true}>  {/* Don't disable MSW */}
-    <Component />
-  </VitestTestWrapper>
-);
-
-// ✅ Check handler is registered in your test
-import { server } from "~/test/msw/setup";
-beforeEach(() => {
-  server.use(/* your handlers here */);
-});
-```
-
-#### 2. "Handler not found for procedure"
-
-**Symptoms**: tRPC procedure not mocked, test fails with "procedure not found"
-
-**Solutions**:
-
-```typescript
-// ✅ Use trpcMsw to create handlers
-import { trpcMsw } from "~/test/msw/setup";
-
-const issueHandlers = [
-  trpcMsw.issues.create.mutation(({ input }) => {
-    return { id: "new-issue", ...input };
+// Mock next/headers for Server Components
+vi.mock("next/headers", () => ({
+  cookies: () => ({
+    get: vi.fn().mockReturnValue({ value: "fake-session" }),
+    set: vi.fn(),
+    remove: vi.fn(),
   }),
-  trpcMsw.issues.list.query(() => []),
+}));
+
+// Mock Supabase server client
+vi.mock("@/utils/supabase/server", () => ({
+  createClient: () => ({
+    auth: {
+      getUser: vi.fn().mockResolvedValue({
+        data: { user: { id: "123", email: "test@example.com" } },
+        error: null,
+      }),
+    },
+  }),
+}));
+```
+
+### Server Action Testing
+
+```typescript
+import * as actions from "@/app/actions";
+
+vi.mock("@/app/actions");
+
+test("form submission calls server action", async () => {
+  const mockCreatePost = vi.mocked(actions.createPost);
+  mockCreatePost.mockResolvedValue({ id: 1 });
+
+  // Simulate form submission
+  const formData = new FormData();
+  formData.set("title", "Test Post");
+
+  await actions.createPost(formData);
+
+  expect(mockCreatePost).toHaveBeenCalledWith(formData);
+});
+```
+
+---
+
+## 🛡️ Security & Permission Testing
+
+### Multi-Tenant Scoping Tests
+
+```typescript
+test("enforces organizational boundaries", async () => {
+  const caller = appRouter.createCaller({
+    user: { organizationId: "org-1" },
+  });
+
+  // Should only return posts from user's organization
+  const posts = await caller.post.getAll();
+
+  posts.forEach((post) => {
+    expect(post.organizationId).toBe("org-1");
+  });
+});
+```
+
+### Permission Matrix Testing
+
+```typescript
+const permissionCases = [
+  { role: "admin", action: "delete", allowed: true },
+  { role: "user", action: "delete", allowed: false },
+  { role: "user", action: "read", allowed: true },
 ];
 
-beforeEach(() => {
-  server.use(...issueHandlers);
-});
-```
+permissionCases.forEach(({ role, action, allowed }) => {
+  test(`${role} can ${allowed ? "" : "not "}${action}`, async () => {
+    const caller = appRouter.createCaller({
+      user: { role, organizationId: "test-org" },
+    });
 
-#### 3. "Transformer mismatch"
-
-**Symptoms**: Superjson serialization errors in MSW responses
-
-**Solutions**:
-
-```typescript
-// ✅ Ensure MSW config matches client transformer
-// MSW setup (already configured in src/test/msw/setup.ts):
-export const trpcMsw = createTRPCMsw<AppRouter>({
-  transformer: { input: superjson, output: superjson }, // Must match client
-});
-
-// ✅ Return proper types from handlers
-trpcMsw.issues.create.mutation(({ input }) => {
-  return {
-    id: "issue-123",
-    createdAt: new Date(), // Superjson handles Date serialization
-    ...input,
-  };
-});
-```
-
-#### 4. "Test hanging or timing out"
-
-**Symptoms**: Test never completes, hangs waiting for response
-
-**Solutions**:
-
-```typescript
-// ✅ Use waitFor for async operations
-await waitFor(() => {
-  expect(screen.getByText("Success")).toBeInTheDocument();
-});
-
-// ✅ Add timeout debugging
-import { waitFor } from "@testing-library/react";
-await waitFor(
-  () => expect(screen.getByText("Loading...")).not.toBeInTheDocument(),
-  { timeout: 5000 }, // Increase timeout for debugging
-);
-```
-
-### MSW Handler Patterns
-
-#### Basic Query Handler
-
-```typescript
-trpcMsw.issues.list.query(() => [
-  { id: "1", title: "Test Issue", status: "OPEN" },
-]);
-```
-
-#### Mutation with Input Validation
-
-```typescript
-trpcMsw.issues.create.mutation(({ input }) => {
-  expect(input.title).toBeDefined();
-  return { id: "new-id", ...input, createdAt: new Date() };
-});
-```
-
-#### Error Response Handler
-
-```typescript
-trpcMsw.issues.create.mutation(() => {
-  throw new TRPCError({
-    code: "BAD_REQUEST",
-    message: "Title is required",
+    if (allowed) {
+      await expect(caller.post[action]({ id: "1" })).resolves.toBeDefined();
+    } else {
+      await expect(caller.post[action]({ id: "1" })).rejects.toThrow();
+    }
   });
 });
 ```
 
-#### Dynamic Handler Based on Input
+---
 
-```typescript
-trpcMsw.issues.update.mutation(({ input }) => {
-  if (input.id === "forbidden-id") {
-    throw new TRPCError({ code: "FORBIDDEN" });
-  }
-  return { ...input, updatedAt: new Date() };
-});
-```
+## 📋 Daily Testing Checklist
 
-### Debugging Workflow
+**Before Router Conversion:**
 
-1. **Start with logging**: Run test with verbose output to see MSW activity
-2. **Check handler registration**: Verify your handlers are actually registered
-3. **Validate request matching**: Ensure URL and method match exactly
-4. **Test handler in isolation**: Create minimal test to verify handler works
-5. **Check component integration**: Verify component makes expected requests
+- [ ] Update test mocks for new Drizzle patterns
+- [ ] Ensure organizational scoping tests pass
+- [ ] Verify authentication context works
 
-### MSW + tRPC Best Practices
+**During Router Conversion:**
 
-- **Use TypeScript**: MSW handlers are fully typed with AppRouter
-- **Mock at HTTP level**: MSW intercepts actual HTTP, providing realistic testing
-- **Handler isolation**: Each test should register its own handlers
-- **Cleanup handlers**: Use `server.resetHandlers()` between tests
-- **Match production config**: MSW transformer must match client transformer
+- [ ] Run tests after each procedure conversion
+- [ ] Fix any failing tests immediately
+- [ ] Add integration tests for complex logic
 
-## Integration Testing Patterns
+**After Router Conversion:**
 
-### Test Project Types
+- [ ] Full test suite passes
+- [ ] Manual testing of key user flows
+- [ ] Performance check for slow queries
 
-```typescript
-// Unit Tests (src/server/**/*.test.ts) - Mocked Database
-describe("UserService", () => {
-  // Uses vi.mock("@prisma/client") from vitest.setup.ts
-  it("creates user", async () => {
-    mockPrisma.user.create.mockResolvedValue({ id: "1", name: "Test" });
-    // Test business logic with mocked DB
-  });
-});
+---
 
-// Integration Tests (src/integration-tests/**/*.test.ts) - Real Database
-describe("User Integration", () => {
-  // Uses real Supabase database from vitest.integration.setup.ts
-  it("creates user with constraints", async () => {
-    const db = createDrizzleClient(); // Real connection
-    const [user] = await db.insert(users).values({...}).returning();
-    // Tests with real database constraints, RLS policies
-  });
-});
-```
+## ⚠️ Common Testing Pitfalls
 
-### Hard Failure Pattern
+**Mock Setup Issues:**
 
-Integration tests fail immediately when database unavailable:
+- ❌ Accessing variables in `vi.mock` factories directly
+- ✅ Use `vi.hoisted` for shared mock state
+- ❌ Mocking individual methods instead of modules
+- ✅ Mock at module level with partial mocking
 
-```typescript
-// ❌ OLD: Silent skipping
-it("creates user", async () => {
-  if (!db) {
-    console.log("Skipping - no database");
-    return; // WRONG - tests should never skip
-  }
-});
+**Database Testing:**
 
-// ✅ NEW: Hard failure in setup
-beforeAll(async () => {
-  if (!process.env.DATABASE_URL) {
-    throw new Error("DATABASE_URL required. Run: supabase start");
-  }
-});
-```
+- ❌ Using external Docker containers for tests
+- ✅ PGlite in-memory for fast, isolated tests
+- ❌ Sharing database state between tests
+- ✅ Fresh database for each test case
 
-### Prerequisites Check
+**Authentication Mocks:**
 
-```bash
-# Before running integration tests
-supabase status        # Check if running
-supabase start        # Start if needed
+- ❌ Forgetting to mock `next/headers` for Server Components
+- ✅ Mock both server and client Supabase utilities
+- ❌ Complex auth state setup in every test
+- ✅ Use factory functions for common auth states
 
-# Integration test commands
-npm run test -- --project=integration
-npm run test src/integration-tests/
-```
+---
 
-## Commands
+## 🚦 Test Commands
 
 ```bash
 # Test by project type
-npm run test -- --project=node         # Unit tests (mocked DB)
-npm run test -- --project=integration  # Integration tests (real DB)
-npm run test -- --project=jsdom        # Component tests
+npm run test -- --project=unit         # Unit tests (mocked DB)
+npm run test -- --project=integration  # Integration tests (PGlite DB)
 
 # All tests
 npm run test            # Full test suite
 npm run test:brief      # Fast, minimal output
-npm run test:coverage   # Coverage report
 
 # Debugging
 npm run test:ui         # Interactive UI
@@ -511,8 +305,4 @@ npm run test -- --reporter=verbose  # Detailed output
 
 ---
 
-**Complete Reference**: See `@docs/testing/vitest-guide.md` for comprehensive patterns  
-**Test Utilities**: See `@docs/testing/test-utilities-guide.md` for helper functions
-
-**Last Updated**: 2025-08-03  
-**Status**: Active - Core patterns for Vitest + React Testing Library
+_Complete testing strategies: @docs/testing/vitest-guide.md_
