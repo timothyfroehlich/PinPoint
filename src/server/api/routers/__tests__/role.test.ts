@@ -429,6 +429,7 @@ describe("Role Router (Drizzle Integration)", () => {
       });
 
       expect(result).toEqual(templateRole);
+
       expect(mockRoleService.createTemplateRole).toHaveBeenCalledWith(
         "MANAGER",
         {
@@ -450,6 +451,7 @@ describe("Role Router (Drizzle Integration)", () => {
 
       expect(result).toEqual(customRole);
       expect(mockContext.drizzle.insert).toHaveBeenCalled();
+
       expect(mockRoleService.updateRole).toHaveBeenCalledWith(customRole.id, {
         permissionIds: ["perm-1", "perm-2"],
       });
@@ -519,6 +521,7 @@ describe("Role Router (Drizzle Integration)", () => {
       });
 
       expect(result).toEqual(updatedRole);
+
       expect(mockRoleService.updateRole).toHaveBeenCalledWith("role-1", {
         name: "Updated Role Name",
       });
@@ -534,6 +537,7 @@ describe("Role Router (Drizzle Integration)", () => {
       });
 
       expect(result).toEqual(updatedRole);
+
       expect(mockRoleService.updateRole).toHaveBeenCalledWith("role-1", {
         permissionIds: ["perm-1", "perm-3"],
       });
@@ -549,6 +553,7 @@ describe("Role Router (Drizzle Integration)", () => {
       });
 
       expect(result).toEqual(updatedRole);
+
       expect(mockRoleService.updateRole).toHaveBeenCalledWith("role-1", {
         isDefault: true,
       });
@@ -569,6 +574,7 @@ describe("Role Router (Drizzle Integration)", () => {
       });
 
       expect(result).toEqual(updatedRole);
+
       expect(mockRoleService.updateRole).toHaveBeenCalledWith("role-1", {
         name: "Multi Updated",
         permissionIds: ["perm-1", "perm-2"],
@@ -596,6 +602,7 @@ describe("Role Router (Drizzle Integration)", () => {
 
       expect(result).toEqual({ success: true });
       expect(mockRoleService.ensureAtLeastOneAdmin).toHaveBeenCalledTimes(1);
+
       expect(mockRoleService.deleteRole).toHaveBeenCalledWith("role-1");
     });
 
@@ -795,13 +802,13 @@ describe("Role Router (Drizzle Integration)", () => {
       } = options;
 
       // Mock role and membership queries
-      let roleQueryCallCount = 0;
+      let _roleQueryCallCount = 0;
       let membershipQueryCallCount = 0;
 
       const mockQueryAPI = {
         roles: {
           findFirst: vi.fn().mockImplementation(() => {
-            roleQueryCallCount++;
+            _roleQueryCallCount++;
             if (shouldThrowOnRoleQuery) {
               throw new Error("Role query failed");
             }
@@ -1060,11 +1067,13 @@ describe("Role Router (Drizzle Integration)", () => {
       await Promise.all([callerA.list(), callerB.list()]);
 
       // Verify RoleService was instantiated with correct org IDs
+
       expect(RoleService).toHaveBeenCalledWith(
         expect.anything(),
         "org-a",
         expect.anything(),
       );
+
       expect(RoleService).toHaveBeenCalledWith(
         expect.anything(),
         "org-b",
