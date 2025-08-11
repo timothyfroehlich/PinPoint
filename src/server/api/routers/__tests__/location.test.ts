@@ -316,27 +316,25 @@ describe("Location Router (Drizzle Conversion)", () => {
     ];
 
     it("should get public location data with complex count queries", async () => {
-      // Mock the complex query chain for getPublic
-      vi.mocked(mockContext.drizzle.query).mockReturnValue({
-        locations: {
-          findMany: vi.fn().mockResolvedValue([
-            {
-              id: "location-1",
-              name: "Test Location",
-              machines: [
-                {
-                  id: "machine-1",
-                  name: "Test Machine",
-                  model: {
-                    name: "Medieval Madness",
-                    manufacturer: "Williams",
-                  },
+      // Mock the locations query for getPublic
+      vi.mocked(mockContext.drizzle.query.locations.findMany).mockResolvedValue(
+        [
+          {
+            id: "location-1",
+            name: "Test Location",
+            machines: [
+              {
+                id: "machine-1",
+                name: "Test Machine",
+                model: {
+                  name: "Medieval Madness",
+                  manufacturer: "Williams",
                 },
-              ],
-            },
-          ]),
-        },
-      } as any);
+              },
+            ],
+          },
+        ],
+      );
 
       // Mock machine counts query
       vi.mocked(mockContext.drizzle.groupBy).mockResolvedValue([
@@ -413,11 +411,9 @@ describe("Location Router (Drizzle Conversion)", () => {
         user: null, // No authentication required for public endpoint
       } as any);
 
-      vi.mocked(mockContext.drizzle.query).mockReturnValue({
-        locations: {
-          findMany: vi.fn().mockResolvedValue([]),
-        },
-      } as any);
+      vi.mocked(mockContext.drizzle.query.locations.findMany).mockResolvedValue(
+        [],
+      );
       vi.mocked(mockContext.drizzle.groupBy).mockResolvedValue([]);
 
       const result = await publicCaller.getPublic();
@@ -436,11 +432,9 @@ describe("Location Router (Drizzle Conversion)", () => {
     });
 
     it("should filter unresolved issues correctly", async () => {
-      vi.mocked(mockContext.drizzle.query).mockReturnValue({
-        locations: {
-          findMany: vi.fn().mockResolvedValue([]),
-        },
-      } as any);
+      vi.mocked(mockContext.drizzle.query.locations.findMany).mockResolvedValue(
+        [],
+      );
       vi.mocked(mockContext.drizzle.groupBy).mockResolvedValue([]);
 
       await caller.getPublic();
@@ -548,11 +542,9 @@ describe("Location Router (Drizzle Conversion)", () => {
     };
 
     it("should get location with detailed relationships", async () => {
-      vi.mocked(mockContext.drizzle.query).mockReturnValue({
-        locations: {
-          findFirst: vi.fn().mockResolvedValue(detailedLocation),
-        },
-      } as any);
+      vi.mocked(
+        mockContext.drizzle.query.locations.findFirst,
+      ).mockResolvedValue(detailedLocation);
 
       const result = await caller.getById({ id: "location-1" });
 
@@ -579,11 +571,9 @@ describe("Location Router (Drizzle Conversion)", () => {
     });
 
     it("should throw error when location not found", async () => {
-      vi.mocked(mockContext.drizzle.query).mockReturnValue({
-        locations: {
-          findFirst: vi.fn().mockResolvedValue(null),
-        },
-      } as any);
+      vi.mocked(
+        mockContext.drizzle.query.locations.findFirst,
+      ).mockResolvedValue(null);
 
       await expect(caller.getById({ id: "nonexistent" })).rejects.toThrow(
         "Location not found or access denied",
@@ -591,11 +581,9 @@ describe("Location Router (Drizzle Conversion)", () => {
     });
 
     it("should enforce organizational scoping in query", async () => {
-      vi.mocked(mockContext.drizzle.query).mockReturnValue({
-        locations: {
-          findFirst: vi.fn().mockResolvedValue(null),
-        },
-      } as any);
+      vi.mocked(
+        mockContext.drizzle.query.locations.findFirst,
+      ).mockResolvedValue(null);
 
       try {
         await caller.getById({ id: "location-1" });
@@ -922,12 +910,12 @@ describe("Location Router (Drizzle Conversion)", () => {
 
   describe("Multi-Tenancy & Organizational Isolation", () => {
     it("should isolate data by organization in all queries", async () => {
-      vi.mocked(mockContext.drizzle.query).mockReturnValue({
-        locations: {
-          findMany: vi.fn().mockResolvedValue([]),
-          findFirst: vi.fn().mockResolvedValue(null),
-        },
-      } as any);
+      vi.mocked(mockContext.drizzle.query.locations.findMany).mockResolvedValue(
+        [],
+      );
+      vi.mocked(
+        mockContext.drizzle.query.locations.findFirst,
+      ).mockResolvedValue(null);
 
       // Test all read operations include organizational scoping
       await caller.getAll().catch(() => {
@@ -980,11 +968,9 @@ describe("Location Router (Drizzle Conversion)", () => {
 
     it("should maintain organizational context throughout complex operations", async () => {
       // Test that getPublic maintains organizational filtering across multiple queries
-      vi.mocked(mockContext.drizzle.query).mockReturnValue({
-        locations: {
-          findMany: vi.fn().mockResolvedValue([]),
-        },
-      } as any);
+      vi.mocked(mockContext.drizzle.query.locations.findMany).mockResolvedValue(
+        [],
+      );
       vi.mocked(mockContext.drizzle.groupBy).mockResolvedValue([]);
 
       await caller.getPublic();
@@ -1021,12 +1007,12 @@ describe("Location Router (Drizzle Conversion)", () => {
 
     it("should handle Drizzle schema relationships correctly", async () => {
       // Verify that relational queries use proper with/columns syntax
-      vi.mocked(mockContext.drizzle.query).mockReturnValue({
-        locations: {
-          findMany: vi.fn().mockResolvedValue([]),
-          findFirst: vi.fn().mockResolvedValue(null),
-        },
-      } as any);
+      vi.mocked(mockContext.drizzle.query.locations.findMany).mockResolvedValue(
+        [],
+      );
+      vi.mocked(
+        mockContext.drizzle.query.locations.findFirst,
+      ).mockResolvedValue(null);
 
       await caller.getAll();
       await caller.getById({ id: "test" }).catch(() => {
