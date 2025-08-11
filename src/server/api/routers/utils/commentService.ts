@@ -6,8 +6,8 @@ import { comments, issues, users } from "~/server/db/schema";
 
 /**
  * Comment service utilities for Drizzle operations.
- * This provides reusable comment business logic during the Prisma->Drizzle migration.
- * TODO: Consolidate with CommentCleanupService once full migration is complete.
+ * This provides reusable comment business logic with Drizzle ORM.
+ * TODO: Consolidate with CommentCleanupService for unified comment management.
  */
 export class DrizzleCommentService {
   constructor(private drizzle: DrizzleClient) {}

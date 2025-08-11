@@ -26,7 +26,20 @@ import { comments, issues, memberships, users } from "~/server/db/schema";
 async function createCommentWithAuthor(
   ctx: OrganizationTRPCContext,
   input: { issueId: string; content: string },
-) {
+): Promise<{
+  id: string;
+  content: string;
+  createdAt: Date;
+  updatedAt: Date | null;
+  issueId: string;
+  authorId: string;
+  author: {
+    id: string;
+    name: string | null;
+    email: string;
+    image: string | null;
+  };
+}> {
   // Verify the issue belongs to this organization
   const [existingIssue] = await ctx.drizzle
     .select({

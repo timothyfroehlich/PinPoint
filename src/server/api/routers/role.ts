@@ -293,7 +293,7 @@ export const roleRouter = createTRPCRouter({
         userPermissions: ctx.userPermissions,
       };
 
-      // Convert Prisma result to validation interface
+      // Convert database result to validation interface
       const validationMembership = {
         id: currentMembership.id,
         userId: currentMembership.userId,

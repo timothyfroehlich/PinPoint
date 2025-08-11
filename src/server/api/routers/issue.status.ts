@@ -1,27 +1,46 @@
-import { StatusCategory } from "@prisma/client";
+import { eq, count } from "drizzle-orm";
 
 import { createTRPCRouter, organizationProcedure } from "~/server/api/trpc";
+import { issues, issueStatuses } from "~/server/db/schema";
+
+// Status category enum values
+const StatusCategory = {
+  NEW: "NEW",
+  IN_PROGRESS: "IN_PROGRESS",
+  RESOLVED: "RESOLVED",
+} as const;
+
+type StatusCategoryType = (typeof StatusCategory)[keyof typeof StatusCategory];
+
+function isValidStatusCategory(
+  category: string,
+): category is StatusCategoryType {
+  return Object.values(StatusCategory).includes(category as StatusCategoryType);
+}
 
 export const issueStatusRouter = createTRPCRouter({
   // Get counts for each status category
   getStatusCounts: organizationProcedure.query(async ({ ctx }) => {
-    const counts = await ctx.db.issue.groupBy({
-      by: ["statusId"],
-      where: {
-        organizationId: ctx.organization.id,
-      },
-      _count: {
-        _all: true,
-      },
-    });
-
-    const statuses = await ctx.db.issueStatus.findMany({
-      where: {
-        organizationId: ctx.organization.id,
-      },
-    });
+    // Get all statuses with their categories for this organization
+    const statuses = await ctx.drizzle
+      .select({
+        id: issueStatuses.id,
+        category: issueStatuses.category,
+      })
+      .from(issueStatuses)
+      .where(eq(issueStatuses.organizationId, ctx.organization.id));
 
     const statusMap = new Map(statuses.map((s) => [s.id, s.category]));
+
+    // Get issue counts grouped by status using Drizzle groupBy
+    const counts = await ctx.drizzle
+      .select({
+        statusId: issues.statusId,
+        count: count(issues.id).as("count"),
+      })
+      .from(issues)
+      .where(eq(issues.organizationId, ctx.organization.id))
+      .groupBy(issues.statusId);
 
     const categoryCounts = {
       [StatusCategory.NEW]: 0,
@@ -30,14 +49,9 @@ export const issueStatusRouter = createTRPCRouter({
     };
 
     for (const group of counts) {
-      // Add type assertion for the group object properties
-      const groupTyped = group as {
-        statusId: string;
-        _count: { _all: number };
-      };
-      const category = statusMap.get(groupTyped.statusId);
-      if (category && Object.values(StatusCategory).includes(category)) {
-        categoryCounts[category] += Number(groupTyped._count._all);
+      const category = statusMap.get(group.statusId);
+      if (category && isValidStatusCategory(category)) {
+        categoryCounts[category] += Number(group.count);
       }
     }
 
