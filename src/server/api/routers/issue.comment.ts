@@ -2,9 +2,18 @@ import { TRPCError } from "@trpc/server";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
+import { DrizzleCommentService } from "./utils/commentService";
+import {
+  validateCommentDeletion,
+  validateCommentRestoration,
+  validateCommentEdit,
+  validateAdminPermissions,
+  type ValidationContext,
+} from "./utils/commentValidation";
+
 import type { OrganizationTRPCContext } from "~/server/api/trpc.base";
 
-import { generateId } from "~/lib/utils/id-generation";
+import { generatePrefixedId } from "~/lib/utils/id-generation";
 import {
   createTRPCRouter,
   organizationProcedure,
@@ -65,7 +74,7 @@ async function createCommentWithAuthor(
   const [comment] = await ctx.drizzle
     .insert(comments)
     .values({
-      id: generateId(),
+      id: generatePrefixedId("comment"),
       content: input.content,
       issueId: input.issueId,
       authorId: ctx.user.id,
@@ -167,25 +176,22 @@ export const issueCommentRouter = createTRPCRouter({
         )
         .limit(1);
 
-      if (!comment) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Comment not found",
-        });
-      }
+      // Use validation functions
+      const validationContext: ValidationContext = {
+        userId: ctx.user.id,
+        organizationId: ctx.organization.id,
+        userPermissions: ctx.userPermissions,
+      };
 
-      if (comment.deletedAt) {
+      const validation = validateCommentEdit(comment, validationContext);
+      if (!validation.valid) {
         throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Cannot edit deleted comment",
-        });
-      }
-
-      // Only the author can edit their own comment
-      if (comment.authorId !== ctx.user.id) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "You can only edit your own comments",
+          code: validation.error?.includes("not found")
+            ? "NOT_FOUND"
+            : validation.error?.includes("deleted")
+              ? "BAD_REQUEST"
+              : "FORBIDDEN",
+          message: validation.error ?? "Validation failed",
         });
       }
 
@@ -267,24 +273,12 @@ export const issueCommentRouter = createTRPCRouter({
         )
         .limit(1);
 
-      if (!comment) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Comment not found",
-        });
-      }
-
-      if (comment.deletedAt) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Comment is already deleted",
-        });
-      }
-
-      // Check permissions: user can delete their own comment, admins can delete any
+      // Get membership for validation
       const [membership] = await ctx.drizzle
         .select({
           id: memberships.id,
+          userId: memberships.userId,
+          organizationId: memberships.organizationId,
         })
         .from(memberships)
         .where(
@@ -295,47 +289,41 @@ export const issueCommentRouter = createTRPCRouter({
         )
         .limit(1);
 
-      if (!membership) {
+      // Use validation functions
+      const validationContext: ValidationContext = {
+        userId: ctx.user.id,
+        organizationId: ctx.organization.id,
+        userPermissions: ctx.userPermissions,
+      };
+
+      const validation = validateCommentDeletion(
+        comment,
+        membership ?? null,
+        validationContext,
+      );
+      if (!validation.valid) {
         throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "User is not a member of this organization",
+          code: validation.error?.includes("not found")
+            ? "NOT_FOUND"
+            : validation.error?.includes("already deleted")
+              ? "BAD_REQUEST"
+              : "FORBIDDEN",
+          message: validation.error ?? "Validation failed",
         });
       }
 
-      const canDelete =
-        comment.authorId === ctx.user.id ||
-        ctx.userPermissions.includes("issue:delete");
-
-      if (!canDelete) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "You can only delete your own comments",
-        });
-      }
-
-      // Soft delete the comment
-      const [deletedComment] = await ctx.drizzle
-        .update(comments)
-        .set({
-          deletedAt: new Date(),
-          deletedBy: ctx.user.id,
-        })
-        .where(eq(comments.id, input.commentId))
-        .returning({
-          id: comments.id,
-          content: comments.content,
-          createdAt: comments.createdAt,
-          updatedAt: comments.updatedAt,
-          deletedAt: comments.deletedAt,
-          deletedBy: comments.deletedBy,
-          issueId: comments.issueId,
-          authorId: comments.authorId,
-        });
+      // Soft delete the comment using service
+      const commentService = new DrizzleCommentService(ctx.drizzle);
+      const deletedComment = await commentService.softDeleteComment(
+        input.commentId,
+        ctx.user.id,
+      );
 
       // Record deletion activity
       const activityService = ctx.services.createIssueActivityService();
       await activityService.recordCommentDeleted(
-        comment.issue.id,
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- comment existence validated above
+        comment!.issue.id,
         ctx.organization.id,
         ctx.user.id,
         input.commentId,
@@ -343,4 +331,93 @@ export const issueCommentRouter = createTRPCRouter({
 
       return deletedComment;
     }),
+
+  // Restore deleted comment (admins only)
+  restoreComment: organizationProcedure
+    .input(
+      z.object({
+        commentId: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Find the comment and verify it exists and is deleted
+      const [comment] = await ctx.drizzle
+        .select({
+          id: comments.id,
+          authorId: comments.authorId,
+          deletedAt: comments.deletedAt,
+          issue: {
+            id: issues.id,
+            organizationId: issues.organizationId,
+          },
+          author: {
+            id: users.id,
+            name: users.name,
+            email: users.email,
+            image: users.image,
+          },
+        })
+        .from(comments)
+        .innerJoin(issues, eq(comments.issueId, issues.id))
+        .innerJoin(users, eq(comments.authorId, users.id))
+        .where(
+          and(
+            eq(comments.id, input.commentId),
+            eq(issues.organizationId, ctx.organization.id),
+          ),
+        )
+        .limit(1);
+
+      // Use validation functions
+      const validationContext: ValidationContext = {
+        userId: ctx.user.id,
+        organizationId: ctx.organization.id,
+        userPermissions: ctx.userPermissions,
+      };
+
+      const validation = validateCommentRestoration(comment, validationContext);
+      if (!validation.valid) {
+        throw new TRPCError({
+          code: validation.error?.includes("not found")
+            ? "NOT_FOUND"
+            : validation.error?.includes("not deleted")
+              ? "BAD_REQUEST"
+              : "FORBIDDEN",
+          message: validation.error ?? "Validation failed",
+        });
+      }
+
+      // Restore the comment using service
+      const commentService = new DrizzleCommentService(ctx.drizzle);
+      const restoredComment = await commentService.restoreComment(
+        input.commentId,
+      );
+
+      // Record restoration activity
+      const activityService = ctx.services.createIssueActivityService();
+      await activityService.recordCommentDeleted(
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- comment existence validated above
+        comment!.issue.id,
+        ctx.organization.id,
+        ctx.user.id,
+        input.commentId,
+      );
+
+      return restoredComment;
+    }),
+
+  // Get all deleted comments for organization (admin view)
+  getDeletedComments: organizationProcedure.query(async ({ ctx }) => {
+    // Use validation functions
+    const adminValidation = validateAdminPermissions(ctx.userPermissions);
+    if (!adminValidation.valid) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Insufficient permissions to view deleted comments",
+      });
+    }
+
+    const commentService = new DrizzleCommentService(ctx.drizzle);
+    return commentService.getDeletedComments(ctx.organization.id);
+  }),
 });
