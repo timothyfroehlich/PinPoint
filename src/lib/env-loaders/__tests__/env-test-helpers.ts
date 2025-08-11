@@ -536,9 +536,7 @@ export function testMissingFileHandling(
 
   // Configure existsSync to return false for missing files
   mockExistsSync.mockImplementation((path: string) => {
-    return !missingFiles.some((missingFile) =>
-      path.toString().endsWith(missingFile),
-    );
+    return !missingFiles.some((missingFile) => path.endsWith(missingFile));
   });
 
   // Configure dotenv to return error for missing files
