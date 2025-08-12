@@ -12,8 +12,11 @@ import { eq, and, sql } from "drizzle-orm";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
 import * as schema from "~/server/db/schema";
-import { createTestDatabase, type TestDatabase, cleanupTestDatabase } from "~/test/helpers/pglite-test-setup";
-import { TEST_IDS } from "~/test/helpers/integration-test-seeds";
+import {
+  createTestDatabase,
+  type TestDatabase,
+  cleanupTestDatabase,
+} from "~/test/helpers/pglite-test-setup";
 
 // Helper to generate unique IDs for tests that need multiple entities
 function generateTestId(prefix: string): string {

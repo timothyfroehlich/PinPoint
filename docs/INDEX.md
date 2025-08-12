@@ -45,6 +45,7 @@ PinPoint is completing a direct conversion migration from Prisma to Drizzle opti
 - [`design-docs/`](./design-docs/) - Feature designs and architectural decisions
 - [`lessons-learned/`](./lessons-learned/) - Counter-intuitive discoveries and insights
 - [`deployment/`](./deployment/) - Environment and deployment guides
+- [`research/`](./research/) - Technical research and experimental patterns
 
 ## Key Resources
 
