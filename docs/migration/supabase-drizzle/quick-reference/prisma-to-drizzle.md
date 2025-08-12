@@ -4,11 +4,7 @@ Modern Drizzle patterns for direct migration (no parallel validation). Use Conte
 
 ## 🚨 Context7 Research First
 
-```bash
-# Always verify current patterns before conversion
-resolve-library-id "drizzle orm"
-get-library-docs /drizzle-team/drizzle-orm --topic="relational queries generated columns"
-```
+Use Context7 for latest Drizzle docs - see [CLAUDE.md → Context7](../../../../CLAUDE.md#🚨-mandatory-use-context7-extensively-🚨)
 
 ---
 
