@@ -11,7 +11,13 @@ import {
   locationDeleteProcedure,
   organizationManageProcedure,
 } from "~/server/api/trpc";
-import { locations, machines, issues, issueStatuses } from "~/server/db/schema";
+import {
+  locations,
+  machines,
+  issues,
+  issueStatuses,
+  models,
+} from "~/server/db/schema";
 
 export const locationRouter = createTRPCRouter({
   create: locationEditProcedure
@@ -52,79 +58,89 @@ export const locationRouter = createTRPCRouter({
       });
     }
 
-    // Get locations with machines and models
-    const locationsWithMachines = await ctx.drizzle.query.locations.findMany({
-      where: eq(locations.organizationId, ctx.organization.id),
-      columns: {
-        id: true,
-        name: true,
-      },
-      with: {
-        machines: {
-          columns: {
-            id: true,
-            name: true,
-          },
-          with: {
-            model: {
-              columns: {
-                name: true,
-                manufacturer: true,
-              },
-            },
-          },
-        },
-      },
-      orderBy: locations.name,
-    });
-
-    // Get machine counts for each location
-    const machineCountsQuery = await ctx.drizzle
+    // Use single optimized query with JOINs instead of separate queries
+    const result = await ctx.drizzle
       .select({
-        locationId: machines.locationId,
-        machineCount: count(),
-      })
-      .from(machines)
-      .where(eq(machines.organizationId, ctx.organization.id))
-      .groupBy(machines.locationId);
-
-    const machineCountsMap = new Map(
-      machineCountsQuery.map((row) => [row.locationId, row.machineCount]),
-    );
-
-    // Get unresolved issue counts for each machine
-    const unresolvedIssueCountsQuery = await ctx.drizzle
-      .select({
-        machineId: issues.machineId,
-        issueCount: count(),
-      })
-      .from(issues)
-      .innerJoin(issueStatuses, eq(issues.statusId, issueStatuses.id))
-      .where(
-        and(
-          eq(issues.organizationId, ctx.organization.id),
-          ne(issueStatuses.category, "RESOLVED"),
+        locationId: locations.id,
+        locationName: locations.name,
+        machineId: machines.id,
+        machineName: machines.name,
+        modelName: models.name,
+        modelManufacturer: models.manufacturer,
+        unresolvedIssueCount: count(
+          and(issues.id, ne(issueStatuses.category, "RESOLVED")),
         ),
+      })
+      .from(locations)
+      .leftJoin(machines, eq(machines.locationId, locations.id))
+      .leftJoin(models, eq(models.id, machines.modelId))
+      .leftJoin(issues, eq(issues.machineId, machines.id))
+      .leftJoin(issueStatuses, eq(issueStatuses.id, issues.statusId))
+      .where(eq(locations.organizationId, ctx.organization.id))
+      .groupBy(
+        locations.id,
+        locations.name,
+        machines.id,
+        machines.name,
+        models.id,
+        models.name,
+        models.manufacturer,
       )
-      .groupBy(issues.machineId);
+      .orderBy(locations.name);
 
-    const unresolvedIssueCountsMap = new Map(
-      unresolvedIssueCountsQuery.map((row) => [row.machineId, row.issueCount]),
-    );
+    // Transform flat result into nested structure
+    interface LocationWithMachines {
+      id: string;
+      name: string;
+      _count: { machines: number };
+      machines: {
+        id: string;
+        name: string;
+        model: {
+          name: string | null;
+          manufacturer: string | null;
+        };
+        _count: { issues: number };
+      }[];
+    }
 
-    // Combine data
-    return locationsWithMachines.map((location) => ({
-      ...location,
-      _count: {
-        machines: machineCountsMap.get(location.id) ?? 0,
-      },
-      machines: location.machines.map((machine) => ({
-        ...machine,
-        _count: {
-          issues: unresolvedIssueCountsMap.get(machine.id) ?? 0,
-        },
-      })),
-    }));
+    const locationMap = new Map<string, LocationWithMachines>();
+
+    for (const row of result) {
+      if (!locationMap.has(row.locationId)) {
+        locationMap.set(row.locationId, {
+          id: row.locationId,
+          name: row.locationName,
+          _count: { machines: 0 },
+          machines: [],
+        });
+      }
+
+      const location = locationMap.get(row.locationId);
+      if (!location) continue;
+
+      if (row.machineId) {
+        const existingMachine = location.machines.find(
+          (m) => m.id === row.machineId,
+        );
+        if (!existingMachine) {
+          location.machines.push({
+            id: row.machineId,
+            name: row.machineName,
+            model: {
+              name: row.modelName,
+              manufacturer: row.modelManufacturer,
+            },
+            _count: {
+              issues: row.unresolvedIssueCount || 0,
+            },
+          });
+          location._count.machines++;
+        }
+      }
+    }
+
+    return Array.from(locationMap.values());
   }),
 
   update: locationEditProcedure
@@ -180,7 +196,7 @@ export const locationRouter = createTRPCRouter({
                 columns: {
                   id: true,
                   name: true,
-                  profilePicture: true, // Note: using profilePicture instead of image based on schema
+                  profilePicture: true,
                 },
               },
             },

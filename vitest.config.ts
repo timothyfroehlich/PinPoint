@@ -113,6 +113,7 @@ export default defineConfig({
           globals: true,
           environment: "node",
           setupFiles: ["src/test/vitest.integration.setup.ts"],
+          hookTimeout: 300000, // 5 minutes for PGlite database setup/seeding
           typecheck: {
             tsconfig: "./tsconfig.tests.json",
           },
