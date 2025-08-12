@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, count, eq, ne } from "drizzle-orm";
+import { and, count, eq, ne, asc } from "drizzle-orm";
 import { z } from "zod";
 
 import { generateId } from "~/lib/utils/id-generation";
@@ -45,7 +45,7 @@ export const locationRouter = createTRPCRouter({
       with: {
         machines: true,
       },
-      orderBy: locations.name,
+      orderBy: asc(locations.name),
     });
   }),
 
@@ -86,7 +86,7 @@ export const locationRouter = createTRPCRouter({
         models.name,
         models.manufacturer,
       )
-      .orderBy(locations.name);
+      .orderBy(asc(locations.name));
 
     // Transform flat result into nested structure
     interface LocationWithMachines {
