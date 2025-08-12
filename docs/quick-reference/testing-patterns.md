@@ -1,6 +1,6 @@
 # Testing Patterns: Modern Vitest & Direct Conversion
 
-Testing strategies aligned with direct conversion approach. Focus on fast feedback over comprehensive coverage.
+Testing strategies optimized for fast feedback and direct conversion.
 
 ## 🎯 Testing Philosophy for Direct Conversion
 
@@ -16,46 +16,10 @@ Testing strategies aligned with direct conversion approach. Focus on fast feedba
 
 ## 🧪 Modern Vitest Patterns
 
-### Type-Safe Partial Mocking
+### Modern Mock Patterns
 
-```typescript
-import type * as AuthModule from "@/utils/auth";
-
-vi.mock("@/utils/auth", async (importOriginal) => {
-  const actual = await importOriginal<typeof AuthModule>();
-  return {
-    ...actual,
-    // Only mock what you need
-    getUser: vi.fn().mockResolvedValue({ id: "123", name: "Test User" }),
-    // hasPermission keeps original implementation
-  };
-});
-```
-
-### Hoisted Mock Variables
-
-```typescript
-const mocks = vi.hoisted(() => ({
-  mockCreateClient: vi.fn(),
-  mockQuery: vi.fn(),
-  mockAuth: {
-    getUser: vi.fn(),
-    signOut: vi.fn(),
-  },
-}));
-
-vi.mock("@/utils/supabase/server", () => ({
-  createClient: () => ({
-    auth: mocks.mockAuth,
-    from: () => ({ select: mocks.mockQuery }),
-  }),
-}));
-
-test("uses hoisted mocks", () => {
-  mocks.mockAuth.getUser.mockResolvedValue({ data: { user: null } });
-  // Test logic here
-});
-```
+**Partial mocking**: `vi.importActual` with type safety → @docs/testing/vitest-guide.md#partial-mocking  
+**Hoisted variables**: `vi.hoisted()` for shared mock state → @docs/testing/vitest-guide.md#hoisted-mocks
 
 ### Configuration Migration
 
@@ -83,65 +47,10 @@ export default defineConfig({
 
 ## 🗄️ Database Testing with PGlite
 
-### Setup In-Memory PostgreSQL
+### Database Testing Setup
 
-```typescript
-// vitest.setup.ts
-import { vi } from "vitest";
-import * as schema from "./src/db/schema";
-
-vi.mock("./src/db/index.ts", async (importOriginal) => {
-  const { PGlite } = await vi.importActual<
-    typeof import("@electric-sql/pglite")
-  >("@electric-sql/pglite");
-  const { drizzle } =
-    await vi.importActual<typeof import("drizzle-orm/pglite")>(
-      "drizzle-orm/pglite",
-    );
-  const { migrate } = await vi.importActual<
-    typeof import("drizzle-orm/pglite/migrator")
-  >("drizzle-orm/pglite/migrator");
-
-  const client = new PGlite();
-  const testDb = drizzle(client, { schema });
-
-  // Apply migrations
-  await migrate(testDb, { migrationsFolder: "./drizzle" });
-
-  const originalModule =
-    await importOriginal<typeof import("./src/db/index.ts")>();
-  return {
-    ...originalModule,
-    db: testDb,
-  };
-});
-```
-
-### Integration Test Pattern
-
-```typescript
-// router.integration.test.ts
-import { createTRPCMsw } from "msw-trpc";
-import { appRouter } from "@/server/api/root";
-
-describe("User Router Integration", () => {
-  beforeEach(() => {
-    // Fresh database for each test
-    vi.clearAllMocks();
-  });
-
-  test("creates user with organizational scoping", async () => {
-    const caller = appRouter.createCaller(mockContext);
-
-    const user = await caller.user.create({
-      name: "Test User",
-      email: "test@example.com",
-    });
-
-    expect(user.organizationId).toBe(mockContext.user.organizationId);
-  });
-});
-```
+**PGlite setup**: In-memory PostgreSQL with migrations → @docs/testing/vitest-guide.md#pglite-setup  
+**Integration tests**: Router testing with real database calls → @docs/testing/integration-guide.md#router-patterns
 
 ---
 
@@ -240,25 +149,15 @@ permissionCases.forEach(({ role, action, allowed }) => {
 
 ---
 
-## 📋 Daily Testing Checklist
+## 📋 Testing Decision Tree
 
-**Before Router Conversion:**
-
-- [ ] Update test mocks for new Drizzle patterns
-- [ ] Ensure organizational scoping tests pass
-- [ ] Verify authentication context works
-
-**During Router Conversion:**
-
-- [ ] Run tests after each procedure conversion
-- [ ] Fix any failing tests immediately
-- [ ] Add integration tests for complex logic
-
-**After Router Conversion:**
-
-- [ ] Full test suite passes
-- [ ] Manual testing of key user flows
-- [ ] Performance check for slow queries
+```
+Testing Need:
+├── Mock setup? → @docs/testing/vitest-guide.md#mock-patterns
+├── Database testing? → @docs/testing/vitest-guide.md#pglite-setup
+├── Router tests? → @docs/testing/integration-guide.md#router-patterns
+└── Complete strategy? → @docs/testing/INDEX.md
+```
 
 ---
 
@@ -305,4 +204,4 @@ npm run test -- --reporter=verbose  # Detailed output
 
 ---
 
-_Complete testing strategies: @docs/testing/vitest-guide.md_
+**Complete strategies**: @docs/testing/vitest-guide.md
