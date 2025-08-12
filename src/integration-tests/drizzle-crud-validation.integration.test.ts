@@ -8,41 +8,35 @@
  * - Performance benchmarking
  */
 
-import { PGlite } from "@electric-sql/pglite";
 import { eq, and, sql } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/pglite";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
 import * as schema from "~/server/db/schema";
-// Import shared test utilities
-import { generateTestId } from "~/test/helpers/integration-test-factories";
-import { createTestSchema } from "~/test/helpers/integration-test-schema";
+import { createTestDatabase, type TestDatabase, cleanupTestDatabase } from "~/test/helpers/pglite-test-setup";
+import { TEST_IDS } from "~/test/helpers/integration-test-seeds";
+
+// Helper to generate unique IDs for tests that need multiple entities
+function generateTestId(prefix: string): string {
+  return `${prefix}-${Date.now()}`;
+}
 
 describe("Drizzle CRUD Operations (Integration)", () => {
-  let db: ReturnType<typeof drizzle>;
-  let pgClient: PGlite;
+  let db: TestDatabase;
 
-  // Use standardized test IDs from shared factories
+  // Generate unique IDs for each test to avoid conflicts
   const testOrgId = generateTestId("test-org");
   const testUserId = generateTestId("test-user");
   const testLocationId = generateTestId("test-location");
   const testModelId = generateTestId("test-model");
 
   beforeEach(async () => {
-    // Create fresh PGlite instance for each test
-    pgClient = new PGlite();
-    db = drizzle(pgClient, { schema });
-
-    // Create database schema using shared utility
-    await createTestSchema(db);
+    // Create fresh PGlite database with real schema
+    db = await createTestDatabase();
   });
 
   afterEach(async () => {
-    // With PGlite, we get a fresh database for each test
-    // No cleanup needed - database instance is destroyed automatically
-    if (pgClient) {
-      await pgClient.close();
-    }
+    // Clean up the test database
+    await cleanupTestDatabase(db);
   });
 
   describe("INSERT Operations", () => {

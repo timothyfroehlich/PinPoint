@@ -18,24 +18,17 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 /* eslint-disable @typescript-eslint/unbound-method */
 
-import { PGlite } from "@electric-sql/pglite";
 import { eq, count, and, ne } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/pglite";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// Import shared test utilities
-
-// Import schema and router
+// Import test setup and utilities
 import type { TRPCContext } from "~/server/api/trpc.base";
 import type { ExtendedPrismaClient } from "~/server/db";
 
 import { locationRouter } from "~/server/api/routers/location";
 import * as schema from "~/server/db/schema";
-import {
-  createCompleteTestDataSet,
-  TEST_IDS,
-} from "~/test/helpers/integration-test-factories";
-import { createTestSchema } from "~/test/helpers/integration-test-schema";
+import { createSeededTestDatabase, type TestDatabase } from "~/test/helpers/pglite-test-setup";
+import { TEST_IDS } from "~/test/helpers/integration-test-seeds";
 
 // Mock external dependencies that aren't database-related
 vi.mock("~/lib/utils/id-generation", () => ({
@@ -61,14 +54,12 @@ vi.mock("~/server/auth/permissions", () => ({
 }));
 
 describe("Location Router Integration (PGlite)", () => {
-  let db: ReturnType<typeof drizzle>;
-  let pgClient: PGlite;
+  let db: TestDatabase;
   let context: TRPCContext;
   let caller: ReturnType<typeof locationRouter.createCaller>;
 
-  // Test data IDs - using standardized IDs from factories
+  // Test data IDs - using standardized IDs from seeds
   const orgId = TEST_IDS.organization;
-  const userId = TEST_IDS.user;
   const locationId = TEST_IDS.location;
   const machineId = TEST_IDS.machine;
   const modelId = TEST_IDS.model;
@@ -76,15 +67,9 @@ describe("Location Router Integration (PGlite)", () => {
   const priorityId = TEST_IDS.priority;
 
   beforeEach(async () => {
-    // Create fresh PGlite instance for each test
-    pgClient = new PGlite();
-    db = drizzle(pgClient, { schema });
-
-    // Create database schema using shared utility
-    await createTestSchema(db);
-
-    // Seed complete test data set using shared factories
-    await createCompleteTestDataSet(db, orgId);
+    // Create fresh PGlite database with real schema and seed data
+    const setup = await createSeededTestDatabase();
+    db = setup.db;
 
     // Create mock Prisma client for tRPC middleware compatibility
     const mockPrismaClient = {
@@ -92,9 +77,9 @@ describe("Location Router Integration (PGlite)", () => {
         findFirst: vi.fn().mockResolvedValue({
           id: "test-membership",
           organizationId: orgId,
-          userId: userId,
+          userId: "test-user-1",
           role: {
-            id: "test-role",
+            id: TEST_IDS.admin_role,
             name: "Admin",
             permissions: [
               { id: "perm1", name: "location:edit" },
@@ -109,7 +94,7 @@ describe("Location Router Integration (PGlite)", () => {
     // Create test context with real database
     context = {
       user: {
-        id: userId,
+        id: "test-user-1",
         email: "test@example.com",
         user_metadata: { name: "Test User" },
         app_metadata: { organization_id: orgId, role: "Admin" },
