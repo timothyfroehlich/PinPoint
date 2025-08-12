@@ -4,12 +4,7 @@ Specialized tactical guides for immediate action. Auto-loaded by Claude Code for
 
 ## 🎯 Direct Conversion Context
 
-**Solo Development + Pre-Beta = Velocity First**
-
-- Move fast, break things temporarily
-- Direct conversion (no parallel validation)
-- Manual testing over complex infrastructure
-- TypeScript safety as primary guard rail
+**Context:** Solo development, pre-beta, velocity first - see [CLAUDE.md → Project Context](../../CLAUDE.md#project-context--development-phase)
 
 ---
 
@@ -68,14 +63,13 @@ Specialized tactical guides for immediate action. Auto-loaded by Claude Code for
 
 ## 📖 Relationship to Other Docs
 
+**Main Documentation**: [@docs/INDEX.md](../INDEX.md) - Project overview, directory structure, getting started  
+**This Directory**: Tactical patterns for immediate action (auto-loaded by Claude Code)
+
 - **CLAUDE.md** - Context, breaking changes, Context7 directive
 - **docs/latest-updates/** - Comprehensive tech stack research
 - **docs/developer-guides/** - In-depth implementation guides
-- **docs/testing/** - Detailed testing methodologies
-
-These quick-references provide **tactical, action-oriented guidance** that complements the broader documentation ecosystem.
 
 ---
 
-**Last Updated**: 2025-08-11  
-**Status**: Active - Aligned with direct conversion approach
+**Last Updated**: 2025-08-11
