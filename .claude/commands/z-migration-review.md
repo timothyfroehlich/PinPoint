@@ -1,200 +1,256 @@
 ---
-description: "Comprehensive Drizzle migration review for PR or specific files"
-argument-hint: "[pr-number|file-path]"
+description: "Code review tool for drizzle-migration and test-architect agent work"
+argument-hint: "[impl|tests|full|pr-number|file-path]"
+allowed-tools: "Bash(gh pr view:*), Bash(gh pr diff:*), Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(npm run typecheck:brief), Bash(npm run lint:brief), Bash(npm run test:brief), Bash(rg:*), Bash(wc:*), Bash(cat:*), Bash(echo:*), Bash(head:*), Bash(grep:*)"
 ---
 
-# AI-Powered Drizzle Migration Review
+# Migration Code Review
 
-**Objective**: Comprehensive review of direct Prisma-to-Drizzle migration using August 2025 best practices.
+**Purpose:** Review work from drizzle-migration and test-architect agents using August 2025 best practices.
 
-**Context**: Solo development, pre-beta, velocity-optimized direct conversion approach.
+**Context:** Solo development, direct conversion approach, velocity-focused.
 
-## Smart Review Mode Detection
+## Usage Modes
 
-$ARGUMENTS can be:
+- `impl` → Review implementation work (routers, components, schema)
+- `tests` → Review testing work (test files, mocks, PGlite)
+- `full` → Comprehensive review (default)
+- `123` → Review PR #123
+- `path/file.ts` → Review specific file
 
-- PR number (e.g., `123`) → Full PR review
-- File path (e.g., `src/server/api/routers/issues.ts`) → Deep file analysis
-- Empty → Review current branch changes vs main
-
-**Detecting Review Mode:**
+## Detect Files to Review
 
 ```bash
-# Detect review mode and get relevant files
+# Determine what to review
 if [[ "$ARGUMENTS" =~ ^[0-9]+$ ]]; then
   echo "🔍 PR Review Mode: #$ARGUMENTS"
   !gh pr view $ARGUMENTS
   !gh pr diff $ARGUMENTS --name-only
-elif [[ "$ARGUMENTS" == *.ts ]] || [[ "$ARGUMENTS" == *.tsx ]] || [[ "$ARGUMENTS" == *.md ]]; then
-  echo "📄 Single File Review Mode: $ARGUMENTS"
-  !git log --oneline -5 -- "$ARGUMENTS"
-  !git diff HEAD~1..HEAD -- "$ARGUMENTS" || git show HEAD:"$ARGUMENTS" | head -50
+  FILES=$(gh pr diff $ARGUMENTS --name-only)
+elif [[ "$ARGUMENTS" == *.* ]]; then
+  echo "📄 Single File Review: $ARGUMENTS"
+  FILES="$ARGUMENTS"
+  !git log --oneline -3 -- "$ARGUMENTS"
 else
-  CURRENT_BRANCH=$(git branch --show-current)
-  if [ "$CURRENT_BRANCH" = "main" ]; then
-    echo "📁 Main Branch - Reviewing recent changes"
-    !git log --oneline -10
-    !git diff HEAD~5..HEAD --name-only
-  else
-    echo "🔍 Branch Review Mode: $CURRENT_BRANCH vs main"
-    !git log main..HEAD --oneline
-    !git diff main...HEAD --name-only
-    if git diff main...HEAD --quiet; then
-      echo "ℹ️ No changes found on branch vs main"
-    else
-      echo "📋 Files changed on branch:"
-      !git diff main...HEAD --stat
-    fi
+  MODE="${ARGUMENTS:-full}"
+  echo "🎯 ${MODE^} Review Mode - Current Changes"
+  !git status --porcelain
+  FILES=$(git diff --name-only HEAD)
+  if [[ -z "$FILES" ]]; then
+    FILES=$(git diff --name-only --staged)
+  fi
+  if [[ -z "$FILES" ]]; then
+    echo "ℹ️ No changes detected"
+    exit 0
+  fi
+fi
+
+echo "📋 Files to review:"
+echo "$FILES"
+```
+
+## File Categorization
+
+```bash
+# Categorize each file
+for file in $FILES; do
+  case "$file" in
+    src/server/api/routers/*.ts)
+      echo "🗄️ ROUTER: $file"
+      ROUTERS+="$file "
+      ;;
+    src/server/db/schema/*.ts)
+      echo "📊 SCHEMA: $file"
+      SCHEMAS+="$file "
+      ;;
+    src/app/**/*.tsx)
+      echo "⚡ SERVER_COMPONENT: $file"
+      COMPONENTS+="$file "
+      ;;
+    src/app/actions/*.ts)
+      echo "🎬 SERVER_ACTION: $file"
+      ACTIONS+="$file "
+      ;;
+    **/*.test.ts|**/*.test.tsx)
+      echo "🧪 TEST: $file"
+      TESTS+="$file "
+      ;;
+    **/*.integration.test.ts)
+      echo "🔗 INTEGRATION_TEST: $file"
+      INTEGRATION_TESTS+="$file "
+      ;;
+    *)
+      echo "📄 OTHER: $file"
+      OTHERS+="$file "
+      ;;
+  esac
+done
+```
+
+## Anti-Pattern Detection
+
+Read comprehensive detection guide:
+
+```bash
+echo "🚨 Loading anti-pattern detection reference..."
+!cat docs/developer-guides/anti-patterns.md | head -20
+```
+
+### Critical Anti-Patterns (All Modes)
+
+```bash
+echo "🔴 CRITICAL Security Issues:"
+
+# Deprecated Supabase auth (BREAKS functionality)
+!rg "@supabase/auth-helpers" --type ts . && echo "❌ CRITICAL: Deprecated auth package causes loops"
+
+# Missing organization scoping (SECURITY BREACH)
+if [[ -n "$ROUTERS" ]]; then
+  for router in $ROUTERS; do
+    !rg -L "organizationId" "$router" && echo "🚨 CRITICAL: $router missing org scoping"
+  done
+fi
+
+# Individual cookie methods (BREAKS SSR)
+!rg "cookies\.(get|set|remove)\(" --type ts . && echo "❌ CRITICAL: Use getAll()/setAll() only"
+```
+
+### Implementation Mode (`impl` or `full`)
+
+```bash
+if [[ "$MODE" == "impl" || "$MODE" == "full" ]]; then
+  echo ""
+  echo "🔧 IMPLEMENTATION REVIEW"
+
+  # Schema anti-patterns
+  if [[ -n "$SCHEMAS" ]]; then
+    echo "📊 Schema Issues:"
+    !rg "serial\(" --type ts $SCHEMAS && echo "❌ Use .generatedAlwaysAsIdentity() instead"
+    !rg "\.on\(.*\)\.asc\(\)|\\.desc\(\)" --type ts $SCHEMAS && echo "❌ Use .on(col.asc()) syntax"
+  fi
+
+  # Query anti-patterns
+  if [[ -n "$ROUTERS" ]]; then
+    echo "🗄️ Router Issues:"
+    !rg "\.from\(.*\)\..*Join\(" --type ts $ROUTERS && echo "❌ Use db.query.table.findMany({ with: {...} })"
+    !rg "ctx\.(db|prisma)\." --type ts $ROUTERS && echo "❌ Use ctx.drizzle exclusively"
+    !rg "findUnique\(" --type ts $ROUTERS && echo "❌ Use findFirst() in Drizzle"
+  fi
+
+  # Next.js anti-patterns
+  if [[ -n "$COMPONENTS$ACTIONS" ]]; then
+    echo "⚡ Next.js Issues:"
+    !rg "getServerSideProps|getStaticProps" --type ts $COMPONENTS $ACTIONS && echo "❌ Use Server Components"
+    !rg "useEffect.*auth|useState.*user" --type tsx $COMPONENTS && echo "❌ Use server-side auth"
   fi
 fi
 ```
 
-## File Analysis & Categorization
-
-Analyze each file and categorize as:
-
-- **ROUTER**: tRPC router (`src/server/api/routers/*.ts`)
-- **TEST**: Test file (`*.test.ts`, `*.integration.test.ts`)
-- **SERVER_COMPONENT**: Next.js Server Component (`app/**/*.tsx`)
-- **SERVER_ACTION**: Server Actions (`app/actions/*.ts`)
-- **SCHEMA**: Database schema (`src/db/schema/*.ts`)
-- **GUIDE**: Documentation (`docs/**/*.md`)
-
-## Critical Migration Checklist
-
-### 🗄️ For ROUTER Files - Direct Conversion
-
-**For router files, run these checks:**
+### Testing Mode (`tests` or `full`)
 
 ```bash
-echo "🔧 Deep Router Analysis"
-rg -n "ctx\.(db|prisma)" $ARGUMENTS
+if [[ "$MODE" == "tests" || "$MODE" == "full" ]]; then
+  echo ""
+  echo "🧪 TESTING REVIEW"
+
+  # Test infrastructure anti-patterns
+  if [[ -n "$TESTS$INTEGRATION_TESTS" ]]; then
+    echo "Test Issues:"
+    !rg "vi\.mock.*\)" --type ts $TESTS $INTEGRATION_TESTS | grep -v "importActual" && echo "❌ Use vi.importActual for type safety"
+    !rg "docker.*postgres" --type yml . && echo "❌ Use PGlite in-memory testing"
+    !rg "workspace:" vitest.config.ts && echo "❌ Use projects config not workspace"
+  fi
+
+  # Mock quality check
+  if [[ -n "$TESTS" ]]; then
+    echo "Mock Quality:"
+    for test_file in $TESTS; do
+      lines=$(wc -l < "$test_file")
+      if [[ $lines -gt 300 ]]; then
+        echo "⚠️ $test_file ($lines lines) - consider splitting by test type"
+      fi
+    done
+  fi
+fi
 ```
+
+## Quality Gates
 
 ```bash
-echo "Checking for Drizzle usage:"
-rg -n "ctx\.drizzle|db\.query\." $ARGUMENTS
+echo ""
+echo "⚙️ QUALITY VALIDATION"
+
+# TypeScript compilation
+!npm run typecheck:brief && echo "✅ TypeScript" || echo "❌ TypeScript FAILED - fix before proceeding"
+
+# Linting
+!npm run lint:brief && echo "✅ ESLint" || echo "❌ ESLint FAILED"
+
+# Test execution (if test files changed)
+if [[ -n "$TESTS$INTEGRATION_TESTS" ]]; then
+  !npm run test:brief && echo "✅ Tests" || echo "❌ Tests FAILED"
+fi
 ```
+
+## Review Standards Assessment
 
 ```bash
-echo "Checking organization scoping:"
-rg -n "eq\(.*organizationId.*ctx\." $ARGUMENTS
+echo ""
+echo "📋 STANDARDS COMPLIANCE"
+
+# Count issues by severity
+CRITICAL_COUNT=$(rg "@supabase/auth-helpers|serial\(|\.on\(.*\)\.asc\(\)" --type ts . | wc -l)
+HIGH_COUNT=$(rg "\.from\(.*\)\..*Join\(|ctx\.(db|prisma)" --type ts . | wc -l)
+MEDIUM_COUNT=$(rg "findUnique\(|getServerSideProps" --type ts . | wc -l)
+
+echo "Issues Found:"
+echo "🔴 Critical: $CRITICAL_COUNT (breaks functionality/security)"
+echo "🟡 High: $HIGH_COUNT (performance/maintenance)"
+echo "🟢 Medium: $MEDIUM_COUNT (code quality)"
+
+# Overall assessment
+TOTAL=$((CRITICAL_COUNT + HIGH_COUNT + MEDIUM_COUNT))
+if [[ $CRITICAL_COUNT -gt 0 ]]; then
+  echo ""
+  echo "🚨 ASSESSMENT: CRITICAL ISSUES - Must fix before merge"
+  echo "Focus on: Supabase SSR migration, org scoping, deprecated patterns"
+elif [[ $HIGH_COUNT -gt 5 ]]; then
+  echo ""
+  echo "⚠️ ASSESSMENT: HIGH PRIORITY FIXES NEEDED"
+  echo "Focus on: Query patterns, manual joins, Prisma removal"
+elif [[ $TOTAL -gt 0 ]]; then
+  echo ""
+  echo "✅ ASSESSMENT: GOOD - Minor improvements available"
+else
+  echo ""
+  echo "🎉 ASSESSMENT: EXCELLENT - August 2025 standards met"
+fi
 ```
 
-**Critical Requirements:**
-
-- [ ] **Complete Prisma Elimination**: Zero `ctx.prisma`, `ctx.db` Prisma references
-- [ ] **Clean Drizzle Implementation**: Uses `ctx.drizzle` or `db.query` exclusively
-- [ ] **Organization Scoping**: Every query includes `eq(table.organizationId, ctx.organizationId)`
-- [ ] **Modern Patterns**: Relational queries, enhanced indexes, generated columns
-
-### 🧪 For TEST Files - Modern Vitest
-
-**Testing Strategy Check:**
-
-- [ ] **Type-Safe Mocking**: Uses `vi.mock` with `vi.importActual<typeof ModuleType>()`
-- [ ] **PGlite Integration**: In-memory PostgreSQL with `@electric-sql/pglite`
-- [ ] **Supabase SSR**: Mocks `@supabase/ssr` (NOT deprecated auth-helpers)
-- [ ] **Hoisted Variables**: Uses `vi.hoisted()` for shared mock state
-
-### ⚡ For SERVER_COMPONENT Files
-
-**App Router Patterns:**
-
-- [ ] **Direct Database Access**: Uses Drizzle client directly in async components
-- [ ] **Server Auth**: Uses `@supabase/ssr` for authentication
-- [ ] **Error Boundaries**: Proper not-found and error handling
-- [ ] **Organization Scoping**: All queries properly scoped
-
-### 📝 For GUIDE Files
-
-**Documentation Quality:**
-
-- [ ] **Current Status**: Reflects completed migration (not "in progress")
-- [ ] **Modern Examples**: All code samples use Drizzle (no Prisma)
-- [ ] **Testing Updates**: References PGlite and Vitest v4.0 patterns
-- [ ] **Supabase SSR**: Documents SSR package usage
-
-## Quality Gates Validation
+## Next Steps
 
 ```bash
-# Run comprehensive quality checks
-echo "🔍 Running Quality Gates..."
-npm run typecheck:brief && echo "✅ TypeScript" || echo "❌ TypeScript FAILED"
-npm run lint:brief && echo "✅ ESLint" || echo "❌ ESLint FAILED"
-npm run test:brief && echo "✅ Tests" || echo "❌ Tests FAILED"
+echo ""
+echo "🎯 RECOMMENDED ACTIONS:"
+
+if [[ $CRITICAL_COUNT -gt 0 ]]; then
+  echo "1. Fix critical security/functionality issues immediately"
+  echo "2. Run review again after fixes"
+elif [[ $HIGH_COUNT -gt 0 ]]; then
+  echo "1. Address query anti-patterns and performance issues"
+  echo "2. Verify organizational scoping in all routers"
+  echo "3. Test manually after changes"
+elif [[ $MEDIUM_COUNT -gt 0 ]]; then
+  echo "1. Consider modernizing remaining patterns"
+  echo "2. Update tests to use latest utilities"
+else
+  echo "1. Code ready for merge/deployment"
+  echo "2. Consider running full test suite"
+fi
+
+echo ""
+echo "🔗 References:"
+echo "- @docs/developer-guides/anti-patterns.md"
+echo "- @docs/developer-guides/drizzle-migration-review-procedure.md"
+echo "- @docs/latest-updates/quick-reference.md"
 ```
-
-## Security & Performance Analysis
-
-### 🔐 Security Validation
-
-```bash
-# Critical security checks
-rg -n "organizationId" "$ARGUMENTS" || echo "⚠️ Multi-tenancy check needed"
-rg -n "TRPCError.*UNAUTHORIZED\|FORBIDDEN" "$ARGUMENTS" || echo "Check auth patterns"
-```
-
-**Security Requirements:**
-
-- [ ] **Multi-Tenant Scoping**: All database queries scoped to organization
-- [ ] **Permission Validation**: Proper authorization logic maintained
-- [ ] **Error Handling**: Secure error messages (no data leakage)
-- [ ] **Input Validation**: Zod schemas validate all inputs
-
-### ⚡ Performance Assessment
-
-**Modern Pattern Usage:**
-
-- [ ] **Relational Queries**: Uses `db.query.table.findMany({ with: {...} })`
-- [ ] **Generated Columns**: Computed fields moved to database
-- [ ] **Prepared Statements**: Frequent queries use `.prepare()`
-- [ ] **Type Inference**: Proper `$inferSelect`/`$inferInsert` usage
-
-## Migration Quality Metrics
-
-Analyze and score:
-
-1. **Code Reduction**: Lines eliminated from parallel validation removal
-2. **Conversion Completeness**: Percentage of Prisma references eliminated
-3. **Pattern Modernization**: Usage of 2025 Drizzle/Supabase/Vitest patterns
-4. **Type Safety**: Enhanced compile-time error catching
-5. **Performance**: Query optimization and generated column usage
-
-## Detailed Assessment Report
-
-### File-by-File Analysis
-
-For each modified file, provide:
-
-- **Status**: PASS/FAIL for direct conversion alignment
-- **Pattern Compliance**: Modern vs legacy pattern usage
-- **Security**: Multi-tenancy and permission validation
-- **Performance Impact**: Expected improvements
-
-### Critical Issues Identification
-
-- **Immediate Actions**: Security or functionality blockers
-- **Performance Concerns**: Query optimization opportunities
-- **Pattern Opportunities**: Reusable improvements for other files
-- **Testing Gaps**: Missing coverage areas
-
-### Migration Success Indicators
-
-- **Velocity Impact**: Development speed improvements from cleaner code
-- **Maintenance Reduction**: Less validation infrastructure burden
-- **Learning Enhancement**: Direct Drizzle usage building expertise
-- **Type Safety**: Stronger compile-time guarantees
-
-## Final Recommendations
-
-**Overall Assessment**: [EXCELLENT/GOOD/NEEDS_WORK/INCOMPLETE]
-
-**Next Steps**:
-
-1. Address any critical security or functionality issues
-2. Optimize performance opportunities identified
-3. Apply reusable patterns to other pending conversions
-4. Update documentation based on conversion learnings
-
-Focus on direct conversion success: clean Drizzle implementations without parallel validation overhead, optimized for solo development velocity while maintaining security and modern best practices.

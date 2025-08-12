@@ -4,60 +4,11 @@ _Essential security patterns for tRPC, Server Actions, and multi-tenant access c
 
 ## Protected Procedure Patterns
 
-### Supabase Session Authentication
+### tRPC Procedure Patterns
 
-```typescript
-const protectedProcedure = publicProcedure.use(({ ctx, next }) => {
-  if (!ctx.session?.user?.id) {
-    throw new TRPCError({ code: "UNAUTHORIZED" });
-  }
-  return next({
-    ctx: {
-      ...ctx,
-      session: ctx.session,
-      userId: ctx.session.user.id,
-    },
-  });
-});
-```
-
-### Organization-Scoped Procedures
-
-```typescript
-const orgScopedProcedure = protectedProcedure.use(({ ctx, next }) => {
-  const orgId = ctx.session.user.user_metadata?.organizationId;
-  if (!orgId) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "No organization selected",
-    });
-  }
-  return next({ ctx: { ...ctx, organizationId: orgId } });
-});
-```
-
-### Permission-Based Procedures
-
-```typescript
-function requirePermission(permission: string) {
-  return orgScopedProcedure.use(async ({ ctx, next }) => {
-    const hasPermission = await checkUserPermission(
-      ctx.userId,
-      ctx.organizationId,
-      permission,
-    );
-    if (!hasPermission) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: `Missing: ${permission}`,
-      });
-    }
-    return next({ ctx });
-  });
-}
-
-const adminProcedure = requirePermission("admin");
-```
+**Protected procedures**: Session auth with Supabase → @docs/developer-guides/trpc/procedures.md#protected  
+**Org scoping**: Multi-tenant boundary enforcement → @docs/developer-guides/row-level-security/multi-tenant.md#trpc  
+**Permission checks**: Role-based access control → @docs/security/rbac-patterns.md
 
 ## Drizzle Query Security Patterns
 
