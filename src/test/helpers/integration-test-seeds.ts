@@ -1,29 +1,18 @@
 /**
  * Integration Test Seed Functions
- * 
- * Adapted from scripts/seed/ for PGlite integration testing.
- * Provides minimal but realistic test data without auth dependencies.
- * 
+ *
+ * Production seed adapters for PGlite integration testing.
+ * Uses ACTUAL production seed functions with realistic data from sample-issues.json.
+ *
  * Key Features:
- * - Works with any Drizzle database instance (PGlite, PostgreSQL)
- * - No Supabase Auth dependencies (PostgreSQL-only)
- * - Minimal data set for fast test execution
- * - Deterministic IDs for predictable testing
- * - Reuses proven seed logic patterns
+ * - 4 machines + 10 realistic issues (vs previous 1 machine + 1 issue)
+ * - Uses production seedInfrastructure() and seedSampleData() functions
+ * - No Supabase Auth dependencies (PostgreSQL-only mode)
+ * - Same seed logic as production for consistency
+ * - Deterministic TEST_IDs preserved for compatibility
  */
 
-import { eq, and, inArray } from "drizzle-orm";
-import { nanoid } from "nanoid";
 import type { drizzle } from "drizzle-orm/pglite";
-
-import * as schema from "~/server/db/schema";
-import {
-  ALL_PERMISSIONS,
-  PERMISSION_DESCRIPTIONS,
-  SYSTEM_ROLES,
-  ROLE_TEMPLATES,
-  UNAUTHENTICATED_PERMISSIONS,
-} from "~/server/auth/permissions.constants";
 
 type TestDatabase = ReturnType<typeof drizzle>;
 
@@ -32,7 +21,7 @@ type TestDatabase = ReturnType<typeof drizzle>;
  */
 export const TEST_IDS = {
   organization: "test-org-1",
-  location: "test-location-1", 
+  location: "test-location-1",
   model: "test-model-1",
   machine: "test-machine-1",
   priority: "test-priority-1",
@@ -49,198 +38,72 @@ export interface TestOrganization {
 }
 
 /**
- * Create global permissions (adapted from scripts/seed/shared/infrastructure.ts)
+ * Production seed infrastructure adapter
+ * Wraps the production seedInfrastructure() function for PGlite usage
  */
-async function createGlobalPermissions(db: TestDatabase): Promise<void> {
-  // Get existing permissions
-  const existingPermissions = await db
-    .select({ name: schema.permissions.name })
-    .from(schema.permissions);
+async function seedProductionInfrastructure(
+  db: TestDatabase,
+): Promise<{ id: string; name: string; subdomain: string }> {
+  // Dynamically import production seed function
+  const { seedInfrastructureWithDb } = await import(
+    "../../../scripts/seed/shared/infrastructure"
+  );
 
-  const existingSet = new Set(existingPermissions.map((p) => p.name));
-
-  // Find permissions that need to be created
-  const permissionsToCreate = ALL_PERMISSIONS.filter(
-    (permName) => !existingSet.has(permName),
-  ).map((permName) => ({
-    id: nanoid(),
-    name: permName,
-    description: PERMISSION_DESCRIPTIONS[permName] ?? `Permission: ${permName}`,
-  }));
-
-  // Batch create all missing permissions
-  if (permissionsToCreate.length > 0) {
-    await db.insert(schema.permissions).values(permissionsToCreate);
-  }
+  // Call production function with our PGlite database instance
+  return await seedInfrastructureWithDb(db);
 }
 
 /**
- * Create system roles (adapted from scripts/seed/shared/infrastructure.ts)
+ * Production sample data adapter
+ * Wraps the production seedSampleData() function for PGlite usage
  */
-async function createSystemRoles(db: TestDatabase): Promise<void> {
-  // Create Admin role
-  const adminRoleId = TEST_IDS.admin_role;
-  await db.insert(schema.roles).values({
-    id: adminRoleId,
-    name: SYSTEM_ROLES.ADMIN,
-    organizationId: TEST_IDS.organization,
-    isSystem: true,
-    isDefault: false,
-  }).onConflictDoNothing();
+async function seedProductionSampleData(
+  db: TestDatabase,
+  organizationId: string,
+): Promise<void> {
+  // Dynamically import production seed function
+  const { seedSampleDataWithDb } = await import(
+    "../../../scripts/seed/shared/sample-data"
+  );
 
-  // Create Unauthenticated role  
-  const unauthRoleId = TEST_IDS.member_role; // Reusing member_role ID for Unauthenticated
-  await db.insert(schema.roles).values({
-    id: unauthRoleId,
-    name: SYSTEM_ROLES.UNAUTHENTICATED,
-    organizationId: TEST_IDS.organization,
-    isSystem: true,
-    isDefault: false,
-  }).onConflictDoNothing();
+  // Call production function with minimal data and skipAuthUsers = true
+  await seedSampleDataWithDb(db, organizationId, "minimal", true);
+}
 
-  // Assign ALL permissions to Admin role
-  const allPermissions = await db
-    .select({ id: schema.permissions.id })
-    .from(schema.permissions);
+// Remove custom implementation - now using production seeds
 
-  if (allPermissions.length > 0) {
-    const adminRolePermissions = allPermissions.map((permission) => ({
-      id: nanoid(),
-      roleId: adminRoleId,
-      permissionId: permission.id,
-    }));
-    await db.insert(schema.rolePermissions).values(adminRolePermissions).onConflictDoNothing();
-  }
+// Remove custom implementation - now using production seeds
 
-  // Assign limited permissions to Unauthenticated role
-  const unauthPermissions = await db
-    .select({ id: schema.permissions.id })
-    .from(schema.permissions)
-    .where(inArray(schema.permissions.name, UNAUTHENTICATED_PERMISSIONS));
-
-  if (unauthPermissions.length > 0) {
-    const unauthRolePermissions = unauthPermissions.map((permission) => ({
-      id: nanoid(), 
-      roleId: unauthRoleId,
-      permissionId: permission.id,
-    }));
-    await db.insert(schema.rolePermissions).values(unauthRolePermissions).onConflictDoNothing();
-  }
+/**
+ * Seed infrastructure for testing using PRODUCTION seed functions
+ * Now uses the actual seedInfrastructure() from production for consistency
+ */
+export async function seedTestInfrastructure(
+  db: TestDatabase,
+): Promise<TestOrganization> {
+  // Use production seed infrastructure function
+  return await seedProductionInfrastructure(db);
 }
 
 /**
- * Create priorities and issue statuses (adapted from scripts/seed/shared/infrastructure.ts)
- */
-async function createPrioritiesAndStatuses(db: TestDatabase): Promise<void> {
-  // Create priorities
-  const prioritiesData = [
-    { id: TEST_IDS.priority, name: "Medium", order: 2, organizationId: TEST_IDS.organization },
-  ];
-
-  await db.insert(schema.priorities).values(prioritiesData).onConflictDoNothing();
-
-  // Create issue statuses
-  const statusesData = [
-    { 
-      id: TEST_IDS.status, 
-      name: "Open", 
-      category: "NEW" as const,
-      organizationId: TEST_IDS.organization 
-    },
-  ];
-
-  await db.insert(schema.issueStatuses).values(statusesData).onConflictDoNothing();
-}
-
-/**
- * Create minimal sample data (adapted from scripts/seed/shared/sample-data.ts)
- */
-async function createSampleData(db: TestDatabase, organizationId: string): Promise<void> {
-  // Create a test location
-  const locationData = {
-    id: TEST_IDS.location,
-    name: "Test Arcade",
-    address: "123 Test St",
-    organizationId,
-  };
-
-  await db.insert(schema.locations).values(locationData).onConflictDoNothing();
-
-  // Create a test model
-  const modelData = {
-    id: TEST_IDS.model,
-    name: "Medieval Madness",
-    manufacturer: "Williams",
-    year: 1997,
-    organizationId,
-  };
-
-  await db.insert(schema.models).values(modelData).onConflictDoNothing();
-
-  // Create a test machine
-  const machineData = {
-    id: TEST_IDS.machine,
-    name: "Test Machine #1",
-    modelId: TEST_IDS.model,
-    locationId: TEST_IDS.location,
-    organizationId,
-    qrCodeId: "test-qr-code-1",
-  };
-
-  await db.insert(schema.machines).values(machineData).onConflictDoNothing();
-
-  // Create a test issue
-  const issueData = {
-    id: TEST_IDS.issue,
-    title: "Left flipper sticking",
-    description: "The left flipper occasionally sticks in the up position",
-    machineId: TEST_IDS.machine,
-    priorityId: TEST_IDS.priority,
-    statusId: TEST_IDS.status,
-    organizationId,
-  };
-
-  await db.insert(schema.issues).values(issueData).onConflictDoNothing();
-}
-
-/**
- * Seed infrastructure for testing (organizations, permissions, roles, priorities, statuses)
- * Adapted from scripts/seed/shared/infrastructure.ts
- */
-export async function seedTestInfrastructure(db: TestDatabase): Promise<TestOrganization> {
-  // Create test organization
-  const organizationData = {
-    id: TEST_IDS.organization,
-    name: "Test Organization", 
-    subdomain: "test-org",
-  };
-
-  await db.insert(schema.organizations).values(organizationData).onConflictDoNothing();
-
-  // Create permissions, roles, priorities, and statuses
-  await createGlobalPermissions(db);
-  await createSystemRoles(db);
-  await createPrioritiesAndStatuses(db);
-
-  return organizationData;
-}
-
-/**
- * Seed minimal sample data for testing
- * Adapted from scripts/seed/shared/sample-data.ts but without auth dependencies
+ * Seed sample data for testing using PRODUCTION seed functions
+ * Now provides 4 machines + 10 realistic issues from sample-issues.json
  */
 export async function seedTestSampleData(
-  db: TestDatabase, 
-  organizationId: string
+  db: TestDatabase,
+  organizationId: string,
 ): Promise<void> {
-  await createSampleData(db, organizationId);
+  // Use production seed sample data function with minimal dataset
+  await seedProductionSampleData(db, organizationId);
 }
 
 /**
  * Complete test data setup - combines infrastructure and sample data
  * This is the main entry point for test setup
  */
-export async function seedCompleteTestData(db: TestDatabase): Promise<TestOrganization> {
+export async function seedCompleteTestData(
+  db: TestDatabase,
+): Promise<TestOrganization> {
   const organization = await seedTestInfrastructure(db);
   await seedTestSampleData(db, organization.id);
   return organization;

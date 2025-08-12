@@ -1,9 +1,9 @@
 /**
  * PGlite Test Database Setup
- * 
+ *
  * Creates PGlite in-memory PostgreSQL databases with ACTUAL Drizzle schema.
  * Uses real schema definitions programmatically via drizzle-kit generation.
- * 
+ *
  * Key Features:
  * - Uses actual Drizzle schema definitions (no sync issues)
  * - In-memory PostgreSQL with PGlite
@@ -13,202 +13,74 @@
  */
 
 import { PGlite } from "@electric-sql/pglite";
-import { sql } from "drizzle-orm";
+import { sql, eq, and } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
+
 import type { PgliteDatabase } from "drizzle-orm/pglite";
 
 import * as schema from "~/server/db/schema";
 
 export type TestDatabase = PgliteDatabase<typeof schema>;
 
-/**
- * Generate SQL DDL from actual Drizzle schema using programmatic API
- * Replaces CLI-based approach with direct drizzle-kit/api function calls
- */
-async function generateSchemaSQL(): Promise<string[]> {
-  try {
-    // Try multiple import strategies for drizzle-kit/api compatibility
-    let generateDrizzleJson: any, generateMigration: any;
-    
-    try {
-      // Strategy 1: Dynamic ESM import
-      const drizzleKit = await import('drizzle-kit/api');
-      generateDrizzleJson = drizzleKit.generateDrizzleJson;
-      generateMigration = drizzleKit.generateMigration;
-    } catch (importError) {
-      // Strategy 2: CommonJS require (fallback)
-      const drizzleKit = require('drizzle-kit/api');
-      generateDrizzleJson = drizzleKit.generateDrizzleJson;
-      generateMigration = drizzleKit.generateMigration;
-    }
-    
-    if (!generateDrizzleJson || !generateMigration) {
-      throw new Error('drizzle-kit/api functions not available');
-    }
-    
-    const statements = await generateMigration(
-      generateDrizzleJson({}), // Empty initial schema
-      generateDrizzleJson(schema) // Current schema
-    );
-    
-    return statements;
-  } catch (error) {
-    console.warn('Programmatic schema generation failed, using fallback:', error);
-    throw error; // Will trigger fallback in caller
-  }
-}
+// Removed: No longer needed since we use actual migration files
 
 /**
  * Apply ACTUAL Drizzle schema to PGlite database
- * Uses drizzle-kit to generate SQL from real schema definitions
+ * Uses ESM-compatible drizzle-kit approach to generate schema from actual definitions
  */
 async function applyDrizzleSchema(db: TestDatabase): Promise<void> {
   try {
-    // Generate SQL from the ACTUAL Drizzle schema definitions
-    const sqlStatements = await generateSchemaSQL();
-    
-    // Apply each SQL statement to create the schema
-    for (const statement of sqlStatements) {
-      if (statement.trim()) {
-        await db.execute(sql.raw(statement));
+    // ESM-compatible approach using createRequire
+    const { createRequire } = await import("node:module");
+    const require = createRequire(import.meta.url);
+
+    // Import drizzle-kit with proper ESM compatibility
+    const { generateDrizzleJson, generateMigration } =
+      require("drizzle-kit/api") as {
+        generateDrizzleJson: (
+          schema: Record<string, unknown>,
+          id?: string,
+          prevId?: string,
+          casing?: string,
+        ) => { id: string; [key: string]: unknown };
+        generateMigration: (
+          prev: Record<string, unknown>,
+          cur: Record<string, unknown>,
+        ) => Promise<string[]>;
+      };
+
+    // Generate migration SQL from empty to current schema
+    const prevJson = generateDrizzleJson({});
+    const curJson = generateDrizzleJson(
+      schema,
+      prevJson.id,
+      undefined,
+      "snake_case",
+    );
+    const statements = await generateMigration(prevJson, curJson);
+
+    // Apply each generated statement
+    for (const statement of statements) {
+      const trimmedStatement = statement.trim();
+      if (trimmedStatement.length > 0) {
+        await db.execute(sql.raw(trimmedStatement));
       }
     }
+
+    if (!process.env.VITEST) {
+      console.log(
+        "Applied Drizzle schema successfully from definitions using ESM-compatible approach",
+      );
+    }
   } catch (error) {
-    // Fallback: Create basic schema structure if generation fails
-    console.warn('Schema generation failed, using fallback approach:', error);
-    await createFallbackSchema(db);
+    console.error("Schema application failed:", error);
+    throw new Error(
+      `Failed to apply Drizzle schema: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }
 
-/**
- * Fallback schema creation for when drizzle-kit generation fails
- * This creates a more comprehensive schema matching the actual Drizzle definitions
- */
-async function createFallbackSchema(db: TestDatabase): Promise<void> {
-  // Create required enums
-  await db.execute(sql`
-    DO $$ BEGIN
-      CREATE TYPE "NotificationFrequency" AS ENUM ('IMMEDIATE', 'DAILY', 'WEEKLY', 'NEVER');
-    EXCEPTION
-      WHEN duplicate_object THEN null;
-    END $$;
-  `);
-  
-  await db.execute(sql`
-    DO $$ BEGIN
-      CREATE TYPE "StatusCategory" AS ENUM ('NEW', 'IN_PROGRESS', 'RESOLVED');
-    EXCEPTION
-      WHEN duplicate_object THEN null;
-    END $$;
-  `);
-
-  await db.execute(sql`
-    DO $$ BEGIN
-      CREATE TYPE "ActivityType" AS ENUM ('CREATED', 'STATUS_CHANGED', 'ASSIGNED', 'PRIORITY_CHANGED', 'COMMENTED', 'COMMENT_DELETED', 'ATTACHMENT_ADDED', 'MERGED', 'RESOLVED', 'REOPENED', 'SYSTEM');
-    EXCEPTION
-      WHEN duplicate_object THEN null;
-    END $$;
-  `);
-
-  // Create tables - more comprehensive set matching actual schema
-  await db.execute(sql`
-    CREATE TABLE IF NOT EXISTS "User" (
-      "id" text PRIMARY KEY NOT NULL,
-      "name" text,
-      "email" text UNIQUE,
-      "createdAt" timestamp DEFAULT now() NOT NULL,
-      "updatedAt" timestamp DEFAULT now() NOT NULL
-    )
-  `);
-
-  await db.execute(sql`
-    CREATE TABLE IF NOT EXISTS "Organization" (
-      "id" text PRIMARY KEY NOT NULL,
-      "name" text NOT NULL,
-      "subdomain" text UNIQUE NOT NULL,
-      "logoUrl" text,
-      "createdAt" timestamp DEFAULT now() NOT NULL,
-      "updatedAt" timestamp DEFAULT now() NOT NULL
-    )
-  `);
-
-  await db.execute(sql`
-    CREATE TABLE IF NOT EXISTS "Permission" (
-      "id" text PRIMARY KEY NOT NULL,
-      "name" text UNIQUE NOT NULL,
-      "description" text
-    )
-  `);
-
-  await db.execute(sql`
-    CREATE TABLE IF NOT EXISTS "Role" (
-      "id" text PRIMARY KEY NOT NULL,
-      "name" text NOT NULL,
-      "organizationId" text NOT NULL,
-      "isDefault" boolean DEFAULT false NOT NULL,
-      "isSystem" boolean DEFAULT false NOT NULL,
-      "createdAt" timestamp DEFAULT now() NOT NULL,
-      "updatedAt" timestamp DEFAULT now() NOT NULL
-    )
-  `);
-
-  await db.execute(sql`
-    CREATE TABLE IF NOT EXISTS "Priority" (
-      "id" text PRIMARY KEY NOT NULL,
-      "name" text NOT NULL,
-      "order" integer NOT NULL,
-      "organizationId" text NOT NULL,
-      "isDefault" boolean DEFAULT false NOT NULL
-    )
-  `);
-
-  await db.execute(sql`
-    CREATE TABLE IF NOT EXISTS "IssueStatus" (
-      "id" text PRIMARY KEY NOT NULL,
-      "name" text NOT NULL,
-      "category" "StatusCategory" NOT NULL,
-      "organizationId" text NOT NULL,
-      "isDefault" boolean DEFAULT false NOT NULL
-    )
-  `);
-
-  await db.execute(sql`
-    CREATE TABLE IF NOT EXISTS "Location" (
-      "id" text PRIMARY KEY NOT NULL,
-      "name" text NOT NULL,
-      "address" text,
-      "organizationId" text NOT NULL,
-      "pinballMapId" integer,
-      "createdAt" timestamp DEFAULT now() NOT NULL,
-      "updatedAt" timestamp DEFAULT now() NOT NULL
-    )
-  `);
-
-  await db.execute(sql`
-    CREATE TABLE IF NOT EXISTS "Model" (
-      "id" text PRIMARY KEY NOT NULL,
-      "name" text NOT NULL,
-      "manufacturer" text NOT NULL,
-      "year" integer,
-      "createdAt" timestamp DEFAULT now() NOT NULL
-    )
-  `);
-
-  await db.execute(sql`
-    CREATE TABLE IF NOT EXISTS "Machine" (
-      "id" text PRIMARY KEY NOT NULL,
-      "serialNumber" text,
-      "organizationId" text NOT NULL,
-      "locationId" text NOT NULL,
-      "modelId" text NOT NULL,
-      "ownerId" text,
-      "status" text DEFAULT 'UNKNOWN' NOT NULL,
-      "createdAt" timestamp DEFAULT now() NOT NULL,
-      "updatedAt" timestamp DEFAULT now() NOT NULL
-    )
-  `);
-}
-
+// Removed: No longer needed since we use actual migration files
 
 /**
  * Create a fresh PGlite test database with real Drizzle schema applied
@@ -216,15 +88,184 @@ async function createFallbackSchema(db: TestDatabase): Promise<void> {
 export async function createTestDatabase(): Promise<TestDatabase> {
   const pgClient = new PGlite();
   const db = drizzle(pgClient, { schema });
-  
+
   // Apply the real schema
   await applyDrizzleSchema(db);
-  
+
   return db;
 }
 
 /**
- * Create a test database with complete seed data
+ * Create minimal users for PostgreSQL-only testing
+ * Enables issue creation which requires createdById references
+ */
+async function createMinimalUsersForTesting(
+  db: TestDatabase,
+  organizationId: string,
+): Promise<void> {
+  // Create users that match the sample data expectations for PostgreSQL-only mode
+  const testUsers = [
+    // Dev users for testing
+    {
+      id: "test-user-admin",
+      email: "admin@dev.local",
+      name: "Dev Admin",
+      profilePicture: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
+    {
+      id: "test-user-member",
+      email: "member@dev.local",
+      name: "Dev Member",
+      profilePicture: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
+    {
+      id: "test-user-player",
+      email: "player@dev.local",
+      name: "Dev Player",
+      profilePicture: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
+    // Pinball personalities that sample data references
+    {
+      id: "test-user-roger",
+      email: "roger.sharpe@pinpoint.dev",
+      name: "Roger Sharpe",
+      profilePicture: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
+    {
+      id: "test-user-gary",
+      email: "gary.stern@pinpoint.dev",
+      name: "Gary Stern",
+      profilePicture: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
+    {
+      id: "test-user-harry",
+      email: "harry.williams@pinpoint.dev",
+      name: "Harry Williams",
+      profilePicture: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
+    {
+      id: "test-user-escher",
+      email: "escher.lefkoff@pinpoint.dev",
+      name: "Escher Lefkoff",
+      profilePicture: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
+    {
+      id: "test-user-tim",
+      email: "timfroehlich@pinpoint.dev",
+      name: "Tim Froehlich",
+      profilePicture: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
+  ];
+
+  await db.insert(schema.users).values(testUsers);
+
+  // Create memberships linking users to organization
+  const adminRole = await db.query.roles.findFirst({
+    where: and(
+      eq(schema.roles.organizationId, organizationId),
+      eq(schema.roles.name, "Admin"),
+    ),
+  });
+
+  const memberRole = await db.query.roles.findFirst({
+    where: and(
+      eq(schema.roles.organizationId, organizationId),
+      eq(schema.roles.name, "Member"),
+    ),
+  });
+
+  if (adminRole && memberRole) {
+    await db.insert(schema.memberships).values([
+      {
+        id: "test-membership-admin",
+        userId: "test-user-admin",
+        organizationId,
+        roleId: adminRole.id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: "test-membership-member",
+        userId: "test-user-member",
+        organizationId,
+        roleId: memberRole.id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: "test-membership-player",
+        userId: "test-user-player",
+        organizationId,
+        roleId: memberRole.id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: "test-membership-roger",
+        userId: "test-user-roger",
+        organizationId,
+        roleId: adminRole.id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: "test-membership-gary",
+        userId: "test-user-gary",
+        organizationId,
+        roleId: memberRole.id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: "test-membership-harry",
+        userId: "test-user-harry",
+        organizationId,
+        roleId: memberRole.id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: "test-membership-escher",
+        userId: "test-user-escher",
+        organizationId,
+        roleId: memberRole.id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: "test-membership-tim",
+        userId: "test-user-tim",
+        organizationId,
+        roleId: adminRole.id, // Make Tim an admin
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ]);
+  }
+
+  if (!process.env.VITEST) {
+    console.log("[TEST] Created minimal users for PostgreSQL-only testing");
+  }
+}
+
+/**
+ * Create a test database with complete seed data using production seeds
  * This is the main entry point for integration tests
  */
 export async function createSeededTestDatabase(): Promise<{
@@ -232,14 +273,107 @@ export async function createSeededTestDatabase(): Promise<{
   organizationId: string;
 }> {
   const db = await createTestDatabase();
-  
-  // Import seed functions dynamically to avoid circular dependencies
-  const { seedCompleteTestData } = await import("./integration-test-seeds");
-  const organization = await seedCompleteTestData(db);
-  
+
+  // Use production seed functions directly (same as CI)
+  const { seedInfrastructureWithDb } = await import(
+    "../../../scripts/seed/shared/infrastructure"
+  );
+  const { seedSampleDataWithDb } = await import(
+    "../../../scripts/seed/shared/sample-data"
+  );
+
+  // Seed infrastructure (organizations, permissions, roles, statuses)
+  const organization = await seedInfrastructureWithDb(db);
+
+  // Create minimal users for PostgreSQL-only mode so issues can be created
+  await createMinimalUsersForTesting(db, organization.id);
+
+  // Seed sample data with minimal dataset and skipAuthUsers = false (now that we have users)
+  await seedSampleDataWithDb(db, organization.id, "minimal", false);
+
   return {
     db,
     organizationId: organization.id,
+  };
+}
+
+/**
+ * Query actual seeded IDs from the database
+ * Replaces hardcoded TEST_IDS with real data from production seeds
+ */
+export async function getSeededTestData(
+  db: TestDatabase,
+  organizationId: string,
+): Promise<{
+  organization: string;
+  location: string | undefined;
+  machine: string | undefined;
+  model: string | undefined;
+  priority: string | undefined;
+  status: string | undefined;
+  issue: string | undefined;
+  adminRole: string | undefined;
+  memberRole: string | undefined;
+  user: string | undefined;
+}> {
+  // Get the first location
+  const location = await db.query.locations.findFirst({
+    where: eq(schema.locations.organizationId, organizationId),
+  });
+
+  // Get the first machine
+  const machine = await db.query.machines.findFirst({
+    where: eq(schema.machines.organizationId, organizationId),
+  });
+
+  // Get the first model
+  const model = await db.query.models.findFirst();
+
+  // Get the first priority
+  const priority = await db.query.priorities.findFirst({
+    where: eq(schema.priorities.organizationId, organizationId),
+  });
+
+  // Get the first status
+  const status = await db.query.issueStatuses.findFirst({
+    where: eq(schema.issueStatuses.organizationId, organizationId),
+  });
+
+  // Get the first issue
+  const issue = await db.query.issues.findFirst({
+    where: eq(schema.issues.organizationId, organizationId),
+  });
+
+  // Get admin role
+  const adminRole = await db.query.roles.findFirst({
+    where: and(
+      eq(schema.roles.organizationId, organizationId),
+      eq(schema.roles.name, "Admin"),
+    ),
+  });
+
+  // Get member role
+  const memberRole = await db.query.roles.findFirst({
+    where: and(
+      eq(schema.roles.organizationId, organizationId),
+      eq(schema.roles.name, "Member"),
+    ),
+  });
+
+  // Get the first user (from machine owner or issue creator)
+  const userId = machine?.ownerId ?? issue?.createdById;
+
+  return {
+    organization: organizationId,
+    location: location?.id,
+    machine: machine?.id,
+    model: model?.id,
+    priority: priority?.id,
+    status: status?.id,
+    issue: issue?.id,
+    adminRole: adminRole?.id,
+    memberRole: memberRole?.id,
+    user: userId,
   };
 }
 
@@ -251,7 +385,10 @@ export async function cleanupTestDatabase(db: TestDatabase): Promise<void> {
   // But we can be explicit about cleanup if needed
   try {
     // Close the PGlite connection
-    await (db as any).client?.close?.();
+    const dbWithClient = db as unknown as {
+      client?: { close?: () => Promise<void> | void };
+    };
+    await dbWithClient.client?.close?.();
   } catch {
     // Ignore cleanup errors in tests
   }
