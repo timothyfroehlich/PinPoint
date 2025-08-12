@@ -1,15 +1,10 @@
 # Quick Reference: Tech Stack Updates for Direct Migration
 
-_Essential updates for Drizzle, Supabase, Next.js, Material UI, and Vitest - optimized for solo development velocity_
+_Essential post-training tech stack updates for direct migration_
 
 ## 🎯 Migration Context
 
-**Solo Development + Pre-Beta + No Users = Direct Conversion Approach**
-
-- **Optimize for:** Velocity and learning over production safety
-- **Risk tolerance:** High - breaking things temporarily is acceptable
-- **Timeline:** 2-3 weeks vs 7+ weeks with parallel validation
-- **Goal:** Clean Drizzle implementations without validation boilerplate
+**Context:** Solo development, pre-beta, direct conversion approach - see [CLAUDE.md → Project Context](../../CLAUDE.md#project-context--development-phase)
 
 ---
 
@@ -31,27 +26,10 @@ _Essential updates for Drizzle, Supabase, Next.js, Material UI, and Vitest - opt
 
 ### **Critical for Direct Conversion**
 
-**✅ DO:**
-
-- Use `.generatedAlwaysAs()` for computed fields (full-text search, slugs)
-- Implement relational queries with `db.query.users.findMany({ with: { posts: true } })`
-- Set up PGlite in-memory testing for integration tests
-- Use enhanced index API: `.on(table.column.asc())`
-- Leverage PostgreSQL extensions natively (`vector`, `geometry`)
-
-**❌ DON'T:**
-
-- Calculate derived fields in tRPC procedures
-- Write manual SQL joins for related data
-- Use external Docker for database testing
-- Apply modifiers to entire index (old API)
-- Use `sql` operator for pg_vector queries
-
-### **Migration Priority**
-
-1. **Generated columns** - replace computed field logic
-2. **Relational queries** - replace Prisma `include` patterns
-3. **Testing setup** - PGlite for fast, isolated tests
+🚀 **NEW**: `.generatedAlwaysAs()` moves computed fields to database  
+🔗 **GAME CHANGER**: `db.query.users.findMany({ with: { posts: true } })` replaces joins  
+🧪 **TESTING**: PGlite in-memory for fast integration tests  
+📋 **Patterns**: @docs/migration/supabase-drizzle/quick-reference/prisma-to-drizzle.md
 
 ---
 
@@ -61,28 +39,9 @@ _Essential updates for Drizzle, Supabase, Next.js, Material UI, and Vitest - opt
 
 ### **Breaking Changes (Immediate Action Required)**
 
-**✅ DO:**
-
-- Migrate to `@supabase/ssr` package immediately
-- Use server-side cookie management with `getAll()` and `setAll()`
-- Call `supabase.auth.getUser()` in middleware for token refresh
-- Implement Broadcast pattern for realtime (scalable, secure)
-- Use Server Actions for authentication flows
-
-**❌ DON'T:**
-
-- Use deprecated `@supabase/auth-helpers-nextjs`
-- Mix auth-helpers with SSR packages (causes auth loops)
-- Use individual cookie methods (`get()`, `set()`, `remove()`)
-- Rely on "Postgres Changes" for new realtime features
-- Use `getSession()` for page protection
-
-### **Migration Priority**
-
-1. **Package migration** - remove auth-helpers, install SSR
-2. **Client utilities** - create server/client utilities
-3. **Component updates** - replace all client creation calls
-4. **Middleware setup** - implement proper auth refresh
+🚨 **CRITICAL**: `@supabase/auth-helpers-nextjs` DEPRECATED → causes auth loops  
+✅ **SOLUTION**: Migrate to `@supabase/ssr` with `getAll()`/`setAll()` cookies  
+📋 **Migration Steps**: @docs/migration/supabase-drizzle/quick-reference/nextauth-to-supabase.md
 
 ---
 
@@ -131,33 +90,10 @@ _Essential updates for Drizzle, Supabase, Next.js, Material UI, and Vitest - opt
 
 ### **Breaking Changes & Opportunities**
 
-**✅ DO:**
-
-- Enable `enableCssLayer: true` in `AppRouterCacheProvider`
-- Replace `Hidden` component with `sx` prop responsive breakpoints
-- Update imports from `@mui/lab` to `@mui/material` (promoted components)
-- Use standardized `slots` pattern: `slots={{ root: Custom }}`
-- Run automated codemods for CSS class updates
-- Define CSS layer order: `@layer theme, base, mui, components, utilities;`
-
-**❌ DON'T:**
-
-- Skip CSS layer setup when using with Tailwind CSS
-- Use removed APIs: `createMuiTheme`, `Hidden`, `onBackdropClick`
-- Mix old `components` props with new `slots` pattern
-- Ignore CSS class composition changes
-
-### **Key Removals**
-
-- `Hidden` → `sx` prop with breakpoints
-- `createMuiTheme` → `createTheme`
-- Component-specific props → unified patterns
-
-### **Migration Priority**
-
-1. **Dependencies** - update to v7, enable CSS layers
-2. **API cleanup** - run codemods, replace deprecated components
-3. **Testing** - update theme provider setup
+🚨 **BREAKING**: `Hidden` component REMOVED → use `sx` prop breakpoints  
+⚙️ **REQUIRED**: `enableCssLayer: true` in AppRouterCacheProvider  
+🔄 **API CHANGE**: `components` → `slots` pattern  
+📋 **Migration Tools**: @docs/latest-updates/material-ui-v7.md
 
 ---
 
@@ -167,36 +103,10 @@ _Essential updates for Drizzle, Supabase, Next.js, Material UI, and Vitest - opt
 
 ### **Modern Mocking Standard**
 
-**✅ DO:**
-
-- Use `vi.mock` with async factory and `vi.importActual`
-- Import original module types: `importOriginal<typeof ModuleType>()`
-- Use `vi.hoisted` for variables accessed in `vi.mock`
-- Implement `vi.mockObject` for deep object mocking
-- Use `projects` configuration (not deprecated `workspace`)
-- Mock at the right level (partial > full module mocking)
-
-**❌ DON'T:**
-
-- Sacrifice type safety for convenience
-- Reference test variables directly in mock factories
-- Let mock state leak between tests
-- Use deprecated `workspace` configuration
-- Mock more than necessary
-
-### **Stack Integration Patterns**
-
-```typescript
-// Drizzle: PGlite in vitest.setup.ts
-// Supabase: Mock next/headers for Server Components
-// Next.js: Mock Server Actions module
-```
-
-### **Migration Priority**
-
-1. **Mock patterns** - update to `vi.importActual`
-2. **Stack integration** - database, auth, Server Action mocks
-3. **Configuration** - migrate to `projects`
+🔧 **NEW STANDARD**: `vi.mock` with `vi.importActual` for type safety  
+🏗️ **PATTERN**: `vi.hoisted()` for shared mock variables  
+⚙️ **CONFIG**: `projects` replaces deprecated `workspace`  
+📋 **Integration**: @docs/latest-updates/vitest.md
 
 ---
 
@@ -225,28 +135,11 @@ _Essential updates for Drizzle, Supabase, Next.js, Material UI, and Vitest - opt
 
 ---
 
-## 🎯 Success Metrics for Solo Development
+## 🎯 Success Metrics
 
-**Velocity Indicators:**
-
-- 2-3 weeks total vs 7+ weeks with parallel validation
-- Clean, readable Drizzle implementations
-- No temporary validation code to maintain
-- Deep understanding of modern patterns
-
-**Technical Quality:**
-
-- TypeScript compilation passes
-- App functionality preserved
-- Key user flows work correctly
-- Enhanced developer experience
-
-**Risk Management:**
-
-- Acceptable temporary breaks (fixable immediately)
-- Incremental approach (one router at a time)
-- Easy rollback with git
-- Manual validation catches issues
+**Velocity:** 2-3 weeks total vs 7+ weeks with parallel validation  
+**Quality:** TypeScript compilation passes, app functionality preserved  
+**Learning:** Deep understanding of modern patterns
 
 ---
 
@@ -263,14 +156,5 @@ _Essential updates for Drizzle, Supabase, Next.js, Material UI, and Vitest - opt
 
 ## 🔄 Implementation Strategy
 
-**Direct Conversion Philosophy:**
-
-1. **No parallel validation** - move directly to clean implementations
-2. **Optimize for learning** - deep understanding over safety nets
-3. **Embrace breaking changes** - temporary breaks are acceptable
-4. **Incremental progress** - one router/component at a time
-5. **Manual validation** - test immediately after each change
-
-**Perfect for solo development context:** No users, pre-beta, high risk tolerance, velocity-focused approach aligned with project phase and constraints.
-
-**Ready to execute the 2-3 week direct conversion! 🚀**
+**Direct Conversion:** No parallel validation, optimize for learning, incremental progress  
+**Details:** [@docs/migration/supabase-drizzle/direct-conversion-plan.md](../migration/supabase-drizzle/direct-conversion-plan.md)
