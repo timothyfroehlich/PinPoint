@@ -73,7 +73,7 @@ export const locationRouter = createTRPCRouter({
       })
       .from(locations)
       .leftJoin(machines, eq(machines.locationId, locations.id))
-      .leftJoin(models, eq(models.id, machines.modelId))
+      .innerJoin(models, eq(models.id, machines.modelId))
       .leftJoin(issues, eq(issues.machineId, machines.id))
       .leftJoin(issueStatuses, eq(issueStatuses.id, issues.statusId))
       .where(eq(locations.organizationId, ctx.organization.id))
@@ -97,7 +97,7 @@ export const locationRouter = createTRPCRouter({
         id: string;
         name: string;
         model: {
-          name: string | null;
+          name: string;
           manufacturer: string | null;
         };
         _count: { issues: number };
@@ -126,7 +126,7 @@ export const locationRouter = createTRPCRouter({
         if (!existingMachine) {
           location.machines.push({
             id: row.machineId,
-            name: row.machineName,
+            name: row.machineName ?? "Unknown Machine",
             model: {
               name: row.modelName,
               manufacturer: row.modelManufacturer,

@@ -15,7 +15,6 @@
  * Uses modern August 2025 patterns with Vitest and PGlite integration.
  */
 
-/* eslint-disable @typescript-eslint/no-non-null-assertion */
 /* eslint-disable @typescript-eslint/unbound-method */
 
 import { eq, count, and, ne } from "drizzle-orm";
@@ -368,13 +367,17 @@ describe("Location Router Integration (PGlite)", () => {
       expect(testArcade).toBeDefined();
       expect(secondLocation).toBeDefined();
 
+      if (!testArcade || !secondLocation) {
+        throw new Error("Test data not found");
+      }
+
       // Verify machine counts (production seeds create 7 machines in main location)
-      expect(testArcade!._count.machines).toBe(7);
-      expect(secondLocation!._count.machines).toBe(1);
+      expect(testArcade._count.machines).toBe(7);
+      expect(secondLocation._count.machines).toBe(1);
 
       // Verify machine details with model relationships
       // First machine should be Ultraman (first in sample data)
-      const firstMachine = testArcade!.machines[0];
+      const firstMachine = testArcade.machines[0];
       expect(firstMachine).toMatchObject({
         name: "Ultraman: Kaiju Rumble (Blood Sucker Edition) #1",
         model: {
@@ -384,12 +387,12 @@ describe("Location Router Integration (PGlite)", () => {
       });
 
       // Verify unresolved issue counts (production seeds create ~6 issues distributed across machines)
-      const totalIssues = testArcade!.machines.reduce(
+      const totalIssues = testArcade.machines.reduce(
         (sum, machine) => sum + machine._count.issues,
         0,
       );
       expect(totalIssues).toBeGreaterThan(0); // Should have some issues from production seeds
-      expect(secondLocation!.machines[0]._count.issues).toBe(1);
+      expect(secondLocation.machines[0]?._count.issues).toBe(1);
     });
 
     it("should filter out resolved issues from counts", async () => {
@@ -420,7 +423,11 @@ describe("Location Router Integration (PGlite)", () => {
       expect(unresolvedIssues[0].count).toBeGreaterThanOrEqual(0);
 
       // The public endpoint should only count unresolved issues
-      const testArcade = result.find((l) => l.id === testData.location)!;
+      const testArcade = result.find((l) => l.id === testData.location);
+      expect(testArcade).toBeDefined();
+      if (!testArcade)
+        throw new Error("Test arcade location not found in results");
+
       const machineWithIssues = testArcade.machines.find(
         (m) => m.id === testData.machine,
       );
@@ -521,7 +528,11 @@ describe("Location Router Integration (PGlite)", () => {
       expect(result.every((l) => l.id !== "other-location")).toBe(true);
 
       // Verify counts aren't affected by other org's data
-      const testArcade = result.find((l) => l.id === testData.location)!;
+      const testArcade = result.find((l) => l.id === testData.location);
+      expect(testArcade).toBeDefined();
+      if (!testArcade)
+        throw new Error("Test arcade location not found in results");
+
       expect(testArcade._count.machines).toBe(7);
       // Ultraman machine should have issues from seeded data only (not other org's issues)
       expect(testArcade.machines[0]._count.issues).toBeGreaterThanOrEqual(2); // Should not include other org's issues
@@ -546,9 +557,12 @@ describe("Location Router Integration (PGlite)", () => {
         where: eq(schema.locations.id, testData.location),
       });
 
-      expect(dbLocation!.name).toBe("Updated Test Arcade");
-      expect(dbLocation!.updatedAt.getTime()).toBeGreaterThan(
-        dbLocation!.createdAt.getTime(),
+      expect(dbLocation).toBeDefined();
+      if (!dbLocation) throw new Error("Location not found in database");
+
+      expect(dbLocation.name).toBe("Updated Test Arcade");
+      expect(dbLocation.updatedAt.getTime()).toBeGreaterThan(
+        dbLocation.createdAt.getTime(),
       );
     });
 
@@ -572,8 +586,12 @@ describe("Location Router Integration (PGlite)", () => {
       const dbLocation = await db.query.locations.findFirst({
         where: eq(schema.locations.id, testData.location),
       });
+      expect(dbLocation).toBeDefined();
+      if (!dbLocation)
+        throw new Error("Location not found in database after failed update");
+
       // Should be "Austin Pinball Collective" from production seeds
-      expect(dbLocation!.name).toContain("Austin");
+      expect(dbLocation.name).toContain("Austin");
     });
 
     it("should handle partial updates correctly", async () => {
@@ -583,9 +601,12 @@ describe("Location Router Integration (PGlite)", () => {
 
       const result = await caller.update({ id: testData.location }); // No name provided
 
-      expect(result.name).toBe(originalData!.name); // Name should remain unchanged
+      expect(originalData).toBeDefined();
+      if (!originalData) throw new Error("Original location data not found");
+
+      expect(result.name).toBe(originalData.name); // Name should remain unchanged
       expect(result.updatedAt.getTime()).toBeGreaterThan(
-        originalData!.updatedAt.getTime(),
+        originalData.updatedAt.getTime(),
       ); // But updatedAt should change
     });
   });
@@ -659,13 +680,19 @@ describe("Location Router Integration (PGlite)", () => {
         where: eq(schema.issues.machineId, testData.machine),
       });
       expect(issueBeforeDeletion).toBeDefined();
-      expect(issueBeforeDeletion!.machineId).toBe(testData.machine);
+      if (!issueBeforeDeletion)
+        throw new Error("Issue not found before deletion test");
+
+      expect(issueBeforeDeletion.machineId).toBe(testData.machine);
 
       const machineBeforeDeletion = await db.query.machines.findFirst({
         where: eq(schema.machines.id, testData.machine),
       });
       expect(machineBeforeDeletion).toBeDefined();
-      expect(machineBeforeDeletion!.locationId).toBe(testData.location);
+      if (!machineBeforeDeletion)
+        throw new Error("Machine not found before deletion test");
+
+      expect(machineBeforeDeletion.locationId).toBe(testData.location);
 
       // Step 1: Delete issues first (they reference machines)
       await db
@@ -764,7 +791,13 @@ describe("Location Router Integration (PGlite)", () => {
       const dbLocation = await db.query.locations.findFirst({
         where: eq(schema.locations.id, testData.location),
       });
-      expect(dbLocation!.pinballMapId).toBe(12345);
+      expect(dbLocation).toBeDefined();
+      if (!dbLocation)
+        throw new Error(
+          "Location not found in database after PinballMap ID update",
+        );
+
+      expect(dbLocation.pinballMapId).toBe(12345);
     });
 
     it("should prevent cross-organizational PinballMap ID updates", async () => {
@@ -789,7 +822,13 @@ describe("Location Router Integration (PGlite)", () => {
       const dbLocation = await db.query.locations.findFirst({
         where: eq(schema.locations.id, testData.location),
       });
-      expect(dbLocation!.pinballMapId).toBeNull();
+      expect(dbLocation).toBeDefined();
+      if (!dbLocation)
+        throw new Error(
+          "Location not found in database after failed PinballMap ID update",
+        );
+
+      expect(dbLocation.pinballMapId).toBeNull();
     });
   });
 
@@ -845,10 +884,22 @@ describe("Location Router Integration (PGlite)", () => {
       });
 
       expect(location).toBeDefined();
-      expect(location!.machines[0].model.id).toBe(testData.model);
-      expect(location!.machines[0].owner.id).toBe(testData.user);
-      expect(location!.machines[0].issues[0].status.id).toBe(testData.status);
-      expect(location!.machines[0].issues[0].priority.id).toBe(
+      if (!location)
+        throw new Error("Location not found for referential integrity test");
+
+      expect(location.machines.length).toBeGreaterThan(0);
+      if (location.machines.length === 0)
+        throw new Error("No machines found for location");
+
+      expect(location.machines[0].model.id).toBe(testData.model);
+      expect(location.machines[0].owner.id).toBe(testData.user);
+
+      expect(location.machines[0].issues.length).toBeGreaterThan(0);
+      if (location.machines[0].issues.length === 0)
+        throw new Error("No issues found for machine");
+
+      expect(location.machines[0].issues[0].status.id).toBe(testData.status);
+      expect(location.machines[0].issues[0].priority.id).toBe(
         testData.priority,
       );
     });
