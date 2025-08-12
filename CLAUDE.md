@@ -39,42 +39,10 @@
 
 Latest updates for our migration: @docs/latest-updates/quick-reference.md
 
-### 🚨 CRITICAL: Don't Forget These Breaking Changes
+### 🚨 CRITICAL: Post-Training Breaking Changes
 
-**Supabase (IMMEDIATE ACTION REQUIRED):**
-
-- `@supabase/auth-helpers-nextjs` is DEPRECATED → causes auth loops
-- Must migrate to `@supabase/ssr` package
-- Cookie methods: ONLY use `getAll()` and `setAll()`, NOT individual `get()`/`set()`
-- Middleware: MUST call `supabase.auth.getUser()` for token refresh
-
-**Drizzle (Game-Changers):**
-
-- Generated columns: `.generatedAlwaysAs(sql`...`)` moves computed logic to DB
-- NEW Index API: `.on(table.column.asc())` NOT `.on(table.column).asc()`
-- Relational queries: `db.query.users.findMany({ with: { posts: true } })` replaces manual joins
-- Testing: PGlite in `vitest.setup.ts` for in-memory PostgreSQL
-
-**Next.js (Paradigm Shift):**
-
-- Server Components: `async function Component()` fetches data directly
-- Server Actions: `'use server'` replaces API routes for mutations
-- Request memoization: `'use cache'` directive prevents duplicate DB queries
-- Cache invalidation: `revalidatePath()` and `revalidateTag()` in Server Actions
-
-**Material UI v7 (Breaking Changes):**
-
-- CSS Layers: `enableCssLayer: true` in `AppRouterCacheProvider`
-- Hidden component REMOVED → use `sx={{ display: { xs: 'none', md: 'block' } }}`
-- Props: `components` → `slots` pattern
-- Imports: Lab components promoted to `@mui/material`
-
-**Vitest (New Standards):**
-
-- Partial mocking: `vi.mock(path, async (importOriginal) => ({ ...await importOriginal(), mock: vi.fn() }))`
-- Hoisted variables: `vi.hoisted(() => ({ mock: vi.fn() }))` for mock setup
-- Configuration: `workspace` → `projects` (deprecated)
-- Type safety: Always use `importOriginal<typeof ModuleType>()`
+**🔥 IMMEDIATE ACTION REQUIRED:** `@supabase/auth-helpers-nextjs` DEPRECATED → causes auth loops  
+**📋 Complete Updates:** @docs/latest-updates/quick-reference.md
 
 ## Claude Memories
 

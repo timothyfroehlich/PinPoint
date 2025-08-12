@@ -11,11 +11,9 @@
 
 ## Executive Summary
 
-**Philosophy:** Direct conversion from Prisma to Drizzle without parallel validation infrastructure, optimized for solo developer velocity and learning in a pre-beta environment.
-
-**Problem Solved:** Eliminate 400+ lines of parallel validation boilerplate and 3-4 weeks of infrastructure development by moving directly to clean Drizzle implementations.
-
-**Timeline:** 2-3 weeks total vs 7+ weeks with parallel validation approach.
+**Philosophy:** Direct conversion from Prisma to Drizzle without parallel validation infrastructure.  
+**Problem Solved:** Eliminate 400+ lines of validation boilerplate and 3-4 weeks of infrastructure.  
+**Timeline:** 2-3 weeks total vs 7+ weeks with parallel validation.
 
 ---
 
@@ -23,14 +21,7 @@
 
 ### **Why Direct Conversion is Perfect Here**
 
-**Project Reality:**
-
-- **No users:** Zero production risk
-- **No production environment:** Development/framework phase
-- **Solo developer:** No coordination overhead
-- **Pre-beta:** Core features still being decided
-- **E2E tests disabled:** UI/UX in flux
-- **High risk tolerance:** Breaking things temporarily is fine
+**Project Context:** Solo development, pre-beta, no users - see [CLAUDE.md](../../CLAUDE.md#project-context--development-phase)
 
 **Technical Reality:**
 
