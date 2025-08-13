@@ -257,16 +257,12 @@ describe("Schema Migration Validation", () => {
 
     it("should enforce required fields", async () => {
       // Test that required fields cannot be null
-      try {
-        await db.insert(schema.organizations).values({
-          id: `required-test-${Date.now()}`,
-          name: "", // Empty name should be allowed (business logic validates)
-          subdomain: `required-${Date.now()}`,
-        });
-      } catch (_error) {
-        // If there are DB-level constraints, they would trigger here
-        // During migration, these might be enforced at application level instead
-      }
+      // Test that empty names are allowed (business logic handles validation)
+      await db.insert(schema.organizations).values({
+        id: `required-test-${Date.now()}`,
+        name: "", // Empty name should be allowed (business logic validates)
+        subdomain: `required-${Date.now()}`,
+      });
 
       // Verify that basic required fields work
       const [org] = await db
