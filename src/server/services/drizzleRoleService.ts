@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { eq, and, ne } from "drizzle-orm";
+import { eq, and, ne, asc } from "drizzle-orm";
 
 import {
   SYSTEM_ROLES,
@@ -592,7 +592,7 @@ export class DrizzleRoleService {
       })
       .from(roles)
       .where(eq(roles.organizationId, this.organizationId))
-      .orderBy(roles.isSystem, roles.name);
+      .orderBy(asc(roles.isSystem), asc(roles.name));
 
     // Get permissions and membership counts for each role
     const rolesWithDetails = await Promise.all(

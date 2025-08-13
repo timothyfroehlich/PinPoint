@@ -67,7 +67,7 @@ logs/
 /tmp
 .recycle_bin/
 /data/
-index.html
+#index.html
 
 # Playwright
 node_modules/
@@ -77,10 +77,6 @@ node_modules/
 /playwright/.cache/
 /trace/
 
-# Orchestrator multi-agent system
-.claude/SUBAGENT_TASK.md
-.claude/ORCHESTRATOR_NOTES.md
-.claude/sub-agent-logs/
 
 # Build/lint/test output files
 *-errors.json
@@ -90,6 +86,7 @@ typescript-output.log
 eslint-test-output.log
 eslint-prod-errors.json
 eslint-results.sarif
+.eslintcache
 shellcheck-results.sarif
 betterer-output.log
 agent_workspace/
