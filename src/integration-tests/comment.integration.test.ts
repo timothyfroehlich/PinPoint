@@ -173,18 +173,11 @@ describe("Comment Router Integration (PGlite)", () => {
         findMany: vi
           .fn()
           .mockImplementation(async ({ where, include, orderBy }) => {
-            // Debug logging
-            console.log(
-              "findMany called with:",
-              JSON.stringify({ where, include, orderBy }, null, 2),
-            );
-
             // Handle deleted comments query for getDeletedComments
             if (
               where?.deletedAt?.not !== undefined &&
               where?.issue?.organizationId
             ) {
-              console.log("Processing getDeletedComments query...");
               const organizationId = where.issue.organizationId;
 
               // Get all deleted comments and filter by organization
@@ -217,7 +210,6 @@ describe("Comment Router Integration (PGlite)", () => {
                   },
                 },
               });
-              console.log("Target organization ID:", organizationId);
 
               // Filter by organization and format results
               const orgDeletedComments = allDeletedComments
@@ -243,11 +235,6 @@ describe("Comment Router Integration (PGlite)", () => {
                     : undefined,
                 }));
 
-              console.log(
-                "Filtered org deleted comments:",
-                orgDeletedComments.length,
-              );
-
               // Sort by deletedAt desc if requested
               if (orderBy?.deletedAt === "desc") {
                 orgDeletedComments.sort(
@@ -261,7 +248,6 @@ describe("Comment Router Integration (PGlite)", () => {
             }
 
             // Default: return empty array for other queries
-            console.log("Returning empty array for unhandled query");
             return [];
           }),
       },
