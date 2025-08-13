@@ -82,6 +82,10 @@ node_modules/
 .claude/ORCHESTRATOR_NOTES.md
 .claude/sub-agent-logs/
 
+# Git worktrees and Claude Code worktree management
+.claude/worktrees/
+worktrees/
+
 # Build/lint/test output files
 *-errors.json
 *-report.json
@@ -102,3 +106,4 @@ cleanup_analysis/
 .betterer.results.backup
 .worktree-ports
 .env*.local
+.eslintcache
