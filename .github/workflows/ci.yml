@@ -148,13 +148,13 @@ jobs:
         run: |
           case "${{ matrix.shard }}" in
             "unit-node")
-              vitest run --coverage --project=node
+              npx vitest run --coverage --project=node
               ;;
             "unit-jsdom")
-              vitest run --coverage --project=jsdom
+              npx vitest run --coverage --project=jsdom
               ;;
             "integration")
-              vitest run --coverage --project=integration
+              npx vitest run --coverage --project=integration
               ;;
           esac
       - name: Upload Coverage (${{ matrix.shard }})
