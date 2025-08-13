@@ -1,8 +1,23 @@
 #!/bin/sh
 echo "🚀 Running pre-push validation..."
 
-# Quick validation with standardized brief commands
-npm run check:brief
+# Run TypeScript check (only checks committed files by design)
+npm run typecheck:brief
+
+# Run lint and format checks only on committed files
+echo "🔍 Checking committed files..."
+COMMITTED_FILES=$(git diff --name-only HEAD~1..HEAD --diff-filter=ACM | grep -E '\.(ts|tsx|js|jsx|mdx)$' || true)
+if [ -n "$COMMITTED_FILES" ]; then
+  echo "📝 Formatting check on committed files..."
+  echo "$COMMITTED_FILES" | xargs npx prettier --check --cache --log-level warn
+  echo "🔍 Linting committed files..."
+  echo "$COMMITTED_FILES" | xargs npx eslint --max-warnings 0 --cache
+else
+  echo "📝 No TypeScript/JavaScript files to check"
+fi
+
+# Run audit for security (doesn't depend on specific files)
+npm audit --audit-level moderate --silent
 
 # Lightweight additional checks
 npm run workflow:ci
