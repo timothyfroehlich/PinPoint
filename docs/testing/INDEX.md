@@ -18,7 +18,7 @@ Comprehensive testing patterns and strategies for PinPoint.
 
 ### Core Testing Strategies
 
-- **[index.md](./index.md)** - Testing philosophy and quick start guide
+- **[GUIDE.md](./GUIDE.md)** - Testing philosophy and quick start guide
 - **[unit-patterns.md](./unit-patterns.md)** - Pure function and business logic testing
 - **[integration-patterns.md](./integration-patterns.md)** - Database and API testing with transactions
 - **[resilient-ui-patterns.md](./resilient-ui-patterns.md)** - UI testing patterns that resist minor changes (unit & E2E with MUI components)

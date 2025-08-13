@@ -19,6 +19,7 @@ PinPoint is completing a direct conversion migration from Prisma to Drizzle opti
 
 ### For Migration Participants
 
+- **🚨 CRITICAL**: [`latest-updates/`](./latest-updates/) - Post-training breaking changes and new patterns
 - **Migration Hub**: [`migration/supabase-drizzle/`](./migration/supabase-drizzle/)
 - **Quick References**: [`migration/supabase-drizzle/quick-reference/`](./migration/supabase-drizzle/quick-reference/)
 - **New Stack Guides**: [`developer-guides/`](./developer-guides/) (Supabase, Drizzle, RLS)
@@ -27,6 +28,7 @@ PinPoint is completing a direct conversion migration from Prisma to Drizzle opti
 
 ### Core Documentation
 
+- [`latest-updates/`](./latest-updates/) - **CRITICAL**: Post-training tech stack updates (August 2025)
 - [`architecture/`](./architecture/) - System design, patterns, and current state
 - [`developer-guides/`](./developer-guides/) - Technology-specific implementation guides
 - [`testing/`](./testing/) - Testing philosophy and patterns (now integration-first)
@@ -46,22 +48,11 @@ PinPoint is completing a direct conversion migration from Prisma to Drizzle opti
 
 ## Key Resources
 
-### Essential Commands
+### Quick References (Auto-Loaded)
 
-See [`CLAUDE.md`](../CLAUDE.md) for the complete command reference.
-
-### Migration Patterns
-
-- **ORM**: Prisma → Drizzle Direct Conversion ([patterns](./migration/supabase-drizzle/quick-reference/prisma-to-drizzle.md))
-- **Approach**: Direct router conversion without parallel validation ([guide](./developer-guides/drizzle/dual-orm-migration.md))
-- **Testing**: Existing test patterns maintained during migration ([philosophy](./testing/))
-
-### Architecture Principles
-
-1. **Multi-tenant by design** - Application-level organization_id filtering
-2. **Type-safe throughout** - Strictest TypeScript standards with tRPC + Drizzle
-3. **Direct conversion approach** - Clean Drizzle implementations without validation overhead
-4. **Progressive enhancement** - Public features work without auth
+- **Tactical Patterns**: [`quick-reference/`](./quick-reference/) - Auto-loaded guides for immediate action
+- **Essential Commands**: [`CLAUDE.md`](../CLAUDE.md) - Command reference and project context
+- **Latest Updates**: [`latest-updates/quick-reference.md`](./latest-updates/quick-reference.md) - Post-training breaking changes
 
 ## Contributing
 

@@ -464,7 +464,7 @@ it("handles missing issue", () => {
 - **[Migration Guide](./migration-guide.md)** - Vitest migration strategies
 - **[Mocking Patterns](./mocking-patterns.md)** - Detailed mocking techniques
 - **[Troubleshooting](./troubleshooting.md)** - Debugging approaches
-- **[Testing Guide](./index.md)** - Main testing documentation
+- **[Testing Guide](./GUIDE.md)** - Main testing documentation
 
 ## Summary
 

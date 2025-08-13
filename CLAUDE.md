@@ -1,5 +1,19 @@
 # PinPoint Development Instructions
 
+## 🚨 MANDATORY: USE CONTEXT7 EXTENSIVELY 🚨
+
+**CRITICAL DIRECTIVE:** Always use Context7 for current library documentation when:
+
+- Working with any library/framework (Drizzle, Supabase, Next.js, Material UI, Vitest, etc.)
+- Your knowledge might be outdated (training cutoff January 2025, now August 2025)
+- Looking up API changes, new features, or current best practices
+- Need examples of modern patterns and implementation approaches
+
+**Process:** `resolve-library-id` → `get-library-docs` → Apply current patterns
+**Why:** Libraries evolve rapidly, my training is 7+ months behind critical updates
+
+---
+
 [... existing content ...]
 
 ## Project Context & Development Phase
@@ -21,6 +35,15 @@
 - Parallel validation, complex migration infrastructure, and extensive safety measures are **waste** in this phase
 - Direct conversion approaches are preferred - cleanup issues as they arise
 
+## Tech Stack Updates
+
+Latest updates for our migration: @docs/latest-updates/quick-reference.md
+
+### 🚨 CRITICAL: Post-Training Breaking Changes
+
+**🔥 IMMEDIATE ACTION REQUIRED:** `@supabase/auth-helpers-nextjs` DEPRECATED → causes auth loops  
+**📋 Complete Updates:** @docs/latest-updates/quick-reference.md
+
 ## Claude Memories
 
 - Don't be a yes-man and don't pander to me
@@ -29,15 +52,57 @@
 - We use husky for precommits and preuploads
 - We run shellcheck against our scripts
 
-## Command Line Tools
+## 🚨🚨🚨 CRITICAL COMMAND RESTRICTIONS 🚨🚨🚨
+
+### ⛔ ABSOLUTELY FORBIDDEN: npm test with Redirection
+
+**🔥 NEVER EVER USE THESE COMMANDS 🔥**
+
+```bash
+npm test 2>&1          # ❌ BREAKS VITEST
+npm test > file.txt    # ❌ BREAKS VITEST
+npm test >> file.txt   # ❌ BREAKS VITEST
+npm run test:* 2>&1    # ❌ BREAKS VITEST
+vitest 2>&1            # ❌ BREAKS VITEST
+```
+
+**💥 WHY THIS BREAKS EVERYTHING:**
+
+- Vitest interprets `2>&1`, `>`, `>>` as **test name filters**
+- Instead of redirecting output, Vitest searches for tests matching "2>&1"
+- This causes bizarre test behavior and broken output
+- **NO REDIRECTION WORKS** with Vitest CLI commands
+
+**✅ USE THESE INSTEAD:**
+
+```bash
+npm run test:brief     # ✅ Fast, minimal output
+npm run test:quiet     # ✅ Suppress console logs
+npm run test:verbose   # ✅ Detailed output
+npm run test:coverage  # ✅ With coverage report
+```
+
+### ⛔ Other Command Restrictions
 
 - **NEVER use the `find` command** - it's dangerous due to the `-exec` flag which can execute arbitrary commands
-- **NEVER use stream redirection with npm test commands** - redirection like `2>&1` gets passed as arguments to Vitest, causing it to interpret them as test filters instead of shell redirection
-- Use safe alternatives instead:
-  - **ripgrep (rg)** - for content searching and file discovery: `rg --files | rg "pattern"`, `rg -l "content" --type js`
-  - **fd/fdfind** - for file system traversal: `fd "*.js"`, `fd --type f --changed-within 1day`
-  - **git ls-files** - for git repositories: `git ls-files | grep "\.js$"`
-  - **Enhanced ls** - for basic directory listing with tools like `exa` or `lsd`
-- For test output control, use the existing npm scripts: `test:brief`, `test:quiet`, `test:verbose`
+
+### ✅ Safe Command Alternatives
+
+- **ripgrep (rg)** - for content searching: `rg --files | rg "pattern"`, `rg -l "content" --type js`
+- **fd/fdfind** - for file discovery: `fd "*.js"`, `fd --type f --changed-within 1day`
+- **git ls-files** - for repo files: `git ls-files | grep "\.js$"`
 - Prefer rg (ripgrep) to find or grep
-- If trying to use a tool that is not installed, suggest installation of the tool with `brew` (preferred) or `apt`
+- Install missing tools with `brew` (preferred) or `apt`
+
+## 📚 Quick Reference (Auto-Loaded)
+
+Core patterns and workflows:
+@docs/INDEX.md
+@docs/quick-reference/INDEX.md
+@docs/quick-reference/migration-patterns.md  
+@docs/quick-reference/testing-patterns.md
+@docs/quick-reference/api-security-patterns.md
+@docs/quick-reference/typescript-strictest-patterns.md
+@docs/migration/supabase-drizzle/quick-reference/prisma-to-drizzle.md
+@docs/migration/supabase-drizzle/quick-reference/nextauth-to-supabase.md
+@docs/migration/supabase-drizzle/direct-conversion-plan.md
