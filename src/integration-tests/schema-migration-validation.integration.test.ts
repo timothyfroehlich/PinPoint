@@ -263,7 +263,7 @@ describe("Schema Migration Validation", () => {
           name: "", // Empty name should be allowed (business logic validates)
           subdomain: `required-${Date.now()}`,
         });
-      } catch (error) {
+      } catch (_error) {
         // If there are DB-level constraints, they would trigger here
         // During migration, these might be enforced at application level instead
       }

@@ -231,7 +231,7 @@ describe("Multi-Tenant Isolation", () => {
 
     it("should allow multi-organization access for global data", async () => {
       // Create global OPDB model
-      const [globalModel] = await db
+      const [_globalModel] = await db
         .insert(schema.models)
         .values({
           id: testModelId,
