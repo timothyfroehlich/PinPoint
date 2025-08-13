@@ -183,8 +183,8 @@ export function MachineGrid({
                           sx={{ fontSize: 16, color: "text.secondary" }}
                         />
                         <Avatar
-                          {...(machine.owner.image && {
-                            src: machine.owner.image,
+                          {...(machine.owner.profilePicture && {
+                            src: machine.owner.profilePicture,
                           })}
                           sx={{ width: 20, height: 20 }}
                           alt={machine.owner.name ?? "Owner"}

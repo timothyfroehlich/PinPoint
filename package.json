@@ -107,6 +107,7 @@
     "pinballmap:update-fixture": "curl -o src/lib/pinballmap/__tests__/fixtures/api_responses/locations/location_26454_machine_details.json https://pinballmap.com/api/v1/locations/26454/machine_details.json"
   },
   "dependencies": {
+    "@electric-sql/pglite": "^0.3.7",
     "@emotion/cache": "^11.14.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
@@ -120,9 +121,9 @@
     "@supabase/supabase-js": "^2.53.0",
     "@t3-oss/env-nextjs": "^0.13.8",
     "@tanstack/react-query": "^5.83.0",
-    "@trpc/client": "^11.4.4",
-    "@trpc/react-query": "^11.4.4",
-    "@trpc/server": "^11.4.4",
+    "@trpc/client": "11.4.3",
+    "@trpc/react-query": "11.4.3",
+    "@trpc/server": "11.4.3",
     "csv-parser": "^3.2.0",
     "drizzle-orm": "^0.44.4",
     "drizzle-seed": "^0.3.1",

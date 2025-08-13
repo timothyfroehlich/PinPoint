@@ -9,4 +9,17 @@ if [ "$branch" = "main" ]; then
 fi
 
 echo "🔧 Running pre-commit checks in parallel..."
+
+# Check for accidental migration files (no-migrations approach)
+if [ -d "supabase/migrations" ]; then
+  MIGRATION_FILES=$(find supabase/migrations -name "*.sql" 2>/dev/null || true)
+  if [ -n "$MIGRATION_FILES" ]; then
+    echo "❌ Migration files detected! This project uses 'drizzle-kit push' (no migrations approach)."
+    echo "Found: $MIGRATION_FILES"
+    echo "Run: rm -rf supabase/migrations"
+    exit 1
+  fi
+fi
+echo "✅ No migration files found - using no-migrations approach correctly"
+
 npm run pre-commit:all
