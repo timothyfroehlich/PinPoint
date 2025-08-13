@@ -2,17 +2,17 @@
 
 ## Overview
 
-Integration tests in PinPoint use a real database with dedicated Vitest project configuration for test isolation. This approach provides confidence that features work correctly with actual database constraints, RLS policies, and multi-table operations.
+Integration tests in PinPoint use **PGlite in-memory PostgreSQL** for fast, reliable database testing with dedicated Vitest project configuration. This approach provides confidence that features work correctly with actual database constraints, referential integrity, and multi-table operations.
 
 ## Core Principles
 
-1. **Real Database**: Use Supabase local instance (never mocked)
-2. **Hard Failures**: Tests fail immediately if database unavailable (no skipping)
+1. **Real Database**: Use PGlite in-memory PostgreSQL (preferred) or Supabase local for E2E
+2. **Fast Execution**: PGlite provides real database behavior without Docker overhead
 3. **Dedicated Project**: Separate Vitest project configuration for integration tests
-4. **Transaction Isolation**: Each test runs in a rolled-back transaction
+4. **Transaction Isolation**: Each test runs in a clean database instance
 5. **Minimal Mocking**: Only mock external services (email, APIs)
-6. **User Journey Focus**: Test complete workflows
-7. **RLS Validation**: Verify security policies work
+6. **User Journey Focus**: Test complete workflows with real constraints
+7. **Referential Integrity**: Validate foreign keys, constraints, cascades
 
 ## Vitest Project Configuration
 
@@ -39,43 +39,101 @@ Integration tests run in a dedicated Vitest project:
 }
 ```
 
-## Test Database Setup
+## PGlite Integration Testing (Recommended)
 
-### Integration Test Setup
+### PGlite Setup Pattern
 
-The integration test setup ensures database availability and provides real connections:
+**Reference Implementation**: `src/integration-tests/location.integration.test.ts`
+
+PGlite provides real PostgreSQL behavior in-memory for fast, reliable integration testing:
 
 ```typescript
-// src/test/vitest.integration.setup.ts
-import { beforeAll, afterAll, afterEach } from "vitest";
+// test/helpers/pglite-test-setup.ts
+import { PGlite } from "@electric-sql/pglite";
+import { drizzle } from "drizzle-orm/pglite";
+import { migrate } from "drizzle-orm/pglite/migrator";
+import * as schema from "~/server/db/schema";
 
-// NO database mocking - uses real Supabase database
+export type TestDatabase = ReturnType<typeof drizzle<typeof schema>>;
 
-beforeAll(async () => {
-  // Hard failure if database unavailable
-  if (!process.env.DATABASE_URL) {
-    throw new Error(
-      "DATABASE_URL is required for integration tests. Ensure Supabase is running.",
-    );
-  }
+export async function createSeededTestDatabase() {
+  // Create fresh in-memory PostgreSQL database
+  const client = new PGlite();
+  const db = drizzle(client, { schema });
 
-  // Reject test/mock URLs - integration tests need real database
-  if (
-    process.env.DATABASE_URL.includes("test://") ||
-    process.env.DATABASE_URL.includes("postgresql://test:test@")
-  ) {
-    throw new Error(
-      "Integration tests require a real database URL, not a test/mock URL. Check .env.test configuration.",
-    );
-  }
-});
+  // Apply real schema migrations
+  await migrate(db, { migrationsFolder: "drizzle" });
 
-afterEach(() => {
-  // Cleanup handled by individual tests using transactions
-});
+  // Create minimal seed data
+  const orgId = await createTestOrganization(db);
+  await createTestUsers(db, orgId);
+  await createTestMachinesAndIssues(db, orgId);
 
-afterAll(() => {
-  // Global cleanup
+  return { db, organizationId: orgId };
+}
+
+export async function getSeededTestData(db: TestDatabase, orgId: string) {
+  // Query actual seeded IDs from database
+  const location = await db.query.locations.findFirst({
+    where: eq(schema.locations.organizationId, orgId),
+  });
+
+  return {
+    organization: orgId,
+    location: location?.id,
+    // ... other test data IDs
+  };
+}
+```
+
+### Integration Test Structure
+
+```typescript
+// src/integration-tests/admin.integration.test.ts
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { adminRouter } from "~/server/api/routers/admin";
+import {
+  createSeededTestDatabase,
+  getSeededTestData,
+} from "~/test/helpers/pglite-test-setup";
+
+describe("Admin Router Integration (PGlite)", () => {
+  let db: TestDatabase;
+  let context: TRPCContext;
+  let caller: ReturnType<typeof adminRouter.createCaller>;
+  let testData: SeededTestData;
+
+  beforeEach(async () => {
+    // Fresh database for each test
+    const setup = await createSeededTestDatabase();
+    db = setup.db;
+    testData = await getSeededTestData(db, setup.organizationId);
+
+    // Create test context with real database
+    context = {
+      user: { id: testData.user, organizationId: testData.organization },
+      organization: { id: testData.organization },
+      drizzle: db, // Real database, not mocked
+      // ... other context setup
+    };
+
+    caller = adminRouter.createCaller(context);
+  });
+
+  it("should create user with real database constraints", async () => {
+    const result = await caller.createUser({
+      name: "New User",
+      email: "newuser@example.com",
+    });
+
+    // Verify in actual database
+    const dbUser = await db.query.users.findFirst({
+      where: eq(schema.users.id, result.id),
+    });
+
+    expect(dbUser).toBeDefined();
+    expect(dbUser?.organizationId).toBe(testData.organization);
+  });
 });
 ```
 
@@ -569,6 +627,14 @@ it("creates issue", async () => {
 
 ### Prerequisites
 
+**PGlite Integration Tests (Recommended):**
+
+- No external dependencies - runs completely in-memory
+- Fast execution (typically <2 seconds per test file)
+- Perfect for router testing and database constraint validation
+
+**Supabase Docker Integration Tests (E2E only):**
+
 1. **Supabase must be running locally:**
 
    ```bash
@@ -583,17 +649,17 @@ it("creates issue", async () => {
 ### Commands
 
 ```bash
-# Run all integration tests
+# Run PGlite integration tests (fast)
+npm run test src/integration-tests/
+
+# Run specific PGlite integration test
+npm run test src/integration-tests/location.integration.test.ts
+
+# Run all integration tests (PGlite + Supabase Docker)
 npm run test -- --project=integration
 
-# Run specific integration test files
-npm run test src/integration-tests/notification.schema.test.ts
-
-# Run both integration test files
-npm run test src/integration-tests/ src/server/db/drizzle-crud-validation.test.ts
-
-# Watch mode for integration tests
-npm run test -- --project=integration --watch
+# Watch mode for integration development
+npm run test src/integration-tests/ --watch
 ```
 
 ### Hard Failure Behavior
