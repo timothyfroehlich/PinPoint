@@ -18,7 +18,7 @@ This document maps test files to the specific source files they test, organized 
 | `src/server/api/routers/issue.test.ts`        | `src/server/api/routers/issue.ts`        | Issue CRUD operations, organization scoping    |
 | `src/server/api/routers/machine.test.ts`      | `src/server/api/routers/machine.ts`      | Machine management, OPDB integration           |
 | `src/server/api/routers/location.test.ts`     | `src/server/api/routers/location.ts`     | Location operations, multi-tenancy             |
-| `src/server/api/routers/comment.test.ts`      | `src/server/api/routers/comment.ts`      | Comment CRUD, soft delete functionality        |
+| `src/integration-tests/comment.integration.test.ts` | `src/server/api/routers/comment.ts`      | Comment CRUD, soft delete functionality (Integration test)        |
 | `src/server/api/routers/upload.test.ts`       | `src/server/api/routers/upload.ts`       | File upload security, storage operations       |
 | `src/server/api/routers/notification.test.ts` | `src/server/api/routers/notification.ts` | Notification triggers, delivery logic          |
 | `src/server/api/routers/organization.test.ts` | `src/server/api/routers/organization.ts` | Organization management, role permissions      |
