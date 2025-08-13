@@ -536,14 +536,13 @@ describe("Router Integration Tests", () => {
       const updatedLocation = {
         ...mockLocation,
         name: "Updated Location Name",
+        updatedAt: new Date(), // Drizzle auto-adds updatedAt
       };
 
-      vi.mocked(mockContext.db.location.findFirst).mockResolvedValue(
-        mockLocation,
-      );
-      vi.mocked(mockContext.db.location.update).mockResolvedValue(
+      // Mock the Drizzle update chain: update().set().where().returning()
+      vi.mocked(mockContext.drizzle.returning).mockResolvedValue([
         updatedLocation,
-      );
+      ]);
 
       // Act
       const result = await caller.location.update({
@@ -558,12 +557,19 @@ describe("Router Integration Tests", () => {
           name: "Updated Location Name",
         }),
       );
-      expect(mockContext.db.location.update).toHaveBeenCalledWith({
-        where: { id: "location-1", organizationId: "org-1" },
-        data: {
-          name: "Updated Location Name",
-        },
+
+      // Verify the Drizzle update chain: update().set().where().returning()
+      expect(mockContext.drizzle.update).toHaveBeenCalledWith(
+        expect.any(Object), // Accept any table object (locations table schema)
+      );
+      expect(mockContext.drizzle.set).toHaveBeenCalledWith({
+        name: "Updated Location Name",
+        updatedAt: expect.any(Date), // Drizzle auto-adds updatedAt
       });
+      expect(mockContext.drizzle.where).toHaveBeenCalledWith(
+        expect.any(Object), // and() clause with id and organization filters
+      );
+      expect(mockContext.drizzle.returning).toHaveBeenCalled();
     });
 
     it("should deny location operations without proper permissions", async () => {

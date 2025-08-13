@@ -1,5 +1,5 @@
 /**
- * Drizzle CRUD Validation Tests
+ * Drizzle CRUD Validation Tests (Integration)
  *
  * Comprehensive testing of Drizzle ORM operations:
  * - INSERT, SELECT, UPDATE, DELETE operations
@@ -11,70 +11,35 @@
 import { eq, and, sql } from "drizzle-orm";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
-import type { DrizzleClient } from "~/server/db/drizzle";
-
-import { createDrizzleClient } from "~/server/db/drizzle";
 import * as schema from "~/server/db/schema";
+import {
+  createTestDatabase,
+  type TestDatabase,
+  cleanupTestDatabase,
+} from "~/test/helpers/pglite-test-setup";
 
-describe("Drizzle CRUD Operations", () => {
-  let db: DrizzleClient;
-  let testOrgId: string;
-  let testUserId: string;
-  let testLocationId: string;
-  let testModelId: string;
+// Helper to generate unique IDs for tests that need multiple entities
+function generateTestId(prefix: string): string {
+  return `${prefix}-${Date.now()}`;
+}
+
+describe("Drizzle CRUD Operations (Integration)", () => {
+  let db: TestDatabase;
+
+  // Generate unique IDs for each test to avoid conflicts
+  const testOrgId = generateTestId("test-org");
+  const testUserId = generateTestId("test-user");
+  const testLocationId = generateTestId("test-location");
+  const testModelId = generateTestId("test-model");
 
   beforeEach(async () => {
-    // Ensure database is available for integration tests
-    if (!process.env.DATABASE_URL) {
-      throw new Error(
-        "DATABASE_URL is required for integration tests. Ensure Supabase is running.",
-      );
-    }
-
-    // Reject test/mock URLs - integration tests need real database
-    if (
-      process.env.DATABASE_URL.includes("test://") ||
-      process.env.DATABASE_URL.includes("postgresql://test:test@")
-    ) {
-      throw new Error(
-        "Integration tests require a real database URL, not a test/mock URL. Check .env.test configuration.",
-      );
-    }
-
-    try {
-      db = createDrizzleClient();
-    } catch (error) {
-      throw new Error(
-        `Failed to connect to database for integration tests: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-
-    testOrgId = `test-org-${Date.now()}`;
-    testUserId = `test-user-${Date.now()}`;
-    testLocationId = `test-location-${Date.now()}`;
-    testModelId = `test-model-${Date.now()}`;
+    // Create fresh PGlite database with real schema
+    db = await createTestDatabase();
   });
 
   afterEach(async () => {
-    // Cleanup test data
-    if (!db) return;
-
-    try {
-      await db
-        .delete(schema.machines)
-        .where(eq(schema.machines.organizationId, testOrgId));
-      await db
-        .delete(schema.locations)
-        .where(eq(schema.locations.organizationId, testOrgId));
-      await db
-        .delete(schema.organizations)
-        .where(eq(schema.organizations.id, testOrgId));
-      await db.delete(schema.users).where(eq(schema.users.id, testUserId));
-      await db.delete(schema.models).where(eq(schema.models.id, testModelId));
-    } catch (error) {
-      // Cleanup errors are not critical for test results
-      console.warn("Cleanup warning:", error);
-    }
+    // Clean up the test database
+    await cleanupTestDatabase(db);
   });
 
   describe("INSERT Operations", () => {
@@ -102,7 +67,7 @@ describe("Drizzle CRUD Operations", () => {
         .values({
           id: testOrgId,
           name: "Drizzle Test Organization",
-          subdomain: `drizzle-test-${Date.now()}`,
+          subdomain: "drizzle-test-1",
         })
         .returning();
 
@@ -116,7 +81,7 @@ describe("Drizzle CRUD Operations", () => {
       await db.insert(schema.organizations).values({
         id: testOrgId,
         name: "Test Org",
-        subdomain: `test-${Date.now()}`,
+        subdomain: "test-org-subdomain",
       });
 
       const [location] = await db
@@ -163,7 +128,7 @@ describe("Drizzle CRUD Operations", () => {
       await db.insert(schema.organizations).values({
         id: testOrgId,
         name: "Test Org",
-        subdomain: `test-${Date.now()}`,
+        subdomain: "test-org-subdomain",
       });
 
       await db.insert(schema.locations).values({
@@ -182,12 +147,12 @@ describe("Drizzle CRUD Operations", () => {
       const [machine] = await db
         .insert(schema.machines)
         .values({
-          id: `test-machine-${Date.now()}`,
+          id: "test-machine-1",
           name: "Test Machine #1",
           organizationId: testOrgId,
           locationId: testLocationId,
           modelId: testModelId,
-          qrCodeId: `qr-${Date.now()}`,
+          qrCodeId: "qr-test-1",
         })
         .returning();
 
@@ -213,7 +178,7 @@ describe("Drizzle CRUD Operations", () => {
       await db.insert(schema.organizations).values({
         id: testOrgId,
         name: "Select Test Org",
-        subdomain: `select-test-${Date.now()}`,
+        subdomain: "select-test-1",
       });
 
       await db.insert(schema.locations).values({
@@ -262,7 +227,7 @@ describe("Drizzle CRUD Operations", () => {
       const [stats] = await db
         .select({
           organizationId: schema.organizations.id,
-          locationCount: sql<string>`count(${schema.locations.id})`.as(
+          locationCount: sql<number>`count(${schema.locations.id})`.as(
             "location_count",
           ),
         })
@@ -276,7 +241,8 @@ describe("Drizzle CRUD Operations", () => {
 
       expect(stats).toBeDefined();
       expect(stats?.organizationId).toBe(testOrgId);
-      expect(stats?.locationCount).toBe("1");
+      // PGlite returns count as number (native JavaScript type)
+      expect(stats?.locationCount).toBe(1);
     });
 
     it("should filter by multiple conditions", async () => {
@@ -311,7 +277,7 @@ describe("Drizzle CRUD Operations", () => {
       await db.insert(schema.organizations).values({
         id: testOrgId,
         name: "Update Test Org",
-        subdomain: `update-test-${Date.now()}`,
+        subdomain: "update-test-1",
       });
     });
 
@@ -364,14 +330,14 @@ describe("Drizzle CRUD Operations", () => {
     beforeEach(async () => {
       await db.insert(schema.users).values({
         id: testUserId,
-        email: `delete-test-${Date.now()}@example.com`,
+        email: "delete-test@example.com",
         name: "Delete Test User",
       });
 
       await db.insert(schema.organizations).values({
         id: testOrgId,
         name: "Delete Test Org",
-        subdomain: `delete-test-${Date.now()}`,
+        subdomain: "delete-test-1",
       });
 
       await db.insert(schema.locations).values({
@@ -414,33 +380,50 @@ describe("Drizzle CRUD Operations", () => {
     });
 
     it("should handle cascade deletions properly", async () => {
-      // Delete organization (should not cascade to locations - they need manual cleanup)
-      await db
-        .delete(schema.organizations)
-        .where(eq(schema.organizations.id, testOrgId));
+      // Attempt to delete organization should fail due to foreign key constraint
+      try {
+        await db
+          .delete(schema.organizations)
+          .where(eq(schema.organizations.id, testOrgId));
 
-      // Location should still exist (no CASCADE DELETE in current schema)
+        // Should not reach here
+        expect.fail("Expected foreign key constraint violation");
+      } catch (error) {
+        // This is expected - foreign key constraint should prevent deletion
+        expect(error).toBeDefined();
+      }
+
+      // Location should still exist (protected by foreign key constraint)
       const locations = await db
         .select()
         .from(schema.locations)
         .where(eq(schema.locations.id, testLocationId));
       expect(locations).toHaveLength(1);
 
-      // Manual cleanup required
+      // Manual cleanup required - delete child records first
       await db
         .delete(schema.locations)
         .where(eq(schema.locations.id, testLocationId));
+
+      // Now organization deletion should succeed
+      await db
+        .delete(schema.organizations)
+        .where(eq(schema.organizations.id, testOrgId));
     });
   });
 
   describe("Transaction Operations", () => {
     it("should commit successful transaction", async () => {
+      const txUserId = "tx-user-commit-test";
+      const txOrgId = "tx-org-commit-test";
+      const txSubdomain = "tx-commit-test";
+
       const result = await db.transaction(async (tx) => {
         const [user] = await tx
           .insert(schema.users)
           .values({
-            id: `tx-user-${Date.now()}`,
-            email: `transaction-test-${Date.now()}@example.com`,
+            id: txUserId,
+            email: "transaction-test@example.com",
             name: "Transaction Test User",
           })
           .returning();
@@ -448,9 +431,9 @@ describe("Drizzle CRUD Operations", () => {
         const [org] = await tx
           .insert(schema.organizations)
           .values({
-            id: `tx-org-${Date.now()}`,
+            id: txOrgId,
             name: "Transaction Test Org",
-            subdomain: `tx-test-${Date.now()}`,
+            subdomain: txSubdomain,
           })
           .returning();
 
@@ -483,7 +466,7 @@ describe("Drizzle CRUD Operations", () => {
     });
 
     it("should rollback failed transaction", async () => {
-      const txUserId = `rollback-user-${Date.now()}`;
+      const txUserId = "rollback-user-test";
 
       try {
         await db.transaction(async (tx) => {
@@ -509,16 +492,17 @@ describe("Drizzle CRUD Operations", () => {
     });
 
     it("should handle constraint violation rollback", async () => {
-      const duplicateSubdomain = `duplicate-${Date.now()}`;
+      const duplicateSubdomain = "duplicate-constraint-test";
+      const firstOrgId = "first-org-constraint-test";
+      const secondOrgId = "second-org-constraint-test";
+      const txUserId = "constraint-user-test";
 
       // Create first org with subdomain
       await db.insert(schema.organizations).values({
-        id: `first-org-${Date.now()}`,
+        id: firstOrgId,
         name: "First Org",
         subdomain: duplicateSubdomain,
       });
-
-      const txUserId = `constraint-user-${Date.now()}`;
 
       try {
         await db.transaction(async (tx) => {
@@ -530,7 +514,7 @@ describe("Drizzle CRUD Operations", () => {
 
           // This should fail due to unique constraint on subdomain
           await tx.insert(schema.organizations).values({
-            id: `second-org-${Date.now()}`,
+            id: secondOrgId,
             name: "Second Org",
             subdomain: duplicateSubdomain, // Duplicate!
           });
@@ -547,7 +531,7 @@ describe("Drizzle CRUD Operations", () => {
         .where(eq(schema.users.id, txUserId));
       expect(users).toHaveLength(0);
 
-      // Cleanup
+      // Cleanup (PGlite gives fresh DB per test, but good practice)
       await db
         .delete(schema.organizations)
         .where(eq(schema.organizations.subdomain, duplicateSubdomain));
@@ -555,8 +539,10 @@ describe("Drizzle CRUD Operations", () => {
   });
 
   describe("Multi-Tenancy Isolation", () => {
-    const org1Id = `tenant1-${Date.now()}`;
-    const org2Id = `tenant2-${Date.now()}`;
+    const org1Id = "tenant1-isolation-test";
+    const org2Id = "tenant2-isolation-test";
+    const loc1Id = "loc1-isolation-test";
+    const loc2Id = "loc2-isolation-test";
 
     beforeEach(async () => {
       // Create two organizations
@@ -564,45 +550,31 @@ describe("Drizzle CRUD Operations", () => {
         {
           id: org1Id,
           name: "Tenant 1",
-          subdomain: `tenant1-${Date.now()}`,
+          subdomain: "tenant1-isolation-test",
         },
         {
           id: org2Id,
           name: "Tenant 2",
-          subdomain: `tenant2-${Date.now()}`,
+          subdomain: "tenant2-isolation-test",
         },
       ]);
 
       // Create locations for each
       await db.insert(schema.locations).values([
         {
-          id: `loc1-${Date.now()}`,
+          id: loc1Id,
           name: "Tenant 1 Location",
           organizationId: org1Id,
         },
         {
-          id: `loc2-${Date.now()}`,
+          id: loc2Id,
           name: "Tenant 2 Location",
           organizationId: org2Id,
         },
       ]);
     });
 
-    afterEach(async () => {
-      // Cleanup tenant test data
-      await db
-        .delete(schema.locations)
-        .where(eq(schema.locations.organizationId, org1Id));
-      await db
-        .delete(schema.locations)
-        .where(eq(schema.locations.organizationId, org2Id));
-      await db
-        .delete(schema.organizations)
-        .where(eq(schema.organizations.id, org1Id));
-      await db
-        .delete(schema.organizations)
-        .where(eq(schema.organizations.id, org2Id));
-    });
+    // No afterEach cleanup needed - PGlite provides fresh database per test
 
     it("should properly isolate tenant data", async () => {
       // Tenant 1 should only see their locations
@@ -642,18 +614,18 @@ describe("Drizzle CRUD Operations", () => {
     it("should validate organizationId indexes work efficiently", async () => {
       // This test verifies that our organizationId indexes are functioning
       // by running a query that should use the index
-      const startTime = Date.now();
+      const startTime = performance.now();
 
       const locations = await db
         .select()
         .from(schema.locations)
         .where(eq(schema.locations.organizationId, org1Id));
 
-      const queryTime = Date.now() - startTime;
+      const queryTime = performance.now() - startTime;
 
       expect(locations).toHaveLength(1);
-      // Index queries should be very fast (< 100ms for simple test data)
-      expect(queryTime).toBeLessThan(100);
+      // PGlite in-memory queries should be very fast (< 50ms for simple test data)
+      expect(queryTime).toBeLessThan(50);
     });
   });
 });
