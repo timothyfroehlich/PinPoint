@@ -25,7 +25,7 @@ type Role = typeof roles.$inferSelect;
 
 // Define interfaces for Prisma-like compatibility
 interface PrismaLikeWhereConditions {
-  name?: { in: string[] };
+  name?: string | { in: string[] };
   userId?: string;
   organizationId?: string;
 }
@@ -80,7 +80,11 @@ export class DrizzleRoleService {
     const prismaLike: PrismaLikeClient = {
       permission: {
         findMany: async (options?: PrismaLikeFindOptions) => {
-          if (options?.where?.name?.in) {
+          if (
+            options?.where?.name &&
+            typeof options.where.name === "object" &&
+            "in" in options.where.name
+          ) {
             const whereClause = options.where.name.in;
             return await this.drizzle.query.permissions.findMany({
               where: (permissions, { inArray }) =>
@@ -96,10 +100,10 @@ export class DrizzleRoleService {
             return await this.drizzle.query.memberships.findFirst({
               where: (memberships, { eq, and }) => {
                 const conditions = [];
-                if (options.where.userId) {
+                if (options.where?.userId) {
                   conditions.push(eq(memberships.userId, options.where.userId));
                 }
-                if (options.where.organizationId) {
+                if (options.where?.organizationId) {
                   conditions.push(
                     eq(
                       memberships.organizationId,
@@ -138,15 +142,20 @@ export class DrizzleRoleService {
         findFirst: async (options?: PrismaLikeFindOptions) => {
           if (options?.where) {
             return await this.drizzle.query.roles.findFirst({
-              where: (roles, { eq, and }) => {
+              where: (roles, { eq, and, inArray }) => {
                 const conditions = [];
-                if (options.where.organizationId) {
+                if (options.where?.organizationId) {
                   conditions.push(
                     eq(roles.organizationId, options.where.organizationId),
                   );
                 }
-                if (options.where.name) {
-                  conditions.push(eq(roles.name, options.where.name));
+                if (options.where?.name) {
+                  // Handle both string and { in: string[] } formats
+                  if (typeof options.where.name === "string") {
+                    conditions.push(eq(roles.name, options.where.name));
+                  } else {
+                    conditions.push(inArray(roles.name, options.where.name.in));
+                  }
                 }
                 return conditions.length > 1
                   ? and(...conditions)
