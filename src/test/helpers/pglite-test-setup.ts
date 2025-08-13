@@ -378,6 +378,36 @@ export async function getSeededTestData(
 }
 
 /**
+ * Transaction wrapper for test isolation
+ * Provides true test isolation with rollback instead of database recreation
+ */
+export async function withTransaction<T>(
+  db: TestDatabase,
+  testFn: (db: TestDatabase) => Promise<T>,
+): Promise<T> {
+  // Begin transaction
+  await db.execute(sql`BEGIN`);
+  
+  try {
+    // Run the test
+    const result = await testFn(db);
+    
+    // Always rollback to maintain isolation
+    await db.execute(sql`ROLLBACK`);
+    
+    return result;
+  } catch (error) {
+    // Rollback on error
+    try {
+      await db.execute(sql`ROLLBACK`);
+    } catch {
+      // Ignore rollback errors
+    }
+    throw error;
+  }
+}
+
+/**
  * Clean up test database (closes PGlite connection)
  */
 export async function cleanupTestDatabase(db: TestDatabase): Promise<void> {
