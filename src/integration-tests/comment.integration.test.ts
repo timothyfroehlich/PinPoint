@@ -18,7 +18,7 @@
 
 /* eslint-disable @typescript-eslint/unbound-method */
 
-import { eq, count, and, ne, desc } from "drizzle-orm";
+import { eq, count, and, ne, desc, isNotNull, lte } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Import test setup and utilities
@@ -154,8 +154,8 @@ describe("Comment Router Integration (PGlite)", () => {
             const result = await db.select({ count: count() })
               .from(schema.comments)
               .where(and(
-                ne(schema.comments.deletedAt, null),
-                schema.comments.deletedAt <= retentionCutoff
+                isNotNull(schema.comments.deletedAt),
+                lte(schema.comments.deletedAt, retentionCutoff)
               ));
             return result[0]?.count || 0;
           }
@@ -170,13 +170,17 @@ describe("Comment Router Integration (PGlite)", () => {
             .then(result => result[0]);
         }),
         findMany: vi.fn().mockImplementation(async ({ where, include, orderBy }) => {
+          // Debug logging
+          console.log('findMany called with:', JSON.stringify({ where, include, orderBy }, null, 2));
+          
           // Handle deleted comments query for getDeletedComments
-          if (where?.deletedAt?.not && where?.issue?.organizationId) {
+          if (where?.deletedAt?.not !== undefined && where?.issue?.organizationId) {
+            console.log('Processing getDeletedComments query...');
             const organizationId = where.issue.organizationId;
             
             // Get all deleted comments and filter by organization
             const allDeletedComments = await db.query.comments.findMany({
-              where: ne(schema.comments.deletedAt, null),
+              where: (comments, { isNotNull }) => isNotNull(comments.deletedAt),
               with: {
                 author: include?.author ? {
                   columns: {
@@ -199,6 +203,7 @@ describe("Comment Router Integration (PGlite)", () => {
                 },
               },
             });
+            console.log('Target organization ID:', organizationId);
             
             // Filter by organization and format results
             const orgDeletedComments = allDeletedComments
@@ -220,6 +225,8 @@ describe("Comment Router Integration (PGlite)", () => {
                 } : undefined,
               }));
 
+            console.log('Filtered org deleted comments:', orgDeletedComments.length);
+
             // Sort by deletedAt desc if requested
             if (orderBy?.deletedAt === "desc") {
               orgDeletedComments.sort((a, b) => 
@@ -231,6 +238,7 @@ describe("Comment Router Integration (PGlite)", () => {
           }
           
           // Default: return empty array for other queries
+          console.log('Returning empty array for unhandled query');
           return [];
         }),
       },
@@ -664,10 +672,10 @@ describe("Comment Router Integration (PGlite)", () => {
     beforeEach(async () => {
       // Create old deleted comments that qualify for cleanup
       const oldDate = new Date();
-      oldDate.setDate(oldDate.getDate() - 100); // 100 days ago (> 90 day threshold)
+      oldDate.setDate(oldDate.getDate() - 200); // 200 days ago (way > 90 day threshold)
 
       const recentDate = new Date();
-      recentDate.setDate(recentDate.getDate() - 30); // 30 days ago (< 90 day threshold)
+      recentDate.setDate(recentDate.getDate() - 30); // 30 days ago (way < 90 day threshold)
 
       await db.insert(schema.comments).values([
         {
