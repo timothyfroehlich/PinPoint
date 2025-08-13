@@ -412,12 +412,12 @@ I categorize each test file's database and authentication service usage into thi
 - **Migration Status**: Uses Drizzle patterns - **ANALYZED**
 - **Key Patterns**: Dual-ORM context testing (Prisma + Drizzle), schema validation, type safety validation, mock client structure testing
 
-**src/server/api/routers/**tests**/comment.test.ts**
+**src/integration-tests/comment.integration.test.ts**
 
-- **Lines**: 358
-- **Tests**: 10
-- **Purpose**: Comment router testing with soft delete patterns and admin functionality
-- **DB Service**: Major DB Mocking
+- **Lines**: 787
+- **Tests**: 13
+- **Purpose**: Comment router integration testing with real database operations, soft delete patterns, and service integration
+- **DB Service**: Real PGlite PostgreSQL database
 - **Auth Service**: Major Auth Mocking
 - **Notes**: Comment router
 - **tRPC Priority**: **ANALYZED** - tRPC router testing

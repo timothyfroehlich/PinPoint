@@ -276,7 +276,7 @@
 
 **PENDING ACTIONS FROM COMPLETED CONVERSIONS:**
 
-- [ ] Update test mocks in `comment.test.ts` for Drizzle query patterns
+- [x] ~~Update test mocks in `comment.test.ts` for Drizzle query patterns~~ → Converted to integration test with real database operations
 - [ ] Update test mocks in `admin.test.ts` for Drizzle query patterns
 - [ ] Consider implementing proper CUID/UUID generation vs timestamp IDs
 - [ ] Update RoleService to use Drizzle natively
