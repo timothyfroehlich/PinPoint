@@ -13,6 +13,12 @@
 
 import { eq, and, inArray } from "drizzle-orm";
 
+// Quiet mode for tests
+const isTestMode = process.env.NODE_ENV === "test" || process.env.VITEST;
+const log = (...args: unknown[]) => {
+  if (!isTestMode) console.log(...args);
+};
+
 import { createDrizzleClient } from "~/server/db/drizzle";
 import {
   models,
@@ -38,10 +44,10 @@ async function waitForAuthUserSync(requiredEmails: string[]): Promise<void> {
   const INITIAL_DELAY_MS = 1000; // Start with 1 second
   const MAX_DELAY_MS = 8000; // Cap at 8 seconds
 
-  console.log(
+  log(
     `[SAMPLE] 🔄 Waiting for ${requiredEmails.length} auth users to sync to database...`,
   );
-  console.log(`[SAMPLE] Required users: ${requiredEmails.join(", ")}`);
+  log(`[SAMPLE] Required users: ${requiredEmails.join(", ")}`);
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     // Query for users in database
@@ -57,12 +63,12 @@ async function waitForAuthUserSync(requiredEmails: string[]): Promise<void> {
       (email) => !foundEmails.includes(email),
     );
 
-    console.log(
+    log(
       `[SAMPLE] 🔍 Attempt ${attempt}/${MAX_ATTEMPTS}: Found ${foundEmails.length}/${requiredEmails.length} users`,
     );
 
     if (missingEmails.length === 0) {
-      console.log(
+      log(
         `[SAMPLE] ✅ All required users found in database after ${attempt} attempts`,
       );
       return;
@@ -82,7 +88,7 @@ async function waitForAuthUserSync(requiredEmails: string[]): Promise<void> {
     const jitter = Math.random() * 0.3; // ±30% jitter
     const delay = Math.floor(baseDelay * (1 + jitter));
 
-    console.log(
+    log(
       `[SAMPLE] ⏳ Missing users: ${missingEmails.join(", ")} - waiting ${delay}ms before retry`,
     );
     await new Promise((resolve) => setTimeout(resolve, delay));
@@ -122,7 +128,7 @@ async function extractUniqueGames(
     );
     const sampleIssues: SampleIssue[] = sampleIssuesModule.default;
 
-    console.log(
+    log(
       `[SAMPLE] Processing ${sampleIssues.length.toString()} sample issues...`,
     );
 
@@ -144,14 +150,25 @@ async function extractUniqueGames(
     }
 
     let uniqueGames = Array.from(gameMap.values());
-    console.log(`[SAMPLE] Found ${uniqueGames.length.toString()} unique games`);
+    log(`[SAMPLE] Found ${uniqueGames.length.toString()} unique games`);
 
     // Limit data for minimal mode (for CI tests and local development)
     if (dataAmount === "minimal") {
-      const MINIMAL_GAME_LIMIT = 4;
-      uniqueGames = uniqueGames.slice(0, MINIMAL_GAME_LIMIT);
-      console.log(
-        `[SAMPLE] Limited to ${uniqueGames.length.toString()} games for minimal seeding`,
+      const MINIMAL_ISSUE_LIMIT = 10;
+
+      // Get OPDB IDs from first 10 issues to ensure consistency
+      const issuesSubset = sampleIssues.slice(0, MINIMAL_ISSUE_LIMIT);
+      const requiredOpdbIds = new Set(
+        issuesSubset.map((issue) => issue.gameOpdbId),
+      );
+
+      // Only keep games that are actually referenced in the issues subset
+      uniqueGames = uniqueGames.filter((game) =>
+        requiredOpdbIds.has(game.opdbId),
+      );
+
+      log(
+        `[SAMPLE] Limited to ${uniqueGames.length.toString()} games for minimal seeding (all games referenced in first ${MINIMAL_ISSUE_LIMIT} issues)`,
       );
     }
 
@@ -210,14 +227,17 @@ function parseGameTitle(title: string): {
 }
 
 /**
- * Create OPDB models from unique games with optimized upsert operations
+ * Create OPDB models with provided database instance
  */
-async function createModels(games: UniqueGame[]): Promise<void> {
-  console.log(`[SAMPLE] Creating ${games.length.toString()} OPDB models...`);
+async function createModelsWithDb(
+  dbInstance: typeof db,
+  games: UniqueGame[],
+): Promise<void> {
+  log(`[SAMPLE] Creating ${games.length.toString()} OPDB models...`);
 
   try {
     if (games.length === 0) {
-      console.log(`[SAMPLE] No games to process`);
+      log(`[SAMPLE] No games to process`);
       return;
     }
 
@@ -235,7 +255,7 @@ async function createModels(games: UniqueGame[]): Promise<void> {
     // Use PostgreSQL upsert pattern - insert all, ignore conflicts on opdbId
     if (modelsToCreate.length > 0) {
       // Check existing models to provide better logging
-      const existingModelOpdbIds = await db
+      const existingModelOpdbIds = await dbInstance
         .select({ opdbId: models.opdbId })
         .from(models)
         .where(
@@ -251,17 +271,17 @@ async function createModels(games: UniqueGame[]): Promise<void> {
         (m) => !existingOpdbIdSet.has(m.opdbId),
       );
 
-      await db
+      await dbInstance
         .insert(models)
         .values(modelsToCreate)
         .onConflictDoNothing({ target: models.opdbId });
 
-      console.log(
+      log(
         `[SAMPLE] ✅ Inserted ${actualNewModels.length} new models (out of ${modelsToCreate.length}) via optimized upsert (${modelsToCreate.length - actualNewModels.length} conflicts ignored)`,
       );
     }
 
-    console.log(`[SAMPLE] ✅ Model creation completed`);
+    log(`[SAMPLE] ✅ Model creation completed`);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error(`[SAMPLE] ❌ Model creation failed: ${errorMessage}`);
@@ -270,24 +290,23 @@ async function createModels(games: UniqueGame[]): Promise<void> {
 }
 
 /**
- * Create machines for all models at the organization's location with batch operations
+ * Create machines with provided database instance
  */
-async function createMachines(
+async function createMachinesWithDb(
+  dbInstance: typeof db,
   organizationId: string,
   games: UniqueGame[],
 ): Promise<void> {
-  console.log(
-    `[SAMPLE] Creating machines for ${games.length.toString()} models...`,
-  );
+  log(`[SAMPLE] Creating machines for ${games.length.toString()} models...`);
 
   try {
     if (games.length === 0) {
-      console.log(`[SAMPLE] No games to process for machine creation`);
+      log(`[SAMPLE] No games to process for machine creation`);
       return;
     }
 
     // Find the Austin Pinball Collective location
-    const location = await db
+    const location = await dbInstance
       .select({ id: locations.id, name: locations.name })
       .from(locations)
       .where(
@@ -307,10 +326,10 @@ async function createMachines(
       throw new Error("Location record is unexpectedly undefined");
     }
     const locationId = locationRecord.id;
-    console.log(`[SAMPLE] Using location: ${locationRecord.name}`);
+    log(`[SAMPLE] Using location: ${locationRecord.name}`);
 
     // Get dev users for machine ownership rotation
-    const devUsers = await db
+    const devUsers = await dbInstance
       .select({ id: users.id, email: users.email })
       .from(users)
       .where(
@@ -322,14 +341,14 @@ async function createMachines(
     const ownerId = devUser?.id;
 
     // Get all models by OPDB ID in one query
-    const modelsData = await db
+    const modelsData = await dbInstance
       .select({ id: models.id, opdbId: models.opdbId, name: models.name })
       .from(models);
 
     const modelsMap = new Map(modelsData.map((m) => [m.opdbId, m]));
 
     // Get existing machines for this organization and location
-    const existingMachines = await db
+    const existingMachines = await dbInstance
       .select({ modelId: machines.modelId })
       .from(machines)
       .where(
@@ -380,8 +399,8 @@ async function createMachines(
     // Batch create all missing machines
     if (machinesToCreate.length > 0) {
       try {
-        await db.insert(machines).values(machinesToCreate);
-        console.log(
+        await dbInstance.insert(machines).values(machinesToCreate);
+        log(
           `[SAMPLE] ✅ Created ${machinesToCreate.length.toString()} machines via batch insert`,
         );
       } catch (error) {
@@ -391,12 +410,12 @@ async function createMachines(
         );
       }
     } else {
-      console.log(
+      log(
         `[SAMPLE] ⏭️  All machines for ${games.length.toString()} models already exist`,
       );
     }
 
-    console.log(
+    log(
       `[SAMPLE] ✅ Machine creation completed (${machinesToCreate.length} new machines)`,
     );
   } catch (error) {
@@ -421,9 +440,10 @@ function mapSeverityToPriority(severity: string): string {
 }
 
 /**
- * Create sample issues mapped to machines with batch operations
+ * Create sample issues with provided database instance
  */
-async function createSampleIssues(
+async function createSampleIssuesWithDb(
+  dbInstance: typeof db,
   organizationId: string,
   dataAmount: DataAmount,
   skipAuthUsers = false,
@@ -435,26 +455,22 @@ async function createSampleIssues(
     );
     let sampleIssues: SampleIssue[] = sampleIssuesModule.default;
 
-    console.log(
-      `[SAMPLE] Found ${sampleIssues.length.toString()} sample issues...`,
-    );
+    log(`[SAMPLE] Found ${sampleIssues.length.toString()} sample issues...`);
 
     // Limit issues for minimal mode (for CI tests and local development)
     if (dataAmount === "minimal") {
       const MINIMAL_ISSUE_LIMIT = 10;
       sampleIssues = sampleIssues.slice(0, MINIMAL_ISSUE_LIMIT);
-      console.log(
+      log(
         `[SAMPLE] Limited to ${sampleIssues.length.toString()} issues for minimal seeding`,
       );
     }
 
-    console.log(
-      `[SAMPLE] Creating ${sampleIssues.length.toString()} sample issues...`,
-    );
+    log(`[SAMPLE] Creating ${sampleIssues.length.toString()} sample issues...`);
 
     // Get priority and status mappings in batch
     const priorityMap = new Map<string, string>();
-    const allPriorities = await db
+    const allPriorities = await dbInstance
       .select({ id: priorities.id, name: priorities.name })
       .from(priorities)
       .where(eq(priorities.organizationId, organizationId));
@@ -464,7 +480,7 @@ async function createSampleIssues(
     }
 
     const statusMap = new Map<string, string>();
-    const allStatuses = await db
+    const allStatuses = await dbInstance
       .select({ id: issueStatuses.id, name: issueStatuses.name })
       .from(issueStatuses)
       .where(eq(issueStatuses.organizationId, organizationId));
@@ -485,22 +501,22 @@ async function createSampleIssues(
       ];
       await waitForAuthUserSync(requiredDevUsers);
     } else {
-      console.log(
+      log(
         "[SAMPLE] ⏭️  Skipping auth user synchronization (PostgreSQL-only mode)",
       );
     }
 
     // Get user mappings for creators
     const userMap = new Map<string, string>();
-    const allUsers = await db
+    const allUsers = await dbInstance
       .select({ id: users.id, email: users.email })
       .from(users);
 
-    console.log(`[SAMPLE] 📋 Found ${allUsers.length} total users in database`);
+    log(`[SAMPLE] 📋 Found ${allUsers.length} total users in database`);
     const devUserEmails = allUsers
       .filter((u) => u.email?.includes("@dev.local"))
       .map((u) => u.email);
-    console.log(`[SAMPLE] 🔧 Dev users available: ${devUserEmails.join(", ")}`);
+    log(`[SAMPLE] 🔧 Dev users available: ${devUserEmails.join(", ")}`);
 
     for (const user of allUsers) {
       if (user.email) {
@@ -509,7 +525,7 @@ async function createSampleIssues(
     }
 
     // Get machines with models in batch
-    const machineData = await db
+    const machineData = await dbInstance
       .select({
         id: machines.id,
         name: machines.name,
@@ -522,7 +538,7 @@ async function createSampleIssues(
     const machineMap = new Map(machineData.map((m) => [m.opdbId, m]));
 
     // Get existing issues to avoid duplicates
-    const existingIssues = await db
+    const existingIssues = await dbInstance
       .select({ title: issues.title, machineId: issues.machineId })
       .from(issues)
       .where(eq(issues.organizationId, organizationId));
@@ -550,7 +566,7 @@ async function createSampleIssues(
         // Check if issue already exists
         const issueKey = `${machine.id}_${issueData.title}`;
         if (existingIssuesSet.has(issueKey)) {
-          console.log(`[SAMPLE] ⏭️  Issue exists: ${issueData.title}`);
+          log(`[SAMPLE] ⏭️  Issue exists: ${issueData.title}`);
           continue;
         }
 
@@ -586,7 +602,7 @@ async function createSampleIssues(
           }
 
           // Skip gracefully for sample data users (these are from the JSON and may not exist)
-          console.log(
+          log(
             `[SAMPLE] ⏭️  Sample user '${issueData.reporterEmail}' not found, skipping issue "${issueData.title}"`,
           );
           skippedCount++;
@@ -618,8 +634,8 @@ async function createSampleIssues(
     // Batch create all issues
     if (issuesToCreate.length > 0) {
       try {
-        await db.insert(issues).values(issuesToCreate);
-        console.log(
+        await dbInstance.insert(issues).values(issuesToCreate);
+        log(
           `[SAMPLE] ✅ Created ${issuesToCreate.length.toString()} issues via batch insert`,
         );
       } catch (error) {
@@ -629,10 +645,10 @@ async function createSampleIssues(
         );
       }
     } else {
-      console.log(`[SAMPLE] ⏭️  No new issues to create`);
+      log(`[SAMPLE] ⏭️  No new issues to create`);
     }
 
-    console.log(
+    log(
       `[SAMPLE] ✅ Issue creation completed: ${issuesToCreate.length} created, ${skippedCount} skipped`,
     );
   } catch (error) {
@@ -650,11 +666,29 @@ export async function seedSampleData(
   dataAmount: DataAmount,
   skipAuthUsers = false,
 ): Promise<void> {
+  return await seedSampleDataWithDb(
+    db,
+    organizationId,
+    dataAmount,
+    skipAuthUsers,
+  );
+}
+
+/**
+ * Sample data seeding function that accepts a database instance
+ * This enables usage with PGlite for testing while maintaining production functionality
+ */
+export async function seedSampleDataWithDb(
+  dbInstance: typeof db,
+  organizationId: string,
+  dataAmount: DataAmount,
+  skipAuthUsers = false,
+): Promise<void> {
   const startTime = Date.now();
-  console.log(
+  log(
     `[SAMPLE] 🎮 Starting sample data seeding for organization ${organizationId}...`,
   );
-  console.log(
+  log(
     `[SAMPLE] Data amount: ${dataAmount.toUpperCase()} (${dataAmount === "minimal" ? "limited for CI/dev" : "full dataset for preview"})`,
   );
 
@@ -663,24 +697,27 @@ export async function seedSampleData(
     const uniqueGames = await extractUniqueGames(dataAmount);
 
     // Phase 2: Create OPDB models
-    await createModels(uniqueGames);
+    await createModelsWithDb(dbInstance, uniqueGames);
 
     // Phase 3: Create machines for all models
-    await createMachines(organizationId, uniqueGames);
+    await createMachinesWithDb(dbInstance, organizationId, uniqueGames);
 
     // Phase 4: Create sample issues mapped to machines
-    await createSampleIssues(organizationId, dataAmount, skipAuthUsers);
+    await createSampleIssuesWithDb(
+      dbInstance,
+      organizationId,
+      dataAmount,
+      skipAuthUsers,
+    );
 
     const duration = Date.now() - startTime;
-    console.log(
+    log(
       `[SAMPLE] ✅ Sample data seeding completed successfully in ${duration}ms!`,
     );
-    console.log(`[SAMPLE] 📊 Summary:`);
-    console.log(`[SAMPLE]   - Games: ${uniqueGames.length} unique OPDB models`);
-    console.log(
-      `[SAMPLE]   - Machines: ${uniqueGames.length} machines created`,
-    );
-    console.log(
+    log(`[SAMPLE] 📊 Summary:`);
+    log(`[SAMPLE]   - Games: ${uniqueGames.length} unique OPDB models`);
+    log(`[SAMPLE]   - Machines: ${uniqueGames.length} machines created`);
+    log(
       `[SAMPLE]   - Issues: ${dataAmount === "minimal" ? "Limited" : "Rich"} sample data from curated JSON`,
     );
   } catch (error) {
