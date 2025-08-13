@@ -8,6 +8,12 @@
 import { eq, and } from "drizzle-orm";
 import { nanoid } from "nanoid";
 
+// Quiet mode for tests
+const isTestMode = process.env.NODE_ENV === "test" || process.env.VITEST;
+const log = (...args: unknown[]) => {
+  if (!isTestMode) console.log(...args);
+};
+
 import { createDrizzleClient } from "~/server/db/drizzle";
 import {
   organizations,
@@ -36,11 +42,13 @@ export interface Organization {
 }
 
 /**
- * Create global permissions using the constants with batch operations
+ * Create global permissions with provided database instance
  */
-async function createGlobalPermissions(): Promise<void> {
+async function createGlobalPermissionsWithDb(
+  dbInstance: typeof db,
+): Promise<void> {
   // Get all existing permissions in one query
-  const existingPermissions = await db
+  const existingPermissions = await dbInstance
     .select({ name: permissions.name })
     .from(permissions);
 
@@ -58,8 +66,8 @@ async function createGlobalPermissions(): Promise<void> {
   // Batch create all missing permissions
   if (permissionsToCreate.length > 0) {
     try {
-      await db.insert(permissions).values(permissionsToCreate);
-      console.log(
+      await dbInstance.insert(permissions).values(permissionsToCreate);
+      log(
         `[INFRASTRUCTURE] Created ${permissionsToCreate.length.toString()} new permissions via batch insert`,
       );
     } catch (error) {
@@ -72,7 +80,7 @@ async function createGlobalPermissions(): Promise<void> {
       );
     }
   } else {
-    console.log(
+    log(
       `[INFRASTRUCTURE] All ${ALL_PERMISSIONS.length.toString()} permissions already exist`,
     );
   }
@@ -81,13 +89,20 @@ async function createGlobalPermissions(): Promise<void> {
 /**
  * Create organization with automatic default roles
  */
-async function createOrganizationWithRoles(orgData: {
-  name: string;
-  subdomain: string;
-  logoUrl?: string;
-}): Promise<Organization> {
+
+/**
+ * Create organization with automatic default roles using provided database instance
+ */
+async function createOrganizationWithRolesWithDb(
+  dbInstance: typeof db,
+  orgData: {
+    name: string;
+    subdomain: string;
+    logoUrl?: string;
+  },
+): Promise<Organization> {
   // Check if organization exists
-  const existing = await db
+  const existing = await dbInstance
     .select()
     .from(organizations)
     .where(eq(organizations.subdomain, orgData.subdomain))
@@ -96,7 +111,7 @@ async function createOrganizationWithRoles(orgData: {
   let organization;
   if (existing.length > 0) {
     // Update existing organization
-    const updated = await db
+    const updated = await dbInstance
       .update(organizations)
       .set({
         name: orgData.name,
@@ -112,7 +127,7 @@ async function createOrganizationWithRoles(orgData: {
       })();
   } else {
     // Create new organization
-    const created = await db
+    const created = await dbInstance
       .insert(organizations)
       .values({
         id: nanoid(),
@@ -131,14 +146,14 @@ async function createOrganizationWithRoles(orgData: {
   }
 
   // Create system roles directly with Drizzle
-  await createSystemRoles(organization.id);
-  console.log(
+  await createSystemRolesWithDb(dbInstance, organization.id);
+  log(
     `[INFRASTRUCTURE] Created system roles for organization: ${organization.name}`,
   );
 
   // Create default Member role from template
-  await createTemplateRole(organization.id, "MEMBER");
-  console.log(
+  await createTemplateRoleWithDb(dbInstance, organization.id, "MEMBER");
+  log(
     `[INFRASTRUCTURE] Created Member role template for organization: ${organization.name}`,
   );
 
@@ -152,7 +167,14 @@ async function createOrganizationWithRoles(orgData: {
 /**
  * Create default priorities for organization with batch operations
  */
-async function createDefaultPriorities(organizationId: string): Promise<void> {
+
+/**
+ * Create default priorities with provided database instance
+ */
+async function createDefaultPrioritiesWithDb(
+  dbInstance: typeof db,
+  organizationId: string,
+): Promise<void> {
   const priorityData = [
     { name: "Low", order: 1 },
     { name: "Medium", order: 2 },
@@ -161,7 +183,7 @@ async function createDefaultPriorities(organizationId: string): Promise<void> {
   ];
 
   // Get existing priorities for this organization
-  const existingPriorities = await db
+  const existingPriorities = await dbInstance
     .select({ name: priorities.name })
     .from(priorities)
     .where(eq(priorities.organizationId, organizationId));
@@ -182,8 +204,8 @@ async function createDefaultPriorities(organizationId: string): Promise<void> {
   // Batch create all missing priorities
   if (prioritiesToCreate.length > 0) {
     try {
-      await db.insert(priorities).values(prioritiesToCreate);
-      console.log(
+      await dbInstance.insert(priorities).values(prioritiesToCreate);
+      log(
         `[INFRASTRUCTURE] Created ${prioritiesToCreate.length.toString()} new priorities via batch insert`,
       );
     } catch (error) {
@@ -196,16 +218,17 @@ async function createDefaultPriorities(organizationId: string): Promise<void> {
       );
     }
   } else {
-    console.log(
+    log(
       `[INFRASTRUCTURE] All ${priorityData.length.toString()} default priorities already exist`,
     );
   }
 }
 
 /**
- * Create default collection types for an organization with batch operations
+ * Create default collection types with provided database instance
  */
-async function createDefaultCollectionTypes(
+async function createDefaultCollectionTypesWithDb(
+  dbInstance: typeof db,
   organizationId: string,
 ): Promise<void> {
   const defaultCollectionTypes = [
@@ -236,7 +259,7 @@ async function createDefaultCollectionTypes(
   ];
 
   // Get existing collection types for this organization
-  const existingTypes = await db
+  const existingTypes = await dbInstance
     .select({ name: collectionTypes.name })
     .from(collectionTypes)
     .where(eq(collectionTypes.organizationId, organizationId));
@@ -269,8 +292,8 @@ async function createDefaultCollectionTypes(
         sourceField: typeData.sourceField,
       }));
 
-      await db.insert(collectionTypes).values(createValues);
-      console.log(
+      await dbInstance.insert(collectionTypes).values(createValues);
+      log(
         `[INFRASTRUCTURE] Created ${typesToCreate.length.toString()} new collection types via batch insert`,
       );
     } catch (error) {
@@ -287,7 +310,7 @@ async function createDefaultCollectionTypes(
   // Update existing collection types (cannot easily batch updates with different WHERE clauses)
   for (const typeData of typesToUpdate) {
     try {
-      await db
+      await dbInstance
         .update(collectionTypes)
         .set({
           displayName: typeData.displayName,
@@ -302,7 +325,7 @@ async function createDefaultCollectionTypes(
             eq(collectionTypes.organizationId, organizationId),
           ),
         );
-      console.log(`[INFRASTRUCTURE] Updated collection type: ${typeData.name}`);
+      log(`[INFRASTRUCTURE] Updated collection type: ${typeData.name}`);
     } catch (error) {
       console.error(
         `[INFRASTRUCTURE] ❌ Failed to update collection type ${typeData.name}:`,
@@ -315,7 +338,7 @@ async function createDefaultCollectionTypes(
   }
 
   if (typesToCreate.length === 0 && typesToUpdate.length === 0) {
-    console.log(
+    log(
       `[INFRASTRUCTURE] All collection types already exist and are up to date`,
     );
   }
@@ -324,7 +347,14 @@ async function createDefaultCollectionTypes(
 /**
  * Create default issue statuses for organization with batch operations
  */
-async function createDefaultStatuses(organizationId: string): Promise<void> {
+
+/**
+ * Create default issue statuses with provided database instance
+ */
+async function createDefaultStatusesWithDb(
+  dbInstance: typeof db,
+  organizationId: string,
+): Promise<void> {
   const statusesToUpsert = [
     { name: "New", category: "NEW" as const },
     { name: "In Progress", category: "IN_PROGRESS" as const },
@@ -336,7 +366,7 @@ async function createDefaultStatuses(organizationId: string): Promise<void> {
   ];
 
   // Get existing issue statuses for this organization
-  const existingStatuses = await db
+  const existingStatuses = await dbInstance
     .select({ name: issueStatuses.name })
     .from(issueStatuses)
     .where(eq(issueStatuses.organizationId, organizationId));
@@ -366,8 +396,8 @@ async function createDefaultStatuses(organizationId: string): Promise<void> {
         isDefault: true,
       }));
 
-      await db.insert(issueStatuses).values(createValues);
-      console.log(
+      await dbInstance.insert(issueStatuses).values(createValues);
+      log(
         `[INFRASTRUCTURE] Created ${statusesToCreate.length.toString()} new issue statuses via batch insert`,
       );
     } catch (error) {
@@ -384,7 +414,7 @@ async function createDefaultStatuses(organizationId: string): Promise<void> {
   // Update existing issue statuses (cannot easily batch updates with different WHERE clauses)
   for (const statusData of statusesToUpdate) {
     try {
-      await db
+      await dbInstance
         .update(issueStatuses)
         .set({ category: statusData.category })
         .where(
@@ -393,7 +423,7 @@ async function createDefaultStatuses(organizationId: string): Promise<void> {
             eq(issueStatuses.organizationId, organizationId),
           ),
         );
-      console.log(`[INFRASTRUCTURE] Updated issue status: ${statusData.name}`);
+      log(`[INFRASTRUCTURE] Updated issue status: ${statusData.name}`);
     } catch (error) {
       console.error(
         `[INFRASTRUCTURE] ❌ Failed to update issue status ${statusData.name}:`,
@@ -406,18 +436,23 @@ async function createDefaultStatuses(organizationId: string): Promise<void> {
   }
 
   if (statusesToCreate.length === 0 && statusesToUpdate.length === 0) {
-    console.log(
-      `[INFRASTRUCTURE] All issue statuses already exist and are up to date`,
-    );
+    log(`[INFRASTRUCTURE] All issue statuses already exist and are up to date`);
   }
 }
 
 /**
  * Create system roles for an organization
  */
-async function createSystemRoles(organizationId: string): Promise<void> {
+
+/**
+ * Create system roles with provided database instance
+ */
+async function createSystemRolesWithDb(
+  dbInstance: typeof db,
+  organizationId: string,
+): Promise<void> {
   // Create Admin role
-  const existingAdmin = await db
+  const existingAdmin = await dbInstance
     .select()
     .from(roles)
     .where(
@@ -431,7 +466,7 @@ async function createSystemRoles(organizationId: string): Promise<void> {
   let adminRole;
   if (existingAdmin.length > 0) {
     // Update existing admin role
-    const updated = await db
+    const updated = await dbInstance
       .update(roles)
       .set({
         isSystem: true,
@@ -452,7 +487,7 @@ async function createSystemRoles(organizationId: string): Promise<void> {
       })();
   } else {
     // Create new admin role
-    const created = await db
+    const created = await dbInstance
       .insert(roles)
       .values({
         id: nanoid(),
@@ -472,12 +507,12 @@ async function createSystemRoles(organizationId: string): Promise<void> {
   }
 
   // Assign all permissions to admin role with batch operations
-  const allPermissions = await db
+  const allPermissions = await dbInstance
     .select({ id: permissions.id })
     .from(permissions);
 
   // Clear existing permissions first
-  await db
+  await dbInstance
     .delete(rolePermissions)
     .where(eq(rolePermissions.roleId, adminRole.id));
 
@@ -489,8 +524,8 @@ async function createSystemRoles(organizationId: string): Promise<void> {
         permissionId: permission.id,
       }));
 
-      await db.insert(rolePermissions).values(rolePermissionValues);
-      console.log(
+      await dbInstance.insert(rolePermissions).values(rolePermissionValues);
+      log(
         `[INFRASTRUCTURE] Assigned ${allPermissions.length.toString()} permissions to Admin role via batch insert`,
       );
     } catch (error) {
@@ -505,7 +540,7 @@ async function createSystemRoles(organizationId: string): Promise<void> {
   }
 
   // Create Unauthenticated role
-  const existingUnauth = await db
+  const existingUnauth = await dbInstance
     .select()
     .from(roles)
     .where(
@@ -519,7 +554,7 @@ async function createSystemRoles(organizationId: string): Promise<void> {
   let unauthRole;
   if (existingUnauth.length > 0) {
     // Update existing unauthenticated role
-    const updated = await db
+    const updated = await dbInstance
       .update(roles)
       .set({
         isSystem: true,
@@ -540,7 +575,7 @@ async function createSystemRoles(organizationId: string): Promise<void> {
       })();
   } else {
     // Create new unauthenticated role
-    const created = await db
+    const created = await dbInstance
       .insert(roles)
       .values({
         id: nanoid(),
@@ -560,7 +595,7 @@ async function createSystemRoles(organizationId: string): Promise<void> {
   }
 
   // Assign unauthenticated permissions with batch operations
-  const unauthPermissions = await db
+  const unauthPermissions = await dbInstance
     .select({ id: permissions.id })
     .from(permissions)
     .where(
@@ -568,7 +603,7 @@ async function createSystemRoles(organizationId: string): Promise<void> {
     );
 
   // Clear existing permissions first
-  await db
+  await dbInstance
     .delete(rolePermissions)
     .where(eq(rolePermissions.roleId, unauthRole.id));
 
@@ -582,8 +617,10 @@ async function createSystemRoles(organizationId: string): Promise<void> {
         }),
       );
 
-      await db.insert(rolePermissions).values(unauthRolePermissionValues);
-      console.log(
+      await dbInstance
+        .insert(rolePermissions)
+        .values(unauthRolePermissionValues);
+      log(
         `[INFRASTRUCTURE] Assigned ${unauthPermissions.length.toString()} permissions to Unauthenticated role via batch insert`,
       );
     } catch (error) {
@@ -599,16 +636,17 @@ async function createSystemRoles(organizationId: string): Promise<void> {
 }
 
 /**
- * Create a role from a template
+ * Create a role from a template with provided database instance
  */
-async function createTemplateRole(
+async function createTemplateRoleWithDb(
+  dbInstance: typeof db,
   organizationId: string,
   templateName: keyof typeof ROLE_TEMPLATES,
 ): Promise<void> {
   const template = ROLE_TEMPLATES[templateName];
 
   // Check if role exists
-  const existing = await db
+  const existing = await dbInstance
     .select()
     .from(roles)
     .where(
@@ -622,7 +660,7 @@ async function createTemplateRole(
   let role;
   if (existing.length > 0) {
     // Update existing role
-    const updated = await db
+    const updated = await dbInstance
       .update(roles)
       .set({
         isSystem: false,
@@ -643,7 +681,7 @@ async function createTemplateRole(
       })();
   } else {
     // Create new role
-    const created = await db
+    const created = await dbInstance
       .insert(roles)
       .values({
         id: nanoid(),
@@ -663,13 +701,15 @@ async function createTemplateRole(
   }
 
   // Get template permissions with batch operations
-  const templatePermissions = await db
+  const templatePermissions = await dbInstance
     .select({ id: permissions.id })
     .from(permissions)
     .where(eq(permissions.name, template.permissions[0] ?? ""));
 
   // Clear existing permissions first
-  await db.delete(rolePermissions).where(eq(rolePermissions.roleId, role.id));
+  await dbInstance
+    .delete(rolePermissions)
+    .where(eq(rolePermissions.roleId, role.id));
 
   // Add template permissions in batch (simplified - in real implementation would expand dependencies)
   if (templatePermissions.length > 0) {
@@ -681,8 +721,10 @@ async function createTemplateRole(
         }),
       );
 
-      await db.insert(rolePermissions).values(templateRolePermissionValues);
-      console.log(
+      await dbInstance
+        .insert(rolePermissions)
+        .values(templateRolePermissionValues);
+      log(
         `[INFRASTRUCTURE] Assigned ${templatePermissions.length.toString()} permissions to ${template.name} role via batch insert`,
       );
     } catch (error) {
@@ -700,9 +742,16 @@ async function createTemplateRole(
 /**
  * Create default location for organization
  */
-async function createDefaultLocation(organizationId: string): Promise<void> {
+
+/**
+ * Create default location with provided database instance
+ */
+async function createDefaultLocationWithDb(
+  dbInstance: typeof db,
+  organizationId: string,
+): Promise<void> {
   // Check if location exists
-  const existing = await db
+  const existing = await dbInstance
     .select()
     .from(locations)
     .where(
@@ -715,7 +764,7 @@ async function createDefaultLocation(organizationId: string): Promise<void> {
 
   if (existing.length === 0) {
     // Create new location
-    await db.insert(locations).values({
+    await dbInstance.insert(locations).values({
       id: nanoid(),
       name: "Austin Pinball Collective",
       street: "8777 Research Blvd",
@@ -724,11 +773,9 @@ async function createDefaultLocation(organizationId: string): Promise<void> {
       zip: "78758",
       organizationId,
     });
-    console.log(
-      "[INFRASTRUCTURE] Created default location: Austin Pinball Collective",
-    );
+    log("[INFRASTRUCTURE] Created default location: Austin Pinball Collective");
   } else {
-    console.log(
+    log(
       "[INFRASTRUCTURE] Default location already exists: Austin Pinball Collective",
     );
   }
@@ -738,32 +785,42 @@ async function createDefaultLocation(organizationId: string): Promise<void> {
  * Main infrastructure seeding function
  */
 export async function seedInfrastructure(): Promise<Organization> {
+  return await seedInfrastructureWithDb(db);
+}
+
+/**
+ * Infrastructure seeding function that accepts a database instance
+ * This enables usage with PGlite for testing while maintaining production functionality
+ */
+export async function seedInfrastructureWithDb(
+  dbInstance: typeof db,
+): Promise<Organization> {
   const startTime = Date.now();
-  console.log("[INFRASTRUCTURE] Creating organizations, permissions, roles...");
+  log("[INFRASTRUCTURE] Creating organizations, permissions, roles...");
 
   // 1. Create global permissions first
-  await createGlobalPermissions();
+  await createGlobalPermissionsWithDb(dbInstance);
 
   // 2. Create organization with roles
-  const organization = await createOrganizationWithRoles({
+  const organization = await createOrganizationWithRolesWithDb(dbInstance, {
     name: "Austin Pinball Collective",
     subdomain: "apc",
     logoUrl:
       "/supabase/storage/pinpoint-storage-main/austinpinballcollective-logo-outline.png",
   });
-  console.log(`[INFRASTRUCTURE] Created organization: ${organization.name}`);
+  log(`[INFRASTRUCTURE] Created organization: ${organization.name}`);
 
   // 3-6. Create organization-specific data in parallel (safe - no interdependencies)
-  console.log(`[INFRASTRUCTURE] Creating organization data...`);
+  log(`[INFRASTRUCTURE] Creating organization data...`);
   await Promise.all([
-    createDefaultPriorities(organization.id), // Independent - creates priority records only
-    createDefaultCollectionTypes(organization.id), // Independent - creates collection types only
-    createDefaultStatuses(organization.id), // Independent - creates status records only
-    createDefaultLocation(organization.id), // Independent - creates location record only
+    createDefaultPrioritiesWithDb(dbInstance, organization.id), // Independent - creates priority records only
+    createDefaultCollectionTypesWithDb(dbInstance, organization.id), // Independent - creates collection types only
+    createDefaultStatusesWithDb(dbInstance, organization.id), // Independent - creates status records only
+    createDefaultLocationWithDb(dbInstance, organization.id), // Independent - creates location record only
   ]);
 
   const duration = Date.now() - startTime;
-  console.log(
+  log(
     `[INFRASTRUCTURE] ✅ Infrastructure seeding complete for ${organization.name} in ${duration}ms`,
   );
 
