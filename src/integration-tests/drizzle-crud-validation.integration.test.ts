@@ -44,11 +44,12 @@ describe("Drizzle CRUD Operations (Integration)", () => {
 
   describe("INSERT Operations", () => {
     it("should insert a user successfully", async () => {
+      const userEmail = `drizzle-test-${Date.now()}@example.com`;
       const [user] = await db
         .insert(schema.users)
         .values({
           id: testUserId,
-          email: "drizzle-test@example.com",
+          email: userEmail,
           name: "Drizzle Test User",
           notificationFrequency: "IMMEDIATE",
         })
@@ -56,7 +57,7 @@ describe("Drizzle CRUD Operations (Integration)", () => {
 
       expect(user).toBeDefined();
       expect(user?.id).toBe(testUserId);
-      expect(user?.email).toBe("drizzle-test@example.com");
+      expect(user?.email).toBe(userEmail);
       expect(user?.name).toBe("Drizzle Test User");
     });
 
@@ -163,11 +164,14 @@ describe("Drizzle CRUD Operations (Integration)", () => {
   });
 
   describe("SELECT Operations", () => {
+    let selectTestEmail: string;
+
     beforeEach(async () => {
       // Setup test data
+      selectTestEmail = `select-test-${Date.now()}@example.com`;
       await db.insert(schema.users).values({
         id: testUserId,
-        email: "select-test@example.com",
+        email: selectTestEmail,
         name: "Select Test User",
       });
 
@@ -190,11 +194,11 @@ describe("Drizzle CRUD Operations (Integration)", () => {
       const users = await db
         .select()
         .from(schema.users)
-        .where(eq(schema.users.email, "select-test@example.com"));
+        .where(eq(schema.users.email, selectTestEmail));
 
       expect(users).toHaveLength(1);
       expect(users[0]?.id).toBe(testUserId);
-      expect(users[0]?.email).toBe("select-test@example.com");
+      expect(users[0]?.email).toBe(selectTestEmail);
     });
 
     it("should perform complex join query", async () => {
@@ -259,10 +263,13 @@ describe("Drizzle CRUD Operations (Integration)", () => {
   });
 
   describe("UPDATE Operations", () => {
+    let updateTestEmail: string;
+
     beforeEach(async () => {
+      updateTestEmail = `update-test-${Date.now()}@example.com`;
       await db.insert(schema.users).values({
         id: testUserId,
-        email: "update-test@example.com",
+        email: updateTestEmail,
         name: "Update Test User",
         notificationFrequency: "IMMEDIATE",
       });
@@ -287,7 +294,7 @@ describe("Drizzle CRUD Operations (Integration)", () => {
       expect(updatedUser).toBeDefined();
       expect(updatedUser?.name).toBe("Updated User Name");
       expect(updatedUser?.notificationFrequency).toBe("DAILY");
-      expect(updatedUser?.email).toBe("update-test@example.com"); // Unchanged
+      expect(updatedUser?.email).toBe(updateTestEmail); // Unchanged
     });
 
     it("should update with conditional logic", async () => {
@@ -465,7 +472,7 @@ describe("Drizzle CRUD Operations (Integration)", () => {
         await db.transaction(async (tx) => {
           await tx.insert(schema.users).values({
             id: txUserId,
-            email: "rollback-test@example.com",
+            email: `rollback-test-${Date.now()}@example.com`,
             name: "Rollback Test User",
           });
 
@@ -501,7 +508,7 @@ describe("Drizzle CRUD Operations (Integration)", () => {
         await db.transaction(async (tx) => {
           await tx.insert(schema.users).values({
             id: txUserId,
-            email: "constraint-test@example.com",
+            email: `constraint-test-${Date.now()}@example.com`,
             name: "Constraint Test User",
           });
 
