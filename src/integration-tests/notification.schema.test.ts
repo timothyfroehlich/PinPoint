@@ -1,150 +1,150 @@
-import { PrismaClient, NotificationType } from "@prisma/client";
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { eq } from "drizzle-orm";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+
+import { users, notifications } from "~/server/db/schema";
+import {
+  createTestDatabase,
+  type TestDatabase,
+  cleanupTestDatabase,
+} from "~/test/helpers/pglite-test-setup";
+
+// Helper to generate unique IDs for tests that need multiple entities
+function generateTestId(prefix: string): string {
+  return `${prefix}-${Date.now()}`;
+}
 
 describe("Notification schema integration", () => {
-  let prisma: PrismaClient;
+  let db: TestDatabase;
   let userId: string;
-  const createdUserIds: string[] = []; // Track users created by this test
 
-  beforeAll(async () => {
-    // Ensure database is available for integration tests
-    if (!process.env.DATABASE_URL) {
-      throw new Error(
-        "DATABASE_URL is required for integration tests. Ensure Supabase is running.",
-      );
-    }
+  beforeEach(async () => {
+    // Create fresh PGlite database with real schema
+    db = await createTestDatabase();
 
-    // Reject test/mock URLs - integration tests need real database
-    if (
-      process.env.DATABASE_URL.includes("test://") ||
-      process.env.DATABASE_URL.includes("postgresql://test:test@")
-    ) {
-      throw new Error(
-        "Integration tests require a real database URL, not a test/mock URL. Check .env.test configuration.",
-      );
-    }
+    // Create test user for notifications
+    const [user] = await db
+      .insert(users)
+      .values({
+        id: generateTestId("test-user"),
+        email: "schematest@example.com",
+        name: "Schema Test",
+      })
+      .returning();
 
-    prisma = new PrismaClient();
-    try {
-      await prisma.$connect();
-      const user = await prisma.user.create({
-        data: { email: "schematest@example.com", name: "Schema Test" },
-      });
-      userId = user.id;
-      createdUserIds.push(user.id); // Track this user for cleanup
-    } catch (error) {
-      throw new Error(
-        `Failed to connect to database for integration tests: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
+    userId = user.id;
   });
 
-  afterAll(async () => {
-    if (!prisma) return;
-    try {
-      // Delete only notifications created by our test users
-      await prisma.notification.deleteMany({
-        where: { userId: { in: createdUserIds } },
-      });
-      // Delete only users created by this test, not ALL users
-      await prisma.user.deleteMany({
-        where: { id: { in: createdUserIds } },
-      });
-      await prisma.$disconnect();
-    } catch {
-      // Ignore cleanup errors in test environment
-    }
+  afterEach(async () => {
+    await cleanupTestDatabase(db);
   });
 
   it("enforces required fields and foreign keys", async () => {
-    // userId is required
+    // userId is required - should fail when missing
     await expect(
-      prisma.notification.create({
-        data: {
-          type: NotificationType.ISSUE_CREATED,
-          message: "Missing userId",
-        } as Parameters<typeof prisma.notification.create>[0]["data"],
-      }),
+      db.insert(notifications).values({
+        id: generateTestId("notification"),
+        type: "ISSUE_CREATED",
+        message: "Missing userId",
+        // userId intentionally omitted
+      } as any),
     ).rejects.toThrow();
+
     // valid notification
-    const notification = await prisma.notification.create({
-      data: {
+    const [notification] = await db
+      .insert(notifications)
+      .values({
+        id: generateTestId("notification"),
         userId,
-        type: NotificationType.ISSUE_CREATED,
+        type: "ISSUE_CREATED",
         message: "Valid notification",
-      },
-    });
+      })
+      .returning();
+
     expect(notification.userId).toBe(userId);
   });
 
   it("validates enums", async () => {
     await expect(
-      prisma.notification.create({
-        data: {
-          userId,
-          type: "INVALID_TYPE" as NotificationType,
-          message: "Invalid enum",
-        },
+      db.insert(notifications).values({
+        id: generateTestId("notification"),
+        userId,
+        type: "INVALID_TYPE" as any,
+        message: "Invalid enum",
       }),
     ).rejects.toThrow();
   });
 
   it("cascades on user delete", async () => {
     // Create a separate user for this test to avoid affecting other tests
-    const testUser = await prisma.user.create({
-      data: { email: "cascade-test@example.com", name: "Cascade Test User" },
-    });
-    createdUserIds.push(testUser.id); // Track this user for cleanup
+    const [testUser] = await db
+      .insert(users)
+      .values({
+        id: generateTestId("cascade-user"),
+        email: "cascade-test@example.com",
+        name: "Cascade Test User",
+      })
+      .returning();
 
     // Create notification for test user
-    const notification = await prisma.notification.create({
-      data: {
+    const [notification] = await db
+      .insert(notifications)
+      .values({
+        id: generateTestId("notification"),
         userId: testUser.id,
-        type: NotificationType.ISSUE_CREATED,
+        type: "ISSUE_CREATED",
         message: "Cascade delete test",
-      },
-    });
+      })
+      .returning();
 
     // Delete notification first, then test user
     // (In a real scenario, cascade would handle this, but we'll test the constraint)
-    await prisma.notification.delete({ where: { id: notification.id } });
-    await prisma.user.delete({ where: { id: testUser.id } });
+    await db.delete(notifications).where(eq(notifications.id, notification.id));
+    await db.delete(users).where(eq(users.id, testUser.id));
 
     // Verify both are deleted
-    const foundNotification = await prisma.notification.findUnique({
-      where: { id: notification.id },
+    const foundNotification = await db.query.notifications.findFirst({
+      where: eq(notifications.id, notification.id),
     });
-    const foundUser = await prisma.user.findUnique({
-      where: { id: testUser.id },
+    const foundUser = await db.query.users.findFirst({
+      where: eq(users.id, testUser.id),
     });
 
-    expect(foundNotification).toBeNull();
-    expect(foundUser).toBeNull();
+    expect(foundNotification).toBeUndefined();
+    expect(foundUser).toBeUndefined();
   });
 
   it("sets default values", async () => {
-    const user = await prisma.user.create({
-      data: { email: "schematest2@example.com", name: "Schema Test 2" },
-    });
-    createdUserIds.push(user.id); // Track this user for cleanup
-    const notification = await prisma.notification.create({
-      data: {
+    const [user] = await db
+      .insert(users)
+      .values({
+        id: generateTestId("default-test-user"),
+        email: "schematest2@example.com",
+        name: "Schema Test 2",
+      })
+      .returning();
+
+    const [notification] = await db
+      .insert(notifications)
+      .values({
+        id: generateTestId("notification"),
         userId: user.id,
-        type: NotificationType.ISSUE_CREATED,
+        type: "ISSUE_CREATED",
         message: "Default value test",
-      },
-    });
+      })
+      .returning();
+
     expect(notification.read).toBe(false);
     expect(notification.createdAt).toBeInstanceOf(Date);
   });
 
   it("creates indexes for performance", async () => {
-    // This test is a placeholder: index usage is not directly testable in Prisma
+    // This test is a placeholder: index usage is not directly testable in Drizzle
     // but we can check that queries by indexed fields work
-    const notifications = await prisma.notification.findMany({
-      where: { userId, read: false },
-      orderBy: { createdAt: "desc" },
+    const notificationsList = await db.query.notifications.findMany({
+      where: (notifications, { eq, and }) =>
+        and(eq(notifications.userId, userId), eq(notifications.read, false)),
+      orderBy: (notifications, { desc }) => [desc(notifications.createdAt)],
     });
-    expect(Array.isArray(notifications)).toBe(true);
+    expect(Array.isArray(notificationsList)).toBe(true);
   });
 });

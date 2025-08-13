@@ -39,7 +39,10 @@ type DataAmount = "minimal" | "full";
  * This prevents the race condition where sample issues are created before
  * auth users appear in the users table via database triggers
  */
-async function waitForAuthUserSync(requiredEmails: string[]): Promise<void> {
+async function waitForAuthUserSync(
+  dbInstance: typeof db,
+  requiredEmails: string[],
+): Promise<void> {
   const MAX_ATTEMPTS = 10;
   const INITIAL_DELAY_MS = 1000; // Start with 1 second
   const MAX_DELAY_MS = 8000; // Cap at 8 seconds
@@ -50,8 +53,8 @@ async function waitForAuthUserSync(requiredEmails: string[]): Promise<void> {
   log(`[SAMPLE] Required users: ${requiredEmails.join(", ")}`);
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    // Query for users in database
-    const foundUsers = await db
+    // Query for users in database using passed dbInstance
+    const foundUsers = await dbInstance
       .select({ id: users.id, email: users.email })
       .from(users)
       .where(inArray(users.email, requiredEmails));
@@ -499,7 +502,7 @@ async function createSampleIssuesWithDb(
         "member@dev.local",
         "player@dev.local",
       ];
-      await waitForAuthUserSync(requiredDevUsers);
+      await waitForAuthUserSync(dbInstance, requiredDevUsers);
     } else {
       log(
         "[SAMPLE] ⏭️  Skipping auth user synchronization (PostgreSQL-only mode)",
