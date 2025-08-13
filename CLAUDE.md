@@ -106,3 +106,5 @@ Core patterns and workflows:
 @docs/migration/supabase-drizzle/quick-reference/prisma-to-drizzle.md
 @docs/migration/supabase-drizzle/quick-reference/nextauth-to-supabase.md
 @docs/migration/supabase-drizzle/direct-conversion-plan.md
+
+- Don't commit or push with --no-verify unless explicitly told to
