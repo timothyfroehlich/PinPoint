@@ -387,14 +387,14 @@ export async function withTransaction<T>(
 ): Promise<T> {
   // Begin transaction
   await db.execute(sql`BEGIN`);
-  
+
   try {
     // Run the test
     const result = await testFn(db);
-    
+
     // Always rollback to maintain isolation
     await db.execute(sql`ROLLBACK`);
-    
+
     return result;
   } catch (error) {
     // Rollback on error
