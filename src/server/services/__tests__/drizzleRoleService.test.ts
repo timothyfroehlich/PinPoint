@@ -1,9 +1,9 @@
 /**
  * DrizzleRoleService Unit Tests
- * 
+ *
  * Tests for the DrizzleRoleService class covering error scenarios,
  * edge cases, and business logic not covered by integration tests.
- * 
+ *
  * Focus areas:
  * - Error handling (NOT_FOUND, FORBIDDEN, PRECONDITION_FAILED)
  * - Admin protection logic
@@ -12,20 +12,20 @@
  * - Role deletion constraints
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { TRPCError } from '@trpc/server';
-import { eq, and, ne } from 'drizzle-orm';
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { DrizzleRoleService } from '../drizzleRoleService';
-import { ROLE_TEMPLATES, SYSTEM_ROLES } from '../../auth/permissions.constants';
-import { generatePrefixedId } from '~/lib/utils/id-generation';
+import { DrizzleRoleService } from "~/server/services/drizzleRoleService";
+import {
+  ROLE_TEMPLATES,
+  SYSTEM_ROLES,
+} from "~/server/auth/permissions.constants";
 
 // Mock dependencies
-vi.mock('~/lib/utils/id-generation', () => ({
-  generatePrefixedId: vi.fn(() => 'test-role-123'),
+vi.mock("~/lib/utils/id-generation", () => ({
+  generatePrefixedId: vi.fn(() => "test-role-123"),
 }));
 
-vi.mock('../permissionService', () => ({
+vi.mock("../permissionService", () => ({
   PermissionService: vi.fn(() => ({
     getPermissions: vi.fn().mockResolvedValue([]),
   })),
@@ -65,10 +65,10 @@ const createMockDrizzleClient = () => ({
   })),
 });
 
-describe('DrizzleRoleService', () => {
+describe("DrizzleRoleService", () => {
   let service: DrizzleRoleService;
   let mockDrizzle: ReturnType<typeof createMockDrizzleClient>;
-  const testOrgId = 'org-123';
+  const testOrgId = "org-123";
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -76,62 +76,62 @@ describe('DrizzleRoleService', () => {
     service = new DrizzleRoleService(mockDrizzle as any, testOrgId);
   });
 
-  describe('deleteRole', () => {
-    it('should throw NOT_FOUND when role does not exist', async () => {
+  describe("deleteRole", () => {
+    it("should throw NOT_FOUND when role does not exist", async () => {
       mockDrizzle.query.roles.findFirst.mockResolvedValue(null);
 
-      await expect(service.deleteRole('nonexistent-role')).rejects.toThrow(
+      await expect(service.deleteRole("nonexistent-role")).rejects.toThrow(
         expect.objectContaining({
-          code: 'NOT_FOUND',
-          message: 'Role not found',
-        })
+          code: "NOT_FOUND",
+          message: "Role not found",
+        }),
       );
     });
 
-    it('should throw FORBIDDEN when trying to delete system role', async () => {
+    it("should throw FORBIDDEN when trying to delete system role", async () => {
       const systemRole = {
-        id: 'role-admin',
+        id: "role-admin",
         name: SYSTEM_ROLES.ADMIN,
         isSystem: true,
         memberships: [],
       };
-      
+
       mockDrizzle.query.roles.findFirst.mockResolvedValue(systemRole);
 
-      await expect(service.deleteRole('role-admin')).rejects.toThrow(
+      await expect(service.deleteRole("role-admin")).rejects.toThrow(
         expect.objectContaining({
-          code: 'FORBIDDEN',
-          message: 'System roles cannot be deleted',
-        })
+          code: "FORBIDDEN",
+          message: "System roles cannot be deleted",
+        }),
       );
     });
 
-    it('should throw PRECONDITION_FAILED when no default role available for reassignment', async () => {
+    it("should throw PRECONDITION_FAILED when no default role available for reassignment", async () => {
       const customRole = {
-        id: 'role-custom',
-        name: 'Custom Role',
+        id: "role-custom",
+        name: "Custom Role",
         isSystem: false,
-        memberships: [{ userId: 'user-123' }],
+        memberships: [{ userId: "user-123" }],
       };
-      
+
       mockDrizzle.query.roles.findFirst
         .mockResolvedValueOnce(customRole) // First call: find role to delete
         .mockResolvedValueOnce(null); // Second call: find default role
 
-      await expect(service.deleteRole('role-custom')).rejects.toThrow(
+      await expect(service.deleteRole("role-custom")).rejects.toThrow(
         expect.objectContaining({
-          code: 'PRECONDITION_FAILED',
-          message: 'No default role available for member reassignment',
-        })
+          code: "PRECONDITION_FAILED",
+          message: "No default role available for member reassignment",
+        }),
       );
     });
   });
 
-  describe('createTemplateRole', () => {
-    it('should create new role when template role does not exist', async () => {
-      const templateName = 'MANAGER' as keyof typeof ROLE_TEMPLATES;
+  describe("createTemplateRole", () => {
+    it("should create new role when template role does not exist", async () => {
+      const templateName = "MANAGER" as keyof typeof ROLE_TEMPLATES;
       const mockNewRole = {
-        id: 'test-role-123',
+        id: "test-role-123",
         name: ROLE_TEMPLATES.MANAGER.name,
         organizationId: testOrgId,
         isSystem: false,
@@ -140,7 +140,7 @@ describe('DrizzleRoleService', () => {
 
       // Role doesn't exist
       mockDrizzle.query.roles.findFirst.mockResolvedValue(null);
-      
+
       // Mock insert chain
       const mockReturning = vi.fn().mockResolvedValue([mockNewRole]);
       const mockValues = vi.fn().mockReturnValue({ returning: mockReturning });
@@ -155,7 +155,7 @@ describe('DrizzleRoleService', () => {
       expect(result).toEqual(mockNewRole);
       expect(mockDrizzle.insert).toHaveBeenCalled();
       expect(mockValues).toHaveBeenCalledWith({
-        id: 'test-role-123',
+        id: "test-role-123",
         name: ROLE_TEMPLATES.MANAGER.name,
         organizationId: testOrgId,
         isSystem: false,
@@ -163,10 +163,10 @@ describe('DrizzleRoleService', () => {
       });
     });
 
-    it('should update existing role when template role already exists', async () => {
-      const templateName = 'MANAGER' as keyof typeof ROLE_TEMPLATES;
+    it("should update existing role when template role already exists", async () => {
+      const templateName = "MANAGER" as keyof typeof ROLE_TEMPLATES;
       const existingRole = {
-        id: 'existing-role-123',
+        id: "existing-role-123",
         name: ROLE_TEMPLATES.MANAGER.name,
         organizationId: testOrgId,
         isSystem: true, // Will be updated to false
@@ -177,7 +177,7 @@ describe('DrizzleRoleService', () => {
 
       // Role exists
       mockDrizzle.query.roles.findFirst.mockResolvedValue(existingRole);
-      
+
       // Mock update chain
       const mockReturning = vi.fn().mockResolvedValue([updatedRole]);
       const mockWhere = vi.fn().mockReturnValue({ returning: mockReturning });
@@ -196,15 +196,15 @@ describe('DrizzleRoleService', () => {
         expect.objectContaining({
           isSystem: false,
           isDefault: true,
-        })
+        }),
       );
     });
 
-    it('should apply name override when provided', async () => {
-      const templateName = 'MANAGER' as keyof typeof ROLE_TEMPLATES;
-      const customName = 'Custom Manager Role';
+    it("should apply name override when provided", async () => {
+      const templateName = "MANAGER" as keyof typeof ROLE_TEMPLATES;
+      const customName = "Custom Manager Role";
       const mockNewRole = {
-        id: 'test-role-123',
+        id: "test-role-123",
         name: customName,
         organizationId: testOrgId,
         isSystem: false,
@@ -212,7 +212,7 @@ describe('DrizzleRoleService', () => {
       };
 
       mockDrizzle.query.roles.findFirst.mockResolvedValue(null);
-      
+
       const mockReturning = vi.fn().mockResolvedValue([mockNewRole]);
       const mockValues = vi.fn().mockReturnValue({ returning: mockReturning });
       mockDrizzle.insert.mockReturnValue({ values: mockValues });
@@ -230,41 +230,43 @@ describe('DrizzleRoleService', () => {
         expect.objectContaining({
           name: customName,
           isDefault: false,
-        })
+        }),
       );
     });
   });
 
-  describe('ensureAtLeastOneAdmin', () => {
-    it('should throw error when no admin users exist', async () => {
+  describe("ensureAtLeastOneAdmin", () => {
+    it("should throw error when no admin users exist", async () => {
       // No admin memberships found
       mockDrizzle.query.memberships.findMany.mockResolvedValue([]);
 
       await expect(service.ensureAtLeastOneAdmin()).rejects.toThrow(
         expect.objectContaining({
-          code: 'PRECONDITION_FAILED',
-          message: expect.stringContaining('At least one admin must remain'),
-        })
+          code: "PRECONDITION_FAILED",
+          message: expect.stringContaining("At least one admin must remain"),
+        }),
       );
     });
 
-    it('should pass when admin users exist', async () => {
+    it("should pass when admin users exist", async () => {
       const adminMemberships = [
         {
-          id: 'membership-123',
-          userId: 'user-admin',
+          id: "membership-123",
+          userId: "user-admin",
           role: { name: SYSTEM_ROLES.ADMIN },
         },
       ];
-      
-      mockDrizzle.query.memberships.findMany.mockResolvedValue(adminMemberships);
+
+      mockDrizzle.query.memberships.findMany.mockResolvedValue(
+        adminMemberships,
+      );
 
       await expect(service.ensureAtLeastOneAdmin()).resolves.not.toThrow();
     });
   });
 
-  describe('getDefaultRole', () => {
-    it('should return null when no default role exists', async () => {
+  describe("getDefaultRole", () => {
+    it("should return null when no default role exists", async () => {
       mockDrizzle.query.roles.findFirst.mockResolvedValue(null);
 
       const result = await service.getDefaultRole();
@@ -275,10 +277,10 @@ describe('DrizzleRoleService', () => {
       });
     });
 
-    it('should return default role when it exists', async () => {
+    it("should return default role when it exists", async () => {
       const defaultRole = {
-        id: 'role-default',
-        name: 'Default Role',
+        id: "role-default",
+        name: "Default Role",
         organizationId: testOrgId,
         isDefault: true,
       };
@@ -291,8 +293,8 @@ describe('DrizzleRoleService', () => {
     });
   });
 
-  describe('getAdminRole', () => {
-    it('should return null when admin role does not exist', async () => {
+  describe("getAdminRole", () => {
+    it("should return null when admin role does not exist", async () => {
       mockDrizzle.query.roles.findFirst.mockResolvedValue(null);
 
       const result = await service.getAdminRole();
@@ -300,9 +302,9 @@ describe('DrizzleRoleService', () => {
       expect(result).toBeNull();
     });
 
-    it('should return admin role when it exists', async () => {
+    it("should return admin role when it exists", async () => {
       const adminRole = {
-        id: 'role-admin',
+        id: "role-admin",
         name: SYSTEM_ROLES.ADMIN,
         organizationId: testOrgId,
         isSystem: true,
@@ -316,22 +318,23 @@ describe('DrizzleRoleService', () => {
     });
   });
 
-  describe('updateRole', () => {
-    it('should throw NOT_FOUND when role does not exist', async () => {
+  describe("updateRole", () => {
+    it("should throw NOT_FOUND when role does not exist", async () => {
       mockDrizzle.query.roles.findFirst.mockResolvedValue(null);
 
-      await expect(service.updateRole('nonexistent-role', { name: 'New Name' }))
-        .rejects.toThrow(
-          expect.objectContaining({
-            code: 'NOT_FOUND',
-            message: 'Role not found',
-          })
-        );
+      await expect(
+        service.updateRole("nonexistent-role", { name: "New Name" }),
+      ).rejects.toThrow(
+        expect.objectContaining({
+          code: "NOT_FOUND",
+          message: "Role not found",
+        }),
+      );
     });
 
-    it('should throw FORBIDDEN when trying to update system role', async () => {
+    it("should throw FORBIDDEN when trying to update system role", async () => {
       const systemRole = {
-        id: 'role-admin',
+        id: "role-admin",
         name: SYSTEM_ROLES.ADMIN,
         isSystem: true,
         organizationId: testOrgId,
@@ -339,13 +342,14 @@ describe('DrizzleRoleService', () => {
 
       mockDrizzle.query.roles.findFirst.mockResolvedValue(systemRole);
 
-      await expect(service.updateRole('role-admin', { name: 'New Admin' }))
-        .rejects.toThrow(
-          expect.objectContaining({
-            code: 'FORBIDDEN',
-            message: 'System roles cannot be modified',
-          })
-        );
+      await expect(
+        service.updateRole("role-admin", { name: "New Admin" }),
+      ).rejects.toThrow(
+        expect.objectContaining({
+          code: "FORBIDDEN",
+          message: "System roles cannot be modified",
+        }),
+      );
     });
   });
 });
