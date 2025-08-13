@@ -510,6 +510,7 @@ describe("Location Router (Drizzle Conversion)", () => {
         where: expect.any(Object), // and() clause with id and organization filters
         with: {
           machines: {
+            orderBy: expect.any(Array), // Machine ordering by ID
             with: {
               model: true,
               owner: {

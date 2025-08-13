@@ -84,7 +84,7 @@ export const locationRouter = createTRPCRouter({
         models.name,
         models.manufacturer,
       )
-      .orderBy(asc(locations.name));
+      .orderBy(asc(locations.name), asc(machines.id));
 
     // Transform flat result into nested structure
     interface LocationWithMachines {
@@ -188,6 +188,7 @@ export const locationRouter = createTRPCRouter({
         ),
         with: {
           machines: {
+            orderBy: [asc(machines.id)],
             with: {
               model: true,
               owner: {

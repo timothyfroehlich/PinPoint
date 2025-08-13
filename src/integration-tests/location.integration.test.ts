@@ -376,13 +376,13 @@ describe("Location Router Integration (PGlite)", () => {
       expect(secondLocation._count.machines).toBe(1);
 
       // Verify machine details with model relationships
-      // First machine should be Ultraman (first in sample data)
+      // First machine should be Xenon (ordered by machine ID)
       const firstMachine = testArcade.machines[0];
       expect(firstMachine).toMatchObject({
-        name: "Ultraman: Kaiju Rumble (Blood Sucker Edition) #1",
+        name: "Xenon #2",
         model: {
-          name: "Ultraman: Kaiju Rumble (Blood Sucker Edition)",
-          manufacturer: "Stern",
+          name: "Xenon",
+          manufacturer: "Bally",
         },
       });
 
@@ -534,8 +534,8 @@ describe("Location Router Integration (PGlite)", () => {
         throw new Error("Test arcade location not found in results");
 
       expect(testArcade._count.machines).toBe(7);
-      // Ultraman machine should have issues from seeded data only (not other org's issues)
-      expect(testArcade.machines[0]._count.issues).toBeGreaterThanOrEqual(2); // Should not include other org's issues
+      // Xenon machine should have issues from seeded data only (not other org's issues)
+      expect(testArcade.machines[0]._count.issues).toBeGreaterThanOrEqual(1); // Should not include other org's issues
     });
   });
 
@@ -623,13 +623,13 @@ describe("Location Router Integration (PGlite)", () => {
       expect(result.name).toContain("Austin");
 
       expect(result.machines).toHaveLength(7);
-      // First machine should be Ultraman (first in seeded data)
+      // First machine should be Xenon (ordered by machine ID)
       expect(result.machines[0]).toMatchObject({
-        name: "Ultraman: Kaiju Rumble (Blood Sucker Edition) #1",
+        name: "Xenon #2",
       });
       expect(result.machines[0].model).toMatchObject({
-        name: "Ultraman: Kaiju Rumble (Blood Sucker Edition)",
-        manufacturer: "Stern",
+        name: "Xenon",
+        manufacturer: "Bally",
       });
       expect(result.machines[0].owner).toMatchObject({
         id: testData.user,
