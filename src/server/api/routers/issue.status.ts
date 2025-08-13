@@ -51,7 +51,7 @@ export const issueStatusRouter = createTRPCRouter({
     for (const group of counts) {
       const category = statusMap.get(group.statusId);
       if (category && isValidStatusCategory(category)) {
-        categoryCounts[category] += Number(group.count);
+        categoryCounts[category] += group.count;
       }
     }
 
