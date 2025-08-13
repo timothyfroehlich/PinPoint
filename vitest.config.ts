@@ -113,15 +113,20 @@ export default defineConfig({
           globals: true,
           environment: "node",
           setupFiles: ["src/test/vitest.integration.setup.ts"],
+          hookTimeout: 300000, // 5 minutes for PGlite database setup/seeding
           typecheck: {
             tsconfig: "./tsconfig.tests.json",
           },
-          // Remove singleThread to restore proper test isolation
+          // Memory optimization: limit workers to reduce PGlite memory usage
           poolOptions: {
             threads: {
-              isolate: true,
+              maxThreads: 4, // Increased from 2 - memory optimization allows more workers
+              minThreads: 1, // Minimum 1 worker
+              isolate: true, // Maintain test isolation
             },
           },
+          // Enable memory monitoring to track optimization impact
+          logHeapUsage: true,
           include: ["src/integration-tests/**/*.test.{ts,tsx}"],
           exclude: [
             "node_modules",
