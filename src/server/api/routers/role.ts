@@ -127,10 +127,11 @@ export const roleRouter = createTRPCRouter({
       }
 
       const role = insertedRoles[0];
+      // This should never happen since we checked length above, but TypeScript requires the check
       if (!role) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: `Role creation returned empty result for "${input.name}"`,
+          message: `Role creation returned undefined result for "${input.name}" in organization ${ctx.organization.id}`,
         });
       }
 
@@ -415,10 +416,11 @@ export const roleRouter = createTRPCRouter({
       }
 
       const updatedMembership = updatedMemberships[0];
+      // This should never happen since we checked length above, but TypeScript requires the check
       if (!updatedMembership) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: `Membership update returned empty result for userId=${input.userId}`,
+          message: `Membership update returned undefined result for userId=${input.userId}, organizationId=${ctx.organization.id}`,
         });
       }
 
