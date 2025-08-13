@@ -14,11 +14,11 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { DrizzleRoleService } from "~/server/services/drizzleRoleService";
 import {
   ROLE_TEMPLATES,
   SYSTEM_ROLES,
 } from "~/server/auth/permissions.constants";
+import { DrizzleRoleService } from "~/server/services/drizzleRoleService";
 
 // Mock dependencies
 vi.mock("~/lib/utils/id-generation", () => ({
@@ -28,6 +28,9 @@ vi.mock("~/lib/utils/id-generation", () => ({
 vi.mock("../permissionService", () => ({
   PermissionService: vi.fn(() => ({
     getPermissions: vi.fn().mockResolvedValue([]),
+    expandPermissionsWithDependencies: vi
+      .fn()
+      .mockReturnValue(["permission:1", "permission:2"]),
   })),
 }));
 
@@ -129,10 +132,10 @@ describe("DrizzleRoleService", () => {
 
   describe("createTemplateRole", () => {
     it("should create new role when template role does not exist", async () => {
-      const templateName = "MANAGER" as keyof typeof ROLE_TEMPLATES;
+      const templateName = "MEMBER" as keyof typeof ROLE_TEMPLATES;
       const mockNewRole = {
         id: "test-role-123",
-        name: ROLE_TEMPLATES.MANAGER.name,
+        name: ROLE_TEMPLATES.MEMBER.name,
         organizationId: testOrgId,
         isSystem: false,
         isDefault: true,
@@ -156,7 +159,7 @@ describe("DrizzleRoleService", () => {
       expect(mockDrizzle.insert).toHaveBeenCalled();
       expect(mockValues).toHaveBeenCalledWith({
         id: "test-role-123",
-        name: ROLE_TEMPLATES.MANAGER.name,
+        name: ROLE_TEMPLATES.MEMBER.name,
         organizationId: testOrgId,
         isSystem: false,
         isDefault: true,
@@ -164,10 +167,10 @@ describe("DrizzleRoleService", () => {
     });
 
     it("should update existing role when template role already exists", async () => {
-      const templateName = "MANAGER" as keyof typeof ROLE_TEMPLATES;
+      const templateName = "MEMBER" as keyof typeof ROLE_TEMPLATES;
       const existingRole = {
         id: "existing-role-123",
-        name: ROLE_TEMPLATES.MANAGER.name,
+        name: ROLE_TEMPLATES.MEMBER.name,
         organizationId: testOrgId,
         isSystem: true, // Will be updated to false
         isDefault: false, // Will be updated to true
@@ -201,8 +204,8 @@ describe("DrizzleRoleService", () => {
     });
 
     it("should apply name override when provided", async () => {
-      const templateName = "MANAGER" as keyof typeof ROLE_TEMPLATES;
-      const customName = "Custom Manager Role";
+      const templateName = "MEMBER" as keyof typeof ROLE_TEMPLATES;
+      const customName = "Custom Member Role";
       const mockNewRole = {
         id: "test-role-123",
         name: customName,
@@ -237,29 +240,29 @@ describe("DrizzleRoleService", () => {
 
   describe("ensureAtLeastOneAdmin", () => {
     it("should throw error when no admin users exist", async () => {
-      // No admin memberships found
-      mockDrizzle.query.memberships.findMany.mockResolvedValue([]);
+      // Admin role exists but has no memberships
+      const adminRole = {
+        id: "role-admin",
+        name: SYSTEM_ROLES.ADMIN,
+        memberships: [], // No admin memberships
+      };
+      mockDrizzle.query.roles.findFirst.mockResolvedValue(adminRole);
 
       await expect(service.ensureAtLeastOneAdmin()).rejects.toThrow(
         expect.objectContaining({
           code: "PRECONDITION_FAILED",
-          message: expect.stringContaining("At least one admin must remain"),
+          message: "Organization must have at least one admin",
         }),
       );
     });
 
     it("should pass when admin users exist", async () => {
-      const adminMemberships = [
-        {
-          id: "membership-123",
-          userId: "user-admin",
-          role: { name: SYSTEM_ROLES.ADMIN },
-        },
-      ];
-
-      mockDrizzle.query.memberships.findMany.mockResolvedValue(
-        adminMemberships,
-      );
+      const adminRole = {
+        id: "role-admin",
+        name: SYSTEM_ROLES.ADMIN,
+        memberships: [{ id: "membership-123", userId: "user-admin" }], // Has admin members
+      };
+      mockDrizzle.query.roles.findFirst.mockResolvedValue(adminRole);
 
       await expect(service.ensureAtLeastOneAdmin()).resolves.not.toThrow();
     });
@@ -347,7 +350,7 @@ describe("DrizzleRoleService", () => {
       ).rejects.toThrow(
         expect.objectContaining({
           code: "FORBIDDEN",
-          message: "System roles cannot be modified",
+          message: "Admin role cannot be modified",
         }),
       );
     });
