@@ -11,6 +11,7 @@ import {
 
 import { PermissionService } from "./permissionService";
 
+import { generatePrefixedId } from "~/lib/utils/id-generation";
 import { type DrizzleClient } from "~/server/db/drizzle";
 import {
   roles,
@@ -18,10 +19,48 @@ import {
   rolePermissions,
   memberships,
 } from "~/server/db/schema";
-import { generatePrefixedId } from "~/lib/utils/id-generation";
 
 // Define Role type from Drizzle schema
 type Role = typeof roles.$inferSelect;
+
+// Define interfaces for Prisma-like compatibility
+interface PrismaLikeWhereConditions {
+  name?: { in: string[] };
+  userId?: string;
+  organizationId?: string;
+}
+
+interface PrismaLikeIncludeConditions {
+  role?: {
+    include?: {
+      permissions?: boolean;
+    };
+  };
+  permissions?: boolean;
+}
+
+interface PrismaLikeFindOptions {
+  where?: PrismaLikeWhereConditions;
+  include?: PrismaLikeIncludeConditions;
+}
+
+interface PrismaLikePermission {
+  findMany: (options?: PrismaLikeFindOptions) => Promise<unknown[]>;
+}
+
+interface PrismaLikeMembership {
+  findFirst: (options?: PrismaLikeFindOptions) => Promise<unknown>;
+}
+
+interface PrismaLikeRole {
+  findFirst: (options?: PrismaLikeFindOptions) => Promise<unknown>;
+}
+
+interface PrismaLikeClient {
+  permission: PrismaLikePermission;
+  membership: PrismaLikeMembership;
+  role: PrismaLikeRole;
+}
 
 /**
  * Drizzle Role Service
@@ -38,19 +77,21 @@ export class DrizzleRoleService {
     private organizationId: string,
   ) {
     // Create a comprehensive Prisma-like interface for PermissionService compatibility
-    const prismaLike = {
+    const prismaLike: PrismaLikeClient = {
       permission: {
-        findMany: async (options?: any) => {
+        findMany: async (options?: PrismaLikeFindOptions) => {
           if (options?.where?.name?.in) {
+            const whereClause = options.where.name.in;
             return await this.drizzle.query.permissions.findMany({
-              where: (permissions, { inArray }) => inArray(permissions.name, options.where.name.in),
+              where: (permissions, { inArray }) =>
+                inArray(permissions.name, whereClause),
             });
           }
           return await this.drizzle.query.permissions.findMany();
         },
       },
       membership: {
-        findFirst: async (options?: any) => {
+        findFirst: async (options?: PrismaLikeFindOptions) => {
           if (options?.where) {
             return await this.drizzle.query.memberships.findFirst({
               where: (memberships, { eq, and }) => {
@@ -59,55 +100,77 @@ export class DrizzleRoleService {
                   conditions.push(eq(memberships.userId, options.where.userId));
                 }
                 if (options.where.organizationId) {
-                  conditions.push(eq(memberships.organizationId, options.where.organizationId));
+                  conditions.push(
+                    eq(
+                      memberships.organizationId,
+                      options.where.organizationId,
+                    ),
+                  );
                 }
-                return conditions.length > 1 ? and(...conditions) : conditions[0];
+                return conditions.length > 1
+                  ? and(...conditions)
+                  : conditions[0];
               },
-              with: options.include ? {
-                role: options.include.role ? {
-                  with: {
-                    rolePermissions: options.include.role.include?.permissions ? {
-                      with: {
-                        permission: true,
-                      },
-                    } : undefined,
-                  },
-                } : undefined,
-              } : undefined,
+              with: options.include
+                ? {
+                    role: options.include.role
+                      ? {
+                          with: {
+                            rolePermissions: options.include.role.include
+                              ?.permissions
+                              ? {
+                                  with: {
+                                    permission: true,
+                                  },
+                                }
+                              : undefined,
+                          },
+                        }
+                      : undefined,
+                  }
+                : undefined,
             });
           }
           return null;
         },
       },
       role: {
-        findFirst: async (options?: any) => {
+        findFirst: async (options?: PrismaLikeFindOptions) => {
           if (options?.where) {
             return await this.drizzle.query.roles.findFirst({
               where: (roles, { eq, and }) => {
                 const conditions = [];
                 if (options.where.organizationId) {
-                  conditions.push(eq(roles.organizationId, options.where.organizationId));
+                  conditions.push(
+                    eq(roles.organizationId, options.where.organizationId),
+                  );
                 }
                 if (options.where.name) {
                   conditions.push(eq(roles.name, options.where.name));
                 }
-                return conditions.length > 1 ? and(...conditions) : conditions[0];
+                return conditions.length > 1
+                  ? and(...conditions)
+                  : conditions[0];
               },
-              with: options.include ? {
-                rolePermissions: options.include.permissions ? {
-                  with: {
-                    permission: true,
-                  },
-                } : undefined,
-              } : undefined,
+              with: options.include
+                ? {
+                    rolePermissions: options.include.permissions
+                      ? {
+                          with: {
+                            permission: true,
+                          },
+                        }
+                      : undefined,
+                  }
+                : undefined,
             });
           }
           return null;
         },
       },
-    } as any;
+    };
 
-    this.permissionService = new PermissionService(prismaLike);
+    this.permissionService = new PermissionService(prismaLike as never);
   }
 
   /**
@@ -138,7 +201,7 @@ export class DrizzleRoleService {
           isDefault: false,
         })
         .returning();
-      
+
       adminRole = newAdminRole;
     } else {
       // Update existing admin role
@@ -151,30 +214,32 @@ export class DrizzleRoleService {
         })
         .where(eq(roles.id, adminRole.id))
         .returning();
-      
+
       adminRole = updatedAdminRole;
     }
 
     if (!adminRole) {
       throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR", 
+        code: "INTERNAL_SERVER_ERROR",
         message: "Failed to create admin role",
       });
     }
 
     // Assign all permissions to admin role
     const allPermissions = await this.drizzle.query.permissions.findMany();
-    
+
     // Clear existing permissions
-    await this.drizzle.delete(rolePermissions).where(eq(rolePermissions.roleId, adminRole.id));
-    
+    await this.drizzle
+      .delete(rolePermissions)
+      .where(eq(rolePermissions.roleId, adminRole.id));
+
     // Insert all permissions
     if (allPermissions.length > 0) {
       await this.drizzle.insert(rolePermissions).values(
-        allPermissions.map(p => ({
+        allPermissions.map((p) => ({
           roleId: adminRole.id,
           permissionId: p.id,
-        }))
+        })),
       );
     }
 
@@ -197,7 +262,7 @@ export class DrizzleRoleService {
           isDefault: false,
         })
         .returning();
-      
+
       unauthRole = newUnauthRole;
     } else {
       // Update existing unauthenticated role
@@ -210,7 +275,7 @@ export class DrizzleRoleService {
         })
         .where(eq(roles.id, unauthRole.id))
         .returning();
-      
+
       unauthRole = updatedUnauthRole;
     }
 
@@ -223,19 +288,22 @@ export class DrizzleRoleService {
 
     // Assign unauthenticated permissions
     const unauthPermissions = await this.drizzle.query.permissions.findMany({
-      where: (permissions, { inArray }) => inArray(permissions.name, UNAUTHENTICATED_PERMISSIONS),
+      where: (permissions, { inArray }) =>
+        inArray(permissions.name, UNAUTHENTICATED_PERMISSIONS),
     });
 
     // Clear existing permissions
-    await this.drizzle.delete(rolePermissions).where(eq(rolePermissions.roleId, unauthRole.id));
-    
+    await this.drizzle
+      .delete(rolePermissions)
+      .where(eq(rolePermissions.roleId, unauthRole.id));
+
     // Insert unauthenticated permissions
     if (unauthPermissions.length > 0) {
       await this.drizzle.insert(rolePermissions).values(
-        unauthPermissions.map(p => ({
+        unauthPermissions.map((p) => ({
           roleId: unauthRole.id,
           permissionId: p.id,
-        }))
+        })),
       );
     }
   }
@@ -274,7 +342,7 @@ export class DrizzleRoleService {
           isDefault: overrides.isDefault ?? true,
         })
         .returning();
-      
+
       role = newRole;
     } else {
       // Update existing role
@@ -287,7 +355,7 @@ export class DrizzleRoleService {
         })
         .where(eq(roles.id, role.id))
         .returning();
-      
+
       role = updatedRole;
     }
 
@@ -299,25 +367,29 @@ export class DrizzleRoleService {
     }
 
     // Get permissions with dependencies
-    const expandedPermissions = this.permissionService.expandPermissionsWithDependencies([
-      ...template.permissions,
-    ]);
+    const expandedPermissions =
+      this.permissionService.expandPermissionsWithDependencies([
+        ...template.permissions,
+      ]);
 
     // Find permission records
     const permissionRecords = await this.drizzle.query.permissions.findMany({
-      where: (permissions, { inArray }) => inArray(permissions.name, expandedPermissions),
+      where: (permissions, { inArray }) =>
+        inArray(permissions.name, expandedPermissions),
     });
 
     // Clear existing permissions
-    await this.drizzle.delete(rolePermissions).where(eq(rolePermissions.roleId, role.id));
+    await this.drizzle
+      .delete(rolePermissions)
+      .where(eq(rolePermissions.roleId, role.id));
 
     // Assign permissions to role
     if (permissionRecords.length > 0) {
       await this.drizzle.insert(rolePermissions).values(
-        permissionRecords.map(p => ({
+        permissionRecords.map((p) => ({
           roleId: role.id,
           permissionId: p.id,
-        }))
+        })),
       );
     }
 
@@ -410,15 +482,17 @@ export class DrizzleRoleService {
     // Handle permission updates
     if (updates.permissionIds) {
       // Clear existing permissions
-      await this.drizzle.delete(rolePermissions).where(eq(rolePermissions.roleId, roleId));
+      await this.drizzle
+        .delete(rolePermissions)
+        .where(eq(rolePermissions.roleId, roleId));
 
       // Insert new permissions
       if (updates.permissionIds.length > 0) {
         await this.drizzle.insert(rolePermissions).values(
-          updates.permissionIds.map(permissionId => ({
+          updates.permissionIds.map((permissionId) => ({
             roleId,
             permissionId,
-          }))
+          })),
         );
       }
     }
@@ -477,7 +551,9 @@ export class DrizzleRoleService {
       .where(eq(memberships.roleId, roleId));
 
     // Delete role permissions
-    await this.drizzle.delete(rolePermissions).where(eq(rolePermissions.roleId, roleId));
+    await this.drizzle
+      .delete(rolePermissions)
+      .where(eq(rolePermissions.roleId, roleId));
 
     // Delete the role
     await this.drizzle.delete(roles).where(eq(roles.id, roleId));
@@ -583,7 +659,7 @@ export class DrizzleRoleService {
       ),
     });
 
-    return result || null;
+    return result ?? null;
   }
 
   /**
@@ -599,7 +675,7 @@ export class DrizzleRoleService {
       ),
     });
 
-    return result || null;
+    return result ?? null;
   }
 
   /**
@@ -627,8 +703,12 @@ export class DrizzleRoleService {
         } catch (error) {
           // Ignore unique constraint violations - permission already exists
           // This can happen with concurrent test execution
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          if (!errorMessage.includes('unique') && !errorMessage.includes('duplicate')) {
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          if (
+            !errorMessage.includes("unique") &&
+            !errorMessage.includes("duplicate")
+          ) {
             throw error;
           }
         }

@@ -8,6 +8,9 @@ import {
   organizationManageProcedure,
 } from "../trpc.permission";
 
+import type { TRPCContext } from "../trpc.base";
+
+import { env } from "~/env.js";
 import {
   validateRoleAssignment,
   type RoleAssignmentInput,
@@ -16,39 +19,34 @@ import {
 import { generatePrefixedId } from "~/lib/utils/id-generation";
 import { ROLE_TEMPLATES } from "~/server/auth/permissions.constants";
 import { roles, memberships } from "~/server/db/schema";
-import { RoleService } from "~/server/services/roleService";
 import { DrizzleRoleService } from "~/server/services/drizzleRoleService";
-import type { TRPCContext } from "../trpc.base";
+import { RoleService } from "~/server/services/roleService";
 
 /**
  * Create appropriate role service based on context
- * 
+ *
  * In test environments with PGlite, use DrizzleRoleService for native integration.
  * In production or when Prisma client is preferred, use RoleService.
  */
-function createRoleService(ctx: TRPCContext, organizationId: string) {
-  // Use DrizzleRoleService in test environments or when specifically requested
-  const isTestEnvironment = process.env.NODE_ENV === "test" || process.env["VITEST"] === "true";
-  
-  // If we're in a test environment and have Drizzle but no proper Prisma client, use DrizzleRoleService
-  if (isTestEnvironment && ctx.drizzle) {
+// Type-safe way to detect Vitest environment
+function isVitestEnvironment(): boolean {
+  return typeof globalThis !== "undefined" && "__vitest_worker__" in globalThis;
+}
+
+function createRoleService(
+  ctx: TRPCContext,
+  organizationId: string,
+): RoleService | DrizzleRoleService {
+  // Use DrizzleRoleService in test environments
+  const isTestEnvironment = env.NODE_ENV === "test" || isVitestEnvironment();
+
+  // If we're in a test environment and have Drizzle, use DrizzleRoleService
+  if (isTestEnvironment) {
     return new DrizzleRoleService(ctx.drizzle, organizationId);
   }
-  
-  // Fallback to original RoleService with Prisma
-  if (ctx.db) {
-    return new RoleService(ctx.db, organizationId, ctx.drizzle);
-  }
-  
-  // If we don't have Prisma but do have Drizzle, use DrizzleRoleService as fallback
-  if (ctx.drizzle) {
-    return new DrizzleRoleService(ctx.drizzle, organizationId);
-  }
-  
-  throw new TRPCError({
-    code: "INTERNAL_SERVER_ERROR",
-    message: "No database client available",
-  });
+
+  // Use RoleService with Prisma in production
+  return new RoleService(ctx.db, organizationId, ctx.drizzle);
 }
 
 export const roleRouter = createTRPCRouter({
