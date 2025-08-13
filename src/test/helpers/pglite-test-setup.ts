@@ -171,6 +171,14 @@ async function createMinimalUsersForTesting(
       createdAt: new Date(),
       updatedAt: new Date(),
     },
+    {
+      id: "user-to-delete",
+      email: "delete@me.com",
+      name: "User to Delete",
+      profilePicture: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
   ];
 
   await db.insert(schema.users).values(testUsers);
@@ -256,6 +264,14 @@ async function createMinimalUsersForTesting(
         createdAt: new Date(),
         updatedAt: new Date(),
       },
+      {
+        id: "test-membership-delete",
+        userId: "user-to-delete",
+        organizationId,
+        roleId: memberRole.id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
     ]);
   }
 
@@ -284,6 +300,20 @@ export async function createSeededTestDatabase(): Promise<{
 
   // Seed infrastructure (organizations, permissions, roles, statuses)
   const organization = await seedInfrastructureWithDb(db);
+
+  const adminRole = await db.query.roles.findFirst({
+    where: and(
+      eq(schema.roles.organizationId, organization.id),
+      eq(schema.roles.name, "Admin"),
+    ),
+  });
+
+  if (!adminRole) {
+    throw new Error("Admin role not found after seeding infrastructure");
+  }
+
+  // Create invitations for testing
+  await createTestInvitations(db, organization.id, adminRole.id);
 
   // Create minimal users for PostgreSQL-only mode so issues can be created
   await createMinimalUsersForTesting(db, organization.id);
