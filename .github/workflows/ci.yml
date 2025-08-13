@@ -120,13 +120,20 @@ jobs:
       - name: Prettier Check
         run: npm run format
 
-  # Job 4: Tests with Coverage
-  # Uses PGlite in-memory PostgreSQL for fast, reliable testing
+  # Job 4: Tests (Parallel Shards)
+  # Uses matrix strategy to run test shards in parallel
   test:
-    name: Tests
+    name: Tests (${{ matrix.shard }})
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        shard:
+          - "unit-node"
+          - "unit-jsdom" 
+          - "integration"
     env:
       NODE_ENV: test
       CI: true
@@ -137,14 +144,25 @@ jobs:
           node-version: "24"
           cache: "npm"
       - run: npm ci
-      - name: Run Tests with Coverage (PGlite)
-        run: npm run test:coverage
-      - name: Upload Coverage
+      - name: Run Tests (${{ matrix.shard }}) with Coverage
+        run: |
+          case "${{ matrix.shard }}" in
+            "unit-node")
+              vitest run --coverage --project=node
+              ;;
+            "unit-jsdom")
+              vitest run --coverage --project=jsdom
+              ;;
+            "integration")
+              vitest run --coverage --project=integration
+              ;;
+          esac
+      - name: Upload Coverage (${{ matrix.shard }})
         uses: codecov/codecov-action@18283e04ce6e62d37312384ff67231eb8fd56d24 # v5
         with:
           files: ./coverage/lcov.info
-          flags: unittests
-          name: codecov-umbrella
+          flags: ${{ matrix.shard }}
+          name: codecov-${{ matrix.shard }}
           fail_ci_if_error: true
 
   # Job 5: Database Validation (Drizzle ORM)
