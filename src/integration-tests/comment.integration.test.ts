@@ -16,9 +16,7 @@
  * Uses modern August 2025 patterns with Vitest and PGlite integration.
  */
 
-/* eslint-disable @typescript-eslint/unbound-method */
-
-import { eq, count, and, ne, desc, isNotNull, lte } from "drizzle-orm";
+import { eq, count, and, ne, isNotNull, lte } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Import test setup and utilities
@@ -43,18 +41,10 @@ vi.mock("~/lib/utils/id-generation", () => ({
 vi.mock("~/server/auth/permissions", () => ({
   getUserPermissionsForSession: vi
     .fn()
-    .mockResolvedValue([
-      "issue:view", 
-      "issue:delete", 
-      "organization:manage"
-    ]),
+    .mockResolvedValue(["issue:view", "issue:delete", "organization:manage"]),
   getUserPermissionsForSupabaseUser: vi
     .fn()
-    .mockResolvedValue([
-      "issue:view", 
-      "issue:delete", 
-      "organization:manage"
-    ]),
+    .mockResolvedValue(["issue:view", "issue:delete", "organization:manage"]),
   requirePermissionForSession: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -62,7 +52,7 @@ vi.mock("~/server/auth/permissions", () => ({
 vi.mock("~/server/services/types", () => ({
   ActivityType: {
     CREATED: "CREATED",
-    STATUS_CHANGED: "STATUS_CHANGED", 
+    STATUS_CHANGED: "STATUS_CHANGED",
     ASSIGNED: "ASSIGNED",
     PRIORITY_CHANGED: "PRIORITY_CHANGED",
     COMMENTED: "COMMENTED",
@@ -104,14 +94,18 @@ describe("Comment Router Integration (PGlite)", () => {
     testData = await getSeededTestData(db, setup.organizationId);
 
     // Create additional test comments for complex scenarios
-    const testComment = await db.insert(schema.comments).values({
-      id: "test-comment-1",
-      content: "Test comment content",
-      issueId: testData.issue!,
-      authorId: testData.user!,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    }).returning().then(result => result[0]);
+    const testComment = await db
+      .insert(schema.comments)
+      .values({
+        id: "test-comment-1",
+        content: "Test comment content",
+        issueId: testData.issue || "test-issue-1",
+        authorId: testData.user || "test-user-1",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning()
+      .then((result) => result[0]);
 
     testData.comment = testComment.id;
 
@@ -123,7 +117,7 @@ describe("Comment Router Integration (PGlite)", () => {
           organizationId: testData.organization,
           userId: testData.user || "test-user-1",
           role: {
-            id: testData.adminRole,
+            id: testData.adminRole || "test-admin-role",
             name: "Admin",
             permissions: [
               { id: "perm1", name: "issue:view" },
@@ -135,112 +129,141 @@ describe("Comment Router Integration (PGlite)", () => {
       },
       // Add comment operations for service compatibility
       comment: {
-        deleteMany: vi.fn().mockImplementation(({ where }) => {
+        deleteMany: vi.fn().mockImplementation(({ where: _where }) => {
           // Calculate retention cutoff for cleanup
           const retentionCutoff = new Date();
           retentionCutoff.setDate(retentionCutoff.getDate() - 90);
-          
-          return db.delete(schema.comments)
-            .where(and(
-              ne(schema.comments.deletedAt, null),
-              schema.comments.deletedAt <= retentionCutoff
-            ))
-            .then(result => ({ count: result.rowCount || 0 }));
+
+          return db
+            .delete(schema.comments)
+            .where(
+              and(
+                ne(schema.comments.deletedAt, null),
+                schema.comments.deletedAt <= retentionCutoff,
+              ),
+            )
+            .then((result) => ({ count: result.rowCount || 0 }));
         }),
         count: vi.fn().mockImplementation(async ({ where }) => {
           // Count old deleted comments that qualify for cleanup
           if (where?.deletedAt?.lte) {
             const retentionCutoff = where.deletedAt.lte;
-            const result = await db.select({ count: count() })
+            const result = await db
+              .select({ count: count() })
               .from(schema.comments)
-              .where(and(
-                isNotNull(schema.comments.deletedAt),
-                lte(schema.comments.deletedAt, retentionCutoff)
-              ));
+              .where(
+                and(
+                  isNotNull(schema.comments.deletedAt),
+                  lte(schema.comments.deletedAt, retentionCutoff),
+                ),
+              );
             return result[0]?.count || 0;
           }
           return 0;
         }),
         update: vi.fn().mockImplementation(({ where, data }) => {
           // Update comment in real database
-          return db.update(schema.comments)
+          return db
+            .update(schema.comments)
             .set(data)
             .where(eq(schema.comments.id, where.id))
             .returning()
-            .then(result => result[0]);
+            .then((result) => result[0]);
         }),
-        findMany: vi.fn().mockImplementation(async ({ where, include, orderBy }) => {
-          // Debug logging
-          console.log('findMany called with:', JSON.stringify({ where, include, orderBy }, null, 2));
-          
-          // Handle deleted comments query for getDeletedComments
-          if (where?.deletedAt?.not !== undefined && where?.issue?.organizationId) {
-            console.log('Processing getDeletedComments query...');
-            const organizationId = where.issue.organizationId;
-            
-            // Get all deleted comments and filter by organization
-            const allDeletedComments = await db.query.comments.findMany({
-              where: (comments, { isNotNull }) => isNotNull(comments.deletedAt),
-              with: {
-                author: include?.author ? {
-                  columns: {
-                    id: true,
-                    name: true,
-                  }
-                } : false,
-                deleter: include?.deleter ? {
-                  columns: {
-                    id: true,
-                    name: true,
-                  }
-                } : false,
-                issue: {
-                  columns: {
-                    id: true,
-                    title: true,
-                    organizationId: true, // We need this to filter
-                  }
+        findMany: vi
+          .fn()
+          .mockImplementation(async ({ where, include, orderBy }) => {
+            // Debug logging
+            console.log(
+              "findMany called with:",
+              JSON.stringify({ where, include, orderBy }, null, 2),
+            );
+
+            // Handle deleted comments query for getDeletedComments
+            if (
+              where?.deletedAt?.not !== undefined &&
+              where?.issue?.organizationId
+            ) {
+              console.log("Processing getDeletedComments query...");
+              const organizationId = where.issue.organizationId;
+
+              // Get all deleted comments and filter by organization
+              const allDeletedComments = await db.query.comments.findMany({
+                where: (comments, { isNotNull }) =>
+                  isNotNull(comments.deletedAt),
+                with: {
+                  author: include?.author
+                    ? {
+                        columns: {
+                          id: true,
+                          name: true,
+                        },
+                      }
+                    : false,
+                  deleter: include?.deleter
+                    ? {
+                        columns: {
+                          id: true,
+                          name: true,
+                        },
+                      }
+                    : false,
+                  issue: {
+                    columns: {
+                      id: true,
+                      title: true,
+                      organizationId: true, // We need this to filter
+                    },
+                  },
                 },
-              },
-            });
-            console.log('Target organization ID:', organizationId);
-            
-            // Filter by organization and format results
-            const orgDeletedComments = allDeletedComments
-              .filter(comment => comment.issue?.organizationId === organizationId)
-              .map(comment => ({
-                id: comment.id,
-                content: comment.content,
-                createdAt: comment.createdAt,
-                updatedAt: comment.updatedAt,
-                deletedAt: comment.deletedAt,
-                deletedBy: comment.deletedBy,
-                issueId: comment.issueId,
-                authorId: comment.authorId,
-                author: include?.author ? comment.author : undefined,
-                deleter: include?.deleter ? comment.deleter : undefined,
-                issue: include?.issue ? {
-                  id: comment.issue!.id,
-                  title: comment.issue!.title,
-                } : undefined,
-              }));
+              });
+              console.log("Target organization ID:", organizationId);
 
-            console.log('Filtered org deleted comments:', orgDeletedComments.length);
+              // Filter by organization and format results
+              const orgDeletedComments = allDeletedComments
+                .filter(
+                  (comment) => comment.issue?.organizationId === organizationId,
+                )
+                .map((comment) => ({
+                  id: comment.id,
+                  content: comment.content,
+                  createdAt: comment.createdAt,
+                  updatedAt: comment.updatedAt,
+                  deletedAt: comment.deletedAt,
+                  deletedBy: comment.deletedBy,
+                  issueId: comment.issueId,
+                  authorId: comment.authorId,
+                  author: include?.author ? comment.author : undefined,
+                  deleter: include?.deleter ? comment.deleter : undefined,
+                  issue: include?.issue
+                    ? {
+                        id: comment.issue?.id ?? "unknown",
+                        title: comment.issue?.title ?? "Unknown Issue",
+                      }
+                    : undefined,
+                }));
 
-            // Sort by deletedAt desc if requested
-            if (orderBy?.deletedAt === "desc") {
-              orgDeletedComments.sort((a, b) => 
-                (b.deletedAt?.getTime() || 0) - (a.deletedAt?.getTime() || 0)
+              console.log(
+                "Filtered org deleted comments:",
+                orgDeletedComments.length,
               );
+
+              // Sort by deletedAt desc if requested
+              if (orderBy?.deletedAt === "desc") {
+                orgDeletedComments.sort(
+                  (a, b) =>
+                    (b.deletedAt?.getTime() || 0) -
+                    (a.deletedAt?.getTime() || 0),
+                );
+              }
+
+              return orgDeletedComments;
             }
 
-            return orgDeletedComments;
-          }
-          
-          // Default: return empty array for other queries
-          console.log('Returning empty array for unhandled query');
-          return [];
-        }),
+            // Default: return empty array for other queries
+            console.log("Returning empty array for unhandled query");
+            return [];
+          }),
       },
       issueHistory: {
         create: vi.fn().mockImplementation(async ({ data }) => {
@@ -250,8 +273,12 @@ describe("Comment Router Integration (PGlite)", () => {
             ...data,
             createdAt: new Date(),
           };
-          
-          return await db.insert(schema.issueHistory).values(historyEntry).returning().then(result => result[0]);
+
+          return await db
+            .insert(schema.issueHistory)
+            .values(historyEntry)
+            .returning()
+            .then((result) => result[0]);
         }),
       },
     } as unknown as ExtendedPrismaClient;
@@ -277,8 +304,12 @@ describe("Comment Router Integration (PGlite)", () => {
         },
       } as any,
       services: {
-        createCommentCleanupService: vi.fn(() => new CommentCleanupService(mockPrismaClient)),
-        createIssueActivityService: vi.fn(() => new IssueActivityService(mockPrismaClient)),
+        createCommentCleanupService: vi.fn(
+          () => new CommentCleanupService(mockPrismaClient),
+        ),
+        createIssueActivityService: vi.fn(
+          () => new IssueActivityService(mockPrismaClient),
+        ),
         createNotificationService: vi.fn(),
         createCollectionService: vi.fn(),
         createPinballMapService: vi.fn(),
@@ -297,11 +328,7 @@ describe("Comment Router Integration (PGlite)", () => {
         withOrganization: vi.fn(() => context.logger),
         withContext: vi.fn(() => context.logger),
       },
-      userPermissions: [
-        "issue:view",
-        "issue:delete", 
-        "organization:manage",
-      ],
+      userPermissions: ["issue:view", "issue:delete", "organization:manage"],
     } as any;
 
     caller = commentRouter.createCaller(context);
@@ -314,18 +341,18 @@ describe("Comment Router Integration (PGlite)", () => {
         {
           id: "comment-2",
           content: "Second test comment",
-          issueId: testData.issue!,
-          authorId: testData.user!,
+          issueId: testData.issue || "test-issue-1",
+          authorId: testData.user || "test-user-1",
           createdAt: new Date("2024-01-02"),
           updatedAt: new Date("2024-01-02"),
         },
         {
           id: "comment-3-deleted",
           content: "Deleted comment",
-          issueId: testData.issue!,
-          authorId: testData.user!,
+          issueId: testData.issue || "test-issue-1",
+          authorId: testData.user || "test-user-1",
           deletedAt: new Date(), // Soft deleted
-          deletedBy: testData.user!,
+          deletedBy: testData.user || "test-user-1",
           createdAt: new Date("2024-01-03"),
           updatedAt: new Date("2024-01-03"),
         },
@@ -333,10 +360,12 @@ describe("Comment Router Integration (PGlite)", () => {
     });
 
     it("should get comments for an issue with author info", async () => {
-      const result = await caller.getForIssue({ issueId: testData.issue! });
+      const result = await caller.getForIssue({
+        issueId: testData.issue || "test-issue-1",
+      });
 
       expect(result).toHaveLength(2); // Should exclude deleted comment
-      
+
       // Comments are ordered by createdAt, so the first one should be the earlier one
       // testData.comment was created now, comment-2 was created at 2024-01-02
       // So comment-2 should come first (earlier date)
@@ -363,7 +392,7 @@ describe("Comment Router Integration (PGlite)", () => {
       });
 
       // Verify soft-deleted comment is excluded
-      expect(result.find(c => c.id === "comment-3-deleted")).toBeUndefined();
+      expect(result.find((c) => c.id === "comment-3-deleted")).toBeUndefined();
     });
 
     it("should handle empty results", async () => {
@@ -372,10 +401,14 @@ describe("Comment Router Integration (PGlite)", () => {
     });
 
     it("should order comments by creation date", async () => {
-      const result = await caller.getForIssue({ issueId: testData.issue! });
-      
+      const result = await caller.getForIssue({
+        issueId: testData.issue || "test-issue-1",
+      });
+
       expect(result).toHaveLength(2);
-      expect(result[0].createdAt.getTime()).toBeLessThanOrEqual(result[1].createdAt.getTime());
+      expect(result[0].createdAt.getTime()).toBeLessThanOrEqual(
+        result[1].createdAt.getTime(),
+      );
     });
 
     it("should maintain organizational scoping", async () => {
@@ -407,10 +440,10 @@ describe("Comment Router Integration (PGlite)", () => {
         id: "other-issue",
         title: "Other Issue",
         organizationId: otherOrgId,
-        machineId: testData.machine!,
+        machineId: testData.machine || "test-machine-1",
         statusId: "other-status",
-        priorityId: "other-priority", 
-        createdById: testData.user!,
+        priorityId: "other-priority",
+        createdById: testData.user || "test-user-1",
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -419,16 +452,18 @@ describe("Comment Router Integration (PGlite)", () => {
         id: "other-comment",
         content: "Other org comment",
         issueId: "other-issue",
-        authorId: testData.user!,
+        authorId: testData.user || "test-user-1",
         createdAt: new Date(),
         updatedAt: new Date(),
       });
 
-      const result = await caller.getForIssue({ issueId: testData.issue! });
-      
+      const result = await caller.getForIssue({
+        issueId: testData.issue || "test-issue-1",
+      });
+
       // Should only get comments from our organization's issue
       expect(result).toHaveLength(2);
-      expect(result.find(c => c.id === "other-comment")).toBeUndefined();
+      expect(result.find((c) => c.id === "other-comment")).toBeUndefined();
     });
   });
 
@@ -436,34 +471,44 @@ describe("Comment Router Integration (PGlite)", () => {
     it("should soft delete a comment successfully", async () => {
       // Verify comment exists before deletion
       const beforeDeletion = await db.query.comments.findFirst({
-        where: eq(schema.comments.id, testData.comment!),
+        where: eq(schema.comments.id, testData.comment || "test-comment-1"),
       });
       expect(beforeDeletion).toBeDefined();
-      expect(beforeDeletion!.deletedAt).toBeNull();
+      expect(beforeDeletion?.deletedAt).toBeNull();
 
-      const result = await caller.delete({ commentId: testData.comment! });
+      const result = await caller.delete({
+        commentId: testData.comment || "test-comment-1",
+      });
 
       expect(result).toEqual({ success: true });
 
       // Verify soft delete in database
       const afterDeletion = await db.query.comments.findFirst({
-        where: eq(schema.comments.id, testData.comment!),
+        where: eq(schema.comments.id, testData.comment || "test-comment-1"),
       });
       expect(afterDeletion).toBeDefined();
-      expect(afterDeletion!.deletedAt).toBeInstanceOf(Date);
-      expect(afterDeletion!.deletedBy).toBe(testData.user);
+      expect(afterDeletion.deletedAt).toBeInstanceOf(Date);
+      expect(afterDeletion.deletedBy).toBe(testData.user);
 
       // Verify comment is filtered out of normal queries
-      const comments = await caller.getForIssue({ issueId: testData.issue! });
-      expect(comments.find(c => c.id === testData.comment)).toBeUndefined();
+      const comments = await caller.getForIssue({
+        issueId: testData.issue || "test-issue-1",
+      });
+      expect(comments.find((c) => c.id === testData.comment)).toBeUndefined();
 
       // Verify issue activity was recorded
       const activities = await db.query.issueHistory.findMany({
-        where: eq(schema.issueHistory.issueId, testData.issue!),
+        where: eq(
+          schema.issueHistory.issueId,
+          testData.issue || "test-issue-1",
+        ),
       });
-      expect(activities.some(a => 
-        a.type === "COMMENT_DELETED" && a.oldValue === testData.comment
-      )).toBe(true);
+      expect(
+        activities.some(
+          (a) =>
+            a.type === "COMMENT_DELETED" && a.oldValue === testData.comment,
+        ),
+      ).toBe(true);
     });
 
     it("should throw NOT_FOUND for non-existent comment", async () => {
@@ -501,10 +546,10 @@ describe("Comment Router Integration (PGlite)", () => {
         id: "other-issue-forbidden",
         title: "Other Issue",
         organizationId: otherOrgId,
-        machineId: testData.machine!,
+        machineId: testData.machine || "test-machine-1",
         statusId: "other-status-forbidden",
         priorityId: "other-priority-forbidden",
-        createdById: testData.user!,
+        createdById: testData.user || "test-user-1",
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -513,14 +558,14 @@ describe("Comment Router Integration (PGlite)", () => {
         id: "other-comment-forbidden",
         content: "Other org comment",
         issueId: "other-issue-forbidden",
-        authorId: testData.user!,
+        authorId: testData.user || "test-user-1",
         createdAt: new Date(),
         updatedAt: new Date(),
       });
 
-      await expect(caller.delete({ commentId: "other-comment-forbidden" })).rejects.toThrow(
-        "Comment not in organization",
-      );
+      await expect(
+        caller.delete({ commentId: "other-comment-forbidden" }),
+      ).rejects.toThrow("Comment not in organization");
     });
   });
 
@@ -531,20 +576,20 @@ describe("Comment Router Integration (PGlite)", () => {
         {
           id: "deleted-comment-1",
           content: "First deleted comment",
-          issueId: testData.issue!,
-          authorId: testData.user!,
+          issueId: testData.issue || "test-issue-1",
+          authorId: testData.user || "test-user-1",
           deletedAt: new Date("2024-01-01"),
-          deletedBy: testData.user!,
+          deletedBy: testData.user || "test-user-1",
           createdAt: new Date("2024-01-01"),
           updatedAt: new Date("2024-01-01"),
         },
         {
-          id: "deleted-comment-2", 
+          id: "deleted-comment-2",
           content: "Second deleted comment",
-          issueId: testData.issue!,
-          authorId: testData.user!,
+          issueId: testData.issue || "test-issue-1",
+          authorId: testData.user || "test-user-1",
           deletedAt: new Date("2024-01-02"),
-          deletedBy: testData.user!,
+          deletedBy: testData.user || "test-user-1",
           createdAt: new Date("2024-01-02"),
           updatedAt: new Date("2024-01-02"),
         },
@@ -600,10 +645,10 @@ describe("Comment Router Integration (PGlite)", () => {
         id: "other-issue-deleted",
         title: "Other Issue",
         organizationId: otherOrgId,
-        machineId: testData.machine!,
+        machineId: testData.machine || "test-machine-1",
         statusId: "other-status-deleted",
         priorityId: "other-priority-deleted",
-        createdById: testData.user!,
+        createdById: testData.user || "test-user-1",
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -612,9 +657,9 @@ describe("Comment Router Integration (PGlite)", () => {
         id: "other-deleted-comment",
         content: "Other org deleted comment",
         issueId: "other-issue-deleted",
-        authorId: testData.user!,
+        authorId: testData.user || "test-user-1",
         deletedAt: new Date(),
-        deletedBy: testData.user!,
+        deletedBy: testData.user || "test-user-1",
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -623,7 +668,9 @@ describe("Comment Router Integration (PGlite)", () => {
 
       // Should only see deleted comments from our organization
       expect(result).toHaveLength(2);
-      expect(result.find(c => c.id === "other-deleted-comment")).toBeUndefined();
+      expect(
+        result.find((c) => c.id === "other-deleted-comment"),
+      ).toBeUndefined();
     });
   });
 
@@ -633,10 +680,10 @@ describe("Comment Router Integration (PGlite)", () => {
       await db.insert(schema.comments).values({
         id: "restore-comment",
         content: "Comment to restore",
-        issueId: testData.issue!,
-        authorId: testData.user!,
+        issueId: testData.issue || "test-issue-1",
+        authorId: testData.user || "test-user-1",
         deletedAt: new Date(),
-        deletedBy: testData.user!,
+        deletedBy: testData.user || "test-user-1",
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -648,7 +695,7 @@ describe("Comment Router Integration (PGlite)", () => {
         where: eq(schema.comments.id, "restore-comment"),
       });
       expect(beforeRestore).toBeDefined();
-      expect(beforeRestore!.deletedAt).toBeInstanceOf(Date);
+      expect(beforeRestore?.deletedAt).toBeInstanceOf(Date);
 
       const result = await caller.restore({ commentId: "restore-comment" });
 
@@ -659,12 +706,14 @@ describe("Comment Router Integration (PGlite)", () => {
         where: eq(schema.comments.id, "restore-comment"),
       });
       expect(afterRestore).toBeDefined();
-      expect(afterRestore!.deletedAt).toBeNull();
-      expect(afterRestore!.deletedBy).toBeNull();
+      expect(afterRestore?.deletedAt).toBeNull();
+      expect(afterRestore?.deletedBy).toBeNull();
 
       // Verify comment appears in normal queries again
-      const comments = await caller.getForIssue({ issueId: testData.issue! });
-      expect(comments.find(c => c.id === "restore-comment")).toBeDefined();
+      const comments = await caller.getForIssue({
+        issueId: testData.issue || "test-issue-1",
+      });
+      expect(comments.find((c) => c.id === "restore-comment")).toBeDefined();
     });
   });
 
@@ -681,30 +730,30 @@ describe("Comment Router Integration (PGlite)", () => {
         {
           id: "old-deleted-1",
           content: "Old deleted comment 1",
-          issueId: testData.issue!,
-          authorId: testData.user!,
+          issueId: testData.issue || "test-issue-1",
+          authorId: testData.user || "test-user-1",
           deletedAt: oldDate,
-          deletedBy: testData.user!,
+          deletedBy: testData.user || "test-user-1",
           createdAt: new Date(),
           updatedAt: new Date(),
         },
         {
           id: "old-deleted-2",
-          content: "Old deleted comment 2", 
-          issueId: testData.issue!,
-          authorId: testData.user!,
+          content: "Old deleted comment 2",
+          issueId: testData.issue || "test-issue-1",
+          authorId: testData.user || "test-user-1",
           deletedAt: oldDate,
-          deletedBy: testData.user!,
+          deletedBy: testData.user || "test-user-1",
           createdAt: new Date(),
           updatedAt: new Date(),
         },
         {
           id: "recent-deleted",
           content: "Recent deleted comment",
-          issueId: testData.issue!,
-          authorId: testData.user!,
+          issueId: testData.issue || "test-issue-1",
+          authorId: testData.user || "test-user-1",
           deletedAt: recentDate,
-          deletedBy: testData.user!,
+          deletedBy: testData.user || "test-user-1",
           createdAt: new Date(),
           updatedAt: new Date(),
         },
@@ -728,16 +777,16 @@ describe("Comment Router Integration (PGlite)", () => {
         {
           id: "concurrent-1",
           content: "Concurrent comment 1",
-          issueId: testData.issue!,
-          authorId: testData.user!,
+          issueId: testData.issue || "test-issue-1",
+          authorId: testData.user || "test-user-1",
           createdAt: new Date(),
           updatedAt: new Date(),
         },
         {
-          id: "concurrent-2", 
+          id: "concurrent-2",
           content: "Concurrent comment 2",
-          issueId: testData.issue!,
-          authorId: testData.user!,
+          issueId: testData.issue || "test-issue-1",
+          authorId: testData.user || "test-user-1",
           createdAt: new Date(),
           updatedAt: new Date(),
         },
@@ -760,36 +809,49 @@ describe("Comment Router Integration (PGlite)", () => {
         where: eq(schema.comments.id, "concurrent-2"),
       });
 
-      expect(comment1!.deletedAt).toBeInstanceOf(Date);
-      expect(comment2!.deletedAt).toBeInstanceOf(Date);
+      expect(comment1?.deletedAt).toBeInstanceOf(Date);
+      expect(comment2?.deletedAt).toBeInstanceOf(Date);
 
       // Verify activity records were created for both
       const activities = await db.query.issueHistory.findMany({
-        where: eq(schema.issueHistory.issueId, testData.issue!),
+        where: eq(
+          schema.issueHistory.issueId,
+          testData.issue || "test-issue-1",
+        ),
       });
-      expect(activities.filter(a => a.type === "COMMENT_DELETED")).toHaveLength(2);
+      expect(
+        activities.filter((a) => a.type === "COMMENT_DELETED"),
+      ).toHaveLength(2);
     });
 
     it("should maintain referential integrity across service operations", async () => {
       // Test complete comment lifecycle: create -> soft delete -> restore -> cleanup
-      
+
       // 1. Soft delete the comment
-      await caller.delete({ commentId: testData.comment! });
-      
+      await caller.delete({ commentId: testData.comment || "test-comment-1" });
+
       // 2. Verify it appears in deleted comments
       const deletedComments = await caller.getDeleted();
-      expect(deletedComments.find(c => c.id === testData.comment)).toBeDefined();
+      expect(
+        deletedComments.find((c) => c.id === testData.comment),
+      ).toBeDefined();
 
       // 3. Restore the comment
-      await caller.restore({ commentId: testData.comment! });
+      await caller.restore({ commentId: testData.comment || "test-comment-1" });
 
       // 4. Verify it no longer appears in deleted comments
       const deletedAfterRestore = await caller.getDeleted();
-      expect(deletedAfterRestore.find(c => c.id === testData.comment)).toBeUndefined();
+      expect(
+        deletedAfterRestore.find((c) => c.id === testData.comment),
+      ).toBeUndefined();
 
       // 5. Verify it appears in normal queries
-      const normalComments = await caller.getForIssue({ issueId: testData.issue! });
-      expect(normalComments.find(c => c.id === testData.comment)).toBeDefined();
+      const normalComments = await caller.getForIssue({
+        issueId: testData.issue || "test-issue-1",
+      });
+      expect(
+        normalComments.find((c) => c.id === testData.comment),
+      ).toBeDefined();
     });
   });
 });
