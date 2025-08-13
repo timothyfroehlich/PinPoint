@@ -3,12 +3,12 @@
  *
  * Integration tests for the admin router using PGlite in-memory PostgreSQL database.
  * Tests real database operations with proper schema, relationships, and data integrity.
- * 
+ *
  * Converted from heavily mocked admin.test.ts to use real database operations.
  *
  * Key Features:
  * - Real PostgreSQL database with PGlite
- * - Complete schema migrations applied  
+ * - Complete schema migrations applied
  * - Real Drizzle ORM operations
  * - Multi-tenant data isolation testing
  * - Complex user/role/membership validation with actual constraints
@@ -18,9 +18,7 @@
  * Uses modern August 2025 patterns with Vitest and PGlite integration.
  */
 
-/* eslint-disable @typescript-eslint/unbound-method */
-
-import { eq, count, and, ne } from "drizzle-orm";
+import { eq, count, and } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Import test setup and utilities
@@ -43,18 +41,10 @@ vi.mock("~/lib/utils/id-generation", () => ({
 vi.mock("~/server/auth/permissions", () => ({
   getUserPermissionsForSession: vi
     .fn()
-    .mockResolvedValue([
-      "user:manage",
-      "role:manage", 
-      "organization:manage",
-    ]),
+    .mockResolvedValue(["user:manage", "role:manage", "organization:manage"]),
   getUserPermissionsForSupabaseUser: vi
     .fn()
-    .mockResolvedValue([
-      "user:manage", 
-      "role:manage",
-      "organization:manage",
-    ]),
+    .mockResolvedValue(["user:manage", "role:manage", "organization:manage"]),
   requirePermissionForSession: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -101,24 +91,30 @@ describe("Admin Router Integration (PGlite)", () => {
     testData = await getSeededTestData(db, setup.organizationId);
 
     // Create additional test users and roles for admin testing
-    const [secondaryUser] = await db.insert(schema.users).values({
-      id: "test-user-2",
-      name: "Secondary Test User", 
-      email: "secondary@example.com",
-      emailVerified: new Date(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    }).returning();
+    const [secondaryUser] = await db
+      .insert(schema.users)
+      .values({
+        id: "test-user-2",
+        name: "Secondary Test User",
+        email: "secondary@example.com",
+        emailVerified: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning();
 
-    const [memberRole] = await db.insert(schema.roles).values({
-      id: "test-member-role",
-      name: "Member",
-      organizationId: testData.organization,
-      isSystem: false,
-      isDefault: true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    }).returning();
+    const [memberRole] = await db
+      .insert(schema.roles)
+      .values({
+        id: "test-member-role",
+        name: "Member",
+        organizationId: testData.organization,
+        isSystem: false,
+        isDefault: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning();
 
     // Create membership for secondary user
     await db.insert(schema.memberships).values({
@@ -163,7 +159,7 @@ describe("Admin Router Integration (PGlite)", () => {
       },
       organization: {
         id: testData.organization,
-        name: "Test Organization", 
+        name: "Test Organization",
         subdomain: "test-org",
       },
       db: mockPrismaClient,
@@ -193,11 +189,7 @@ describe("Admin Router Integration (PGlite)", () => {
         withOrganization: vi.fn(() => context.logger),
         withContext: vi.fn(() => context.logger),
       },
-      userPermissions: [
-        "user:manage",
-        "role:manage",
-        "organization:manage",
-      ],
+      userPermissions: ["user:manage", "role:manage", "organization:manage"],
     } as any;
 
     caller = adminRouter.createCaller(context);
@@ -209,14 +201,14 @@ describe("Admin Router Integration (PGlite)", () => {
 
       // Expect 9 users: 8 from seed data + 1 secondary user we added
       expect(result).toHaveLength(9);
-      
+
       // Check that our test users are included
-      const emails = result.map(member => member.email);
+      const emails = result.map((member) => member.email);
       expect(emails).toContain("admin@dev.local");
       expect(emails).toContain("secondary@example.com");
-      
+
       // Verify all are from same organization
-      result.forEach(member => {
+      result.forEach((member) => {
         expect(member).toHaveProperty("userId");
         expect(member).toHaveProperty("email");
         expect(member).toHaveProperty("role");
@@ -226,29 +218,38 @@ describe("Admin Router Integration (PGlite)", () => {
 
     it("should enforce organizational isolation", async () => {
       // Create another organization with users
-      const [otherOrg] = await db.insert(schema.organizations).values({
-        id: "other-org",
-        name: "Other Organization",
-        subdomain: "other",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }).returning();
+      const [otherOrg] = await db
+        .insert(schema.organizations)
+        .values({
+          id: "other-org",
+          name: "Other Organization",
+          subdomain: "other",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .returning();
 
-      const [otherUser] = await db.insert(schema.users).values({
-        id: "other-user",
-        name: "Other User",
-        email: "other@example.com",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }).returning();
+      const [otherUser] = await db
+        .insert(schema.users)
+        .values({
+          id: "other-user",
+          name: "Other User",
+          email: "other@example.com",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .returning();
 
-      const [otherRole] = await db.insert(schema.roles).values({
-        id: "other-role",
-        name: "Other Role",
-        organizationId: otherOrg.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }).returning();
+      const [otherRole] = await db
+        .insert(schema.roles)
+        .values({
+          id: "other-role",
+          name: "Other Role",
+          organizationId: otherOrg.id,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .returning();
 
       await db.insert(schema.memberships).values({
         id: "other-membership",
@@ -262,31 +263,38 @@ describe("Admin Router Integration (PGlite)", () => {
       // Query should only return users from test organization (9 users)
       const result = await caller.getUsers();
       expect(result).toHaveLength(9);
-      
+
       // Ensure none are from other organization
-      const emails = result.map(member => member.email);
+      const emails = result.map((member) => member.email);
       expect(emails).not.toContain("other@example.com");
     });
   });
 
   describe("updateUserRole", () => {
     it("should update user role with real database operations", async () => {
-      const newRole = await db.insert(schema.roles).values({
-        id: "new-role",
-        name: "New Role",
-        organizationId: testData.organization,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }).returning().then(r => r[0]);
+      const newRole = await db
+        .insert(schema.roles)
+        .values({
+          id: "new-role",
+          name: "New Role",
+          organizationId: testData.organization,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .returning()
+        .then((r) => r[0]);
+
+      if (!testData.secondaryUser)
+        throw new Error("Secondary user not created");
 
       await caller.updateUserRole({
-        userId: testData.secondaryUser!,
+        userId: testData.secondaryUser,
         roleId: newRole.id,
       });
 
       // Verify in database
       const membership = await db.query.memberships.findFirst({
-        where: eq(schema.memberships.userId, testData.secondaryUser!),
+        where: eq(schema.memberships.userId, testData.secondaryUser),
         with: { role: true },
       });
 
@@ -296,34 +304,47 @@ describe("Admin Router Integration (PGlite)", () => {
 
     it("should enforce role exists in organization constraint", async () => {
       // Create role in different organization
-      const [otherOrg] = await db.insert(schema.organizations).values({
-        id: "other-org-role-test",
-        name: "Other Org",
-        subdomain: "other-role",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }).returning();
+      const [otherOrg] = await db
+        .insert(schema.organizations)
+        .values({
+          id: "other-org-role-test",
+          name: "Other Org",
+          subdomain: "other-role",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .returning();
 
-      const [otherRole] = await db.insert(schema.roles).values({
-        id: "other-org-role",
-        name: "Other Org Role",
-        organizationId: otherOrg.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }).returning();
+      const [otherRole] = await db
+        .insert(schema.roles)
+        .values({
+          id: "other-org-role",
+          name: "Other Org Role",
+          organizationId: otherOrg.id,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .returning();
 
-      await expect(caller.updateUserRole({
-        userId: testData.secondaryUser!,
-        roleId: otherRole.id,
-      })).rejects.toThrow();
+      if (!testData.secondaryUser)
+        throw new Error("Secondary user not created");
+
+      await expect(
+        caller.updateUserRole({
+          userId: testData.secondaryUser,
+          roleId: otherRole.id,
+        }),
+      ).rejects.toThrow();
     });
   });
 
   describe("inviteUser", () => {
     it("should create invitation with real database operations", async () => {
+      if (!testData.memberRole) throw new Error("Member role not created");
+
       const result = await caller.inviteUser({
         email: "invite@example.com",
-        roleId: testData.memberRole!,
+        roleId: testData.memberRole,
       });
 
       expect(result).toMatchObject({
@@ -342,8 +363,10 @@ describe("Admin Router Integration (PGlite)", () => {
       expect(user).toBeTruthy();
       expect(user?.emailVerified).toBeNull();
 
+      if (!user) throw new Error("User not found");
+
       const membership = await db.query.memberships.findFirst({
-        where: eq(schema.memberships.userId, user!.id),
+        where: eq(schema.memberships.userId, user.id),
       });
       expect(membership).toMatchObject({
         organizationId: testData.organization,
@@ -352,73 +375,94 @@ describe("Admin Router Integration (PGlite)", () => {
     });
 
     it("should handle duplicate email invitations", async () => {
+      if (!testData.memberRole || !testData.adminRole)
+        throw new Error("Roles not created");
+
       // First invitation
       await caller.inviteUser({
         email: "duplicate@example.com",
-        roleId: testData.memberRole!,
+        roleId: testData.memberRole,
       });
 
       // Second invitation with same email should throw CONFLICT error
-      await expect(caller.inviteUser({
-        email: "duplicate@example.com", 
-        roleId: testData.adminRole!,
-      })).rejects.toThrow("User is already a member of this organization");
+      await expect(
+        caller.inviteUser({
+          email: "duplicate@example.com",
+          roleId: testData.adminRole,
+        }),
+      ).rejects.toThrow("User is already a member of this organization");
     });
   });
 
   describe("getInvitations", () => {
     it("should retrieve pending invitations with real database operations", async () => {
+      if (!testData.memberRole || !testData.adminRole)
+        throw new Error("Roles not created");
+
       // Create some invitations
       await caller.inviteUser({
         email: "pending1@example.com",
-        roleId: testData.memberRole!,
+        roleId: testData.memberRole,
       });
 
       await caller.inviteUser({
-        email: "pending2@example.com", 
-        roleId: testData.adminRole!,
+        email: "pending2@example.com",
+        roleId: testData.adminRole,
       });
 
       const result = await caller.getInvitations();
 
       // Check that our specific invitations are included
-      const emails = result.map(inv => inv.email);
+      const emails = result.map((inv) => inv.email);
       expect(emails).toContain("pending1@example.com");
       expect(emails).toContain("pending2@example.com");
-      
+
       // Verify the format of our invitations
-      const pending1 = result.find(inv => inv.email === "pending1@example.com");
-      const pending2 = result.find(inv => inv.email === "pending2@example.com");
-      
+      const pending1 = result.find(
+        (inv) => inv.email === "pending1@example.com",
+      );
+      const pending2 = result.find(
+        (inv) => inv.email === "pending2@example.com",
+      );
+
       expect(pending1?.role.name).toBe("Member");
       expect(pending2?.role.name).toBe("Admin");
     });
 
     it("should enforce organizational isolation for invitations", async () => {
       // Create another organization with users
-      const [otherOrg] = await db.insert(schema.organizations).values({
-        id: "other-org-inv",
-        name: "Other Org",
-        subdomain: "other-inv",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }).returning();
+      const [otherOrg] = await db
+        .insert(schema.organizations)
+        .values({
+          id: "other-org-inv",
+          name: "Other Org",
+          subdomain: "other-inv",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .returning();
 
-      const [otherRole] = await db.insert(schema.roles).values({
-        id: "other-role-inv", 
-        name: "Other Role",
-        organizationId: otherOrg.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }).returning();
+      const [otherRole] = await db
+        .insert(schema.roles)
+        .values({
+          id: "other-role-inv",
+          name: "Other Role",
+          organizationId: otherOrg.id,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .returning();
 
-      const [otherUser] = await db.insert(schema.users).values({
-        id: "other-user-inv",
-        email: "other-invite@example.com",
-        emailVerified: null, // Not verified (invitation)
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }).returning();
+      const [otherUser] = await db
+        .insert(schema.users)
+        .values({
+          id: "other-user-inv",
+          email: "other-invite@example.com",
+          emailVerified: null, // Not verified (invitation)
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .returning();
 
       await db.insert(schema.memberships).values({
         id: "other-membership-inv",
@@ -429,16 +473,18 @@ describe("Admin Router Integration (PGlite)", () => {
         updatedAt: new Date(),
       });
 
-      // Should only return invitations for current organization 
+      // Should only return invitations for current organization
       const result = await caller.getInvitations();
-      const emails = result.map(inv => inv.email);
+      const emails = result.map((inv) => inv.email);
       expect(emails).not.toContain("other-invite@example.com");
     });
   });
 
   describe("removeUser", () => {
     it("should remove user with real database operations and constraint validation", async () => {
-      const userToRemove = testData.secondaryUser!;
+      if (!testData.secondaryUser)
+        throw new Error("Secondary user not created");
+      const userToRemove = testData.secondaryUser;
 
       await caller.removeUser({ userId: userToRemove });
 
@@ -449,7 +495,7 @@ describe("Admin Router Integration (PGlite)", () => {
       expect(membership).toBeUndefined();
 
       // Verify user still exists (soft delete approach) or is deleted depending on implementation
-      const user = await db.query.users.findFirst({
+      const _user = await db.query.users.findFirst({
         where: eq(schema.users.id, userToRemove),
       });
       // Depending on implementation, user might be soft-deleted or removed
@@ -457,29 +503,44 @@ describe("Admin Router Integration (PGlite)", () => {
     });
 
     it("should remove user with cascading referential integrity handling", async () => {
+      if (
+        !testData.secondaryUser ||
+        !testData.location ||
+        !testData.machine ||
+        !testData.status ||
+        !testData.priority
+      ) {
+        throw new Error("Required test data not available");
+      }
+
       // Create an issue assigned to the user
-      const [issue] = await db.insert(schema.issues).values({
-        id: "test-issue-ref",
-        title: "Test Issue",
-        description: "Test",
-        createdById: testData.secondaryUser!,
-        assignedToId: testData.secondaryUser,
-        organizationId: testData.organization,
-        locationId: testData.location!,
-        machineId: testData.machine!,
-        statusId: testData.status!,
-        priorityId: testData.priority!,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }).returning();
+      const [issue] = await db
+        .insert(schema.issues)
+        .values({
+          id: "test-issue-ref",
+          title: "Test Issue",
+          description: "Test",
+          createdById: testData.secondaryUser,
+          assignedToId: testData.secondaryUser,
+          organizationId: testData.organization,
+          locationId: testData.location,
+          machineId: testData.machine,
+          statusId: testData.status,
+          priorityId: testData.priority,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .returning();
 
       // The system may implement cascade delete or orphan handling
-      const result = await caller.removeUser({ userId: testData.secondaryUser! });
+      const result = await caller.removeUser({
+        userId: testData.secondaryUser,
+      });
       expect(result.success).toBe(true);
 
       // Verify user membership is removed
       const membership = await db.query.memberships.findFirst({
-        where: eq(schema.memberships.userId, testData.secondaryUser!),
+        where: eq(schema.memberships.userId, testData.secondaryUser),
       });
       expect(membership).toBeUndefined();
 
@@ -487,7 +548,7 @@ describe("Admin Router Integration (PGlite)", () => {
       const updatedIssue = await db.query.issues.findFirst({
         where: eq(schema.issues.id, issue.id),
       });
-      
+
       // Issue should still exist but may have null assignedToId or be reassigned
       expect(updatedIssue).toBeTruthy();
       // The actual behavior depends on the schema constraints and implementation
@@ -496,8 +557,8 @@ describe("Admin Router Integration (PGlite)", () => {
     it("should prevent removal of last admin (with proper validation)", async () => {
       // First, let's check how many admins exist and remove all but one
       const users = await caller.getUsers();
-      const admins = users.filter(user => user.role.name === "Admin");
-      
+      const admins = users.filter((user) => user.role.name === "Admin");
+
       // Remove all but one admin to test the last admin constraint
       for (let i = 0; i < admins.length - 1; i++) {
         await caller.removeUser({ userId: admins[i].userId });
@@ -505,34 +566,43 @@ describe("Admin Router Integration (PGlite)", () => {
 
       // Now try to remove the last admin - this should fail
       const lastAdmin = admins[admins.length - 1];
-      
+
       // Mock validation to return proper error for last admin removal
-      const { validateUserRemoval } = await import("~/lib/users/roleManagementValidation");
-      vi.mocked(validateUserRemoval).mockReturnValueOnce({ 
-        valid: false, 
-        error: "Cannot remove the last admin from the organization" 
+      const { validateUserRemoval } = await import(
+        "~/lib/users/roleManagementValidation"
+      );
+      vi.mocked(validateUserRemoval).mockReturnValueOnce({
+        valid: false,
+        error: "Cannot remove the last admin from the organization",
       });
 
-      await expect(caller.removeUser({ userId: lastAdmin.userId }))
-        .rejects.toThrow("Cannot remove the last admin from the organization");
+      await expect(
+        caller.removeUser({ userId: lastAdmin.userId }),
+      ).rejects.toThrow("Cannot remove the last admin from the organization");
     });
   });
 
   describe("deleteRoleWithReassignment", () => {
     it("should delete role and reassign users with real database operations", async () => {
       // Create a role to delete
-      const [roleToDelete] = await db.insert(schema.roles).values({
-        id: "role-to-delete",
-        name: "Role To Delete",
-        organizationId: testData.organization,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }).returning();
+      const [roleToDelete] = await db
+        .insert(schema.roles)
+        .values({
+          id: "role-to-delete",
+          name: "Role To Delete",
+          organizationId: testData.organization,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .returning();
+
+      if (!testData.secondaryUser || !testData.memberRole)
+        throw new Error("Required test data not available");
 
       // Assign user to this role
       await db.insert(schema.memberships).values({
-        id: "temp-membership", 
-        userId: testData.secondaryUser!,
+        id: "temp-membership",
+        userId: testData.secondaryUser,
         organizationId: testData.organization,
         roleId: roleToDelete.id,
         createdAt: new Date(),
@@ -541,7 +611,7 @@ describe("Admin Router Integration (PGlite)", () => {
 
       await caller.deleteRoleWithReassignment({
         roleId: roleToDelete.id,
-        reassignToRoleId: testData.memberRole!,
+        reassignToRoleId: testData.memberRole,
       });
 
       // Verify role is deleted
@@ -552,7 +622,7 @@ describe("Admin Router Integration (PGlite)", () => {
 
       // Verify user is reassigned to new role
       const membership = await db.query.memberships.findFirst({
-        where: eq(schema.memberships.userId, testData.secondaryUser!),
+        where: eq(schema.memberships.userId, testData.secondaryUser),
       });
       expect(membership?.roleId).toBe(testData.memberRole);
     });
@@ -562,15 +632,17 @@ describe("Admin Router Integration (PGlite)", () => {
       const systemRole = await db.query.roles.findFirst({
         where: and(
           eq(schema.roles.organizationId, testData.organization),
-          eq(schema.roles.isSystem, true)
+          eq(schema.roles.isSystem, true),
         ),
       });
 
-      if (systemRole) {
-        await expect(caller.deleteRoleWithReassignment({
-          roleId: systemRole.id,
-          reassignToRoleId: testData.memberRole!,
-        })).rejects.toThrow();
+      if (systemRole && testData.memberRole) {
+        await expect(
+          caller.deleteRoleWithReassignment({
+            roleId: systemRole.id,
+            reassignToRoleId: testData.memberRole,
+          }),
+        ).rejects.toThrow();
       }
     });
   });
@@ -578,21 +650,27 @@ describe("Admin Router Integration (PGlite)", () => {
   describe("Transaction Integrity", () => {
     it("should maintain ACID properties for bulk operations", async () => {
       // Test that failed operations don't leave partial state
-      const originalMembershipCount = await db.select({ count: count() })
+      const originalMembershipCount = await db
+        .select({ count: count() })
         .from(schema.memberships)
         .where(eq(schema.memberships.organizationId, testData.organization));
 
       // Attempt operation that should fail
-      await expect(caller.removeUser({ 
-        userId: "non-existent-user" 
-      })).rejects.toThrow();
+      await expect(
+        caller.removeUser({
+          userId: "non-existent-user",
+        }),
+      ).rejects.toThrow();
 
       // Verify no partial changes occurred
-      const finalMembershipCount = await db.select({ count: count() })
-        .from(schema.memberships) 
+      const finalMembershipCount = await db
+        .select({ count: count() })
+        .from(schema.memberships)
         .where(eq(schema.memberships.organizationId, testData.organization));
 
-      expect(finalMembershipCount[0].count).toBe(originalMembershipCount[0].count);
+      expect(finalMembershipCount[0].count).toBe(
+        originalMembershipCount[0].count,
+      );
     });
   });
 });
