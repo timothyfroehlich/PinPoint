@@ -1,6 +1,6 @@
 # TypeScript Strictest Patterns
 
-Essential patterns for @tsconfig/strictest compliance. Auto-loaded by Claude Code agents.
+_Essential patterns for @tsconfig/strictest compliance and direct conversion approach_
 
 ## Core Safety Patterns
 
@@ -39,7 +39,7 @@ const data = {
 const data: { name?: string } = { name: value }; // Error if value is undefined
 ```
 
-### Type Narrowing & Guards
+### Type Guards
 
 ```typescript
 // ✅ Type guard for arrays
@@ -47,21 +47,11 @@ function hasItems<T>(arr: T[] | undefined): arr is T[] {
   return arr !== undefined && arr.length > 0;
 }
 
-// ✅ Type guard for objects
+// ✅ Type guard for Supabase user
 function isValidUser(user: unknown): user is { id: string; email: string } {
   return (
-    typeof user === "object" &&
-    user !== null &&
-    "id" in user &&
-    "email" in user &&
-    typeof user.id === "string" &&
-    typeof user.email === "string"
+    typeof user === "object" && user !== null && "id" in user && "email" in user
   );
-}
-
-// ✅ Using type guards
-if (hasItems(items)) {
-  items.forEach((item) => processItem(item)); // items is T[]
 }
 ```
 
@@ -79,11 +69,7 @@ const user = await getUserById(id);
 if (!user) throw new Error("User not found");
 console.log(user.email); // Safe
 
-// ✅ Solution 2: Non-null assertion (use sparingly)
-const user = await getUserById(id);
-console.log(user!.email); // Only if you're certain user exists
-
-// ✅ Solution 3: Optional chaining with fallback
+// ✅ Solution 2: Optional chaining with fallback
 const user = await getUserById(id);
 console.log(user?.email ?? "No email"); // Safe with fallback
 ```
@@ -99,49 +85,30 @@ const result = await fetchUser(id); // Error: expects string
 const id: string | number = getId();
 const userId = typeof id === "string" ? id : String(id);
 const result = await fetchUser(userId);
-
-// ✅ Alternative: Type assertion (use carefully)
-const result = await fetchUser(id as string);
 ```
 
-### "Property X does not exist on type" Errors
+### Union Type Errors
 
 ```typescript
-// ❌ Problem: Accessing properties on union types
-function processResult(result: Success | Error) {
-  console.log(result.message); // Error: message might not exist
-}
-
-// ✅ Solution: Type narrowing
-function processResult(result: Success | Error) {
-  if ("message" in result) {
-    console.log(result.message); // Safe
-  }
-}
-
-// ✅ Alternative: Discriminated unions
+// ✅ Discriminated unions
 type Result =
   | { type: "success"; data: string }
   | { type: "error"; message: string };
 
 function processResult(result: Result) {
-  switch (result.type) {
-    case "success":
-      console.log(result.data); // Safe
-      break;
-    case "error":
-      console.log(result.message); // Safe
-      break;
+  if (result.type === "success") {
+    console.log(result.data); // Safe
+  } else {
+    console.log(result.message); // Safe
   }
 }
 ```
 
-## Project-Specific Patterns
+## tRPC Context Safety
 
-### tRPC Context Safety
+### Protected Procedure Pattern
 
 ```typescript
-// ✅ Protected procedure pattern
 const protectedProcedure = publicProcedure.use(({ ctx, next }) => {
   if (!ctx.session?.user?.id) {
     throw new TRPCError({ code: "UNAUTHORIZED" });
@@ -156,23 +123,11 @@ const protectedProcedure = publicProcedure.use(({ ctx, next }) => {
 });
 ```
 
-### Multi-Tenant Query Safety
+### Organization Scoping
 
 ```typescript
-// ✅ Safe organization scoping
-export async function getIssuesForOrg(organizationId: string) {
-  if (!organizationId) {
-    throw new Error("Organization ID required");
-  }
-
-  return await db.issue.findMany({
-    where: { organizationId }, // Guaranteed to be string
-  });
-}
-
-// ✅ Session-based organization scoping
 const protectedOrgProcedure = protectedProcedure.use(({ ctx, next }) => {
-  const orgId = ctx.session.user.currentOrganizationId;
+  const orgId = ctx.session.user.user_metadata?.organizationId;
   if (!orgId) {
     throw new TRPCError({
       code: "FORBIDDEN",
@@ -188,43 +143,89 @@ const protectedOrgProcedure = protectedProcedure.use(({ ctx, next }) => {
 });
 ```
 
-### Prisma Select Clause Safety
+## Drizzle Query Safety
+
+### Safe Query Patterns
 
 ```typescript
-// ✅ Explicit select for type safety
-const users = await db.user.findMany({
-  select: {
+import { eq, and } from "drizzle-orm";
+import { issues, machines } from "~/db/schema";
+
+// ✅ Safe Drizzle queries with proper typing
+export async function getIssuesWithMachines(organizationId: string) {
+  if (!organizationId) {
+    throw new Error("Organization ID required");
+  }
+
+  return await db.query.issues.findMany({
+    where: eq(issues.organizationId, organizationId),
+    with: {
+      machine: {
+        columns: { id: true, name: true, model: true },
+      },
+    },
+  });
+}
+
+// ✅ Explicit column selection
+const users = await db.query.users.findMany({
+  columns: {
     id: true,
     email: true,
     name: true,
     // Explicitly exclude sensitive fields
   },
 });
+```
 
-// ✅ Type-safe partial selections
-type UserPublic = Pick<User, "id" | "email" | "name">;
-const publicUsers: UserPublic[] = await db.user.findMany({
-  select: {
-    id: true,
-    email: true,
-    name: true,
-  },
-});
+## Supabase SSR Safety
+
+### Safe Auth Context
+
+```typescript
+// ✅ Safe auth context access
+export async function createTRPCContext({ req }: { req: NextRequest }) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  // Handle both success and error cases
+  if (error) {
+    console.warn("Auth error:", error.message);
+    return { user: null, supabase };
+  }
+
+  return { user, supabase };
+}
+```
+
+### Server Action Safety
+
+```typescript
+// ✅ Safe Server Action with auth
+export async function updateProfile(formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  const name = formData.get("name");
+  if (typeof name !== "string") {
+    throw new Error("Name must be a string");
+  }
+
+  await db.update(users).set({ name }).where(eq(users.id, user.id));
+  revalidatePath("/profile");
+}
 ```
 
 ## Error Prevention Strategies
-
-### Import Path Consistency
-
-```typescript
-// ✅ Always use TypeScript alias
-import { validateUser } from "~/lib/validation/user";
-import { createClient } from "~/lib/supabase/client";
-
-// ❌ Never use relative paths for deep imports
-import { validateUser } from "../../../lib/validation/user";
-import { createClient } from "../../../lib/supabase/client";
-```
 
 ### Strict Function Signatures
 
@@ -236,9 +237,9 @@ export async function getUserMemberships(
   if (!userId) {
     throw new Error("User ID required");
   }
-  // Implementation ensures return type matches
-  return await db.membership.findMany({
-    where: { userId },
+
+  return await db.query.memberships.findMany({
+    where: eq(memberships.userId, userId),
   });
 }
 
@@ -249,9 +250,19 @@ export function createIssue(data: {
   machineId: string;
   organizationId: string;
 }): Promise<Issue> {
-  // All required fields are guaranteed by type system
-  return db.issue.create({ data });
+  return db.insert(issues).values(data).returning();
 }
+```
+
+### Import Path Consistency
+
+```typescript
+// ✅ Always use TypeScript alias
+import { validateUser } from "~/lib/validation/user";
+import { createClient } from "~/utils/supabase/server";
+
+// ❌ Never use relative paths for deep imports
+import { validateUser } from "../../../lib/validation/user";
 ```
 
 ## Anti-Patterns to Avoid
@@ -270,57 +281,37 @@ const result = dangerousOperation();
 // ❌ Never: Unsafe type assertions
 const user = data as User; // Without validation
 
-// ❌ Never: Mutating readonly arrays
-const items: readonly string[] = getItems();
-items.push("new"); // Error (good!)
-
-// ✅ Instead: Create new array
-const newItems = [...items, "new"];
-```
-
-## Migration-Specific Patterns
-
-### Supabase Auth Transition
-
-```typescript
-// ✅ Safe auth context access
-export async function createTRPCContext({ req }: { req: NextRequest }) {
-  const supabase = createServerClient(cookies);
-  const {
-    data: { session },
-    error,
-  } = await supabase.auth.getSession();
-
-  // Handle both success and error cases
-  if (error) {
-    console.warn("Auth session error:", error.message);
-    return { session: null, supabase };
-  }
-
-  return { session, supabase };
+// ✅ Instead: Proper validation
+function isUser(data: unknown): data is User {
+  return typeof data === "object" && data !== null && "id" in data;
+}
+if (isUser(data)) {
+  const user = data; // Safe
 }
 ```
 
-### Drizzle Query Safety
+## Server Components Safety
+
+### Async Component Patterns
 
 ```typescript
-// ✅ Safe Drizzle queries with proper typing
-import { eq, and } from "drizzle-orm";
-import { issues, machines } from "~/db/schema";
-
-export async function getIssuesWithMachines(organizationId: string) {
-  if (!organizationId) {
-    throw new Error("Organization ID required");
+// ✅ Safe async Server Component
+export default async function IssuesPage({ params }: { params: { orgId: string } }) {
+  if (!params.orgId) {
+    throw new Error('Organization ID required');
   }
 
-  return await db
-    .select({
-      issue: issues,
-      machine: machines,
-    })
-    .from(issues)
-    .innerJoin(machines, eq(issues.machineId, machines.id))
-    .where(eq(issues.organizationId, organizationId));
+  const issues = await db.query.issues.findMany({
+    where: eq(issues.organizationId, params.orgId),
+  });
+
+  return (
+    <div>
+      {issues.map((issue) => (
+        <IssueCard key={issue.id} issue={issue} />
+      ))}
+    </div>
+  );
 }
 ```
 
@@ -328,5 +319,7 @@ export async function getIssuesWithMachines(organizationId: string) {
 
 **Key Remember**: In @tsconfig/strictest mode, TypeScript catches potential runtime errors at compile time. Embrace the errors—they're preventing bugs.
 
-**Last Updated**: 2025-08-03  
-**Status**: Active - Core patterns for strictest compliance
+**Cross-References:**
+
+- Latest patterns: @docs/latest-updates/quick-reference.md
+- API security: @docs/quick-reference/api-security-patterns.md

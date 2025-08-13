@@ -74,7 +74,7 @@ export class QRCodeService {
     // Upload QR code image directly from buffer
     const qrCodeUrl = await imageStorage.uploadQRCode(
       qrCodeBuffer,
-      `qr-codes/machine-${String(machine.id)}/qr-code-${String(machine.id)}`,
+      `qr-codes/machine-${machine.id}/qr-code-${machine.id}`,
     );
 
     // Update machine with QR code information

@@ -1,3 +1,25 @@
 #!/bin/sh
+# Prevent commits to main branch
+branch=$(git rev-parse --abbrev-ref HEAD)
+if [ "$branch" = "main" ]; then
+  echo "🚨 BLOCKED: Direct commits to main are not allowed!"
+  echo "💡 Use a feature branch and create a PR, or use /ship-it for meta changes"
+  echo "🔧 Create a branch: git checkout -b feature/your-changes"
+  exit 1
+fi
+
 echo "🔧 Running pre-commit checks in parallel..."
+
+# Check for accidental migration files (no-migrations approach)
+if [ -d "supabase/migrations" ]; then
+  MIGRATION_FILES=$(find supabase/migrations -name "*.sql" 2>/dev/null || true)
+  if [ -n "$MIGRATION_FILES" ]; then
+    echo "❌ Migration files detected! This project uses 'drizzle-kit push' (no migrations approach)."
+    echo "Found: $MIGRATION_FILES"
+    echo "Run: rm -rf supabase/migrations"
+    exit 1
+  fi
+fi
+echo "✅ No migration files found - using no-migrations approach correctly"
+
 npm run pre-commit:all

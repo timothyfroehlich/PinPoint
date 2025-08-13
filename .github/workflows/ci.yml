@@ -120,32 +120,23 @@ jobs:
       - name: Prettier Check
         run: npm run format
 
-  # Job 4: Tests with Coverage
-  # Uses simple PostgreSQL container (Supabase local doesn't work well in CI)
+  # Job 4: Tests (Parallel Shards)
+  # Uses matrix strategy to run test shards in parallel
   test:
-    name: Tests
+    name: Tests (${{ matrix.shard }})
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: test_user
-          POSTGRES_PASSWORD: test_password
-          POSTGRES_DB: test_db
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+    strategy:
+      fail-fast: false
+      matrix:
+        shard:
+          - "unit-node"
+          - "unit-jsdom" 
+          - "integration"
     env:
-      DATABASE_URL: "postgresql://test_user:test_password@localhost:5432/test_db"
-      DIRECT_URL: "postgresql://test_user:test_password@localhost:5432/test_db"
-      POSTGRES_PRISMA_URL: "postgresql://test_user:test_password@localhost:5432/test_db"
-      POSTGRES_URL_NON_POOLING: "postgresql://test_user:test_password@localhost:5432/test_db"
+      NODE_ENV: test
+      CI: true
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -153,21 +144,29 @@ jobs:
           node-version: "24"
           cache: "npm"
       - run: npm ci
-      - name: Setup Database Schema
-        run: npm run db:push:local
-      - name: Seed Database for Tests
-        run: npm run db:seed:local:pg
-      - name: Run Tests with Coverage
-        run: npm run test:coverage
-      - name: Upload Coverage
+      - name: Run Tests (${{ matrix.shard }}) with Coverage
+        run: |
+          case "${{ matrix.shard }}" in
+            "unit-node")
+              npx vitest run --coverage --project=node --coverage.thresholds=false
+              ;;
+            "unit-jsdom")
+              npx vitest run --coverage --project=jsdom --coverage.thresholds=false
+              ;;
+            "integration")
+              npx vitest run --coverage --project=integration --coverage.thresholds=false
+              ;;
+          esac
+      - name: Upload Coverage (${{ matrix.shard }})
         uses: codecov/codecov-action@18283e04ce6e62d37312384ff67231eb8fd56d24 # v5
         with:
           files: ./coverage/lcov.info
-          flags: unittests
-          name: codecov-umbrella
+          flags: ${{ matrix.shard }}
+          name: codecov-${{ matrix.shard }}
           fail_ci_if_error: true
 
   # Job 5: Database Validation (Drizzle ORM)
+  # Validates real database connection setup with PostgreSQL
   database-validation:
     name: Database Validation
     runs-on: ubuntu-latest
@@ -175,7 +174,7 @@ jobs:
       contents: read
     services:
       postgres:
-        image: postgres:16
+        image: postgres:17
         env:
           POSTGRES_USER: test_user
           POSTGRES_PASSWORD: test_password
@@ -190,8 +189,8 @@ jobs:
     env:
       DATABASE_URL: "postgresql://test_user:test_password@localhost:5432/test_db"
       DIRECT_URL: "postgresql://test_user:test_password@localhost:5432/test_db"
-      POSTGRES_PRISMA_URL: "postgresql://test_user:test_password@localhost:5432/test_db"
-      POSTGRES_URL_NON_POOLING: "postgresql://test_user:test_password@localhost:5432/test_db"
+      NODE_ENV: test
+      CI: true
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4

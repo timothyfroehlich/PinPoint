@@ -19,6 +19,10 @@ export const locations = pgTable(
     name: text("name").notNull(),
     organizationId: text("organizationId").notNull(),
 
+    // Timestamps
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+
     // Geographic and Contact Information (from PinballMap API analysis)
     street: text("street"),
     city: text("city"),
@@ -65,6 +69,10 @@ export const models = pgTable("Model", {
 
   // PinPoint-specific
   isCustom: boolean("isCustom").default(false).notNull(), // Flag for custom/homebrew models
+
+  // Timestamps
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
 // Replaces GameInstance
@@ -92,6 +100,10 @@ export const machines = pgTable(
     qrCodeId: text("qrCodeId").unique().notNull(),
     qrCodeUrl: text("qrCodeUrl"),
     qrCodeGeneratedAt: timestamp("qrCodeGeneratedAt"),
+
+    // Timestamps
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().notNull(),
   },
   (table) => [
     // QR code lookups (critical for scanning performance)

@@ -87,5 +87,13 @@ console.warn = (...args: any[]) => {
   ) {
     return;
   }
+  if (
+    typeof args[0] === "string" &&
+    args[0].includes(
+      "React internals not available - hooks may not work properly",
+    )
+  ) {
+    return;
+  }
   originalConsoleWarn(...args);
 };

@@ -135,7 +135,7 @@ These files are referenced across multiple subsystems and should be understood f
 
 ### Tests
 
-- `src/server/api/routers/comment.test.ts` - Comment router tests
+- `src/integration-tests/comment.integration.test.ts` - Comment router integration tests with real database operations
 - `src/integration-tests/comment-soft-delete.test.ts` - Soft delete functionality
 
 ## File Upload & Attachment System
