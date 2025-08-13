@@ -316,74 +316,29 @@ describe("Location Router (Drizzle Conversion)", () => {
     ];
 
     it("should get public location data with complex count queries", async () => {
-      // Mock the locations query for getPublic
-      vi.mocked(mockContext.drizzle.query.locations.findMany).mockResolvedValue(
-        [
-          {
-            id: "location-1",
-            name: "Test Location",
-            machines: [
-              {
-                id: "machine-1",
-                name: "Test Machine",
-                model: {
-                  name: "Medieval Madness",
-                  manufacturer: "Williams",
-                },
-              },
-            ],
-          },
-        ],
-      );
-
-      // Mock machine counts query
-      vi.mocked(mockContext.drizzle.groupBy).mockResolvedValue([
-        { locationId: "location-1", machineCount: 1 },
+      // Mock the query builder chain to return flat rows that match the new query structure
+      vi.mocked(mockContext.drizzle.orderBy).mockResolvedValue([
+        {
+          locationId: "location-1",
+          locationName: "Test Location",
+          machineId: "machine-1",
+          machineName: "Test Machine",
+          modelName: "Medieval Madness",
+          modelManufacturer: "Williams",
+          unresolvedIssueCount: 2,
+        },
       ]);
-
-      // Mock unresolved issue counts query
-      const _issueCountQuery = vi
-        .fn()
-        .mockResolvedValue([{ machineId: "machine-1", issueCount: 2 }]);
-      vi.mocked(mockContext.drizzle.groupBy)
-        .mockResolvedValueOnce([{ locationId: "location-1", machineCount: 1 }])
-        .mockResolvedValueOnce([{ machineId: "machine-1", issueCount: 2 }]);
 
       const result = await caller.getPublic();
 
-      // Verify the relational query was called with proper column selection
-      expect(mockContext.drizzle.query.locations.findMany).toHaveBeenCalledWith(
-        {
-          where: expect.any(Object),
-          columns: {
-            id: true,
-            name: true,
-          },
-          with: {
-            machines: {
-              columns: {
-                id: true,
-                name: true,
-              },
-              with: {
-                model: {
-                  columns: {
-                    name: true,
-                    manufacturer: true,
-                  },
-                },
-              },
-            },
-          },
-          orderBy: expect.any(Object),
-        },
-      );
-
-      // Verify machine count aggregation query
+      // Verify the query builder chain was called
       expect(mockContext.drizzle.select).toHaveBeenCalled();
       expect(mockContext.drizzle.from).toHaveBeenCalled();
+      expect(mockContext.drizzle.leftJoin).toHaveBeenCalled();
+      expect(mockContext.drizzle.innerJoin).toHaveBeenCalled();
       expect(mockContext.drizzle.where).toHaveBeenCalled();
       expect(mockContext.drizzle.groupBy).toHaveBeenCalled();
+      expect(mockContext.drizzle.orderBy).toHaveBeenCalled();
 
       expect(result).toEqual(
         expect.arrayContaining([
@@ -411,10 +366,8 @@ describe("Location Router (Drizzle Conversion)", () => {
         user: null, // No authentication required for public endpoint
       } as any);
 
-      vi.mocked(mockContext.drizzle.query.locations.findMany).mockResolvedValue(
-        [],
-      );
-      vi.mocked(mockContext.drizzle.groupBy).mockResolvedValue([]);
+      // Mock empty result from query builder chain
+      vi.mocked(mockContext.drizzle.orderBy).mockResolvedValue([]);
 
       const result = await publicCaller.getPublic();
       expect(result).toEqual([]);
@@ -432,18 +385,18 @@ describe("Location Router (Drizzle Conversion)", () => {
     });
 
     it("should filter unresolved issues correctly", async () => {
-      vi.mocked(mockContext.drizzle.query.locations.findMany).mockResolvedValue(
-        [],
-      );
-      vi.mocked(mockContext.drizzle.groupBy).mockResolvedValue([]);
+      // Mock empty result from query builder chain
+      vi.mocked(mockContext.drizzle.orderBy).mockResolvedValue([]);
 
       await caller.getPublic();
 
-      // Verify that the issue count query includes proper filtering
+      // Verify that the query builder chain includes proper filtering
+      expect(mockContext.drizzle.select).toHaveBeenCalled();
+      expect(mockContext.drizzle.leftJoin).toHaveBeenCalled();
       expect(mockContext.drizzle.innerJoin).toHaveBeenCalled();
-      expect(mockContext.drizzle.where).toHaveBeenCalledWith(
-        expect.any(Object), // and() clause with organization filter and status != RESOLVED
-      );
+      expect(mockContext.drizzle.where).toHaveBeenCalled();
+      expect(mockContext.drizzle.groupBy).toHaveBeenCalled();
+      expect(mockContext.drizzle.orderBy).toHaveBeenCalled();
     });
   });
 
@@ -970,25 +923,16 @@ describe("Location Router (Drizzle Conversion)", () => {
     });
 
     it("should maintain organizational context throughout complex operations", async () => {
-      // Test that getPublic maintains organizational filtering across multiple queries
-      vi.mocked(mockContext.drizzle.query.locations.findMany).mockResolvedValue(
-        [],
-      );
-      vi.mocked(mockContext.drizzle.groupBy).mockResolvedValue([]);
+      // Test that getPublic maintains organizational filtering across query builder chain
+      vi.mocked(mockContext.drizzle.orderBy).mockResolvedValue([]);
 
       await caller.getPublic();
 
-      // Verify all sub-queries in getPublic use organizational filtering
-      expect(mockContext.drizzle.query.locations.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.any(Object), // eq(locations.organizationId, ctx.organization.id)
-        }),
-      );
-
-      // Machine count and issue count queries should also be org-scoped
-      expect(mockContext.drizzle.where).toHaveBeenCalledWith(
-        expect.any(Object), // Should include organizational filters
-      );
+      // Verify the query builder chain includes organizational filtering
+      expect(mockContext.drizzle.select).toHaveBeenCalled();
+      expect(mockContext.drizzle.from).toHaveBeenCalled();
+      expect(mockContext.drizzle.where).toHaveBeenCalled(); // Should include organizational filters
+      expect(mockContext.drizzle.orderBy).toHaveBeenCalled();
     });
   });
 

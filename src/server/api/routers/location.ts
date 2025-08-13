@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, count, eq, ne, asc } from "drizzle-orm";
+import { and, eq, asc, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { generateId } from "~/lib/utils/id-generation";
@@ -67,9 +67,7 @@ export const locationRouter = createTRPCRouter({
         machineName: machines.name,
         modelName: models.name,
         modelManufacturer: models.manufacturer,
-        unresolvedIssueCount: count(
-          and(issues.id, ne(issueStatuses.category, "RESOLVED")),
-        ),
+        unresolvedIssueCount: sql<number>`count(case when ${issueStatuses.category} <> 'RESOLVED' then 1 end)`,
       })
       .from(locations)
       .leftJoin(machines, eq(machines.locationId, locations.id))
