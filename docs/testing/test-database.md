@@ -2,9 +2,90 @@
 
 ## Overview
 
-PinPoint uses Supabase local for testing, providing a complete PostgreSQL environment with RLS policies, stored procedures, and all production features. This ensures tests accurately reflect production behavior.
+PinPoint uses two database testing approaches:
 
-## Installation
+1. **PGlite Integration Testing** (Recommended) - Fast, in-memory PostgreSQL for router and database logic testing
+2. **Supabase Local Testing** (E2E) - Complete PostgreSQL environment for full-stack integration and E2E testing
+
+## PGlite Integration Testing (Recommended)
+
+### Overview
+
+**PGlite** provides a complete PostgreSQL database running in-memory via WebAssembly. Perfect for integration testing router logic, database constraints, and business rules.
+
+**Benefits:**
+
+- ✅ **Fast execution**: No Docker startup time, runs instantly
+- ✅ **Real PostgreSQL**: Full compatibility with PostgreSQL features
+- ✅ **Isolation**: Fresh database for each test, no cleanup needed
+- ✅ **CI friendly**: No external dependencies or Docker requirements
+- ✅ **Schema migrations**: Real migration testing with Drizzle
+
+### Setup
+
+```typescript
+// test/helpers/pglite-test-setup.ts
+import { PGlite } from "@electric-sql/pglite";
+import { drizzle } from "drizzle-orm/pglite";
+import { migrate } from "drizzle-orm/pglite/migrator";
+import * as schema from "~/server/db/schema";
+
+export async function createSeededTestDatabase() {
+  // Create fresh PostgreSQL database in memory
+  const client = new PGlite();
+  const db = drizzle(client, { schema });
+
+  // Apply real schema migrations
+  await migrate(db, { migrationsFolder: "drizzle" });
+
+  // Create minimal seed data
+  const orgId = await createTestOrganization(db);
+  await createTestData(db, orgId);
+
+  return { db, organizationId: orgId };
+}
+```
+
+### Usage Example
+
+**Reference**: `src/integration-tests/location.integration.test.ts`
+
+```typescript
+describe("Admin Router Integration (PGlite)", () => {
+  let db: TestDatabase;
+  let testData: SeededTestData;
+
+  beforeEach(async () => {
+    // Fresh database for each test
+    const setup = await createSeededTestDatabase();
+    db = setup.db;
+    testData = await getSeededTestData(db, setup.organizationId);
+  });
+
+  it("should enforce referential integrity", async () => {
+    // Real foreign key constraints are tested
+    await expect(
+      db.insert(issues).values({
+        title: "Test Issue",
+        machineId: "nonexistent-machine", // Foreign key violation
+        organizationId: testData.organization,
+      }),
+    ).rejects.toThrow(); // Real database constraint error
+  });
+});
+```
+
+### Installation
+
+```bash
+# Install PGlite
+npm install @electric-sql/pglite --save-dev
+
+# PGlite is automatically included in tests
+# No additional setup required - runs in memory
+```
+
+## Supabase Local Testing (E2E)
 
 ### Prerequisites
 
@@ -25,25 +106,31 @@ npm install -g supabase
 supabase --version
 ```
 
-## Project Configuration
-
 ### Initialize Supabase
 
 ```bash
 # In project root
 supabase init
 
-# Start local services
+# Start local services (required for E2E tests)
 supabase start
 ```
 
-This starts:
+**Services started:**
 
-- PostgreSQL (port 54322)
-- Auth service (port 54321)
-- Storage service
-- Realtime service
-- Studio UI (port 54323)
+- PostgreSQL (port 54322) - Database with RLS policies
+- Auth service (port 54321) - User authentication
+- Storage service - File uploads
+- Realtime service - Live updates
+- Studio UI (port 54323) - Database admin interface
+
+**When to use:**
+
+- ✅ E2E tests requiring full Supabase stack
+- ✅ Authentication flow testing
+- ✅ RLS policy validation
+- ✅ Realtime feature testing
+- ❌ Router integration testing (use PGlite instead)
 
 ### Environment Setup
 
@@ -100,6 +187,34 @@ supabase db push
 # Or reset completely
 supabase db reset
 ```
+
+## Testing Approach Guidelines
+
+### Use PGlite for:
+
+- ✅ **Router integration tests** - Fast database constraint validation
+- ✅ **Database logic testing** - Foreign keys, constraints, cascades
+- ✅ **Multi-table operations** - Complex queries with real relationships
+- ✅ **Business rule validation** - Database-enforced business logic
+- ✅ **CI/CD pipelines** - No external dependencies required
+
+### Use Supabase Local for:
+
+- ✅ **E2E testing** - Complete user workflows with authentication
+- ✅ **Authentication flows** - Login, logout, session management
+- ✅ **RLS policy testing** - Row-level security validation
+- ✅ **Realtime features** - WebSocket connections and live updates
+- ✅ **Full-stack integration** - Frontend + backend + database
+
+### Performance Comparison
+
+| Aspect               | PGlite              | Supabase Local        |
+| -------------------- | ------------------- | --------------------- |
+| **Startup time**     | <100ms              | 10-30 seconds         |
+| **Test execution**   | <2 seconds per file | 5-15 seconds per file |
+| **CI friendliness**  | Excellent           | Good                  |
+| **Feature coverage** | Database only       | Full Supabase stack   |
+| **Use case**         | Integration tests   | E2E tests             |
 
 ## Vitest Configuration
 
