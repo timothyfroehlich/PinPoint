@@ -35,7 +35,7 @@ export class ServiceFactory {
   }
 
   createQRCodeService(): QRCodeService {
-    return new QRCodeService(this.db);
+    return new QRCodeService(this.drizzle);
   }
 }
 
