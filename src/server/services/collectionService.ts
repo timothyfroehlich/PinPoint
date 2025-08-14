@@ -1,12 +1,7 @@
 import { eq, and, or, sql, count } from "drizzle-orm";
 
 import { type DrizzleClient } from "../db/drizzle";
-import {
-  collections,
-  collectionTypes,
-  machines,
-  models,
-} from "../db/schema";
+import { collections, collectionTypes, machines, models } from "../db/schema";
 
 import type { InferSelectModel } from "drizzle-orm";
 
@@ -71,15 +66,16 @@ export class CollectionService {
       })
       .from(collections)
       .innerJoin(collectionTypes, eq(collections.typeId, collectionTypes.id))
-      .leftJoin(machines, 
+      .leftJoin(
+        machines,
         and(
           sql`EXISTS (
             SELECT 1 FROM collection_machines cm 
             WHERE cm.collection_id = ${collections.id} 
             AND cm.machine_id = ${machines.id}
           )`,
-          eq(machines.locationId, locationId)
-        )
+          eq(machines.locationId, locationId),
+        ),
       )
       .where(
         and(
@@ -162,7 +158,10 @@ export class CollectionService {
       })
       .from(machines)
       .innerJoin(models, eq(machines.modelId, models.id))
-      .innerJoin(sql`collection_machines cm`, sql`cm.machine_id = ${machines.id}`)
+      .innerJoin(
+        sql`collection_machines cm`,
+        sql`cm.machine_id = ${machines.id}`,
+      )
       .where(
         and(
           eq(machines.locationId, locationId),
@@ -228,7 +227,7 @@ export class CollectionService {
     // In a real implementation, we'd need either:
     // 1. An explicit junction table defined in the schema
     // 2. A different approach to handle this relationship
-    
+
     // Placeholder implementation - this would need to be adapted based on the actual schema structure
     await this.db.execute(sql`
       -- This is a placeholder for the many-to-many relationship
@@ -447,7 +446,7 @@ export class CollectionService {
           DELETE FROM collection_machines 
           WHERE collection_id = ${existing.id}
         `);
-        
+
         await this.addMachinesToCollection(existing.id, machineIds);
         updated++;
       }
