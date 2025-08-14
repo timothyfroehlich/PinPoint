@@ -69,6 +69,6 @@ describe("ServiceFactory", () => {
   it("should create a QRCodeService instance", () => {
     const service = factory.createQRCodeService();
     expect(service).toBeInstanceOf(QRCodeService);
-    expect(QRCodeService).toHaveBeenCalledWith(mockPrismaDb);
+    expect(QRCodeService).toHaveBeenCalledWith(mockDrizzleDb);
   });
 });
