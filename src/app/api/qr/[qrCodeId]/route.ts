@@ -10,6 +10,7 @@ export async function GET(
 ): Promise<NextResponse> {
   const dbProvider = getGlobalDatabaseProvider();
   const db = dbProvider.getClient();
+  const drizzle = dbProvider.getDrizzleClient();
   try {
     const { qrCodeId } = await params;
 
@@ -21,7 +22,7 @@ export async function GET(
     }
 
     // Initialize services
-    const services = new ServiceFactory(db);
+    const services = new ServiceFactory(db, drizzle);
     const qrCodeService = services.createQRCodeService();
 
     // Resolve machine information from QR code
@@ -58,6 +59,7 @@ export async function HEAD(
 ): Promise<NextResponse> {
   const dbProvider = getGlobalDatabaseProvider();
   const db = dbProvider.getClient();
+  const drizzle = dbProvider.getDrizzleClient();
   try {
     const { qrCodeId } = await params;
 
@@ -65,7 +67,7 @@ export async function HEAD(
       return new NextResponse(null, { status: 400 });
     }
 
-    const services = new ServiceFactory(db);
+    const services = new ServiceFactory(db, drizzle);
     const qrCodeService = services.createQRCodeService();
     const machine = await qrCodeService.resolveMachineFromQR(qrCodeId);
 

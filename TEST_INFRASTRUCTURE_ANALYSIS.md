@@ -2,12 +2,14 @@
 
 ## Executive Summary
 
-**Current State**: PinPoint has a complex testing ecosystem with multiple approaches for database and authentication testing. This analysis documents 48 test files across unit tests, integration tests, and E2E tests to identify service usage patterns and infrastructure needs.
+**Current State**: PinPoint has a complex testing ecosystem with multiple approaches for database and authentication testing. This analysis documents 50 test files across unit tests, integration tests, and E2E tests to identify service usage patterns and infrastructure needs.
+
+**Latest Update**: Added machine location router tests - both unit tests with comprehensive mocking and integration tests with real PGlite database. These demonstrate excellent modern testing patterns with Drizzle ORM integration.
 
 **Key Findings**:
 
-- **Total Test Files**: 48 (unit/integration) + 7 (E2E) = 55 files
-- **Total Lines of Code**: ~27,440 lines of test code
+- **Total Test Files**: 50 (unit/integration) + 7 (E2E) = 57 files
+- **Total Lines of Code**: ~28,794 lines of test code
 - **Mixed Infrastructure**: Tests use combinations of mocked databases, real PGlite databases, Supabase mocking, and full Docker containers
 - **Inconsistent Patterns**: Some tests mock when they should use real services, others use real services when mocking would be appropriate
 
@@ -55,6 +57,17 @@ I categorize each test file's database and authentication service usage into thi
 - **Notes**: New PGlite integration style
 - **Migration Status**: Uses Drizzle patterns - **ANALYZED**
 - **Key Patterns**: PGlite in-memory database, real schema migrations, transaction testing, multi-tenancy isolation, foreign key constraint validation
+
+**src/integration-tests/machine.location.integration.test.ts**
+
+- **Lines**: 777
+- **Tests**: 13
+- **Purpose**: Machine location router integration testing with real PGlite database - validates machine location assignment workflows and multi-tenant security
+- **DB Service**: Real DB (PGlite)
+- **Auth Service**: Major Auth Mocking
+- **Notes**: Modern August 2025 patterns with Vitest and PGlite
+- **Migration Status**: Uses Drizzle patterns - **ANALYZED**
+- **Key Patterns**: Real PostgreSQL database with PGlite, complete schema migrations, real Drizzle ORM operations, multi-tenant data isolation testing, complex relationship validation, machine location assignment workflows, organizational boundary enforcement
 
 **src/integration-tests/location.integration.test.ts**
 
@@ -448,6 +461,18 @@ I categorize each test file's database and authentication service usage into thi
 - **Migration Status**: Uses Drizzle patterns - **ANALYZED**
 - **Key Patterns**: Extensive Drizzle query chain mocking, complex relational queries, multi-tenancy validation, external service integration (PinballMap), comprehensive error scenarios
 
+**src/server/api/routers/**tests**/machine.location.test.ts**
+
+- **Lines**: 577
+- **Tests**: 14
+- **Purpose**: Machine location router unit testing with comprehensive mocking - validates machine location assignment operations with Drizzle patterns
+- **DB Service**: Major DB Mocking
+- **Auth Service**: Major Auth Mocking
+- **Notes**: Machine location router
+- **tRPC Priority**: **ANALYZED** - tRPC router testing
+- **Migration Status**: Uses Drizzle patterns - **ANALYZED**
+- **Key Patterns**: Extensive Drizzle query chain mocking, machine location movement validation, organizational scoping enforcement, permission system integration, error handling scenarios, TRPCError validation
+
 **src/server/api/routers/**tests**/integration.test.ts**
 
 - **Lines**: 973
@@ -721,9 +746,9 @@ I categorize each test file's database and authentication service usage into thi
 
 ### Service Usage Matrix Summary
 
-**Completed Analysis**: 55 test files (48 unit/integration + 7 E2E)
-**Total Test Count**: ~1,650+ individual tests
-**Total Lines of Code**: ~27,440 lines
+**Completed Analysis**: 57 test files (50 unit/integration + 7 E2E)
+**Total Test Count**: ~1,677+ individual tests
+**Total Lines of Code**: ~28,794 lines
 
 #### Service Usage Distribution
 
@@ -731,9 +756,9 @@ I categorize each test file's database and authentication service usage into thi
 | ----------------------------------------- | ---------- | -------------------- | ---------------------------------- |
 | **No DB + No Auth**                       | 18 files   | 753 tests            | Vitest only, no infrastructure     |
 | **Major DB Mocking + No Auth**            | 8 files    | 67 tests             | Mock factories, no real services   |
-| **Major DB Mocking + Major Auth Mocking** | 9 files    | 154 tests            | Complex mock context, tRPC testing |
+| **Major DB Mocking + Major Auth Mocking** | 10 files   | 168 tests            | Complex mock context, tRPC testing |
 | **Minor Auth/DB Mocking**                 | 5 files    | 52 tests             | Simple mocks, strategy testing     |
-| **Real DB (PGlite) + Auth Mocking**       | 2 files    | 48 tests             | PGlite in-memory database          |
+| **Real DB (PGlite) + Auth Mocking**       | 3 files    | 61 tests             | PGlite in-memory database          |
 | **Real DB (External) + Real Auth (Full)** | 8 files    | 75 tests             | Full Supabase Docker stack         |
 | **Database Infrastructure**               | 4 files    | 127 tests            | Mixed real/mock database testing   |
 
@@ -752,7 +777,7 @@ I categorize each test file's database and authentication service usage into thi
 
 #### Tier 2: Unit Tests with Mocking (Light Infrastructure)
 
-**Files**: 13 files, 273 tests  
+**Files**: 14 files, 287 tests  
 **Current State**: ⚠️ Mixed quality - some over-mocked, some under-mocked  
 **Recommendation**: Standardize mock patterns, reduce complexity
 
@@ -765,7 +790,7 @@ I categorize each test file's database and authentication service usage into thi
 
 #### Tier 3: Integration Testing (Medium Infrastructure)
 
-**Files**: 2 files, 48 tests  
+**Files**: 3 files, 61 tests  
 **Current State**: ✅ Excellent approach with PGlite  
 **Recommendation**: Expand this pattern for critical business logic
 
@@ -876,11 +901,14 @@ Parallel Test Execution:
 
 ## 🏁 Analysis Complete
 
-✅ **55 files analyzed** (48 unit/integration + 7 E2E)  
+✅ **57 files analyzed** (50 unit/integration + 7 E2E)  
 ✅ **Service usage patterns identified**  
 ✅ **Infrastructure recommendations generated**  
-✅ **Implementation plan created**
+✅ **Implementation plan created**  
+✅ **Latest additions include machine location router tests with modern patterns**
 
 **Key Finding**: The project has a **solid foundation** with excellent pure logic tests (Tier 1) but needs **standardization and optimization** in mocked tests (Tier 2) and **strategic expansion** of integration testing (Tier 3) while **streamlining** E2E tests (Tier 4).
+
+**Recent Progress**: The new machine location router tests demonstrate excellent modern testing patterns with both comprehensive unit test mocking and real database integration testing using PGlite. These serve as good examples for future router testing approaches.
 
 The recommended four-tier approach balances test reliability, performance, and coverage while providing clear guidelines for testing infrastructure planning.
