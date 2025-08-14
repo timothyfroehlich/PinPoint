@@ -44,7 +44,7 @@ const mockDrizzleClient = {
   leftJoin: vi.fn().mockReturnThis(),
   limit: vi.fn().mockReturnThis(),
   offset: vi.fn().mockReturnThis(),
-  groupBy: vi.fn().mockReturnThis(),
+  groupBy: vi.fn().mockReturnThis(), // Added for issue status count aggregation
   having: vi.fn().mockReturnThis(),
   // Transaction support
   transaction: vi.fn(),
@@ -71,6 +71,14 @@ const mockDrizzleClient = {
       findFirst: vi.fn().mockResolvedValue(null),
     },
     memberships: {
+      findMany: vi.fn().mockResolvedValue([]),
+      findFirst: vi.fn().mockResolvedValue(null),
+    },
+    comments: {
+      findMany: vi.fn().mockResolvedValue([]),
+      findFirst: vi.fn().mockResolvedValue(null),
+    },
+    issueHistory: {
       findMany: vi.fn().mockResolvedValue([]),
       findFirst: vi.fn().mockResolvedValue(null),
     },

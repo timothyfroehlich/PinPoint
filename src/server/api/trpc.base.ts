@@ -7,6 +7,7 @@
  */
 
 import { initTRPC, TRPCError } from "@trpc/server";
+import { eq } from "drizzle-orm";
 import superjson from "superjson";
 import { ZodError } from "zod";
 
@@ -27,6 +28,7 @@ import { createTraceContext, traceStorage } from "~/lib/tracing";
 import { getUserPermissionsForSupabaseUser } from "~/server/auth/permissions";
 import { getSupabaseUser } from "~/server/auth/supabase";
 import { getGlobalDatabaseProvider } from "~/server/db/provider";
+import { organizations } from "~/server/db/schema";
 import { ServiceFactory } from "~/server/services/factory";
 
 /**
@@ -124,11 +126,11 @@ export const createTRPCContext = async (
 
   // If user is authenticated and has organization context, use that
   if (user?.app_metadata.organization_id) {
-    const org = await db.organization.findUnique({
-      where: { id: user.app_metadata.organization_id },
+    const org = await drizzle.query.organizations.findFirst({
+      where: eq(organizations.id, user.app_metadata.organization_id),
     });
     if (org) {
-      // Type-safe assignment - Prisma findUnique returns full object
+      // Type-safe assignment - Drizzle findFirst returns full object
       organization = {
         id: org.id,
         subdomain: org.subdomain,
@@ -143,11 +145,11 @@ export const createTRPCContext = async (
 
   // Fallback to organization based on subdomain
   if (!organization) {
-    const org = await db.organization.findUnique({
-      where: { subdomain },
+    const org = await drizzle.query.organizations.findFirst({
+      where: eq(organizations.subdomain, subdomain),
     });
     if (org) {
-      // Type-safe assignment - Prisma findUnique returns full object
+      // Type-safe assignment - Drizzle findFirst returns full object
       organization = {
         id: org.id,
         subdomain: org.subdomain,
