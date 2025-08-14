@@ -319,6 +319,17 @@ jobs:
             * Error Logging and Monitoring: Ensure errors are logged effectively, and implement monitoring
               mechanisms to track application health in production.
 
+            ### Special Attention: Prisma to Drizzle Migration
+            This section focuses on the migration process to Drizzle ORM. Reviewers should pay special attention to:
+
+            0. You MUST read the Drizzle Migration review procedure (docs/developer-guides/drizzle-migration-review-procedure.md)
+              and evaluate the PR against it. If the PR does not appear to be part of this migration, state so in your comment. Otherwise
+              you must report on the quality of the migration in the PR.
+            1. **Data Model Changes**: Ensure that all changes to the data model are reflected in the migration scripts.
+            2. **Query Adjustments**: Verify that all database queries are updated to use the new Drizzle syntax and features.
+            3. **Testing**: Ensure that comprehensive tests are in place to validate the migration and catch any issues early.
+
+
             **CRITICAL CONSTRAINTS:**
 
             You MUST only provide comments on lines that represent the actual changes in
