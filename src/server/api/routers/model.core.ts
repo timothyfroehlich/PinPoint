@@ -1,3 +1,5 @@
+import { TRPCError } from "@trpc/server";
+import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import {
@@ -5,6 +7,7 @@ import {
   organizationProcedure,
   organizationManageProcedure,
 } from "~/server/api/trpc";
+import { machines, models } from "~/server/db/schema";
 
 export const modelCoreRouter = createTRPCRouter({
   // Enhanced getAll with OPDB metadata
@@ -12,25 +15,27 @@ export const modelCoreRouter = createTRPCRouter({
     // Get all game titles that are either:
     // 1. Custom games belonging to this organization
     // 2. Global OPDB games that have instances in this organization
-    return ctx.db.model.findMany({
-      where: {
-        machines: {
-          some: {
-            organizationId: ctx.organization.id,
-          },
-        },
-      },
-      orderBy: { name: "asc" },
-      include: {
-        _count: {
-          select: {
-            machines: {
-              where: {
-                organizationId: ctx.organization.id,
-              },
-            },
-          },
-        },
+    return await ctx.drizzle.query.models.findMany({
+      where: (models, { exists }) =>
+        exists(
+          ctx.drizzle
+            .select({ id: machines.id })
+            .from(machines)
+            .where(
+              and(
+                eq(machines.modelId, models.id),
+                eq(machines.organizationId, ctx.organization.id),
+              ),
+            ),
+        ),
+      orderBy: (models, { asc }) => [asc(models.name)],
+      extras: {
+        machineCount: sql<number>`(
+          SELECT COUNT(*) 
+          FROM ${machines} 
+          WHERE ${machines.modelId} = ${models.id} 
+            AND ${machines.organizationId} = ${ctx.organization.id}
+        )`.as("machine_count"),
       },
     });
   }),
@@ -39,30 +44,37 @@ export const modelCoreRouter = createTRPCRouter({
   getById: organizationProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
-      const model = await ctx.db.model.findFirst({
-        where: {
-          id: input.id,
-          machines: {
-            some: {
-              organizationId: ctx.organization.id,
-            },
-          },
-        },
-        include: {
-          _count: {
-            select: {
-              machines: {
-                where: {
-                  organizationId: ctx.organization.id,
-                },
-              },
-            },
-          },
+      const model = await ctx.drizzle.query.models.findFirst({
+        where: (models, { and, eq, exists }) =>
+          and(
+            eq(models.id, input.id),
+            exists(
+              ctx.drizzle
+                .select({ id: machines.id })
+                .from(machines)
+                .where(
+                  and(
+                    eq(machines.modelId, models.id),
+                    eq(machines.organizationId, ctx.organization.id),
+                  ),
+                ),
+            ),
+          ),
+        extras: {
+          machineCount: sql<number>`(
+            SELECT COUNT(*) 
+            FROM ${machines} 
+            WHERE ${machines.modelId} = ${models.id} 
+              AND ${machines.organizationId} = ${ctx.organization.id}
+          )`.as("machine_count"),
         },
       });
 
       if (!model) {
-        throw new Error("Game title not found");
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Game title not found or access denied",
+        });
       }
 
       return model;
@@ -73,44 +85,58 @@ export const modelCoreRouter = createTRPCRouter({
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       // Verify the game title belongs to this organization or is a global OPDB game
-      const model = await ctx.db.model.findFirst({
-        where: {
-          id: input.id,
-          machines: {
-            some: {
-              organizationId: ctx.organization.id,
-            },
-          },
-        },
-        include: {
-          _count: {
-            select: {
-              machines: {
-                where: {
-                  organizationId: ctx.organization.id,
-                },
-              },
-            },
-          },
+      const model = await ctx.drizzle.query.models.findFirst({
+        where: (models, { and, eq, exists }) =>
+          and(
+            eq(models.id, input.id),
+            exists(
+              ctx.drizzle
+                .select({ id: machines.id })
+                .from(machines)
+                .where(
+                  and(
+                    eq(machines.modelId, models.id),
+                    eq(machines.organizationId, ctx.organization.id),
+                  ),
+                ),
+            ),
+          ),
+        extras: {
+          machineCount: sql<number>`(
+            SELECT COUNT(*) 
+            FROM ${machines} 
+            WHERE ${machines.modelId} = ${models.id} 
+              AND ${machines.organizationId} = ${ctx.organization.id}
+          )`.as("machine_count"),
         },
       });
 
       if (!model) {
-        throw new Error("Game title not found");
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Game title not found or access denied",
+        });
       }
 
       if (model.isCustom) {
-        throw new Error(
-          "Cannot delete custom games. Remove game instances instead.",
-        );
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Cannot delete custom games. Remove game instances instead.",
+        });
       }
 
-      if (model._count.machines > 0) {
-        throw new Error("Cannot delete game title that has game instances");
+      if (model.machineCount > 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Cannot delete game title that has game instances",
+        });
       }
 
-      return ctx.db.model.delete({
-        where: { id: input.id },
-      });
+      const [deletedModel] = await ctx.drizzle
+        .delete(models)
+        .where(eq(models.id, input.id))
+        .returning();
+
+      return deletedModel;
     }),
 });

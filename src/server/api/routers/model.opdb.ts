@@ -1,12 +1,16 @@
+import { TRPCError } from "@trpc/server";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { env } from "~/env";
 import { OPDBClient } from "~/lib/opdb/client";
+import { generateId } from "~/lib/utils/id-generation";
 import {
   createTRPCRouter,
   organizationProcedure,
   organizationManageProcedure,
 } from "~/server/api/trpc";
+import { machines, models } from "~/server/db/schema";
 
 export const modelOpdbRouter = createTRPCRouter({
   // Search OPDB games for typeahead
@@ -22,14 +26,15 @@ export const modelOpdbRouter = createTRPCRouter({
     .input(z.object({ opdbId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       // Check if this OPDB game already exists globally
-      const existingGame = await ctx.db.model.findUnique({
-        where: {
-          opdbId: input.opdbId,
-        },
+      const existingGame = await ctx.drizzle.query.models.findFirst({
+        where: eq(models.opdbId, input.opdbId),
       });
 
       if (existingGame) {
-        throw new Error("This game already exists in the system");
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "This game already exists in the system",
+        });
       }
 
       // Fetch full data from OPDB
@@ -37,40 +42,56 @@ export const modelOpdbRouter = createTRPCRouter({
       const machineData = await opdbClient.getMachineById(input.opdbId);
 
       if (!machineData) {
-        throw new Error("Game not found in OPDB");
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Game not found in OPDB",
+        });
       }
 
       // Create global Model record with OPDB data
       // OPDB games are shared across all organizations
-      return ctx.db.model.create({
-        data: {
+      const [newModel] = await ctx.drizzle
+        .insert(models)
+        .values({
+          id: generateId(),
           name: machineData.name,
           opdbId: input.opdbId,
           manufacturer: machineData.manufacturer ?? null,
           year: machineData.year ?? null,
           opdbImgUrl: machineData.playfield_image ?? null,
           machineType: machineData.type ?? null,
-        },
-      });
+          // Set appropriate defaults for other fields
+          isCustom: false,
+          isActive: true,
+        })
+        .returning();
+
+      return newModel;
     }),
 
   // Sync existing titles with OPDB
   syncWithOPDB: organizationManageProcedure.mutation(async ({ ctx }) => {
     // Find all OPDB games that have game instances in this organization
-    const machinesInOrg = await ctx.db.machine.findMany({
-      where: {
-        organizationId: ctx.organization.id,
-      },
-      include: {
+    const machinesInOrg = await ctx.drizzle.query.machines.findMany({
+      where: eq(machines.organizationId, ctx.organization.id),
+      with: {
         model: true,
       },
     });
 
     const opdbGamesToSync = machinesInOrg
-      .map((gi) => gi.model)
-      .filter((gt) => gt.opdbId && !gt.opdbId.startsWith("custom-"));
+      .map((machine) => machine.model)
+      .filter((model) => model.opdbId && !model.opdbId.startsWith("custom-"))
+      // Remove duplicates by creating a Map
+      .reduce((uniqueModels, model) => {
+        uniqueModels.set(model.id, model);
+        return uniqueModels;
+      }, new Map<string, (typeof machinesInOrg)[0]["model"]>())
+      .values();
 
-    if (opdbGamesToSync.length === 0) {
+    const uniqueModels = Array.from(opdbGamesToSync);
+
+    if (uniqueModels.length === 0) {
       return { synced: 0, message: "No OPDB-linked games found to sync" };
     }
 
@@ -78,23 +99,24 @@ export const modelOpdbRouter = createTRPCRouter({
     let syncedCount = 0;
 
     // Sync each title with OPDB data
-    for (const title of opdbGamesToSync) {
+    for (const title of uniqueModels) {
       try {
         if (!title.opdbId) continue; // Type guard
 
         const machineData = await opdbClient.getMachineById(title.opdbId);
 
         if (machineData) {
-          await ctx.db.model.update({
-            where: { id: title.id },
-            data: {
+          await ctx.drizzle
+            .update(models)
+            .set({
               name: machineData.name,
               manufacturer: machineData.manufacturer ?? null,
               year: machineData.year ?? null,
               opdbImgUrl: machineData.playfield_image ?? null,
               machineType: machineData.type ?? null,
-            },
-          });
+              updatedAt: new Date(),
+            })
+            .where(eq(models.id, title.id));
           syncedCount++;
         }
       } catch (error) {
@@ -116,8 +138,8 @@ export const modelOpdbRouter = createTRPCRouter({
 
     return {
       synced: syncedCount,
-      total: opdbGamesToSync.length,
-      message: `Synced ${syncedCount.toString()} of ${opdbGamesToSync.length.toString()} games`,
+      total: uniqueModels.length,
+      message: `Synced ${syncedCount.toString()} of ${uniqueModels.length.toString()} games`,
     };
   }),
 });
