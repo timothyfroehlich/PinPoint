@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/unbound-method */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { DrizzleClient } from "~/server/db/drizzle";
@@ -99,6 +100,7 @@ describe("Collection Router Integration", () => {
       expect(result).toHaveProperty("auto");
       expect(Array.isArray(result.manual)).toBe(true);
       expect(Array.isArray(result.auto)).toBe(true);
+
       expect(mockDrizzle.select).toHaveBeenCalled();
     });
 
@@ -112,7 +114,8 @@ describe("Collection Router Integration", () => {
       };
 
       // Update mock to return the collection
-      vi.mocked(mockDrizzle.insert).mockReturnValue({
+      const mockInsert = mockDrizzle.insert as any;
+      mockInsert.mockReturnValue({
         values: vi.fn().mockReturnValue({
           returning: vi.fn().mockResolvedValue([mockCollection]),
         }),
@@ -136,14 +139,14 @@ describe("Collection Router Integration", () => {
 
     it("should call database methods for getOrganizationCollectionTypes", async () => {
       const result = await service.getOrganizationCollectionTypes("org1");
-      
+
       expect(Array.isArray(result)).toBe(true);
       expect(mockDrizzle.select).toHaveBeenCalled();
     });
 
     it("should call database methods for generateAutoCollections", async () => {
       const result = await service.generateAutoCollections("org1");
-      
+
       expect(result).toHaveProperty("generated");
       expect(result).toHaveProperty("updated");
       expect(typeof result.generated).toBe("number");

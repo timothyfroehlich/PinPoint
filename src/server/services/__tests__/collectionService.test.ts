@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/unbound-method */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CollectionService } from "../collectionService";
@@ -142,7 +143,8 @@ describe("CollectionService", () => {
       };
 
       // Update mock to return the collection
-      vi.mocked(mockDrizzle.insert).mockReturnValue({
+      const mockInsert = mockDrizzle.insert as any;
+      mockInsert.mockReturnValue({
         values: vi.fn().mockReturnValue({
           returning: vi.fn().mockResolvedValue([mockCollection]),
         }),
@@ -171,14 +173,14 @@ describe("CollectionService", () => {
 
     it("should call database methods for getOrganizationCollectionTypes", async () => {
       const result = await service.getOrganizationCollectionTypes("org1");
-      
+
       expect(Array.isArray(result)).toBe(true);
       expect(mockDrizzle.select).toHaveBeenCalled();
     });
 
     it("should call database methods for generateAutoCollections", async () => {
       const result = await service.generateAutoCollections("org1");
-      
+
       expect(result).toHaveProperty("generated");
       expect(result).toHaveProperty("updated");
       expect(typeof result.generated).toBe("number");
