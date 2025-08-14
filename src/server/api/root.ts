@@ -4,7 +4,7 @@ import { adminRouter } from "~/server/api/routers/admin";
 import { collectionRouter } from "~/server/api/routers/collection";
 import { commentRouter } from "~/server/api/routers/comment";
 import { issueRouter } from "~/server/api/routers/issue";
-import { issueStatusRouter } from "~/server/api/routers/issueStatus";
+import { issueStatusRouter } from "~/server/api/routers/issue.status";
 import { locationRouter } from "~/server/api/routers/location";
 import { machineRouter } from "~/server/api/routers/machine";
 import { modelRouter } from "~/server/api/routers/model";
