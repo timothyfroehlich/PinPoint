@@ -245,8 +245,7 @@ describe("machineLocationRouter", () => {
       const ctx = createAuthenticatedContext();
       const caller = appRouter.createCaller(ctx);
 
-      // Mock machine from different organization
-      const otherOrgMachine = { ...mockMachine, organizationId: "other-org" };
+      // Mock machine from different organization (not returned due to org filter)
       ctx.drizzle.query.machines.findFirst.mockResolvedValue(null); // Will return null due to organization filter
 
       await expect(
