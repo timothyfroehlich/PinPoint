@@ -101,8 +101,14 @@ async function createCommentWithAuthor(
       authorId: comments.authorId,
     });
 
+  if (!comment) {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Failed to create comment",
+    });
+  }
+
   // Fetch the comment with author details
-  // Note: comment.id is guaranteed to exist since Drizzle .returning() throws on failure
   const [commentWithAuthor] = await ctx.drizzle
     .select({
       id: comments.id,
@@ -120,8 +126,7 @@ async function createCommentWithAuthor(
     })
     .from(comments)
     .innerJoin(users, eq(comments.authorId, users.id))
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Drizzle .returning() guarantees non-null
-    .where(eq(comments.id, comment!.id))
+    .where(eq(comments.id, comment.id))
     .limit(1);
 
   if (!commentWithAuthor) {
@@ -134,30 +139,41 @@ async function createCommentWithAuthor(
   return commentWithAuthor;
 }
 
+const addCommentProcedure = issueCreateProcedure
+  .input(
+    z.object({
+      issueId: z.string(),
+      content: z.string().min(1).max(1000),
+    }),
+  )
+  .mutation(
+    async ({
+      ctx,
+      input,
+    }): Promise<{
+      id: string;
+      content: string;
+      createdAt: Date;
+      updatedAt: Date | null;
+      issueId: string;
+      authorId: string;
+      author: {
+        id: string;
+        name: string | null;
+        email: string | null;
+        image: string | null;
+      };
+    }> => {
+      return createCommentWithAuthor(ctx, input);
+    },
+  );
+
 export const issueCommentRouter = createTRPCRouter({
   // Add comment to an issue (for members/admins)
-  addComment: issueCreateProcedure
-    .input(
-      z.object({
-        issueId: z.string(),
-        content: z.string().min(1).max(1000),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      return createCommentWithAuthor(ctx, input);
-    }),
+  addComment: addCommentProcedure,
 
   // Alias for addComment (for backward compatibility with tests)
-  create: issueCreateProcedure
-    .input(
-      z.object({
-        issueId: z.string(),
-        content: z.string().min(1).max(1000),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      return createCommentWithAuthor(ctx, input);
-    }),
+  create: addCommentProcedure,
 
   // Edit comment (users can only edit their own comments)
   editComment: issueEditProcedure
@@ -167,95 +183,125 @@ export const issueCommentRouter = createTRPCRouter({
         content: z.string().min(1).max(1000),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
-      // Find the comment and verify permissions
-      const [comment] = await ctx.drizzle
-        .select({
-          id: comments.id,
-          authorId: comments.authorId,
-          deletedAt: comments.deletedAt,
-          issue: {
-            id: issues.id,
-            organizationId: issues.organizationId,
-          },
-          author: {
-            id: users.id,
-            name: users.name,
-            email: users.email,
-            image: users.image,
-          },
-        })
-        .from(comments)
-        .innerJoin(issues, eq(comments.issueId, issues.id))
-        .innerJoin(users, eq(comments.authorId, users.id))
-        .where(
-          and(
-            eq(comments.id, input.commentId),
-            eq(issues.organizationId, ctx.organization.id),
-          ),
-        )
-        .limit(1);
+    .mutation(
+      async ({
+        ctx,
+        input,
+      }): Promise<{
+        id: string;
+        content: string;
+        createdAt: Date;
+        updatedAt: Date | null;
+        issueId: string;
+        authorId: string;
+        author: {
+          id: string;
+          name: string | null;
+          email: string | null;
+          image: string | null;
+        };
+      }> => {
+        // Find the comment and verify permissions
+        const [comment] = await ctx.drizzle
+          .select({
+            id: comments.id,
+            authorId: comments.authorId,
+            deletedAt: comments.deletedAt,
+            issue: {
+              id: issues.id,
+              organizationId: issues.organizationId,
+            },
+            author: {
+              id: users.id,
+              name: users.name,
+              email: users.email,
+              image: users.image,
+            },
+          })
+          .from(comments)
+          .innerJoin(issues, eq(comments.issueId, issues.id))
+          .innerJoin(users, eq(comments.authorId, users.id))
+          .where(
+            and(
+              eq(comments.id, input.commentId),
+              eq(issues.organizationId, ctx.organization.id),
+            ),
+          )
+          .limit(1);
 
-      // Use validation functions
-      const validationContext: ValidationContext = {
-        userId: ctx.user.id,
-        organizationId: ctx.organization.id,
-        userPermissions: ctx.userPermissions,
-      };
+        // Use validation functions
+        const validationContext: ValidationContext = {
+          userId: ctx.user.id,
+          organizationId: ctx.organization.id,
+          userPermissions: ctx.userPermissions,
+        };
 
-      const validation = validateCommentEdit(comment, validationContext);
-      if (!validation.valid) {
-        throw new TRPCError({
-          code: validation.error?.includes("not found")
-            ? "NOT_FOUND"
-            : validation.error?.includes("deleted")
-              ? "BAD_REQUEST"
-              : "FORBIDDEN",
-          message: validation.error ?? "Validation failed",
-        });
-      }
+        const validation = validateCommentEdit(comment, validationContext);
+        if (!validation.valid) {
+          throw new TRPCError({
+            code: validation.error?.includes("not found")
+              ? "NOT_FOUND"
+              : validation.error?.includes("deleted")
+                ? "BAD_REQUEST"
+                : "FORBIDDEN",
+            message: validation.error ?? "Validation failed",
+          });
+        }
 
-      // Update the comment
-      const [updatedComment] = await ctx.drizzle
-        .update(comments)
-        .set({
-          content: input.content,
-        })
-        .where(eq(comments.id, input.commentId))
-        .returning({
-          id: comments.id,
-          content: comments.content,
-          createdAt: comments.createdAt,
-          updatedAt: comments.updatedAt,
-          issueId: comments.issueId,
-          authorId: comments.authorId,
-        });
+        // Update the comment
+        const [updatedComment] = await ctx.drizzle
+          .update(comments)
+          .set({
+            content: input.content,
+          })
+          .where(eq(comments.id, input.commentId))
+          .returning({
+            id: comments.id,
+            content: comments.content,
+            createdAt: comments.createdAt,
+            updatedAt: comments.updatedAt,
+            issueId: comments.issueId,
+            authorId: comments.authorId,
+          });
 
-      // Fetch the updated comment with author details
-      // Note: updatedComment.id is guaranteed to exist since Drizzle .returning() throws on failure
-      const [commentWithAuthor] = await ctx.drizzle
-        .select({
-          id: comments.id,
-          content: comments.content,
-          createdAt: comments.createdAt,
-          updatedAt: comments.updatedAt,
-          issueId: comments.issueId,
-          authorId: comments.authorId,
-          author: {
-            id: users.id,
-            name: users.name,
-            email: users.email,
-            image: users.image,
-          },
-        })
-        .from(comments)
-        .innerJoin(users, eq(comments.authorId, users.id))
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Drizzle .returning() guarantees non-null
-        .where(eq(comments.id, updatedComment!.id))
-        .limit(1);
+        if (!updatedComment) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to update comment",
+          });
+        }
 
-      return commentWithAuthor;
-    }),
+        // Fetch the updated comment with author details
+        const [commentWithAuthor] = await ctx.drizzle
+          .select({
+            id: comments.id,
+            content: comments.content,
+            createdAt: comments.createdAt,
+            updatedAt: comments.updatedAt,
+            issueId: comments.issueId,
+            authorId: comments.authorId,
+            author: {
+              id: users.id,
+              name: users.name,
+              email: users.email,
+              image: users.image,
+            },
+          })
+          .from(comments)
+          .innerJoin(users, eq(comments.authorId, users.id))
+          .where(eq(comments.id, updatedComment.id))
+          .limit(1);
+
+        if (!commentWithAuthor) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to fetch updated comment with author details",
+          });
+        }
+
+        return commentWithAuthor;
+      },
+    ),
 
   // Delete comment (users can delete their own, admins can delete any)
   deleteComment: organizationProcedure
@@ -332,6 +378,14 @@ export const issueCommentRouter = createTRPCRouter({
         });
       }
 
+      // At this point, validation ensures comment exists
+      if (!comment) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Comment not found",
+        });
+      }
+
       // Soft delete the comment using service
       const commentService = new DrizzleCommentService(ctx.drizzle);
       const deletedComment = await commentService.softDeleteComment(
@@ -342,8 +396,7 @@ export const issueCommentRouter = createTRPCRouter({
       // Record deletion activity
       const activityService = ctx.services.createIssueActivityService();
       await activityService.recordCommentDeleted(
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- comment existence validated above
-        comment!.issue.id,
+        comment.issue.id,
         ctx.organization.id,
         ctx.user.id,
         input.commentId,
@@ -407,6 +460,14 @@ export const issueCommentRouter = createTRPCRouter({
         });
       }
 
+      // At this point, validation ensures comment exists
+      if (!comment) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Comment not found",
+        });
+      }
+
       // Restore the comment using service
       const commentService = new DrizzleCommentService(ctx.drizzle);
       const restoredComment = await commentService.restoreComment(
@@ -416,8 +477,7 @@ export const issueCommentRouter = createTRPCRouter({
       // Record restoration activity
       const activityService = ctx.services.createIssueActivityService();
       await activityService.recordCommentDeleted(
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- comment existence validated above
-        comment!.issue.id,
+        comment.issue.id,
         ctx.organization.id,
         ctx.user.id,
         input.commentId,
