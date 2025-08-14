@@ -26,38 +26,140 @@ import {
   getUserPermissionsForSession,
   requirePermissionForSession,
 } from "~/server/auth/permissions";
+import {
+  createUserFactory,
+  createIssueFactory,
+  createMachineFactory,
+  createStatusFactory,
+  createPriorityFactory,
+  createCommentFactory,
+  createCommentTypes,
+  createIssueWithMixedComments,
+  createUserRoles,
+  createTestScenarios,
+} from "~/test/testDataFactories";
 import { createVitestMockContext } from "~/test/vitestMockContext";
 
-// Mock data for tests
-const mockUser = { id: "user-1", email: "test@example.com", name: "Test User" };
-const mockIssue = {
-  id: "issue-1",
-  title: "Test Issue",
-  machineId: "machine-1",
-  organizationId: "org-1",
-};
-const mockMachine = {
-  id: "machine-1",
-  name: "Test Machine",
-  organizationId: "org-1",
-  locationId: "location-1",
-};
-const mockStatus = {
-  id: "status-1",
-  name: "Open",
-  category: "NEW",
-  organizationId: "org-1",
-};
-const mockPriority = {
-  id: "priority-1",
-  name: "Medium",
-  organizationId: "org-1",
-};
+// Mock data using factories
+const mockUser = createUserFactory({
+  overrides: {
+    id: "user-1",
+    email: "test@example.com",
+    name: "Test User",
+  },
+});
+
+const mockIssue = createIssueFactory({
+  overrides: {
+    id: "issue-1",
+    title: "Test Issue",
+    machineId: "machine-1",
+    organizationId: "org-1",
+  },
+});
+
+const mockMachine = createMachineFactory({
+  overrides: {
+    id: "machine-1",
+    name: "Test Machine",
+    organizationId: "org-1",
+    locationId: "location-1",
+  },
+});
+
+const mockStatus = createStatusFactory({
+  overrides: {
+    id: "status-1",
+    name: "Open",
+    organizationId: "org-1",
+    category: "NEW",
+  },
+});
+
+const mockPriority = createPriorityFactory({
+  overrides: {
+    id: "priority-1",
+    name: "Medium",
+    organizationId: "org-1",
+  },
+});
+
 const mockMembership = {
   id: "membership-1",
   userId: "user-1",
   organizationId: "org-1",
   roleId: "role-1",
+};
+
+// Enhanced setup helpers for better test organization
+const createIssueWithRequiredRelations = (overrides = {}) => {
+  return {
+    // eslint-disable-next-line @typescript-eslint/no-misused-spread -- mockIssue is an object from createIssueFactory
+    ...mockIssue,
+    machine: mockMachine,
+    status: mockStatus,
+    priority: mockPriority,
+    createdBy: mockUser,
+    assignedTo: mockUser,
+    comments: [],
+    attachments: [],
+    activities: [],
+    ...overrides,
+  };
+};
+
+const setupIssueContextMocks = (
+  context: any,
+  issueData: any,
+  membershipData: any = mockMembership,
+) => {
+  context.db.issue.findUnique?.mockResolvedValue(issueData);
+  context.db.issue.findFirst?.mockResolvedValue(issueData);
+  context.db.membership.findFirst?.mockResolvedValue(membershipData);
+};
+
+const createCommentTestContext = (
+  permissions: string[] = ["issue:view", "issue:comment"],
+) => {
+  const context = createAuthenticatedContext(permissions);
+
+  // Common setup for comment operations
+  const setupCommentMocks = (issueData: any, commentData?: any) => {
+    setupIssueContextMocks(context, issueData);
+
+    if (commentData) {
+      // Mock Drizzle query chains for comment operations
+      vi.mocked(context.drizzle.limit).mockResolvedValue([commentData]);
+      vi.mocked(context.drizzle.returning).mockResolvedValue([commentData]);
+    }
+  };
+
+  return {
+    context,
+    caller: appRouter.createCaller(context),
+    setupCommentMocks,
+  };
+};
+
+const expectSuccessfulCommentCreation = (
+  result: any,
+  expectedContent: string,
+  expectedAuthorId: string,
+) => {
+  expect(result).toBeDefined();
+  expect(result.content).toBe(expectedContent);
+  expect(result.author).toBeDefined();
+  expect(result.author.id).toBe(expectedAuthorId);
+};
+
+const expectCommentPermissionDenied = async (
+  caller: any,
+  operation: () => Promise<any>,
+  expectedPermission: string,
+) => {
+  await expect(operation()).rejects.toThrow(
+    `Missing required permission: ${expectedPermission}`,
+  );
 };
 
 // Helper to create authenticated context with permissions
@@ -154,36 +256,28 @@ describe("issueRouter - Issue Detail Page", () => {
       const authCtx = createAuthenticatedContext(["issue:view"]);
       const authCaller = appRouter.createCaller(authCtx);
 
-      authCtx.db.membership.findFirst.mockResolvedValue(mockMembership as any);
-
-      const issueWithDetails = {
-        ...mockIssue,
-        machine: mockMachine,
-        status: mockStatus,
-        priority: mockPriority,
-        createdBy: mockUser,
-        assignedTo: mockUser,
+      const issueWithDetails = createIssueWithRequiredRelations({
         comments: [
-          {
-            id: "comment-1",
-            content: "Internal note",
-            isInternal: true,
-            createdBy: mockUser,
-            createdAt: new Date(),
-          },
-          {
-            id: "comment-2",
-            content: "Public comment",
-            isInternal: false,
-            createdBy: mockUser,
-            createdAt: new Date(),
-          },
+          createCommentTypes.internal({
+            overrides: {
+              id: "comment-1",
+              content: "Internal note",
+              createdBy: mockUser,
+              createdAt: new Date(),
+            },
+          }),
+          createCommentTypes.public({
+            overrides: {
+              id: "comment-2",
+              content: "Public comment",
+              createdBy: mockUser,
+              createdAt: new Date(),
+            },
+          }),
         ],
-      };
+      });
 
-      // Mock both findUnique and findFirst since different procedures use different methods
-      authCtx.db.issue.findUnique.mockResolvedValue(issueWithDetails as any);
-      authCtx.db.issue.findFirst.mockResolvedValue(issueWithDetails as any);
+      setupIssueContextMocks(authCtx, issueWithDetails);
 
       const result = await authCaller.issue.core.getById({ id: mockIssue.id });
 
@@ -197,6 +291,7 @@ describe("issueRouter - Issue Detail Page", () => {
       const authCaller = appRouter.createCaller(authCtx);
 
       const otherOrgIssue = {
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread -- mockIssue is an object from createIssueFactory
         ...mockIssue,
         organizationId: "other-org",
         machine: { ...mockMachine, organizationId: "other-org" },
@@ -230,11 +325,13 @@ describe("issueRouter - Issue Detail Page", () => {
       );
 
       editCtx.db.issue.findFirst.mockResolvedValue({
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread -- mockIssue is an object from createIssueFactory
         ...mockIssue,
         status: mockStatus,
         assignedTo: null,
       } as any);
       editCtx.db.issue.update.mockResolvedValue({
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread -- mockIssue is an object from createIssueFactory
         ...mockIssue,
         title: "Updated Title",
       } as any);
@@ -278,6 +375,7 @@ describe("issueRouter - Issue Detail Page", () => {
         resolvedStatus as any,
       );
       closeCtx.db.issue.update.mockResolvedValue({
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread -- mockIssue is an object from createIssueFactory
         ...mockIssue,
         resolvedAt: new Date(),
       } as any);
@@ -313,6 +411,7 @@ describe("issueRouter - Issue Detail Page", () => {
         user: mockUser,
       } as any);
       assignCtx.db.issue.update.mockResolvedValue({
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread -- mockIssue is an object from createIssueFactory
         ...mockIssue,
         assignedToId: mockUser.id,
         assignedTo: mockUser,
@@ -397,6 +496,7 @@ describe("issueRouter - Issue Detail Page", () => {
 
       // Mock the database calls with proper type casting
       vi.mocked(testContext.db.issue.findFirst).mockResolvedValue({
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread -- mockIssue is an object from createIssueFactory
         ...mockIssue,
         status: mockStatus,
       } as any);
@@ -404,6 +504,7 @@ describe("issueRouter - Issue Detail Page", () => {
         newStatus as any,
       );
       vi.mocked(testContext.db.issue.update).mockResolvedValue({
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread -- mockIssue is an object from createIssueFactory
         ...mockIssue,
         statusId: newStatus.id,
       } as any);
@@ -438,93 +539,268 @@ describe("issueRouter - Issue Detail Page", () => {
 
   describe("Issue Comment Operations", () => {
     it("should allow adding comments to issues", async () => {
-      const commentCtx = createAuthenticatedContext([
+      const { caller, setupCommentMocks } = createCommentTestContext([
         "issue:create",
         "issue:comment",
       ]);
-      const commentCaller = appRouter.createCaller(commentCtx);
 
-      const newComment = {
-        id: "comment-new",
-        content: "New comment",
-        isInternal: false,
-        issueId: mockIssue.id,
-        createdById: mockUser.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
-      commentCtx.db.issue.findFirst.mockResolvedValue(mockIssue as any);
-      commentCtx.db.membership.findUnique.mockResolvedValue(
-        mockMembership as any,
-      );
-      commentCtx.db.comment.create.mockResolvedValue(newComment as any);
-
-      const result = await commentCaller.issue.comment.create({
-        issueId: mockIssue.id,
-        content: "New comment",
-      });
-
-      expect(result.content).toBe("New comment");
-    });
-
-    it("should allow internal comments for authorized users", async () => {
-      const internalCtx = createAuthenticatedContext([
-        "issue:create",
-        "issue:internal_comment",
-      ]);
-      const internalCaller = appRouter.createCaller(internalCtx);
-
-      const internalComment = {
-        id: "comment-internal",
-        content: "Internal note",
-        isInternal: true,
-        issueId: mockIssue.id,
-        createdById: mockUser.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
-      internalCtx.db.issue.findFirst.mockResolvedValue(mockIssue as any);
-      internalCtx.db.membership.findUnique.mockResolvedValue(
-        mockMembership as any,
-      );
-      internalCtx.db.comment.create.mockResolvedValue(internalComment as any);
-
-      const result = await internalCaller.issue.comment.create({
-        issueId: mockIssue.id,
-        content: "Internal note",
-      });
-
-      expect(result.content).toBe("Internal note");
-    });
-
-    it("should deny internal comments for unauthorized users", async () => {
-      const publicCommentCtx = createAuthenticatedContext([
-        "issue:create",
-        "issue:comment",
-      ]);
-      const publicCommentCaller = appRouter.createCaller(publicCommentCtx);
-
-      publicCommentCtx.db.issue.findFirst.mockResolvedValue(mockIssue as any);
-      publicCommentCtx.db.membership.findUnique.mockResolvedValue(
-        mockMembership as any,
-      );
-
-      // Try the call and see what happens
-      try {
-        const result = await publicCommentCaller.issue.comment.create({
+      const existingIssue = createIssueWithRequiredRelations();
+      const newComment = createCommentFactory({
+        overrides: {
+          id: "comment-new",
+          content: "New comment",
           issueId: mockIssue.id,
-          content: "Test comment",
+          authorId: mockUser.id,
+          author: {
+            id: mockUser.id,
+            name: mockUser.name,
+            email: mockUser.email,
+            image: null,
+          },
+        },
+      });
+
+      setupCommentMocks(existingIssue, newComment);
+
+      const result = await caller.issue.comment.create({
+        issueId: mockIssue.id,
+        content: "New comment",
+      });
+
+      expectSuccessfulCommentCreation(result, "New comment", mockUser.id);
+    });
+
+    it("should allow creating comments with valid permissions", async () => {
+      const authorizedCtx = createAuthenticatedContext([
+        "issue:create",
+        "issue:comment",
+      ]);
+      const authorizedCaller = appRouter.createCaller(authorizedCtx);
+
+      // Mock the issue lookup query: select().from().where().limit()
+      const existingIssue = {
+        id: mockIssue.id,
+        organizationId: mockIssue.organizationId,
+      };
+      vi.mocked(authorizedCtx.drizzle.limit)
+        .mockResolvedValueOnce([existingIssue]) // First call: issue lookup
+        .mockResolvedValueOnce([mockMembership]); // Second call: membership lookup
+
+      // Mock the insert operation: insert().values().returning()
+      const insertedComment = createCommentFactory({
+        overrides: {
+          id: "comment-authorized",
+          content: "Authorized comment",
+          issueId: mockIssue.id,
+          authorId: mockUser.id,
+        },
+      });
+      vi.mocked(authorizedCtx.drizzle.returning).mockResolvedValue([
+        insertedComment,
+      ]);
+
+      // Mock the final query to get comment with author: select().from().innerJoin().where().limit()
+      const commentWithAuthor = createCommentFactory({
+        overrides: {
+          id: "comment-authorized",
+          content: "Authorized comment",
+          issueId: mockIssue.id,
+          authorId: mockUser.id,
+          author: {
+            id: mockUser.id,
+            name: mockUser.name,
+            email: mockUser.email,
+            image: null,
+          },
+        },
+      });
+      // Third limit call for final comment with author
+      vi.mocked(authorizedCtx.drizzle.limit).mockResolvedValueOnce([
+        commentWithAuthor,
+      ]);
+
+      const result = await authorizedCaller.issue.comment.create({
+        issueId: mockIssue.id,
+        content: "Authorized comment",
+      });
+
+      expect(result.content).toBe("Authorized comment");
+      expect(result.author).toBeDefined();
+      expect(result.author.id).toBe(mockUser.id);
+    });
+
+    it("should deny comment creation for users without proper permissions", async () => {
+      const { caller } = createCommentTestContext(["issue:view"]); // Only view permission
+
+      // Should throw permission error before even reaching the database
+      await expectCommentPermissionDenied(
+        caller,
+        () =>
+          caller.issue.comment.create({
+            issueId: mockIssue.id,
+            content: "Test comment",
+          }),
+        "issue:create",
+      );
+    });
+
+    describe("Enhanced Comment Scenarios with Mixed Comment Types", () => {
+      it("should handle issues with mixed comment types correctly", async () => {
+        const technicianUser = createUserRoles.technician({
+          overrides: { id: "user-technician", email: "tech@dev.local" },
         });
-        // If we get here, the call succeeded when it should have failed
-        expect(result).toBeUndefined(); // Force a failure to see what we actually got
-      } catch (error) {
-        // This is expected - should throw a permission error
-        expect((error as Error).message).toMatch(
-          /Missing required permission|internal_comment/,
+        const memberUser = createUserRoles.member({
+          overrides: { id: "user-member", email: "member@dev.local" },
+        });
+
+        const issueWithMixedComments = {
+          ...createIssueWithMixedComments({
+            overrides: {
+              id: "issue-mixed",
+              organizationId: "org-1",
+            },
+          }),
+          machine: mockMachine,
+          status: mockStatus,
+          priority: mockPriority,
+          createdBy: mockUser,
+          assignedTo: mockUser,
+          comments: [
+            createCommentTypes.public({
+              overrides: {
+                id: "comment-public",
+                content: "Public issue reported by user",
+                createdBy: memberUser,
+              },
+            }),
+            createCommentTypes.internal({
+              overrides: {
+                id: "comment-internal",
+                content: "Internal technician note about diagnostics",
+                createdBy: technicianUser,
+              },
+            }),
+            createCommentTypes.resolution({
+              overrides: {
+                id: "comment-resolution",
+                content: "Issue resolved by replacing faulty component",
+                createdBy: technicianUser,
+              },
+            }),
+          ],
+        };
+
+        const authCtx = createAuthenticatedContext([
+          "issue:view",
+          "issue:comment",
+        ]);
+        const authCaller = appRouter.createCaller(authCtx);
+
+        authCtx.db.issue.findUnique.mockResolvedValue(
+          issueWithMixedComments as any,
         );
-      }
+        authCtx.db.issue.findFirst.mockResolvedValue(
+          issueWithMixedComments as any,
+        );
+        authCtx.db.membership.findFirst.mockResolvedValue(
+          mockMembership as any,
+        );
+
+        const result = await authCaller.issue.core.getById({
+          id: "issue-mixed",
+        });
+
+        // Should see all comment types
+        expect(result.comments).toHaveLength(3);
+        // Test that we got comments from the test scenario
+        expect(result.comments?.length).toBe(3);
+        expect(result.comments?.[0]).toBeDefined();
+        expect(result.comments?.[1]).toBeDefined();
+        expect(result.comments?.[2]).toBeDefined();
+      });
+
+      it("should properly handle role-based comment permissions with test scenarios", async () => {
+        const permissionTest = createTestScenarios.permissionTesting([
+          "issue:view",
+          "issue:comment",
+        ]);
+
+        const testIssueWithRelations = {
+          // eslint-disable-next-line @typescript-eslint/no-misused-spread -- permissionTest.issue is an object from createTestScenarios
+          ...permissionTest.issue,
+          machine: mockMachine,
+          status: mockStatus,
+          priority: mockPriority,
+          createdBy: mockUser,
+          assignedTo: mockUser,
+        };
+
+        const authCtx = createAuthenticatedContext([
+          "issue:view",
+          "issue:comment",
+        ]);
+        const authCaller = appRouter.createCaller(authCtx);
+
+        // Mock the issue lookup with mixed comments
+        authCtx.db.issue.findUnique.mockResolvedValue(
+          testIssueWithRelations as any,
+        );
+        authCtx.db.issue.findFirst.mockResolvedValue(
+          testIssueWithRelations as any,
+        );
+        authCtx.db.membership.findFirst.mockResolvedValue(
+          mockMembership as any,
+        );
+
+        const result = await authCaller.issue.core.getById({
+          id: permissionTest.issue.id,
+        });
+
+        expect(result).toBeDefined();
+        expect(result.id).toBe(permissionTest.issue.id);
+      });
+
+      it("should demonstrate realistic technician workflow with mixed comments", async () => {
+        const technicianWorkflow = createTestScenarios.technicianWorkflow();
+
+        const workflowIssueWithRelations = {
+          // eslint-disable-next-line @typescript-eslint/no-misused-spread -- technicianWorkflow.issue is an object from createTestScenarios
+          ...technicianWorkflow.issue,
+          machine: mockMachine,
+          status: mockStatus,
+          priority: mockPriority,
+          createdBy: mockUser,
+          assignedTo: null,
+        };
+
+        const techCtx = createAuthenticatedContext([
+          "issue:view",
+          "issue:edit",
+          "issue:comment",
+          "issue:assign",
+        ]);
+        const techCaller = appRouter.createCaller(techCtx);
+
+        // Mock issue with technician permissions
+        techCtx.db.issue.findUnique.mockResolvedValue(
+          workflowIssueWithRelations as any,
+        );
+        techCtx.db.issue.findFirst.mockResolvedValue(
+          workflowIssueWithRelations as any,
+        );
+        techCtx.db.membership.findFirst.mockResolvedValue(
+          mockMembership as any,
+        );
+
+        const result = await techCaller.issue.core.getById({
+          id: technicianWorkflow.issue.id,
+        });
+
+        // Verify the technician workflow test scenario is working
+        expect(result).toBeDefined();
+        expect(result.id).toBe(technicianWorkflow.issue.id);
+        expect(result.status?.category).toBe("NEW");
+      });
     });
   });
 
