@@ -33,8 +33,11 @@ beforeAll(() => {
   }
 
   // Debug: Verify React internals are available (for hook dispatcher)
-  const internals = (React as any)
-    .__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED;
+  const internals = (
+    React as unknown as {
+      __SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED?: unknown;
+    }
+  ).__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED;
   if (!internals) {
     console.warn("React internals not available - hooks may not work properly");
   }
@@ -73,7 +76,7 @@ vi.mock("next/navigation", () => ({
 
 // Suppress console warnings in tests (optional)
 const originalConsoleWarn = console.warn;
-console.warn = (...args: any[]) => {
+console.warn = (...args: unknown[]) => {
   // Suppress known React warnings in test environment
   if (
     typeof args[0] === "string" &&
@@ -95,5 +98,5 @@ console.warn = (...args: any[]) => {
   ) {
     return;
   }
-  originalConsoleWarn(...args);
+  originalConsoleWarn(...(args as Parameters<typeof originalConsoleWarn>));
 };

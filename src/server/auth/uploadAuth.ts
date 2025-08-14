@@ -1,13 +1,15 @@
 import { TRPCError } from "@trpc/server";
+import { eq, and } from "drizzle-orm";
 import { type NextRequest } from "next/server";
 
 import { getSupabaseUser } from "./supabase";
 import { isValidOrganization, isValidMembership } from "./types";
 
 import type { PinPointSupabaseUser } from "~/lib/supabase/types";
-import type { ExtendedPrismaClient } from "~/server/db";
+import type { DrizzleClient } from "~/server/db/drizzle";
 
 import { env } from "~/env";
+import { organizations, memberships } from "~/server/db/schema";
 
 export interface UploadAuthContext {
   user: PinPointSupabaseUser;
@@ -32,7 +34,7 @@ export interface UploadAuthContext {
 
 export async function getUploadAuthContext(
   req: NextRequest,
-  db: ExtendedPrismaClient,
+  drizzle: DrizzleClient,
 ): Promise<UploadAuthContext> {
   // 1. Verify authentication
   const user = await getSupabaseUser();
@@ -47,8 +49,8 @@ export async function getUploadAuthContext(
   let subdomain = req.headers.get("x-subdomain");
   subdomain ??= env.DEFAULT_ORG_SUBDOMAIN;
 
-  const organizationResult = await db.organization.findUnique({
-    where: { subdomain },
+  const organizationResult = await drizzle.query.organizations.findFirst({
+    where: eq(organizations.subdomain, subdomain),
   });
 
   if (!isValidOrganization(organizationResult)) {
@@ -59,15 +61,19 @@ export async function getUploadAuthContext(
   }
 
   // 3. Get user's membership and permissions
-  const membershipResult = await db.membership.findFirst({
-    where: {
-      organizationId: organizationResult.id,
-      userId: user.id,
-    },
-    include: {
+  const membershipResult = await drizzle.query.memberships.findFirst({
+    where: and(
+      eq(memberships.organizationId, organizationResult.id),
+      eq(memberships.userId, user.id),
+    ),
+    with: {
       role: {
-        include: {
-          permissions: true,
+        with: {
+          rolePermissions: {
+            with: {
+              permission: true,
+            },
+          },
         },
       },
     },
@@ -84,7 +90,9 @@ export async function getUploadAuthContext(
     user,
     organization: organizationResult,
     membership: membershipResult,
-    userPermissions: membershipResult.role.permissions.map((p) => p.name),
+    userPermissions: membershipResult.role.rolePermissions.map(
+      (rp) => rp.permission.name,
+    ),
   };
 }
 
@@ -101,7 +109,7 @@ export function requireUploadPermission(
 }
 
 export function validateUploadAuth(
-  _db: ExtendedPrismaClient,
+  _drizzle: DrizzleClient,
   _sessionId?: string,
   _organizationId?: string,
 ): void {
