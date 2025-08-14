@@ -43,7 +43,7 @@ export const userRouter = createTRPCRouter({
       throw new Error("User not found");
     }
 
-    // Get counts separately since _count is Prisma-specific
+    // Get counts separately using individual queries
     const [ownedMachinesCount, issuesCreatedCount, commentsCount] =
       await Promise.all([
         ctx.drizzle
@@ -223,7 +223,7 @@ export const userRouter = createTRPCRouter({
         throw new Error("User not found in this organization");
       }
 
-      // Get counts separately (since _count is a Prisma-specific feature)
+      // Get counts separately using individual queries
       const [ownedMachinesCount, issuesCreatedCount, commentsCount] =
         await Promise.all([
           ctx.drizzle
