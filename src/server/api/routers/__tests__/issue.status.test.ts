@@ -83,14 +83,7 @@ describe("issueStatusRouter", () => {
         { statusId: "status-3", count: 8 },
       ];
 
-      // Set up Drizzle mock chain for statuses query
-      const statusSelectQuery = {
-        from: vi.fn().mockReturnThis(),
-        where: vi.fn().mockResolvedValue(mockStatuses),
-      };
-      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(statusSelectQuery);
-
-      // Set up Drizzle mock chain for issues count query
+      // Set up Drizzle mock chain for issues count query (FIRST call)
       const issueCountQuery = {
         from: vi.fn().mockReturnThis(),
         where: vi.fn().mockReturnThis(),
@@ -98,8 +91,15 @@ describe("issueStatusRouter", () => {
       };
       vi.mocked(ctx.drizzle.select).mockReturnValueOnce(issueCountQuery);
 
+      // Set up Drizzle mock chain for statuses query (SECOND call)
+      const statusSelectQuery = {
+        from: vi.fn().mockReturnThis(),
+        where: vi.fn().mockResolvedValue(mockStatuses),
+      };
+      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(statusSelectQuery);
+
       const caller = appRouter.createCaller(ctx as any);
-      const result = await caller.issue.status.getStatusCounts();
+      const result = await caller.issueStatus.getStatusCounts();
 
       expect(result).toEqual({
         NEW: 5,
@@ -117,13 +117,7 @@ describe("issueStatusRouter", () => {
     });
 
     it("should handle empty results", async () => {
-      // Mock empty status and issue data
-      const statusSelectQuery = {
-        from: vi.fn().mockReturnThis(),
-        where: vi.fn().mockResolvedValue([]),
-      };
-      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(statusSelectQuery);
-
+      // Set up Drizzle mock chain for issues count query (FIRST call)
       const issueCountQuery = {
         from: vi.fn().mockReturnThis(),
         where: vi.fn().mockReturnThis(),
@@ -131,8 +125,15 @@ describe("issueStatusRouter", () => {
       };
       vi.mocked(ctx.drizzle.select).mockReturnValueOnce(issueCountQuery);
 
+      // Set up Drizzle mock chain for statuses query (SECOND call)
+      const statusSelectQuery = {
+        from: vi.fn().mockReturnThis(),
+        where: vi.fn().mockResolvedValue([]),
+      };
+      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(statusSelectQuery);
+
       const caller = appRouter.createCaller(ctx as any);
-      const result = await caller.issue.status.getStatusCounts();
+      const result = await caller.issueStatus.getStatusCounts();
 
       expect(result).toEqual({
         NEW: 0,
@@ -149,12 +150,7 @@ describe("issueStatusRouter", () => {
         { id: "status-3", category: "RESOLVED" },
       ];
 
-      const statusSelectQuery = {
-        from: vi.fn().mockReturnThis(),
-        where: vi.fn().mockResolvedValue(mockStatuses),
-      };
-      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(statusSelectQuery);
-
+      // Set up Drizzle mock chain for issues count query (FIRST call)
       const issueCountQuery = {
         from: vi.fn().mockReturnThis(),
         where: vi.fn().mockReturnThis(),
@@ -162,8 +158,15 @@ describe("issueStatusRouter", () => {
       };
       vi.mocked(ctx.drizzle.select).mockReturnValueOnce(issueCountQuery);
 
+      // Set up Drizzle mock chain for statuses query (SECOND call)
+      const statusSelectQuery = {
+        from: vi.fn().mockReturnThis(),
+        where: vi.fn().mockResolvedValue(mockStatuses),
+      };
+      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(statusSelectQuery);
+
       const caller = appRouter.createCaller(ctx as any);
-      const result = await caller.issue.status.getStatusCounts();
+      const result = await caller.issueStatus.getStatusCounts();
 
       expect(result).toEqual({
         NEW: 0,
@@ -188,12 +191,7 @@ describe("issueStatusRouter", () => {
         { statusId: "status-4", count: 1 },
       ];
 
-      const statusSelectQuery = {
-        from: vi.fn().mockReturnThis(),
-        where: vi.fn().mockResolvedValue(mockStatuses),
-      };
-      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(statusSelectQuery);
-
+      // Set up Drizzle mock chain for issues count query (FIRST call)
       const issueCountQuery = {
         from: vi.fn().mockReturnThis(),
         where: vi.fn().mockReturnThis(),
@@ -201,8 +199,15 @@ describe("issueStatusRouter", () => {
       };
       vi.mocked(ctx.drizzle.select).mockReturnValueOnce(issueCountQuery);
 
+      // Set up Drizzle mock chain for statuses query (SECOND call)
+      const statusSelectQuery = {
+        from: vi.fn().mockReturnThis(),
+        where: vi.fn().mockResolvedValue(mockStatuses),
+      };
+      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(statusSelectQuery);
+
       const caller = appRouter.createCaller(ctx as any);
-      const result = await caller.issue.status.getStatusCounts();
+      const result = await caller.issueStatus.getStatusCounts();
 
       expect(result).toEqual({
         NEW: 5, // 3 + 2 accumulated
@@ -225,12 +230,7 @@ describe("issueStatusRouter", () => {
         { statusId: "status-3", count: 1 },
       ];
 
-      const statusSelectQuery = {
-        from: vi.fn().mockReturnThis(),
-        where: vi.fn().mockResolvedValue(mockStatuses),
-      };
-      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(statusSelectQuery);
-
+      // Set up Drizzle mock chain for issues count query (FIRST call)
       const issueCountQuery = {
         from: vi.fn().mockReturnThis(),
         where: vi.fn().mockReturnThis(),
@@ -238,8 +238,15 @@ describe("issueStatusRouter", () => {
       };
       vi.mocked(ctx.drizzle.select).mockReturnValueOnce(issueCountQuery);
 
+      // Set up Drizzle mock chain for statuses query (SECOND call)
+      const statusSelectQuery = {
+        from: vi.fn().mockReturnThis(),
+        where: vi.fn().mockResolvedValue(mockStatuses),
+      };
+      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(statusSelectQuery);
+
       const caller = appRouter.createCaller(ctx as any);
-      const result = await caller.issue.status.getStatusCounts();
+      const result = await caller.issueStatus.getStatusCounts();
 
       expect(result).toEqual({
         NEW: 2,
@@ -263,12 +270,7 @@ describe("issueStatusRouter", () => {
         { statusId: "status-2", count: 3 },
       ];
 
-      const statusSelectQuery = {
-        from: vi.fn().mockReturnThis(),
-        where: vi.fn().mockResolvedValue(mockStatuses),
-      };
-      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(statusSelectQuery);
-
+      // Set up Drizzle mock chain for issues count query (FIRST call)
       const issueCountQuery = {
         from: vi.fn().mockReturnThis(),
         where: vi.fn().mockReturnThis(),
@@ -276,8 +278,15 @@ describe("issueStatusRouter", () => {
       };
       vi.mocked(ctx.drizzle.select).mockReturnValueOnce(issueCountQuery);
 
+      // Set up Drizzle mock chain for statuses query (SECOND call)
+      const statusSelectQuery = {
+        from: vi.fn().mockReturnThis(),
+        where: vi.fn().mockResolvedValue(mockStatuses),
+      };
+      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(statusSelectQuery);
+
       const caller = appRouter.createCaller(ctx as any);
-      const result = await caller.issue.status.getStatusCounts();
+      const result = await caller.issueStatus.getStatusCounts();
 
       expect(result).toEqual({
         NEW: 2,
@@ -290,7 +299,7 @@ describe("issueStatusRouter", () => {
     it("should require authentication", async () => {
       const caller = appRouter.createCaller({ ...ctx, user: null } as any);
 
-      await expect(caller.issue.status.getStatusCounts()).rejects.toThrow(
+      await expect(caller.issueStatus.getStatusCounts()).rejects.toThrow(
         "UNAUTHORIZED",
       );
     });
@@ -301,7 +310,7 @@ describe("issueStatusRouter", () => {
         organization: null,
       } as any);
 
-      await expect(caller.issue.status.getStatusCounts()).rejects.toThrow();
+      await expect(caller.issueStatus.getStatusCounts()).rejects.toThrow();
     });
 
     it("should enforce organization isolation", async () => {
@@ -319,12 +328,7 @@ describe("issueStatusRouter", () => {
 
       const mockIssueCounts = [{ statusId: "status-1", count: 10 }];
 
-      const statusSelectQuery = {
-        from: vi.fn().mockReturnThis(),
-        where: vi.fn().mockResolvedValue(mockStatuses),
-      };
-      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(statusSelectQuery);
-
+      // Set up Drizzle mock chain for issues count query (FIRST call)
       const issueCountQuery = {
         from: vi.fn().mockReturnThis(),
         where: vi.fn().mockReturnThis(),
@@ -332,8 +336,15 @@ describe("issueStatusRouter", () => {
       };
       vi.mocked(ctx.drizzle.select).mockReturnValueOnce(issueCountQuery);
 
+      // Set up Drizzle mock chain for statuses query (SECOND call)
+      const statusSelectQuery = {
+        from: vi.fn().mockReturnThis(),
+        where: vi.fn().mockResolvedValue(mockStatuses),
+      };
+      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(statusSelectQuery);
+
       const caller = appRouter.createCaller(otherOrgCtx as any);
-      await caller.issue.status.getStatusCounts();
+      await caller.issueStatus.getStatusCounts();
 
       // Verify queries were called with the correct organization ID
       expect(statusSelectQuery.where).toHaveBeenCalledWith(

@@ -44,7 +44,7 @@ const mockDrizzleClient = {
   leftJoin: vi.fn().mockReturnThis(),
   limit: vi.fn().mockReturnThis(),
   offset: vi.fn().mockReturnThis(),
-  groupBy: vi.fn().mockReturnThis(),
+  groupBy: vi.fn().mockReturnThis(), // Added for issue status count aggregation
   having: vi.fn().mockReturnThis(),
   // Transaction support
   transaction: vi.fn(),
