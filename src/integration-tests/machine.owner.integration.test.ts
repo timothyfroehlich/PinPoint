@@ -268,7 +268,7 @@ describe("machine.owner router integration tests", () => {
         ).rejects.toThrow(
           new TRPCError({
             code: "NOT_FOUND",
-            message: "Game instance not found",
+            message: "Machine not found",
           }),
         );
       });

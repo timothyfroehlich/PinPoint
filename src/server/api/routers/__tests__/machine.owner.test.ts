@@ -252,7 +252,7 @@ describe("machine.owner router", () => {
         ).rejects.toThrow(
           new TRPCError({
             code: "NOT_FOUND",
-            message: "Game instance not found",
+            message: "Machine not found",
           }),
         );
 
@@ -283,7 +283,7 @@ describe("machine.owner router", () => {
         ).rejects.toThrow(
           new TRPCError({
             code: "NOT_FOUND",
-            message: "Game instance not found",
+            message: "Machine not found",
           }),
         );
       });
@@ -581,7 +581,7 @@ describe("machine.owner router", () => {
         ).rejects.toThrow(
           new TRPCError({
             code: "NOT_FOUND",
-            message: "Game instance not found",
+            message: "Machine not found",
           }),
         );
       });

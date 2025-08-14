@@ -26,7 +26,7 @@ export const machineOwnerRouter = createTRPCRouter({
       if (!existingInstance) {
         throw new TRPCError({
           code: "NOT_FOUND",
-          message: "Game instance not found",
+          message: "Machine not found",
         });
       }
 
