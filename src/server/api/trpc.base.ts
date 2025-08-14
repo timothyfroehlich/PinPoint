@@ -116,7 +116,7 @@ export const createTRPCContext = async (
 
   const db = dbProvider.getClient();
   const drizzle = dbProvider.getDrizzleClient();
-  const services = new ServiceFactory(db);
+  const services = new ServiceFactory(db, drizzle);
   const supabase = await createClient();
   const user = await getSupabaseUser();
 
