@@ -76,7 +76,7 @@
     "playwright:headed": "playwright test --headed",
     "smoke": "playwright test e2e/smoke-test-workflow.spec.ts --project=chromium --reporter=line",
     "audit": "npm audit --audit-level=high",
-    "audit:brief": "npm audit --audit-level=high --format table",
+    "audit:brief": "npm audit --audit-level=high",
     "audit:verbose": "npm audit --audit-level=moderate",
     "_comment_status": "========== Status Commands ==========",
     "status:overview": "node scripts/status-overview.cjs",
