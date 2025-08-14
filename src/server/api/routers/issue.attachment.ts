@@ -1,11 +1,14 @@
 import { TRPCError } from "@trpc/server";
+import { and, count, eq } from "drizzle-orm";
 import { z } from "zod";
 
+import { generatePrefixedId } from "~/lib/utils/id-generation";
 import { createTRPCRouter } from "~/server/api/trpc";
 import {
   attachmentCreateProcedure,
   attachmentDeleteProcedure,
 } from "~/server/api/trpc.permission";
+import { attachments, issues } from "~/server/db/schema";
 
 export const issueAttachmentRouter = createTRPCRouter({
   // Create attachment record after file upload (called by upload API)
@@ -20,12 +23,19 @@ export const issueAttachmentRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       // Verify the issue belongs to this organization
-      const existingIssue = await ctx.db.issue.findFirst({
-        where: {
-          id: input.issueId,
-          organizationId: ctx.organization.id,
-        },
-      });
+      const [existingIssue] = await ctx.drizzle
+        .select({
+          id: issues.id,
+          organizationId: issues.organizationId,
+        })
+        .from(issues)
+        .where(
+          and(
+            eq(issues.id, input.issueId),
+            eq(issues.organizationId, ctx.organization.id),
+          ),
+        )
+        .limit(1);
 
       if (!existingIssue) {
         throw new TRPCError({
@@ -35,11 +45,12 @@ export const issueAttachmentRouter = createTRPCRouter({
       }
 
       // Check attachment count limit
-      const existingAttachments = await ctx.db.attachment.count({
-        where: {
-          issueId: input.issueId,
-        },
-      });
+      const [attachmentCountResult] = await ctx.drizzle
+        .select({ count: count() })
+        .from(attachments)
+        .where(eq(attachments.issueId, input.issueId));
+
+      const existingAttachments = attachmentCountResult?.count ?? 0;
 
       if (existingAttachments >= 3) {
         throw new TRPCError({
@@ -49,15 +60,19 @@ export const issueAttachmentRouter = createTRPCRouter({
       }
 
       // Create attachment record
-      return ctx.db.attachment.create({
-        data: {
+      const [newAttachment] = await ctx.drizzle
+        .insert(attachments)
+        .values({
+          id: generatePrefixedId("attachment"),
           url: input.url,
           fileName: input.fileName,
           fileType: input.fileType,
           issueId: input.issueId,
           organizationId: ctx.organization.id,
-        },
-      });
+        })
+        .returning();
+
+      return newAttachment;
     }),
 
   // Delete attachment from an issue
@@ -69,12 +84,24 @@ export const issueAttachmentRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       // Find the attachment and verify it belongs to this organization
-      const attachment = await ctx.db.attachment.findFirst({
-        where: {
-          id: input.attachmentId,
-          organizationId: ctx.organization.id,
-        },
-      });
+      const [attachment] = await ctx.drizzle
+        .select({
+          id: attachments.id,
+          url: attachments.url,
+          fileName: attachments.fileName,
+          fileType: attachments.fileType,
+          organizationId: attachments.organizationId,
+          issueId: attachments.issueId,
+          createdAt: attachments.createdAt,
+        })
+        .from(attachments)
+        .where(
+          and(
+            eq(attachments.id, input.attachmentId),
+            eq(attachments.organizationId, ctx.organization.id),
+          ),
+        )
+        .limit(1);
 
       if (!attachment) {
         throw new TRPCError({
@@ -92,8 +119,11 @@ export const issueAttachmentRouter = createTRPCRouter({
       await imageStorage.deleteImage(attachment.url);
 
       // Delete the attachment record
-      return ctx.db.attachment.delete({
-        where: { id: input.attachmentId },
-      });
+      const [deletedAttachment] = await ctx.drizzle
+        .delete(attachments)
+        .where(eq(attachments.id, input.attachmentId))
+        .returning();
+
+      return deletedAttachment;
     }),
 });

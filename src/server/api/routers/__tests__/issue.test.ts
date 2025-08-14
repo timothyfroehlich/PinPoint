@@ -32,11 +32,7 @@ import {
   createMachineFactory,
   createStatusFactory,
   createPriorityFactory,
-  createCommentFactory,
   createCommentTypes,
-  createIssueWithMixedComments,
-  createUserRoles,
-  createTestScenarios,
 } from "~/test/testDataFactories";
 import { createVitestMockContext } from "~/test/vitestMockContext";
 
@@ -116,50 +112,6 @@ const setupIssueContextMocks = (
   context.db.issue.findUnique?.mockResolvedValue(issueData);
   context.db.issue.findFirst?.mockResolvedValue(issueData);
   context.db.membership.findFirst?.mockResolvedValue(membershipData);
-};
-
-const createCommentTestContext = (
-  permissions: string[] = ["issue:view", "issue:comment"],
-) => {
-  const context = createAuthenticatedContext(permissions);
-
-  // Common setup for comment operations
-  const setupCommentMocks = (issueData: any, commentData?: any) => {
-    setupIssueContextMocks(context, issueData);
-
-    if (commentData) {
-      // Mock Drizzle query chains for comment operations
-      vi.mocked(context.drizzle.limit).mockResolvedValue([commentData]);
-      vi.mocked(context.drizzle.returning).mockResolvedValue([commentData]);
-    }
-  };
-
-  return {
-    context,
-    caller: appRouter.createCaller(context),
-    setupCommentMocks,
-  };
-};
-
-const expectSuccessfulCommentCreation = (
-  result: any,
-  expectedContent: string,
-  expectedAuthorId: string,
-) => {
-  expect(result).toBeDefined();
-  expect(result.content).toBe(expectedContent);
-  expect(result.author).toBeDefined();
-  expect(result.author.id).toBe(expectedAuthorId);
-};
-
-const expectCommentPermissionDenied = async (
-  caller: any,
-  operation: () => Promise<any>,
-  expectedPermission: string,
-) => {
-  await expect(operation()).rejects.toThrow(
-    `Missing required permission: ${expectedPermission}`,
-  );
 };
 
 // Helper to create authenticated context with permissions
@@ -306,50 +258,6 @@ describe("issueRouter - Issue Detail Page", () => {
   });
 
   describe("Permission-based Issue Operations", () => {
-    it("should allow users with edit permissions to update issues", async () => {
-      const editCtx = createAuthenticatedContext(["issue:edit"]);
-      const editCaller = appRouter.createCaller(editCtx);
-
-      // Mock activity and notification services
-      const mockActivityService = {
-        recordFieldUpdate: vi.fn().mockResolvedValue(undefined),
-      };
-      const mockNotificationService = {
-        notifyMachineOwnerOfStatusChange: vi.fn().mockResolvedValue(undefined),
-      };
-      vi.mocked(editCtx.services.createIssueActivityService).mockReturnValue(
-        mockActivityService as any,
-      );
-      vi.mocked(editCtx.services.createNotificationService).mockReturnValue(
-        mockNotificationService as any,
-      );
-
-      editCtx.db.issue.findFirst.mockResolvedValue({
-        // eslint-disable-next-line @typescript-eslint/no-misused-spread -- mockIssue is an object from createIssueFactory
-        ...mockIssue,
-        status: mockStatus,
-        assignedTo: null,
-      } as any);
-      editCtx.db.issue.update.mockResolvedValue({
-        // eslint-disable-next-line @typescript-eslint/no-misused-spread -- mockIssue is an object from createIssueFactory
-        ...mockIssue,
-        title: "Updated Title",
-      } as any);
-
-      const result = await editCaller.issue.core.update({
-        id: mockIssue.id,
-        title: "Updated Title",
-      });
-
-      expect(result.title).toBe("Updated Title");
-      expect(editCtx.db.issue.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: mockIssue.id },
-          data: expect.objectContaining({ title: "Updated Title" }),
-        }),
-      );
-    });
-
     it("should deny users without edit permissions from updating issues", async () => {
       const readOnlyCtx = createAuthenticatedContext(["issue:view"]);
       const readOnlyCaller = appRouter.createCaller(readOnlyCtx);
@@ -362,165 +270,11 @@ describe("issueRouter - Issue Detail Page", () => {
       ).rejects.toThrow("Missing required permission: issue:edit");
     });
 
-    it("should allow users with close permissions to close issues", async () => {
-      const closeCtx = createAuthenticatedContext(["issue:edit"]);
-      const closeCaller = appRouter.createCaller(closeCtx);
-
-      const resolvedStatus = {
-        id: "status-resolved",
-        name: "Resolved",
-        category: "RESOLVED",
-      };
-      closeCtx.db.issueStatus.findFirst.mockResolvedValue(
-        resolvedStatus as any,
-      );
-      closeCtx.db.issue.update.mockResolvedValue({
-        // eslint-disable-next-line @typescript-eslint/no-misused-spread -- mockIssue is an object from createIssueFactory
-        ...mockIssue,
-        resolvedAt: new Date(),
-      } as any);
-
-      const result = await closeCaller.issue.core.close({
-        id: mockIssue.id,
-      });
-
-      expect(result.resolvedAt).toBeTruthy();
-      expect(closeCtx.db.issue.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: mockIssue.id },
-          data: expect.objectContaining({ resolvedAt: expect.any(Date) }),
-        }),
-      );
-    });
-
-    it("should allow users with assign permissions to assign issues", async () => {
-      const assignCtx = createAuthenticatedContext(["issue:assign"]);
-      const assignCaller = appRouter.createCaller(assignCtx);
-
-      // Mock activity service
-      const mockActivityService = {
-        recordIssueAssigned: vi.fn().mockResolvedValue(undefined),
-      };
-      vi.mocked(assignCtx.services.createIssueActivityService).mockReturnValue(
-        mockActivityService as any,
-      );
-
-      assignCtx.db.issue.findFirst.mockResolvedValue(mockIssue as any);
-      assignCtx.db.membership.findUnique.mockResolvedValue({
-        ...mockMembership,
-        user: mockUser,
-      } as any);
-      assignCtx.db.issue.update.mockResolvedValue({
-        // eslint-disable-next-line @typescript-eslint/no-misused-spread -- mockIssue is an object from createIssueFactory
-        ...mockIssue,
-        assignedToId: mockUser.id,
-        assignedTo: mockUser,
-      } as any);
-
-      const result = await assignCaller.issue.core.assign({
-        issueId: mockIssue.id,
-        userId: mockUser.id,
-      });
-
-      expect(result.issue.assignedToId).toBe(mockUser.id);
-      expect(assignCtx.db.issue.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: mockIssue.id },
-          data: { assignedToId: mockUser.id },
-        }),
-      );
-    });
+    // NOTE: Complex business logic tests (update, assignment, close) moved to issue.integration.test.ts
+    // These tests involve multiple service mocks and complex workflows better tested with real database
   });
 
   describe("Issue Status Changes", () => {
-    it("should allow status changes with proper validation", async () => {
-      // Create a minimal context that satisfies tRPC requirements
-      const mockDb = createVitestMockContext().db;
-      const mockServices = createVitestMockContext().services;
-
-      // Create a proper PinPointSupabaseUser
-      const supabaseUser = {
-        id: "user-1",
-        aud: "authenticated",
-        role: "authenticated",
-        email: "test@example.com",
-        email_confirmed_at: "2023-01-01T00:00:00Z",
-        phone: "",
-        last_sign_in_at: "2023-01-01T00:00:00Z",
-        app_metadata: {
-          provider: "google",
-          organization_id: "org-1",
-        },
-        user_metadata: {
-          name: "Test User",
-        },
-        identities: [],
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-
-      const testContext = {
-        db: mockDb,
-        services: mockServices,
-        headers: new Headers(),
-        session: {
-          user: {
-            id: "user-1",
-            email: "test@example.com",
-            name: "Test User",
-            image: null,
-          },
-          expires: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(),
-        },
-        organization: {
-          id: "org-1",
-          name: "Test Organization",
-          subdomain: "test",
-        },
-        user: supabaseUser,
-      };
-
-      const statusCaller = appRouter.createCaller(testContext as any);
-
-      const newStatus = {
-        ...mockStatus,
-        id: "status-in-progress",
-        name: "In Progress",
-        category: "IN_PROGRESS" as const,
-      };
-
-      // Mock the membership lookup that the middleware requires
-      vi.mocked(testContext.db.membership.findFirst).mockResolvedValue(
-        mockMembership as any,
-      );
-
-      // Mock the database calls with proper type casting
-      vi.mocked(testContext.db.issue.findFirst).mockResolvedValue({
-        // eslint-disable-next-line @typescript-eslint/no-misused-spread -- mockIssue is an object from createIssueFactory
-        ...mockIssue,
-        status: mockStatus,
-      } as any);
-      vi.mocked(testContext.db.issueStatus.findFirst).mockResolvedValue(
-        newStatus as any,
-      );
-      vi.mocked(testContext.db.issue.update).mockResolvedValue({
-        // eslint-disable-next-line @typescript-eslint/no-misused-spread -- mockIssue is an object from createIssueFactory
-        ...mockIssue,
-        statusId: newStatus.id,
-      } as any);
-
-      // Mock the permission system to allow the test to pass
-      vi.mocked(getUserPermissionsForSession).mockResolvedValue(["issue:edit"]);
-      vi.mocked(requirePermissionForSession).mockResolvedValue();
-
-      const result = await statusCaller.issue.core.updateStatus({
-        id: mockIssue.id,
-        statusId: newStatus.id,
-      });
-
-      expect(result.statusId).toBe(newStatus.id);
-    });
-
     it("should validate status belongs to same organization", async () => {
       const statusCtx = createAuthenticatedContext(["issue:edit"]);
       const statusCaller = appRouter.createCaller(statusCtx);
@@ -535,274 +289,13 @@ describe("issueRouter - Issue Detail Page", () => {
         }),
       ).rejects.toThrow("Invalid status");
     });
+
+    // NOTE: Complex status change workflow test moved to issue.integration.test.ts
+    // Multi-service mocking and full status update workflow better tested with real database
   });
 
-  describe("Issue Comment Operations", () => {
-    it("should allow adding comments to issues", async () => {
-      const { caller, setupCommentMocks } = createCommentTestContext([
-        "issue:create",
-        "issue:comment",
-      ]);
-
-      const existingIssue = createIssueWithRequiredRelations();
-      const newComment = createCommentFactory({
-        overrides: {
-          id: "comment-new",
-          content: "New comment",
-          issueId: mockIssue.id,
-          authorId: mockUser.id,
-          author: {
-            id: mockUser.id,
-            name: mockUser.name,
-            email: mockUser.email,
-            image: null,
-          },
-        },
-      });
-
-      setupCommentMocks(existingIssue, newComment);
-
-      const result = await caller.issue.comment.create({
-        issueId: mockIssue.id,
-        content: "New comment",
-      });
-
-      expectSuccessfulCommentCreation(result, "New comment", mockUser.id);
-    });
-
-    it("should allow creating comments with valid permissions", async () => {
-      const authorizedCtx = createAuthenticatedContext([
-        "issue:create",
-        "issue:comment",
-      ]);
-      const authorizedCaller = appRouter.createCaller(authorizedCtx);
-
-      // Mock the issue lookup query: select().from().where().limit()
-      const existingIssue = {
-        id: mockIssue.id,
-        organizationId: mockIssue.organizationId,
-      };
-      vi.mocked(authorizedCtx.drizzle.limit)
-        .mockResolvedValueOnce([existingIssue]) // First call: issue lookup
-        .mockResolvedValueOnce([mockMembership]); // Second call: membership lookup
-
-      // Mock the insert operation: insert().values().returning()
-      const insertedComment = createCommentFactory({
-        overrides: {
-          id: "comment-authorized",
-          content: "Authorized comment",
-          issueId: mockIssue.id,
-          authorId: mockUser.id,
-        },
-      });
-      vi.mocked(authorizedCtx.drizzle.returning).mockResolvedValue([
-        insertedComment,
-      ]);
-
-      // Mock the final query to get comment with author: select().from().innerJoin().where().limit()
-      const commentWithAuthor = createCommentFactory({
-        overrides: {
-          id: "comment-authorized",
-          content: "Authorized comment",
-          issueId: mockIssue.id,
-          authorId: mockUser.id,
-          author: {
-            id: mockUser.id,
-            name: mockUser.name,
-            email: mockUser.email,
-            image: null,
-          },
-        },
-      });
-      // Third limit call for final comment with author
-      vi.mocked(authorizedCtx.drizzle.limit).mockResolvedValueOnce([
-        commentWithAuthor,
-      ]);
-
-      const result = await authorizedCaller.issue.comment.create({
-        issueId: mockIssue.id,
-        content: "Authorized comment",
-      });
-
-      expect(result.content).toBe("Authorized comment");
-      expect(result.author).toBeDefined();
-      expect(result.author.id).toBe(mockUser.id);
-    });
-
-    it("should deny comment creation for users without proper permissions", async () => {
-      const { caller } = createCommentTestContext(["issue:view"]); // Only view permission
-
-      // Should throw permission error before even reaching the database
-      await expectCommentPermissionDenied(
-        caller,
-        () =>
-          caller.issue.comment.create({
-            issueId: mockIssue.id,
-            content: "Test comment",
-          }),
-        "issue:create",
-      );
-    });
-
-    describe("Enhanced Comment Scenarios with Mixed Comment Types", () => {
-      it("should handle issues with mixed comment types correctly", async () => {
-        const technicianUser = createUserRoles.technician({
-          overrides: { id: "user-technician", email: "tech@dev.local" },
-        });
-        const memberUser = createUserRoles.member({
-          overrides: { id: "user-member", email: "member@dev.local" },
-        });
-
-        const issueWithMixedComments = {
-          ...createIssueWithMixedComments({
-            overrides: {
-              id: "issue-mixed",
-              organizationId: "org-1",
-            },
-          }),
-          machine: mockMachine,
-          status: mockStatus,
-          priority: mockPriority,
-          createdBy: mockUser,
-          assignedTo: mockUser,
-          comments: [
-            createCommentTypes.public({
-              overrides: {
-                id: "comment-public",
-                content: "Public issue reported by user",
-                createdBy: memberUser,
-              },
-            }),
-            createCommentTypes.internal({
-              overrides: {
-                id: "comment-internal",
-                content: "Internal technician note about diagnostics",
-                createdBy: technicianUser,
-              },
-            }),
-            createCommentTypes.resolution({
-              overrides: {
-                id: "comment-resolution",
-                content: "Issue resolved by replacing faulty component",
-                createdBy: technicianUser,
-              },
-            }),
-          ],
-        };
-
-        const authCtx = createAuthenticatedContext([
-          "issue:view",
-          "issue:comment",
-        ]);
-        const authCaller = appRouter.createCaller(authCtx);
-
-        authCtx.db.issue.findUnique.mockResolvedValue(
-          issueWithMixedComments as any,
-        );
-        authCtx.db.issue.findFirst.mockResolvedValue(
-          issueWithMixedComments as any,
-        );
-        authCtx.db.membership.findFirst.mockResolvedValue(
-          mockMembership as any,
-        );
-
-        const result = await authCaller.issue.core.getById({
-          id: "issue-mixed",
-        });
-
-        // Should see all comment types
-        expect(result.comments).toHaveLength(3);
-        // Test that we got comments from the test scenario
-        expect(result.comments?.length).toBe(3);
-        expect(result.comments?.[0]).toBeDefined();
-        expect(result.comments?.[1]).toBeDefined();
-        expect(result.comments?.[2]).toBeDefined();
-      });
-
-      it("should properly handle role-based comment permissions with test scenarios", async () => {
-        const permissionTest = createTestScenarios.permissionTesting([
-          "issue:view",
-          "issue:comment",
-        ]);
-
-        const testIssueWithRelations = {
-          // eslint-disable-next-line @typescript-eslint/no-misused-spread -- permissionTest.issue is an object from createTestScenarios
-          ...permissionTest.issue,
-          machine: mockMachine,
-          status: mockStatus,
-          priority: mockPriority,
-          createdBy: mockUser,
-          assignedTo: mockUser,
-        };
-
-        const authCtx = createAuthenticatedContext([
-          "issue:view",
-          "issue:comment",
-        ]);
-        const authCaller = appRouter.createCaller(authCtx);
-
-        // Mock the issue lookup with mixed comments
-        authCtx.db.issue.findUnique.mockResolvedValue(
-          testIssueWithRelations as any,
-        );
-        authCtx.db.issue.findFirst.mockResolvedValue(
-          testIssueWithRelations as any,
-        );
-        authCtx.db.membership.findFirst.mockResolvedValue(
-          mockMembership as any,
-        );
-
-        const result = await authCaller.issue.core.getById({
-          id: permissionTest.issue.id,
-        });
-
-        expect(result).toBeDefined();
-        expect(result.id).toBe(permissionTest.issue.id);
-      });
-
-      it("should demonstrate realistic technician workflow with mixed comments", async () => {
-        const technicianWorkflow = createTestScenarios.technicianWorkflow();
-
-        const workflowIssueWithRelations = {
-          // eslint-disable-next-line @typescript-eslint/no-misused-spread -- technicianWorkflow.issue is an object from createTestScenarios
-          ...technicianWorkflow.issue,
-          machine: mockMachine,
-          status: mockStatus,
-          priority: mockPriority,
-          createdBy: mockUser,
-          assignedTo: null,
-        };
-
-        const techCtx = createAuthenticatedContext([
-          "issue:view",
-          "issue:edit",
-          "issue:comment",
-          "issue:assign",
-        ]);
-        const techCaller = appRouter.createCaller(techCtx);
-
-        // Mock issue with technician permissions
-        techCtx.db.issue.findUnique.mockResolvedValue(
-          workflowIssueWithRelations as any,
-        );
-        techCtx.db.issue.findFirst.mockResolvedValue(
-          workflowIssueWithRelations as any,
-        );
-        techCtx.db.membership.findFirst.mockResolvedValue(
-          mockMembership as any,
-        );
-
-        const result = await techCaller.issue.core.getById({
-          id: technicianWorkflow.issue.id,
-        });
-
-        // Verify the technician workflow test scenario is working
-        expect(result).toBeDefined();
-        expect(result.id).toBe(technicianWorkflow.issue.id);
-        expect(result.status?.category).toBe("NEW");
-      });
-    });
-  });
+  // NOTE: Comment operations are now tested in issue.comment.test.ts
+  // This keeps issue.test.ts focused on core issue operations
 
   describe("Loading States and Error Handling", () => {
     it("should handle database connection errors gracefully", async () => {
@@ -834,6 +327,582 @@ describe("issueRouter - Issue Detail Page", () => {
           title: "Updated Title",
         }),
       ).rejects.toThrow("Concurrent modification");
+    });
+  });
+});
+
+describe("issueRouter - Public Procedures", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  // Helper to create unauthenticated (public) context
+  const createPublicContext = () => {
+    const mockContext = createVitestMockContext();
+
+    // Override for anonymous/public access
+    (mockContext as any).user = null;
+    (mockContext as any).organization = {
+      id: "org-1",
+      name: "Test Organization",
+      subdomain: "test",
+    };
+
+    return mockContext as any;
+  };
+
+  describe("publicCreate - Anonymous Issue Creation", () => {
+    it("should allow anonymous users to create issues via QR codes", async () => {
+      const publicCtx = createPublicContext();
+      const publicCaller = appRouter.createCaller(publicCtx);
+
+      // Mock required database entities for validation
+      publicCtx.db.machine.findFirst.mockResolvedValue({
+        id: "machine-1",
+        name: "Test Machine",
+        organizationId: "org-1",
+        location: {
+          organizationId: "org-1",
+        },
+      });
+
+      publicCtx.db.issueStatus.findFirst.mockResolvedValue({
+        id: "status-1",
+        name: "Open",
+        isDefault: true,
+        organizationId: "org-1",
+        category: "NEW",
+      });
+
+      publicCtx.db.priority.findFirst.mockResolvedValue({
+        id: "priority-1",
+        name: "Medium",
+        isDefault: true,
+        organizationId: "org-1",
+        order: 2,
+      });
+
+      // Mock issue creation
+      const createdIssue = {
+        id: "issue-1",
+        title: "Machine not working",
+        description: "Screen is black",
+        machineId: "machine-1",
+        organizationId: "org-1",
+        statusId: "status-1",
+        priorityId: "priority-1",
+        createdById: null,
+        submitterName: "John Doe",
+        reporterEmail: "john@example.com",
+        status: { id: "status-1", name: "Open" },
+        createdBy: null,
+        machine: {
+          id: "machine-1",
+          name: "Test Machine",
+          model: { id: "model-1", name: "Test Model" },
+          location: { id: "location-1", name: "Test Location" },
+        },
+      };
+
+      publicCtx.db.issue.create.mockResolvedValue(createdIssue);
+
+      const result = await publicCaller.issue.core.publicCreate({
+        title: "Machine not working",
+        description: "Screen is black",
+        machineId: "machine-1",
+        reporterEmail: "john@example.com",
+        submitterName: "John Doe",
+      });
+
+      expect(result).toBeDefined();
+      expect(result.title).toBe("Machine not working");
+      expect(result.createdById).toBeNull();
+      expect(result.submitterName).toBe("John Doe");
+      expect(result.reporterEmail).toBe("john@example.com");
+
+      // Verify database call
+      expect(publicCtx.db.issue.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          title: "Machine not working",
+          description: "Screen is black",
+          createdById: null,
+          submitterName: "John Doe",
+          reporterEmail: "john@example.com",
+          machineId: "machine-1",
+          organizationId: "org-1",
+        }),
+        include: expect.any(Object),
+      });
+
+      // Verify notification service was called (the notification service is called inside the procedure)
+      expect(publicCtx.services.createNotificationService).toHaveBeenCalled();
+    });
+
+    it("should validate required fields for anonymous issue creation", async () => {
+      const publicCtx = createPublicContext();
+      const publicCaller = appRouter.createCaller(publicCtx);
+
+      // Test missing title
+      await expect(
+        publicCaller.issue.core.publicCreate({
+          title: "",
+          machineId: "machine-1",
+        }),
+      ).rejects.toThrow();
+
+      // Test missing machineId
+      await expect(
+        publicCaller.issue.core.publicCreate({
+          title: "Test Issue",
+          machineId: "",
+        }),
+      ).rejects.toThrow();
+    });
+
+    it("should validate email format for reporterEmail", async () => {
+      const publicCtx = createPublicContext();
+      const publicCaller = appRouter.createCaller(publicCtx);
+
+      await expect(
+        publicCaller.issue.core.publicCreate({
+          title: "Test Issue",
+          machineId: "machine-1",
+          reporterEmail: "invalid-email",
+        }),
+      ).rejects.toThrow();
+    });
+
+    it("should handle machine not found error", async () => {
+      const publicCtx = createPublicContext();
+      const publicCaller = appRouter.createCaller(publicCtx);
+
+      publicCtx.db.machine.findFirst.mockResolvedValue(null);
+
+      await expect(
+        publicCaller.issue.core.publicCreate({
+          title: "Test Issue",
+          machineId: "nonexistent-machine",
+        }),
+      ).rejects.toThrow("Machine not found");
+    });
+
+    it("should handle missing default status error", async () => {
+      const publicCtx = createPublicContext();
+      const publicCaller = appRouter.createCaller(publicCtx);
+
+      publicCtx.db.machine.findFirst.mockResolvedValue({
+        id: "machine-1",
+        location: { organizationId: "org-1" },
+      });
+
+      publicCtx.db.issueStatus.findFirst.mockResolvedValue(null);
+
+      await expect(
+        publicCaller.issue.core.publicCreate({
+          title: "Test Issue",
+          machineId: "machine-1",
+        }),
+      ).rejects.toThrow(
+        "Default issue status not found. Please contact an administrator.",
+      );
+    });
+
+    it("should handle missing default priority error", async () => {
+      const publicCtx = createPublicContext();
+      const publicCaller = appRouter.createCaller(publicCtx);
+
+      publicCtx.db.machine.findFirst.mockResolvedValue({
+        id: "machine-1",
+        location: { organizationId: "org-1" },
+      });
+
+      publicCtx.db.issueStatus.findFirst.mockResolvedValue({
+        id: "status-1",
+        isDefault: true,
+        organizationId: "org-1",
+      });
+
+      publicCtx.db.priority.findFirst.mockResolvedValue(null);
+
+      await expect(
+        publicCaller.issue.core.publicCreate({
+          title: "Test Issue",
+          machineId: "machine-1",
+        }),
+      ).rejects.toThrow(
+        "Default priority not found. Please contact an administrator.",
+      );
+    });
+
+    it("should create minimal issue with only required fields", async () => {
+      const publicCtx = createPublicContext();
+      const publicCaller = appRouter.createCaller(publicCtx);
+
+      // Mock required database entities
+      publicCtx.db.machine.findFirst.mockResolvedValue({
+        id: "machine-1",
+        location: { organizationId: "org-1" },
+      });
+
+      publicCtx.db.issueStatus.findFirst.mockResolvedValue({
+        id: "status-1",
+        name: "Open",
+        isDefault: true,
+        organizationId: "org-1",
+      });
+
+      publicCtx.db.priority.findFirst.mockResolvedValue({
+        id: "priority-1",
+        name: "Medium",
+        isDefault: true,
+        organizationId: "org-1",
+      });
+
+      const createdIssue = {
+        id: "issue-1",
+        title: "Machine Issue",
+        machineId: "machine-1",
+        organizationId: "org-1",
+        createdById: null,
+        status: { id: "status-1", name: "Open" },
+        createdBy: null,
+        machine: {
+          id: "machine-1",
+          model: { id: "model-1", name: "Test Model" },
+          location: { id: "location-1", name: "Test Location" },
+        },
+      };
+
+      publicCtx.db.issue.create.mockResolvedValue(createdIssue);
+
+      const result = await publicCaller.issue.core.publicCreate({
+        title: "Machine Issue",
+        machineId: "machine-1",
+      });
+
+      expect(result).toBeDefined();
+      expect(result.title).toBe("Machine Issue");
+      expect(result.createdById).toBeNull();
+
+      // Verify database call doesn't include optional fields
+      expect(publicCtx.db.issue.create).toHaveBeenCalledWith({
+        data: {
+          title: "Machine Issue",
+          createdById: null,
+          machineId: "machine-1",
+          organizationId: "org-1",
+          statusId: "status-1",
+          priorityId: "priority-1",
+        },
+        include: expect.any(Object),
+      });
+    });
+  });
+
+  describe("publicGetAll - Anonymous Issue Viewing", () => {
+    it("should allow anonymous users to view issues", async () => {
+      const publicCtx = createPublicContext();
+      const publicCaller = appRouter.createCaller(publicCtx);
+
+      const mockIssues = [
+        {
+          id: "issue-1",
+          title: "Machine not working",
+          description: "Screen is black",
+          createdAt: new Date(),
+          submitterName: "John Doe",
+          status: { id: "status-1", name: "Open" },
+          priority: { id: "priority-1", name: "Medium" },
+          assignedTo: null,
+          createdBy: null,
+          machine: {
+            id: "machine-1",
+            model: { id: "model-1", name: "Test Model" },
+            location: { id: "location-1", name: "Test Location" },
+          },
+        },
+        {
+          id: "issue-2",
+          title: "Flipper stuck",
+          description: null,
+          createdAt: new Date(),
+          submitterName: "Jane Smith",
+          status: { id: "status-2", name: "In Progress" },
+          priority: { id: "priority-2", name: "High" },
+          assignedTo: {
+            id: "user-1",
+            name: "Tech Support",
+            email: "tech@example.com",
+            image: null,
+          },
+          createdBy: {
+            id: "user-2",
+            name: "Staff Member",
+            email: "staff@example.com",
+            image: null,
+          },
+          machine: {
+            id: "machine-2",
+            model: { id: "model-2", name: "Another Model" },
+            location: { id: "location-2", name: "Another Location" },
+          },
+        },
+      ];
+
+      publicCtx.db.issue.findMany.mockResolvedValue(mockIssues);
+
+      const result = await publicCaller.issue.core.publicGetAll();
+
+      expect(result).toHaveLength(2);
+      expect(result[0].title).toBe("Machine not working");
+      expect(result[1].title).toBe("Flipper stuck");
+
+      // Verify database query includes organization filtering
+      expect(publicCtx.db.issue.findMany).toHaveBeenCalledWith({
+        where: { organizationId: "org-1" },
+        select: expect.objectContaining({
+          id: true,
+          title: true,
+          description: true,
+          createdAt: true,
+          submitterName: true,
+          status: true,
+          priority: true,
+          assignedTo: expect.any(Object),
+          createdBy: expect.any(Object),
+          machine: expect.any(Object),
+        }),
+        orderBy: { createdAt: "desc" },
+        take: 20, // Default limit
+      });
+    });
+
+    it("should filter issues by location", async () => {
+      const publicCtx = createPublicContext();
+      const publicCaller = appRouter.createCaller(publicCtx);
+
+      publicCtx.db.issue.findMany.mockResolvedValue([]);
+
+      await publicCaller.issue.core.publicGetAll({
+        locationId: "location-1",
+      });
+
+      expect(publicCtx.db.issue.findMany).toHaveBeenCalledWith({
+        where: {
+          organizationId: "org-1",
+          machine: { locationId: "location-1" },
+        },
+        select: expect.any(Object),
+        orderBy: expect.any(Object),
+        take: 20,
+      });
+    });
+
+    it("should filter issues by machine", async () => {
+      const publicCtx = createPublicContext();
+      const publicCaller = appRouter.createCaller(publicCtx);
+
+      publicCtx.db.issue.findMany.mockResolvedValue([]);
+
+      await publicCaller.issue.core.publicGetAll({
+        machineId: "machine-1",
+      });
+
+      expect(publicCtx.db.issue.findMany).toHaveBeenCalledWith({
+        where: {
+          organizationId: "org-1",
+          machineId: "machine-1",
+        },
+        select: expect.any(Object),
+        orderBy: expect.any(Object),
+        take: 20,
+      });
+    });
+
+    it("should filter issues by status", async () => {
+      const publicCtx = createPublicContext();
+      const publicCaller = appRouter.createCaller(publicCtx);
+
+      publicCtx.db.issue.findMany.mockResolvedValue([]);
+
+      await publicCaller.issue.core.publicGetAll({
+        statusId: "status-1",
+      });
+
+      expect(publicCtx.db.issue.findMany).toHaveBeenCalledWith({
+        where: {
+          organizationId: "org-1",
+          statusId: "status-1",
+        },
+        select: expect.any(Object),
+        orderBy: expect.any(Object),
+        take: 20,
+      });
+    });
+
+    it("should filter issues by status category", async () => {
+      const publicCtx = createPublicContext();
+      const publicCaller = appRouter.createCaller(publicCtx);
+
+      publicCtx.db.issue.findMany.mockResolvedValue([]);
+
+      await publicCaller.issue.core.publicGetAll({
+        statusCategory: "NEW",
+      });
+
+      expect(publicCtx.db.issue.findMany).toHaveBeenCalledWith({
+        where: {
+          organizationId: "org-1",
+          status: { category: "NEW" },
+        },
+        select: expect.any(Object),
+        orderBy: expect.any(Object),
+        take: 20,
+      });
+    });
+
+    it("should filter issues by model", async () => {
+      const publicCtx = createPublicContext();
+      const publicCaller = appRouter.createCaller(publicCtx);
+
+      publicCtx.db.issue.findMany.mockResolvedValue([]);
+
+      await publicCaller.issue.core.publicGetAll({
+        modelId: "model-1",
+      });
+
+      expect(publicCtx.db.issue.findMany).toHaveBeenCalledWith({
+        where: {
+          organizationId: "org-1",
+          machine: { modelId: "model-1" },
+        },
+        select: expect.any(Object),
+        orderBy: expect.any(Object),
+        take: 20,
+      });
+    });
+
+    it("should handle custom limit parameter", async () => {
+      const publicCtx = createPublicContext();
+      const publicCaller = appRouter.createCaller(publicCtx);
+
+      publicCtx.db.issue.findMany.mockResolvedValue([]);
+
+      await publicCaller.issue.core.publicGetAll({
+        limit: 50,
+      });
+
+      expect(publicCtx.db.issue.findMany).toHaveBeenCalledWith({
+        where: { organizationId: "org-1" },
+        select: expect.any(Object),
+        orderBy: expect.any(Object),
+        take: 50,
+      });
+    });
+
+    it("should enforce maximum limit of 100", async () => {
+      const publicCtx = createPublicContext();
+      const publicCaller = appRouter.createCaller(publicCtx);
+
+      await expect(
+        publicCaller.issue.core.publicGetAll({
+          limit: 150, // Over maximum
+        }),
+      ).rejects.toThrow();
+    });
+
+    it("should enforce minimum limit of 1", async () => {
+      const publicCtx = createPublicContext();
+      const publicCaller = appRouter.createCaller(publicCtx);
+
+      await expect(
+        publicCaller.issue.core.publicGetAll({
+          limit: 0, // Under minimum
+        }),
+      ).rejects.toThrow();
+    });
+
+    it("should sort issues by different criteria", async () => {
+      const publicCtx = createPublicContext();
+      const publicCaller = appRouter.createCaller(publicCtx);
+
+      publicCtx.db.issue.findMany.mockResolvedValue([]);
+
+      // Test sorting by updated date
+      await publicCaller.issue.core.publicGetAll({
+        sortBy: "updated",
+        sortOrder: "asc",
+      });
+
+      expect(publicCtx.db.issue.findMany).toHaveBeenCalledWith({
+        where: { organizationId: "org-1" },
+        select: expect.any(Object),
+        orderBy: { updatedAt: "asc" },
+        take: 20,
+      });
+
+      // Test sorting by status
+      await publicCaller.issue.core.publicGetAll({
+        sortBy: "status",
+        sortOrder: "desc",
+      });
+
+      expect(publicCtx.db.issue.findMany).toHaveBeenCalledWith({
+        where: { organizationId: "org-1" },
+        select: expect.any(Object),
+        orderBy: { status: { name: "desc" } },
+        take: 20,
+      });
+
+      // Test sorting by severity (priority)
+      await publicCaller.issue.core.publicGetAll({
+        sortBy: "severity",
+      });
+
+      expect(publicCtx.db.issue.findMany).toHaveBeenCalledWith({
+        where: { organizationId: "org-1" },
+        select: expect.any(Object),
+        orderBy: { priority: { order: "desc" } },
+        take: 20,
+      });
+    });
+
+    it("should handle organization not found error", async () => {
+      const publicCtx = createPublicContext();
+      const publicCaller = appRouter.createCaller(publicCtx);
+
+      // Set organization to null to simulate missing organization
+      (publicCtx as any).organization = null;
+
+      await expect(publicCaller.issue.core.publicGetAll()).rejects.toThrow(
+        "Organization not found",
+      );
+    });
+
+    it("should combine multiple filters", async () => {
+      const publicCtx = createPublicContext();
+      const publicCaller = appRouter.createCaller(publicCtx);
+
+      publicCtx.db.issue.findMany.mockResolvedValue([]);
+
+      await publicCaller.issue.core.publicGetAll({
+        locationId: "location-1",
+        statusCategory: "NEW",
+        sortBy: "created",
+        sortOrder: "asc",
+        limit: 10,
+      });
+
+      expect(publicCtx.db.issue.findMany).toHaveBeenCalledWith({
+        where: {
+          organizationId: "org-1",
+          machine: { locationId: "location-1" },
+          status: { category: "NEW" },
+        },
+        select: expect.any(Object),
+        orderBy: { createdAt: "asc" },
+        take: 10,
+      });
     });
   });
 });
