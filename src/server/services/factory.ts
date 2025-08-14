@@ -6,12 +6,16 @@ import { PinballMapService } from "./pinballmapService";
 import { QRCodeService } from "./qrCodeService";
 
 import type { ExtendedPrismaClient } from "./types";
+import type { DrizzleClient } from "~/server/db/drizzle";
 
 export class ServiceFactory {
-  constructor(private db: ExtendedPrismaClient) {}
+  constructor(
+    private db: ExtendedPrismaClient,
+    private drizzle: DrizzleClient,
+  ) {}
 
   createNotificationService(): NotificationService {
-    return new NotificationService(this.db);
+    return new NotificationService(this.drizzle);
   }
 
   createCollectionService(): CollectionService {
