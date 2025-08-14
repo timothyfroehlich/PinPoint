@@ -1,9 +1,10 @@
+import { eq, and, isNull, count } from "drizzle-orm";
 import * as QRCode from "qrcode";
-
-import { type Machine, type ExtendedPrismaClient } from "./types";
 
 import { imageStorage } from "~/lib/image-storage/local-storage";
 import { logger } from "~/lib/logger";
+import { type DrizzleClient } from "~/server/db/drizzle";
+import { machines } from "~/server/db/schema";
 import { constructReportUrl } from "~/server/utils/qrCodeUtils";
 
 export interface QRCodeInfo {
@@ -37,18 +38,18 @@ export interface BulkGenerationResult {
 }
 
 export class QRCodeService {
-  constructor(private prisma: ExtendedPrismaClient) {}
+  constructor(private db: DrizzleClient) {}
 
   /**
    * Generate QR code for a machine
    */
   async generateQRCode(machineId: string): Promise<QRCodeInfo> {
     // Get machine details for QR code content
-    const machine = await this.prisma.machine.findUnique({
-      where: { id: machineId },
-      include: {
+    const machine = await this.db.query.machines.findFirst({
+      where: eq(machines.id, machineId),
+      with: {
         organization: {
-          select: { subdomain: true },
+          columns: { subdomain: true },
         },
       },
     });
@@ -78,18 +79,22 @@ export class QRCodeService {
     );
 
     // Update machine with QR code information
-    const updatedMachine = await this.prisma.machine.update({
-      where: { id: machineId },
-      data: {
+    const [updatedMachine] = await this.db
+      .update(machines)
+      .set({
         qrCodeUrl,
         qrCodeGeneratedAt: new Date(),
-      },
-      select: {
-        qrCodeId: true,
-        qrCodeUrl: true,
-        qrCodeGeneratedAt: true,
-      },
-    });
+      })
+      .where(eq(machines.id, machineId))
+      .returning({
+        qrCodeId: machines.qrCodeId,
+        qrCodeUrl: machines.qrCodeUrl,
+        qrCodeGeneratedAt: machines.qrCodeGeneratedAt,
+      });
+
+    if (!updatedMachine) {
+      throw new Error("Failed to update machine QR code");
+    }
 
     return {
       id: updatedMachine.qrCodeId,
@@ -102,9 +107,9 @@ export class QRCodeService {
    * Get QR code information for a machine
    */
   async getQRCodeInfo(machineId: string): Promise<QRCodeInfo | null> {
-    const machine = await this.prisma.machine.findUnique({
-      where: { id: machineId },
-      select: {
+    const machine = await this.db.query.machines.findFirst({
+      where: eq(machines.id, machineId),
+      columns: {
         qrCodeId: true,
         qrCodeUrl: true,
         qrCodeGeneratedAt: true,
@@ -130,9 +135,9 @@ export class QRCodeService {
    * Regenerate QR code for a machine (delete old and create new)
    */
   async regenerateQRCode(machineId: string): Promise<QRCodeInfo> {
-    const machine = await this.prisma.machine.findUnique({
-      where: { id: machineId },
-      select: { qrCodeUrl: true },
+    const machine = await this.db.query.machines.findFirst({
+      where: eq(machines.id, machineId),
+      columns: { qrCodeUrl: true },
     });
 
     if (!machine) {
@@ -170,22 +175,28 @@ export class QRCodeService {
   async resolveMachineFromQR(
     qrCodeId: string,
   ): Promise<MachineFromQRCode | null> {
-    const machine = await this.prisma.machine.findUnique({
-      where: { qrCodeId },
-      include: {
+    const machine = await this.db.query.machines.findFirst({
+      where: eq(machines.qrCodeId, qrCodeId),
+      columns: {
+        id: true,
+        name: true,
+        organizationId: true,
+        locationId: true,
+      },
+      with: {
         model: {
-          select: {
+          columns: {
             name: true,
             manufacturer: true,
           },
         },
         location: {
-          select: {
+          columns: {
             name: true,
           },
         },
         organization: {
-          select: {
+          columns: {
             name: true,
             subdomain: true,
           },
@@ -214,19 +225,19 @@ export class QRCodeService {
   async generateQRCodesForOrganization(
     organizationId: string,
   ): Promise<BulkGenerationResult> {
-    const machines = await this.prisma.machine.findMany({
-      where: {
-        organizationId,
-        qrCodeUrl: null, // Only generate for machines without QR codes
-      },
-      select: { id: true },
+    const machineList = await this.db.query.machines.findMany({
+      where: and(
+        eq(machines.organizationId, organizationId),
+        isNull(machines.qrCodeUrl), // Only generate for machines without QR codes
+      ),
+      columns: { id: true },
     });
 
     let generated = 0;
     let failed = 0;
-    const total = machines.length;
+    const total = machineList.length;
 
-    for (const machine of machines) {
+    for (const machine of machineList) {
       try {
         await this.generateQRCode(machine.id);
         generated++;
@@ -257,16 +268,16 @@ export class QRCodeService {
   async regenerateQRCodesForOrganization(
     organizationId: string,
   ): Promise<BulkGenerationResult> {
-    const machines = await this.prisma.machine.findMany({
-      where: { organizationId },
-      select: { id: true },
+    const machineList = await this.db.query.machines.findMany({
+      where: eq(machines.organizationId, organizationId),
+      columns: { id: true },
     });
 
     let generated = 0;
     let failed = 0;
-    const total = machines.length;
+    const total = machineList.length;
 
-    for (const machine of machines) {
+    for (const machine of machineList) {
       try {
         await this.regenerateQRCode(machine.id);
         generated++;
@@ -294,9 +305,10 @@ export class QRCodeService {
   /**
    * Generate the QR code content URL based on machine and organization
    */
-  private generateQRCodeContent(
-    machine: Machine & { organization: { subdomain: string } },
-  ): string {
+  private generateQRCodeContent(machine: {
+    id: string;
+    organization: { subdomain: string };
+  }): string {
     return constructReportUrl(machine);
   }
 
@@ -308,22 +320,30 @@ export class QRCodeService {
     withQRCodes: number;
     withoutQRCodes: number;
   }> {
-    const [total, withQRCodes] = await Promise.all([
-      this.prisma.machine.count({
-        where: { organizationId },
-      }),
-      this.prisma.machine.count({
-        where: {
-          organizationId,
-          qrCodeUrl: { not: null },
-        },
-      }),
+    const [totalResult, withoutQRCodesResult] = await Promise.all([
+      this.db
+        .select({ count: count() })
+        .from(machines)
+        .where(eq(machines.organizationId, organizationId)),
+      this.db
+        .select({ count: count() })
+        .from(machines)
+        .where(
+          and(
+            eq(machines.organizationId, organizationId),
+            isNull(machines.qrCodeUrl),
+          ),
+        ),
     ]);
+
+    const total = totalResult[0]?.count ?? 0;
+    const withoutQRCodes = withoutQRCodesResult[0]?.count ?? 0;
+    const withQRCodes = total - withoutQRCodes;
 
     return {
       total,
       withQRCodes,
-      withoutQRCodes: total - withQRCodes,
+      withoutQRCodes,
     };
   }
 }
