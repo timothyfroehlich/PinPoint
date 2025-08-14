@@ -84,7 +84,14 @@ export const machineLocationRouter = createTRPCRouter({
         });
       }
 
-      const [updatedMachine] = updatedMachines;
+      const updatedMachine = updatedMachines[0];
+      if (!updatedMachine) {
+        // This should never happen since we checked length above
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Machine update succeeded but returned no data",
+        });
+      }
 
       // Fetch the related data separately (model, location, owner)
       const [machineWithRelations] = await ctx.drizzle
