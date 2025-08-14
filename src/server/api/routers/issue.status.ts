@@ -134,31 +134,36 @@ export const issueStatusRouter = createTRPCRouter({
       .groupBy(issues.statusId);
 
     // Get all statuses for the organization
-    const statuses = await ctx.drizzle.query.issueStatuses.findMany({
-      where: eq(issueStatuses.organizationId, ctx.organization.id),
-      columns: {
-        id: true,
-        category: true,
-      },
-    });
+    const statuses = await ctx.drizzle
+      .select({
+        id: issueStatuses.id,
+        category: issueStatuses.category,
+      })
+      .from(issueStatuses)
+      .where(eq(issueStatuses.organizationId, ctx.organization.id));
 
     // Create status ID to category mapping
     const statusMap = new Map(statuses.map((s) => [s.id, s.category]));
 
     // Initialize category counts using Drizzle enum values
-    const categoryCounts: Record<string, number> = {
+    const categoryCounts = {
       NEW: 0,
       IN_PROGRESS: 0,
       RESOLVED: 0,
     };
 
+    // Type guard to ensure category is a valid key
+    function isValidCategory(
+      category: string,
+    ): category is keyof typeof categoryCounts {
+      return category in categoryCounts;
+    }
+
     // Aggregate counts by category
     for (const group of counts) {
       const category = statusMap.get(group.statusId);
-      if (category && category in categoryCounts) {
-        const validCategory = category as keyof typeof categoryCounts;
-        categoryCounts[validCategory] =
-          (categoryCounts[validCategory] ?? 0) + group.count;
+      if (category && isValidCategory(category)) {
+        categoryCounts[category] = categoryCounts[category] + group.count;
       }
     }
 
