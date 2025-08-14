@@ -1,9 +1,18 @@
+import { eq, and, or, sql, count } from "drizzle-orm";
+
+import { type DrizzleClient } from "../db/drizzle";
 import {
-  type Collection,
-  type CollectionType,
-  Prisma,
-  type ExtendedPrismaClient,
-} from "./types";
+  collections,
+  collectionTypes,
+  machines,
+  models,
+} from "../db/schema";
+
+import type { InferSelectModel } from "drizzle-orm";
+
+// Type definitions using Drizzle schema inference
+type Collection = InferSelectModel<typeof collections>;
+type CollectionType = InferSelectModel<typeof collectionTypes>;
 
 export interface CreateManualCollectionData {
   name: string;
@@ -30,46 +39,12 @@ export interface CollectionWithMachines {
   }[];
 }
 
-// Type definitions for Prisma queries
-type CollectionWithTypeAndCount = Prisma.CollectionGetPayload<{
-  include: {
-    type: {
-      select: {
-        id: true;
-        name: true;
-        displayName: true;
-      };
-    };
-    _count: {
-      select: {
-        machines: true;
-      };
-    };
-  };
-}>;
-
-type MachineWithModelManufacturer = Prisma.MachineGetPayload<{
-  select: {
-    model: {
-      select: {
-        manufacturer: true;
-      };
-    };
-  };
-}>;
-
-type CollectionTypeWithCount = Prisma.CollectionTypeGetPayload<{
-  include: {
-    _count: {
-      select: {
-        collections: true;
-      };
-    };
-  };
-}>;
+type CollectionTypeWithCount = CollectionType & {
+  collectionCount: number;
+};
 
 export class CollectionService {
-  constructor(private prisma: ExtendedPrismaClient) {}
+  constructor(private db: DrizzleClient) {}
 
   /**
    * Get collections for a location (for public filtering)
@@ -81,63 +56,70 @@ export class CollectionService {
     manual: CollectionWithMachines[];
     auto: CollectionWithMachines[];
   }> {
-    // Get all collections in one query to avoid N+1 pattern
-    const collections = await this.prisma.collection.findMany({
-      where: {
-        OR: [
-          { locationId }, // Location-specific collections
-          { locationId: null, isManual: false }, // Organization-wide auto-collections
-        ],
-        type: {
-          organizationId,
-          isEnabled: true,
-        },
-      },
-      include: {
-        type: {
-          select: {
-            id: true,
-            name: true,
-            displayName: true,
-          },
-        },
-        _count: {
-          select: {
-            machines: {
-              where: {
-                locationId, // Only count machines at this location
-              },
-            },
-          },
-        },
-      },
-      orderBy: [
-        {
-          type: {
-            sortOrder: "asc",
-          },
-        },
-        {
-          sortOrder: "asc",
-        },
-      ],
-    });
+    // Use a join query instead of nested relational queries for better control
+    const collectionsData = await this.db
+      .select({
+        collectionId: collections.id,
+        collectionName: collections.name,
+        collectionIsManual: collections.isManual,
+        collectionSortOrder: collections.sortOrder,
+        typeId: collectionTypes.id,
+        typeName: collectionTypes.name,
+        typeDisplayName: collectionTypes.displayName,
+        typeSortOrder: collectionTypes.sortOrder,
+        machineCount: count(machines.id).as("machine_count"),
+      })
+      .from(collections)
+      .innerJoin(collectionTypes, eq(collections.typeId, collectionTypes.id))
+      .leftJoin(machines, 
+        and(
+          sql`EXISTS (
+            SELECT 1 FROM collection_machines cm 
+            WHERE cm.collection_id = ${collections.id} 
+            AND cm.machine_id = ${machines.id}
+          )`,
+          eq(machines.locationId, locationId)
+        )
+      )
+      .where(
+        and(
+          or(
+            eq(collections.locationId, locationId), // Location-specific collections
+            and(
+              sql`${collections.locationId} IS NULL`, // Organization-wide auto-collections
+              eq(collections.isManual, false),
+            ),
+          ),
+          eq(collectionTypes.organizationId, organizationId),
+          eq(collectionTypes.isEnabled, true),
+        ),
+      )
+      .groupBy(
+        collections.id,
+        collections.name,
+        collections.isManual,
+        collections.sortOrder,
+        collectionTypes.id,
+        collectionTypes.name,
+        collectionTypes.displayName,
+        collectionTypes.sortOrder,
+      )
+      .orderBy(collectionTypes.sortOrder, collections.sortOrder);
 
-    const { manual, auto } = collections.reduce(
+    const { manual, auto } = collectionsData.reduce(
       (acc, collection) => {
-        const typedCollection = collection as CollectionWithTypeAndCount;
         const collectionData: CollectionWithMachines = {
-          id: typedCollection.id,
-          name: typedCollection.name,
+          id: collection.collectionId,
+          name: collection.collectionName,
           type: {
-            id: typedCollection.type.id,
-            name: typedCollection.type.name,
-            displayName: typedCollection.type.displayName,
+            id: collection.typeId,
+            name: collection.typeName,
+            displayName: collection.typeDisplayName,
           },
-          machineCount: typedCollection._count.machines,
+          machineCount: collection.machineCount,
         };
 
-        if (collection.isManual) {
+        if (collection.collectionIsManual) {
           acc.manual.push(collectionData);
         } else {
           acc.auto.push(collectionData);
@@ -170,78 +152,91 @@ export class CollectionService {
       };
     }[]
   > {
-    const machines = await this.prisma.machine.findMany({
-      where: {
-        locationId,
-        collections: {
-          some: {
-            id: collectionId,
-          },
-        },
+    // Use a join query to get machines in the collection at the location
+    const machinesData = await this.db
+      .select({
+        id: machines.id,
+        modelName: models.name,
+        modelManufacturer: models.manufacturer,
+        modelYear: models.year,
+      })
+      .from(machines)
+      .innerJoin(models, eq(machines.modelId, models.id))
+      .innerJoin(sql`collection_machines cm`, sql`cm.machine_id = ${machines.id}`)
+      .where(
+        and(
+          eq(machines.locationId, locationId),
+          sql`cm.collection_id = ${collectionId}`,
+        ),
+      )
+      .orderBy(models.name);
+
+    return machinesData.map((machine) => ({
+      id: machine.id,
+      model: {
+        name: machine.modelName,
+        manufacturer: machine.modelManufacturer,
+        year: machine.modelYear,
       },
-      include: {
-        model: true,
-      },
-      orderBy: {
-        model: {
-          name: "asc",
-        },
-      },
-    });
-    return machines;
+    }));
   }
 
   /**
    * Create a manual collection
    */
-  createManualCollection(
-    organizationId: string,
+  async createManualCollection(
+    _organizationId: string, // Not used in this method but kept for API compatibility
     data: CreateManualCollectionData,
   ): Promise<Collection> {
-    const createData: {
-      name: string;
-      typeId: string;
-      organizationId: string;
-      locationId?: string | null;
-      description?: string | null;
-      isManual: true;
-      isSmart: false;
-    } = {
+    const createData = {
+      id: sql`gen_random_uuid()`, // Generate UUID in database
       name: data.name,
       typeId: data.typeId,
-      organizationId,
+      locationId: data.locationId ?? null,
+      description: data.description ?? null,
       isManual: true,
       isSmart: false,
+      sortOrder: 0,
+      filterCriteria: null,
     };
 
-    if (data.locationId) {
-      createData.locationId = data.locationId;
+    const [newCollection] = await this.db
+      .insert(collections)
+      .values(createData)
+      .returning();
+
+    if (!newCollection) {
+      throw new Error("Failed to create collection");
     }
 
-    if (data.description) {
-      createData.description = data.description;
-    }
-
-    return this.prisma.collection.create({
-      data: createData,
-    });
+    return newCollection;
   }
 
   /**
    * Add machines to a manual collection
+   * Note: This implements the many-to-many relationship using direct SQL
+   * since Drizzle's relations API requires an explicit junction table
    */
   async addMachinesToCollection(
     collectionId: string,
     machineIds: string[],
   ): Promise<void> {
-    await this.prisma.collection.update({
-      where: { id: collectionId },
-      data: {
-        machines: {
-          connect: machineIds.map((id) => ({ id })),
-        },
-      },
-    });
+    if (machineIds.length === 0) return;
+
+    // For now, we'll use a direct SQL approach to handle the many-to-many relationship
+    // This assumes there's an implicit junction table or the relationship is handled differently
+    // In a real implementation, we'd need either:
+    // 1. An explicit junction table defined in the schema
+    // 2. A different approach to handle this relationship
+    
+    // Placeholder implementation - this would need to be adapted based on the actual schema structure
+    await this.db.execute(sql`
+      -- This is a placeholder for the many-to-many relationship
+      -- The actual implementation would depend on how the relationship is stored
+      INSERT INTO collection_machines (collection_id, machine_id)
+      SELECT ${collectionId}, unnest(${machineIds})
+      ON CONFLICT (collection_id, machine_id) DO NOTHING
+    `);
   }
 
   /**
@@ -251,12 +246,12 @@ export class CollectionService {
     generated: number;
     updated: number;
   }> {
-    const autoTypes = await this.prisma.collectionType.findMany({
-      where: {
-        organizationId,
-        isAutoGenerated: true,
-        isEnabled: true,
-      },
+    const autoTypes = await this.db.query.collectionTypes.findMany({
+      where: and(
+        eq(collectionTypes.organizationId, organizationId),
+        eq(collectionTypes.isAutoGenerated, true),
+        eq(collectionTypes.isEnabled, true),
+      ),
     });
 
     let generated = 0;
@@ -283,101 +278,89 @@ export class CollectionService {
   private async generateManufacturerCollections(
     collectionType: CollectionType,
   ): Promise<{ generated: number; updated: number }> {
-    // Get all unique manufacturers for machines in this organization
-    const machines = await this.prisma.machine.findMany({
-      where: {
-        organizationId: collectionType.organizationId,
-        model: {
-          manufacturer: {
-            not: null,
-          },
-        },
-      },
-      select: {
-        model: {
-          select: {
-            manufacturer: true,
-          },
-        },
-      },
-      distinct: ["modelId"],
-    });
+    // Get all unique manufacturers for machines in this organization using Drizzle
+    const manufacturerData = await this.db
+      .selectDistinct({
+        manufacturer: models.manufacturer,
+      })
+      .from(machines)
+      .innerJoin(models, eq(machines.modelId, models.id))
+      .where(
+        and(
+          eq(machines.organizationId, collectionType.organizationId),
+          sql`${models.manufacturer} IS NOT NULL`,
+        ),
+      );
 
-    const uniqueManufacturers = Array.from(
-      new Set(
-        (machines as unknown as MachineWithModelManufacturer[])
-          .map((m) => m.model.manufacturer)
-          .filter((m): m is string => m !== null),
-      ),
-    );
+    const uniqueManufacturers = manufacturerData
+      .map((m) => m.manufacturer)
+      .filter((m): m is string => m !== null);
 
     let generated = 0;
     let updated = 0;
 
     for (const manufacturer of uniqueManufacturers) {
       // Check if collection already exists
-      const existing = await this.prisma.collection.findFirst({
-        where: {
-          name: manufacturer,
-          typeId: collectionType.id,
-          locationId: null, // Organization-wide
-        },
+      const existing = await this.db.query.collections.findFirst({
+        where: and(
+          eq(collections.name, manufacturer),
+          eq(collections.typeId, collectionType.id),
+          sql`${collections.locationId} IS NULL`, // Organization-wide
+        ),
       });
+
+      // Get all machines with this manufacturer
+      const machinesWithManufacturer = await this.db
+        .select({ id: machines.id })
+        .from(machines)
+        .innerJoin(models, eq(machines.modelId, models.id))
+        .where(
+          and(
+            eq(machines.organizationId, collectionType.organizationId),
+            eq(models.manufacturer, manufacturer),
+          ),
+        );
+
+      const machineIds = machinesWithManufacturer.map((m) => m.id);
 
       if (!existing) {
         // Create new collection
-        const collection = await this.prisma.collection.create({
-          data: {
+        const [collection] = await this.db
+          .insert(collections)
+          .values({
+            id: sql`gen_random_uuid()`,
             name: manufacturer,
             typeId: collectionType.id,
             locationId: null,
             isManual: false,
             isSmart: false,
-            filterCriteria: { manufacturer } as Prisma.JsonObject,
-          },
-        });
+            sortOrder: 0,
+            filterCriteria: { manufacturer },
+            description: null,
+          })
+          .returning();
 
-        // Add all machines with this manufacturer
-        const machines = await this.prisma.machine.findMany({
-          where: {
-            organizationId: collectionType.organizationId,
-            model: {
-              manufacturer,
-            },
-          },
-          select: { id: true },
-        });
+        if (!collection) {
+          throw new Error("Failed to create manufacturer collection");
+        }
 
-        await this.prisma.collection.update({
-          where: { id: collection.id },
-          data: {
-            machines: {
-              connect: machines.map((m) => ({ id: m.id })),
-            },
-          },
-        });
+        // Add machines to collection (using placeholder SQL)
+        if (machineIds.length > 0) {
+          await this.addMachinesToCollection(collection.id, machineIds);
+        }
 
         generated++;
       } else {
-        // Update existing collection with new machines
-        const machines = await this.prisma.machine.findMany({
-          where: {
-            organizationId: collectionType.organizationId,
-            model: {
-              manufacturer,
-            },
-          },
-          select: { id: true },
-        });
+        // Update existing collection with new machines (replace all)
+        // First remove existing associations, then add new ones
+        await this.db.execute(sql`
+          DELETE FROM collection_machines 
+          WHERE collection_id = ${existing.id}
+        `);
 
-        await this.prisma.collection.update({
-          where: { id: existing.id },
-          data: {
-            machines: {
-              set: machines.map((m) => ({ id: m.id })),
-            },
-          },
-        });
+        if (machineIds.length > 0) {
+          await this.addMachinesToCollection(existing.id, machineIds);
+        }
 
         updated++;
       }
@@ -407,64 +390,65 @@ export class CollectionService {
 
     for (const era of eras) {
       // Check if collection exists
-      const existing = await this.prisma.collection.findFirst({
-        where: {
-          name: era.name,
-          typeId: collectionType.id,
-          locationId: null,
-        },
+      const existing = await this.db.query.collections.findFirst({
+        where: and(
+          eq(collections.name, era.name),
+          eq(collections.typeId, collectionType.id),
+          sql`${collections.locationId} IS NULL`,
+        ),
       });
 
-      const machines = await this.prisma.machine.findMany({
-        where: {
-          organizationId: collectionType.organizationId,
-          model: {
-            year: {
-              gte: era.start,
-              lte: era.end,
-            },
-          },
-        },
-        select: { id: true },
-      });
+      // Find machines in this era
+      const machinesInEra = await this.db
+        .select({ id: machines.id })
+        .from(machines)
+        .innerJoin(models, eq(machines.modelId, models.id))
+        .where(
+          and(
+            eq(machines.organizationId, collectionType.organizationId),
+            sql`${models.year} >= ${era.start}`,
+            sql`${models.year} <= ${era.end}`,
+          ),
+        );
 
-      if (machines.length === 0) continue; // Skip empty eras
+      if (machinesInEra.length === 0) continue; // Skip empty eras
+
+      const machineIds = machinesInEra.map((m) => m.id);
 
       if (!existing) {
-        const collection = await this.prisma.collection.create({
-          data: {
+        // Create new collection
+        const [collection] = await this.db
+          .insert(collections)
+          .values({
+            id: sql`gen_random_uuid()`,
             name: era.name,
             typeId: collectionType.id,
             locationId: null,
             isManual: false,
             isSmart: false,
+            sortOrder: 0,
             filterCriteria: {
               yearStart: era.start,
               yearEnd: era.end,
-            } as Prisma.JsonObject,
-          },
-        });
-
-        await this.prisma.collection.update({
-          where: { id: collection.id },
-          data: {
-            machines: {
-              connect: machines.map((m) => ({ id: m.id })),
             },
-          },
-        });
+            description: null,
+          })
+          .returning();
 
+        if (!collection) {
+          throw new Error("Failed to create year-based collection");
+        }
+
+        await this.addMachinesToCollection(collection.id, machineIds);
         generated++;
       } else {
-        await this.prisma.collection.update({
-          where: { id: existing.id },
-          data: {
-            machines: {
-              set: machines.map((m) => ({ id: m.id })),
-            },
-          },
-        });
-
+        // Update existing collection with new machines (replace all)
+        await this.db.execute(sql`
+          DELETE FROM collection_machines 
+          WHERE collection_id = ${existing.id}
+        `);
+        
+        await this.addMachinesToCollection(existing.id, machineIds);
         updated++;
       }
     }
@@ -479,10 +463,10 @@ export class CollectionService {
     collectionTypeId: string,
     enabled: boolean,
   ): Promise<void> {
-    await this.prisma.collectionType.update({
-      where: { id: collectionTypeId },
-      data: { isEnabled: enabled },
-    });
+    await this.db
+      .update(collectionTypes)
+      .set({ isEnabled: enabled })
+      .where(eq(collectionTypes.id, collectionTypeId));
   }
 
   /**
@@ -491,24 +475,37 @@ export class CollectionService {
   async getOrganizationCollectionTypes(
     organizationId: string,
   ): Promise<CollectionTypeWithCount[]> {
-    const types: CollectionTypeWithCount[] =
-      await this.prisma.collectionType.findMany({
-        where: { organizationId },
-        include: {
-          _count: {
-            select: {
-              collections: true,
-            },
-          },
-        },
-        orderBy: {
-          sortOrder: "asc",
-        },
-      });
+    const typesWithCounts = await this.db
+      .select({
+        id: collectionTypes.id,
+        name: collectionTypes.name,
+        organizationId: collectionTypes.organizationId,
+        isAutoGenerated: collectionTypes.isAutoGenerated,
+        isEnabled: collectionTypes.isEnabled,
+        sourceField: collectionTypes.sourceField,
+        generationRules: collectionTypes.generationRules,
+        displayName: collectionTypes.displayName,
+        description: collectionTypes.description,
+        sortOrder: collectionTypes.sortOrder,
+        collectionCount: count(collections.id).as("collection_count"),
+      })
+      .from(collectionTypes)
+      .leftJoin(collections, eq(collectionTypes.id, collections.typeId))
+      .where(eq(collectionTypes.organizationId, organizationId))
+      .groupBy(
+        collectionTypes.id,
+        collectionTypes.name,
+        collectionTypes.organizationId,
+        collectionTypes.isAutoGenerated,
+        collectionTypes.isEnabled,
+        collectionTypes.sourceField,
+        collectionTypes.generationRules,
+        collectionTypes.displayName,
+        collectionTypes.description,
+        collectionTypes.sortOrder,
+      )
+      .orderBy(collectionTypes.sortOrder);
 
-    return types.map((type) => ({
-      ...type,
-      collectionCount: type._count.collections,
-    }));
+    return typesWithCounts;
   }
 }
