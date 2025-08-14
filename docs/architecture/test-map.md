@@ -12,17 +12,17 @@ This document maps test files to the specific source files they test, organized 
 
 ### API Router Tests
 
-| Test File                                     | Source Files Tested                      | Coverage Focus                                 |
-| --------------------------------------------- | ---------------------------------------- | ---------------------------------------------- |
-| `src/server/api/routers/auth.test.ts`         | `src/server/api/routers/auth.ts`         | Authentication procedures, session management  |
-| `src/server/api/routers/issue.test.ts`        | `src/server/api/routers/issue.ts`        | Issue CRUD operations, organization scoping    |
-| `src/server/api/routers/machine.test.ts`      | `src/server/api/routers/machine.ts`      | Machine management, OPDB integration           |
-| `src/server/api/routers/location.test.ts`     | `src/server/api/routers/location.ts`     | Location operations, multi-tenancy             |
-| `src/integration-tests/comment.integration.test.ts` | `src/server/api/routers/comment.ts`      | Comment CRUD, soft delete functionality (Integration test)        |
-| `src/server/api/routers/upload.test.ts`       | `src/server/api/routers/upload.ts`       | File upload security, storage operations       |
-| `src/server/api/routers/notification.test.ts` | `src/server/api/routers/notification.ts` | Notification triggers, delivery logic          |
-| `src/server/api/routers/organization.test.ts` | `src/server/api/routers/organization.ts` | Organization management, role permissions      |
-| `src/server/api/routers/user.test.ts`         | `src/server/api/routers/user.ts`         | User profile operations, membership management |
+| Test File                                           | Source Files Tested                      | Coverage Focus                                             |
+| --------------------------------------------------- | ---------------------------------------- | ---------------------------------------------------------- |
+| `src/server/api/routers/auth.test.ts`               | `src/server/api/routers/auth.ts`         | Authentication procedures, session management              |
+| `src/server/api/routers/issue.test.ts`              | `src/server/api/routers/issue.ts`        | Issue CRUD operations, organization scoping                |
+| `src/server/api/routers/machine.test.ts`            | `src/server/api/routers/machine.ts`      | Machine management, OPDB integration                       |
+| `src/server/api/routers/location.test.ts`           | `src/server/api/routers/location.ts`     | Location operations, multi-tenancy                         |
+| `src/integration-tests/comment.integration.test.ts` | `src/server/api/routers/comment.ts`      | Comment CRUD, soft delete functionality (Integration test) |
+| `src/server/api/routers/upload.test.ts`             | `src/server/api/routers/upload.ts`       | File upload security, storage operations                   |
+| `src/server/api/routers/notification.test.ts`       | `src/server/api/routers/notification.ts` | Notification triggers, delivery logic                      |
+| `src/server/api/routers/organization.test.ts`       | `src/server/api/routers/organization.ts` | Organization management, role permissions                  |
+| `src/server/api/routers/user.test.ts`               | `src/server/api/routers/user.ts`         | User profile operations, membership management             |
 
 ### Library Function Tests
 
@@ -148,9 +148,9 @@ This document maps test files to the specific source files they test, organized 
 
 ### Drizzle ORM Test Coverage
 
-| Test File                                                 | Source Files Tested                             | Coverage Focus                                |
-| --------------------------------------------------------- | ----------------------------------------------- | --------------------------------------------- |
-| `src/server/db/drizzle-crud-validation.test.ts`          | `src/server/db/schema/*`, `src/server/db/drizzle.ts` | CRUD operations, transactions, multi-tenancy  |
+| Test File                                                      | Source Files Tested                                            | Coverage Focus                               |
+| -------------------------------------------------------------- | -------------------------------------------------------------- | -------------------------------------------- |
+| `src/server/db/drizzle-crud-validation.test.ts`                | `src/server/db/schema/*`, `src/server/db/drizzle.ts`           | CRUD operations, transactions, multi-tenancy |
 | `src/server/api/routers/__tests__/drizzle-integration.test.ts` | `src/server/api/trpc.base.ts`, `src/test/vitestMockContext.ts` | tRPC + Drizzle integration, dual-ORM support |
 
 ### Test Statistics
