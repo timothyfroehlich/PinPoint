@@ -225,13 +225,13 @@ export class NotificationService {
    * Get unread notification count
    */
   async getUnreadCount(userId: string): Promise<number> {
-    const result = await this.db
+    const [countResult] = await this.db
       .select({ count: count() })
       .from(notifications)
       .where(
         and(eq(notifications.userId, userId), eq(notifications.read, false)),
       );
 
-    return result[0]?.count ?? 0;
+    return countResult?.count ?? 0;
   }
 }
