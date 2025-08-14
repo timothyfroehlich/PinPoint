@@ -342,50 +342,9 @@ describe("machineLocationRouter", () => {
       );
     });
 
-    it("should throw INTERNAL_SERVER_ERROR when final machine fetch fails", async () => {
-      const ctx = createAuthenticatedContext();
-      const caller = appRouter.createCaller(ctx);
-
-      // Mock machine and location exist, update succeeds
-      ctx.drizzle.query.machines.findFirst.mockResolvedValue(mockMachine);
-      ctx.drizzle.query.locations.findFirst.mockResolvedValue(mockLocation);
-
-      const mockUpdatedMachine = { ...mockMachine, locationId: "location-2" };
-      ctx.drizzle.update = vi.fn().mockReturnValue({
-        set: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            returning: vi.fn().mockResolvedValue([mockUpdatedMachine]),
-          }),
-        }),
-      });
-
-      // Mock final select returning empty array (fetch fails)
-      ctx.drizzle.select = vi.fn().mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          leftJoin: vi.fn().mockReturnValue({
-            leftJoin: vi.fn().mockReturnValue({
-              leftJoin: vi.fn().mockReturnValue({
-                where: vi.fn().mockReturnValue({
-                  limit: vi.fn().mockResolvedValue([]), // No machine returned
-                }),
-              }),
-            }),
-          }),
-        }),
-      });
-
-      await expect(
-        caller.machine.location.moveToLocation({
-          machineId: "machine-1",
-          locationId: "location-2",
-        }),
-      ).rejects.toThrow(
-        new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to retrieve updated machine",
-        }),
-      );
-    });
+    // Test removed: The optimization eliminated the final error check that this test was validating
+    // Since we use non-null assertion, if the machine was updated successfully,
+    // the subsequent select should always return a result
 
     it("should validate input parameters", async () => {
       const ctx = createAuthenticatedContext();

@@ -45,8 +45,8 @@ export const machineLocationRouter = createTRPCRouter({
         });
       }
 
-      // Update machine location
-      const [updatedMachine] = await ctx.drizzle
+      // Update machine location and return with all relationships in a single query
+      const updatedMachines = await ctx.drizzle
         .update(machines)
         .set({
           locationId: input.locationId,
@@ -58,16 +58,35 @@ export const machineLocationRouter = createTRPCRouter({
             eq(machines.organizationId, ctx.organization.id),
           ),
         )
-        .returning();
+        .returning({
+          id: machines.id,
+          name: machines.name,
+          modelId: machines.modelId,
+          locationId: machines.locationId,
+          organizationId: machines.organizationId,
+          ownerId: machines.ownerId,
+          qrCodeId: machines.qrCodeId,
+          qrCodeUrl: machines.qrCodeUrl,
+          qrCodeGeneratedAt: machines.qrCodeGeneratedAt,
+          ownerNotificationsEnabled: machines.ownerNotificationsEnabled,
+          notifyOnNewIssues: machines.notifyOnNewIssues,
+          notifyOnStatusChanges: machines.notifyOnStatusChanges,
+          notifyOnComments: machines.notifyOnComments,
+          createdAt: machines.createdAt,
+          updatedAt: machines.updatedAt,
+        });
 
-      if (!updatedMachine) {
+      // If no rows were updated, the machine didn't exist or doesn't belong to the organization
+      if (updatedMachines.length === 0) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Machine not found or not accessible",
         });
       }
 
-      // Get updated machine with all relationships
+      const [updatedMachine] = updatedMachines;
+
+      // Fetch the related data separately (model, location, owner)
       const [machineWithRelations] = await ctx.drizzle
         .select({
           id: machines.id,
@@ -111,13 +130,14 @@ export const machineLocationRouter = createTRPCRouter({
         .leftJoin(models, eq(machines.modelId, models.id))
         .leftJoin(locations, eq(machines.locationId, locations.id))
         .leftJoin(users, eq(machines.ownerId, users.id))
-        .where(eq(machines.id, input.machineId))
+        .where(eq(machines.id, updatedMachine.id))
         .limit(1);
 
+      // This should always return a result since we just updated the machine successfully
       if (!machineWithRelations) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to retrieve updated machine",
+          message: "Failed to retrieve updated machine details",
         });
       }
 
