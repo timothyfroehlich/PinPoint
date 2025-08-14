@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import {
@@ -15,60 +15,97 @@ export const modelCoreRouter = createTRPCRouter({
     // Get all game titles that are either:
     // 1. Custom games belonging to this organization
     // 2. Global OPDB games that have instances in this organization
-    return await ctx.drizzle.query.models.findMany({
-      where: (models, { exists }) =>
-        exists(
-          ctx.drizzle
-            .select({ id: machines.id })
-            .from(machines)
-            .where(
-              and(
-                eq(machines.modelId, models.id),
-                eq(machines.organizationId, ctx.organization.id),
-              ),
-            ),
-        ),
-      orderBy: (models, { asc }) => [asc(models.name)],
-      extras: {
+
+    // Get distinct model IDs that have machines in this organization
+    const modelIdsWithMachinesResult = await ctx.drizzle
+      .selectDistinct({ modelId: machines.modelId })
+      .from(machines)
+      .where(eq(machines.organizationId, ctx.organization.id));
+
+    const modelIdsWithMachines = modelIdsWithMachinesResult.map(
+      (row) => row.modelId,
+    );
+
+    if (modelIdsWithMachines.length === 0) {
+      return [];
+    }
+
+    return await ctx.drizzle
+      .select({
+        id: models.id,
+        name: models.name,
+        manufacturer: models.manufacturer,
+        year: models.year,
+        ipdbId: models.ipdbId,
+        opdbId: models.opdbId,
+        machineType: models.machineType,
+        machineDisplay: models.machineDisplay,
+        isActive: models.isActive,
+        ipdbLink: models.ipdbLink,
+        opdbImgUrl: models.opdbImgUrl,
+        kineticistUrl: models.kineticistUrl,
+        isCustom: models.isCustom,
+        createdAt: models.createdAt,
+        updatedAt: models.updatedAt,
         machineCount: sql<number>`(
-          SELECT COUNT(*) 
-          FROM ${machines} 
-          WHERE ${machines.modelId} = ${models.id} 
-            AND ${machines.organizationId} = ${ctx.organization.id}
+          SELECT COUNT(*)::int
+          FROM "Machine" m 
+          WHERE m."modelId" = "Model"."id" 
+            AND m."organizationId" = ${ctx.organization.id}::text
         )`.as("machine_count"),
-      },
-    });
+      })
+      .from(models)
+      .where(inArray(models.id, modelIdsWithMachines))
+      .orderBy(models.name);
   }),
 
   // Get single game title by ID
   getById: organizationProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
-      const model = await ctx.drizzle.query.models.findFirst({
-        where: (models, { and, eq, exists }) =>
+      // Get distinct model IDs that have machines in this organization
+      const modelIdsWithMachinesResult = await ctx.drizzle
+        .selectDistinct({ modelId: machines.modelId })
+        .from(machines)
+        .where(eq(machines.organizationId, ctx.organization.id));
+
+      const modelIdsWithMachines = modelIdsWithMachinesResult.map(
+        (row) => row.modelId,
+      );
+
+      const model = await ctx.drizzle
+        .select({
+          id: models.id,
+          name: models.name,
+          manufacturer: models.manufacturer,
+          year: models.year,
+          ipdbId: models.ipdbId,
+          opdbId: models.opdbId,
+          machineType: models.machineType,
+          machineDisplay: models.machineDisplay,
+          isActive: models.isActive,
+          ipdbLink: models.ipdbLink,
+          opdbImgUrl: models.opdbImgUrl,
+          kineticistUrl: models.kineticistUrl,
+          isCustom: models.isCustom,
+          createdAt: models.createdAt,
+          updatedAt: models.updatedAt,
+          machineCount: sql<number>`(
+            SELECT COUNT(*)::int
+            FROM "Machine" m 
+            WHERE m."modelId" = "Model"."id" 
+              AND m."organizationId" = ${ctx.organization.id}::text
+          )`.as("machine_count"),
+        })
+        .from(models)
+        .where(
           and(
             eq(models.id, input.id),
-            exists(
-              ctx.drizzle
-                .select({ id: machines.id })
-                .from(machines)
-                .where(
-                  and(
-                    eq(machines.modelId, models.id),
-                    eq(machines.organizationId, ctx.organization.id),
-                  ),
-                ),
-            ),
+            inArray(models.id, modelIdsWithMachines),
           ),
-        extras: {
-          machineCount: sql<number>`(
-            SELECT COUNT(*) 
-            FROM ${machines} 
-            WHERE ${machines.modelId} = ${models.id} 
-              AND ${machines.organizationId} = ${ctx.organization.id}
-          )`.as("machine_count"),
-        },
-      });
+        )
+        .limit(1)
+        .then((rows) => rows[0] ?? null);
 
       if (!model) {
         throw new TRPCError({
@@ -84,32 +121,50 @@ export const modelCoreRouter = createTRPCRouter({
   delete: organizationManageProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      // Get distinct model IDs that have machines in this organization
+      const modelIdsWithMachinesResult = await ctx.drizzle
+        .selectDistinct({ modelId: machines.modelId })
+        .from(machines)
+        .where(eq(machines.organizationId, ctx.organization.id));
+
+      const modelIdsWithMachines = modelIdsWithMachinesResult.map(
+        (row) => row.modelId,
+      );
+
       // Verify the game title belongs to this organization or is a global OPDB game
-      const model = await ctx.drizzle.query.models.findFirst({
-        where: (models, { and, eq, exists }) =>
+      const model = await ctx.drizzle
+        .select({
+          id: models.id,
+          name: models.name,
+          manufacturer: models.manufacturer,
+          year: models.year,
+          ipdbId: models.ipdbId,
+          opdbId: models.opdbId,
+          machineType: models.machineType,
+          machineDisplay: models.machineDisplay,
+          isActive: models.isActive,
+          ipdbLink: models.ipdbLink,
+          opdbImgUrl: models.opdbImgUrl,
+          kineticistUrl: models.kineticistUrl,
+          isCustom: models.isCustom,
+          createdAt: models.createdAt,
+          updatedAt: models.updatedAt,
+          machineCount: sql<number>`(
+            SELECT COUNT(*)::int
+            FROM "Machine" m 
+            WHERE m."modelId" = "Model"."id" 
+              AND m."organizationId" = ${ctx.organization.id}::text
+          )`.as("machine_count"),
+        })
+        .from(models)
+        .where(
           and(
             eq(models.id, input.id),
-            exists(
-              ctx.drizzle
-                .select({ id: machines.id })
-                .from(machines)
-                .where(
-                  and(
-                    eq(machines.modelId, models.id),
-                    eq(machines.organizationId, ctx.organization.id),
-                  ),
-                ),
-            ),
+            inArray(models.id, modelIdsWithMachines),
           ),
-        extras: {
-          machineCount: sql<number>`(
-            SELECT COUNT(*) 
-            FROM ${machines} 
-            WHERE ${machines.modelId} = ${models.id} 
-              AND ${machines.organizationId} = ${ctx.organization.id}
-          )`.as("machine_count"),
-        },
-      });
+        )
+        .limit(1)
+        .then((rows) => rows[0] ?? null);
 
       if (!model) {
         throw new TRPCError({

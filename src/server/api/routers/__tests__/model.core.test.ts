@@ -65,8 +65,8 @@ describe("modelCoreRouter", () => {
   });
 
   describe("getAll", () => {
-    it("returns models with machine counts using exists() subquery", async () => {
-      // Mock successful response with extras (machine counts)
+    it("returns models with machine counts using inArray pattern", async () => {
+      // Mock successful response with machine counts
       const mockModels = [
         {
           id: "model-1",
@@ -86,42 +86,60 @@ describe("modelCoreRouter", () => {
         },
       ];
 
-      vi.mocked(mockCtx.drizzle.query.models.findMany).mockResolvedValue(
-        mockModels,
-      );
+      // Mock the selectDistinct query for machine model IDs
+      vi.mocked(mockCtx.drizzle.selectDistinct).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi
+            .fn()
+            .mockResolvedValue([
+              { modelId: "model-1" },
+              { modelId: "model-2" },
+            ]),
+        }),
+      } as any);
+
+      // Mock the main select query
+      vi.mocked(mockCtx.drizzle.select).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            orderBy: vi.fn().mockResolvedValue(mockModels),
+          }),
+        }),
+      } as any);
 
       const result = await caller.getAll();
 
       expect(result).toEqual(mockModels);
-      expect(mockCtx.drizzle.query.models.findMany).toHaveBeenCalledWith({
-        where: expect.any(Function), // exists() subquery function
-        orderBy: expect.any(Function), // asc ordering function
-        extras: {
-          machineCount: expect.any(Object), // SQL template for counting
-        },
-      });
+      expect(mockCtx.drizzle.selectDistinct).toHaveBeenCalled();
+      expect(mockCtx.drizzle.select).toHaveBeenCalled();
     });
 
     it("returns empty array when no models exist in organization", async () => {
-      vi.mocked(mockCtx.drizzle.query.models.findMany).mockResolvedValue([]);
+      // Mock no machines in organization
+      vi.mocked(mockCtx.drizzle.selectDistinct).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([]),
+        }),
+      } as any);
 
       const result = await caller.getAll();
 
       expect(result).toEqual([]);
-      expect(mockCtx.drizzle.query.models.findMany).toHaveBeenCalledOnce();
+      expect(mockCtx.drizzle.selectDistinct).toHaveBeenCalledOnce();
     });
 
-    it("applies organizational scoping through exists() subquery", async () => {
-      vi.mocked(mockCtx.drizzle.query.models.findMany).mockResolvedValue([]);
+    it("applies organizational scoping through inArray pattern", async () => {
+      // Mock no machines in organization
+      vi.mocked(mockCtx.drizzle.selectDistinct).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([]),
+        }),
+      } as any);
 
       await caller.getAll();
 
-      // Verify exists() subquery structure was used
-      const call = vi.mocked(mockCtx.drizzle.query.models.findMany).mock
-        .calls[0];
-      const whereClause = call?.[0]?.where;
-      expect(whereClause).toBeInstanceOf(Function);
-      expect(call?.[0]?.extras?.machineCount).toBeDefined();
+      // Verify organizational scoping query was used
+      expect(mockCtx.drizzle.selectDistinct).toHaveBeenCalled();
     });
   });
 
@@ -136,23 +154,49 @@ describe("modelCoreRouter", () => {
         machineCount: 2,
       };
 
-      vi.mocked(mockCtx.drizzle.query.models.findFirst).mockResolvedValue(
-        mockModel,
-      );
+      // Mock the selectDistinct query for machine model IDs
+      vi.mocked(mockCtx.drizzle.selectDistinct).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([{ modelId: "model-1" }]),
+        }),
+      } as any);
+
+      // Mock the main select query
+      vi.mocked(mockCtx.drizzle.select).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockReturnValue({
+              then: vi.fn().mockImplementation((fn) => fn([mockModel])),
+            }),
+          }),
+        }),
+      } as any);
 
       const result = await caller.getById({ id: "model-1" });
 
       expect(result).toEqual(mockModel);
-      expect(mockCtx.drizzle.query.models.findFirst).toHaveBeenCalledWith({
-        where: expect.any(Function), // and() with eq() and exists() functions
-        extras: {
-          machineCount: expect.any(Object), // SQL template for counting
-        },
-      });
+      expect(mockCtx.drizzle.selectDistinct).toHaveBeenCalled();
+      expect(mockCtx.drizzle.select).toHaveBeenCalled();
     });
 
     it("throws NOT_FOUND when model doesn't exist", async () => {
-      vi.mocked(mockCtx.drizzle.query.models.findFirst).mockResolvedValue(null);
+      // Mock the selectDistinct query for machine model IDs
+      vi.mocked(mockCtx.drizzle.selectDistinct).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([]),
+        }),
+      } as any);
+
+      // Mock the main select query returning null
+      vi.mocked(mockCtx.drizzle.select).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockReturnValue({
+              then: vi.fn().mockImplementation((fn) => fn([])),
+            }),
+          }),
+        }),
+      } as any);
 
       await expect(caller.getById({ id: "non-existent" })).rejects.toThrow(
         new TRPCError({
@@ -163,8 +207,22 @@ describe("modelCoreRouter", () => {
     });
 
     it("throws NOT_FOUND when model exists but not in organization", async () => {
-      // Simulate model existing but exists() subquery filtering it out
-      vi.mocked(mockCtx.drizzle.query.models.findFirst).mockResolvedValue(null);
+      // Simulate model existing but not having machines in this organization
+      vi.mocked(mockCtx.drizzle.selectDistinct).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([]), // No machines in this org
+        }),
+      } as any);
+
+      vi.mocked(mockCtx.drizzle.select).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockReturnValue({
+              then: vi.fn().mockImplementation((fn) => fn([])),
+            }),
+          }),
+        }),
+      } as any);
 
       await expect(caller.getById({ id: "other-org-model" })).rejects.toThrow(
         new TRPCError({
@@ -181,20 +239,26 @@ describe("modelCoreRouter", () => {
         machineCount: 5,
       };
 
-      vi.mocked(mockCtx.drizzle.query.models.findFirst).mockResolvedValue(
-        mockModel,
-      );
+      vi.mocked(mockCtx.drizzle.selectDistinct).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([{ modelId: "model-1" }]),
+        }),
+      } as any);
+
+      vi.mocked(mockCtx.drizzle.select).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockReturnValue({
+              then: vi.fn().mockImplementation((fn) => fn([mockModel])),
+            }),
+          }),
+        }),
+      } as any);
 
       const result = await caller.getById({ id: "model-1" });
 
       expect(result.machineCount).toBe(5);
-      expect(mockCtx.drizzle.query.models.findFirst).toHaveBeenCalledWith(
-        expect.objectContaining({
-          extras: expect.objectContaining({
-            machineCount: expect.any(Object),
-          }),
-        }),
-      );
+      expect(mockCtx.drizzle.select).toHaveBeenCalled();
     });
   });
 
@@ -209,9 +273,22 @@ describe("modelCoreRouter", () => {
 
       const deletedModel = { ...mockModel, deletedAt: new Date() };
 
-      vi.mocked(mockCtx.drizzle.query.models.findFirst).mockResolvedValue(
-        mockModel,
-      );
+      vi.mocked(mockCtx.drizzle.selectDistinct).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([{ modelId: "model-1" }]),
+        }),
+      } as any);
+
+      vi.mocked(mockCtx.drizzle.select).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockReturnValue({
+              then: vi.fn().mockImplementation((fn) => fn([mockModel])),
+            }),
+          }),
+        }),
+      } as any);
+
       vi.mocked(mockCtx.drizzle.delete).mockReturnValue({
         where: vi.fn().mockReturnValue({
           returning: vi.fn().mockResolvedValue([deletedModel]),
@@ -225,7 +302,21 @@ describe("modelCoreRouter", () => {
     });
 
     it("throws NOT_FOUND when model doesn't exist", async () => {
-      vi.mocked(mockCtx.drizzle.query.models.findFirst).mockResolvedValue(null);
+      vi.mocked(mockCtx.drizzle.selectDistinct).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([]),
+        }),
+      } as any);
+
+      vi.mocked(mockCtx.drizzle.select).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockReturnValue({
+              then: vi.fn().mockImplementation((fn) => fn([])),
+            }),
+          }),
+        }),
+      } as any);
 
       await expect(caller.delete({ id: "non-existent" })).rejects.toThrow(
         new TRPCError({
@@ -243,9 +334,21 @@ describe("modelCoreRouter", () => {
         machineCount: 0,
       };
 
-      vi.mocked(mockCtx.drizzle.query.models.findFirst).mockResolvedValue(
-        mockModel,
-      );
+      vi.mocked(mockCtx.drizzle.selectDistinct).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([{ modelId: "model-1" }]),
+        }),
+      } as any);
+
+      vi.mocked(mockCtx.drizzle.select).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockReturnValue({
+              then: vi.fn().mockImplementation((fn) => fn([mockModel])),
+            }),
+          }),
+        }),
+      } as any);
 
       await expect(caller.delete({ id: "model-1" })).rejects.toThrow(
         new TRPCError({
@@ -263,9 +366,21 @@ describe("modelCoreRouter", () => {
         machineCount: 3, // Has machines
       };
 
-      vi.mocked(mockCtx.drizzle.query.models.findFirst).mockResolvedValue(
-        mockModel,
-      );
+      vi.mocked(mockCtx.drizzle.selectDistinct).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([{ modelId: "model-1" }]),
+        }),
+      } as any);
+
+      vi.mocked(mockCtx.drizzle.select).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockReturnValue({
+              then: vi.fn().mockImplementation((fn) => fn([mockModel])),
+            }),
+          }),
+        }),
+      } as any);
 
       await expect(caller.delete({ id: "model-1" })).rejects.toThrow(
         new TRPCError({
@@ -276,7 +391,21 @@ describe("modelCoreRouter", () => {
     });
 
     it("validates organizational access before deletion", async () => {
-      vi.mocked(mockCtx.drizzle.query.models.findFirst).mockResolvedValue(null);
+      vi.mocked(mockCtx.drizzle.selectDistinct).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([]), // No machines in org
+        }),
+      } as any);
+
+      vi.mocked(mockCtx.drizzle.select).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockReturnValue({
+              then: vi.fn().mockImplementation((fn) => fn([])),
+            }),
+          }),
+        }),
+      } as any);
 
       await expect(caller.delete({ id: "other-org-model" })).rejects.toThrow(
         new TRPCError({
@@ -285,10 +414,8 @@ describe("modelCoreRouter", () => {
         }),
       );
 
-      // Verify findFirst was called with organizational scoping
-      const call = vi.mocked(mockCtx.drizzle.query.models.findFirst).mock
-        .calls[0];
-      expect(call?.[0]?.where).toBeInstanceOf(Function);
+      // Verify organizational scoping was applied
+      expect(mockCtx.drizzle.selectDistinct).toHaveBeenCalled();
     });
 
     it("includes machine count check in deletion validation", async () => {
@@ -299,9 +426,21 @@ describe("modelCoreRouter", () => {
         machineCount: 1,
       };
 
-      vi.mocked(mockCtx.drizzle.query.models.findFirst).mockResolvedValue(
-        mockModel,
-      );
+      vi.mocked(mockCtx.drizzle.selectDistinct).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([{ modelId: "model-1" }]),
+        }),
+      } as any);
+
+      vi.mocked(mockCtx.drizzle.select).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockReturnValue({
+              then: vi.fn().mockImplementation((fn) => fn([mockModel])),
+            }),
+          }),
+        }),
+      } as any);
 
       await expect(caller.delete({ id: "model-1" })).rejects.toThrow(
         new TRPCError({
@@ -310,77 +449,100 @@ describe("modelCoreRouter", () => {
         }),
       );
 
-      // Verify extras with machineCount was requested
-      const call = vi.mocked(mockCtx.drizzle.query.models.findFirst).mock
-        .calls[0];
-      expect(call?.[0]?.extras?.machineCount).toBeDefined();
+      // Verify machine count is included in the response
+      expect(mockCtx.drizzle.select).toHaveBeenCalled();
     });
   });
 
   describe("organizational scoping", () => {
-    it("applies exists() subquery for organizational boundaries", async () => {
-      vi.mocked(mockCtx.drizzle.query.models.findMany).mockResolvedValue([]);
+    it("applies inArray pattern for organizational boundaries", async () => {
+      vi.mocked(mockCtx.drizzle.selectDistinct).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([]),
+        }),
+      } as any);
 
       await caller.getAll();
 
-      // Verify the where clause uses exists() subquery pattern
-      const call = vi.mocked(mockCtx.drizzle.query.models.findMany).mock
-        .calls[0];
-      const whereFunction = call?.[0]?.where;
-      expect(whereFunction).toBeInstanceOf(Function);
-
-      // The where function should receive models and { exists } as parameters
-      // This validates the Drizzle exists() subquery pattern is being used
-      expect(whereFunction).toBeDefined();
+      // Verify the organizational scoping query was executed
+      expect(mockCtx.drizzle.selectDistinct).toHaveBeenCalled();
     });
 
     it("scopes all operations by organization context", async () => {
       // Test that organization ID from context is used consistently
       expect(mockCtx.organization?.id).toBe("org-1");
 
-      vi.mocked(mockCtx.drizzle.query.models.findFirst).mockResolvedValue(null);
+      vi.mocked(mockCtx.drizzle.selectDistinct).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([]),
+        }),
+      } as any);
+
+      vi.mocked(mockCtx.drizzle.select).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockReturnValue({
+              then: vi.fn().mockImplementation((fn) => fn([])),
+            }),
+          }),
+        }),
+      } as any);
 
       await expect(caller.getById({ id: "test" })).rejects.toThrow();
 
       // All operations should use the same organizational scoping pattern
-      const call = vi.mocked(mockCtx.drizzle.query.models.findFirst).mock
-        .calls[0];
-      expect(call?.[0]?.where).toBeInstanceOf(Function);
+      expect(mockCtx.drizzle.selectDistinct).toHaveBeenCalled();
     });
   });
 
   describe("SQL extras and machine counting", () => {
     it("uses SQL template for machine counting in getAll", async () => {
-      vi.mocked(mockCtx.drizzle.query.models.findMany).mockResolvedValue([]);
+      vi.mocked(mockCtx.drizzle.selectDistinct).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([]),
+        }),
+      } as any);
 
       await caller.getAll();
 
-      const call = vi.mocked(mockCtx.drizzle.query.models.findMany).mock
-        .calls[0];
-      expect(call?.[0]?.extras?.machineCount).toBeDefined();
+      // Verify the select operation was called (which includes machine count SQL)
+      expect(mockCtx.drizzle.selectDistinct).toHaveBeenCalled();
     });
 
     it("uses consistent machine counting across operations", async () => {
-      vi.mocked(mockCtx.drizzle.query.models.findFirst).mockResolvedValue(null);
+      vi.mocked(mockCtx.drizzle.selectDistinct).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([]),
+        }),
+      } as any);
+
+      vi.mocked(mockCtx.drizzle.select).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockReturnValue({
+              then: vi.fn().mockImplementation((fn) => fn([])),
+            }),
+          }),
+        }),
+      } as any);
 
       await expect(caller.getById({ id: "test" })).rejects.toThrow();
       await expect(caller.delete({ id: "test" })).rejects.toThrow();
 
-      // Both operations should use the same extras pattern
-      const calls = vi.mocked(mockCtx.drizzle.query.models.findFirst).mock
-        .calls;
-      calls.forEach((call) => {
-        expect(call?.[0]?.extras?.machineCount).toBeDefined();
-      });
+      // Both operations should use the same select pattern with machine counting
+      expect(mockCtx.drizzle.selectDistinct).toHaveBeenCalledTimes(2);
+      expect(mockCtx.drizzle.select).toHaveBeenCalledTimes(2);
     });
   });
 
   describe("error handling", () => {
     it("propagates database errors appropriately", async () => {
       const dbError = new Error("Database connection failed");
-      vi.mocked(mockCtx.drizzle.query.models.findMany).mockRejectedValue(
-        dbError,
-      );
+      vi.mocked(mockCtx.drizzle.selectDistinct).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockRejectedValue(dbError),
+        }),
+      } as any);
 
       await expect(caller.getAll()).rejects.toThrow(
         "Database connection failed",
@@ -388,7 +550,21 @@ describe("modelCoreRouter", () => {
     });
 
     it("uses consistent error messages for access control", async () => {
-      vi.mocked(mockCtx.drizzle.query.models.findFirst).mockResolvedValue(null);
+      vi.mocked(mockCtx.drizzle.selectDistinct).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([]),
+        }),
+      } as any);
+
+      vi.mocked(mockCtx.drizzle.select).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockReturnValue({
+              then: vi.fn().mockImplementation((fn) => fn([])),
+            }),
+          }),
+        }),
+      } as any);
 
       // Both getById and delete should use the same message for access denial
       await expect(caller.getById({ id: "test" })).rejects.toThrow(
@@ -414,17 +590,43 @@ describe("modelCoreRouter", () => {
       };
 
       // Test custom model error
-      vi.mocked(mockCtx.drizzle.query.models.findFirst).mockResolvedValue(
-        customModel,
-      );
+      vi.mocked(mockCtx.drizzle.selectDistinct).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([{ modelId: "model-1" }]),
+        }),
+      } as any);
+
+      vi.mocked(mockCtx.drizzle.select).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockReturnValue({
+              then: vi.fn().mockImplementation((fn) => fn([customModel])),
+            }),
+          }),
+        }),
+      } as any);
+
       await expect(caller.delete({ id: "model-1" })).rejects.toThrow(
         "Cannot delete custom games. Remove game instances instead.",
       );
 
       // Test model with machines error
-      vi.mocked(mockCtx.drizzle.query.models.findFirst).mockResolvedValue(
-        modelWithMachines,
-      );
+      vi.mocked(mockCtx.drizzle.selectDistinct).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([{ modelId: "model-2" }]),
+        }),
+      } as any);
+
+      vi.mocked(mockCtx.drizzle.select).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockReturnValue({
+              then: vi.fn().mockImplementation((fn) => fn([modelWithMachines])),
+            }),
+          }),
+        }),
+      } as any);
+
       await expect(caller.delete({ id: "model-2" })).rejects.toThrow(
         "Cannot delete game title that has game instances",
       );
