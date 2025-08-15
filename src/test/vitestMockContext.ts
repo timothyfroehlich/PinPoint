@@ -29,6 +29,7 @@ const mockSupabaseClient = {
 // Enhanced to support joins, limits, and additional operators used in converted routers
 const mockDrizzleClient = {
   select: vi.fn().mockReturnThis(),
+  selectDistinct: vi.fn().mockReturnThis(),
   from: vi.fn().mockReturnThis(),
   where: vi.fn().mockReturnThis(),
   orderBy: vi.fn().mockReturnThis(),
@@ -71,6 +72,10 @@ const mockDrizzleClient = {
       findFirst: vi.fn().mockResolvedValue(null),
     },
     memberships: {
+      findMany: vi.fn().mockResolvedValue([]),
+      findFirst: vi.fn().mockResolvedValue(null),
+    },
+    models: {
       findMany: vi.fn().mockResolvedValue([]),
       findFirst: vi.fn().mockResolvedValue(null),
     },
