@@ -1,4 +1,4 @@
-import { eq, and, or, sql, count } from "drizzle-orm";
+import { eq, and, or, sql, count, type InferSelectModel } from "drizzle-orm";
 
 import { type DrizzleClient } from "../db/drizzle";
 import {
@@ -9,7 +9,7 @@ import {
   models,
 } from "../db/schema";
 
-import type { InferSelectModel } from "drizzle-orm";
+import { generateId } from "~/lib/utils/id-generation";
 
 // Type definitions using Drizzle schema inference
 type Collection = InferSelectModel<typeof collections>;
@@ -211,7 +211,7 @@ export class CollectionService {
       );
     }
     const createData = {
-      id: sql`gen_random_uuid()`, // Generate UUID in database
+      id: generateId(), // Generate UUID using centralized utility
       name: data.name,
       typeId: data.typeId,
       locationId: data.locationId ?? null,
@@ -238,9 +238,10 @@ export class CollectionService {
    * Add machines to a manual collection
    * Uses PostgreSQL-specific unnest function for efficient bulk insert
    *
-   * TODO: Consider migrating to Drizzle's native many-to-many relations once the library
-   * supports junction tables with additional fields (like createdAt timestamps).
-   * Target timeline: Next major Drizzle version release or when collection audit trail is needed.
+   * NOTE: Uses raw SQL for PostgreSQL-specific bulk operations. The machineIds parameter
+   * is properly parameterized to prevent SQL injection. Drizzle supports many-to-many
+   * relations via junction tables, but this approach provides better performance for
+   * bulk operations with proper conflict handling.
    */
   async addMachinesToCollection(
     collectionId: string,
@@ -249,6 +250,7 @@ export class CollectionService {
     if (machineIds.length === 0) return;
 
     // Use PostgreSQL-specific unnest function for bulk insert with proper conflict handling
+    // Note: machineIds array is properly parameterized to prevent SQL injection
     await this.db.execute(sql`
       INSERT INTO ${collectionMachines} (collection_id, machine_id)
       SELECT ${collectionId}, unnest(${machineIds})
@@ -345,7 +347,7 @@ export class CollectionService {
         const [collection] = await this.db
           .insert(collections)
           .values({
-            id: sql`gen_random_uuid()`,
+            id: generateId(),
             name: manufacturer,
             typeId: collectionType.id,
             locationId: null,
@@ -437,7 +439,7 @@ export class CollectionService {
         const [collection] = await this.db
           .insert(collections)
           .values({
-            id: sql`gen_random_uuid()`,
+            id: generateId(),
             name: era.name,
             typeId: collectionType.id,
             locationId: null,
