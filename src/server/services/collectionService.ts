@@ -210,7 +210,6 @@ export class CollectionService {
         "Collection type does not belong to the specified organization",
       );
     }
-
     const createData = {
       id: sql`gen_random_uuid()`, // Generate UUID in database
       name: data.name,

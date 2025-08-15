@@ -153,7 +153,6 @@ describe("CollectionService", () => {
           }),
         }),
       });
-
       // Update mock to return the collection
       const mockInsert = mockDrizzle.insert as any;
       mockInsert.mockReturnValue({
@@ -208,7 +207,6 @@ describe("CollectionService", () => {
       await service.toggleCollectionType("type1", false);
       expect(mockDrizzle.update).toHaveBeenCalled();
     });
-
     it("should call database methods for getOrganizationCollectionTypes", async () => {
       const result = await service.getOrganizationCollectionTypes("org1");
 
