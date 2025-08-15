@@ -48,6 +48,9 @@ describe("Collection Router Integration", () => {
           orderBy: vi.fn().mockResolvedValue([]),
         }),
         where: vi.fn().mockReturnValue({
+          limit: vi
+            .fn()
+            .mockResolvedValue([{ id: "type1", organizationId: "org1" }]),
           orderBy: vi.fn().mockResolvedValue([]),
         }),
         orderBy: vi.fn().mockResolvedValue([]),
