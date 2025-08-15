@@ -86,10 +86,9 @@ export const modelOpdbRouter = createTRPCRouter({
       .reduce((uniqueModels, model) => {
         uniqueModels.set(model.id, model);
         return uniqueModels;
-      }, new Map<string, (typeof machinesInOrg)[0]["model"]>())
-      .values();
+      }, new Map<string, (typeof machinesInOrg)[0]["model"]>());
 
-    const uniqueModels = Array.from(opdbGamesToSync);
+    const uniqueModels = Array.from(opdbGamesToSync.values());
 
     if (uniqueModels.length === 0) {
       return { synced: 0, message: "No OPDB-linked games found to sync" };
