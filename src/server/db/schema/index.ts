@@ -4,6 +4,7 @@ import { users, accounts, sessions } from "./auth";
 import {
   collections,
   collectionTypes,
+  collectionMachines,
   notifications,
   pinballMapConfigs,
 } from "./collections";
@@ -154,7 +155,7 @@ export const machinesRelations = relations(machines, ({ one, many }) => ({
     references: [users.id],
   }),
   issues: many(issues),
-  collections: many(collections),
+  collectionMachines: many(collectionMachines),
 }));
 
 // Issue Relations
@@ -273,8 +274,22 @@ export const collectionsRelations = relations(collections, ({ one, many }) => ({
     fields: [collections.locationId],
     references: [locations.id],
   }),
-  machines: many(machines),
+  collectionMachines: many(collectionMachines),
 }));
+
+export const collectionMachinesRelations = relations(
+  collectionMachines,
+  ({ one }) => ({
+    collection: one(collections, {
+      fields: [collectionMachines.collectionId],
+      references: [collections.id],
+    }),
+    machine: one(machines, {
+      fields: [collectionMachines.machineId],
+      references: [machines.id],
+    }),
+  }),
+);
 
 export const collectionTypesRelations = relations(
   collectionTypes,

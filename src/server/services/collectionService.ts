@@ -156,7 +156,7 @@ export class CollectionService {
           machineCount: collection.machineCount,
         };
 
-        if (collection.isManual) {
+        if (collection.collectionIsManual) {
           acc.manual.push(collectionData);
         } else {
           acc.auto.push(collectionData);
@@ -248,6 +248,12 @@ export class CollectionService {
 
   /**
    * Add machines to a manual collection
+   * Uses PostgreSQL-specific unnest function for efficient bulk insert
+   *
+   * NOTE: Uses raw SQL for PostgreSQL-specific bulk operations. The machineIds parameter
+   * is properly parameterized to prevent SQL injection. Drizzle supports many-to-many
+   * relations via junction tables, but this approach provides better performance for
+   * bulk operations with proper conflict handling.
    */
   async addMachinesToCollection(
     collectionId: string,
@@ -336,6 +342,20 @@ export class CollectionService {
           isNull(collections.locationId), // Organization-wide
         ),
       });
+
+      // Get all machines with this manufacturer
+      const machinesWithManufacturer = await this.db
+        .select({ id: machines.id })
+        .from(machines)
+        .innerJoin(models, eq(machines.modelId, models.id))
+        .where(
+          and(
+            eq(machines.organizationId, collectionType.organizationId),
+            eq(models.manufacturer, manufacturer),
+          ),
+        );
+
+      const machineIds = machinesWithManufacturer.map((m) => m.id);
 
       if (!existing) {
         // Create new collection
@@ -497,6 +517,11 @@ export class CollectionService {
           SELECT ${collection.id}, unnest(ARRAY[${machineIdArray}])
         `);
 
+        if (!collection) {
+          throw new Error("Failed to create year-based collection");
+        }
+
+        await this.addMachinesToCollection(collection.id, machineIds);
         generated++;
       } else {
         // Update existing era collection (replace all machines)
@@ -514,6 +539,7 @@ export class CollectionService {
           SELECT ${existing.id}, unnest(ARRAY[${machineIdArray}])
         `);
 
+        await this.addMachinesToCollection(existing.id, machineIds);
         updated++;
       }
     }

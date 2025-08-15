@@ -72,6 +72,16 @@ export const modelCoreRouter = createTRPCRouter({
   delete: organizationManageProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      // Get distinct model IDs that have machines in this organization
+      const modelIdsWithMachinesResult = await ctx.drizzle
+        .selectDistinct({ modelId: machines.modelId })
+        .from(machines)
+        .where(eq(machines.organizationId, ctx.organization.id));
+
+      const modelIdsWithMachines = modelIdsWithMachinesResult.map(
+        (row) => row.modelId,
+      );
+
       // Verify the game title belongs to this organization or is a global OPDB game
       const model = await ctx.db.query.models.findFirst({
         where: eq(models.id, input.id),
@@ -88,9 +98,10 @@ export const modelCoreRouter = createTRPCRouter({
       }
 
       if (model.isCustom) {
-        throw new Error(
-          "Cannot delete custom games. Remove game instances instead.",
-        );
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Cannot delete custom games. Remove game instances instead.",
+        });
       }
 
       if (model.machines.length > 0) {

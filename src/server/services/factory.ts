@@ -15,7 +15,7 @@ export class ServiceFactory {
   }
 
   createCollectionService(): CollectionService {
-    return new CollectionService(this.db);
+    return new CollectionService(this.drizzle);
   }
 
   createPinballMapService(): PinballMapService {

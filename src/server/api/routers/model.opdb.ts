@@ -30,7 +30,10 @@ export const modelOpdbRouter = createTRPCRouter({
       });
 
       if (existingGame) {
-        throw new Error("This game already exists in the system");
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "This game already exists in the system",
+        });
       }
 
       // Fetch full data from OPDB
@@ -38,7 +41,10 @@ export const modelOpdbRouter = createTRPCRouter({
       const machineData = await opdbClient.getMachineById(input.opdbId);
 
       if (!machineData) {
-        throw new Error("Game not found in OPDB");
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Game not found in OPDB",
+        });
       }
 
       // Create global Model record with OPDB data
@@ -70,10 +76,17 @@ export const modelOpdbRouter = createTRPCRouter({
     });
 
     const opdbGamesToSync = machinesInOrg
-      .map((gi) => gi.model)
-      .filter((gt) => gt.opdbId && !gt.opdbId.startsWith("custom-"));
+      .map((machine) => machine.model)
+      .filter((model) => model.opdbId && !model.opdbId.startsWith("custom-"))
+      // Remove duplicates by creating a Map
+      .reduce((uniqueModels, model) => {
+        uniqueModels.set(model.id, model);
+        return uniqueModels;
+      }, new Map<string, (typeof machinesInOrg)[0]["model"]>());
 
-    if (opdbGamesToSync.length === 0) {
+    const uniqueModels = Array.from(opdbGamesToSync.values());
+
+    if (uniqueModels.length === 0) {
       return { synced: 0, message: "No OPDB-linked games found to sync" };
     }
 
@@ -81,7 +94,7 @@ export const modelOpdbRouter = createTRPCRouter({
     let syncedCount = 0;
 
     // Sync each title with OPDB data
-    for (const title of opdbGamesToSync) {
+    for (const title of uniqueModels) {
       try {
         if (!title.opdbId) continue; // Type guard
 
@@ -119,8 +132,8 @@ export const modelOpdbRouter = createTRPCRouter({
 
     return {
       synced: syncedCount,
-      total: opdbGamesToSync.length,
-      message: `Synced ${syncedCount.toString()} of ${opdbGamesToSync.length.toString()} games`,
+      total: uniqueModels.length,
+      message: `Synced ${syncedCount.toString()} of ${uniqueModels.length.toString()} games`,
     };
   }),
 });
