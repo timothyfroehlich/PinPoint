@@ -14,6 +14,26 @@ export interface CreateManualCollectionData {
   description?: string;
 }
 
+// Type definitions for raw SQL query results
+interface MachineCountQueryResult {
+  count: string;
+}
+
+interface MachineQueryRow {
+  id: string;
+  model_name: string;
+  manufacturer: string | null;
+  year: number | null;
+}
+
+interface ManufacturerQueryResult {
+  manufacturer: string;
+}
+
+interface MachineIdResult {
+  id: string;
+}
+
 export interface CollectionWithMachines {
   id: string;
   name: string;
@@ -101,7 +121,7 @@ export class CollectionService {
     for (const collection of collectionsWithTypes) {
       // Skip if type is not enabled or not from correct organization
       if (
-        !collection.type?.isEnabled ||
+        !collection.type.isEnabled ||
         collection.type.organizationId !== organizationId
       ) {
         continue;
@@ -117,8 +137,9 @@ export class CollectionService {
           AND m.location_id = ${locationId}
       `);
 
-      const machineCount =
-        Number((machineCountResult as any).rows[0]?.count) || 0;
+      const machineCount = machineCountResult[0]
+        ? Number((machineCountResult[0] as MachineCountQueryResult).count)
+        : 0;
 
       collectionsData.push({
         ...collection,
@@ -133,11 +154,11 @@ export class CollectionService {
 
     // Sort by type sort order, then collection sort order
     collectionsData.sort((a, b) => {
-      const typeA = collectionsWithTypes.find((c: any) => c.id === a.id)?.type;
-      const typeB = collectionsWithTypes.find((c: any) => c.id === b.id)?.type;
+      const typeA = collectionsWithTypes.find((c) => c.id === a.id)?.type;
+      const typeB = collectionsWithTypes.find((c) => c.id === b.id)?.type;
 
       if (typeA?.sortOrder !== typeB?.sortOrder) {
-        return (typeA?.sortOrder || 0) - (typeB?.sortOrder || 0);
+        return (typeA?.sortOrder ?? 0) - (typeB?.sortOrder ?? 0);
       }
 
       return a.sortOrder - b.sortOrder;
@@ -156,7 +177,7 @@ export class CollectionService {
           machineCount: collection.machineCount,
         };
 
-        if (collection.collectionIsManual) {
+        if (collection.isManual) {
           acc.manual.push(collectionData);
         } else {
           acc.auto.push(collectionData);
@@ -204,12 +225,12 @@ export class CollectionService {
       ORDER BY mo.name ASC
     `);
 
-    return (machinesInCollection as any).rows.map((row: any) => ({
+    return (machinesInCollection as MachineQueryRow[]).map((row) => ({
       id: row.id,
       model: {
-        name: row.model_name || "",
-        manufacturer: row.manufacturer || null,
-        year: row.year || null,
+        name: row.model_name,
+        manufacturer: row.manufacturer,
+        year: row.year,
       },
     }));
   }
@@ -225,8 +246,8 @@ export class CollectionService {
       id: generateId(),
       name: data.name,
       typeId: data.typeId,
-      locationId: data.locationId || null,
-      description: data.description || null,
+      locationId: data.locationId ?? null,
+      description: data.description ?? null,
       isManual: true,
       isSmart: false,
       sortOrder: 0,
@@ -327,7 +348,7 @@ export class CollectionService {
       );
 
     const uniqueManufacturers = machineModels
-      .map((m: any) => m.manufacturer)
+      .map((m: ManufacturerQueryResult) => m.manufacturer)
       .filter((m: string | null): m is string => m !== null);
 
     let generated = 0;
@@ -342,20 +363,6 @@ export class CollectionService {
           isNull(collections.locationId), // Organization-wide
         ),
       });
-
-      // Get all machines with this manufacturer
-      const machinesWithManufacturer = await this.db
-        .select({ id: machines.id })
-        .from(machines)
-        .innerJoin(models, eq(machines.modelId, models.id))
-        .where(
-          and(
-            eq(machines.organizationId, collectionType.organizationId),
-            eq(models.manufacturer, manufacturer),
-          ),
-        );
-
-      const machineIds = machinesWithManufacturer.map((m) => m.id);
 
       if (!existing) {
         // Create new collection
@@ -393,7 +400,7 @@ export class CollectionService {
 
         if (manufacturerMachines.length > 0) {
           const machineIdArray = sql.join(
-            manufacturerMachines.map((m: any) => sql`${m.id}`),
+            manufacturerMachines.map((m: MachineIdResult) => sql`${m.id}`),
             sql`, `,
           );
           await this.db.execute(sql`
@@ -425,7 +432,7 @@ export class CollectionService {
         // Then add current machines
         if (manufacturerMachines.length > 0) {
           const machineIdArray = sql.join(
-            manufacturerMachines.map((m: any) => sql`${m.id}`),
+            manufacturerMachines.map((m: MachineIdResult) => sql`${m.id}`),
             sql`, `,
           );
           await this.db.execute(sql`
@@ -508,20 +515,10 @@ export class CollectionService {
           throw new Error("Failed to create era collection");
         }
 
-        const machineIdArray = sql.join(
-          eraMachines.map((m: any) => sql`${m.id}`),
-          sql`, `,
+        await this.addMachinesToCollection(
+          collection.id,
+          eraMachines.map((m) => m.id),
         );
-        await this.db.execute(sql`
-          INSERT INTO collection_machines (collection_id, machine_id)
-          SELECT ${collection.id}, unnest(ARRAY[${machineIdArray}])
-        `);
-
-        if (!collection) {
-          throw new Error("Failed to create year-based collection");
-        }
-
-        await this.addMachinesToCollection(collection.id, machineIds);
         generated++;
       } else {
         // Update existing era collection (replace all machines)
@@ -530,16 +527,10 @@ export class CollectionService {
           WHERE collection_id = ${existing.id}
         `);
 
-        const machineIdArray = sql.join(
-          eraMachines.map((m: any) => sql`${m.id}`),
-          sql`, `,
+        await this.addMachinesToCollection(
+          existing.id,
+          eraMachines.map((m) => m.id),
         );
-        await this.db.execute(sql`
-          INSERT INTO collection_machines (collection_id, machine_id)
-          SELECT ${existing.id}, unnest(ARRAY[${machineIdArray}])
-        `);
-
-        await this.addMachinesToCollection(existing.id, machineIds);
         updated++;
       }
     }
@@ -582,7 +573,7 @@ export class CollectionService {
 
       typesWithCounts.push({
         ...type,
-        collectionCount: countResult[0]?.count || 0,
+        collectionCount: countResult[0]?.count ?? 0,
       });
     }
 
