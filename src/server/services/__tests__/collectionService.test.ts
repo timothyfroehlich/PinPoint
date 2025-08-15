@@ -142,6 +142,17 @@ describe("CollectionService", () => {
         isManual: true,
       };
 
+      // Mock the organizational validation query
+      const mockSelect = mockDrizzle.select as any;
+      mockSelect.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi
+              .fn()
+              .mockResolvedValue([{ id: "type1", organizationId: "org1" }]),
+          }),
+        }),
+      });
       // Update mock to return the collection
       const mockInsert = mockDrizzle.insert as any;
       mockInsert.mockReturnValue({
@@ -158,7 +169,33 @@ describe("CollectionService", () => {
       });
 
       expect(result).toEqual(mockCollection);
+      expect(mockDrizzle.select).toHaveBeenCalled();
       expect(mockDrizzle.insert).toHaveBeenCalled();
+    });
+
+    it("should throw error when collection type does not belong to organization", async () => {
+      // Mock the organizational validation query to return empty result
+      const mockSelect = mockDrizzle.select as any;
+      mockSelect.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([]), // Empty result = invalid org
+          }),
+        }),
+      });
+
+      await expect(
+        service.createManualCollection("org1", {
+          name: "Test Collection",
+          typeId: "invalid-type",
+          locationId: "loc1",
+          description: "Test description",
+        }),
+      ).rejects.toThrow(
+        "Collection type does not belong to the specified organization",
+      );
+
+      expect(mockDrizzle.select).toHaveBeenCalled();
     });
 
     it("should call database methods for addMachinesToCollection", async () => {
@@ -170,7 +207,6 @@ describe("CollectionService", () => {
       await service.toggleCollectionType("type1", false);
       expect(mockDrizzle.update).toHaveBeenCalled();
     });
-
     it("should call database methods for getOrganizationCollectionTypes", async () => {
       const result = await service.getOrganizationCollectionTypes("org1");
 

@@ -7,6 +7,7 @@ import {
   pgEnum,
   json,
   index,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 
 // =================================
@@ -107,6 +108,22 @@ export const notifications = pgTable(
       table.userId,
       table.createdAt,
     ),
+  ],
+);
+
+export const collectionMachines = pgTable(
+  "collection_machines",
+  {
+    collectionId: text("collection_id").notNull(),
+    machineId: text("machine_id").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    // Composite primary key
+    primaryKey({ columns: [table.collectionId, table.machineId] }),
+    // Indexes for efficient lookups
+    index("collection_machines_collection_id_idx").on(table.collectionId),
+    index("collection_machines_machine_id_idx").on(table.machineId),
   ],
 );
 
