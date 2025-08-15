@@ -9,6 +9,18 @@ import {
 } from "~/server/api/trpc";
 import { machines, models } from "~/server/db/schema";
 
+// Helper function for machine count SQL to reduce duplication
+const getMachineCountSql = (
+  organizationId: string,
+): ReturnType<typeof sql<number>> => {
+  return sql<number>`(
+    SELECT COUNT(*)::int
+    FROM "Machine" m 
+    WHERE m."modelId" = "Model"."id" 
+      AND m."organizationId" = ${organizationId}::text
+  )`;
+};
+
 export const modelCoreRouter = createTRPCRouter({
   // Enhanced getAll with OPDB metadata
   getAll: organizationProcedure.query(async ({ ctx }) => {
@@ -47,12 +59,9 @@ export const modelCoreRouter = createTRPCRouter({
         isCustom: models.isCustom,
         createdAt: models.createdAt,
         updatedAt: models.updatedAt,
-        machineCount: sql<number>`(
-          SELECT COUNT(*)::int
-          FROM "Machine" m 
-          WHERE m."modelId" = "Model"."id" 
-            AND m."organizationId" = ${ctx.organization.id}::text
-        )`.as("machine_count"),
+        machineCount: getMachineCountSql(ctx.organization.id).as(
+          "machine_count",
+        ),
       })
       .from(models)
       .where(inArray(models.id, modelIdsWithMachines))
@@ -90,12 +99,9 @@ export const modelCoreRouter = createTRPCRouter({
           isCustom: models.isCustom,
           createdAt: models.createdAt,
           updatedAt: models.updatedAt,
-          machineCount: sql<number>`(
-            SELECT COUNT(*)::int
-            FROM "Machine" m 
-            WHERE m."modelId" = "Model"."id" 
-              AND m."organizationId" = ${ctx.organization.id}::text
-          )`.as("machine_count"),
+          machineCount: getMachineCountSql(ctx.organization.id).as(
+            "machine_count",
+          ),
         })
         .from(models)
         .where(
@@ -149,12 +155,9 @@ export const modelCoreRouter = createTRPCRouter({
           isCustom: models.isCustom,
           createdAt: models.createdAt,
           updatedAt: models.updatedAt,
-          machineCount: sql<number>`(
-            SELECT COUNT(*)::int
-            FROM "Machine" m 
-            WHERE m."modelId" = "Model"."id" 
-              AND m."organizationId" = ${ctx.organization.id}::text
-          )`.as("machine_count"),
+          machineCount: getMachineCountSql(ctx.organization.id).as(
+            "machine_count",
+          ),
         })
         .from(models)
         .where(
