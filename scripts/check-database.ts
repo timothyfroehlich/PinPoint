@@ -1,11 +1,18 @@
-import { PrismaClient } from "@prisma/client";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
+import "./lib/env-loaders/development";
+import * as schema from "../src/server/db/schema";
 
-const prisma = new PrismaClient();
+const sql = postgres(
+  process.env.DATABASE_URL ??
+    "postgresql://postgres:postgres@localhost:54322/postgres",
+);
+const db = drizzle(sql, { schema });
 
 async function checkGames() {
   console.log("=== Available Models ===");
-  const models = await prisma.model.findMany({
-    select: { name: true, opdbId: true },
+  const models = await db.query.models.findMany({
+    columns: { name: true, opdbId: true },
   });
 
   models.forEach((game, index) => {
@@ -13,8 +20,12 @@ async function checkGames() {
   });
 
   console.log("\n=== Available Machines ===");
-  const machines = await prisma.machine.findMany({
-    include: { model: { select: { name: true } } },
+  const machines = await db.query.machines.findMany({
+    with: {
+      model: {
+        columns: { name: true },
+      },
+    },
   });
 
   machines.forEach((machine, index) => {
@@ -22,8 +33,8 @@ async function checkGames() {
   });
 
   console.log("\n=== Available Statuses ===");
-  const statuses = await prisma.issueStatus.findMany({
-    select: { name: true, category: true },
+  const statuses = await db.query.issueStatuses.findMany({
+    columns: { name: true, category: true },
   });
 
   statuses.forEach((status, index) => {
@@ -31,14 +42,18 @@ async function checkGames() {
   });
 
   console.log("\n=== Created Issues ===");
-  const issues = await prisma.issue.findMany({
-    include: {
+  const issues = await db.query.issues.findMany({
+    with: {
       machine: {
-        include: {
-          model: { select: { name: true } },
+        with: {
+          model: {
+            columns: { name: true },
+          },
         },
       },
-      status: { select: { name: true } },
+      status: {
+        columns: { name: true },
+      },
     },
   });
 
@@ -51,4 +66,4 @@ async function checkGames() {
 
 checkGames()
   .catch(console.error)
-  .finally(() => void prisma.$disconnect());
+  .finally(() => void sql.end());
