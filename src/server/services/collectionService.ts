@@ -15,23 +15,19 @@ export interface CreateManualCollectionData {
 }
 
 // Type definitions for raw SQL query results
-interface MachineCountQueryResult {
+interface MachineIdResult {
+  id: string;
+}
+
+interface CountQueryResult {
   count: string;
 }
 
-interface MachineQueryRow {
+interface MachineCollectionQueryResult {
   id: string;
   model_name: string;
   manufacturer: string | null;
   year: number | null;
-}
-
-interface ManufacturerQueryResult {
-  manufacturer: string;
-}
-
-interface MachineIdResult {
-  id: string;
 }
 
 export interface CollectionWithMachines {
@@ -137,9 +133,8 @@ export class CollectionService {
           AND m.location_id = ${locationId}
       `);
 
-      const machineCount = machineCountResult[0]
-        ? Number((machineCountResult[0] as MachineCountQueryResult).count)
-        : 0;
+      const typedCountResult = machineCountResult as CountQueryResult[];
+      const machineCount = Number(typedCountResult[0]?.count) || 0;
 
       collectionsData.push({
         ...collection,
@@ -225,7 +220,9 @@ export class CollectionService {
       ORDER BY mo.name ASC
     `);
 
-    return (machinesInCollection as MachineQueryRow[]).map((row) => ({
+    const typedMachinesResult =
+      machinesInCollection as MachineCollectionQueryResult[];
+    return typedMachinesResult.map((row) => ({
       id: row.id,
       model: {
         name: row.model_name,
@@ -348,7 +345,7 @@ export class CollectionService {
       );
 
     const uniqueManufacturers = machineModels
-      .map((m: ManufacturerQueryResult) => m.manufacturer)
+      .map((m) => m.manufacturer)
       .filter((m: string | null): m is string => m !== null);
 
     let generated = 0;
