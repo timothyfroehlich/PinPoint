@@ -1,9 +1,15 @@
-import { eq, and, or, sql, count } from "drizzle-orm";
+import { eq, and, or, sql, count, type InferSelectModel } from "drizzle-orm";
 
 import { type DrizzleClient } from "../db/drizzle";
-import { collections, collectionTypes, machines, models } from "../db/schema";
+import {
+  collections,
+  collectionTypes,
+  collectionMachines,
+  machines,
+  models,
+} from "../db/schema";
 
-import type { InferSelectModel } from "drizzle-orm";
+import { generateId } from "~/lib/utils/id-generation";
 
 // Type definitions using Drizzle schema inference
 type Collection = InferSelectModel<typeof collections>;
@@ -70,7 +76,7 @@ export class CollectionService {
         machines,
         and(
           sql`EXISTS (
-            SELECT 1 FROM collection_machines cm 
+            SELECT 1 FROM ${collectionMachines} cm 
             WHERE cm.collection_id = ${collections.id} 
             AND cm.machine_id = ${machines.id}
           )`,
@@ -159,13 +165,13 @@ export class CollectionService {
       .from(machines)
       .innerJoin(models, eq(machines.modelId, models.id))
       .innerJoin(
-        sql`collection_machines cm`,
-        sql`cm.machine_id = ${machines.id}`,
+        collectionMachines,
+        eq(collectionMachines.machineId, machines.id),
       )
       .where(
         and(
           eq(machines.locationId, locationId),
-          sql`cm.collection_id = ${collectionId}`,
+          eq(collectionMachines.collectionId, collectionId),
         ),
       )
       .orderBy(models.name);
@@ -184,11 +190,28 @@ export class CollectionService {
    * Create a manual collection
    */
   async createManualCollection(
-    _organizationId: string, // Not used in this method but kept for API compatibility
+    organizationId: string,
     data: CreateManualCollectionData,
   ): Promise<Collection> {
+    // Validate that the collection type belongs to the specified organization
+    const [type] = await this.db
+      .select()
+      .from(collectionTypes)
+      .where(
+        and(
+          eq(collectionTypes.id, data.typeId),
+          eq(collectionTypes.organizationId, organizationId),
+        ),
+      )
+      .limit(1);
+
+    if (!type) {
+      throw new Error(
+        "Collection type does not belong to the specified organization",
+      );
+    }
     const createData = {
-      id: sql`gen_random_uuid()`, // Generate UUID in database
+      id: generateId(), // Generate UUID using centralized utility
       name: data.name,
       typeId: data.typeId,
       locationId: data.locationId ?? null,
@@ -213,8 +236,12 @@ export class CollectionService {
 
   /**
    * Add machines to a manual collection
-   * Note: This implements the many-to-many relationship using direct SQL
-   * since Drizzle's relations API requires an explicit junction table
+   * Uses PostgreSQL-specific unnest function for efficient bulk insert
+   *
+   * NOTE: Uses raw SQL for PostgreSQL-specific bulk operations. The machineIds parameter
+   * is properly parameterized to prevent SQL injection. Drizzle supports many-to-many
+   * relations via junction tables, but this approach provides better performance for
+   * bulk operations with proper conflict handling.
    */
   async addMachinesToCollection(
     collectionId: string,
@@ -222,17 +249,10 @@ export class CollectionService {
   ): Promise<void> {
     if (machineIds.length === 0) return;
 
-    // For now, we'll use a direct SQL approach to handle the many-to-many relationship
-    // This assumes there's an implicit junction table or the relationship is handled differently
-    // In a real implementation, we'd need either:
-    // 1. An explicit junction table defined in the schema
-    // 2. A different approach to handle this relationship
-
-    // Placeholder implementation - this would need to be adapted based on the actual schema structure
+    // Use PostgreSQL-specific unnest function for bulk insert with proper conflict handling
+    // Note: machineIds array is properly parameterized to prevent SQL injection
     await this.db.execute(sql`
-      -- This is a placeholder for the many-to-many relationship
-      -- The actual implementation would depend on how the relationship is stored
-      INSERT INTO collection_machines (collection_id, machine_id)
+      INSERT INTO ${collectionMachines} (collection_id, machine_id)
       SELECT ${collectionId}, unnest(${machineIds})
       ON CONFLICT (collection_id, machine_id) DO NOTHING
     `);
@@ -327,7 +347,7 @@ export class CollectionService {
         const [collection] = await this.db
           .insert(collections)
           .values({
-            id: sql`gen_random_uuid()`,
+            id: generateId(),
             name: manufacturer,
             typeId: collectionType.id,
             locationId: null,
@@ -353,7 +373,7 @@ export class CollectionService {
         // Update existing collection with new machines (replace all)
         // First remove existing associations, then add new ones
         await this.db.execute(sql`
-          DELETE FROM collection_machines 
+          DELETE FROM ${collectionMachines} 
           WHERE collection_id = ${existing.id}
         `);
 
@@ -419,7 +439,7 @@ export class CollectionService {
         const [collection] = await this.db
           .insert(collections)
           .values({
-            id: sql`gen_random_uuid()`,
+            id: generateId(),
             name: era.name,
             typeId: collectionType.id,
             locationId: null,
@@ -443,7 +463,7 @@ export class CollectionService {
       } else {
         // Update existing collection with new machines (replace all)
         await this.db.execute(sql`
-          DELETE FROM collection_machines 
+          DELETE FROM ${collectionMachines} 
           WHERE collection_id = ${existing.id}
         `);
 
