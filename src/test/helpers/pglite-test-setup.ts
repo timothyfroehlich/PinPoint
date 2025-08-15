@@ -360,8 +360,8 @@ export async function getSeededTestData(
     ),
   });
 
-  // Get the first user (from machine owner or issue creator)
-  const userId = machine?.ownerId ?? issue?.createdById;
+  // Get a consistent test user (prefer admin for permissions)
+  const userId = machine?.ownerId ?? issue?.createdById ?? "test-user-admin";
 
   return {
     organization: organizationId,

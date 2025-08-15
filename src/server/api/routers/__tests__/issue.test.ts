@@ -110,8 +110,8 @@ const setupIssueContextMocks = (
   membershipData: any = mockMembership,
 ) => {
   context.db.issue.findUnique?.mockResolvedValue(issueData);
-  context.db.issue.findFirst?.mockResolvedValue(issueData);
-  context.db.membership.findFirst?.mockResolvedValue(membershipData);
+  context.db.query.issues.findFirst?.mockResolvedValue(issueData);
+  context.db.query.memberships.findFirst?.mockResolvedValue(membershipData);
 };
 
 // Helper to create authenticated context with permissions
@@ -164,7 +164,7 @@ const createAuthenticatedContext = (permissions: string[] = []) => {
   };
 
   // Mock the database query for membership lookup
-  vi.mocked(mockContext.db.membership.findFirst).mockResolvedValue(
+  vi.mocked(mockContext.db.query.memberships.findFirst).mockResolvedValue(
     membershipData as any,
   );
 
@@ -279,7 +279,7 @@ describe("issueRouter - Issue Detail Page", () => {
       const statusCtx = createAuthenticatedContext(["issue:edit"]);
       const statusCaller = appRouter.createCaller(statusCtx);
 
-      statusCtx.db.issue.findFirst.mockResolvedValue(mockIssue as any);
+      statusCtx.db.query.issues.findFirst.mockResolvedValue(mockIssue as any);
       statusCtx.db.issueStatus.findFirst.mockResolvedValue(null); // Status not found
 
       await expect(
@@ -302,7 +302,7 @@ describe("issueRouter - Issue Detail Page", () => {
       const errorCtx = createAuthenticatedContext(["issue:view"]);
       const errorCaller = appRouter.createCaller(errorCtx);
 
-      errorCtx.db.issue.findFirst.mockRejectedValue(
+      errorCtx.db.query.issues.findFirst.mockRejectedValue(
         new Error("Database connection failed"),
       );
 
@@ -316,7 +316,9 @@ describe("issueRouter - Issue Detail Page", () => {
       const concurrentCaller = appRouter.createCaller(concurrentCtx);
 
       // Simulate optimistic locking scenario
-      concurrentCtx.db.issue.findFirst.mockResolvedValue(mockIssue as any);
+      concurrentCtx.db.query.issues.findFirst.mockResolvedValue(
+        mockIssue as any,
+      );
       concurrentCtx.db.issue.update.mockRejectedValue(
         new Error("Concurrent modification"),
       );
@@ -357,7 +359,7 @@ describe("issueRouter - Public Procedures", () => {
       const publicCaller = appRouter.createCaller(publicCtx);
 
       // Mock required database entities for validation
-      publicCtx.db.machine.findFirst.mockResolvedValue({
+      publicCtx.db.query.machines.findFirst.mockResolvedValue({
         id: "machine-1",
         name: "Test Machine",
         organizationId: "org-1",
@@ -476,7 +478,7 @@ describe("issueRouter - Public Procedures", () => {
       const publicCtx = createPublicContext();
       const publicCaller = appRouter.createCaller(publicCtx);
 
-      publicCtx.db.machine.findFirst.mockResolvedValue(null);
+      publicCtx.db.query.machines.findFirst.mockResolvedValue(null);
 
       await expect(
         publicCaller.issue.core.publicCreate({
@@ -490,7 +492,7 @@ describe("issueRouter - Public Procedures", () => {
       const publicCtx = createPublicContext();
       const publicCaller = appRouter.createCaller(publicCtx);
 
-      publicCtx.db.machine.findFirst.mockResolvedValue({
+      publicCtx.db.query.machines.findFirst.mockResolvedValue({
         id: "machine-1",
         location: { organizationId: "org-1" },
       });
@@ -511,7 +513,7 @@ describe("issueRouter - Public Procedures", () => {
       const publicCtx = createPublicContext();
       const publicCaller = appRouter.createCaller(publicCtx);
 
-      publicCtx.db.machine.findFirst.mockResolvedValue({
+      publicCtx.db.query.machines.findFirst.mockResolvedValue({
         id: "machine-1",
         location: { organizationId: "org-1" },
       });
@@ -539,7 +541,7 @@ describe("issueRouter - Public Procedures", () => {
       const publicCaller = appRouter.createCaller(publicCtx);
 
       // Mock required database entities
-      publicCtx.db.machine.findFirst.mockResolvedValue({
+      publicCtx.db.query.machines.findFirst.mockResolvedValue({
         id: "machine-1",
         location: { organizationId: "org-1" },
       });

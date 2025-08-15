@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/unbound-method */
+ 
 /**
  * Issue Timeline Router Integration Tests (PGlite)
  *
@@ -17,25 +17,25 @@
  * Uses modern August 2025 patterns with Vitest and PGlite integration.
  */
 
-import { eq } from "drizzle-orm";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+// No drizzle-orm imports needed
+import { describe, expect, vi } from "vitest";
 
 // Import test setup and utilities
 import type { TRPCContext } from "~/server/api/trpc.base";
-import type { ExtendedPrismaClient } from "~/server/db";
 
 import { issueTimelineRouter } from "~/server/api/routers/issue.timeline";
 import * as schema from "~/server/db/schema";
 import { IssueActivityService } from "~/server/services/issueActivityService";
+import { generateTestId } from "~/test/helpers/test-id-generator";
 import {
-  createSeededTestDatabase,
-  getSeededTestData,
+  test,
+  withIsolatedTest,
   type TestDatabase,
-} from "~/test/helpers/pglite-test-setup";
+} from "~/test/helpers/worker-scoped-db";
 
 // Mock external dependencies that aren't database-related
 vi.mock("~/lib/utils/id-generation", () => ({
-  generateId: vi.fn(() => `test-id-${Date.now()}`),
+  generateId: vi.fn(() => generateTestId("test-id")),
 }));
 
 vi.mock("~/server/auth/permissions", () => ({
@@ -66,153 +66,111 @@ vi.mock("~/server/services/types", () => ({
 }));
 
 describe("Issue Timeline Router Integration (PGlite)", () => {
-  let db: TestDatabase;
-  let context: TRPCContext;
-  let caller: ReturnType<typeof issueTimelineRouter.createCaller>;
+  // Helper function to create test context and caller
+  async function createTestContext(db: TestDatabase) {
+    // Create seed data for this test run
+    const organizationId = generateTestId("test-org");
 
-  // Test data IDs - queried from actual seeded data
-  let testData: {
-    organization: string;
-    location?: string;
-    machine?: string;
-    model?: string;
-    status?: string;
-    priority?: string;
-    issue?: string;
-    adminRole?: string;
-    memberRole?: string;
-    user?: string;
-  };
+    // Create test organization
+    await db.insert(schema.organizations).values({
+      id: organizationId,
+      name: "Test Organization",
+      subdomain: generateTestId("test-org"),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
 
-  beforeEach(async () => {
-    // Create fresh PGlite database with real schema and seed data
-    const setup = await createSeededTestDatabase();
-    db = setup.db;
+    // Create test user
+    const userId = generateTestId("test-user");
+    await db.insert(schema.users).values({
+      id: userId,
+      email: "test@example.com",
+      name: "Test User",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
 
-    // Query actual seeded IDs instead of using hardcoded ones
-    testData = await getSeededTestData(db, setup.organizationId);
+    // Create test location
+    const locationId = generateTestId("test-location");
+    await db.insert(schema.locations).values({
+      id: locationId,
+      name: "Test Location",
+      organizationId,
+    });
 
-    // Create mock Prisma client for tRPC middleware compatibility
-    const mockPrismaClient = {
-      membership: {
-        findFirst: vi.fn().mockResolvedValue({
-          id: "test-membership",
-          organizationId: testData.organization,
-          userId: testData.user || "test-user-1",
-          role: {
-            id: testData.adminRole || "test-admin-role",
-            name: "Admin",
-            permissions: [
-              { id: "perm1", name: "issue:view" },
-              { id: "perm2", name: "organization:manage" },
-            ],
-          },
-        }),
-      },
-      // Add required methods for IssueActivityService compatibility
-      issueHistory: {
-        create: vi.fn().mockImplementation(async ({ data }) => {
-          // Create issue history in real database
-          const historyEntry = {
-            id: `history-${Date.now()}`,
-            ...data,
-            changedAt: new Date(),
-          };
+    // Create test model
+    const modelId = generateTestId("test-model");
+    await db.insert(schema.models).values({
+      id: modelId,
+      name: "Test Model",
+      manufacturer: "Test Manufacturer",
+      organizationId,
+    });
 
-          return await db
-            .insert(schema.issueHistory)
-            .values(historyEntry)
-            .returning()
-            .then((result) => result[0]);
-        }),
-        findMany: vi.fn().mockImplementation(async ({ where, include }) => {
-          // Get issue history for timeline from real database
-          if (where?.issueId && where?.organizationId) {
-            const activities = await db.query.issueHistory.findMany({
-              where: (history, { eq, and }) =>
-                and(
-                  eq(history.issueId, where.issueId),
-                  eq(history.organizationId, where.organizationId),
-                ),
-              with: include?.actor
-                ? {
-                    actor: {
-                      columns: {
-                        id: true,
-                        name: true,
-                        profilePicture: true,
-                      },
-                    },
-                  }
-                : {},
-              orderBy: (history, { asc }) => [asc(history.changedAt)],
-            });
+    // Create test machine
+    const machineId = generateTestId("test-machine");
+    await db.insert(schema.machines).values({
+      id: machineId,
+      name: "Test Machine",
+      qrCodeId: generateTestId("qr"),
+      organizationId,
+      locationId,
+      modelId,
+      serialNumber: `SN-${generateTestId("sn")}`,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
 
-            return activities.map((activity) => ({
-              id: activity.id,
-              field: activity.field,
-              oldValue: activity.oldValue,
-              newValue: activity.newValue,
-              changedAt: activity.changedAt,
-              actorId: activity.actorId,
-              issueId: activity.issueId,
-              organizationId: activity.organizationId,
-              type: activity.type,
-              actor: activity.actor
-                ? {
-                    id: activity.actor.id,
-                    name: activity.actor.name,
-                    profilePicture: activity.actor.profilePicture,
-                  }
-                : null,
-            }));
-          }
-          return [];
-        }),
-      },
-      comment: {
-        findMany: vi.fn().mockImplementation(async ({ where }) => {
-          // Get comments for timeline from real database
-          if (where?.issueId) {
-            const comments = await db.query.comments.findMany({
-              where: eq(schema.comments.issueId, where.issueId),
-              with: {
-                author: {
-                  columns: {
-                    id: true,
-                    name: true,
-                    profilePicture: true,
-                  },
-                },
-              },
-              orderBy: (comments, { asc }) => [asc(comments.createdAt)],
-            });
+    // Create test priority
+    const priorityId = generateTestId("test-priority");
+    await db.insert(schema.priorities).values({
+      id: priorityId,
+      name: "Test Priority",
+      organizationId,
+      order: 1,
+    });
 
-            return comments.map((comment) => ({
-              id: comment.id,
-              content: comment.content,
-              createdAt: comment.createdAt,
-              updatedAt: comment.updatedAt,
-              issueId: comment.issueId,
-              authorId: comment.authorId,
-              author: comment.author
-                ? {
-                    id: comment.author.id,
-                    name: comment.author.name,
-                    profilePicture: comment.author.profilePicture,
-                  }
-                : null,
-            }));
-          }
-          return [];
-        }),
-      },
-    } as unknown as ExtendedPrismaClient;
+    // Create test status
+    const statusId = generateTestId("test-status");
+    await db.insert(schema.issueStatuses).values({
+      id: statusId,
+      name: "Test Status",
+      category: "NEW",
+      organizationId,
+    });
+
+    // Create test issue
+    const issueId = generateTestId("test-issue");
+    await db.insert(schema.issues).values({
+      id: issueId,
+      title: "Test Issue",
+      organizationId,
+      machineId,
+      statusId,
+      priorityId,
+      createdById: userId,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const testData = {
+      organization: organizationId,
+      location: locationId,
+      machine: machineId,
+      model: modelId,
+      status: statusId,
+      priority: priorityId,
+      issue: issueId,
+      user: userId,
+    };
+
+    // Create services with direct Drizzle access
+    const issueActivityService = new IssueActivityService(db);
 
     // Create test context with real database and services
-    context = {
+    const context: TRPCContext = {
       user: {
-        id: testData.user || "test-user-1",
+        id: testData.user,
         email: "test@example.com",
         user_metadata: { name: "Test User" },
         app_metadata: { organization_id: testData.organization, role: "Admin" },
@@ -222,17 +180,14 @@ describe("Issue Timeline Router Integration (PGlite)", () => {
         name: "Test Organization",
         subdomain: "test-org",
       },
-      db: mockPrismaClient,
-      drizzle: db,
+      db: db,
       supabase: {
         auth: {
           getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
         },
       } as any,
       services: {
-        createIssueActivityService: vi.fn(
-          () => new IssueActivityService(mockPrismaClient),
-        ),
+        createIssueActivityService: vi.fn(() => issueActivityService),
         createNotificationService: vi.fn(),
         createCommentCleanupService: vi.fn(),
         createCollectionService: vi.fn(),
@@ -255,505 +210,558 @@ describe("Issue Timeline Router Integration (PGlite)", () => {
       userPermissions: ["issue:view", "organization:manage"],
     } as any;
 
-    caller = issueTimelineRouter.createCaller(context);
-  });
+    const caller = issueTimelineRouter.createCaller(context);
+
+    return { context, caller, testData };
+  }
 
   describe("getTimeline", () => {
-    beforeEach(async () => {
-      // Create additional test data for comprehensive timeline testing
-      // Add comments to the test issue
-      await db.insert(schema.comments).values([
-        {
-          id: "test-comment-1",
-          content: "First comment on the issue",
-          issueId: testData.issue || "test-issue-1",
-          authorId: testData.user || "test-user-1",
-          createdAt: new Date("2024-01-01T10:00:00Z"),
-          updatedAt: new Date("2024-01-01T10:00:00Z"),
-        },
-        {
-          id: "test-comment-2",
-          content: "Second comment for discussion",
-          issueId: testData.issue || "test-issue-1",
-          authorId: testData.user || "test-user-1",
-          createdAt: new Date("2024-01-02T14:30:00Z"),
-          updatedAt: new Date("2024-01-02T14:30:00Z"),
-        },
-      ]);
+    test("should get timeline with comments and activities for valid issue", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { caller, testData } = await createTestContext(db);
 
-      // Add issue history activities
-      await db.insert(schema.issueHistory).values([
-        {
-          id: "test-activity-1",
-          issueId: testData.issue || "test-issue-1",
-          organizationId: testData.organization,
-          type: "STATUS_CHANGED",
-          field: "status",
-          oldValue: testData.status || "initial-status",
-          newValue: "new-status",
-          actorId: testData.user || "test-user-1",
-          changedAt: new Date("2024-01-01T15:00:00Z"),
-        },
-        {
-          id: "test-activity-2",
-          issueId: testData.issue || "test-issue-1",
-          organizationId: testData.organization,
-          type: "ASSIGNED",
-          field: "assignedTo",
-          oldValue: null,
-          newValue: testData.user || "test-user-1",
-          actorId: testData.user || "test-user-1",
-          changedAt: new Date("2024-01-03T09:15:00Z"),
-        },
-      ]);
-    });
+        // Create additional test data for comprehensive timeline testing
+        // Add comments to the test issue
+        await db.insert(schema.comments).values([
+          {
+            id: "test-comment-1",
+            content: "First comment on the issue",
+            issueId: testData.issue,
+            authorId: testData.user,
+            createdAt: new Date("2024-01-01T10:00:00Z"),
+            updatedAt: new Date("2024-01-01T10:00:00Z"),
+          },
+          {
+            id: "test-comment-2",
+            content: "Second comment for discussion",
+            issueId: testData.issue,
+            authorId: testData.user,
+            createdAt: new Date("2024-01-02T14:30:00Z"),
+            updatedAt: new Date("2024-01-02T14:30:00Z"),
+          },
+        ]);
 
-    it("should get timeline with comments and activities for valid issue", async () => {
-      const result = await caller.getTimeline({
-        issueId: testData.issue || "test-issue-1",
-      });
+        // Add issue history activities
+        await db.insert(schema.issueHistory).values([
+          {
+            id: "test-activity-1",
+            issueId: testData.issue,
+            organizationId: testData.organization,
+            type: "STATUS_CHANGED",
+            field: "status",
+            oldValue: testData.status,
+            newValue: "new-status",
+            actorId: testData.user,
+            changedAt: new Date("2024-01-01T15:00:00Z"),
+          },
+          {
+            id: "test-activity-2",
+            issueId: testData.issue,
+            organizationId: testData.organization,
+            type: "ASSIGNED",
+            field: "assignedTo",
+            oldValue: null,
+            newValue: testData.user,
+            actorId: testData.user,
+            changedAt: new Date("2024-01-03T09:15:00Z"),
+          },
+        ]);
 
-      expect(result).toBeDefined();
-      expect(Array.isArray(result)).toBe(true);
+        const result = await caller.getTimeline({
+          issueId: testData.issue,
+        });
 
-      // Should contain both comments and activities
-      const comments = result.filter((item) => item.itemType === "comment");
-      const activities = result.filter((item) => item.itemType === "activity");
+        expect(result).toBeDefined();
+        expect(Array.isArray(result)).toBe(true);
 
-      expect(comments.length).toBeGreaterThan(0);
-      expect(activities.length).toBeGreaterThan(0);
-
-      // Verify comment structure
-      const firstComment = comments[0];
-      expect(firstComment).toMatchObject({
-        itemType: "comment",
-        id: expect.any(String),
-        content: expect.any(String),
-        timestamp: expect.any(Date),
-        author: {
-          id: expect.any(String),
-          name: expect.any(String),
-        },
-      });
-
-      // Verify activity structure
-      const firstActivity = activities[0];
-      expect(firstActivity).toMatchObject({
-        itemType: "activity",
-        id: expect.any(String),
-        type: expect.any(String),
-        timestamp: expect.any(Date),
-        actor: {
-          id: expect.any(String),
-          name: expect.any(String),
-        },
-      });
-
-      // Timeline should be ordered by timestamp
-      for (let i = 1; i < result.length; i++) {
-        expect(result[i].timestamp.getTime()).toBeGreaterThanOrEqual(
-          result[i - 1].timestamp.getTime(),
+        // Should contain both comments and activities
+        const comments = result.filter((item) => item.itemType === "comment");
+        const activities = result.filter(
+          (item) => item.itemType === "activity",
         );
-      }
+
+        expect(comments.length).toBeGreaterThan(0);
+        expect(activities.length).toBeGreaterThan(0);
+
+        // Verify comment structure
+        const firstComment = comments[0];
+        expect(firstComment).toMatchObject({
+          itemType: "comment",
+          id: expect.any(String),
+          content: expect.any(String),
+          timestamp: expect.any(Date),
+          author: {
+            id: expect.any(String),
+            name: expect.any(String),
+          },
+        });
+
+        // Verify activity structure
+        const firstActivity = activities[0];
+        expect(firstActivity).toMatchObject({
+          itemType: "activity",
+          id: expect.any(String),
+          type: expect.any(String),
+          timestamp: expect.any(Date),
+          actor: {
+            id: expect.any(String),
+            name: expect.any(String),
+          },
+        });
+
+        // Timeline should be ordered by timestamp
+        for (let i = 1; i < result.length; i++) {
+          expect(result[i].timestamp.getTime()).toBeGreaterThanOrEqual(
+            result[i - 1].timestamp.getTime(),
+          );
+        }
+      });
     });
 
-    it("should handle issue with no timeline data", async () => {
-      // Create an issue without comments or activities
-      const emptyIssue = await db
-        .insert(schema.issues)
-        .values({
-          id: "empty-issue",
-          title: "Empty Issue",
-          organizationId: testData.organization,
-          machineId: testData.machine || "test-machine-1",
-          statusId: testData.status || "test-status-1",
-          priorityId: testData.priority || "test-priority-1",
-          createdById: testData.user || "test-user-1",
+    test("should handle issue with no timeline data", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { caller, testData } = await createTestContext(db);
+
+        // Create an issue without comments or activities
+        const emptyIssue = await db
+          .insert(schema.issues)
+          .values({
+            id: "empty-issue",
+            title: "Empty Issue",
+            organizationId: testData.organization,
+            machineId: testData.machine,
+            statusId: testData.status,
+            priorityId: testData.priority,
+            createdById: testData.user,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning()
+          .then((result) => result[0]);
+
+        const result = await caller.getTimeline({ issueId: emptyIssue.id });
+
+        expect(result).toEqual([]);
+      });
+    });
+
+    test("should throw NOT_FOUND for non-existent issue", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { caller } = await createTestContext(db);
+
+        await expect(
+          caller.getTimeline({ issueId: "non-existent-issue" }),
+        ).rejects.toThrow(
+          expect.objectContaining({
+            code: "NOT_FOUND",
+            message: "Issue not found or access denied",
+          }),
+        );
+      });
+    });
+
+    test("should enforce organizational scoping", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { caller, testData } = await createTestContext(db);
+
+        // Create issue in different organization
+        const otherOrgId = "other-org-timeline";
+        await db.insert(schema.organizations).values({
+          id: otherOrgId,
+          name: "Other Organization",
+          subdomain: "other-org-timeline",
           createdAt: new Date(),
           updatedAt: new Date(),
-        })
-        .returning()
-        .then((result) => result[0]);
+        });
 
-      const result = await caller.getTimeline({ issueId: emptyIssue.id });
-
-      expect(result).toEqual([]);
-    });
-
-    it("should throw NOT_FOUND for non-existent issue", async () => {
-      await expect(
-        caller.getTimeline({ issueId: "non-existent-issue" }),
-      ).rejects.toThrow(
-        expect.objectContaining({
-          code: "NOT_FOUND",
-          message: "Issue not found or access denied",
-        }),
-      );
-    });
-
-    it("should enforce organizational scoping", async () => {
-      // Create issue in different organization
-      const otherOrgId = "other-org-timeline";
-      await db.insert(schema.organizations).values({
-        id: otherOrgId,
-        name: "Other Organization",
-        subdomain: "other-org-timeline",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-
-      await db.insert(schema.priorities).values({
-        id: "other-priority-timeline",
-        name: "Other Priority",
-        organizationId: otherOrgId,
-        order: 1,
-      });
-
-      await db.insert(schema.issueStatuses).values({
-        id: "other-status-timeline",
-        name: "Other Status",
-        category: "NEW",
-        organizationId: otherOrgId,
-      });
-
-      const otherOrgIssue = await db
-        .insert(schema.issues)
-        .values({
-          id: "other-org-issue",
-          title: "Other Org Issue",
+        await db.insert(schema.priorities).values({
+          id: "other-priority-timeline",
+          name: "Other Priority",
           organizationId: otherOrgId,
-          machineId: testData.machine || "test-machine-1",
-          statusId: "other-status-timeline",
-          priorityId: "other-priority-timeline",
-          createdById: testData.user || "test-user-1",
+          order: 1,
+        });
+
+        await db.insert(schema.issueStatuses).values({
+          id: "other-status-timeline",
+          name: "Other Status",
+          category: "NEW",
+          organizationId: otherOrgId,
+        });
+
+        const otherOrgIssue = await db
+          .insert(schema.issues)
+          .values({
+            id: "other-org-issue",
+            title: "Other Org Issue",
+            organizationId: otherOrgId,
+            machineId: testData.machine,
+            statusId: "other-status-timeline",
+            priorityId: "other-priority-timeline",
+            createdById: testData.user,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning()
+          .then((result) => result[0]);
+
+        // Add timeline data to other org issue
+        await db.insert(schema.comments).values({
+          id: "other-org-comment",
+          content: "Comment in other org",
+          issueId: otherOrgIssue.id,
+          authorId: testData.user,
           createdAt: new Date(),
           updatedAt: new Date(),
-        })
-        .returning()
-        .then((result) => result[0]);
+        });
 
-      // Add timeline data to other org issue
-      await db.insert(schema.comments).values({
-        id: "other-org-comment",
-        content: "Comment in other org",
-        issueId: otherOrgIssue.id,
-        authorId: testData.user || "test-user-1",
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        // Should not be able to access issue from different organization
+        await expect(
+          caller.getTimeline({ issueId: otherOrgIssue.id }),
+        ).rejects.toThrow(
+          expect.objectContaining({
+            code: "NOT_FOUND",
+            message: "Issue not found or access denied",
+          }),
+        );
       });
-
-      // Should not be able to access issue from different organization
-      await expect(
-        caller.getTimeline({ issueId: otherOrgIssue.id }),
-      ).rejects.toThrow(
-        expect.objectContaining({
-          code: "NOT_FOUND",
-          message: "Issue not found or access denied",
-        }),
-      );
     });
 
-    it("should handle timeline with only comments", async () => {
-      // Create issue with only comments, no activities
-      const commentsOnlyIssue = await db
-        .insert(schema.issues)
-        .values({
-          id: "comments-only-issue",
-          title: "Comments Only Issue",
-          organizationId: testData.organization,
-          machineId: testData.machine || "test-machine-1",
-          statusId: testData.status || "test-status-1",
-          priorityId: testData.priority || "test-priority-1",
-          createdById: testData.user || "test-user-1",
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .returning()
-        .then((result) => result[0]);
+    test("should handle timeline with only comments", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { caller, testData } = await createTestContext(db);
+        // Create issue with only comments, no activities
+        const commentsOnlyIssue = await db
+          .insert(schema.issues)
+          .values({
+            id: "comments-only-issue",
+            title: "Comments Only Issue",
+            organizationId: testData.organization,
+            machineId: testData.machine,
+            statusId: testData.status,
+            priorityId: testData.priority,
+            createdById: testData.user,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning()
+          .then((result) => result[0]);
 
-      await db.insert(schema.comments).values([
-        {
-          id: "comment-only-1",
-          content: "First comment only",
-          issueId: commentsOnlyIssue.id,
-          authorId: testData.user || "test-user-1",
-          createdAt: new Date("2024-01-01"),
-          updatedAt: new Date("2024-01-01"),
-        },
-        {
-          id: "comment-only-2",
-          content: "Second comment only",
-          issueId: commentsOnlyIssue.id,
-          authorId: testData.user || "test-user-1",
-          createdAt: new Date("2024-01-02"),
-          updatedAt: new Date("2024-01-02"),
-        },
-      ]);
+        await db.insert(schema.comments).values([
+          {
+            id: "comment-only-1",
+            content: "First comment only",
+            issueId: commentsOnlyIssue.id,
+            authorId: testData.user,
+            createdAt: new Date("2024-01-01"),
+            updatedAt: new Date("2024-01-01"),
+          },
+          {
+            id: "comment-only-2",
+            content: "Second comment only",
+            issueId: commentsOnlyIssue.id,
+            authorId: testData.user,
+            createdAt: new Date("2024-01-02"),
+            updatedAt: new Date("2024-01-02"),
+          },
+        ]);
 
-      const result = await caller.getTimeline({
-        issueId: commentsOnlyIssue.id,
+        const result = await caller.getTimeline({
+          issueId: commentsOnlyIssue.id,
+        });
+
+        expect(result).toHaveLength(2);
+        expect(result.every((item) => item.itemType === "comment")).toBe(true);
+
+        // Verify chronological order
+        expect(result[0].timestamp.getTime()).toBeLessThanOrEqual(
+          result[1].timestamp.getTime(),
+        );
       });
-
-      expect(result).toHaveLength(2);
-      expect(result.every((item) => item.itemType === "comment")).toBe(true);
-
-      // Verify chronological order
-      expect(result[0].timestamp.getTime()).toBeLessThanOrEqual(
-        result[1].timestamp.getTime(),
-      );
     });
 
-    it("should handle timeline with only activities", async () => {
-      // Create issue with only activities, no comments
-      const activitiesOnlyIssue = await db
-        .insert(schema.issues)
-        .values({
-          id: "activities-only-issue",
-          title: "Activities Only Issue",
-          organizationId: testData.organization,
-          machineId: testData.machine || "test-machine-1",
-          statusId: testData.status || "test-status-1",
-          priorityId: testData.priority || "test-priority-1",
-          createdById: testData.user || "test-user-1",
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .returning()
-        .then((result) => result[0]);
+    test("should handle timeline with only activities", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { caller, testData } = await createTestContext(db);
 
-      await db.insert(schema.issueHistory).values([
-        {
-          id: "activity-only-1",
+        // Create issue with only activities, no comments
+        const activitiesOnlyIssue = await db
+          .insert(schema.issues)
+          .values({
+            id: "activities-only-issue",
+            title: "Activities Only Issue",
+            organizationId: testData.organization,
+            machineId: testData.machine,
+            statusId: testData.status,
+            priorityId: testData.priority,
+            createdById: testData.user,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning()
+          .then((result) => result[0]);
+
+        await db.insert(schema.issueHistory).values([
+          {
+            id: "activity-only-1",
+            issueId: activitiesOnlyIssue.id,
+            organizationId: testData.organization,
+            type: "STATUS_CHANGED",
+            field: "status",
+            oldValue: "old-status",
+            newValue: "new-status",
+            actorId: testData.user,
+            changedAt: new Date("2024-01-01"),
+          },
+          {
+            id: "activity-only-2",
+            issueId: activitiesOnlyIssue.id,
+            organizationId: testData.organization,
+            type: "PRIORITY_CHANGED",
+            field: "priority",
+            oldValue: "low",
+            newValue: "high",
+            actorId: testData.user,
+            changedAt: new Date("2024-01-02"),
+          },
+        ]);
+
+        const result = await caller.getTimeline({
           issueId: activitiesOnlyIssue.id,
-          organizationId: testData.organization,
-          type: "STATUS_CHANGED",
-          field: "status",
+        });
+
+        expect(result).toHaveLength(2);
+        expect(result.every((item) => item.itemType === "activity")).toBe(true);
+
+        // Verify activity types and data
+        const statusActivity = result.find(
+          (item) =>
+            item.itemType === "activity" && item.type === "STATUS_CHANGED",
+        );
+        expect(statusActivity).toBeDefined();
+        expect(statusActivity).toMatchObject({
           oldValue: "old-status",
           newValue: "new-status",
-          actorId: testData.user || "test-user-1",
-          changedAt: new Date("2024-01-01"),
-        },
-        {
-          id: "activity-only-2",
-          issueId: activitiesOnlyIssue.id,
-          organizationId: testData.organization,
-          type: "PRIORITY_CHANGED",
-          field: "priority",
-          oldValue: "low",
-          newValue: "high",
-          actorId: testData.user || "test-user-1",
-          changedAt: new Date("2024-01-02"),
-        },
-      ]);
-
-      const result = await caller.getTimeline({
-        issueId: activitiesOnlyIssue.id,
-      });
-
-      expect(result).toHaveLength(2);
-      expect(result.every((item) => item.itemType === "activity")).toBe(true);
-
-      // Verify activity types and data
-      const statusActivity = result.find(
-        (item) =>
-          item.itemType === "activity" && item.type === "STATUS_CHANGED",
-      );
-      expect(statusActivity).toBeDefined();
-      expect(statusActivity).toMatchObject({
-        oldValue: "old-status",
-        newValue: "new-status",
+        });
       });
     });
 
-    it("should handle mixed timeline with complex chronological ordering", async () => {
-      // Create issue and add timeline items with specific timestamps for testing ordering
-      const mixedTimelineIssue = await db
-        .insert(schema.issues)
-        .values({
-          id: "mixed-timeline-issue",
-          title: "Mixed Timeline Issue",
-          organizationId: testData.organization,
-          machineId: testData.machine || "test-machine-1",
-          statusId: testData.status || "test-status-1",
-          priorityId: testData.priority || "test-priority-1",
-          createdById: testData.user || "test-user-1",
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .returning()
-        .then((result) => result[0]);
+    test("should handle mixed timeline with complex chronological ordering", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { caller, testData } = await createTestContext(db);
 
-      // Add timeline items in specific chronological order
-      await db.insert(schema.comments).values([
-        {
-          id: "mixed-comment-1",
-          content: "First comment",
-          issueId: mixedTimelineIssue.id,
-          authorId: testData.user || "test-user-1",
-          createdAt: new Date("2024-01-01T09:00:00Z"), // First
-          updatedAt: new Date("2024-01-01T09:00:00Z"),
-        },
-        {
-          id: "mixed-comment-2",
-          content: "Third item chronologically",
-          issueId: mixedTimelineIssue.id,
-          authorId: testData.user || "test-user-1",
-          createdAt: new Date("2024-01-01T15:00:00Z"), // Third
-          updatedAt: new Date("2024-01-01T15:00:00Z"),
-        },
-      ]);
+        // Create issue and add timeline items with specific timestamps for testing ordering
+        const mixedTimelineIssue = await db
+          .insert(schema.issues)
+          .values({
+            id: "mixed-timeline-issue",
+            title: "Mixed Timeline Issue",
+            organizationId: testData.organization,
+            machineId: testData.machine,
+            statusId: testData.status,
+            priorityId: testData.priority,
+            createdById: testData.user,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning()
+          .then((result) => result[0]);
 
-      await db.insert(schema.issueHistory).values([
-        {
-          id: "mixed-activity-1",
-          issueId: mixedTimelineIssue.id,
-          organizationId: testData.organization,
-          type: "STATUS_CHANGED",
-          field: "status",
-          oldValue: "open",
-          newValue: "in-progress",
-          actorId: testData.user || "test-user-1",
-          changedAt: new Date("2024-01-01T12:00:00Z"), // Second
-        },
-        {
-          id: "mixed-activity-2",
-          issueId: mixedTimelineIssue.id,
-          organizationId: testData.organization,
-          type: "ASSIGNED",
-          field: "assignedTo",
-          oldValue: null,
-          newValue: testData.user || "test-user-1",
-          actorId: testData.user || "test-user-1",
-          changedAt: new Date("2024-01-01T18:00:00Z"), // Fourth
-        },
-      ]);
+        // Add timeline items in specific chronological order
+        await db.insert(schema.comments).values([
+          {
+            id: "mixed-comment-1",
+            content: "First comment",
+            issueId: mixedTimelineIssue.id,
+            authorId: testData.user,
+            createdAt: new Date("2024-01-01T09:00:00Z"), // First
+            updatedAt: new Date("2024-01-01T09:00:00Z"),
+          },
+          {
+            id: "mixed-comment-2",
+            content: "Third item chronologically",
+            issueId: mixedTimelineIssue.id,
+            authorId: testData.user,
+            createdAt: new Date("2024-01-01T15:00:00Z"), // Third
+            updatedAt: new Date("2024-01-01T15:00:00Z"),
+          },
+        ]);
 
-      const result = await caller.getTimeline({
-        issueId: mixedTimelineIssue.id,
+        await db.insert(schema.issueHistory).values([
+          {
+            id: "mixed-activity-1",
+            issueId: mixedTimelineIssue.id,
+            organizationId: testData.organization,
+            type: "STATUS_CHANGED",
+            field: "status",
+            oldValue: "open",
+            newValue: "in-progress",
+            actorId: testData.user,
+            changedAt: new Date("2024-01-01T12:00:00Z"), // Second
+          },
+          {
+            id: "mixed-activity-2",
+            issueId: mixedTimelineIssue.id,
+            organizationId: testData.organization,
+            type: "ASSIGNED",
+            field: "assignedTo",
+            oldValue: null,
+            newValue: testData.user,
+            actorId: testData.user,
+            changedAt: new Date("2024-01-01T18:00:00Z"), // Fourth
+          },
+        ]);
+
+        const result = await caller.getTimeline({
+          issueId: mixedTimelineIssue.id,
+        });
+
+        expect(result).toHaveLength(4);
+
+        // Verify chronological ordering
+        const expectedOrder = [
+          { itemType: "comment", content: "First comment" },
+          { itemType: "activity", type: "STATUS_CHANGED" },
+          { itemType: "comment", content: "Third item chronologically" },
+          { itemType: "activity", type: "ASSIGNED" },
+        ];
+
+        for (let i = 0; i < expectedOrder.length; i++) {
+          expect(result[i].itemType).toBe(expectedOrder[i].itemType);
+          if (expectedOrder[i].content) {
+            expect((result[i] as any).content).toBe(expectedOrder[i].content);
+          }
+          if (expectedOrder[i].type) {
+            expect((result[i] as any).type).toBe(expectedOrder[i].type);
+          }
+        }
+
+        // Verify timeline is properly sorted by timestamp
+        for (let i = 1; i < result.length; i++) {
+          expect(result[i].timestamp.getTime()).toBeGreaterThanOrEqual(
+            result[i - 1].timestamp.getTime(),
+          );
+        }
       });
+    });
 
-      expect(result).toHaveLength(4);
+    test("should validate issue exists before calling service", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { context, caller, testData } = await createTestContext(db);
 
-      // Verify chronological ordering
-      const expectedOrder = [
-        { itemType: "comment", content: "First comment" },
-        { itemType: "activity", type: "STATUS_CHANGED" },
-        { itemType: "comment", content: "Third item chronologically" },
-        { itemType: "activity", type: "ASSIGNED" },
-      ];
+        // Create a spy to track service method calls
+        const serviceMethodSpy = vi.fn().mockResolvedValue([]);
+        const mockService = {
+          getIssueTimeline: serviceMethodSpy,
+          recordIssueCreated: vi.fn(),
+          recordActivity: vi.fn(),
+          recordStatusChange: vi.fn(),
+          recordAssignmentChange: vi.fn(),
+          recordFieldUpdate: vi.fn(),
+          recordCommentDeleted: vi.fn(),
+          recordIssueResolved: vi.fn(),
+          recordIssueAssigned: vi.fn(),
+        };
 
-      for (let i = 0; i < expectedOrder.length; i++) {
-        expect(result[i].itemType).toBe(expectedOrder[i].itemType);
-        if (expectedOrder[i].content) {
-          expect((result[i] as any).content).toBe(expectedOrder[i].content);
-        }
-        if (expectedOrder[i].type) {
-          expect((result[i] as any).type).toBe(expectedOrder[i].type);
-        }
-      }
-
-      // Verify timeline is properly sorted by timestamp
-      for (let i = 1; i < result.length; i++) {
-        expect(result[i].timestamp.getTime()).toBeGreaterThanOrEqual(
-          result[i - 1].timestamp.getTime(),
+        vi.mocked(context.services.createIssueActivityService).mockReturnValue(
+          mockService,
         );
-      }
-    });
 
-    it("should validate issue exists before calling service", async () => {
-      // Create a spy to track service method calls
-      const serviceMethodSpy = vi.fn().mockResolvedValue([]);
-      const mockService = {
-        getIssueTimeline: serviceMethodSpy,
-        recordIssueCreated: vi.fn(),
-        recordActivity: vi.fn(),
-        recordStatusChange: vi.fn(),
-        recordAssignmentChange: vi.fn(),
-        recordFieldUpdate: vi.fn(),
-        recordCommentDeleted: vi.fn(),
-        recordIssueResolved: vi.fn(),
-        recordIssueAssigned: vi.fn(),
-      };
+        // Test with non-existent issue
+        await expect(
+          caller.getTimeline({ issueId: "definitely-does-not-exist" }),
+        ).rejects.toThrow("Issue not found or access denied");
 
-      vi.mocked(context.services.createIssueActivityService).mockReturnValue(
-        mockService,
-      );
+        // Verify service method was never called
+        expect(serviceMethodSpy).not.toHaveBeenCalled();
 
-      // Test with non-existent issue
-      await expect(
-        caller.getTimeline({ issueId: "definitely-does-not-exist" }),
-      ).rejects.toThrow("Issue not found or access denied");
+        // Now test with valid issue
+        await caller.getTimeline({ issueId: testData.issue });
 
-      // Verify service method was never called
-      expect(serviceMethodSpy).not.toHaveBeenCalled();
-
-      // Now test with valid issue
-      await caller.getTimeline({ issueId: testData.issue || "test-issue-1" });
-
-      // Verify service method was called for valid issue
-      expect(serviceMethodSpy).toHaveBeenCalledWith(
-        testData.issue || "test-issue-1",
-        testData.organization,
-      );
+        // Verify service method was called for valid issue
+        expect(serviceMethodSpy).toHaveBeenCalledWith(
+          testData.issue,
+          testData.organization,
+        );
+      });
     });
   });
 
   describe("Service Integration", () => {
-    it("should properly integrate with IssueActivityService", async () => {
-      // Create real service instance for testing integration
-      const realService = new IssueActivityService(context.db);
+    test("should properly integrate with IssueActivityService", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { context, caller, testData } = await createTestContext(db);
 
-      // Mock the service factory to return real service
-      vi.mocked(context.services.createIssueActivityService).mockReturnValue(
-        realService,
-      );
+        // Create real service instance for testing integration
+        const realService = new IssueActivityService(context.db);
 
-      const result = await caller.getTimeline({
-        issueId: testData.issue || "test-issue-1",
+        // Mock the service factory to return real service
+        vi.mocked(context.services.createIssueActivityService).mockReturnValue(
+          realService,
+        );
+
+        const result = await caller.getTimeline({
+          issueId: testData.issue,
+        });
+
+        // Verify service was called and returned data
+        expect(result).toBeDefined();
+        expect(Array.isArray(result)).toBe(true);
+
+        // The actual timeline content depends on the service implementation
+        // but we can verify the structure and organizational scoping
+        if (result.length > 0) {
+          expect(result[0]).toHaveProperty("type");
+          expect(result[0]).toHaveProperty("createdAt");
+          expect(result[0].createdAt).toBeInstanceOf(Date);
+        }
       });
-
-      // Verify service was called and returned data
-      expect(result).toBeDefined();
-      expect(Array.isArray(result)).toBe(true);
-
-      // The actual timeline content depends on the service implementation
-      // but we can verify the structure and organizational scoping
-      if (result.length > 0) {
-        expect(result[0]).toHaveProperty("type");
-        expect(result[0]).toHaveProperty("createdAt");
-        expect(result[0].createdAt).toBeInstanceOf(Date);
-      }
     });
 
-    it("should handle service errors gracefully", async () => {
-      // Create a service that throws an error
-      const failingService = {
-        getIssueTimeline: vi
-          .fn()
-          .mockRejectedValue(new Error("Database connection lost")),
-        recordIssueCreated: vi.fn(),
-        recordActivity: vi.fn(),
-        recordStatusChange: vi.fn(),
-        recordAssignmentChange: vi.fn(),
-        recordFieldUpdate: vi.fn(),
-        recordCommentDeleted: vi.fn(),
-        recordIssueResolved: vi.fn(),
-        recordIssueAssigned: vi.fn(),
-      };
+    test("should handle service errors gracefully", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { context, caller, testData } = await createTestContext(db);
 
-      vi.mocked(context.services.createIssueActivityService).mockReturnValue(
-        failingService,
-      );
+        // Create a service that throws an error
+        const failingService = {
+          getIssueTimeline: vi
+            .fn()
+            .mockRejectedValue(new Error("Database connection lost")),
+          recordIssueCreated: vi.fn(),
+          recordActivity: vi.fn(),
+          recordStatusChange: vi.fn(),
+          recordAssignmentChange: vi.fn(),
+          recordFieldUpdate: vi.fn(),
+          recordCommentDeleted: vi.fn(),
+          recordIssueResolved: vi.fn(),
+          recordIssueAssigned: vi.fn(),
+        };
 
-      await expect(
-        caller.getTimeline({ issueId: testData.issue || "test-issue-1" }),
-      ).rejects.toThrow("Database connection lost");
+        vi.mocked(context.services.createIssueActivityService).mockReturnValue(
+          failingService,
+        );
 
-      // Verify the service method was actually called
-      expect(failingService.getIssueTimeline).toHaveBeenCalledWith(
-        testData.issue || "test-issue-1",
-        testData.organization,
-      );
+        await expect(
+          caller.getTimeline({ issueId: testData.issue }),
+        ).rejects.toThrow("Database connection lost");
+
+        // Verify the service method was actually called
+        expect(failingService.getIssueTimeline).toHaveBeenCalledWith(
+          testData.issue,
+          testData.organization,
+        );
+      });
     });
   });
 });

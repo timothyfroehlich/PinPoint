@@ -262,8 +262,8 @@ jobs:
   #         --health-retries 5
   #   env:
   #     # Override database URLs to use test PostgreSQL service
-  #     POSTGRES_PRISMA_URL: "postgresql://test_user:test_password@postgres:5432/test_db"
-  #     POSTGRES_URL_NON_POOLING: "postgresql://test_user:test_password@postgres:5432/test_db"
+  #     DATABASE_URL: "postgresql://test_user:test_password@postgres:5432/test_db"
+  #     DIRECT_URL: "postgresql://test_user:test_password@postgres:5432/test_db"
   #     NODE_ENV: "test"
   #     CI: true
   #   steps:
@@ -281,7 +281,7 @@ jobs:
   #         VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
   #     - run: npm ci
   #     - name: Set up database
-  #       run: npx prisma db push --force-reset
+  #       run: npm run db:push:local
   #     - name: Seed database with test data
   #       run: npm run seed
   #     - name: Run Playwright Tests (${{ matrix.test-group }})

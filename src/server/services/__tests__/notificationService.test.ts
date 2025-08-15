@@ -100,6 +100,7 @@ describe("NotificationService", () => {
         {
           id: "test-machine-1",
           name: "Test Machine 1",
+          qrCodeId: "qr-code-test-machine-1",
           serialNumber: "TST001",
           organizationId,
           modelId: seededData.model || "test-model",
@@ -112,6 +113,7 @@ describe("NotificationService", () => {
         {
           id: "test-machine-2",
           name: "Test Machine 2",
+          qrCodeId: "qr-code-test-machine-2",
           serialNumber: "TST002",
           organizationId,
           modelId: seededData.model || "test-model",

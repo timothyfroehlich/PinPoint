@@ -1,4 +1,5 @@
 import { TRPCError } from "@trpc/server";
+import { eq, and } from "drizzle-orm";
 
 // Legacy session type for backward compatibility
 type Session = {
@@ -17,7 +18,7 @@ import {
 
 import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 
-import { type ExtendedPrismaClient } from "~/server/db";
+import { type DrizzleClient } from "~/server/db/drizzle";
 
 /**
  * Permission Service
@@ -26,7 +27,7 @@ import { type ExtendedPrismaClient } from "~/server/db";
  * Supports both authenticated users and unauthenticated access.
  */
 export class PermissionService {
-  constructor(private prisma: ExtendedPrismaClient) {}
+  constructor(private db: DrizzleClient) {}
 
   /**
    * Check if a user has a specific permission
@@ -228,12 +229,19 @@ export class PermissionService {
     }
 
     // Get organization-specific unauthenticated role permissions
-    const unauthRole = await this.prisma.role.findFirst({
-      where: {
-        organizationId,
-        name: SYSTEM_ROLES.UNAUTHENTICATED,
+    const unauthRole = await this.db.query.roles.findFirst({
+      where: (roles) =>
+        and(
+          eq(roles.organizationId, organizationId),
+          eq(roles.name, SYSTEM_ROLES.UNAUTHENTICATED),
+        ),
+      with: {
+        rolePermissions: {
+          with: {
+            permission: true,
+          },
+        },
       },
-      include: { permissions: true },
     });
 
     if (!unauthRole) {
@@ -243,8 +251,8 @@ export class PermissionService {
       );
     }
 
-    const rolePermissions = unauthRole.permissions.map(
-      (p: { name: string }) => p.name,
+    const rolePermissions = unauthRole.rolePermissions.map(
+      (rp) => rp.permission.name,
     );
     const expandedPermissions =
       this.expandPermissionsWithDependencies(rolePermissions);
@@ -264,12 +272,19 @@ export class PermissionService {
     }
 
     // Get organization-specific unauthenticated role permissions
-    const unauthRole = await this.prisma.role.findFirst({
-      where: {
-        organizationId,
-        name: SYSTEM_ROLES.UNAUTHENTICATED,
+    const unauthRole = await this.db.query.roles.findFirst({
+      where: (roles) =>
+        and(
+          eq(roles.organizationId, organizationId),
+          eq(roles.name, SYSTEM_ROLES.UNAUTHENTICATED),
+        ),
+      with: {
+        rolePermissions: {
+          with: {
+            permission: true,
+          },
+        },
       },
-      include: { permissions: true },
     });
 
     if (!unauthRole) {
@@ -278,8 +293,8 @@ export class PermissionService {
       );
     }
 
-    const rolePermissions = unauthRole.permissions.map(
-      (p: { name: string }) => p.name,
+    const rolePermissions = unauthRole.rolePermissions.map(
+      (rp) => rp.permission.name,
     );
     return this.expandPermissionsWithDependencies(rolePermissions);
   }
@@ -296,21 +311,38 @@ export class PermissionService {
       permissions: { name: string }[];
     };
   } | null> {
-    return this.prisma.membership.findUnique({
-      where: {
-        userId_organizationId: {
-          userId,
-          organizationId,
-        },
-      },
-      include: {
+    const membership = await this.db.query.memberships.findFirst({
+      where: (memberships) =>
+        and(
+          eq(memberships.userId, userId),
+          eq(memberships.organizationId, organizationId),
+        ),
+      with: {
         role: {
-          include: {
-            permissions: true,
+          with: {
+            rolePermissions: {
+              with: {
+                permission: true,
+              },
+            },
           },
         },
       },
     });
+
+    if (!membership) {
+      return null;
+    }
+
+    // Transform the data structure to match expected interface
+    return {
+      role: {
+        name: membership.role.name,
+        permissions: membership.role.rolePermissions.map((rp) => ({
+          name: rp.permission.name,
+        })),
+      },
+    };
   }
 
   /**

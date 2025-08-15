@@ -1,8 +1,30 @@
-import { ActivityType } from "./types";
-import { type IssueStatus, type ExtendedPrismaClient } from "./types";
+import { eq, and, isNull } from "drizzle-orm";
+
+import { type DrizzleClient } from "../db/drizzle";
+import { issueHistory, comments, activityTypeEnum } from "../db/schema";
+
+import { generatePrefixedId } from "~/lib/utils/id-generation";
+
+// Import ActivityType from schema enum
+type ActivityType = (typeof activityTypeEnum.enumValues)[number];
+
+// Constants for ActivityType enum values
+const ActivityType = {
+  CREATED: "CREATED" as const,
+  STATUS_CHANGED: "STATUS_CHANGED" as const,
+  ASSIGNED: "ASSIGNED" as const,
+  PRIORITY_CHANGED: "PRIORITY_CHANGED" as const,
+  COMMENTED: "COMMENTED" as const,
+  COMMENT_DELETED: "COMMENT_DELETED" as const,
+  ATTACHMENT_ADDED: "ATTACHMENT_ADDED" as const,
+  MERGED: "MERGED" as const,
+  RESOLVED: "RESOLVED" as const,
+  REOPENED: "REOPENED" as const,
+  SYSTEM: "SYSTEM" as const,
+} as const;
 
 export interface ActivityData {
-  type: ActivityType; // Use enum instead of string
+  type: ActivityType;
   actorId?: string;
   fieldName?: string;
   oldValue?: string;
@@ -10,8 +32,13 @@ export interface ActivityData {
   description?: string;
 }
 
+// IssueStatus interface for backward compatibility
+export interface IssueStatus {
+  name: string;
+}
+
 export class IssueActivityService {
-  constructor(private prisma: ExtendedPrismaClient) {}
+  constructor(private db: DrizzleClient) {}
 
   async recordActivity(
     issueId: string,
@@ -20,6 +47,7 @@ export class IssueActivityService {
   ): Promise<void> {
     // Build data object with conditional assignment for exactOptionalPropertyTypes compatibility
     const data: {
+      id: string;
       issueId: string;
       organizationId: string;
       type: ActivityType;
@@ -28,8 +56,9 @@ export class IssueActivityService {
       oldValue?: string;
       newValue?: string;
     } = {
+      id: generatePrefixedId("history"),
       issueId,
-      organizationId, // Now properly supported
+      organizationId,
       type: activityData.type,
       field: activityData.fieldName ?? "",
     };
@@ -45,7 +74,7 @@ export class IssueActivityService {
       data.newValue = activityData.newValue;
     }
 
-    await this.prisma.issueHistory.create({ data });
+    await this.db.insert(issueHistory).values(data);
   }
 
   async recordIssueCreated(
@@ -219,46 +248,67 @@ export class IssueActivityService {
       } | null;
     }
 
-    const [comments, activities] = await Promise.all([
-      this.prisma.comment.findMany({
-        where: {
-          issueId,
-          deletedAt: null, // Exclude soft-deleted comments
+    // Use Drizzle relational queries to fetch comments and activities
+    const [commentsData, activitiesData] = await Promise.all([
+      // Fetch comments with author relations (exclude soft-deleted)
+      this.db.query.comments.findMany({
+        where: and(eq(comments.issueId, issueId), isNull(comments.deletedAt)),
+        columns: {
+          id: true,
+          content: true,
+          createdAt: true,
         },
-        include: {
+        with: {
           author: {
-            select: {
+            columns: {
               id: true,
               name: true,
               profilePicture: true,
             },
           },
         },
-        orderBy: { createdAt: "asc" },
-      }) as Promise<CommentResult[]>,
-      this.prisma.issueHistory.findMany({
-        where: { issueId, organizationId },
-        include: {
+        orderBy: [comments.createdAt],
+      }),
+      // Fetch issue history with actor relations (organization scoped)
+      this.db.query.issueHistory.findMany({
+        where: and(
+          eq(issueHistory.issueId, issueId),
+          eq(issueHistory.organizationId, organizationId),
+        ),
+        columns: {
+          id: true,
+          type: true,
+          field: true,
+          oldValue: true,
+          newValue: true,
+          changedAt: true,
+        },
+        with: {
           actor: {
-            select: {
+            columns: {
               id: true,
               name: true,
               profilePicture: true,
             },
           },
         },
-        orderBy: { changedAt: "asc" },
-      }) as Promise<ActivityResult[]>,
+        orderBy: [issueHistory.changedAt],
+      }),
     ]);
+
+    // Type-safe cast based on the schema structure
+    const commentsResults: CommentResult[] = commentsData as CommentResult[];
+    const activitiesResults: ActivityResult[] =
+      activitiesData as ActivityResult[];
 
     // Merge comments and activities into a single timeline
     const timeline = [
-      ...comments.map((comment) => ({
+      ...commentsResults.map((comment) => ({
         ...comment,
         itemType: "comment" as const,
         timestamp: comment.createdAt,
       })),
-      ...activities.map((activity) => ({
+      ...activitiesResults.map((activity) => ({
         ...activity,
         itemType: "activity" as const,
         timestamp: activity.changedAt,

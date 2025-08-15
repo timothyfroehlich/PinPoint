@@ -1,15 +1,13 @@
-# AI-Powered Drizzle Migration Review Procedure (2025)
+# Database & Testing Code Review Procedure (2025)
 
-**Objective**: Comprehensive review checklist for direct Prisma-to-Drizzle migration optimized for solo development velocity and modern best practices.
+**Objective**: Comprehensive review checklist for modern database architecture and testing patterns using August 2025 best practices.
 
 **Context**:
+- **Tech Stack**: August 2025 patterns (Drizzle ORM, Supabase SSR, Vitest v4.0, Next.js App Router)
+- **Focus**: Database optimization, testing quality, performance, and security
+- **Standards**: Modern full-stack development with comprehensive testing
 
-- **Migration Approach**: Direct conversion without parallel validation infrastructure
-- **Project Phase**: Solo development, pre-beta, velocity-optimized
-- **Timeline**: 2-3 weeks vs 7+ weeks with parallel validation
-- **Tech Stack**: August 2025 patterns (Drizzle, Supabase SSR, Vitest v4.0, Next.js App Router)
-
-**Scope**: Individual files within Pull Requests that are part of the direct conversion migration.
+**Scope**: Database-related files, testing infrastructure, and quality assurance within Pull Requests.
 
 ---
 
@@ -19,7 +17,9 @@
 
 For each modified file, categorize as:
 
+- `DATABASE_SCHEMA`: Database schema file (`src/server/db/schema/*.ts`)
 - `ROUTER`: tRPC router file (`src/server/api/routers/*.ts`)
+- `SERVICE`: Business logic service (`src/server/services/*.ts`)
 - `UNIT_TEST`: Unit test with mocked dependencies (`src/**/*.test.ts`)
 - `INTEGRATION_TEST`: Integration test with PGlite database (`src/**/*.integration.test.ts`)
 - `COMPONENT_TEST`: UI component test with MSW-tRPC patterns (`src/**/*.component.test.tsx`)
@@ -34,47 +34,69 @@ For each modified file, categorize as:
 
 ## Automated Review Checklist
 
-### Category: `ROUTER` - Direct Conversion
+### Category: `DATABASE_SCHEMA` - Modern Schema Design
 
-#### 🚨 Critical Migration Requirements
+#### 🗄️ August 2025 Drizzle Patterns
 
-- [ ] **Complete Prisma Elimination**: Zero Prisma usage remains
-  - [ ] No `ctx.db` or `ctx.prisma` references
-  - [ ] No Prisma imports (`@prisma/client`, `prisma.*`)
-  - [ ] No parallel validation or comparison code
-  - [ ] No Prisma-specific types or enums
-- [ ] **Clean Drizzle Implementation**: All data access uses `ctx.drizzle` exclusively
-- [ ] **TypeScript Compilation**: File builds without errors
+- [ ] **Generated Columns**: Computed fields use `.generatedAlwaysAs()` for database-level calculations
+- [ ] **Enhanced Index API**: Uses `.on(table.column.asc())` NOT old `.on(table.column).asc()`
+- [ ] **Type Inference**: Uses `$inferSelect`/`$inferInsert` for schema type safety
+- [ ] **PostgreSQL Extensions**: Native types for vector/geometry where applicable
+- [ ] **Relationships**: Proper foreign key constraints and relational query support
 
-#### 🗄️ Modern Drizzle Patterns (2025)
+#### 🔐 Security & Performance
+
+- [ ] **Multi-Tenant Structure**: Organizational scoping columns present where needed
+- [ ] **Index Optimization**: Appropriate indexes for common query patterns
+- [ ] **Data Integrity**: Proper constraints and validation at database level
+- [ ] **Performance Considerations**: Efficient data types and structure
+
+---
+
+### Category: `ROUTER` - Database Integration
+
+#### 🗄️ Modern Drizzle Implementation
 
 - [ ] **Relational Queries**: Uses `db.query.users.findMany({ with: { posts: true } })` for relationships
-- [ ] **Generated Columns**: Computed fields migrated to `.generatedAlwaysAs()` in schema
-- [ ] **Enhanced Index API**: Uses `.on(table.column.asc())` NOT old `.on(table.column).asc()`
 - [ ] **Core Query Patterns**:
   - [ ] SELECTs use relational API or `db.select().from(...)`
   - [ ] INSERTs use `db.insert(table).values(...).returning()`
   - [ ] UPDATEs use `db.update(table).set(...).where(...)`
   - [ ] DELETEs use `db.delete(table).where(...)`
-- [ ] **Advanced Features**:
-  - [ ] Batch operations use `db.batch()` for performance
+- [ ] **Performance Features**:
   - [ ] Frequently used queries implement `.prepare()`
-  - [ ] PostgreSQL extensions (`vector`, `geometry`) use native types
-  - [ ] Schema type inference uses `$inferSelect`/`$inferInsert`
+  - [ ] Batch operations use `db.batch()` for efficiency
+  - [ ] Partial column selection to reduce over-fetching
 
 #### 🔐 Security & Multi-Tenancy
 
 - [ ] **Organization Scoping**: Every query includes `eq(table.organizationId, ctx.organizationId)`
-- [ ] **Permission Validation**: Authorization logic preserved from original
+- [ ] **Permission Validation**: Authorization logic properly implemented
 - [ ] **Error Handling**: `TRPCError` patterns maintained for security
 - [ ] **Input Validation**: Zod schemas properly validate all inputs
 
-#### ⚡ Performance & Quality
+#### ⚡ Quality & Performance
 
-- [ ] **Query Optimization**: Prepared statements, indexes, batch operations used appropriately
 - [ ] **Type Safety**: Full TypeScript type safety throughout
-- [ ] **Import Cleanup**: Only necessary Drizzle imports remain
-- [ ] **Code Quality**: Clean, readable implementation without legacy patterns
+- [ ] **Query Optimization**: Prepared statements, indexes, batch operations used appropriately
+- [ ] **Code Quality**: Clean, readable implementation following modern patterns
+
+---
+
+### Category: `SERVICE` - Business Logic Layer
+
+#### 🏗️ Modern Architecture Patterns
+
+- [ ] **Dependency Injection**: Clean service constructor patterns
+- [ ] **Database Integration**: Proper Drizzle client usage
+- [ ] **Error Handling**: Comprehensive error handling with proper typing
+- [ ] **Business Logic Separation**: Clear separation between data access and business rules
+
+#### 🔐 Security Integration
+
+- [ ] **Authorization**: Proper permission checking and organizational scoping
+- [ ] **Data Validation**: Input validation at service layer
+- [ ] **Audit Logging**: Security-relevant operations logged appropriately
 
 ---
 
@@ -87,10 +109,6 @@ For each modified file, categorize as:
   - [ ] Implements `vi.hoisted(() => ({ mockFn: vi.fn() }))` for shared state
   - [ ] Mocks at module level instead of individual methods
   - [ ] No manual chain mocking on `db.query.*` methods
-- [ ] **PGlite Integration**:
-  - [ ] Uses `@electric-sql/pglite` for in-memory PostgreSQL testing
-  - [ ] Database module mocked in `vitest.setup.ts` with real schema
-  - [ ] Migrations applied automatically in test setup
 
 #### 🔒 Authentication & Context Mocking
 
@@ -109,14 +127,27 @@ For each modified file, categorize as:
 
 ### Category: `INTEGRATION_TEST` - PGlite Database Testing
 
-#### 🗄️ In-Memory Database Setup (Preferred)
+#### 🚨 CRITICAL: Memory Pattern Validation (MANDATORY)
+
+- [ ] **🔴 BLOCKING**: Uses worker-scoped database pattern (NOT per-test instances)
+  - [ ] ❌ FORBIDDEN: `createSeededTestDatabase()` in `beforeEach()` or per-test
+  - [ ] ❌ FORBIDDEN: `new PGlite()` in individual tests
+  - [ ] ❌ FORBIDDEN: Multiple database instances per test file
+  - [ ] ✅ REQUIRED: `import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db"`
+  - [ ] ✅ REQUIRED: `test("...", async ({ workerDb }) => await withIsolatedTest(workerDb, ...))`
+- [ ] **🔴 Memory Impact Assessment**: 
+  - [ ] Count of integration tests using old pattern: **0** (must be zero)
+  - [ ] Estimated memory usage: **< 200MB total** (worker-scoped pattern)
+  - [ ] No evidence of per-test PGlite instance creation
+
+#### 🗄️ In-Memory Database Setup (Worker-Scoped Only)
 
 - [ ] **PGlite Configuration**:
-  - [ ] Uses `@electric-sql/pglite` for fast, isolated testing
-  - [ ] Schema applied with `drizzle-orm/pglite/migrator`
-  - [ ] Fresh database instance per test suite
+  - [ ] Uses `@electric-sql/pglite` with worker-scoped fixtures
+  - [ ] Schema applied with `drizzle-orm/pglite/migrator` once per worker
+  - [ ] **SHARED** database instance per worker process (NOT per test)
   - [ ] Complete schema with relationships and indexes
-- [ ] **Test Isolation**: Clean database state between tests (transaction rollback or fresh instance)
+- [ ] **Test Isolation**: Transaction cleanup via `withIsolatedTest()` helper
 
 #### 🔍 High-Fidelity Validation
 
@@ -124,12 +155,6 @@ For each modified file, categorize as:
 - [ ] **Database Constraints**: Validates UNIQUE constraints, foreign keys, cascades
 - [ ] **Complex Operations**: Multi-table joins, aggregations, transactions tested
 - [ ] **Performance Validation**: Query performance within acceptable limits
-
-#### 🛠️ Alternative: Real Database
-
-- [ ] **Environment Setup**: Dedicated test database with proper `.env.test` configuration
-- [ ] **Schema Management**: Automated sync with `drizzle-kit generate && migrate`
-- [ ] **Hard Failure**: Tests fail immediately when database unavailable (no silent skipping)
 
 ---
 
@@ -243,9 +268,9 @@ For each modified file, categorize as:
 
 #### 📝 Content Accuracy & Completeness
 
-- [ ] **Migration Status**: Reflects **completed** migration (not "in progress")
-- [ ] **Modern Patterns**: Comprehensive Drizzle ORM patterns and best practices
-- [ ] **Current Examples**: All code examples use Drizzle syntax (no Prisma)
+- [ ] **Current Standards**: Reflects modern development practices (not outdated)
+- [ ] **Modern Patterns**: Comprehensive database and testing best practices
+- [ ] **Current Examples**: All code examples use modern syntax
 - [ ] **Testing Updates**: Modern testing infrastructure (PGlite, Vitest v4.0)
 
 #### 🎯 Technical Coverage
@@ -271,22 +296,30 @@ For each modified file, ensure:
 - [ ] **Supabase SSR**: No usage of deprecated `@supabase/auth-helpers`
 - [ ] **Vitest Configuration**: Uses `projects` config (not deprecated `workspace`)
 
+### 🚨 CRITICAL: Memory Pattern Validation (Integration Tests)
+
+**MANDATORY FOR ALL INTEGRATION TEST FILES:**
+
+- [ ] **Memory Safety Audit**: `grep -r "createSeededTestDatabase\\|new PGlite" src/integration-tests/` returns **ZERO results**
+- [ ] **Worker-Scoped Pattern**: All integration tests use `import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db"`
+- [ ] **Memory Estimation**: Maximum 1-2 PGlite instances (worker-scoped) vs 10+ instances (per-test)
+- [ ] **System Impact**: No risk of 1-2GB+ memory consumption causing system lockups
+
 ### ⏱️ Performance Expectations (2025)
 
 - **Unit Tests**: < 100ms execution per test
 - **Integration Tests**: < 5s per test suite (PGlite) or < 30s (real DB)
 - **Component Tests**: < 1s per test
-- **Build Time**: Noticeable improvement from cleaner codebase
+- **Build Time**: Optimal performance from clean, modern codebase
 
-### 📊 Migration Quality Metrics
+### 📊 Quality Metrics
 
-- **Code Reduction**: Lines eliminated from parallel validation removal
-- **Conversion Completeness**: Percentage of Prisma references eliminated
+- **Code Quality**: Lines of clean, maintainable code vs legacy patterns
 - **Modern Pattern Adoption**: Usage of relational queries, generated columns, enhanced indexes
-- **Type Safety**: Migration to `$inferSelect`/`$inferInsert` patterns
+- **Type Safety**: Full TypeScript inference with modern patterns
 - **Test Modernization**: Percentage using PGlite and `vi.importActual` patterns
-- **Performance**: Query optimization through prepared statements and generated columns
-- **Supabase SSR**: Complete migration from deprecated auth-helpers
+- **Performance**: Query optimization through prepared statements and database-level features
+- **Supabase SSR**: Modern authentication patterns throughout
 - **Vitest v4.0**: Updated configuration and mocking patterns
 
 ---
@@ -296,47 +329,55 @@ For each modified file, ensure:
 ### Overall Assessment
 
 - **Status**: [PASS / FAIL]
-- **Migration Compliance**: [DIRECT_CONVERSION_ALIGNED / NEEDS_ADJUSTMENT]
+- **Quality Compliance**: [MODERN_STANDARDS_ALIGNED / NEEDS_IMPROVEMENT]
 - **Files Reviewed**: [Count and breakdown by category]
 - **Quality Gates**: [TypeScript/ESLint/Tests/Build results]
 
 ### File-by-File Results
 
-**Router Files:**
+**Database Files:**
 
 - `[filename]`: [PASS/FAIL]
-  - Prisma Removal: [COMPLETE/INCOMPLETE]
-  - Modern Drizzle: [CLEAN/NEEDS_WORK]
-  - File Impact: [X → Y lines (-Z%)]
+  - Modern Patterns: [CURRENT/OUTDATED]
+  - Performance: [OPTIMIZED/NEEDS_WORK]
+  - Security: [COMPLIANT/GAPS]
 
 **Test Files:**
 
 - `[filename]`: [PASS/FAIL]
-  - Testing Strategy: [MODERN_VITEST/LEGACY]
+  - Testing Strategy: [MODERN_PATTERNS/LEGACY]
   - Mock Patterns: [TYPE_SAFE/MANUAL]
   - Performance: [ACCEPTABLE/SLOW]
 
+**Integration Test Files (Memory Assessment):**
+
+- `[filename]`: [PASS/FAIL]
+  - Memory Pattern: [WORKER_SCOPED/DANGEROUS_PER_TEST]
+  - PGlite Usage: [SHARED_INSTANCE/INDIVIDUAL_INSTANCES]
+  - Memory Impact: [SAFE_<200MB/CRITICAL_>1GB]
+  - Pattern Status: [MODERN_COMPLIANT/NEEDS_UPDATE]
+
 ### Critical Issues for Human Review
 
-- **Complex Conversions**: [Files requiring manual validation]
 - **Performance Concerns**: [Potential query performance impacts]
 - **Testing Gaps**: [Missing coverage areas]
 - **Security Considerations**: [Multi-tenancy or permission issues]
+- **Memory Safety**: [Integration test patterns requiring attention]
 
-### Migration Success Indicators
+### Quality Indicators
 
-- **Velocity Impact**: Expected improvement from cleaner codebase
-- **Maintenance**: Reduction in validation infrastructure burden
-- **Learning**: Direct Drizzle usage improving development knowledge
-- **Type Safety**: Enhanced compile-time error catching
+- **Performance Impact**: Expected improvement from modern patterns
+- **Maintainability**: Reduction in technical debt through modern practices
+- **Developer Experience**: Improved type safety and testing reliability
+- **Scalability**: Enhanced performance and architectural patterns
 
 ### Recommendations
 
 - **Immediate Actions**: [Critical issues requiring attention]
-- **Follow-up Tasks**: [Non-blocking improvements for future PRs]
-- **Pattern Opportunities**: [Reusable patterns for other conversions]
-- **Documentation**: [Guide updates based on conversion learnings]
+- **Follow-up Tasks**: [Non-blocking improvements for future work]
+- **Pattern Opportunities**: [Reusable patterns for other development]
+- **Documentation**: [Guide updates based on learnings]
 
 ---
 
-**This enhanced review procedure ensures every migration PR advances the direct conversion strategy while maintaining code quality, security, and modern best practices aligned with August 2025 standards.**
+**This comprehensive review procedure ensures every database and testing change advances modern development practices while maintaining the highest standards for code quality, security, performance, and developer experience aligned with August 2025 standards.**

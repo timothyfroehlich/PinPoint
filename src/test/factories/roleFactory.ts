@@ -1,10 +1,39 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type */
-import {
-  type Role,
-  type Permission,
-  type Organization,
-  type Membership,
-} from "@prisma/client";
+// Local types to replace Prisma imports for testing
+interface Role {
+  id: string;
+  name: string;
+  organizationId: string;
+  isSystem: boolean;
+  isDefault: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface Permission {
+  id: string;
+  name: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface Organization {
+  id: string;
+  name: string;
+  subdomain: string;
+  logoUrl: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface Membership {
+  id: string;
+  userId: string;
+  organizationId: string;
+  roleId: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 /**
  * Test Data Factory for Roles and Permissions

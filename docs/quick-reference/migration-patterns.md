@@ -1,11 +1,67 @@
-# Migration Patterns: Direct Conversion
+# Final Migration Patterns: Complete Prisma Removal
 
-Migration workflows optimized for velocity and clean implementations.
+Service layer conversion and infrastructure cleanup workflows for complete Prisma removal.
 
-## 🎯 Core Migration Philosophy
+## 🎯 Final Migration Phase Context
 
-**Context:** Direct conversion approach - see [CLAUDE.md → Project Context](../../CLAUDE.md#project-context--development-phase)  
-**Principles:** One router at a time, clean Drizzle implementations, TypeScript safety net
+**Phase:** Complete Prisma removal - service layer conversion and infrastructure cleanup  
+**Status:** Router layer 85%+ complete, service layer conversion in progress  
+**Approach:** Direct Drizzle-only implementations, no dual-ORM patterns, complete removal  
+**Context:** Solo development, pre-beta - see [CLAUDE.md → Migration Status](../../CLAUDE.md#🚨-migration-status-final-prisma-removal-phase-🚨)
+
+---
+
+## 🔧 Service Layer Conversion Patterns
+
+### Service Constructor Updates
+
+**Pattern**: Convert Prisma-based services to Drizzle-only dependency injection
+
+**Before (Dual-ORM):**
+```typescript
+export class CollectionService {
+  constructor(private prisma: PrismaClient, private drizzle: DrizzleClient) {}
+}
+```
+
+**After (Drizzle-only):**
+```typescript
+export class CollectionService {
+  constructor(private db: DrizzleClient) {}
+}
+```
+
+### Business Logic Preservation
+
+**Pattern**: Maintain identical functionality while converting data access patterns
+
+**Conversion Priority:**
+- **High**: `roleService.ts`, `permissionService.ts` (security-critical)
+- **Medium**: `collectionService.ts`, `issueActivityService.ts` (business logic)
+- **Low**: `pinballmapService.ts`, `commentCleanupService.ts` (utilities)
+
+---
+
+## 🏗️ Infrastructure Cleanup Patterns
+
+### tRPC Context Simplification
+
+**Pattern**: Remove dual-ORM from tRPC context, single Drizzle client
+
+**Before (Dual-ORM):**
+```typescript
+export interface TRPCContext {
+  db: PrismaClient;
+  drizzle: DrizzleClient;
+}
+```
+
+**After (Drizzle-only):**
+```typescript
+export interface TRPCContext {
+  db: DrizzleClient; // Renamed from drizzle to db
+}
+```
 
 ---
 
@@ -25,100 +81,97 @@ Migration workflows optimized for velocity and clean implementations.
 
 ---
 
-## 🗄️ Prisma → Drizzle Direct Conversion
+## 🧪 Test Infrastructure Updates
 
-### Router Conversion Workflow
+### Mock Pattern Conversion
 
-**Router Patterns:**
+**Pattern**: Update test mocks from dual-ORM to Drizzle-only patterns
 
-- **Setup**: Context change from Prisma → Drizzle clients
-- **Query conversion**: `include` → `with` for relational queries → @docs/migration/supabase-drizzle/quick-reference/prisma-to-drizzle.md#query-patterns
-- **Organizational scoping**: Maintain multi-tenant boundaries
+**Before (Dual-ORM Mocks):**
+```typescript
+const mockContext = {
+  db: mockPrisma,
+  drizzle: mockDrizzle,
+}
+```
 
-### Generated Columns Pattern
+**After (Drizzle-only Mocks):**
+```typescript
+const mockContext = {
+  db: mockDrizzle, // Single client, renamed
+}
+```
 
-**Pattern**: `.generatedAlwaysAs()` moves computed fields to DB → @docs/migration/supabase-drizzle/quick-reference/prisma-to-drizzle.md#generated-columns
+### Integration Test Memory Safety
 
----
-
-## 🧪 Testing Migration Patterns
-
-### Database Testing Setup
-
-**PGlite setup**: In-memory PostgreSQL for tests → @docs/quick-reference/testing-patterns.md#pglite  
-**Mock updates**: Update router test mocks for Drizzle patterns → @docs/quick-reference/testing-patterns.md#router-test-updates
-
----
-
-## ⚡ Next.js App Router Integration
-
-### App Router Integration
-
-**Server Components**: `async function` with direct DB queries → @docs/latest-updates/nextjs.md#server-components  
-**Server Actions**: `'use server'` mutations with `revalidatePath()` → @docs/latest-updates/nextjs.md#server-actions
+**Pattern**: Continue using worker-scoped PGlite to prevent memory blowouts → @docs/quick-reference/testing-patterns.md#pglite
 
 ---
 
-## 🚦 Migration Decision Tree
+## 🚦 Final Migration Decision Tree
 
 ```
-Migration Task:
-├── Auth issues? → @docs/migration/supabase-drizzle/quick-reference/nextauth-to-supabase.md
-├── Router conversion? → @docs/migration/supabase-drizzle/quick-reference/prisma-to-drizzle.md
-├── Testing setup? → @docs/quick-reference/testing-patterns.md
-└── Complete strategy? → @docs/migration/supabase-drizzle/direct-conversion-plan.md
+Final Migration Task:
+├── Service conversion? → Use drizzle-migration agent + @docs/migration/supabase-drizzle/quick-reference/prisma-to-drizzle.md
+├── Infrastructure cleanup? → @prisma-removal-tasks/phase-2-infrastructure.md
+├── Test updates? → Use test-architect agent + @docs/quick-reference/testing-patterns.md
+├── Dependency removal? → @prisma-removal-tasks/phase-7-cleanup.md
+└── Complete task plan? → @prisma-removal-tasks/README.md
 ```
 
 ---
 
-## ⚠️ Common Migration Pitfalls
+## ⚠️ Final Migration Pitfalls
 
-**Authentication Issues:**
+**Service Conversion Issues:**
 
-- ❌ Using individual cookie methods (`get()`, `set()`)
-- ✅ Always use `getAll()` and `setAll()`
-- ❌ Skipping `getUser()` in middleware
-- ✅ Token refresh on every protected request
+- ❌ Leaving Prisma client in service constructors
+- ✅ Convert to Drizzle-only dependency injection
+- ❌ Attempting to maintain dual-ORM patterns
+- ✅ Complete removal of all Prisma references
+- ❌ Breaking business logic during conversion
+- ✅ Preserve functionality while modernizing data access
 
-**Database Conversion:**
+**Infrastructure Cleanup:**
 
-- ❌ Keeping Prisma patterns in Drizzle
-- ✅ Use relational queries for joins
-- ❌ Manual transaction management
-- ✅ Leverage database-generated columns
+- ❌ Leaving dual clients in tRPC context
+- ✅ Single Drizzle client throughout system
+- ❌ Keeping parallel validation code
+- ✅ Clean removal of comparison/logging infrastructure
 
-**Testing Strategy:**
+**Test Updates:**
 
-- ❌ External Docker databases for tests
-- ✅ PGlite in-memory for fast feedback
-- ❌ Mocking individual query methods
-- ✅ Mock entire database module
-
----
-
-## 📋 Router Conversion Process
-
-**Quick Checklist:** Read router → Convert procedures → Test → Commit  
-**Detailed workflow:** @docs/migration/supabase-drizzle/direct-conversion-plan.md#file-by-file-process
+- ❌ Keeping Prisma mock patterns in tests
+- ✅ Update all test mocks to Drizzle-only patterns
+- ❌ Breaking integration test memory safety
+- ✅ Maintain worker-scoped PGlite for memory efficiency
 
 ---
 
-## 🎯 Success Indicators
+## 📋 Service Conversion Process
+
+**Quick Checklist:** Read service → Convert to Drizzle → Update tests → Validate functionality  
+**Detailed workflow:** @prisma-removal-tasks/phase-1-services.md
+
+---
+
+## 🎯 Final Migration Success Indicators
 
 **Technical Metrics:**
 
-- TypeScript build passes
-- No Prisma imports remaining
-- All tests pass with new mocks
+- TypeScript build passes with zero Prisma references
+- All services use Drizzle-only dependency injection
+- Infrastructure uses single database client
+- All tests pass with updated mocks
 - Manual user flows work correctly
 
-**Velocity Metrics:**
+**Completion Metrics:**
 
-- Converting 1-2 routers per day
-- Immediate issue resolution
-- Clean, readable Drizzle code
-- No parallel validation overhead
+- Service layer: 100% converted from Prisma to Drizzle
+- Infrastructure: Single Drizzle client in tRPC context
+- Dependencies: Zero Prisma packages remaining
+- Tests: All mocks updated to Drizzle-only patterns
 
 ---
 
-**Complete strategy**: @docs/migration/supabase-drizzle/direct-conversion-plan.md
+**Complete removal plan**: @prisma-removal-tasks/README.md

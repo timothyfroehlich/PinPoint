@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/unbound-method */
+ 
 /**
  * Issue Timeline Router Unit Tests
  *
@@ -42,8 +42,8 @@ describe("Issue Timeline Router (Unit Tests)", () => {
     vi.clearAllMocks();
     mockContext = createVitestMockContext();
 
-    // Mock membership lookup for organizationProcedure
-    vi.mocked(mockContext.db.membership.findFirst).mockResolvedValue({
+    // Mock membership lookup for organizationProcedure using Drizzle query API
+    vi.mocked(mockContext.db.query.memberships.findFirst).mockResolvedValue({
       id: "test-membership",
       organizationId: "org-1",
       userId: "user-1",
@@ -113,11 +113,9 @@ describe("Issue Timeline Router (Unit Tests)", () => {
     describe("Success Cases", () => {
       beforeEach(() => {
         // Mock successful issue lookup with organizational scoping
-        vi.mocked(mockContext.drizzle.query.issues.findFirst).mockResolvedValue(
-          {
-            id: "test-issue-1",
-          },
-        );
+        vi.mocked(mockContext.db.query.issues.findFirst).mockResolvedValue({
+          id: "test-issue-1",
+        });
 
         // Mock service creation and getIssueTimeline method
         const mockActivityService = {
@@ -143,7 +141,7 @@ describe("Issue Timeline Router (Unit Tests)", () => {
         expect(result).toEqual(mockTimelineData);
 
         // Verify issue lookup with organizational scoping
-        expect(mockContext.drizzle.query.issues.findFirst).toHaveBeenCalledWith(
+        expect(mockContext.db.query.issues.findFirst).toHaveBeenCalledWith(
           expect.objectContaining({
             columns: {
               id: true,
@@ -265,7 +263,7 @@ describe("Issue Timeline Router (Unit Tests)", () => {
     describe("Error Cases", () => {
       it("should throw NOT_FOUND when issue does not exist", async () => {
         // Mock issue not found
-        vi.mocked(mockContext.drizzle.query.issues.findFirst).mockResolvedValue(
+        vi.mocked(mockContext.db.query.issues.findFirst).mockResolvedValue(
           null,
         );
 
@@ -277,9 +275,7 @@ describe("Issue Timeline Router (Unit Tests)", () => {
         );
 
         // Verify issue lookup was attempted
-        expect(
-          mockContext.drizzle.query.issues.findFirst,
-        ).toHaveBeenCalledTimes(1);
+        expect(mockContext.db.query.issues.findFirst).toHaveBeenCalledTimes(1);
 
         // Verify service was NOT called when issue doesn't exist
         expect(
@@ -289,7 +285,7 @@ describe("Issue Timeline Router (Unit Tests)", () => {
 
       it("should throw NOT_FOUND when issue belongs to different organization", async () => {
         // Mock issue not found due to organizational scoping
-        vi.mocked(mockContext.drizzle.query.issues.findFirst).mockResolvedValue(
+        vi.mocked(mockContext.db.query.issues.findFirst).mockResolvedValue(
           null,
         );
 
@@ -303,7 +299,7 @@ describe("Issue Timeline Router (Unit Tests)", () => {
         );
 
         // Verify organizational scoping in query
-        expect(mockContext.drizzle.query.issues.findFirst).toHaveBeenCalledWith(
+        expect(mockContext.db.query.issues.findFirst).toHaveBeenCalledWith(
           expect.objectContaining({
             columns: {
               id: true,
@@ -314,11 +310,9 @@ describe("Issue Timeline Router (Unit Tests)", () => {
 
       it("should handle service method failures gracefully", async () => {
         // Mock successful issue lookup
-        vi.mocked(mockContext.drizzle.query.issues.findFirst).mockResolvedValue(
-          {
-            id: "test-issue-1",
-          },
-        );
+        vi.mocked(mockContext.db.query.issues.findFirst).mockResolvedValue({
+          id: "test-issue-1",
+        });
 
         // Mock service method throwing an error
         const mockActivityService = {
@@ -344,9 +338,7 @@ describe("Issue Timeline Router (Unit Tests)", () => {
         );
 
         // Verify issue lookup succeeded
-        expect(
-          mockContext.drizzle.query.issues.findFirst,
-        ).toHaveBeenCalledTimes(1);
+        expect(mockContext.db.query.issues.findFirst).toHaveBeenCalledTimes(1);
 
         // Verify service was called despite eventual failure
         expect(
@@ -360,7 +352,7 @@ describe("Issue Timeline Router (Unit Tests)", () => {
 
       it("should handle database lookup failures", async () => {
         // Mock database error
-        vi.mocked(mockContext.drizzle.query.issues.findFirst).mockRejectedValue(
+        vi.mocked(mockContext.db.query.issues.findFirst).mockRejectedValue(
           new Error("Database connection error"),
         );
 
@@ -389,11 +381,9 @@ describe("Issue Timeline Router (Unit Tests)", () => {
 
       it("should accept valid issueId strings", async () => {
         // Mock successful issue lookup for validation test
-        vi.mocked(mockContext.drizzle.query.issues.findFirst).mockResolvedValue(
-          {
-            id: "valid-issue-id",
-          },
-        );
+        vi.mocked(mockContext.db.query.issues.findFirst).mockResolvedValue({
+          id: "valid-issue-id",
+        });
 
         const mockActivityService = {
           getIssueTimeline: vi.fn().mockResolvedValue([]),
@@ -445,11 +435,9 @@ describe("Issue Timeline Router (Unit Tests)", () => {
           issueTimelineRouter.createCaller(orgSpecificContext);
 
         // Mock successful issue lookup
-        vi.mocked(mockContext.drizzle.query.issues.findFirst).mockResolvedValue(
-          {
-            id: "test-issue-1",
-          },
-        );
+        vi.mocked(mockContext.db.query.issues.findFirst).mockResolvedValue({
+          id: "test-issue-1",
+        });
 
         const mockActivityService = {
           getIssueTimeline: vi.fn().mockResolvedValue([]),
@@ -497,20 +485,16 @@ describe("Issue Timeline Router (Unit Tests)", () => {
         ).rejects.toThrow();
 
         // Verify database was not called due to early authentication failure
-        expect(
-          mockContext.drizzle.query.issues.findFirst,
-        ).not.toHaveBeenCalled();
+        expect(mockContext.db.query.issues.findFirst).not.toHaveBeenCalled();
       });
     });
 
     describe("Service Integration", () => {
       it("should create activity service and call getIssueTimeline with correct parameters", async () => {
         // Mock successful issue lookup
-        vi.mocked(mockContext.drizzle.query.issues.findFirst).mockResolvedValue(
-          {
-            id: "test-issue-1",
-          },
-        );
+        vi.mocked(mockContext.db.query.issues.findFirst).mockResolvedValue({
+          id: "test-issue-1",
+        });
 
         const mockTimelineResult = [
           {
@@ -564,11 +548,9 @@ describe("Issue Timeline Router (Unit Tests)", () => {
 
       it("should handle service creation failures", async () => {
         // Mock successful issue lookup
-        vi.mocked(mockContext.drizzle.query.issues.findFirst).mockResolvedValue(
-          {
-            id: "test-issue-1",
-          },
-        );
+        vi.mocked(mockContext.db.query.issues.findFirst).mockResolvedValue({
+          id: "test-issue-1",
+        });
 
         // Mock service factory throwing an error
         vi.mocked(
@@ -582,9 +564,7 @@ describe("Issue Timeline Router (Unit Tests)", () => {
         );
 
         // Verify issue lookup succeeded before service creation failure
-        expect(
-          mockContext.drizzle.query.issues.findFirst,
-        ).toHaveBeenCalledTimes(1);
+        expect(mockContext.db.query.issues.findFirst).toHaveBeenCalledTimes(1);
       });
     });
   });

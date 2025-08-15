@@ -73,7 +73,7 @@ export function createCleanEnvironment(
   const standardVarsToDelete = [
     "NODE_ENV",
     "DATABASE_URL",
-    "POSTGRES_PRISMA_URL",
+    "DATABASE_URL",
     "DIRECT_URL",
     "SUPABASE_URL",
     "SUPABASE_ANON_KEY",
@@ -589,7 +589,7 @@ export function debugEnvironmentState(prefix = "Environment"): void {
   const relevantVars = [
     "NODE_ENV",
     "DATABASE_URL",
-    "POSTGRES_PRISMA_URL",
+    "DATABASE_URL",
     "SUPABASE_URL",
     "VERCEL_ENV",
     "CI",

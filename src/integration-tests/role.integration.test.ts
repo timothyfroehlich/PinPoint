@@ -18,33 +18,30 @@
  * - list, create, update, delete, get, getPermissions, getTemplates, assignToUser
  */
 
-/* eslint-disable @typescript-eslint/no-deprecated */
+ 
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 /* eslint-disable import/order */
 
 import { eq, and } from "drizzle-orm";
-import { beforeAll, afterAll, describe, expect, it, vi } from "vitest";
+import { describe, expect, vi } from "vitest";
 
 // Import test setup and utilities
 import type { TRPCContext } from "~/server/api/trpc.base";
-import type { ExtendedPrismaClient } from "~/server/db";
 
 import { TRPCError } from "@trpc/server";
 import { roleRouter } from "~/server/api/routers/role";
 import * as schema from "~/server/db/schema";
 import {
-  createSeededTestDatabase,
-  getSeededTestData,
-  withTransaction,
-  cleanupTestDatabase,
+  test,
+  withIsolatedTest,
   type TestDatabase,
-} from "~/test/helpers/pglite-test-setup";
+} from "~/test/helpers/worker-scoped-db";
+import { getSeededTestData } from "~/test/helpers/pglite-test-setup";
+import { generateTestId } from "~/test/helpers/test-id-generator";
 
 // Mock external dependencies that aren't database-related
 vi.mock("~/lib/utils/id-generation", () => ({
-  generatePrefixedId: vi.fn(
-    () => `test-role-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-  ),
+  generatePrefixedId: vi.fn(() => generateTestId("test-role")),
 }));
 
 vi.mock("~/server/auth/permissions", () => ({
@@ -62,107 +59,28 @@ vi.mock("~/lib/users/roleManagementValidation", () => ({
 }));
 
 describe("Role Router Integration Tests (PGlite)", () => {
-  let sharedDb: TestDatabase;
-  let sharedTestData: {
-    organization: string;
-    location?: string;
-    machine?: string;
-    model?: string;
-    status?: string;
-    priority?: string;
-    issue?: string;
-    adminRole?: string;
-    memberRole?: string;
-    user?: string;
-  };
-
-  // Suite-level database setup for performance
-  beforeAll(async () => {
-    // Create PGlite database with real schema and seed data once
-    const setup = await createSeededTestDatabase();
-    sharedDb = setup.db;
-
-    // Query actual seeded IDs once
-    sharedTestData = await getSeededTestData(sharedDb, setup.organizationId);
-  });
-
-  afterAll(async () => {
-    // Clean up the shared database
-    await cleanupTestDatabase(sharedDb);
-  });
-
   // Helper to create context for each test
-  function createTestContext(
+  async function createTestContext(
     db: TestDatabase,
-    testData: typeof sharedTestData,
-  ): TRPCContext {
-    // Create comprehensive mock Prisma client for tRPC middleware compatibility
-    // The DrizzleRoleService will handle all role operations natively, but tRPC middleware still needs Prisma
-    const mockPrismaClient = {
-      membership: {
-        findFirst: vi.fn().mockImplementation(async ({ where }) => {
-          // Return membership data from the actual database via Drizzle
-          if (where?.userId && where?.organizationId) {
-            const membership = await db.query.memberships.findFirst({
-              where: and(
-                eq(schema.memberships.userId, where.userId),
-                eq(schema.memberships.organizationId, where.organizationId),
-              ),
-              with: {
-                role: {
-                  with: {
-                    rolePermissions: {
-                      with: {
-                        permission: true,
-                      },
-                    },
-                  },
-                },
-              },
-            });
-
-            if (membership) {
-              // Transform to Prisma-like structure for tRPC middleware
-              return {
-                ...membership,
-                role: {
-                  ...membership.role,
-                  permissions: membership.role.rolePermissions.map(
-                    (rp) => rp.permission,
-                  ),
-                },
-              };
-            }
-          }
-          return null;
-        }),
-        findMany: vi.fn().mockImplementation(async ({ where }) => {
-          // Return memberships for a role to support delete validation
-          if (where?.roleId) {
-            return await db.query.memberships.findMany({
-              where: eq(schema.memberships.roleId, where.roleId),
-            });
-          }
-          return [];
-        }),
-      },
-    } as unknown as ExtendedPrismaClient;
+    organizationId: string,
+  ): Promise<{ context: TRPCContext; testData: any }> {
+    // Get seeded test data for this organization
+    const testData = await getSeededTestData(db, organizationId);
 
     // Create test context with real database
-    return {
+    const context: TRPCContext = {
       user: {
         id: testData.user || "test-user-admin",
         email: "admin@dev.local",
         user_metadata: { name: "Dev Admin" },
-        app_metadata: { organization_id: testData.organization, role: "Admin" },
+        app_metadata: { organization_id: organizationId, role: "Admin" },
       },
       organization: {
-        id: testData.organization,
+        id: organizationId,
         name: "Test Organization",
         subdomain: "test-org",
       },
-      db: mockPrismaClient,
-      drizzle: db,
+      db: db,
       supabase: {
         auth: {
           getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
@@ -191,12 +109,20 @@ describe("Role Router Integration Tests (PGlite)", () => {
       },
       userPermissions: ["role:manage", "organization:manage"],
     } as any;
+
+    return { context, testData };
   }
 
   describe("list - Get all roles", () => {
-    it("should return roles with member count and permissions", async () => {
-      await withTransaction(sharedDb, async (db) => {
-        const context = createTestContext(db, sharedTestData);
+    test("should return roles with member count and permissions", async ({
+      workerDb,
+      organizationId,
+    }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { context, testData } = await createTestContext(
+          db,
+          organizationId,
+        );
         const caller = roleRouter.createCaller(context);
 
         const result = await caller.list();
@@ -208,7 +134,7 @@ describe("Role Router Integration Tests (PGlite)", () => {
         expect(adminRole).toBeDefined();
         expect(adminRole).toMatchObject({
           name: "Admin",
-          organizationId: sharedTestData.organization,
+          organizationId: organizationId,
           isSystem: true,
           isDefault: false,
         });
@@ -220,42 +146,34 @@ describe("Role Router Integration Tests (PGlite)", () => {
         expect(memberRole).toBeDefined();
         expect(memberRole).toMatchObject({
           name: "Member",
-          organizationId: sharedTestData.organization,
+          organizationId: organizationId,
           isSystem: false, // Member role in seeds is not a system role
           isDefault: true,
         });
       });
     });
 
-    it("should handle empty roles list in new organization", async () => {
-      await withTransaction(sharedDb, async (db) => {
+    test("should handle empty roles list in new organization", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (db) => {
         // Create a new organization with no roles
-        const newOrgId = `empty-org-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const newOrgId = generateTestId("empty-org");
         await db.insert(schema.organizations).values({
           id: newOrgId,
           name: "Empty Organization",
-          subdomain: `empty-org-${Date.now()}`,
+          subdomain: generateTestId("empty-org-sub"),
           createdAt: new Date(),
           updatedAt: new Date(),
         });
 
-        // Create a membership for the test user in the new organization
-        const membershipId = `test-membership-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        await db.insert(schema.memberships).values({
-          id: membershipId,
-          userId: sharedTestData.user || "test-user-admin",
-          organizationId: newOrgId,
-          roleId: sharedTestData.adminRole!, // Use admin role from test data
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
-
+        const { context } = await createTestContext(db, newOrgId);
         const newContext = {
-          ...createTestContext(db, sharedTestData),
+          ...context,
           organization: {
             id: newOrgId,
             name: "Empty Organization",
-            subdomain: `empty-org-${Date.now()}`,
+            subdomain: generateTestId("empty-org-sub"),
           },
         };
         const newCaller = roleRouter.createCaller(newContext as any);
@@ -263,13 +181,16 @@ describe("Role Router Integration Tests (PGlite)", () => {
         const result = await newCaller.list();
         expect(result).toEqual([]);
 
-        // Cleanup happens automatically via transaction rollback
+        // Cleanup happens automatically via withIsolatedTest
       });
     });
 
-    it("should enforce organization scoping", async () => {
-      await withTransaction(sharedDb, async (db) => {
-        const context = createTestContext(db, sharedTestData);
+    test("should enforce organization scoping", async ({
+      workerDb,
+      organizationId,
+    }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { context } = await createTestContext(db, organizationId);
         const caller = roleRouter.createCaller(context);
 
         // Get roles from test organization
@@ -278,16 +199,20 @@ describe("Role Router Integration Tests (PGlite)", () => {
 
         // All roles should belong to the test organization
         result.forEach((role) => {
-          expect(role.organizationId).toBe(sharedTestData.organization);
+          expect(role.organizationId).toBe(organizationId);
         });
       });
     });
 
-    it("should handle database errors gracefully", async () => {
-      await withTransaction(sharedDb, async (db) => {
+    test("should handle database errors gracefully", async ({
+      workerDb,
+      organizationId,
+    }) => {
+      await withIsolatedTest(workerDb, async (db) => {
         // Create context with invalid organization but expect permission error instead of database error
+        const { context } = await createTestContext(db, organizationId);
         const invalidContext = {
-          ...createTestContext(db, sharedTestData),
+          ...context,
           organization: {
             id: "nonexistent-org",
             name: "Invalid",
@@ -467,8 +392,9 @@ describe("Role Router Integration Tests (PGlite)", () => {
           updatedAt: new Date(),
         });
 
+        const baseContext = await createTestContext(db, sharedTestData);
         const otherOrgContext = {
-          ...createTestContext(db, sharedTestData),
+          ...baseContext,
           organization: {
             id: otherOrgId,
             name: "Other Org",
@@ -785,8 +711,9 @@ describe("Role Router Integration Tests (PGlite)", () => {
           updatedAt: new Date(),
         });
 
+        const baseContext = await createTestContext(db, sharedTestData);
         const otherOrgContext = {
-          ...createTestContext(db, sharedTestData),
+          ...baseContext,
           organization: {
             id: otherOrgId,
             name: "Other Org",
@@ -880,12 +807,12 @@ describe("Role Router Integration Tests (PGlite)", () => {
         const caller = roleRouter.createCaller(context);
 
         // Create a test user for assignment testing
-        const targetUserId = `target-user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const targetUserId = generateTestId("target-user");
         const [targetUser] = await db
           .insert(schema.users)
           .values({
             id: targetUserId,
-            email: `target-${Date.now()}@example.com`,
+            email: `target-${generateTestId("email")}@example.com`,
             name: "Target User",
             createdAt: new Date(),
             updatedAt: new Date(),
@@ -893,7 +820,7 @@ describe("Role Router Integration Tests (PGlite)", () => {
           .returning();
 
         // Create membership for target user in member role
-        const membershipId = `target-membership-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const membershipId = generateTestId("target-membership");
         await db.insert(schema.memberships).values({
           id: membershipId,
           userId: targetUser.id,
@@ -939,12 +866,12 @@ describe("Role Router Integration Tests (PGlite)", () => {
         const caller = roleRouter.createCaller(context);
 
         // Create a test user for assignment testing
-        const targetUserId = `target-user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const targetUserId = generateTestId("target-user");
         const [targetUser] = await db
           .insert(schema.users)
           .values({
             id: targetUserId,
-            email: `target-${Date.now()}@example.com`,
+            email: `target-${generateTestId("email")}@example.com`,
             name: "Target User",
             createdAt: new Date(),
             updatedAt: new Date(),
@@ -996,12 +923,12 @@ describe("Role Router Integration Tests (PGlite)", () => {
         const caller = roleRouter.createCaller(context);
 
         // Create a test user for assignment testing
-        const targetUserId = `target-user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const targetUserId = generateTestId("target-user");
         const [targetUser] = await db
           .insert(schema.users)
           .values({
             id: targetUserId,
-            email: `target-${Date.now()}@example.com`,
+            email: `target-${generateTestId("email")}@example.com`,
             name: "Target User",
             createdAt: new Date(),
             updatedAt: new Date(),
@@ -1009,7 +936,7 @@ describe("Role Router Integration Tests (PGlite)", () => {
           .returning();
 
         // Create membership for target user in member role
-        const membershipId = `target-membership-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const membershipId = generateTestId("target-membership");
         await db.insert(schema.memberships).values({
           id: membershipId,
           userId: targetUser.id,
@@ -1058,12 +985,12 @@ describe("Role Router Integration Tests (PGlite)", () => {
         const caller = roleRouter.createCaller(context);
 
         // Create a test user for assignment testing
-        const targetUserId = `target-user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const targetUserId = generateTestId("target-user");
         const [targetUser] = await db
           .insert(schema.users)
           .values({
             id: targetUserId,
-            email: `target-${Date.now()}@example.com`,
+            email: `target-${generateTestId("email")}@example.com`,
             name: "Target User",
             createdAt: new Date(),
             updatedAt: new Date(),
@@ -1071,7 +998,7 @@ describe("Role Router Integration Tests (PGlite)", () => {
           .returning();
 
         // Create membership for target user in member role
-        const membershipId = `target-membership-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const membershipId = generateTestId("target-membership");
         await db.insert(schema.memberships).values({
           id: membershipId,
           userId: targetUser.id,
@@ -1131,12 +1058,12 @@ describe("Role Router Integration Tests (PGlite)", () => {
         const caller = roleRouter.createCaller(context);
 
         // Create a test user for assignment testing
-        const targetUserId = `target-user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const targetUserId = generateTestId("target-user");
         const [targetUser] = await db
           .insert(schema.users)
           .values({
             id: targetUserId,
-            email: `target-${Date.now()}@example.com`,
+            email: `target-${generateTestId("email")}@example.com`,
             name: "Target User",
             createdAt: new Date(),
             updatedAt: new Date(),
@@ -1144,7 +1071,7 @@ describe("Role Router Integration Tests (PGlite)", () => {
           .returning();
 
         // Create membership for target user in member role
-        const membershipId = `target-membership-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const membershipId = generateTestId("target-membership");
         await db.insert(schema.memberships).values({
           id: membershipId,
           userId: targetUser.id,
@@ -1186,17 +1113,17 @@ describe("Role Router Integration Tests (PGlite)", () => {
         const caller = roleRouter.createCaller(context);
 
         // Create second organization with roles
-        const org2Id = `test-org-2-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const org2Id = generateTestId("test-org-2");
         await db.insert(schema.organizations).values({
           id: org2Id,
           name: "Test Organization 2",
-          subdomain: `test-org-2-${Date.now()}`,
+          subdomain: generateTestId("test-org-2-sub"),
           createdAt: new Date(),
           updatedAt: new Date(),
         });
 
         // Create role in org2
-        const org2RoleId = `org2-role-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const org2RoleId = generateTestId("org2-role");
         await db.insert(schema.roles).values({
           id: org2RoleId,
           name: "Org2 Role",
@@ -1217,7 +1144,7 @@ describe("Role Router Integration Tests (PGlite)", () => {
         const [org2AdminRole] = await db
           .insert(schema.roles)
           .values({
-            id: `org2-admin-role-${Date.now()}`,
+            id: generateTestId("org2-admin-role"),
             name: "Admin",
             organizationId: org2Id,
             isSystem: true,
@@ -1229,7 +1156,7 @@ describe("Role Router Integration Tests (PGlite)", () => {
 
         // Create membership for test user in org2
         await db.insert(schema.memberships).values({
-          id: `org2-membership-${Date.now()}`,
+          id: generateTestId("org2-membership"),
           userId: sharedTestData.user || "test-user-admin",
           organizationId: org2Id,
           roleId: org2AdminRole.id,
@@ -1243,7 +1170,7 @@ describe("Role Router Integration Tests (PGlite)", () => {
           organization: {
             id: org2Id,
             name: "Test Organization 2",
-            subdomain: `test-org-2-${Date.now()}`,
+            subdomain: generateTestId("test-org-2-sub-ctx"),
           },
         };
         const org2Caller = roleRouter.createCaller(org2Context as any);

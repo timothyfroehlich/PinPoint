@@ -84,6 +84,8 @@ export default defineConfig({
           poolOptions: {
             threads: {
               isolate: true,
+              maxThreads: 2, // Limit parallelism for memory safety
+              memoryLimit: "256MB", // Lower limit for unit tests
             },
           },
           include: [
@@ -113,20 +115,21 @@ export default defineConfig({
           globals: true,
           environment: "node",
           setupFiles: ["src/test/vitest.integration.setup.ts"],
-          hookTimeout: 300000, // 5 minutes for PGlite database setup/seeding
+          hookTimeout: 30000, // 30 seconds - PGlite should initialize quickly
           typecheck: {
             tsconfig: "./tsconfig.tests.json",
           },
           // Memory optimization: limit workers to reduce PGlite memory usage
           poolOptions: {
             threads: {
-              maxThreads: 4, // Increased from 2 - memory optimization allows more workers
+              maxThreads: 2, // Reduced for memory safety - each worker can use 512MB
               minThreads: 1, // Minimum 1 worker
               isolate: true, // Maintain test isolation
+              memoryLimit: "512MB", // Hard memory limit per worker thread
             },
           },
-          // Enable memory monitoring to track optimization impact
-          logHeapUsage: true,
+          // Disabled: Memory monitoring can cause performance issues
+          // logHeapUsage: true,
           include: ["src/integration-tests/**/*.test.{ts,tsx}"],
           exclude: [
             "node_modules",

@@ -2,7 +2,6 @@ import { vi } from "vitest";
 
 import type { LoggerInterface } from "~/lib/logger";
 import type { PinPointSupabaseUser } from "~/lib/supabase/types";
-import type { ExtendedPrismaClient } from "~/server/db";
 import type { DrizzleClient } from "~/server/db/drizzle";
 import type { ServiceFactory } from "~/server/services/factory";
 
@@ -86,8 +85,7 @@ const mockDrizzleClient = {
 } as unknown as DrizzleClient;
 
 export interface VitestMockContext {
-  db: ExtendedPrismaClient;
-  drizzle: DrizzleClient;
+  db: DrizzleClient;
   services: ServiceFactory;
   user: PinPointSupabaseUser | null;
   supabase: typeof mockSupabaseClient;
@@ -116,127 +114,8 @@ export function createVitestMockContext(): VitestMockContext {
     },
   } as unknown as PinPointSupabaseUser;
 
-  // Create a mock database client with all the necessary methods
-  const mockDb = {
-    $accelerate: {
-      invalidate: vi.fn(),
-      ttl: vi.fn(),
-    },
-    user: {
-      findFirst: vi.fn(),
-      findUnique: vi.fn(),
-      findMany: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-    },
-    membership: {
-      findFirst: vi.fn(),
-      findUnique: vi.fn(),
-      findMany: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-    },
-    organization: {
-      findFirst: vi.fn(),
-      findUnique: vi.fn(),
-      findMany: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-    },
-    role: {
-      findFirst: vi.fn(),
-      findUnique: vi.fn(),
-      findMany: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-    },
-    permission: {
-      findFirst: vi.fn(),
-      findUnique: vi.fn(),
-      findMany: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-    },
-    location: {
-      findFirst: vi.fn(),
-      findUnique: vi.fn(),
-      findMany: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-    },
-    issue: {
-      findFirst: vi.fn(),
-      findUnique: vi.fn(),
-      findMany: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-      count: vi.fn(),
-    },
-    machine: {
-      findFirst: vi.fn(),
-      findUnique: vi.fn(),
-      findMany: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-    },
-    model: {
-      findFirst: vi.fn(),
-      findUnique: vi.fn(),
-      findMany: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-    },
-    notification: {
-      findFirst: vi.fn(),
-      findUnique: vi.fn(),
-      findMany: vi.fn(),
-      create: vi.fn(),
-      createMany: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-    },
-    issueStatus: {
-      findFirst: vi.fn(),
-      findUnique: vi.fn(),
-      findMany: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-    },
-    priority: {
-      findFirst: vi.fn(),
-      findUnique: vi.fn(),
-      findMany: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-    },
-    issueComment: {
-      findFirst: vi.fn(),
-      findUnique: vi.fn(),
-      findMany: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-    },
-    comment: {
-      findFirst: vi.fn(),
-      findUnique: vi.fn(),
-      findMany: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-    },
-  } as unknown as ExtendedPrismaClient;
+  // Enhanced mock Drizzle client with all necessary query and mutation methods
+  const mockDb = mockDrizzleClient;
 
   // Create a mock service factory
   const mockServices = {
@@ -282,7 +161,6 @@ export function createVitestMockContext(): VitestMockContext {
 
   return {
     db: mockDb,
-    drizzle: mockDrizzleClient,
     services: mockServices,
     user: mockUser,
     supabase: mockSupabaseClient,

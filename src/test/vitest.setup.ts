@@ -1,306 +1,85 @@
 // Vitest setup file
 import { beforeAll, afterAll, afterEach, vi } from "vitest";
 
-// CRITICAL: Mock Prisma client BEFORE any imports to prevent real database connections
-vi.mock("@prisma/client", () => ({
-  PrismaClient: vi.fn(() => {
-    // Create a comprehensive mock that matches the ExtendedPrismaClient interface
-    const mockClient = {
-      $extends: vi.fn(() => mockClient), // Return self for chaining
-      $connect: vi.fn(),
-      $disconnect: vi.fn(),
-      $transaction: vi.fn(),
-      $queryRaw: vi.fn(),
-      $executeRaw: vi.fn(),
-      // Add all model mocks
-      user: {
-        findFirst: vi.fn(),
-        findUnique: vi.fn(),
-        findMany: vi.fn(),
-        create: vi.fn(),
-        update: vi.fn(),
-        delete: vi.fn(),
-        count: vi.fn(),
-      },
-      membership: {
-        findFirst: vi.fn(),
-        findUnique: vi.fn(),
-        findMany: vi.fn(),
-        create: vi.fn(),
-        update: vi.fn(),
-        delete: vi.fn(),
-      },
-      organization: {
-        findFirst: vi.fn(),
-        findUnique: vi.fn(),
-        findMany: vi.fn(),
-        create: vi.fn(),
-        update: vi.fn(),
-        delete: vi.fn(),
-      },
-      issue: {
-        findFirst: vi.fn(),
-        findUnique: vi.fn(),
-        findMany: vi.fn(),
-        create: vi.fn(),
-        update: vi.fn(),
-        delete: vi.fn(),
-        count: vi.fn(),
-      },
-      // Add other models as needed
-      location: {
-        findFirst: vi.fn(),
-        findUnique: vi.fn(),
-        findMany: vi.fn(),
-        create: vi.fn(),
-        update: vi.fn(),
-        delete: vi.fn(),
-      },
-      machine: {
-        findFirst: vi.fn(),
-        findUnique: vi.fn(),
-        findMany: vi.fn(),
-        create: vi.fn(),
-        update: vi.fn(),
-        delete: vi.fn(),
-      },
-      model: {
-        findFirst: vi.fn(),
-        findUnique: vi.fn(),
-        findMany: vi.fn(),
-        create: vi.fn(),
-        update: vi.fn(),
-        delete: vi.fn(),
-      },
-      issueStatus: {
-        findFirst: vi.fn(),
-        findUnique: vi.fn(),
-        findMany: vi.fn(),
-        create: vi.fn(),
-        update: vi.fn(),
-        delete: vi.fn(),
-      },
-      priority: {
-        findFirst: vi.fn(),
-        findUnique: vi.fn(),
-        findMany: vi.fn(),
-        create: vi.fn(),
-        update: vi.fn(),
-        delete: vi.fn(),
-      },
-      role: {
-        findFirst: vi.fn(),
-        findUnique: vi.fn(),
-        findMany: vi.fn(),
-        create: vi.fn(),
-        update: vi.fn(),
-        delete: vi.fn(),
-      },
-      permission: {
-        findFirst: vi.fn(),
-        findUnique: vi.fn(),
-        findMany: vi.fn(),
-        create: vi.fn(),
-        update: vi.fn(),
-        delete: vi.fn(),
-      },
-      notification: {
-        findFirst: vi.fn(),
-        findUnique: vi.fn(),
-        findMany: vi.fn(),
-        create: vi.fn(),
-        createMany: vi.fn(),
-        update: vi.fn(),
-        delete: vi.fn(),
-      },
-      comment: {
-        findFirst: vi.fn(),
-        findUnique: vi.fn(),
-        findMany: vi.fn(),
-        create: vi.fn(),
-        update: vi.fn(),
-        delete: vi.fn(),
-      },
-      issueComment: {
-        findFirst: vi.fn(),
-        findUnique: vi.fn(),
-        findMany: vi.fn(),
-        create: vi.fn(),
-        update: vi.fn(),
-        delete: vi.fn(),
-      },
-    };
-    return mockClient;
-  }),
-  // Add Prisma-generated enums and types that are imported in the codebase
-  StatusCategory: {
-    NEW: "NEW",
-    IN_PROGRESS: "IN_PROGRESS",
-    RESOLVED: "RESOLVED",
-  },
-  NotificationType: {
-    ISSUE_CREATED: "ISSUE_CREATED",
-    ISSUE_STATUS_CHANGED: "ISSUE_STATUS_CHANGED",
-    ISSUE_ASSIGNED: "ISSUE_ASSIGNED",
-    COMMENT_ADDED: "COMMENT_ADDED",
-  },
-  NotificationEntity: {
-    ISSUE: "ISSUE",
-    COMMENT: "COMMENT",
-  },
-  // Add Prisma namespace mock for type imports
-  Prisma: {
-    // Add common Prisma utilities that might be imported
-    UserScalarFieldEnum: {},
-    IssueScalarFieldEnum: {},
-  },
-}));
-
-// Mock Prisma Accelerate extension
-vi.mock("@prisma/extension-accelerate", () => ({
-  withAccelerate: vi.fn(() => (client: object) => ({
-    ...client,
-    $accelerate: {
-      invalidate: vi.fn(),
-      ttl: vi.fn(),
-    },
-  })),
-}));
-
-// Mock the server/db module to use our mocked PrismaClient
-vi.mock("~/server/db", () => {
+// Mock the server/db/drizzle module with Drizzle-only patterns
+vi.mock("~/server/db/drizzle", () => {
+  // Create comprehensive Drizzle mock that matches the database client interface
   const mockDb = {
-    $extends: vi.fn().mockReturnThis(),
-    $connect: vi.fn(),
-    $disconnect: vi.fn(),
-    $transaction: vi.fn(),
-    $queryRaw: vi.fn(),
-    $executeRaw: vi.fn(),
-    $accelerate: {
-      invalidate: vi.fn(),
-      ttl: vi.fn(),
-    },
-    // Add all model mocks with the exact same structure as vitestMockContext
-    user: {
-      findFirst: vi.fn(),
-      findUnique: vi.fn(),
-      findMany: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-    },
-    membership: {
-      findFirst: vi.fn(),
-      findUnique: vi.fn(),
-      findMany: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-    },
-    organization: {
-      findFirst: vi.fn(),
-      findUnique: vi.fn(),
-      findMany: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-    },
-    role: {
-      findFirst: vi.fn(),
-      findUnique: vi.fn(),
-      findMany: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-    },
-    permission: {
-      findFirst: vi.fn(),
-      findUnique: vi.fn(),
-      findMany: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-    },
-    location: {
-      findFirst: vi.fn(),
-      findUnique: vi.fn(),
-      findMany: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-    },
-    issue: {
-      findFirst: vi.fn(),
-      findUnique: vi.fn(),
-      findMany: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-      count: vi.fn(),
-    },
-    machine: {
-      findFirst: vi.fn(),
-      findUnique: vi.fn(),
-      findMany: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-    },
-    model: {
-      findFirst: vi.fn(),
-      findUnique: vi.fn(),
-      findMany: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-    },
-    notification: {
-      findFirst: vi.fn(),
-      findUnique: vi.fn(),
-      findMany: vi.fn(),
-      create: vi.fn(),
-      createMany: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-    },
-    issueStatus: {
-      findFirst: vi.fn(),
-      findUnique: vi.fn(),
-      findMany: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-    },
-    priority: {
-      findFirst: vi.fn(),
-      findUnique: vi.fn(),
-      findMany: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-    },
-    issueComment: {
-      findFirst: vi.fn(),
-      findUnique: vi.fn(),
-      findMany: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-    },
-    comment: {
-      findFirst: vi.fn(),
-      findUnique: vi.fn(),
-      findMany: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
+    // Core Drizzle methods
+    select: vi.fn().mockReturnThis(),
+    insert: vi.fn().mockReturnThis(),
+    update: vi.fn().mockReturnThis(),
+    delete: vi.fn().mockReturnThis(),
+    values: vi.fn().mockReturnThis(),
+    set: vi.fn().mockReturnThis(),
+    where: vi.fn().mockReturnThis(),
+    returning: vi.fn(),
+    execute: vi.fn(),
+    transaction: vi.fn(),
+
+    // Drizzle query methods for relational queries
+    query: {
+      users: {
+        findFirst: vi.fn(),
+        findMany: vi.fn(),
+      },
+      organizations: {
+        findFirst: vi.fn(),
+        findMany: vi.fn(),
+      },
+      memberships: {
+        findFirst: vi.fn(),
+        findMany: vi.fn(),
+      },
+      issues: {
+        findFirst: vi.fn(),
+        findMany: vi.fn(),
+      },
+      locations: {
+        findFirst: vi.fn(),
+        findMany: vi.fn(),
+      },
+      machines: {
+        findFirst: vi.fn(),
+        findMany: vi.fn(),
+      },
+      models: {
+        findFirst: vi.fn(),
+        findMany: vi.fn(),
+      },
+      issueStatuses: {
+        findFirst: vi.fn(),
+        findMany: vi.fn(),
+      },
+      priorities: {
+        findFirst: vi.fn(),
+        findMany: vi.fn(),
+      },
+      roles: {
+        findFirst: vi.fn(),
+        findMany: vi.fn(),
+      },
+      permissions: {
+        findFirst: vi.fn(),
+        findMany: vi.fn(),
+      },
+      notifications: {
+        findFirst: vi.fn(),
+        findMany: vi.fn(),
+      },
+      comments: {
+        findFirst: vi.fn(),
+        findMany: vi.fn(),
+      },
+      issueComments: {
+        findFirst: vi.fn(),
+        findMany: vi.fn(),
+      },
     },
   };
 
   return {
-    createPrismaClient: vi.fn(() => mockDb),
-    // Export the mock db directly for backwards compatibility
-    default: mockDb,
+    createDrizzleClient: vi.fn(() => mockDb),
   };
 });
 

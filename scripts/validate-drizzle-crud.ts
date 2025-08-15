@@ -85,8 +85,8 @@ class DrizzleCRUDValidator {
       console.log(
         `   - Connection string: ${(() => {
           try {
-            if (!env.POSTGRES_PRISMA_URL) return "";
-            const url = new URL(env.POSTGRES_PRISMA_URL);
+            if (!env.DATABASE_URL) return "";
+            const url = new URL(env.DATABASE_URL);
             url.username = "***";
             url.password = "***";
             return url.toString();
@@ -739,9 +739,7 @@ class DrizzleCRUDValidator {
   async runMinimalTests(): Promise<void> {
     console.log("🚀 Starting Drizzle CRUD Validation (Minimal)...");
     console.log(`Environment: ${env.NODE_ENV}`);
-    console.log(
-      `Database: ${env.POSTGRES_PRISMA_URL?.split("@")[1] ?? "Unknown"}`,
-    );
+    console.log(`Database: ${env.DATABASE_URL?.split("@")[1] ?? "Unknown"}`);
 
     try {
       // Step 1: Test basic connection first
@@ -817,9 +815,7 @@ class DrizzleCRUDValidator {
   async runAllTests(): Promise<void> {
     console.log("🚀 Starting Drizzle CRUD Validation (Full)...");
     console.log(`Environment: ${env.NODE_ENV}`);
-    console.log(
-      `Database: ${env.POSTGRES_PRISMA_URL?.split("@")[1] ?? "Unknown"}`,
-    );
+    console.log(`Database: ${env.DATABASE_URL?.split("@")[1] ?? "Unknown"}`);
 
     try {
       if (this.isMinimalMode) {

@@ -23,7 +23,7 @@ export const issueAttachmentRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       // Verify the issue belongs to this organization
-      const [existingIssue] = await ctx.drizzle
+      const [existingIssue] = await ctx.db
         .select({
           id: issues.id,
           organizationId: issues.organizationId,
@@ -45,7 +45,7 @@ export const issueAttachmentRouter = createTRPCRouter({
       }
 
       // Check attachment count limit
-      const [attachmentCountResult] = await ctx.drizzle
+      const [attachmentCountResult] = await ctx.db
         .select({ count: count() })
         .from(attachments)
         .where(eq(attachments.issueId, input.issueId));
@@ -60,7 +60,7 @@ export const issueAttachmentRouter = createTRPCRouter({
       }
 
       // Create attachment record
-      const [newAttachment] = await ctx.drizzle
+      const [newAttachment] = await ctx.db
         .insert(attachments)
         .values({
           id: generatePrefixedId("attachment"),
@@ -84,7 +84,7 @@ export const issueAttachmentRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       // Find the attachment and verify it belongs to this organization
-      const [attachment] = await ctx.drizzle
+      const [attachment] = await ctx.db
         .select({
           id: attachments.id,
           url: attachments.url,
@@ -119,7 +119,7 @@ export const issueAttachmentRouter = createTRPCRouter({
       await imageStorage.deleteImage(attachment.url);
 
       // Delete the attachment record
-      const [deletedAttachment] = await ctx.drizzle
+      const [deletedAttachment] = await ctx.db
         .delete(attachments)
         .where(eq(attachments.id, input.attachmentId))
         .returning();

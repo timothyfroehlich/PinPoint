@@ -1,24 +1,33 @@
-// Temporary type definitions for service layer
-// These will be replaced by generated Prisma types once client generation is working
+// Service layer type definitions
+// Using Drizzle schema types for service layer
 
-// Use the actual ExtendedPrismaClient from the db module
-export type { ExtendedPrismaClient } from "../db";
+import type { InferSelectModel } from "drizzle-orm";
 
-export type {
-  Collection,
-  CollectionType,
-  User,
-  IssueStatus,
-  Notification,
-  Comment,
-  Machine,
-} from "@prisma/client";
+import {
+  collections,
+  collectionTypes,
+  users,
+  issueStatuses,
+  notifications,
+  comments,
+  machines,
+} from "~/server/db/schema";
+import {
+  notificationTypeEnum,
+  notificationEntityEnum,
+} from "~/server/db/schema/collections";
+import { activityTypeEnum } from "~/server/db/schema/issues";
 
-export {
-  NotificationType,
-  NotificationEntity,
-  ActivityType,
-} from "@prisma/client";
+export type { DrizzleClient } from "~/server/db/drizzle";
 
-// Re-export Prisma utility types
-export { Prisma } from "@prisma/client";
+// Infer types from Drizzle schema
+export type Collection = InferSelectModel<typeof collections>;
+export type CollectionType = InferSelectModel<typeof collectionTypes>;
+export type User = InferSelectModel<typeof users>;
+export type IssueStatus = InferSelectModel<typeof issueStatuses>;
+export type Notification = InferSelectModel<typeof notifications>;
+export type Comment = InferSelectModel<typeof comments>;
+export type Machine = InferSelectModel<typeof machines>;
+
+// Export enum types
+export { notificationTypeEnum, notificationEntityEnum, activityTypeEnum };

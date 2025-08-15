@@ -22,7 +22,7 @@
  * Uses modern August 2025 patterns with Vitest and mock context.
  */
 
-/* eslint-disable @typescript-eslint/unbound-method */
+ 
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -123,9 +123,13 @@ describe("Issue Comment Router", () => {
     ctx.membership = mockMembership;
 
     // Mock the database membership lookup that organizationProcedure expects
-    vi.mocked(ctx.db.membership.findFirst).mockResolvedValue(
-      mockMembership as any,
-    );
+    // Mock membership lookup for organizationProcedure
+    const membershipSelectQuery = {
+      from: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockResolvedValue([mockMembership]),
+    };
+    vi.mocked(ctx.db.select).mockReturnValue(membershipSelectQuery);
 
     // Set up user permissions for different test scenarios
     ctx.userPermissions = [
@@ -150,7 +154,7 @@ describe("Issue Comment Router", () => {
           },
         ]),
       };
-      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(issueSelectQuery);
+      vi.mocked(ctx.db.select).mockReturnValueOnce(issueSelectQuery);
 
       // Mock the membership query chain
       const membershipSelectQuery = {
@@ -162,7 +166,7 @@ describe("Issue Comment Router", () => {
           },
         ]),
       };
-      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(membershipSelectQuery);
+      vi.mocked(ctx.db.select).mockReturnValueOnce(membershipSelectQuery);
 
       // Mock the comment insert
       const insertQuery = {
@@ -178,7 +182,7 @@ describe("Issue Comment Router", () => {
           },
         ]),
       };
-      vi.mocked(ctx.drizzle.insert).mockReturnValueOnce(insertQuery);
+      vi.mocked(ctx.db.insert).mockReturnValueOnce(insertQuery);
 
       // Mock the comment with author query
       const commentWithAuthorQuery = {
@@ -202,7 +206,7 @@ describe("Issue Comment Router", () => {
           },
         ]),
       };
-      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(commentWithAuthorQuery);
+      vi.mocked(ctx.db.select).mockReturnValueOnce(commentWithAuthorQuery);
 
       const caller = appRouter.createCaller(ctx as any);
       const result = await caller.issue.comment.addComment({
@@ -260,7 +264,7 @@ describe("Issue Comment Router", () => {
         where: vi.fn().mockReturnThis(),
         limit: vi.fn().mockResolvedValue([]), // No issue found
       };
-      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(issueSelectQuery);
+      vi.mocked(ctx.db.select).mockReturnValueOnce(issueSelectQuery);
 
       const caller = appRouter.createCaller(ctx as any);
 
@@ -284,7 +288,7 @@ describe("Issue Comment Router", () => {
           },
         ]),
       };
-      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(issueSelectQuery);
+      vi.mocked(ctx.db.select).mockReturnValueOnce(issueSelectQuery);
 
       // Mock the membership query to fail (no membership found)
       const membershipSelectQuery = {
@@ -292,7 +296,7 @@ describe("Issue Comment Router", () => {
         where: vi.fn().mockReturnThis(),
         limit: vi.fn().mockResolvedValue([]), // No membership found
       };
-      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(membershipSelectQuery);
+      vi.mocked(ctx.db.select).mockReturnValueOnce(membershipSelectQuery);
 
       const caller = appRouter.createCaller(ctx as any);
 
@@ -318,7 +322,7 @@ describe("Issue Comment Router", () => {
           },
         ]),
       };
-      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(issueSelectQuery);
+      vi.mocked(ctx.db.select).mockReturnValueOnce(issueSelectQuery);
 
       const membershipSelectQuery = {
         from: vi.fn().mockReturnThis(),
@@ -329,7 +333,7 @@ describe("Issue Comment Router", () => {
           },
         ]),
       };
-      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(membershipSelectQuery);
+      vi.mocked(ctx.db.select).mockReturnValueOnce(membershipSelectQuery);
 
       const insertQuery = {
         values: vi.fn().mockReturnThis(),
@@ -344,7 +348,7 @@ describe("Issue Comment Router", () => {
           },
         ]),
       };
-      vi.mocked(ctx.drizzle.insert).mockReturnValueOnce(insertQuery);
+      vi.mocked(ctx.db.insert).mockReturnValueOnce(insertQuery);
 
       const commentWithAuthorQuery = {
         from: vi.fn().mockReturnThis(),
@@ -367,7 +371,7 @@ describe("Issue Comment Router", () => {
           },
         ]),
       };
-      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(commentWithAuthorQuery);
+      vi.mocked(ctx.db.select).mockReturnValueOnce(commentWithAuthorQuery);
 
       const caller = appRouter.createCaller(ctx as any);
       const result = await caller.issue.comment.create({
@@ -409,7 +413,7 @@ describe("Issue Comment Router", () => {
           },
         ]),
       };
-      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(commentSelectQuery);
+      vi.mocked(ctx.db.select).mockReturnValueOnce(commentSelectQuery);
 
       // Mock the update query
       const updateQuery = {
@@ -426,7 +430,7 @@ describe("Issue Comment Router", () => {
           },
         ]),
       };
-      vi.mocked(ctx.drizzle.update).mockReturnValueOnce(updateQuery);
+      vi.mocked(ctx.db.update).mockReturnValueOnce(updateQuery);
 
       // Mock the final comment with author query
       const finalCommentQuery = {
@@ -450,7 +454,7 @@ describe("Issue Comment Router", () => {
           },
         ]),
       };
-      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(finalCommentQuery);
+      vi.mocked(ctx.db.select).mockReturnValueOnce(finalCommentQuery);
 
       const caller = appRouter.createCaller(ctx as any);
       const result = await caller.issue.comment.editComment({
@@ -498,7 +502,7 @@ describe("Issue Comment Router", () => {
           },
         ]),
       };
-      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(commentSelectQuery);
+      vi.mocked(ctx.db.select).mockReturnValueOnce(commentSelectQuery);
 
       const caller = appRouter.createCaller(ctx as any);
 
@@ -534,7 +538,7 @@ describe("Issue Comment Router", () => {
           },
         ]),
       };
-      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(commentSelectQuery);
+      vi.mocked(ctx.db.select).mockReturnValueOnce(commentSelectQuery);
 
       const caller = appRouter.createCaller(ctx as any);
 
@@ -572,7 +576,7 @@ describe("Issue Comment Router", () => {
           },
         ]),
       };
-      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(commentSelectQuery);
+      vi.mocked(ctx.db.select).mockReturnValueOnce(commentSelectQuery);
 
       // Mock membership lookup
       const membershipSelectQuery = {
@@ -586,7 +590,7 @@ describe("Issue Comment Router", () => {
           },
         ]),
       };
-      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(membershipSelectQuery);
+      vi.mocked(ctx.db.select).mockReturnValueOnce(membershipSelectQuery);
 
       // Mock the update for soft delete
       const updateQuery = {
@@ -605,7 +609,7 @@ describe("Issue Comment Router", () => {
           },
         ]),
       };
-      vi.mocked(ctx.drizzle.update).mockReturnValueOnce(updateQuery);
+      vi.mocked(ctx.db.update).mockReturnValueOnce(updateQuery);
 
       const caller = appRouter.createCaller(ctx as any);
       const result = await caller.issue.comment.deleteComment({
@@ -630,7 +634,7 @@ describe("Issue Comment Router", () => {
         where: vi.fn().mockReturnThis(),
         limit: vi.fn().mockResolvedValue([]), // No comment found
       };
-      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(commentSelectQuery);
+      vi.mocked(ctx.db.select).mockReturnValueOnce(commentSelectQuery);
 
       // Also need to mock the membership query even though it won't be used
       const membershipSelectQuery = {
@@ -638,7 +642,7 @@ describe("Issue Comment Router", () => {
         where: vi.fn().mockReturnThis(),
         limit: vi.fn().mockResolvedValue([]),
       };
-      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(membershipSelectQuery);
+      vi.mocked(ctx.db.select).mockReturnValueOnce(membershipSelectQuery);
 
       const caller = appRouter.createCaller(ctx as any);
 
@@ -675,7 +679,7 @@ describe("Issue Comment Router", () => {
           },
         ]),
       };
-      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(commentSelectQuery);
+      vi.mocked(ctx.db.select).mockReturnValueOnce(commentSelectQuery);
 
       // Mock the update for restore
       const updateQuery = {
@@ -694,7 +698,7 @@ describe("Issue Comment Router", () => {
           },
         ]),
       };
-      vi.mocked(ctx.drizzle.update).mockReturnValueOnce(updateQuery);
+      vi.mocked(ctx.db.update).mockReturnValueOnce(updateQuery);
 
       const caller = appRouter.createCaller(ctx as any);
       const result = await caller.issue.comment.restoreComment({
@@ -732,7 +736,7 @@ describe("Issue Comment Router", () => {
           },
         ]),
       };
-      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(commentSelectQuery);
+      vi.mocked(ctx.db.select).mockReturnValueOnce(commentSelectQuery);
 
       const caller = appRouter.createCaller(ctx as any);
 
@@ -788,7 +792,7 @@ describe("Issue Comment Router", () => {
           })),
         ),
       };
-      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(selectQuery);
+      vi.mocked(ctx.db.select).mockReturnValueOnce(selectQuery);
 
       // Mock the individual deleter queries
       mockDeletedComments.forEach((comment) => {
@@ -798,7 +802,7 @@ describe("Issue Comment Router", () => {
             where: vi.fn().mockReturnThis(),
             limit: vi.fn().mockResolvedValue([comment.deleter]),
           };
-          vi.mocked(ctx.drizzle.select).mockReturnValueOnce(deleterQuery);
+          vi.mocked(ctx.db.select).mockReturnValueOnce(deleterQuery);
         }
       });
 
@@ -841,9 +845,13 @@ describe("Issue Comment Router", () => {
           permissions: [],
         },
       };
-      vi.mocked(memberCtx.db.membership.findFirst).mockResolvedValue(
-        mockMembership as any,
-      );
+      // Mock the membership for the organization procedure
+      const memberCtxMembershipQuery = {
+        from: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockResolvedValue([mockMembership]),
+      };
+      vi.mocked(memberCtx.db.select).mockReturnValue(memberCtxMembershipQuery);
 
       const caller = appRouter.createCaller(memberCtx as any);
 

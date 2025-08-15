@@ -105,7 +105,7 @@ describe("Database Test Helpers", () => {
       await cleanupTestData(mockDb, testIds);
 
       // Verify delete operations were called
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       const mockedDelete = mockDb.delete as any;
       expect(mockedDelete).toHaveBeenCalled();
 
@@ -136,7 +136,7 @@ describe("Database Test Helpers", () => {
       const result = await createTestOrganization(mockDb);
 
       expect(result).toEqual(mockOrg);
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       const mockedInsert = mockDb.insert as any;
       expect(mockedInsert).toHaveBeenCalledWith(schema.organizations);
     });
@@ -205,7 +205,7 @@ describe("Database Test Helpers", () => {
       const result = await createTestUser(mockDb);
 
       expect(result).toEqual(mockUser);
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       const mockedInsert = mockDb.insert as any;
       expect(mockedInsert).toHaveBeenCalledWith(schema.users);
     });
@@ -281,7 +281,7 @@ describe("Database Test Helpers", () => {
       expect(result.membership).toEqual(mockMembership);
 
       // Should have called insert 3 times (user, role, membership)
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       const mockedInsert = mockDb.insert as any;
       expect(mockedInsert).toHaveBeenCalledTimes(3);
     });
@@ -415,7 +415,7 @@ describe("Database Test Helpers", () => {
       expect(result.users.org2Member).toBeDefined();
 
       // Should have called insert multiple times for all entities
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       const mockedInsert = mockDb.insert as any;
       expect(mockedInsert).toHaveBeenCalledWith(schema.organizations);
       expect(mockedInsert).toHaveBeenCalledWith(schema.users);

@@ -263,6 +263,7 @@ export const createMachineFactory = (options: FactoryOptions = {}) => {
 
   return {
     id: faker.string.uuid(),
+    name: faker.company.name(), // Added name field
     serialNumber: faker.string.alphanumeric({ length: 8 }).toUpperCase(),
     condition: faker.helpers.arrayElement([
       "Excellent",
@@ -275,6 +276,18 @@ export const createMachineFactory = (options: FactoryOptions = {}) => {
     locationId: "location-test",
     modelId: "model-test",
     ownerId: null,
+
+    // QR Code system (required fields from schema)
+    qrCodeId: faker.string.uuid(),
+    qrCodeUrl: null,
+    qrCodeGeneratedAt: null,
+
+    // Notification preferences
+    ownerNotificationsEnabled: true,
+    notifyOnNewIssues: true,
+    notifyOnStatusChanges: true,
+    notifyOnComments: false,
+
     createdAt: faker.date.past({ years: 2 }),
     updatedAt: faker.date.recent({ days: 30 }),
 
@@ -820,8 +833,7 @@ export const createTRPCCallerForIssues = (
     membership: routerContext.membership,
     userPermissions: permissions,
     services: createMockServices(),
-    db: null, // Will be mocked by test
-    drizzle: null, // Will be mocked by test
+    db: null, // Will be mocked by test as DrizzleClient
     headers: new Headers(),
     logger: {
       error: vi.fn(),
@@ -839,61 +851,64 @@ export const createTRPCCallerForIssues = (
   };
 };
 
-// Database Mock Helpers for Issue Testing
+// Database Mock Helpers for Issue Testing (Drizzle-only)
 export const createIssueDbMocks = (context: any) => ({
   setupIssueFound: (issue: any) => {
-    context.db.issue.findUnique?.mockResolvedValue(issue);
-    context.db.issue.findFirst?.mockResolvedValue(issue);
+    context.db.query.issues.findFirst?.mockResolvedValue(issue);
   },
 
   setupIssueNotFound: () => {
-    context.db.issue.findUnique?.mockResolvedValue(null);
-    context.db.issue.findFirst?.mockResolvedValue(null);
+    context.db.query.issues.findFirst?.mockResolvedValue(null);
   },
 
   setupMachineFound: (machine: any) => {
-    context.db.machine.findFirst?.mockResolvedValue(machine);
+    context.db.query.machines.findFirst?.mockResolvedValue(machine);
   },
 
   setupStatusFound: (status: any) => {
-    context.db.issueStatus.findFirst?.mockResolvedValue(status);
+    context.db.query.issueStatuses.findFirst?.mockResolvedValue(status);
   },
 
   setupPriorityFound: (priority: any) => {
-    context.db.priority.findFirst?.mockResolvedValue(priority);
+    context.db.query.priorities.findFirst?.mockResolvedValue(priority);
   },
 
   setupIssueCreation: (createdIssue: any) => {
-    context.db.issue.create?.mockResolvedValue(createdIssue);
+    context.db.insert.mockReturnValue({
+      values: vi.fn().mockReturnThis(),
+      returning: vi.fn().mockResolvedValue([createdIssue]),
+    });
   },
 
   setupIssueUpdate: (updatedIssue: any) => {
-    context.db.issue.update?.mockResolvedValue(updatedIssue);
+    context.db.update.mockReturnValue({
+      set: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      returning: vi.fn().mockResolvedValue([updatedIssue]),
+    });
   },
 
   setupMembershipFound: (membership: any) => {
-    context.db.membership.findFirst?.mockResolvedValue(membership);
+    context.db.query.memberships.findFirst?.mockResolvedValue(membership);
   },
 
-  // For Drizzle-based tests
-  setupDrizzleIssueQuery: (drizzleContext: any, issue: any) => {
+  // For Drizzle-based tests (updated for single client)
+  setupDrizzleIssueQuery: (context: any, issue: any) => {
     const issueSelectQuery = {
       from: vi.fn().mockReturnThis(),
       where: vi.fn().mockReturnThis(),
       limit: vi.fn().mockResolvedValue([issue]),
     };
-    vi.mocked(drizzleContext.drizzle.select).mockReturnValueOnce(
-      issueSelectQuery,
-    );
+    vi.mocked(context.db.select).mockReturnValueOnce(issueSelectQuery);
     return issueSelectQuery;
   },
 
-  setupDrizzleIssueInsert: (drizzleContext: any, createdIssue: any) => {
+  setupDrizzleIssueInsert: (context: any, createdIssue: any) => {
     const insertQuery = {
       values: vi.fn().mockReturnThis(),
       returning: vi.fn().mockResolvedValue([createdIssue]),
     };
-    vi.mocked(drizzleContext.drizzle.insert).mockReturnValueOnce(insertQuery);
+    vi.mocked(context.db.insert).mockReturnValueOnce(insertQuery);
     return insertQuery;
   },
 });
@@ -945,10 +960,9 @@ export const createPermissionTestScenarios = {
 
 // Integration Test Helpers for PGlite
 export const createIssueIntegrationTestHelpers = {
-  // Create test context for integration tests with real database
+  // Create test context for integration tests with real database (Drizzle-only)
   createTestContext: (txDb: any, seededData: any) => ({
-    db: null, // Mock Prisma client - middleware still expects this
-    drizzle: txDb,
+    db: txDb, // Real Drizzle client for integration tests
     services: createMockServices(),
     user: {
       id: seededData.user,

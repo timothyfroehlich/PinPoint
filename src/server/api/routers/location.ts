@@ -27,7 +27,7 @@ export const locationRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const [location] = await ctx.drizzle
+      const [location] = await ctx.db
         .insert(locations)
         .values({
           id: generateId(),
@@ -40,7 +40,7 @@ export const locationRouter = createTRPCRouter({
     }),
 
   getAll: organizationProcedure.query(async ({ ctx }) => {
-    return await ctx.drizzle.query.locations.findMany({
+    return await ctx.db.query.locations.findMany({
       where: eq(locations.organizationId, ctx.organization.id),
       with: {
         machines: true,
@@ -59,7 +59,7 @@ export const locationRouter = createTRPCRouter({
     }
 
     // Use single optimized query with JOINs instead of separate queries
-    const result = await ctx.drizzle
+    const result = await ctx.db
       .select({
         locationId: locations.id,
         locationName: locations.name,
@@ -156,7 +156,7 @@ export const locationRouter = createTRPCRouter({
         updates.name = input.name;
       }
 
-      const [updatedLocation] = await ctx.drizzle
+      const [updatedLocation] = await ctx.db
         .update(locations)
         .set(updates)
         .where(
@@ -181,7 +181,7 @@ export const locationRouter = createTRPCRouter({
   getById: organizationProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
-      const location = await ctx.drizzle.query.locations.findFirst({
+      const location = await ctx.db.query.locations.findFirst({
         where: and(
           eq(locations.id, input.id),
           eq(locations.organizationId, ctx.organization.id),
@@ -216,7 +216,7 @@ export const locationRouter = createTRPCRouter({
   delete: locationDeleteProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      const [deletedLocation] = await ctx.drizzle
+      const [deletedLocation] = await ctx.db
         .delete(locations)
         .where(
           and(
@@ -245,7 +245,7 @@ export const locationRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const [updatedLocation] = await ctx.drizzle
+      const [updatedLocation] = await ctx.db
         .update(locations)
         .set({
           pinballMapId: input.pinballMapId,

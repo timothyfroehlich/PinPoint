@@ -29,7 +29,7 @@ function generateId(): string {
 export const issueStatusRouter = createTRPCRouter({
   // CRUD Operations
   getAll: organizationProcedure.query(async ({ ctx }) => {
-    return ctx.drizzle
+    return ctx.db
       .select()
       .from(issueStatuses)
       .where(eq(issueStatuses.organizationId, ctx.organization.id))
@@ -44,7 +44,7 @@ export const issueStatusRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const [result] = await ctx.drizzle
+      const [result] = await ctx.db
         .insert(issueStatuses)
         .values({
           id: generateId(),
@@ -74,7 +74,7 @@ export const issueStatusRouter = createTRPCRouter({
       if (input.name) updateData.name = input.name;
       if (input.category) updateData.category = input.category;
 
-      const [result] = await ctx.drizzle
+      const [result] = await ctx.db
         .update(issueStatuses)
         .set(updateData)
         .where(
@@ -92,7 +92,7 @@ export const issueStatusRouter = createTRPCRouter({
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       // Check if any issues are using this status
-      const [issueCountResult] = await ctx.drizzle
+      const [issueCountResult] = await ctx.db
         .select({ count: count() })
         .from(issues)
         .where(
@@ -108,7 +108,7 @@ export const issueStatusRouter = createTRPCRouter({
         );
       }
 
-      const [result] = await ctx.drizzle
+      const [result] = await ctx.db
         .delete(issueStatuses)
         .where(
           and(
@@ -124,7 +124,7 @@ export const issueStatusRouter = createTRPCRouter({
   // Status Counts / Analytics
   getStatusCounts: organizationProcedure.query(async ({ ctx }) => {
     // Get issue counts grouped by statusId using Drizzle aggregation
-    const counts = await ctx.drizzle
+    const counts = await ctx.db
       .select({
         statusId: issues.statusId,
         count: count(),
@@ -134,7 +134,7 @@ export const issueStatusRouter = createTRPCRouter({
       .groupBy(issues.statusId);
 
     // Get all statuses for the organization
-    const statuses = await ctx.drizzle
+    const statuses = await ctx.db
       .select({
         id: issueStatuses.id,
         category: issueStatuses.category,

@@ -41,7 +41,7 @@ async function createCommentWithAuthor(
   };
 }> {
   // Verify the issue belongs to this organization
-  const [existingIssue] = await ctx.drizzle
+  const [existingIssue] = await ctx.db
     .select({
       id: issues.id,
       organizationId: issues.organizationId,
@@ -63,7 +63,7 @@ async function createCommentWithAuthor(
   }
 
   // Verify the user is a member of this organization
-  const [membership] = await ctx.drizzle
+  const [membership] = await ctx.db
     .select({
       id: memberships.id,
     })
@@ -84,7 +84,7 @@ async function createCommentWithAuthor(
   }
 
   // Insert the comment
-  const [comment] = await ctx.drizzle
+  const [comment] = await ctx.db
     .insert(comments)
     .values({
       id: generatePrefixedId("comment"),
@@ -109,7 +109,7 @@ async function createCommentWithAuthor(
   }
 
   // Fetch the comment with author details
-  const [commentWithAuthor] = await ctx.drizzle
+  const [commentWithAuthor] = await ctx.db
     .select({
       id: comments.id,
       content: comments.content,
@@ -202,7 +202,7 @@ export const issueCommentRouter = createTRPCRouter({
         };
       }> => {
         // Find the comment and verify permissions
-        const [comment] = await ctx.drizzle
+        const [comment] = await ctx.db
           .select({
             id: comments.id,
             authorId: comments.authorId,
@@ -249,7 +249,7 @@ export const issueCommentRouter = createTRPCRouter({
         }
 
         // Update the comment
-        const [updatedComment] = await ctx.drizzle
+        const [updatedComment] = await ctx.db
           .update(comments)
           .set({
             content: input.content,
@@ -272,7 +272,7 @@ export const issueCommentRouter = createTRPCRouter({
         }
 
         // Fetch the updated comment with author details
-        const [commentWithAuthor] = await ctx.drizzle
+        const [commentWithAuthor] = await ctx.db
           .select({
             id: comments.id,
             content: comments.content,
@@ -312,7 +312,7 @@ export const issueCommentRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       // Find the comment and verify permissions
-      const [comment] = await ctx.drizzle
+      const [comment] = await ctx.db
         .select({
           id: comments.id,
           authorId: comments.authorId,
@@ -340,7 +340,7 @@ export const issueCommentRouter = createTRPCRouter({
         .limit(1);
 
       // Get membership for validation
-      const [membership] = await ctx.drizzle
+      const [membership] = await ctx.db
         .select({
           id: memberships.id,
           userId: memberships.userId,
@@ -387,7 +387,7 @@ export const issueCommentRouter = createTRPCRouter({
       }
 
       // Soft delete the comment using service
-      const commentService = new DrizzleCommentService(ctx.drizzle);
+      const commentService = new DrizzleCommentService(ctx.db);
       const deletedComment = await commentService.softDeleteComment(
         input.commentId,
         ctx.user.id,
@@ -414,7 +414,7 @@ export const issueCommentRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       // Find the comment and verify it exists and is deleted
-      const [comment] = await ctx.drizzle
+      const [comment] = await ctx.db
         .select({
           id: comments.id,
           authorId: comments.authorId,
@@ -469,7 +469,7 @@ export const issueCommentRouter = createTRPCRouter({
       }
 
       // Restore the comment using service
-      const commentService = new DrizzleCommentService(ctx.drizzle);
+      const commentService = new DrizzleCommentService(ctx.db);
       const restoredComment = await commentService.restoreComment(
         input.commentId,
       );
@@ -497,7 +497,7 @@ export const issueCommentRouter = createTRPCRouter({
       });
     }
 
-    const commentService = new DrizzleCommentService(ctx.drizzle);
+    const commentService = new DrizzleCommentService(ctx.db);
     return commentService.getDeletedComments(ctx.organization.id);
   }),
 });

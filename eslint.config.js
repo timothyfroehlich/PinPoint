@@ -188,6 +188,8 @@ export default tseslint.config(
       "@typescript-eslint/no-unnecessary-boolean-literal-compare": "off",
       "@typescript-eslint/prefer-nullish-coalescing": "off",
       "@typescript-eslint/no-unnecessary-type-assertion": "off",
+      // Allow unbound methods in tests (Vitest expect calls are safe)
+      "@typescript-eslint/unbound-method": "off",
     },
   },
   {

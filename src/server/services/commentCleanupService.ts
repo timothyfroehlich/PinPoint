@@ -1,9 +1,28 @@
-import { type Comment, type ExtendedPrismaClient } from "./types";
+import { and, eq, lte, isNotNull } from "drizzle-orm";
+import { type InferSelectModel } from "drizzle-orm";
 
 import { COMMENT_CLEANUP_CONFIG } from "~/server/constants/cleanup";
+import { type DrizzleClient } from "~/server/db/drizzle";
+import { comments, issues } from "~/server/db/schema";
+
+// Infer Comment type from Drizzle schema
+type Comment = InferSelectModel<typeof comments> & {
+  author: {
+    id: string;
+    name: string | null;
+  } | null;
+  deleter: {
+    id: string;
+    name: string | null;
+  } | null;
+  issue: {
+    id: string;
+    title: string;
+  };
+};
 
 export class CommentCleanupService {
-  constructor(private prisma: ExtendedPrismaClient) {}
+  constructor(private db: DrizzleClient) {}
 
   /**
    * Permanently delete comments that have been soft-deleted for more than the configured retention period
@@ -14,15 +33,17 @@ export class CommentCleanupService {
       retentionCutoff.getDate() - COMMENT_CLEANUP_CONFIG.RETENTION_DAYS,
     );
 
-    const result: { count: number } = await this.prisma.comment.deleteMany({
-      where: {
-        deletedAt: {
-          lte: retentionCutoff,
-        },
-      },
-    });
+    const deletedComments = await this.db
+      .delete(comments)
+      .where(
+        and(
+          isNotNull(comments.deletedAt),
+          lte(comments.deletedAt, retentionCutoff),
+        ),
+      )
+      .returning({ id: comments.id });
 
-    return result.count;
+    return deletedComments.length;
   }
 
   /**
@@ -34,14 +55,17 @@ export class CommentCleanupService {
       retentionCutoff.getDate() - COMMENT_CLEANUP_CONFIG.RETENTION_DAYS,
     );
 
-    const count = await this.prisma.comment.count({
-      where: {
-        deletedAt: {
-          lte: retentionCutoff,
-        },
-      },
-    });
-    return count;
+    const candidateComments = await this.db
+      .select({ id: comments.id })
+      .from(comments)
+      .where(
+        and(
+          isNotNull(comments.deletedAt),
+          lte(comments.deletedAt, retentionCutoff),
+        ),
+      );
+
+    return candidateComments.length;
   }
 
   /**
@@ -51,63 +75,62 @@ export class CommentCleanupService {
     commentId: string,
     deletedById: string,
   ): Promise<void> {
-    await this.prisma.comment.update({
-      where: { id: commentId },
-      data: {
+    await this.db
+      .update(comments)
+      .set({
         deletedAt: new Date(),
         deletedBy: deletedById,
-      },
-    });
+        updatedAt: new Date(),
+      })
+      .where(eq(comments.id, commentId));
   }
 
   /**
    * Restore a soft-deleted comment
    */
   async restoreComment(commentId: string): Promise<void> {
-    await this.prisma.comment.update({
-      where: { id: commentId },
-      data: {
+    await this.db
+      .update(comments)
+      .set({
         deletedAt: null,
         deletedBy: null,
-      },
-    });
+        updatedAt: new Date(),
+      })
+      .where(eq(comments.id, commentId));
   }
 
   /**
    * Get all soft-deleted comments for an organization (admin view)
    */
   async getDeletedComments(organizationId: string): Promise<Comment[]> {
-    const comments = await this.prisma.comment.findMany({
-      where: {
-        deletedAt: { not: null },
-        issue: {
-          organizationId,
-        },
-      },
-      include: {
+    const deletedComments = await this.db.query.comments.findMany({
+      where: and(
+        isNotNull(comments.deletedAt),
+        eq(issues.organizationId, organizationId),
+      ),
+      with: {
         author: {
-          select: {
+          columns: {
             id: true,
             name: true,
           },
         },
         deleter: {
-          select: {
+          columns: {
             id: true,
             name: true,
           },
         },
         issue: {
-          select: {
+          columns: {
             id: true,
             title: true,
           },
         },
       },
-      orderBy: {
-        deletedAt: "desc",
-      },
+      orderBy: (comments, { desc }) => [desc(comments.deletedAt)],
     });
-    return comments;
+
+    return deletedComments as Comment[];
   }
 }

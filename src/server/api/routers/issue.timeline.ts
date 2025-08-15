@@ -11,7 +11,7 @@ export const issueTimelineRouter = createTRPCRouter({
     .input(z.object({ issueId: z.string() }))
     .query(async ({ ctx, input }) => {
       // Verify the issue belongs to this organization
-      const issue = await ctx.drizzle.query.issues.findFirst({
+      const issue = await ctx.db.query.issues.findFirst({
         where: and(
           eq(issues.id, input.issueId),
           eq(issues.organizationId, ctx.organization.id),

@@ -47,7 +47,7 @@ describe("Drizzle Mock Helpers", () => {
 
         expect(mockEnv.NODE_ENV).toBe("development");
         expect(mockEnv.VERCEL_ENV).toBeUndefined();
-        expect(mockEnv.POSTGRES_PRISMA_URL).toContain("localhost:5432");
+        expect(mockEnv.DATABASE_URL).toContain("localhost:5432");
         expect(mockIsDevelopment()).toBe(true);
       });
 
@@ -69,7 +69,7 @@ describe("Drizzle Mock Helpers", () => {
 
         expect(mockEnv.NODE_ENV).toBe("production");
         expect(mockEnv.VERCEL_ENV).toBe("production");
-        expect(mockEnv.POSTGRES_PRISMA_URL).toContain("remote.example.com");
+        expect(mockEnv.DATABASE_URL).toContain("remote.example.com");
         expect(mockIsDevelopment()).toBe(false);
       });
     });
@@ -80,7 +80,7 @@ describe("Drizzle Mock Helpers", () => {
 
         expect(mockEnv.NODE_ENV).toBe("test");
         expect(mockEnv.VERCEL_ENV).toBeUndefined();
-        expect(mockEnv.POSTGRES_PRISMA_URL).toContain("ci-db.example.com");
+        expect(mockEnv.DATABASE_URL).toContain("ci-db.example.com");
         expect(mockIsDevelopment()).toBe(false);
       });
     });
@@ -89,14 +89,14 @@ describe("Drizzle Mock Helpers", () => {
       it("should apply custom configuration", () => {
         const customConfig: EnvironmentConfig = {
           NODE_ENV: "staging",
-          POSTGRES_PRISMA_URL: "postgresql://staging:pass@staging.db:5432/app",
+          DATABASE_URL: "postgresql://staging:pass@staging.db:5432/app",
           isDevelopment: false,
         };
 
         configureCustomEnvironment(customConfig);
 
         expect(mockEnv.NODE_ENV).toBe("staging");
-        expect(mockEnv.POSTGRES_PRISMA_URL).toBe(
+        expect(mockEnv.DATABASE_URL).toBe(
           "postgresql://staging:pass@staging.db:5432/app",
         );
         expect(mockIsDevelopment()).toBe(false);
@@ -105,17 +105,17 @@ describe("Drizzle Mock Helpers", () => {
       it("should handle partial configuration", () => {
         // Set initial state
         mockEnv.NODE_ENV = "development";
-        mockEnv.POSTGRES_PRISMA_URL = "old-url";
+        mockEnv.DATABASE_URL = "old-url";
 
         const partialConfig: EnvironmentConfig = {
           NODE_ENV: "production",
-          // Don't change POSTGRES_PRISMA_URL
+          // Don't change DATABASE_URL
         };
 
         configureCustomEnvironment(partialConfig);
 
         expect(mockEnv.NODE_ENV).toBe("production");
-        expect(mockEnv.POSTGRES_PRISMA_URL).toBe("old-url"); // Unchanged
+        expect(mockEnv.DATABASE_URL).toBe("old-url"); // Unchanged
       });
     });
   });
@@ -278,7 +278,7 @@ describe("Drizzle Mock Helpers", () => {
         setupDrizzleTestEnvironment();
 
         expect(mockEnv.NODE_ENV).toBe("development");
-        expect(mockEnv.POSTGRES_PRISMA_URL).toContain("localhost:5432");
+        expect(mockEnv.DATABASE_URL).toContain("localhost:5432");
         expect(mockIsDevelopment()).toBe(true);
         expect(mockPostgres).not.toHaveBeenCalled(); // Should be cleared
       });
@@ -286,14 +286,14 @@ describe("Drizzle Mock Helpers", () => {
       it("should apply custom environment setup", () => {
         const customSetup = vi.fn(() => {
           mockEnv.NODE_ENV = "staging";
-          mockEnv.POSTGRES_PRISMA_URL = "custom-url";
+          mockEnv.DATABASE_URL = "custom-url";
         });
 
         setupDrizzleTestEnvironment(customSetup);
 
         expect(customSetup).toHaveBeenCalled();
         expect(mockEnv.NODE_ENV).toBe("staging");
-        expect(mockEnv.POSTGRES_PRISMA_URL).toBe("custom-url");
+        expect(mockEnv.DATABASE_URL).toBe("custom-url");
       });
     });
 
@@ -445,7 +445,7 @@ describe("Drizzle Mock Helpers", () => {
 
     describe("mockEnv", () => {
       it("should have expected environment properties", () => {
-        expect(mockEnv).toHaveProperty("POSTGRES_PRISMA_URL");
+        expect(mockEnv).toHaveProperty("DATABASE_URL");
         expect(mockEnv).toHaveProperty("NODE_ENV");
         expect(mockEnv).toHaveProperty("VERCEL_ENV");
       });
@@ -454,8 +454,8 @@ describe("Drizzle Mock Helpers", () => {
         mockEnv.NODE_ENV = "test";
         expect(mockEnv.NODE_ENV).toBe("test");
 
-        mockEnv.POSTGRES_PRISMA_URL = "custom-url";
-        expect(mockEnv.POSTGRES_PRISMA_URL).toBe("custom-url");
+        mockEnv.DATABASE_URL = "custom-url";
+        expect(mockEnv.DATABASE_URL).toBe("custom-url");
       });
     });
   });
@@ -499,7 +499,7 @@ describe("Drizzle Mock Helpers", () => {
 
         // Each environment should have its specific settings
         expect(mockEnv.NODE_ENV).toBeDefined();
-        expect(mockEnv.POSTGRES_PRISMA_URL).toBeDefined();
+        expect(mockEnv.DATABASE_URL).toBeDefined();
         expect(typeof mockIsDevelopment()).toBe("boolean");
       });
     });

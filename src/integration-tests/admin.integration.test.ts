@@ -19,23 +19,22 @@
  */
 
 import { eq, count, and } from "drizzle-orm";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, vi } from "vitest";
 
 // Import test setup and utilities
 import type { TRPCContext } from "~/server/api/trpc.base";
-import type { ExtendedPrismaClient } from "~/server/db";
 
 import { adminRouter } from "~/server/api/routers/admin";
 import * as schema from "~/server/db/schema";
-import {
-  createSeededTestDatabase,
-  getSeededTestData,
-  type TestDatabase,
-} from "~/test/helpers/pglite-test-setup";
+import { type TestDatabase } from "~/test/helpers/pglite-test-setup";
+import { generateTestId } from "~/test/helpers/test-id-generator";
+import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
 
 // Mock external dependencies that aren't database-related
 vi.mock("~/lib/utils/id-generation", () => ({
-  generatePrefixedId: vi.fn((prefix: string) => `${prefix}_test_${Date.now()}`),
+  generatePrefixedId: vi.fn(
+    (prefix: string) => `${prefix}_${generateTestId("test")}`,
+  ),
 }));
 
 vi.mock("~/server/auth/permissions", () => ({
@@ -63,41 +62,211 @@ vi.mock("~/lib/utils/membership-transformers", () => ({
 }));
 
 describe("Admin Router Integration (PGlite)", () => {
-  let db: TestDatabase;
-  let context: TRPCContext;
-  let caller: ReturnType<typeof adminRouter.createCaller>;
+  // Helper function to create minimal users for testing
+  async function createMinimalUsersForTesting(
+    db: TestDatabase,
+    organizationId: string,
+    adminRoleId: string,
+    memberRoleId: string,
+  ): Promise<{
+    adminUserId: string;
+    memberUserId: string;
+    playerUserId: string;
+    rogerUserId: string;
+    garyUserId: string;
+    harryUserId: string;
+    escherUserId: string;
+    timUserId: string;
+  }> {
+    // Generate unique user IDs to prevent duplicate key violations
+    const adminUserId = generateTestId("test-user-admin");
+    const memberUserId = generateTestId("test-user-member");
+    const playerUserId = generateTestId("test-user-player");
+    const rogerUserId = generateTestId("test-user-roger");
+    const garyUserId = generateTestId("test-user-gary");
+    const harryUserId = generateTestId("test-user-harry");
+    const escherUserId = generateTestId("test-user-escher");
+    const timUserId = generateTestId("test-user-tim");
 
-  // Test data IDs - queried from actual seeded data
-  let testData: {
-    organization: string;
-    location?: string;
-    machine?: string;
-    model?: string;
-    status?: string;
-    priority?: string;
-    issue?: string;
-    adminRole?: string;
-    memberRole?: string;
-    user?: string;
-    secondaryUser?: string;
-  };
+    // Create users that match the sample data expectations for PostgreSQL-only mode
+    const testUsers = [
+      // Dev users for testing
+      {
+        id: adminUserId,
+        email: `admin-${generateTestId("admin")}@dev.local`,
+        name: "Dev Admin",
+        profilePicture: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: memberUserId,
+        email: `member-${generateTestId("member")}@dev.local`,
+        name: "Dev Member",
+        profilePicture: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: playerUserId,
+        email: `player-${generateTestId("player")}@dev.local`,
+        name: "Dev Player",
+        profilePicture: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      // Pinball personalities that sample data references
+      {
+        id: rogerUserId,
+        email: `roger.sharpe-${generateTestId("roger")}@pinpoint.dev`,
+        name: "Roger Sharpe",
+        profilePicture: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: garyUserId,
+        email: `gary.stern-${generateTestId("gary")}@pinpoint.dev`,
+        name: "Gary Stern",
+        profilePicture: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: harryUserId,
+        email: `harry.williams-${generateTestId("harry")}@pinpoint.dev`,
+        name: "Harry Williams",
+        profilePicture: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: escherUserId,
+        email: `escher.lefkoff-${generateTestId("escher")}@pinpoint.dev`,
+        name: "Escher Lefkoff",
+        profilePicture: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: timUserId,
+        email: `timfroehlich-${generateTestId("tim")}@pinpoint.dev`,
+        name: "Tim Froehlich",
+        profilePicture: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ];
 
-  beforeEach(async () => {
-    // Create fresh PGlite database with real schema and seed data
-    const setup = await createSeededTestDatabase();
-    db = setup.db;
+    await db.insert(schema.users).values(testUsers);
 
-    // Query actual seeded IDs instead of using hardcoded ones
-    testData = await getSeededTestData(db, setup.organizationId);
+    // Create memberships linking users to organization with provided role IDs
+    await db.insert(schema.memberships).values([
+      {
+        id: generateTestId("test-membership-admin"),
+        userId: adminUserId,
+        organizationId,
+        roleId: adminRoleId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: generateTestId("test-membership-member"),
+        userId: memberUserId,
+        organizationId,
+        roleId: memberRoleId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: generateTestId("test-membership-player"),
+        userId: playerUserId,
+        organizationId,
+        roleId: memberRoleId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: generateTestId("test-membership-roger"),
+        userId: rogerUserId,
+        organizationId,
+        roleId: adminRoleId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: generateTestId("test-membership-gary"),
+        userId: garyUserId,
+        organizationId,
+        roleId: adminRoleId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: generateTestId("test-membership-harry"),
+        userId: harryUserId,
+        organizationId,
+        roleId: memberRoleId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: generateTestId("test-membership-escher"),
+        userId: escherUserId,
+        organizationId,
+        roleId: memberRoleId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: generateTestId("test-membership-tim"),
+        userId: timUserId,
+        organizationId,
+        roleId: adminRoleId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ]);
 
-    // Create additional test users and roles for admin testing
-    const [secondaryUser] = await db
-      .insert(schema.users)
+    return {
+      adminUserId,
+      memberUserId,
+      playerUserId,
+      rogerUserId,
+      garyUserId,
+      harryUserId,
+      escherUserId,
+      timUserId,
+    };
+  }
+
+  // Helper function to set up test context with seeded data
+  async function createTestContext(db: TestDatabase) {
+    // Create test organization directly in database
+    const organizationId = generateTestId("test-org");
+    const adminRoleId = generateTestId("admin-role");
+
+    const [organization] = await db
+      .insert(schema.organizations)
       .values({
-        id: "test-user-2",
-        name: "Secondary Test User",
-        email: "secondary@example.com",
-        emailVerified: new Date(),
+        id: organizationId,
+        name: "Test Organization",
+        subdomain: generateTestId("test-org"),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning();
+
+    // Create basic roles for the organization
+    const [adminRole] = await db
+      .insert(schema.roles)
+      .values({
+        id: adminRoleId,
+        name: "Admin",
+        organizationId: organization.id,
+        description: "Administrator role",
+        isSystem: true,
+        isDefault: false,
         createdAt: new Date(),
         updatedAt: new Date(),
       })
@@ -106,9 +275,10 @@ describe("Admin Router Integration (PGlite)", () => {
     const [memberRole] = await db
       .insert(schema.roles)
       .values({
-        id: "test-member-role",
+        id: generateTestId("member-role"),
         name: "Member",
-        organizationId: testData.organization,
+        organizationId: organization.id,
+        description: "Member role",
         isSystem: false,
         isDefault: true,
         createdAt: new Date(),
@@ -116,65 +286,153 @@ describe("Admin Router Integration (PGlite)", () => {
       })
       .returning();
 
-    // Create membership for secondary user
+    // Create minimal users for testing
+    const userIds = await createMinimalUsersForTesting(
+      db,
+      organization.id,
+      adminRole.id,
+      memberRole.id,
+    );
+
+    // Create supporting data for issue testing
+    const [location] = await db
+      .insert(schema.locations)
+      .values({
+        id: generateTestId("test-location"),
+        name: "Test Location",
+        organizationId: organization.id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning();
+
+    // Create a model first (required for machine)
+    const [model] = await db
+      .insert(schema.models)
+      .values({
+        id: generateTestId("test-model"),
+        name: "Test Model",
+        manufacturer: "Test Manufacturer",
+        year: 2000,
+        type: "SS",
+        opdbId: parseInt(generateTestId("opdb").slice(-8), 16), // Convert hex portion to integer
+        organizationId: organization.id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning();
+
+    const [machine] = await db
+      .insert(schema.machines)
+      .values({
+        id: generateTestId("test-machine"),
+        name: "Test Machine",
+        organizationId: organization.id,
+        locationId: location.id,
+        modelId: model.id,
+        qrCodeId: generateTestId("test-qr"),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning();
+
+    const [status] = await db
+      .insert(schema.issueStatuses)
+      .values({
+        id: generateTestId("test-status"),
+        name: "Open",
+        category: "NEW",
+        organizationId: organization.id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning();
+
+    const [priority] = await db
+      .insert(schema.priorities)
+      .values({
+        id: generateTestId("test-priority"),
+        name: "High",
+        order: 3,
+        organizationId: organization.id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning();
+
+    // Create basic test data structure to match expected format
+    const testData = {
+      organization: organization.id,
+      user: userIds.adminUserId, // Use the unique admin user ID that was created
+      adminRole: adminRole.id,
+      memberRole: memberRole.id,
+      location: location.id,
+      machine: machine.id,
+      status: status.id,
+      priority: priority.id,
+    };
+
+    // Create additional test users for admin testing
+    const [secondaryUser] = await db
+      .insert(schema.users)
+      .values({
+        id: generateTestId("test-user-2"),
+        name: "Secondary Test User",
+        email: `secondary-${generateTestId("secondary")}@example.com`, // Make email unique per test
+        emailVerified: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning();
+
+    // Create membership for secondary user using the existing member role
     await db.insert(schema.memberships).values({
-      id: "test-membership-2",
+      id: generateTestId("test-membership-2"),
       userId: secondaryUser.id,
       organizationId: testData.organization,
-      roleId: memberRole.id,
+      roleId: testData.memberRole,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
 
-    testData.secondaryUser = secondaryUser.id;
-    testData.memberRole = memberRole.id;
+    const enhancedTestData = {
+      ...testData,
+      secondaryUser: secondaryUser.id,
+    };
 
-    // Create mock Prisma client for tRPC middleware compatibility
-    const mockPrismaClient = {
-      membership: {
-        findFirst: vi.fn().mockResolvedValue({
-          id: "test-membership",
-          organizationId: testData.organization,
-          userId: testData.user || "test-user-1",
-          role: {
-            id: testData.adminRole,
-            name: "Admin",
-            permissions: [
-              { id: "perm1", name: "user:manage" },
-              { id: "perm2", name: "role:manage" },
-              { id: "perm3", name: "organization:manage" },
-            ],
-          },
-        }),
-      },
-    } as unknown as ExtendedPrismaClient;
+    // Create service factories that use Drizzle directly
+    const serviceFactories = {
+      createNotificationService: vi.fn(),
+      createCollectionService: vi.fn(),
+      createIssueActivityService: vi.fn(),
+      createCommentCleanupService: vi.fn(),
+      createQRCodeService: vi.fn(),
+    };
 
     // Create test context with real database
-    context = {
+    const context: TRPCContext = {
       user: {
-        id: testData.user || "test-user-1",
-        email: "admin@example.com",
+        id: enhancedTestData.user,
+        email: `admin-${generateTestId("admin")}@example.com`,
         user_metadata: { name: "Admin User" },
-        app_metadata: { organization_id: testData.organization, role: "Admin" },
+        app_metadata: {
+          organization_id: enhancedTestData.organization,
+          role: "Admin",
+        },
       },
       organization: {
-        id: testData.organization,
+        id: enhancedTestData.organization,
         name: "Test Organization",
         subdomain: "test-org",
       },
-      db: mockPrismaClient,
-      drizzle: db,
+      db: db,
       supabase: {
         auth: {
           getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
         },
       } as any,
       services: {
-        createNotificationService: vi.fn(),
-        createCollectionService: vi.fn(),
-        createIssueActivityService: vi.fn(),
-        createCommentCleanupService: vi.fn(),
-        createQRCodeService: vi.fn(),
+        ...serviceFactories,
       },
       headers: new Headers(),
       logger: {
@@ -192,485 +450,593 @@ describe("Admin Router Integration (PGlite)", () => {
       userPermissions: ["user:manage", "role:manage", "organization:manage"],
     } as any;
 
-    caller = adminRouter.createCaller(context);
-  });
+    const caller = adminRouter.createCaller(context);
+
+    return { testData: enhancedTestData, context, caller };
+  }
 
   describe("getUsers", () => {
-    it("should retrieve all organization members with real database operations", async () => {
-      const result = await caller.getUsers();
+    test("should retrieve all organization members with real database operations", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { caller } = await createTestContext(db);
 
-      // Expect 9 users: 8 from seed data + 1 secondary user we added
-      expect(result).toHaveLength(9);
+        const result = await caller.getUsers();
 
-      // Check that our test users are included
-      const emails = result.map((member) => member.email);
-      expect(emails).toContain("admin@dev.local");
-      expect(emails).toContain("secondary@example.com");
+        // Expect 9 users: 8 from seed data + 1 secondary user we added
+        expect(result).toHaveLength(9);
 
-      // Verify all are from same organization
-      result.forEach((member) => {
-        expect(member).toHaveProperty("userId");
-        expect(member).toHaveProperty("email");
-        expect(member).toHaveProperty("role");
-        expect(member.role).toHaveProperty("name");
+        // Check that our test users are included - use partial matching since emails now have timestamps
+        const emails = result.map((member) => member.email);
+        expect(
+          emails.some(
+            (email) =>
+              email.startsWith("admin-") && email.endsWith("@dev.local"),
+          ),
+        ).toBe(true);
+        expect(
+          emails.some(
+            (email) =>
+              email.startsWith("secondary-") && email.endsWith("@example.com"),
+          ),
+        ).toBe(true);
+
+        // Verify all are from same organization
+        result.forEach((member) => {
+          expect(member).toHaveProperty("userId");
+          expect(member).toHaveProperty("email");
+          expect(member).toHaveProperty("role");
+          expect(member.role).toHaveProperty("name");
+        });
       });
     });
 
-    it("should enforce organizational isolation", async () => {
-      // Create another organization with users
-      const [otherOrg] = await db
-        .insert(schema.organizations)
-        .values({
-          id: "other-org",
-          name: "Other Organization",
-          subdomain: "other",
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .returning();
+    test("should enforce organizational isolation", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { caller } = await createTestContext(db);
 
-      const [otherUser] = await db
-        .insert(schema.users)
-        .values({
-          id: "other-user",
-          name: "Other User",
-          email: "other@example.com",
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .returning();
+        // Create another organization with users
+        const otherOrgId = generateTestId("other-org");
 
-      const [otherRole] = await db
-        .insert(schema.roles)
-        .values({
-          id: "other-role",
-          name: "Other Role",
+        const [otherOrg] = await db
+          .insert(schema.organizations)
+          .values({
+            id: otherOrgId,
+            name: "Other Organization",
+            subdomain: generateTestId("other"),
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
+
+        const [otherUser] = await db
+          .insert(schema.users)
+          .values({
+            id: generateTestId("other-user"),
+            name: "Other User",
+            email: `other-${generateTestId("other")}@example.com`,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
+
+        const [otherRole] = await db
+          .insert(schema.roles)
+          .values({
+            id: generateTestId("other-role"),
+            name: "Other Role",
+            organizationId: otherOrg.id,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
+
+        await db.insert(schema.memberships).values({
+          id: generateTestId("other-membership"),
+          userId: otherUser.id,
           organizationId: otherOrg.id,
+          roleId: otherRole.id,
           createdAt: new Date(),
           updatedAt: new Date(),
-        })
-        .returning();
+        });
 
-      await db.insert(schema.memberships).values({
-        id: "other-membership",
-        userId: otherUser.id,
-        organizationId: otherOrg.id,
-        roleId: otherRole.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        // Query should only return users from test organization (9 users)
+        const result = await caller.getUsers();
+        expect(result).toHaveLength(9);
+
+        // Ensure none are from other organization
+        const emails = result.map((member) => member.email);
+        expect(
+          emails.some(
+            (email) =>
+              email.startsWith("other-") && email.endsWith("@example.com"),
+          ),
+        ).toBe(false);
       });
-
-      // Query should only return users from test organization (9 users)
-      const result = await caller.getUsers();
-      expect(result).toHaveLength(9);
-
-      // Ensure none are from other organization
-      const emails = result.map((member) => member.email);
-      expect(emails).not.toContain("other@example.com");
     });
   });
 
   describe("updateUserRole", () => {
-    it("should update user role with real database operations", async () => {
-      const newRole = await db
-        .insert(schema.roles)
-        .values({
-          id: "new-role",
-          name: "New Role",
-          organizationId: testData.organization,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .returning()
-        .then((r) => r[0]);
+    test("should update user role with real database operations", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { testData, caller } = await createTestContext(db);
 
-      if (!testData.secondaryUser)
-        throw new Error("Secondary user not created");
+        const newRole = await db
+          .insert(schema.roles)
+          .values({
+            id: generateTestId("new-role"),
+            name: "New Role",
+            organizationId: testData.organization,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning()
+          .then((r) => r[0]);
 
-      await caller.updateUserRole({
-        userId: testData.secondaryUser,
-        roleId: newRole.id,
+        if (!testData.secondaryUser)
+          throw new Error("Secondary user not created");
+
+        await caller.updateUserRole({
+          userId: testData.secondaryUser,
+          roleId: newRole.id,
+        });
+
+        // Verify in database
+        const membership = await db.query.memberships.findFirst({
+          where: eq(schema.memberships.userId, testData.secondaryUser),
+          with: { role: true },
+        });
+
+        expect(membership?.roleId).toBe(newRole.id);
+        expect(membership?.role.name).toBe("New Role");
       });
-
-      // Verify in database
-      const membership = await db.query.memberships.findFirst({
-        where: eq(schema.memberships.userId, testData.secondaryUser),
-        with: { role: true },
-      });
-
-      expect(membership?.roleId).toBe(newRole.id);
-      expect(membership?.role.name).toBe("New Role");
     });
 
-    it("should enforce role exists in organization constraint", async () => {
-      // Create role in different organization
-      const [otherOrg] = await db
-        .insert(schema.organizations)
-        .values({
-          id: "other-org-role-test",
-          name: "Other Org",
-          subdomain: "other-role",
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .returning();
+    test("should enforce role exists in organization constraint", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { testData, caller } = await createTestContext(db);
 
-      const [otherRole] = await db
-        .insert(schema.roles)
-        .values({
-          id: "other-org-role",
-          name: "Other Org Role",
-          organizationId: otherOrg.id,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .returning();
+        // Create role in different organization
+        const [otherOrg] = await db
+          .insert(schema.organizations)
+          .values({
+            id: generateTestId("other-org-role-test"),
+            name: "Other Org",
+            subdomain: generateTestId("other-role"),
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
 
-      if (!testData.secondaryUser)
-        throw new Error("Secondary user not created");
+        const [otherRole] = await db
+          .insert(schema.roles)
+          .values({
+            id: generateTestId("other-org-role"),
+            name: "Other Org Role",
+            organizationId: otherOrg.id,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
 
-      await expect(
-        caller.updateUserRole({
-          userId: testData.secondaryUser,
-          roleId: otherRole.id,
-        }),
-      ).rejects.toThrow();
+        if (!testData.secondaryUser)
+          throw new Error("Secondary user not created");
+
+        await expect(
+          caller.updateUserRole({
+            userId: testData.secondaryUser,
+            roleId: otherRole.id,
+          }),
+        ).rejects.toThrow();
+      });
     });
   });
 
   describe("inviteUser", () => {
-    it("should create invitation with real database operations", async () => {
-      if (!testData.memberRole) throw new Error("Member role not created");
+    test("should create invitation with real database operations", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { testData, caller } = await createTestContext(db);
 
-      const result = await caller.inviteUser({
-        email: "invite@example.com",
-        roleId: testData.memberRole,
-      });
+        if (!testData.memberRole) throw new Error("Member role not created");
 
-      expect(result).toMatchObject({
-        email: "invite@example.com",
-        emailVerified: null, // Not verified (invitation)
-        isInvitation: true,
-        role: expect.objectContaining({
-          name: "Member",
-        }),
-      });
+        const inviteEmail = `invite-${generateTestId("invite")}@example.com`;
 
-      // Verify user and membership created in database
-      const user = await db.query.users.findFirst({
-        where: eq(schema.users.email, "invite@example.com"),
-      });
-      expect(user).toBeTruthy();
-      expect(user?.emailVerified).toBeNull();
+        const result = await caller.inviteUser({
+          email: inviteEmail,
+          roleId: testData.memberRole,
+        });
 
-      if (!user) throw new Error("User not found");
+        expect(result).toMatchObject({
+          email: inviteEmail,
+          emailVerified: null, // Not verified (invitation)
+          isInvitation: true,
+          role: expect.objectContaining({
+            name: "Member",
+          }),
+        });
 
-      const membership = await db.query.memberships.findFirst({
-        where: eq(schema.memberships.userId, user.id),
-      });
-      expect(membership).toMatchObject({
-        organizationId: testData.organization,
-        roleId: testData.memberRole,
+        // Verify user and membership created in database
+        const user = await db.query.users.findFirst({
+          where: eq(schema.users.email, inviteEmail),
+        });
+        expect(user).toBeTruthy();
+        expect(user?.emailVerified).toBeNull();
+
+        if (!user) throw new Error("User not found");
+
+        const membership = await db.query.memberships.findFirst({
+          where: eq(schema.memberships.userId, user.id),
+        });
+        expect(membership).toMatchObject({
+          organizationId: testData.organization,
+          roleId: testData.memberRole,
+        });
       });
     });
 
-    it("should handle duplicate email invitations", async () => {
-      if (!testData.memberRole || !testData.adminRole)
-        throw new Error("Roles not created");
+    test("should handle duplicate email invitations", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { testData, caller } = await createTestContext(db);
 
-      // First invitation
-      await caller.inviteUser({
-        email: "duplicate@example.com",
-        roleId: testData.memberRole,
+        if (!testData.memberRole || !testData.adminRole)
+          throw new Error("Roles not created");
+
+        const duplicateEmail = `duplicate-${generateTestId("duplicate")}@example.com`;
+
+        // First invitation
+        await caller.inviteUser({
+          email: duplicateEmail,
+          roleId: testData.memberRole,
+        });
+
+        // Second invitation with same email should throw CONFLICT error
+        await expect(
+          caller.inviteUser({
+            email: duplicateEmail,
+            roleId: testData.adminRole,
+          }),
+        ).rejects.toThrow("User is already a member of this organization");
       });
-
-      // Second invitation with same email should throw CONFLICT error
-      await expect(
-        caller.inviteUser({
-          email: "duplicate@example.com",
-          roleId: testData.adminRole,
-        }),
-      ).rejects.toThrow("User is already a member of this organization");
     });
   });
 
   describe("getInvitations", () => {
-    it("should retrieve pending invitations with real database operations", async () => {
-      if (!testData.memberRole || !testData.adminRole)
-        throw new Error("Roles not created");
+    test("should retrieve pending invitations with real database operations", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { testData, caller } = await createTestContext(db);
 
-      // Create some invitations
-      await caller.inviteUser({
-        email: "pending1@example.com",
-        roleId: testData.memberRole,
+        if (!testData.memberRole || !testData.adminRole)
+          throw new Error("Roles not created");
+
+        const pending1Email = `pending1-${generateTestId("pending1")}@example.com`;
+        const pending2Email = `pending2-${generateTestId("pending2")}@example.com`;
+
+        // Create some invitations
+        await caller.inviteUser({
+          email: pending1Email,
+          roleId: testData.memberRole,
+        });
+
+        await caller.inviteUser({
+          email: pending2Email,
+          roleId: testData.adminRole,
+        });
+
+        const result = await caller.getInvitations();
+
+        // Check that our specific invitations are included
+        const emails = result.map((inv) => inv.email);
+        expect(emails).toContain(pending1Email);
+        expect(emails).toContain(pending2Email);
+
+        // Verify the format of our invitations
+        const pending1 = result.find((inv) => inv.email === pending1Email);
+        const pending2 = result.find((inv) => inv.email === pending2Email);
+
+        expect(pending1?.role.name).toBe("Member");
+        expect(pending2?.role.name).toBe("Admin");
       });
-
-      await caller.inviteUser({
-        email: "pending2@example.com",
-        roleId: testData.adminRole,
-      });
-
-      const result = await caller.getInvitations();
-
-      // Check that our specific invitations are included
-      const emails = result.map((inv) => inv.email);
-      expect(emails).toContain("pending1@example.com");
-      expect(emails).toContain("pending2@example.com");
-
-      // Verify the format of our invitations
-      const pending1 = result.find(
-        (inv) => inv.email === "pending1@example.com",
-      );
-      const pending2 = result.find(
-        (inv) => inv.email === "pending2@example.com",
-      );
-
-      expect(pending1?.role.name).toBe("Member");
-      expect(pending2?.role.name).toBe("Admin");
     });
 
-    it("should enforce organizational isolation for invitations", async () => {
-      // Create another organization with users
-      const [otherOrg] = await db
-        .insert(schema.organizations)
-        .values({
-          id: "other-org-inv",
-          name: "Other Org",
-          subdomain: "other-inv",
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .returning();
+    test("should enforce organizational isolation for invitations", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { caller } = await createTestContext(db);
 
-      const [otherRole] = await db
-        .insert(schema.roles)
-        .values({
-          id: "other-role-inv",
-          name: "Other Role",
+        // Create another organization with users
+        const [otherOrg] = await db
+          .insert(schema.organizations)
+          .values({
+            id: generateTestId("other-org-inv"),
+            name: "Other Org",
+            subdomain: generateTestId("other-inv"),
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
+
+        const [otherRole] = await db
+          .insert(schema.roles)
+          .values({
+            id: generateTestId("other-role-inv"),
+            name: "Other Role",
+            organizationId: otherOrg.id,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
+
+        const [otherUser] = await db
+          .insert(schema.users)
+          .values({
+            id: generateTestId("other-user-inv"),
+            email: `other-invite-${generateTestId("other-invite")}@example.com`,
+            emailVerified: null, // Not verified (invitation)
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
+
+        await db.insert(schema.memberships).values({
+          id: generateTestId("other-membership-inv"),
+          userId: otherUser.id,
           organizationId: otherOrg.id,
+          roleId: otherRole.id,
           createdAt: new Date(),
           updatedAt: new Date(),
-        })
-        .returning();
+        });
 
-      const [otherUser] = await db
-        .insert(schema.users)
-        .values({
-          id: "other-user-inv",
-          email: "other-invite@example.com",
-          emailVerified: null, // Not verified (invitation)
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .returning();
-
-      await db.insert(schema.memberships).values({
-        id: "other-membership-inv",
-        userId: otherUser.id,
-        organizationId: otherOrg.id,
-        roleId: otherRole.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        // Should only return invitations for current organization
+        const result = await caller.getInvitations();
+        const emails = result.map((inv) => inv.email);
+        expect(
+          emails.some(
+            (email) =>
+              email.startsWith("other-invite-") &&
+              email.endsWith("@example.com"),
+          ),
+        ).toBe(false);
       });
-
-      // Should only return invitations for current organization
-      const result = await caller.getInvitations();
-      const emails = result.map((inv) => inv.email);
-      expect(emails).not.toContain("other-invite@example.com");
     });
   });
 
   describe("removeUser", () => {
-    it("should remove user with real database operations and constraint validation", async () => {
-      if (!testData.secondaryUser)
-        throw new Error("Secondary user not created");
-      const userToRemove = testData.secondaryUser;
+    test("should remove user with real database operations and constraint validation", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { testData, caller } = await createTestContext(db);
 
-      await caller.removeUser({ userId: userToRemove });
+        if (!testData.secondaryUser)
+          throw new Error("Secondary user not created");
+        const userToRemove = testData.secondaryUser;
 
-      // Verify user membership is deleted
-      const membership = await db.query.memberships.findFirst({
-        where: eq(schema.memberships.userId, userToRemove),
+        await caller.removeUser({ userId: userToRemove });
+
+        // Verify user membership is deleted
+        const membership = await db.query.memberships.findFirst({
+          where: eq(schema.memberships.userId, userToRemove),
+        });
+        expect(membership).toBeUndefined();
+
+        // Verify user still exists (soft delete approach) or is deleted depending on implementation
+        const _user = await db.query.users.findFirst({
+          where: eq(schema.users.id, userToRemove),
+        });
+        // Depending on implementation, user might be soft-deleted or removed
+        // This test validates the actual behavior
       });
-      expect(membership).toBeUndefined();
-
-      // Verify user still exists (soft delete approach) or is deleted depending on implementation
-      const _user = await db.query.users.findFirst({
-        where: eq(schema.users.id, userToRemove),
-      });
-      // Depending on implementation, user might be soft-deleted or removed
-      // This test validates the actual behavior
     });
 
-    it("should remove user with cascading referential integrity handling", async () => {
-      if (
-        !testData.secondaryUser ||
-        !testData.location ||
-        !testData.machine ||
-        !testData.status ||
-        !testData.priority
-      ) {
-        throw new Error("Required test data not available");
-      }
+    test("should remove user with cascading referential integrity handling", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { testData, caller } = await createTestContext(db);
 
-      // Create an issue assigned to the user
-      const [issue] = await db
-        .insert(schema.issues)
-        .values({
-          id: "test-issue-ref",
-          title: "Test Issue",
-          description: "Test",
-          createdById: testData.secondaryUser,
-          assignedToId: testData.secondaryUser,
-          organizationId: testData.organization,
-          locationId: testData.location,
-          machineId: testData.machine,
-          statusId: testData.status,
-          priorityId: testData.priority,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .returning();
+        if (
+          !testData.secondaryUser ||
+          !testData.location ||
+          !testData.machine ||
+          !testData.status ||
+          !testData.priority
+        ) {
+          throw new Error("Required test data not available");
+        }
 
-      // The system may implement cascade delete or orphan handling
-      const result = await caller.removeUser({
-        userId: testData.secondaryUser,
+        // Create an issue assigned to the user
+        const [issue] = await db
+          .insert(schema.issues)
+          .values({
+            id: generateTestId("test-issue-ref"),
+            title: "Test Issue",
+            description: "Test",
+            createdById: testData.secondaryUser,
+            assignedToId: testData.secondaryUser,
+            organizationId: testData.organization,
+            locationId: testData.location,
+            machineId: testData.machine,
+            statusId: testData.status,
+            priorityId: testData.priority,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
+
+        // The system may implement cascade delete or orphan handling
+        const result = await caller.removeUser({
+          userId: testData.secondaryUser,
+        });
+        expect(result.success).toBe(true);
+
+        // Verify user membership is removed
+        const membership = await db.query.memberships.findFirst({
+          where: eq(schema.memberships.userId, testData.secondaryUser),
+        });
+        expect(membership).toBeUndefined();
+
+        // Check how the issue was handled (may be reassigned or marked as orphan)
+        const updatedIssue = await db.query.issues.findFirst({
+          where: eq(schema.issues.id, issue.id),
+        });
+
+        // Issue should still exist but may have null assignedToId or be reassigned
+        expect(updatedIssue).toBeTruthy();
+        // The actual behavior depends on the schema constraints and implementation
       });
-      expect(result.success).toBe(true);
-
-      // Verify user membership is removed
-      const membership = await db.query.memberships.findFirst({
-        where: eq(schema.memberships.userId, testData.secondaryUser),
-      });
-      expect(membership).toBeUndefined();
-
-      // Check how the issue was handled (may be reassigned or marked as orphan)
-      const updatedIssue = await db.query.issues.findFirst({
-        where: eq(schema.issues.id, issue.id),
-      });
-
-      // Issue should still exist but may have null assignedToId or be reassigned
-      expect(updatedIssue).toBeTruthy();
-      // The actual behavior depends on the schema constraints and implementation
     });
 
-    it("should prevent removal of last admin (with proper validation)", async () => {
-      // First, let's check how many admins exist and remove all but one
-      const users = await caller.getUsers();
-      const admins = users.filter((user) => user.role.name === "Admin");
+    test("should prevent removal of last admin (with proper validation)", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { caller } = await createTestContext(db);
 
-      // Remove all but one admin to test the last admin constraint
-      for (let i = 0; i < admins.length - 1; i++) {
-        await caller.removeUser({ userId: admins[i].userId });
-      }
+        // First, let's check how many admins exist and remove all but one
+        const users = await caller.getUsers();
+        const admins = users.filter((user) => user.role.name === "Admin");
 
-      // Now try to remove the last admin - this should fail
-      const lastAdmin = admins[admins.length - 1];
+        // Remove all but one admin to test the last admin constraint
+        for (let i = 0; i < admins.length - 1; i++) {
+          await caller.removeUser({ userId: admins[i].userId });
+        }
 
-      // Mock validation to return proper error for last admin removal
-      const { validateUserRemoval } = await import(
-        "~/lib/users/roleManagementValidation"
-      );
-      vi.mocked(validateUserRemoval).mockReturnValueOnce({
-        valid: false,
-        error: "Cannot remove the last admin from the organization",
+        // Now try to remove the last admin - this should fail
+        const lastAdmin = admins[admins.length - 1];
+
+        // Mock validation to return proper error for last admin removal
+        const { validateUserRemoval } = await import(
+          "~/lib/users/roleManagementValidation"
+        );
+        vi.mocked(validateUserRemoval).mockReturnValueOnce({
+          valid: false,
+          error: "Cannot remove the last admin from the organization",
+        });
+
+        await expect(
+          caller.removeUser({ userId: lastAdmin.userId }),
+        ).rejects.toThrow("Cannot remove the last admin from the organization");
       });
-
-      await expect(
-        caller.removeUser({ userId: lastAdmin.userId }),
-      ).rejects.toThrow("Cannot remove the last admin from the organization");
     });
   });
 
   describe("deleteRoleWithReassignment", () => {
-    it("should delete role and reassign users with real database operations", async () => {
-      // Create a role to delete
-      const [roleToDelete] = await db
-        .insert(schema.roles)
-        .values({
-          id: "role-to-delete",
-          name: "Role To Delete",
+    test("should delete role and reassign users with real database operations", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { testData, caller } = await createTestContext(db);
+
+        // Create a role to delete
+        const [roleToDelete] = await db
+          .insert(schema.roles)
+          .values({
+            id: generateTestId("role-to-delete"),
+            name: "Role To Delete",
+            organizationId: testData.organization,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
+
+        if (!testData.secondaryUser || !testData.memberRole)
+          throw new Error("Required test data not available");
+
+        // Assign user to this role
+        await db.insert(schema.memberships).values({
+          id: generateTestId("temp-membership"),
+          userId: testData.secondaryUser,
           organizationId: testData.organization,
+          roleId: roleToDelete.id,
           createdAt: new Date(),
           updatedAt: new Date(),
-        })
-        .returning();
+        });
 
-      if (!testData.secondaryUser || !testData.memberRole)
-        throw new Error("Required test data not available");
+        await caller.deleteRoleWithReassignment({
+          roleId: roleToDelete.id,
+          reassignToRoleId: testData.memberRole,
+        });
 
-      // Assign user to this role
-      await db.insert(schema.memberships).values({
-        id: "temp-membership",
-        userId: testData.secondaryUser,
-        organizationId: testData.organization,
-        roleId: roleToDelete.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        // Verify role is deleted
+        const role = await db.query.roles.findFirst({
+          where: eq(schema.roles.id, roleToDelete.id),
+        });
+        expect(role).toBeUndefined();
+
+        // Verify user is reassigned to new role
+        const membership = await db.query.memberships.findFirst({
+          where: eq(schema.memberships.userId, testData.secondaryUser),
+        });
+        expect(membership?.roleId).toBe(testData.memberRole);
       });
-
-      await caller.deleteRoleWithReassignment({
-        roleId: roleToDelete.id,
-        reassignToRoleId: testData.memberRole,
-      });
-
-      // Verify role is deleted
-      const role = await db.query.roles.findFirst({
-        where: eq(schema.roles.id, roleToDelete.id),
-      });
-      expect(role).toBeUndefined();
-
-      // Verify user is reassigned to new role
-      const membership = await db.query.memberships.findFirst({
-        where: eq(schema.memberships.userId, testData.secondaryUser),
-      });
-      expect(membership?.roleId).toBe(testData.memberRole);
     });
 
-    it("should enforce constraint validation for role deletion", async () => {
-      // Try to delete a system role
-      const systemRole = await db.query.roles.findFirst({
-        where: and(
-          eq(schema.roles.organizationId, testData.organization),
-          eq(schema.roles.isSystem, true),
-        ),
-      });
+    test("should enforce constraint validation for role deletion", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { testData, caller } = await createTestContext(db);
 
-      if (systemRole && testData.memberRole) {
-        await expect(
-          caller.deleteRoleWithReassignment({
-            roleId: systemRole.id,
-            reassignToRoleId: testData.memberRole,
-          }),
-        ).rejects.toThrow();
-      }
+        // Try to delete a system role
+        const systemRole = await db.query.roles.findFirst({
+          where: and(
+            eq(schema.roles.organizationId, testData.organization),
+            eq(schema.roles.isSystem, true),
+          ),
+        });
+
+        if (systemRole && testData.memberRole) {
+          await expect(
+            caller.deleteRoleWithReassignment({
+              roleId: systemRole.id,
+              reassignToRoleId: testData.memberRole,
+            }),
+          ).rejects.toThrow();
+        }
+      });
     });
   });
 
   describe("Transaction Integrity", () => {
-    it("should maintain ACID properties for bulk operations", async () => {
-      // Test that failed operations don't leave partial state
-      const originalMembershipCount = await db
-        .select({ count: count() })
-        .from(schema.memberships)
-        .where(eq(schema.memberships.organizationId, testData.organization));
+    test("should maintain ACID properties for bulk operations", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { testData, caller } = await createTestContext(db);
 
-      // Attempt operation that should fail
-      await expect(
-        caller.removeUser({
-          userId: "non-existent-user",
-        }),
-      ).rejects.toThrow();
+        // Test that failed operations don't leave partial state
+        const originalMembershipCount = await db
+          .select({ count: count() })
+          .from(schema.memberships)
+          .where(eq(schema.memberships.organizationId, testData.organization));
 
-      // Verify no partial changes occurred
-      const finalMembershipCount = await db
-        .select({ count: count() })
-        .from(schema.memberships)
-        .where(eq(schema.memberships.organizationId, testData.organization));
+        // Attempt operation that should fail
+        await expect(
+          caller.removeUser({
+            userId: "non-existent-user",
+          }),
+        ).rejects.toThrow();
 
-      expect(finalMembershipCount[0].count).toBe(
-        originalMembershipCount[0].count,
-      );
+        // Verify no partial changes occurred
+        const finalMembershipCount = await db
+          .select({ count: count() })
+          .from(schema.memberships)
+          .where(eq(schema.memberships.organizationId, testData.organization));
+
+        expect(finalMembershipCount[0].count).toBe(
+          originalMembershipCount[0].count,
+        );
+      });
     });
   });
 });

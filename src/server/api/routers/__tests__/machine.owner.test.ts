@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/unbound-method */
+ 
 /**
  * Machine Owner Router Unit Tests
  *
@@ -115,7 +115,7 @@ describe("machine.owner router", () => {
     vi.mocked(requirePermissionForSession).mockResolvedValue(undefined);
 
     // Mock membership query for organizationProcedure
-    mockCtx.db.membership.findFirst.mockResolvedValue({
+    mockCtx.db.query.memberships.findFirst.mockResolvedValue({
       id: "membership-1",
       userId: "user-1",
       organizationId: "org-1",
@@ -129,15 +129,15 @@ describe("machine.owner router", () => {
     describe("success scenarios", () => {
       it("should assign owner to machine successfully", async () => {
         // Mock database operations
-        mockCtx.drizzle.query.machines.findFirst
+        mockCtx.db.query.machines.findFirst
           .mockResolvedValueOnce(mockMachine) // Machine exists check
           .mockResolvedValueOnce(mockMachineWithRelations); // Final fetch with relations
 
-        mockCtx.drizzle.query.memberships.findFirst.mockResolvedValueOnce(
+        mockCtx.db.query.memberships.findFirst.mockResolvedValueOnce(
           mockMembership,
         ); // Membership validation
 
-        (mockCtx.drizzle.update as any).mockReturnValue({
+        (mockCtx.db.update as any).mockReturnValue({
           set: vi.fn().mockReturnValue({
             where: vi.fn().mockReturnValue({
               returning: vi.fn().mockResolvedValue([mockUpdatedMachine]),
@@ -153,22 +153,20 @@ describe("machine.owner router", () => {
         });
 
         expect(result).toEqual(mockMachineWithRelations);
-        expect(mockCtx.drizzle.query.machines.findFirst).toHaveBeenCalledTimes(
-          2,
-        );
-        expect(mockCtx.drizzle.query.memberships.findFirst).toHaveBeenCalled();
-        expect(mockCtx.drizzle.update).toHaveBeenCalled();
+        expect(mockCtx.db.query.machines.findFirst).toHaveBeenCalledTimes(2);
+        expect(mockCtx.db.query.memberships.findFirst).toHaveBeenCalled();
+        expect(mockCtx.db.update).toHaveBeenCalled();
       });
 
       it("should remove owner from machine successfully", async () => {
         // Mock database operations for removing owner
-        mockCtx.drizzle.query.machines.findFirst
+        mockCtx.db.query.machines.findFirst
           .mockResolvedValueOnce(mockMachineWithOwner) // Machine exists check
           .mockResolvedValueOnce(mockMachineWithoutOwnerRelations); // Final fetch without owner
 
         // No membership check when removing owner (ownerId is undefined)
 
-        (mockCtx.drizzle.update as any).mockReturnValue({
+        (mockCtx.db.update as any).mockReturnValue({
           set: vi.fn().mockReturnValue({
             where: vi.fn().mockReturnValue({
               returning: vi
@@ -186,13 +184,9 @@ describe("machine.owner router", () => {
         });
 
         expect(result).toEqual(mockMachineWithoutOwnerRelations);
-        expect(mockCtx.drizzle.query.machines.findFirst).toHaveBeenCalledTimes(
-          2,
-        );
-        expect(
-          mockCtx.drizzle.query.memberships.findFirst,
-        ).not.toHaveBeenCalled();
-        expect(mockCtx.drizzle.update).toHaveBeenCalled();
+        expect(mockCtx.db.query.machines.findFirst).toHaveBeenCalledTimes(2);
+        expect(mockCtx.db.query.memberships.findFirst).not.toHaveBeenCalled();
+        expect(mockCtx.db.update).toHaveBeenCalled();
       });
 
       it("should handle reassigning owner to different user", async () => {
@@ -208,15 +202,15 @@ describe("machine.owner router", () => {
           },
         };
 
-        mockCtx.drizzle.query.machines.findFirst
+        mockCtx.db.query.machines.findFirst
           .mockResolvedValueOnce(mockMachineWithOwner) // Machine exists with current owner
           .mockResolvedValueOnce(machineWithNewOwner); // Final fetch with new owner
 
-        mockCtx.drizzle.query.memberships.findFirst.mockResolvedValueOnce(
+        mockCtx.db.query.memberships.findFirst.mockResolvedValueOnce(
           newMembership,
         ); // New owner membership validation
 
-        (mockCtx.drizzle.update as any).mockReturnValue({
+        (mockCtx.db.update as any).mockReturnValue({
           set: vi.fn().mockReturnValue({
             where: vi.fn().mockReturnValue({
               returning: vi
@@ -240,7 +234,7 @@ describe("machine.owner router", () => {
 
     describe("error scenarios", () => {
       it("should throw NOT_FOUND when machine does not exist", async () => {
-        mockCtx.drizzle.query.machines.findFirst.mockResolvedValueOnce(null);
+        mockCtx.db.query.machines.findFirst.mockResolvedValueOnce(null);
 
         const caller = appRouter.createCaller(mockCtx);
 
@@ -256,13 +250,9 @@ describe("machine.owner router", () => {
           }),
         );
 
-        expect(mockCtx.drizzle.query.machines.findFirst).toHaveBeenCalledTimes(
-          1,
-        );
-        expect(
-          mockCtx.drizzle.query.memberships.findFirst,
-        ).not.toHaveBeenCalled();
-        expect(mockCtx.drizzle.update).not.toHaveBeenCalled();
+        expect(mockCtx.db.query.machines.findFirst).toHaveBeenCalledTimes(1);
+        expect(mockCtx.db.query.memberships.findFirst).not.toHaveBeenCalled();
+        expect(mockCtx.db.update).not.toHaveBeenCalled();
       });
 
       it("should throw NOT_FOUND when machine belongs to different organization", async () => {
@@ -271,7 +261,7 @@ describe("machine.owner router", () => {
           organizationId: "org-2", // Different organization
         };
 
-        mockCtx.drizzle.query.machines.findFirst.mockResolvedValueOnce(null); // Scoped query returns null
+        mockCtx.db.query.machines.findFirst.mockResolvedValueOnce(null); // Scoped query returns null
 
         const caller = appRouter.createCaller(mockCtx);
 
@@ -289,10 +279,8 @@ describe("machine.owner router", () => {
       });
 
       it("should throw FORBIDDEN when user is not a member of organization", async () => {
-        mockCtx.drizzle.query.machines.findFirst.mockResolvedValueOnce(
-          mockMachine,
-        );
-        mockCtx.drizzle.query.memberships.findFirst.mockResolvedValueOnce(null); // No membership found
+        mockCtx.db.query.machines.findFirst.mockResolvedValueOnce(mockMachine);
+        mockCtx.db.query.memberships.findFirst.mockResolvedValueOnce(null); // No membership found
 
         const caller = appRouter.createCaller(mockCtx);
 
@@ -308,24 +296,18 @@ describe("machine.owner router", () => {
           }),
         );
 
-        expect(mockCtx.drizzle.query.machines.findFirst).toHaveBeenCalledTimes(
-          1,
-        );
-        expect(
-          mockCtx.drizzle.query.memberships.findFirst,
-        ).toHaveBeenCalledTimes(1);
-        expect(mockCtx.drizzle.update).not.toHaveBeenCalled();
+        expect(mockCtx.db.query.machines.findFirst).toHaveBeenCalledTimes(1);
+        expect(mockCtx.db.query.memberships.findFirst).toHaveBeenCalledTimes(1);
+        expect(mockCtx.db.update).not.toHaveBeenCalled();
       });
 
       it("should throw INTERNAL_SERVER_ERROR when machine update fails", async () => {
-        mockCtx.drizzle.query.machines.findFirst.mockResolvedValueOnce(
-          mockMachine,
-        );
-        mockCtx.drizzle.query.memberships.findFirst.mockResolvedValueOnce(
+        mockCtx.db.query.machines.findFirst.mockResolvedValueOnce(mockMachine);
+        mockCtx.db.query.memberships.findFirst.mockResolvedValueOnce(
           mockMembership,
         );
 
-        (mockCtx.drizzle.update as any).mockReturnValue({
+        (mockCtx.db.update as any).mockReturnValue({
           set: vi.fn().mockReturnValue({
             where: vi.fn().mockReturnValue({
               returning: vi.fn().mockResolvedValue([]), // Empty array = update failed
@@ -349,15 +331,15 @@ describe("machine.owner router", () => {
       });
 
       it("should throw INTERNAL_SERVER_ERROR when final fetch fails", async () => {
-        mockCtx.drizzle.query.machines.findFirst
+        mockCtx.db.query.machines.findFirst
           .mockResolvedValueOnce(mockMachine) // Initial check succeeds
           .mockResolvedValueOnce(null); // Final fetch fails
 
-        mockCtx.drizzle.query.memberships.findFirst.mockResolvedValueOnce(
+        mockCtx.db.query.memberships.findFirst.mockResolvedValueOnce(
           mockMembership,
         );
 
-        (mockCtx.drizzle.update as any).mockReturnValue({
+        (mockCtx.db.update as any).mockReturnValue({
           set: vi.fn().mockReturnValue({
             where: vi.fn().mockReturnValue({
               returning: vi.fn().mockResolvedValue([mockUpdatedMachine]),
@@ -403,17 +385,17 @@ describe("machine.owner router", () => {
         );
 
         // Should not call database operations when permission check fails
-        expect(mockCtx.drizzle.query.machines.findFirst).not.toHaveBeenCalled();
+        expect(mockCtx.db.query.machines.findFirst).not.toHaveBeenCalled();
       });
     });
 
     describe("input validation", () => {
       it("should accept valid machineId", async () => {
-        mockCtx.drizzle.query.machines.findFirst
+        mockCtx.db.query.machines.findFirst
           .mockResolvedValueOnce(mockMachine)
           .mockResolvedValueOnce(mockMachineWithoutOwnerRelations);
 
-        (mockCtx.drizzle.update as any).mockReturnValue({
+        (mockCtx.db.update as any).mockReturnValue({
           set: vi.fn().mockReturnValue({
             where: vi.fn().mockReturnValue({
               returning: vi
@@ -433,15 +415,15 @@ describe("machine.owner router", () => {
       });
 
       it("should accept optional ownerId", async () => {
-        mockCtx.drizzle.query.machines.findFirst
+        mockCtx.db.query.machines.findFirst
           .mockResolvedValueOnce(mockMachine)
           .mockResolvedValueOnce(mockMachineWithRelations);
 
-        mockCtx.drizzle.query.memberships.findFirst.mockResolvedValueOnce(
+        mockCtx.db.query.memberships.findFirst.mockResolvedValueOnce(
           mockMembership,
         );
 
-        (mockCtx.drizzle.update as any).mockReturnValue({
+        (mockCtx.db.update as any).mockReturnValue({
           set: vi.fn().mockReturnValue({
             where: vi.fn().mockReturnValue({
               returning: vi.fn().mockResolvedValue([mockUpdatedMachine]),
@@ -460,11 +442,11 @@ describe("machine.owner router", () => {
       });
 
       it("should handle empty string ownerId as removal", async () => {
-        mockCtx.drizzle.query.machines.findFirst
+        mockCtx.db.query.machines.findFirst
           .mockResolvedValueOnce(mockMachine)
           .mockResolvedValueOnce(mockMachineWithoutOwnerRelations);
 
-        (mockCtx.drizzle.update as any).mockReturnValue({
+        (mockCtx.db.update as any).mockReturnValue({
           set: vi.fn().mockReturnValue({
             where: vi.fn().mockReturnValue({
               returning: vi
@@ -483,22 +465,18 @@ describe("machine.owner router", () => {
         });
 
         expect(result).toEqual(mockMachineWithoutOwnerRelations);
-        expect(
-          mockCtx.drizzle.query.memberships.findFirst,
-        ).not.toHaveBeenCalled();
+        expect(mockCtx.db.query.memberships.findFirst).not.toHaveBeenCalled();
       });
     });
 
     describe("organizational scoping", () => {
       it("should only find machines within user's organization", async () => {
-        mockCtx.drizzle.query.machines.findFirst.mockResolvedValueOnce(
-          mockMachine,
-        );
-        mockCtx.drizzle.query.memberships.findFirst.mockResolvedValueOnce(
+        mockCtx.db.query.machines.findFirst.mockResolvedValueOnce(mockMachine);
+        mockCtx.db.query.memberships.findFirst.mockResolvedValueOnce(
           mockMembership,
         );
 
-        (mockCtx.drizzle.update as any).mockReturnValue({
+        (mockCtx.db.update as any).mockReturnValue({
           set: vi.fn().mockReturnValue({
             where: vi.fn().mockReturnValue({
               returning: vi.fn().mockResolvedValue([mockUpdatedMachine]),
@@ -506,7 +484,7 @@ describe("machine.owner router", () => {
           }),
         });
 
-        mockCtx.drizzle.query.machines.findFirst.mockResolvedValueOnce(
+        mockCtx.db.query.machines.findFirst.mockResolvedValueOnce(
           mockMachineWithRelations,
         );
 
@@ -518,20 +496,18 @@ describe("machine.owner router", () => {
         });
 
         // Verify organizational scoping in machine lookup
-        expect(mockCtx.drizzle.query.machines.findFirst).toHaveBeenCalledWith({
+        expect(mockCtx.db.query.machines.findFirst).toHaveBeenCalledWith({
           where: expect.anything(), // SQL object from and(eq(machines.id, input.machineId), eq(machines.organizationId, ctx.organization.id))
         });
       });
 
       it("should only validate membership within user's organization", async () => {
-        mockCtx.drizzle.query.machines.findFirst.mockResolvedValueOnce(
-          mockMachine,
-        );
-        mockCtx.drizzle.query.memberships.findFirst.mockResolvedValueOnce(
+        mockCtx.db.query.machines.findFirst.mockResolvedValueOnce(mockMachine);
+        mockCtx.db.query.memberships.findFirst.mockResolvedValueOnce(
           mockMembership,
         );
 
-        (mockCtx.drizzle.update as any).mockReturnValue({
+        (mockCtx.db.update as any).mockReturnValue({
           set: vi.fn().mockReturnValue({
             where: vi.fn().mockReturnValue({
               returning: vi.fn().mockResolvedValue([mockUpdatedMachine]),
@@ -539,7 +515,7 @@ describe("machine.owner router", () => {
           }),
         });
 
-        mockCtx.drizzle.query.machines.findFirst.mockResolvedValueOnce(
+        mockCtx.db.query.machines.findFirst.mockResolvedValueOnce(
           mockMachineWithRelations,
         );
 
@@ -551,9 +527,7 @@ describe("machine.owner router", () => {
         });
 
         // Verify organizational scoping in membership validation
-        expect(
-          mockCtx.drizzle.query.memberships.findFirst,
-        ).toHaveBeenCalledWith({
+        expect(mockCtx.db.query.memberships.findFirst).toHaveBeenCalledWith({
           where: expect.anything(), // SQL object from and(eq(memberships.userId, input.ownerId), eq(memberships.organizationId, ctx.organization.id))
         });
       });
@@ -569,7 +543,7 @@ describe("machine.owner router", () => {
           },
         };
 
-        mockCtx.drizzle.query.machines.findFirst.mockResolvedValueOnce(null); // No machine in org-2
+        mockCtx.db.query.machines.findFirst.mockResolvedValueOnce(null); // No machine in org-2
 
         const caller = appRouter.createCaller(customCtx);
 
@@ -590,15 +564,15 @@ describe("machine.owner router", () => {
     describe("permission validation", () => {
       it("should require machine:edit permission", async () => {
         // Set up mocks to reach the permission check
-        mockCtx.drizzle.query.machines.findFirst
+        mockCtx.db.query.machines.findFirst
           .mockResolvedValueOnce(mockMachine)
           .mockResolvedValueOnce(mockMachineWithRelations);
 
-        mockCtx.drizzle.query.memberships.findFirst.mockResolvedValueOnce(
+        mockCtx.db.query.memberships.findFirst.mockResolvedValueOnce(
           mockMembership,
         );
 
-        (mockCtx.drizzle.update as any).mockReturnValue({
+        (mockCtx.db.update as any).mockReturnValue({
           set: vi.fn().mockReturnValue({
             where: vi.fn().mockReturnValue({
               returning: vi.fn().mockResolvedValue([mockUpdatedMachine]),
@@ -625,15 +599,15 @@ describe("machine.owner router", () => {
 
     describe("relationship loading", () => {
       it("should load machine with model, location, and owner relationships", async () => {
-        mockCtx.drizzle.query.machines.findFirst
+        mockCtx.db.query.machines.findFirst
           .mockResolvedValueOnce(mockMachine)
           .mockResolvedValueOnce(mockMachineWithRelations);
 
-        mockCtx.drizzle.query.memberships.findFirst.mockResolvedValueOnce(
+        mockCtx.db.query.memberships.findFirst.mockResolvedValueOnce(
           mockMembership,
         );
 
-        (mockCtx.drizzle.update as any).mockReturnValue({
+        (mockCtx.db.update as any).mockReturnValue({
           set: vi.fn().mockReturnValue({
             where: vi.fn().mockReturnValue({
               returning: vi.fn().mockResolvedValue([mockUpdatedMachine]),
@@ -657,11 +631,11 @@ describe("machine.owner router", () => {
       });
 
       it("should handle null owner relationship when removing owner", async () => {
-        mockCtx.drizzle.query.machines.findFirst
+        mockCtx.db.query.machines.findFirst
           .mockResolvedValueOnce(mockMachineWithOwner)
           .mockResolvedValueOnce(mockMachineWithoutOwnerRelations);
 
-        (mockCtx.drizzle.update as any).mockReturnValue({
+        (mockCtx.db.update as any).mockReturnValue({
           set: vi.fn().mockReturnValue({
             where: vi.fn().mockReturnValue({
               returning: vi
@@ -683,15 +657,15 @@ describe("machine.owner router", () => {
       });
 
       it("should load only necessary owner fields for security", async () => {
-        mockCtx.drizzle.query.machines.findFirst
+        mockCtx.db.query.machines.findFirst
           .mockResolvedValueOnce(mockMachine)
           .mockResolvedValueOnce(mockMachineWithRelations);
 
-        mockCtx.drizzle.query.memberships.findFirst.mockResolvedValueOnce(
+        mockCtx.db.query.memberships.findFirst.mockResolvedValueOnce(
           mockMembership,
         );
 
-        (mockCtx.drizzle.update as any).mockReturnValue({
+        (mockCtx.db.update as any).mockReturnValue({
           set: vi.fn().mockReturnValue({
             where: vi.fn().mockReturnValue({
               returning: vi.fn().mockResolvedValue([mockUpdatedMachine]),

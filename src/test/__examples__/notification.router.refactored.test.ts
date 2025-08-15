@@ -246,7 +246,7 @@ describe("notificationRouter - Refactored", () => {
       await caller.notification.getNotifications({});
 
       const createNotificationServiceFn =
-        // eslint-disable-next-line @typescript-eslint/unbound-method
+         
         context.services.createNotificationService;
       const mockCreateNotificationService = vi.mocked(
         createNotificationServiceFn,
@@ -294,7 +294,7 @@ describe("notificationRouter - Refactored", () => {
       await caller.notification.getUnreadCount();
 
       const createNotificationServiceFn =
-        // eslint-disable-next-line @typescript-eslint/unbound-method
+         
         context.services.createNotificationService;
       const mockCreateNotificationService = vi.mocked(
         createNotificationServiceFn,

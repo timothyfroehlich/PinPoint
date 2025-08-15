@@ -16,7 +16,7 @@ export const machineOwnerRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       // Verify the game instance belongs to this organization
-      const existingInstance = await ctx.drizzle.query.machines.findFirst({
+      const existingInstance = await ctx.db.query.machines.findFirst({
         where: and(
           eq(machines.id, input.machineId),
           eq(machines.organizationId, ctx.organization.id),
@@ -32,7 +32,7 @@ export const machineOwnerRouter = createTRPCRouter({
 
       // If setting an owner, verify the user is a member of this organization
       if (input.ownerId) {
-        const membership = await ctx.drizzle.query.memberships.findFirst({
+        const membership = await ctx.db.query.memberships.findFirst({
           where: and(
             eq(memberships.userId, input.ownerId),
             eq(memberships.organizationId, ctx.organization.id),
@@ -48,7 +48,7 @@ export const machineOwnerRouter = createTRPCRouter({
       }
 
       // Update the machine owner
-      const [updatedMachine] = await ctx.drizzle
+      const [updatedMachine] = await ctx.db
         .update(machines)
         .set({ ownerId: input.ownerId ?? null })
         .where(eq(machines.id, input.machineId))
@@ -62,7 +62,7 @@ export const machineOwnerRouter = createTRPCRouter({
       }
 
       // Fetch the updated machine with its relationships
-      const machineWithRelations = await ctx.drizzle.query.machines.findFirst({
+      const machineWithRelations = await ctx.db.query.machines.findFirst({
         where: eq(machines.id, input.machineId),
         with: {
           model: true,

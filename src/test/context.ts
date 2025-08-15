@@ -1,14 +1,20 @@
-import { PrismaClient } from "@prisma/client";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
+
+import * as schema from "~/server/db/schema";
 
 export function createTestContext(): {
-  prisma: PrismaClient;
+  db: ReturnType<typeof drizzle<typeof schema>>;
   session: undefined;
   organization: undefined;
 } {
-  const prisma = new PrismaClient();
+  // For tests, use a mock pool that doesn't actually connect
+  const mockPool = new Pool({ connectionString: "postgresql://mock" });
+  const db = drizzle(mockPool, { schema });
+
   // Optionally seed test org, etc. here
   return {
-    prisma,
+    db,
     session: undefined,
     organization: undefined,
   };

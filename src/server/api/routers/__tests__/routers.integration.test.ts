@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/unbound-method */
+ 
 import { TRPCError } from "@trpc/server";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
@@ -81,7 +81,7 @@ describe("Router Integration Tests", () => {
     };
 
     // Mock the database call that organizationProcedure makes
-    vi.mocked(mockContext.db.membership.findFirst).mockResolvedValue(
+    vi.mocked(mockContext.db.query.memberships.findFirst).mockResolvedValue(
       mockMembership,
     );
 
@@ -210,7 +210,7 @@ describe("Router Integration Tests", () => {
         upvotes: [],
       };
 
-      vi.mocked(mockContext.db.machine.findFirst).mockResolvedValue(
+      vi.mocked(mockContext.db.query.machines.findFirst).mockResolvedValue(
         mockMachine,
       );
       vi.mocked(mockContext.db.machine.findUnique).mockResolvedValue(
@@ -325,7 +325,9 @@ describe("Router Integration Tests", () => {
         description: "Updated description",
       };
 
-      vi.mocked(mockContext.db.issue.findFirst).mockResolvedValue(mockIssue);
+      vi.mocked(mockContext.db.query.issues.findFirst).mockResolvedValue(
+        mockIssue,
+      );
       vi.mocked(mockContext.db.issue.update).mockResolvedValue(updatedIssue);
 
       // Act
@@ -447,12 +449,12 @@ describe("Router Integration Tests", () => {
       // Sequential mocking for multiple limit() calls:
       // 1. First query: existence check returns original machine
       // 2. Final query: get with relations returns updated machine with full data
-      vi.mocked(ctx.drizzle.limit)
+      vi.mocked(ctx.db.limit)
         .mockResolvedValueOnce([mockMachine])
         .mockResolvedValueOnce([updatedMachine]);
 
       // Mock update operation returning the updated machine
-      vi.mocked(ctx.drizzle.returning).mockResolvedValue([updatedMachine]);
+      vi.mocked(ctx.db.returning).mockResolvedValue([updatedMachine]);
 
       // Act
       const result = await caller.machine.core.update({
@@ -490,7 +492,7 @@ describe("Router Integration Tests", () => {
       const caller = createCaller(ctx);
 
       // Mock machine from different organization - return empty array to simulate not found
-      vi.mocked(ctx.drizzle.limit).mockResolvedValue([]);
+      vi.mocked(ctx.db.limit).mockResolvedValue([]);
 
       // Act & Assert
       await expect(
@@ -540,9 +542,7 @@ describe("Router Integration Tests", () => {
       };
 
       // Mock the Drizzle update chain: update().set().where().returning()
-      vi.mocked(mockContext.drizzle.returning).mockResolvedValue([
-        updatedLocation,
-      ]);
+      vi.mocked(mockContext.db.returning).mockResolvedValue([updatedLocation]);
 
       // Act
       const result = await caller.location.update({
@@ -559,17 +559,17 @@ describe("Router Integration Tests", () => {
       );
 
       // Verify the Drizzle update chain: update().set().where().returning()
-      expect(mockContext.drizzle.update).toHaveBeenCalledWith(
+      expect(mockContext.db.update).toHaveBeenCalledWith(
         expect.any(Object), // Accept any table object (locations table schema)
       );
-      expect(mockContext.drizzle.set).toHaveBeenCalledWith({
+      expect(mockContext.db.set).toHaveBeenCalledWith({
         name: "Updated Location Name",
         updatedAt: expect.any(Date), // Drizzle auto-adds updatedAt
       });
-      expect(mockContext.drizzle.where).toHaveBeenCalledWith(
+      expect(mockContext.db.where).toHaveBeenCalledWith(
         expect.any(Object), // and() clause with id and organization filters
       );
-      expect(mockContext.drizzle.returning).toHaveBeenCalled();
+      expect(mockContext.db.returning).toHaveBeenCalled();
     });
 
     it("should deny location operations without proper permissions", async () => {
@@ -619,7 +619,7 @@ describe("Router Integration Tests", () => {
       };
 
       // Mock Drizzle update operation - organization router uses Drizzle exclusively
-      vi.mocked(ctx.drizzle.returning).mockResolvedValue([updatedOrganization]);
+      vi.mocked(ctx.db.returning).mockResolvedValue([updatedOrganization]);
 
       // Act
       const result = await caller.organization.update({
@@ -725,7 +725,7 @@ describe("Router Integration Tests", () => {
       // 1. Role lookup: returns role with organizationId for validation
       // 2. Membership lookup: returns membership with userId for validation
       // 3. Get membership details: returns full membership details for response
-      vi.mocked(ctx.drizzle.limit)
+      vi.mocked(ctx.db.limit)
         .mockResolvedValueOnce([{ organizationId: "org-1" }]) // Role lookup
         .mockResolvedValueOnce([{ userId: "user-2" }]) // Membership lookup
         .mockResolvedValueOnce([
@@ -743,7 +743,7 @@ describe("Router Integration Tests", () => {
         ]);
 
       // Mock membership update returning operation
-      vi.mocked(ctx.drizzle.returning).mockResolvedValue([updatedMembership]);
+      vi.mocked(ctx.db.returning).mockResolvedValue([updatedMembership]);
 
       // Act
       const result = await caller.user.updateMembership({
@@ -838,8 +838,10 @@ describe("Router Integration Tests", () => {
         mockContext.services.createIssueActivityService,
       ).mockReturnValue(mockActivityService);
 
-      vi.mocked(mockContext.db.issue.findFirst).mockResolvedValue(mockIssue);
-      vi.mocked(mockContext.db.membership.findUnique).mockResolvedValue({
+      vi.mocked(mockContext.db.query.issues.findFirst).mockResolvedValue(
+        mockIssue,
+      );
+      vi.mocked(mockContext.db.query.memberships.findFirst).mockResolvedValue({
         id: "membership-2",
         userId: "user-2",
         organizationId: "org-1",

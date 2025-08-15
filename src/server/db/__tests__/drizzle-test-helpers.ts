@@ -23,7 +23,7 @@ export interface EnvironmentConfig {
   /** Vercel environment (preview, production) */
   VERCEL_ENV?: string | undefined;
   /** Database connection URL */
-  POSTGRES_PRISMA_URL?: string;
+  DATABASE_URL?: string;
   /** Whether this is a development environment */
   isDevelopment?: boolean;
 }
@@ -55,7 +55,7 @@ export function configureDevelopmentMocks(): void {
   // Reset environment to development defaults
   vi.mocked(mockEnv).NODE_ENV = "development";
   vi.mocked(mockEnv).VERCEL_ENV = undefined;
-  vi.mocked(mockEnv).POSTGRES_PRISMA_URL = createLocalhost5432URL("test");
+  vi.mocked(mockEnv).DATABASE_URL = createLocalhost5432URL("test");
 
   // Development environment detection
   mockIsDevelopment.mockReturnValue(true);
@@ -82,7 +82,7 @@ export function configureProductionMocks(): void {
   // Reset environment to production defaults
   vi.mocked(mockEnv).NODE_ENV = "production";
   vi.mocked(mockEnv).VERCEL_ENV = "production";
-  vi.mocked(mockEnv).POSTGRES_PRISMA_URL = createRemoteURL(
+  vi.mocked(mockEnv).DATABASE_URL = createRemoteURL(
     "remote.example.com",
     "prod_db",
   );
@@ -112,7 +112,7 @@ export function configureCIMocks(): void {
   // Reset environment to CI/test defaults
   vi.mocked(mockEnv).NODE_ENV = "test";
   vi.mocked(mockEnv).VERCEL_ENV = undefined;
-  vi.mocked(mockEnv).POSTGRES_PRISMA_URL = createRemoteURL(
+  vi.mocked(mockEnv).DATABASE_URL = createRemoteURL(
     "ci-db.example.com",
     "ci_test",
   );
@@ -136,7 +136,7 @@ export function configureCIMocks(): void {
  * ```typescript
  * configureCustomEnvironment({
  *   NODE_ENV: "staging",
- *   POSTGRES_PRISMA_URL: "postgresql://staging:pass@staging.db:5432/app",
+ *   DATABASE_URL: "postgresql://staging:pass@staging.db:5432/app",
  *   isDevelopment: false
  * });
  * ```
@@ -149,8 +149,8 @@ export function configureCustomEnvironment(config: EnvironmentConfig): void {
   if (config.VERCEL_ENV !== undefined) {
     vi.mocked(mockEnv).VERCEL_ENV = config.VERCEL_ENV;
   }
-  if (config.POSTGRES_PRISMA_URL !== undefined) {
-    vi.mocked(mockEnv).POSTGRES_PRISMA_URL = config.POSTGRES_PRISMA_URL;
+  if (config.DATABASE_URL !== undefined) {
+    vi.mocked(mockEnv).DATABASE_URL = config.DATABASE_URL;
   }
   if (config.isDevelopment !== undefined) {
     mockIsDevelopment.mockReturnValue(config.isDevelopment);
@@ -417,7 +417,7 @@ export const mockIsDevelopment = vi.fn();
 
 // Mock env - we'll manipulate this in tests
 export const mockEnv = {
-  POSTGRES_PRISMA_URL: "postgresql://user:pass@localhost:5432/test",
+  DATABASE_URL: "postgresql://user:pass@localhost:5432/test",
   NODE_ENV: "development" as const,
   VERCEL_ENV: undefined as string | undefined,
 };
@@ -451,7 +451,7 @@ export function setupDrizzleTestEnvironment(customEnvSetup?: () => void): void {
   vi.clearAllMocks();
 
   // Reset mock env to defaults
-  mockEnv.POSTGRES_PRISMA_URL = "postgresql://user:pass@localhost:5432/test";
+  mockEnv.DATABASE_URL = "postgresql://user:pass@localhost:5432/test";
   mockEnv.NODE_ENV = "development";
   mockEnv.VERCEL_ENV = undefined;
 

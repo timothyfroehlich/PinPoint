@@ -1,3 +1,5 @@
+import { TRPCError } from "@trpc/server";
+import { and, eq, inArray, sql, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 import {
@@ -11,6 +13,7 @@ import {
   validateStatusTransition,
   getStatusChangeEffects,
 } from "~/lib/issues/statusValidation";
+import { generatePrefixedId } from "~/lib/utils/id-generation";
 import {
   createTRPCRouter,
   organizationProcedure,
@@ -22,6 +25,15 @@ import {
   issueAssignProcedure,
   issueViewProcedure,
 } from "~/server/api/trpc.permission";
+import {
+  issues,
+  machines,
+  issueStatuses,
+  priorities,
+  memberships,
+  comments,
+  attachments,
+} from "~/server/db/schema";
 
 export const issueCoreRouter = createTRPCRouter({
   // Public issue creation for anonymous users (via QR codes)
@@ -44,31 +56,29 @@ export const issueCoreRouter = createTRPCRouter({
       }
 
       // Get machine, status, and priority for validation
-      const machine = await ctx.db.machine.findFirst({
-        where: {
-          id: input.machineId,
-        },
-        include: {
+      const machine = await ctx.db.query.machines.findFirst({
+        where: eq(machines.id, input.machineId),
+        with: {
           location: {
-            select: {
+            columns: {
               organizationId: true,
             },
           },
         },
       });
 
-      const defaultStatus = await ctx.db.issueStatus.findFirst({
-        where: {
-          isDefault: true,
-          organizationId: organization.id,
-        },
+      const defaultStatus = await ctx.db.query.issueStatuses.findFirst({
+        where: and(
+          eq(issueStatuses.isDefault, true),
+          eq(issueStatuses.organizationId, organization.id),
+        ),
       });
 
-      const defaultPriority = await ctx.db.priority.findFirst({
-        where: {
-          isDefault: true,
-          organizationId: organization.id,
-        },
+      const defaultPriority = await ctx.db.query.priorities.findFirst({
+        where: and(
+          eq(priorities.isDefault, true),
+          eq(priorities.organizationId, organization.id),
+        ),
       });
 
       // Create validation input (handle exactOptionalPropertyTypes)
@@ -94,9 +104,9 @@ export const issueCoreRouter = createTRPCRouter({
       // Validate issue creation using pure functions
       const validation = validateIssueCreation(
         validationInput,
-        machine,
-        defaultStatus,
-        defaultPriority,
+        machine ?? null,
+        defaultStatus ?? null,
+        defaultPriority ?? null,
         context,
       );
 
@@ -114,6 +124,7 @@ export const issueCoreRouter = createTRPCRouter({
 
       // Create the issue without a user (anonymous)
       const issueData: {
+        id: string;
         title: string;
         description?: string | null;
         reporterEmail?: string | null;
@@ -124,6 +135,7 @@ export const issueCoreRouter = createTRPCRouter({
         statusId: string;
         priorityId: string;
       } = {
+        id: generatePrefixedId("issue"),
         title: input.title,
         createdById: null, // Anonymous issue
         machineId: input.machineId,
@@ -144,12 +156,15 @@ export const issueCoreRouter = createTRPCRouter({
         issueData.reporterEmail = input.reporterEmail;
       }
 
-      const issue = await ctx.db.issue.create({
-        data: issueData,
-        include: {
+      await ctx.db.insert(issues).values(issueData);
+
+      // Get issue with relations for return
+      const issueWithRelations = await ctx.db.query.issues.findFirst({
+        where: eq(issues.id, issueData.id),
+        with: {
           status: true,
           createdBy: {
-            select: {
+            columns: {
               id: true,
               name: true,
               email: true,
@@ -157,7 +172,7 @@ export const issueCoreRouter = createTRPCRouter({
             },
           },
           machine: {
-            include: {
+            with: {
               model: true,
               location: true,
             },
@@ -165,17 +180,21 @@ export const issueCoreRouter = createTRPCRouter({
         },
       });
 
+      if (!issueWithRelations) {
+        throw new Error("Failed to create issue");
+      }
+
       // Note: Skip activity recording for anonymous issues
       // Activity service requires actorId, which we don't have for anonymous users
 
       // Send notifications for new issue
       const notificationService = ctx.services.createNotificationService();
       await notificationService.notifyMachineOwnerOfIssue(
-        issue.id,
+        issueData.id,
         input.machineId,
       );
 
-      return issue;
+      return issueWithRelations;
     }),
   // Create issue - requires issue:create permission
   create: issueCreateProcedure
@@ -192,31 +211,29 @@ export const issueCoreRouter = createTRPCRouter({
       const organization = ctx.organization;
 
       // Get machine, status, and priority for validation
-      const machine = await ctx.db.machine.findFirst({
-        where: {
-          id: input.machineId,
-        },
-        include: {
+      const machine = await ctx.db.query.machines.findFirst({
+        where: eq(machines.id, input.machineId),
+        with: {
           location: {
-            select: {
+            columns: {
               organizationId: true,
             },
           },
         },
       });
 
-      const defaultStatus = await ctx.db.issueStatus.findFirst({
-        where: {
-          isDefault: true,
-          organizationId: organization.id,
-        },
+      const defaultStatus = await ctx.db.query.issueStatuses.findFirst({
+        where: and(
+          eq(issueStatuses.isDefault, true),
+          eq(issueStatuses.organizationId, organization.id),
+        ),
       });
 
-      const defaultPriority = await ctx.db.priority.findFirst({
-        where: {
-          isDefault: true,
-          organizationId: organization.id,
-        },
+      const defaultPriority = await ctx.db.query.priorities.findFirst({
+        where: and(
+          eq(priorities.isDefault, true),
+          eq(priorities.organizationId, organization.id),
+        ),
       });
 
       // Create validation input (handle exactOptionalPropertyTypes)
@@ -241,9 +258,9 @@ export const issueCoreRouter = createTRPCRouter({
       // Validate issue creation using pure functions
       const validation = validateIssueCreation(
         validationInput,
-        machine,
-        defaultStatus,
-        defaultPriority,
+        machine ?? null,
+        defaultStatus ?? null,
+        defaultPriority ?? null,
         context,
       );
 
@@ -264,6 +281,7 @@ export const issueCoreRouter = createTRPCRouter({
 
       // Create the issue
       const issueData: {
+        id: string;
         title: string;
         description?: string | null;
         createdById: string;
@@ -272,6 +290,7 @@ export const issueCoreRouter = createTRPCRouter({
         statusId: string;
         priorityId: string;
       } = {
+        id: generatePrefixedId("issue"),
         title: input.title,
         createdById,
         machineId: input.machineId,
@@ -284,12 +303,15 @@ export const issueCoreRouter = createTRPCRouter({
         issueData.description = input.description;
       }
 
-      const issue = await ctx.db.issue.create({
-        data: issueData,
-        include: {
+      await ctx.db.insert(issues).values(issueData);
+
+      // Get issue with relations for return
+      const issueWithRelations = await ctx.db.query.issues.findFirst({
+        where: eq(issues.id, issueData.id),
+        with: {
           status: true,
           createdBy: {
-            select: {
+            columns: {
               id: true,
               name: true,
               email: true,
@@ -297,7 +319,7 @@ export const issueCoreRouter = createTRPCRouter({
             },
           },
           machine: {
-            include: {
+            with: {
               model: true,
               location: true,
             },
@@ -305,10 +327,14 @@ export const issueCoreRouter = createTRPCRouter({
         },
       });
 
+      if (!issueWithRelations) {
+        throw new Error("Failed to create issue");
+      }
+
       // Record the issue creation activity
       const activityService = ctx.services.createIssueActivityService();
       await activityService.recordIssueCreated(
-        issue.id,
+        issueData.id,
         organization.id,
         createdById,
       );
@@ -316,11 +342,11 @@ export const issueCoreRouter = createTRPCRouter({
       // Send notifications for new issue
       const notificationService = ctx.services.createNotificationService();
       await notificationService.notifyMachineOwnerOfIssue(
-        issue.id,
+        issueData.id,
         input.machineId,
       );
 
-      return issue;
+      return issueWithRelations;
     }),
 
   // Assign issue to a user - requires issue:assign permission
@@ -333,21 +359,19 @@ export const issueCoreRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       // Get issue and membership for validation
-      const issue = await ctx.db.issue.findFirst({
-        where: {
-          id: input.issueId,
-          organizationId: ctx.organization.id,
-        },
+      const issue = await ctx.db.query.issues.findFirst({
+        where: and(
+          eq(issues.id, input.issueId),
+          eq(issues.organizationId, ctx.organization.id),
+        ),
       });
 
-      const membership = await ctx.db.membership.findUnique({
-        where: {
-          userId_organizationId: {
-            userId: input.userId,
-            organizationId: ctx.organization.id,
-          },
-        },
-        include: { user: true },
+      const membership = await ctx.db.query.memberships.findFirst({
+        where: and(
+          eq(memberships.userId, input.userId),
+          eq(memberships.organizationId, ctx.organization.id),
+        ),
+        with: { user: true },
       });
 
       // Create validation input
@@ -381,7 +405,7 @@ export const issueCoreRouter = createTRPCRouter({
       // Validate issue assignment using pure functions
       const validation = validateIssueAssignment(
         validationInput,
-        issue,
+        issue ?? null,
         validationMembership,
         context,
       );
@@ -393,12 +417,17 @@ export const issueCoreRouter = createTRPCRouter({
       }
 
       // Update the issue assignment
-      const updatedIssue = await ctx.db.issue.update({
-        where: { id: input.issueId },
-        data: { assignedToId: input.userId },
-        include: {
+      await ctx.db
+        .update(issues)
+        .set({ assignedToId: input.userId })
+        .where(eq(issues.id, input.issueId));
+
+      // Get updated issue with relations
+      const updatedIssue = await ctx.db.query.issues.findFirst({
+        where: eq(issues.id, input.issueId),
+        with: {
           assignedTo: {
-            select: {
+            columns: {
               id: true,
               name: true,
               email: true,
@@ -406,19 +435,23 @@ export const issueCoreRouter = createTRPCRouter({
           },
           status: true,
           createdBy: {
-            select: {
+            columns: {
               id: true,
               name: true,
             },
           },
           machine: {
-            include: {
+            with: {
               model: true,
               location: true,
             },
           },
         },
       });
+
+      if (!updatedIssue) {
+        throw new Error("Failed to update issue");
+      }
 
       // Record the assignment activity
       const activityService = ctx.services.createIssueActivityService();
@@ -459,118 +492,43 @@ export const issueCoreRouter = createTRPCRouter({
         .optional(),
     )
     .query(async ({ ctx, input }) => {
-      const whereClause: {
-        organizationId: string;
-        machine?: {
-          location?: { id: string };
-          modelId?: string;
-          owner?: { id: string };
-        };
-        machineId?: string;
-        statusId?: string | { in: string[] };
-        status?: {
-          category: "NEW" | "IN_PROGRESS" | "RESOLVED";
-        };
-        assignedToId?: string | null;
-        createdById?: string;
-        OR?: {
-          title?: { contains: string; mode: "insensitive" };
-          description?: { contains: string; mode: "insensitive" };
-        }[];
-      } = {
-        organizationId: ctx.organization.id,
-      };
+      // Build where conditions dynamically
+      const conditions = [eq(issues.organizationId, ctx.organization.id)];
 
-      if (input?.locationId) {
-        whereClause.machine = {
-          ...whereClause.machine,
-          location: { id: input.locationId },
-        };
-      }
-
+      // Machine ID filter
       if (input?.machineId) {
-        whereClause.machineId = input.machineId;
+        conditions.push(eq(issues.machineId, input.machineId));
       }
 
-      if (input?.modelId) {
-        whereClause.machine = {
-          ...whereClause.machine,
-          modelId: input.modelId,
-        };
-      }
-
-      // Handle status filtering - support both single statusId and statusIds array
+      // Status filtering - support both single statusId and statusIds array
       if (input?.statusIds && input.statusIds.length > 0) {
-        whereClause.statusId = { in: input.statusIds };
+        conditions.push(inArray(issues.statusId, input.statusIds));
       } else if (input?.statusId) {
-        whereClause.statusId = input.statusId;
+        conditions.push(eq(issues.statusId, input.statusId));
       }
 
-      if (input?.statusCategory) {
-        whereClause.status = {
-          category: input.statusCategory,
-        };
-      }
-
-      // Handle search across title and description
-      if (input?.search && input.search.trim() !== "") {
-        const searchTerm = input.search.trim();
-        whereClause.OR = [
-          { title: { contains: searchTerm, mode: "insensitive" } },
-          { description: { contains: searchTerm, mode: "insensitive" } },
-        ];
-      }
-
-      // Handle assignee filter
+      // Assignee filter
       if (input?.assigneeId) {
         if (input.assigneeId === "unassigned") {
-          whereClause.assignedToId = null;
+          conditions.push(isNull(issues.assignedToId));
         } else {
-          whereClause.assignedToId = input.assigneeId;
+          conditions.push(eq(issues.assignedToId, input.assigneeId));
         }
       }
 
-      // Handle reporter filter
+      // Reporter filter
       if (input?.reporterId) {
-        whereClause.createdById = input.reporterId;
+        conditions.push(eq(issues.createdById, input.reporterId));
       }
 
-      // Handle machine owner filter
-      if (input?.ownerId) {
-        whereClause.machine = {
-          ...whereClause.machine,
-          owner: { id: input.ownerId },
-        };
-      }
-
-      // Define sort order
-      const sortBy = input?.sortBy ?? "created";
-      const sortOrder = input?.sortOrder ?? "desc";
-
-      const orderBy = (() => {
-        switch (sortBy) {
-          case "created":
-            return { createdAt: sortOrder };
-          case "updated":
-            return { updatedAt: sortOrder };
-          case "status":
-            return { status: { name: sortOrder } };
-          case "severity":
-            return { priority: { order: sortOrder } };
-          case "game":
-            return { machine: { model: { name: sortOrder } } };
-          default:
-            return { createdAt: "desc" as const };
-        }
-      })();
-
-      return ctx.db.issue.findMany({
-        where: whereClause,
-        include: {
+      // For complex filters involving relations, we'll need to use the subquery or joins
+      const baseQuery = ctx.db.query.issues.findMany({
+        where: and(...conditions),
+        with: {
           status: true,
           priority: true,
           assignedTo: {
-            select: {
+            columns: {
               id: true,
               name: true,
               email: true,
@@ -578,7 +536,7 @@ export const issueCoreRouter = createTRPCRouter({
             },
           },
           createdBy: {
-            select: {
+            columns: {
               id: true,
               name: true,
               email: true,
@@ -586,36 +544,158 @@ export const issueCoreRouter = createTRPCRouter({
             },
           },
           machine: {
-            include: {
+            with: {
               model: true,
               location: true,
-            },
-          },
-          _count: {
-            select: {
-              comments: true,
-              attachments: true,
+              owner: {
+                columns: {
+                  id: true,
+                  name: true,
+                },
+              },
             },
           },
         },
-        orderBy,
       });
+
+      let results = await baseQuery;
+
+      // Apply post-query filters for complex relations
+      if (input?.locationId) {
+        results = results.filter(
+          (issue) => issue.machine.location.id === input.locationId,
+        );
+      }
+
+      if (input?.modelId) {
+        results = results.filter(
+          (issue) => issue.machine.model.id === input.modelId,
+        );
+      }
+
+      if (input?.ownerId) {
+        results = results.filter(
+          (issue) => issue.machine.owner?.id === input.ownerId,
+        );
+      }
+
+      if (input?.statusCategory) {
+        results = results.filter(
+          (issue) => issue.status.category === input.statusCategory,
+        );
+      }
+
+      // Handle search across title and description
+      if (input?.search?.trim()) {
+        const searchTerm = input.search.trim().toLowerCase();
+        results = results.filter(
+          (issue) =>
+            issue.title.toLowerCase().includes(searchTerm) ||
+            issue.description?.toLowerCase().includes(searchTerm),
+        );
+      }
+
+      // Get comment and attachment counts using separate queries
+      const issueIds = results.map((issue) => issue.id);
+
+      const commentCounts =
+        issueIds.length > 0
+          ? await ctx.db
+              .select({
+                issueId: comments.issueId,
+                count: sql<number>`count(*)`.as("count"),
+              })
+              .from(comments)
+              .where(inArray(comments.issueId, issueIds))
+              .groupBy(comments.issueId)
+          : [];
+
+      const attachmentCounts =
+        issueIds.length > 0
+          ? await ctx.db
+              .select({
+                issueId: attachments.issueId,
+                count: sql<number>`count(*)`.as("count"),
+              })
+              .from(attachments)
+              .where(inArray(attachments.issueId, issueIds))
+              .groupBy(attachments.issueId)
+          : [];
+
+      // Map counts to issues
+      const commentCountMap = new Map(
+        commentCounts.map((c) => [c.issueId, c.count]),
+      );
+      const attachmentCountMap = new Map(
+        attachmentCounts.map((a) => [a.issueId, a.count]),
+      );
+
+      const resultsWithCounts = results.map((issue) => ({
+        ...issue,
+        _count: {
+          comments: commentCountMap.get(issue.id) ?? 0,
+          attachments: attachmentCountMap.get(issue.id) ?? 0,
+        },
+      }));
+
+      // Apply sorting
+      const sortBy = input?.sortBy ?? "created";
+      const sortOrder = input?.sortOrder ?? "desc";
+
+      resultsWithCounts.sort((a, b) => {
+        let aValue: string | number | Date;
+        let bValue: string | number | Date;
+
+        switch (sortBy) {
+          case "created":
+            aValue = a.createdAt;
+            bValue = b.createdAt;
+            break;
+          case "updated":
+            aValue = a.updatedAt;
+            bValue = b.updatedAt;
+            break;
+          case "status":
+            aValue = a.status.name;
+            bValue = b.status.name;
+            break;
+          case "severity":
+            aValue = a.priority.order;
+            bValue = b.priority.order;
+            break;
+          case "game":
+            aValue = a.machine.model.name;
+            bValue = b.machine.model.name;
+            break;
+          default:
+            aValue = a.createdAt;
+            bValue = b.createdAt;
+        }
+
+        if (sortOrder === "desc") {
+          return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
+        } else {
+          return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+        }
+      });
+
+      return resultsWithCounts;
     }),
 
   // Get a single issue by ID
   getById: issueViewProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
-      const issue = await ctx.db.issue.findFirst({
-        where: {
-          id: input.id,
-          organizationId: ctx.organization.id,
-        },
-        include: {
+      const issue = await ctx.db.query.issues.findFirst({
+        where: and(
+          eq(issues.id, input.id),
+          eq(issues.organizationId, ctx.organization.id),
+        ),
+        with: {
           status: true,
           priority: true,
           assignedTo: {
-            select: {
+            columns: {
               id: true,
               name: true,
               email: true,
@@ -623,7 +703,7 @@ export const issueCoreRouter = createTRPCRouter({
             },
           },
           createdBy: {
-            select: {
+            columns: {
               id: true,
               name: true,
               email: true,
@@ -631,31 +711,34 @@ export const issueCoreRouter = createTRPCRouter({
             },
           },
           machine: {
-            include: {
+            with: {
               model: true,
               location: true,
             },
           },
           comments: {
-            include: {
+            with: {
               author: {
-                select: {
+                columns: {
                   id: true,
                   name: true,
                   image: true,
                 },
               },
             },
-            orderBy: { createdAt: "asc" },
+            orderBy: (comments, { asc }) => [asc(comments.createdAt)],
           },
           attachments: {
-            orderBy: { id: "asc" },
+            orderBy: (attachments, { asc }) => [asc(attachments.id)],
           },
         },
       });
 
       if (!issue) {
-        throw new Error("Issue not found");
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Issue not found",
+        });
       }
 
       // Map comments to include createdBy alias
@@ -683,19 +766,22 @@ export const issueCoreRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       // Verify the issue belongs to this organization
-      const existingIssue = await ctx.db.issue.findFirst({
-        where: {
-          id: input.id,
-          organizationId: ctx.organization.id,
-        },
-        include: {
+      const existingIssue = await ctx.db.query.issues.findFirst({
+        where: and(
+          eq(issues.id, input.id),
+          eq(issues.organizationId, ctx.organization.id),
+        ),
+        with: {
           status: true,
           assignedTo: true,
         },
       });
 
       if (!existingIssue) {
-        throw new Error("Issue not found");
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Issue not found",
+        });
       }
 
       const activityService = ctx.services.createIssueActivityService();
@@ -708,14 +794,17 @@ export const issueCoreRouter = createTRPCRouter({
 
       // If updating status, verify it belongs to the organization
       if (input.statusId) {
-        const status = await ctx.db.issueStatus.findFirst({
-          where: {
-            id: input.statusId,
-            organizationId: ctx.organization.id,
-          },
+        const status = await ctx.db.query.issueStatuses.findFirst({
+          where: and(
+            eq(issueStatuses.id, input.statusId),
+            eq(issueStatuses.organizationId, ctx.organization.id),
+          ),
         });
         if (!status) {
-          throw new Error("Invalid status");
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Invalid status",
+          });
         }
         newStatus = status;
       }
@@ -723,19 +812,20 @@ export const issueCoreRouter = createTRPCRouter({
       // If updating assignee, verify they are a member of this organization
       if (input.assignedToId !== undefined) {
         if (input.assignedToId) {
-          const membership = await ctx.db.membership.findUnique({
-            where: {
-              userId_organizationId: {
-                userId: input.assignedToId,
-                organizationId: ctx.organization.id,
-              },
-            },
-            include: {
+          const membership = await ctx.db.query.memberships.findFirst({
+            where: and(
+              eq(memberships.userId, input.assignedToId),
+              eq(memberships.organizationId, ctx.organization.id),
+            ),
+            with: {
               user: true,
             },
           });
           if (!membership) {
-            throw new Error("User is not a member of this organization");
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "User is not a member of this organization",
+            });
           }
           newAssignedTo = membership.user;
         } else {
@@ -744,22 +834,26 @@ export const issueCoreRouter = createTRPCRouter({
       }
 
       // Update the issue
-      const updatedIssue = await ctx.db.issue.update({
-        where: { id: input.id },
-        data: {
-          ...(input.title && { title: input.title }),
-          ...(input.description !== undefined && {
-            description: input.description,
-          }),
-          ...(input.statusId && { statusId: input.statusId }),
-          ...(input.assignedToId !== undefined && {
-            assignedToId: input.assignedToId ?? null,
-          }),
-        },
-        include: {
+      const updateData: Partial<typeof issues.$inferInsert> = {};
+      if (input.title) updateData.title = input.title;
+      if (input.description !== undefined)
+        updateData.description = input.description;
+      if (input.statusId) updateData.statusId = input.statusId;
+      if (input.assignedToId !== undefined)
+        updateData.assignedToId = input.assignedToId ?? null;
+
+      await ctx.db
+        .update(issues)
+        .set(updateData)
+        .where(eq(issues.id, input.id));
+
+      // Get updated issue with relations
+      const updatedIssue = await ctx.db.query.issues.findFirst({
+        where: eq(issues.id, input.id),
+        with: {
           status: true,
           assignedTo: {
-            select: {
+            columns: {
               id: true,
               name: true,
               email: true,
@@ -767,7 +861,7 @@ export const issueCoreRouter = createTRPCRouter({
             },
           },
           createdBy: {
-            select: {
+            columns: {
               id: true,
               name: true,
               email: true,
@@ -775,13 +869,20 @@ export const issueCoreRouter = createTRPCRouter({
             },
           },
           machine: {
-            include: {
+            with: {
               model: true,
               location: true,
             },
           },
         },
       });
+
+      if (!updatedIssue) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to update issue",
+        });
+      }
 
       // Record activities for changes
       if (input.statusId && existingIssue.status.id !== input.statusId) {
@@ -855,29 +956,37 @@ export const issueCoreRouter = createTRPCRouter({
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       // Find the resolved status for this organization
-      const resolvedStatus = await ctx.db.issueStatus.findFirst({
-        where: {
-          organizationId: ctx.organization.id,
-          category: "RESOLVED",
-        },
+      const resolvedStatus = await ctx.db.query.issueStatuses.findFirst({
+        where: and(
+          eq(issueStatuses.organizationId, ctx.organization.id),
+          eq(issueStatuses.category, "RESOLVED"),
+        ),
       });
 
       if (!resolvedStatus) {
-        throw new Error("No resolved status found for this organization");
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "No resolved status found for this organization",
+        });
       }
 
       // Update the issue
-      const updatedIssue = await ctx.db.issue.update({
-        where: { id: input.id },
-        data: {
+      await ctx.db
+        .update(issues)
+        .set({
           statusId: resolvedStatus.id,
           resolvedAt: new Date(),
-        },
-        include: {
+        })
+        .where(eq(issues.id, input.id));
+
+      // Get updated issue with relations
+      const updatedIssue = await ctx.db.query.issues.findFirst({
+        where: eq(issues.id, input.id),
+        with: {
           status: true,
           priority: true,
           assignedTo: {
-            select: {
+            columns: {
               id: true,
               name: true,
               email: true,
@@ -885,7 +994,7 @@ export const issueCoreRouter = createTRPCRouter({
             },
           },
           createdBy: {
-            select: {
+            columns: {
               id: true,
               name: true,
               email: true,
@@ -893,13 +1002,20 @@ export const issueCoreRouter = createTRPCRouter({
             },
           },
           machine: {
-            include: {
+            with: {
               model: true,
               location: true,
             },
           },
         },
       });
+
+      if (!updatedIssue) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to close issue",
+        });
+      }
 
       // Record activity
       const activityService = ctx.services.createIssueActivityService();
@@ -922,30 +1038,36 @@ export const issueCoreRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       // Verify the issue belongs to this organization
-      const existingIssue = await ctx.db.issue.findFirst({
-        where: {
-          id: input.id,
-          organizationId: ctx.organization.id,
-        },
-        include: {
+      const existingIssue = await ctx.db.query.issues.findFirst({
+        where: and(
+          eq(issues.id, input.id),
+          eq(issues.organizationId, ctx.organization.id),
+        ),
+        with: {
           status: true,
         },
       });
 
       if (!existingIssue) {
-        throw new Error("Issue not found");
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Issue not found",
+        });
       }
 
       // Verify the status belongs to this organization
-      const newStatus = await ctx.db.issueStatus.findFirst({
-        where: {
-          id: input.statusId,
-          organizationId: ctx.organization.id,
-        },
+      const newStatus = await ctx.db.query.issueStatuses.findFirst({
+        where: and(
+          eq(issueStatuses.id, input.statusId),
+          eq(issueStatuses.organizationId, ctx.organization.id),
+        ),
       });
 
       if (!newStatus) {
-        throw new Error("Invalid status");
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Invalid status",
+        });
       }
 
       // Use extracted validation functions
@@ -972,18 +1094,25 @@ export const issueCoreRouter = createTRPCRouter({
       const effects = getStatusChangeEffects(existingIssue.status, newStatus);
 
       // Update the issue
-      const updatedIssue = await ctx.db.issue.update({
-        where: { id: input.id },
-        data: {
-          statusId: input.statusId,
-          ...(effects.shouldSetResolvedAt && { resolvedAt: new Date() }),
-          ...(effects.shouldClearResolvedAt && { resolvedAt: null }),
-        },
-        include: {
+      const updateData: Partial<typeof issues.$inferInsert> = {
+        statusId: input.statusId,
+      };
+      if (effects.shouldSetResolvedAt) updateData.resolvedAt = new Date();
+      if (effects.shouldClearResolvedAt) updateData.resolvedAt = null;
+
+      await ctx.db
+        .update(issues)
+        .set(updateData)
+        .where(eq(issues.id, input.id));
+
+      // Get updated issue with relations
+      const updatedIssue = await ctx.db.query.issues.findFirst({
+        where: eq(issues.id, input.id),
+        with: {
           status: true,
           priority: true,
           assignedTo: {
-            select: {
+            columns: {
               id: true,
               name: true,
               email: true,
@@ -991,7 +1120,7 @@ export const issueCoreRouter = createTRPCRouter({
             },
           },
           createdBy: {
-            select: {
+            columns: {
               id: true,
               name: true,
               email: true,
@@ -999,13 +1128,20 @@ export const issueCoreRouter = createTRPCRouter({
             },
           },
           machine: {
-            include: {
+            with: {
               model: true,
               location: true,
             },
           },
         },
       });
+
+      if (!updatedIssue) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to update issue status",
+        });
+      }
 
       // Record activity
       const activityService = ctx.services.createIssueActivityService();
@@ -1054,86 +1190,34 @@ export const issueCoreRouter = createTRPCRouter({
         throw new Error("Organization not found");
       }
 
-      // Build where clause with proper typing
-      interface WhereClause {
-        organizationId: string;
-        machine?: {
-          locationId?: string;
-          modelId?: string;
-        };
-        machineId?: string;
-        statusId?: string;
-        status?: {
-          category: "NEW" | "IN_PROGRESS" | "RESOLVED";
-        };
-      }
+      // Build where conditions dynamically
+      const conditions = [eq(issues.organizationId, organization.id)];
 
-      const whereClause: WhereClause = {
-        organizationId: organization.id,
-      };
-
-      // Apply filters
-      if (input?.locationId) {
-        whereClause.machine = {
-          ...whereClause.machine,
-          locationId: input.locationId,
-        };
-      }
-
+      // Machine ID filter
       if (input?.machineId) {
-        whereClause.machineId = input.machineId;
+        conditions.push(eq(issues.machineId, input.machineId));
       }
 
-      if (input?.modelId) {
-        whereClause.machine = {
-          ...whereClause.machine,
-          modelId: input.modelId,
-        };
-      }
-
+      // Status filter
       if (input?.statusId) {
-        whereClause.statusId = input.statusId;
+        conditions.push(eq(issues.statusId, input.statusId));
       }
 
-      if (input?.statusCategory) {
-        whereClause.status = {
-          category: input.statusCategory,
-        };
-      }
-
-      // Define sort order
-      const sortBy = input?.sortBy ?? "created";
-      const sortOrder = input?.sortOrder ?? "desc";
-
-      const orderBy = (() => {
-        switch (sortBy) {
-          case "created":
-            return { createdAt: sortOrder };
-          case "updated":
-            return { updatedAt: sortOrder };
-          case "status":
-            return { status: { name: sortOrder } };
-          case "severity":
-            return { priority: { order: sortOrder } };
-          case "game":
-            return { machine: { model: { name: sortOrder } } };
-          default:
-            return { createdAt: "desc" as const };
-        }
-      })();
-
-      return ctx.db.issue.findMany({
-        where: whereClause,
-        select: {
+      const baseQuery = ctx.db.query.issues.findMany({
+        where: and(...conditions),
+        columns: {
           id: true,
           title: true,
           description: true,
           createdAt: true,
+          updatedAt: true,
           submitterName: true,
+        },
+        with: {
           status: true,
           priority: true,
           assignedTo: {
-            select: {
+            columns: {
               id: true,
               name: true,
               email: true,
@@ -1141,7 +1225,7 @@ export const issueCoreRouter = createTRPCRouter({
             },
           },
           createdBy: {
-            select: {
+            columns: {
               id: true,
               name: true,
               email: true,
@@ -1149,14 +1233,78 @@ export const issueCoreRouter = createTRPCRouter({
             },
           },
           machine: {
-            include: {
+            with: {
               model: true,
               location: true,
             },
           },
         },
-        orderBy,
-        take: input?.limit ?? 20, // Default limit for public access
       });
+
+      let results = await baseQuery;
+
+      // Apply post-query filters for complex relations
+      if (input?.locationId) {
+        results = results.filter(
+          (issue) => issue.machine.location.id === input.locationId,
+        );
+      }
+
+      if (input?.modelId) {
+        results = results.filter(
+          (issue) => issue.machine.model.id === input.modelId,
+        );
+      }
+
+      if (input?.statusCategory) {
+        results = results.filter(
+          (issue) => issue.status.category === input.statusCategory,
+        );
+      }
+
+      // Apply sorting
+      const sortBy = input?.sortBy ?? "created";
+      const sortOrder = input?.sortOrder ?? "desc";
+
+      results.sort((a, b) => {
+        let aValue: string | number | Date;
+        let bValue: string | number | Date;
+
+        switch (sortBy) {
+          case "created":
+            aValue = a.createdAt;
+            bValue = b.createdAt;
+            break;
+          case "updated":
+            aValue = a.updatedAt;
+            bValue = b.updatedAt;
+            break;
+          case "status":
+            aValue = a.status.name;
+            bValue = b.status.name;
+            break;
+          case "severity":
+            aValue = a.priority.order;
+            bValue = b.priority.order;
+            break;
+          case "game":
+            aValue = a.machine.model.name;
+            bValue = b.machine.model.name;
+            break;
+          default:
+            aValue = a.createdAt;
+            bValue = b.createdAt;
+        }
+
+        if (sortOrder === "desc") {
+          return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
+        } else {
+          return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+        }
+      });
+
+      // Apply limit
+      const limit = input?.limit ?? 20;
+      return results.slice(0, limit);
     }),
 });

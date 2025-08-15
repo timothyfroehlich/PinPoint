@@ -132,7 +132,7 @@ const mockPrisma = {
 // See integration-patterns.md for examples
 ```
 
-~~See [Prisma Patterns](./prisma-patterns.md) for advanced patterns.~~ **DEPRECATED** - Use [Integration Patterns](./integration-patterns.md) instead.
+See [Integration Patterns](./integration-patterns.md) for database testing with PGlite.
 
 ### Variable Hoisting
 
@@ -193,7 +193,6 @@ describe('MyComponent', () => {
 
 - **[Configuration](./configuration.md)** - Vitest setup and project configuration
 - ⚠️ **[Mocking Patterns](./mocking-patterns.md)** - ~~Comprehensive mocking strategies~~ **DEPRECATED**
-- ⚠️ **[Prisma Patterns](./prisma-patterns.md)** - ~~Database mocking with Accelerate~~ **DEPRECATED**
 - **[Migration Examples](./migration-examples.md)** - Real Jest → Vitest migrations
 - **[Performance](./performance.md)** - Benchmarks and optimization
 - **[Troubleshooting](./troubleshooting.md)** - Common issues and solutions

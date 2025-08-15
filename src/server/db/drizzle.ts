@@ -50,10 +50,10 @@ function getDatabaseConfig(): DatabaseConfig {
 
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 function createDrizzleClientInternal() {
-  const connectionString = env.POSTGRES_PRISMA_URL;
+  const connectionString = env.DATABASE_URL;
 
   if (!connectionString) {
-    throw new Error("POSTGRES_PRISMA_URL is required for Drizzle client");
+    throw new Error("DATABASE_URL is required for Drizzle client");
   }
 
   // Determine SSL configuration based on environment
@@ -111,10 +111,10 @@ class DrizzleSingleton {
   }
 
   private createClient(): DrizzleClient {
-    const connectionString = env.POSTGRES_PRISMA_URL;
+    const connectionString = env.DATABASE_URL;
 
     if (!connectionString) {
-      throw new Error("POSTGRES_PRISMA_URL is required for Drizzle client");
+      throw new Error("DATABASE_URL is required for Drizzle client");
     }
 
     // Determine SSL configuration based on environment

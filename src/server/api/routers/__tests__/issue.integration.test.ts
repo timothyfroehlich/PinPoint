@@ -1,15 +1,81 @@
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 import { generateId } from "~/lib/utils/id-generation";
 import { appRouter } from "~/server/api/root";
-import { issues, machines, issueStatuses } from "~/server/db/schema";
+import {
+  issues,
+  machines,
+  issueStatuses,
+  memberships,
+} from "~/server/db/schema";
 import {
   createSeededTestDatabase,
   getSeededTestData,
   withTransaction,
   type TestDatabase,
 } from "~/test/helpers/pglite-test-setup";
+import { createMachineFactory } from "~/test/testDataFactories";
+
+// Helper function to create test context with proper mocks
+const createTestContext = async (
+  txDb: any,
+  testOrgId: string,
+  userId: string,
+) => {
+  // Query the real membership from the database (since this is an integration test)
+  const membership = await txDb.query.memberships.findFirst({
+    where: and(
+      eq(memberships.userId, userId),
+      eq(memberships.organizationId, testOrgId),
+    ),
+    with: {
+      role: {
+        with: {
+          permissions: true,
+        },
+      },
+    },
+  });
+
+  return {
+    db: txDb, // Use Drizzle client directly
+    membership, // Real membership from database
+    services: {
+      createIssueActivityService: vi.fn(() => ({
+        recordIssueCreated: vi.fn(),
+        recordFieldUpdate: vi.fn(),
+        recordIssueAssigned: vi.fn(),
+        recordStatusChange: vi.fn(),
+      })),
+      createNotificationService: vi.fn(() => ({
+        notifyMachineOwnerOfIssue: vi.fn(),
+        notifyMachineOwnerOfStatusChange: vi.fn(),
+      })),
+    },
+    user: {
+      id: userId,
+      email: "test@example.com",
+      user_metadata: { name: "Test User" },
+      app_metadata: { organization_id: testOrgId },
+    },
+    organization: {
+      id: testOrgId,
+      name: "Test Organization",
+      subdomain: "test-org",
+    },
+    session: {
+      user: {
+        id: userId,
+        email: "test@example.com",
+        name: "Test User",
+        image: null,
+      },
+      expires: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(),
+    },
+    headers: new Headers(),
+  };
+};
 
 // Mock NextAuth for integration tests
 vi.mock("next-auth", () => ({
@@ -27,6 +93,14 @@ vi.mock("~/server/auth/permissions", async () => {
   return {
     ...actual,
     getUserPermissionsForSession: vi
+      .fn()
+      .mockResolvedValue([
+        "issue:view",
+        "issue:edit",
+        "issue:create",
+        "issue:assign",
+      ]),
+    getUserPermissionsForSupabaseUser: vi
       .fn()
       .mockResolvedValue([
         "issue:view",
@@ -76,39 +150,11 @@ describe("Issue Router Integration Tests (PGlite)", () => {
 
       await withTransaction(testDb, async (txDb) => {
         // Create test context with real database
-        const testContext = {
-          db: null, // Mock Prisma client - middleware still expects this
-          drizzle: txDb,
-          services: {
-            createIssueActivityService: vi.fn(() => ({
-              recordIssueCreated: vi.fn(),
-            })),
-            createNotificationService: vi.fn(() => ({
-              notifyMachineOwnerOfIssue: vi.fn(),
-            })),
-          },
-          user: {
-            id: seededData.user,
-            email: "test@example.com",
-            user_metadata: { name: "Test User" },
-            app_metadata: { organization_id: testOrgId },
-          },
-          organization: {
-            id: testOrgId,
-            name: "Test Organization",
-            subdomain: "test-org",
-          },
-          session: {
-            user: {
-              id: seededData.user,
-              email: "test@example.com",
-              name: "Test User",
-              image: null,
-            },
-            expires: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(),
-          },
-          headers: new Headers(),
-        } as any;
+        const testContext = (await createTestContext(
+          txDb,
+          testOrgId,
+          seededData.user,
+        )) as any;
 
         const caller = appRouter.createCaller(testContext);
 
@@ -162,44 +208,26 @@ describe("Issue Router Integration Tests (PGlite)", () => {
         const otherOrgId = "other-org-id";
         const otherMachineId = "other-machine-id";
 
-        // Insert a machine that belongs to a different organization
-        await txDb.insert(machines).values({
-          id: otherMachineId,
-          name: "Other Org Machine",
-          organizationId: otherOrgId,
-          locationId: "other-location-id",
-          modelId: "other-model-id",
+        // Insert a machine that belongs to a different organization using factory
+        const otherOrgMachine = createMachineFactory({
+          overrides: {
+            id: otherMachineId,
+            name: "Other Org Machine",
+            organizationId: otherOrgId,
+            locationId: "other-location-id",
+            modelId: "other-model-id",
+            qrCodeId: "other-qr-code-" + generateId(), // Unique QR code ID
+          },
         });
 
+        await txDb.insert(machines).values(otherOrgMachine);
+
         // Create test context with seeded user data
-        const testContext = {
-          drizzle: txDb,
-          services: {
-            createIssueActivityService: vi.fn(() => ({})),
-            createNotificationService: vi.fn(() => ({})),
-          },
-          user: {
-            id: seededData.user,
-            email: "test@example.com",
-            user_metadata: { name: "Test User" },
-            app_metadata: { organization_id: testOrgId },
-          },
-          organization: {
-            id: testOrgId,
-            name: "Test Organization",
-            subdomain: "test-org",
-          },
-          session: {
-            user: {
-              id: seededData.user,
-              email: "test@example.com",
-              name: "Test User",
-              image: null,
-            },
-            expires: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(),
-          },
-          headers: new Headers(),
-        } as any;
+        const testContext = (await createTestContext(
+          txDb,
+          testOrgId,
+          seededData.user,
+        )) as any;
 
         const caller = appRouter.createCaller(testContext);
 
@@ -249,31 +277,11 @@ describe("Issue Router Integration Tests (PGlite)", () => {
 
         await txDb.insert(issues).values(testIssues);
 
-        const testContext = {
-          drizzle: txDb,
-          services: {},
-          user: {
-            id: seededData.user,
-            email: "test@example.com",
-            user_metadata: { name: "Test User" },
-            app_metadata: { organization_id: testOrgId },
-          },
-          organization: {
-            id: testOrgId,
-            name: "Test Organization",
-            subdomain: "test-org",
-          },
-          session: {
-            user: {
-              id: seededData.user,
-              email: "test@example.com",
-              name: "Test User",
-              image: null,
-            },
-            expires: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(),
-          },
-          headers: new Headers(),
-        } as any;
+        const testContext = (await createTestContext(
+          txDb,
+          testOrgId,
+          seededData.user,
+        )) as any;
 
         const caller = appRouter.createCaller(testContext);
 
@@ -309,31 +317,11 @@ describe("Issue Router Integration Tests (PGlite)", () => {
 
         await txDb.insert(issues).values([testIssue]);
 
-        const testContext = {
-          drizzle: txDb,
-          services: {},
-          user: {
-            id: seededData.user,
-            email: "test@example.com",
-            user_metadata: { name: "Test User" },
-            app_metadata: { organization_id: testOrgId },
-          },
-          organization: {
-            id: testOrgId,
-            name: "Test Organization",
-            subdomain: "test-org",
-          },
-          session: {
-            user: {
-              id: seededData.user,
-              email: "test@example.com",
-              name: "Test User",
-              image: null,
-            },
-            expires: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(),
-          },
-          headers: new Headers(),
-        } as any;
+        const testContext = (await createTestContext(
+          txDb,
+          testOrgId,
+          seededData.user,
+        )) as any;
 
         const caller = appRouter.createCaller(testContext);
 
@@ -392,31 +380,11 @@ describe("Issue Router Integration Tests (PGlite)", () => {
 
         await txDb.insert(issues).values(testIssues);
 
-        const testContext = {
-          drizzle: txDb,
-          services: {},
-          user: {
-            id: seededData.user,
-            email: "test@example.com",
-            user_metadata: { name: "Test User" },
-            app_metadata: { organization_id: testOrgId },
-          },
-          organization: {
-            id: testOrgId,
-            name: "Test Organization",
-            subdomain: "test-org",
-          },
-          session: {
-            user: {
-              id: seededData.user,
-              email: "test@example.com",
-              name: "Test User",
-              image: null,
-            },
-            expires: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(),
-          },
-          headers: new Headers(),
-        } as any;
+        const testContext = (await createTestContext(
+          txDb,
+          testOrgId,
+          seededData.user,
+        )) as any;
 
         const caller = appRouter.createCaller(testContext);
 
@@ -453,35 +421,11 @@ describe("Issue Router Integration Tests (PGlite)", () => {
           createdById: seededData.user,
         });
 
-        const testContext = {
-          drizzle: txDb,
-          services: {
-            createIssueActivityService: vi.fn(() => ({
-              recordIssueAssigned: vi.fn(),
-            })),
-          },
-          user: {
-            id: seededData.user,
-            email: "test@example.com",
-            user_metadata: { name: "Test User" },
-            app_metadata: { organization_id: testOrgId },
-          },
-          organization: {
-            id: testOrgId,
-            name: "Test Organization",
-            subdomain: "test-org",
-          },
-          session: {
-            user: {
-              id: seededData.user,
-              email: "test@example.com",
-              name: "Test User",
-              image: null,
-            },
-            expires: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(),
-          },
-          headers: new Headers(),
-        } as any;
+        const testContext = (await createTestContext(
+          txDb,
+          testOrgId,
+          seededData.user,
+        )) as any;
 
         const caller = appRouter.createCaller(testContext);
 
@@ -537,38 +481,11 @@ describe("Issue Router Integration Tests (PGlite)", () => {
           createdById: seededData.user,
         });
 
-        const testContext = {
-          drizzle: txDb,
-          services: {
-            createIssueActivityService: vi.fn(() => ({
-              recordStatusChange: vi.fn(),
-            })),
-            createNotificationService: vi.fn(() => ({
-              notifyMachineOwnerOfStatusChange: vi.fn(),
-            })),
-          },
-          user: {
-            id: seededData.user,
-            email: "test@example.com",
-            user_metadata: { name: "Test User" },
-            app_metadata: { organization_id: testOrgId },
-          },
-          organization: {
-            id: testOrgId,
-            name: "Test Organization",
-            subdomain: "test-org",
-          },
-          session: {
-            user: {
-              id: seededData.user,
-              email: "test@example.com",
-              name: "Test User",
-              image: null,
-            },
-            expires: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(),
-          },
-          headers: new Headers(),
-        } as any;
+        const testContext = (await createTestContext(
+          txDb,
+          testOrgId,
+          seededData.user,
+        )) as any;
 
         const caller = appRouter.createCaller(testContext);
 

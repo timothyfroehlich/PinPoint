@@ -2,17 +2,12 @@
 
 Comprehensive testing patterns and strategies for PinPoint.
 
-## Current Stack (Being Replaced)
+## Modern Testing Stack
 
-- Heavy Prisma mocking with complex test doubles
-- Unit test focused approach
-- Mock-based isolation
-
-## Migration Target
-
-- Transaction-based testing with real database
+- Transaction-based testing with PGlite
 - Integration test focused approach
 - Minimal mocking (external services only)
+- Type-safe patterns with Drizzle
 
 ## Contents
 

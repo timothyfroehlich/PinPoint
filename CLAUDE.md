@@ -35,14 +35,17 @@
 - Parallel validation, complex migration infrastructure, and extensive safety measures are **waste** in this phase
 - Direct conversion approaches are preferred - cleanup issues as they arise
 
-## Tech Stack Updates
+## 🚨 MIGRATION STATUS: FINAL PRISMA REMOVAL PHASE 🚨
 
-Latest updates for our migration: @docs/latest-updates/quick-reference.md
+**CURRENT PHASE**: Complete Prisma removal - router layer 85%+ complete, service layer cleanup in progress
 
-### 🚨 CRITICAL: Post-Training Breaking Changes
+**CRITICAL DIRECTIVE FOR ALL AGENTS:**
+- **NO attempts to fix Prisma issues** - Prisma is being completely removed
+- **NO dual-validation schemes** - Direct Drizzle-only implementations  
+- **PURGE all Prisma references** - Remove imports, dependencies, parallel validation code
 
-**🔥 IMMEDIATE ACTION REQUIRED:** `@supabase/auth-helpers-nextjs` DEPRECATED → causes auth loops  
-**📋 Complete Updates:** @docs/latest-updates/quick-reference.md
+**Tech Stack**: Drizzle + Supabase SSR + Next.js App Router (August 2025 patterns)  
+**Details**: @docs/latest-updates/quick-reference.md + @prisma-removal-tasks/
 
 ## Claude Memories
 
@@ -52,7 +55,47 @@ Latest updates for our migration: @docs/latest-updates/quick-reference.md
 - We use husky for precommits and preuploads
 - We run shellcheck against our scripts
 
-## 🚨🚨🚨 CRITICAL COMMAND RESTRICTIONS 🚨🚨🚨
+## 🚨🚨🚨 CRITICAL SYSTEM RESTRICTIONS 🚨🚨🚨
+
+### ⛔ ABSOLUTELY FORBIDDEN: Integration Test Memory Patterns
+
+**🔥 NEVER EVER USE THESE PATTERNS 🔥**
+
+```typescript
+// ❌ CAUSES SYSTEM LOCKUPS - PGlite memory blowouts
+beforeEach(async () => {
+  const { db } = await createSeededTestDatabase(); // 50-100MB per test
+});
+
+// ❌ CAUSES 1-2GB+ MEMORY USAGE  
+beforeAll(async () => {
+  const client = new PGlite(); // Multiple instances per test file
+});
+
+// ❌ ANY PER-TEST DATABASE CREATION
+test("...", async () => {
+  const testDb = await createTestDatabase(); // Multiplies memory usage
+});
+```
+
+**💥 WHY THIS BREAKS EVERYTHING:**
+
+- **12+ integration tests** using per-test PGlite = **20+ database instances**
+- **50-100MB per instance** = **1-2GB+ total memory usage**
+- **Causes system lockups** and computer freezing
+- **vitest workers multiply the problem** (4 workers × many instances)
+
+**✅ ONLY ACCEPTABLE PATTERN:**
+
+```typescript
+import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
+
+test("integration test", async ({ workerDb }) => {
+  await withIsolatedTest(workerDb, async (db) => {
+    // Test logic - shared PGlite instance, automatic cleanup
+  });
+});
+```
 
 ### ⛔ ABSOLUTELY FORBIDDEN: npm test with Redirection
 
@@ -94,17 +137,35 @@ npm run test:coverage  # ✅ With coverage report
 - Prefer rg (ripgrep) to find or grep
 - Install missing tools with `brew` (preferred) or `apt`
 
+## ⚡ Single-File Validation Commands (Fast Development Workflow)
+
+**CRITICAL FOR AGENTS:** Use these commands for fast feedback during development:
+
+```bash
+# Fast single-file validation (2-3s vs 30s+ full validation)
+npm run validate-file src/server/api/routers/user.ts
+npm run check-file src/components/Header.tsx  
+npm run test-file src/server/api/routers/__tests__/user.test.ts
+
+# Advanced options: --skip-typecheck, --skip-lint, --verbose
+node scripts/validate-single-file.cjs FILE --verbose
+```
+
 ## 📚 Quick Reference (Auto-Loaded)
 
-Core patterns and workflows:
+Current development patterns (post-migration):
 @docs/INDEX.md
 @docs/quick-reference/INDEX.md
-@docs/quick-reference/migration-patterns.md  
 @docs/quick-reference/testing-patterns.md
 @docs/quick-reference/api-security-patterns.md
 @docs/quick-reference/typescript-strictest-patterns.md
-@docs/migration/supabase-drizzle/quick-reference/prisma-to-drizzle.md
-@docs/migration/supabase-drizzle/quick-reference/nextauth-to-supabase.md
-@docs/migration/supabase-drizzle/direct-conversion-plan.md
+
+**Final migration cleanup:**
+@docs/quick-reference/migration-patterns.md - Updated for Drizzle-only patterns
+@docs/migration/supabase-drizzle/quick-reference/prisma-to-drizzle.md - Service conversion reference
+@docs/migration/supabase-drizzle/direct-conversion-plan.md - Final phase status
+
+**Task execution:** 
+@prisma-removal-tasks/ - Comprehensive Prisma removal task list
 
 - Don't commit or push with --no-verify unless explicitly told to

@@ -1,7 +1,21 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type */
 import { trpcMsw } from "./setup";
 
-import type { User } from "@prisma/client";
+// Local User type to match application schema (replaces Prisma import)
+interface User {
+  id: string;
+  email: string;
+  name: string | null;
+  bio: string | null;
+  profilePicture: string | null;
+  emailVerified: Date | null;
+  image: string | null;
+  emailNotificationsEnabled: boolean;
+  pushNotificationsEnabled: boolean;
+  notificationFrequency: "IMMEDIATE" | "DAILY" | "WEEKLY";
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 // Local Organization type that matches tRPC context expectations
 interface Organization {

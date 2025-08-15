@@ -1,5 +1,6 @@
-import { NotificationType } from "@prisma/client";
 import { describe, it, expect, beforeEach, vi } from "vitest";
+
+import { NotificationType } from "~/server/db/schema";
 
 // Mock NextAuth first to avoid import issues
 vi.mock("next-auth", () => ({
@@ -66,18 +67,28 @@ describe("issueRouter notification integration", () => {
       actionUrl: null,
     };
 
-    // Mock the issue creation
-    vi.mocked(ctx.db.issue.create).mockResolvedValue(mockIssue as any);
-    vi.mocked(ctx.db.notification.create).mockResolvedValue(
-      mockNotification as any,
-    );
-    vi.mocked(ctx.db.notification.findMany).mockResolvedValue([
+    // Mock the Drizzle issue creation
+    const issueInsertQuery = {
+      values: vi.fn().mockReturnThis(),
+      returning: vi.fn().mockResolvedValue([mockIssue]),
+    };
+    vi.mocked(ctx.db.insert).mockReturnValue(issueInsertQuery);
+
+    // Mock notification creation
+    const notificationInsertQuery = {
+      values: vi.fn().mockReturnThis(),
+      returning: vi.fn().mockResolvedValue([mockNotification]),
+    };
+    vi.mocked(ctx.db.insert).mockReturnValue(notificationInsertQuery);
+
+    // Mock notification findMany query
+    vi.mocked(ctx.db.query.notifications.findMany).mockResolvedValue([
       mockNotification,
     ]);
 
     // Verify notifications can be created for issues
-    const notifications = await ctx.db.notification.findMany({
-      where: { userId: mockUser.id },
+    const notifications = await ctx.db.query.notifications.findMany({
+      where: (notifications, { eq }) => eq(notifications.userId, mockUser.id),
     });
 
     expect(
@@ -100,16 +111,28 @@ describe("issueRouter notification integration", () => {
       actionUrl: null,
     };
 
-    vi.mocked(ctx.db.issue.update).mockResolvedValue(updatedIssue as any);
-    vi.mocked(ctx.db.notification.create).mockResolvedValue(
-      mockNotification as any,
-    );
-    vi.mocked(ctx.db.notification.findMany).mockResolvedValue([
+    // Mock Drizzle update query
+    const updateQuery = {
+      set: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      returning: vi.fn().mockResolvedValue([updatedIssue]),
+    };
+    vi.mocked(ctx.db.update).mockReturnValue(updateQuery);
+
+    // Mock notification creation
+    const notificationInsertQuery = {
+      values: vi.fn().mockReturnThis(),
+      returning: vi.fn().mockResolvedValue([mockNotification]),
+    };
+    vi.mocked(ctx.db.insert).mockReturnValue(notificationInsertQuery);
+
+    // Mock notification query
+    vi.mocked(ctx.db.query.notifications.findMany).mockResolvedValue([
       mockNotification,
     ]);
 
-    const notifications = await ctx.db.notification.findMany({
-      where: { userId: mockUser.id },
+    const notifications = await ctx.db.query.notifications.findMany({
+      where: (notifications, { eq }) => eq(notifications.userId, mockUser.id),
     });
 
     expect(
@@ -132,16 +155,27 @@ describe("issueRouter notification integration", () => {
       actionUrl: null,
     };
 
-    vi.mocked(ctx.db.issue.create).mockResolvedValue(assignedIssue as any);
-    vi.mocked(ctx.db.notification.create).mockResolvedValue(
-      mockNotification as any,
-    );
-    vi.mocked(ctx.db.notification.findMany).mockResolvedValue([
+    // Mock Drizzle issue creation
+    const issueInsertQuery = {
+      values: vi.fn().mockReturnThis(),
+      returning: vi.fn().mockResolvedValue([assignedIssue]),
+    };
+    vi.mocked(ctx.db.insert).mockReturnValue(issueInsertQuery);
+
+    // Mock notification creation
+    const notificationInsertQuery = {
+      values: vi.fn().mockReturnThis(),
+      returning: vi.fn().mockResolvedValue([mockNotification]),
+    };
+    vi.mocked(ctx.db.insert).mockReturnValue(notificationInsertQuery);
+
+    // Mock notification query
+    vi.mocked(ctx.db.query.notifications.findMany).mockResolvedValue([
       mockNotification,
     ]);
 
-    const notifications = await ctx.db.notification.findMany({
-      where: { userId: mockUser.id },
+    const notifications = await ctx.db.query.notifications.findMany({
+      where: (notifications, { eq }) => eq(notifications.userId, mockUser.id),
     });
 
     expect(
@@ -155,15 +189,28 @@ describe("issueRouter notification integration", () => {
       ownerNotificationsEnabled: false,
     };
 
-    vi.mocked(ctx.db.machine.findUnique).mockResolvedValue(
+    // Mock Drizzle machine query
+    vi.mocked(ctx.db.query.machines.findFirst).mockResolvedValue(
       machineWithoutNotifications as any,
     );
-    vi.mocked(ctx.db.issue.create).mockResolvedValue(mockIssue as any);
-    vi.mocked(ctx.db.notification.findMany).mockResolvedValue([]);
+
+    // Mock issue creation
+    const issueInsertQuery = {
+      values: vi.fn().mockReturnThis(),
+      returning: vi.fn().mockResolvedValue([mockIssue]),
+    };
+    vi.mocked(ctx.db.insert).mockReturnValue(issueInsertQuery);
+
+    // Mock empty notification query
+    vi.mocked(ctx.db.query.notifications.findMany).mockResolvedValue([]);
 
     // Should not create notification when disabled
-    const notifications = await ctx.db.notification.findMany({
-      where: { userId: mockUser.id, entityId: mockIssue.id },
+    const notifications = await ctx.db.query.notifications.findMany({
+      where: (notifications, { eq, and }) =>
+        and(
+          eq(notifications.userId, mockUser.id),
+          eq(notifications.entityId, mockIssue.id),
+        ),
     });
 
     expect(notifications.length).toBe(0);
@@ -197,14 +244,31 @@ describe("issueRouter notification integration", () => {
       },
     ];
 
-    vi.mocked(ctx.db.issue.create).mockResolvedValue(mockIssue as any);
-    vi.mocked(ctx.db.notification.createMany).mockResolvedValue({ count: 2 });
-    vi.mocked(ctx.db.notification.findMany).mockResolvedValue(
+    // Mock Drizzle issue creation
+    const issueInsertQuery = {
+      values: vi.fn().mockReturnThis(),
+      returning: vi.fn().mockResolvedValue([mockIssue]),
+    };
+    vi.mocked(ctx.db.insert).mockReturnValue(issueInsertQuery);
+
+    // Mock batch notification creation (createMany equivalent)
+    const notificationInsertQuery = {
+      values: vi.fn().mockReturnThis(),
+      returning: vi.fn().mockResolvedValue(mockNotifications),
+    };
+    vi.mocked(ctx.db.insert).mockReturnValue(notificationInsertQuery);
+
+    // Mock notification query
+    vi.mocked(ctx.db.query.notifications.findMany).mockResolvedValue(
       mockNotifications,
     );
 
-    const notifications = await ctx.db.notification.findMany({
-      where: { userId: mockUser.id, entityId: mockIssue.id },
+    const notifications = await ctx.db.query.notifications.findMany({
+      where: (notifications, { eq, and }) =>
+        and(
+          eq(notifications.userId, mockUser.id),
+          eq(notifications.entityId, mockIssue.id),
+        ),
     });
 
     expect(notifications.length).toBe(2);

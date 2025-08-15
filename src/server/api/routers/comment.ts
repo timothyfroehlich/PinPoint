@@ -17,7 +17,7 @@ export const commentRouter = createTRPCRouter({
   getForIssue: organizationProcedure
     .input(z.object({ issueId: z.string() }))
     .query(({ ctx, input }) => {
-      return ctx.drizzle
+      return ctx.db
         .select({
           id: comments.id,
           content: comments.content,
@@ -48,7 +48,7 @@ export const commentRouter = createTRPCRouter({
   delete: issueDeleteProcedure
     .input(z.object({ commentId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      const [comment] = await ctx.drizzle
+      const [comment] = await ctx.db
         .select({
           id: comments.id,
           issueId: comments.issueId,

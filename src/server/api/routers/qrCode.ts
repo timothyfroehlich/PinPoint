@@ -35,7 +35,7 @@ export const qrCodeRouter = createTRPCRouter({
       // Verify machine belongs to organization
 
       const machine = await getSingleRecordWithLimit(
-        ctx.drizzle
+        ctx.db
           .select()
           .from(machines)
           .where(

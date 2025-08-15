@@ -3,14 +3,25 @@
  * Handles syncing machine data between PinballMap and PinPoint
  */
 
-import type { ExtendedPrismaClient } from "./types";
+import { eq, count } from "drizzle-orm";
+
 import type {
   PinballMapMachine,
   PinballMapMachineDetailsResponse,
 } from "~/lib/pinballmap/types";
+import type { DrizzleClient } from "~/server/db/drizzle";
 
 import { transformPinballMapMachineToModel } from "~/lib/external/pinballmapTransformer";
 import { logger } from "~/lib/logger";
+
+// Drizzle ORM imports
+import {
+  machines,
+  models,
+  locations,
+  pinballMapConfigs,
+  issues,
+} from "~/server/db/schema";
 
 export interface SyncResult {
   success: boolean;
@@ -21,23 +32,26 @@ export interface SyncResult {
 }
 
 export class PinballMapService {
-  constructor(private prisma: ExtendedPrismaClient) {}
+  constructor(private db: DrizzleClient) {}
 
   /**
    * Enable PinballMap integration for an organization
    */
   async enableIntegration(organizationId: string): Promise<void> {
-    await this.prisma.pinballMapConfig.upsert({
-      where: { organizationId },
-      create: {
+    await this.db
+      .insert(pinballMapConfigs)
+      .values({
+        id: `pmc_${organizationId}`,
         organizationId,
         apiEnabled: true,
         autoSyncEnabled: false, // Start with manual sync
-      },
-      update: {
-        apiEnabled: true,
-      },
-    });
+      })
+      .onConflictDoUpdate({
+        target: pinballMapConfigs.organizationId,
+        set: {
+          apiEnabled: true,
+        },
+      });
   }
 
   /**
@@ -49,8 +63,8 @@ export class PinballMapService {
     organizationId: string,
   ): Promise<void> {
     // Verify organization has PinballMap enabled
-    const config = await this.prisma.pinballMapConfig.findUnique({
-      where: { organizationId },
+    const config = await this.db.query.pinballMapConfigs.findFirst({
+      where: eq(pinballMapConfigs.organizationId, organizationId),
     });
 
     if (!config?.apiEnabled) {
@@ -58,25 +72,31 @@ export class PinballMapService {
     }
 
     // Update location with PinballMap configuration
-    await this.prisma.location.update({
-      where: { id: locationId },
-      data: {
+    await this.db
+      .update(locations)
+      .set({
         pinballMapId,
         syncEnabled: true,
-      },
-    });
+      })
+      .where(eq(locations.id, locationId));
   }
 
   /**
    * Sync a specific location with PinballMap
    */
   async syncLocation(locationId: string): Promise<SyncResult> {
-    const location = await this.prisma.location.findUnique({
-      where: { id: locationId },
-      include: {
+    const location = await this.db.query.locations.findFirst({
+      where: eq(locations.id, locationId),
+      with: {
         organization: {
-          include: {
-            pinballMapConfig: true,
+          with: {
+            pinballMapConfig: {
+              columns: {
+                apiEnabled: true,
+                createMissingModels: true,
+                updateExistingData: true,
+              },
+            },
           },
         },
       },
@@ -102,7 +122,9 @@ export class PinballMapService {
       };
     }
 
-    if (!location.organization.pinballMapConfig?.apiEnabled) {
+    // Get the PinballMap config - array access since schema defines it as many relationship
+    const pinballMapConfig = location.organization.pinballMapConfig?.[0];
+    if (!pinballMapConfig?.apiEnabled) {
       return {
         success: false,
         added: 0,
@@ -133,14 +155,14 @@ export class PinballMapService {
         location.id,
         location.organizationId,
         machineData.machines,
-        location.organization.pinballMapConfig,
+        pinballMapConfig,
       );
 
       // Update last sync time
-      await this.prisma.location.update({
-        where: { id: locationId },
-        data: { lastSyncAt: new Date() },
-      });
+      await this.db
+        .update(locations)
+        .set({ lastSyncAt: new Date() })
+        .where(eq(locations.id, locationId));
 
       return result;
     } catch (error) {
@@ -168,10 +190,15 @@ export class PinballMapService {
     let removed = 0;
 
     // Get current machines at this location
-    const currentMachines = await this.prisma.machine.findMany({
-      where: { locationId },
-      include: {
-        model: true,
+    const currentMachines = await this.db.query.machines.findMany({
+      where: eq(machines.locationId, locationId),
+      with: {
+        model: {
+          columns: {
+            id: true,
+            name: true,
+          },
+        },
       },
     });
 
@@ -206,14 +233,14 @@ export class PinballMapService {
           }
         } else {
           // Create new machine
-          await this.prisma.machine.create({
-            data: {
-              name: model.name, // Use model name as default instance name
-              organizationId,
-              locationId,
-              modelId: model.id,
-              // ownerId will be null initially
-            },
+          await this.db.insert(machines).values({
+            id: `machine_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            name: model.name, // Use model name as default instance name
+            organizationId,
+            locationId,
+            modelId: model.id,
+            qrCodeId: `qr_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            // ownerId will be null initially
           });
           added++;
         }
@@ -242,15 +269,14 @@ export class PinballMapService {
 
     for (const machine of machinesToRemove) {
       // Check if machine has issues before removing
-      const issueCount = await this.prisma.issue.count({
-        where: { machineId: machine.id },
-      });
+      const [issueCountResult] = await this.db
+        .select({ count: count() })
+        .from(issues)
+        .where(eq(issues.machineId, machine.id));
 
-      if (issueCount === 0) {
+      if (issueCountResult?.count === 0) {
         // Only remove machines with no issues
-        await this.prisma.machine.delete({
-          where: { id: machine.id },
-        });
+        await this.db.delete(machines).where(eq(machines.id, machine.id));
         removed++;
       }
     }
@@ -272,8 +298,8 @@ export class PinballMapService {
   ): Promise<{ id: string; name: string } | null> {
     // Look for existing model by OPDB ID
     let model = pmMachine.opdb_id
-      ? await this.prisma.model.findUnique({
-          where: { opdbId: pmMachine.opdb_id },
+      ? await this.db.query.models.findFirst({
+          where: eq(models.opdbId, pmMachine.opdb_id),
         })
       : null;
 
@@ -283,8 +309,8 @@ export class PinballMapService {
 
     // Look for existing model by IPDB ID if available
     if (pmMachine.ipdb_id) {
-      model = await this.prisma.model.findUnique({
-        where: { ipdbId: pmMachine.ipdb_id.toString() },
+      model = await this.db.query.models.findFirst({
+        where: eq(models.ipdbId, pmMachine.ipdb_id.toString()),
       });
 
       if (model) {
@@ -299,20 +325,28 @@ export class PinballMapService {
     // Create new global model from PinballMap data using extracted transformer
     try {
       const modelData = transformPinballMapMachineToModel(pmMachine);
-      model = await this.prisma.model.create({
-        data: modelData,
-      });
+      const [newModel] = await this.db
+        .insert(models)
+        .values({
+          id: `model_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          ...modelData,
+        })
+        .returning({
+          id: models.id,
+          name: models.name,
+        });
 
-      return model;
+      return newModel ?? null;
     } catch (error) {
       // Handle duplicate key errors gracefully
       if (error instanceof Error && error.message.includes("unique")) {
         // Another sync might have created this model
-        return pmMachine.opdb_id
-          ? this.prisma.model.findUnique({
-              where: { opdbId: pmMachine.opdb_id },
+        const fallbackModel = pmMachine.opdb_id
+          ? await this.db.query.models.findFirst({
+              where: eq(models.opdbId, pmMachine.opdb_id),
             })
           : null;
+        return fallbackModel ?? null;
       }
       throw error;
     }
@@ -365,30 +399,28 @@ export class PinballMapService {
       machineCount: number;
     }[];
   }> {
-    const config = await this.prisma.pinballMapConfig.findUnique({
-      where: { organizationId },
+    const config = await this.db.query.pinballMapConfigs.findFirst({
+      where: eq(pinballMapConfigs.organizationId, organizationId),
     });
 
-    const locations = await this.prisma.location.findMany({
-      where: { organizationId },
-      include: {
-        _count: {
-          select: {
-            machines: true,
-          },
+    const locationsData = await this.db.query.locations.findMany({
+      where: eq(locations.organizationId, organizationId),
+      with: {
+        machines: {
+          columns: { id: true },
         },
       },
     });
 
     return {
       configEnabled: config?.apiEnabled ?? false,
-      locations: locations.map((location) => ({
+      locations: locationsData.map((location) => ({
         id: location.id,
         name: location.name,
         pinballMapId: location.pinballMapId,
         syncEnabled: location.syncEnabled,
         lastSyncAt: location.lastSyncAt,
-        machineCount: location._count.machines,
+        machineCount: location.machines.length,
       })),
     };
   }
@@ -396,22 +428,22 @@ export class PinballMapService {
 
 // Export legacy functions for backward compatibility during transition
 export async function syncLocationGames(
-  prisma: ExtendedPrismaClient,
+  db: DrizzleClient,
   locationId: string,
 ): Promise<SyncResult> {
-  const service = new PinballMapService(prisma);
+  const service = new PinballMapService(db);
   return service.syncLocation(locationId);
 }
 
 export async function processFixtureData(
-  prisma: ExtendedPrismaClient,
+  db: DrizzleClient,
   fixtureData: PinballMapMachineDetailsResponse,
   locationId: string,
   organizationId: string,
 ): Promise<{ created: number; error?: string }> {
   try {
     let created = 0;
-    const service = new PinballMapService(prisma);
+    const service = new PinballMapService(db);
 
     for (const machine of fixtureData.machines) {
       // Create or update model
@@ -419,13 +451,13 @@ export async function processFixtureData(
 
       if (model) {
         // Create machine instance
-        await prisma.machine.create({
-          data: {
-            name: model.name, // Use model name as default instance name
-            organizationId: organizationId,
-            modelId: model.id,
-            locationId: locationId,
-          },
+        await db.insert(machines).values({
+          id: `machine_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          name: model.name, // Use model name as default instance name
+          organizationId,
+          modelId: model.id,
+          locationId,
+          qrCodeId: `qr_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         });
         created++;
       }

@@ -11,7 +11,7 @@
  * Focused on achieving 80%+ coverage of the main execution paths.
  */
 
-/* eslint-disable @typescript-eslint/unbound-method */
+ 
 /* eslint-disable @typescript-eslint/no-confusing-void-expression */
 
 import { TRPCError } from "@trpc/server";

@@ -137,7 +137,7 @@ _Essential post-training tech stack updates for direct migration_
 
 ## 🎯 Success Metrics
 
-**Velocity:** 2-3 weeks total vs 7+ weeks with parallel validation  
+**Velocity:** Final Prisma removal in 1-2 weeks (router layer already 85% complete)  
 **Quality:** TypeScript compilation passes, app functionality preserved  
 **Learning:** Deep understanding of modern patterns
 
@@ -156,5 +156,5 @@ _Essential post-training tech stack updates for direct migration_
 
 ## 🔄 Implementation Strategy
 
-**Direct Conversion:** No parallel validation, optimize for learning, incremental progress  
-**Details:** [@docs/migration/supabase-drizzle/direct-conversion-plan.md](../migration/supabase-drizzle/direct-conversion-plan.md)
+**Complete Removal:** Pure Drizzle implementations, service layer conversion, infrastructure cleanup  
+**Details:** [@prisma-removal-tasks/README.md](../../prisma-removal-tasks/README.md)

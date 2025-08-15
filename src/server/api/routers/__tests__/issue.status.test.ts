@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-/* eslint-disable @typescript-eslint/unbound-method */
+ 
 
 // Mock NextAuth first to avoid import issues
 vi.mock("next-auth", () => ({
@@ -62,9 +62,12 @@ describe("issueStatusRouter", () => {
     ctx.membership = mockMembership;
 
     // Mock the database membership lookup that organizationProcedure expects
-    vi.mocked(ctx.db.membership.findFirst).mockResolvedValue(
-      mockMembership as any,
-    );
+    const membershipSelectQuery = {
+      from: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockResolvedValue([mockMembership]),
+    };
+    vi.mocked(ctx.db.select).mockReturnValue(membershipSelectQuery);
   });
 
   describe("getStatusCounts", () => {
@@ -89,14 +92,14 @@ describe("issueStatusRouter", () => {
         where: vi.fn().mockReturnThis(),
         groupBy: vi.fn().mockResolvedValue(mockIssueCounts),
       };
-      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(issueCountQuery);
+      vi.mocked(ctx.db.select).mockReturnValueOnce(issueCountQuery);
 
       // Set up Drizzle mock chain for statuses query (SECOND call)
       const statusSelectQuery = {
         from: vi.fn().mockReturnThis(),
         where: vi.fn().mockResolvedValue(mockStatuses),
       };
-      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(statusSelectQuery);
+      vi.mocked(ctx.db.select).mockReturnValueOnce(statusSelectQuery);
 
       const caller = appRouter.createCaller(ctx as any);
       const result = await caller.issueStatus.getStatusCounts();
@@ -123,14 +126,14 @@ describe("issueStatusRouter", () => {
         where: vi.fn().mockReturnThis(),
         groupBy: vi.fn().mockResolvedValue([]),
       };
-      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(issueCountQuery);
+      vi.mocked(ctx.db.select).mockReturnValueOnce(issueCountQuery);
 
       // Set up Drizzle mock chain for statuses query (SECOND call)
       const statusSelectQuery = {
         from: vi.fn().mockReturnThis(),
         where: vi.fn().mockResolvedValue([]),
       };
-      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(statusSelectQuery);
+      vi.mocked(ctx.db.select).mockReturnValueOnce(statusSelectQuery);
 
       const caller = appRouter.createCaller(ctx as any);
       const result = await caller.issueStatus.getStatusCounts();
@@ -156,14 +159,14 @@ describe("issueStatusRouter", () => {
         where: vi.fn().mockReturnThis(),
         groupBy: vi.fn().mockResolvedValue([]), // No issues
       };
-      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(issueCountQuery);
+      vi.mocked(ctx.db.select).mockReturnValueOnce(issueCountQuery);
 
       // Set up Drizzle mock chain for statuses query (SECOND call)
       const statusSelectQuery = {
         from: vi.fn().mockReturnThis(),
         where: vi.fn().mockResolvedValue(mockStatuses),
       };
-      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(statusSelectQuery);
+      vi.mocked(ctx.db.select).mockReturnValueOnce(statusSelectQuery);
 
       const caller = appRouter.createCaller(ctx as any);
       const result = await caller.issueStatus.getStatusCounts();
@@ -197,14 +200,14 @@ describe("issueStatusRouter", () => {
         where: vi.fn().mockReturnThis(),
         groupBy: vi.fn().mockResolvedValue(mockIssueCounts),
       };
-      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(issueCountQuery);
+      vi.mocked(ctx.db.select).mockReturnValueOnce(issueCountQuery);
 
       // Set up Drizzle mock chain for statuses query (SECOND call)
       const statusSelectQuery = {
         from: vi.fn().mockReturnThis(),
         where: vi.fn().mockResolvedValue(mockStatuses),
       };
-      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(statusSelectQuery);
+      vi.mocked(ctx.db.select).mockReturnValueOnce(statusSelectQuery);
 
       const caller = appRouter.createCaller(ctx as any);
       const result = await caller.issueStatus.getStatusCounts();
@@ -236,14 +239,14 @@ describe("issueStatusRouter", () => {
         where: vi.fn().mockReturnThis(),
         groupBy: vi.fn().mockResolvedValue(mockIssueCounts),
       };
-      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(issueCountQuery);
+      vi.mocked(ctx.db.select).mockReturnValueOnce(issueCountQuery);
 
       // Set up Drizzle mock chain for statuses query (SECOND call)
       const statusSelectQuery = {
         from: vi.fn().mockReturnThis(),
         where: vi.fn().mockResolvedValue(mockStatuses),
       };
-      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(statusSelectQuery);
+      vi.mocked(ctx.db.select).mockReturnValueOnce(statusSelectQuery);
 
       const caller = appRouter.createCaller(ctx as any);
       const result = await caller.issueStatus.getStatusCounts();
@@ -276,14 +279,14 @@ describe("issueStatusRouter", () => {
         where: vi.fn().mockReturnThis(),
         groupBy: vi.fn().mockResolvedValue(mockIssueCounts),
       };
-      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(issueCountQuery);
+      vi.mocked(ctx.db.select).mockReturnValueOnce(issueCountQuery);
 
       // Set up Drizzle mock chain for statuses query (SECOND call)
       const statusSelectQuery = {
         from: vi.fn().mockReturnThis(),
         where: vi.fn().mockResolvedValue(mockStatuses),
       };
-      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(statusSelectQuery);
+      vi.mocked(ctx.db.select).mockReturnValueOnce(statusSelectQuery);
 
       const caller = appRouter.createCaller(ctx as any);
       const result = await caller.issueStatus.getStatusCounts();
@@ -334,14 +337,14 @@ describe("issueStatusRouter", () => {
         where: vi.fn().mockReturnThis(),
         groupBy: vi.fn().mockResolvedValue(mockIssueCounts),
       };
-      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(issueCountQuery);
+      vi.mocked(ctx.db.select).mockReturnValueOnce(issueCountQuery);
 
       // Set up Drizzle mock chain for statuses query (SECOND call)
       const statusSelectQuery = {
         from: vi.fn().mockReturnThis(),
         where: vi.fn().mockResolvedValue(mockStatuses),
       };
-      vi.mocked(ctx.drizzle.select).mockReturnValueOnce(statusSelectQuery);
+      vi.mocked(ctx.db.select).mockReturnValueOnce(statusSelectQuery);
 
       const caller = appRouter.createCaller(otherOrgCtx as any);
       await caller.issueStatus.getStatusCounts();

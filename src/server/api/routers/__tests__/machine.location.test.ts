@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/unbound-method */
+ 
 import { TRPCError } from "@trpc/server";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
@@ -141,7 +141,7 @@ const createAuthenticatedContext = () => {
   };
 
   // Mock the membership lookup that the organization procedure requires
-  vi.mocked(mockContext.db.membership.findFirst).mockResolvedValue(
+  vi.mocked(mockContext.db.query.memberships.findFirst).mockResolvedValue(
     mockMembership as any,
   );
 
@@ -162,15 +162,15 @@ describe("machineLocationRouter", () => {
       const caller = appRouter.createCaller(ctx);
 
       // Mock database queries
-      ctx.drizzle.query.machines.findFirst
+      ctx.db.query.machines.findFirst
         .mockResolvedValueOnce(mockMachine) // Machine exists check
         .mockResolvedValueOnce(null); // Not used in this path
 
-      ctx.drizzle.query.locations.findFirst.mockResolvedValue(mockLocation);
+      ctx.db.query.locations.findFirst.mockResolvedValue(mockLocation);
 
       // Mock update operation
       const mockUpdatedMachine = { ...mockMachine, locationId: "location-2" };
-      ctx.drizzle.update = vi.fn().mockReturnValue({
+      ctx.db.update = vi.fn().mockReturnValue({
         set: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
             returning: vi.fn().mockResolvedValue([mockUpdatedMachine]),
@@ -179,7 +179,7 @@ describe("machineLocationRouter", () => {
       });
 
       // Mock final select with joins
-      ctx.drizzle.select = vi.fn().mockReturnValue({
+      ctx.db.select = vi.fn().mockReturnValue({
         from: vi.fn().mockReturnValue({
           leftJoin: vi.fn().mockReturnValue({
             leftJoin: vi.fn().mockReturnValue({
@@ -199,14 +199,10 @@ describe("machineLocationRouter", () => {
       });
 
       expect(result).toEqual(mockMachineWithRelations);
-      expect(
-        vi.mocked(ctx.drizzle.query.machines.findFirst),
-      ).toHaveBeenCalledWith({
+      expect(vi.mocked(ctx.db.query.machines.findFirst)).toHaveBeenCalledWith({
         where: expect.any(Object), // Drizzle SQL object
       });
-      expect(
-        vi.mocked(ctx.drizzle.query.locations.findFirst),
-      ).toHaveBeenCalledWith({
+      expect(vi.mocked(ctx.db.query.locations.findFirst)).toHaveBeenCalledWith({
         where: expect.any(Object), // Drizzle SQL object
       });
     });
@@ -216,7 +212,7 @@ describe("machineLocationRouter", () => {
       const caller = appRouter.createCaller(ctx);
 
       // Mock machine not found
-      ctx.drizzle.query.machines.findFirst.mockResolvedValue(null);
+      ctx.db.query.machines.findFirst.mockResolvedValue(null);
 
       await expect(
         caller.machine.location.moveToLocation({
@@ -230,14 +226,12 @@ describe("machineLocationRouter", () => {
         }),
       );
 
-      expect(
-        vi.mocked(ctx.drizzle.query.machines.findFirst),
-      ).toHaveBeenCalledWith({
+      expect(vi.mocked(ctx.db.query.machines.findFirst)).toHaveBeenCalledWith({
         where: expect.any(Object),
       });
       // Should not check location if machine doesn't exist
       expect(
-        vi.mocked(ctx.drizzle.query.locations.findFirst),
+        vi.mocked(ctx.db.query.locations.findFirst),
       ).not.toHaveBeenCalled();
     });
 
@@ -246,7 +240,7 @@ describe("machineLocationRouter", () => {
       const caller = appRouter.createCaller(ctx);
 
       // Mock machine from different organization (not returned due to org filter)
-      ctx.drizzle.query.machines.findFirst.mockResolvedValue(null); // Will return null due to organization filter
+      ctx.db.query.machines.findFirst.mockResolvedValue(null); // Will return null due to organization filter
 
       await expect(
         caller.machine.location.moveToLocation({
@@ -266,8 +260,8 @@ describe("machineLocationRouter", () => {
       const caller = appRouter.createCaller(ctx);
 
       // Mock machine exists but location does not
-      ctx.drizzle.query.machines.findFirst.mockResolvedValue(mockMachine);
-      ctx.drizzle.query.locations.findFirst.mockResolvedValue(null);
+      ctx.db.query.machines.findFirst.mockResolvedValue(mockMachine);
+      ctx.db.query.locations.findFirst.mockResolvedValue(null);
 
       await expect(
         caller.machine.location.moveToLocation({
@@ -281,12 +275,8 @@ describe("machineLocationRouter", () => {
         }),
       );
 
-      expect(
-        vi.mocked(ctx.drizzle.query.machines.findFirst),
-      ).toHaveBeenCalled();
-      expect(
-        vi.mocked(ctx.drizzle.query.locations.findFirst),
-      ).toHaveBeenCalledWith({
+      expect(vi.mocked(ctx.db.query.machines.findFirst)).toHaveBeenCalled();
+      expect(vi.mocked(ctx.db.query.locations.findFirst)).toHaveBeenCalledWith({
         where: expect.any(Object),
       });
     });
@@ -296,8 +286,8 @@ describe("machineLocationRouter", () => {
       const caller = appRouter.createCaller(ctx);
 
       // Mock machine exists but location from different org
-      ctx.drizzle.query.machines.findFirst.mockResolvedValue(mockMachine);
-      ctx.drizzle.query.locations.findFirst.mockResolvedValue(null); // Will return null due to organization filter
+      ctx.db.query.machines.findFirst.mockResolvedValue(mockMachine);
+      ctx.db.query.locations.findFirst.mockResolvedValue(null); // Will return null due to organization filter
 
       await expect(
         caller.machine.location.moveToLocation({
@@ -317,11 +307,11 @@ describe("machineLocationRouter", () => {
       const caller = appRouter.createCaller(ctx);
 
       // Mock machine and location exist
-      ctx.drizzle.query.machines.findFirst.mockResolvedValue(mockMachine);
-      ctx.drizzle.query.locations.findFirst.mockResolvedValue(mockLocation);
+      ctx.db.query.machines.findFirst.mockResolvedValue(mockMachine);
+      ctx.db.query.locations.findFirst.mockResolvedValue(mockLocation);
 
       // Mock update operation returning empty array (no rows affected)
-      ctx.drizzle.update = vi.fn().mockReturnValue({
+      ctx.db.update = vi.fn().mockReturnValue({
         set: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
             returning: vi.fn().mockResolvedValue([]), // No rows returned
@@ -400,7 +390,7 @@ describe("machineLocationRouter", () => {
       const caller = appRouter.createCaller(ctx);
 
       // Mock database error
-      ctx.drizzle.query.machines.findFirst.mockRejectedValue(
+      ctx.db.query.machines.findFirst.mockRejectedValue(
         new Error("Database connection failed"),
       );
 
@@ -417,11 +407,11 @@ describe("machineLocationRouter", () => {
       const caller = appRouter.createCaller(ctx);
 
       // Mock machine and location exist
-      ctx.drizzle.query.machines.findFirst.mockResolvedValue(mockMachine);
-      ctx.drizzle.query.locations.findFirst.mockResolvedValue(mockLocation);
+      ctx.db.query.machines.findFirst.mockResolvedValue(mockMachine);
+      ctx.db.query.locations.findFirst.mockResolvedValue(mockLocation);
 
       // Mock update operation throwing error
-      ctx.drizzle.update = vi.fn().mockReturnValue({
+      ctx.db.update = vi.fn().mockReturnValue({
         set: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
             returning: vi.fn().mockRejectedValue(new Error("Update failed")),
@@ -442,11 +432,11 @@ describe("machineLocationRouter", () => {
       const caller = appRouter.createCaller(ctx);
 
       // Mock successful flow
-      ctx.drizzle.query.machines.findFirst.mockResolvedValue(mockMachine);
-      ctx.drizzle.query.locations.findFirst.mockResolvedValue(mockLocation);
+      ctx.db.query.machines.findFirst.mockResolvedValue(mockMachine);
+      ctx.db.query.locations.findFirst.mockResolvedValue(mockLocation);
 
       const mockUpdatedMachine = { ...mockMachine, locationId: "location-2" };
-      ctx.drizzle.update = vi.fn().mockReturnValue({
+      ctx.db.update = vi.fn().mockReturnValue({
         set: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
             returning: vi.fn().mockResolvedValue([mockUpdatedMachine]),
@@ -454,7 +444,7 @@ describe("machineLocationRouter", () => {
         }),
       });
 
-      ctx.drizzle.select = vi.fn().mockReturnValue({
+      ctx.db.select = vi.fn().mockReturnValue({
         from: vi.fn().mockReturnValue({
           leftJoin: vi.fn().mockReturnValue({
             leftJoin: vi.fn().mockReturnValue({
@@ -474,14 +464,10 @@ describe("machineLocationRouter", () => {
       });
 
       // Verify that queries include organization scoping
-      expect(
-        vi.mocked(ctx.drizzle.query.machines.findFirst),
-      ).toHaveBeenCalledWith({
+      expect(vi.mocked(ctx.db.query.machines.findFirst)).toHaveBeenCalledWith({
         where: expect.any(Object), // Should include organization check
       });
-      expect(
-        vi.mocked(ctx.drizzle.query.locations.findFirst),
-      ).toHaveBeenCalledWith({
+      expect(vi.mocked(ctx.db.query.locations.findFirst)).toHaveBeenCalledWith({
         where: expect.any(Object), // Should include organization check
       });
     });
@@ -491,8 +477,8 @@ describe("machineLocationRouter", () => {
       const caller = appRouter.createCaller(ctx);
 
       // Mock successful flow
-      ctx.drizzle.query.machines.findFirst.mockResolvedValue(mockMachine);
-      ctx.drizzle.query.locations.findFirst.mockResolvedValue(mockLocation);
+      ctx.db.query.machines.findFirst.mockResolvedValue(mockMachine);
+      ctx.db.query.locations.findFirst.mockResolvedValue(mockLocation);
 
       const mockSet = vi.fn().mockReturnValue({
         where: vi.fn().mockReturnValue({
@@ -500,11 +486,11 @@ describe("machineLocationRouter", () => {
         }),
       });
 
-      ctx.drizzle.update = vi.fn().mockReturnValue({
+      ctx.db.update = vi.fn().mockReturnValue({
         set: mockSet,
       });
 
-      ctx.drizzle.select = vi.fn().mockReturnValue({
+      ctx.db.select = vi.fn().mockReturnValue({
         from: vi.fn().mockReturnValue({
           leftJoin: vi.fn().mockReturnValue({
             leftJoin: vi.fn().mockReturnValue({
@@ -535,11 +521,11 @@ describe("machineLocationRouter", () => {
       const caller = appRouter.createCaller(ctx);
 
       // Mock successful flow
-      ctx.drizzle.query.machines.findFirst.mockResolvedValue(mockMachine);
-      ctx.drizzle.query.locations.findFirst.mockResolvedValue(mockLocation);
+      ctx.db.query.machines.findFirst.mockResolvedValue(mockMachine);
+      ctx.db.query.locations.findFirst.mockResolvedValue(mockLocation);
 
       const mockUpdatedMachine = { ...mockMachine, locationId: "location-2" };
-      ctx.drizzle.update = vi.fn().mockReturnValue({
+      ctx.db.update = vi.fn().mockReturnValue({
         set: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
             returning: vi.fn().mockResolvedValue([mockUpdatedMachine]),
@@ -547,7 +533,7 @@ describe("machineLocationRouter", () => {
         }),
       });
 
-      ctx.drizzle.select = vi.fn().mockReturnValue({
+      ctx.db.select = vi.fn().mockReturnValue({
         from: vi.fn().mockReturnValue({
           leftJoin: vi.fn().mockReturnValue({
             leftJoin: vi.fn().mockReturnValue({

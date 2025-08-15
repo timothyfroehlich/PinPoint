@@ -22,7 +22,7 @@ export async function GET(): Promise<NextResponse> {
   }
 
   const dbProvider = getGlobalDatabaseProvider();
-  const db = dbProvider.getDrizzleClient(); // ← Use Drizzle instead of Prisma
+  const db = dbProvider.getClient(); // ← Use Drizzle instead of Prisma
   try {
     const user = await getSupabaseUser();
 

@@ -11,7 +11,23 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 
-import type { User, NotificationFrequency } from "@prisma/client";
+// Local types to replace Prisma imports for testing
+type NotificationFrequency = "IMMEDIATE" | "DAILY" | "WEEKLY";
+
+interface User {
+  id: string;
+  name: string | null;
+  email: string;
+  emailVerified: Date | null;
+  image: string | null;
+  bio: string | null;
+  profilePicture: string | null;
+  emailNotificationsEnabled: boolean;
+  pushNotificationsEnabled: boolean;
+  notificationFrequency: NotificationFrequency;
+  createdAt: Date;
+  updatedAt: Date;
+}
 import type { ReactNode } from "react";
 import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 

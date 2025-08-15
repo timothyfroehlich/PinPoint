@@ -1,4 +1,5 @@
 import { TRPCError } from "@trpc/server";
+import { eq, and, gte, lte, count } from "drizzle-orm";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { z } from "zod";
 
@@ -33,6 +34,7 @@ import {
   requirePermissionForSession,
   getUserPermissionsForSupabaseUser,
 } from "~/server/auth/permissions";
+import { issues, machines } from "~/server/db/schema";
 import { createVitestMockContext } from "~/test/vitestMockContext";
 
 // Create issue confirm procedure for testing
@@ -83,8 +85,9 @@ const issueConfirmationRouter = createTRPCRouter({
       }
 
       // Create the issue with confirmation status
-      const issue = await ctx.db.issue.create({
-        data: {
+      const [issue] = await ctx.db
+        .insert(issues)
+        .values({
           title: input.title,
           description: input.description ?? null,
           machineId: input.machineId,
@@ -99,19 +102,8 @@ const issueConfirmationRouter = createTRPCRouter({
           // isConfirmed: confirmationStatus,
           // confirmedAt: confirmationStatus ? new Date() : null,
           // confirmedById: confirmationStatus ? ctx.user.id : null,
-        },
-        include: {
-          machine: {
-            include: {
-              location: true,
-              model: true,
-            },
-          },
-          status: true,
-          priority: true,
-          createdBy: true,
-        },
-      });
+        })
+        .returning();
 
       return {
         ...issue,
@@ -132,11 +124,11 @@ const issueConfirmationRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       // Check if issue exists and user has access
-      const issue = await ctx.db.issue.findFirst({
-        where: {
-          id: input.issueId,
-          organizationId: ctx.organization.id,
-        },
+      const issue = await ctx.db.query.issues.findFirst({
+        where: and(
+          eq(issues.id, input.issueId),
+          eq(issues.organizationId, ctx.organization.id),
+        ),
       });
 
       if (!issue) {
@@ -147,26 +139,17 @@ const issueConfirmationRouter = createTRPCRouter({
       }
 
       // Update confirmation status
-      const updatedIssue = await ctx.db.issue.update({
-        where: { id: input.issueId },
-        data: {
+      const [updatedIssue] = await ctx.db
+        .update(issues)
+        .set({
           // Note: These fields don't exist in current schema - mocking for tests
           // isConfirmed: input.isConfirmed,
           // confirmedAt: input.isConfirmed ? new Date() : null,
           // confirmedById: input.isConfirmed ? ctx.user.id : null,
-        },
-        include: {
-          machine: {
-            include: {
-              location: true,
-              model: true,
-            },
-          },
-          status: true,
-          priority: true,
-          createdBy: true,
-        },
-      });
+          updatedAt: new Date(),
+        })
+        .where(eq(issues.id, input.issueId))
+        .returning();
 
       return {
         ...updatedIssue,
@@ -188,23 +171,18 @@ const issueConfirmationRouter = createTRPCRouter({
       }),
     )
     .query(async ({ ctx, input }) => {
-      const whereClause: any = {
-        organizationId: ctx.organization.id,
-      };
-
-      if (input.locationId) {
-        whereClause.machine = { locationId: input.locationId };
-      }
+      // Build where conditions array
+      const conditions = [eq(issues.organizationId, ctx.organization.id)];
 
       if (input.machineId) {
-        whereClause.machineId = input.machineId;
+        conditions.push(eq(issues.machineId, input.machineId));
       }
 
-      const issues = await ctx.db.issue.findMany({
-        where: whereClause,
-        include: {
+      const issuesList = await ctx.db.query.issues.findMany({
+        where: and(...conditions),
+        with: {
           machine: {
-            include: {
+            with: {
               location: true,
               model: true,
             },
@@ -213,11 +191,18 @@ const issueConfirmationRouter = createTRPCRouter({
           priority: true,
           createdBy: true,
         },
-        orderBy: [{ createdAt: "desc" }],
+        orderBy: (issues, { desc }) => desc(issues.createdAt),
       });
 
+      // Filter by location if needed (since we need to check nested machine.locationId)
+      const filteredIssues = input.locationId
+        ? issuesList.filter(
+            (issue) => issue.machine?.locationId === input.locationId,
+          )
+        : issuesList;
+
       // Mock confirmation status for testing
-      return issues.map((issue) => ({
+      return filteredIssues.map((issue) => ({
         ...issue,
         // Mock confirmation fields - in reality these would come from the database
         isConfirmed: Math.random() > 0.3, // Random for testing
@@ -240,27 +225,38 @@ const issueConfirmationRouter = createTRPCRouter({
       }),
     )
     .query(async ({ ctx, input }) => {
-      const whereClause: any = {
-        organizationId: ctx.organization.id,
-      };
-
-      if (input.locationId) {
-        whereClause.machine = { locationId: input.locationId };
-      }
+      // Build where conditions for count query
+      const conditions = [eq(issues.organizationId, ctx.organization.id)];
 
       if (input.dateRange) {
-        whereClause.createdAt = {};
         if (input.dateRange.from) {
-          whereClause.createdAt.gte = input.dateRange.from;
+          conditions.push(gte(issues.createdAt, input.dateRange.from));
         }
         if (input.dateRange.to) {
-          whereClause.createdAt.lte = input.dateRange.to;
+          conditions.push(lte(issues.createdAt, input.dateRange.to));
         }
       }
 
-      const totalIssues = await ctx.db.issue.count({
-        where: whereClause,
-      });
+      // For location filtering, we need a join or subquery
+      let totalIssues: number;
+      if (input.locationId) {
+        // Use a count query with join to machines table for location filtering
+        const [{ count: totalIssuesCount }] = await ctx.db
+          .select({ count: count() })
+          .from(issues)
+          .leftJoin(machines, eq(issues.machineId, machines.id))
+          .where(and(...conditions, eq(machines.locationId, input.locationId)));
+
+        totalIssues = totalIssuesCount;
+      } else {
+        // Simple count without location filter
+        const [{ count: totalIssuesCount }] = await ctx.db
+          .select({ count: count() })
+          .from(issues)
+          .where(and(...conditions));
+
+        totalIssues = totalIssuesCount;
+      }
 
       // Mock confirmation statistics for testing
       const confirmedCount = Math.floor(totalIssues * 0.7); // 70% confirmed
@@ -321,7 +317,7 @@ const createMockTRPCContext = (
   };
 
   // Mock the database query for membership lookup
-  vi.mocked(mockContext.db.membership.findFirst).mockResolvedValue(
+  vi.mocked(mockContext.db.query.memberships.findFirst).mockResolvedValue(
     membershipData as any,
   );
 
@@ -583,7 +579,9 @@ describe("Issue Confirmation Workflow", () => {
         createdBy: { id: "user-1", name: "Test User" },
       };
 
-      vi.mocked(ctx.db.issue.findFirst).mockResolvedValue(mockIssue as any);
+      vi.mocked(ctx.db.query.issues.findFirst).mockResolvedValue(
+        mockIssue as any,
+      );
       vi.mocked(ctx.db.issue.update).mockResolvedValue(mockIssue as any);
 
       // Act
@@ -622,7 +620,7 @@ describe("Issue Confirmation Workflow", () => {
       const ctx = createMockTRPCContext(["issue:confirm"]);
       const caller = issueConfirmationRouter.createCaller(ctx);
 
-      vi.mocked(ctx.db.issue.findFirst).mockResolvedValue(null);
+      vi.mocked(ctx.db.query.issues.findFirst).mockResolvedValue(null);
 
       // Act & Assert
       await expect(
@@ -651,7 +649,9 @@ describe("Issue Confirmation Workflow", () => {
         createdBy: { id: "user-1", name: "Test User" },
       };
 
-      vi.mocked(ctx.db.issue.findFirst).mockResolvedValue(mockIssue as any);
+      vi.mocked(ctx.db.query.issues.findFirst).mockResolvedValue(
+        mockIssue as any,
+      );
       vi.mocked(ctx.db.issue.update).mockResolvedValue(mockIssue as any);
 
       // Act

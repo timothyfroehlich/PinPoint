@@ -7,126 +7,85 @@ import { vi, afterEach } from "vitest";
 // Mock fetch globally for tests
 global.fetch = vi.fn();
 
-// Create a mock Prisma client
-const mockPrismaClient = {
-  $disconnect: vi.fn().mockResolvedValue(undefined),
-  organization: {
-    findMany: vi.fn(),
-    findFirst: vi.fn(),
-    findUnique: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
-  },
-  user: {
-    findMany: vi.fn(),
-    findFirst: vi.fn(),
-    findUnique: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
-  },
-  membership: {
-    findMany: vi.fn(),
-    findFirst: vi.fn(),
-    findUnique: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
-  },
-  issue: {
-    findMany: vi.fn(),
-    findFirst: vi.fn(),
-    findUnique: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
-    count: vi.fn(),
-  },
-  machine: {
-    findMany: vi.fn(),
-    findFirst: vi.fn(),
-    findUnique: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
-  },
-  location: {
-    findMany: vi.fn(),
-    findFirst: vi.fn(),
-    findUnique: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
-  },
-  attachment: {
-    findMany: vi.fn(),
-    findFirst: vi.fn(),
-    findUnique: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
-    count: vi.fn(),
-  },
-  model: {
-    findMany: vi.fn(),
-    findFirst: vi.fn(),
-    findUnique: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
-  },
-  issueStatus: {
-    findMany: vi.fn(),
-    findFirst: vi.fn(),
-    findUnique: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
-  },
-  priority: {
-    findMany: vi.fn(),
-    findFirst: vi.fn(),
-    findUnique: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
-  },
-  issueHistory: {
-    findMany: vi.fn(),
-    findFirst: vi.fn(),
-    findUnique: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
-  },
-  notification: {
-    findMany: vi.fn(),
-    findFirst: vi.fn(),
-    findUnique: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
-  },
-  pinballMapConfig: {
-    findMany: vi.fn(),
-    findFirst: vi.fn(),
-    findUnique: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
-    upsert: vi.fn(),
+// Create a mock Drizzle client
+const mockDrizzleClient = {
+  // Core Drizzle query methods
+  select: vi.fn().mockReturnThis(),
+  insert: vi.fn().mockReturnThis(),
+  update: vi.fn().mockReturnThis(),
+  delete: vi.fn().mockReturnThis(),
+  values: vi.fn().mockReturnThis(),
+  set: vi.fn().mockReturnThis(),
+  where: vi.fn().mockReturnThis(),
+  returning: vi.fn(),
+  execute: vi.fn(),
+  transaction: vi.fn(),
+
+  // Drizzle relational query API
+  query: {
+    organizations: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+    },
+    users: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+    },
+    memberships: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+    },
+    issues: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+    },
+    machines: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+    },
+    locations: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+    },
+    attachments: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+    },
+    models: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+    },
+    issueStatuses: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+    },
+    priorities: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+    },
+    issueHistories: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+    },
+    notifications: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+    },
+    pinballMapConfigs: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+    },
   },
 };
 
 // Mock database module
-vi.mock("~/server/db", () => ({
-  createPrismaClient: vi.fn().mockReturnValue(mockPrismaClient),
+vi.mock("~/server/db/drizzle", () => ({
+  createDrizzleClient: vi.fn(() => mockDrizzleClient),
 }));
 
-// Mock database provider
+// Mock database provider with Drizzle-only patterns
 const mockDatabaseProvider = {
-  getClient: vi.fn().mockReturnValue(mockPrismaClient),
+  getClient: vi.fn().mockReturnValue(mockDrizzleClient),
   disconnect: vi.fn().mockResolvedValue(undefined),
   reset: vi.fn(),
 };

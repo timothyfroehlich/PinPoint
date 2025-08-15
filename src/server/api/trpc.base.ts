@@ -14,7 +14,6 @@ import { ZodError } from "zod";
 import type { LoggerInterface } from "~/lib/logger";
 import type { SupabaseServerClient } from "~/lib/supabase/server";
 import type { PinPointSupabaseUser } from "~/lib/supabase/types";
-import type { ExtendedPrismaClient } from "~/server/db";
 import type { DrizzleClient } from "~/server/db/drizzle";
 
 import { env } from "~/env";
@@ -79,8 +78,7 @@ interface Membership {
  * tRPC context type that includes all available properties
  */
 export interface TRPCContext {
-  db: ExtendedPrismaClient;
-  drizzle: DrizzleClient;
+  db: DrizzleClient;
   user: PinPointSupabaseUser | null;
   supabase: SupabaseServerClient;
   organization: Organization | null;
@@ -117,8 +115,7 @@ export const createTRPCContext = async (
   const dbProvider = getGlobalDatabaseProvider();
 
   const db = dbProvider.getClient();
-  const drizzle = dbProvider.getDrizzleClient();
-  const services = new ServiceFactory(db, drizzle);
+  const services = new ServiceFactory(db);
   const supabase = await createClient();
   const user = await getSupabaseUser();
 
@@ -126,7 +123,7 @@ export const createTRPCContext = async (
 
   // If user is authenticated and has organization context, use that
   if (user?.app_metadata.organization_id) {
-    const org = await drizzle.query.organizations.findFirst({
+    const org = await db.query.organizations.findFirst({
       where: eq(organizations.id, user.app_metadata.organization_id),
     });
     if (org) {
@@ -145,7 +142,7 @@ export const createTRPCContext = async (
 
   // Fallback to organization based on subdomain
   if (!organization) {
-    const org = await drizzle.query.organizations.findFirst({
+    const org = await db.query.organizations.findFirst({
       where: eq(organizations.subdomain, subdomain),
     });
     if (org) {
@@ -167,7 +164,6 @@ export const createTRPCContext = async (
 
   return {
     db,
-    drizzle,
     user,
     supabase,
     organization,
@@ -313,15 +309,23 @@ export const organizationProcedure = protectedProcedure.use(
       });
     }
 
-    const membership = await ctx.db.membership.findFirst({
-      where: {
-        organizationId: ctx.organization.id,
-        userId: ctx.user.id,
-      },
-      include: {
+    // TypeScript assertion: we've already checked organization exists
+    const organization = ctx.organization;
+
+    const membership = await ctx.db.query.memberships.findFirst({
+      where: (memberships, { and, eq }) =>
+        and(
+          eq(memberships.organizationId, organization.id),
+          eq(memberships.userId, ctx.user.id),
+        ),
+      with: {
         role: {
-          include: {
-            permissions: true,
+          with: {
+            rolePermissions: {
+              with: {
+                permission: true,
+              },
+            },
           },
         },
       },
@@ -338,18 +342,24 @@ export const organizationProcedure = protectedProcedure.use(
     const userPermissions = await getUserPermissionsForSupabaseUser(
       ctx.user,
       ctx.db,
-      ctx.organization.id,
+      organization.id,
     );
 
     return next({
       ctx: {
         ...ctx,
-        organization: ctx.organization, // Safe assertion - already checked above
+        organization, // Safe assertion - already checked above
         membership: {
           id: membership.id,
           organizationId: membership.organizationId,
           userId: membership.userId,
-          role: membership.role,
+          role: {
+            id: membership.role.id,
+            name: membership.role.name,
+            permissions: membership.role.rolePermissions.map(
+              (rp) => rp.permission,
+            ),
+          },
         } satisfies Membership,
         userPermissions,
       } satisfies OrganizationTRPCContext,

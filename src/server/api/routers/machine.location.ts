@@ -16,7 +16,7 @@ export const machineLocationRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       // Verify the game instance belongs to this organization
-      const existingInstance = await ctx.drizzle.query.machines.findFirst({
+      const existingInstance = await ctx.db.query.machines.findFirst({
         where: and(
           eq(machines.id, input.machineId),
           eq(machines.organizationId, ctx.organization.id),
@@ -31,7 +31,7 @@ export const machineLocationRouter = createTRPCRouter({
       }
 
       // Verify the target location belongs to this organization
-      const location = await ctx.drizzle.query.locations.findFirst({
+      const location = await ctx.db.query.locations.findFirst({
         where: and(
           eq(locations.id, input.locationId),
           eq(locations.organizationId, ctx.organization.id),
@@ -46,7 +46,7 @@ export const machineLocationRouter = createTRPCRouter({
       }
 
       // Update machine location and return with all relationships in a single query
-      const updatedMachines = await ctx.drizzle
+      const updatedMachines = await ctx.db
         .update(machines)
         .set({
           locationId: input.locationId,
@@ -94,7 +94,7 @@ export const machineLocationRouter = createTRPCRouter({
       }
 
       // Fetch the related data separately (model, location, owner)
-      const [machineWithRelations] = await ctx.drizzle
+      const [machineWithRelations] = await ctx.db
         .select({
           id: machines.id,
           name: machines.name,

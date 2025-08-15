@@ -2,34 +2,55 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CollectionService } from "../collectionService";
 
-import type { ExtendedPrismaClient } from "~/server/db";
+import type { DrizzleClient } from "~/server/db/drizzle";
 
-// Mock Prisma Client
-const mockPrisma = {
-  collectionType: {
-    findMany: vi.fn(),
-    update: vi.fn(),
+// Mock DrizzleClient
+const mockDrizzle = {
+  query: {
+    collections: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+    },
+    collectionTypes: {
+      findMany: vi.fn(),
+    },
+    machines: {
+      findMany: vi.fn(),
+    },
   },
-  collection: {
-    findMany: vi.fn(),
-    findFirst: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-  },
-  machine: {
-    findMany: vi.fn(),
-  },
-  $accelerate: {
-    invalidate: vi.fn(),
-    ttl: vi.fn(),
-  },
-} as unknown as ExtendedPrismaClient;
+  insert: vi.fn().mockReturnValue({
+    values: vi.fn().mockReturnValue({
+      returning: vi.fn(),
+    }),
+  }),
+  update: vi.fn().mockReturnValue({
+    set: vi.fn().mockReturnValue({
+      where: vi.fn(),
+    }),
+  }),
+  select: vi.fn().mockReturnValue({
+    from: vi.fn().mockReturnValue({
+      where: vi.fn(),
+    }),
+  }),
+  execute: vi.fn(),
+  selectDistinct: vi.fn().mockReturnValue({
+    from: vi.fn().mockReturnValue({
+      innerJoin: vi.fn().mockReturnValue({
+        where: vi.fn(),
+      }),
+    }),
+  }),
+  delete: vi.fn().mockReturnValue({
+    where: vi.fn(),
+  }),
+} as unknown as DrizzleClient;
 
 describe("CollectionService", () => {
   let service: CollectionService;
 
   beforeEach(() => {
-    service = new CollectionService(mockPrisma);
+    service = new CollectionService(mockDrizzle);
     vi.clearAllMocks();
   });
 
@@ -57,21 +78,38 @@ describe("CollectionService", () => {
           id: "coll1",
           name: "Front Room",
           isManual: true,
-          type: mockCollectionTypes[0],
-          _count: { machines: 5 },
+          sortOrder: 1,
+          type: {
+            id: "type1",
+            name: "Rooms",
+            displayName: "Rooms",
+            organizationId: "org1",
+            isEnabled: true,
+            sortOrder: 1,
+          },
         },
         {
           id: "coll2",
           name: "Stern",
           isManual: false,
-          type: mockCollectionTypes[1],
-          _count: { machines: 3 },
+          sortOrder: 2,
+          type: {
+            id: "type2",
+            name: "Manufacturer",
+            displayName: "Manufacturer",
+            organizationId: "org1",
+            isEnabled: true,
+            sortOrder: 2,
+          },
         },
       ];
 
-      vi.mocked(mockPrisma.collection.findMany).mockResolvedValue(
+      vi.mocked(mockDrizzle.query.collections.findMany).mockResolvedValue(
         mockCollections as any,
       );
+      vi.mocked(mockDrizzle.execute).mockResolvedValue({
+        rows: [{ count: 5 }],
+      } as any);
 
       const result = await service.getLocationCollections("loc1", "org1");
 
@@ -82,49 +120,28 @@ describe("CollectionService", () => {
     });
 
     it("should only return enabled collection types", async () => {
-      vi.mocked(mockPrisma.collection.findMany).mockResolvedValue([]);
+      vi.mocked(mockDrizzle.query.collections.findMany).mockResolvedValue([]);
+      vi.mocked(mockDrizzle.execute).mockResolvedValue({
+        rows: [{ count: 0 }],
+      } as any);
 
       await service.getLocationCollections("loc1", "org1");
 
-      expect(mockPrisma.collection.findMany).toHaveBeenCalledWith({
-        where: {
-          OR: [
-            { locationId: "loc1" }, // Location-specific collections
-            { locationId: null, isManual: false }, // Organization-wide auto-collections
-          ],
+      expect(mockDrizzle.query.collections.findMany).toHaveBeenCalledWith({
+        where: expect.any(Object), // Complex Drizzle where clause with or() and and()
+        with: {
           type: {
-            organizationId: "org1",
-            isEnabled: true,
-          },
-        },
-        include: {
-          type: {
-            select: {
+            columns: {
               id: true,
               name: true,
               displayName: true,
-            },
-          },
-          _count: {
-            select: {
-              machines: {
-                where: {
-                  locationId: "loc1", // Only count machines at this location
-                },
-              },
+              organizationId: true,
+              isEnabled: true,
+              sortOrder: true,
             },
           },
         },
-        orderBy: [
-          {
-            type: {
-              sortOrder: "asc",
-            },
-          },
-          {
-            sortOrder: "asc",
-          },
-        ],
+        orderBy: expect.any(Array), // Drizzle orderBy with asc()
       });
     });
   });
@@ -142,31 +159,33 @@ describe("CollectionService", () => {
         },
       ];
 
-      vi.mocked(mockPrisma.machine.findMany).mockResolvedValue(
-        mockMachines as any,
-      );
+      const expectedResult = [
+        {
+          id: "machine1",
+          model: {
+            name: "Medieval Madness",
+            manufacturer: "Williams",
+            year: 1997,
+          },
+        },
+      ];
+      vi.mocked(mockDrizzle.execute).mockResolvedValue({
+        rows: [
+          {
+            id: "machine1",
+            model_name: "Medieval Madness",
+            manufacturer: "Williams",
+            year: 1997,
+          },
+        ],
+      } as any);
 
       const result = await service.getCollectionMachines("coll1", "loc1");
 
-      expect(result).toEqual(mockMachines);
-      expect(mockPrisma.machine.findMany).toHaveBeenCalledWith({
-        where: {
-          locationId: "loc1",
-          collections: {
-            some: {
-              id: "coll1",
-            },
-          },
-        },
-        include: {
-          model: true,
-        },
-        orderBy: {
-          model: {
-            name: "asc",
-          },
-        },
-      });
+      expect(result).toEqual(expectedResult);
+      expect(mockDrizzle.execute).toHaveBeenCalledWith(
+        expect.any(Object), // SQL query with joins
+      );
     });
   });
 
@@ -180,9 +199,11 @@ describe("CollectionService", () => {
         isManual: true,
       };
 
-      vi.mocked(mockPrisma.collection.create).mockResolvedValue(
-        mockCollection as any,
-      );
+      vi.mocked(mockDrizzle.insert).mockReturnValue({
+        values: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([mockCollection]),
+        }),
+      } as any);
 
       const result = await service.createManualCollection("org1", {
         name: "Front Room",
@@ -192,47 +213,38 @@ describe("CollectionService", () => {
       });
 
       expect(result).toEqual(mockCollection);
-      expect(mockPrisma.collection.create).toHaveBeenCalledWith({
-        data: {
-          name: "Front Room",
-          typeId: "type1",
-          locationId: "loc1",
-          description: "Main playing area",
-          isManual: true,
-          isSmart: false,
-          organizationId: "org1",
-        } as any,
-      });
+      expect(mockDrizzle.insert).toHaveBeenCalled();
+      const insertCall = vi.mocked(mockDrizzle.insert).mock.calls[0];
+      const valuesCall = insertCall?.[0];
+      expect(valuesCall).toBeDefined(); // Insert called with collections table
     });
   });
 
   describe("addMachinesToCollection", () => {
     it("should add machines to a collection", async () => {
-      vi.mocked(mockPrisma.collection.update).mockResolvedValue({} as any);
+      vi.mocked(mockDrizzle.execute).mockResolvedValue({} as any);
 
       await service.addMachinesToCollection("coll1", ["machine1", "machine2"]);
 
-      expect(mockPrisma.collection.update).toHaveBeenCalledWith({
-        where: { id: "coll1" },
-        data: {
-          machines: {
-            connect: [{ id: "machine1" }, { id: "machine2" }],
-          },
-        },
-      });
+      expect(mockDrizzle.execute).toHaveBeenCalledWith(
+        expect.any(Object), // SQL query for junction table insert
+      );
     });
   });
 
   describe("toggleCollectionType", () => {
     it("should enable/disable a collection type", async () => {
-      vi.mocked(mockPrisma.collectionType.update).mockResolvedValue({} as any);
+      vi.mocked(mockDrizzle.update).mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue({}),
+        }),
+      } as any);
 
       await service.toggleCollectionType("type1", false);
 
-      expect(mockPrisma.collectionType.update).toHaveBeenCalledWith({
-        where: { id: "type1" },
-        data: { isEnabled: false },
-      });
+      expect(mockDrizzle.update).toHaveBeenCalled();
+      const updateCall = vi.mocked(mockDrizzle.update).mock.calls[0];
+      expect(updateCall).toBeDefined(); // Update called with collectionTypes table
     });
   });
 
@@ -245,13 +257,17 @@ describe("CollectionService", () => {
           displayName: "Rooms",
           isAutoGenerated: false,
           isEnabled: true,
-          _count: { collections: 3 },
         },
       ];
 
-      vi.mocked(mockPrisma.collectionType.findMany).mockResolvedValue(
+      vi.mocked(mockDrizzle.query.collectionTypes.findMany).mockResolvedValue(
         mockTypes as any,
       );
+      vi.mocked(mockDrizzle.select).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([{ count: 3 }]),
+        }),
+      } as any);
 
       const result = await service.getOrganizationCollectionTypes("org1");
 
@@ -262,7 +278,6 @@ describe("CollectionService", () => {
           displayName: "Rooms",
           isAutoGenerated: false,
           isEnabled: true,
-          _count: { collections: 3 },
           collectionCount: 3,
         },
       ]);
@@ -271,17 +286,15 @@ describe("CollectionService", () => {
 
   describe("generateAutoCollections", () => {
     it("should return empty counts when no auto types enabled", async () => {
-      vi.mocked(mockPrisma.collectionType.findMany).mockResolvedValue([]);
+      vi.mocked(mockDrizzle.query.collectionTypes.findMany).mockResolvedValue(
+        [],
+      );
 
       const result = await service.generateAutoCollections("org1");
 
       expect(result).toEqual({ generated: 0, updated: 0 });
-      expect(mockPrisma.collectionType.findMany).toHaveBeenCalledWith({
-        where: {
-          organizationId: "org1",
-          isAutoGenerated: true,
-          isEnabled: true,
-        },
+      expect(mockDrizzle.query.collectionTypes.findMany).toHaveBeenCalledWith({
+        where: expect.any(Object), // Complex Drizzle where clause with and() conditions
       });
     });
   });

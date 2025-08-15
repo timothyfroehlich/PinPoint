@@ -55,7 +55,7 @@ vi.mock("~/lib/environment", () => ({
 
 // Mock env - we'll manipulate this in tests
 const mockEnv = {
-  POSTGRES_PRISMA_URL: "postgresql://user:pass@localhost:5432/test",
+  DATABASE_URL: "postgresql://user:pass@localhost:5432/test",
   NODE_ENV: "development" as const,
   VERCEL_ENV: undefined,
 };
@@ -72,7 +72,7 @@ describe("Drizzle Client Singleton Pattern", () => {
     vi.clearAllMocks();
 
     // Reset mock env to defaults
-    mockEnv.POSTGRES_PRISMA_URL = "postgresql://user:pass@localhost:5432/test";
+    mockEnv.DATABASE_URL = "postgresql://user:pass@localhost:5432/test";
     mockEnv.NODE_ENV = "development";
     mockEnv.VERCEL_ENV = undefined;
 
@@ -181,8 +181,7 @@ describe("Drizzle Client Singleton Pattern", () => {
   describe("Connection Configuration", () => {
     describe("SSL Configuration", () => {
       it("should disable SSL for localhost connections", async () => {
-        mockEnv.POSTGRES_PRISMA_URL =
-          "postgresql://user:pass@localhost:5432/testdb";
+        mockEnv.DATABASE_URL = "postgresql://user:pass@localhost:5432/testdb";
         mockEnv.NODE_ENV = "production"; // Even in production, localhost should disable SSL
         mockIsDevelopment.mockReturnValue(false);
 
@@ -198,8 +197,7 @@ describe("Drizzle Client Singleton Pattern", () => {
       });
 
       it("should disable SSL for 127.0.0.1 connections", async () => {
-        mockEnv.POSTGRES_PRISMA_URL =
-          "postgresql://user:pass@127.0.0.1:5432/testdb";
+        mockEnv.DATABASE_URL = "postgresql://user:pass@127.0.0.1:5432/testdb";
         mockEnv.NODE_ENV = "production";
         mockIsDevelopment.mockReturnValue(false);
 
@@ -215,7 +213,7 @@ describe("Drizzle Client Singleton Pattern", () => {
       });
 
       it("should disable SSL in CI environment", async () => {
-        mockEnv.POSTGRES_PRISMA_URL =
+        mockEnv.DATABASE_URL =
           "postgresql://user:pass@remote.example.com:5432/testdb";
         mockEnv.NODE_ENV = "test"; // CI environment
         mockIsDevelopment.mockReturnValue(false);
@@ -232,7 +230,7 @@ describe("Drizzle Client Singleton Pattern", () => {
       });
 
       it("should require SSL for production remote connections", async () => {
-        mockEnv.POSTGRES_PRISMA_URL =
+        mockEnv.DATABASE_URL =
           "postgresql://user:pass@remote.example.com:5432/testdb";
         mockEnv.NODE_ENV = "production";
         mockIsDevelopment.mockReturnValue(false);
@@ -437,13 +435,13 @@ describe("Drizzle Client Singleton Pattern", () => {
   });
 
   describe("Error Handling", () => {
-    it("should throw clear error when POSTGRES_PRISMA_URL is missing", async () => {
-      mockEnv.POSTGRES_PRISMA_URL = "" as any; // Empty string should be treated as missing
+    it("should throw clear error when DATABASE_URL is missing", async () => {
+      mockEnv.DATABASE_URL = "" as any; // Empty string should be treated as missing
 
       const { createDrizzleClient } = await importDrizzleModule();
 
       expect(() => createDrizzleClient()).toThrow(
-        "POSTGRES_PRISMA_URL is required for Drizzle client",
+        "DATABASE_URL is required for Drizzle client",
       );
 
       // Should not have attempted to create postgres connection
@@ -451,7 +449,7 @@ describe("Drizzle Client Singleton Pattern", () => {
     });
 
     it("should handle invalid connection strings gracefully", async () => {
-      mockEnv.POSTGRES_PRISMA_URL = "not-a-valid-url";
+      mockEnv.DATABASE_URL = "not-a-valid-url";
 
       const { createDrizzleClient } = await importDrizzleModule();
 

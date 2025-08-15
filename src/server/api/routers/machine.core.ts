@@ -23,13 +23,13 @@ export const machineCoreRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       // Verify that the model and location belong to the same organization
-      const [model] = await ctx.drizzle
+      const [model] = await ctx.db
         .select()
         .from(models)
         .where(eq(models.id, input.modelId))
         .limit(1);
 
-      const [location] = await ctx.drizzle
+      const [location] = await ctx.db
         .select()
         .from(locations)
         .where(
@@ -49,7 +49,7 @@ export const machineCoreRouter = createTRPCRouter({
       const qrCodeId = generatePrefixedId("qr");
 
       // Create machine
-      const [machine] = await ctx.drizzle
+      const [machine] = await ctx.db
         .insert(machines)
         .values({
           id: machineId,
@@ -66,7 +66,7 @@ export const machineCoreRouter = createTRPCRouter({
       }
 
       // Get machine with all relationships for return
-      const [machineWithRelations] = await ctx.drizzle
+      const [machineWithRelations] = await ctx.db
         .select({
           id: machines.id,
           name: machines.name,
@@ -142,7 +142,7 @@ export const machineCoreRouter = createTRPCRouter({
     }),
 
   getAll: organizationProcedure.query(async ({ ctx }) => {
-    const machinesWithRelations = await ctx.drizzle
+    const machinesWithRelations = await ctx.db
       .select({
         id: machines.id,
         name: machines.name,
@@ -187,7 +187,7 @@ export const machineCoreRouter = createTRPCRouter({
       });
     }
 
-    const machinesForIssues = await ctx.drizzle
+    const machinesForIssues = await ctx.db
       .select({
         id: machines.id,
         name: machines.name,
@@ -206,7 +206,7 @@ export const machineCoreRouter = createTRPCRouter({
   getById: organizationProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
-      const [machineWithRelations] = await ctx.drizzle
+      const [machineWithRelations] = await ctx.db
         .select({
           id: machines.id,
           name: machines.name,
@@ -277,7 +277,7 @@ export const machineCoreRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       // First verify the game instance belongs to this organization
-      const [existingMachine] = await ctx.drizzle
+      const [existingMachine] = await ctx.db
         .select()
         .from(machines)
         .where(
@@ -297,7 +297,7 @@ export const machineCoreRouter = createTRPCRouter({
 
       // If updating model or location, verify they belong to the organization
       if (input.modelId) {
-        const [model] = await ctx.drizzle
+        const [model] = await ctx.db
           .select()
           .from(models)
           .where(eq(models.id, input.modelId))
@@ -312,7 +312,7 @@ export const machineCoreRouter = createTRPCRouter({
       }
 
       if (input.locationId) {
-        const [location] = await ctx.drizzle
+        const [location] = await ctx.db
           .select()
           .from(locations)
           .where(
@@ -342,7 +342,7 @@ export const machineCoreRouter = createTRPCRouter({
       if (input.locationId) updateData.locationId = input.locationId;
 
       // Update machine with organization scoping
-      const [updatedMachine] = await ctx.drizzle
+      const [updatedMachine] = await ctx.db
         .update(machines)
         .set(updateData)
         .where(
@@ -361,7 +361,7 @@ export const machineCoreRouter = createTRPCRouter({
       }
 
       // Get updated machine with all relationships
-      const [machineWithRelations] = await ctx.drizzle
+      const [machineWithRelations] = await ctx.db
         .select({
           id: machines.id,
           name: machines.name,
@@ -423,7 +423,7 @@ export const machineCoreRouter = createTRPCRouter({
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       // Verify the game instance belongs to this organization
-      const [existingMachine] = await ctx.drizzle
+      const [existingMachine] = await ctx.db
         .select()
         .from(machines)
         .where(
@@ -439,7 +439,7 @@ export const machineCoreRouter = createTRPCRouter({
       }
 
       // Delete the machine
-      const [deletedMachine] = await ctx.drizzle
+      const [deletedMachine] = await ctx.db
         .delete(machines)
         .where(eq(machines.id, input.id))
         .returning();

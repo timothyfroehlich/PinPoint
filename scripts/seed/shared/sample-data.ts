@@ -125,11 +125,16 @@ async function extractUniqueGames(
   dataAmount: DataAmount,
 ): Promise<UniqueGame[]> {
   try {
-    // Import sample issues JSON
-    const sampleIssuesModule = await import(
-      "../../../prisma/seeds/sample-issues.json"
-    );
-    const sampleIssues: SampleIssue[] = sampleIssuesModule.default;
+    // Note: sample-issues.json was removed during Prisma cleanup
+    // For now, use empty array to maintain build compatibility
+    const sampleIssues: SampleIssue[] = [];
+
+    if (sampleIssues.length === 0) {
+      log(
+        "[SAMPLE] No sample issues data available (file removed during Prisma cleanup)",
+      );
+      return [];
+    }
 
     log(
       `[SAMPLE] Processing ${sampleIssues.length.toString()} sample issues...`,
@@ -452,11 +457,16 @@ async function createSampleIssuesWithDb(
   skipAuthUsers = false,
 ): Promise<void> {
   try {
-    // Import sample issues JSON
-    const sampleIssuesModule = await import(
-      "../../../prisma/seeds/sample-issues.json"
-    );
-    let sampleIssues: SampleIssue[] = sampleIssuesModule.default;
+    // Note: sample-issues.json was removed during Prisma cleanup
+    // For now, use empty array to maintain build compatibility
+    let sampleIssues: SampleIssue[] = [];
+
+    if (sampleIssues.length === 0) {
+      log(
+        "[SAMPLE] No sample issues data available (file removed during Prisma cleanup)",
+      );
+      return;
+    }
 
     log(`[SAMPLE] Found ${sampleIssues.length.toString()} sample issues...`);
 

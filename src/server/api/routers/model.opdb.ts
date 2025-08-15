@@ -1,12 +1,15 @@
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { env } from "~/env";
 import { OPDBClient } from "~/lib/opdb/client";
+import { generateId } from "~/lib/utils/id-generation";
 import {
   createTRPCRouter,
   organizationProcedure,
   organizationManageProcedure,
 } from "~/server/api/trpc";
+import { models, machines } from "~/server/db/schema";
 
 export const modelOpdbRouter = createTRPCRouter({
   // Search OPDB games for typeahead
@@ -22,10 +25,8 @@ export const modelOpdbRouter = createTRPCRouter({
     .input(z.object({ opdbId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       // Check if this OPDB game already exists globally
-      const existingGame = await ctx.db.model.findUnique({
-        where: {
-          opdbId: input.opdbId,
-        },
+      const existingGame = await ctx.db.query.models.findFirst({
+        where: eq(models.opdbId, input.opdbId),
       });
 
       if (existingGame) {
@@ -42,26 +43,28 @@ export const modelOpdbRouter = createTRPCRouter({
 
       // Create global Model record with OPDB data
       // OPDB games are shared across all organizations
-      return ctx.db.model.create({
-        data: {
+      const [newModel] = await ctx.db
+        .insert(models)
+        .values({
+          id: generateId(),
           name: machineData.name,
           opdbId: input.opdbId,
           manufacturer: machineData.manufacturer ?? null,
           year: machineData.year ?? null,
           opdbImgUrl: machineData.playfield_image ?? null,
           machineType: machineData.type ?? null,
-        },
-      });
+        })
+        .returning();
+
+      return newModel;
     }),
 
   // Sync existing titles with OPDB
   syncWithOPDB: organizationManageProcedure.mutation(async ({ ctx }) => {
     // Find all OPDB games that have game instances in this organization
-    const machinesInOrg = await ctx.db.machine.findMany({
-      where: {
-        organizationId: ctx.organization.id,
-      },
-      include: {
+    const machinesInOrg = await ctx.db.query.machines.findMany({
+      where: eq(machines.organizationId, ctx.organization.id),
+      with: {
         model: true,
       },
     });
@@ -85,16 +88,16 @@ export const modelOpdbRouter = createTRPCRouter({
         const machineData = await opdbClient.getMachineById(title.opdbId);
 
         if (machineData) {
-          await ctx.db.model.update({
-            where: { id: title.id },
-            data: {
+          await ctx.db
+            .update(models)
+            .set({
               name: machineData.name,
               manufacturer: machineData.manufacturer ?? null,
               year: machineData.year ?? null,
               opdbImgUrl: machineData.playfield_image ?? null,
               machineType: machineData.type ?? null,
-            },
-          });
+            })
+            .where(eq(models.id, title.id));
           syncedCount++;
         }
       } catch (error) {

@@ -32,11 +32,11 @@ describe("Drizzle tRPC Integration", () => {
       execute: vi.fn(),
     } as unknown as DrizzleClient;
 
-    // Create enhanced context with Drizzle client
+    // Create enhanced context with Drizzle client (single client pattern)
     const baseContext = createVitestMockContext();
     mockContext = {
       ...baseContext,
-      drizzle: mockDrizzleClient,
+      db: mockDrizzleClient, // Use single client pattern
       user: {
         id: "user-1",
         email: "test@example.com",
@@ -64,26 +64,23 @@ describe("Drizzle tRPC Integration", () => {
 
   describe("Context Integration", () => {
     it("should have Drizzle client available in tRPC context", () => {
-      expect(mockContext.drizzle).toBeDefined();
-      expect(mockContext.drizzle).toBe(mockDrizzleClient);
-    });
-
-    it("should have both Prisma and Drizzle clients in context", () => {
       expect(mockContext.db).toBeDefined();
-      expect(mockContext.drizzle).toBeDefined();
-      expect(mockContext.db).not.toBe(mockContext.drizzle);
+      expect(mockContext.db).toBe(mockDrizzleClient);
     });
 
-    it("should be able to create tRPC router with dual-ORM context", () => {
+    it("should have Drizzle client in context", () => {
+      expect(mockContext.db).toBeDefined();
+      expect(mockContext.db).toBe(mockDrizzleClient);
+    });
+
+    it("should be able to create tRPC router with Drizzle context", () => {
       const testRouter = createTRPCRouter({
         testProcedure: publicProcedure.query(({ ctx }) => {
-          // Validate both clients are available
-          if (!ctx.db) throw new Error("Prisma client missing");
-          if (!ctx.drizzle) throw new Error("Drizzle client missing");
+          // Validate Drizzle client is available
+          if (!ctx.db) throw new Error("Drizzle client missing");
 
           return {
-            hasPrisma: !!ctx.db,
-            hasDrizzle: !!ctx.drizzle,
+            hasDrizzle: !!ctx.db,
           };
         }),
       });
@@ -136,7 +133,7 @@ describe("Drizzle tRPC Integration", () => {
     it("should handle missing Drizzle client gracefully", async () => {
       const testRouter = createTRPCRouter({
         testMissingDrizzle: publicProcedure.query(({ ctx }) => {
-          if (!ctx.drizzle) {
+          if (!ctx.db) {
             throw new TRPCError({
               code: "INTERNAL_SERVER_ERROR",
               message: "Drizzle client not available",
@@ -149,7 +146,7 @@ describe("Drizzle tRPC Integration", () => {
       // Create context without drizzle
       const contextWithoutDrizzle = {
         ...mockContext,
-        drizzle: undefined,
+        db: undefined,
       } as unknown as TRPCContext;
 
       const caller = testRouter.createCaller(contextWithoutDrizzle);
@@ -159,29 +156,29 @@ describe("Drizzle tRPC Integration", () => {
       );
     });
 
-    it("should handle missing Prisma client gracefully", async () => {
+    it("should handle missing database client gracefully", async () => {
       const testRouter = createTRPCRouter({
-        testMissingPrisma: publicProcedure.query(({ ctx }) => {
+        testMissingDb: publicProcedure.query(({ ctx }) => {
           if (!ctx.db) {
             throw new TRPCError({
               code: "INTERNAL_SERVER_ERROR",
-              message: "Prisma client not available",
+              message: "Database client not available",
             });
           }
           return { success: true };
         }),
       });
 
-      // Create context without prisma
-      const contextWithoutPrisma = {
+      // Create context without database client
+      const contextWithoutDb = {
         ...mockContext,
         db: undefined,
       } as unknown as TRPCContext;
 
-      const caller = testRouter.createCaller(contextWithoutPrisma);
+      const caller = testRouter.createCaller(contextWithoutDb);
 
-      await expect(caller.testMissingPrisma()).rejects.toThrow(
-        "Prisma client not available",
+      await expect(caller.testMissingDb()).rejects.toThrow(
+        "Database client not available",
       );
     });
   });
@@ -202,7 +199,7 @@ describe("Drizzle tRPC Integration", () => {
               userId,
               orgId,
               testInput,
-              hasDrizzle: !!ctx.drizzle,
+              hasDrizzle: !!ctx.db,
               hasPrisma: !!ctx.db,
             };
           }),
@@ -217,11 +214,11 @@ describe("Drizzle tRPC Integration", () => {
       const testRouter = createTRPCRouter({
         drizzleMethodTest: publicProcedure.query(({ ctx }) => {
           // These should all be typed methods on DrizzleClient
-          const hasSelect = typeof ctx.drizzle.select === "function";
-          const hasInsert = typeof ctx.drizzle.insert === "function";
-          const hasUpdate = typeof ctx.drizzle.update === "function";
-          const hasDelete = typeof ctx.drizzle.delete === "function";
-          const hasTransaction = typeof ctx.drizzle.transaction === "function";
+          const hasSelect = typeof ctx.db.select === "function";
+          const hasInsert = typeof ctx.db.insert === "function";
+          const hasUpdate = typeof ctx.db.update === "function";
+          const hasDelete = typeof ctx.db.delete === "function";
+          const hasTransaction = typeof ctx.db.transaction === "function";
 
           return {
             hasSelect,
@@ -259,7 +256,7 @@ describe("Drizzle tRPC Integration", () => {
     it("should validate mock integration without method calls", () => {
       // Validate the mock client is properly integrated
       expect(mockDrizzleClient).toBeDefined();
-      expect(mockContext.drizzle).toBe(mockDrizzleClient);
+      expect(mockContext.db).toBe(mockDrizzleClient);
 
       // Ensure it satisfies the DrizzleClient type
       const client: DrizzleClient = mockDrizzleClient;

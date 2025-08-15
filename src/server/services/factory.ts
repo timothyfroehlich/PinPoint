@@ -5,17 +5,13 @@ import { NotificationService } from "./notificationService";
 import { PinballMapService } from "./pinballmapService";
 import { QRCodeService } from "./qrCodeService";
 
-import type { ExtendedPrismaClient } from "./types";
 import type { DrizzleClient } from "~/server/db/drizzle";
 
 export class ServiceFactory {
-  constructor(
-    private db: ExtendedPrismaClient,
-    private drizzle: DrizzleClient,
-  ) {}
+  constructor(private db: DrizzleClient) {}
 
   createNotificationService(): NotificationService {
-    return new NotificationService(this.drizzle);
+    return new NotificationService(this.db);
   }
 
   createCollectionService(): CollectionService {
@@ -35,7 +31,7 @@ export class ServiceFactory {
   }
 
   createQRCodeService(): QRCodeService {
-    return new QRCodeService(this.drizzle);
+    return new QRCodeService(this.db);
   }
 }
 
