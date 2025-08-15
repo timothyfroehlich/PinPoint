@@ -25,16 +25,13 @@ import type { TRPCContext } from "~/server/api/trpc.base";
 import { generateId } from "~/lib/utils/id-generation";
 import { modelCoreRouter } from "~/server/api/routers/model.core";
 import * as schema from "~/server/db/schema";
-import {
-  createSeededTestDatabase,
-  getSeededTestData,
-  type TestDatabase,
-} from "~/test/helpers/pglite-test-setup";
+import { generateTestId } from "~/test/helpers/test-id-generator";
+import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
+import type { TestDatabase } from "~/test/helpers/pglite-test-setup";
 
 // Mock ID generation for predictable test data
-let idCounter = 0;
 vi.mock("~/lib/utils/id-generation", () => ({
-  generateId: vi.fn(() => `test-id-${Date.now()}-${++idCounter}`),
+  generateId: vi.fn(() => generateTestId("model")),
 }));
 
 // Mock permissions (not database-related)
@@ -49,26 +46,21 @@ vi.mock("~/server/auth/permissions", () => ({
 }));
 
 describe("modelCoreRouter Integration Tests", () => {
-  let testDb: TestDatabase;
-  let testData: Awaited<ReturnType<typeof getSeededTestData>>;
-  let mockContext: TRPCContext;
-  let caller: ReturnType<typeof modelCoreRouter.createCaller>;
-
-  beforeEach(async () => {
-    vi.clearAllMocks();
-    const setup = await createSeededTestDatabase();
-    testDb = setup.db;
-    testData = await getSeededTestData(setup.db, setup.organizationId);
-
+  // Helper function to create test context
+  function createTestContext(
+    testDb: TestDatabase,
+    organizationId: string,
+    userId: string,
+  ): TRPCContext {
     // Create mock Prisma client for tRPC middleware compatibility
     const mockPrismaClient = {
       membership: {
         findFirst: vi.fn().mockResolvedValue({
           id: "test-membership",
-          organizationId: testData.organization,
-          userId: testData.user || "test-user-1",
+          organizationId,
+          userId,
           role: {
-            id: testData.adminRole || "test-admin-role",
+            id: generateTestId("admin-role"),
             name: "Admin",
             permissions: [
               { id: "perm1", name: "model:view" },
@@ -79,18 +71,18 @@ describe("modelCoreRouter Integration Tests", () => {
       },
     };
 
-    mockContext = {
+    const mockContext: TRPCContext = {
       db: mockPrismaClient as any,
       drizzle: testDb,
       services: {} as any,
       user: {
-        id: testData.user || "test-user-1",
+        id: userId,
         email: "member@test.com",
-        app_metadata: { organization_id: testData.organization },
+        app_metadata: { organization_id: organizationId },
       } as any,
       supabase: {} as any,
       organization: {
-        id: testData.organization,
+        id: organizationId,
         name: "Test Organization",
         subdomain: "test",
       },

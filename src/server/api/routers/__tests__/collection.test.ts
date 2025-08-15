@@ -175,7 +175,7 @@ describe("Collection Router", () => {
         const mockGetLocationCollections = vi
           .fn()
           .mockResolvedValue(mockCollections);
-         
+
         const createCollectionServiceFn = ctx.services.createCollectionService;
         const mockCreateCollectionServiceFn = vi.mocked(
           createCollectionServiceFn,
@@ -238,7 +238,7 @@ describe("Collection Router", () => {
         const mockGetCollectionMachines = vi
           .fn()
           .mockResolvedValue(mockMachines);
-         
+
         const createCollectionServiceFn = ctx.services.createCollectionService;
         const mockCreateCollectionServiceFn = vi.mocked(
           createCollectionServiceFn,

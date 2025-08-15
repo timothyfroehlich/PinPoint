@@ -18,7 +18,6 @@
  * - list, create, update, delete, get, getPermissions, getTemplates, assignToUser
  */
 
- 
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 /* eslint-disable import/order */
 
@@ -119,7 +118,7 @@ describe("Role Router Integration Tests (PGlite)", () => {
       organizationId,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { context, testData } = await createTestContext(
+        const { context } = await createTestContext(
           db,
           organizationId,
         );
@@ -1165,8 +1164,9 @@ describe("Role Router Integration Tests (PGlite)", () => {
         });
 
         // Test org2 caller cannot see org1 roles
+        const baseContext = await createTestContext(db, sharedTestData);
         const org2Context = {
-          ...createTestContext(db, sharedTestData),
+          ...baseContext,
           organization: {
             id: org2Id,
             name: "Test Organization 2",
@@ -1217,8 +1217,9 @@ describe("Role Router Integration Tests (PGlite)", () => {
     it("should allow organization:manage permission for queries", async () => {
       await withTransaction(sharedDb, async (db) => {
         // Test context with organization:manage but not role:manage
+        const baseQueryContext = await createTestContext(db, sharedTestData);
         const queryContext = {
-          ...createTestContext(db, sharedTestData),
+          ...baseQueryContext,
           userPermissions: ["organization:manage"],
         };
         const queryCaller = roleRouter.createCaller(queryContext as any);

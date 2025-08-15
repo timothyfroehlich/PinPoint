@@ -22,8 +22,6 @@
  * Uses modern August 2025 patterns with Vitest and mock context.
  */
 
- 
-
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Import test setup and utilities

@@ -221,7 +221,6 @@ describe("notificationRouter", () => {
       await caller.notification.getNotifications({});
 
       const createNotificationServiceFn =
-         
         ctx.services.createNotificationService;
       const mockCreateNotificationService = vi.mocked(
         createNotificationServiceFn,
@@ -249,7 +248,6 @@ describe("notificationRouter", () => {
 
       // Service factory should be called for each procedure
       const createNotificationServiceFn =
-         
         ctx.services.createNotificationService;
       const mockCreateNotificationService = vi.mocked(
         createNotificationServiceFn,

@@ -92,7 +92,7 @@ describe("Collection Router - ORIGINAL PATTERN", () => {
         const mockCreateManualCollection = vi
           .fn()
           .mockResolvedValue(mockCollection);
-         
+
         const createCollectionServiceFn = ctx.services.createCollectionService;
         const mockCreateCollectionService = vi.mocked(
           createCollectionServiceFn,
@@ -182,7 +182,7 @@ describe("Collection Router - ORIGINAL PATTERN", () => {
         const mockGenerateAutoCollections = vi
           .fn()
           .mockResolvedValue(mockGeneratedCollections);
-         
+
         const createCollectionServiceFn = ctx.services.createCollectionService;
         const mockCreateCollectionService = vi.mocked(
           createCollectionServiceFn,

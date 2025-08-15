@@ -8,7 +8,7 @@
  * Key Features Tested:
  * - Complex exists() subqueries for organizational scoping
  * - SQL template extras for machine counting
- * - Relational queries with ctx.drizzle.query.models.findMany()
+ * - Relational queries with ctx.db.query.models.findMany()
  * - TRPCError handling (NOT_FOUND, BAD_REQUEST)
  * - Model deletion validation logic
  *

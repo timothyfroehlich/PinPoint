@@ -19,16 +19,19 @@ interface MachineIdResult {
   id: string;
 }
 
-interface CountQueryResult {
-  count: string;
+interface CountResult {
+  count: string | number;
 }
 
-interface MachineCollectionQueryResult {
+interface MachineWithModelResult {
   id: string;
   model_name: string;
   manufacturer: string | null;
   year: number | null;
 }
+
+// Drizzle's execute() returns the results directly, not wrapped in a rows object
+type SqlExecuteResult<T = unknown> = T[];
 
 export interface CollectionWithMachines {
   id: string;
@@ -125,16 +128,15 @@ export class CollectionService {
 
       // Count machines in this collection at the specific location
       // Note: This assumes a collection_machines junction table exists
-      const machineCountResult = await this.db.execute(sql`
+      const machineCountResult = (await this.db.execute(sql`
         SELECT COUNT(*) as count
         FROM collection_machines cm
         INNER JOIN machines m ON cm.machine_id = m.id
         WHERE cm.collection_id = ${collection.id}
           AND m.location_id = ${locationId}
-      `);
+      `)) as unknown as SqlExecuteResult<CountResult>;
 
-      const typedCountResult = machineCountResult as CountQueryResult[];
-      const machineCount = Number(typedCountResult[0]?.count) || 0;
+      const machineCount = Number(machineCountResult[0]?.count) || 0;
 
       collectionsData.push({
         ...collection,
@@ -206,7 +208,7 @@ export class CollectionService {
     }[]
   > {
     // Get machines in the collection at the specific location using junction table
-    const machinesInCollection = await this.db.execute(sql`
+    const machinesInCollection = (await this.db.execute(sql`
       SELECT 
         m.id,
         mo.name as model_name,
@@ -218,11 +220,9 @@ export class CollectionService {
       WHERE cm.collection_id = ${collectionId}
         AND m.location_id = ${locationId}
       ORDER BY mo.name ASC
-    `);
+    `)) as unknown as SqlExecuteResult<MachineWithModelResult>;
 
-    const typedMachinesResult =
-      machinesInCollection as MachineCollectionQueryResult[];
-    return typedMachinesResult.map((row) => ({
+    return machinesInCollection.map((row) => ({
       id: row.id,
       model: {
         name: row.model_name,

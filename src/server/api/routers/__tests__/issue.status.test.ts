@@ -1,7 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
- 
-
 // Mock NextAuth first to avoid import issues
 vi.mock("next-auth", () => ({
   default: vi.fn().mockImplementation(() => ({

@@ -246,7 +246,6 @@ describe("notificationRouter - Refactored", () => {
       await caller.notification.getNotifications({});
 
       const createNotificationServiceFn =
-         
         context.services.createNotificationService;
       const mockCreateNotificationService = vi.mocked(
         createNotificationServiceFn,
@@ -294,7 +293,6 @@ describe("notificationRouter - Refactored", () => {
       await caller.notification.getUnreadCount();
 
       const createNotificationServiceFn =
-         
         context.services.createNotificationService;
       const mockCreateNotificationService = vi.mocked(
         createNotificationServiceFn,
