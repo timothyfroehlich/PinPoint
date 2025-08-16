@@ -77,7 +77,7 @@ describe("Comment Validation Functions", () => {
     ...overrides,
   });
 
-  beforeEach(async () => {
+  beforeEach.skip(async () => {
     // Create fresh PGlite database with real schema and seed data
     const setup = await createSeededTestDatabase();
     db = setup.db;

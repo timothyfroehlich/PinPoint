@@ -18,7 +18,7 @@
  */
 
 import { TRPCError } from "@trpc/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, vi } from "vitest";
 
 import type { TRPCContext } from "~/server/api/trpc.base";
 
@@ -102,20 +102,45 @@ describe("modelCoreRouter Integration Tests", () => {
       userPermissions: ["model:view", "organization:manage"],
     };
 
-    caller = modelCoreRouter.createCaller(mockContext);
-  });
+    return mockContext;
+  }
 
   describe("getAll", () => {
-    it("returns models with machine counts using real exists() subqueries", async () => {
-      // Create test models and machines with unique IDs
-      const modelId1 = `model-${Date.now()}-1`;
-      const modelId2 = `model-${Date.now()}-2`;
-      const machineId1 = `machine-${Date.now()}-1`;
-      const machineId2 = `machine-${Date.now()}-2`;
-      const machineId3 = `machine-${Date.now()}-3`;
+    test("returns models with machine counts using real exists() subqueries", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        // Create test organization and user
+        const organizationId = generateTestId("org");
+        const userId = generateTestId("user");
 
-      // Create models
-      await testDb.insert(schema.models).values([
+        const [org] = await db
+          .insert(schema.organizations)
+          .values({
+            id: organizationId,
+            name: "Test Organization",
+            subdomain: "test",
+          })
+          .returning();
+
+        const [user] = await db
+          .insert(schema.users)
+          .values({
+            id: userId,
+            email: "test@example.com",
+            name: "Test User",
+          })
+          .returning();
+
+        // Create test models and machines with unique IDs
+        const modelId1 = generateTestId("model-1");
+        const modelId2 = generateTestId("model-2");
+        const machineId1 = generateTestId("machine-1");
+        const machineId2 = generateTestId("machine-2");
+        const machineId3 = generateTestId("machine-3");
+
+        // Create models
+        await db.insert(schema.models).values([
         {
           id: modelId1,
           name: "Medieval Madness",
@@ -134,309 +159,477 @@ describe("modelCoreRouter Integration Tests", () => {
         },
       ]);
 
-      // Create machines in primary organization
-      await testDb.insert(schema.machines).values([
-        {
-          id: machineId1,
-          name: "MM #001",
-          modelId: modelId1,
-          organizationId: testData.organization,
-          locationId: testData.location || "test-location-1",
-          qrCodeId: `qr-${machineId1}`,
-          isActive: true,
-        },
-        {
-          id: machineId2,
-          name: "MM #002",
-          modelId: modelId1,
-          organizationId: testData.organization,
-          locationId: testData.location || "test-location-1",
-          qrCodeId: `qr-${machineId2}`,
-          isActive: true,
-        },
-        {
-          id: machineId3,
-          name: "AFM #001",
-          modelId: modelId2,
-          organizationId: testData.organization,
-          locationId: testData.location || "test-location-1",
-          qrCodeId: `qr-${machineId3}`,
-          isActive: true,
-        },
-      ]);
+        // Create test context with proper organization and user
+        const testContext = createTestContext(db, organizationId, userId);
+        const caller = modelCoreRouter.createCaller(testContext);
 
-      const result = await caller.getAll();
+        // Create machines in primary organization
+        await db.insert(schema.machines).values([
+          {
+            id: machineId1,
+            name: "MM #001",
+            modelId: modelId1,
+            organizationId: organizationId,
+            locationId: "test-location-1",
+            qrCodeId: `qr-${machineId1}`,
+            isActive: true,
+          },
+          {
+            id: machineId2,
+            name: "MM #002",
+            modelId: modelId1,
+            organizationId: organizationId,
+            locationId: "test-location-1",
+            qrCodeId: `qr-${machineId2}`,
+            isActive: true,
+          },
+          {
+            id: machineId3,
+            name: "AFM #001",
+            modelId: modelId2,
+            organizationId: organizationId,
+            locationId: "test-location-1",
+            qrCodeId: `qr-${machineId3}`,
+            isActive: true,
+          },
+        ]);
 
-      // Debug: Log the actual results
-      console.log("Models returned:", result.length);
-      console.log(
-        "Models:",
-        result.map((m) => ({
-          id: m.id,
-          name: m.name,
-          machineCount: m.machineCount,
-        })),
-      );
+        const result = await caller.getAll();
 
-      // Should return at least our 2 new models plus any existing models
-      expect(result.length).toBeGreaterThanOrEqual(2);
+        // Debug: Log the actual results
+        console.log("Models returned:", result.length);
+        console.log(
+          "Models:",
+          result.map((m) => ({
+            id: m.id,
+            name: m.name,
+            machineCount: m.machineCount,
+          })),
+        );
 
-      // Find our specific models in the results
-      const mmModel = result.find((m) => m.name === "Medieval Madness");
-      const afmModel = result.find((m) => m.name === "Attack from Mars");
+        // Should return at least our 2 new models plus any existing models
+        expect(result.length).toBeGreaterThanOrEqual(2);
 
-      expect(mmModel).toBeDefined();
-      expect(afmModel).toBeDefined();
-      expect(mmModel?.machineCount).toBe(2); // Real count from SQL extras
-      expect(afmModel?.machineCount).toBe(1); // Real count from SQL extras
-    });
+        // Find our specific models in the results
+        const mmModel = result.find((m) => m.name === "Medieval Madness");
+        const afmModel = result.find((m) => m.name === "Attack from Mars");
 
-    it("excludes models with no machines in organization", async () => {
-      // Create model with no machines
-      const modelId = generateId();
-      await testDb.insert(schema.models).values({
-        id: modelId,
-        name: "Unused Model",
-        manufacturer: "Test",
-        isCustom: false,
-        isActive: true,
-      });
-
-      const result = await caller.getAll();
-
-      // Should not include the model with no machines
-      const unusedModel = result.find((m) => m.name === "Unused Model");
-      expect(unusedModel).toBeUndefined();
-
-      // Should still include models that have machines in this organization
-      expect(result.length).toBeGreaterThan(0);
-
-      // Verify all returned models have machine counts > 0
-      result.forEach((model) => {
-        expect(model.machineCount).toBeGreaterThan(0);
+        expect(mmModel).toBeDefined();
+        expect(afmModel).toBeDefined();
+        expect(mmModel?.machineCount).toBe(2); // Real count from SQL extras
+        expect(afmModel?.machineCount).toBe(1); // Real count from SQL extras
       });
     });
 
-    it("excludes models from other organizations", async () => {
-      const modelId = generateId();
-      const machineId = generateId();
+    test("excludes models with no machines in organization", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        // Create test organization and user
+        const organizationId = generateTestId("org");
+        const userId = generateTestId("user");
 
-      // Get baseline count of models in our organization
-      const baselineResult = await caller.getAll();
-      const baselineCount = baselineResult.length;
+        await db.insert(schema.organizations).values({
+          id: organizationId,
+          name: "Test Organization",
+          subdomain: "test",
+        });
 
-      // Create model and machine in secondary organization
-      await testDb.insert(schema.models).values({
-        id: modelId,
-        name: "Other Org Model",
-        manufacturer: "Test",
-        isCustom: false,
-        isActive: true,
-      });
+        await db.insert(schema.users).values({
+          id: userId,
+          email: "test@example.com",
+          name: "Test User",
+        });
 
-      await testDb.insert(schema.machines).values({
-        id: machineId,
-        name: "Other Machine",
-        modelId: modelId,
-        organizationId: "test-org-secondary",
-        locationId: "test-location-secondary",
-        qrCodeId: machineId,
-        isActive: true,
-      });
+        const testContext = createTestContext(db, organizationId, userId);
+        const caller = modelCoreRouter.createCaller(testContext);
 
-      const result = await caller.getAll();
-
-      // Should not add any new models to our organization
-      expect(result).toHaveLength(baselineCount);
-      expect(result.find((m) => m.id === modelId)).toBeUndefined();
-    });
-
-    it("returns models sorted by name", async () => {
-      const modelId1 = generateId();
-      const modelId2 = generateId();
-      const machineId1 = generateId();
-      const machineId2 = generateId();
-
-      // Create models in reverse alphabetical order
-      await testDb.insert(schema.models).values([
-        {
-          id: modelId1,
-          name: "Zebra Pinball",
+        // Create model with no machines
+        const modelId = generateId();
+        await db.insert(schema.models).values({
+          id: modelId,
+          name: "Unused Model",
+          manufacturer: "Test",
           isCustom: false,
           isActive: true,
-        },
-        {
-          id: modelId2,
-          name: "Alpha Pinball",
+        });
+
+        const result = await caller.getAll();
+
+        // Should not include the model with no machines
+        const unusedModel = result.find((m) => m.name === "Unused Model");
+        expect(unusedModel).toBeUndefined();
+
+        // Should return empty array since no models have machines in this organization
+        expect(result.length).toBe(0);
+      });
+    });
+
+    test("excludes models from other organizations", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        // Create test organization and user
+        const organizationId = generateTestId("org");
+        const userId = generateTestId("user");
+
+        await db.insert(schema.organizations).values({
+          id: organizationId,
+          name: "Test Organization",
+          subdomain: "test",
+        });
+
+        await db.insert(schema.users).values({
+          id: userId,
+          email: "test@example.com",
+          name: "Test User",
+        });
+
+        const testContext = createTestContext(db, organizationId, userId);
+        const caller = modelCoreRouter.createCaller(testContext);
+
+        const modelId = generateId();
+        const machineId = generateId();
+
+        // Get baseline count of models in our organization
+        const baselineResult = await caller.getAll();
+        const baselineCount = baselineResult.length;
+
+        // Create model and machine in secondary organization
+        await db.insert(schema.models).values({
+          id: modelId,
+          name: "Other Org Model",
+          manufacturer: "Test",
           isCustom: false,
           isActive: true,
-        },
-      ]);
+        });
 
-      // Create machines for both models
-      await testDb.insert(schema.machines).values([
-        {
-          id: machineId1,
-          name: "Machine 1",
-          modelId: modelId1,
-          organizationId: testData.organization,
-          locationId: testData.location || "test-location-1",
-          qrCodeId: machineId1,
+        await db.insert(schema.machines).values({
+          id: machineId,
+          name: "Other Machine",
+          modelId: modelId,
+          organizationId: "test-org-secondary",
+          locationId: "test-location-secondary",
+          qrCodeId: machineId,
           isActive: true,
-        },
-        {
-          id: machineId2,
-          name: "Machine 2",
-          modelId: modelId2,
-          organizationId: testData.organization,
-          locationId: testData.location || "test-location-1",
-          qrCodeId: machineId2,
-          isActive: true,
-        },
-      ]);
+        });
 
-      const result = await caller.getAll();
+        const result = await caller.getAll();
 
-      // Find our test models in the sorted results
-      const alphaIndex = result.findIndex((m) => m.name === "Alpha Pinball");
-      const zebraIndex = result.findIndex((m) => m.name === "Zebra Pinball");
+        // Should not add any new models to our organization
+        expect(result).toHaveLength(baselineCount);
+        expect(result.find((m) => m.id === modelId)).toBeUndefined();
+      });
+    });
 
-      expect(alphaIndex).toBeGreaterThanOrEqual(0);
-      expect(zebraIndex).toBeGreaterThanOrEqual(0);
-      expect(alphaIndex).toBeLessThan(zebraIndex); // Alpha comes before Zebra
+    test("returns models sorted by name", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        // Create test organization and user
+        const organizationId = generateTestId("org");
+        const userId = generateTestId("user");
+
+        await db.insert(schema.organizations).values({
+          id: organizationId,
+          name: "Test Organization",
+          subdomain: "test",
+        });
+
+        await db.insert(schema.users).values({
+          id: userId,
+          email: "test@example.com",
+          name: "Test User",
+        });
+
+        const testContext = createTestContext(db, organizationId, userId);
+        const caller = modelCoreRouter.createCaller(testContext);
+
+        const modelId1 = generateId();
+        const modelId2 = generateId();
+        const machineId1 = generateId();
+        const machineId2 = generateId();
+
+        // Create models in reverse alphabetical order
+        await db.insert(schema.models).values([
+          {
+            id: modelId1,
+            name: "Zebra Pinball",
+            isCustom: false,
+            isActive: true,
+          },
+          {
+            id: modelId2,
+            name: "Alpha Pinball",
+            isCustom: false,
+            isActive: true,
+          },
+        ]);
+
+        // Create machines for both models
+        await db.insert(schema.machines).values([
+          {
+            id: machineId1,
+            name: "Machine 1",
+            modelId: modelId1,
+            organizationId: organizationId,
+            locationId: "test-location-1",
+            qrCodeId: machineId1,
+            isActive: true,
+          },
+          {
+            id: machineId2,
+            name: "Machine 2",
+            modelId: modelId2,
+            organizationId: organizationId,
+            locationId: "test-location-1",
+            qrCodeId: machineId2,
+            isActive: true,
+          },
+        ]);
+
+        const result = await caller.getAll();
+
+        // Find our test models in the sorted results
+        const alphaIndex = result.findIndex((m) => m.name === "Alpha Pinball");
+        const zebraIndex = result.findIndex((m) => m.name === "Zebra Pinball");
+
+        expect(alphaIndex).toBeGreaterThanOrEqual(0);
+        expect(zebraIndex).toBeGreaterThanOrEqual(0);
+        expect(alphaIndex).toBeLessThan(zebraIndex); // Alpha comes before Zebra
+      });
     });
   });
 
   describe("getById", () => {
-    it("returns model with machine count for valid ID", async () => {
-      const modelId = generateId();
-      const machineId1 = generateId();
-      const machineId2 = generateId();
+    test("returns model with machine count for valid ID", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        // Create test organization and user
+        const organizationId = generateTestId("org");
+        const userId = generateTestId("user");
 
-      // Create model
-      await testDb.insert(schema.models).values({
-        id: modelId,
-        name: "Test Model",
-        manufacturer: "Test Manufacturer",
-        year: 2023,
-        isCustom: false,
-        isActive: true,
-      });
+        await db.insert(schema.organizations).values({
+          id: organizationId,
+          name: "Test Organization",
+          subdomain: "test",
+        });
 
-      // Create machines
-      await testDb.insert(schema.machines).values([
-        {
-          id: machineId1,
-          name: "Machine 1",
-          modelId: modelId,
-          organizationId: testData.organization,
-          locationId: testData.location || "test-location-1",
-          qrCodeId: machineId1,
-          isActive: true,
-        },
-        {
-          id: machineId2,
-          name: "Machine 2",
-          modelId: modelId,
-          organizationId: testData.organization,
-          locationId: testData.location || "test-location-1",
-          qrCodeId: machineId2,
-          isActive: true,
-        },
-      ]);
+        await db.insert(schema.users).values({
+          id: userId,
+          email: "test@example.com",
+          name: "Test User",
+        });
 
-      const result = await caller.getById({ id: modelId });
+        const testContext = createTestContext(db, organizationId, userId);
+        const caller = modelCoreRouter.createCaller(testContext);
 
-      expect(result).toEqual(
-        expect.objectContaining({
+        const modelId = generateId();
+        const machineId1 = generateId();
+        const machineId2 = generateId();
+
+        // Create model
+        await db.insert(schema.models).values({
           id: modelId,
           name: "Test Model",
           manufacturer: "Test Manufacturer",
           year: 2023,
-          machineCount: 2,
-        }),
-      );
+          isCustom: false,
+          isActive: true,
+        });
+
+        // Create machines
+        await db.insert(schema.machines).values([
+          {
+            id: machineId1,
+            name: "Machine 1",
+            modelId: modelId,
+            organizationId: organizationId,
+            locationId: "test-location-1",
+            qrCodeId: machineId1,
+            isActive: true,
+          },
+          {
+            id: machineId2,
+            name: "Machine 2",
+            modelId: modelId,
+            organizationId: organizationId,
+            locationId: "test-location-1",
+            qrCodeId: machineId2,
+            isActive: true,
+          },
+        ]);
+
+        const result = await caller.getById({ id: modelId });
+
+        expect(result).toEqual(
+          expect.objectContaining({
+            id: modelId,
+            name: "Test Model",
+            manufacturer: "Test Manufacturer",
+            year: 2023,
+            machineCount: 2,
+          }),
+        );
+      });
     });
 
-    it("throws NOT_FOUND for non-existent model", async () => {
-      await expect(caller.getById({ id: "non-existent" })).rejects.toThrow(
-        new TRPCError({
-          code: "NOT_FOUND",
-          message: "Game title not found or access denied",
-        }),
-      );
+    test("throws NOT_FOUND for non-existent model", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        // Create test organization and user
+        const organizationId = generateTestId("org");
+        const userId = generateTestId("user");
+
+        await db.insert(schema.organizations).values({
+          id: organizationId,
+          name: "Test Organization",
+          subdomain: "test",
+        });
+
+        await db.insert(schema.users).values({
+          id: userId,
+          email: "test@example.com",
+          name: "Test User",
+        });
+
+        const testContext = createTestContext(db, organizationId, userId);
+        const caller = modelCoreRouter.createCaller(testContext);
+
+        await expect(caller.getById({ id: "non-existent" })).rejects.toThrow(
+          new TRPCError({
+            code: "NOT_FOUND",
+            message: "Game title not found or access denied",
+          }),
+        );
+      });
     });
 
-    it("throws NOT_FOUND for model not in organization", async () => {
-      const modelId = generateId();
-      const machineId = generateId();
+    test("throws NOT_FOUND for model not in organization", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        // Create test organization and user
+        const organizationId = generateTestId("org");
+        const userId = generateTestId("user");
 
-      // Create model with machine in different organization
-      await testDb.insert(schema.models).values({
-        id: modelId,
-        name: "Other Org Model",
-        isCustom: false,
-        isActive: true,
+        await db.insert(schema.organizations).values({
+          id: organizationId,
+          name: "Test Organization",
+          subdomain: "test",
+        });
+
+        await db.insert(schema.users).values({
+          id: userId,
+          email: "test@example.com",
+          name: "Test User",
+        });
+
+        const testContext = createTestContext(db, organizationId, userId);
+        const caller = modelCoreRouter.createCaller(testContext);
+
+        const modelId = generateId();
+        const machineId = generateId();
+
+        // Create model with machine in different organization
+        await db.insert(schema.models).values({
+          id: modelId,
+          name: "Other Org Model",
+          isCustom: false,
+          isActive: true,
+        });
+
+        await db.insert(schema.machines).values({
+          id: machineId,
+          name: "Other Machine",
+          modelId: modelId,
+          organizationId: "test-org-secondary",
+          locationId: "test-location-secondary",
+          qrCodeId: machineId,
+          isActive: true,
+        });
+
+        await expect(caller.getById({ id: modelId })).rejects.toThrow(
+          new TRPCError({
+            code: "NOT_FOUND",
+            message: "Game title not found or access denied",
+          }),
+        );
       });
-
-      await testDb.insert(schema.machines).values({
-        id: machineId,
-        name: "Other Machine",
-        modelId: modelId,
-        organizationId: "test-org-secondary",
-        locationId: "test-location-secondary",
-        qrCodeId: machineId,
-        isActive: true,
-      });
-
-      await expect(caller.getById({ id: modelId })).rejects.toThrow(
-        new TRPCError({
-          code: "NOT_FOUND",
-          message: "Game title not found or access denied",
-        }),
-      );
     });
 
-    it("throws NOT_FOUND for model with no machines in organization", async () => {
-      const modelId = generateId();
+    test("throws NOT_FOUND for model with no machines in organization", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        // Create test organization and user
+        const organizationId = generateTestId("org");
+        const userId = generateTestId("user");
 
-      // Create model but no machines
-      await testDb.insert(schema.models).values({
-        id: modelId,
-        name: "No Machines Model",
-        isCustom: false,
-        isActive: true,
+        await db.insert(schema.organizations).values({
+          id: organizationId,
+          name: "Test Organization",
+          subdomain: "test",
+        });
+
+        await db.insert(schema.users).values({
+          id: userId,
+          email: "test@example.com",
+          name: "Test User",
+        });
+
+        const testContext = createTestContext(db, organizationId, userId);
+        const caller = modelCoreRouter.createCaller(testContext);
+
+        const modelId = generateId();
+
+        // Create model but no machines
+        await db.insert(schema.models).values({
+          id: modelId,
+          name: "No Machines Model",
+          isCustom: false,
+          isActive: true,
+        });
+
+        await expect(caller.getById({ id: modelId })).rejects.toThrow(
+          new TRPCError({
+            code: "NOT_FOUND",
+            message: "Game title not found or access denied",
+          }),
+        );
       });
-
-      await expect(caller.getById({ id: modelId })).rejects.toThrow(
-        new TRPCError({
-          code: "NOT_FOUND",
-          message: "Game title not found or access denied",
-        }),
-      );
     });
   });
 
   describe("delete", () => {
-    it("throws NOT_FOUND when trying to delete model with no machines in current organization", async () => {
-      const modelId = generateId();
+    test("throws NOT_FOUND when trying to delete model with no machines in current organization", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        // Create test organization and user
+        const organizationId = generateTestId("org");
+        const userId = generateTestId("user");
 
-      // Create OPDB model (not custom) with no machines in current organization
-      await testDb.insert(schema.models).values({
-        id: modelId,
-        name: "Deletable Model",
-        opdbId: "opdb-123",
-        isCustom: false,
-        isActive: true,
+        await db.insert(schema.organizations).values({
+          id: organizationId,
+          name: "Test Organization",
+          subdomain: "test",
+        });
+
+        await db.insert(schema.users).values({
+          id: userId,
+          email: "test@example.com",
+          name: "Test User",
+        });
+
+        const testContext = createTestContext(db, organizationId, userId);
+        const caller = modelCoreRouter.createCaller(testContext);
+
+        const modelId = generateId();
+
+        // Create OPDB model (not custom) with no machines in current organization
+        await db.insert(schema.models).values({
+          id: modelId,
+          name: "Deletable Model",
+          opdbId: "opdb-123",
+          isCustom: false,
+          isActive: true,
+        });
+
+        // Model has no machines in current organization, so it's not visible to delete
+        await expect(caller.delete({ id: modelId })).rejects.toThrow(
+          new TRPCError({
+            code: "NOT_FOUND",
+            message: "Game title not found or access denied",
+          }),
+        );
       });
-
-      // Model has no machines in current organization, so it's not visible to delete
-      await expect(caller.delete({ id: modelId })).rejects.toThrow(
-        new TRPCError({
-          code: "NOT_FOUND",
-          message: "Game title not found or access denied",
-        }),
-      );
     });
 
     // Note: Based on current router logic, successful deletion is only possible if:
@@ -445,338 +638,533 @@ describe("modelCoreRouter Integration Tests", () => {
     // This appears to be a logical inconsistency in the router design.
     // The unit test mocks this scenario, but it's not possible with real data.
 
-    it("throws NOT_FOUND for non-existent model", async () => {
-      await expect(caller.delete({ id: "non-existent" })).rejects.toThrow(
-        new TRPCError({
-          code: "NOT_FOUND",
-          message: "Game title not found or access denied",
-        }),
-      );
+    test("throws NOT_FOUND for non-existent model", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        // Create test organization and user
+        const organizationId = generateTestId("org");
+        const userId = generateTestId("user");
+
+        await db.insert(schema.organizations).values({
+          id: organizationId,
+          name: "Test Organization",
+          subdomain: "test",
+        });
+
+        await db.insert(schema.users).values({
+          id: userId,
+          email: "test@example.com",
+          name: "Test User",
+        });
+
+        const testContext = createTestContext(db, organizationId, userId);
+        const caller = modelCoreRouter.createCaller(testContext);
+
+        await expect(caller.delete({ id: "non-existent" })).rejects.toThrow(
+          new TRPCError({
+            code: "NOT_FOUND",
+            message: "Game title not found or access denied",
+          }),
+        );
+      });
     });
 
-    it("throws BAD_REQUEST for custom model", async () => {
-      const modelId = generateId();
-      const machineId = generateId();
+    test("throws BAD_REQUEST for custom model", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        // Create test organization and user
+        const organizationId = generateTestId("org");
+        const userId = generateTestId("user");
 
-      // Create custom model with a machine
-      await testDb.insert(schema.models).values({
-        id: modelId,
-        name: "Custom Model",
-        isCustom: true,
-        isActive: true,
+        await db.insert(schema.organizations).values({
+          id: organizationId,
+          name: "Test Organization",
+          subdomain: "test",
+        });
+
+        await db.insert(schema.users).values({
+          id: userId,
+          email: "test@example.com",
+          name: "Test User",
+        });
+
+        const testContext = createTestContext(db, organizationId, userId);
+        const caller = modelCoreRouter.createCaller(testContext);
+
+        const modelId = generateId();
+        const machineId = generateId();
+
+        // Create custom model with a machine
+        await db.insert(schema.models).values({
+          id: modelId,
+          name: "Custom Model",
+          isCustom: true,
+          isActive: true,
+        });
+
+        await db.insert(schema.machines).values({
+          id: machineId,
+          name: "Custom Machine",
+          modelId: modelId,
+          organizationId: organizationId,
+          locationId: "test-location-1",
+          qrCodeId: machineId,
+          isActive: true,
+        });
+
+        await expect(caller.delete({ id: modelId })).rejects.toThrow(
+          new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Cannot delete custom games. Remove game instances instead.",
+          }),
+        );
       });
-
-      await testDb.insert(schema.machines).values({
-        id: machineId,
-        name: "Custom Machine",
-        modelId: modelId,
-        organizationId: testData.organization,
-        locationId: testData.location || "test-location-1",
-        qrCodeId: machineId,
-        isActive: true,
-      });
-
-      await expect(caller.delete({ id: modelId })).rejects.toThrow(
-        new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Cannot delete custom games. Remove game instances instead.",
-        }),
-      );
     });
 
-    it("throws BAD_REQUEST for model with existing machines", async () => {
-      const modelId = generateId();
-      const machineId = generateId();
+    test("throws BAD_REQUEST for model with existing machines", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        // Create test organization and user
+        const organizationId = generateTestId("org");
+        const userId = generateTestId("user");
 
-      // Create OPDB model with machines
-      await testDb.insert(schema.models).values({
-        id: modelId,
-        name: "Model with Machines",
-        opdbId: "opdb-456",
-        isCustom: false,
-        isActive: true,
+        await db.insert(schema.organizations).values({
+          id: organizationId,
+          name: "Test Organization",
+          subdomain: "test",
+        });
+
+        await db.insert(schema.users).values({
+          id: userId,
+          email: "test@example.com",
+          name: "Test User",
+        });
+
+        const testContext = createTestContext(db, organizationId, userId);
+        const caller = modelCoreRouter.createCaller(testContext);
+
+        const modelId = generateId();
+        const machineId = generateId();
+
+        // Create OPDB model with machines
+        await db.insert(schema.models).values({
+          id: modelId,
+          name: "Model with Machines",
+          opdbId: "opdb-456",
+          isCustom: false,
+          isActive: true,
+        });
+
+        await db.insert(schema.machines).values({
+          id: machineId,
+          name: "Blocking Machine",
+          modelId: modelId,
+          organizationId: organizationId,
+          locationId: "test-location-1",
+          qrCodeId: machineId,
+          isActive: true,
+        });
+
+        await expect(caller.delete({ id: modelId })).rejects.toThrow(
+          new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Cannot delete game title that has game instances",
+          }),
+        );
       });
-
-      await testDb.insert(schema.machines).values({
-        id: machineId,
-        name: "Blocking Machine",
-        modelId: modelId,
-        organizationId: testData.organization,
-        locationId: testData.location || "test-location-1",
-        qrCodeId: machineId,
-        isActive: true,
-      });
-
-      await expect(caller.delete({ id: modelId })).rejects.toThrow(
-        new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Cannot delete game title that has game instances",
-        }),
-      );
     });
 
-    it("throws NOT_FOUND for model not in organization", async () => {
-      const modelId = generateId();
-      const machineId = generateId();
+    test("throws NOT_FOUND for model not in organization", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        // Create test organization and user
+        const organizationId = generateTestId("org");
+        const userId = generateTestId("user");
 
-      // Create model in different organization
-      await testDb.insert(schema.models).values({
-        id: modelId,
-        name: "Other Org Model",
-        isCustom: false,
-        isActive: true,
+        await db.insert(schema.organizations).values({
+          id: organizationId,
+          name: "Test Organization",
+          subdomain: "test",
+        });
+
+        await db.insert(schema.users).values({
+          id: userId,
+          email: "test@example.com",
+          name: "Test User",
+        });
+
+        const testContext = createTestContext(db, organizationId, userId);
+        const caller = modelCoreRouter.createCaller(testContext);
+
+        const modelId = generateId();
+        const machineId = generateId();
+
+        // Create model in different organization
+        await db.insert(schema.models).values({
+          id: modelId,
+          name: "Other Org Model",
+          isCustom: false,
+          isActive: true,
+        });
+
+        await db.insert(schema.machines).values({
+          id: machineId,
+          name: "Other Machine",
+          modelId: modelId,
+          organizationId: "test-org-secondary",
+          locationId: "test-location-secondary",
+          qrCodeId: machineId,
+          isActive: true,
+        });
+
+        await expect(caller.delete({ id: modelId })).rejects.toThrow(
+          new TRPCError({
+            code: "NOT_FOUND",
+            message: "Game title not found or access denied",
+          }),
+        );
       });
-
-      await testDb.insert(schema.machines).values({
-        id: machineId,
-        name: "Other Machine",
-        modelId: modelId,
-        organizationId: "test-org-secondary",
-        locationId: "test-location-secondary",
-        qrCodeId: machineId,
-        isActive: true,
-      });
-
-      await expect(caller.delete({ id: modelId })).rejects.toThrow(
-        new TRPCError({
-          code: "NOT_FOUND",
-          message: "Game title not found or access denied",
-        }),
-      );
     });
   });
 
   describe("organizational boundaries", () => {
-    it("enforces strict organizational scoping with real data", async () => {
-      const modelId1 = generateId();
-      const modelId2 = generateId();
-      const machineId1 = generateId();
-      const machineId2 = generateId();
+    test("enforces strict organizational scoping with real data", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        // Create test organization and user
+        const organizationId = generateTestId("org");
+        const userId = generateTestId("user");
 
-      // Get baseline count before adding test data
-      const baselineResult = await caller.getAll();
-      const baselineCount = baselineResult.length;
+        await db.insert(schema.organizations).values({
+          id: organizationId,
+          name: "Test Organization",
+          subdomain: "test",
+        });
 
-      // Create identical models in both organizations
-      await testDb.insert(schema.models).values([
-        {
-          id: modelId1,
-          name: "Shared Model Name",
-          opdbId: "opdb-shared",
-          isCustom: false,
-          isActive: true,
-        },
-        {
-          id: modelId2,
-          name: "Primary Org Model",
-          opdbId: "opdb-primary",
-          isCustom: false,
-          isActive: true,
-        },
-      ]);
+        await db.insert(schema.users).values({
+          id: userId,
+          email: "test@example.com",
+          name: "Test User",
+        });
 
-      // Create machines in different organizations
-      await testDb.insert(schema.machines).values([
-        {
-          id: machineId1,
-          name: "Secondary Machine",
-          modelId: modelId1,
-          organizationId: "test-org-secondary",
-          locationId: "test-location-secondary",
-          qrCodeId: machineId1,
-          isActive: true,
-        },
-        {
-          id: machineId2,
-          name: "Primary Machine",
-          modelId: modelId2,
-          organizationId: testData.organization,
-          locationId: testData.location || "test-location-1",
-          qrCodeId: machineId2,
-          isActive: true,
-        },
-      ]);
+        const testContext = createTestContext(db, organizationId, userId);
+        const caller = modelCoreRouter.createCaller(testContext);
 
-      // Primary org caller should only see one additional model (our primary org model)
-      const result = await caller.getAll();
+        const modelId1 = generateId();
+        const modelId2 = generateId();
+        const machineId1 = generateId();
+        const machineId2 = generateId();
 
-      expect(result).toHaveLength(baselineCount + 1);
-      expect(result.find((m) => m.name === "Primary Org Model")).toBeDefined();
-      expect(result.find((m) => m.id === modelId1)).toBeUndefined();
+        // Get baseline count before adding test data
+        const baselineResult = await caller.getAll();
+        const baselineCount = baselineResult.length;
+
+        // Create identical models in both organizations
+        await db.insert(schema.models).values([
+          {
+            id: modelId1,
+            name: "Shared Model Name",
+            opdbId: "opdb-shared",
+            isCustom: false,
+            isActive: true,
+          },
+          {
+            id: modelId2,
+            name: "Primary Org Model",
+            opdbId: "opdb-primary",
+            isCustom: false,
+            isActive: true,
+          },
+        ]);
+
+        // Create machines in different organizations
+        await db.insert(schema.machines).values([
+          {
+            id: machineId1,
+            name: "Secondary Machine",
+            modelId: modelId1,
+            organizationId: "test-org-secondary",
+            locationId: "test-location-secondary",
+            qrCodeId: machineId1,
+            isActive: true,
+          },
+          {
+            id: machineId2,
+            name: "Primary Machine",
+            modelId: modelId2,
+            organizationId: organizationId,
+            locationId: "test-location-1",
+            qrCodeId: machineId2,
+            isActive: true,
+          },
+        ]);
+
+        // Primary org caller should only see one additional model (our primary org model)
+        const result = await caller.getAll();
+
+        expect(result).toHaveLength(baselineCount + 1);
+        expect(result.find((m) => m.name === "Primary Org Model")).toBeDefined();
+        expect(result.find((m) => m.id === modelId1)).toBeUndefined();
+      });
     });
 
-    it("validates organizational access with exists() subqueries", async () => {
-      // Switch context to secondary organization
-      mockContext.organization = {
-        id: "test-org-secondary",
-        name: "Secondary Org",
-        subdomain: "secondary",
-      };
-      mockContext.user.app_metadata = {
-        organization_id: "test-org-secondary",
-      };
-      const secondaryCaller = modelCoreRouter.createCaller(mockContext);
+    test("validates organizational access with exists() subqueries", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        // Create primary organization and user
+        const primaryOrgId = generateTestId("primary-org");
+        const primaryUserId = generateTestId("primary-user");
+        const secondaryOrgId = generateTestId("secondary-org");
+        const secondaryUserId = generateTestId("secondary-user");
 
-      const modelId = generateId();
-      const machineId = generateId();
+        await db.insert(schema.organizations).values([
+          {
+            id: primaryOrgId,
+            name: "Primary Organization",
+            subdomain: "primary",
+          },
+          {
+            id: secondaryOrgId,
+            name: "Secondary Organization",
+            subdomain: "secondary",
+          },
+        ]);
 
-      // Create model with machine in primary organization
-      await testDb.insert(schema.models).values({
-        id: modelId,
-        name: "Primary Org Model",
-        isCustom: false,
-        isActive: true,
+        await db.insert(schema.users).values([
+          {
+            id: primaryUserId,
+            email: "primary@example.com",
+            name: "Primary User",
+          },
+          {
+            id: secondaryUserId,
+            email: "secondary@example.com",
+            name: "Secondary User",
+          },
+        ]);
+
+        // Create secondary org context
+        const secondaryContext = createTestContext(db, secondaryOrgId, secondaryUserId);
+        const secondaryCaller = modelCoreRouter.createCaller(secondaryContext);
+
+        const modelId = generateId();
+        const machineId = generateId();
+
+        // Create model with machine in primary organization
+        await db.insert(schema.models).values({
+          id: modelId,
+          name: "Primary Org Model",
+          isCustom: false,
+          isActive: true,
+        });
+
+        await db.insert(schema.machines).values({
+          id: machineId,
+          name: "Primary Machine",
+          modelId: modelId,
+          organizationId: primaryOrgId,
+          locationId: "test-location-1",
+          qrCodeId: machineId,
+          isActive: true,
+        });
+
+        // Secondary org caller should not see primary org models
+        const result = await secondaryCaller.getAll();
+        expect(result).toEqual([]);
+
+        // Should also fail getById
+        await expect(secondaryCaller.getById({ id: modelId })).rejects.toThrow(
+          new TRPCError({
+            code: "NOT_FOUND",
+            message: "Game title not found or access denied",
+          }),
+        );
       });
-
-      await testDb.insert(schema.machines).values({
-        id: machineId,
-        name: "Primary Machine",
-        modelId: modelId,
-        organizationId: testData.organization,
-        locationId: testData.location || "test-location-1",
-        qrCodeId: machineId,
-        isActive: true,
-      });
-
-      // Secondary org caller should not see primary org models
-      const result = await secondaryCaller.getAll();
-      expect(result).toEqual([]);
-
-      // Should also fail getById
-      await expect(secondaryCaller.getById({ id: modelId })).rejects.toThrow(
-        new TRPCError({
-          code: "NOT_FOUND",
-          message: "Game title not found or access denied",
-        }),
-      );
     });
   });
 
   describe("machine counting accuracy", () => {
-    it("counts machines accurately with SQL extras", async () => {
-      const modelId = generateId();
+    test("counts machines accurately with SQL extras", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        // Create test organization and user
+        const organizationId = generateTestId("org");
+        const userId = generateTestId("user");
 
-      // Create model
-      await testDb.insert(schema.models).values({
-        id: modelId,
-        name: "Count Test Model",
-        isCustom: false,
-        isActive: true,
-      });
+        await db.insert(schema.organizations).values({
+          id: organizationId,
+          name: "Test Organization",
+          subdomain: "test",
+        });
 
-      // Create varying numbers of machines
-      const machineIds = Array.from({ length: 5 }, () => generateId());
-      await testDb.insert(schema.machines).values(
-        machineIds.map((id, index) => ({
-          id,
-          name: `Machine ${index + 1}`,
-          modelId: modelId,
-          organizationId: testData.organization,
-          locationId: testData.location || "test-location-1",
-          qrCodeId: id,
+        await db.insert(schema.users).values({
+          id: userId,
+          email: "test@example.com",
+          name: "Test User",
+        });
+
+        const testContext = createTestContext(db, organizationId, userId);
+        const caller = modelCoreRouter.createCaller(testContext);
+
+        const modelId = generateId();
+
+        // Create model
+        await db.insert(schema.models).values({
+          id: modelId,
+          name: "Count Test Model",
+          isCustom: false,
           isActive: true,
-        })),
-      );
+        });
 
-      const result = await caller.getById({ id: modelId });
-      expect(result.machineCount).toBe(5);
+        // Create varying numbers of machines
+        const machineIds = Array.from({ length: 5 }, () => generateId());
+        await db.insert(schema.machines).values(
+          machineIds.map((id, index) => ({
+            id,
+            name: `Machine ${index + 1}`,
+            modelId: modelId,
+            organizationId: organizationId,
+            locationId: "test-location-1",
+            qrCodeId: id,
+            isActive: true,
+          })),
+        );
 
-      // Test getAll also returns correct count
-      const allResults = await caller.getAll();
-      const foundModel = allResults.find((m) => m.id === modelId);
-      expect(foundModel?.machineCount).toBe(5);
+        const result = await caller.getById({ id: modelId });
+        expect(result.machineCount).toBe(5);
+
+        // Test getAll also returns correct count
+        const allResults = await caller.getAll();
+        const foundModel = allResults.find((m) => m.id === modelId);
+        expect(foundModel?.machineCount).toBe(5);
+      });
     });
 
-    it("excludes inactive machines from count", async () => {
-      const modelId = generateId();
-      const activeMachineId = generateId();
-      const inactiveMachineId = generateId();
+    test("excludes inactive machines from count", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        // Create test organization and user
+        const organizationId = generateTestId("org");
+        const userId = generateTestId("user");
 
-      await testDb.insert(schema.models).values({
-        id: modelId,
-        name: "Active Count Test",
-        isCustom: false,
-        isActive: true,
-      });
+        await db.insert(schema.organizations).values({
+          id: organizationId,
+          name: "Test Organization",
+          subdomain: "test",
+        });
 
-      await testDb.insert(schema.machines).values([
-        {
-          id: activeMachineId,
-          name: "Active Machine",
-          modelId: modelId,
-          organizationId: testData.organization,
-          locationId: testData.location || "test-location-1",
-          qrCodeId: activeMachineId,
+        await db.insert(schema.users).values({
+          id: userId,
+          email: "test@example.com",
+          name: "Test User",
+        });
+
+        const testContext = createTestContext(db, organizationId, userId);
+        const caller = modelCoreRouter.createCaller(testContext);
+
+        const modelId = generateId();
+        const activeMachineId = generateId();
+        const inactiveMachineId = generateId();
+
+        await db.insert(schema.models).values({
+          id: modelId,
+          name: "Active Count Test",
+          isCustom: false,
           isActive: true,
-        },
-        {
-          id: inactiveMachineId,
-          name: "Inactive Machine",
-          modelId: modelId,
-          organizationId: testData.organization,
-          locationId: testData.location || "test-location-1",
-          qrCodeId: inactiveMachineId,
-          isActive: false,
-        },
-      ]);
+        });
 
-      const result = await caller.getById({ id: modelId });
-      expect(result.machineCount).toBe(2); // Count includes inactive machines based on schema
+        await db.insert(schema.machines).values([
+          {
+            id: activeMachineId,
+            name: "Active Machine",
+            modelId: modelId,
+            organizationId: organizationId,
+            locationId: "test-location-1",
+            qrCodeId: activeMachineId,
+            isActive: true,
+          },
+          {
+            id: inactiveMachineId,
+            name: "Inactive Machine",
+            modelId: modelId,
+            organizationId: organizationId,
+            locationId: "test-location-1",
+            qrCodeId: inactiveMachineId,
+            isActive: false,
+          },
+        ]);
+
+        const result = await caller.getById({ id: modelId });
+        expect(result.machineCount).toBe(2); // Count includes inactive machines based on schema
+      });
     });
   });
 
   describe("complex relational queries", () => {
-    it("handles models with complex machine relationships", async () => {
-      const modelId = generateId();
-      const machineId1 = generateId();
-      const machineId2 = generateId();
+    test("handles models with complex machine relationships", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        // Create test organization and user
+        const organizationId = generateTestId("org");
+        const userId = generateTestId("user");
 
-      await testDb.insert(schema.models).values({
-        id: modelId,
-        name: "Complex Model",
-        manufacturer: "Test Manufacturer",
-        year: 2023,
-        opdbId: "opdb-complex",
-        isCustom: false,
-        isActive: true,
-      });
+        await db.insert(schema.organizations).values({
+          id: organizationId,
+          name: "Test Organization",
+          subdomain: "test",
+        });
 
-      // Create machines with different properties
-      await testDb.insert(schema.machines).values([
-        {
-          id: machineId1,
-          name: "Complex Machine 1",
-          modelId: modelId,
-          organizationId: testData.organization,
-          locationId: testData.location || "test-location-1",
-          qrCodeId: machineId1,
-          isActive: true,
-          serialNumber: "CM001",
-        },
-        {
-          id: machineId2,
-          name: "Complex Machine 2",
-          modelId: modelId,
-          organizationId: testData.organization,
-          locationId: testData.location || "test-location-1",
-          qrCodeId: machineId2,
-          isActive: true,
-          serialNumber: "CM002",
-        },
-      ]);
+        await db.insert(schema.users).values({
+          id: userId,
+          email: "test@example.com",
+          name: "Test User",
+        });
 
-      const result = await caller.getById({ id: modelId });
+        const testContext = createTestContext(db, organizationId, userId);
+        const caller = modelCoreRouter.createCaller(testContext);
 
-      expect(result).toEqual(
-        expect.objectContaining({
+        const modelId = generateId();
+        const machineId1 = generateId();
+        const machineId2 = generateId();
+
+        await db.insert(schema.models).values({
           id: modelId,
           name: "Complex Model",
           manufacturer: "Test Manufacturer",
           year: 2023,
           opdbId: "opdb-complex",
-          machineCount: 2,
-        }),
-      );
+          isCustom: false,
+          isActive: true,
+        });
+
+        // Create machines with different properties
+        await db.insert(schema.machines).values([
+          {
+            id: machineId1,
+            name: "Complex Machine 1",
+            modelId: modelId,
+            organizationId: organizationId,
+            locationId: "test-location-1",
+            qrCodeId: machineId1,
+            isActive: true,
+            serialNumber: "CM001",
+          },
+          {
+            id: machineId2,
+            name: "Complex Machine 2",
+            modelId: modelId,
+            organizationId: organizationId,
+            locationId: "test-location-1",
+            qrCodeId: machineId2,
+            isActive: true,
+            serialNumber: "CM002",
+          },
+        ]);
+
+        const result = await caller.getById({ id: modelId });
+
+        expect(result).toEqual(
+          expect.objectContaining({
+            id: modelId,
+            name: "Complex Model",
+            manufacturer: "Test Manufacturer",
+            year: 2023,
+            opdbId: "opdb-complex",
+            machineCount: 2,
+          }),
+        );
+      });
     });
   });
 });

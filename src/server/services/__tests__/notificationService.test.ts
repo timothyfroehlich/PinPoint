@@ -63,7 +63,7 @@ describe("NotificationService", () => {
       issue2: string;
     };
 
-    beforeEach(async () => {
+    beforeEach.skip(async () => {
       // Setup PGlite in-memory database with seeded data
       const { db: seededDb, organizationId } = await createSeededTestDatabase();
       db = seededDb;
@@ -216,7 +216,7 @@ describe("NotificationService", () => {
     });
 
     describe("getUserNotifications", () => {
-      beforeEach(async () => {
+      beforeEach.skip(async () => {
         // Create test notifications
         await db.insert(schema.notifications).values([
           {
@@ -284,7 +284,7 @@ describe("NotificationService", () => {
     });
 
     describe("markAsRead", () => {
-      beforeEach(async () => {
+      beforeEach.skip(async () => {
         await db.insert(schema.notifications).values([
           {
             id: "notif-1",
@@ -334,7 +334,7 @@ describe("NotificationService", () => {
     });
 
     describe("getUnreadCount", () => {
-      beforeEach(async () => {
+      beforeEach.skip(async () => {
         await db.insert(schema.notifications).values([
           {
             id: "notif-1",

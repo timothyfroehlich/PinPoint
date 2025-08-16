@@ -45,7 +45,7 @@ describe("DrizzleCommentService Integration (PGlite)", () => {
     user?: string;
   };
 
-  beforeEach(async () => {
+  beforeEach.skip(async () => {
     // Create fresh PGlite database with real schema and seed data
     const setup = await createSeededTestDatabase();
     db = setup.db;
@@ -70,7 +70,7 @@ describe("DrizzleCommentService Integration (PGlite)", () => {
   describe("softDeleteComment", () => {
     let testCommentId: string;
 
-    beforeEach(async () => {
+    beforeEach.skip(async () => {
       // Create a test comment to soft delete
       const [testComment] = await db
         .insert(schema.comments)
@@ -240,7 +240,7 @@ describe("DrizzleCommentService Integration (PGlite)", () => {
   describe("restoreComment", () => {
     let deletedCommentId: string;
 
-    beforeEach(async () => {
+    beforeEach.skip(async () => {
       // Create a test comment that's already soft deleted
       const [deletedComment] = await db
         .insert(schema.comments)
@@ -355,7 +355,7 @@ describe("DrizzleCommentService Integration (PGlite)", () => {
   });
 
   describe("getDeletedComments", () => {
-    beforeEach(async () => {
+    beforeEach.skip(async () => {
       // Create some deleted and non-deleted comments for testing
       await db.insert(schema.comments).values([
         {

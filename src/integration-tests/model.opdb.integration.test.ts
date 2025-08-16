@@ -19,17 +19,15 @@
 
 import { TRPCError } from "@trpc/server";
 import { eq } from "drizzle-orm";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, vi } from "vitest";
 
 import type { TRPCContext } from "~/server/api/trpc.base";
 
 import { modelOpdbRouter } from "~/server/api/routers/model.opdb";
 import * as schema from "~/server/db/schema";
-import {
-  createSeededTestDatabase,
-  getSeededTestData,
-  type TestDatabase,
-} from "~/test/helpers/pglite-test-setup";
+import { generateTestId } from "~/test/helpers/test-id-generator";
+import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
+import type { TestDatabase } from "~/test/helpers/pglite-test-setup";
 
 // Mock external dependencies
 let idCounter = 0;
@@ -61,32 +59,49 @@ vi.mock("~/server/auth/permissions", () => ({
 }));
 
 describe("modelOpdbRouter Integration Tests", () => {
-  let testDb: TestDatabase;
-  let testData: Awaited<ReturnType<typeof getSeededTestData>>;
-  let mockContext: TRPCContext;
-  let caller: ReturnType<typeof modelOpdbRouter.createCaller>;
-
-  beforeEach(async () => {
+  // Helper function to set up test with org, user, and caller
+  async function setupTest(db: TestDatabase) {
+    // Reset mock counter and clear mocks
     vi.clearAllMocks();
-    idCounter = 0; // Reset counter for each test
-    const setup = await createSeededTestDatabase();
-    testDb = setup.db;
-    testData = await getSeededTestData(setup.db, setup.organizationId);
+    idCounter = 0;
+    
+    // Create test organization and user
+    const organizationId = generateTestId("org");
+    const userId = generateTestId("user");
 
-    // Setup predictable ID generation with unique counter
-    mocks.generateId.mockImplementation(
-      () => `test-model-${Date.now()}-${++idCounter}`,
-    );
+    await db.insert(schema.organizations).values({
+      id: organizationId,
+      name: "Test Organization",
+      subdomain: "test",
+    });
 
+    await db.insert(schema.users).values({
+      id: userId,
+      email: "test@example.com",
+      name: "Test User",
+    });
+
+    const testContext = createTestContext(db, organizationId, userId);
+    const caller = modelOpdbRouter.createCaller(testContext);
+
+    return { organizationId, userId, caller, db };
+  }
+
+  // Helper function to create test context
+  function createTestContext(
+    testDb: TestDatabase,
+    organizationId: string,
+    userId: string,
+  ): TRPCContext {
     // Create mock Prisma client for tRPC middleware compatibility
     const mockPrismaClient = {
       membership: {
         findFirst: vi.fn().mockResolvedValue({
           id: "test-membership",
-          organizationId: testData.organization,
-          userId: testData.user || "test-user-1",
+          organizationId,
+          userId,
           role: {
-            id: testData.adminRole || "test-admin-role",
+            id: generateTestId("admin-role"),
             name: "Admin",
             permissions: [
               { id: "perm1", name: "model:view" },
@@ -97,18 +112,18 @@ describe("modelOpdbRouter Integration Tests", () => {
       },
     };
 
-    mockContext = {
+    const mockContext: TRPCContext = {
       db: mockPrismaClient as any,
       drizzle: testDb,
       services: {} as any,
       user: {
-        id: testData.user || "test-user-1",
+        id: userId,
         email: "member@test.com",
-        app_metadata: { organization_id: testData.organization },
+        app_metadata: { organization_id: organizationId },
       } as any,
       supabase: {} as any,
       organization: {
-        id: testData.organization,
+        id: organizationId,
         name: "Test Organization",
         subdomain: "test",
       },
@@ -128,42 +143,50 @@ describe("modelOpdbRouter Integration Tests", () => {
       userPermissions: ["model:view", "organization:manage"],
     };
 
-    caller = modelOpdbRouter.createCaller(mockContext);
-  });
+    return mockContext;
+  }
 
   describe("searchOPDB", () => {
-    it("searches OPDB machines successfully", async () => {
-      const mockResults = [
-        {
-          id: "opdb-1",
-          name: "Medieval Madness",
-          manufacturer: "Williams",
-          year: 1997,
-        },
-        {
-          id: "opdb-2",
-          name: "Attack from Mars",
-          manufacturer: "Bally",
-          year: 1995,
-        },
-      ];
+    test("searches OPDB machines successfully", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { caller } = await setupTest(db);
 
-      mocks.opdbClient.searchMachines.mockResolvedValue(mockResults);
+        const mockResults = [
+          {
+            id: "opdb-1",
+            name: "Medieval Madness",
+            manufacturer: "Williams",
+            year: 1997,
+          },
+          {
+            id: "opdb-2",
+            name: "Attack from Mars",
+            manufacturer: "Bally",
+            year: 1995,
+          },
+        ];
 
-      const result = await caller.searchOPDB({ query: "medieval" });
+        mocks.opdbClient.searchMachines.mockResolvedValue(mockResults);
 
-      expect(result).toEqual(mockResults);
-      expect(mocks.opdbClient.searchMachines).toHaveBeenCalledWith("medieval");
+        const result = await caller.searchOPDB({ query: "medieval" });
+
+        expect(result).toEqual(mockResults);
+        expect(mocks.opdbClient.searchMachines).toHaveBeenCalledWith("medieval");
+      });
     });
 
-    it("handles OPDB API errors gracefully", async () => {
-      mocks.opdbClient.searchMachines.mockRejectedValue(
-        new Error("OPDB API timeout"),
-      );
+    test("handles OPDB API errors gracefully", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { caller } = await setupTest(db);
 
-      await expect(caller.searchOPDB({ query: "test" })).rejects.toThrow(
-        "OPDB API timeout",
-      );
+        mocks.opdbClient.searchMachines.mockRejectedValue(
+          new Error("OPDB API timeout"),
+        );
+
+        await expect(caller.searchOPDB({ query: "test" })).rejects.toThrow(
+          "OPDB API timeout",
+        );
+      });
     });
   });
 
@@ -176,7 +199,7 @@ describe("modelOpdbRouter Integration Tests", () => {
       playfield_image: "https://opdb.org/images/mm.jpg",
     };
 
-    it("creates new model from OPDB data with real database operations", async () => {
+    test("creates new model from OPDB data with real database operations", async ({ workerDb }) => {
       const generatedId = `test-model-${Date.now()}`;
       mocks.generateId.mockReturnValue(generatedId);
       mocks.opdbClient.getMachineById.mockResolvedValue(mockOPDBData);
@@ -207,7 +230,7 @@ describe("modelOpdbRouter Integration Tests", () => {
       expect(createdModel?.opdbId).toBe("opdb-123");
     });
 
-    it("throws CONFLICT when model with same OPDB ID already exists", async () => {
+    test("throws CONFLICT when model with same OPDB ID already exists", async ({ workerDb }) => {
       // Create existing model with OPDB ID
       const existingModelId = mocks.generateId();
       mocks.generateId.mockReturnValue(existingModelId);
@@ -234,7 +257,7 @@ describe("modelOpdbRouter Integration Tests", () => {
       expect(mocks.opdbClient.getMachineById).not.toHaveBeenCalled();
     });
 
-    it("throws NOT_FOUND when OPDB game doesn't exist", async () => {
+    test("throws NOT_FOUND when OPDB game doesn't exist", async ({ workerDb }) => {
       mocks.opdbClient.getMachineById.mockResolvedValue(null);
 
       await expect(
@@ -247,7 +270,7 @@ describe("modelOpdbRouter Integration Tests", () => {
       );
     });
 
-    it("handles partial OPDB data with proper defaults", async () => {
+    test("handles partial OPDB data with proper defaults", async ({ workerDb }) => {
       const partialData = {
         name: "Partial Game",
         manufacturer: null,
@@ -284,7 +307,7 @@ describe("modelOpdbRouter Integration Tests", () => {
       expect(createdModel?.year).toBeNull();
     });
 
-    it("creates globally available models (not organization-scoped)", async () => {
+    test("creates globally available models (not organization-scoped)", async ({ workerDb }) => {
       const generatedId = `test-global-${Date.now()}`;
       mocks.generateId.mockReturnValue(generatedId);
       mocks.opdbClient.getMachineById.mockResolvedValue(mockOPDBData);
@@ -324,7 +347,7 @@ describe("modelOpdbRouter Integration Tests", () => {
   });
 
   describe("syncWithOPDB", () => {
-    it("syncs models with real database operations and deduplication", async () => {
+    test("syncs models with real database operations and deduplication", async ({ workerDb }) => {
       // Get baseline count of existing OPDB models in the seeded database
       const baselineResult = await caller.syncWithOPDB();
       const baselineCount = baselineResult.total;
@@ -466,7 +489,7 @@ describe("modelOpdbRouter Integration Tests", () => {
       expect(updatedModel2?.updatedAt).toBeDefined();
     });
 
-    it("returns appropriate message when OPDB sync fails", async () => {
+    test("returns appropriate message when OPDB sync fails", async ({ workerDb }) => {
       // The seeded database has existing models with OPDB IDs
       // This test verifies what happens when OPDB API calls fail
 
@@ -486,7 +509,7 @@ describe("modelOpdbRouter Integration Tests", () => {
       expect(mocks.opdbClient.getMachineById).toHaveBeenCalled();
     });
 
-    it("filters out custom models with custom- prefix", async () => {
+    test("filters out custom models with custom- prefix", async ({ workerDb }) => {
       // This test verifies that models with "custom-" prefix OPDB IDs are filtered out
       // But since the seeded data contains other valid OPDB models, we expect those to be found
 
@@ -531,7 +554,7 @@ describe("modelOpdbRouter Integration Tests", () => {
       expect(customCalls).toHaveLength(0);
     });
 
-    it("continues sync despite individual failures", async () => {
+    test("continues sync despite individual failures", async ({ workerDb }) => {
       // This test verifies that sync operation continues and handles failures gracefully
       // by simulating a mix of successful and failed API calls
 
@@ -572,7 +595,7 @@ describe("modelOpdbRouter Integration Tests", () => {
       // (Note: error logging is verified in other tests, this focuses on resilience)
     });
 
-    it("only syncs models in current organization", async () => {
+    test("only syncs models in current organization", async ({ workerDb }) => {
       // Get existing count for the primary organization
       const existingResult = await caller.syncWithOPDB();
       const existingCount = existingResult.total;
@@ -649,7 +672,7 @@ describe("modelOpdbRouter Integration Tests", () => {
       );
     });
 
-    it("deduplicates models correctly with Map-based logic", async () => {
+    test("deduplicates models correctly with Map-based logic", async ({ workerDb }) => {
       // Get existing count first
       const existingResult = await caller.syncWithOPDB();
       const existingCount = existingResult.total;
@@ -725,7 +748,7 @@ describe("modelOpdbRouter Integration Tests", () => {
   });
 
   describe("data integrity", () => {
-    it("maintains referential integrity during model creation", async () => {
+    test("maintains referential integrity during model creation", async ({ workerDb }) => {
       const generatedId = `test-integrity-${Date.now()}`;
       mocks.generateId.mockReturnValue(generatedId);
       mocks.opdbClient.getMachineById.mockResolvedValue({
@@ -767,7 +790,7 @@ describe("modelOpdbRouter Integration Tests", () => {
       expect(createdMachine?.model?.name).toBe("Integrity Test Game");
     });
 
-    it("maintains data consistency during sync operations", async () => {
+    test("maintains data consistency during sync operations", async ({ workerDb }) => {
       const modelId = mocks.generateId();
       const machineId = mocks.generateId();
 
@@ -834,7 +857,7 @@ describe("modelOpdbRouter Integration Tests", () => {
   });
 
   describe("error scenarios", () => {
-    it("handles database constraint violations gracefully", async () => {
+    test("handles database constraint violations gracefully", async ({ workerDb }) => {
       // Create model with specific OPDB ID
       const existingId = mocks.generateId();
       mocks.generateId.mockReturnValue(existingId);
@@ -863,7 +886,7 @@ describe("modelOpdbRouter Integration Tests", () => {
       );
     });
 
-    it("handles concurrent sync operations safely", async () => {
+    test("handles concurrent sync operations safely", async ({ workerDb }) => {
       // Get existing model count
       const existingResult = await caller.syncWithOPDB();
       const existingTotal = existingResult.total;
