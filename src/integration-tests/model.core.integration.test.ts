@@ -21,13 +21,13 @@ import { TRPCError } from "@trpc/server";
 import { describe, expect, vi } from "vitest";
 
 import type { TRPCContext } from "~/server/api/trpc.base";
+import type { TestDatabase } from "~/test/helpers/pglite-test-setup";
 
 import { generateId } from "~/lib/utils/id-generation";
 import { modelCoreRouter } from "~/server/api/routers/model.core";
 import * as schema from "~/server/db/schema";
 import { generateTestId } from "~/test/helpers/test-id-generator";
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
-import type { TestDatabase } from "~/test/helpers/pglite-test-setup";
 
 // Mock ID generation for predictable test data
 vi.mock("~/lib/utils/id-generation", () => ({
@@ -141,23 +141,23 @@ describe("modelCoreRouter Integration Tests", () => {
 
         // Create models
         await db.insert(schema.models).values([
-        {
-          id: modelId1,
-          name: "Medieval Madness",
-          manufacturer: "Williams",
-          year: 1997,
-          isCustom: false,
-          isActive: true,
-        },
-        {
-          id: modelId2,
-          name: "Attack from Mars",
-          manufacturer: "Bally",
-          year: 1995,
-          isCustom: false,
-          isActive: true,
-        },
-      ]);
+          {
+            id: modelId1,
+            name: "Medieval Madness",
+            manufacturer: "Williams",
+            year: 1997,
+            isCustom: false,
+            isActive: true,
+          },
+          {
+            id: modelId2,
+            name: "Attack from Mars",
+            manufacturer: "Bally",
+            year: 1995,
+            isCustom: false,
+            isActive: true,
+          },
+        ]);
 
         // Create test context with proper organization and user
         const testContext = createTestContext(db, organizationId, userId);
@@ -221,7 +221,9 @@ describe("modelCoreRouter Integration Tests", () => {
       });
     });
 
-    test("excludes models with no machines in organization", async ({ workerDb }) => {
+    test("excludes models with no machines in organization", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Create test organization and user
         const organizationId = generateTestId("org");
@@ -396,7 +398,9 @@ describe("modelCoreRouter Integration Tests", () => {
   });
 
   describe("getById", () => {
-    test("returns model with machine count for valid ID", async ({ workerDb }) => {
+    test("returns model with machine count for valid ID", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Create test organization and user
         const organizationId = generateTestId("org");
@@ -497,7 +501,9 @@ describe("modelCoreRouter Integration Tests", () => {
       });
     });
 
-    test("throws NOT_FOUND for model not in organization", async ({ workerDb }) => {
+    test("throws NOT_FOUND for model not in organization", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Create test organization and user
         const organizationId = generateTestId("org");
@@ -548,7 +554,9 @@ describe("modelCoreRouter Integration Tests", () => {
       });
     });
 
-    test("throws NOT_FOUND for model with no machines in organization", async ({ workerDb }) => {
+    test("throws NOT_FOUND for model with no machines in organization", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Create test organization and user
         const organizationId = generateTestId("org");
@@ -590,7 +598,9 @@ describe("modelCoreRouter Integration Tests", () => {
   });
 
   describe("delete", () => {
-    test("throws NOT_FOUND when trying to delete model with no machines in current organization", async ({ workerDb }) => {
+    test("throws NOT_FOUND when trying to delete model with no machines in current organization", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Create test organization and user
         const organizationId = generateTestId("org");
@@ -713,13 +723,16 @@ describe("modelCoreRouter Integration Tests", () => {
         await expect(caller.delete({ id: modelId })).rejects.toThrow(
           new TRPCError({
             code: "BAD_REQUEST",
-            message: "Cannot delete custom games. Remove game instances instead.",
+            message:
+              "Cannot delete custom games. Remove game instances instead.",
           }),
         );
       });
     });
 
-    test("throws BAD_REQUEST for model with existing machines", async ({ workerDb }) => {
+    test("throws BAD_REQUEST for model with existing machines", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Create test organization and user
         const organizationId = generateTestId("org");
@@ -771,7 +784,9 @@ describe("modelCoreRouter Integration Tests", () => {
       });
     });
 
-    test("throws NOT_FOUND for model not in organization", async ({ workerDb }) => {
+    test("throws NOT_FOUND for model not in organization", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Create test organization and user
         const organizationId = generateTestId("org");
@@ -824,7 +839,9 @@ describe("modelCoreRouter Integration Tests", () => {
   });
 
   describe("organizational boundaries", () => {
-    test("enforces strict organizational scoping with real data", async ({ workerDb }) => {
+    test("enforces strict organizational scoping with real data", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Create test organization and user
         const organizationId = generateTestId("org");
@@ -898,12 +915,16 @@ describe("modelCoreRouter Integration Tests", () => {
         const result = await caller.getAll();
 
         expect(result).toHaveLength(baselineCount + 1);
-        expect(result.find((m) => m.name === "Primary Org Model")).toBeDefined();
+        expect(
+          result.find((m) => m.name === "Primary Org Model"),
+        ).toBeDefined();
         expect(result.find((m) => m.id === modelId1)).toBeUndefined();
       });
     });
 
-    test("validates organizational access with exists() subqueries", async ({ workerDb }) => {
+    test("validates organizational access with exists() subqueries", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Create primary organization and user
         const primaryOrgId = generateTestId("primary-org");
@@ -938,7 +959,11 @@ describe("modelCoreRouter Integration Tests", () => {
         ]);
 
         // Create secondary org context
-        const secondaryContext = createTestContext(db, secondaryOrgId, secondaryUserId);
+        const secondaryContext = createTestContext(
+          db,
+          secondaryOrgId,
+          secondaryUserId,
+        );
         const secondaryCaller = modelCoreRouter.createCaller(secondaryContext);
 
         const modelId = generateId();
@@ -1093,7 +1118,9 @@ describe("modelCoreRouter Integration Tests", () => {
   });
 
   describe("complex relational queries", () => {
-    test("handles models with complex machine relationships", async ({ workerDb }) => {
+    test("handles models with complex machine relationships", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Create test organization and user
         const organizationId = generateTestId("org");

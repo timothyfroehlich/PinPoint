@@ -31,9 +31,14 @@ import { generateTestId } from "~/test/helpers/test-id-generator";
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
 
 // Mock external dependencies that aren't database-related
-vi.mock("~/lib/utils/id-generation", () => ({
-  generateId: vi.fn(() => generateTestId("test-comment-id")),
-}));
+vi.mock("~/lib/utils/id-generation", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("~/lib/utils/id-generation")>();
+  return {
+    ...actual,
+    generateId: vi.fn(() => generateTestId("test-comment-id")),
+    generatePrefixedId: vi.fn((prefix: string) => generateTestId(`test-${prefix}-id`)),
+  };
+});
 
 vi.mock("~/server/auth/permissions", () => ({
   getUserPermissionsForSession: vi
@@ -74,7 +79,6 @@ describe("Comment Router Integration (PGlite)", () => {
 
     if (!machineId) {
       // Create a model first (required for machine)
-      const orgId = generateTestId("test-org");
 
       const modelData = {
         id: generateTestId("test-model"),
@@ -132,7 +136,6 @@ describe("Comment Router Integration (PGlite)", () => {
       let statusId = testData.status;
 
       if (!priorityId) {
-        const orgId = generateTestId("test-org");
 
         const priorityData = {
           id: generateTestId("test-priority"),
@@ -151,7 +154,6 @@ describe("Comment Router Integration (PGlite)", () => {
       }
 
       if (!statusId) {
-        const orgId = generateTestId("test-org");
 
         const statusData = {
           id: generateTestId("test-status"),
@@ -170,7 +172,6 @@ describe("Comment Router Integration (PGlite)", () => {
       }
 
       // Create an issue
-      const orgId = generateTestId("test-org");
 
       const issueData = {
         id: generateTestId("test-issue"),
@@ -208,6 +209,7 @@ describe("Comment Router Integration (PGlite)", () => {
       .values({
         id: uniqueCommentId,
         content: "Test comment content",
+        organizationId,
         issueId: issueId,
         authorId: testData.user,
         createdAt: new Date(),
@@ -290,7 +292,6 @@ describe("Comment Router Integration (PGlite)", () => {
         );
 
         // Generate unique IDs for this test to avoid conflicts
-        const orgId = generateTestId("test-org");
         const comment2Id = generateTestId("comment-2");
         const comment3Id = generateTestId("comment-3-deleted");
 
@@ -299,6 +300,7 @@ describe("Comment Router Integration (PGlite)", () => {
           {
             id: comment2Id,
             content: "Second test comment",
+            organizationId,
             issueId: testData.issue,
             authorId: testData.user,
             createdAt: new Date("2024-01-02"),
@@ -307,6 +309,7 @@ describe("Comment Router Integration (PGlite)", () => {
           {
             id: comment3Id,
             content: "Deleted comment",
+            organizationId,
             issueId: testData.issue,
             authorId: testData.user,
             deletedAt: new Date(), // Soft deleted
@@ -377,7 +380,6 @@ describe("Comment Router Integration (PGlite)", () => {
         );
 
         // Generate unique IDs for this test to avoid conflicts
-        const orgId = generateTestId("test-org");
         const comment2Id = generateTestId("comment-2");
 
         // Create additional test comments for comprehensive testing
@@ -385,6 +387,7 @@ describe("Comment Router Integration (PGlite)", () => {
           {
             id: comment2Id,
             content: "Second test comment",
+            organizationId,
             issueId: testData.issue,
             authorId: testData.user,
             createdAt: new Date("2024-01-02"),
@@ -414,7 +417,6 @@ describe("Comment Router Integration (PGlite)", () => {
         );
 
         // Generate unique IDs for this test to avoid conflicts
-        const orgId = generateTestId("test-org");
         const comment2Id = generateTestId("comment-2");
 
         // Create additional test comments for comprehensive testing
@@ -422,6 +424,7 @@ describe("Comment Router Integration (PGlite)", () => {
           {
             id: comment2Id,
             content: "Second test comment",
+            organizationId,
             issueId: testData.issue,
             authorId: testData.user,
             createdAt: new Date("2024-01-02"),
@@ -473,6 +476,7 @@ describe("Comment Router Integration (PGlite)", () => {
         await db.insert(schema.comments).values({
           id: otherCommentId,
           content: "Other org comment",
+          organizationId: otherOrgId,
           issueId: otherIssueId,
           authorId: testData.user,
           createdAt: new Date(),
@@ -565,7 +569,6 @@ describe("Comment Router Integration (PGlite)", () => {
         );
 
         // Generate unique IDs for this test to avoid conflicts
-        const orgId = generateTestId("test-org");
 
         // Create comment in different organization (reuse setup from previous test)
         const otherOrgId = generateTestId("other-org-forbidden");
@@ -611,6 +614,7 @@ describe("Comment Router Integration (PGlite)", () => {
         await db.insert(schema.comments).values({
           id: otherCommentId,
           content: "Other org comment",
+          organizationId: otherOrgId,
           issueId: otherIssueId,
           authorId: testData.user,
           createdAt: new Date(),
@@ -636,7 +640,6 @@ describe("Comment Router Integration (PGlite)", () => {
         );
 
         // Generate unique IDs for this test to avoid conflicts
-        const orgId = generateTestId("test-org");
         const deletedComment1Id = generateTestId("deleted-comment-1");
         const deletedComment2Id = generateTestId("deleted-comment-2");
 
@@ -645,6 +648,7 @@ describe("Comment Router Integration (PGlite)", () => {
           {
             id: deletedComment1Id,
             content: "First deleted comment",
+            organizationId,
             issueId: testData.issue,
             authorId: testData.user,
             deletedAt: new Date("2024-01-01"),
@@ -655,6 +659,7 @@ describe("Comment Router Integration (PGlite)", () => {
           {
             id: deletedComment2Id,
             content: "Second deleted comment",
+            organizationId,
             issueId: testData.issue,
             authorId: testData.user,
             deletedAt: new Date("2024-01-02"),
@@ -695,7 +700,6 @@ describe("Comment Router Integration (PGlite)", () => {
         );
 
         // Generate unique IDs for this test to avoid conflicts
-        const orgId = generateTestId("test-org");
         const deletedComment1Id = generateTestId("deleted-comment-1");
         const deletedComment2Id = generateTestId("deleted-comment-2");
 
@@ -704,6 +708,7 @@ describe("Comment Router Integration (PGlite)", () => {
           {
             id: deletedComment1Id,
             content: "First deleted comment",
+            organizationId,
             issueId: testData.issue,
             authorId: testData.user,
             deletedAt: new Date("2024-01-01"),
@@ -714,6 +719,7 @@ describe("Comment Router Integration (PGlite)", () => {
           {
             id: deletedComment2Id,
             content: "Second deleted comment",
+            organizationId,
             issueId: testData.issue,
             authorId: testData.user,
             deletedAt: new Date("2024-01-02"),
@@ -767,6 +773,7 @@ describe("Comment Router Integration (PGlite)", () => {
         await db.insert(schema.comments).values({
           id: otherDeletedCommentId,
           content: "Other org deleted comment",
+          organizationId: otherOrgId,
           issueId: otherIssueId,
           authorId: testData.user,
           deletedAt: new Date(),
@@ -798,13 +805,13 @@ describe("Comment Router Integration (PGlite)", () => {
         );
 
         // Generate unique IDs for this test to avoid conflicts
-        const orgId = generateTestId("test-org");
         const restoreCommentId = generateTestId("restore-comment");
 
         // Create deleted comment for restoration testing
         await db.insert(schema.comments).values({
           id: restoreCommentId,
           content: "Comment to restore",
+          organizationId,
           issueId: testData.issue,
           authorId: testData.user,
           deletedAt: new Date(),
@@ -860,7 +867,6 @@ describe("Comment Router Integration (PGlite)", () => {
         recentDate.setDate(recentDate.getDate() - 30); // 30 days ago (way < 90 day threshold)
 
         // Generate unique IDs for this test to avoid conflicts
-        const orgId = generateTestId("test-org");
         const oldDeleted1Id = generateTestId("old-deleted-1");
         const oldDeleted2Id = generateTestId("old-deleted-2");
         const recentDeletedId = generateTestId("recent-deleted");
@@ -869,6 +875,7 @@ describe("Comment Router Integration (PGlite)", () => {
           {
             id: oldDeleted1Id,
             content: "Old deleted comment 1",
+            organizationId,
             issueId: testData.issue,
             authorId: testData.user,
             deletedAt: oldDate,
@@ -879,6 +886,7 @@ describe("Comment Router Integration (PGlite)", () => {
           {
             id: oldDeleted2Id,
             content: "Old deleted comment 2",
+            organizationId,
             issueId: testData.issue,
             authorId: testData.user,
             deletedAt: oldDate,
@@ -889,6 +897,7 @@ describe("Comment Router Integration (PGlite)", () => {
           {
             id: recentDeletedId,
             content: "Recent deleted comment",
+            organizationId,
             issueId: testData.issue,
             authorId: testData.user,
             deletedAt: recentDate,
@@ -920,7 +929,6 @@ describe("Comment Router Integration (PGlite)", () => {
         );
 
         // Generate unique IDs for this test to avoid conflicts
-        const orgId = generateTestId("test-org");
         const concurrent1Id = generateTestId("concurrent-1");
         const concurrent2Id = generateTestId("concurrent-2");
 
@@ -929,6 +937,7 @@ describe("Comment Router Integration (PGlite)", () => {
           {
             id: concurrent1Id,
             content: "Concurrent comment 1",
+            organizationId,
             issueId: testData.issue,
             authorId: testData.user,
             createdAt: new Date(),
@@ -937,6 +946,7 @@ describe("Comment Router Integration (PGlite)", () => {
           {
             id: concurrent2Id,
             content: "Concurrent comment 2",
+            organizationId,
             issueId: testData.issue,
             authorId: testData.user,
             createdAt: new Date(),

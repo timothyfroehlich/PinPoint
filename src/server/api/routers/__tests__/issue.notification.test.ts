@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
+
 import { NotificationType } from "~/server/db/schema";
 // Mock NextAuth first to avoid import issues
 vi.mock("next-auth", () => ({

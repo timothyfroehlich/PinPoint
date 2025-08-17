@@ -13,7 +13,6 @@ import type { DrizzleClient } from "~/server/db/drizzle";
 
 import { transformPinballMapMachineToModel } from "~/lib/external/pinballmapTransformer";
 import { logger } from "~/lib/logger";
-
 // Drizzle ORM imports
 import {
   machines,
@@ -123,7 +122,7 @@ export class PinballMapService {
     }
 
     // Get the PinballMap config - array access since schema defines it as many relationship
-    const pinballMapConfig = location.organization.pinballMapConfig?.[0];
+    const pinballMapConfig = location.organization.pinballMapConfig[0];
     if (!pinballMapConfig?.apiEnabled) {
       return {
         success: false,
@@ -234,12 +233,12 @@ export class PinballMapService {
         } else {
           // Create new machine
           await this.db.insert(machines).values({
-            id: `machine_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            id: `machine_${Date.now().toString()}_${Math.random().toString(36).substring(2, 11)}`,
             name: model.name, // Use model name as default instance name
             organizationId,
             locationId,
             modelId: model.id,
-            qrCodeId: `qr_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            qrCodeId: `qr_${Date.now().toString()}_${Math.random().toString(36).substring(2, 11)}`,
             // ownerId will be null initially
           });
           added++;
@@ -328,7 +327,7 @@ export class PinballMapService {
       const [newModel] = await this.db
         .insert(models)
         .values({
-          id: `model_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          id: `model_${Date.now().toString()}_${Math.random().toString(36).substring(2, 11)}`,
           ...modelData,
         })
         .returning({
@@ -452,12 +451,12 @@ export async function processFixtureData(
       if (model) {
         // Create machine instance
         await db.insert(machines).values({
-          id: `machine_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          id: `machine_${Date.now().toString()}_${Math.random().toString(36).substring(2, 11)}`,
           name: model.name, // Use model name as default instance name
           organizationId,
           modelId: model.id,
           locationId,
-          qrCodeId: `qr_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          qrCodeId: `qr_${Date.now().toString()}_${Math.random().toString(36).substring(2, 11)}`,
         });
         created++;
       }

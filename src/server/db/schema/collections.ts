@@ -35,7 +35,7 @@ export const notificationEntityEnum = pgEnum("NotificationEntity", [
 // =================================
 
 export const collections = pgTable(
-  "Collection",
+  "collections",
   {
     id: text("id").primaryKey(),
     name: text("name").notNull(), // e.g., "Front Room", "Bally", "1980s"
@@ -60,7 +60,7 @@ export const collections = pgTable(
 // locationId is nullable for organization-wide collections
 
 export const collectionTypes = pgTable(
-  "CollectionType",
+  "collectionTypes",
   {
     id: text("id").primaryKey(),
     name: text("name").notNull(), // e.g., "Rooms", "Manufacturer", "Era", "Genre"
@@ -87,7 +87,7 @@ export const collectionTypes = pgTable(
 );
 
 export const notifications = pgTable(
-  "Notification",
+  "notifications",
   {
     id: text("id").primaryKey(),
     message: text("message").notNull(),
@@ -128,7 +128,7 @@ export const collectionMachines = pgTable(
 );
 
 export const pinballMapConfigs = pgTable(
-  "PinballMapConfig",
+  "pinballMapConfigs",
   {
     id: text("id").primaryKey(),
     organizationId: text("organizationId").unique().notNull(),

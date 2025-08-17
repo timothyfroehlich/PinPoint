@@ -1,7 +1,8 @@
 import { eq, and, isNull } from "drizzle-orm";
 
 import { type DrizzleClient } from "../db/drizzle";
-import { issueHistory, comments, activityTypeEnum } from "../db/schema";
+import type { activityTypeEnum } from "../db/schema";
+import { issueHistory, comments } from "../db/schema";
 
 import { generatePrefixedId } from "~/lib/utils/id-generation";
 

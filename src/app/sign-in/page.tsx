@@ -19,7 +19,7 @@ import { useAuth } from "~/app/auth-provider";
 import { authenticateDevUser, getAuthResultMessage } from "~/lib/auth/dev-auth";
 import { isDevAuthAvailable } from "~/lib/environment-client";
 import { createClient } from "~/lib/supabase/client";
-import { users, roles } from "~/server/db/schema";
+import type { users, roles } from "~/server/db/schema";
 
 type User = InferSelectModel<typeof users>;
 type Role = InferSelectModel<typeof roles>;

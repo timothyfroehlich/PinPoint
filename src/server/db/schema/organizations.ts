@@ -5,7 +5,7 @@ import { pgTable, text, timestamp, boolean, index } from "drizzle-orm/pg-core";
 // =================================
 
 export const organizations = pgTable(
-  "Organization",
+  "organizations",
   {
     id: text("id").primaryKey(),
     name: text("name").notNull(),
@@ -21,7 +21,7 @@ export const organizations = pgTable(
 );
 
 export const memberships = pgTable(
-  "Membership",
+  "memberships",
   {
     id: text("id").primaryKey(),
     userId: text("userId").notNull(),
@@ -40,7 +40,7 @@ export const memberships = pgTable(
 
 // Models for V1.0 Configurable RBAC
 export const roles = pgTable(
-  "Role",
+  "roles",
   {
     id: text("id").primaryKey(),
     name: text("name").notNull(), // e.g., "Admin", "Technician", "Manager"
@@ -53,7 +53,7 @@ export const roles = pgTable(
   (table) => [index("Role_organizationId_idx").on(table.organizationId)],
 );
 
-export const permissions = pgTable("Permission", {
+export const permissions = pgTable("permissions", {
   id: text("id").primaryKey(),
   name: text("name").unique().notNull(), // e.g., "issue:create", "machine:delete", "role:manage"
   description: text("description"), // Human-readable description of the permission
@@ -61,7 +61,7 @@ export const permissions = pgTable("Permission", {
 
 // Junction table for Role-Permission many-to-many relationship (exact Prisma parity)
 export const rolePermissions = pgTable(
-  "_RolePermissions",
+  "rolePermissions",
   {
     roleId: text("A")
       .notNull()

@@ -219,7 +219,7 @@ describe("Location Router CRUD Operations (PGlite)", () => {
         const { caller, context } = await createTestContext(db);
 
         // Create location in test org
-        const result = await caller.create({ name: "Org1 Location" });
+        const _result = await caller.create({ name: "Org1 Location" });
 
         // Try to query from different organization context
         const otherOrgContext = {

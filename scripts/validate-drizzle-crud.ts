@@ -80,7 +80,7 @@ class DrizzleCRUDValidator {
       );
 
       console.log("\n💡 Connection troubleshooting:");
-      console.log("   - Check if Supabase is running: npm run dev:bg:status");
+      console.log("   - Check if Supabase is running: supabase status");
       console.log("   - Verify DATABASE_URL in your environment");
       console.log(
         `   - Connection string: ${(() => {

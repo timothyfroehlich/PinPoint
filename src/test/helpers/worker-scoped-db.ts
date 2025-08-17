@@ -122,15 +122,17 @@ export async function withIsolatedTest<T>(
       // This ensures the transaction is always rolled back, regardless of test outcome
       const rollbackMarker: TestRollback = {
         [ROLLBACK_SYMBOL]: true,
-        result: testResult!,
+        result: testResult!, // eslint-disable-line @typescript-eslint/no-non-null-assertion
       };
 
       // If test failed, we need to preserve the original error
       if (testError) {
         // Attach test error to rollback marker for proper error handling
-        (rollbackMarker as any).testError = testError;
+        (rollbackMarker as TestRollback & { testError: unknown }).testError =
+          testError;
       }
 
+      // eslint-disable-next-line @typescript-eslint/only-throw-error
       throw rollbackMarker;
     })
     .catch((thrownValue: unknown) => {
@@ -144,7 +146,9 @@ export async function withIsolatedTest<T>(
 
         // If the test itself threw an error, re-throw it with proper stack trace
         if (rollback.testError) {
-          throw rollback.testError;
+          throw rollback.testError instanceof Error
+            ? rollback.testError
+            : new Error(String(rollback.testError)); // eslint-disable-line @typescript-eslint/no-base-to-string
         }
 
         // Return the successful test result
@@ -177,6 +181,7 @@ export async function withExplicitRollback<T>(
 
       // Explicitly rollback the transaction
       // Note: tx.rollback() throws an error that triggers rollback
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (tx as any).rollback?.();
 
       // This line should not be reached if rollback() works correctly
@@ -211,7 +216,8 @@ export async function withExplicitRollback<T>(
  * This is a simple approach for the memory optimization demo
  * (Currently unused but kept for potential future use)
  */
-async function cleanupAllTestData(db: TestDatabase): Promise<void> {
+// eslint-disable-next-line @typescript-eslint/require-await
+async function cleanupAllTestData(_db: TestDatabase): Promise<void> {
   try {
     // Note: This function is not currently used since worker-scoped databases
     // provide sufficient isolation. Kept for potential future cleanup needs.

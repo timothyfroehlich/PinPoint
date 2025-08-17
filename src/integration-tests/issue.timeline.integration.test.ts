@@ -227,6 +227,7 @@ describe("Issue Timeline Router Integration (PGlite)", () => {
           {
             id: "test-comment-1",
             content: "First comment on the issue",
+            organizationId: testData.organization,
             issueId: testData.issue,
             authorId: testData.user,
             createdAt: new Date("2024-01-01T10:00:00Z"),
@@ -235,6 +236,7 @@ describe("Issue Timeline Router Integration (PGlite)", () => {
           {
             id: "test-comment-2",
             content: "Second comment for discussion",
+            organizationId: testData.organization,
             issueId: testData.issue,
             authorId: testData.user,
             createdAt: new Date("2024-01-02T14:30:00Z"),
@@ -411,6 +413,7 @@ describe("Issue Timeline Router Integration (PGlite)", () => {
         await db.insert(schema.comments).values({
           id: "other-org-comment",
           content: "Comment in other org",
+          organizationId: otherOrgId,
           issueId: otherOrgIssue.id,
           authorId: testData.user,
           createdAt: new Date(),
@@ -453,6 +456,7 @@ describe("Issue Timeline Router Integration (PGlite)", () => {
           {
             id: "comment-only-1",
             content: "First comment only",
+            organizationId: testData.organization,
             issueId: commentsOnlyIssue.id,
             authorId: testData.user,
             createdAt: new Date("2024-01-01"),
@@ -461,6 +465,7 @@ describe("Issue Timeline Router Integration (PGlite)", () => {
           {
             id: "comment-only-2",
             content: "Second comment only",
+            organizationId: testData.organization,
             issueId: commentsOnlyIssue.id,
             authorId: testData.user,
             createdAt: new Date("2024-01-02"),
@@ -578,6 +583,7 @@ describe("Issue Timeline Router Integration (PGlite)", () => {
           {
             id: "mixed-comment-1",
             content: "First comment",
+            organizationId: testData.organization,
             issueId: mixedTimelineIssue.id,
             authorId: testData.user,
             createdAt: new Date("2024-01-01T09:00:00Z"), // First
@@ -586,6 +592,7 @@ describe("Issue Timeline Router Integration (PGlite)", () => {
           {
             id: "mixed-comment-2",
             content: "Third item chronologically",
+            organizationId: testData.organization,
             issueId: mixedTimelineIssue.id,
             authorId: testData.user,
             createdAt: new Date("2024-01-01T15:00:00Z"), // Third

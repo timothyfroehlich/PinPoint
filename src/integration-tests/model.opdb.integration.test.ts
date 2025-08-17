@@ -22,12 +22,12 @@ import { eq } from "drizzle-orm";
 import { describe, expect, vi } from "vitest";
 
 import type { TRPCContext } from "~/server/api/trpc.base";
+import type { TestDatabase } from "~/test/helpers/pglite-test-setup";
 
 import { modelOpdbRouter } from "~/server/api/routers/model.opdb";
 import * as schema from "~/server/db/schema";
 import { generateTestId } from "~/test/helpers/test-id-generator";
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
-import type { TestDatabase } from "~/test/helpers/pglite-test-setup";
 
 // Mock external dependencies
 let idCounter = 0;
@@ -64,7 +64,7 @@ describe("modelOpdbRouter Integration Tests", () => {
     // Reset mock counter and clear mocks
     vi.clearAllMocks();
     idCounter = 0;
-    
+
     // Create test organization and user
     const organizationId = generateTestId("org");
     const userId = generateTestId("user");
@@ -171,7 +171,9 @@ describe("modelOpdbRouter Integration Tests", () => {
         const result = await caller.searchOPDB({ query: "medieval" });
 
         expect(result).toEqual(mockResults);
-        expect(mocks.opdbClient.searchMachines).toHaveBeenCalledWith("medieval");
+        expect(mocks.opdbClient.searchMachines).toHaveBeenCalledWith(
+          "medieval",
+        );
       });
     });
 
@@ -199,7 +201,9 @@ describe("modelOpdbRouter Integration Tests", () => {
       playfield_image: "https://opdb.org/images/mm.jpg",
     };
 
-    test("creates new model from OPDB data with real database operations", async ({ workerDb }) => {
+    test("creates new model from OPDB data with real database operations", async ({
+      workerDb,
+    }) => {
       const generatedId = `test-model-${Date.now()}`;
       mocks.generateId.mockReturnValue(generatedId);
       mocks.opdbClient.getMachineById.mockResolvedValue(mockOPDBData);
@@ -230,7 +234,9 @@ describe("modelOpdbRouter Integration Tests", () => {
       expect(createdModel?.opdbId).toBe("opdb-123");
     });
 
-    test("throws CONFLICT when model with same OPDB ID already exists", async ({ workerDb }) => {
+    test("throws CONFLICT when model with same OPDB ID already exists", async ({
+      workerDb,
+    }) => {
       // Create existing model with OPDB ID
       const existingModelId = mocks.generateId();
       mocks.generateId.mockReturnValue(existingModelId);
@@ -257,7 +263,9 @@ describe("modelOpdbRouter Integration Tests", () => {
       expect(mocks.opdbClient.getMachineById).not.toHaveBeenCalled();
     });
 
-    test("throws NOT_FOUND when OPDB game doesn't exist", async ({ workerDb }) => {
+    test("throws NOT_FOUND when OPDB game doesn't exist", async ({
+      workerDb,
+    }) => {
       mocks.opdbClient.getMachineById.mockResolvedValue(null);
 
       await expect(
@@ -270,7 +278,9 @@ describe("modelOpdbRouter Integration Tests", () => {
       );
     });
 
-    test("handles partial OPDB data with proper defaults", async ({ workerDb }) => {
+    test("handles partial OPDB data with proper defaults", async ({
+      workerDb,
+    }) => {
       const partialData = {
         name: "Partial Game",
         manufacturer: null,
@@ -307,7 +317,9 @@ describe("modelOpdbRouter Integration Tests", () => {
       expect(createdModel?.year).toBeNull();
     });
 
-    test("creates globally available models (not organization-scoped)", async ({ workerDb }) => {
+    test("creates globally available models (not organization-scoped)", async ({
+      workerDb,
+    }) => {
       const generatedId = `test-global-${Date.now()}`;
       mocks.generateId.mockReturnValue(generatedId);
       mocks.opdbClient.getMachineById.mockResolvedValue(mockOPDBData);
@@ -347,10 +359,12 @@ describe("modelOpdbRouter Integration Tests", () => {
   });
 
   describe("syncWithOPDB", () => {
-    test("syncs models with real database operations and deduplication", async ({ workerDb }) => {
+    test("syncs models with real database operations and deduplication", async ({
+      workerDb,
+    }) => {
       // Get baseline count of existing OPDB models in the seeded database
       const baselineResult = await caller.syncWithOPDB();
-      const baselineCount = baselineResult.total;
+      const baselineCount = Number(baselineResult.total);
 
       // Create test models with specific OPDB IDs
       const modelId1 = mocks.generateId();
@@ -489,7 +503,9 @@ describe("modelOpdbRouter Integration Tests", () => {
       expect(updatedModel2?.updatedAt).toBeDefined();
     });
 
-    test("returns appropriate message when OPDB sync fails", async ({ workerDb }) => {
+    test("returns appropriate message when OPDB sync fails", async ({
+      workerDb,
+    }) => {
       // The seeded database has existing models with OPDB IDs
       // This test verifies what happens when OPDB API calls fail
 
@@ -509,7 +525,9 @@ describe("modelOpdbRouter Integration Tests", () => {
       expect(mocks.opdbClient.getMachineById).toHaveBeenCalled();
     });
 
-    test("filters out custom models with custom- prefix", async ({ workerDb }) => {
+    test("filters out custom models with custom- prefix", async ({
+      workerDb,
+    }) => {
       // This test verifies that models with "custom-" prefix OPDB IDs are filtered out
       // But since the seeded data contains other valid OPDB models, we expect those to be found
 
@@ -598,7 +616,7 @@ describe("modelOpdbRouter Integration Tests", () => {
     test("only syncs models in current organization", async ({ workerDb }) => {
       // Get existing count for the primary organization
       const existingResult = await caller.syncWithOPDB();
-      const existingCount = existingResult.total;
+      const existingCount = Number(existingResult.total);
 
       const primaryModelId = mocks.generateId();
       const secondaryModelId = mocks.generateId();
@@ -672,10 +690,12 @@ describe("modelOpdbRouter Integration Tests", () => {
       );
     });
 
-    test("deduplicates models correctly with Map-based logic", async ({ workerDb }) => {
+    test("deduplicates models correctly with Map-based logic", async ({
+      workerDb,
+    }) => {
       // Get existing count first
       const existingResult = await caller.syncWithOPDB();
-      const existingCount = existingResult.total;
+      const existingCount = Number(existingResult.total);
 
       const modelId = mocks.generateId();
       const machineId1 = mocks.generateId();
@@ -748,7 +768,9 @@ describe("modelOpdbRouter Integration Tests", () => {
   });
 
   describe("data integrity", () => {
-    test("maintains referential integrity during model creation", async ({ workerDb }) => {
+    test("maintains referential integrity during model creation", async ({
+      workerDb,
+    }) => {
       const generatedId = `test-integrity-${Date.now()}`;
       mocks.generateId.mockReturnValue(generatedId);
       mocks.opdbClient.getMachineById.mockResolvedValue({
@@ -790,7 +812,9 @@ describe("modelOpdbRouter Integration Tests", () => {
       expect(createdMachine?.model?.name).toBe("Integrity Test Game");
     });
 
-    test("maintains data consistency during sync operations", async ({ workerDb }) => {
+    test("maintains data consistency during sync operations", async ({
+      workerDb,
+    }) => {
       const modelId = mocks.generateId();
       const machineId = mocks.generateId();
 
@@ -857,7 +881,9 @@ describe("modelOpdbRouter Integration Tests", () => {
   });
 
   describe("error scenarios", () => {
-    test("handles database constraint violations gracefully", async ({ workerDb }) => {
+    test("handles database constraint violations gracefully", async ({
+      workerDb,
+    }) => {
       // Create model with specific OPDB ID
       const existingId = mocks.generateId();
       mocks.generateId.mockReturnValue(existingId);
@@ -889,7 +915,7 @@ describe("modelOpdbRouter Integration Tests", () => {
     test("handles concurrent sync operations safely", async ({ workerDb }) => {
       // Get existing model count
       const existingResult = await caller.syncWithOPDB();
-      const existingTotal = existingResult.total;
+      const existingTotal = Number(existingResult.total);
 
       const modelId = mocks.generateId();
       const machineId = mocks.generateId();

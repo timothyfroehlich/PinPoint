@@ -1,5 +1,5 @@
 import { eq, and } from "drizzle-orm";
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, vi } from "vitest";
 
 import { generateId } from "~/lib/utils/id-generation";
 import { appRouter } from "~/server/api/root";
@@ -130,7 +130,7 @@ describe("Issue Router Integration Tests (PGlite)", () => {
   let testOrgId: string;
   let seededData: Awaited<ReturnType<typeof getSeededTestData>>;
 
-  beforeEach.skip(async () => {
+  beforeAll(async () => {
     // Use existing seeded test database infrastructure
     const { db, organizationId } = await createSeededTestDatabase();
     testDb = db;

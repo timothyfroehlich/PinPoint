@@ -19,7 +19,6 @@
  */
 
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
-/* eslint-disable import/order */
 
 import { eq, and } from "drizzle-orm";
 import { describe, expect, vi } from "vitest";
@@ -118,10 +117,7 @@ describe("Role Router Integration Tests (PGlite)", () => {
       organizationId,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { context } = await createTestContext(
-          db,
-          organizationId,
-        );
+        const { context } = await createTestContext(db, organizationId);
         const caller = roleRouter.createCaller(context);
 
         const result = await caller.list();

@@ -650,7 +650,8 @@ Total operations: 47
 
 ```bash
 # Development startup validation
-npm run dev:bg          # Start dev server
+supabase start          # Start database
+npm run dev             # Start dev server
 npm run db:validate:minimal  # Quick check database is working
 
 # Pre-commit validation

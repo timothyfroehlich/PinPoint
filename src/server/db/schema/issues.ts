@@ -38,7 +38,7 @@ export const activityTypeEnum = pgEnum("ActivityType", [
 // =================================
 
 export const issues = pgTable(
-  "Issue",
+  "issues",
   {
     id: text("id").primaryKey(),
     title: text("title").notNull(),
@@ -78,7 +78,7 @@ export const issues = pgTable(
 );
 
 export const priorities = pgTable(
-  "Priority",
+  "priorities",
   {
     id: text("id").primaryKey(),
     name: text("name").notNull(), // e.g., "Low", "Medium", "High"
@@ -90,7 +90,7 @@ export const priorities = pgTable(
 );
 
 export const issueStatuses = pgTable(
-  "IssueStatus",
+  "issueStatuses",
   {
     id: text("id").primaryKey(),
     name: text("name").notNull(), // e.g., "Reported", "Diagnosing", "Awaiting Parts", "Fixed"
@@ -102,7 +102,7 @@ export const issueStatuses = pgTable(
 );
 
 export const comments = pgTable(
-  "Comment",
+  "comments",
   {
     id: text("id").primaryKey(),
     content: text("content").notNull(),
@@ -114,18 +114,20 @@ export const comments = pgTable(
     deletedBy: text("deletedBy"), // Who deleted the comment (for audit trail)
 
     // Relations
+    organizationId: text("organizationId").notNull(),
     issueId: text("issueId").notNull(),
     authorId: text("authorId").notNull(),
   },
   (table) => [
-    // Comments: issue-specific lookups
-    index("Comment_issueId_idx").on(table.issueId),
-    index("Comment_authorId_idx").on(table.authorId),
+    // Comments: multi-tenancy and lookups
+    index("comments_organizationId_idx").on(table.organizationId),
+    index("comments_issueId_idx").on(table.issueId),
+    index("comments_authorId_idx").on(table.authorId),
   ],
 );
 
 export const attachments = pgTable(
-  "Attachment",
+  "attachments",
   {
     id: text("id").primaryKey(),
     url: text("url").notNull(),
@@ -146,7 +148,7 @@ export const attachments = pgTable(
 );
 
 export const issueHistory = pgTable(
-  "IssueHistory",
+  "issueHistory",
   {
     id: text("id").primaryKey(),
     field: text("field").notNull(), // e.g., "status", "assignee", "priority"
@@ -170,7 +172,7 @@ export const issueHistory = pgTable(
 );
 
 export const upvotes = pgTable(
-  "Upvote",
+  "upvotes",
   {
     id: text("id").primaryKey(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),

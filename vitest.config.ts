@@ -37,7 +37,6 @@ export default defineConfig({
         "test-results/",
         "*.config.{ts,js}",
         "scripts/",
-        "prisma/",
         ".next/",
         "docs/",
       ],

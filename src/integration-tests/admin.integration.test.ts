@@ -414,7 +414,10 @@ describe("Admin Router Integration (PGlite)", () => {
       user: {
         id: enhancedTestData.user,
         email: `admin-${generateTestId("admin")}@example.com`,
-        user_metadata: { name: "Admin User" },
+        user_metadata: {
+          name: "Admin User",
+          organizationId: enhancedTestData.organization,
+        },
         app_metadata: {
           organization_id: enhancedTestData.organization,
           role: "Admin",

@@ -2,13 +2,11 @@ import { eq, and, count, desc } from "drizzle-orm";
 
 import { generatePrefixedId } from "~/lib/utils/id-generation";
 import { type DrizzleClient } from "~/server/db/drizzle";
-import {
-  notifications,
-  machines,
-  issues,
+import type {
   notificationTypeEnum,
   notificationEntityEnum,
 } from "~/server/db/schema";
+import { notifications, machines, issues } from "~/server/db/schema";
 
 // Define types from Drizzle schema
 type Notification = typeof notifications.$inferSelect;

@@ -13,7 +13,7 @@ import {
 // =================================
 
 export const locations = pgTable(
-  "Location",
+  "locations",
   {
     id: text("id").primaryKey(),
     name: text("name").notNull(),
@@ -47,7 +47,7 @@ export const locations = pgTable(
 );
 
 // Replaces GameTitle
-export const models = pgTable("Model", {
+export const models = pgTable("models", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   manufacturer: text("manufacturer"),
@@ -77,7 +77,7 @@ export const models = pgTable("Model", {
 
 // Replaces GameInstance
 export const machines = pgTable(
-  "Machine",
+  "machines",
   {
     id: text("id").primaryKey(),
     name: text("name").notNull(), // Instance-specific name (e.g., "Medieval Madness #1")

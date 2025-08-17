@@ -455,6 +455,7 @@ describe("Schema Data Integrity", () => {
         const commentId = generateTestId("comment");
         await db.insert(schema.comments).values({
           id: commentId,
+          organizationId,
           issueId: testIssueId,
           authorId: testUser1Id,
           content: "Test comment",

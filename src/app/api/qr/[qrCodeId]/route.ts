@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 
 import { getGlobalDatabaseProvider } from "~/server/db/provider";
 import { ServiceFactory } from "~/server/services/factory";

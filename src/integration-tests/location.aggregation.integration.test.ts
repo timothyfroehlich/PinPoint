@@ -653,7 +653,7 @@ describe("Location Router Aggregation Operations (PGlite)", () => {
       workerDb,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { context, organization, model, user, priority, status } =
+        const { context, _organization, _model, user, _priority, _status } =
           await createTestContext(db);
 
         // Create multiple organizations with overlapping data
@@ -773,7 +773,7 @@ describe("Location Router Aggregation Operations (PGlite)", () => {
       workerDb,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { context, organization, model, user } =
+        const { context, _organization, _model, user } =
           await createTestContext(db);
 
         // Create organizations with different priorities and statuses

@@ -15,7 +15,7 @@ export const notificationFrequencyEnum = pgEnum("NotificationFrequency", [
 // AUTH & USER TABLES
 // =================================
 
-export const users = pgTable("User", {
+export const users = pgTable("users", {
   id: text("id").primaryKey(),
   name: text("name"),
   email: text("email").unique(),
@@ -40,7 +40,7 @@ export const users = pgTable("User", {
     .notNull(),
 });
 
-export const accounts = pgTable("Account", {
+export const accounts = pgTable("accounts", {
   id: text("id").primaryKey(),
   userId: text("userId").notNull(),
   type: text("type").notNull(),
@@ -55,7 +55,7 @@ export const accounts = pgTable("Account", {
   session_state: text("session_state"),
 });
 
-export const sessions = pgTable("Session", {
+export const sessions = pgTable("sessions", {
   id: text("id").primaryKey(),
   sessionToken: text("sessionToken").unique().notNull(),
   userId: text("userId").notNull(),

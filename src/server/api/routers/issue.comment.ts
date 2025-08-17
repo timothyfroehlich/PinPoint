@@ -89,6 +89,7 @@ async function createCommentWithAuthor(
     .values({
       id: generatePrefixedId("comment"),
       content: input.content,
+      organizationId: ctx.organization.id,
       issueId: input.issueId,
       authorId: ctx.user.id,
     })
