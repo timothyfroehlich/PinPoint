@@ -21,7 +21,7 @@ PinPoint is in the final phase of Prisma-to-Drizzle migration - removing the las
 
 - **🚨 TASK EXECUTION**: [`prisma-removal-tasks/`](../prisma-removal-tasks/) - Comprehensive 8-phase cleanup plan
 - **Service Conversion**: Use drizzle-migration agent for service layer files
-- **Testing Updates**: Use test-architect agent for mock and integration test updates  
+- **Testing Updates**: Use test-architect agent for mock and integration test updates
 - **Current Patterns**: [`developer-guides/`](./developer-guides/) - Modern Drizzle + Supabase SSR patterns
 
 ## Documentation Structure
@@ -37,7 +37,6 @@ PinPoint is in the final phase of Prisma-to-Drizzle migration - removing the las
 ### Planning & Process
 
 - [`planning/`](./planning/) - Roadmap, future features, and archived ideas
-- [`migration/`](./migration/) - Active and completed migrations
 - [`orchestrator-system/`](./orchestrator-system/) - Multi-agent development workflow
 
 ### Reference
@@ -62,4 +61,4 @@ PinPoint is in the final phase of Prisma-to-Drizzle migration - removing the las
 3. **Documentation**: Update relevant docs with any pattern changes
 4. **Testing**: Write integration tests with transaction cleanup
 
-For detailed contribution guidelines, see the migration developer guide.
+For detailed contribution guidelines, see the developer guides.
