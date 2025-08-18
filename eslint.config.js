@@ -4,6 +4,10 @@ import tseslint from "typescript-eslint";
 import nextPlugin from "@next/eslint-plugin-next";
 import promisePlugin from "eslint-plugin-promise";
 import unusedImportsPlugin from "eslint-plugin-unused-imports";
+// Phase 0: Modern security and quality plugins
+import vitestPlugin from "@vitest/eslint-plugin";
+import securityPlugin from "eslint-plugin-security";
+import sdlPlugin from "@microsoft/eslint-plugin-sdl";
 import {
   INCLUDE_PATTERNS,
   ESLINT_RULES,
@@ -16,6 +20,7 @@ export default tseslint.config(
   ...tseslint.configs.stylistic,
   ...tseslint.configs.strictTypeChecked,
   ...tseslint.configs.stylisticTypeChecked,
+  
   {
     // Enable type-aware linting with multi-config support
     languageOptions: {
@@ -38,11 +43,50 @@ export default tseslint.config(
       "@next/next": nextPlugin,
       promise: promisePlugin,
       "unused-imports": unusedImportsPlugin,
+      // Phase 0: Modern security and quality plugins  
+      vitest: vitestPlugin,
+      security: securityPlugin,
+      "@microsoft/sdl": sdlPlugin,
     },
     rules: {
       // Existing Next.js rules
       ...nextPlugin.configs.recommended.rules,
       ...nextPlugin.configs["core-web-vitals"].rules,
+
+      // Phase 0: Modern security and quality rules
+      
+      // Security hardening (Phase 0)
+      // Critical security vulnerabilities
+      "security/detect-eval-with-expression": "error",
+      "security/detect-non-literal-require": "error",
+      "security/detect-child-process": "error", 
+      "security/detect-object-injection": "warn", // Many false positives in TypeScript
+      "security/detect-unsafe-regex": "error",
+      "security/detect-possible-timing-attacks": "warn", // Can be noisy in tests
+      
+      // Web security essentials
+      "@microsoft/sdl/no-inner-html": "error",
+      "@microsoft/sdl/no-document-write": "error",
+      "@microsoft/sdl/no-insecure-url": "error", 
+      "@microsoft/sdl/no-postmessage-star-origin": "error",
+      
+      // Test quality (only for test files - will be properly scoped)
+      "vitest/consistent-test-it": "off", // Enable only in test files
+      "vitest/no-disabled-tests": "off",  // Enable only in test files
+      "vitest/no-focused-tests": "off",   // Enable only in test files
+      
+      // Custom Drizzle safety (replaces abandoned plugin)
+      "no-restricted-syntax": [
+        "error",
+        {
+          "selector": "CallExpression[callee.property.name='delete']:not([arguments.0])",
+          "message": "DELETE operations must include WHERE clause"
+        },
+        {
+          "selector": "CallExpression[callee.property.name='update']:not([arguments.0])",
+          "message": "UPDATE operations must include WHERE clause"
+        }
+      ],
 
       // Rule to enforce use of validated env object
       "no-restricted-properties": [
@@ -168,6 +212,9 @@ export default tseslint.config(
   {
     // Override: Test files - relaxed standards for pragmatic testing
     files: convertPatterns.forESLint(INCLUDE_PATTERNS.tests),
+    plugins: {
+      vitest: vitestPlugin,
+    },
     rules: {
       // Use shared rules configuration
       ...ESLINT_RULES.tests,
@@ -182,6 +229,11 @@ export default tseslint.config(
       "@typescript-eslint/unbound-method": "off",
       // Allow dynamic imports in tests (can't use import type)
       "@typescript-eslint/consistent-type-imports": "off",
+      
+      // Phase 0: Test quality rules (enabled for test files)
+      "vitest/consistent-test-it": "error",
+      "vitest/no-disabled-tests": "warn",
+      "vitest/no-focused-tests": "error",
     },
   },
   {

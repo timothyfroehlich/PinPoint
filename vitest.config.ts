@@ -1,3 +1,14 @@
+/**
+ * Vitest Configuration for PinPoint
+ * 
+ * Three-project setup for optimal performance and memory safety:
+ * - node: Unit tests with mocked database (256MB limit)
+ * - integration: Real PGlite database tests (512MB limit)  
+ * - jsdom: React component tests
+ * 
+ * Memory safety: Worker threads isolated, limited parallelism
+ * for PGlite stability. See CONFIG_GUIDE.md for full details.
+ */
 /// <reference types="vitest" />
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";

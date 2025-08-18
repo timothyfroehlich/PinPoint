@@ -35,17 +35,27 @@
 - Parallel validation, complex migration infrastructure, and extensive safety measures are **waste** in this phase
 - Direct conversion approaches are preferred - cleanup issues as they arise
 
-## 🚨 MIGRATION STATUS: FINAL PRISMA REMOVAL PHASE 🚨
+## 🚧 MIGRATION STATUS: ACTIVE EXECUTION - TEMPORARY BREAKAGE EXPECTED 🚧
 
-**CURRENT PHASE**: Complete Prisma removal - router layer 85%+ complete, service layer cleanup in progress
+**CURRENT REALITY**: We're actively executing the migration plan from @migration-plan-v2/ and everything will be messy/broken until completion
 
-**CRITICAL DIRECTIVE FOR ALL AGENTS:**
-- **NO attempts to fix Prisma issues** - Prisma is being completely removed
-- **NO dual-validation schemes** - Direct Drizzle-only implementations  
-- **PURGE all Prisma references** - Remove imports, dependencies, parallel validation code
+**EXPECTED TEMPORARY ISSUES:**
+- **🔥 313 failing tests**: Normal during migration - tests will be fixed in Phase 3
+- **⚠️ Mixed auth patterns**: Transitional state while implementing RLS
+- **🧩 Partial Prisma cleanup**: Being systematically removed following the plan
+- **📚 Multiple migration docs**: Part of planned phases, will be consolidated at end
 
-**Tech Stack**: Drizzle + Supabase SSR + Next.js App Router (August 2025 patterns)  
-**Details**: @docs/latest-updates/quick-reference.md + @prisma-removal-tasks/
+**MIGRATION PROGRESS (Following @migration-plan-v2/):**
+- ✅ **Phase 0**: Configuration audit - COMPLETE
+- ✅ **Phase 1**: Prisma removal - COMPLETE
+- 🔄 **Phase 2**: RLS implementation - ACTIVE/IN PROGRESS
+- ⏳ **Phase 3**: Test architecture - will fix the 313 failing tests
+- ⏳ **Phase 4**: Cleanup & consolidation
+
+**CRITICAL UNDERSTANDING:**
+- The 313 failing tests are **expected** and will remain broken until Phase 3
+- We're following the migration plan, not doing ad-hoc fixes
+- Everything will be messy until we complete the full architectural transformation
 
 ## Claude Memories
 
@@ -160,12 +170,14 @@ Current development patterns (post-migration):
 @docs/quick-reference/api-security-patterns.md
 @docs/quick-reference/typescript-strictest-patterns.md
 
-**Final migration cleanup:**
-@docs/quick-reference/migration-patterns.md - Updated for Drizzle-only patterns
-@docs/migration/supabase-drizzle/quick-reference/prisma-to-drizzle.md - Service conversion reference
-@docs/migration/supabase-drizzle/direct-conversion-plan.md - Final phase status
+**Active migration execution:**
+@migration-plan-v2/ - Current migration plan being executed (temporary mess expected)
+@docs/quick-reference/ - Patterns for implementing current phase work
 
-**Task execution:** 
-@prisma-removal-tasks/ - Comprehensive Prisma removal task list
+**Priority approach:** 
+Execute the migration plan phases systematically - tests will be fixed in Phase 3 as planned
 
 - Don't commit or push with --no-verify unless explicitly told to
+
+- I only develop with Claude Code. All documentation should be designed for an efficient LLM who needs to be reminded of context but doesn't need to be convinced to do things.
+- I don't care about implementation time estimates or splitting work up into days or sessions. I just want to know the scope of changes, what files need to change and by how much

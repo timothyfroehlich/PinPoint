@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type */
 import { trpcMsw } from "./setup";
 
-// Local User type to match application schema (replaces Prisma import)
+// Local User type to match application schema
 interface User {
   id: string;
   email: string;

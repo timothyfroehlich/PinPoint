@@ -52,28 +52,8 @@ describe("modelCoreRouter Integration Tests", () => {
     organizationId: string,
     userId: string,
   ): TRPCContext {
-    // Create mock Prisma client for tRPC middleware compatibility
-    const mockPrismaClient = {
-      membership: {
-        findFirst: vi.fn().mockResolvedValue({
-          id: "test-membership",
-          organizationId,
-          userId,
-          role: {
-            id: generateTestId("admin-role"),
-            name: "Admin",
-            permissions: [
-              { id: "perm1", name: "model:view" },
-              { id: "perm2", name: "organization:manage" },
-            ],
-          },
-        }),
-      },
-    };
-
     const mockContext: TRPCContext = {
-      db: mockPrismaClient as any,
-      drizzle: testDb,
+      db: testDb,
       services: {} as any,
       user: {
         id: userId,

@@ -18,18 +18,16 @@ import {
 import { generatePrefixedId } from "~/lib/utils/id-generation";
 import { ROLE_TEMPLATES } from "~/server/auth/permissions.constants";
 import { roles, memberships } from "~/server/db/schema";
-import { DrizzleRoleService } from "~/server/services/drizzleRoleService";
+import { RoleService } from "~/server/services/roleService";
 
 /**
- * Create role service using Drizzle ORM
- *
- * Uses DrizzleRoleService for all environments as part of Prisma removal.
+ * Create role service
  */
 function createRoleService(
   ctx: TRPCContext,
   organizationId: string,
-): DrizzleRoleService {
-  return new DrizzleRoleService(ctx.db, organizationId);
+): RoleService {
+  return new RoleService(ctx.db, organizationId);
 }
 
 export const roleRouter = createTRPCRouter({

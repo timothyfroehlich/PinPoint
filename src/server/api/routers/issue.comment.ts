@@ -2,7 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
-import { DrizzleCommentService } from "./utils/commentService";
+import { CommentService } from "./utils/commentService";
 import {
   validateCommentDeletion,
   validateCommentRestoration,
@@ -388,7 +388,7 @@ export const issueCommentRouter = createTRPCRouter({
       }
 
       // Soft delete the comment using service
-      const commentService = new DrizzleCommentService(ctx.db);
+      const commentService = new CommentService(ctx.db);
       const deletedComment = await commentService.softDeleteComment(
         input.commentId,
         ctx.user.id,
@@ -470,7 +470,7 @@ export const issueCommentRouter = createTRPCRouter({
       }
 
       // Restore the comment using service
-      const commentService = new DrizzleCommentService(ctx.db);
+      const commentService = new CommentService(ctx.db);
       const restoredComment = await commentService.restoreComment(
         input.commentId,
       );
@@ -498,7 +498,7 @@ export const issueCommentRouter = createTRPCRouter({
       });
     }
 
-    const commentService = new DrizzleCommentService(ctx.db);
+    const commentService = new CommentService(ctx.db);
     return commentService.getDeletedComments(ctx.organization.id);
   }),
 });

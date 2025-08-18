@@ -5,11 +5,11 @@ import type { DrizzleClient } from "~/server/db/drizzle";
 import { comments, issues, users } from "~/server/db/schema";
 
 /**
- * Comment service utilities for Drizzle operations.
- * This provides reusable comment business logic with Drizzle ORM.
+ * Comment service utilities.
+ * This provides reusable comment business logic.
  * TODO: Consolidate with CommentCleanupService for unified comment management.
  */
-export class DrizzleCommentService {
+export class CommentService {
   constructor(private drizzle: DrizzleClient) {}
 
   /**

@@ -777,7 +777,7 @@ describe("Issue Comment Router", () => {
         },
       ];
 
-      // Mock the DrizzleCommentService by mocking the Drizzle operations it uses
+      // Mock the CommentService by mocking the database operations it uses
       // The getDeletedComments procedure creates the service directly, so we mock the underlying DB calls
       const selectQuery = {
         from: vi.fn().mockReturnThis(),

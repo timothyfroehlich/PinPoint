@@ -1,6 +1,6 @@
 // Vitest integration test setup file
 // This setup is for integration tests that use REAL database connections
-// DO NOT mock Prisma or database connections in this file
+// DO NOT mock database connections in this file
 
 import { beforeAll, afterAll, afterEach } from "vitest";
 

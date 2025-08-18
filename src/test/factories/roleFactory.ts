@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type */
-// Local types to replace Prisma imports for testing
+// Local types for testing
 interface Role {
   id: string;
   name: string;

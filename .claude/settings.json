@@ -30,7 +30,6 @@
       "Bash(npx eslint:*)",
       "Bash(npx prettier:*)",
       "Bash(npx tsc:*)",
-      "Bash(npx prisma db seed:*)",
       "Bash(ls:*)",
       "Bash(grep:*)",
       "Bash(gitleaks detect:*)",

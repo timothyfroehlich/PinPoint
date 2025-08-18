@@ -15,6 +15,15 @@ export {
   publicProcedure,
   protectedProcedure,
   organizationProcedure,
+  orgScopedProcedure,
+} from "./trpc.base";
+
+// Re-export types for convenience
+export type {
+  TRPCContext,
+  ProtectedTRPCContext,
+  OrganizationTRPCContext,
+  RLSOrganizationTRPCContext,
 } from "./trpc.base";
 
 export * from "./trpc.permission";

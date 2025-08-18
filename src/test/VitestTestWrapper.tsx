@@ -11,7 +11,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 
-// Local types to replace Prisma imports for testing
+// Local types for testing
 type NotificationFrequency = "IMMEDIATE" | "DAILY" | "WEEKLY";
 
 interface User {

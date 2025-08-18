@@ -106,7 +106,48 @@ _Essential post-training tech stack updates for direct migration_
 🔧 **NEW STANDARD**: `vi.mock` with `vi.importActual` for type safety  
 🏗️ **PATTERN**: `vi.hoisted()` for shared mock variables  
 ⚙️ **CONFIG**: `projects` replaces deprecated `workspace`  
+🛡️ **SECURITY**: Official `@vitest/eslint-plugin` enforces test quality  
 📋 **Integration**: @docs/latest-updates/vitest.md
+
+---
+
+## 🛡️ ESLint 9: Modern Security Configuration
+
+**→ See [@docs/developer-guides/eslint-security-config.md](../developer-guides/eslint-security-config.md) for complete setup**
+
+### **Validated Security Plugin Stack (August 2025)**
+
+**✅ Production-Ready Plugins**:
+- **eslint-plugin-security**: 996K downloads, vulnerability detection
+- **@microsoft/eslint-plugin-sdl**: Microsoft-backed web security rules
+- **@vitest/eslint-plugin**: Official test quality enforcement
+
+**❌ Avoided Tools**:
+- **eslint-plugin-drizzle**: Abandoned (2+ years, only 2 rules)
+- **@ts-safeql/eslint-plugin**: Complex setup, deferred to post-migration
+- **schemalint**: Low adoption (328 downloads), better alternatives exist
+
+### **Security Rule Categories**
+
+```javascript
+// Critical vulnerabilities (6 rules)
+"security/detect-eval-with-expression": "error",
+"security/detect-non-literal-require": "error", 
+"security/detect-child-process": "error",
+
+// Web security (4 rules)
+"@microsoft/sdl/no-inner-html": "error",
+"@microsoft/sdl/no-insecure-url": "error",
+
+// Custom Drizzle safety (better than abandoned plugin)
+"no-restricted-syntax": [...] // UPDATE/DELETE must include WHERE
+```
+
+### **Tool Evaluation Methodology**
+
+**Framework**: LOW/MEDIUM/HIGH risk assessment based on adoption, maintenance, backing  
+**Success**: Avoided 2 problematic tools, validated 4 production-ready tools  
+**Details**: [@docs/developer-guides/tool-evaluation-methodology.md](../developer-guides/tool-evaluation-methodology.md)
 
 ---
 

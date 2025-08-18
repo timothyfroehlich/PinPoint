@@ -1,4 +1,10 @@
 {
+  // Relaxed TypeScript configuration for test files
+  // Allows pragmatic testing patterns that conflict with strict production rules:
+  // - Mock objects with partial interfaces
+  // - Dynamic test data generation
+  // - Framework-specific patterns (Vitest globals)
+  // - any types for complex mock scenarios
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     /* Relaxed settings for pragmatic testing */

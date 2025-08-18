@@ -468,7 +468,7 @@ describe("Router Integration Tests", () => {
           name: "Updated Machine Name",
         }),
       );
-      // Note: No Prisma expectations - this router uses Drizzle exclusively
+      // Note: This router uses Drizzle exclusively
     });
 
     it("should deny machine operations without proper permissions", async () => {
@@ -632,7 +632,7 @@ describe("Router Integration Tests", () => {
           name: "Updated Organization Name",
         }),
       );
-      // Note: No Prisma expectations - this router uses Drizzle exclusively
+      // Note: This router uses Drizzle exclusively
     });
 
     it("should deny organization operations without proper permissions", async () => {
@@ -758,7 +758,7 @@ describe("Router Integration Tests", () => {
           roleId: "role-2",
         }),
       });
-      // Note: No Prisma expectations - this router uses Drizzle exclusively
+      // Note: This router uses Drizzle exclusively
     });
 
     it("should deny user operations without proper permissions", async () => {

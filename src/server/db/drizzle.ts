@@ -91,8 +91,8 @@ export type DrizzleClient = ReturnType<typeof createDrizzleClientInternal>;
  * Controlled singleton pattern for development hot-reload optimization.
  * Avoids global namespace pollution while maintaining connection reuse benefits.
  */
-class DrizzleSingleton {
-  private static instance: DrizzleSingleton | undefined;
+class DatabaseSingleton {
+  private static instance: DatabaseSingleton | undefined;
   private _client: DrizzleClient | null = null;
   private _sql: ReturnType<typeof postgres> | null = null;
 
@@ -100,9 +100,9 @@ class DrizzleSingleton {
     // Private constructor ensures singleton pattern
   }
 
-  static getInstance(): DrizzleSingleton {
-    DrizzleSingleton.instance ??= new DrizzleSingleton();
-    return DrizzleSingleton.instance;
+  static getInstance(): DatabaseSingleton {
+    DatabaseSingleton.instance ??= new DatabaseSingleton();
+    return DatabaseSingleton.instance;
   }
 
   getClient(): DrizzleClient {
@@ -177,7 +177,7 @@ export const createDrizzleClient = (): DrizzleClient => {
   }
 
   // Development: reuse connection across hot reloads to prevent connection exhaustion
-  return DrizzleSingleton.getInstance().getClient();
+  return DatabaseSingleton.getInstance().getClient();
 };
 
 /**
@@ -185,5 +185,5 @@ export const createDrizzleClient = (): DrizzleClient => {
  * Call this when the application is shutting down
  */
 export const closeDrizzleConnection = async (): Promise<void> => {
-  await DrizzleSingleton.getInstance().cleanup();
+  await DatabaseSingleton.getInstance().cleanup();
 };

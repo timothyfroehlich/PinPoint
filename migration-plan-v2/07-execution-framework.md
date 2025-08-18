@@ -3,75 +3,11 @@
 **Purpose**: Operational framework for executing the Prisma removal + RLS implementation migration  
 **Context**: Solo development with 306 failing tests requiring architectural transformation  
 **Prerequisite**: Complete [Migration Setup](./00.5-migration-setup.md) before using this framework  
-**Framework Type**: Daily execution procedures with dependency gate enforcement
+**Framework Type**: Phase execution procedures with dependency gate enforcement
 
 ---
 
-## 1. Daily Execution Procedures
-
-### Morning Startup Sequence (15 minutes)
-
-**Phase Status Validation**:
-
-```bash
-#!/bin/bash
-# scripts/morning-startup.sh
-
-echo "🌅 MORNING MIGRATION STARTUP"
-echo "=============================="
-
-# 1. Dependency Gate Check
-echo "📋 Checking dependency gates..."
-npm run validate-migration-phase
-
-# 2. Current Phase Identification
-CURRENT_PHASE=$(git branch --show-current | grep -o 'phase-[0-9]*')
-echo "📍 Current phase: ${CURRENT_PHASE}"
-
-# 3. Yesterday's Progress Review
-echo "📊 Yesterday's commits:"
-git log --oneline --since="yesterday" --until="today"
-
-# 4. Test Status Baseline
-echo "🧪 Current test baseline:"
-npm run test:brief | tail -5
-
-# 5. Psychological Check-in
-echo "🧠 Psychological state check:"
-echo "   - Feeling pressured to fix tests directly? (Yes/No)"
-echo "   - Committed to current phase work only? (Yes/No)"
-echo "   - Understanding dependency chain importance? (Yes/No)"
-
-echo "✅ Morning startup complete. Ready for focused work."
-```
-
-**Daily Goal Setting**:
-
-```bash
-# Based on current phase
-case $CURRENT_PHASE in
-  "phase-1")
-    echo "🎯 Today's Phase 1 Focus: Prisma removal"
-    echo "   - Target: 2-3 service files converted"
-    echo "   - Quality gate: TypeScript compilation passes"
-    ;;
-  "phase-2")
-    echo "🎯 Today's Phase 2 Focus: RLS implementation"
-    echo "   - Target: Core RLS policies working"
-    echo "   - Quality gate: Session context functional"
-    ;;
-  "phase-3")
-    echo "🎯 Today's Phase 3 Focus: Test methodology"
-    echo "   - Target: Test archetype patterns validated"
-    echo "   - Quality gate: Example conversions successful"
-    ;;
-  "phase-4")
-    echo "🎯 Today's Phase 4 Focus: Systematic test fixes"
-    echo "   - Target: 10-20 tests using new patterns"
-    echo "   - Quality gate: Green test rate improving"
-    ;;
-esac
-```
+## 1. Phase Execution Framework
 
 ### Validation Commands and Quality Gates
 
@@ -221,78 +157,6 @@ EOF
 echo "✅ Metrics saved to ${METRICS_FILE}"
 ```
 
-### Evening Checkpoint and Planning
-
-**Evening Review Protocol**:
-
-```bash
-#!/bin/bash
-# scripts/evening-review.sh
-
-echo "🌙 EVENING MIGRATION REVIEW"
-echo "============================"
-
-# 1. Progress Documentation
-echo "📋 Today's actual progress:"
-git log --oneline --since="today"
-
-# 2. Technical State Assessment
-echo "🔧 Technical state:"
-npm run validate-migration-phase
-
-# 3. Tomorrow's Risk Assessment
-echo "⚠️  Tomorrow's risk factors:"
-PHASE=$(git branch --show-current | grep -o 'phase-[0-9]*')
-
-case $PHASE in
-  "phase-1")
-    echo "   - Risk: Getting distracted by test failures"
-    echo "   - Mitigation: Focus only on service conversion"
-    ;;
-  "phase-2")
-    echo "   - Risk: RLS complexity overwhelming"
-    echo "   - Mitigation: Start with simplest policy"
-    ;;
-  "phase-3")
-    echo "   - Risk: Ad-hoc test fixes instead of patterns"
-    echo "   - Mitigation: Follow archetype templates strictly"
-    ;;
-esac
-
-# 4. Psychological State Check
-echo "🧠 Psychological assessment:"
-echo "   - Frustrated with architectural work? $(read -p '[Yes/No]: ' ANSWER; echo $ANSWER)"
-echo "   - Tempted to fix tests directly? $(read -p '[Yes/No]: ' ANSWER; echo $ANSWER)"
-echo "   - Confident in tomorrow's approach? $(read -p '[Yes/No]: ' ANSWER; echo $ANSWER)"
-
-# 5. Tomorrow's Preparation
-echo "📅 Tomorrow's prepared focus:"
-cat > tomorrow-plan.md << EOF
-# Tomorrow's Migration Focus
-
-## Phase: ${PHASE}
-## Priority: Stay disciplined to current phase only
-
-### Morning Goal:
-- [ ] [Specific technical milestone]
-
-### Afternoon Goal:
-- [ ] [Specific technical milestone]
-
-### Resistance Protocol:
-If feeling urge to fix tests directly:
-1. STOP and take 15-minute break
-2. Read strategic overview rationale
-3. Commit to one more phase-specific task
-4. Celebrate architectural progress
-
-### Success Metric:
-- Technical: [Specific measurable outcome]
-- Psychological: Maintained phase discipline
-EOF
-
-echo "✅ Evening review complete. Ready for tomorrow."
-```
 
 ---
 
@@ -1014,13 +878,6 @@ echo "✅ Phase $PHASE success criteria validation complete"
 echo "⚠️  MIGRATION RISK MONITORING"
 echo "============================"
 
-# Psychological risk indicators
-RECENT_COMMITS=$(git log --oneline --since="24 hours ago" | wc -l)
-if [ $RECENT_COMMITS -eq 0 ]; then
-  echo "🧠 PSYCHOLOGICAL RISK: No progress in 24 hours"
-  echo "   Recommendation: Break current task into smaller pieces"
-fi
-
 # Check for test-fixing during architecture phases
 CURRENT_PHASE=$(git branch --show-current | grep -o 'phase-[0-9]*')
 if [[ "$CURRENT_PHASE" =~ phase-[12] ]]; then
@@ -1153,121 +1010,47 @@ fi
 
 ---
 
-## 6. Solo Development Optimizations
+## 6. Context Switching Prevention
 
-### Context Switching Minimization
-
-**Single-Session Focus Protocol**:
+**Task Validation**:
 
 ```bash
 #!/bin/bash
-# scripts/focus-session.sh
-
-PHASE=$1
-DURATION=${2:-"2"}  # Default 2 hours
-
-echo "🎯 STARTING FOCUSED MIGRATION SESSION"
-echo "====================================="
-echo "Phase: $PHASE"
-echo "Duration: $DURATION hours"
-
-# Setup focused environment
-export MIGRATION_FOCUS_MODE=1
-export CURRENT_PHASE=$PHASE
-
-# Disable distracting notifications
-echo "🔇 Disabling distractions..."
-# (Platform-specific notification management)
-
-# Set up phase-specific workspace
-case $PHASE in
-  "phase-1")
-    echo "⚙️  Prisma removal focus session"
-    echo "Files to work on:"
-    rg -l "prisma" src/server/services/ | head -5
-    ;;
-  "phase-2")
-    echo "🔐 RLS implementation focus session"
-    echo "Next RLS policies to create:"
-    echo "  - User organization isolation"
-    echo "  - Machine access control"
-    ;;
-  "phase-3")
-    echo "🧪 Testing architecture focus session"
-    echo "Archetype patterns to implement:"
-    echo "  - Memory-safe integration tests"
-    echo "  - RLS session context patterns"
-    ;;
-esac
-
-# Start session timer
-echo "⏰ Focus session timer started: $(date)"
-echo "Session will end at: $(date -d "+$DURATION hours")"
-
-# Create session tracking
-echo "$(date),$PHASE,$DURATION" >> focus-sessions.log
-
-# Set up session completion reminder
-(
-  sleep $(($DURATION * 3600))
-  echo "⏰ FOCUS SESSION COMPLETE"
-  echo "Time to take a break and review progress"
-  # (Platform-specific notification)
-) &
-
-echo "✅ Focus session active. Stay disciplined to $PHASE work only."
-```
-
-**Context Switching Prevention**:
-
-```bash
-#!/bin/bash
-# scripts/prevent-context-switching.sh
+# scripts/validate-task.sh
 
 CURRENT_TASK=$1
-
-echo "🚧 CONTEXT SWITCHING PREVENTION"
-echo "==============================="
-
-# Check if switching contexts inappropriately
 CURRENT_PHASE=$(git branch --show-current | grep -o 'phase-[0-9]*')
+
+echo "🚧 TASK VALIDATION"
+echo "=================="
 
 case "$CURRENT_TASK" in
   "fix-tests")
     if [[ "$CURRENT_PHASE" =~ phase-[12] ]]; then
-      echo "🚨 CONTEXT SWITCHING DETECTED!"
-      echo "Current phase: $CURRENT_PHASE"
-      echo "Attempted task: $CURRENT_TASK"
-      echo ""
-      echo "REMINDER: Fix tests only during Phase 3+"
+      echo "❌ INVALID: Fix tests only during Phase 3+"
       echo "Current focus should be: Architecture work"
-      echo ""
-      echo "Resist the urge. Stay disciplined to current phase."
-      echo "Take 15-minute break if feeling frustrated."
       exit 1
     fi
     ;;
 
   "add-features")
     if [[ "$CURRENT_PHASE" =~ phase-[1-3] ]]; then
-      echo "🚨 CONTEXT SWITCHING DETECTED!"
-      echo "No new features during migration phases."
-      echo "Complete migration first, then add features."
+      echo "❌ INVALID: No new features during migration phases"
+      echo "Complete migration first, then add features"
       exit 1
     fi
     ;;
 
   "performance-optimization")
     if [[ "$CURRENT_PHASE" =~ phase-[1-3] ]]; then
-      echo "🚨 CONTEXT SWITCHING DETECTED!"
-      echo "Performance optimization during migration is distraction."
-      echo "Focus on correctness first, optimize in Phase 4."
+      echo "❌ INVALID: Performance optimization during migration"
+      echo "Focus on correctness first, optimize in Phase 4"
       exit 1
     fi
     ;;
 esac
 
-echo "✅ Task appropriate for current phase. Proceed."
+echo "✅ Task appropriate for current phase"
 ```
 
 ### Knowledge Capture and Reuse
@@ -1459,7 +1242,7 @@ echo "✅ Pattern library created in patterns/ directory"
 
 ````
 
-### Motivation and Progress Visualization
+## 7. Progress Visualization
 
 **Visual Progress Dashboard**:
 ```bash
@@ -1514,95 +1297,18 @@ OVERALL_PROGRESS=$(((PHASE1_PROGRESS + PHASE2_PROGRESS + PHASE3_PROGRESS) / 3))
 
 echo "Overall Migration Progress"
 progress_bar $OVERALL_PROGRESS
-echo ""
-
-# Motivational messages based on progress
-if [ $OVERALL_PROGRESS -lt 25 ]; then
-  echo "💪 Just getting started! Foundation work is critical."
-elif [ $OVERALL_PROGRESS -lt 50 ]; then
-  echo "🔥 Building momentum! Architecture taking shape."
-elif [ $OVERALL_PROGRESS -lt 75 ]; then
-  echo "🚀 More than halfway! The finish line is visible."
-else
-  echo "🎯 Almost there! Preparing for architectural excellence."
-fi
-
-echo ""
-echo "🎖️  Remember: Every line of architectural work"
-echo "    eliminates 10 lines of future complexity."
-````
-
-**Daily Wins Celebration**:
-
-```bash
-#!/bin/bash
-# scripts/celebrate-wins.sh
-
-DATE=$(date +%Y%m%d)
-PHASE=$(git branch --show-current | grep -o 'phase-[0-9]*')
-
-echo "🎉 DAILY WINS CELEBRATION"
-echo "========================="
-
-# Capture today's wins
-echo "What was accomplished today:"
-
-# Technical wins
-echo "🔧 Technical Accomplishments:"
-git log --oneline --since="today" | while read commit; do
-  echo "  - $commit"
-done
-
-# Learning wins
-echo "🧠 Knowledge Gained:"
-echo "  - [What new patterns or concepts were learned]"
-echo "  - [What architectural insights were gained]"
-echo "  - [What problems were solved]"
-
-# Progress wins
-echo "📈 Progress Made:"
-case $PHASE in
-  "phase-1")
-    PRISMA_REMOVED_TODAY=$(git diff --name-only HEAD~1 | xargs rg -l "prisma" 2>/dev/null | wc -l)
-    echo "  - $PRISMA_REMOVED_TODAY files removed Prisma dependencies"
-    ;;
-  "phase-2")
-    RLS_ADDED_TODAY=$(git diff --name-only HEAD~1 | xargs rg -l "ROW LEVEL SECURITY" 2>/dev/null | wc -l)
-    echo "  - $RLS_ADDED_TODAY RLS policies implemented"
-    ;;
-  "phase-3")
-    TESTS_CONVERTED_TODAY=$(git diff --name-only HEAD~1 | xargs rg -l "withIsolatedTest" 2>/dev/null | wc -l)
-    echo "  - $TESTS_CONVERTED_TODAY tests converted to memory-safe patterns"
-    ;;
-esac
-
-# Architectural wins (often invisible but crucial)
-echo "🏗️  Architectural Improvements:"
-echo "  - Codebase complexity reduced"
-echo "  - Future development velocity increased"
-echo "  - Technical debt eliminated"
-echo "  - Foundation strengthened"
-
-# Save wins to permanent record
-cat >> "daily-wins.log" << EOF
-$DATE,$PHASE,$(git log --oneline --since="today" | wc -l) commits,Architectural progress
-EOF
-
-echo ""
-echo "✨ Today's work contributes to permanent architectural excellence!"
-echo "🌟 Tomorrow will build on today's solid foundation."
 ```
 
 ---
 
-This execution framework provides the tactical structure to transform the strategic vision into daily executable reality. The framework ensures disciplined phase progression, prevents common migration pitfalls, and maintains solo developer productivity through the architectural transformation process.
+This execution framework provides the tactical structure to transform the strategic vision into executable reality. The framework ensures disciplined phase progression, prevents common migration pitfalls, and maintains productivity through the architectural transformation process.
 
 **Key Success Factors:**
 
 - **Dependency chain enforcement** prevents technical impossibilities
-- **Daily procedures** provide consistent progress structure
+- **Phase procedures** provide consistent progress structure
 - **Risk monitoring** catches problems before they derail progress
-- **Progress visualization** maintains motivation during invisible architectural work
-- **Solo development optimizations** leverage context advantages
+- **Progress visualization** tracks architectural work
+- **Context switching prevention** maintains focus
 
-The framework is designed to support a solo developer through the psychological and technical challenges of architectural migration while ensuring the strategic vision is realized through disciplined tactical execution.
+The framework is designed to support systematic architectural migration while ensuring the strategic vision is realized through disciplined tactical execution.

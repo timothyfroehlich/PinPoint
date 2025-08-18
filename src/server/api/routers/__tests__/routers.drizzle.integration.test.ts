@@ -1,8 +1,7 @@
 /**
  * Drizzle tRPC Integration Tests
  *
- * Validates that Drizzle client is properly integrated into tRPC context
- * and can be used alongside Prisma during the migration period.
+ * Validates that Drizzle client is properly integrated into tRPC context.
  */
 
 import { TRPCError } from "@trpc/server";
@@ -200,7 +199,6 @@ describe("Drizzle tRPC Integration", () => {
               orgId,
               testInput,
               hasDrizzle: !!ctx.db,
-              hasPrisma: !!ctx.db,
             };
           }),
       });
