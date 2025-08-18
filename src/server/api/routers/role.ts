@@ -21,13 +21,10 @@ import { roles, memberships } from "~/server/db/schema";
 import { RoleService } from "~/server/services/roleService";
 
 /**
- * Create role service
+ * Create role service (RLS handles organizational scoping)
  */
-function createRoleService(
-  ctx: TRPCContext,
-  organizationId: string,
-): RoleService {
-  return new RoleService(ctx.db, organizationId);
+function createRoleService(ctx: TRPCContext): RoleService {
+  return new RoleService(ctx.db);
 }
 
 export const roleRouter = createTRPCRouter({
@@ -35,7 +32,7 @@ export const roleRouter = createTRPCRouter({
    * List all roles in the organization
    */
   list: organizationManageProcedure.query(async ({ ctx }) => {
-    const roleService = createRoleService(ctx, ctx.organization.id);
+    const roleService = createRoleService(ctx);
     const roles = await roleService.getRoles();
 
     return roles.map(
@@ -78,7 +75,7 @@ export const roleRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const roleService = createRoleService(ctx, ctx.organization.id);
+      const roleService = createRoleService(ctx);
 
       // If template is specified, create from template
       if (input.template) {
@@ -94,7 +91,6 @@ export const roleRouter = createTRPCRouter({
         .values({
           id: generatePrefixedId("role"),
           name: input.name,
-          organizationId: ctx.organization.id,
           isSystem: false,
           isDefault: input.isDefault,
         })
@@ -139,7 +135,7 @@ export const roleRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const roleService = createRoleService(ctx, ctx.organization.id);
+      const roleService = createRoleService(ctx);
 
       const updateData: {
         name?: string;
@@ -165,7 +161,7 @@ export const roleRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const roleService = createRoleService(ctx, ctx.organization.id);
+      const roleService = createRoleService(ctx);
 
       // Ensure we maintain at least one admin before deletion
       await roleService.ensureAtLeastOneAdmin();
@@ -187,10 +183,7 @@ export const roleRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       // Get role details
       const role = await ctx.db.query.roles.findFirst({
-        where: and(
-          eq(roles.id, input.roleId),
-          eq(roles.organizationId, ctx.organization.id),
-        ),
+        where: eq(roles.id, input.roleId),
         with: {
           rolePermissions: {
             with: {
@@ -260,10 +253,7 @@ export const roleRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       // Get the target role and verify it exists in this organization
       const role = await ctx.db.query.roles.findFirst({
-        where: and(
-          eq(roles.id, input.roleId),
-          eq(roles.organizationId, ctx.organization.id),
-        ),
+        where: eq(roles.id, input.roleId),
       });
 
       if (!role) {
@@ -275,10 +265,7 @@ export const roleRouter = createTRPCRouter({
 
       // Get the current user membership with user and role details
       const currentMembership = await ctx.db.query.memberships.findFirst({
-        where: and(
-          eq(memberships.userId, input.userId),
-          eq(memberships.organizationId, ctx.organization.id),
-        ),
+        where: eq(memberships.userId, input.userId),
         with: {
           user: true,
           role: true,
@@ -294,7 +281,6 @@ export const roleRouter = createTRPCRouter({
 
       // Get all memberships for validation
       const allMemberships = await ctx.db.query.memberships.findMany({
-        where: eq(memberships.organizationId, ctx.organization.id),
         with: {
           user: true,
           role: true,
@@ -381,12 +367,7 @@ export const roleRouter = createTRPCRouter({
       const updatedMemberships = await ctx.db
         .update(memberships)
         .set({ roleId: input.roleId })
-        .where(
-          and(
-            eq(memberships.userId, input.userId),
-            eq(memberships.organizationId, ctx.organization.id),
-          ),
-        )
+        .where(eq(memberships.userId, input.userId))
         .returning();
 
       if (updatedMemberships.length === 0) {

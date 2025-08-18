@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { createTRPCRouter, machineEditProcedure } from "~/server/api/trpc";
@@ -15,12 +15,9 @@ export const machineOwnerRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Verify the game instance belongs to this organization
+      // Verify the game instance exists (RLS handles org scoping)
       const existingInstance = await ctx.db.query.machines.findFirst({
-        where: and(
-          eq(machines.id, input.machineId),
-          eq(machines.organizationId, ctx.organization.id),
-        ),
+        where: eq(machines.id, input.machineId),
       });
 
       if (!existingInstance) {
@@ -30,13 +27,10 @@ export const machineOwnerRouter = createTRPCRouter({
         });
       }
 
-      // If setting an owner, verify the user is a member of this organization
+      // If setting an owner, verify the user is a member of this organization (RLS handles org scoping)
       if (input.ownerId) {
         const membership = await ctx.db.query.memberships.findFirst({
-          where: and(
-            eq(memberships.userId, input.ownerId),
-            eq(memberships.organizationId, ctx.organization.id),
-          ),
+          where: eq(memberships.userId, input.ownerId),
         });
 
         if (!membership) {

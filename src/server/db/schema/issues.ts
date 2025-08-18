@@ -13,13 +13,13 @@ import {
 // ENUMS
 // =================================
 
-export const statusCategoryEnum = pgEnum("StatusCategory", [
+export const statusCategoryEnum = pgEnum("status_category", [
   "NEW",
   "IN_PROGRESS",
   "RESOLVED",
 ]);
 
-export const activityTypeEnum = pgEnum("ActivityType", [
+export const activityTypeEnum = pgEnum("activity_type", [
   "CREATED", // Issue created
   "STATUS_CHANGED", // Status updated
   "ASSIGNED", // Assignee changed
@@ -65,15 +65,15 @@ export const issues = pgTable(
   },
   (table) => [
     // Multi-tenancy: organizationId filtering (most critical)
-    index("Issue_organizationId_idx").on(table.organizationId),
+    index("issues_organization_id_idx").on(table.organizationId),
     // Issue workflow: machine-specific issue lookups
-    index("Issue_machineId_idx").on(table.machineId),
+    index("issues_machine_id_idx").on(table.machineId),
     // Issue workflow: status and priority filtering
-    index("Issue_statusId_idx").on(table.statusId),
-    index("Issue_priorityId_idx").on(table.priorityId),
+    index("issues_status_id_idx").on(table.statusId),
+    index("issues_priority_id_idx").on(table.priorityId),
     // Issue workflow: assignment tracking (nullable fields)
-    index("Issue_assignedToId_idx").on(table.assignedToId),
-    index("Issue_createdById_idx").on(table.createdById),
+    index("issues_assigned_to_id_idx").on(table.assignedToId),
+    index("issues_created_by_id_idx").on(table.createdById),
   ],
 );
 
@@ -86,11 +86,11 @@ export const priorities = pgTable(
     organizationId: text("organizationId").notNull(),
     isDefault: boolean("isDefault").default(false).notNull(),
   },
-  (table) => [index("Priority_organizationId_idx").on(table.organizationId)],
+  (table) => [index("priorities_organization_id_idx").on(table.organizationId)],
 );
 
 export const issueStatuses = pgTable(
-  "issueStatuses",
+  "issue_statuses",
   {
     id: text("id").primaryKey(),
     name: text("name").notNull(), // e.g., "Reported", "Diagnosing", "Awaiting Parts", "Fixed"
@@ -98,7 +98,7 @@ export const issueStatuses = pgTable(
     organizationId: text("organizationId").notNull(),
     isDefault: boolean("isDefault").default(false).notNull(),
   },
-  (table) => [index("IssueStatus_organizationId_idx").on(table.organizationId)],
+  (table) => [index("issue_statuses_organization_id_idx").on(table.organizationId)],
 );
 
 export const comments = pgTable(
@@ -142,13 +142,13 @@ export const attachments = pgTable(
     issueId: text("issueId").notNull(),
   },
   (table) => [
-    index("Attachment_organizationId_idx").on(table.organizationId),
-    index("Attachment_issueId_idx").on(table.issueId),
+    index("attachments_organization_id_idx").on(table.organizationId),
+    index("attachments_issue_id_idx").on(table.issueId),
   ],
 );
 
 export const issueHistory = pgTable(
-  "issueHistory",
+  "issue_history",
   {
     id: text("id").primaryKey(),
     field: text("field").notNull(), // e.g., "status", "assignee", "priority"
@@ -165,9 +165,9 @@ export const issueHistory = pgTable(
     issueId: text("issueId").notNull(),
   },
   (table) => [
-    index("IssueHistory_organizationId_idx").on(table.organizationId),
-    index("IssueHistory_issueId_idx").on(table.issueId),
-    index("IssueHistory_type_idx").on(table.type),
+    index("issue_history_organization_id_idx").on(table.organizationId),
+    index("issue_history_issue_id_idx").on(table.issueId),
+    index("issue_history_type_idx").on(table.type),
   ],
 );
 
@@ -180,7 +180,7 @@ export const upvotes = pgTable(
     userId: text("userId").notNull(),
   },
   (table) => [
-    index("Upvote_issueId_idx").on(table.issueId),
-    index("Upvote_userId_issueId_idx").on(table.userId, table.issueId),
+    index("upvotes_issue_id_idx").on(table.issueId),
+    index("upvotes_user_id_issue_id_idx").on(table.userId, table.issueId),
   ],
 );

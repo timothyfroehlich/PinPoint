@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, eq, inArray, sql, isNull } from "drizzle-orm";
+import { eq, inArray, sql, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 import {
@@ -55,30 +55,20 @@ export const issueCoreRouter = createTRPCRouter({
         throw new Error("Organization not found");
       }
 
-      // Get machine, status, and priority for validation
+      // Get machine, status, and priority for validation (RLS handles org scoping)
       const machine = await ctx.db.query.machines.findFirst({
         where: eq(machines.id, input.machineId),
         with: {
-          location: {
-            columns: {
-              organizationId: true,
-            },
-          },
+          location: true,
         },
       });
 
       const defaultStatus = await ctx.db.query.issueStatuses.findFirst({
-        where: and(
-          eq(issueStatuses.isDefault, true),
-          eq(issueStatuses.organizationId, organization.id),
-        ),
+        where: eq(issueStatuses.isDefault, true),
       });
 
       const defaultPriority = await ctx.db.query.priorities.findFirst({
-        where: and(
-          eq(priorities.isDefault, true),
-          eq(priorities.organizationId, organization.id),
-        ),
+        where: eq(priorities.isDefault, true),
       });
 
       // Create validation input (handle exactOptionalPropertyTypes)
@@ -122,7 +112,7 @@ export const issueCoreRouter = createTRPCRouter({
         throw new Error("Default priority validation failed");
       }
 
-      // Create the issue without a user (anonymous)
+      // Create the issue without a user (anonymous) - RLS trigger handles organizationId
       const issueData: {
         id: string;
         title: string;
@@ -131,7 +121,6 @@ export const issueCoreRouter = createTRPCRouter({
         submitterName?: string | null;
         createdById?: string | null;
         machineId: string;
-        organizationId: string;
         statusId: string;
         priorityId: string;
       } = {
@@ -139,7 +128,6 @@ export const issueCoreRouter = createTRPCRouter({
         title: input.title,
         createdById: null, // Anonymous issue
         machineId: input.machineId,
-        organizationId: organization.id,
         statusId: defaultStatus.id,
         priorityId: defaultPriority.id,
       };
@@ -210,30 +198,20 @@ export const issueCoreRouter = createTRPCRouter({
       // Organization is guaranteed by organizationProcedure middleware
       const organization = ctx.organization;
 
-      // Get machine, status, and priority for validation
+      // Get machine, status, and priority for validation (RLS handles org scoping)
       const machine = await ctx.db.query.machines.findFirst({
         where: eq(machines.id, input.machineId),
         with: {
-          location: {
-            columns: {
-              organizationId: true,
-            },
-          },
+          location: true,
         },
       });
 
       const defaultStatus = await ctx.db.query.issueStatuses.findFirst({
-        where: and(
-          eq(issueStatuses.isDefault, true),
-          eq(issueStatuses.organizationId, organization.id),
-        ),
+        where: eq(issueStatuses.isDefault, true),
       });
 
       const defaultPriority = await ctx.db.query.priorities.findFirst({
-        where: and(
-          eq(priorities.isDefault, true),
-          eq(priorities.organizationId, organization.id),
-        ),
+        where: eq(priorities.isDefault, true),
       });
 
       // Create validation input (handle exactOptionalPropertyTypes)
@@ -279,14 +257,13 @@ export const issueCoreRouter = createTRPCRouter({
       // User is guaranteed to exist in protected procedure
       const createdById = ctx.user.id;
 
-      // Create the issue
+      // Create the issue (RLS trigger handles organizationId)
       const issueData: {
         id: string;
         title: string;
         description?: string | null;
         createdById: string;
         machineId: string;
-        organizationId: string;
         statusId: string;
         priorityId: string;
       } = {
@@ -294,7 +271,6 @@ export const issueCoreRouter = createTRPCRouter({
         title: input.title,
         createdById,
         machineId: input.machineId,
-        organizationId: organization.id,
         statusId: defaultStatus.id,
         priorityId: defaultPriority.id,
       };
@@ -335,7 +311,6 @@ export const issueCoreRouter = createTRPCRouter({
       const activityService = ctx.services.createIssueActivityService();
       await activityService.recordIssueCreated(
         issueData.id,
-        organization.id,
         createdById,
       );
 
@@ -358,19 +333,13 @@ export const issueCoreRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Get issue and membership for validation
+      // Get issue and membership for validation (RLS handles org scoping)
       const issue = await ctx.db.query.issues.findFirst({
-        where: and(
-          eq(issues.id, input.issueId),
-          eq(issues.organizationId, ctx.organization.id),
-        ),
+        where: eq(issues.id, input.issueId),
       });
 
       const membership = await ctx.db.query.memberships.findFirst({
-        where: and(
-          eq(memberships.userId, input.userId),
-          eq(memberships.organizationId, ctx.organization.id),
-        ),
+        where: eq(memberships.userId, input.userId),
         with: { user: true },
       });
 
@@ -457,7 +426,6 @@ export const issueCoreRouter = createTRPCRouter({
       const activityService = ctx.services.createIssueActivityService();
       await activityService.recordIssueAssigned(
         input.issueId,
-        ctx.organization.id,
         ctx.user.id,
         input.userId,
       );
@@ -492,8 +460,8 @@ export const issueCoreRouter = createTRPCRouter({
         .optional(),
     )
     .query(async ({ ctx, input }) => {
-      // Build where conditions dynamically
-      const conditions = [eq(issues.organizationId, ctx.organization.id)];
+      // Build where conditions dynamically (RLS handles org scoping)
+      const conditions = [];
 
       // Machine ID filter
       if (input?.machineId) {
@@ -687,10 +655,7 @@ export const issueCoreRouter = createTRPCRouter({
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
       const issue = await ctx.db.query.issues.findFirst({
-        where: and(
-          eq(issues.id, input.id),
-          eq(issues.organizationId, ctx.organization.id),
-        ),
+        where: eq(issues.id, input.id),
         with: {
           status: true,
           priority: true,
@@ -765,12 +730,9 @@ export const issueCoreRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Verify the issue belongs to this organization
+      // Verify the issue exists (RLS handles org scoping)
       const existingIssue = await ctx.db.query.issues.findFirst({
-        where: and(
-          eq(issues.id, input.id),
-          eq(issues.organizationId, ctx.organization.id),
-        ),
+        where: eq(issues.id, input.id),
         with: {
           status: true,
           assignedTo: true,
@@ -792,13 +754,10 @@ export const issueCoreRouter = createTRPCRouter({
       let newStatus = existingIssue.status;
       let newAssignedTo = existingIssue.assignedTo;
 
-      // If updating status, verify it belongs to the organization
+      // If updating status, verify it exists (RLS handles org scoping)
       if (input.statusId) {
         const status = await ctx.db.query.issueStatuses.findFirst({
-          where: and(
-            eq(issueStatuses.id, input.statusId),
-            eq(issueStatuses.organizationId, ctx.organization.id),
-          ),
+          where: eq(issueStatuses.id, input.statusId),
         });
         if (!status) {
           throw new TRPCError({
@@ -809,14 +768,11 @@ export const issueCoreRouter = createTRPCRouter({
         newStatus = status;
       }
 
-      // If updating assignee, verify they are a member of this organization
+      // If updating assignee, verify they are a member (RLS handles org scoping)
       if (input.assignedToId !== undefined) {
         if (input.assignedToId) {
           const membership = await ctx.db.query.memberships.findFirst({
-            where: and(
-              eq(memberships.userId, input.assignedToId),
-              eq(memberships.organizationId, ctx.organization.id),
-            ),
+            where: eq(memberships.userId, input.assignedToId),
             with: {
               user: true,
             },
@@ -888,7 +844,6 @@ export const issueCoreRouter = createTRPCRouter({
       if (input.statusId && existingIssue.status.id !== input.statusId) {
         await activityService.recordStatusChange(
           input.id,
-          ctx.organization.id,
           userId,
           existingIssue.status,
           newStatus,
@@ -955,12 +910,9 @@ export const issueCoreRouter = createTRPCRouter({
   close: issueEditProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      // Find the resolved status for this organization
+      // Find the resolved status (RLS handles org scoping)
       const resolvedStatus = await ctx.db.query.issueStatuses.findFirst({
-        where: and(
-          eq(issueStatuses.organizationId, ctx.organization.id),
-          eq(issueStatuses.category, "RESOLVED"),
-        ),
+        where: eq(issueStatuses.category, "RESOLVED"),
       });
 
       if (!resolvedStatus) {
@@ -1021,7 +973,6 @@ export const issueCoreRouter = createTRPCRouter({
       const activityService = ctx.services.createIssueActivityService();
       await activityService.recordIssueResolved(
         input.id,
-        ctx.organization.id,
         ctx.user.id,
       );
 
@@ -1037,12 +988,9 @@ export const issueCoreRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Verify the issue belongs to this organization
+      // Verify the issue exists (RLS handles org scoping)
       const existingIssue = await ctx.db.query.issues.findFirst({
-        where: and(
-          eq(issues.id, input.id),
-          eq(issues.organizationId, ctx.organization.id),
-        ),
+        where: eq(issues.id, input.id),
         with: {
           status: true,
         },
@@ -1055,12 +1003,9 @@ export const issueCoreRouter = createTRPCRouter({
         });
       }
 
-      // Verify the status belongs to this organization
+      // Verify the status exists (RLS handles org scoping)
       const newStatus = await ctx.db.query.issueStatuses.findFirst({
-        where: and(
-          eq(issueStatuses.id, input.statusId),
-          eq(issueStatuses.organizationId, ctx.organization.id),
-        ),
+        where: eq(issueStatuses.id, input.statusId),
       });
 
       if (!newStatus) {
@@ -1147,7 +1092,6 @@ export const issueCoreRouter = createTRPCRouter({
       const activityService = ctx.services.createIssueActivityService();
       await activityService.recordStatusChange(
         input.id,
-        ctx.organization.id,
         ctx.user.id,
         existingIssue.status,
         newStatus,
@@ -1190,8 +1134,8 @@ export const issueCoreRouter = createTRPCRouter({
         throw new Error("Organization not found");
       }
 
-      // Build where conditions dynamically
-      const conditions = [eq(issues.organizationId, organization.id)];
+      // Build where conditions dynamically (RLS handles org scoping)
+      const conditions = [];
 
       // Machine ID filter
       if (input?.machineId) {

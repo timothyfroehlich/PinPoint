@@ -42,7 +42,7 @@ export const locations = pgTable(
   },
   (table) => [
     // Multi-tenancy: organizationId filtering
-    index("Location_organizationId_idx").on(table.organizationId),
+    index("locations_organization_id_idx").on(table.organizationId),
   ],
 );
 
@@ -96,8 +96,8 @@ export const machines = pgTable(
       .notNull(), // Notify when issue status changes
     notifyOnComments: boolean("notifyOnComments").default(false).notNull(), // Notify on new comments
 
-    // QR Code system
-    qrCodeId: text("qrCodeId").unique().notNull(),
+    // QR Code system  
+    qrCodeId: text("qrCodeId").unique(),
     qrCodeUrl: text("qrCodeUrl"),
     qrCodeGeneratedAt: timestamp("qrCodeGeneratedAt"),
 
@@ -107,14 +107,14 @@ export const machines = pgTable(
   },
   (table) => [
     // QR code lookups (critical for scanning performance)
-    index("Machine_qrCodeId_idx").on(table.qrCodeId),
+    index("machines_qr_code_id_idx").on(table.qrCodeId),
     // Multi-tenancy: organizationId filtering
-    index("Machine_organizationId_idx").on(table.organizationId),
+    index("machines_organization_id_idx").on(table.organizationId),
     // Location-specific machine queries
-    index("Machine_locationId_idx").on(table.locationId),
+    index("machines_location_id_idx").on(table.locationId),
     // Model-specific machine queries
-    index("Machine_modelId_idx").on(table.modelId),
+    index("machines_model_id_idx").on(table.modelId),
     // Owner-specific machine queries (nullable field - this was the problem!)
-    index("Machine_ownerId_idx").on(table.ownerId),
+    index("machines_owner_id_idx").on(table.ownerId),
   ],
 );

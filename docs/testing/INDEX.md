@@ -2,12 +2,15 @@
 
 Comprehensive testing patterns and strategies for PinPoint.
 
-## Modern Testing Stack
+## Modern Testing Stack (Post-RLS)
 
-- Transaction-based testing with PGlite
-- Integration test focused approach
-- Minimal mocking (external services only)
-- Type-safe patterns with Drizzle
+- **Worker-scoped PGlite**: Memory-safe testing (prevents system lockups)
+- **RLS session context**: Automatic organizational scoping via PostgreSQL session variables
+- **Transaction isolation**: Each test gets clean database state with automatic rollback
+- **Integration-focused**: Real database constraints and relationships
+- **Minimal mocking**: External services only, database operations use real PGlite
+- **Type-safe patterns**: Drizzle provides full type inference
+- **Specialized agents**: Dedicated testing architects for each archetype pattern
 
 ## Contents
 

@@ -425,7 +425,7 @@ describe("Drizzle Mock Helpers", () => {
         expect(mockSchema).toHaveProperty("locations");
         expect(mockSchema).toHaveProperty("models");
         expect(mockSchema).toHaveProperty("priorities");
-        expect(mockSchema).toHaveProperty("issueStatuses");
+        expect(mockSchema).toHaveProperty("issue_statuses");
       });
     });
 

@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { createTRPCRouter, organizationProcedure } from "~/server/api/trpc";
@@ -10,12 +10,9 @@ export const issueTimelineRouter = createTRPCRouter({
   getTimeline: organizationProcedure
     .input(z.object({ issueId: z.string() }))
     .query(async ({ ctx, input }) => {
-      // Verify the issue belongs to this organization
+      // Verify the issue exists (RLS handles org scoping)
       const issue = await ctx.db.query.issues.findFirst({
-        where: and(
-          eq(issues.id, input.issueId),
-          eq(issues.organizationId, ctx.organization.id),
-        ),
+        where: eq(issues.id, input.issueId),
         columns: {
           id: true,
         },
@@ -29,9 +26,6 @@ export const issueTimelineRouter = createTRPCRouter({
       }
 
       const activityService = ctx.services.createIssueActivityService();
-      return activityService.getIssueTimeline(
-        input.issueId,
-        ctx.organization.id,
-      );
+      return activityService.getIssueTimeline(input.issueId);
     }),
 });

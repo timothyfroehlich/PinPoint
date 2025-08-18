@@ -76,7 +76,7 @@ describe("RoleService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockDrizzle = createMockDrizzleClient();
-    service = new RoleService(mockDrizzle as any, testOrgId);
+    service = new RoleService(mockDrizzle as any);
   });
 
   describe("deleteRole", () => {

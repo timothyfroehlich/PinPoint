@@ -68,14 +68,7 @@ export const commentRouter = createTRPCRouter({
         });
       }
 
-      // Verify comment belongs to user's organization
-
-      if (comment.issue.organizationId !== ctx.organization.id) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Comment not in organization",
-        });
-      }
+      // RLS ensures comment belongs to user's organization
 
       const cleanupService = ctx.services.createCommentCleanupService();
       await cleanupService.softDeleteComment(input.commentId, ctx.user.id);
@@ -84,7 +77,6 @@ export const commentRouter = createTRPCRouter({
       const activityService = ctx.services.createIssueActivityService();
       await activityService.recordCommentDeleted(
         comment.issueId,
-        ctx.organization.id,
         ctx.user.id,
         input.commentId,
       );

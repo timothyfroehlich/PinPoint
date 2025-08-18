@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, eq, asc, sql } from "drizzle-orm";
+import { eq, asc, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { generateId } from "~/lib/utils/id-generation";
@@ -32,7 +32,6 @@ export const locationRouter = createTRPCRouter({
         .values({
           id: generateId(),
           name: input.name,
-          organizationId: ctx.organization.id,
         })
         .returning();
 
@@ -41,7 +40,6 @@ export const locationRouter = createTRPCRouter({
 
   getAll: organizationProcedure.query(async ({ ctx }) => {
     return await ctx.db.query.locations.findMany({
-      where: eq(locations.organizationId, ctx.organization.id),
       with: {
         machines: true,
       },
@@ -74,7 +72,7 @@ export const locationRouter = createTRPCRouter({
       .innerJoin(models, eq(models.id, machines.modelId))
       .leftJoin(issues, eq(issues.machineId, machines.id))
       .leftJoin(issueStatuses, eq(issueStatuses.id, issues.statusId))
-      .where(eq(locations.organizationId, ctx.organization.id))
+      .where(sql`1=1`)
       .groupBy(
         locations.id,
         locations.name,
@@ -159,12 +157,7 @@ export const locationRouter = createTRPCRouter({
       const [updatedLocation] = await ctx.db
         .update(locations)
         .set(updates)
-        .where(
-          and(
-            eq(locations.id, input.id),
-            eq(locations.organizationId, ctx.organization.id), // Ensure user can only update their org's locations
-          ),
-        )
+        .where(eq(locations.id, input.id))
         .returning();
 
       if (!updatedLocation) {
@@ -182,10 +175,7 @@ export const locationRouter = createTRPCRouter({
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
       const location = await ctx.db.query.locations.findFirst({
-        where: and(
-          eq(locations.id, input.id),
-          eq(locations.organizationId, ctx.organization.id),
-        ),
+        where: eq(locations.id, input.id),
         with: {
           machines: {
             orderBy: [asc(machines.id)],
@@ -218,12 +208,7 @@ export const locationRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const [deletedLocation] = await ctx.db
         .delete(locations)
-        .where(
-          and(
-            eq(locations.id, input.id),
-            eq(locations.organizationId, ctx.organization.id), // Ensure user can only delete their org's locations
-          ),
-        )
+        .where(eq(locations.id, input.id))
         .returning();
 
       if (!deletedLocation) {
@@ -250,12 +235,7 @@ export const locationRouter = createTRPCRouter({
         .set({
           pinballMapId: input.pinballMapId,
         })
-        .where(
-          and(
-            eq(locations.id, input.locationId),
-            eq(locations.organizationId, ctx.organization.id),
-          ),
-        )
+        .where(eq(locations.id, input.locationId))
         .returning();
 
       if (!updatedLocation) {

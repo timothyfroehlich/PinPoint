@@ -69,8 +69,8 @@ export const modelOpdbRouter = createTRPCRouter({
   // Sync existing titles with OPDB
   syncWithOPDB: organizationManageProcedure.mutation(async ({ ctx }) => {
     // Find all OPDB games that have game instances in this organization
+    // RLS automatically scopes to organization's machines
     const machinesInOrg = await ctx.db.query.machines.findMany({
-      where: eq(machines.organizationId, ctx.organization.id),
       with: {
         model: true,
       },

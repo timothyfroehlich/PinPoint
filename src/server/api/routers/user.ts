@@ -211,12 +211,7 @@ export const userRouter = createTRPCRouter({
         })
         .from(memberships)
         .innerJoin(users, eq(memberships.userId, users.id))
-        .where(
-          and(
-            eq(memberships.userId, input.userId),
-            eq(memberships.organizationId, ctx.membership.organizationId),
-          ),
-        )
+        .where(eq(memberships.userId, input.userId))
         .limit(1);
 
       if (!membership) {
@@ -269,7 +264,6 @@ export const userRouter = createTRPCRouter({
       .from(memberships)
       .innerJoin(users, eq(memberships.userId, users.id))
       .innerJoin(roles, eq(memberships.roleId, roles.id))
-      .where(eq(memberships.organizationId, ctx.membership.organizationId))
       .orderBy(asc(users.name));
 
     // Get counts for each user (batched approach for performance)
@@ -390,45 +384,33 @@ export const userRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Verify the role exists and belongs to the current organization
+      // Verify the role exists
       const [role] = await ctx.db
-        .select({ organizationId: roles.organizationId })
+        .select({ id: roles.id })
         .from(roles)
         .where(eq(roles.id, input.roleId))
         .limit(1);
 
-      if (!role || role.organizationId !== ctx.organization.id) {
-        throw new Error(
-          "Role not found or does not belong to this organization",
-        );
+      if (!role) {
+        throw new Error("Role not found");
       }
 
-      // Verify the user is a member of the current organization
+      // Verify the user is a member
       const [membership] = await ctx.db
         .select({ userId: memberships.userId })
         .from(memberships)
-        .where(
-          and(
-            eq(memberships.userId, input.userId),
-            eq(memberships.organizationId, ctx.organization.id),
-          ),
-        )
+        .where(eq(memberships.userId, input.userId))
         .limit(1);
 
       if (!membership) {
-        throw new Error("User is not a member of this organization");
+        throw new Error("User membership not found");
       }
 
       // Update the membership
       const [updatedMembership] = await ctx.db
         .update(memberships)
         .set({ roleId: input.roleId })
-        .where(
-          and(
-            eq(memberships.userId, input.userId),
-            eq(memberships.organizationId, ctx.organization.id),
-          ),
-        )
+        .where(eq(memberships.userId, input.userId))
         .returning();
 
       if (!updatedMembership) {
@@ -450,12 +432,7 @@ export const userRouter = createTRPCRouter({
         .from(memberships)
         .innerJoin(roles, eq(memberships.roleId, roles.id))
         .innerJoin(users, eq(memberships.userId, users.id))
-        .where(
-          and(
-            eq(memberships.userId, input.userId),
-            eq(memberships.organizationId, ctx.organization.id),
-          ),
-        )
+        .where(eq(memberships.userId, input.userId))
         .limit(1);
 
       if (!membershipDetails) {

@@ -16,7 +16,7 @@ import { type DrizzleClient } from "~/server/db/drizzle";
 import {
   roles,
   permissions,
-  rolePermissions,
+  role_permissions,
   memberships,
 } from "~/server/db/schema";
 
@@ -33,10 +33,7 @@ type Role = typeof roles.$inferSelect;
 export class RoleService {
   private permissionService: PermissionService;
 
-  constructor(
-    private drizzle: DrizzleClient,
-    private organizationId: string,
-  ) {
+  constructor(private drizzle: DrizzleClient) {
     this.permissionService = new PermissionService(this.drizzle);
   }
 
@@ -50,11 +47,9 @@ export class RoleService {
     await this.ensurePermissionsExist();
 
     // Create Admin role with all permissions (check if exists first)
+    // RLS automatically scopes to user's organization
     let adminRole = await this.drizzle.query.roles.findFirst({
-      where: and(
-        eq(roles.organizationId, this.organizationId),
-        eq(roles.name, SYSTEM_ROLES.ADMIN),
-      ),
+      where: eq(roles.name, SYSTEM_ROLES.ADMIN),
     });
 
     if (!adminRole) {
@@ -63,7 +58,7 @@ export class RoleService {
         .values({
           id: generatePrefixedId("role"),
           name: SYSTEM_ROLES.ADMIN,
-          organizationId: this.organizationId,
+          // organizationId set automatically by RLS trigger
           isSystem: true,
           isDefault: false,
         })
@@ -97,12 +92,12 @@ export class RoleService {
 
     // Clear existing permissions
     await this.drizzle
-      .delete(rolePermissions)
-      .where(eq(rolePermissions.roleId, adminRole.id));
+      .delete(role_permissions)
+      .where(eq(role_permissions.roleId, adminRole.id));
 
     // Insert all permissions
     if (allPermissions.length > 0) {
-      await this.drizzle.insert(rolePermissions).values(
+      await this.drizzle.insert(role_permissions).values(
         allPermissions.map((p) => ({
           roleId: adminRole.id,
           permissionId: p.id,
@@ -111,11 +106,9 @@ export class RoleService {
     }
 
     // Create Unauthenticated role with limited permissions (check if exists first)
+    // RLS automatically scopes to user's organization
     let unauthRole = await this.drizzle.query.roles.findFirst({
-      where: and(
-        eq(roles.organizationId, this.organizationId),
-        eq(roles.name, SYSTEM_ROLES.UNAUTHENTICATED),
-      ),
+      where: eq(roles.name, SYSTEM_ROLES.UNAUTHENTICATED),
     });
 
     if (!unauthRole) {
@@ -124,7 +117,7 @@ export class RoleService {
         .values({
           id: generatePrefixedId("role"),
           name: SYSTEM_ROLES.UNAUTHENTICATED,
-          organizationId: this.organizationId,
+          // organizationId set automatically by RLS trigger
           isSystem: true,
           isDefault: false,
         })
@@ -161,12 +154,12 @@ export class RoleService {
 
     // Clear existing permissions
     await this.drizzle
-      .delete(rolePermissions)
-      .where(eq(rolePermissions.roleId, unauthRole.id));
+      .delete(role_permissions)
+      .where(eq(role_permissions.roleId, unauthRole.id));
 
     // Insert unauthenticated permissions
     if (unauthPermissions.length > 0) {
-      await this.drizzle.insert(rolePermissions).values(
+      await this.drizzle.insert(role_permissions).values(
         unauthPermissions.map((p) => ({
           roleId: unauthRole.id,
           permissionId: p.id,
@@ -189,12 +182,9 @@ export class RoleService {
     const template = ROLE_TEMPLATES[templateName];
     const roleName = overrides.name ?? template.name;
 
-    // Check if role already exists
+    // Check if role already exists (RLS scoped)
     let role = await this.drizzle.query.roles.findFirst({
-      where: and(
-        eq(roles.organizationId, this.organizationId),
-        eq(roles.name, roleName),
-      ),
+      where: eq(roles.name, roleName),
     });
 
     if (!role) {
@@ -204,7 +194,7 @@ export class RoleService {
         .values({
           id: generatePrefixedId("role"),
           name: roleName,
-          organizationId: this.organizationId,
+          // organizationId set automatically by RLS trigger
           isSystem: false,
           isDefault: overrides.isDefault ?? true,
         })
@@ -247,12 +237,12 @@ export class RoleService {
 
     // Clear existing permissions
     await this.drizzle
-      .delete(rolePermissions)
-      .where(eq(rolePermissions.roleId, role.id));
+      .delete(role_permissions)
+      .where(eq(role_permissions.roleId, role.id));
 
     // Assign permissions to role
     if (permissionRecords.length > 0) {
-      await this.drizzle.insert(rolePermissions).values(
+      await this.drizzle.insert(role_permissions).values(
         permissionRecords.map((p) => ({
           roleId: role.id,
           permissionId: p.id,
@@ -282,7 +272,7 @@ export class RoleService {
     const role = await this.drizzle.query.roles.findFirst({
       where: eq(roles.id, roleId),
       with: {
-        rolePermissions: {
+        role_permissions: {
           with: {
             permission: true,
           },
@@ -350,12 +340,12 @@ export class RoleService {
     if (updates.permissionIds) {
       // Clear existing permissions
       await this.drizzle
-        .delete(rolePermissions)
-        .where(eq(rolePermissions.roleId, roleId));
+        .delete(role_permissions)
+        .where(eq(role_permissions.roleId, roleId));
 
       // Insert new permissions
       if (updates.permissionIds.length > 0) {
-        await this.drizzle.insert(rolePermissions).values(
+        await this.drizzle.insert(role_permissions).values(
           updates.permissionIds.map((permissionId) => ({
             roleId,
             permissionId,
@@ -395,10 +385,9 @@ export class RoleService {
       });
     }
 
-    // Find default role for reassignment
+    // Find default role for reassignment (RLS scoped)
     const defaultRole = await this.drizzle.query.roles.findFirst({
       where: and(
-        eq(roles.organizationId, this.organizationId),
         eq(roles.isDefault, true),
         ne(roles.id, roleId),
       ),
@@ -419,8 +408,8 @@ export class RoleService {
 
     // Delete role permissions
     await this.drizzle
-      .delete(rolePermissions)
-      .where(eq(rolePermissions.roleId, roleId));
+      .delete(role_permissions)
+      .where(eq(role_permissions.roleId, roleId));
 
     // Delete the role
     await this.drizzle.delete(roles).where(eq(roles.id, roleId));
@@ -437,7 +426,7 @@ export class RoleService {
       _count: { memberships: number };
     })[]
   > {
-    // Get roles with permissions and membership counts
+    // Get roles with permissions and membership counts (RLS scoped)
     const rolesWithPermissions = await this.drizzle
       .select({
         id: roles.id,
@@ -449,7 +438,6 @@ export class RoleService {
         updatedAt: roles.updatedAt,
       })
       .from(roles)
-      .where(eq(roles.organizationId, this.organizationId))
       .orderBy(asc(roles.isSystem), asc(roles.name));
 
     // Get permissions and membership counts for each role
@@ -462,12 +450,12 @@ export class RoleService {
               id: permissions.id,
               name: permissions.name,
             })
-            .from(rolePermissions)
+            .from(role_permissions)
             .innerJoin(
               permissions,
-              eq(rolePermissions.permissionId, permissions.id),
+              eq(role_permissions.permissionId, permissions.id),
             )
-            .where(eq(rolePermissions.roleId, role.id)),
+            .where(eq(role_permissions.roleId, role.id)),
           this.drizzle
             .select()
             .from(memberships)
@@ -494,11 +482,9 @@ export class RoleService {
    * @throws TRPCError if no admin exists
    */
   async ensureAtLeastOneAdmin(): Promise<void> {
+    // RLS automatically scopes to user's organization
     const adminRole = await this.drizzle.query.roles.findFirst({
-      where: and(
-        eq(roles.organizationId, this.organizationId),
-        eq(roles.name, SYSTEM_ROLES.ADMIN),
-      ),
+      where: eq(roles.name, SYSTEM_ROLES.ADMIN),
       with: {
         memberships: true,
       },
@@ -518,9 +504,9 @@ export class RoleService {
    * @returns Promise<Role | null> - Default role or null if none exists
    */
   async getDefaultRole(): Promise<Role | null> {
+    // RLS automatically scopes to user's organization
     const result = await this.drizzle.query.roles.findFirst({
       where: and(
-        eq(roles.organizationId, this.organizationId),
         eq(roles.isDefault, true),
         eq(roles.isSystem, false),
       ),
@@ -535,11 +521,9 @@ export class RoleService {
    * @returns Promise<Role | null> - Admin role or null if none exists
    */
   async getAdminRole(): Promise<Role | null> {
+    // RLS automatically scopes to user's organization
     const result = await this.drizzle.query.roles.findFirst({
-      where: and(
-        eq(roles.organizationId, this.organizationId),
-        eq(roles.name, SYSTEM_ROLES.ADMIN),
-      ),
+      where: eq(roles.name, SYSTEM_ROLES.ADMIN),
     });
 
     return result ?? null;

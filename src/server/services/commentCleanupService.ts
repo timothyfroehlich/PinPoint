@@ -101,13 +101,11 @@ export class CommentCleanupService {
 
   /**
    * Get all soft-deleted comments for an organization (admin view)
+   * RLS automatically scopes to user's organization
    */
-  async getDeletedComments(organizationId: string): Promise<Comment[]> {
+  async getDeletedComments(): Promise<Comment[]> {
     const deletedComments = await this.db.query.comments.findMany({
-      where: and(
-        isNotNull(comments.deletedAt),
-        eq(issues.organizationId, organizationId),
-      ),
+      where: isNotNull(comments.deletedAt),
       with: {
         author: {
           columns: {

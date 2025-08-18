@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { createTRPCRouter, machineEditProcedure } from "~/server/api/trpc";
@@ -15,12 +15,9 @@ export const machineLocationRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Verify the game instance belongs to this organization
+      // Verify the game instance exists (RLS handles org scoping)
       const existingInstance = await ctx.db.query.machines.findFirst({
-        where: and(
-          eq(machines.id, input.machineId),
-          eq(machines.organizationId, ctx.organization.id),
-        ),
+        where: eq(machines.id, input.machineId),
       });
 
       if (!existingInstance) {
@@ -30,12 +27,9 @@ export const machineLocationRouter = createTRPCRouter({
         });
       }
 
-      // Verify the target location belongs to this organization
+      // Verify the target location exists (RLS handles org scoping)
       const location = await ctx.db.query.locations.findFirst({
-        where: and(
-          eq(locations.id, input.locationId),
-          eq(locations.organizationId, ctx.organization.id),
-        ),
+        where: eq(locations.id, input.locationId),
       });
 
       if (!location) {
@@ -52,12 +46,7 @@ export const machineLocationRouter = createTRPCRouter({
           locationId: input.locationId,
           updatedAt: new Date(),
         })
-        .where(
-          and(
-            eq(machines.id, input.machineId),
-            eq(machines.organizationId, ctx.organization.id),
-          ),
-        )
+        .where(eq(machines.id, input.machineId))
         .returning({
           id: machines.id,
           name: machines.name,

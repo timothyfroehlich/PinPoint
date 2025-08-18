@@ -18,7 +18,7 @@ import {
   machines,
   models,
   locations,
-  pinballMapConfigs,
+  pinball_map_configs,
   issues,
 } from "~/server/db/schema";
 
@@ -34,19 +34,22 @@ export class PinballMapService {
   constructor(private db: DrizzleClient) {}
 
   /**
-   * Enable PinballMap integration for an organization
+   * Enable PinballMap integration for organization (RLS scoped)
    */
-  async enableIntegration(organizationId: string): Promise<void> {
+  async enableIntegration(): Promise<void> {
+    // Generate ID using current timestamp for uniqueness
+    const configId = `pmc_${Date.now().toString()}`;
+    
     await this.db
-      .insert(pinballMapConfigs)
+      .insert(pinball_map_configs)
       .values({
-        id: `pmc_${organizationId}`,
-        organizationId,
+        id: configId,
+        // organizationId set automatically by RLS trigger
         apiEnabled: true,
         autoSyncEnabled: false, // Start with manual sync
       })
       .onConflictDoUpdate({
-        target: pinballMapConfigs.organizationId,
+        target: pinball_map_configs.organizationId,
         set: {
           apiEnabled: true,
         },
@@ -54,17 +57,14 @@ export class PinballMapService {
   }
 
   /**
-   * Configure a location for PinballMap sync
+   * Configure a location for PinballMap sync (RLS scoped)
    */
   async configureLocationSync(
     locationId: string,
     pinballMapId: number,
-    organizationId: string,
   ): Promise<void> {
-    // Verify organization has PinballMap enabled
-    const config = await this.db.query.pinballMapConfigs.findFirst({
-      where: eq(pinballMapConfigs.organizationId, organizationId),
-    });
+    // Verify organization has PinballMap enabled (RLS scoped)
+    const config = await this.db.query.pinball_map_configs.findFirst();
 
     if (!config?.apiEnabled) {
       throw new Error("PinballMap integration not enabled for organization");
@@ -152,7 +152,6 @@ export class PinballMapService {
       // Process the machines
       const result = await this.reconcileMachines(
         location.id,
-        location.organizationId,
         machineData.machines,
         pinballMapConfig,
       );
@@ -176,11 +175,10 @@ export class PinballMapService {
   }
 
   /**
-   * Reconcile PinballMap machines with local database
+   * Reconcile PinballMap machines with local database (RLS scoped)
    */
   private async reconcileMachines(
     locationId: string,
-    organizationId: string,
     pinballMapMachines: PinballMapMachine[],
     config: { createMissingModels: boolean; updateExistingData: boolean },
   ): Promise<SyncResult> {
@@ -231,11 +229,10 @@ export class PinballMapService {
             updated++;
           }
         } else {
-          // Create new machine
+          // Create new machine (organizationId set by RLS trigger)
           await this.db.insert(machines).values({
             id: `machine_${Date.now().toString()}_${Math.random().toString(36).substring(2, 11)}`,
             name: model.name, // Use model name as default instance name
-            organizationId,
             locationId,
             modelId: model.id,
             qrCodeId: `qr_${Date.now().toString()}_${Math.random().toString(36).substring(2, 11)}`,
@@ -249,7 +246,6 @@ export class PinballMapService {
           component: "pinballMapService.syncLocation",
           context: {
             locationId,
-            organizationId,
             machineOpdbId: pmMachine.opdb_id ?? "unknown",
             operation: "sync_machine",
           },
@@ -385,9 +381,9 @@ export class PinballMapService {
   }
 
   /**
-   * Get sync status for all locations in an organization
+   * Get sync status for all locations in organization (RLS scoped)
    */
-  async getOrganizationSyncStatus(organizationId: string): Promise<{
+  async getOrganizationSyncStatus(): Promise<{
     configEnabled: boolean;
     locations: {
       id: string;
@@ -398,12 +394,10 @@ export class PinballMapService {
       machineCount: number;
     }[];
   }> {
-    const config = await this.db.query.pinballMapConfigs.findFirst({
-      where: eq(pinballMapConfigs.organizationId, organizationId),
-    });
+    // RLS automatically scopes to user's organization
+    const config = await this.db.query.pinball_map_configs.findFirst();
 
     const locationsData = await this.db.query.locations.findMany({
-      where: eq(locations.organizationId, organizationId),
       with: {
         machines: {
           columns: { id: true },
@@ -438,7 +432,6 @@ export async function processFixtureData(
   db: DrizzleClient,
   fixtureData: PinballMapMachineDetailsResponse,
   locationId: string,
-  organizationId: string,
 ): Promise<{ created: number; error?: string }> {
   try {
     let created = 0;
@@ -449,11 +442,10 @@ export async function processFixtureData(
       const model = await service.findOrCreateModel(machine, true);
 
       if (model) {
-        // Create machine instance
+        // Create machine instance (organizationId set by RLS trigger)
         await db.insert(machines).values({
           id: `machine_${Date.now().toString()}_${Math.random().toString(36).substring(2, 11)}`,
           name: model.name, // Use model name as default instance name
-          organizationId,
           modelId: model.id,
           locationId,
           qrCodeId: `qr_${Date.now().toString()}_${Math.random().toString(36).substring(2, 11)}`,

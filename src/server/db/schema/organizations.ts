@@ -16,7 +16,7 @@ export const organizations = pgTable(
   },
   (table) => [
     // Organization subdomain lookup (critical for tenant resolution)
-    index("Organization_subdomain_idx").on(table.subdomain),
+    index("organizations_subdomain_idx").on(table.subdomain),
   ],
 );
 
@@ -30,11 +30,11 @@ export const memberships = pgTable(
   },
   (table) => [
     // Multi-tenancy: organizationId filtering (most critical for performance)
-    index("Membership_userId_organizationId_idx").on(
+    index("memberships_user_id_organization_id_idx").on(
       table.userId,
       table.organizationId,
     ),
-    index("Membership_organizationId_idx").on(table.organizationId),
+    index("memberships_organization_id_idx").on(table.organizationId),
   ],
 );
 
@@ -50,7 +50,7 @@ export const roles = pgTable(
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().notNull(),
   },
-  (table) => [index("Role_organizationId_idx").on(table.organizationId)],
+  (table) => [index("roles_organization_id_idx").on(table.organizationId)],
 );
 
 export const permissions = pgTable("permissions", {
@@ -61,7 +61,7 @@ export const permissions = pgTable("permissions", {
 
 // Junction table for Role-Permission many-to-many relationship (exact Prisma parity)
 export const rolePermissions = pgTable(
-  "rolePermissions",
+  "role_permissions",
   {
     roleId: text("A")
       .notNull()
@@ -72,7 +72,7 @@ export const rolePermissions = pgTable(
   },
   (table) => [
     // Permission system: role-permission lookups
-    index("_RolePermissions_roleId_idx").on(table.roleId),
-    index("_RolePermissions_permissionId_idx").on(table.permissionId),
+    index("role_permissions_role_id_idx").on(table.roleId),
+    index("role_permissions_permission_id_idx").on(table.permissionId),
   ],
 );

@@ -4,7 +4,7 @@ import { pgTable, text, timestamp, boolean, pgEnum } from "drizzle-orm/pg-core";
 // ENUMS
 // =================================
 
-export const notificationFrequencyEnum = pgEnum("NotificationFrequency", [
+export const notificationFrequencyEnum = pgEnum("notification_frequency", [
   "IMMEDIATE",
   "DAILY",
   "WEEKLY",
@@ -62,7 +62,7 @@ export const sessions = pgTable("sessions", {
   expires: timestamp("expires").notNull(),
 });
 
-export const verificationTokens = pgTable("VerificationToken", {
+export const verificationTokens = pgTable("verification_tokens", {
   identifier: text("identifier").notNull(),
   token: text("token").unique().notNull(),
   expires: timestamp("expires").notNull(),

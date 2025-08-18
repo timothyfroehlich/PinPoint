@@ -18,6 +18,16 @@
  *   Part of enhanced database reset workflow (npm run db:reset:local:sb)
  */
 
+import dotenv from 'dotenv';
+
+// Load environment variables - try .env.development first for local dev
+try {
+  dotenv.config({ path: '.env.development' });
+  dotenv.config({ path: '.env.local' }); 
+  dotenv.config(); // Load default .env
+} catch (error) {
+  // If dotenv loading fails, continue - might be in production
+}
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -57,8 +67,9 @@ async function setupRLS(): Promise<void> {
     console.log('🔒 Setting up Row Level Security policies...');
     console.log('📍 Reading setup-rls.sql from scripts directory');
     
-    // Read the SQL setup file
-    const rlsSQL = readFileSync(join(__dirname, 'setup-rls.sql'), 'utf-8');
+    // Read the SQL setup file (use local dev version if no JWT available)
+    const sqlFile = process.env.NODE_ENV === 'production' ? 'setup-rls.sql' : 'setup-rls-local.sql';
+    const rlsSQL = readFileSync(join(__dirname, sqlFile), 'utf-8');
     
     console.log('📊 Executing RLS setup (this may take 30-60 seconds)...');
     

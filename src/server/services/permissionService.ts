@@ -228,13 +228,9 @@ export class PermissionService {
       );
     }
 
-    // Get organization-specific unauthenticated role permissions
+    // Get organization-specific unauthenticated role permissions (RLS scoped)
     const unauthRole = await this.db.query.roles.findFirst({
-      where: (roles) =>
-        and(
-          eq(roles.organizationId, organizationId),
-          eq(roles.name, SYSTEM_ROLES.UNAUTHENTICATED),
-        ),
+      where: (roles) => eq(roles.name, SYSTEM_ROLES.UNAUTHENTICATED),
       with: {
         rolePermissions: {
           with: {
@@ -271,13 +267,9 @@ export class PermissionService {
       );
     }
 
-    // Get organization-specific unauthenticated role permissions
+    // Get organization-specific unauthenticated role permissions (RLS scoped)
     const unauthRole = await this.db.query.roles.findFirst({
-      where: (roles) =>
-        and(
-          eq(roles.organizationId, organizationId),
-          eq(roles.name, SYSTEM_ROLES.UNAUTHENTICATED),
-        ),
+      where: (roles) => eq(roles.name, SYSTEM_ROLES.UNAUTHENTICATED),
       with: {
         rolePermissions: {
           with: {
@@ -300,23 +292,20 @@ export class PermissionService {
   }
 
   /**
-   * Get user membership with role and permissions
+   * Get user membership with role and permissions (RLS scoped)
    */
   private async getUserMembership(
     userId: string,
-    organizationId: string,
+    _organizationId: string, // Keep parameter for API compatibility but rely on RLS
   ): Promise<{
     role: {
       name: string;
       permissions: { name: string }[];
     };
   } | null> {
+    // RLS automatically scopes to user's organization
     const membership = await this.db.query.memberships.findFirst({
-      where: (memberships) =>
-        and(
-          eq(memberships.userId, userId),
-          eq(memberships.organizationId, organizationId),
-        ),
+      where: (memberships) => eq(memberships.userId, userId),
       with: {
         role: {
           with: {

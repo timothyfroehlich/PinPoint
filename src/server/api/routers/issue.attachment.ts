@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, count, eq } from "drizzle-orm";
+import { count, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { generatePrefixedId } from "~/lib/utils/id-generation";
@@ -22,19 +22,13 @@ export const issueAttachmentRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Verify the issue belongs to this organization
+      // Verify the issue exists (RLS handles org scoping)
       const [existingIssue] = await ctx.db
         .select({
           id: issues.id,
-          organizationId: issues.organizationId,
         })
         .from(issues)
-        .where(
-          and(
-            eq(issues.id, input.issueId),
-            eq(issues.organizationId, ctx.organization.id),
-          ),
-        )
+        .where(eq(issues.id, input.issueId))
         .limit(1);
 
       if (!existingIssue) {
@@ -59,7 +53,7 @@ export const issueAttachmentRouter = createTRPCRouter({
         });
       }
 
-      // Create attachment record
+      // Create attachment record (RLS trigger handles organizationId)
       const [newAttachment] = await ctx.db
         .insert(attachments)
         .values({
@@ -68,7 +62,6 @@ export const issueAttachmentRouter = createTRPCRouter({
           fileName: input.fileName,
           fileType: input.fileType,
           issueId: input.issueId,
-          organizationId: ctx.organization.id,
         })
         .returning();
 
@@ -83,24 +76,18 @@ export const issueAttachmentRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Find the attachment and verify it belongs to this organization
+      // Find the attachment (RLS handles org scoping)
       const [attachment] = await ctx.db
         .select({
           id: attachments.id,
           url: attachments.url,
           fileName: attachments.fileName,
           fileType: attachments.fileType,
-          organizationId: attachments.organizationId,
           issueId: attachments.issueId,
           createdAt: attachments.createdAt,
         })
         .from(attachments)
-        .where(
-          and(
-            eq(attachments.id, input.attachmentId),
-            eq(attachments.organizationId, ctx.organization.id),
-          ),
-        )
+        .where(eq(attachments.id, input.attachmentId))
         .limit(1);
 
       if (!attachment) {

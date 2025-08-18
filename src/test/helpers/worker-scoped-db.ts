@@ -258,6 +258,129 @@ async function cleanupAllTestData(_db: TestDatabase): Promise<void> {
  */
 
 /**
+ * RLS Session Context Helpers for Testing
+ *
+ * These helpers set PostgreSQL session variables that RLS policies read
+ * to determine organizational and user context during testing.
+ */
+
+import { sql } from "drizzle-orm";
+
+/**
+ * Set RLS session context for testing
+ * 
+ * @param db - Test database instance
+ * @param orgId - Organization ID for RLS context
+ * @param userId - Optional user ID for RLS context  
+ * @param role - Optional user role for RLS context
+ */
+async function setTestSession(
+  db: TestDatabase,
+  orgId: string,
+  userId?: string,
+  role?: string,
+) {
+  await db.execute(sql`SET app.current_organization_id = ${orgId}`);
+
+  if (userId) {
+    await db.execute(sql`SET app.current_user_id = ${userId}`);
+  }
+
+  if (role) {
+    await db.execute(sql`SET app.current_user_role = ${role}`);
+  }
+}
+
+/**
+ * Pre-configured RLS session contexts for common test scenarios
+ */
+export const rlsContexts = {
+  /**
+   * Admin user context - full organizational access
+   */
+  admin: async (db: TestDatabase, orgId: string, userId: string = "admin-user-id") => {
+    await setTestSession(db, orgId, userId, "admin");
+  },
+
+  /**
+   * Member user context - standard organizational access
+   */  
+  member: async (db: TestDatabase, orgId: string, userId: string = "member-user-id") => {
+    await setTestSession(db, orgId, userId, "member");
+  },
+
+  /**
+   * Anonymous context - only organizational scoping
+   */
+  anonymous: async (db: TestDatabase, orgId: string) => {
+    await setTestSession(db, orgId);
+  },
+
+  /**
+   * Cross-organization testing - switch between orgs to test isolation
+   */
+  switchOrganization: async (db: TestDatabase, newOrgId: string) => {
+    await setTestSession(db, newOrgId);
+  },
+};
+
+/**
+ * Enhanced test isolation wrapper with RLS session context
+ *
+ * Extends withIsolatedTest to automatically set organizational context
+ * for RLS-aware testing.
+ *
+ * @param db - Worker-scoped database instance  
+ * @param orgId - Organization ID for RLS context
+ * @param testFn - Test function that receives transaction context
+ * @returns Promise resolving to test result
+ */
+export async function withRLSTest<T>(
+  db: TestDatabase,
+  orgId: string,
+  testFn: (tx: TestDatabase) => Promise<T>,
+): Promise<T> {
+  return await withIsolatedTest(db, async (tx) => {
+    // Set RLS context at start of transaction
+    await rlsContexts.anonymous(tx, orgId);
+    
+    // Run test function
+    return await testFn(tx);
+  });
+}
+
+/**
+ * Multi-context RLS testing helper
+ * 
+ * For testing organizational boundaries and cross-org isolation
+ */
+export async function withMultiOrgTest<T>(
+  db: TestDatabase,
+  contexts: { orgId: string; role?: string; userId?: string }[],
+  testFn: (
+    setContext: (contextIndex: number) => Promise<void>,
+    tx: TestDatabase
+  ) => Promise<T>,
+): Promise<T> {
+  return await withIsolatedTest(db, async (tx) => {
+    const setContext = async (contextIndex: number) => {
+      const context = contexts[contextIndex];
+      if (!context) {
+        throw new Error(`Context ${contextIndex} not provided`);
+      }
+      
+      await setTestSession(tx, context.orgId, context.userId, context.role);
+    };
+    
+    // Start with first context
+    await setContext(0);
+    
+    // Run test function with context switcher
+    return await testFn(setContext, tx);
+  });
+}
+
+/**
  * Export types for convenience
  */
 export type { TestDatabase } from "./pglite-test-setup";

@@ -1,6 +1,8 @@
-# Current tRPC Patterns
+# Current tRPC Patterns (Post-RLS)
 
-Current tRPC procedure patterns used in PinPoint. **Note**: API routes have been removed - these are our current operational patterns.
+Current tRPC procedure patterns used in PinPoint. **Phase 0-2 Complete**: API routes removed, RLS implemented.
+
+**🔑 Key Change**: Simplified procedures - no more manual `organizationId` filtering or complex middleware.
 
 ## 🔧 Basic Procedure Patterns
 
@@ -61,39 +63,58 @@ export const issueRouter = createTRPCRouter({
 
 ## 🔐 Multi-Tenant Security Pattern
 
-### Organization-Scoped Procedure
+### Simplified Procedures (Post-RLS)
 
 ```typescript
-// CURRENT PATTERN - Multi-tenant security
+// ✅ CURRENT PATTERN (Post-RLS) - RLS handles organizational scoping
 export const machineRouter = createTRPCRouter({
-  list: organizationProcedure
-    .requiresPermission("machine:view")
+  list: protectedProcedure
     .query(async ({ ctx }) => {
-      // All auth/permission checks handled by middleware
-      // Drizzle query automatically scoped by organizationId
+      // RLS automatically scopes to user's organization via Supabase auth context
+      // No manual organizationId filtering needed!
       return ctx.db.query.machines.findMany({
-        where: eq(machines.organizationId, ctx.organizationId),
+        orderBy: [asc(machines.name)], // Only business logic needed
+      });
+    }),
+    
+  byLocation: protectedProcedure
+    .input(z.object({ locationId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      return ctx.db.query.machines.findMany({
+        where: eq(machines.locationId, input.locationId),
+        // ✅ Both machines and location automatically scoped to user's org by RLS
+        with: {
+          location: true,
+          model: true,
+        }
       });
     }),
 });
 ```
 
-### Resource Access Validation
+### Resource Access Validation  
 
 ```typescript
-// CURRENT PATTERN - Verify resource ownership
+// ✅ CURRENT PATTERN (Post-RLS) - Trust database-level security
 export const issueRouter = createTRPCRouter({
-  byId: organizationProcedure
+  byId: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
       const issue = await ctx.db.query.issues.findFirst({
-        where: and(
-          eq(issues.id, input.id),
-          eq(issues.organizationId, ctx.organizationId),
-        ),
+        // ✅ Only business logic filtering - RLS ensures organizational isolation
+        where: eq(issues.id, input.id),
+        with: {
+          machine: {
+            with: { location: true }
+          },
+          comments: {
+            with: { author: true }
+          }
+        }
       });
 
       if (!issue) {
+        // If RLS policies block access, issue will be null (not found)
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Issue not found or access denied",

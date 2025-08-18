@@ -1,4 +1,4 @@
-import { count, eq, asc, and } from "drizzle-orm";
+import { count, eq, asc } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
 
@@ -32,7 +32,6 @@ export const issueStatusRouter = createTRPCRouter({
     return ctx.db
       .select()
       .from(issueStatuses)
-      .where(eq(issueStatuses.organizationId, ctx.organization.id))
       .orderBy(asc(issueStatuses.name));
   }),
 
@@ -50,7 +49,6 @@ export const issueStatusRouter = createTRPCRouter({
           id: generateId(),
           name: input.name,
           category: input.category,
-          organizationId: ctx.organization.id,
         })
         .returning();
       return result;
@@ -77,12 +75,7 @@ export const issueStatusRouter = createTRPCRouter({
       const [result] = await ctx.db
         .update(issueStatuses)
         .set(updateData)
-        .where(
-          and(
-            eq(issueStatuses.id, input.id),
-            eq(issueStatuses.organizationId, ctx.organization.id),
-          ),
-        )
+        .where(eq(issueStatuses.id, input.id))
         .returning();
 
       return result;
@@ -91,16 +84,11 @@ export const issueStatusRouter = createTRPCRouter({
   delete: organizationManageProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      // Check if any issues are using this status
+      // Check if any issues are using this status (RLS handles org scoping)
       const [issueCountResult] = await ctx.db
         .select({ count: count() })
         .from(issues)
-        .where(
-          and(
-            eq(issues.statusId, input.id),
-            eq(issues.organizationId, ctx.organization.id),
-          ),
-        );
+        .where(eq(issues.statusId, input.id));
 
       if (issueCountResult?.count && issueCountResult.count > 0) {
         throw new Error(
@@ -110,12 +98,7 @@ export const issueStatusRouter = createTRPCRouter({
 
       const [result] = await ctx.db
         .delete(issueStatuses)
-        .where(
-          and(
-            eq(issueStatuses.id, input.id),
-            eq(issueStatuses.organizationId, ctx.organization.id),
-          ),
-        )
+        .where(eq(issueStatuses.id, input.id))
         .returning();
 
       return result;
@@ -123,24 +106,22 @@ export const issueStatusRouter = createTRPCRouter({
 
   // Status Counts / Analytics
   getStatusCounts: organizationProcedure.query(async ({ ctx }) => {
-    // Get issue counts grouped by statusId using Drizzle aggregation
+    // Get issue counts grouped by statusId using Drizzle aggregation (RLS handles org scoping)
     const counts = await ctx.db
       .select({
         statusId: issues.statusId,
         count: count(),
       })
       .from(issues)
-      .where(eq(issues.organizationId, ctx.organization.id))
       .groupBy(issues.statusId);
 
-    // Get all statuses for the organization
+    // Get all statuses (RLS handles org scoping)
     const statuses = await ctx.db
       .select({
         id: issueStatuses.id,
         category: issueStatuses.category,
       })
-      .from(issueStatuses)
-      .where(eq(issueStatuses.organizationId, ctx.organization.id));
+      .from(issueStatuses);
 
     // Create status ID to category mapping
     const statusMap = new Map(statuses.map((s) => [s.id, s.category]));

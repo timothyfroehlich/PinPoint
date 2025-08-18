@@ -28,7 +28,7 @@ const mockDrizzleClient = {
 
 ### Supported Query Patterns
 
-The mock supports these Drizzle query patterns used in the migrated `issueStatus` router:
+The mock supports these Drizzle query patterns used in the migrated `issue_status` router:
 
 1. **getAll**: `select().from().where().orderBy()`
 2. **create**: `insert().values().returning()`
@@ -109,13 +109,13 @@ vi.mocked(mockContext.drizzle.returning).mockResolvedValue([deleteResult]);
 
 ## IssueStatus Router Example
 
-The migrated `issueStatus` router demonstrates all key patterns:
+The migrated `issue_status` router demonstrates all key patterns:
 
 ### Operations Converted
 
-- **getAll**: `ctx.drizzle.select().from(schema.issueStatuses).where().orderBy()`
-- **create**: `ctx.drizzle.insert(schema.issueStatuses).values().returning()`
-- **update**: `ctx.drizzle.update(schema.issueStatuses).set().where().returning()`
+- **getAll**: `ctx.drizzle.select().from(schema.issue_statuses).where().orderBy()`
+- **create**: `ctx.drizzle.insert(schema.issue_statuses).values().returning()`
+- **update**: `ctx.drizzle.update(schema.issue_statuses).set().where().returning()`
 - **delete**: Complex operation with count check + delete
 
 ### Key Features Tested
@@ -337,7 +337,7 @@ describe("Complex Router with Multiple Queries", () => {
 ✅ **Test Infrastructure Updated**: Enhanced Drizzle mock supports all query patterns
 ✅ **Complex Router Testing Solved**: Admin router breakthrough provides pattern for complex scenarios
 ✅ **All Tests Passing**: Full validation suite passes with new patterns  
-✅ **IssueStatus Router Migrated**: First router successfully migrated and tested
+✅ **Issue_status Router Migrated**: First router successfully migrated and tested
 ✅ **Documentation Complete**: Testing patterns documented for future migrations
 
 The test infrastructure is ready to support all Drizzle router migrations in Phase 2B-E, including complex routers with multiple query chains and business logic validation.

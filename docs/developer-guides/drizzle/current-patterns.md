@@ -1,32 +1,45 @@
-# Current Drizzle Patterns
+# Current Drizzle Patterns (Post-RLS)
 
-Current database query and mutation patterns used in PinPoint. **Note**: Prisma has been removed - these are our current operational patterns.
+Current database query patterns used in PinPoint. **Phase 0-2 Complete**: Prisma removed, RLS implemented.
+
+**🔑 Key Change**: No more manual `organizationId` filtering - RLS handles organizational scoping automatically.
 
 ## 🔄 Query Patterns
 
 ### Simple Queries
 
 ```typescript
-// Single record lookup
+// Single record lookup - RLS automatically scopes to user's organization  
 const user = await db.query.users.findFirst({
   where: eq(users.id, userId),
+  // ✅ No organizationId filter needed - RLS handles it
 });
 
-// Multiple records
+// Multiple records - organizational scoping is automatic
 const users = await db.query.users.findMany({
-  where: eq(users.organizationId, orgId),
+  // ✅ Only business logic filtering needed
+  where: eq(users.roleId, "admin"),
 });
 ```
 
 ### Relational Queries
 
 ```typescript
-// Related data fetching with 'with'
-const postsWithAuthor = await db.query.posts.findMany({
-  where: eq(posts.organizationId, organizationId),
+// Related data fetching with 'with' - all relations automatically scoped
+const issuesWithMachines = await db.query.issues.findMany({
+  // ✅ No organizationId needed anywhere - RLS ensures isolation
+  where: eq(issues.statusId, "open"), 
   with: {
-    author: true,
-    comments: { with: { author: true } },
+    machine: {
+      with: {
+        location: true, // All nested relations automatically scoped
+      }
+    },
+    comments: { 
+      with: { 
+        author: true 
+      } 
+    },
   },
 });
 ```
@@ -34,13 +47,43 @@ const postsWithAuthor = await db.query.posts.findMany({
 ### Complex Filtering
 
 ```typescript
-// Multiple conditions with and/or
+// Business logic filtering only - RLS handles organizational boundaries
 const issues = await db.query.issues.findMany({
   where: and(
-    eq(issues.organizationId, organizationId),
-    inArray(issues.status, ["open", "in-progress"]),
+    // ✅ Only business logic conditions needed
+    inArray(issues.statusId, ["open", "in-progress"]),
     gte(issues.createdAt, startDate),
+    // ❌ No longer needed: eq(issues.organizationId, organizationId)
   ),
+});
+```
+
+### Legacy vs Modern Comparison
+
+```typescript
+// ❌ OLD (Pre-RLS): Manual organizational filtering everywhere
+const oldIssues = await db.query.issues.findMany({
+  where: and(
+    eq(issues.organizationId, ctx.organization.id), // Manual filter
+    eq(issues.statusId, "open"),
+    eq(issues.machineId, machineId)
+  ),
+  with: {
+    machine: {
+      where: eq(machines.organizationId, ctx.organization.id), // Manual nested filter
+    }
+  }
+});
+
+// ✅ NEW (Post-RLS): Clean business logic only  
+const newIssues = await db.query.issues.findMany({
+  where: and(
+    eq(issues.statusId, "open"),
+    eq(issues.machineId, machineId)
+  ),
+  with: {
+    machine: true, // RLS automatically ensures organizational isolation
+  }
 });
 ```
 

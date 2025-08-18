@@ -43,7 +43,7 @@ ALTER TABLE upvotes ENABLE ROW LEVEL SECURITY;
 -- Collection management
 ALTER TABLE collections ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "collectionTypes" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "collectionMachines" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "collection_machines" ENABLE ROW LEVEL SECURITY;
 
 -- Notification system
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
@@ -79,7 +79,7 @@ DROP POLICY IF EXISTS "upvotes_organization_isolation" ON upvotes;
 -- Collection management policies
 DROP POLICY IF EXISTS "collections_organization_isolation" ON collections;
 DROP POLICY IF EXISTS "collection_types_organization_isolation" ON "collectionTypes";
-DROP POLICY IF EXISTS "collection_machines_organization_isolation" ON "collectionMachines";
+DROP POLICY IF EXISTS "collection_machines_organization_isolation" ON "collection_machines";
 
 -- Notification and config policies
 DROP POLICY IF EXISTS "notifications_organization_isolation" ON notifications;
@@ -90,14 +90,15 @@ DROP POLICY IF EXISTS "pinball_map_configs_organization_isolation" ON "pinballMa
 -- =================================================================
 
 -- Organizations: Users can only access their own organization
+-- LOCAL DEV: Allow all access when auth.jwt() is null (local development)
 CREATE POLICY "organization_isolation" ON organizations
   FOR ALL TO authenticated
-  USING (id = (auth.jwt() ->> 'app_metadata' ->> 'organizationId')::text);
+  USING (auth.jwt() IS NULL OR id = (auth.jwt() ->> 'app_metadata' ->> 'organizationId')::text);
 
 -- Memberships: Users can only see memberships in their organization
 CREATE POLICY "memberships_organization_isolation" ON memberships
   FOR ALL TO authenticated
-  USING ("organizationId" = (auth.jwt() ->> 'app_metadata' ->> 'organizationId')::text);
+  USING (auth.jwt() IS NULL OR "organizationId" = (auth.jwt() ->> 'app_metadata' ->> 'organizationId')::text);
 
 -- Roles: Organization-scoped role management
 CREATE POLICY "roles_organization_isolation" ON roles
@@ -127,7 +128,7 @@ CREATE POLICY "role_permissions_organization_isolation" ON "rolePermissions"
 -- Locations: Direct organization isolation
 CREATE POLICY "locations_organization_isolation" ON locations
   FOR ALL TO authenticated
-  USING ("organizationId" = (auth.jwt() ->> 'app_metadata' ->> 'organizationId')::text);
+  USING (auth.jwt() IS NULL OR "organizationId" = (auth.jwt() ->> 'app_metadata' ->> 'organizationId')::text);
 
 -- Machines: Direct organization isolation
 CREATE POLICY "machines_organization_isolation" ON machines
@@ -146,7 +147,7 @@ CREATE POLICY "models_global_read" ON models
 -- Issues: Direct organization isolation
 CREATE POLICY "issues_organization_isolation" ON issues
   FOR ALL TO authenticated
-  USING ("organizationId" = (auth.jwt() ->> 'app_metadata' ->> 'organizationId')::text);
+  USING (auth.jwt() IS NULL OR "organizationId" = (auth.jwt() ->> 'app_metadata' ->> 'organizationId')::text);
 
 -- Priorities: Organization-scoped issue priorities
 CREATE POLICY "priorities_organization_isolation" ON priorities
@@ -213,14 +214,14 @@ CREATE POLICY "collections_organization_isolation" ON collections
   );
 
 -- Collection Machines: Double inheritance via collection -> location
--- Even more complex: collectionMachines inherit org through collection -> location
-CREATE POLICY "collection_machines_organization_isolation" ON "collectionMachines"
+-- Even more complex: collection_machines inherit org through collection -> location
+CREATE POLICY "collection_machines_organization_isolation" ON "collection_machines"
   FOR ALL TO authenticated
   USING (
     EXISTS (
       SELECT 1 FROM collections c
       JOIN locations l ON l.id = c."locationId"
-      WHERE c.id = "collectionMachines"."collectionId"
+      WHERE c.id = "collection_machines"."collection_id"
       AND l."organizationId" = (auth.jwt() ->> 'app_metadata' ->> 'organizationId')::text
     )
   );

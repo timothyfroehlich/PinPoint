@@ -29,7 +29,7 @@ LANGUAGE plpgsql
 SECURITY DEFINER SET search_path = ''
 AS $$
 BEGIN
-  INSERT INTO public."User" (
+  INSERT INTO public.users (
     id,
     name,
     email,
@@ -62,6 +62,6 @@ CREATE TRIGGER on_auth_user_created
 
 -- Enable RLS on key tables (no policies yet - tables must exist first)
 -- These will be uncommented in Stage 3:
--- ALTER TABLE public."User" ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 -- ALTER TABLE public."Organization" ENABLE ROW LEVEL SECURITY;
 -- ALTER TABLE public."Issue" ENABLE ROW LEVEL SECURITY;

@@ -346,63 +346,84 @@ describe("Issue Workflow Integration", () => {
 });
 ```
 
-### RLS Policy Testing
+### RLS Policy Testing (Modern Pattern)
+
+Using memory-safe PGlite with RLS session helpers:
 
 ```typescript
-describe("RLS Security Policies", () => {
-  it("prevents unauthorized access patterns", async () => {
-    await withTransaction(async (tx) => {
-      // Setup: Create issue as admin
-      const adminCtx = await createTestContext({
-        db: tx,
-        organizationId: testOrgId,
-        permissions: ["admin"],
-      });
+import { test, withIsolatedTest, rlsContexts } from "~/test/helpers/worker-scoped-db";
 
-      const adminCaller = appRouter.createCaller(adminCtx);
-      const sensitiveIssue = await adminCaller.issue.create({
-        title: "Security Vulnerability",
-        isInternal: true,
-        machineId: testMachineId,
-      });
+test("RLS enforces organizational boundaries", async ({ workerDb }) => {
+  await withIsolatedTest(workerDb, async (db) => {
+    // Create data in org-1 context
+    await rlsContexts.admin(db, "org-1");
+    const [org1Issue] = await db.insert(issues).values({
+      title: "Org 1 Confidential Issue",
+      priority: "high"
+    }).returning();
 
-      // Test 1: Member without permission cannot see internal issues
-      const memberCtx = await createTestContext({
-        db: tx,
-        organizationId: testOrgId,
-        permissions: ["issue:view"], // No internal permission
-      });
+    // Create data in org-2 context  
+    await rlsContexts.admin(db, "org-2");
+    const [org2Issue] = await db.insert(issues).values({
+      title: "Org 2 Confidential Issue",
+      priority: "low"
+    }).returning();
 
-      const memberCaller = appRouter.createCaller(memberCtx);
-      const memberIssues = await memberCaller.issue.getAll();
+    // Verify complete isolation - org-2 context only sees org-2 data
+    const org2VisibleIssues = await db.query.issues.findMany();
+    expect(org2VisibleIssues).toHaveLength(1);
+    expect(org2VisibleIssues[0].id).toBe(org2Issue.id);
+    
+    // Switch to org-1 context and verify isolation
+    await rlsContexts.admin(db, "org-1");
+    const org1VisibleIssues = await db.query.issues.findMany();
+    expect(org1VisibleIssues).toHaveLength(1);
+    expect(org1VisibleIssues[0].id).toBe(org1Issue.id);
+  });
+});
 
-      expect(memberIssues).not.toContainEqual(
-        expect.objectContaining({ id: sensitiveIssue.id }),
-      );
+test("multi-context testing with helper", async ({ workerDb }) => {
+  await withMultiOrgTest(
+    workerDb,
+    [
+      { orgId: "org-1", role: "admin", userId: "admin-1" },
+      { orgId: "org-2", role: "member", userId: "member-2" }
+    ],
+    async (setContext, db) => {
+      // Start in org-1 as admin
+      await setContext(0);
+      await db.insert(issues).values({ title: "Admin Issue" });
+      
+      // Switch to org-2 as member  
+      await setContext(1);
+      await db.insert(issues).values({ title: "Member Issue" });
+      
+      // Each context only sees their own org's data
+      const org2Issues = await db.query.issues.findMany();
+      expect(org2Issues).toHaveLength(1);
+      expect(org2Issues[0].title).toBe("Member Issue");
+    }
+  );
+});
+```
 
-      // Test 2: Different org cannot access at all
-      const otherOrgCtx = await createTestContext({
-        db: tx,
-        organizationId: "other-org",
-        permissions: ["admin"], // Even admin in other org
-      });
+### Legacy Pattern (Pre-RLS)
 
-      const otherOrgCaller = appRouter.createCaller(otherOrgCtx);
-      await expect(
-        otherOrgCaller.issue.getById({ id: sensitiveIssue.id }),
-      ).rejects.toThrow();
+For reference, the old manual filtering approach:
 
-      // Test 3: Anonymous access blocked
-      const publicCtx = await createTestContext({
-        db: tx,
-        // No auth
-      });
-
-      const publicCaller = appRouter.createCaller(publicCtx);
-      await expect(
-        publicCaller.issue.getById({ id: sensitiveIssue.id }),
-      ).rejects.toThrow("UNAUTHORIZED");
+```typescript
+describe("Manual Organization Filtering (Legacy)", () => {
+  it("required complex manual checks", async () => {
+    // OLD: Manual organizationId coordination everywhere
+    const issues = await db.query.issues.findMany({
+      where: and(
+        eq(issues.organizationId, ctx.organization.id), // Manual filter
+        eq(issues.statusId, input.statusId)
+      )
     });
+    
+    // OLD: Manual validation required
+    expect(issues.every(i => i.organizationId === ctx.organization.id)).toBe(true);
   });
 });
 ```

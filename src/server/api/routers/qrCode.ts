@@ -32,18 +32,12 @@ export const qrCodeRouter = createTRPCRouter({
   getInfo: organizationProcedure
     .input(z.object({ machineId: z.string() }))
     .query(async ({ ctx, input }) => {
-      // Verify machine belongs to organization
-
+      // Verify machine exists and is accessible (RLS handles org scoping)
       const machine = await getSingleRecordWithLimit(
         ctx.db
           .select()
           .from(machines)
-          .where(
-            and(
-              eq(machines.id, input.machineId),
-              eq(machines.organizationId, ctx.organization.id),
-            ),
-          )
+          .where(eq(machines.id, input.machineId))
           .$dynamic(),
       );
 
@@ -67,27 +61,27 @@ export const qrCodeRouter = createTRPCRouter({
     }),
 
   /**
-   * Generate QR codes for all machines without QR codes in the organization
+   * Generate QR codes for all machines without QR codes in the organization (RLS scoped)
    */
   generateBulk: organizationManageProcedure.mutation(async ({ ctx }) => {
     const qrCodeService = ctx.services.createQRCodeService();
-    return qrCodeService.generateQRCodesForOrganization(ctx.organization.id);
+    return qrCodeService.generateQRCodesForOrganization();
   }),
 
   /**
-   * Regenerate QR codes for all machines in the organization
+   * Regenerate QR codes for all machines in the organization (RLS scoped)
    */
   regenerateBulk: organizationManageProcedure.mutation(async ({ ctx }) => {
     const qrCodeService = ctx.services.createQRCodeService();
-    return qrCodeService.regenerateQRCodesForOrganization(ctx.organization.id);
+    return qrCodeService.regenerateQRCodesForOrganization();
   }),
 
   /**
-   * Get QR code statistics for the organization
+   * Get QR code statistics for the organization (RLS scoped)
    */
   getStats: organizationProcedure.query(async ({ ctx }) => {
     const qrCodeService = ctx.services.createQRCodeService();
-    return qrCodeService.getOrganizationQRCodeStats(ctx.organization.id);
+    return qrCodeService.getOrganizationQRCodeStats();
   }),
 
   /**

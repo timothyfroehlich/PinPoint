@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { eq, and, asc, desc, isNull } from "drizzle-orm";
+import { eq, asc, desc, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 import { createTRPCRouter } from "../trpc";
@@ -52,7 +52,6 @@ export const adminRouter = createTRPCRouter({
       .from(memberships)
       .innerJoin(users, eq(memberships.userId, users.id))
       .innerJoin(roles, eq(memberships.roleId, roles.id))
-      .where(eq(memberships.organizationId, ctx.organization.id))
       .orderBy(asc(roles.name), asc(users.name));
 
     return members.map((member) => ({
@@ -82,16 +81,11 @@ export const adminRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Get the target role and verify it exists in this organization
+      // Get the target role and verify it exists
       const [role] = await ctx.db
         .select()
         .from(roles)
-        .where(
-          and(
-            eq(roles.id, input.roleId),
-            eq(roles.organizationId, ctx.organization.id),
-          ),
-        )
+        .where(eq(roles.id, input.roleId))
         .limit(1);
 
       if (!role) {
@@ -127,12 +121,7 @@ export const adminRouter = createTRPCRouter({
         .from(memberships)
         .innerJoin(users, eq(memberships.userId, users.id))
         .innerJoin(roles, eq(memberships.roleId, roles.id))
-        .where(
-          and(
-            eq(memberships.userId, input.userId),
-            eq(memberships.organizationId, ctx.organization.id),
-          ),
-        )
+        .where(eq(memberships.userId, input.userId))
         .limit(1);
 
       const currentMembership = membershipResults[0];
@@ -170,7 +159,7 @@ export const adminRouter = createTRPCRouter({
         .from(memberships)
         .innerJoin(users, eq(memberships.userId, users.id))
         .innerJoin(roles, eq(memberships.roleId, roles.id))
-        .where(eq(memberships.organizationId, ctx.organization.id));
+        ;
 
       // Create validation input
       const validationInput: RoleAssignmentInput = {
@@ -214,12 +203,7 @@ export const adminRouter = createTRPCRouter({
       await ctx.db
         .update(memberships)
         .set({ roleId: input.roleId })
-        .where(
-          and(
-            eq(memberships.userId, input.userId),
-            eq(memberships.organizationId, ctx.organization.id),
-          ),
-        );
+        .where(eq(memberships.userId, input.userId));
 
       // Fetch the updated membership with role and user data
       const [membership] = await ctx.db
@@ -242,12 +226,7 @@ export const adminRouter = createTRPCRouter({
         .from(memberships)
         .innerJoin(users, eq(memberships.userId, users.id))
         .innerJoin(roles, eq(memberships.roleId, roles.id))
-        .where(
-          and(
-            eq(memberships.userId, input.userId),
-            eq(memberships.organizationId, ctx.organization.id),
-          ),
-        )
+        .where(eq(memberships.userId, input.userId))
         .limit(1);
 
       return membership;
@@ -269,12 +248,7 @@ export const adminRouter = createTRPCRouter({
       const [role] = await ctx.db
         .select()
         .from(roles)
-        .where(
-          and(
-            eq(roles.id, input.roleId),
-            eq(roles.organizationId, ctx.organization.id),
-          ),
-        )
+        .where(eq(roles.id, input.roleId))
         .limit(1);
 
       if (!role) {
@@ -321,12 +295,7 @@ export const adminRouter = createTRPCRouter({
       const [existingMembership] = await ctx.db
         .select()
         .from(memberships)
-        .where(
-          and(
-            eq(memberships.userId, user.id),
-            eq(memberships.organizationId, ctx.organization.id),
-          ),
-        )
+        .where(eq(memberships.userId, user.id))
         .limit(1);
 
       if (existingMembership) {
@@ -416,12 +385,7 @@ export const adminRouter = createTRPCRouter({
       .from(memberships)
       .innerJoin(users, eq(memberships.userId, users.id))
       .innerJoin(roles, eq(memberships.roleId, roles.id))
-      .where(
-        and(
-          eq(memberships.organizationId, ctx.organization.id),
-          isNull(users.emailVerified),
-        ),
-      )
+      .where(isNull(users.emailVerified))
       .orderBy(desc(users.createdAt));
 
     return invitations.map((invitation) => ({
@@ -466,12 +430,7 @@ export const adminRouter = createTRPCRouter({
         .from(memberships)
         .innerJoin(users, eq(memberships.userId, users.id))
         .innerJoin(roles, eq(memberships.roleId, roles.id))
-        .where(
-          and(
-            eq(memberships.userId, input.userId),
-            eq(memberships.organizationId, ctx.organization.id),
-          ),
-        )
+        .where(eq(memberships.userId, input.userId))
         .limit(1);
 
       if (!membership) {
@@ -507,7 +466,7 @@ export const adminRouter = createTRPCRouter({
         .from(memberships)
         .innerJoin(users, eq(memberships.userId, users.id))
         .innerJoin(roles, eq(memberships.roleId, roles.id))
-        .where(eq(memberships.organizationId, ctx.organization.id));
+        ;
 
       const context: RoleManagementContext = {
         organizationId: ctx.organization.id,
@@ -555,12 +514,7 @@ export const adminRouter = createTRPCRouter({
       // Remove the membership
       await ctx.db
         .delete(memberships)
-        .where(
-          and(
-            eq(memberships.userId, input.userId),
-            eq(memberships.organizationId, ctx.organization.id),
-          ),
-        );
+        .where(eq(memberships.userId, input.userId));
 
       return { success: true };
     }),
@@ -580,12 +534,7 @@ export const adminRouter = createTRPCRouter({
       const [role] = await ctx.db
         .select()
         .from(roles)
-        .where(
-          and(
-            eq(roles.id, input.roleId),
-            eq(roles.organizationId, ctx.organization.id),
-          ),
-        )
+        .where(eq(roles.id, input.roleId))
         .limit(1);
 
       if (!role) {
@@ -632,12 +581,7 @@ export const adminRouter = createTRPCRouter({
         [reassignRole] = await ctx.db
           .select()
           .from(roles)
-          .where(
-            and(
-              eq(roles.id, input.reassignRoleId),
-              eq(roles.organizationId, ctx.organization.id),
-            ),
-          )
+          .where(eq(roles.id, input.reassignRoleId))
           .limit(1);
 
         if (!reassignRole) {

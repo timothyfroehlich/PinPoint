@@ -2,20 +2,22 @@
 
 In-depth technical guides for PinPoint development.
 
-## Current Stack (Migration In Progress)
+## Current Stack (Post-Migration)
 
-**Legacy (Being Replaced):**
+**Phase 0-2 Complete:** Drizzle + RLS Implementation
 
-- TypeScript with Prisma type generation
-- NextAuth session patterns
+- ✅ TypeScript with Drizzle type inference
+- ✅ Supabase server-centric auth (@supabase/ssr)
+- ✅ Row-Level Security (RLS) for multi-tenancy
+- ✅ Memory-safe PGlite testing patterns
+- ✅ Server Components + Server Actions
+- ✅ Modern ES Module mocking patterns
 
-**New Stack (Current):**
-
-- TypeScript with Drizzle type inference
-- Supabase server-centric auth (@supabase/ssr)
-- Generated columns for computed fields
-- Server Components + Server Actions
-- Modern ES Module mocking patterns
+**Architecture Benefits:**
+- Database-level organizational scoping via RLS
+- Zero manual organizationId filtering needed
+- Worker-scoped test databases prevent memory blowouts
+- Type-safe testing with specialized agent patterns
 
 **🚨 CRITICAL**: See [`../latest-updates/`](../latest-updates/) for post-training breaking changes
 

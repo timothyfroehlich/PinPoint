@@ -7,18 +7,16 @@ import {
   organizationProcedure,
   organizationManageProcedure,
 } from "~/server/api/trpc";
-import { models, machines } from "~/server/db/schema";
+import { models } from "~/server/db/schema";
 
 export const modelCoreRouter = createTRPCRouter({
   // Enhanced getAll with OPDB metadata
   getAll: organizationProcedure.query(async ({ ctx }) => {
-    // Get all game titles that are either:
-    // 1. Custom games belonging to this organization
-    // 2. Global OPDB games that have instances in this organization
+    // Get all game titles that have instances in this organization
+    // RLS automatically handles organizational scoping for machines
     const modelsWithMachines = await ctx.db.query.models.findMany({
       with: {
         machines: {
-          where: eq(machines.organizationId, ctx.organization.id),
           columns: { id: true },
         },
       },
@@ -49,7 +47,6 @@ export const modelCoreRouter = createTRPCRouter({
         where: eq(models.id, input.id),
         with: {
           machines: {
-            where: eq(machines.organizationId, ctx.organization.id),
             columns: { id: true },
           },
         },
@@ -73,12 +70,11 @@ export const modelCoreRouter = createTRPCRouter({
   delete: organizationManageProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      // Verify the game title belongs to this organization or is a global OPDB game
+      // Verify the game title is accessible to this organization
       const model = await ctx.db.query.models.findFirst({
         where: eq(models.id, input.id),
         with: {
           machines: {
-            where: eq(machines.organizationId, ctx.organization.id),
             columns: { id: true },
           },
         },

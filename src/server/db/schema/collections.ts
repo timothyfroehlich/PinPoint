@@ -14,7 +14,7 @@ import {
 // ENUMS
 // =================================
 
-export const notificationTypeEnum = pgEnum("NotificationType", [
+export const notificationTypeEnum = pgEnum("notification_type", [
   "ISSUE_CREATED", // New issue on owned machine
   "ISSUE_UPDATED", // Issue status changed
   "ISSUE_ASSIGNED", // Issue assigned to user
@@ -23,7 +23,7 @@ export const notificationTypeEnum = pgEnum("NotificationType", [
   "SYSTEM_ANNOUNCEMENT", // System-wide announcements
 ]);
 
-export const notificationEntityEnum = pgEnum("NotificationEntity", [
+export const notificationEntityEnum = pgEnum("notification_entity", [
   "ISSUE",
   "MACHINE",
   "COMMENT",
@@ -53,14 +53,14 @@ export const collections = pgTable(
   },
   (table) => [
     // Collection filtering by type
-    index("Collection_typeId_idx").on(table.typeId),
+    index("collections_type_id_idx").on(table.typeId),
   ],
 );
 
 // locationId is nullable for organization-wide collections
 
 export const collectionTypes = pgTable(
-  "collectionTypes",
+  "collection_types",
   {
     id: text("id").primaryKey(),
     name: text("name").notNull(), // e.g., "Rooms", "Manufacturer", "Era", "Genre"
@@ -79,10 +79,10 @@ export const collectionTypes = pgTable(
   },
   (table) => [
     // Multi-tenancy: organizationId filtering (most critical)
-    index("CollectionType_organizationId_idx").on(table.organizationId),
+    index("collection_types_organization_id_idx").on(table.organizationId),
     // Collection type filtering and display ordering
-    index("CollectionType_isEnabled_idx").on(table.isEnabled),
-    index("CollectionType_sortOrder_idx").on(table.sortOrder),
+    index("collection_types_is_enabled_idx").on(table.isEnabled),
+    index("collection_types_sort_order_idx").on(table.sortOrder),
   ],
 );
 
@@ -103,8 +103,8 @@ export const notifications = pgTable(
   },
   (table) => [
     // Essential notification indexes for performance
-    index("Notification_userId_read_idx").on(table.userId, table.read),
-    index("Notification_userId_createdAt_idx").on(
+    index("notifications_user_id_read_idx").on(table.userId, table.read),
+    index("notifications_user_id_created_at_idx").on(
       table.userId,
       table.createdAt,
     ),
@@ -128,7 +128,7 @@ export const collectionMachines = pgTable(
 );
 
 export const pinballMapConfigs = pgTable(
-  "pinballMapConfigs",
+  "pinball_map_configs",
   {
     id: text("id").primaryKey(),
     organizationId: text("organizationId").unique().notNull(),
@@ -148,6 +148,6 @@ export const pinballMapConfigs = pgTable(
   },
   (table) => [
     // PinballMap config lookup (already has unique constraint but adding explicit index)
-    index("PinballMapConfig_organizationId_idx").on(table.organizationId),
+    index("pinball_map_configs_organization_id_idx").on(table.organizationId),
   ],
 );

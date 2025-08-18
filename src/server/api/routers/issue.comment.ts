@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { CommentService } from "./utils/commentService";
@@ -11,7 +11,7 @@ import {
   type ValidationContext,
 } from "./utils/commentValidation";
 
-import type { OrganizationTRPCContext } from "~/server/api/trpc.base";
+import type { RLSOrganizationTRPCContext } from "~/server/api/trpc.base";
 
 import { generatePrefixedId } from "~/lib/utils/id-generation";
 import {
@@ -24,7 +24,7 @@ import { comments, issues, memberships, users } from "~/server/db/schema";
 
 // Helper function to create a comment with author details
 async function createCommentWithAuthor(
-  ctx: OrganizationTRPCContext,
+  ctx: RLSOrganizationTRPCContext,
   input: { issueId: string; content: string },
 ): Promise<{
   id: string;
@@ -40,19 +40,13 @@ async function createCommentWithAuthor(
     image: string | null;
   };
 }> {
-  // Verify the issue belongs to this organization
+  // Verify the issue exists (RLS handles org scoping)
   const [existingIssue] = await ctx.db
     .select({
       id: issues.id,
-      organizationId: issues.organizationId,
     })
     .from(issues)
-    .where(
-      and(
-        eq(issues.id, input.issueId),
-        eq(issues.organizationId, ctx.organization.id),
-      ),
-    )
+    .where(eq(issues.id, input.issueId))
     .limit(1);
 
   if (!existingIssue) {
@@ -62,18 +56,13 @@ async function createCommentWithAuthor(
     });
   }
 
-  // Verify the user is a member of this organization
+  // Verify the user is a member (RLS handles org scoping)
   const [membership] = await ctx.db
     .select({
       id: memberships.id,
     })
     .from(memberships)
-    .where(
-      and(
-        eq(memberships.userId, ctx.user.id),
-        eq(memberships.organizationId, ctx.organization.id),
-      ),
-    )
+    .where(eq(memberships.userId, ctx.user.id))
     .limit(1);
 
   if (!membership) {
@@ -83,13 +72,12 @@ async function createCommentWithAuthor(
     });
   }
 
-  // Insert the comment
+  // Insert the comment (RLS trigger handles organizationId)
   const [comment] = await ctx.db
     .insert(comments)
     .values({
       id: generatePrefixedId("comment"),
       content: input.content,
-      organizationId: ctx.organization.id,
       issueId: input.issueId,
       authorId: ctx.user.id,
     })
@@ -202,7 +190,7 @@ export const issueCommentRouter = createTRPCRouter({
           image: string | null;
         };
       }> => {
-        // Find the comment and verify permissions
+        // Find the comment and verify permissions (RLS handles org scoping)
         const [comment] = await ctx.db
           .select({
             id: comments.id,
@@ -210,7 +198,6 @@ export const issueCommentRouter = createTRPCRouter({
             deletedAt: comments.deletedAt,
             issue: {
               id: issues.id,
-              organizationId: issues.organizationId,
             },
             author: {
               id: users.id,
@@ -222,12 +209,7 @@ export const issueCommentRouter = createTRPCRouter({
           .from(comments)
           .innerJoin(issues, eq(comments.issueId, issues.id))
           .innerJoin(users, eq(comments.authorId, users.id))
-          .where(
-            and(
-              eq(comments.id, input.commentId),
-              eq(issues.organizationId, ctx.organization.id),
-            ),
-          )
+          .where(eq(comments.id, input.commentId))
           .limit(1);
 
         // Use validation functions
@@ -312,7 +294,7 @@ export const issueCommentRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Find the comment and verify permissions
+      // Find the comment and verify permissions (RLS handles org scoping)
       const [comment] = await ctx.db
         .select({
           id: comments.id,
@@ -320,7 +302,6 @@ export const issueCommentRouter = createTRPCRouter({
           deletedAt: comments.deletedAt,
           issue: {
             id: issues.id,
-            organizationId: issues.organizationId,
           },
           author: {
             id: users.id,
@@ -332,28 +313,17 @@ export const issueCommentRouter = createTRPCRouter({
         .from(comments)
         .innerJoin(issues, eq(comments.issueId, issues.id))
         .innerJoin(users, eq(comments.authorId, users.id))
-        .where(
-          and(
-            eq(comments.id, input.commentId),
-            eq(issues.organizationId, ctx.organization.id),
-          ),
-        )
+        .where(eq(comments.id, input.commentId))
         .limit(1);
 
-      // Get membership for validation
+      // Get membership for validation (RLS handles org scoping)
       const [membership] = await ctx.db
         .select({
           id: memberships.id,
           userId: memberships.userId,
-          organizationId: memberships.organizationId,
         })
         .from(memberships)
-        .where(
-          and(
-            eq(memberships.userId, ctx.user.id),
-            eq(memberships.organizationId, ctx.organization.id),
-          ),
-        )
+        .where(eq(memberships.userId, ctx.user.id))
         .limit(1);
 
       // Use validation functions
@@ -398,7 +368,6 @@ export const issueCommentRouter = createTRPCRouter({
       const activityService = ctx.services.createIssueActivityService();
       await activityService.recordCommentDeleted(
         comment.issue.id,
-        ctx.organization.id,
         ctx.user.id,
         input.commentId,
       );
@@ -414,7 +383,7 @@ export const issueCommentRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Find the comment and verify it exists and is deleted
+      // Find the comment and verify it exists and is deleted (RLS handles org scoping)
       const [comment] = await ctx.db
         .select({
           id: comments.id,
@@ -422,7 +391,6 @@ export const issueCommentRouter = createTRPCRouter({
           deletedAt: comments.deletedAt,
           issue: {
             id: issues.id,
-            organizationId: issues.organizationId,
           },
           author: {
             id: users.id,
@@ -434,12 +402,7 @@ export const issueCommentRouter = createTRPCRouter({
         .from(comments)
         .innerJoin(issues, eq(comments.issueId, issues.id))
         .innerJoin(users, eq(comments.authorId, users.id))
-        .where(
-          and(
-            eq(comments.id, input.commentId),
-            eq(issues.organizationId, ctx.organization.id),
-          ),
-        )
+        .where(eq(comments.id, input.commentId))
         .limit(1);
 
       // Use validation functions
@@ -479,7 +442,6 @@ export const issueCommentRouter = createTRPCRouter({
       const activityService = ctx.services.createIssueActivityService();
       await activityService.recordCommentDeleted(
         comment.issue.id,
-        ctx.organization.id,
         ctx.user.id,
         input.commentId,
       );

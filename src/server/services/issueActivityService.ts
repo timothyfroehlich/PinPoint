@@ -2,7 +2,7 @@ import { eq, and, isNull } from "drizzle-orm";
 
 import { type DrizzleClient } from "../db/drizzle";
 import type { activityTypeEnum } from "../db/schema";
-import { issueHistory, comments } from "../db/schema";
+import { issue_history, comments } from "../db/schema";
 
 import { generatePrefixedId } from "~/lib/utils/id-generation";
 
@@ -43,14 +43,12 @@ export class IssueActivityService {
 
   async recordActivity(
     issueId: string,
-    organizationId: string,
     activityData: ActivityData,
   ): Promise<void> {
     // Build data object with conditional assignment for exactOptionalPropertyTypes compatibility
     const data: {
       id: string;
       issueId: string;
-      organizationId: string;
       type: ActivityType;
       field: string;
       actorId?: string;
@@ -59,7 +57,7 @@ export class IssueActivityService {
     } = {
       id: generatePrefixedId("history"),
       issueId,
-      organizationId,
+      // organizationId set automatically by RLS trigger
       type: activityData.type,
       field: activityData.fieldName ?? "",
     };
@@ -75,15 +73,14 @@ export class IssueActivityService {
       data.newValue = activityData.newValue;
     }
 
-    await this.db.insert(issueHistory).values(data);
+    await this.db.insert(issue_history).values(data);
   }
 
   async recordIssueCreated(
     issueId: string,
-    organizationId: string,
     actorId: string,
   ): Promise<void> {
-    await this.recordActivity(issueId, organizationId, {
+    await this.recordActivity(issueId, {
       type: ActivityType.CREATED,
       actorId,
       fieldName: "status",
@@ -93,12 +90,11 @@ export class IssueActivityService {
 
   async recordStatusChange(
     issueId: string,
-    organizationId: string,
     actorId: string,
     oldStatus: IssueStatus,
     newStatus: IssueStatus,
   ): Promise<void> {
-    await this.recordActivity(issueId, organizationId, {
+    await this.recordActivity(issueId, {
       type: ActivityType.STATUS_CHANGED,
       actorId,
       fieldName: "status",
@@ -109,7 +105,6 @@ export class IssueActivityService {
 
   async recordAssignmentChange(
     issueId: string,
-    organizationId: string,
     actorId: string,
     oldAssignee: { name?: string | null } | null,
     newAssignee: { name?: string | null } | null,
@@ -128,18 +123,17 @@ export class IssueActivityService {
       activityData.newValue = newAssignee.name;
     }
 
-    await this.recordActivity(issueId, organizationId, activityData);
+    await this.recordActivity(issueId, activityData);
   }
 
   async recordFieldUpdate(
     issueId: string,
-    organizationId: string,
     actorId: string,
     fieldName: string,
     oldValue: string,
     newValue: string,
   ): Promise<void> {
-    await this.recordActivity(issueId, organizationId, {
+    await this.recordActivity(issueId, {
       type: ActivityType.SYSTEM,
       actorId,
       fieldName,
@@ -150,10 +144,9 @@ export class IssueActivityService {
 
   async recordIssueResolved(
     issueId: string,
-    organizationId: string,
     actorId: string,
   ): Promise<void> {
-    await this.recordActivity(issueId, organizationId, {
+    await this.recordActivity(issueId, {
       type: ActivityType.RESOLVED,
       actorId,
       fieldName: "status",
@@ -163,11 +156,10 @@ export class IssueActivityService {
 
   async recordIssueAssigned(
     issueId: string,
-    organizationId: string,
     actorId: string,
     assigneeId: string,
   ): Promise<void> {
-    await this.recordActivity(issueId, organizationId, {
+    await this.recordActivity(issueId, {
       type: ActivityType.ASSIGNED,
       actorId,
       fieldName: "assignee",
@@ -177,11 +169,10 @@ export class IssueActivityService {
 
   async recordCommentDeleted(
     issueId: string,
-    organizationId: string,
     actorId: string,
     commentId: string,
   ): Promise<void> {
-    await this.recordActivity(issueId, organizationId, {
+    await this.recordActivity(issueId, {
       type: ActivityType.COMMENT_DELETED,
       actorId,
       fieldName: "comment",
@@ -192,7 +183,6 @@ export class IssueActivityService {
 
   async getIssueTimeline(
     issueId: string,
-    organizationId: string,
   ): Promise<
     (
       | {
@@ -270,12 +260,9 @@ export class IssueActivityService {
         },
         orderBy: [comments.createdAt],
       }),
-      // Fetch issue history with actor relations (organization scoped)
-      this.db.query.issueHistory.findMany({
-        where: and(
-          eq(issueHistory.issueId, issueId),
-          eq(issueHistory.organizationId, organizationId),
-        ),
+      // Fetch issue history with actor relations (RLS scoped)
+      this.db.query.issue_history.findMany({
+        where: eq(issue_history.issueId, issueId),
         columns: {
           id: true,
           type: true,
@@ -293,7 +280,7 @@ export class IssueActivityService {
             },
           },
         },
-        orderBy: [issueHistory.changedAt],
+        orderBy: [issue_history.changedAt],
       }),
     ]);
 
