@@ -7,71 +7,139 @@ PinPoint uses two database testing approaches:
 1. **PGlite Integration Testing** (Recommended) - Fast, in-memory PostgreSQL for router and database logic testing
 2. **Supabase Local Testing** (E2E) - Complete PostgreSQL environment for full-stack integration and E2E testing
 
-## PGlite Integration Testing (Recommended)
+## 🚨 CRITICAL: Memory-Safe PGlite Integration Testing
 
-### Overview
+### Memory Safety Overview
 
-**PGlite** provides a complete PostgreSQL database running in-memory via WebAssembly. Perfect for integration testing router logic, database constraints, and business rules.
+**PGlite** provides a complete PostgreSQL database running in-memory via WebAssembly. However, **improper usage causes 1-2GB+ memory consumption and system lockups**.
 
-**Benefits:**
+**🔥 CRITICAL MEMORY SAFETY RULES:**
 
-- ✅ **Fast execution**: No Docker startup time, runs instantly
-- ✅ **Real PostgreSQL**: Full compatibility with PostgreSQL features
-- ✅ **Isolation**: Fresh database for each test, no cleanup needed
-- ✅ **CI friendly**: No external dependencies or Docker requirements
-- ✅ **Schema migrations**: Real migration testing with Drizzle
+- ❌ **NEVER**: Create `new PGlite()` instances per test (50-100MB each)
+- ❌ **NEVER**: Use `createSeededTestDatabase()` in `beforeEach` (memory blowout)
+- ✅ **ALWAYS**: Use worker-scoped instances with transaction isolation
+- ✅ **ALWAYS**: Use `withIsolatedTest` pattern for automatic cleanup
 
-### Setup
+### Memory-Safe Setup (MANDATORY)
 
 ```typescript
-// test/helpers/pglite-test-setup.ts
+// test/helpers/worker-scoped-db.ts
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
 import * as schema from "~/server/db/schema";
 
-export async function createSeededTestDatabase() {
-  // Create fresh PostgreSQL database in memory
-  const client = new PGlite();
-  const db = drizzle(client, { schema });
+// Single PGlite instance per worker (NOT per test)
+let workerDb: ReturnType<typeof drizzle> | null = null;
 
-  // Apply real schema migrations
-  await migrate(db, { migrationsFolder: "drizzle" });
+export async function getWorkerDb() {
+  if (!workerDb) {
+    const client = new PGlite(); // ONE instance per worker
+    workerDb = drizzle(client, { schema });
 
-  // Create minimal seed data
-  const orgId = await createTestOrganization(db);
-  await createTestData(db, orgId);
-
-  return { db, organizationId: orgId };
+    // Run migrations once
+    await migrate(workerDb, { migrationsFolder: "drizzle" });
+  }
+  return workerDb;
 }
+
+// Transaction isolation for test cleanup
+export async function withIsolatedTest<T>(
+  db: ReturnType<typeof drizzle>,
+  testFn: (db: ReturnType<typeof drizzle>) => Promise<T>,
+): Promise<T> {
+  return await db.transaction(async (tx) => {
+    try {
+      return await testFn(tx);
+    } finally {
+      // Transaction rollback provides automatic cleanup
+      throw new Error("Test transaction rollback");
+    }
+  }).catch((error) => {
+    if (error.message === "Test transaction rollback") {
+      return; // Expected rollback
+    }
+    throw error; // Re-throw actual errors
+  });
+}
+
+// Vitest test helper with proper types
+export const test = vitest.test.extend<{
+  workerDb: ReturnType<typeof drizzle>;
+}>({
+  workerDb: async ({}, use) => {
+    const db = await getWorkerDb();
+    await use(db);
+  },
+});
 ```
 
-### Usage Example
+### Memory-Safe Usage Example (REQUIRED PATTERN)
 
-**Reference**: `src/integration-tests/location.integration.test.ts`
+**Reference**: Integration Testing Archetype
 
 ```typescript
-describe("Admin Router Integration (PGlite)", () => {
+// ✅ CORRECT: Memory-safe integration testing
+import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
+import { sql } from "drizzle-orm";
+
+test("database constraints with RLS", async ({ workerDb }) => {
+  await withIsolatedTest(workerDb, async (db) => {
+    // Set RLS context
+    await db.execute(sql`SET app.current_organization_id = 'test-org'`);
+
+    // Create test data - RLS handles organizational scoping
+    const [machine] = await db
+      .insert(schema.machines)
+      .values({ name: "Test Machine" })
+      .returning();
+
+    // Test foreign key constraints with RLS
+    const [issue] = await db
+      .insert(schema.issues)
+      .values({
+        title: "Test Issue",
+        machineId: machine.id,
+        // No organizationId needed - RLS handles it
+      })
+      .returning();
+
+    expect(issue.organizationId).toBe("test-org"); // RLS automatic
+    // Automatic cleanup via transaction rollback
+  });
+});
+```
+
+### ❌ DANGEROUS Anti-Patterns (NEVER USE)
+
+```typescript
+// ❌ MEMORY BLOWOUT: Per-test database creation
+describe("BAD: Memory unsafe", () => {
   let db: TestDatabase;
-  let testData: SeededTestData;
 
   beforeEach(async () => {
-    // Fresh database for each test
+    // DANGEROUS: 50-100MB per test, causes system lockups
     const setup = await createSeededTestDatabase();
     db = setup.db;
-    testData = await getSeededTestData(db, setup.organizationId);
   });
 
-  it("should enforce referential integrity", async () => {
-    // Real foreign key constraints are tested
-    await expect(
-      db.insert(issues).values({
-        title: "Test Issue",
-        machineId: "nonexistent-machine", // Foreign key violation
-        organizationId: testData.organization,
-      }),
-    ).rejects.toThrow(); // Real database constraint error
+  // This pattern causes 1-2GB+ memory usage with 12+ tests
+});
+
+// ❌ MEMORY BLOWOUT: Multiple PGlite instances
+test("BAD: Multiple instances", async () => {
+  const db1 = new PGlite(); // 50-100MB
+  const db2 = new PGlite(); // Another 50-100MB
+  // Multiplies memory usage, causes lockups
+});
+
+// ❌ COORDINATION COMPLEXITY: Manual organizational management
+test("BAD: Manual coordination", async () => {
+  const org = await db.insert(organizations).values({...});
+  const user = await db.insert(users).values({
+    organizationId: org.id, // Manual coordination
   });
+  // Complex, error-prone, misses RLS benefits
 });
 ```
 
@@ -84,6 +152,133 @@ npm install @electric-sql/pglite --save-dev
 # PGlite is automatically included in tests
 # No additional setup required - runs in memory
 ```
+
+## Test Seed Data Architecture
+
+### Overview: Minimal → Full Progression
+
+PinPoint uses a **hardcoded ID approach** for test data to provide consistency and predictability across all test environments (CI, local, pgTAP).
+
+**Key Benefits:**
+- 🎯 **Consistent debugging**: "machine-mm-001 is failing" instead of random UUIDs
+- 🔗 **Stable relationships**: Foreign keys never break due to ID changes  
+- ⚡ **Fast tests**: No random generation overhead
+- 🔄 **Cross-language compatibility**: Same IDs in TypeScript and SQL tests
+
+### Two-Tier Seed Structure
+
+```
+Minimal Seed (Foundation)
+├── 2 organizations (primary + competitor)
+├── ~8 test users (admin, members, guests)  
+├── ~10 machines across different games
+├── ~20 sample issues
+└── All infrastructure (roles, statuses, priorities)
+
+Full Seed (Additive)
+├── Minimal seed (always included) 
+├── +50 additional machines
+├── +180 additional issues
+└── Rich sample data for demos
+```
+
+**Usage:**
+- **Development/CI**: Uses minimal seed (fast, essential data)
+- **Preview environments**: Uses full seed (rich demonstration data)
+- **Tests**: Always use minimal as foundation, add specific data as needed
+
+### Hardcoded ID Constants
+
+**Primary source**: [`src/test/constants/seed-test-ids.ts`](../../../src/test/constants/seed-test-ids.ts)
+
+```typescript
+// Example usage in tests
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
+
+// Unit tests - use mock patterns
+const mockOrg = SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION;
+
+// Integration tests - use real seeded data  
+const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
+expect(result.machineId).toBe(seededData.machine);
+```
+
+### Two Organizations for Security Testing
+
+**Primary Organization**: `test-org-pinpoint` (Austin Pinball Collective)
+- Used for standard testing scenarios
+- Contains majority of seeded data
+- Default organization for single-org tests
+
+**Competitor Organization**: `test-org-competitor` (Competitor Arcade) 
+- Used for RLS boundary testing
+- Enables cross-org isolation validation
+- Critical for multi-tenant security tests
+
+```typescript
+// Example: Testing organizational boundaries
+test("cross-org isolation", async ({ workerDb }) => {
+  await withIsolatedTest(workerDb, async (db) => {
+    // Create data in primary org
+    await setOrgContext(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
+    const issue1 = await createIssue(db, { title: "Primary Org Issue" });
+    
+    // Switch to competitor org - should not see primary org data
+    await setOrgContext(db, SEED_TEST_IDS.ORGANIZATIONS.competitor);
+    const visibleIssues = await db.query.issues.findMany();
+    
+    expect(visibleIssues).not.toContainEqual(issue1);
+  });
+});
+```
+
+### SQL Generation for pgTAP
+
+**Build-time script**: [`scripts/generate-sql-constants.ts`](../../../scripts/generate-sql-constants.ts)
+
+```bash
+# Generate SQL constants from TypeScript
+npm run generate:sql-constants
+
+# Generated file: supabase/tests/constants.sql (DO NOT EDIT MANUALLY)
+```
+
+**pgTAP usage example:**
+```sql
+-- Use generated functions instead of hardcoded strings
+SELECT results_eq(
+  'SELECT organization_id FROM issues WHERE id = test_issue_primary()',  
+  'SELECT test_org_primary()',
+  'Issue belongs to primary organization'
+);
+```
+
+### Seed Data Commands
+
+```bash
+# Development - minimal dataset (fast)
+npm run db:seed:local:sb
+
+# Preview - full dataset (comprehensive)  
+npm run db:seed:preview
+
+# CI - PostgreSQL only (no auth)
+npm run db:seed:local:pg
+```
+
+### Best Practices
+
+**✅ DO:**
+- Use `SEED_TEST_IDS` constants for predictable IDs
+- Use `getSeededTestData()` for dynamic relationship IDs
+- Add minimal additional data only when tests require it
+- Use both organizations for security boundary testing
+
+**❌ DON'T:**
+- Create custom organizations unless testing multi-tenant scenarios
+- Use `nanoid()` or random IDs in seed data
+- Modify hardcoded IDs without updating all references
+- Skip organizational context when testing RLS scenarios
 
 ## Supabase Local Testing (E2E)
 
@@ -172,7 +367,6 @@ import { config } from "dotenv";
 export function loadTestEnvironment(): void {
   // Load in order of precedence (later files override earlier ones)
   config({ path: resolve(projectRoot, ".env"), override: true });
-  config({ path: resolve(projectRoot, ".env.development"), override: true });
   config({ path: resolve(projectRoot, ".env.test"), override: true }); // Highest precedence
   config({ path: resolve(projectRoot, ".env.local"), override: true });
 }

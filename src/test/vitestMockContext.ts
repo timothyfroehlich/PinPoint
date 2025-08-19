@@ -94,6 +94,7 @@ export interface VitestMockContext {
   services: ServiceFactory;
   user: PinPointSupabaseUser | null;
   supabase: typeof mockSupabaseClient;
+  organizationId: string | null;
   organization: {
     id: string;
     name: string;
@@ -169,6 +170,7 @@ export function createVitestMockContext(): VitestMockContext {
     services: mockServices,
     user: mockUser,
     supabase: mockSupabaseClient,
+    organizationId: "org-1", // Added for orgScopedProcedure compatibility
     organization: {
       id: "org-1", // Changed to match integration test expectations
       name: "Test Organization",

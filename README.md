@@ -82,7 +82,7 @@ npm install
 
 # 2. Set up environment variables
 vercel link --project pin-point
-vercel env pull  # Downloads shared development environment from Vercel
+npm run env:pull  # Downloads shared development environment from Vercel
 
 # 3. Start Supabase and initialize database (from root worktree)
 supabase start  # Start shared instance from root directory

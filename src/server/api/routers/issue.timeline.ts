@@ -2,12 +2,12 @@ import { TRPCError } from "@trpc/server";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
-import { createTRPCRouter, organizationProcedure } from "~/server/api/trpc";
+import { createTRPCRouter, orgScopedProcedure } from "~/server/api/trpc";
 import { issues } from "~/server/db/schema";
 
 export const issueTimelineRouter = createTRPCRouter({
   // Get issue timeline (comments + activities)
-  getTimeline: organizationProcedure
+  getTimeline: orgScopedProcedure
     .input(z.object({ issueId: z.string() }))
     .query(async ({ ctx, input }) => {
       // Verify the issue exists (RLS handles org scoping)

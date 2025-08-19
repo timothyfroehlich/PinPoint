@@ -6,7 +6,7 @@ import { generateId } from "~/lib/utils/id-generation";
 import {
   createTRPCRouter,
   publicProcedure,
-  organizationProcedure,
+  orgScopedProcedure,
   locationEditProcedure,
   locationDeleteProcedure,
   organizationManageProcedure,
@@ -38,7 +38,7 @@ export const locationRouter = createTRPCRouter({
       return location;
     }),
 
-  getAll: organizationProcedure.query(async ({ ctx }) => {
+  getAll: orgScopedProcedure.query(async ({ ctx }) => {
     return await ctx.db.query.locations.findMany({
       with: {
         machines: true,
@@ -171,7 +171,7 @@ export const locationRouter = createTRPCRouter({
     }),
 
   // Get a single location with detailed info
-  getById: organizationProcedure
+  getById: orgScopedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
       const location = await ctx.db.query.locations.findFirst({

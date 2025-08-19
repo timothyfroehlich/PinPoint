@@ -646,11 +646,10 @@ import { simulateEnvFileContents } from "~/lib/env-loaders/__tests__/env-test-he
 it("should respect file precedence order", () => {
   simulateEnvFileContents({
     '.env': { DATABASE_URL: 'base-url', COMMON_VAR: 'base' },
-    '.env.development': { DATABASE_URL: 'dev-url' },
-    '.env.local': { COMMON_VAR: 'local-override' }
+    '.env.local': { COMMON_VAR: 'local-override', DATABASE_URL: 'local-dev-url' }
   });
 
-  // Test that dev-url and local-override take precedence
+  // Test that local environment takes precedence
 });
 ```
 
@@ -691,7 +690,6 @@ it("should load files in correct order", async () => {
   
   expectFileLoadOrder([
     '.env',
-    '.env.development', 
     '.env.local'
   ], mockDotenvConfig);
 });

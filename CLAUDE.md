@@ -48,12 +48,14 @@
 **MIGRATION PROGRESS (Following @migration-plan-v2/):**
 - ✅ **Phase 0**: Configuration audit - COMPLETE
 - ✅ **Phase 1**: Prisma removal - COMPLETE
-- 🔄 **Phase 2**: RLS implementation - ACTIVE/IN PROGRESS
-- ⏳ **Phase 3**: Test architecture - will fix the 313 failing tests
+- ✅ **Phase 2**: RLS implementation - COMPLETE
+- ✅ **Phase 2.5**: Testing architecture (pgTAP + PGlite) - COMPLETE
+- 🔄 **Phase 3**: Test implementation - converting 313 failing tests to RLS patterns
 - ⏳ **Phase 4**: Cleanup & consolidation
 
 **CRITICAL UNDERSTANDING:**
 - The 313 failing tests are **expected** and will remain broken until Phase 3
+- **NEW**: Testing architecture implemented (pgTAP for RLS + PGlite for business logic)
 - We're following the migration plan, not doing ad-hoc fixes
 - Everything will be messy until we complete the full architectural transformation
 
@@ -130,7 +132,6 @@ vitest 2>&1            # ❌ BREAKS VITEST
 
 ```bash
 npm run test:brief     # ✅ Fast, minimal output
-npm run test:quiet     # ✅ Suppress console logs
 npm run test:verbose   # ✅ Detailed output
 npm run test:coverage  # ✅ With coverage report
 ```
@@ -138,12 +139,14 @@ npm run test:coverage  # ✅ With coverage report
 ### ⛔ Other Command Restrictions
 
 - **NEVER use the `find` command** - it's dangerous due to the `-exec` flag which can execute arbitrary commands
+- **NEVER use the `psql` command directly** - use `./scripts/safe-psql.sh` instead for database safety
 
 ### ✅ Safe Command Alternatives
 
 - **ripgrep (rg)** - for content searching: `rg --files | rg "pattern"`, `rg -l "content" --type js`
 - **fd/fdfind** - for file discovery: `fd "*.js"`, `fd --type f --changed-within 1day`
 - **git ls-files** - for repo files: `git ls-files | grep "\.js$"`
+- **safe-psql** - for database access: `./scripts/safe-psql.sh` (localhost-only with safety guardrails)
 - Prefer rg (ripgrep) to find or grep
 - Install missing tools with `brew` (preferred) or `apt`
 
@@ -160,6 +163,11 @@ npm run test-file src/server/api/routers/__tests__/user.test.ts
 # Advanced options: --skip-typecheck, --skip-lint, --verbose
 node scripts/validate-single-file.cjs FILE --verbose
 ```
+
+## 🧪 RLS Testing
+
+**NEW**: `npm run test:rls` - pgTAP RLS policy validation
+**NEW**: `npm run test:all` - Complete testing (business logic + RLS)
 
 ## 📚 Quick Reference (Auto-Loaded)
 

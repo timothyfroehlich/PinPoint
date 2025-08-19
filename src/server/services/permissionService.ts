@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 // Legacy session type for backward compatibility
 type Session = {
@@ -25,6 +25,9 @@ import { type DrizzleClient } from "~/server/db/drizzle";
  *
  * Handles permission checking with dependency resolution and session support.
  * Supports both authenticated users and unauthenticated access.
+ *
+ * Post-RLS Migration: Service methods now trust RLS policies for organizational
+ * scoping and no longer require explicit organizationId parameters.
  */
 export class PermissionService {
   constructor(private db: DrizzleClient) {}
@@ -34,34 +37,23 @@ export class PermissionService {
    *
    * @param session - User session (null for unauthenticated users)
    * @param permission - Permission to check
-   * @param organizationId - Organization context (required for unauthenticated users)
    * @returns Promise<boolean> - Whether the user has the permission
    */
   async hasPermission(
     session: Session | null,
     permission: string,
-    organizationId?: string,
   ): Promise<boolean> {
     // Handle unauthenticated users
     if (!session?.user) {
-      return this.checkUnauthenticatedPermission(permission, organizationId);
+      return this.checkUnauthenticatedPermission(permission);
     }
 
-    // Get the user's membership and role
-    const finalOrgId =
-      organizationId ??
-      (session.user as { organizationId?: string }).organizationId;
-    if (!finalOrgId) {
-      throw new Error("Organization ID is required");
-    }
     if (!session.user.id) {
       throw new Error("User ID is required");
     }
 
-    const membership = await this.getUserMembership(
-      session.user.id,
-      finalOrgId,
-    );
+    // Get the user's membership and role (RLS automatically scopes to user's organization)
+    const membership = await this.getUserMembership(session.user.id);
 
     if (!membership?.role) {
       return false;
@@ -81,19 +73,13 @@ export class PermissionService {
    *
    * @param session - User session
    * @param permission - Required permission
-   * @param organizationId - Organization context
    * @throws TRPCError if permission is denied
    */
   async requirePermission(
     session: Session | null,
     permission: string,
-    organizationId?: string,
   ): Promise<void> {
-    const hasAccess = await this.hasPermission(
-      session,
-      permission,
-      organizationId,
-    );
+    const hasAccess = await this.hasPermission(session, permission);
 
     if (!hasAccess) {
       throw new TRPCError({
@@ -107,33 +93,20 @@ export class PermissionService {
    * Get all permissions for a user
    *
    * @param session - User session
-   * @param organizationId - Organization context
    * @returns Promise<string[]> - Array of permission names
    */
-  async getUserPermissions(
-    session: Session | null,
-    organizationId?: string,
-  ): Promise<string[]> {
+  async getUserPermissions(session: Session | null): Promise<string[]> {
     // Handle unauthenticated users
     if (!session?.user) {
-      return this.getUnauthenticatedPermissions(organizationId);
+      return Promise.resolve(this.getUnauthenticatedPermissions());
     }
 
-    // Get the user's membership and role
-    const finalOrgId =
-      organizationId ??
-      (session.user as { organizationId?: string }).organizationId;
-    if (!finalOrgId) {
-      throw new Error("Organization ID is required");
-    }
     if (!session.user.id) {
       throw new Error("User ID is required");
     }
 
-    const membership = await this.getUserMembership(
-      session.user.id,
-      finalOrgId,
-    );
+    // Get the user's membership and role (RLS automatically scopes to user's organization)
+    const membership = await this.getUserMembership(session.user.id);
 
     if (!membership?.role) {
       return [];
@@ -156,25 +129,18 @@ export class PermissionService {
    * Get all permissions for a Supabase user
    *
    * @param user - Supabase user (null for unauthenticated users)
-   * @param organizationId - Organization context
    * @returns Promise<string[]> - Array of permission names
    */
   async getUserPermissionsForSupabaseUser(
     user: PinPointSupabaseUser | null,
-    organizationId?: string,
   ): Promise<string[]> {
     // Handle unauthenticated users
     if (!user) {
-      return this.getUnauthenticatedPermissions(organizationId);
+      return Promise.resolve(this.getUnauthenticatedPermissions());
     }
 
-    // Get the organization ID from user metadata or parameter
-    const finalOrgId = organizationId ?? user.app_metadata.organization_id;
-    if (!finalOrgId) {
-      throw new Error("Organization ID is required");
-    }
-
-    const membership = await this.getUserMembership(user.id, finalOrgId);
+    // Get the user's membership and role (RLS automatically scopes to user's organization)
+    const membership = await this.getUserMembership(user.id);
 
     if (!membership?.role) {
       return [];
@@ -216,88 +182,34 @@ export class PermissionService {
 
   /**
    * Check if unauthenticated users have a permission
+   *
+   * Note: For unauthenticated users, we fall back to default permissions
+   * since there's no organizational context available for RLS scoping.
    */
-  private async checkUnauthenticatedPermission(
-    permission: string,
-    organizationId?: string,
-  ): Promise<boolean> {
-    if (!organizationId) {
-      // Default unauthenticated permissions
-      return (UNAUTHENTICATED_PERMISSIONS as readonly string[]).includes(
-        permission,
-      );
-    }
-
-    // Get organization-specific unauthenticated role permissions (RLS scoped)
-    const unauthRole = await this.db.query.roles.findFirst({
-      where: (roles) => eq(roles.name, SYSTEM_ROLES.UNAUTHENTICATED),
-      with: {
-        rolePermissions: {
-          with: {
-            permission: true,
-          },
-        },
-      },
-    });
-
-    if (!unauthRole) {
-      // Fallback to default permissions
-      return (UNAUTHENTICATED_PERMISSIONS as readonly string[]).includes(
-        permission,
-      );
-    }
-
-    const rolePermissions = unauthRole.rolePermissions.map(
-      (rp) => rp.permission.name,
+  private checkUnauthenticatedPermission(permission: string): boolean {
+    // Default unauthenticated permissions - no RLS context available
+    return (UNAUTHENTICATED_PERMISSIONS as readonly string[]).includes(
+      permission,
     );
-    const expandedPermissions =
-      this.expandPermissionsWithDependencies(rolePermissions);
-    return expandedPermissions.includes(permission);
   }
 
   /**
    * Get unauthenticated user permissions
+   *
+   * Note: For unauthenticated users, we return default permissions
+   * since there's no organizational context available for RLS scoping.
    */
-  private async getUnauthenticatedPermissions(
-    organizationId?: string,
-  ): Promise<string[]> {
-    if (!organizationId) {
-      return this.expandPermissionsWithDependencies(
-        UNAUTHENTICATED_PERMISSIONS,
-      );
-    }
-
-    // Get organization-specific unauthenticated role permissions (RLS scoped)
-    const unauthRole = await this.db.query.roles.findFirst({
-      where: (roles) => eq(roles.name, SYSTEM_ROLES.UNAUTHENTICATED),
-      with: {
-        rolePermissions: {
-          with: {
-            permission: true,
-          },
-        },
-      },
-    });
-
-    if (!unauthRole) {
-      return this.expandPermissionsWithDependencies(
-        UNAUTHENTICATED_PERMISSIONS,
-      );
-    }
-
-    const rolePermissions = unauthRole.rolePermissions.map(
-      (rp) => rp.permission.name,
-    );
-    return this.expandPermissionsWithDependencies(rolePermissions);
+  private getUnauthenticatedPermissions(): string[] {
+    return this.expandPermissionsWithDependencies(UNAUTHENTICATED_PERMISSIONS);
   }
 
   /**
-   * Get user membership with role and permissions (RLS scoped)
+   * Get user membership with role and permissions
+   *
+   * RLS policies automatically scope queries to the user's organization context,
+   * so we only need the userId parameter.
    */
-  private async getUserMembership(
-    userId: string,
-    _organizationId: string, // Keep parameter for API compatibility but rely on RLS
-  ): Promise<{
+  private async getUserMembership(userId: string): Promise<{
     role: {
       name: string;
       permissions: { name: string }[];

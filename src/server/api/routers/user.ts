@@ -1,12 +1,13 @@
-import { and, asc, count, eq, inArray } from "drizzle-orm";
+import { asc, count, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import { imageStorage } from "~/lib/image-storage/local-storage";
 import { getDefaultAvatarUrl } from "~/lib/utils/image-processing";
+import { getUserPermissionsForSupabaseUser } from "~/server/auth/permissions";
 import {
   createTRPCRouter,
   protectedProcedure,
-  organizationProcedure,
+  orgScopedProcedure,
 } from "~/server/api/trpc";
 import { userManageProcedure } from "~/server/api/trpc.permission";
 import {
@@ -71,12 +72,31 @@ export const userRouter = createTRPCRouter({
   }),
 
   // Get current user's membership info in the current organization
-  getCurrentMembership: organizationProcedure.query(({ ctx }) => {
+  getCurrentMembership: orgScopedProcedure.query(async ({ ctx }) => {
+    // RLS handles organizational scoping automatically
+    const membership = await ctx.db.query.memberships.findFirst({
+      where: eq(memberships.userId, ctx.user.id),
+      with: {
+        role: true,
+      },
+    });
+
+    if (!membership) {
+      throw new Error("User membership not found");
+    }
+
+    // Get user permissions separately
+    const userPermissions = await getUserPermissionsForSupabaseUser(
+      ctx.user,
+      ctx.db,
+      ctx.organizationId,
+    );
+
     return {
-      userId: ctx.membership.userId,
-      role: ctx.membership.role.name,
-      organizationId: ctx.membership.organizationId,
-      permissions: ctx.userPermissions,
+      userId: membership.userId,
+      role: membership.role.name,
+      organizationId: membership.organizationId,
+      permissions: userPermissions,
     };
   }),
 
@@ -195,10 +215,10 @@ export const userRouter = createTRPCRouter({
     }),
 
   // Get user by ID (public info only - within organization context)
-  getUser: organizationProcedure
+  getUser: orgScopedProcedure
     .input(z.object({ userId: z.string() }))
     .query(async ({ ctx, input }) => {
-      // Verify user is a member of the current organization
+      // Verify user is a member of the current organization (RLS handles org scoping)
       const [membership] = await ctx.db
         .select({
           user: {
@@ -246,7 +266,7 @@ export const userRouter = createTRPCRouter({
     }),
 
   // Get all users in the current organization
-  getAllInOrganization: organizationProcedure.query(async ({ ctx }) => {
+  getAllInOrganization: orgScopedProcedure.query(async ({ ctx }) => {
     // Get memberships with user and role data
     const membershipData = await ctx.db
       .select({

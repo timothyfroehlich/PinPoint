@@ -3,7 +3,7 @@ import { z } from "zod";
 import {
   createTRPCRouter,
   publicProcedure,
-  organizationProcedure,
+  orgScopedProcedure,
   organizationManageProcedure,
   locationEditProcedure,
 } from "~/server/api/trpc";
@@ -96,7 +96,7 @@ export const collectionRouter = createTRPCRouter({
   }),
 
   // Get organization collection types for admin (RLS scoped)
-  getTypes: organizationProcedure.query(async ({ ctx }) => {
+  getTypes: orgScopedProcedure.query(async ({ ctx }) => {
     const service = ctx.services.createCollectionService();
     return service.getOrganizationCollectionTypes();
   }),

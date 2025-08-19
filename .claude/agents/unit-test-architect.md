@@ -32,11 +32,34 @@ color: green
 
 When starting unit test work:
 
-1. **Performance Assessment**: Identify current test execution times
-2. **Isolation Analysis**: Determine external dependencies to mock
-3. **Business Logic Mapping**: Separate pure logic from database operations
-4. **Component Behavior Planning**: Map user interactions and permission scenarios
-5. **Mock Strategy**: Plan type-safe mocking approach for dependencies
+1. **📋 CHECK TEST HEADERS**: Read test file headers for specific update requirements
+2. **🎯 USE SEED CONSTANTS**: Import SEED_TEST_IDS.MOCK_PATTERNS for consistent mock data
+3. **Performance Assessment**: Identify current test execution times
+4. **Isolation Analysis**: Determine external dependencies to mock
+5. **Business Logic Mapping**: Separate pure logic from database operations
+6. **Component Behavior Planning**: Map user interactions and permission scenarios
+7. **Mock Strategy**: Plan type-safe mocking approach for dependencies
+
+### **Test File Header Interpretation**
+
+**🔄 Service Unit Tests**: "Replace hardcoded mock IDs with SEED_TEST_IDS.MOCK_PATTERNS"
+- Replace ALL arbitrary IDs ("coll1", "org1", "user-123") with SEED_TEST_IDS.MOCK_PATTERNS
+- Use `SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION` instead of "test-org" or "org-1"
+- Use `SEED_TEST_IDS.MOCK_PATTERNS.USER` instead of "user-123" or "test-user"
+- Use `SEED_TEST_IDS.MOCK_PATTERNS.MACHINE` for consistent machine references
+- Standardize mock data patterns across ALL service unit tests
+- Focus on business logic testing, not database operations
+
+**⚠️ Router Unit Tests**: "Convert Unit → tRPC Router" headers indicate integration tests
+- These tests should be converted by integration-test-architect, NOT unit-test-architect
+- Unit-test-architect should focus on pure business logic extracted from routers
+- Leave tRPC integration testing to integration-test-architect
+- Extract and test pure functions from router handlers as separate unit tests
+
+**✅ Component Tests**: Already use SEED_TEST_IDS.MOCK_PATTERNS properly
+- Use createMockAdminContext() and createMockMemberContext() helpers
+- Leverage VITEST_PERMISSION_SCENARIOS for consistent permission testing
+- Focus on UI behavior, user interactions, and permission-based rendering
 
 ---
 
@@ -47,14 +70,21 @@ When starting unit test work:
 ```typescript
 import type * as IssueServiceModule from '@/server/services/issueService';
 
-// ✅ Type-safe partial mocking with importActual
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
+
+// ✅ Type-safe partial mocking with importActual + SEED_TEST_IDS
 vi.mock('@/server/services/issueService', async (importOriginal) => {
   const actual = await importOriginal<typeof IssueServiceModule>();
   return {
     ...actual,
     IssueService: vi.fn().mockImplementation(() => ({
-      // Mock database methods
-      create: vi.fn().mockResolvedValue({ id: '1', title: 'Mock Issue' }),
+      // Mock database methods with consistent IDs
+      create: vi.fn().mockResolvedValue({ 
+        id: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE, 
+        title: 'Mock Issue',
+        organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+        machineId: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE
+      }),
       findByStatus: vi.fn().mockResolvedValue([]),
       delete: vi.fn().mockResolvedValue(true),
       
@@ -70,11 +100,23 @@ vi.mock('@/server/services/issueService', async (importOriginal) => {
 ### **Hoisted Mock Variables**
 
 ```typescript
-// ✅ Shared mock state with vi.hoisted
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
+
+// ✅ Shared mock state with vi.hoisted + SEED_TEST_IDS
 const mockUserData = vi.hoisted(() => ({
-  validUser: { id: '123', email: 'test@example.com', role: 'admin' },
+  validUser: { 
+    id: SEED_TEST_IDS.MOCK_PATTERNS.USER, 
+    email: 'admin@example.com', 
+    role: 'admin',
+    organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION
+  },
   invalidUser: null,
-  memberUser: { id: '456', email: 'member@example.com', role: 'member' }
+  memberUser: { 
+    id: SEED_TEST_IDS.USERS.MEMBER1,  // Use actual seed user ID for consistency
+    email: 'member@example.com', 
+    role: 'member',
+    organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION
+  }
 }));
 
 vi.mock('@/utils/supabase/server', () => ({
@@ -129,9 +171,10 @@ export default defineConfig({
 
 ## Pure Function Testing Mastery
 
-### **Business Logic Testing Patterns**
+### **Business Logic Testing Patterns with SEED_TEST_IDS**
 
 ```typescript
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 import { calculateIssuePriority } from "@/lib/utils/issue-priority";
 import { formatIssueStatus } from "@/lib/formatters/issue";
 import { validateMachineId } from "@/lib/validation/machine";
@@ -196,7 +239,8 @@ describe("formatIssueStatus", () => {
 
 describe("validateMachineId", () => {
   test("accepts valid UUID format", () => {
-    const validId = "123e4567-e89b-12d3-a456-426614174000";
+    // Use consistent test machine ID
+    const validId = SEED_TEST_IDS.MOCK_PATTERNS.MACHINE;
     expect(validateMachineId(validId)).toBe(true);
   });
   
@@ -275,22 +319,25 @@ describe("aggregateLocationStats", () => {
 
 ## React Component Testing Excellence
 
-### **Permission-Based Rendering Tests**
+### **Permission-Based Rendering Tests with SEED_TEST_IDS**
 
 ```typescript
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { VitestTestWrapper, VITEST_PERMISSION_SCENARIOS } from '~/test/VitestTestWrapper';
+import { SEED_TEST_IDS, createMockAdminContext, createMockMemberContext } from '~/test/constants/seed-test-ids';
 import { IssueList } from '../IssueList';
 import { CreateIssueForm } from '../CreateIssueForm';
 
 describe("IssueList Component", () => {
   test('admin sees all management actions', () => {
+    const adminContext = createMockAdminContext();
+    
     render(
       <VitestTestWrapper
         userPermissions={VITEST_PERMISSION_SCENARIOS.ADMIN}
         supabaseUser={{
-          id: '123',
-          user_metadata: { organizationId: 'org-1', role: 'admin' }
+          id: adminContext.userId,
+          user_metadata: { organizationId: adminContext.organizationId, role: 'admin' }
         }}
       >
         <IssueList />
@@ -303,12 +350,14 @@ describe("IssueList Component", () => {
   });
 
   test('member sees limited actions only', () => {
+    const memberContext = createMockMemberContext();
+    
     render(
       <VitestTestWrapper
         userPermissions={VITEST_PERMISSION_SCENARIOS.MEMBER}
         supabaseUser={{
-          id: '456',
-          user_metadata: { organizationId: 'org-1', role: 'member' }
+          id: memberContext.userId,
+          user_metadata: { organizationId: memberContext.organizationId, role: 'member' }
         }}
       >
         <IssueList />
@@ -499,29 +548,37 @@ import { setupServer } from 'msw/node';
 
 const trpcMsw = createTRPCMsw<typeof appRouter>();
 
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
+
 const handlers = [
-  // Mock successful responses
+  // Mock successful responses with SEED_TEST_IDS
   trpcMsw.issues.getAll.query(() => [
     { 
-      id: '1', 
+      id: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE, 
       title: 'Mock Issue 1', 
       status: 'open', 
-      organizationId: 'org-1',
-      machine: { id: 'm1', name: 'Medieval Madness' }
+      organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+      machine: { 
+        id: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE, 
+        name: 'Medieval Madness' 
+      }
     },
     { 
-      id: '2', 
+      id: `${SEED_TEST_IDS.MOCK_PATTERNS.ISSUE}-2`, 
       title: 'Mock Issue 2', 
       status: 'resolved', 
-      organizationId: 'org-1',
-      machine: { id: 'm2', name: 'Attack from Mars' }
+      organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+      machine: { 
+        id: `${SEED_TEST_IDS.MOCK_PATTERNS.MACHINE}-2`, 
+        name: 'Attack from Mars' 
+      }
     }
   ]),
   
   trpcMsw.issues.create.mutation(({ input }) => ({ 
-    id: 'new-123', 
+    id: `${SEED_TEST_IDS.MOCK_PATTERNS.ISSUE}-new`, 
     ...input,
-    organizationId: 'org-1',
+    organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
     createdAt: new Date(),
     status: 'open'
   })),
@@ -580,6 +637,108 @@ describe("IssueList with tRPC", () => {
     });
   });
 });
+```
+
+---
+
+## MOCK_PATTERNS vs Integration Test Patterns
+
+### **Unit Test Approach: SEED_TEST_IDS.MOCK_PATTERNS**
+
+**When to Use**: Pure business logic testing, UI component testing, service method testing (without database)
+
+```typescript
+import { SEED_TEST_IDS, createMockAdminContext } from "~/test/constants/seed-test-ids";
+
+describe("Service Business Logic (Unit Test)", () => {
+  test("calculateIssuePriority with mock data", () => {
+    const mockIssue = {
+      id: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
+      machineId: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
+      organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+      downtime: 120 // minutes
+    };
+    
+    // Test pure business logic
+    const priority = calculateIssuePriority(mockIssue);
+    expect(priority).toBe("high");
+  });
+  
+  test("component with mock context", () => {
+    const mockContext = createMockAdminContext();
+    
+    render(
+      <TestWrapper userContext={mockContext}>
+        <IssueCard issueId={SEED_TEST_IDS.MOCK_PATTERNS.ISSUE} />
+      </TestWrapper>
+    );
+    
+    expect(screen.getByText(/admin actions/i)).toBeVisible();
+  });
+});
+```
+
+### **Integration Test Approach: Real Seed Data**
+
+**When to Use**: Database operations, tRPC router testing, full-stack workflows (handled by integration-test-architect)
+
+```typescript
+// ❌ WRONG: Unit test architect should NOT write these patterns
+test("integration test example (wrong archetype)", async ({ workerDb }) => {
+  await withIsolatedTest(workerDb, async (db) => {
+    const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
+    // This is integration testing - wrong archetype!
+  });
+});
+
+// ✅ CORRECT: Unit test architect extracts business logic
+test("extracted business logic from integration test", () => {
+  // Extract the pure function from the router/service and test it
+  const result = calculateBusinessLogic({
+    inputData: mockInputWithConsistentIds,
+    organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION
+  });
+  
+  expect(result).toMatchObject(expectedOutput);
+});
+```
+
+### **Key Differences**
+
+| Aspect | Unit Tests (MOCK_PATTERNS) | Integration Tests (Real Seed Data) |
+|--------|----------------------------|-----------------------------------|
+| **Purpose** | Business logic, UI behavior | Database operations, full-stack workflows |
+| **Speed** | Sub-100ms execution | 1-5 seconds per test |
+| **Database** | No database (mocked) | Real PGlite database |
+| **IDs** | `SEED_TEST_IDS.MOCK_PATTERNS.*` | `getSeededTestData()` for dynamic IDs |
+| **Archetype** | unit-test-architect | integration-test-architect |
+| **Dependencies** | All external dependencies mocked | Real database, RLS policies |
+
+### **MOCK_PATTERNS Best Practices**
+
+```typescript
+// ✅ Consistent mock IDs across all unit tests
+const mockUserContext = {
+  userId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+  organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+  role: 'admin'
+};
+
+// ✅ Predictable test data for debugging
+const mockMachine = {
+  id: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
+  name: "Mock Medieval Madness",
+  location: SEED_TEST_IDS.MOCK_PATTERNS.LOCATION,
+  status: "active"
+};
+
+// ✅ Type-safe mock relationships
+const mockIssueWithMachine = {
+  id: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
+  title: "Mock Flipper Issue",
+  machineId: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE, // Consistent reference
+  organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION
+};
 ```
 
 ---
@@ -680,11 +839,15 @@ describe("Performance validation", () => {
 - [ ] No unnecessary async operations
 - [ ] Efficient mock setup and teardown
 
-**Type Safety:**
+**Type Safety & Mock Data Consistency:**
 - [ ] Type-safe mocking with `vi.importActual`
 - [ ] Mock types match real implementations  
 - [ ] Business logic contracts validated
 - [ ] No `any` types in test code
+- [ ] SEED_TEST_IDS.MOCK_PATTERNS used for ALL mock IDs
+- [ ] No hardcoded strings ("test-org", "user-123") in test data
+- [ ] createMockAdminContext() and createMockMemberContext() used for user contexts
+- [ ] Mock relationships use consistent SEED_TEST_IDS references
 
 **Component Quality:**
 - [ ] Semantic queries over brittle selectors
@@ -729,11 +892,14 @@ describe("Performance validation", () => {
 - Use optimal mocking strategies for external dependencies
 - Eliminate unnecessary async operations
 
-**Type Safety Excellence:**
+**Type Safety Excellence & Mock Data Consistency:**
 - Implement type-safe mocking with `vi.importActual`
 - Ensure mock types perfectly match real implementations
 - Validate business logic contracts through testing
 - Maintain strict TypeScript compliance in test code
+- **CRITICAL**: Replace ALL hardcoded mock IDs with SEED_TEST_IDS.MOCK_PATTERNS
+- Use createMockAdminContext() and createMockMemberContext() for consistent user contexts
+- Ensure predictable mock data across all unit tests for better debugging
 
 **Component Testing Mastery:**
 - Test user interaction patterns comprehensively

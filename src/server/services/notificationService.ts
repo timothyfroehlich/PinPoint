@@ -44,6 +44,9 @@ export class NotificationService {
 
   /**
    * Create a new notification
+   *
+   * RLS automatically scopes notifications to the user's organization
+   * via database trigger that sets organizationId from auth.jwt()
    */
   async createNotification(data: NotificationData): Promise<void> {
     const notificationData: typeof notifications.$inferInsert = {
@@ -61,6 +64,9 @@ export class NotificationService {
 
   /**
    * Notify machine owner of new issue
+   *
+   * RLS automatically ensures only machines and issues from the same
+   * organization are accessible via database-level policies
    */
   async notifyMachineOwnerOfIssue(
     issueId: string,
@@ -101,6 +107,9 @@ export class NotificationService {
 
   /**
    * Notify machine owner of issue status change
+   *
+   * RLS automatically ensures only issues from the same organization
+   * are accessible, providing cross-organizational security
    */
   async notifyMachineOwnerOfStatusChange(
     issueId: string,
@@ -139,6 +148,9 @@ export class NotificationService {
 
   /**
    * Notify user of issue assignment
+   *
+   * RLS automatically ensures only issues from the same organization
+   * are accessible, and notifications are scoped appropriately
    */
   async notifyUserOfAssignment(
     issueId: string,
@@ -169,6 +181,9 @@ export class NotificationService {
 
   /**
    * Get user's notifications
+   *
+   * RLS automatically filters notifications to only those belonging
+   * to the user's organization via database-level policies
    */
   async getUserNotifications(
     userId: string,
@@ -194,6 +209,9 @@ export class NotificationService {
 
   /**
    * Mark notification as read
+   *
+   * RLS ensures the notification belongs to the user's organization.
+   * User ownership validation prevents cross-user notification access.
    */
   async markAsRead(notificationId: string, userId: string): Promise<void> {
     await this.db
@@ -209,6 +227,9 @@ export class NotificationService {
 
   /**
    * Mark all notifications as read for user
+   *
+   * RLS automatically scopes to the user's organization,
+   * ensuring only their notifications are updated
    */
   async markAllAsRead(userId: string): Promise<void> {
     await this.db
@@ -221,6 +242,9 @@ export class NotificationService {
 
   /**
    * Get unread notification count
+   *
+   * RLS automatically filters to notifications within the user's
+   * organization, providing accurate organizational counts
    */
   async getUnreadCount(userId: string): Promise<number> {
     const [countResult] = await this.db

@@ -48,62 +48,37 @@ function supabaseUserToSession(
   };
 }
 
-export const issueViewProcedure = organizationProcedure.use(async (opts) => {
+export const issueViewProcedure = orgScopedProcedure.use(async (opts) => {
   const session = supabaseUserToSession(opts.ctx.user, opts.ctx.organizationId);
-  await requirePermissionForSession(
-    session,
-    "issue:view",
-    opts.ctx.db,
-    opts.ctx.organizationId,
-  );
+  await requirePermissionForSession(session, "issue:view", opts.ctx.db);
   return opts.next();
 });
 
-export const issueCreateProcedure = organizationProcedure.use(async (opts) => {
+export const issueCreateProcedure = orgScopedProcedure.use(async (opts) => {
   const session = supabaseUserToSession(opts.ctx.user, opts.ctx.organizationId);
-  await requirePermissionForSession(
-    session,
-    "issue:create",
-    opts.ctx.db,
-    opts.ctx.organizationId,
-  );
+  await requirePermissionForSession(session, "issue:create", opts.ctx.db);
   return opts.next();
 });
 
-export const issueEditProcedure = organizationProcedure.use(async (opts) => {
+export const issueEditProcedure = orgScopedProcedure.use(async (opts) => {
   const session = supabaseUserToSession(opts.ctx.user, opts.ctx.organizationId);
-  await requirePermissionForSession(
-    session,
-    "issue:edit",
-    opts.ctx.db,
-    opts.ctx.organizationId,
-  );
+  await requirePermissionForSession(session, "issue:edit", opts.ctx.db);
   return opts.next();
 });
 
-export const issueDeleteProcedure = organizationProcedure.use(async (opts) => {
+export const issueDeleteProcedure = orgScopedProcedure.use(async (opts) => {
   const session = supabaseUserToSession(opts.ctx.user, opts.ctx.organizationId);
-  await requirePermissionForSession(
-    session,
-    "issue:delete",
-    opts.ctx.db,
-    opts.ctx.organizationId,
-  );
+  await requirePermissionForSession(session, "issue:delete", opts.ctx.db);
   return opts.next();
 });
 
-export const issueAssignProcedure = organizationProcedure.use(async (opts) => {
+export const issueAssignProcedure = orgScopedProcedure.use(async (opts) => {
   const session = supabaseUserToSession(opts.ctx.user, opts.ctx.organizationId);
-  await requirePermissionForSession(
-    session,
-    "issue:assign",
-    opts.ctx.db,
-    opts.ctx.organizationId,
-  );
+  await requirePermissionForSession(session, "issue:assign", opts.ctx.db);
   return opts.next();
 });
 
-export const attachmentCreateProcedure = organizationProcedure.use(
+export const attachmentCreateProcedure = orgScopedProcedure.use(
   async (opts) => {
     const session = supabaseUserToSession(
       opts.ctx.user,
@@ -113,13 +88,12 @@ export const attachmentCreateProcedure = organizationProcedure.use(
       session,
       "attachment:create",
       opts.ctx.db,
-      opts.ctx.organizationId,
     );
     return opts.next();
   },
 );
 
-export const attachmentDeleteProcedure = organizationProcedure.use(
+export const attachmentDeleteProcedure = orgScopedProcedure.use(
   async (opts) => {
     const session = supabaseUserToSession(
       opts.ctx.user,
@@ -129,67 +103,46 @@ export const attachmentDeleteProcedure = organizationProcedure.use(
       session,
       "attachment:delete",
       opts.ctx.db,
-      opts.ctx.organizationId,
     );
     return opts.next();
   },
 );
 
-export const machineEditProcedure = organizationProcedure.use(async (opts) => {
+export const machineEditProcedure = orgScopedProcedure.use(async (opts) => {
   const session = supabaseUserToSession(opts.ctx.user, opts.ctx.organizationId);
-  await requirePermissionForSession(
-    session,
-    "machine:edit",
-    opts.ctx.db,
-    opts.ctx.organizationId,
-  );
+  await requirePermissionForSession(session, "machine:edit", opts.ctx.db);
   return opts.next();
 });
 
-export const machineDeleteProcedure = organizationProcedure.use(
+export const machineDeleteProcedure = orgScopedProcedure.use(
   async (opts) => {
     const session = supabaseUserToSession(
       opts.ctx.user,
       opts.ctx.organizationId,
     );
-    await requirePermissionForSession(
-      session,
-      "machine:delete",
-      opts.ctx.db,
-      opts.ctx.organizationId,
-    );
+    await requirePermissionForSession(session, "machine:delete", opts.ctx.db);
     return opts.next();
   },
 );
 
-export const locationEditProcedure = organizationProcedure.use(async (opts) => {
+export const locationEditProcedure = orgScopedProcedure.use(async (opts) => {
   const session = supabaseUserToSession(opts.ctx.user, opts.ctx.organizationId);
-  await requirePermissionForSession(
-    session,
-    "location:edit",
-    opts.ctx.db,
-    opts.ctx.organizationId,
-  );
+  await requirePermissionForSession(session, "location:edit", opts.ctx.db);
   return opts.next();
 });
 
-export const locationDeleteProcedure = organizationProcedure.use(
+export const locationDeleteProcedure = orgScopedProcedure.use(
   async (opts) => {
     const session = supabaseUserToSession(
       opts.ctx.user,
       opts.ctx.organizationId,
     );
-    await requirePermissionForSession(
-      session,
-      "location:delete",
-      opts.ctx.db,
-      opts.ctx.organizationId,
-    );
+    await requirePermissionForSession(session, "location:delete", opts.ctx.db);
     return opts.next();
   },
 );
 
-export const organizationManageProcedure = organizationProcedure.use(
+export const organizationManageProcedure = orgScopedProcedure.use(
   async (opts) => {
     const session = supabaseUserToSession(
       opts.ctx.user,
@@ -199,31 +152,20 @@ export const organizationManageProcedure = organizationProcedure.use(
       session,
       "organization:manage",
       opts.ctx.db,
-      opts.ctx.organizationId,
     );
     return opts.next();
   },
 );
 
-export const roleManageProcedure = organizationProcedure.use(async (opts) => {
+export const roleManageProcedure = orgScopedProcedure.use(async (opts) => {
   const session = supabaseUserToSession(opts.ctx.user, opts.ctx.organizationId);
-  await requirePermissionForSession(
-    session,
-    "role:manage",
-    opts.ctx.db,
-    opts.ctx.organizationId,
-  );
+  await requirePermissionForSession(session, "role:manage", opts.ctx.db);
   return opts.next();
 });
 
-export const userManageProcedure = organizationProcedure.use(async (opts) => {
+export const userManageProcedure = orgScopedProcedure.use(async (opts) => {
   const session = supabaseUserToSession(opts.ctx.user, opts.ctx.organizationId);
-  await requirePermissionForSession(
-    session,
-    "user:manage",
-    opts.ctx.db,
-    opts.ctx.organizationId,
-  );
+  await requirePermissionForSession(session, "user:manage", opts.ctx.db);
   return opts.next();
 });
 

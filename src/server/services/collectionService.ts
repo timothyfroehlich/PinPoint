@@ -82,7 +82,7 @@ export class CollectionService {
 
   /**
    * Get collections for a location (for public filtering)
-   * RLS automatically scopes to user's organization
+   * RLS automatically scopes to user's organization through collection types and locations
    */
   async getLocationCollections(
     locationId: string,
@@ -190,6 +190,7 @@ export class CollectionService {
 
   /**
    * Get machines in a collection at a specific location
+   * RLS automatically scopes machines and collections to user's organization
    */
   async getCollectionMachines(
     collectionId: string,
@@ -231,7 +232,7 @@ export class CollectionService {
 
   /**
    * Create a manual collection
-   * RLS automatically sets organizationId via trigger
+   * RLS automatically sets organizationId via trigger or policy
    */
   async createManualCollection(
     data: CreateManualCollectionData,
@@ -264,6 +265,7 @@ export class CollectionService {
   /**
    * Add machines to a manual collection
    * Uses PostgreSQL-specific unnest function for efficient bulk insert
+   * RLS automatically validates that collection and machines belong to user's organization
    *
    * NOTE: Uses raw SQL for PostgreSQL-specific bulk operations. The machineIds parameter
    * is properly parameterized to prevent SQL injection. Drizzle supports many-to-many
@@ -289,8 +291,8 @@ export class CollectionService {
   }
 
   /**
-   * Generate auto-collections for an organization
-   * RLS automatically scopes to user's organization
+   * Generate auto-collections for the current user's organization
+   * RLS automatically scopes collection types and machines to user's organization
    */
   async generateAutoCollections(): Promise<{
     generated: number;
@@ -323,6 +325,7 @@ export class CollectionService {
 
   /**
    * Generate manufacturer-based collections
+   * RLS automatically scopes all queries to user's organization
    */
   private async generateManufacturerCollections(
     collectionType: CollectionType,
@@ -438,6 +441,7 @@ export class CollectionService {
 
   /**
    * Generate year/era-based collections
+   * RLS automatically scopes all queries to user's organization
    */
   private async generateYearCollections(
     collectionType: CollectionType,
@@ -527,7 +531,8 @@ export class CollectionService {
   }
 
   /**
-   * Enable/disable a collection type for an organization
+   * Enable/disable a collection type
+   * RLS automatically ensures only user's organization collection types can be modified
    */
   async toggleCollectionType(
     collectionTypeId: string,
@@ -540,7 +545,7 @@ export class CollectionService {
   }
 
   /**
-   * Get organization's collection types for admin management
+   * Get current user's organization collection types for admin management
    * RLS automatically scopes to user's organization
    */
   async getOrganizationCollectionTypes(): Promise<CollectionTypeWithCount[]> {

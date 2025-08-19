@@ -16,7 +16,7 @@ import type { RLSOrganizationTRPCContext } from "~/server/api/trpc.base";
 import { generatePrefixedId } from "~/lib/utils/id-generation";
 import {
   createTRPCRouter,
-  organizationProcedure,
+  orgScopedProcedure,
   issueCreateProcedure,
   issueEditProcedure,
 } from "~/server/api/trpc";
@@ -287,7 +287,7 @@ export const issueCommentRouter = createTRPCRouter({
     ),
 
   // Delete comment (users can delete their own, admins can delete any)
-  deleteComment: organizationProcedure
+  deleteComment: orgScopedProcedure
     .input(
       z.object({
         commentId: z.string(),
@@ -376,7 +376,7 @@ export const issueCommentRouter = createTRPCRouter({
     }),
 
   // Restore deleted comment (admins only)
-  restoreComment: organizationProcedure
+  restoreComment: orgScopedProcedure
     .input(
       z.object({
         commentId: z.string(),
@@ -450,7 +450,7 @@ export const issueCommentRouter = createTRPCRouter({
     }),
 
   // Get all deleted comments for organization (admin view)
-  getDeletedComments: organizationProcedure.query(async ({ ctx }) => {
+  getDeletedComments: orgScopedProcedure.query(async ({ ctx }) => {
     // Use validation functions
     const adminValidation = validateAdminPermissions(ctx.userPermissions);
     if (!adminValidation.valid) {

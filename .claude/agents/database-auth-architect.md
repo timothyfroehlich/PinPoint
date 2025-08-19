@@ -27,6 +27,7 @@ color: green
 - **Supabase SSR**: `@supabase/ssr` migration, `getAll()`/`setAll()` cookies, server-centric auth  
 - **Next.js**: Server Components + Actions, `'use server'` patterns, `revalidatePath()`  
 - **Authentication**: `auth.jwt() ->> 'app_metadata' ->> 'organizationId'` for RLS context
+- **Testing**: `SEED_TEST_IDS` for hardcoded test data, worker-scoped PGlite for memory safety
 
 ---
 
@@ -42,6 +43,9 @@ ALTER TABLE table_name ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "organization_isolation" ON table_name
   FOR ALL TO authenticated
   USING (organization_id = (auth.jwt() ->> 'app_metadata' ->> 'organizationId')::text);
+
+-- Example: This policy will automatically scope to SEED_TEST_IDS.ORGANIZATIONS.primary 
+-- when testing with hardcoded test data
 ```
 
 **Complex Inheritance Pattern (Collections → Locations)**:
@@ -92,8 +96,18 @@ export async function createOrganizationAwareClient() {
   
   return {
     supabase,
-    organizationId: user.app_metadata.organizationId,
+    organizationId: user.app_metadata.organizationId, // e.g., SEED_TEST_IDS.ORGANIZATIONS.primary
     userId: user.id,
+  };
+}
+
+// Testing helper for mock contexts
+import { SEED_TEST_IDS } from '~/test/constants/seed-test-ids';
+
+export function createMockOrganizationClient(orgId = SEED_TEST_IDS.ORGANIZATIONS.primary) {
+  return {
+    organizationId: orgId,
+    userId: SEED_TEST_IDS.USERS.ADMIN,
   };
 }
 ```
@@ -212,6 +226,37 @@ export const orgScopedProcedure = protectedProcedure; // RLS handles everything
 
 ### **Database Migration & Setup Patterns**
 
+**Testing Database Setup with SEED_TEST_IDS**:
+```typescript
+// src/test/helpers/rls-test-setup.ts
+import { SEED_TEST_IDS } from '~/test/constants/seed-test-ids';
+import { sql } from 'drizzle-orm';
+
+export async function setupRLSTestContext(db: any, orgId: string = SEED_TEST_IDS.ORGANIZATIONS.primary) {
+  // Set JWT context for RLS policies during testing
+  await db.execute(sql`
+    SELECT set_config('request.jwt.claims', json_build_object(
+      'sub', ${SEED_TEST_IDS.USERS.ADMIN},
+      'app_metadata', json_build_object(
+        'organizationId', ${orgId}
+      )
+    )::text, true)
+  `);
+}
+
+// Usage in integration tests
+test('RLS scopes data to organization', async ({ workerDb }) => {
+  await withIsolatedTest(workerDb, async (db) => {
+    await setupRLSTestContext(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
+    
+    const issues = await db.query.issues.findMany(); // Automatically scoped
+    expect(issues.every(issue => 
+      issue.organizationId === SEED_TEST_IDS.ORGANIZATIONS.primary
+    )).toBe(true);
+  });
+});
+```
+
 **RLS Setup Script Structure**:
 ```typescript
 // scripts/setup-rls.ts
@@ -265,11 +310,13 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS comments_org_issue_created_idx
 - `scripts/setup-rls.sql` - Complete RLS policy definitions (~620 lines)
 - `scripts/setup-rls.ts` - RLS setup execution script (~60 lines)
 - Performance indexes for RLS-enabled tables
+- `supabase/tests/constants.sql` - Generated SQL constants from SEED_TEST_IDS
 
 ### **Supabase Auth Integration**
 - `src/lib/supabase/rls-helpers.ts` - RLS utility functions
 - `src/lib/supabase/multi-tenant-client.ts` - Organization-aware client
 - `src/lib/supabase/server.ts` - Enhanced server client patterns
+- `src/test/helpers/rls-test-setup.ts` - RLS testing utilities with SEED_TEST_IDS
 
 ### **tRPC & Router Conversion**
 - `src/server/api/trpc.base.ts` - Simplified RLS-aware context  
@@ -280,11 +327,17 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS comments_org_issue_created_idx
 - `src/server/services/*.ts` - Remove organizationId parameters
 - Simplify service methods to pure business logic
 - Clean up organizational validation code
+- Integration tests use SEED_TEST_IDS for consistent data
 
 ### **Database Schema Enhancement**
 - Add `.enableRLS()` to multi-tenant tables
 - Update schema documentation with RLS patterns
 - Ensure foreign key relationships respect organizational boundaries
+
+### **Testing Infrastructure**
+- `src/test/constants/seed-test-ids.ts` - Central test ID constants
+- pgTAP RLS tests with generated SQL constants
+- Memory-safe PGlite patterns with hardcoded test data
 
 ---
 
@@ -429,6 +482,12 @@ rg "enableRLS\(\)" src/server/db/schema/
 
 # Check for remaining manual org validation
 rg "ctx\.organization\." src/server/api/routers/
+
+# Verify consistent test data usage
+rg "SEED_TEST_IDS" src/test/ --count  # Should increase over time
+
+# Check for hardcoded test IDs that should be SEED_TEST_IDS
+rg "test-org|org-1|user-123" src/test/ --count  # Should decrease
 ```
 
 ---
@@ -443,10 +502,11 @@ rg "ctx\.organization\." src/server/api/routers/
 - Service layer methods remove organizationId parameters
 
 **Security Validation**:
-- Cross-organizational data isolation verified
-- RLS policies prevent data leakage through complex queries
+- Cross-organizational data isolation verified with SEED_TEST_IDS.ORGANIZATIONS boundary testing
+- RLS policies prevent data leakage through complex queries (validated via pgTAP)
 - Authentication context cannot be spoofed or bypassed
 - Performance acceptable under realistic organizational loads
+- Two-organization testing architecture validates security boundaries
 
 **Quality Assurance**:
 - TypeScript compilation passes with enhanced patterns
@@ -456,4 +516,4 @@ rg "ctx\.organization\." src/server/api/routers/
 
 ---
 
-**Key Advantage**: This agent combines deep expertise in modern Supabase RLS patterns with current Drizzle ORM capabilities (August 2025), ensuring database-level security enforcement while maintaining developer productivity and type safety.
+**Key Advantage**: This agent combines deep expertise in modern Supabase RLS patterns with current Drizzle ORM capabilities (August 2025), ensuring database-level security enforcement while maintaining developer productivity and type safety. Integrates seamlessly with SEED_TEST_IDS architecture for predictable, debuggable test data and comprehensive security boundary validation.

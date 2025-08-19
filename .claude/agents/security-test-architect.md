@@ -33,11 +33,37 @@ color: red
 
 When starting security test work:
 
-1. **Threat Model Assessment**: Identify potential security boundary violations
-2. **RLS Policy Mapping**: Understand all active RLS policies in database schema
-3. **Permission Matrix Analysis**: Map all role-permission combinations
-4. **Cross-Org Attack Vectors**: Identify potential data leakage scenarios
-5. **Compliance Requirements**: Ensure GDPR and multi-tenant isolation standards
+1. **📋 CHECK TEST HEADERS**: Read test file headers for specific security test requirements
+2. **🎯 TWO-ORG ARCHITECTURE**: Use SEED_TEST_IDS.ORGANIZATIONS for consistent cross-org testing
+3. **Threat Model Assessment**: Identify potential security boundary violations
+4. **RLS Policy Mapping**: Understand all active RLS policies in database schema
+5. **Permission Matrix Analysis**: Map all role-permission combinations
+6. **Cross-Org Attack Vectors**: Test primary ↔ competitor organization isolation
+7. **Compliance Requirements**: Ensure GDPR and multi-tenant isolation standards
+
+### **Test File Header Interpretation**
+
+**✅ Multi-Tenant Tests**: "KEEP: Multi-org testing requires custom orgs (legitimate)"
+- Cross-org isolation tests legitimately need multiple organizations
+- Custom org creation via setupMultiOrgContext() is appropriate
+- Cannot use single SEED_TEST_IDS organization for isolation testing
+
+**🔄 Schema/Security Tests**: "Convert to security-test-architect pattern"
+- Database integrity tests need security validation
+- RLS policy enforcement should be added to constraint tests
+- Focus on security boundaries and data isolation
+
+### **Data Strategy for Security Tests**
+
+**Use SEED_TEST_IDS for**: Single-org security validation
+- Permission boundary tests within one organization
+- Role-based access control within organizational scope
+- Basic RLS policy functionality validation
+
+**Use Custom Orgs for**: Multi-org isolation testing
+- Cross-organizational data leakage prevention
+- Tenant isolation boundary enforcement  
+- Multi-context security scenarios
 
 ---
 
@@ -48,11 +74,12 @@ When starting security test work:
 ```typescript
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
 import { sql } from "drizzle-orm";
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
 test("RLS policy blocks cross-org data access completely", async ({ workerDb }) => {
   await withIsolatedTest(workerDb, async (db) => {
-    // Create sensitive data in org-1
-    await db.execute(sql`SET app.current_organization_id = 'confidential-org'`);
+    // Create sensitive data in primary org
+    await db.execute(sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`);
     await db.execute(sql`SET app.current_user_role = 'admin'`);
     
     const [sensitiveIssue] = await db.insert(schema.issues).values({
@@ -62,8 +89,8 @@ test("RLS policy blocks cross-org data access completely", async ({ workerDb }) 
       internalNotes: "DO NOT LEAK"
     }).returning();
     
-    // Create data in org-2
-    await db.execute(sql`SET app.current_organization_id = 'competitor-org'`);
+    // Create data in competitor org
+    await db.execute(sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.competitor}`);
     await db.execute(sql`SET app.current_user_role = 'admin'`);
     
     const [normalIssue] = await db.insert(schema.issues).values({
@@ -71,21 +98,23 @@ test("RLS policy blocks cross-org data access completely", async ({ workerDb }) 
       description: "Standard operational issue"
     }).returning();
     
-    // CRITICAL: Verify complete isolation - org-2 should see NOTHING from org-1
+    // CRITICAL: Verify complete isolation - competitor should see NOTHING from primary
     const visibleIssues = await db.query.issues.findMany();
     expect(visibleIssues).toHaveLength(1);
     expect(visibleIssues[0].id).toBe(normalIssue.id);
     expect(visibleIssues[0].title).toBe("Normal Issue");
+    expect(visibleIssues[0].organizationId).toBe(SEED_TEST_IDS.ORGANIZATIONS.competitor);
     
     // Verify no sensitive data leaked
     const allTitles = visibleIssues.map(issue => issue.title);
     expect(allTitles).not.toContain("CONFIDENTIAL: Security Vulnerability");
     
-    // Switch back to org-1 and verify data still exists
-    await db.execute(sql`SET app.current_organization_id = 'confidential-org'`);
-    const org1Issues = await db.query.issues.findMany();
-    expect(org1Issues).toHaveLength(1);
-    expect(org1Issues[0].title).toBe("CONFIDENTIAL: Security Vulnerability");
+    // Switch back to primary org and verify data still exists
+    await db.execute(sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`);
+    const primaryOrgIssues = await db.query.issues.findMany();
+    expect(primaryOrgIssues).toHaveLength(1);
+    expect(primaryOrgIssues[0].title).toBe("CONFIDENTIAL: Security Vulnerability");
+    expect(primaryOrgIssues[0].organizationId).toBe(SEED_TEST_IDS.ORGANIZATIONS.primary);
   });
 });
 ```
@@ -95,11 +124,10 @@ test("RLS policy blocks cross-org data access completely", async ({ workerDb }) 
 ```typescript
 test("RLS policies handle complex query patterns", async ({ workerDb }) => {
   await withIsolatedTest(workerDb, async (db) => {
-    // Set up data across multiple organizations
+    // Set up data across multiple organizations (using our two test orgs)
     const testData = [
-      { org: 'medical-org', title: 'Patient Data Issue', sensitivity: 'high' },
-      { org: 'finance-org', title: 'Payment Processing Bug', sensitivity: 'critical' },
-      { org: 'gaming-org', title: 'Leaderboard Display Error', sensitivity: 'low' }
+      { org: SEED_TEST_IDS.ORGANIZATIONS.primary, title: 'Primary Org High Priority Issue', sensitivity: 'high' },
+      { org: SEED_TEST_IDS.ORGANIZATIONS.competitor, title: 'Competitor Display Issue', sensitivity: 'low' }
     ];
     
     for (const { org, title, sensitivity } of testData) {
@@ -108,19 +136,19 @@ test("RLS policies handle complex query patterns", async ({ workerDb }) => {
     }
     
     // Test complex aggregation queries don't leak data
-    await db.execute(sql`SET app.current_organization_id = 'gaming-org'`);
+    await db.execute(sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.competitor}`);
     
-    // Should only count gaming-org issues
+    // Should only count competitor org issues
     const [countResult] = await db
       .select({ total: sql`count(*)` })
       .from(schema.issues);
     expect(countResult.total).toBe(1);
     
-    // Should only aggregate gaming-org data  
+    // Should only aggregate competitor org data  
     const [avgResult] = await db
       .select({ avgLength: sql`avg(length(${schema.issues.title}))` })
       .from(schema.issues);
-    expect(avgResult.avgLength).toBeCloseTo(24); // "Leaderboard Display Error".length
+    expect(avgResult.avgLength).toBeCloseTo(22); // "Competitor Display Issue".length
     
     // Complex JOIN queries should still respect RLS
     const joinResults = await db
@@ -132,7 +160,14 @@ test("RLS policies handle complex query patterns", async ({ workerDb }) => {
       .leftJoin(schema.machines, eq(schema.issues.machineId, schema.machines.id));
     
     expect(joinResults).toHaveLength(1);
-    expect(joinResults[0].issueTitle).toBe('Leaderboard Display Error');
+    expect(joinResults[0].issueTitle).toBe('Competitor Display Issue');
+    
+    // Switch to primary org and verify different data
+    await db.execute(sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`);
+    const primaryResults = await db.query.issues.findMany();
+    expect(primaryResults).toHaveLength(1);
+    expect(primaryResults[0].title).toBe('Primary Org High Priority Issue');
+    expect(primaryResults[0].organizationId).toBe(SEED_TEST_IDS.ORGANIZATIONS.primary);
   });
 });
 ```
@@ -142,8 +177,8 @@ test("RLS policies handle complex query patterns", async ({ workerDb }) => {
 ```typescript
 test("RLS policies maintain performance under concurrent access", async ({ workerDb }) => {
   await withIsolatedTest(workerDb, async (db) => {
-    // Create large dataset across multiple orgs
-    const orgs = ['org-1', 'org-2', 'org-3', 'org-4', 'org-5'];
+    // Create large dataset across our test organizations
+    const orgs = [SEED_TEST_IDS.ORGANIZATIONS.primary, SEED_TEST_IDS.ORGANIZATIONS.competitor];
     const issuesPerOrg = 50;
     
     for (const org of orgs) {
@@ -158,8 +193,8 @@ test("RLS policies maintain performance under concurrent access", async ({ worke
       await db.insert(schema.issues).values(issueData);
     }
     
-    // Test performance with RLS active
-    await db.execute(sql`SET app.current_organization_id = 'org-3'`);
+    // Test performance with RLS active on primary org
+    await db.execute(sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`);
     
     const start = performance.now();
     
@@ -187,9 +222,10 @@ test("RLS policies maintain performance under concurrent access", async ({ worke
     // Should complete quickly even with RLS
     expect(duration).toBeLessThan(100); // Under 100ms
     
-    // Should only return org-3 data
+    // Should only return primary org data
     results.forEach(issue => {
-      expect(issue.title).toMatch(/org-3/);
+      expect(issue.title).toMatch(new RegExp(SEED_TEST_IDS.ORGANIZATIONS.primary));
+      expect(issue.organizationId).toBe(SEED_TEST_IDS.ORGANIZATIONS.primary);
     });
     
     // Should only return high priority issues
@@ -240,7 +276,7 @@ describe("Role-based permission matrix", () => {
   permissionMatrix.forEach(({ role, action, resource, allowed }) => {
     test(`${role} ${allowed ? "can" : "cannot"} ${action} ${resource}`, async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        await db.execute(sql`SET app.current_organization_id = 'test-org'`);
+        await db.execute(sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`);
         await db.execute(sql`SET app.current_user_role = ${role}`);
         await db.execute(sql`SET app.current_user_id = '${role}-user-id'`);
         
@@ -308,10 +344,10 @@ async function performSecurityAction(db: DrizzleDB, action: string, resource: st
 ```typescript
 test("prevents role escalation attacks", async ({ workerDb }) => {
   await withIsolatedTest(workerDb, async (db) => {
-    // Set up as member user
-    await db.execute(sql`SET app.current_organization_id = 'security-test'`);
+    // Set up as member user in primary org
+    await db.execute(sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`);
     await db.execute(sql`SET app.current_user_role = 'member'`);
-    await db.execute(sql`SET app.current_user_id = 'member-123'`);
+    await db.execute(sql`SET app.current_user_id = ${SEED_TEST_IDS.USERS.MEMBER1}`);
     
     // Attempt to escalate role through various attack vectors
     
@@ -330,12 +366,12 @@ test("prevents role escalation attacks", async ({ workerDb }) => {
     ).rejects.toThrow(/permission denied/i);
     
     // Attack 3: Try to delete other users' data
-    await db.execute(sql`SET app.current_user_id = 'other-user'`);
+    await db.execute(sql`SET app.current_user_id = ${SEED_TEST_IDS.USERS.MEMBER2}`);
     const [otherUserIssue] = await db.insert(schema.issues).values({
       title: 'Other User Issue'
     }).returning();
     
-    await db.execute(sql`SET app.current_user_id = 'member-123'`);
+    await db.execute(sql`SET app.current_user_id = ${SEED_TEST_IDS.USERS.MEMBER1}`);
     await expect(
       db.delete(schema.issues).where(eq(schema.issues.id, otherUserIssue.id))
     ).rejects.toThrow(/permission denied/i);
@@ -346,7 +382,8 @@ test("prevents role escalation attacks", async ({ workerDb }) => {
     }).returning();
     
     expect(memberIssue).toHaveLength(1);
-    expect(memberIssue[0].createdBy).toBe('member-123');
+    expect(memberIssue[0].createdBy).toBe(SEED_TEST_IDS.USERS.MEMBER1);
+    expect(memberIssue[0].organizationId).toBe(SEED_TEST_IDS.ORGANIZATIONS.primary);
   });
 });
 ```
@@ -360,32 +397,32 @@ test("prevents role escalation attacks", async ({ workerDb }) => {
 ```typescript
 test("prevents data leakage through complex joins and subqueries", async ({ workerDb }) => {
   await withIsolatedTest(workerDb, async (db) => {
-    // Set up sensitive data in victim organization
-    await db.execute(sql`SET app.current_organization_id = 'victim-corp'`);
+    // Set up sensitive data in primary organization
+    await db.execute(sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`);
     await db.execute(sql`SET app.current_user_role = 'admin'`);
     
-    const [victimLocation] = await db.insert(schema.locations).values({
-      name: "Victim Corp Headquarters",
+    const [primaryLocation] = await db.insert(schema.locations).values({
+      name: "Primary Corp Headquarters",
       address: "123 Confidential St",
       phone: "555-SECRET",
       coordinates: { lat: 40.7128, lng: -74.0060 }
     }).returning();
     
-    const [victimMachine] = await db.insert(schema.machines).values({
+    const [primaryMachine] = await db.insert(schema.machines).values({
       name: "Confidential Data Terminal",
-      locationId: victimLocation.id,
+      locationId: primaryLocation.id,
       model: "Classified-X1"
     }).returning();
     
-    const [victimIssue] = await db.insert(schema.issues).values({
+    const [primaryIssue] = await db.insert(schema.issues).values({
       title: "CONFIDENTIAL: Data Breach Investigation",
       description: "Investigating potential data theft",
-      machineId: victimMachine.id,
+      machineId: primaryMachine.id,
       priority: "critical"
     }).returning();
     
-    // Switch to attacker organization
-    await db.execute(sql`SET app.current_organization_id = 'attacker-corp'`);
+    // Switch to competitor organization (acts as potential attacker)
+    await db.execute(sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.competitor}`);
     await db.execute(sql`SET app.current_user_role = 'admin'`);
     
     // Attack 1: Try to access data through direct queries
@@ -435,9 +472,9 @@ test("prevents data leakage through complex joins and subqueries", async ({ work
     
     expect(windowAttack).toHaveLength(0);
     
-    // Verify victim data still exists when accessed properly
-    await db.execute(sql`SET app.current_organization_id = 'victim-corp'`);
-    const victimData = await db.query.issues.findMany({
+    // Verify primary org data still exists when accessed properly
+    await db.execute(sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`);
+    const primaryData = await db.query.issues.findMany({
       with: {
         machine: {
           with: {
@@ -447,8 +484,9 @@ test("prevents data leakage through complex joins and subqueries", async ({ work
       }
     });
     
-    expect(victimData).toHaveLength(1);
-    expect(victimData[0].title).toBe("CONFIDENTIAL: Data Breach Investigation");
+    expect(primaryData).toHaveLength(1);
+    expect(primaryData[0].title).toBe("CONFIDENTIAL: Data Breach Investigation");
+    expect(primaryData[0].organizationId).toBe(SEED_TEST_IDS.ORGANIZATIONS.primary);
   });
 });
 ```
@@ -458,9 +496,7 @@ test("prevents data leakage through complex joins and subqueries", async ({ work
 ```typescript
 test("maintains isolation under high concurrent load", async ({ workerDb }) => {
   await withIsolatedTest(workerDb, async (db) => {
-    const organizations = [
-      'healthcare-inc', 'finance-corp', 'gaming-ltd', 'education-org', 'retail-chain'
-    ];
+    const organizations = [SEED_TEST_IDS.ORGANIZATIONS.primary, SEED_TEST_IDS.ORGANIZATIONS.competitor];
     
     // Create isolated data for each organization
     for (const org of organizations) {
@@ -491,6 +527,7 @@ test("maintains isolation under high concurrent load", async ({ workerDb }) => {
       orgIssues.forEach(issue => {
         expect(issue.title).toMatch(new RegExp(`^${testOrg.toUpperCase()}-CONFIDENTIAL-`));
         expect(issue.description).toBe(`Sensitive data for ${testOrg} only`);
+        expect(issue.organizationId).toBe(testOrg);
       });
       
       // Should not see any other organization's data
@@ -500,14 +537,22 @@ test("maintains isolation under high concurrent load", async ({ workerDb }) => {
       expect(otherOrgData).toHaveLength(0);
     }
     
-    // Test aggregation isolation
-    await db.execute(sql`SET app.current_organization_id = 'healthcare-inc'`);
+    // Test aggregation isolation on primary org
+    await db.execute(sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`);
     const [totalCount] = await db
       .select({ count: sql`count(*)` })
       .from(schema.issues);
     
-    // Should only count healthcare-inc issues
+    // Should only count primary org issues
     expect(totalCount.count).toBe(20);
+    
+    // Test competitor org sees different count
+    await db.execute(sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.competitor}`);
+    const [competitorCount] = await db
+      .select({ count: sql`count(*)` })
+      .from(schema.issues);
+    
+    expect(competitorCount.count).toBe(20); // Same amount, different data
   });
 });
 ```
@@ -521,54 +566,56 @@ test("maintains isolation under high concurrent load", async ({ workerDb }) => {
 ```typescript
 test("foreign key constraints respect organizational boundaries", async ({ workerDb }) => {
   await withIsolatedTest(workerDb, async (db) => {
-    // Create machine in org-1
-    await db.execute(sql`SET app.current_organization_id = 'secure-org-1'`);
+    // Create machine in primary org
+    await db.execute(sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`);
     await db.execute(sql`SET app.current_user_role = 'admin'`);
     
-    const [org1Machine] = await db.insert(schema.machines).values({
-      name: "Org 1 Secure Machine",
+    const [primaryMachine] = await db.insert(schema.machines).values({
+      name: "Primary Org Secure Machine",
       model: "Classified",
-      serialNumber: "ORG1-SECRET-001"
+      serialNumber: "PRIMARY-SECRET-001"
     }).returning();
     
-    // Create machine in org-2 
-    await db.execute(sql`SET app.current_organization_id = 'secure-org-2'`);
-    const [org2Machine] = await db.insert(schema.machines).values({
-      name: "Org 2 Secure Machine", 
+    // Create machine in competitor org 
+    await db.execute(sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.competitor}`);
+    const [competitorMachine] = await db.insert(schema.machines).values({
+      name: "Competitor Org Secure Machine", 
       model: "Classified",
-      serialNumber: "ORG2-SECRET-001"
+      serialNumber: "COMPETITOR-SECRET-001"
     }).returning();
     
-    // Try to create issue in org-2 referencing org-1 machine
+    // Try to create issue in competitor org referencing primary org machine
     await expect(async () => {
       await db.insert(schema.issues).values({
         title: "Cross-org attack attempt",
-        machineId: org1Machine.id, // Foreign key to org-1 machine
+        machineId: primaryMachine.id, // Foreign key to primary org machine
         description: "This should fail"
       });
     }).rejects.toThrow(); // Should fail due to RLS + FK constraint
     
     // Verify legitimate references work within organization
     const validIssue = await db.insert(schema.issues).values({
-      title: "Valid org-2 issue",
-      machineId: org2Machine.id, // Valid reference to org-2 machine
+      title: "Valid competitor issue",
+      machineId: competitorMachine.id, // Valid reference to competitor machine
       description: "This should work"
     }).returning();
     
     expect(validIssue).toHaveLength(1);
-    expect(validIssue[0].machineId).toBe(org2Machine.id);
+    expect(validIssue[0].machineId).toBe(competitorMachine.id);
+    expect(validIssue[0].organizationId).toBe(SEED_TEST_IDS.ORGANIZATIONS.competitor);
     
-    // Verify org-1 can still access their machine
-    await db.execute(sql`SET app.current_organization_id = 'secure-org-1'`);
-    const org1Issues = await db.query.issues.findMany({
+    // Verify primary org can still access their machine
+    await db.execute(sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`);
+    const primaryIssues = await db.query.issues.findMany({
       with: { machine: true }
     });
     
-    expect(org1Issues).toHaveLength(0); // No issues created for org-1
+    expect(primaryIssues).toHaveLength(0); // No issues created for primary org
     
-    const org1Machines = await db.query.machines.findMany();
-    expect(org1Machines).toHaveLength(1);
-    expect(org1Machines[0].serialNumber).toBe("ORG1-SECRET-001");
+    const primaryMachines = await db.query.machines.findMany();
+    expect(primaryMachines).toHaveLength(1);
+    expect(primaryMachines[0].serialNumber).toBe("PRIMARY-SECRET-001");
+    expect(primaryMachines[0].organizationId).toBe(SEED_TEST_IDS.ORGANIZATIONS.primary);
   });
 });
 ```
@@ -578,67 +625,70 @@ test("foreign key constraints respect organizational boundaries", async ({ worke
 ```typescript
 test("cascade deletes respect organizational boundaries", async ({ workerDb }) => {
   await withIsolatedTest(workerDb, async (db) => {
-    // Set up related data in org-1
-    await db.execute(sql`SET app.current_organization_id = 'cascade-org-1'`);
+    // Set up related data in primary org
+    await db.execute(sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`);
     await db.execute(sql`SET app.current_user_role = 'admin'`);
     
-    const [location] = await db.insert(schema.locations).values({
-      name: "Org 1 Location"
+    const [primaryLocation] = await db.insert(schema.locations).values({
+      name: "Primary Org Location"
     }).returning();
     
-    const [machine] = await db.insert(schema.machines).values({
-      name: "Org 1 Machine",
-      locationId: location.id
+    const [primaryMachine] = await db.insert(schema.machines).values({
+      name: "Primary Org Machine",
+      locationId: primaryLocation.id
     }).returning();
     
-    const [issue] = await db.insert(schema.issues).values({
-      title: "Org 1 Issue",
-      machineId: machine.id
+    const [primaryIssue] = await db.insert(schema.issues).values({
+      title: "Primary Org Issue",
+      machineId: primaryMachine.id
     }).returning();
     
-    // Set up similar data in org-2
-    await db.execute(sql`SET app.current_organization_id = 'cascade-org-2'`);
-    const [location2] = await db.insert(schema.locations).values({
-      name: "Org 2 Location"
+    // Set up similar data in competitor org
+    await db.execute(sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.competitor}`);
+    const [competitorLocation] = await db.insert(schema.locations).values({
+      name: "Competitor Org Location"
     }).returning();
     
-    const [machine2] = await db.insert(schema.machines).values({
-      name: "Org 2 Machine", 
-      locationId: location2.id
+    const [competitorMachine] = await db.insert(schema.machines).values({
+      name: "Competitor Org Machine", 
+      locationId: competitorLocation.id
     }).returning();
     
-    const [issue2] = await db.insert(schema.issues).values({
-      title: "Org 2 Issue",
-      machineId: machine2.id
+    const [competitorIssue] = await db.insert(schema.issues).values({
+      title: "Competitor Org Issue",
+      machineId: competitorMachine.id
     }).returning();
     
-    // Delete location in org-2 (should cascade to machine and issues)
+    // Delete location in competitor org (should cascade to machine and issues)
     await db.delete(schema.locations)
-      .where(eq(schema.locations.id, location2.id));
+      .where(eq(schema.locations.id, competitorLocation.id));
     
-    // Verify org-2 data was deleted
-    const org2Locations = await db.query.locations.findMany();
-    const org2Machines = await db.query.machines.findMany();
-    const org2Issues = await db.query.issues.findMany();
+    // Verify competitor org data was deleted
+    const competitorLocations = await db.query.locations.findMany();
+    const competitorMachines = await db.query.machines.findMany();
+    const competitorIssues = await db.query.issues.findMany();
     
-    expect(org2Locations).toHaveLength(0);
-    expect(org2Machines).toHaveLength(0);
-    expect(org2Issues).toHaveLength(0);
+    expect(competitorLocations).toHaveLength(0);
+    expect(competitorMachines).toHaveLength(0);
+    expect(competitorIssues).toHaveLength(0);
     
-    // Verify org-1 data is untouched
-    await db.execute(sql`SET app.current_organization_id = 'cascade-org-1'`);
+    // Verify primary org data is untouched
+    await db.execute(sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`);
     
-    const org1Locations = await db.query.locations.findMany();
-    const org1Machines = await db.query.machines.findMany();
-    const org1Issues = await db.query.issues.findMany();
+    const primaryLocations = await db.query.locations.findMany();
+    const primaryMachines = await db.query.machines.findMany();
+    const primaryIssues = await db.query.issues.findMany();
     
-    expect(org1Locations).toHaveLength(1);
-    expect(org1Machines).toHaveLength(1);  
-    expect(org1Issues).toHaveLength(1);
+    expect(primaryLocations).toHaveLength(1);
+    expect(primaryMachines).toHaveLength(1);  
+    expect(primaryIssues).toHaveLength(1);
     
-    expect(org1Locations[0].name).toBe("Org 1 Location");
-    expect(org1Machines[0].name).toBe("Org 1 Machine");
-    expect(org1Issues[0].title).toBe("Org 1 Issue");
+    expect(primaryLocations[0].name).toBe("Primary Org Location");
+    expect(primaryLocations[0].organizationId).toBe(SEED_TEST_IDS.ORGANIZATIONS.primary);
+    expect(primaryMachines[0].name).toBe("Primary Org Machine");
+    expect(primaryMachines[0].organizationId).toBe(SEED_TEST_IDS.ORGANIZATIONS.primary);
+    expect(primaryIssues[0].title).toBe("Primary Org Issue");
+    expect(primaryIssues[0].organizationId).toBe(SEED_TEST_IDS.ORGANIZATIONS.primary);
   });
 });
 ```
@@ -652,8 +702,8 @@ test("cascade deletes respect organizational boundaries", async ({ workerDb }) =
 ```typescript
 test("ensures GDPR-compliant data isolation", async ({ workerDb }) => {
   await withIsolatedTest(workerDb, async (db) => {
-    // Simulate EU organization with sensitive data
-    await db.execute(sql`SET app.current_organization_id = 'eu-medical-corp'`);
+    // Simulate primary organization with sensitive data (EU-like scenario)
+    await db.execute(sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`);
     await db.execute(sql`SET app.current_user_role = 'admin'`);
     await db.execute(sql`SET app.data_region = 'eu'`);
     
@@ -665,26 +715,26 @@ test("ensures GDPR-compliant data isolation", async ({ workerDb }) => {
       processingLegalBasis: "medical_care"
     };
     
-    const [euIssue] = await db.insert(schema.issues).values({
+    const [primaryIssue] = await db.insert(schema.issues).values({
       title: `Medical Device Issue: ${gdprSensitiveData.medicalDevice}`,
       description: gdprSensitiveData.personalData,
       priority: "critical",
       gdprData: gdprSensitiveData
     }).returning();
     
-    // Simulate US organization  
-    await db.execute(sql`SET app.current_organization_id = 'us-tech-corp'`);
+    // Simulate competitor organization (US-like scenario)
+    await db.execute(sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.competitor}`);
     await db.execute(sql`SET app.data_region = 'us'`);
     
-    // US organization should see ZERO EU data
-    const usVisibleIssues = await db.query.issues.findMany();
-    expect(usVisibleIssues).toHaveLength(0);
+    // Competitor organization should see ZERO primary org data
+    const competitorVisibleIssues = await db.query.issues.findMany();
+    expect(competitorVisibleIssues).toHaveLength(0);
     
     // Even admin-level aggregation queries should return zero
-    const [usCount] = await db
+    const [competitorCount] = await db
       .select({ count: sql`count(*)` })
       .from(schema.issues);
-    expect(usCount.count).toBe(0);
+    expect(competitorCount.count).toBe(0);
     
     // Search queries should return no results
     const searchResults = await db.query.issues.findMany({
@@ -692,13 +742,14 @@ test("ensures GDPR-compliant data isolation", async ({ workerDb }) => {
     });
     expect(searchResults).toHaveLength(0);
     
-    // Verify EU data still accessible to EU organization
-    await db.execute(sql`SET app.current_organization_id = 'eu-medical-corp'`);
+    // Verify primary org data still accessible to primary organization
+    await db.execute(sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`);
     await db.execute(sql`SET app.data_region = 'eu'`);
     
-    const euData = await db.query.issues.findMany();
-    expect(euData).toHaveLength(1);
-    expect(euData[0].title).toContain("MRI Scanner #7");
+    const primaryData = await db.query.issues.findMany();
+    expect(primaryData).toHaveLength(1);
+    expect(primaryData[0].title).toContain("MRI Scanner #7");
+    expect(primaryData[0].organizationId).toBe(SEED_TEST_IDS.ORGANIZATIONS.primary);
   });
 });
 ```
@@ -708,12 +759,16 @@ test("ensures GDPR-compliant data isolation", async ({ workerDb }) => {
 ```typescript
 test("maintains audit trail integrity across organizations", async ({ workerDb }) => {
   await withIsolatedTest(workerDb, async (db) => {
-    const organizations = ['audit-org-1', 'audit-org-2'];
+    const organizations = [SEED_TEST_IDS.ORGANIZATIONS.primary, SEED_TEST_IDS.ORGANIZATIONS.competitor];
+    const adminUsers = [SEED_TEST_IDS.USERS.ADMIN, SEED_TEST_IDS.USERS.ADMIN]; // Same admin for both orgs for simplicity
     
-    for (const org of organizations) {
+    for (let i = 0; i < organizations.length; i++) {
+      const org = organizations[i];
+      const adminId = `${org}-admin`; // Unique admin per org
+      
       await db.execute(sql`SET app.current_organization_id = ${org}`);
       await db.execute(sql`SET app.current_user_role = 'admin'`);
-      await db.execute(sql`SET app.current_user_id = '${org}-admin'`);
+      await db.execute(sql`SET app.current_user_id = ${adminId}`);
       
       // Perform auditable actions
       const [issue] = await db.insert(schema.issues).values({
@@ -730,7 +785,10 @@ test("maintains audit trail integrity across organizations", async ({ workerDb }
     }
     
     // Verify each organization only sees their audit logs
-    for (const org of organizations) {
+    for (let i = 0; i < organizations.length; i++) {
+      const org = organizations[i];
+      const adminId = `${org}-admin`;
+      
       await db.execute(sql`SET app.current_organization_id = ${org}`);
       
       const auditLogs = await db.query.auditLogs.findMany({
@@ -743,7 +801,7 @@ test("maintains audit trail integrity across organizations", async ({ workerDb }
       // All entries should be for this organization
       auditLogs.forEach(log => {
         expect(log.organizationId).toBe(org);
-        expect(log.userId).toBe(`${org}-admin`);
+        expect(log.userId).toBe(adminId);
       });
       
       // Should contain expected actions
@@ -753,7 +811,7 @@ test("maintains audit trail integrity across organizations", async ({ workerDb }
       
       // Should not contain any other organization's data
       const foreignEntries = auditLogs.filter(log => 
-        !log.userId.startsWith(org) || log.organizationId !== org
+        log.organizationId !== org || log.userId !== adminId
       );
       expect(foreignEntries).toHaveLength(0);
     }
@@ -779,6 +837,8 @@ test("maintains audit trail integrity across organizations", async ({ workerDb }
 - [ ] Role escalation attempts properly blocked
 - [ ] Permission inheritance correctly implemented
 - [ ] Edge cases and boundary conditions validated
+- [ ] SEED_TEST_IDS used for single-org security tests
+- [ ] Custom orgs used for multi-org isolation tests
 
 **Data Leakage Prevention:**
 - [ ] Zero cross-organizational data visibility

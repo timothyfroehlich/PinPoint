@@ -24,7 +24,7 @@ ALTER TABLE organizations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE memberships ENABLE ROW LEVEL SECURITY;
 ALTER TABLE roles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE permissions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "rolePermissions" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE role_permissions ENABLE ROW LEVEL SECURITY;
 
 -- Location and machine management
 ALTER TABLE locations ENABLE ROW LEVEL SECURITY;
@@ -34,22 +34,22 @@ ALTER TABLE models ENABLE ROW LEVEL SECURITY;
 -- Issue management system
 ALTER TABLE issues ENABLE ROW LEVEL SECURITY;
 ALTER TABLE priorities ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "issueStatuses" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE issue_statuses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE comments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE attachments ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "issueHistory" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE issue_history ENABLE ROW LEVEL SECURITY;
 ALTER TABLE upvotes ENABLE ROW LEVEL SECURITY;
 
 -- Collection management
 ALTER TABLE collections ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "collectionTypes" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "collection_machines" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE collection_types ENABLE ROW LEVEL SECURITY;
+ALTER TABLE collection_machines ENABLE ROW LEVEL SECURITY;
 
 -- Notification system
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 
 -- PinballMap integration
-ALTER TABLE "pinballMapConfigs" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pinball_map_configs ENABLE ROW LEVEL SECURITY;
 
 -- =================================================================
 -- 2. DROP EXISTING POLICIES (IF ANY)
@@ -60,7 +60,7 @@ DROP POLICY IF EXISTS "organization_isolation" ON organizations;
 DROP POLICY IF EXISTS "memberships_organization_isolation" ON memberships;
 DROP POLICY IF EXISTS "roles_organization_isolation" ON roles;
 DROP POLICY IF EXISTS "permissions_global_read" ON permissions;
-DROP POLICY IF EXISTS "role_permissions_organization_isolation" ON "rolePermissions";
+DROP POLICY IF EXISTS "role_permissions_organization_isolation" ON role_permissions;
 
 -- Location and machine policies
 DROP POLICY IF EXISTS "locations_organization_isolation" ON locations;
@@ -70,20 +70,20 @@ DROP POLICY IF EXISTS "models_global_read" ON models;
 -- Issue management policies
 DROP POLICY IF EXISTS "issues_organization_isolation" ON issues;
 DROP POLICY IF EXISTS "priorities_organization_isolation" ON priorities;
-DROP POLICY IF EXISTS "issue_statuses_organization_isolation" ON "issueStatuses";
+DROP POLICY IF EXISTS "issue_statuses_organization_isolation" ON issue_statuses;
 DROP POLICY IF EXISTS "comments_organization_isolation" ON comments;
 DROP POLICY IF EXISTS "attachments_organization_isolation" ON attachments;
-DROP POLICY IF EXISTS "issue_history_organization_isolation" ON "issueHistory";
+DROP POLICY IF EXISTS "issue_history_organization_isolation" ON issue_history;
 DROP POLICY IF EXISTS "upvotes_organization_isolation" ON upvotes;
 
 -- Collection management policies
 DROP POLICY IF EXISTS "collections_organization_isolation" ON collections;
-DROP POLICY IF EXISTS "collection_types_organization_isolation" ON "collectionTypes";
-DROP POLICY IF EXISTS "collection_machines_organization_isolation" ON "collection_machines";
+DROP POLICY IF EXISTS "collection_types_organization_isolation" ON collection_types;
+DROP POLICY IF EXISTS "collection_machines_organization_isolation" ON collection_machines;
 
 -- Notification and config policies
 DROP POLICY IF EXISTS "notifications_organization_isolation" ON notifications;
-DROP POLICY IF EXISTS "pinball_map_configs_organization_isolation" ON "pinballMapConfigs";
+DROP POLICY IF EXISTS "pinball_map_configs_organization_isolation" ON pinball_map_configs;
 
 -- =================================================================
 -- 3. ORGANIZATION ISOLATION POLICIES

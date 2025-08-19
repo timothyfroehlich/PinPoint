@@ -2,16 +2,13 @@ import { TRPCError } from "@trpc/server";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
-import {
-  createTRPCRouter,
-  organizationProcedure,
-  organizationManageProcedure,
-} from "~/server/api/trpc";
+import { createTRPCRouter, orgScopedProcedure } from "~/server/api/trpc";
+import { organizationManageProcedure } from "~/server/api/trpc.permission";
 import { models } from "~/server/db/schema";
 
 export const modelCoreRouter = createTRPCRouter({
   // Enhanced getAll with OPDB metadata
-  getAll: organizationProcedure.query(async ({ ctx }) => {
+  getAll: orgScopedProcedure.query(async ({ ctx }) => {
     // Get all game titles that have instances in this organization
     // RLS automatically handles organizational scoping for machines
     const modelsWithMachines = await ctx.db.query.models.findMany({
@@ -40,7 +37,7 @@ export const modelCoreRouter = createTRPCRouter({
   }),
 
   // Get single game title by ID
-  getById: organizationProcedure
+  getById: orgScopedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
       const model = await ctx.db.query.models.findFirst({

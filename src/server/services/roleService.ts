@@ -23,7 +23,6 @@ import {
 // Define Role type from Drizzle schema
 type Role = typeof roles.$inferSelect;
 
-
 /**
  * Role Service
  *
@@ -387,10 +386,7 @@ export class RoleService {
 
     // Find default role for reassignment (RLS scoped)
     const defaultRole = await this.drizzle.query.roles.findFirst({
-      where: and(
-        eq(roles.isDefault, true),
-        ne(roles.id, roleId),
-      ),
+      where: and(eq(roles.isDefault, true), ne(roles.id, roleId)),
     });
 
     if (!defaultRole) {
@@ -506,10 +502,7 @@ export class RoleService {
   async getDefaultRole(): Promise<Role | null> {
     // RLS automatically scopes to user's organization
     const result = await this.drizzle.query.roles.findFirst({
-      where: and(
-        eq(roles.isDefault, true),
-        eq(roles.isSystem, false),
-      ),
+      where: and(eq(roles.isDefault, true), eq(roles.isSystem, false)),
     });
 
     return result ?? null;

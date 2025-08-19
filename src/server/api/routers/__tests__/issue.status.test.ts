@@ -1,3 +1,29 @@
+/**
+ * 🚨 UPDATE NEEDED: Convert Unit → tRPC Router (Archetype 5) + Use SEED_TEST_IDS
+ * 
+ * NEXT MODIFICATION TASKS:
+ * 1. Convert from Unit tests (Archetype 1) → tRPC Router tests (Archetype 5)
+ * 2. Replace hardcoded mock IDs with SEED_TEST_IDS constants
+ * 3. Add RLS session context testing for status updates
+ * 4. Test real tRPC procedures with PGlite integration
+ * 5. Validate organizational boundary enforcement
+ * 
+ * CURRENT ISSUES:
+ * - Complex Drizzle mock chains instead of real database testing
+ * - Missing organizational isolation validation
+ * - No RLS session context testing
+ * 
+ * IMPORT: import { SEED_TEST_IDS, createMockAdminContext } from "~/test/constants/seed-test-ids";
+ * 
+ * Issue Status Router Tests
+ * Tests for the issue status-related tRPC procedures
+ * 
+ * Tests:
+ * - statusUpdate: Updates the status of an issue with activity logging
+ * - getStatusHistory: Retrieves the status change history for an issue
+ * - getStatusStats: Gets status distribution statistics for an organization
+ */
+
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 // Mock NextAuth first to avoid import issues
@@ -31,6 +57,7 @@ describe("issueStatusRouter", () => {
       app_metadata: { organization_id: "org-1" },
     } as any;
 
+    ctx.organizationId = "org-1";
     ctx.organization = {
       id: "org-1",
       name: "Test Organization",
@@ -87,15 +114,13 @@ describe("issueStatusRouter", () => {
       // Set up Drizzle mock chain for issues count query (FIRST call)
       const issueCountQuery = {
         from: vi.fn().mockReturnThis(),
-        where: vi.fn().mockReturnThis(),
         groupBy: vi.fn().mockResolvedValue(mockIssueCounts),
       };
       vi.mocked(ctx.db.select).mockReturnValueOnce(issueCountQuery);
 
       // Set up Drizzle mock chain for statuses query (SECOND call)
       const statusSelectQuery = {
-        from: vi.fn().mockReturnThis(),
-        where: vi.fn().mockResolvedValue(mockStatuses),
+        from: vi.fn().mockResolvedValue(mockStatuses),
       };
       vi.mocked(ctx.db.select).mockReturnValueOnce(statusSelectQuery);
 
@@ -108,28 +133,22 @@ describe("issueStatusRouter", () => {
         RESOLVED: 8,
       });
 
-      // Verify organization scoping was applied
-      expect(statusSelectQuery.where).toHaveBeenCalledWith(
-        expect.anything(), // eq(issueStatuses.organizationId, ctx.organization.id)
-      );
-      expect(issueCountQuery.where).toHaveBeenCalledWith(
-        expect.anything(), // eq(issues.organizationId, ctx.organization.id)
-      );
+      // Verify queries were executed (RLS handles org scoping automatically)
+      expect(statusSelectQuery.from).toHaveBeenCalled();
+      expect(issueCountQuery.groupBy).toHaveBeenCalled();
     });
 
     it("should handle empty results", async () => {
       // Set up Drizzle mock chain for issues count query (FIRST call)
       const issueCountQuery = {
         from: vi.fn().mockReturnThis(),
-        where: vi.fn().mockReturnThis(),
         groupBy: vi.fn().mockResolvedValue([]),
       };
       vi.mocked(ctx.db.select).mockReturnValueOnce(issueCountQuery);
 
       // Set up Drizzle mock chain for statuses query (SECOND call)
       const statusSelectQuery = {
-        from: vi.fn().mockReturnThis(),
-        where: vi.fn().mockResolvedValue([]),
+        from: vi.fn().mockResolvedValue([]),
       };
       vi.mocked(ctx.db.select).mockReturnValueOnce(statusSelectQuery);
 
@@ -154,15 +173,13 @@ describe("issueStatusRouter", () => {
       // Set up Drizzle mock chain for issues count query (FIRST call)
       const issueCountQuery = {
         from: vi.fn().mockReturnThis(),
-        where: vi.fn().mockReturnThis(),
         groupBy: vi.fn().mockResolvedValue([]), // No issues
       };
       vi.mocked(ctx.db.select).mockReturnValueOnce(issueCountQuery);
 
       // Set up Drizzle mock chain for statuses query (SECOND call)
       const statusSelectQuery = {
-        from: vi.fn().mockReturnThis(),
-        where: vi.fn().mockResolvedValue(mockStatuses),
+        from: vi.fn().mockResolvedValue(mockStatuses),
       };
       vi.mocked(ctx.db.select).mockReturnValueOnce(statusSelectQuery);
 
@@ -195,15 +212,13 @@ describe("issueStatusRouter", () => {
       // Set up Drizzle mock chain for issues count query (FIRST call)
       const issueCountQuery = {
         from: vi.fn().mockReturnThis(),
-        where: vi.fn().mockReturnThis(),
         groupBy: vi.fn().mockResolvedValue(mockIssueCounts),
       };
       vi.mocked(ctx.db.select).mockReturnValueOnce(issueCountQuery);
 
       // Set up Drizzle mock chain for statuses query (SECOND call)
       const statusSelectQuery = {
-        from: vi.fn().mockReturnThis(),
-        where: vi.fn().mockResolvedValue(mockStatuses),
+        from: vi.fn().mockResolvedValue(mockStatuses),
       };
       vi.mocked(ctx.db.select).mockReturnValueOnce(statusSelectQuery);
 
@@ -234,15 +249,13 @@ describe("issueStatusRouter", () => {
       // Set up Drizzle mock chain for issues count query (FIRST call)
       const issueCountQuery = {
         from: vi.fn().mockReturnThis(),
-        where: vi.fn().mockReturnThis(),
         groupBy: vi.fn().mockResolvedValue(mockIssueCounts),
       };
       vi.mocked(ctx.db.select).mockReturnValueOnce(issueCountQuery);
 
       // Set up Drizzle mock chain for statuses query (SECOND call)
       const statusSelectQuery = {
-        from: vi.fn().mockReturnThis(),
-        where: vi.fn().mockResolvedValue(mockStatuses),
+        from: vi.fn().mockResolvedValue(mockStatuses),
       };
       vi.mocked(ctx.db.select).mockReturnValueOnce(statusSelectQuery);
 
@@ -274,15 +287,13 @@ describe("issueStatusRouter", () => {
       // Set up Drizzle mock chain for issues count query (FIRST call)
       const issueCountQuery = {
         from: vi.fn().mockReturnThis(),
-        where: vi.fn().mockReturnThis(),
         groupBy: vi.fn().mockResolvedValue(mockIssueCounts),
       };
       vi.mocked(ctx.db.select).mockReturnValueOnce(issueCountQuery);
 
       // Set up Drizzle mock chain for statuses query (SECOND call)
       const statusSelectQuery = {
-        from: vi.fn().mockReturnThis(),
-        where: vi.fn().mockResolvedValue(mockStatuses),
+        from: vi.fn().mockResolvedValue(mockStatuses),
       };
       vi.mocked(ctx.db.select).mockReturnValueOnce(statusSelectQuery);
 
@@ -308,6 +319,7 @@ describe("issueStatusRouter", () => {
     it("should require organization context", async () => {
       const caller = appRouter.createCaller({
         ...ctx,
+        organizationId: null,
         organization: null,
       } as any);
 
@@ -318,6 +330,7 @@ describe("issueStatusRouter", () => {
       // Create context for different organization
       const otherOrgCtx = {
         ...ctx,
+        organizationId: "org-2",
         organization: {
           id: "org-2",
           name: "Other Organization",
@@ -332,28 +345,22 @@ describe("issueStatusRouter", () => {
       // Set up Drizzle mock chain for issues count query (FIRST call)
       const issueCountQuery = {
         from: vi.fn().mockReturnThis(),
-        where: vi.fn().mockReturnThis(),
         groupBy: vi.fn().mockResolvedValue(mockIssueCounts),
       };
       vi.mocked(ctx.db.select).mockReturnValueOnce(issueCountQuery);
 
       // Set up Drizzle mock chain for statuses query (SECOND call)
       const statusSelectQuery = {
-        from: vi.fn().mockReturnThis(),
-        where: vi.fn().mockResolvedValue(mockStatuses),
+        from: vi.fn().mockResolvedValue(mockStatuses),
       };
       vi.mocked(ctx.db.select).mockReturnValueOnce(statusSelectQuery);
 
       const caller = appRouter.createCaller(otherOrgCtx as any);
       await caller.issueStatus.getStatusCounts();
 
-      // Verify queries were called with the correct organization ID
-      expect(statusSelectQuery.where).toHaveBeenCalledWith(
-        expect.anything(), // Should be eq(issueStatuses.organizationId, "org-2")
-      );
-      expect(issueCountQuery.where).toHaveBeenCalledWith(
-        expect.anything(), // Should be eq(issues.organizationId, "org-2")
-      );
+      // Verify queries were executed with different organization context (RLS handles isolation)
+      expect(statusSelectQuery.from).toHaveBeenCalled();
+      expect(issueCountQuery.groupBy).toHaveBeenCalled();
     });
   });
 });

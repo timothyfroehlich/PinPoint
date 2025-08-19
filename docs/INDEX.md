@@ -30,7 +30,7 @@ PinPoint has completed the Prisma-to-Drizzle migration with full removal of all 
 - [`latest-updates/`](./latest-updates/) - **CRITICAL**: Post-training tech stack updates (August 2025)
 - [`architecture/`](./architecture/) - System design, patterns, and current state
 - [`developer-guides/`](./developer-guides/) - Technology-specific implementation guides
-- [`testing/`](./testing/) - Testing philosophy and patterns (now integration-first)
+- [`testing/`](./testing/) - Testing philosophy and patterns (now integration-first, with shared SEED_TEST_IDS constants)
 - [`security/`](./security/) - Security patterns and audit findings
 
 ### Planning & Process
@@ -49,7 +49,7 @@ PinPoint has completed the Prisma-to-Drizzle migration with full removal of all 
 
 ### Quick References (Auto-Loaded)
 
-- **Tactical Patterns**: [`quick-reference/`](./quick-reference/) - Auto-loaded guides for immediate action
+- **Tactical Patterns**: [`quick-reference/`](./quick-reference/) - Auto-loaded guides with SEED_TEST_IDS usage patterns
 - **Essential Commands**: [`CLAUDE.md`](../CLAUDE.md) - Command reference and project context
 - **Latest Updates**: [`latest-updates/quick-reference.md`](./latest-updates/quick-reference.md) - Post-training breaking changes
 

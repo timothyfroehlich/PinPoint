@@ -7,14 +7,14 @@ import { OPDBClient } from "~/lib/opdb/client";
 import { generateId } from "~/lib/utils/id-generation";
 import {
   createTRPCRouter,
-  organizationProcedure,
+  orgScopedProcedure,
   organizationManageProcedure,
 } from "~/server/api/trpc";
-import { models, machines } from "~/server/db/schema";
+import { models } from "~/server/db/schema";
 
 export const modelOpdbRouter = createTRPCRouter({
   // Search OPDB games for typeahead
-  searchOPDB: organizationProcedure
+  searchOPDB: orgScopedProcedure
     .input(z.object({ query: z.string().min(1) }))
     .query(async ({ input }) => {
       const opdbClient = new OPDBClient(env.OPDB_API_KEY, env.OPDB_API_URL);

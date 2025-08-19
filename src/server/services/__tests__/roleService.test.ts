@@ -34,6 +34,31 @@ vi.mock("../permissionService", () => ({
   })),
 }));
 
+// Mock schema imports
+vi.mock("~/server/db/schema", () => ({
+  roles: {
+    id: "roles.id",
+    name: "roles.name",
+    organizationId: "roles.organizationId",
+    isSystem: "roles.isSystem",
+    isDefault: "roles.isDefault",
+    createdAt: "roles.createdAt",
+    updatedAt: "roles.updatedAt",
+  },
+  permissions: {
+    id: "permissions.id",
+    name: "permissions.name",
+  },
+  role_permissions: {
+    roleId: "role_permissions.roleId",
+    permissionId: "role_permissions.permissionId",
+  },
+  memberships: {
+    roleId: "memberships.roleId",
+    userId: "memberships.userId",
+  },
+}));
+
 // Mock drizzle client
 const createMockDrizzleClient = () => ({
   query: {
@@ -64,14 +89,13 @@ const createMockDrizzleClient = () => ({
     })),
   })),
   delete: vi.fn(() => ({
-    where: vi.fn(),
+    where: vi.fn().mockResolvedValue(undefined),
   })),
 });
 
 describe("RoleService", () => {
   let service: RoleService;
   let mockDrizzle: ReturnType<typeof createMockDrizzleClient>;
-  const testOrgId = "org-123";
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -136,7 +160,7 @@ describe("RoleService", () => {
       const mockNewRole = {
         id: "test-role-123",
         name: ROLE_TEMPLATES.MEMBER.name,
-        organizationId: testOrgId,
+        // organizationId handled by RLS
         isSystem: false,
         isDefault: true,
       };
@@ -160,7 +184,7 @@ describe("RoleService", () => {
       expect(mockValues).toHaveBeenCalledWith({
         id: "test-role-123",
         name: ROLE_TEMPLATES.MEMBER.name,
-        organizationId: testOrgId,
+        // organizationId set automatically by RLS trigger
         isSystem: false,
         isDefault: true,
       });
@@ -171,7 +195,7 @@ describe("RoleService", () => {
       const existingRole = {
         id: "existing-role-123",
         name: ROLE_TEMPLATES.MEMBER.name,
-        organizationId: testOrgId,
+        // organizationId handled by RLS
         isSystem: true, // Will be updated to false
         isDefault: false, // Will be updated to true
       };
@@ -209,7 +233,7 @@ describe("RoleService", () => {
       const mockNewRole = {
         id: "test-role-123",
         name: customName,
-        organizationId: testOrgId,
+        // organizationId handled by RLS
         isSystem: false,
         isDefault: false,
       };
@@ -276,7 +300,7 @@ describe("RoleService", () => {
 
       expect(result).toBeNull();
       expect(mockDrizzle.query.roles.findFirst).toHaveBeenCalledWith({
-        where: expect.any(Object), // and(eq(organizationId), eq(isDefault, true))
+        where: expect.any(Object), // and(eq(isDefault, true), eq(isSystem, false)) - RLS handles org scoping
       });
     });
 
@@ -284,7 +308,7 @@ describe("RoleService", () => {
       const defaultRole = {
         id: "role-default",
         name: "Default Role",
-        organizationId: testOrgId,
+        // organizationId handled by RLS
         isDefault: true,
       };
 
@@ -309,7 +333,7 @@ describe("RoleService", () => {
       const adminRole = {
         id: "role-admin",
         name: SYSTEM_ROLES.ADMIN,
-        organizationId: testOrgId,
+        // organizationId handled by RLS
         isSystem: true,
       };
 
@@ -340,7 +364,7 @@ describe("RoleService", () => {
         id: "role-admin",
         name: SYSTEM_ROLES.ADMIN,
         isSystem: true,
-        organizationId: testOrgId,
+        // organizationId handled by RLS
       };
 
       mockDrizzle.query.roles.findFirst.mockResolvedValue(systemRole);

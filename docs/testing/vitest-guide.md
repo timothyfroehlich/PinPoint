@@ -2,9 +2,31 @@
 
 **Status**: ✅ **Active** - Complete reference for all Vitest testing patterns  
 **Audience**: Developers, agents, and contributors  
-**Scope**: Unit testing, component testing, service testing, mocking patterns
+**Scope**: Unit testing, component testing, service testing, mocking patterns  
+**Archetype Integration**: Aligned with the 3 testing archetypes
 
-This guide consolidates all Vitest testing patterns, mocking strategies, and performance insights for PinPoint development.
+This guide consolidates all Vitest testing patterns, mocking strategies, and performance insights for PinPoint development, organized by testing archetype.
+
+---
+
+## 🎯 Archetype Integration
+
+### Testing Archetype Mapping
+
+**Unit Testing Archetype** → `unit-test-architect`
+- **Vitest Patterns**: Component testing, mock factories, pure function testing
+- **Focus**: Fast execution, isolated testing, type-safe mocking
+- **See**: [archetype-unit-testing.md](./archetype-unit-testing.md)
+
+**Integration Testing Archetype** → `integration-test-architect`  
+- **Vitest Patterns**: Service layer testing, multi-tenant validation, dependency injection
+- **Focus**: Real database operations, transaction isolation, memory safety
+- **See**: [archetype-integration-testing.md](./archetype-integration-testing.md)
+
+**Security Testing Archetype** → `security-test-architect`
+- **Vitest Patterns**: Permission testing, RLS validation, cross-org isolation
+- **Focus**: Security boundaries, policy enforcement, compliance testing
+- **See**: [archetype-security-testing.md](./archetype-security-testing.md)
 
 ---
 
@@ -57,6 +79,48 @@ beforeEach(() => vi.clearAllMocks());
 - **12-19x faster** on service layer tests
 - **Overall**: 87-93% test success rates across 200+ test files
 
+### 🎯 Archetype-Specific Patterns
+
+**Unit Testing Archetype** (handled by `unit-test-architect`):
+```typescript
+// Fast, isolated patterns - no database
+import { describe, it, expect, vi } from "vitest";
+
+// Pure function testing
+test("utility function behavior", () => {
+  expect(formatDate(input)).toBe(expected);
+});
+
+// Component testing with mocks
+test("component rendering", () => {
+  render(<Component />);
+  expect(screen.getByText("content")).toBeInTheDocument();
+});
+```
+
+**Integration Testing Archetype** (handled by `integration-test-architect`):
+```typescript
+// Memory-safe database testing - NO per-test PGlite instances
+import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
+
+test("database operations", async ({ workerDb }) => {
+  await withIsolatedTest(workerDb, async (db) => {
+    // Real database operations with transaction isolation
+  });
+});
+```
+
+**Security Testing Archetype** (handled by `security-test-architect`):
+```typescript
+// RLS policy and boundary testing
+test("organizational isolation", async ({ workerDb }) => {
+  await withIsolatedTest(workerDb, async (db) => {
+    await db.execute(sql`SET app.current_organization_id = 'org-1'`);
+    // Verify RLS enforcement and boundaries
+  });
+});
+```
+
 ### Critical MSW-tRPC v2.0.1 Setup
 
 ```typescript
@@ -70,7 +134,7 @@ export const trpcMsw = createTRPCMsw<AppRouter>({
 // baseUrl: 'http://localhost:3000/api/trpc' // This property doesn't exist!
 ```
 
-### tRPC Component Testing Pattern
+### tRPC Component Testing Pattern (Unit Archetype)
 
 **The Problem**: Partial tRPC mocking can break React component rendering with `Element type is invalid: expected a string (for built-in components) or a class/function (for composite components) but got: undefined`.
 
@@ -458,10 +522,28 @@ const mockResult = { id: 1, name: "Test" }; // Only selected fields
 
 ---
 
-**Status**: ✅ **Complete Consolidation** - This guide consolidates patterns from:
+### 🎯 Archetype Decision Guide
+
+**When writing tests, choose your approach**:
+
+```
+┌─ No database needed? ──→ Unit Testing Archetype + Vitest mocking patterns
+├─ Database operations? ──→ Integration Testing Archetype + memory-safe PGlite  
+└─ Security boundaries? ──→ Security Testing Archetype + RLS validation patterns
+```
+
+**Cross-references**:
+- **[archetype-unit-testing.md](./archetype-unit-testing.md)** - Pure functions, React components, business logic
+- **[archetype-integration-testing.md](./archetype-integration-testing.md)** - Database operations, memory safety
+- **[archetype-security-testing.md](./archetype-security-testing.md)** - Security boundaries, RLS policies
+
+---
+
+**Status**: ✅ **Complete Consolidation + Archetype Integration** - This guide consolidates patterns from:
 
 - `vitest-best-practices.md` (performance data, agent patterns)
 - `mocking-patterns.md` (advanced mocking, factories)
 - `issue-list-testing-patterns.md` (tRPC component testing)
+- **NEW**: Integration with the 3 testing archetypes for systematic testing approach
 
-This guide is now the single source of truth for all Vitest testing in PinPoint.
+This guide provides Vitest-specific patterns for all three testing archetypes, ensuring consistent tooling across the testing system.

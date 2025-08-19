@@ -2,11 +2,7 @@ import { count, eq, asc } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
 
-import {
-  createTRPCRouter,
-  organizationProcedure,
-  organizationManageProcedure,
-} from "~/server/api/trpc";
+import { createTRPCRouter, orgScopedProcedure } from "~/server/api/trpc";
 import { issues, issueStatuses } from "~/server/db/schema/issues";
 
 /**
@@ -28,14 +24,11 @@ function generateId(): string {
 
 export const issueStatusRouter = createTRPCRouter({
   // CRUD Operations
-  getAll: organizationProcedure.query(async ({ ctx }) => {
-    return ctx.db
-      .select()
-      .from(issueStatuses)
-      .orderBy(asc(issueStatuses.name));
+  getAll: orgScopedProcedure.query(async ({ ctx }) => {
+    return ctx.db.select().from(issueStatuses).orderBy(asc(issueStatuses.name));
   }),
 
-  create: organizationManageProcedure
+  create: orgScopedProcedure
     .input(
       z.object({
         name: z.string().min(1).max(50),
@@ -54,7 +47,7 @@ export const issueStatusRouter = createTRPCRouter({
       return result;
     }),
 
-  update: organizationManageProcedure
+  update: orgScopedProcedure
     .input(
       z.object({
         id: z.string(),
@@ -81,7 +74,7 @@ export const issueStatusRouter = createTRPCRouter({
       return result;
     }),
 
-  delete: organizationManageProcedure
+  delete: orgScopedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       // Check if any issues are using this status (RLS handles org scoping)
@@ -105,7 +98,7 @@ export const issueStatusRouter = createTRPCRouter({
     }),
 
   // Status Counts / Analytics
-  getStatusCounts: organizationProcedure.query(async ({ ctx }) => {
+  getStatusCounts: orgScopedProcedure.query(async ({ ctx }) => {
     // Get issue counts grouped by statusId using Drizzle aggregation (RLS handles org scoping)
     const counts = await ctx.db
       .select({
@@ -142,9 +135,15 @@ export const issueStatusRouter = createTRPCRouter({
 
     // Aggregate counts by category
     for (const group of counts) {
-      const category = statusMap.get(group.statusId);
-      if (category && isValidCategory(category)) {
-        categoryCounts[category] = categoryCounts[category] + group.count;
+      // Type assertion needed due to Drizzle query result typing
+      const statusId = group.statusId as string;
+      const category = statusMap.get(statusId);
+      if (category !== undefined && isValidCategory(category)) {
+        // Safe to use bracket notation - category is validated by type guard
+        // eslint-disable-next-line security/detect-object-injection
+        const currentCount = categoryCounts[category];
+        // eslint-disable-next-line security/detect-object-injection
+        categoryCounts[category] = currentCount + group.count;
       }
     }
 

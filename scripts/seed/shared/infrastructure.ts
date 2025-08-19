@@ -782,6 +782,90 @@ async function createDefaultLocationWithDb(
 }
 
 /**
+ * Create test database roles for dual-track testing
+ * Only creates roles in test environments for safety
+ */
+async function createTestDatabaseRolesWithDb(
+  dbInstance: typeof db,
+): Promise<void> {
+  // Only create test roles in test environments
+  const nodeEnv = process.env.NODE_ENV;
+  const isTestEnv = nodeEnv === "test" || process.env.VITEST;
+  
+  if (!isTestEnv) {
+    log("[INFRASTRUCTURE] Skipping test roles creation (not in test environment)");
+    return;
+  }
+
+  log("[INFRASTRUCTURE] Creating test database roles...");
+
+  // Check and create integration_tester role (Track 2: Business Logic Testing)
+  const integrationTesterExists = await dbInstance.execute(`
+    SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'integration_tester'
+  `).then(result => result.length > 0).catch(() => false);
+
+  if (!integrationTesterExists) {
+    try {
+      await dbInstance.execute(`
+        CREATE ROLE integration_tester WITH LOGIN BYPASSRLS PASSWORD 'testpassword'
+      `);
+      log("[INFRASTRUCTURE] Created integration_tester role for business logic testing");
+    } catch (error) {
+      // Role creation might fail if not superuser - that's okay, tests can still run
+      log("[INFRASTRUCTURE] Could not create integration_tester role (may require superuser)");
+    }
+  } else {
+    log("[INFRASTRUCTURE] integration_tester role already exists");
+  }
+
+  // authenticated and anon roles are typically created by Supabase
+  // but we'll ensure they exist for completeness
+  const authenticatedExists = await dbInstance.execute(`
+    SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'authenticated'
+  `).then(result => result.length > 0).catch(() => false);
+
+  if (!authenticatedExists) {
+    try {
+      await dbInstance.execute(`CREATE ROLE authenticated`);
+      log("[INFRASTRUCTURE] Created authenticated role for RLS testing");
+    } catch (error) {
+      log("[INFRASTRUCTURE] Could not create authenticated role (may already exist in Supabase)");
+    }
+  }
+
+  const anonExists = await dbInstance.execute(`
+    SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'anon'
+  `).then(result => result.length > 0).catch(() => false);
+
+  if (!anonExists) {
+    try {
+      await dbInstance.execute(`CREATE ROLE anon`);
+      log("[INFRASTRUCTURE] Created anon role for anonymous testing");
+    } catch (error) {
+      log("[INFRASTRUCTURE] Could not create anon role (may already exist in Supabase)");
+    }
+  }
+
+  // Grant necessary permissions for test roles
+  try {
+    await dbInstance.execute(`
+      GRANT USAGE ON SCHEMA public TO integration_tester, authenticated, anon;
+      GRANT ALL ON ALL TABLES IN SCHEMA public TO integration_tester;
+      GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO integration_tester;
+      GRANT ALL ON ALL FUNCTIONS IN SCHEMA public TO integration_tester;
+      GRANT SELECT ON ALL TABLES IN SCHEMA public TO authenticated, anon;
+      GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO authenticated, anon;
+      GRANT INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authenticated;
+    `);
+    log("[INFRASTRUCTURE] Granted permissions to test roles");
+  } catch (error) {
+    log("[INFRASTRUCTURE] Could not grant all permissions to test roles (may require superuser)");
+  }
+
+  log("[INFRASTRUCTURE] ✅ Test database roles setup complete");
+}
+
+/**
  * Main infrastructure seeding function
  */
 export async function seedInfrastructure(): Promise<Organization> {
@@ -810,7 +894,10 @@ export async function seedInfrastructureWithDb(
   });
   log(`[INFRASTRUCTURE] Created organization: ${organization.name}`);
 
-  // 3-6. Create organization-specific data in parallel (safe - no interdependencies)
+  // 3. Create test database roles (only in test environments)
+  await createTestDatabaseRolesWithDb(dbInstance);
+
+  // 4-7. Create organization-specific data in parallel (safe - no interdependencies)
   log(`[INFRASTRUCTURE] Creating organization data...`);
   await Promise.all([
     createDefaultPrioritiesWithDb(dbInstance, organization.id), // Independent - creates priority records only

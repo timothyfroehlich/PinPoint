@@ -1,4 +1,31 @@
-# Unit Testing Patterns with Drizzle
+# ⚠️ DEPRECATED: Unit Testing Patterns
+
+**Status**: **DEPRECATED** - Superseded by archetype-based testing system  
+**Replacement**: **[archetype-unit-testing.md](./archetype-unit-testing.md)**  
+**Date**: August 2025
+
+---
+
+## 🎯 Use the New Archetype System
+
+This file has been **superseded** by the comprehensive **Unit Testing Archetype**:
+
+**👉 [archetype-unit-testing.md](./archetype-unit-testing.md)**
+
+The new archetype provides:
+- **Comprehensive patterns** for pure functions, React components, and business logic
+- **Agent assignment** (`unit-test-architect`) for expert assistance
+- **Performance targets** (<100ms per test)
+- **Memory safety guidance** and anti-patterns
+- **Integration** with the complete 3-archetype testing system
+
+---
+
+## Legacy Content (For Reference Only)
+
+The content below is **deprecated** and may be **outdated**. Use the archetype system instead.
+
+---
 
 ## Overview
 

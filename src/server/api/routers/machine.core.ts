@@ -5,7 +5,7 @@ import { z } from "zod";
 import { generatePrefixedId } from "~/lib/utils/id-generation";
 import {
   createTRPCRouter,
-  organizationProcedure,
+  orgScopedProcedure,
   publicProcedure,
   machineEditProcedure,
   machineDeleteProcedure,
@@ -135,7 +135,7 @@ export const machineCoreRouter = createTRPCRouter({
       return machineWithRelations;
     }),
 
-  getAll: organizationProcedure.query(async ({ ctx }) => {
+  getAll: orgScopedProcedure.query(async ({ ctx }) => {
     const machinesWithRelations = await ctx.db
       .select({
         id: machines.id,
@@ -195,7 +195,7 @@ export const machineCoreRouter = createTRPCRouter({
     return machinesForIssues;
   }),
 
-  getById: organizationProcedure
+  getById: orgScopedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
       const [machineWithRelations] = await ctx.db

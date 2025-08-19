@@ -1,9 +1,9 @@
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import {
   createTRPCRouter,
-  organizationProcedure,
+  orgScopedProcedure,
   publicProcedure,
   machineEditProcedure,
   organizationManageProcedure,
@@ -29,7 +29,7 @@ export const qrCodeRouter = createTRPCRouter({
   /**
    * Get QR code information for a specific machine
    */
-  getInfo: organizationProcedure
+  getInfo: orgScopedProcedure
     .input(z.object({ machineId: z.string() }))
     .query(async ({ ctx, input }) => {
       // Verify machine exists and is accessible (RLS handles org scoping)
@@ -79,7 +79,7 @@ export const qrCodeRouter = createTRPCRouter({
   /**
    * Get QR code statistics for the organization (RLS scoped)
    */
-  getStats: organizationProcedure.query(async ({ ctx }) => {
+  getStats: orgScopedProcedure.query(async ({ ctx }) => {
     const qrCodeService = ctx.services.createQRCodeService();
     return qrCodeService.getOrganizationQRCodeStats();
   }),

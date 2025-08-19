@@ -1,4 +1,20 @@
 /**
+ * 🚨 UPDATE NEEDED: Convert Unit → tRPC Router (Archetype 5) + Use SEED_TEST_IDS
+ * 
+ * NEXT MODIFICATION TASKS:
+ * 1. Convert from Unit tests (Archetype 1) → tRPC Router tests (Archetype 5)
+ * 2. Replace hardcoded mock IDs with SEED_TEST_IDS constants
+ * 3. Add RLS session context testing for comment access control
+ * 4. Test real comment service integration instead of pure mocks
+ * 5. Validate organizational boundary enforcement
+ * 
+ * CURRENT ISSUES:
+ * - Extensive mocks instead of real service integration
+ * - Missing organizational boundary validation
+ * - No RLS session context testing
+ * 
+ * IMPORT: import { SEED_TEST_IDS, createMockAdminContext } from "~/test/constants/seed-test-ids";
+ * 
  * Issue Comment Router Tests (Unit)
  *
  * Unit tests for the issue.comment router using Vitest mock context.

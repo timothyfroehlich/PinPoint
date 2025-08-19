@@ -165,7 +165,56 @@ jobs:
           name: codecov-${{ matrix.shard }}
           fail_ci_if_error: true
 
-  # Job 5: Database Validation (Drizzle ORM)
+  # Job 5: RLS Policy Tests
+  # Database-level security validation with pgTAP
+  rls-tests:
+    name: RLS Validation
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+          POSTGRES_USER: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+      NODE_ENV: test
+      CI: true
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+          cache: "npm"
+      - run: npm ci
+      - name: Install pgTAP
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-15-pgtap libtap-parser-sourcehandler-pgtap-perl
+      - name: Setup database for RLS testing
+        run: |
+          npm run db:push:local
+          psql $DATABASE_URL -c "CREATE EXTENSION IF NOT EXISTS pgtap;"
+          psql $DATABASE_URL -f supabase/tests/setup/01-test-roles.sql
+      - name: Run pgTAP RLS tests
+        run: |
+          if [ -d "supabase/tests/rls" ] && [ -n "$(find supabase/tests/rls -name "*.test.sql" 2>/dev/null)" ]; then
+            npm run test:rls
+          else
+            echo "⚠️ No pgTAP RLS tests found - skipping"
+          fi
+
+  # Job 6: Database Validation (Drizzle ORM)
   # Validates real database connection setup with PostgreSQL
   database-validation:
     name: Database Validation

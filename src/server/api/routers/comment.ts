@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import {
   createTRPCRouter,
-  organizationProcedure,
+  orgScopedProcedure,
   issueDeleteProcedure,
   organizationManageProcedure,
 } from "~/server/api/trpc";
@@ -14,7 +14,7 @@ import { excludeSoftDeleted } from "~/server/db/utils/common-queries";
 
 export const commentRouter = createTRPCRouter({
   // Get comments for an issue (excludes deleted)
-  getForIssue: organizationProcedure
+  getForIssue: orgScopedProcedure
     .input(z.object({ issueId: z.string() }))
     .query(({ ctx, input }) => {
       return ctx.db
@@ -87,7 +87,7 @@ export const commentRouter = createTRPCRouter({
   // Admin: Get deleted comments
   getDeleted: organizationManageProcedure.query(({ ctx }) => {
     const cleanupService = ctx.services.createCommentCleanupService();
-    return cleanupService.getDeletedComments(ctx.organization.id);
+    return cleanupService.getDeletedComments();
   }),
 
   // Admin: Restore deleted comment

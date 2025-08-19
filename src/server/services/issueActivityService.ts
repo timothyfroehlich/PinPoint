@@ -2,7 +2,7 @@ import { eq, and, isNull } from "drizzle-orm";
 
 import { type DrizzleClient } from "../db/drizzle";
 import type { activityTypeEnum } from "../db/schema";
-import { issue_history, comments } from "../db/schema";
+import { issues, issueHistory, comments } from "../db/schema";
 
 import { generatePrefixedId } from "~/lib/utils/id-generation";
 
@@ -38,17 +38,40 @@ export interface IssueStatus {
   name: string;
 }
 
+/**
+ * Service for recording and retrieving issue activity.
+ *
+ * RLS Context: All database operations are automatically scoped to the user's
+ * organization via RLS policies. Issue activities inherit organizational scope
+ * through their associated issues.
+ */
 export class IssueActivityService {
   constructor(private db: DrizzleClient) {}
 
+  /**
+   * Records a general activity for an issue.
+   * RLS handles organizational scoping in queries. For inserts, organizationId
+   * is derived from the associated issue via database query.
+   */
   async recordActivity(
     issueId: string,
     activityData: ActivityData,
   ): Promise<void> {
+    // Get the issue to obtain organizationId (RLS ensures we only get issues from our org)
+    const issue = await this.db.query.issues.findFirst({
+      where: eq(issues.id, issueId),
+      columns: { organizationId: true },
+    });
+
+    if (!issue) {
+      throw new Error("Issue not found or access denied");
+    }
+
     // Build data object with conditional assignment for exactOptionalPropertyTypes compatibility
     const data: {
       id: string;
       issueId: string;
+      organizationId: string;
       type: ActivityType;
       field: string;
       actorId?: string;
@@ -57,7 +80,7 @@ export class IssueActivityService {
     } = {
       id: generatePrefixedId("history"),
       issueId,
-      // organizationId set automatically by RLS trigger
+      organizationId: issue.organizationId,
       type: activityData.type,
       field: activityData.fieldName ?? "",
     };
@@ -73,13 +96,14 @@ export class IssueActivityService {
       data.newValue = activityData.newValue;
     }
 
-    await this.db.insert(issue_history).values(data);
+    await this.db.insert(issueHistory).values(data);
   }
 
-  async recordIssueCreated(
-    issueId: string,
-    actorId: string,
-  ): Promise<void> {
+  /**
+   * Records an issue creation activity.
+   * RLS automatically handles organizational scoping.
+   */
+  async recordIssueCreated(issueId: string, actorId: string): Promise<void> {
     await this.recordActivity(issueId, {
       type: ActivityType.CREATED,
       actorId,
@@ -88,6 +112,10 @@ export class IssueActivityService {
     });
   }
 
+  /**
+   * Records a status change activity.
+   * RLS automatically handles organizational scoping.
+   */
   async recordStatusChange(
     issueId: string,
     actorId: string,
@@ -103,6 +131,10 @@ export class IssueActivityService {
     });
   }
 
+  /**
+   * Records an assignment change activity.
+   * RLS automatically handles organizational scoping.
+   */
   async recordAssignmentChange(
     issueId: string,
     actorId: string,
@@ -126,6 +158,10 @@ export class IssueActivityService {
     await this.recordActivity(issueId, activityData);
   }
 
+  /**
+   * Records a general field update activity.
+   * RLS automatically handles organizational scoping.
+   */
   async recordFieldUpdate(
     issueId: string,
     actorId: string,
@@ -142,10 +178,11 @@ export class IssueActivityService {
     });
   }
 
-  async recordIssueResolved(
-    issueId: string,
-    actorId: string,
-  ): Promise<void> {
+  /**
+   * Records an issue resolution activity.
+   * RLS automatically handles organizational scoping.
+   */
+  async recordIssueResolved(issueId: string, actorId: string): Promise<void> {
     await this.recordActivity(issueId, {
       type: ActivityType.RESOLVED,
       actorId,
@@ -154,6 +191,10 @@ export class IssueActivityService {
     });
   }
 
+  /**
+   * Records an issue assignment activity.
+   * RLS automatically handles organizational scoping.
+   */
   async recordIssueAssigned(
     issueId: string,
     actorId: string,
@@ -167,6 +208,10 @@ export class IssueActivityService {
     });
   }
 
+  /**
+   * Records a comment deletion activity.
+   * RLS automatically handles organizational scoping.
+   */
   async recordCommentDeleted(
     issueId: string,
     actorId: string,
@@ -181,9 +226,14 @@ export class IssueActivityService {
     });
   }
 
-  async getIssueTimeline(
-    issueId: string,
-  ): Promise<
+  /**
+   * Gets the complete timeline (activities + comments) for an issue.
+   * RLS automatically scopes results to the user's organization.
+   *
+   * @param issueId - The issue ID to get timeline for
+   * @returns Merged timeline of activities and comments, sorted chronologically
+   */
+  async getIssueTimeline(issueId: string): Promise<
     (
       | {
           itemType: "comment";
@@ -261,8 +311,8 @@ export class IssueActivityService {
         orderBy: [comments.createdAt],
       }),
       // Fetch issue history with actor relations (RLS scoped)
-      this.db.query.issue_history.findMany({
-        where: eq(issue_history.issueId, issueId),
+      this.db.query.issueHistory.findMany({
+        where: eq(issueHistory.issueId, issueId),
         columns: {
           id: true,
           type: true,
@@ -280,14 +330,13 @@ export class IssueActivityService {
             },
           },
         },
-        orderBy: [issue_history.changedAt],
+        orderBy: [issueHistory.changedAt],
       }),
     ]);
 
-    // Type-safe cast based on the schema structure
-    const commentsResults: CommentResult[] = commentsData as CommentResult[];
-    const activitiesResults: ActivityResult[] =
-      activitiesData as ActivityResult[];
+    // Type-safe assignment based on the schema structure
+    const commentsResults: CommentResult[] = commentsData;
+    const activitiesResults: ActivityResult[] = activitiesData;
 
     // Merge comments and activities into a single timeline
     const timeline = [

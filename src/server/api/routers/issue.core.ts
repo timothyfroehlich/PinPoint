@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { eq, inArray, sql, isNull } from "drizzle-orm";
+import { eq, inArray, sql, isNull, and } from "drizzle-orm";
 import { z } from "zod";
 
 import {
@@ -16,7 +16,7 @@ import {
 import { generatePrefixedId } from "~/lib/utils/id-generation";
 import {
   createTRPCRouter,
-  organizationProcedure,
+  orgScopedProcedure,
   publicProcedure,
   issueEditProcedure,
 } from "~/server/api/trpc";
@@ -309,10 +309,7 @@ export const issueCoreRouter = createTRPCRouter({
 
       // Record the issue creation activity
       const activityService = ctx.services.createIssueActivityService();
-      await activityService.recordIssueCreated(
-        issueData.id,
-        createdById,
-      );
+      await activityService.recordIssueCreated(issueData.id, createdById);
 
       // Send notifications for new issue
       const notificationService = ctx.services.createNotificationService();
@@ -437,7 +434,7 @@ export const issueCoreRouter = createTRPCRouter({
     }),
 
   // Get all issues for an organization
-  getAll: organizationProcedure
+  getAll: orgScopedProcedure
     .input(
       z
         .object({
@@ -863,7 +860,6 @@ export const issueCoreRouter = createTRPCRouter({
       ) {
         await activityService.recordAssignmentChange(
           input.id,
-          ctx.organization.id,
           userId,
           existingIssue.assignedTo,
           newAssignedTo,
@@ -971,10 +967,7 @@ export const issueCoreRouter = createTRPCRouter({
 
       // Record activity
       const activityService = ctx.services.createIssueActivityService();
-      await activityService.recordIssueResolved(
-        input.id,
-        ctx.user.id,
-      );
+      await activityService.recordIssueResolved(input.id, ctx.user.id);
 
       return updatedIssue;
     }),

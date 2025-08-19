@@ -1,4 +1,21 @@
 /**
+ * 🚨 UPDATE NEEDED: Convert Unit → tRPC Router (Archetype 5) + Use SEED_TEST_IDS
+ * 
+ * NEXT MODIFICATION TASKS:
+ * 1. Convert from Unit tests (Archetype 1) → tRPC Router tests (Archetype 5)
+ * 2. Replace hardcoded IDs ("org-1", "user-1") with SEED_TEST_IDS constants
+ * 3. Add RLS session context testing for organizational boundaries
+ * 4. Integrate real service layer testing instead of pure mocks
+ * 5. Test actual tRPC router procedures with PGlite database
+ * 
+ * CURRENT ISSUES:
+ * - Uses hardcoded mock IDs instead of seed constants
+ * - Pure unit tests with mocks, should be router integration tests
+ * - Missing organizational boundary validation
+ * - No RLS session context testing
+ * 
+ * IMPORT: import { SEED_TEST_IDS, createMockAdminContext } from "~/test/constants/seed-test-ids";
+ * 
  * Collection Router Tests (Unit)
  *
  * Unit tests for the collection router using Vitest mock context.
@@ -55,27 +72,29 @@ import {
   createVitestMockContext,
   type VitestMockContext,
 } from "~/test/vitestMockContext";
+import { SEED_TEST_IDS, createMockAdminContext } from "~/test/constants/seed-test-ids";
 
 // Helper to create authenticated context with permissions
 const createAuthenticatedContext = (permissions: string[] = []) => {
   const mockContext = createVitestMockContext();
 
-  // Override the user with proper test data
+  // Override the user with proper test data using constants
+  const adminContext = createMockAdminContext();
   (mockContext as any).user = {
-    id: "user-1",
-    email: "test@example.com",
+    id: adminContext.userId,
+    email: adminContext.userEmail,
     user_metadata: {
-      name: "Test User",
+      name: adminContext.userName,
       avatar_url: null,
     },
     app_metadata: {
-      organization_id: "org-1",
+      organization_id: adminContext.organizationId,
       role: "Member",
     },
   };
 
   (mockContext as any).organization = {
-    id: "org-1",
+    id: adminContext.organizationId,
     name: "Test Organization",
     subdomain: "test",
   };
@@ -186,14 +205,13 @@ describe("Collection Router", () => {
 
         const caller = appRouter.createCaller(ctx as any);
         const result = await caller.collection.getForLocation({
-          locationId: "location-1",
-          organizationId: "org-1",
+          locationId: SEED_TEST_IDS.MOCK_PATTERNS.LOCATION,
+          organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
         });
 
         expect(result).toEqual(mockCollections);
         expect(mockGetLocationCollections).toHaveBeenCalledWith(
-          "location-1",
-          "org-1",
+          SEED_TEST_IDS.MOCK_PATTERNS.LOCATION,
         );
         expect(mockCreateCollectionServiceFn).toHaveBeenCalled();
       });
@@ -297,7 +315,7 @@ describe("Collection Router", () => {
         });
 
         expect(result).toEqual(mockCollection);
-        expect(mockCreateManualCollection).toHaveBeenCalledWith("org-1", {
+        expect(mockCreateManualCollection).toHaveBeenCalledWith({
           name: "Test Collection",
           typeId: "type-1",
           locationId: "location-1",
@@ -451,9 +469,7 @@ describe("Collection Router", () => {
         const result = await caller.collection.getTypes();
 
         expect(result).toEqual(mockTypes);
-        expect(mockGetOrganizationCollectionTypes).toHaveBeenCalledWith(
-          "org-1",
-        );
+        expect(mockGetOrganizationCollectionTypes).toHaveBeenCalledWith();
       });
     });
   });
@@ -489,7 +505,7 @@ describe("Collection Router", () => {
         const result = await caller.collection.generateAuto();
 
         expect(result).toEqual(mockGeneratedCollections);
-        expect(mockGenerateAutoCollections).toHaveBeenCalledWith("org-1");
+        expect(mockGenerateAutoCollections).toHaveBeenCalledWith();
       });
 
       it("should require admin permissions", async () => {
@@ -647,9 +663,7 @@ describe("Collection Router", () => {
 
       // Verify service was created and called
       expect(mockCreateCollectionServiceFn).toHaveBeenCalled();
-      expect(mockService.getOrganizationCollectionTypes).toHaveBeenCalledWith(
-        "org-1",
-      );
+      expect(mockService.getOrganizationCollectionTypes).toHaveBeenCalledWith();
     });
   });
 });

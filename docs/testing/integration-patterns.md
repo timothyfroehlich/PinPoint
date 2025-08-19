@@ -1,4 +1,31 @@
-# Integration Testing Patterns
+# ⚠️ DEPRECATED: Integration Testing Patterns
+
+**Status**: **DEPRECATED** - Superseded by archetype-based testing system  
+**Replacement**: **[archetype-integration-testing.md](./archetype-integration-testing.md)**  
+**Date**: August 2025
+
+---
+
+## 🚨 CRITICAL: Memory Safety Alert
+
+This legacy file contains **dangerous patterns** that cause **system lockups**. Use the new archetype instead.
+
+**👉 [archetype-integration-testing.md](./archetype-integration-testing.md)**
+
+The new archetype provides:
+- **🚨 Memory safety patterns** (prevents 1-2GB+ memory usage and system lockups)
+- **Worker-scoped PGlite** patterns (MANDATORY for integration testing)
+- **RLS session context** management for automatic organizational scoping
+- **Agent assignment** (`integration-test-architect`) for expert assistance
+- **Complete conversion procedures** from problematic patterns
+
+---
+
+## Legacy Content (For Reference Only - DANGEROUS PATTERNS)
+
+The content below contains **dangerous memory patterns** and is **deprecated**. Use the archetype system instead.
+
+---
 
 ## Overview
 

@@ -100,6 +100,9 @@ export const notifications = pgTable(
     entityType: notificationEntityEnum("entityType"), // What kind of entity (issue, machine, etc.)
     entityId: text("entityId"), // ID of the related entity
     actionUrl: text("actionUrl"), // URL to navigate to when clicked
+
+    // RLS organizational scoping
+    organizationId: text("organizationId").notNull(), // Set automatically by trigger
   },
   (table) => [
     // Essential notification indexes for performance
@@ -108,6 +111,8 @@ export const notifications = pgTable(
       table.userId,
       table.createdAt,
     ),
+    // RLS organizational index (matches setup-rls.sql)
+    index("notifications_organization_id_idx").on(table.organizationId),
   ],
 );
 

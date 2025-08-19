@@ -1,4 +1,32 @@
-# Multi-Tenant Testing Patterns
+# ⚠️ DEPRECATED: Multi-Tenant Testing Patterns
+
+**Status**: **DEPRECATED** - Superseded by archetype-based testing system  
+**Replacement**: **[archetype-security-testing.md](./archetype-security-testing.md)**  
+**Date**: August 2025
+
+---
+
+## 🎯 Use the New Security Testing Archetype
+
+This file has been **superseded** by the comprehensive **Security Testing Archetype**:
+
+**👉 [archetype-security-testing.md](./archetype-security-testing.md)**
+
+The new archetype provides:
+- **RLS policy direct testing** patterns (NEW archetype not in this legacy file)
+- **Permission matrix validation** with comprehensive coverage
+- **Cross-organizational data leakage prevention** testing
+- **Agent assignment** (`security-test-architect`) for expert assistance
+- **Compliance validation** (GDPR, data isolation)
+- **Database-level security enforcement** testing
+
+---
+
+## Legacy Content (For Reference Only)
+
+The content below is **deprecated** and **incomplete** compared to the new archetype. Use the archetype system instead.
+
+---
 
 This guide documents patterns for testing multi-tenant security boundaries, organization isolation, and cross-tenant prevention in a shared database architecture.
 

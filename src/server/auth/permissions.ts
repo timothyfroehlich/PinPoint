@@ -131,80 +131,73 @@ export async function getUserPermissions(
 }
 
 /**
- * Checks if a user session has a specific permission within an organization.
+ * Checks if a user session has a specific permission.
+ *
+ * Post-RLS Migration: Organization context is automatically handled by RLS policies.
  *
  * @param session - The NextAuth session object.
  * @param permission - The permission string to check for.
  * @param db - The Drizzle client instance.
- * @param organizationId - The ID of the organization to check against.
  * @returns A boolean indicating whether the permission is granted.
  */
 export async function hasPermissionForSession(
   session: Session | null,
   permission: string,
   db: DrizzleClient,
-  organizationId: string,
 ): Promise<boolean> {
   const permissionService = new PermissionService(db);
-  return permissionService.hasPermission(session, permission, organizationId);
+  return permissionService.hasPermission(session, permission);
 }
 
 /**
  * Enforces that a user session has a specific permission.
  * Throws a TRPCError if the permission is not granted.
  *
+ * Post-RLS Migration: Organization context is automatically handled by RLS policies.
+ *
  * @param session - The NextAuth session object.
  * @param permission - The permission string to require.
  * @param db - The Drizzle client instance.
- * @param organizationId - The ID of the organization to check against.
  */
 export async function requirePermissionForSession(
   session: Session | null,
   permission: string,
   db: DrizzleClient,
-  organizationId: string,
 ): Promise<void> {
   const permissionService = new PermissionService(db);
-  await permissionService.requirePermission(
-    session,
-    permission,
-    organizationId,
-  );
+  await permissionService.requirePermission(session, permission);
 }
 
 /**
- * Retrieves all permissions for a user session in a given organization.
+ * Retrieves all permissions for a user session.
+ *
+ * Post-RLS Migration: Organization context is automatically handled by RLS policies.
  *
  * @param session - The NextAuth session object.
  * @param db - The Drizzle client instance.
- * @param organizationId - The ID of the organization.
  * @returns A string array of all granted permissions.
  */
 export async function getUserPermissionsForSession(
   session: Session | null,
   db: DrizzleClient,
-  organizationId: string,
 ): Promise<string[]> {
   const permissionService = new PermissionService(db);
-  return permissionService.getUserPermissions(session, organizationId);
+  return permissionService.getUserPermissions(session);
 }
 
 /**
  * Get all permissions for a Supabase user
  *
+ * Post-RLS Migration: Organization context is automatically handled by RLS policies.
+ *
  * @param user - The Supabase user
  * @param db - The Drizzle client instance
- * @param organizationId - The ID of the organization.
  * @returns A string array of all granted permissions.
  */
 export async function getUserPermissionsForSupabaseUser(
   user: PinPointSupabaseUser | null,
   db: DrizzleClient,
-  organizationId?: string,
 ): Promise<string[]> {
   const permissionService = new PermissionService(db);
-  return permissionService.getUserPermissionsForSupabaseUser(
-    user,
-    organizationId,
-  );
+  return permissionService.getUserPermissionsForSupabaseUser(user);
 }

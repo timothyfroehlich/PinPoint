@@ -112,7 +112,6 @@ const testRouter = createTRPCRouter({
         session,
         "test:permission",
         opts.ctx.db as any,
-        opts.ctx.organization.id,
       );
       return opts.next();
     })

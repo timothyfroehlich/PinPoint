@@ -486,7 +486,6 @@ expect(parseInt(stats?.locationCount ?? "0")).toBe(1); // Convert string to numb
 export function loadTestEnvironment(): void {
   // Load with override: true to ensure test environment wins
   config({ path: resolve(projectRoot, ".env"), override: true });
-  config({ path: resolve(projectRoot, ".env.development"), override: true });
   config({ path: resolve(projectRoot, ".env.test"), override: true });
   config({ path: resolve(projectRoot, ".env.local"), override: true });
 }

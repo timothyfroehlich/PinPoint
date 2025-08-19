@@ -80,10 +80,33 @@ test("integration test", async ({ workerDb }) => {
 When starting integration test work:
 
 1. **🚨 MEMORY SAFETY FIRST**: Verify all patterns use worker-scoped database
-2. **Read Current Patterns**: Check `@docs/quick-reference/testing-patterns.md`
-3. **Assess Test Scope**: Determine if full-stack or service-layer testing needed
-4. **RLS Context Planning**: Map organizational boundaries and user roles
-5. **Performance Baseline**: Ensure test execution under 5 seconds per test
+2. **📋 CHECK TEST HEADERS**: Read test file headers for specific update requirements
+3. **🎯 USE SEED CONSTANTS**: Import SEED_TEST_IDS for consistent test data
+4. **Read Current Patterns**: Check `@docs/quick-reference/testing-patterns.md`
+5. **Assess Test Scope**: Determine if full-stack or service-layer testing needed
+6. **RLS Context Planning**: Map organizational boundaries and user roles
+7. **Performance Baseline**: Ensure test execution under 5 seconds per test
+
+### **Test File Header Interpretation**
+
+**🚨 Router Tests**: "Convert Unit → tRPC Router (Archetype 5) + Use SEED_TEST_IDS"
+- Convert from mocked unit tests to tRPC router integration tests
+- Add RLS session context for organizational scoping
+- Replace ALL hardcoded IDs with SEED_TEST_IDS constants
+- Test real service integration instead of pure mocks
+- Use `SEED_TEST_IDS.ORGANIZATIONS.primary` for single-org tests
+- Use both organizations for security boundary testing
+
+**📝 Integration Tests**: "Use getSeededTestData() + SEED_TEST_IDS instead of custom data creation"
+- Replace custom organization/user creation with hardcoded seed infrastructure
+- Use `getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary)` for dynamic relationships
+- Focus on business logic rather than data setup
+- Leverage predictable IDs for debugging ("machine-mm-001" vs random UUIDs)
+
+**✅ Good Tests**: "GOOD: Uses SEED_TEST_IDS properly, minor context enhancements only"
+- Already follows hardcoded ID patterns
+- May need minor RLS context improvements
+- Serve as examples for conversion patterns
 
 ---
 
@@ -116,36 +139,40 @@ const rlsContexts = {
 };
 ```
 
-### **Multi-Context Testing Patterns**
+### **Multi-Context Testing Patterns with SEED_TEST_IDS**
 
 ```typescript
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
+
 test("organizational boundary enforcement", async ({ workerDb }) => {
   await withIsolatedTest(workerDb, async (db) => {
-    // Create data in org-1
-    await rlsContexts.admin(db, "org-1");
-    const [org1Issue] = await db.insert(issues).values({
-      title: "Org 1 Confidential Issue",
+    // Create data in primary org
+    await rlsContexts.admin(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
+    const [primaryIssue] = await db.insert(issues).values({
+      title: "Primary Org Confidential Issue",
       priority: "high"
     }).returning();
 
-    // Create data in org-2  
-    await rlsContexts.admin(db, "org-2");
-    const [org2Issue] = await db.insert(issues).values({
-      title: "Org 2 Confidential Issue", 
+    // Create data in competitor org  
+    await rlsContexts.admin(db, SEED_TEST_IDS.ORGANIZATIONS.competitor);
+    const [competitorIssue] = await db.insert(issues).values({
+      title: "Competitor Org Confidential Issue", 
       priority: "low"
     }).returning();
 
     // Verify complete isolation
-    const org2VisibleIssues = await db.query.issues.findMany();
-    expect(org2VisibleIssues).toHaveLength(1);
-    expect(org2VisibleIssues[0].id).toBe(org2Issue.id);
-    expect(org2VisibleIssues[0].title).toBe("Org 2 Confidential Issue");
+    const competitorVisibleIssues = await db.query.issues.findMany();
+    expect(competitorVisibleIssues).toHaveLength(1);
+    expect(competitorVisibleIssues[0].id).toBe(competitorIssue.id);
+    expect(competitorVisibleIssues[0].title).toBe("Competitor Org Confidential Issue");
+    expect(competitorVisibleIssues[0].organizationId).toBe(SEED_TEST_IDS.ORGANIZATIONS.competitor);
 
-    // Switch back to org-1 and verify isolation
-    await rlsContexts.admin(db, "org-1");
-    const org1VisibleIssues = await db.query.issues.findMany();
-    expect(org1VisibleIssues).toHaveLength(1);
-    expect(org1VisibleIssues[0].id).toBe(org1Issue.id);
+    // Switch back to primary org and verify isolation
+    await rlsContexts.admin(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
+    const primaryVisibleIssues = await db.query.issues.findMany();
+    expect(primaryVisibleIssues).toHaveLength(1);
+    expect(primaryVisibleIssues[0].id).toBe(primaryIssue.id);
+    expect(primaryVisibleIssues[0].organizationId).toBe(SEED_TEST_IDS.ORGANIZATIONS.primary);
   });
 });
 ```
@@ -154,45 +181,51 @@ test("organizational boundary enforcement", async ({ workerDb }) => {
 
 ## Full-Stack Integration Patterns
 
-### **Service + Router Integration Testing**
+### **Service + Router Integration Testing with SEED_TEST_IDS**
 
 ```typescript
+import { SEED_TEST_IDS, createMockAdminContext } from "~/test/constants/seed-test-ids";
+import { getSeededTestData } from "~/test/helpers/pglite-test-setup";
+
 // Tests both service layer AND tRPC router with real database
 test("issue creation full stack workflow", async ({ workerDb }) => {
   await withIsolatedTest(workerDb, async (db) => {
-    await rlsContexts.admin(db, "test-org");
+    // Use seed data for consistent testing
+    const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
+    await rlsContexts.admin(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
     
-    // Test service layer directly
+    // Test service layer directly with seeded data
     const service = new IssueService(db);
     const serviceResult = await service.create({
       title: "Service Layer Test",
-      machineId: "machine-123",
+      machineId: seededData.machine!, // Use real seeded machine ID
       priority: "medium"
     });
     
     // Test via tRPC router (full HTTP-like flow)
+    const adminContext = createMockAdminContext();
     const caller = createTRPCCaller(db, { 
       user: { 
-        id: "admin-user", 
-        user_metadata: { organizationId: "test-org", role: "admin" }
+        id: adminContext.userId,
+        user_metadata: { organizationId: adminContext.organizationId, role: "admin" }
       }
     });
     const routerResult = await caller.issues.create({
       title: "Router Layer Test",
-      machineId: "machine-456", 
+      machineId: seededData.machine!, // Consistent seeded data
       priority: "high"
     });
     
     // Both should respect RLS automatically
-    expect(serviceResult.organizationId).toBe("test-org");
-    expect(routerResult.organizationId).toBe("test-org");
+    expect(serviceResult.organizationId).toBe(SEED_TEST_IDS.ORGANIZATIONS.primary);
+    expect(routerResult.organizationId).toBe(SEED_TEST_IDS.ORGANIZATIONS.primary);
     
     // Verify full-stack data integrity
     const allIssues = await db.query.issues.findMany({
       orderBy: (issues, { asc }) => [asc(issues.createdAt)]
     });
     expect(allIssues).toHaveLength(2);
-    expect(allIssues.every(issue => issue.organizationId === "test-org")).toBe(true);
+    expect(allIssues.every(issue => issue.organizationId === SEED_TEST_IDS.ORGANIZATIONS.primary)).toBe(true);
   });
 });
 ```
@@ -202,7 +235,7 @@ test("issue creation full stack workflow", async ({ workerDb }) => {
 ```typescript
 test("issue timeline full workflow", async ({ workerDb }) => {
   await withIsolatedTest(workerDb, async (db) => {
-    await rlsContexts.member(db, "workflow-org", "member-123");
+    await rlsContexts.member(db, SEED_TEST_IDS.ORGANIZATIONS.primary, SEED_TEST_IDS.USERS.MEMBER1);
     
     // Step 1: Create issue via tRPC
     const caller = createTRPCCaller(db, memberContext);
@@ -253,7 +286,7 @@ test("issue timeline full workflow", async ({ workerDb }) => {
 ```typescript
 test("machine-location-issue relationship integrity", async ({ workerDb }) => {
   await withIsolatedTest(workerDb, async (db) => {
-    await rlsContexts.admin(db, "relationship-org");
+    await rlsContexts.admin(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
     
     // Create location
     const [location] = await db.insert(locations).values({
@@ -288,9 +321,9 @@ test("machine-location-issue relationship integrity", async ({ workerDb }) => {
     expect(issueWithFullContext.machine?.location?.name).toBe("Test Arcade");
     
     // Verify RLS enforcement on relationships
-    expect(issueWithFullContext.organizationId).toBe("relationship-org");
-    expect(issueWithFullContext.machine?.organizationId).toBe("relationship-org");
-    expect(issueWithFullContext.machine?.location?.organizationId).toBe("relationship-org");
+    expect(issueWithFullContext.organizationId).toBe(SEED_TEST_IDS.ORGANIZATIONS.primary);
+    expect(issueWithFullContext.machine?.organizationId).toBe(SEED_TEST_IDS.ORGANIZATIONS.primary);
+    expect(issueWithFullContext.machine?.location?.organizationId).toBe(SEED_TEST_IDS.ORGANIZATIONS.primary);
   });
 });
 ```
@@ -304,7 +337,7 @@ test("machine-location-issue relationship integrity", async ({ workerDb }) => {
 ```typescript
 test("service transaction rollback integration", async ({ workerDb }) => {
   await withIsolatedTest(workerDb, async (db) => {
-    await rlsContexts.admin(db, "transaction-org");
+    await rlsContexts.admin(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
     
     const service = new IssueService(db);
     
@@ -341,65 +374,89 @@ test("service transaction rollback integration", async ({ workerDb }) => {
 
 ## Target File Conversion Patterns
 
-### **Router Test Migration**
+### **Router Test Migration with SEED_TEST_IDS**
 
 ```typescript
-// BEFORE: Mocked router testing
+// BEFORE: Mocked router testing with hardcoded IDs
 describe("issueRouter", () => {
+  const mockContext = { user: { id: "user-1" }, organization: { id: "org-1" } };
   const mockDb = vi.mocked(db);
-  // ... mocked patterns
+  // ... mocked patterns with arbitrary IDs
 });
 
-// AFTER: Full-stack integration testing
+// AFTER: Full-stack integration testing with consistent data
+import { SEED_TEST_IDS, createMockAdminContext } from "~/test/constants/seed-test-ids";
+import { getSeededTestData } from "~/test/helpers/pglite-test-setup";
+
 test("issue router with real database", async ({ workerDb }) => {
   await withIsolatedTest(workerDb, async (db) => {
-    await rlsContexts.admin(db, "test-org");
+    // Use seeded data for consistency
+    const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
+    await rlsContexts.admin(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
     
-    const caller = createTRPCCaller(db, adminContext);
+    const adminContext = createMockAdminContext();
+    const caller = createTRPCCaller(db, {
+      user: {
+        id: adminContext.userId,
+        user_metadata: { organizationId: adminContext.organizationId }
+      }
+    });
     
     // Real database operations, real RLS enforcement
     const issues = await caller.issues.getAll();
     expect(Array.isArray(issues)).toBe(true);
     
     const newIssue = await caller.issues.create({
-      title: "Integration Test Issue"
+      title: "Integration Test Issue",
+      machineId: seededData.machine! // Use seeded machine
     });
-    expect(newIssue.organizationId).toBe("test-org");
+    expect(newIssue.organizationId).toBe(SEED_TEST_IDS.ORGANIZATIONS.primary);
   });
 });
 ```
 
-### **Service Test Enhancement**
+### **Service Test Enhancement with Seed Data**
 
 ```typescript
-// BEFORE: Direct service testing with mocks
+// BEFORE: Direct service testing with mocks and hardcoded IDs
 test("commentService.create", () => {
+  const mockDb = { insert: vi.fn(), query: vi.fn() };
   const service = new CommentService(mockDb);
-  // ... isolated testing
+  // ... isolated testing with "org-1", "user-1" etc.
 });
 
-// AFTER: Service + tRPC integration testing  
+// AFTER: Service + tRPC integration testing with seeded data
+import { SEED_TEST_IDS, createMockMemberContext } from "~/test/constants/seed-test-ids";
+
 test("comment service full stack integration", async ({ workerDb }) => {
   await withIsolatedTest(workerDb, async (db) => {
-    await rlsContexts.member(db, "comment-org", "commenter-123");
+    const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
+    const memberContext = createMockMemberContext();
     
-    // Test service directly
+    await rlsContexts.member(db, SEED_TEST_IDS.ORGANIZATIONS.primary, memberContext.userId);
+    
+    // Test service directly with seeded data
     const service = new CommentService(db);
     const directComment = await service.create({
       content: "Direct service comment",
-      issueId: "issue-123"
+      issueId: seededData.issue! // Use seeded issue
     });
     
-    // Test via tRPC router
-    const caller = createTRPCCaller(db, memberContext);
+    // Test via tRPC router with consistent context
+    const caller = createTRPCCaller(db, {
+      user: {
+        id: memberContext.userId,
+        user_metadata: { organizationId: memberContext.organizationId }
+      }
+    });
     const routerComment = await caller.comments.create({
       content: "Router comment",
-      issueId: "issue-123"
+      issueId: seededData.issue! // Same seeded issue
     });
     
     // Verify both paths work with RLS
-    expect(directComment.organizationId).toBe("comment-org");
-    expect(routerComment.organizationId).toBe("comment-org");
+    expect(directComment.organizationId).toBe(SEED_TEST_IDS.ORGANIZATIONS.primary);
+    expect(routerComment.organizationId).toBe(SEED_TEST_IDS.ORGANIZATIONS.primary);
   });
 });
 ```
@@ -422,11 +479,15 @@ test("comment service full stack integration", async ({ workerDb }) => {
 - [ ] Cross-org isolation verified where applicable
 - [ ] User role permissions validated
 
-**Full-Stack Integration:**
+**Full-Stack Integration & Seed Data Usage:**
 - [ ] Real database operations (no mocking at DB layer)
 - [ ] tRPC router testing with actual context
 - [ ] Service layer integration where appropriate
 - [ ] Complete request flow validation
+- [ ] SEED_TEST_IDS constants used throughout (no hardcoded strings)
+- [ ] getSeededTestData() used for dynamic relationships
+- [ ] Primary organization (SEED_TEST_IDS.ORGANIZATIONS.primary) for single-org tests
+- [ ] Both organizations used for security boundary validation
 
 **Performance:**
 - [ ] Individual tests complete under 5 seconds

@@ -25,6 +25,8 @@ In-depth technical guides for PinPoint development.
 
 ### Core Development
 
+- **[environment-setup.md](./environment-setup.md)** - 3-step environment setup with native Vercel tooling
+- **[configuration-architecture.md](./configuration-architecture.md)** - Configuration strategy and tool integration philosophy
 - **[typescript-guide.md](./typescript-guide.md)** - Comprehensive TypeScript patterns and migration guide
 - **[common-errors.md](./common-errors.md)** - ESLint violations and fixes
 - **[troubleshooting.md](./troubleshooting.md)** - Common development issues and solutions

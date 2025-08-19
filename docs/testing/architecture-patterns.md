@@ -1,9 +1,40 @@
-# Testing Architecture Patterns
+# ⚠️ DEPRECATED: Testing Architecture Patterns
+
+**Status**: **DEPRECATED** - Superseded by 3-archetype testing system  
+**Replacement**: **Complete archetype system** - See [INDEX.md](./INDEX.md)  
+**Date**: August 2025
 
 ---
 
-status: active
-last-updated: 2025-07-24
+## 🎯 Use the New 3-Archetype System
+
+This file has been **completely superseded** by the comprehensive **3-archetype testing system**:
+
+**👉 [INDEX.md](./INDEX.md)** - Complete archetype navigation
+
+### The New Architecture:
+
+1. **[archetype-unit-testing.md](./archetype-unit-testing.md)** → `unit-test-architect`
+   - Pure functions, React components, business logic
+
+2. **[archetype-integration-testing.md](./archetype-integration-testing.md)** → `integration-test-architect`  
+   - Memory-safe PGlite, RLS context, full-stack testing
+
+3. **[archetype-security-testing.md](./archetype-security-testing.md)** → `security-test-architect`
+   - Security boundaries, RLS policies, multi-tenant isolation
+
+### Benefits over Legacy Patterns:
+- **Agent specialization** for expert assistance
+- **Memory safety enforcement** (prevents system lockups)
+- **RLS integration** for simplified organizational scoping  
+- **Systematic approach** for 306 test conversion
+- **Clear decision guide** for choosing the right archetype
+
+---
+
+## Legacy Content (For Reference Only)
+
+The content below is **deprecated** and **superseded** by the archetype system. Use the new system instead.
 
 ---
 

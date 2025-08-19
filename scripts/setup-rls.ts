@@ -20,11 +20,10 @@
 
 import dotenv from 'dotenv';
 
-// Load environment variables - try .env.development first for local dev
+// Load environment variables in correct precedence order
 try {
-  dotenv.config({ path: '.env.development' });
-  dotenv.config({ path: '.env.local' }); 
   dotenv.config(); // Load default .env
+  dotenv.config({ path: '.env.local' }); // Override with local development vars
 } catch (error) {
   // If dotenv loading fails, continue - might be in production
 }
