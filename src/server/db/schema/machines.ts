@@ -46,14 +46,20 @@ export const locations = pgTable(
   ],
 );
 
-// Replaces GameTitle
+// Models Table (OPDB + Future Custom Models)
+// organizationId = NULL for OPDB models (global access)
+// organizationId != NULL for custom models (org-scoped, v1.x feature)
 export const models = pgTable("models", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
+  organizationId: text("organizationId").default(null), // NULL for OPDB (global), set for custom (org-scoped)
   manufacturer: text("manufacturer"),
   year: integer("year"),
 
-  // Cross-Database References (both IPDB and OPDB from PinballMap)
+  // Model Type Classification
+  isCustom: boolean("isCustom").default(false).notNull(), // false = OPDB, true = custom
+
+  // Cross-Database References (IPDB and OPDB from PinballMap)
   ipdbId: text("ipdbId").unique(), // Internet Pinball Database ID
   opdbId: text("opdbId").unique(), // Open Pinball Database ID
 
@@ -67,13 +73,11 @@ export const models = pgTable("models", {
   opdbImgUrl: text("opdbImgUrl"), // Image from OPDB
   kineticistUrl: text("kineticistUrl"), // Link to additional machine information
 
-  // PinPoint-specific
-  isCustom: boolean("isCustom").default(false).notNull(), // Flag for custom/homebrew models
-
   // Timestamps
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
+
 
 // Replaces GameInstance
 export const machines = pgTable(
@@ -83,7 +87,8 @@ export const machines = pgTable(
     name: text("name").notNull(), // Instance-specific name (e.g., "Medieval Madness #1")
     organizationId: text("organizationId").notNull(),
     locationId: text("locationId").notNull(),
-    modelId: text("modelId").notNull(),
+    // Model reference
+    modelId: text("modelId").notNull(), // References models.id
     ownerId: text("ownerId"),
 
     // Add notification preferences for owner

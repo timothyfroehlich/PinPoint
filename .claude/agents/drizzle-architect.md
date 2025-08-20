@@ -1,6 +1,7 @@
 ---
 name: drizzle-architect
 description: Use this agent for advanced Drizzle database architecture, optimization, and modern pattern implementation. Specializes in performance tuning, schema design, security patterns, and August 2025 best practices.
+tools: [*, Bash(npm run test:*), Bash(npm run lint:*), Bash(npm run typecheck:*), Bash(npm run validate:*), Bash(npm run check:*), Bash(vitest:*), Bash(npx eslint:*), Bash(npx prettier:*), Bash(git status:*), Bash(git log:*), Bash(git diff:*), Bash(git show:*), Bash(./scripts/safe-psql.sh:*), Bash(cat:*), Bash(head:*), Bash(tail:*), Bash(wc:*), Bash(ls:*), Bash(rg:*), Bash(grep:*), Bash(ps:*), Bash(which:*), Bash(npm list:*)]
 model: sonnet
 color: blue
 ---

@@ -21,7 +21,8 @@ const log = (...args: unknown[]) => {
 
 import { createDrizzleClient } from "~/server/db/drizzle";
 import {
-  models,
+  opdbModels,
+  customModels, 
   machines,
   issues,
   priorities,
@@ -256,7 +257,8 @@ async function createModelsWithDb(
       manufacturer: game.manufacturer,
       year: game.year,
       opdbId: game.opdbId,
-      isCustom: false, // OPDB games are not custom
+      // isCustom defaults to false in schema (OPDB games)
+      // organizationId defaults to null in schema (global access)
       isActive: true,
     }));
 

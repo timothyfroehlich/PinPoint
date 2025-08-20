@@ -41,6 +41,7 @@ export const collections = pgTable(
     name: text("name").notNull(), // e.g., "Front Room", "Bally", "1980s"
     typeId: text("typeId").notNull(),
     locationId: text("locationId"), // null for auto-collections (organization-wide)
+    organizationId: text("organizationId").notNull(), // Multi-tenant support
     isSmart: boolean("isSmart").default(false).notNull(), // For 1.x Smart Collections
     isManual: boolean("isManual").default(true).notNull(), // Manual vs auto-generated
 
@@ -50,10 +51,18 @@ export const collections = pgTable(
 
     // Auto-collection fields
     filterCriteria: json("filterCriteria"), // Criteria for auto-collections: { "manufacturer": "Bally" }
+    
+    // Timestamps
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().notNull(),
   },
   (table) => [
+    // Multi-tenancy: organizationId filtering (critical)
+    index("collections_organization_id_idx").on(table.organizationId),
     // Collection filtering by type
     index("collections_type_id_idx").on(table.typeId),
+    // Location-specific filtering
+    index("collections_location_id_idx").on(table.locationId),
   ],
 );
 
@@ -76,6 +85,10 @@ export const collectionTypes = pgTable(
     displayName: text("displayName"), // Human-readable name for UI
     description: text("description"), // Description for admin interface
     sortOrder: integer("sortOrder").default(0).notNull(), // Order on location pages
+    
+    // Timestamps
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().notNull(),
   },
   (table) => [
     // Multi-tenancy: organizationId filtering (most critical)

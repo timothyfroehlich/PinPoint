@@ -126,6 +126,10 @@ export const SEED_TEST_IDS = {
     MACHINE: "mock-machine-1",
     ISSUE: "mock-issue-1",
     COLLECTION: "mock-collection-1",
+    MODEL: "mock-model-1",
+    TYPE: "mock-type-1",
+    ROLE: "mock-role-1",
+    MEMBERSHIP: "mock-membership-1",
   },
 } as const;
 

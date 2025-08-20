@@ -32,6 +32,19 @@ import { FilterToolbar } from "./FilterToolbar";
 import { PermissionGate } from "~/components/permissions/PermissionGate";
 import { usePermissions } from "~/hooks/usePermissions";
 import { api } from "~/trpc/react";
+import { 
+  type IssueFilters, 
+  mergeFilters, 
+  validateFilters, 
+  clearAllFilters 
+} from "~/lib/issues/filterUtils";
+import { createFilteredUrl } from "~/lib/issues/urlUtils";
+import { 
+  toggleSelection, 
+  selectAll, 
+  selectNone, 
+  isSelected 
+} from "~/lib/issues/selectionUtils";
 
 // Helper function to get status color based on category
 const getStatusColor = (
@@ -49,17 +62,7 @@ const getStatusColor = (
   }
 };
 
-interface IssueFilters {
-  locationId?: string | undefined;
-  machineId?: string | undefined;
-  statusIds?: string[] | undefined;
-  search?: string | undefined;
-  assigneeId?: string | undefined;
-  reporterId?: string | undefined;
-  ownerId?: string | undefined;
-  sortBy: "created" | "updated" | "status" | "severity" | "game";
-  sortOrder: "asc" | "desc";
-}
+// IssueFilters interface imported from ~/lib/issues/filterUtils
 
 // Type for issue data from tRPC (matches actual API response)
 interface IssueData {
@@ -118,7 +121,7 @@ export function IssueList({
   const searchParams = useSearchParams();
   const { hasPermission, isLoading: permissionsLoading } = usePermissions();
 
-  const [filters, setFilters] = useState<IssueFilters>(initialFilters);
+  const [filters, setFilters] = useState<IssueFilters>(validateFilters(initialFilters));
   const [selectedIssues, setSelectedIssues] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
@@ -133,72 +136,22 @@ export function IssueList({
 
   // Update URL when filters change
   const updateFilters = (newFilters: Partial<IssueFilters>): void => {
-    const updated: IssueFilters = { ...filters };
-
-    // Handle each filter property explicitly for TypeScript strictest
-    if ("locationId" in newFilters) {
-      updated.locationId = newFilters.locationId;
-    }
-    if ("machineId" in newFilters) {
-      updated.machineId = newFilters.machineId;
-    }
-    if ("statusIds" in newFilters) {
-      updated.statusIds = newFilters.statusIds;
-    }
-    if ("search" in newFilters) {
-      updated.search = newFilters.search;
-    }
-    if ("assigneeId" in newFilters) {
-      updated.assigneeId = newFilters.assigneeId;
-    }
-    if ("reporterId" in newFilters) {
-      updated.reporterId = newFilters.reporterId;
-    }
-    if ("ownerId" in newFilters) {
-      updated.ownerId = newFilters.ownerId;
-    }
-    if ("sortBy" in newFilters) {
-      updated.sortBy = newFilters.sortBy;
-    }
-    if ("sortOrder" in newFilters) {
-      updated.sortOrder = newFilters.sortOrder;
-    }
-
-    setFilters(updated);
+    const merged = mergeFilters(filters, newFilters);
+    setFilters(merged);
 
     // Update URL for shareable links
-    const params = new URLSearchParams(searchParams);
-
-    Object.entries(updated).forEach(([key, value]) => {
-      if (value != null && value !== "") {
-        if (Array.isArray(value)) {
-          // Handle array parameters (like statusIds)
-          params.delete(key); // Clear existing values
-          if (value.length > 0) {
-            value.forEach((item) => {
-              params.append(key, String(item));
-            });
-          }
-        } else {
-          params.set(key, String(value));
-        }
-      } else {
-        params.delete(key);
-      }
-    });
-
-    router.push(`/issues?${params.toString()}`);
+    const url = createFilteredUrl("/issues", merged);
+    router.push(url);
   };
 
   // Handle issue selection
   const handleSelectIssue = (issueId: string, selected: boolean): void => {
-    setSelectedIssues((prev) =>
-      selected ? [...prev, issueId] : prev.filter((id) => id !== issueId),
-    );
+    setSelectedIssues(prev => toggleSelection(prev, issueId, selected));
   };
 
   const handleSelectAll = (selected: boolean): void => {
-    setSelectedIssues(selected ? (issues?.map((issue) => issue.id) ?? []) : []);
+    const issueIds = issues?.map(issue => issue.id) ?? [];
+    setSelectedIssues(selected ? selectAll(issueIds) : selectNone());
   };
 
   // Note: Bulk actions to be implemented later
@@ -224,10 +177,8 @@ export function IssueList({
 
   // Handle clear all filters
   const handleClearAllFilters = (): void => {
-    setFilters({
-      sortBy: "created",
-      sortOrder: "desc",
-    });
+    const clearedFilters = clearAllFilters();
+    setFilters(clearedFilters);
     router.push("/issues");
   };
 

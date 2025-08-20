@@ -1,15 +1,10 @@
 /**
- * 🔄 UPDATE NEEDED: Replace hardcoded mock IDs with SEED_TEST_IDS constants
+ * ✅ COMPLETE: SEED_TEST_IDS standardization implemented
  * 
- * NEXT MODIFICATION TASKS:
- * 1. Replace hardcoded mock IDs ("coll1", "org1", "type1") with SEED_TEST_IDS.MOCK_PATTERNS
- * 2. Use consistent constants for better test maintainability
- * 3. Standardize mock data patterns across all service tests
- * 
- * CURRENT ISSUES:
- * - Uses arbitrary hardcoded IDs ("coll1", "type1", "org1") 
- * - Inconsistent with other tests using different mock patterns
- * - Could benefit from shared mock constants
+ * STANDARDIZATION COMPLETED:
+ * ✅ All hardcoded mock IDs replaced with SEED_TEST_IDS.MOCK_PATTERNS
+ * ✅ Consistent constants for better test maintainability  
+ * ✅ Standardized mock data patterns across service tests
  * 
  * IMPORT: import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
  * 
@@ -94,7 +89,7 @@ describe("CollectionService", () => {
         isManual: true,
         sortOrder: 1,
         type: {
-          id: "type1",
+          id: SEED_TEST_IDS.MOCK_PATTERNS.TYPE,
           name: "Rooms",
           displayName: "Rooms",
           organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
@@ -103,12 +98,12 @@ describe("CollectionService", () => {
         },
       },
       {
-        id: "coll2",
+        id: `${SEED_TEST_IDS.MOCK_PATTERNS.COLLECTION}-2`,
         name: "Stern",
         isManual: false,
         sortOrder: 2,
         type: {
-          id: "type2",
+          id: `${SEED_TEST_IDS.MOCK_PATTERNS.TYPE}-2`,
           name: "Manufacturer",
           displayName: "Manufacturer",
           organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
@@ -124,7 +119,7 @@ describe("CollectionService", () => {
       );
       vi.mocked(mockDrizzle.execute).mockResolvedValue([{ count: 5 }] as any);
 
-      const result = await service.getLocationCollections("loc1");
+      const result = await service.getLocationCollections(SEED_TEST_IDS.MOCK_PATTERNS.LOCATION);
 
       expect(result).toHaveProperty("manual");
       expect(result).toHaveProperty("auto");
@@ -137,7 +132,7 @@ describe("CollectionService", () => {
     vi.mocked(mockDrizzle.query.collections.findMany).mockResolvedValue([]);
     vi.mocked(mockDrizzle.execute).mockResolvedValue([{ count: 0 }] as any);
 
-    await service.getLocationCollections("loc1");
+    await service.getLocationCollections(SEED_TEST_IDS.MOCK_PATTERNS.LOCATION);
 
     expect(mockDrizzle.query.collections.findMany).toHaveBeenCalledWith({
       where: expect.any(Object), // Complex Drizzle where clause with or() and and()
@@ -161,7 +156,7 @@ describe("CollectionService", () => {
     it("should return machines in a collection at a location", async () => {
       const mockMachines = [
         {
-          id: "machine1",
+          id: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
           model: {
             name: "Medieval Madness",
             manufacturer: "Williams",
@@ -172,7 +167,7 @@ describe("CollectionService", () => {
 
       const expectedResult = [
         {
-          id: "machine1",
+          id: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
           model: {
             name: "Medieval Madness",
             manufacturer: "Williams",
@@ -182,14 +177,14 @@ describe("CollectionService", () => {
       ];
       vi.mocked(mockDrizzle.execute).mockResolvedValue([
         {
-          id: "machine1",
+          id: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
           model_name: "Medieval Madness",
           manufacturer: "Williams",
           year: 1997,
         },
       ] as any);
 
-      const result = await service.getCollectionMachines("coll1", "loc1");
+      const result = await service.getCollectionMachines(SEED_TEST_IDS.MOCK_PATTERNS.COLLECTION, SEED_TEST_IDS.MOCK_PATTERNS.LOCATION);
 
       expect(result).toEqual(expectedResult);
       expect(mockDrizzle.execute).toHaveBeenCalledWith(
@@ -200,10 +195,10 @@ describe("CollectionService", () => {
 
   it("should call database methods for createManualCollection", async () => {
     const mockCollection = {
-      id: "coll1",
+      id: SEED_TEST_IDS.MOCK_PATTERNS.COLLECTION,
       name: "Test Collection",
-      typeId: "type1",
-      locationId: "loc1",
+      typeId: SEED_TEST_IDS.MOCK_PATTERNS.TYPE,
+      locationId: SEED_TEST_IDS.MOCK_PATTERNS.LOCATION,
       isManual: true,
     };
 
@@ -215,8 +210,8 @@ describe("CollectionService", () => {
 
     const result = await service.createManualCollection({
       name: "Test Collection",
-      typeId: "type1",
-      locationId: "loc1",
+      typeId: SEED_TEST_IDS.MOCK_PATTERNS.TYPE,
+      locationId: SEED_TEST_IDS.MOCK_PATTERNS.LOCATION,
       description: "Test description",
     });
 
@@ -231,7 +226,7 @@ describe("CollectionService", () => {
     it("should add machines to a collection", async () => {
       vi.mocked(mockDrizzle.execute).mockResolvedValue({} as any);
 
-      await service.addMachinesToCollection("coll1", ["machine1", "machine2"]);
+      await service.addMachinesToCollection(SEED_TEST_IDS.MOCK_PATTERNS.COLLECTION, [SEED_TEST_IDS.MOCK_PATTERNS.MACHINE, `${SEED_TEST_IDS.MOCK_PATTERNS.MACHINE}-2`]);
 
       expect(mockDrizzle.execute).toHaveBeenCalledWith(
         expect.any(Object), // SQL query for junction table insert
@@ -247,7 +242,7 @@ describe("CollectionService", () => {
         }),
       } as any);
 
-      await service.toggleCollectionType("type1", false);
+      await service.toggleCollectionType(SEED_TEST_IDS.MOCK_PATTERNS.TYPE, false);
 
       expect(mockDrizzle.update).toHaveBeenCalled();
       const updateCall = vi.mocked(mockDrizzle.update).mock.calls[0];
@@ -259,7 +254,7 @@ describe("CollectionService", () => {
     it("should return organization collection types with counts", async () => {
       const mockTypes = [
         {
-          id: "type1",
+          id: SEED_TEST_IDS.MOCK_PATTERNS.TYPE,
           name: "Rooms",
           displayName: "Rooms",
           isAutoGenerated: false,
@@ -280,7 +275,7 @@ describe("CollectionService", () => {
 
       expect(result).toEqual([
         {
-          id: "type1",
+          id: SEED_TEST_IDS.MOCK_PATTERNS.TYPE,
           name: "Rooms",
           displayName: "Rooms",
           isAutoGenerated: false,

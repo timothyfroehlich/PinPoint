@@ -155,7 +155,7 @@ CREATE POLICY "priorities_organization_isolation" ON priorities
   USING ("organizationId" = (auth.jwt() ->> 'app_metadata' ->> 'organizationId')::text);
 
 -- Issue Statuses: Organization-scoped status definitions
-CREATE POLICY "issue_statuses_organization_isolation" ON "issueStatuses"
+CREATE POLICY "issue_statuses_organization_isolation" ON "issue_statuses"
   FOR ALL TO authenticated
   USING ("organizationId" = (auth.jwt() ->> 'app_metadata' ->> 'organizationId')::text);
 
@@ -270,7 +270,7 @@ DROP TRIGGER IF EXISTS set_locations_organization_id ON locations;
 DROP TRIGGER IF EXISTS set_machines_organization_id ON machines;
 DROP TRIGGER IF EXISTS set_issues_organization_id ON issues;
 DROP TRIGGER IF EXISTS set_priorities_organization_id ON priorities;
-DROP TRIGGER IF EXISTS set_issue_statuses_organization_id ON "issueStatuses";
+DROP TRIGGER IF EXISTS set_issue_statuses_organization_id ON "issue_statuses";
 DROP TRIGGER IF EXISTS set_attachments_organization_id ON attachments;
 DROP TRIGGER IF EXISTS set_issue_history_organization_id ON "issueHistory";
 DROP TRIGGER IF EXISTS set_collection_types_organization_id ON "collectionTypes";
@@ -307,7 +307,7 @@ CREATE TRIGGER set_priorities_organization_id
   EXECUTE FUNCTION set_organization_id();
 
 CREATE TRIGGER set_issue_statuses_organization_id
-  BEFORE INSERT ON "issueStatuses" FOR EACH ROW
+  BEFORE INSERT ON "issue_statuses" FOR EACH ROW
   EXECUTE FUNCTION set_organization_id();
 
 CREATE TRIGGER set_attachments_organization_id
@@ -382,7 +382,7 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS priorities_org_id_idx
   ON priorities ("organizationId", "order");
 
 CREATE INDEX CONCURRENTLY IF NOT EXISTS issue_statuses_org_id_idx
-  ON "issueStatuses" ("organizationId", "order");
+  ON "issue_statuses" ("organizationId", "order");
 
 -- Comment and interaction indexes
 CREATE INDEX CONCURRENTLY IF NOT EXISTS comments_org_id_issue_idx

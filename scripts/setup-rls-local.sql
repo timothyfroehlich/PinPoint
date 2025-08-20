@@ -25,7 +25,7 @@ ALTER TABLE machines ENABLE ROW LEVEL SECURITY;
 -- Issue management system
 ALTER TABLE issues ENABLE ROW LEVEL SECURITY;
 ALTER TABLE priorities ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "issueStatuses" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "issue_statuses" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE comments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE attachments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "issueHistory" ENABLE ROW LEVEL SECURITY;
@@ -85,7 +85,7 @@ CREATE POLICY "local_dev_allow_all" ON priorities
   USING (true);
 
 -- Issue Statuses
-CREATE POLICY "local_dev_allow_all" ON "issueStatuses"
+CREATE POLICY "local_dev_allow_all" ON "issue_statuses"
   FOR ALL TO authenticated
   USING (true);
 

@@ -69,6 +69,35 @@
 
 ## 🚨🚨🚨 CRITICAL SYSTEM RESTRICTIONS 🚨🚨🚨
 
+### ⛔ ABSOLUTELY FORBIDDEN: Database Migrations Until Beta Launch
+
+**🔥 NO MIGRATION FILES ALLOWED 🔥**
+
+```bash
+# ❌ NEVER CREATE MIGRATION FILES
+supabase/migrations/                    # Directory should remain empty
+npm run db:generate                     # Don't generate migrations
+drizzle-kit generate                    # Don't run migration generation
+```
+
+**💥 WHY NO MIGRATIONS IN PRE-BETA:**
+
+- **Zero users**: No production data to migrate or preserve
+- **Schema in flux**: Core features and data models still being decided
+- **Direct schema changes**: Faster to modify schema files directly 
+- **Fresh database starts**: Reset development DB as needed vs complex migrations
+- **Migration complexity**: Don't solve problems that don't exist yet
+
+**✅ ACCEPTABLE PRE-BETA APPROACH:**
+
+```bash
+supabase db reset                       # ✅ Reset local DB to latest schema
+npm run db:push                         # ✅ Push schema changes directly
+npm run db:seed                         # ✅ Re-seed with fresh data
+```
+
+**FUTURE**: Migrations will be implemented when we have real users and production data (beta launch+)
+
 ### ⛔ ABSOLUTELY FORBIDDEN: Integration Test Memory Patterns
 
 **🔥 NEVER EVER USE THESE PATTERNS 🔥**

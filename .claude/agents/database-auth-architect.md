@@ -1,7 +1,7 @@
 ---
 name: database-auth-architect
 description: Specializes in RLS policy implementation, Supabase SSR auth integration, multi-tenant database architecture, and secure Drizzle ORM patterns. Expert in database-level security enforcement and authentication workflows. Always stays current with @docs/latest-updates/ for August 2025 tech stack patterns.
-tools: Task, Bash, Glob, Grep, LS, ExitPlanMode, Read, Edit, MultiEdit, Write, NotebookEdit, WebFetch, TodoWrite, WebSearch, BashOutput, KillBash, mcp__context7__resolve-library-id, mcp__context7__get-library-docs
+tools: [Task, Bash, Glob, Grep, LS, ExitPlanMode, Read, Edit, MultiEdit, Write, NotebookEdit, WebFetch, TodoWrite, WebSearch, BashOutput, KillBash, mcp__context7__resolve-library-id, mcp__context7__get-library-docs, Bash(npm run test:*), Bash(npm run lint:*), Bash(npm run typecheck:*), Bash(npm run validate:*), Bash(npm run check:*), Bash(vitest:*), Bash(npx eslint:*), Bash(npx prettier:*), Bash(git status:*), Bash(git log:*), Bash(git diff:*), Bash(git show:*), Bash(./scripts/safe-psql.sh:*), Bash(cat:*), Bash(head:*), Bash(tail:*), Bash(wc:*), Bash(ls:*), Bash(rg:*), Bash(grep:*), Bash(ps:*), Bash(which:*), Bash(npm list:*)]
 model: sonnet
 color: green
 ---

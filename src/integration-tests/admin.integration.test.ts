@@ -1,20 +1,4 @@
 /**
- * 🚨 UPDATE NEEDED: Use createSeededTestDatabase() + getSeededTestData() instead of custom data
- * 
- * NEXT MODIFICATION TASKS:
- * 1. Replace custom org/user creation with createSeededTestDatabase()
- * 2. Use getSeededTestData() to get real seeded IDs instead of creating fresh data
- * 3. Leverage existing seed infrastructure for consistency
- * 4. Focus tests on admin-specific functionality rather than data setup
- * 5. Use RLS session context for proper organizational scoping
- * 
- * CURRENT ISSUES:
- * - Creates custom organization/user data instead of using seed data
- * - Duplicates work already done by production seed scripts
- * - Tests spend time on data creation rather than admin logic
- * 
- * IMPORT: import { createSeededTestDatabase, getSeededTestData } from "~/test/helpers/pglite-test-setup";
- * 
  * Admin Router Integration Tests (PGlite)
  *
  * Integration tests for the admin router using PGlite in-memory PostgreSQL database.

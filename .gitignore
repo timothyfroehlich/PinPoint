@@ -102,3 +102,4 @@ cleanup_analysis/
 .worktree-ports
 .env*.local
 .eslintcache
+.claude/recycle_bin/

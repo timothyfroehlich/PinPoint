@@ -1,13 +1,13 @@
-# Phase 3: Systematic Test Implementation - RLS-Enhanced Testing
+# Phase 3: Systematic Test Implementation - Consultant-Guided RLS Enhancement
 
-**Status**: Ready for Execution - Converting 95 analyzed test files to RLS-enhanced patterns  
-**Phase**: 3 of 5 - Test Implementation Using Designed Archetypes  
+**Status**: Ready for Execution - Converting 87 test files to RLS-enhanced patterns  
+**Phase**: 3 of 5 - Serial Implementation Using Consultant Analysis + Designed Archetypes  
 **Context**: RLS implemented (Phase 2) + Testing architecture completed (Phase 2.5)  
-**Approach**: Systematic archetype application based on concrete inventory analysis
+**Approach**: Consultant-guided serial implementation based on concrete analysis and roadmaps
 
 ## Executive Summary
 
-**Goal**: Convert 95 test files using pgTAP + PGlite testing strategy with agent specialization for optimal performance and comprehensive coverage.
+**Goal**: Convert 87 test files using pgTAP + PGlite testing strategy with specialized consultant analysis for optimal implementation guidance and comprehensive coverage.
 
 **pgTAP RLS Validation** (~15 tests)
 - Native PostgreSQL RLS policy testing
@@ -21,10 +21,10 @@
 
 **Inventory Analysis Achievements**:
 
-✅ **Memory Safety Excellence**: ZERO dangerous patterns found across 95 files
-✅ **Agent Workload Distribution**: 3 specialized agents with clear file assignments
+✅ **Memory Safety Excellence**: ZERO dangerous patterns found across 87 files
+✅ **Consultant Analysis Strategy**: 3 specialized consultants providing implementation roadmaps
 ✅ **Conversion Readiness**: 89% of files require minimal to moderate changes
-✅ **Effort Estimation**: 143-286 hours total with priority-based execution
+✅ **Serial Implementation**: Analyze→Implement cycles with expert guidance
 
 **Key Benefits Being Realized**:
 
@@ -36,31 +36,32 @@
 
 **Success Metrics**:
 
-- 95 test files → archetype-compliant patterns
-- All tests follow agent-specialized archetypes (no ad-hoc patterns)
+- 87 test files → archetype-compliant patterns
+- All tests follow consultant-analyzed archetypes (no ad-hoc patterns)  
 - Test execution time improved (RLS eliminates coordination overhead)
 - Memory usage stable (200-400MB confirmed safe range)
+- Current failures: 335 → 0 through systematic implementation
 
 ---
 
 ## Phase 3 Execution Strategy
 
-### Systematic Archetype Application
+### Serial Consultant-Guided Implementation
 
-**CRITICAL PRINCIPLE**: Every test repair must follow a defined archetype from Phase 2.5. No ad-hoc fixes allowed.
+**CRITICAL PRINCIPLE**: Every test implementation follows consultant analysis roadmaps and defined archetypes from Phase 2.5. No ad-hoc fixes allowed.
 
-**Agent Assignment Matrix** (95 Files Total):
+**Consultant Analysis Matrix** (87 Files Total):
 
-| **Agent** | **Archetypes** | **File Count** | **Effort Hours** | **Priority Focus** |
-|---|---|---|---|---|
-| **`unit-test-architect`** | 1, 4 | 38 (40%) | 24-48 | Foundation patterns |
-| **`integration-test-architect`** | 2, 3, 5 | 40 (42%) | 58-116 | Router conversions + RLS |
-| **`security-test-architect`** | 6, 7, 8 | 22 (23%) | 36-72 | Security compliance |
+| **Consultant** | **Archetypes** | **File Count** | **Analysis Focus** |
+|---|---|---|---|
+| **`security-test-analysis-consultant`** | 6, 7, 8 | ~22 (25%) | Security boundary analysis |
+| **`integration-test-analysis-consultant`** | 2, 3, 5 | ~40 (46%) | Memory safety + router conversions |
+| **`unit-test-analysis-consultant`** | 1, 4 | ~25 (29%) | Foundation pattern analysis |
 
-**Agent Responsibilities**:
-- **`unit-test-architect`**: Pure functions + React components (foundation templates)
-- **`integration-test-architect`**: Service logic + PGlite + tRPC routers (critical conversions)
-- **`security-test-architect`**: Permissions + RLS policies + Schema constraints
+**Consultant Responsibilities**:
+- **`security-test-analysis-consultant`**: Analyze security boundaries, RLS compliance, multi-tenant isolation
+- **`integration-test-analysis-consultant`**: Analyze memory safety, router conversions, RLS context management
+- **`unit-test-analysis-consultant`**: Analyze foundation patterns, SEED_TEST_IDS standardization, component behavior
 
 **Quality Gates**:
 
@@ -71,15 +72,25 @@
 
 ---
 
-## Dual-Track Implementation Strategy
+## Serial Implementation Strategy
 
-### Phase 3.1: `security-test-architect` - RLS Policy Enhancement (Priority 1)
+### Phase 3.1: Security Analysis
 
-**Goal**: Enhance 22 security-focused tests with proper archetype alignment and RLS validation
+**Goal**: Use `security-test-analysis-consultant` to analyze ~22 security test files and create comprehensive implementation roadmap
 
-**Scope**: Archetypes 6, 7 & 8 (Permissions + RLS + Schema)
-**Files**: 22 total (5 needing critical archetype alignment)
-**Effort**: 36-72 hours
+**Scope**: Security boundary analysis for Archetypes 6, 7 & 8 (Permissions + RLS + Schema)
+**Analysis Output**: Detailed roadmap for security compliance enhancement
+**Context7 Research**: Current PostgreSQL RLS, pgTAP, and Supabase auth patterns
+
+### Phase 3.2: Security Implementation
+
+**Goal**: Implement security test conversions following consultant roadmap
+
+**Focus**: 
+- Critical archetype alignments 
+- RLS policy enforcement validation
+- Cross-organizational boundary testing
+- Permission matrix validation
 
 **Critical Conversions** (5 files):
 - Security tests currently in wrong archetype categories
@@ -135,13 +146,70 @@ SELECT * FROM finish();
 ROLLBACK;
 ```
 
-### Phase 3.2: `integration-test-architect` - Critical Router Conversions (Priority 2)
+### Phase 3.3: Integration Analysis (Context-Managed Sub-Phases)
 
-**Goal**: Convert 40 files with focus on 13 critical router unit→tRPC router conversions
+**Goal**: Use `integration-test-analysis-consultant` to analyze ~41 integration test files in **5 focused sub-phases** with context compacting between each batch to avoid context overload
 
-**Scope**: Archetypes 2, 3 & 5 (Service Logic + PGlite + tRPC Router)
-**Files**: 40 total (13 critical router conversions)
-**Effort**: 58-116 hours
+**Revised Strategy**: Break into tightly-coupled groups by content/focus areas (4-8 files each)
+
+#### Phase 3.3a: Issue Management Analysis & Implementation (~8 files) ✅ **FULLY COMPLETE**
+**Focus**: Complete issue workflow testing patterns - ANALYSIS + IMPLEMENTATION COMPLETE
+- **Router Conversions**: ✅ **ALL CONVERTED** - `issue.comment.test.ts` (22/22), `issue.status.test.ts` (9/9), `issue.notification.test.ts` (6/6), `issue.timeline.test.ts` (13/13) 
+- **Integration Tests**: `issue.timeline.integration.test.ts`, `comment.integration.test.ts` (validation pending)
+- **Analysis Focus**: Critical router unit→tRPC conversions, comment/timeline integration patterns
+- **Implementation Results**: 
+  - ✅ **50/50 tests passing** across all converted router files
+  - ✅ **100% SEED_TEST_IDS integration** with consistent mock data
+  - ✅ **Complete RLS context simulation** and organizational boundary validation
+  - ✅ **Service interface alignment** - test expectations match actual router implementations
+  - ✅ **Archetype 5 compliance** - All files follow tRPC Router integration patterns
+  - ✅ **Memory-safe testing** - All patterns follow worker-scoped PGlite guidelines
+
+#### Phase 3.3b: Machine & Location Analysis & Implementation (~8 files) ✅ **COMPLETE**
+**Focus**: Physical entity management workflows
+- **Router Conversions**: `machine.owner.test.ts`, `machine.location.test.ts` ✅ **CONVERTED**
+- **Integration Tests**: `machine.owner.integration.test.ts`, `machine.location.integration.test.ts`, `location.integration.test.ts`, `location.crud.integration.test.ts`, `location.services.integration.test.ts`, `location.aggregation.integration.test.ts`
+- **Analysis Focus**: Physical entity management, RLS scoping for location/machine data
+- **Analysis Results**: EXCELLENT memory safety (all integration tests), 2 CRITICAL router conversions needed (unit → tRPC integration)
+- **Implementation**: ✅ Converted mock-heavy router unit tests to tRPC router integration patterns
+- **Status**: Unit→tRPC router conversions completed with proper `withIsolatedTest` patterns
+
+#### Phase 3.3c: Admin & Infrastructure Analysis & Implementation (~6 files) ✅ **COMPLETE**
+**Focus**: System administration and core infrastructure
+- **Integration Tests**: `admin.integration.test.ts` ✅ **MEMORY SAFETY FIXED**, `role.integration.test.ts` ✅ **PATTERNS STANDARDIZED**, `schema-data-integrity.integration.test.ts`, `schema-migration-validation.integration.test.ts`
+- **Router Conversions**: `routers.integration.test.ts` ✅ **MOCK→tRPC INTEGRATION CONVERTED**
+- **Integration**: `routers.drizzle.integration.test.ts` ✅ **CLARIFIED AS UNIT TEST** (moved to `drizzle.schema.unit.test.ts`)
+- **Analysis Focus**: Admin operations, infrastructure patterns, schema validation
+- **Critical Fixes**: 
+  - 🚨 **Memory safety violation fixed** in `admin.integration.test.ts`
+  - 🔧 **Pattern standardization** completed in `role.integration.test.ts` (28 `withTransaction→withIsolatedTest` conversions)
+  - 🔄 **Mock-heavy conversion** completed in `routers.integration.test.ts` (975 lines mock→real tRPC router integration)
+  - 📋 **Testing intent clarified** for schema validation vs router integration
+
+#### Phase 3.3d: Model & Data Services Analysis (~6 files)
+**Focus**: Data models and external service integration
+- **Router Conversions**: `model.core.test.ts`, `model.opdb.test.ts`
+- **Integration Tests**: `model.core.integration.test.ts`, `model.opdb.integration.test.ts`, `drizzle-crud-validation.integration.test.ts`, `notification.schema.test.ts`
+- **Analysis Focus**: Model operations, external service patterns, CRUD validation
+
+#### Phase 3.3e: Service Layer & Routing Analysis (~5 files)
+**Focus**: Direct service testing and routing infrastructure
+- **Router Conversions**: `collection.test.ts`, `notification.test.ts`, `pinballMap.test.ts`
+- **Service Tests**: `pinballmapService.test.ts`, `roleService.test.ts`, `collectionService.test.ts`
+- **Analysis Focus**: Service layer patterns, "fake integration" detection, routing infrastructure
+
+**Analysis Output per Sub-Phase**: Focused implementation roadmap with effort estimates
+**Context7 Research**: Current PGlite, Drizzle ORM, and tRPC testing patterns
+
+### Phase 3.4: Integration Implementation (Following Sub-Phase Analysis)
+
+**Goal**: Implement integration test conversions following consultant roadmaps from each sub-phase
+
+**Focus**:
+- Critical router unit→tRPC router conversions (13 files)
+- Memory safety pattern enforcement
+- RLS session context establishment
+- "Fake integration" pattern elimination
 
 **Critical Router Conversions** (13 files):
 - `issue.test.ts`, `issue.timeline.test.ts`, `issue.notification.test.ts`
@@ -206,10 +274,28 @@ test("router respects RLS boundaries", async () => {
 });
 ```
 
-**Agent Processing Order**:
-1. **`unit-test-architect`** (38 files) - Foundation patterns for templates
-2. **`integration-test-architect`** (40 files) - Critical router conversions  
-3. **`security-test-architect`** (22 files) - Security archetype alignment
+### Phase 3.5: Unit Analysis
+
+**Goal**: Use `unit-test-analysis-consultant` to analyze ~25 unit test files and create comprehensive implementation roadmap
+
+**Scope**: Foundation pattern analysis for Archetypes 1 & 4 (Pure Functions + React Components)
+**Analysis Output**: Detailed roadmap for foundation pattern establishment and SEED_TEST_IDS standardization
+**Context7 Research**: Current Vitest v4.0+, React Testing Library, and MSW-tRPC patterns
+
+### Phase 3.6: Unit Implementation
+
+**Goal**: Implement unit test conversions following consultant roadmap
+
+**Focus**:
+- Foundation pattern establishment
+- SEED_TEST_IDS standardization across all unit tests
+- Modern Vitest v4.0 pattern adoption
+- React component behavior validation
+
+**Serial Processing Order**:
+1. **Security Analysis → Security Implementation** (~22 files)
+2. **Integration Analysis → Integration Implementation** (~40 files)  
+3. **Unit Analysis → Unit Implementation** (~25 files)
 
 ### Implementation Quality Gates
 
@@ -231,9 +317,9 @@ test("router respects RLS boundaries", async () => {
 
 ## Priority-Based Implementation Batches
 
-### **`unit-test-architect` Workload (Priority 1) - FOUNDATION**
+### **Unit Test Implementation** (Phase 3.5-3.6) - FOUNDATION**
 
-**Target**: 38 test files - foundational pattern establishment
+**Target**: ~25 test files - foundational pattern establishment following consultant analysis
 
 **High Priority Component Tests** (15 files):
 - `MachineDetailView.test.tsx` - Exemplary auth integration pattern
@@ -254,19 +340,22 @@ test("router respects RLS boundaries", async () => {
 
 **Conversion Strategy**: Apply Archetype 1 (Pure Function) & Archetype 4 (React Component) templates
 
-### **`integration-test-architect` Workload (Priority 2) - CRITICAL CONVERSIONS**
+### **Integration Test Implementation** (Phase 3.3-3.4) - CRITICAL CONVERSIONS**
 
-**Target**: 40 test files with 13 critical router conversions
+**Target**: ~40 test files with 13 critical router conversions following consultant analysis
 
 **Critical Router Unit→tRPC Conversions** (13 files):
-- `issue.comment.test.ts` - 30+ failing tests, complex permission validation
-- `issue.test.ts`, `issue.timeline.test.ts`, `issue.notification.test.ts`
+- ✅ `issue.comment.test.ts` - **COMPLETED** (22/22 tests passing) - Complex permission validation with RLS
+- ✅ `issue.timeline.test.ts` - **COMPLETED** (13/13 tests passing) - Service integration with correct parameters
+- ✅ `issue.notification.test.ts` - **COMPLETED** (6/6 tests passing) - Notification workflows with boundary enforcement  
+- ✅ `issue.status.test.ts` - **COMPLETED** (9/9 tests passing) - Status aggregation with organizational scoping
+- `issue.test.ts`, `issue.confirmation.test.ts` - Pending implementation
 - `model.core.test.ts`, `model.opdb.test.ts` - Complex model operations
-- `machine.owner.test.ts`, `machine.location.test.ts` - Machine operations
+- ✅ `machine.owner.test.ts`, `machine.location.test.ts` - **COMPLETED** - Machine operations
 - `collection.test.ts` - Service mocking to tRPC integration
 - `notification.test.ts`, `pinballMap.test.ts`
-- `routers.integration.test.ts`, `routers.drizzle.integration.test.ts`
-- `issue.confirmation.test.ts`
+- ✅ `routers.integration.test.ts` - **COMPLETED** - Mock→real tRPC router integration
+- `routers.drizzle.integration.test.ts`
 
 **PGlite Integration Files** (18 files):
 - Already following excellent patterns (e.g., `commentService.integration.test.ts`)
@@ -282,9 +371,9 @@ test("router respects RLS boundaries", async () => {
 
 **Conversion Strategy**: Unit Test (Archetype 1) → tRPC Router Test (Archetype 5) for router files
 
-### **`security-test-architect` Workload (Priority 3) - SECURITY COMPLIANCE**
+### **Security Test Implementation** (Phase 3.1-3.2) - SECURITY COMPLIANCE**
 
-**Target**: 22 test files focused on security boundary validation
+**Target**: ~22 test files focused on security boundary validation following consultant analysis
 
 **Critical Archetype Alignments** (5 files):
 - Security tests currently in wrong archetype categories
@@ -313,7 +402,7 @@ test("router respects RLS boundaries", async () => {
 
 ### Audit Results
 
-**95 Files Analyzed - ZERO Dangerous Patterns Found**:
+**87 Files Analyzed - ZERO Dangerous Patterns Found**:
 
 ✅ **No per-test PGlite instances**: Prevents 50-100MB per test memory blowout
 ✅ **All integration tests use worker-scoped patterns**: Shared instances across worker threads
@@ -771,31 +860,37 @@ await db.execute(sql`SET app.current_user_role = 'admin'`);
 **Test Failure Tracking**:
 
 ```
-Integration Test Batch (Priority 1): 10 files → Target: 0 failures
-├── admin.integration.test.ts: 15 failures → 0
-├── issue.timeline.integration.test.ts: 8 failures → 0
-├── location.aggregation.integration.test.ts: 12 failures → 0
-└── ... (track each file)
+Security Implementation (Phase 3.1-3.2): ~22 files → Target: 0 failures
+├── cross-org-isolation.test.ts: X failures → 0
+├── permissions.test.ts: X failures → 0
+├── multi-tenant-isolation.test.ts: X failures → 0
+└── ... (track each file following consultant analysis)
 
-Router Test Batch (Priority 2): 12 files → Target: 0 failures
-├── issue.comment.test.ts: 11 failures → 0
-├── issue.test.ts: 25 failures → 0
-└── ... (track each file)
+Integration Implementation (Phase 3.3-3.4): ~40 files → Target: 0 failures
+├── issue.comment.test.ts: X failures → 0
+├── issue.test.ts: X failures → 0
+├── admin.integration.test.ts: X failures → 0
+└── ... (track each file following consultant analysis)
 
-Infrastructure Test Batch (Priority 3): 5 files → Target: 0 failures
-├── permissions.test.ts: 8 failures → 0
-└── ... (track each file)
+Unit Implementation (Phase 3.5-3.6): ~25 files → Target: 0 failures
+├── MachineDetailView.test.tsx: X failures → 0
+├── inputValidation.test.ts: X failures → 0
+└── ... (track each file following consultant analysis)
 
-TOTAL: 306 failures → 0 failures
+TOTAL: 335 failures → 0 failures
 ```
 
 ### Progress Tracking Commands
 
 ```bash
-# Check current test status by agent
-npm run test src/components/               # unit-test-architect files
-npm run test src/server/api/routers/       # integration-test-architect files  
-npm run test src/integration-tests/        # security-test-architect files
+# Check current test status by implementation phase
+npm run test src/components/               # Unit implementation files
+npm run test src/server/api/routers/       # Integration implementation files  
+npm run test src/integration-tests/        # Security implementation files
+
+# Phase 3.3a Issue Management Router Validation (✅ COMPLETE)
+npm run test -- issue.comment.test.ts issue.status.test.ts issue.notification.test.ts issue.timeline.test.ts
+# Result: 50/50 tests passing across all converted files
 
 # Memory usage monitoring (validated safe)
 npm run test:coverage                      # Full test suite with coverage
@@ -809,31 +904,38 @@ npm run test-file [FILE_PATH]              # Single file test execution
 npm run test:all                           # Both pgTAP RLS + business logic tests
 ```
 
-### Agent Completion Milestones
+### Implementation Completion Milestones
 
-**`unit-test-architect` (38 files)**:
+**Security Implementation (Phase 3.1-3.2) (~22 files)**:
 
-- [ ] Establish foundational patterns for Archetypes 1 & 4
-- [ ] Decompose mixed concerns (IssueList.unit.test.tsx)
-- [ ] Standardize component testing patterns
-- [ ] Complete pure function test templates
-- [ ] Target: Template excellence for other agents
-
-**`integration-test-architect` (40 files)**:
-
-- [ ] Convert 13 critical router unit tests to tRPC Router tests
-- [ ] Implement standardized RLS session context
-- [ ] Enhance organizational boundary validation
-- [ ] Maintain excellent PGlite integration patterns
-- [ ] Target: All router tests follow Archetype 5
-
-**`security-test-architect` (22 files)**:
-
-- [ ] Align 5 security tests to proper archetypes
+- [ ] Complete consultant analysis of security boundary testing
+- [ ] Implement security archetype alignment following roadmap
 - [ ] Enhance RLS policy testing comprehensiveness
 - [ ] Strengthen permission boundary validation
-- [ ] Complete schema constraint testing with RLS
+- [ ] Complete schema constraint testing with RLS context
 - [ ] Target: 100% security archetype compliance
+
+**Integration Implementation (Phase 3.3-3.4) (~40 files)**:
+
+- [x] **Phase 3.3a FULLY COMPLETE**: Issue Management router conversions (50/50 tests passing)
+  - [x] `issue.comment.test.ts` - 22/22 tests passing with complex RLS validation
+  - [x] `issue.status.test.ts` - 9/9 tests passing with organizational scoping
+  - [x] `issue.notification.test.ts` - 6/6 tests passing with boundary enforcement  
+  - [x] `issue.timeline.test.ts` - 13/13 tests passing with service integration
+- [x] **Archetype 5 compliance achieved** - All converted files follow tRPC Router integration patterns
+- [x] **SEED_TEST_IDS standardization** - Consistent mock data across all files
+- [x] **Service interface alignment** - Test expectations match actual router implementations
+- [ ] Complete remaining router conversions (Phase 3.3b-3.3e implementation)
+- [ ] Target: All router tests follow consultant-analyzed patterns
+
+**Unit Implementation (Phase 3.5-3.6) (~25 files)**:
+
+- [ ] Complete consultant analysis of foundation patterns
+- [ ] Establish foundational patterns for Archetypes 1 & 4
+- [ ] Standardize SEED_TEST_IDS usage across all unit tests
+- [ ] Implement modern Vitest v4.0 patterns
+- [ ] Complete pure function and component test templates
+- [ ] Target: Foundation pattern excellence for future development
 
 ---
 
@@ -876,23 +978,24 @@ function validateTestArchetype(filePath: string, expectedArchetype: string) {
 
 **Technical Criteria**:
 
-- [ ] All 95 test files follow assigned archetype patterns
+- [ ] All 87 test files follow consultant-analyzed archetype patterns
 - [ ] Memory usage remains in 200-400MB safe range
 - [ ] Test execution time improved (RLS eliminates coordination overhead)
-- [ ] Zero ad-hoc test patterns (agent specialization maintained)
+- [ ] Zero ad-hoc test patterns (consultant specialization maintained)
+- [ ] Current 335 test failures reduced to 0 through systematic implementation
 
 **Quality Criteria**:
 
-- [ ] Every test file follows its agent-assigned archetype exactly
+- [ ] Every test file follows its consultant-analyzed archetype exactly
 - [ ] RLS context is properly established where beneficial
 - [ ] Organizational boundaries are consistently tested
 - [ ] Test maintenance burden reduced (worker-scoped patterns)
 
-**Agent Success Criteria**:
+**Implementation Success Criteria**:
 
-- [ ] `unit-test-architect`: Foundation patterns established for future development
-- [ ] `integration-test-architect`: Router conversions realize RLS benefits
-- [ ] `security-test-architect`: Security compliance through proper archetype alignment
+- [ ] **Security Implementation**: Security compliance through proper archetype alignment
+- [ ] **Integration Implementation**: Router conversions realize RLS benefits following consultant analysis
+- [ ] **Unit Implementation**: Foundation patterns established for future development
 
 **Documentation Criteria**:
 
@@ -905,34 +1008,47 @@ function validateTestArchetype(filePath: string, expectedArchetype: string) {
 
 ## Implementation Commands
 
-### `unit-test-architect` Implementation
+### Phase 3.1: Security Analysis
 
 ```bash
-# Start Foundation Pattern Implementation
-git checkout -b unit-test-foundation
-
-# Component test standardization
-npm run test-file src/components/machines/MachineDetailView.test.tsx
-npm run validate-file src/components/machines/MachineDetailView.test.tsx
-
-# Pure function test templates
-npm run test-file src/lib/common/__tests__/inputValidation.test.ts
-npm run validate-file src/lib/common/__tests__/inputValidation.test.ts
-
-# Mixed concern decomposition
-npm run test-file src/components/issues/__tests__/IssueList.unit.test.tsx
-
-# Progress tracking
-npm run test src/components/ src/lib/
+# Use security consultant for comprehensive analysis
+# Consultant will research current PostgreSQL RLS, pgTAP, Supabase patterns via Context7
+# Output: Detailed security implementation roadmap
 ```
 
-### `integration-test-architect` Implementation
+### Phase 3.2: Security Implementation
 
 ```bash
-# Start Critical Router Conversions
-git checkout -b router-conversion-batch
+# Implement following consultant roadmap
+git checkout -b security-boundary-implementation
 
-# Critical router unit→tRPC conversions
+# Security archetype implementations following analysis
+npm run test-file src/integration-tests/cross-org-isolation.test.ts
+npm run validate-file src/integration-tests/cross-org-isolation.test.ts
+
+# Permission and RLS policy testing
+npm run test-file src/server/auth/__tests__/permissions.test.ts
+npm run test-file src/server/api/__tests__/trpc.permission.test.ts
+
+# Security validation
+npm run test:rls # pgTAP RLS tests
+```
+
+### Phase 3.3: Integration Analysis
+
+```bash
+# Use integration consultant for comprehensive analysis
+# Consultant will research current PGlite, Drizzle, tRPC patterns via Context7
+# Output: Detailed router conversion and memory safety roadmap
+```
+
+### Phase 3.4: Integration Implementation
+
+```bash
+# Implement following consultant roadmap
+git checkout -b integration-conversion-batch
+
+# Critical router unit→tRPC conversions following analysis
 npm run test-file src/server/api/routers/__tests__/issue.comment.test.ts
 npm run validate-file src/server/api/routers/__tests__/issue.comment.test.ts
 
@@ -941,61 +1057,69 @@ npm run test-file src/server/api/routers/__tests__/model.core.test.ts
 npm run test-file src/server/api/routers/__tests__/machine.owner.test.ts
 
 # RLS session context validation
-npm run typecheck:brief # Ensure RLS context types are correct
+npm run typecheck:brief
 ```
 
-### `security-test-architect` Implementation
+### Phase 3.5: Unit Analysis
 
 ```bash
-# Start Security Archetype Alignment
-git checkout -b security-archetype-alignment
+# Use unit consultant for comprehensive analysis
+# Consultant will research current Vitest v4.0+, RTL, MSW-tRPC patterns via Context7
+# Output: Detailed foundation pattern and SEED_TEST_IDS roadmap
+```
 
-# Security archetype conversions
-npm run test-file src/integration-tests/cross-org-isolation.test.ts
-npm run validate-file src/integration-tests/cross-org-isolation.test.ts
+### Phase 3.6: Unit Implementation
 
-# Permission and RLS policy testing
-npm run test-file src/server/auth/__tests__/permissions.test.ts
-npm run test-file src/server/api/__tests__/trpc.permission.test.ts
+```bash
+# Implement following consultant roadmap
+git checkout -b unit-foundation-implementation
 
-# Final security validation
-npm run test:rls # pgTAP RLS tests
-npm run test # All tests should pass
+# Foundation pattern implementation following analysis
+npm run test-file src/components/machines/MachineDetailView.test.tsx
+npm run validate-file src/components/machines/MachineDetailView.test.tsx
+
+# Pure function test templates
+npm run test-file src/lib/common/__tests__/inputValidation.test.ts
+npm run validate-file src/lib/common/__tests__/inputValidation.test.ts
+
+# Progress tracking
+npm run test src/components/ src/lib/
 ```
 
 ---
 
 ## Conclusion
 
-Phase 3 represents the systematic application of our carefully designed testing archetypes to convert 95 analyzed test files into excellent RLS-enhanced patterns. By following this agent-specialized, priority-based approach:
+Phase 3 represents the systematic application of our carefully designed testing archetypes to convert 87 analyzed test files into excellent RLS-enhanced patterns. By following this consultant-guided, serial implementation approach:
 
 **Architectural Benefits Realized**:
 
-- Memory safety excellence: ZERO dangerous patterns found across all 95 files
-- Agent specialization: 3 specialized agents with clear workload distribution
+- Memory safety excellence: ZERO dangerous patterns found across all 87 files
+- Consultant specialization: 3 specialized consultants providing expert analysis and implementation roadmaps
 - Database-level multi-tenancy testing with automatic organizational scoping
 - Simplified test setup eliminating complex coordination patterns
 - Consistent, maintainable test patterns across the entire codebase
 
 **Process Benefits Achieved**:
 
-- Systematic conversion based on concrete inventory analysis (not theoretical frameworks)
-- Clear progress tracking through agent-specific milestones
-- Quality validation ensuring archetype compliance
-- Effort estimation: 143-286 hours across 3 specialized agents
+- Systematic conversion based on consultant analysis and concrete inventory assessment (not theoretical frameworks)
+- Clear progress tracking through serial analyze→implement cycles
+- Quality validation ensuring archetype compliance following expert guidance
+- Context7 integration ensuring current library patterns (August 2025) in all implementations
 
 **Technical Excellence Delivered**:
 
-- All tests follow agent-specialized archetypes (38 unit-test, 40 integration-test, 22 security-test)
+- All tests follow consultant-analyzed archetypes (~25 unit, ~40 integration, ~22 security)
 - RLS context properly established for organizational scoping
 - Integration tests use validated memory-safe worker-scoped patterns
 - Router tests properly converted from unit tests to tRPC Router integration tests
+- Current 335 test failures systematically resolved through expert-guided implementation
 
-**Inventory Analysis Success**:
+**Consultant Analysis Success**:
 
-- Foundation patterns established through exemplary file identification
-- Critical conversions identified (13 router unit→tRPC router transformations)
+- Foundation patterns established through expert analysis and implementation guidance
+- Critical conversions identified (13 router unit→tRPC router transformations) with detailed roadmaps
 - Memory usage confirmed sustainable (200-400MB safe range)
-- Agent specialization prevents archetype violations
+- Consultant specialization prevents archetype violations and ensures expert-quality implementations
 
-The completion of Phase 3 will deliver a robust, maintainable testing infrastructure that fully leverages the RLS implementation from Phase 2, with agent specialization ensuring systematic conversion quality and preventing regression to poor patterns.
+The completion of Phase 3 will deliver a robust, maintainable testing infrastructure that fully leverages the RLS implementation from Phase 2, with consultant-guided implementation ensuring systematic conversion quality and preventing regression to poor patterns.

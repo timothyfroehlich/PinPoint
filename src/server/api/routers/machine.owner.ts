@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { z } from "zod";
 
 import { createTRPCRouter, machineEditProcedure } from "~/server/api/trpc";
@@ -15,9 +15,12 @@ export const machineOwnerRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Verify the game instance exists (RLS handles org scoping)
+      // Verify the game instance exists and belongs to the user's organization
       const existingInstance = await ctx.db.query.machines.findFirst({
-        where: eq(machines.id, input.machineId),
+        where: and(
+          eq(machines.id, input.machineId),
+          eq(machines.organizationId, ctx.organizationId)
+        ),
       });
 
       if (!existingInstance) {
@@ -27,10 +30,13 @@ export const machineOwnerRouter = createTRPCRouter({
         });
       }
 
-      // If setting an owner, verify the user is a member of this organization (RLS handles org scoping)
-      if (input.ownerId) {
+      // If setting an owner, verify the user is a member of this organization
+      if (input.ownerId && input.ownerId.trim() !== "") {
         const membership = await ctx.db.query.memberships.findFirst({
-          where: eq(memberships.userId, input.ownerId),
+          where: and(
+            eq(memberships.userId, input.ownerId),
+            eq(memberships.organizationId, ctx.organizationId)
+          ),
         });
 
         if (!membership) {
@@ -41,10 +47,10 @@ export const machineOwnerRouter = createTRPCRouter({
         }
       }
 
-      // Update the machine owner
+      // Update the machine owner (treat empty string as null)
       const [updatedMachine] = await ctx.db
         .update(machines)
-        .set({ ownerId: input.ownerId ?? null })
+        .set({ ownerId: input.ownerId && input.ownerId.trim() !== "" ? input.ownerId : null })
         .where(eq(machines.id, input.machineId))
         .returning();
 
@@ -55,9 +61,12 @@ export const machineOwnerRouter = createTRPCRouter({
         });
       }
 
-      // Fetch the updated machine with its relationships
+      // Fetch the updated machine with its relationships (ensure org scoping)
       const machineWithRelations = await ctx.db.query.machines.findFirst({
-        where: eq(machines.id, input.machineId),
+        where: and(
+          eq(machines.id, input.machineId),
+          eq(machines.organizationId, ctx.organizationId)
+        ),
         with: {
           model: true,
           location: true,
@@ -65,7 +74,7 @@ export const machineOwnerRouter = createTRPCRouter({
             columns: {
               id: true,
               name: true,
-              image: true,
+              profilePicture: true,
             },
           },
         },

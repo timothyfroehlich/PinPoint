@@ -11,12 +11,12 @@
  */
 /// <reference types="vitest" />
 import { defineConfig } from "vitest/config";
+import { loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import tsconfigPaths from "vite-tsconfig-paths";
 import path from "path";
 
-// Load environment variables before any tests run
-import "./src/lib/env-loaders/test";
+// Environment variables loaded by Vitest's native env handling
 
 // Smart coverage: enabled in CI, disabled in development for performance
 const enableCoverage =
@@ -31,6 +31,8 @@ export default defineConfig({
     conditions: ["node", "import"],
   },
   test: {
+    // Native environment loading - Vitest will load .env, .env.test, and .env.local automatically
+    env: loadEnv("test", process.cwd(), ""),
     coverage: {
       enabled: enableCoverage,
       provider: "v8",
@@ -86,7 +88,7 @@ export default defineConfig({
           name: "node",
           globals: true,
           environment: "node",
-          setupFiles: ["src/test/vitest.setup.ts"],
+          setupFiles: ["src/test/setup/node.setup.ts"],
           typecheck: {
             tsconfig: "./tsconfig.tests.json",
           },
@@ -95,7 +97,7 @@ export default defineConfig({
             threads: {
               isolate: true,
               maxThreads: 2, // Limit parallelism for memory safety
-              memoryLimit: "256MB", // Lower limit for unit tests
+              memoryLimit: "768MB", // Increased from 256MB - user has more RAM
             },
           },
           include: [
@@ -124,7 +126,7 @@ export default defineConfig({
           name: "integration",
           globals: true,
           environment: "node",
-          setupFiles: ["src/test/vitest.integration.setup.ts"],
+          setupFiles: ["src/test/setup/integration.setup.ts"],
           hookTimeout: 30000, // 30 seconds - PGlite should initialize quickly
           typecheck: {
             tsconfig: "./tsconfig.tests.json",
@@ -162,7 +164,7 @@ export default defineConfig({
           name: "jsdom",
           globals: true,
           environment: "jsdom",
-          setupFiles: ["vitest.setup.react.ts"],
+          setupFiles: ["src/test/setup/react.setup.ts"],
           pool: "forks",
           typecheck: {
             tsconfig: "./tsconfig.tests.json",

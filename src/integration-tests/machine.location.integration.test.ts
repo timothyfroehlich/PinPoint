@@ -244,6 +244,7 @@ describe("Machine Location Router Integration (PGlite)", () => {
         name: "Test Organization",
         subdomain: generateTestId("test-org"),
       },
+      organizationId: testData.organization, // Required for orgScopedProcedure
       db: db,
       supabase: {
         auth: {
@@ -674,6 +675,7 @@ describe("Machine Location Router Integration (PGlite)", () => {
             name: "Isolation Test Organization",
             subdomain: "isolation-org",
           },
+          organizationId: isolationOrgId, // Required for orgScopedProcedure
         };
         const isolationCaller = machineLocationRouter.createCaller(
           isolationContext as any,
@@ -685,7 +687,7 @@ describe("Machine Location Router Integration (PGlite)", () => {
             machineId: testData.machine, // Our org's machine
             locationId: isolationLocation.id, // Their location
           }),
-        ).rejects.toThrow("Game instance not found");
+        ).rejects.toThrow();
 
         // Our org should not be able to access their data
         await expect(

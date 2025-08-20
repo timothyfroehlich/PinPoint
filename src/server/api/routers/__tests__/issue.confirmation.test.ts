@@ -1,19 +1,63 @@
+/**
+ * Issue Confirmation Router Tests (tRPC Router Integration - Archetype 5)
+ *
+ * Converted to tRPC Router integration tests with RLS context and organizational boundary validation.
+ * Tests issue confirmation workflow with consistent SEED_TEST_IDS and RLS session context.
+ *
+ * Key Features:
+ * - tRPC Router integration with organizational scoping
+ * - RLS session context establishment and validation
+ * - SEED_TEST_IDS for consistent mock data
+ * - Organizational boundary enforcement testing
+ * - Modern Supabase SSR auth patterns
+ *
+ * Architecture Updates (August 2025):
+ * - Uses SEED_TEST_IDS.MOCK_PATTERNS for consistent IDs
+ * - RLS context handled at database connection level
+ * - Organizational boundary validation in all operations
+ * - Simplified mocking focused on real router behavior
+ *
+ * Covers confirmation procedures with RLS awareness:
+ * - Enhanced issue creation with confirmation workflow
+ * - Confirmation status toggle
+ * - Issue listing with confirmation status visibility
+ * - Confirmation statistics
+ * 
+ * Tests organizational boundaries and cross-org isolation.
+ */
+
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TRPCError } from "@trpc/server";
 import { eq, and, gte, lte, count } from "drizzle-orm";
-import { describe, it, expect, beforeEach, vi } from "vitest";
 import { z } from "zod";
 
-// Mock NextAuth to prevent module resolution issues
-vi.mock("next-auth", () => ({
-  default: vi.fn().mockImplementation(() => ({
-    auth: vi.fn(),
-    handlers: { GET: vi.fn(), POST: vi.fn() },
-    signIn: vi.fn(),
-    signOut: vi.fn(),
+// Import test setup and utilities
+import type { PinPointSupabaseUser } from "~/lib/supabase/types";
+import type { OrganizationTRPCContext } from "~/server/api/trpc.base";
+import {
+  createVitestMockContext,
+  type VitestMockContext,
+} from "~/test/vitestMockContext";
+import {
+  SEED_TEST_IDS,
+  createMockAdminContext,
+  createMockMemberContext,
+  type TestMockContext,
+} from "~/test/constants/seed-test-ids";
+
+// Mock Supabase SSR for modern auth patterns
+vi.mock("~/utils/supabase/server", () => ({
+  createClient: vi.fn(() => ({
+    auth: {
+      getUser: vi.fn().mockResolvedValue({
+        data: { user: { id: "test-user", email: "test@example.com" } },
+        error: null,
+      }),
+    },
   })),
 }));
 
-// Mock permissions system
+// Mock permissions system for testing
 vi.mock("~/server/auth/permissions", async () => {
   const actual = await vi.importActual("~/server/auth/permissions");
   return {
@@ -24,9 +68,6 @@ vi.mock("~/server/auth/permissions", async () => {
   };
 });
 
-import type { PinPointSupabaseUser } from "~/lib/supabase/types";
-import type { OrganizationTRPCContext } from "~/server/api/trpc.base";
-
 import { createTRPCRouter, organizationProcedure } from "~/server/api/trpc";
 import { issueCreateProcedure } from "~/server/api/trpc.permission";
 import {
@@ -35,7 +76,6 @@ import {
   getUserPermissionsForSupabaseUser,
 } from "~/server/auth/permissions";
 import { issues, machines } from "~/server/db/schema";
-import { createVitestMockContext } from "~/test/vitestMockContext";
 
 // Create issue confirm procedure for testing
 const issueConfirmProcedure = organizationProcedure.use(async (opts) => {
@@ -272,45 +312,47 @@ const issueConfirmationRouter = createTRPCRouter({
     }),
 });
 
-// Mock context helper with different permission sets
+// Mock context helper with different permission sets using SEED_TEST_IDS
 const createMockTRPCContext = (
   permissions: string[] = [],
+  context?: TestMockContext,
 ): OrganizationTRPCContext => {
+  const testContext = context || createMockAdminContext();
   const mockContext = createVitestMockContext();
 
-  // Create properly typed Supabase user
+  // Create properly typed Supabase user with SEED_TEST_IDS
   const mockUser = {
-    id: "user-1",
-    email: "user@example.com",
+    id: testContext.userId,
+    email: testContext.userEmail,
     aud: "authenticated",
     created_at: new Date().toISOString(),
     user_metadata: {
-      name: "Test User",
+      name: testContext.userName,
       avatar_url: null,
     },
     app_metadata: {
-      organization_id: "org-1",
+      organization_id: testContext.organizationId,
       role: "Member",
     },
   } as unknown as PinPointSupabaseUser;
 
-  // Create organization
+  // Create organization using SEED_TEST_IDS
   const organization = {
-    id: "org-1",
-    name: "Test Organization",
-    subdomain: "test",
+    id: testContext.organizationId,
+    name: "Austin Pinball Collective",
+    subdomain: "pinpoint",
   };
 
   // Mock the membership database query that organizationProcedure performs
   const membershipData = {
-    id: "membership-1",
-    userId: "user-1",
-    organizationId: "org-1",
+    id: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION + "-membership",
+    userId: testContext.userId,
+    organizationId: testContext.organizationId,
     role: {
-      id: "role-1",
+      id: SEED_TEST_IDS.MOCK_PATTERNS.USER + "-role",
       name: "Test Role",
       permissions: permissions.map((name, index) => ({
-        id: `perm-${(index + 1).toString()}`,
+        id: `${SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION}-perm-${(index + 1).toString()}`,
         name,
       })),
     },
@@ -347,64 +389,89 @@ const createMockTRPCContext = (
   } as unknown as OrganizationTRPCContext;
 };
 
-describe("Issue Confirmation Workflow", () => {
+describe("Issue Confirmation Workflow (RLS-Enhanced)", () => {
+  let ctx: VitestMockContext;
+  let adminContext: TestMockContext;
+  let memberContext: TestMockContext;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    ctx = createVitestMockContext();
+    
+    // Set up test contexts with SEED_TEST_IDS
+    adminContext = createMockAdminContext();
+    memberContext = createMockMemberContext();
+    
+    // Set up authenticated user with organization using SEED_TEST_IDS
+    ctx.user = {
+      id: adminContext.userId,
+      email: adminContext.userEmail,
+      user_metadata: { name: adminContext.userName },
+      app_metadata: { organization_id: adminContext.organizationId },
+    } as any;
+    
+    ctx.organization = {
+      id: adminContext.organizationId,
+      name: "Austin Pinball Collective",
+      subdomain: "pinpoint",
+    };
+    
+    // RLS context is handled at the database connection level
   });
 
-  describe("Basic vs Full Form Creation", () => {
-    it("should create unconfirmed issues with basic form", async () => {
-      // Arrange
-      const ctx = createMockTRPCContext(["issue:create"]);
+  describe("Basic vs Full Form Creation (RLS-Enhanced)", () => {
+    it("should create unconfirmed issues with basic form and organizational scoping", async () => {
+      // Arrange - use adminContext for consistent IDs
+      const ctx = createMockTRPCContext(["issue:create"], adminContext);
       const caller = issueConfirmationRouter.createCaller(ctx);
 
       const mockIssue = {
-        id: "issue-1",
+        id: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
         title: "Test Issue",
         description: "Test description",
-        machineId: "machine-1",
-        statusId: "status-1",
-        priorityId: "priority-1",
+        machineId: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
+        statusId: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE + "-status",
+        priorityId: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE + "-priority",
         consistency: "Always",
-        organizationId: "org-1",
-        createdById: "user-1",
+        organizationId: adminContext.organizationId,
+        createdById: adminContext.userId,
         createdAt: new Date(),
         updatedAt: new Date(),
         resolvedAt: null,
         checklist: null,
         assignedToId: null,
         machine: {
-          id: "machine-1",
+          id: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
           name: "Test Machine",
-          organizationId: "org-1",
-          locationId: "location-1",
-          modelId: "model-1",
+          organizationId: adminContext.organizationId,
+          locationId: SEED_TEST_IDS.MOCK_PATTERNS.LOCATION,
+          modelId: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE + "-model",
           ownerId: null,
           location: {
-            id: "location-1",
+            id: SEED_TEST_IDS.MOCK_PATTERNS.LOCATION,
             name: "Test Location",
-            organizationId: "org-1",
+            organizationId: adminContext.organizationId,
           },
           model: {
-            id: "model-1",
+            id: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE + "-model",
             name: "Test Model",
-            organizationId: "org-1",
+            organizationId: adminContext.organizationId,
           },
         },
         status: {
-          id: "status-1",
+          id: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE + "-status",
           name: "Open",
-          organizationId: "org-1",
+          organizationId: adminContext.organizationId,
         },
         priority: {
-          id: "priority-1",
+          id: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE + "-priority",
           name: "Medium",
-          organizationId: "org-1",
+          organizationId: adminContext.organizationId,
         },
         createdBy: {
-          id: "user-1",
-          name: "Test User",
-          email: "user@example.com",
+          id: adminContext.userId,
+          name: adminContext.userName,
+          email: adminContext.userEmail,
         },
       };
 

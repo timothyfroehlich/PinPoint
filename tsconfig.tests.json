@@ -29,7 +29,6 @@
     "src/integration-tests/**/*.tsx",
     "e2e/**/*.ts",
     "e2e/**/*.tsx",
-    "vitest.setup.ts",
-    "vitest.setup.react.ts"
+    "src/test/setup/**/*.ts"
   ]
 }

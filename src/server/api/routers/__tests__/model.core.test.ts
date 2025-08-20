@@ -1,634 +1,699 @@
 /**
- * Model Core Router Unit Tests
+ * Model Router Integration Tests (tRPC + PGlite)
  *
- * Unit tests for the model.core router using modern Vitest patterns and mock database.
- * Tests the core Drizzle query patterns, organizational scoping, and error handling.
+ * Real tRPC router integration tests using PGlite in-memory PostgreSQL database.
+ * Tests the simplified single-table model architecture with OPDB global models.
  *
- * Key Features Tested:
- * - Complex exists() subqueries for organizational scoping
- * - SQL template extras for machine counting
- * - Relational queries with ctx.db.query.models.findMany()
- * - TRPCError handling (NOT_FOUND, BAD_REQUEST)
- * - Model deletion validation logic
+ * Converted from mock-heavy unit tests to proper Archetype 5 (tRPC Router Integration) patterns.
  *
- * Uses August 2025 Vitest patterns with type-safe mocking.
+ * Key Features:
+ * - Real PostgreSQL database with PGlite
+ * - Complete schema migrations applied
+ * - Real tRPC router operations with simplified model architecture
+ * - OPDB models (organizationId = NULL) accessible globally
+ * - Custom models (organizationId != NULL) scoped to organizations (v1.x feature)
+ * - Multi-tenant data isolation testing
+ * - Worker-scoped database for memory safety
+ * - No deletion operations - OPDB models are read-only in beta
+ *
+ * Uses modern August 2025 patterns with Vitest and PGlite integration.
  */
 
 import { TRPCError } from "@trpc/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { eq } from "drizzle-orm";
+import { describe, expect, vi } from "vitest";
 
-// Mock permissions system
-const mockPermissions = vi.hoisted(() => ({
-  requirePermissionForSession: vi.fn(),
+// Import test setup and utilities
+import type { TRPCContext } from "~/server/api/trpc.base";
+import type { TestDatabase } from "~/test/helpers/pglite-test-setup";
+
+import { appRouter } from "~/server/api/root";
+import * as schema from "~/server/db/schema";
+import { SEED_TEST_IDS, createMockAdminContext } from "~/test/constants/seed-test-ids";
+import { generateTestId } from "~/test/helpers/test-id-generator";
+import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
+
+// Mock external dependencies that aren't database-related
+vi.mock("~/lib/utils/id-generation", () => ({
+  generateId: vi.fn(() => generateTestId("test-id")),
 }));
 
 vi.mock("~/server/auth/permissions", () => ({
   getUserPermissionsForSession: vi
     .fn()
-    .mockResolvedValue(["model:view", "organization:manage"]),
+    .mockResolvedValue([
+      "model:view", 
+      "model:create",
+      "model:edit",
+      "model:delete",
+      "organization:manage",
+    ]),
   getUserPermissionsForSupabaseUser: vi
     .fn()
-    .mockResolvedValue(["model:view", "organization:manage"]),
-  requirePermissionForSession: mockPermissions.requirePermissionForSession,
+    .mockResolvedValue([
+      "model:view", 
+      "model:create",
+      "model:edit",
+      "model:delete",
+      "organization:manage",
+    ]),
+  requirePermissionForSession: vi.fn().mockResolvedValue(undefined),
+  supabaseUserToSession: vi.fn((user) => ({
+    user: {
+      id: user?.id ?? generateTestId("fallback-user"),
+      email: user?.email ?? "test@example.com",
+      name: user?.name ?? "Test User",
+    },
+    expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+  })),
 }));
 
-import type { VitestMockContext } from "~/test/vitestMockContext";
+describe("Model Router Integration Tests (Simplified Single-Table Architecture)", () => {
+  // Helper function to set up test data and context
+  async function setupTestData(db: TestDatabase) {
+    // Create seed data first
+    const organizationId = SEED_TEST_IDS.ORGANIZATIONS.primary;
 
-import { modelCoreRouter } from "~/server/api/routers/model.core";
-import { requirePermissionForSession } from "~/server/auth/permissions";
-import { createVitestMockContext } from "~/test/vitestMockContext";
+    // Create organization
+    const [org] = await db
+      .insert(schema.organizations)
+      .values({
+        id: organizationId,
+        name: "Test Organization",
+        subdomain: "test",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning();
 
-describe("modelCoreRouter", () => {
-  let mockCtx: VitestMockContext;
-  let caller: ReturnType<typeof modelCoreRouter.createCaller>;
+    // Create roles
+    const [adminRole] = await db
+      .insert(schema.roles)
+      .values({
+        id: generateTestId("admin-role"),
+        name: "Admin",
+        organizationId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning();
 
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockCtx = createVitestMockContext();
+    // Create test user
+    const [testUser] = await db
+      .insert(schema.users)
+      .values({
+        id: generateTestId("admin-user"),
+        name: "Test Admin User",
+        email: `admin-${generateTestId("user")}@example.com`,
+        emailVerified: null,
+      })
+      .returning();
 
-    // Mock membership lookup for organizationProcedure
-    vi.mocked(mockCtx.db.membership.findFirst).mockResolvedValue({
-      id: "test-membership",
-      organizationId: "org-1",
-      userId: "user-1",
-      roleId: "role-1",
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    } as any);
+    // Create membership for the test user
+    await db.insert(schema.memberships).values({
+      id: generateTestId("test-membership"),
+      userId: testUser.id,
+      organizationId,
+      roleId: adminRole.id,
+    });
 
-    // Mock permissions to allow organization management
-    vi.mocked(requirePermissionForSession).mockResolvedValue(undefined);
+    // Create location
+    const [location] = await db
+      .insert(schema.locations)
+      .values({
+        id: generateTestId("location"),
+        name: "Test Location",
+        organizationId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning();
 
-    caller = modelCoreRouter.createCaller(mockCtx);
-  });
+    // Create OPDB models (global - use schema defaults)
+    const [model1] = await db
+      .insert(schema.models)
+      .values({
+        id: generateTestId("model-1"),
+        name: "Medieval Madness",
+        manufacturer: "Williams",
+        year: 1997,
+        // organizationId defaults to null (global OPDB)
+        // isCustom defaults to false (OPDB model)
+      })
+      .returning();
 
-  describe("getAll", () => {
-    it("returns models with machine counts using inArray pattern", async () => {
-      // Mock successful response with machine counts
-      const mockModels = [
-        {
-          id: "model-1",
+    const [model2] = await db
+      .insert(schema.models)
+      .values({
+        id: generateTestId("model-2"),
+        name: "Attack from Mars",
+        manufacturer: "Bally",
+        year: 1995,
+        // organizationId defaults to null (global OPDB) 
+        // isCustom defaults to false (OPDB model)
+      })
+      .returning();
+
+    // Create machines to test machine counts
+    await db.insert(schema.machines).values([
+      {
+        id: generateTestId("machine-1"),
+        name: "Medieval Madness #1",
+        qrCodeId: generateTestId("qr-1"),
+        organizationId,
+        locationId: location.id,
+        modelId: model1.id,
+        ownerId: testUser.id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: generateTestId("machine-2"),
+        name: "Medieval Madness #2",
+        qrCodeId: generateTestId("qr-2"),
+        organizationId,
+        locationId: location.id,
+        modelId: model1.id,
+        ownerId: testUser.id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: generateTestId("machine-3"),
+        name: "Attack from Mars #1",
+        qrCodeId: generateTestId("qr-3"),
+        organizationId,
+        locationId: location.id,
+        modelId: model2.id,
+        ownerId: testUser.id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ]);
+
+    // Create test context with real database
+    const ctx: TRPCContext = {
+      db: db,
+      user: {
+        id: testUser.id,
+        email: "test@example.com",
+        name: "Test Admin User",
+        user_metadata: {},
+        app_metadata: {
+          organization_id: organizationId,
+        },
+      },
+      organization: {
+        id: organizationId,
+        name: "Test Organization",
+        subdomain: "test",
+      },
+      organizationId: organizationId,
+      supabase: {} as any, // Not used in this router
+      headers: new Headers(),
+      userPermissions: [
+        "model:view", 
+        "model:create",
+        "model:edit",
+        "model:delete",
+        "organization:manage",
+      ],
+      services: {} as any, // Not used in this router
+      logger: {
+        error: vi.fn(),
+        warn: vi.fn(),
+        info: vi.fn(),
+        debug: vi.fn(),
+        trace: vi.fn(),
+        child: vi.fn(() => ctx.logger),
+        withRequest: vi.fn(() => ctx.logger),
+        withUser: vi.fn(() => ctx.logger),
+        withOrganization: vi.fn(() => ctx.logger),
+        withContext: vi.fn(() => ctx.logger),
+      } as any,
+    };
+
+    return {
+      ctx,
+      organizationId,
+      testUser,
+      adminRole,
+      location,
+      models: { model1, model2 },
+    };
+  }
+
+  describe("Model Retrieval Operations", () => {
+    test("should return models with machine counts using real database operations", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx, models } = await setupTestData(db);
+        const caller = appRouter.createCaller(ctx);
+
+        const result = await caller.model.getAll();
+
+        // Verify the result structure with real machine counts
+        expect(result).toHaveLength(2);
+        
+        // Find Medieval Madness model (has 2 machines)
+        const medievalMadness = result.find(m => m.name === "Medieval Madness");
+        expect(medievalMadness).toMatchObject({
+          id: models.model1.id,
           name: "Medieval Madness",
           manufacturer: "Williams",
           year: 1997,
           isCustom: false,
-          machineCount: 3,
-        },
-        {
-          id: "model-2",
+          machineCount: 2, // Real count from database
+        });
+
+        // Find Attack from Mars model (has 1 machine)
+        const attackFromMars = result.find(m => m.name === "Attack from Mars");
+        expect(attackFromMars).toMatchObject({
+          id: models.model2.id,
           name: "Attack from Mars",
           manufacturer: "Bally",
           year: 1995,
           isCustom: false,
-          machineCount: 1,
-        },
-      ];
-
-      // Mock the selectDistinct query for machine model IDs
-      vi.mocked(mockCtx.drizzle.selectDistinct).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi
-            .fn()
-            .mockResolvedValue([
-              { modelId: "model-1" },
-              { modelId: "model-2" },
-            ]),
-        }),
-      } as any);
-
-      // Mock the main select query
-      vi.mocked(mockCtx.drizzle.select).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            orderBy: vi.fn().mockResolvedValue(mockModels),
-          }),
-        }),
-      } as any);
-
-      const result = await caller.getAll();
-
-      expect(result).toEqual(mockModels);
-      expect(mockCtx.drizzle.selectDistinct).toHaveBeenCalled();
-      expect(mockCtx.drizzle.select).toHaveBeenCalled();
+          machineCount: 1, // Real count from database
+        });
+      });
     });
 
-    it("returns empty array when no models exist in organization", async () => {
-      // Mock no machines in organization
-      vi.mocked(mockCtx.drizzle.selectDistinct).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([]),
-        }),
-      } as any);
+    test("should return empty array when no models exist in organization", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        // Create organization but no models or machines
+        const organizationId = SEED_TEST_IDS.ORGANIZATIONS.competitor;
+        
+        const [org] = await db
+          .insert(schema.organizations)
+          .values({
+            id: organizationId,
+            name: "Empty Organization",
+            subdomain: "empty",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
 
-      const result = await caller.getAll();
+        const [testUser] = await db
+          .insert(schema.users)
+          .values({
+            id: generateTestId("empty-user"),
+            name: "Empty User",
+            email: "empty@example.com",
+            emailVerified: null,
+          })
+          .returning();
 
-      expect(result).toEqual([]);
-      expect(mockCtx.drizzle.selectDistinct).toHaveBeenCalledOnce();
+        const ctx: TRPCContext = {
+          db: db,
+          user: {
+            id: testUser.id,
+            email: "empty@example.com",
+            name: "Empty User",
+            user_metadata: {},
+            app_metadata: {
+              organization_id: organizationId,
+            },
+          },
+          organization: {
+            id: organizationId,
+            name: "Empty Organization",
+            subdomain: "empty",
+          },
+          organizationId: organizationId,
+          supabase: {} as any,
+          headers: new Headers(),
+          userPermissions: ["model:view"],
+          services: {} as any,
+          logger: {
+            error: vi.fn(),
+            warn: vi.fn(),
+            info: vi.fn(),
+            debug: vi.fn(),
+            trace: vi.fn(),
+            child: vi.fn(() => ctx.logger),
+            withRequest: vi.fn(() => ctx.logger),
+            withUser: vi.fn(() => ctx.logger),
+            withOrganization: vi.fn(() => ctx.logger),
+            withContext: vi.fn(() => ctx.logger),
+          } as any,
+        };
+
+        const caller = appRouter.createCaller(ctx);
+        const result = await caller.model.getAll();
+
+        expect(result).toEqual([]);
+      });
     });
 
-    it("applies organizational scoping through inArray pattern", async () => {
-      // Mock no machines in organization
-      vi.mocked(mockCtx.drizzle.selectDistinct).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([]),
-        }),
-      } as any);
+    test("should enforce organizational scoping and isolation", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx } = await setupTestData(db);
+        
+        // Create a second organization with its own models
+        const [org2] = await db
+          .insert(schema.organizations)
+          .values({
+            id: SEED_TEST_IDS.ORGANIZATIONS.competitor,
+            name: "Competitor Organization",
+            subdomain: "competitor",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
 
-      await caller.getAll();
+        // Create a custom model in org2 that should not be visible to org1
+        await db.insert(schema.models).values({
+          id: generateTestId("competitor-model"),
+          name: "Competitor Model",
+          manufacturer: "Competitor Corp",
+          year: 2023,
+          organizationId: org2.id, // Custom model belongs to org2
+          isCustom: true, // Must explicitly set for custom models
+        });
 
-      // Verify organizational scoping query was used
-      expect(mockCtx.drizzle.selectDistinct).toHaveBeenCalled();
-    });
-  });
+        const caller = appRouter.createCaller(ctx);
+        const result = await caller.model.getAll();
 
-  describe("getById", () => {
-    it("returns model by ID with organizational scoping", async () => {
-      const mockModel = {
-        id: "model-1",
-        name: "Medieval Madness",
-        manufacturer: "Williams",
-        year: 1997,
-        isCustom: false,
-        machineCount: 2,
-      };
-
-      // Mock the selectDistinct query for machine model IDs
-      vi.mocked(mockCtx.drizzle.selectDistinct).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([{ modelId: "model-1" }]),
-        }),
-      } as any);
-
-      // Mock the main select query
-      vi.mocked(mockCtx.drizzle.select).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockReturnValue({
-              then: vi.fn().mockImplementation((fn) => fn([mockModel])),
-            }),
-          }),
-        }),
-      } as any);
-
-      const result = await caller.getById({ id: "model-1" });
-
-      expect(result).toEqual(mockModel);
-      expect(mockCtx.drizzle.selectDistinct).toHaveBeenCalled();
-      expect(mockCtx.drizzle.select).toHaveBeenCalled();
-    });
-
-    it("throws NOT_FOUND when model doesn't exist", async () => {
-      // Mock the selectDistinct query for machine model IDs
-      vi.mocked(mockCtx.drizzle.selectDistinct).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([]),
-        }),
-      } as any);
-
-      // Mock the main select query returning null
-      vi.mocked(mockCtx.drizzle.select).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockReturnValue({
-              then: vi.fn().mockImplementation((fn) => fn([])),
-            }),
-          }),
-        }),
-      } as any);
-
-      await expect(caller.getById({ id: "non-existent" })).rejects.toThrow(
-        new TRPCError({
-          code: "NOT_FOUND",
-          message: "Game title not found or access denied",
-        }),
-      );
-    });
-
-    it("throws NOT_FOUND when model exists but not in organization", async () => {
-      // Simulate model existing but not having machines in this organization
-      vi.mocked(mockCtx.drizzle.selectDistinct).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([]), // No machines in this org
-        }),
-      } as any);
-
-      vi.mocked(mockCtx.drizzle.select).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockReturnValue({
-              then: vi.fn().mockImplementation((fn) => fn([])),
-            }),
-          }),
-        }),
-      } as any);
-
-      await expect(caller.getById({ id: "other-org-model" })).rejects.toThrow(
-        new TRPCError({
-          code: "NOT_FOUND",
-          message: "Game title not found or access denied",
-        }),
-      );
-    });
-
-    it("includes machine count in response", async () => {
-      const mockModel = {
-        id: "model-1",
-        name: "Attack from Mars",
-        machineCount: 5,
-      };
-
-      vi.mocked(mockCtx.drizzle.selectDistinct).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([{ modelId: "model-1" }]),
-        }),
-      } as any);
-
-      vi.mocked(mockCtx.drizzle.select).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockReturnValue({
-              then: vi.fn().mockImplementation((fn) => fn([mockModel])),
-            }),
-          }),
-        }),
-      } as any);
-
-      const result = await caller.getById({ id: "model-1" });
-
-      expect(result.machineCount).toBe(5);
-      expect(mockCtx.drizzle.select).toHaveBeenCalled();
+        // Should only see models from primary organization
+        expect(result).toHaveLength(2); // Only our test models
+        expect(result.every(m => ["Medieval Madness", "Attack from Mars"].includes(m.name))).toBe(true);
+        expect(result.find(m => m.name === "Competitor Model")).toBeUndefined();
+      });
     });
   });
 
-  describe("delete", () => {
-    it("successfully deletes OPDB model with no machines", async () => {
-      const mockModel = {
-        id: "model-1",
-        name: "Medieval Madness",
-        isCustom: false,
-        machineCount: 0,
-      };
+  describe("Model Individual Retrieval", () => {
+    test("should return model by ID with real machine count", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx, models } = await setupTestData(db);
+        const caller = appRouter.createCaller(ctx);
 
-      const deletedModel = { ...mockModel, deletedAt: new Date() };
+        const result = await caller.model.getById({ id: models.model1.id });
 
-      vi.mocked(mockCtx.drizzle.selectDistinct).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([{ modelId: "model-1" }]),
-        }),
-      } as any);
+        // Verify the result structure with real data
+        expect(result).toMatchObject({
+          id: models.model1.id,
+          name: "Medieval Madness",
+          manufacturer: "Williams",
+          year: 1997,
+          isCustom: false,
+          machineCount: 2, // Real count from setupTestData
+        });
 
-      vi.mocked(mockCtx.drizzle.select).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockReturnValue({
-              then: vi.fn().mockImplementation((fn) => fn([mockModel])),
-            }),
-          }),
-        }),
-      } as any);
-
-      vi.mocked(mockCtx.drizzle.delete).mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue([deletedModel]),
-        }),
-      } as any);
-
-      const result = await caller.delete({ id: "model-1" });
-
-      expect(result).toEqual(deletedModel);
-      expect(mockCtx.drizzle.delete).toHaveBeenCalled();
+        expect(result).toHaveProperty("machineCount");
+        expect(typeof result.machineCount).toBe("number");
+      });
     });
 
-    it("throws NOT_FOUND when model doesn't exist", async () => {
-      vi.mocked(mockCtx.drizzle.selectDistinct).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([]),
-        }),
-      } as any);
+    test("should throw NOT_FOUND when model doesn't exist", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx } = await setupTestData(db);
+        const caller = appRouter.createCaller(ctx);
 
-      vi.mocked(mockCtx.drizzle.select).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockReturnValue({
-              then: vi.fn().mockImplementation((fn) => fn([])),
-            }),
-          }),
-        }),
-      } as any);
-
-      await expect(caller.delete({ id: "non-existent" })).rejects.toThrow(
-        new TRPCError({
-          code: "NOT_FOUND",
-          message: "Game title not found or access denied",
-        }),
-      );
+        await expect(
+          caller.model.getById({ id: generateTestId("nonexistent") })
+        ).rejects.toThrow(TRPCError);
+        
+        await expect(
+          caller.model.getById({ id: generateTestId("nonexistent") })
+        ).rejects.toThrow("Model not found or access denied");
+      });
     });
 
-    it("throws BAD_REQUEST when trying to delete custom model", async () => {
-      const mockModel = {
-        id: "model-1",
-        name: "Custom Game",
-        isCustom: true,
-        machineCount: 0,
-      };
+    test("should throw NOT_FOUND when model exists but not in organization", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx } = await setupTestData(db);
+        
+        // Create a model in a different organization
+        const [org2] = await db
+          .insert(schema.organizations)
+          .values({
+            id: SEED_TEST_IDS.ORGANIZATIONS.competitor,
+            name: "Competitor Organization",
+            subdomain: "competitor",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
 
-      vi.mocked(mockCtx.drizzle.selectDistinct).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([{ modelId: "model-1" }]),
-        }),
-      } as any);
+        const [otherOrgModel] = await db
+          .insert(schema.models)
+          .values({
+            id: generateTestId("other-org-model"),
+            name: "Other Org Model",
+            manufacturer: "Other Corp",
+            year: 2023,
+            organizationId: org2.id, // Custom model belongs to org2
+            isCustom: true, // Must explicitly set for custom models
+          })
+          .returning();
 
-      vi.mocked(mockCtx.drizzle.select).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockReturnValue({
-              then: vi.fn().mockImplementation((fn) => fn([mockModel])),
-            }),
-          }),
-        }),
-      } as any);
+        const caller = appRouter.createCaller(ctx);
 
-      await expect(caller.delete({ id: "model-1" })).rejects.toThrow(
-        new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Cannot delete custom games. Remove game instances instead.",
-        }),
-      );
+        // Should not be able to access model from different organization
+        await expect(
+          caller.model.getById({ id: otherOrgModel.id })
+        ).rejects.toThrow(TRPCError);
+        
+        await expect(
+          caller.model.getById({ id: otherOrgModel.id })
+        ).rejects.toThrow("Model not found or access denied");
+      });
     });
 
-    it("throws BAD_REQUEST when model has existing machines", async () => {
-      const mockModel = {
-        id: "model-1",
-        name: "Medieval Madness",
-        isCustom: false,
-        machineCount: 3, // Has machines
-      };
+    test("should include accurate machine count in response", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx, models, organizationId, testUser, location } = await setupTestData(db);
+        
+        // Create additional machines for model2 to test different counts
+        await db.insert(schema.machines).values([
+          {
+            id: generateTestId("machine-4"),
+            name: "Attack from Mars #2",
+            qrCodeId: generateTestId("qr-4"),
+            organizationId,
+            locationId: location.id,
+            modelId: models.model2.id,
+            ownerId: testUser.id,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+          {
+            id: generateTestId("machine-5"),
+            name: "Attack from Mars #3",
+            qrCodeId: generateTestId("qr-5"),
+            organizationId,
+            locationId: location.id,
+            modelId: models.model2.id,
+            ownerId: testUser.id,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        ]);
 
-      vi.mocked(mockCtx.drizzle.selectDistinct).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([{ modelId: "model-1" }]),
-        }),
-      } as any);
+        const caller = appRouter.createCaller(ctx);
+        const result = await caller.model.getById({ id: models.model2.id });
 
-      vi.mocked(mockCtx.drizzle.select).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockReturnValue({
-              then: vi.fn().mockImplementation((fn) => fn([mockModel])),
-            }),
-          }),
-        }),
-      } as any);
-
-      await expect(caller.delete({ id: "model-1" })).rejects.toThrow(
-        new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Cannot delete game title that has game instances",
-        }),
-      );
-    });
-
-    it("validates organizational access before deletion", async () => {
-      vi.mocked(mockCtx.drizzle.selectDistinct).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([]), // No machines in org
-        }),
-      } as any);
-
-      vi.mocked(mockCtx.drizzle.select).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockReturnValue({
-              then: vi.fn().mockImplementation((fn) => fn([])),
-            }),
-          }),
-        }),
-      } as any);
-
-      await expect(caller.delete({ id: "other-org-model" })).rejects.toThrow(
-        new TRPCError({
-          code: "NOT_FOUND",
-          message: "Game title not found or access denied",
-        }),
-      );
-
-      // Verify organizational scoping was applied
-      expect(mockCtx.drizzle.selectDistinct).toHaveBeenCalled();
-    });
-
-    it("includes machine count check in deletion validation", async () => {
-      const mockModel = {
-        id: "model-1",
-        name: "Test Game",
-        isCustom: false,
-        machineCount: 1,
-      };
-
-      vi.mocked(mockCtx.drizzle.selectDistinct).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([{ modelId: "model-1" }]),
-        }),
-      } as any);
-
-      vi.mocked(mockCtx.drizzle.select).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockReturnValue({
-              then: vi.fn().mockImplementation((fn) => fn([mockModel])),
-            }),
-          }),
-        }),
-      } as any);
-
-      await expect(caller.delete({ id: "model-1" })).rejects.toThrow(
-        new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Cannot delete game title that has game instances",
-        }),
-      );
-
-      // Verify machine count is included in the response
-      expect(mockCtx.drizzle.select).toHaveBeenCalled();
+        expect(result).toHaveProperty("machineCount");
+        expect(result.machineCount).toBe(3); // 1 from setup + 2 additional = 3
+        expect(typeof result.machineCount).toBe("number");
+      });
     });
   });
 
-  describe("organizational scoping", () => {
-    it("applies inArray pattern for organizational boundaries", async () => {
-      vi.mocked(mockCtx.drizzle.selectDistinct).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([]),
-        }),
-      } as any);
+  // Note: Model deletion operations removed - OPDB models are read-only in beta
+  // Custom model deletion will be implemented in v1.x
 
-      await caller.getAll();
+  describe("Cross-Organizational Security Testing", () => {
+    test("should enforce organizational boundaries across all operations", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx, models } = await setupTestData(db);
+        
+        // Create a second organization with its own data
+        const [org2] = await db
+          .insert(schema.organizations)
+          .values({
+            id: SEED_TEST_IDS.ORGANIZATIONS.competitor,
+            name: "Competitor Organization",
+            subdomain: "competitor",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
 
-      // Verify the organizational scoping query was executed
-      expect(mockCtx.drizzle.selectDistinct).toHaveBeenCalled();
+        // Create custom models in org2 that should not be visible to org1
+        await db.insert(schema.models).values([
+          {
+            id: generateTestId("competitor-model-1"),
+            name: "Competitor Model 1",
+            manufacturer: "Competitor Corp",
+            year: 2023,
+            organizationId: org2.id, // Custom model belongs to org2
+            isCustom: true, // Must explicitly set for custom models
+          },
+          {
+            id: generateTestId("competitor-model-2"),
+            name: "Competitor Model 2",
+            manufacturer: "Another Corp",
+            year: 2024,
+            organizationId: org2.id, // Custom model belongs to org2
+            isCustom: true, // Must explicitly set for custom models
+          },
+        ]);
+
+        const caller = appRouter.createCaller(ctx);
+        
+        // Test getAll - should only see primary org models
+        const allModels = await caller.model.getAll();
+        expect(allModels).toHaveLength(2); // Only our test models
+        expect(allModels.every(m => ["Medieval Madness", "Attack from Mars"].includes(m.name))).toBe(true);
+        expect(allModels.find(m => m.name.includes("Competitor"))).toBeUndefined();
+
+        // Test getById - should not access competitor org models
+        await expect(
+          caller.model.getById({ id: generateTestId("competitor-model-1") })
+        ).rejects.toThrow("Model not found or access denied");
+
+        // Note: Delete operations removed - OPDB models are read-only in beta
+      });
     });
 
-    it("scopes all operations by organization context", async () => {
-      // Test that organization ID from context is used consistently
-      expect(mockCtx.organization?.id).toBe("org-1");
+    test("should maintain data integrity across organizations", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx, organizationId } = await setupTestData(db);
+        
+        // Create context for competitor organization
+        const [competitorUser] = await db
+          .insert(schema.users)
+          .values({
+            id: generateTestId("competitor-user"),
+            name: "Competitor User",
+            email: "competitor@example.com",
+            emailVerified: null,
+          })
+          .returning();
 
-      vi.mocked(mockCtx.drizzle.selectDistinct).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([]),
-        }),
-      } as any);
+        const competitorCtx: TRPCContext = {
+          db: db,
+          user: {
+            id: competitorUser.id,
+            email: "competitor@example.com",
+            name: "Competitor User",
+            user_metadata: {},
+            app_metadata: {
+              organization_id: SEED_TEST_IDS.ORGANIZATIONS.competitor,
+            },
+          },
+          organization: {
+            id: SEED_TEST_IDS.ORGANIZATIONS.competitor,
+            name: "Competitor Organization",
+            subdomain: "competitor",
+          },
+          organizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor,
+          supabase: {} as any,
+          headers: new Headers(),
+          userPermissions: ["model:view", "model:create", "model:edit", "model:delete", "organization:manage"],
+          services: {} as any,
+          logger: {
+            error: vi.fn(),
+            warn: vi.fn(),
+            info: vi.fn(),
+            debug: vi.fn(),
+            trace: vi.fn(),
+            child: vi.fn(() => competitorCtx.logger),
+            withRequest: vi.fn(() => competitorCtx.logger),
+            withUser: vi.fn(() => competitorCtx.logger),
+            withOrganization: vi.fn(() => competitorCtx.logger),
+            withContext: vi.fn(() => competitorCtx.logger),
+          } as any,
+        };
 
-      vi.mocked(mockCtx.drizzle.select).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockReturnValue({
-              then: vi.fn().mockImplementation((fn) => fn([])),
-            }),
-          }),
-        }),
-      } as any);
+        const primaryCaller = appRouter.createCaller(ctx);
+        const competitorCaller = appRouter.createCaller(competitorCtx);
 
-      await expect(caller.getById({ id: "test" })).rejects.toThrow();
+        // Primary org should see global OPDB models (2) + no custom models 
+        const primaryModels = await primaryCaller.model.getAll();
+        expect(primaryModels).toHaveLength(2); // Global OPDB models
 
-      // All operations should use the same organizational scoping pattern
-      expect(mockCtx.drizzle.selectDistinct).toHaveBeenCalled();
+        // Competitor org should see the same global OPDB models (2) since no custom models exist
+        const competitorModels = await competitorCaller.model.getAll();
+        expect(competitorModels).toHaveLength(2); // Same global OPDB models
+
+        // Verify complete organizational isolation
+        expect(primaryModels.every(m => m.name !== "Competitor Model")).toBe(true);
+      });
     });
   });
 
-  describe("SQL extras and machine counting", () => {
-    it("uses SQL template for machine counting in getAll", async () => {
-      vi.mocked(mockCtx.drizzle.selectDistinct).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([]),
-        }),
-      } as any);
+  describe("Real Database Operations & Performance", () => {
+    test("should perform accurate machine counting with complex relationships", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx, models, organizationId, testUser, location } = await setupTestData(db);
+        
+        // Create additional OPDB model for complex test data
+        const [newModel] = await db
+          .insert(schema.models)
+          .values({
+            id: generateTestId("complex-model"),
+            name: "Complex Model",
+            manufacturer: "Complex Corp",
+            year: 2023,
+            // organizationId defaults to null (global OPDB)
+            // isCustom defaults to false (OPDB model)
+          })
+          .returning();
 
-      await caller.getAll();
+        // Create many machines for this model to test counting accuracy
+        const machineInserts = Array.from({ length: 7 }, (_, i) => ({
+          id: generateTestId(`complex-machine-${i + 1}`),
+          name: `Complex Machine #${i + 1}`,
+          qrCodeId: generateTestId(`complex-qr-${i + 1}`),
+          organizationId,
+          locationId: location.id,
+          modelId: newModel.id,
+          ownerId: testUser.id,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }));
 
-      // Verify the select operation was called (which includes machine count SQL)
-      expect(mockCtx.drizzle.selectDistinct).toHaveBeenCalled();
+        await db.insert(schema.machines).values(machineInserts);
+
+        const caller = appRouter.createCaller(ctx);
+        
+        // Test getAll with accurate machine counts
+        const allModels = await caller.model.getAll();
+        expect(allModels).toHaveLength(3); // Original 2 + 1 new
+        
+        const complexModel = allModels.find(m => m.name === "Complex Model");
+        expect(complexModel).toBeDefined();
+        expect(complexModel!.machineCount).toBe(7);
+
+        // Test getById with accurate machine count
+        const singleModel = await caller.model.getById({ id: newModel.id });
+        expect(singleModel.machineCount).toBe(7);
+        expect(singleModel.name).toBe("Complex Model");
+      });
     });
 
-    it("uses consistent machine counting across operations", async () => {
-      vi.mocked(mockCtx.drizzle.selectDistinct).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([]),
-        }),
-      } as any);
+    test("should handle database errors gracefully with real operations", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx } = await setupTestData(db);
+        const caller = appRouter.createCaller(ctx);
 
-      vi.mocked(mockCtx.drizzle.select).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockReturnValue({
-              then: vi.fn().mockImplementation((fn) => fn([])),
-            }),
-          }),
-        }),
-      } as any);
+        // Test with malformed ID (should handle gracefully)
+        await expect(
+          caller.model.getById({ id: "definitely-not-a-valid-id" })
+        ).rejects.toThrow("Model not found or access denied");
 
-      await expect(caller.getById({ id: "test" })).rejects.toThrow();
-      await expect(caller.delete({ id: "test" })).rejects.toThrow();
-
-      // Both operations should use the same select pattern with machine counting
-      expect(mockCtx.drizzle.selectDistinct).toHaveBeenCalledTimes(2);
-      expect(mockCtx.drizzle.select).toHaveBeenCalledTimes(2);
-    });
-  });
-
-  describe("error handling", () => {
-    it("propagates database errors appropriately", async () => {
-      const dbError = new Error("Database connection failed");
-      vi.mocked(mockCtx.drizzle.selectDistinct).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockRejectedValue(dbError),
-        }),
-      } as any);
-
-      await expect(caller.getAll()).rejects.toThrow(
-        "Database connection failed",
-      );
+        // Test with empty string ID
+        await expect(
+          caller.model.getById({ id: "" })
+        ).rejects.toThrow("Model not found or access denied");
+      });
     });
 
-    it("uses consistent error messages for access control", async () => {
-      vi.mocked(mockCtx.drizzle.selectDistinct).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([]),
-        }),
-      } as any);
-
-      vi.mocked(mockCtx.drizzle.select).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockReturnValue({
-              then: vi.fn().mockImplementation((fn) => fn([])),
-            }),
-          }),
-        }),
-      } as any);
-
-      // Both getById and delete should use the same message for access denial
-      await expect(caller.getById({ id: "test" })).rejects.toThrow(
-        "Game title not found or access denied",
-      );
-
-      await expect(caller.delete({ id: "test" })).rejects.toThrow(
-        "Game title not found or access denied",
-      );
-    });
-
-    it("provides specific error messages for deletion validation", async () => {
-      const customModel = {
-        id: "model-1",
-        isCustom: true,
-        machineCount: 0,
-      };
-
-      const modelWithMachines = {
-        id: "model-2",
-        isCustom: false,
-        machineCount: 2,
-      };
-
-      // Test custom model error
-      vi.mocked(mockCtx.drizzle.selectDistinct).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([{ modelId: "model-1" }]),
-        }),
-      } as any);
-
-      vi.mocked(mockCtx.drizzle.select).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockReturnValue({
-              then: vi.fn().mockImplementation((fn) => fn([customModel])),
-            }),
-          }),
-        }),
-      } as any);
-
-      await expect(caller.delete({ id: "model-1" })).rejects.toThrow(
-        "Cannot delete custom games. Remove game instances instead.",
-      );
-
-      // Test model with machines error
-      vi.mocked(mockCtx.drizzle.selectDistinct).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([{ modelId: "model-2" }]),
-        }),
-      } as any);
-
-      vi.mocked(mockCtx.drizzle.select).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockReturnValue({
-              then: vi.fn().mockImplementation((fn) => fn([modelWithMachines])),
-            }),
-          }),
-        }),
-      } as any);
-
-      await expect(caller.delete({ id: "model-2" })).rejects.toThrow(
-        "Cannot delete game title that has game instances",
-      );
-    });
+    // Note: Deletion business rules tests removed - OPDB models are read-only in beta
+    // Custom model deletion will be implemented in v1.x
   });
 });

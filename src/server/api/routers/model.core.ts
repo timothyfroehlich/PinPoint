@@ -1,20 +1,20 @@
 import { TRPCError } from "@trpc/server";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { z } from "zod";
 
 import { createTRPCRouter, orgScopedProcedure } from "~/server/api/trpc";
 import { organizationManageProcedure } from "~/server/api/trpc.permission";
-import { models } from "~/server/db/schema";
+import { models, machines } from "~/server/db/schema";
 
 export const modelCoreRouter = createTRPCRouter({
   // Enhanced getAll with OPDB metadata
   getAll: orgScopedProcedure.query(async ({ ctx }) => {
     // Get all game titles that have instances in this organization
-    // RLS automatically handles organizational scoping for machines
     const modelsWithMachines = await ctx.db.query.models.findMany({
       with: {
         machines: {
           columns: { id: true },
+          where: eq(machines.organizationId, ctx.organizationId),
         },
       },
     });
@@ -28,6 +28,7 @@ export const modelCoreRouter = createTRPCRouter({
     return filteredModels
       .map((model) => ({
         ...model,
+        machineCount: model.machines.length, // For test compatibility
         _count: {
           machines: model.machines.length,
         },
@@ -45,17 +46,22 @@ export const modelCoreRouter = createTRPCRouter({
         with: {
           machines: {
             columns: { id: true },
+            where: eq(machines.organizationId, ctx.organizationId),
           },
         },
       });
 
       if (!model || model.machines.length === 0) {
-        throw new Error("Game title not found");
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Game title not found or access denied",
+        });
       }
 
       // Return model with machine count
       return {
         ...model,
+        machineCount: model.machines.length, // For test compatibility
         _count: {
           machines: model.machines.length,
         },
@@ -67,18 +73,31 @@ export const modelCoreRouter = createTRPCRouter({
   delete: organizationManageProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      // Verify the game title is accessible to this organization
+      // Get the model and check all its machines
       const model = await ctx.db.query.models.findFirst({
         where: eq(models.id, input.id),
         with: {
           machines: {
-            columns: { id: true },
+            columns: { id: true, organizationId: true },
           },
         },
       });
 
-      if (!model || model.machines.length === 0) {
-        throw new Error("Game title not found");
+      if (!model) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Game title not found or access denied",
+        });
+      }
+
+      // Check if this organization has any machines of this model
+      const orgMachines = model.machines.filter(m => m.organizationId === ctx.organizationId);
+      
+      if (orgMachines.length === 0) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Game title not found or access denied",
+        });
       }
 
       if (model.isCustom) {
@@ -88,8 +107,11 @@ export const modelCoreRouter = createTRPCRouter({
         });
       }
 
-      if (model.machines.length > 0) {
-        throw new Error("Cannot delete game title that has game instances");
+      if (orgMachines.length > 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Cannot delete game title that has game instances",
+        });
       }
 
       // Delete the model

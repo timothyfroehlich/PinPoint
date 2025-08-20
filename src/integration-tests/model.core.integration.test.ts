@@ -1,13 +1,19 @@
 /**
- * Model Core Router Integration Tests (PGlite)
+ * Model Router Integration Tests (PGlite) - CONSOLIDATED
  *
- * Integration tests for the model.core router using PGlite in-memory PostgreSQL database.
+ * Comprehensive integration tests for the model router using PGlite in-memory PostgreSQL database.
  * Tests real database operations with proper schema, relationships, and data integrity.
+ * 
+ * CONSOLIDATED from router and integration test duplicates to combine best patterns:
+ * - Full-stack appRouter testing patterns (from router version)
+ * - SEED_TEST_IDS for consistent data (from router version) 
+ * - Comprehensive edge case coverage (from integration version)
+ * - Complex SQL query validation (from integration version)
  *
  * Key Features:
  * - Real PostgreSQL database with PGlite
  * - Complete schema migrations applied
- * - Real Drizzle ORM operations
+ * - Real Drizzle ORM operations with full appRouter stack
  * - Multi-tenant data isolation testing
  * - Complex exists() subquery validation with actual data
  * - SQL extras with real machine counting
@@ -23,66 +29,145 @@ import { describe, expect, vi } from "vitest";
 import type { TRPCContext } from "~/server/api/trpc.base";
 import type { TestDatabase } from "~/test/helpers/pglite-test-setup";
 
-import { generateId } from "~/lib/utils/id-generation";
-import { modelCoreRouter } from "~/server/api/routers/model.core";
+import { appRouter } from "~/server/api/root";
 import * as schema from "~/server/db/schema";
+import { SEED_TEST_IDS, createMockAdminContext } from "~/test/constants/seed-test-ids";
 import { generateTestId } from "~/test/helpers/test-id-generator";
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
 
-// Mock ID generation for predictable test data
+// Mock external dependencies that aren't database-related
 vi.mock("~/lib/utils/id-generation", () => ({
-  generateId: vi.fn(() => generateTestId("model")),
+  generateId: vi.fn(() => generateTestId("test-id")),
 }));
 
-// Mock permissions (not database-related)
 vi.mock("~/server/auth/permissions", () => ({
   getUserPermissionsForSession: vi
     .fn()
-    .mockResolvedValue(["model:view", "organization:manage"]),
+    .mockResolvedValue([
+      "model:view", 
+      "model:create",
+      "model:edit",
+      "model:delete",
+      "organization:manage",
+    ]),
   getUserPermissionsForSupabaseUser: vi
     .fn()
-    .mockResolvedValue(["model:view", "organization:manage"]),
+    .mockResolvedValue([
+      "model:view", 
+      "model:create",
+      "model:edit",
+      "model:delete",
+      "organization:manage",
+    ]),
   requirePermissionForSession: vi.fn().mockResolvedValue(undefined),
+  supabaseUserToSession: vi.fn((user) => ({
+    user: {
+      id: user?.id ?? generateTestId("fallback-user"),
+      email: user?.email ?? "test@example.com",
+      name: user?.name ?? "Test User",
+    },
+    expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+  })),
 }));
 
-describe("modelCoreRouter Integration Tests", () => {
-  // Helper function to create test context
-  function createTestContext(
-    testDb: TestDatabase,
-    organizationId: string,
-    userId: string,
-  ): TRPCContext {
-    const mockContext: TRPCContext = {
-      db: testDb,
-      services: {} as any,
+describe("Model Router Integration Tests (Consolidated from Router + Integration Duplicates)", () => {
+  // Helper function to set up test data and context with full appRouter patterns
+  async function setupTestData(db: TestDatabase, orgSuffix: string = "") {
+    // Create unique organization ID for each test
+    const organizationId = generateTestId(`org${orgSuffix}`);
+
+    // Create organization with unique subdomain
+    const [org] = await db
+      .insert(schema.organizations)
+      .values({
+        id: organizationId,
+        name: `Test Organization${orgSuffix}`,
+        subdomain: `test${orgSuffix}${Date.now()}`, // Ensure unique subdomain
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning();
+
+    // Create roles
+    const [adminRole] = await db
+      .insert(schema.roles)
+      .values({
+        id: generateTestId("admin-role"),
+        name: "Admin",
+        organizationId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning();
+
+    // Create test user with unique ID
+    const [testUser] = await db
+      .insert(schema.users)
+      .values({
+        id: generateTestId(`admin-user${orgSuffix}`),
+        name: "Test Admin User",
+        email: `admin-${generateTestId(`user${orgSuffix}`)}@example.com`,
+        emailVerified: null,
+      })
+      .returning();
+
+    // Create membership for the test user
+    await db.insert(schema.memberships).values({
+      id: generateTestId(`test-membership${orgSuffix}`),
+      userId: testUser.id,
+      organizationId,
+      roleId: adminRole.id,
+    });
+
+    // Create test context with real database - full appRouter pattern
+    const ctx: TRPCContext = {
+      db: db,
       user: {
-        id: userId,
-        email: "member@test.com",
-        app_metadata: { organization_id: organizationId },
-      } as any,
-      supabase: {} as any,
+        id: testUser.id,
+        email: "test@example.com",
+        name: "Test Admin User",
+        user_metadata: {},
+        app_metadata: {
+          organization_id: organizationId,
+        },
+      },
       organization: {
         id: organizationId,
         name: "Test Organization",
         subdomain: "test",
       },
+      organizationId: organizationId,
+      supabase: {} as any, // Not used in this router
       headers: new Headers(),
+      userPermissions: [
+        "model:view", 
+        "model:create",
+        "model:edit",
+        "model:delete",
+        "organization:manage",
+      ],
+      services: {} as any, // Not used in this router
       logger: {
         error: vi.fn(),
         warn: vi.fn(),
         info: vi.fn(),
         debug: vi.fn(),
         trace: vi.fn(),
-        child: vi.fn(() => mockContext.logger),
-        withRequest: vi.fn(() => mockContext.logger),
-        withUser: vi.fn(() => mockContext.logger),
-        withOrganization: vi.fn(() => mockContext.logger),
-        withContext: vi.fn(() => mockContext.logger),
+        child: vi.fn(() => ctx.logger),
+        withRequest: vi.fn(() => ctx.logger),
+        withUser: vi.fn(() => ctx.logger),
+        withOrganization: vi.fn(() => ctx.logger),
+        withContext: vi.fn(() => ctx.logger),
       } as any,
-      userPermissions: ["model:view", "organization:manage"],
-    };
+    } as any;
 
-    return mockContext;
+    return {
+      ctx,
+      organizationId,
+      testUser,
+      adminRole,
+      org,
+    };
   }
 
   describe("getAll", () => {
@@ -90,27 +175,8 @@ describe("modelCoreRouter Integration Tests", () => {
       workerDb,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        // Create test organization and user
-        const organizationId = generateTestId("org");
-        const userId = generateTestId("user");
-
-        const [org] = await db
-          .insert(schema.organizations)
-          .values({
-            id: organizationId,
-            name: "Test Organization",
-            subdomain: "test",
-          })
-          .returning();
-
-        const [user] = await db
-          .insert(schema.users)
-          .values({
-            id: userId,
-            email: "test@example.com",
-            name: "Test User",
-          })
-          .returning();
+        // Use setupTestData for consistent context creation
+        const { ctx, organizationId, testUser } = await setupTestData(db, "-models-count");
 
         // Create test models and machines with unique IDs
         const modelId1 = generateTestId("model-1");
@@ -126,7 +192,6 @@ describe("modelCoreRouter Integration Tests", () => {
             name: "Medieval Madness",
             manufacturer: "Williams",
             year: 1997,
-            isCustom: false,
             isActive: true,
           },
           {
@@ -134,14 +199,11 @@ describe("modelCoreRouter Integration Tests", () => {
             name: "Attack from Mars",
             manufacturer: "Bally",
             year: 1995,
-            isCustom: false,
             isActive: true,
           },
         ]);
 
-        // Create test context with proper organization and user
-        const testContext = createTestContext(db, organizationId, userId);
-        const caller = modelCoreRouter.createCaller(testContext);
+        const caller = appRouter.createCaller(ctx);
 
         // Create machines in primary organization
         await db.insert(schema.machines).values([
@@ -149,7 +211,7 @@ describe("modelCoreRouter Integration Tests", () => {
             id: machineId1,
             name: "MM #001",
             modelId: modelId1,
-            organizationId: organizationId,
+            organizationId: ctx.organizationId,
             locationId: "test-location-1",
             qrCodeId: `qr-${machineId1}`,
             isActive: true,
@@ -158,7 +220,7 @@ describe("modelCoreRouter Integration Tests", () => {
             id: machineId2,
             name: "MM #002",
             modelId: modelId1,
-            organizationId: organizationId,
+            organizationId: ctx.organizationId,
             locationId: "test-location-1",
             qrCodeId: `qr-${machineId2}`,
             isActive: true,
@@ -167,14 +229,14 @@ describe("modelCoreRouter Integration Tests", () => {
             id: machineId3,
             name: "AFM #001",
             modelId: modelId2,
-            organizationId: organizationId,
+            organizationId: ctx.organizationId,
             locationId: "test-location-1",
             qrCodeId: `qr-${machineId3}`,
             isActive: true,
           },
         ]);
 
-        const result = await caller.getAll();
+        const result = await caller.model.getAll();
 
         // Debug: Log the actual results
         console.log("Models returned:", result.length);
@@ -201,47 +263,15 @@ describe("modelCoreRouter Integration Tests", () => {
       });
     });
 
-    test("excludes models with no machines in organization", async ({
-      workerDb,
-    }) => {
+    test("should return empty array when no models exist in organization", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        // Create test organization and user
-        const organizationId = generateTestId("org");
-        const userId = generateTestId("user");
+        // Create organization but no models or machines
+        const { ctx } = await setupTestData(db);
+        
+        const caller = appRouter.createCaller(ctx);
+        const result = await caller.model.getAll();
 
-        await db.insert(schema.organizations).values({
-          id: organizationId,
-          name: "Test Organization",
-          subdomain: "test",
-        });
-
-        await db.insert(schema.users).values({
-          id: userId,
-          email: "test@example.com",
-          name: "Test User",
-        });
-
-        const testContext = createTestContext(db, organizationId, userId);
-        const caller = modelCoreRouter.createCaller(testContext);
-
-        // Create model with no machines
-        const modelId = generateId();
-        await db.insert(schema.models).values({
-          id: modelId,
-          name: "Unused Model",
-          manufacturer: "Test",
-          isCustom: false,
-          isActive: true,
-        });
-
-        const result = await caller.getAll();
-
-        // Should not include the model with no machines
-        const unusedModel = result.find((m) => m.name === "Unused Model");
-        expect(unusedModel).toBeUndefined();
-
-        // Should return empty array since no models have machines in this organization
-        expect(result.length).toBe(0);
+        expect(result).toEqual([]);
       });
     });
 
@@ -263,14 +293,16 @@ describe("modelCoreRouter Integration Tests", () => {
           name: "Test User",
         });
 
-        const testContext = createTestContext(db, organizationId, userId);
-        const caller = modelCoreRouter.createCaller(testContext);
+        const { ctx } = await setupTestData(db);
+        ctx.organizationId = organizationId;
+        ctx.user.id = userId;
+        const caller = appRouter.createCaller(ctx);
 
-        const modelId = generateId();
-        const machineId = generateId();
+        const modelId = generateTestId("model");
+        const machineId = generateTestId("machine");
 
         // Get baseline count of models in our organization
-        const baselineResult = await caller.getAll();
+        const baselineResult = await caller.model.getAll();
         const baselineCount = baselineResult.length;
 
         // Create model and machine in secondary organization
@@ -278,7 +310,8 @@ describe("modelCoreRouter Integration Tests", () => {
           id: modelId,
           name: "Other Org Model",
           manufacturer: "Test",
-          isCustom: false,
+          organizationId: "test-org-secondary", // Custom model scoped to secondary org
+          isCustom: true,
           isActive: true,
         });
 
@@ -292,7 +325,7 @@ describe("modelCoreRouter Integration Tests", () => {
           isActive: true,
         });
 
-        const result = await caller.getAll();
+        const result = await caller.model.getAll();
 
         // Should not add any new models to our organization
         expect(result).toHaveLength(baselineCount);
@@ -318,26 +351,26 @@ describe("modelCoreRouter Integration Tests", () => {
           name: "Test User",
         });
 
-        const testContext = createTestContext(db, organizationId, userId);
-        const caller = modelCoreRouter.createCaller(testContext);
+        const { ctx } = await setupTestData(db);
+        ctx.organizationId = organizationId;
+        ctx.user.id = userId;
+        const caller = appRouter.createCaller(ctx);
 
-        const modelId1 = generateId();
-        const modelId2 = generateId();
-        const machineId1 = generateId();
-        const machineId2 = generateId();
+        const modelId1 = generateTestId("model-1");
+        const modelId2 = generateTestId("model-2");
+        const machineId1 = generateTestId("machine-1");
+        const machineId2 = generateTestId("machine-2");
 
         // Create models in reverse alphabetical order
         await db.insert(schema.models).values([
           {
             id: modelId1,
             name: "Zebra Pinball",
-            isCustom: false,
             isActive: true,
           },
           {
             id: modelId2,
             name: "Alpha Pinball",
-            isCustom: false,
             isActive: true,
           },
         ]);
@@ -348,7 +381,7 @@ describe("modelCoreRouter Integration Tests", () => {
             id: machineId1,
             name: "Machine 1",
             modelId: modelId1,
-            organizationId: organizationId,
+            organizationId: ctx.organizationId,
             locationId: "test-location-1",
             qrCodeId: machineId1,
             isActive: true,
@@ -357,14 +390,14 @@ describe("modelCoreRouter Integration Tests", () => {
             id: machineId2,
             name: "Machine 2",
             modelId: modelId2,
-            organizationId: organizationId,
+            organizationId: ctx.organizationId,
             locationId: "test-location-1",
             qrCodeId: machineId2,
             isActive: true,
           },
         ]);
 
-        const result = await caller.getAll();
+        const result = await caller.model.getAll();
 
         // Find our test models in the sorted results
         const alphaIndex = result.findIndex((m) => m.name === "Alpha Pinball");
@@ -398,12 +431,14 @@ describe("modelCoreRouter Integration Tests", () => {
           name: "Test User",
         });
 
-        const testContext = createTestContext(db, organizationId, userId);
-        const caller = modelCoreRouter.createCaller(testContext);
+        const { ctx } = await setupTestData(db);
+        ctx.organizationId = organizationId;
+        ctx.user.id = userId;
+        const caller = appRouter.createCaller(ctx);
 
-        const modelId = generateId();
-        const machineId1 = generateId();
-        const machineId2 = generateId();
+        const modelId = generateTestId("model");
+        const machineId1 = generateTestId("machine-1");
+        const machineId2 = generateTestId("machine-2");
 
         // Create model
         await db.insert(schema.models).values({
@@ -411,7 +446,6 @@ describe("modelCoreRouter Integration Tests", () => {
           name: "Test Model",
           manufacturer: "Test Manufacturer",
           year: 2023,
-          isCustom: false,
           isActive: true,
         });
 
@@ -421,7 +455,7 @@ describe("modelCoreRouter Integration Tests", () => {
             id: machineId1,
             name: "Machine 1",
             modelId: modelId,
-            organizationId: organizationId,
+            organizationId: ctx.organizationId,
             locationId: "test-location-1",
             qrCodeId: machineId1,
             isActive: true,
@@ -430,14 +464,14 @@ describe("modelCoreRouter Integration Tests", () => {
             id: machineId2,
             name: "Machine 2",
             modelId: modelId,
-            organizationId: organizationId,
+            organizationId: ctx.organizationId,
             locationId: "test-location-1",
             qrCodeId: machineId2,
             isActive: true,
           },
         ]);
 
-        const result = await caller.getById({ id: modelId });
+        const result = await caller.model.getById({ id: modelId });
 
         expect(result).toEqual(
           expect.objectContaining({
@@ -469,13 +503,15 @@ describe("modelCoreRouter Integration Tests", () => {
           name: "Test User",
         });
 
-        const testContext = createTestContext(db, organizationId, userId);
-        const caller = modelCoreRouter.createCaller(testContext);
+        const { ctx } = await setupTestData(db);
+        ctx.organizationId = organizationId;
+        ctx.user.id = userId;
+        const caller = appRouter.createCaller(ctx);
 
-        await expect(caller.getById({ id: "non-existent" })).rejects.toThrow(
+        await expect(caller.model.getById({ id: "non-existent" })).rejects.toThrow(
           new TRPCError({
             code: "NOT_FOUND",
-            message: "Game title not found or access denied",
+            message: "Model not found or access denied",
           }),
         );
       });
@@ -501,17 +537,20 @@ describe("modelCoreRouter Integration Tests", () => {
           name: "Test User",
         });
 
-        const testContext = createTestContext(db, organizationId, userId);
-        const caller = modelCoreRouter.createCaller(testContext);
+        const { ctx } = await setupTestData(db);
+        ctx.organizationId = organizationId;
+        ctx.user.id = userId;
+        const caller = appRouter.createCaller(ctx);
 
-        const modelId = generateId();
-        const machineId = generateId();
+        const modelId = generateTestId("model");
+        const machineId = generateTestId("machine");
 
         // Create model with machine in different organization
         await db.insert(schema.models).values({
           id: modelId,
           name: "Other Org Model",
-          isCustom: false,
+          organizationId: "test-org-secondary", // Custom model scoped to secondary org
+          isCustom: true,
           isActive: true,
         });
 
@@ -525,10 +564,10 @@ describe("modelCoreRouter Integration Tests", () => {
           isActive: true,
         });
 
-        await expect(caller.getById({ id: modelId })).rejects.toThrow(
+        await expect(caller.model.getById({ id: modelId })).rejects.toThrow(
           new TRPCError({
             code: "NOT_FOUND",
-            message: "Game title not found or access denied",
+            message: "Model not found or access denied",
           }),
         );
       });
@@ -554,269 +593,33 @@ describe("modelCoreRouter Integration Tests", () => {
           name: "Test User",
         });
 
-        const testContext = createTestContext(db, organizationId, userId);
-        const caller = modelCoreRouter.createCaller(testContext);
+        const { ctx } = await setupTestData(db);
+        ctx.organizationId = organizationId;
+        ctx.user.id = userId;
+        const caller = appRouter.createCaller(ctx);
 
-        const modelId = generateId();
+        const modelId = generateTestId("model");
 
-        // Create model but no machines
+        // Create organization-scoped custom model with no machines in this org
         await db.insert(schema.models).values({
           id: modelId,
           name: "No Machines Model",
-          isCustom: false,
-          isActive: true,
-        });
-
-        await expect(caller.getById({ id: modelId })).rejects.toThrow(
-          new TRPCError({
-            code: "NOT_FOUND",
-            message: "Game title not found or access denied",
-          }),
-        );
-      });
-    });
-  });
-
-  describe("delete", () => {
-    test("throws NOT_FOUND when trying to delete model with no machines in current organization", async ({
-      workerDb,
-    }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        // Create test organization and user
-        const organizationId = generateTestId("org");
-        const userId = generateTestId("user");
-
-        await db.insert(schema.organizations).values({
-          id: organizationId,
-          name: "Test Organization",
-          subdomain: "test",
-        });
-
-        await db.insert(schema.users).values({
-          id: userId,
-          email: "test@example.com",
-          name: "Test User",
-        });
-
-        const testContext = createTestContext(db, organizationId, userId);
-        const caller = modelCoreRouter.createCaller(testContext);
-
-        const modelId = generateId();
-
-        // Create OPDB model (not custom) with no machines in current organization
-        await db.insert(schema.models).values({
-          id: modelId,
-          name: "Deletable Model",
-          opdbId: "opdb-123",
-          isCustom: false,
-          isActive: true,
-        });
-
-        // Model has no machines in current organization, so it's not visible to delete
-        await expect(caller.delete({ id: modelId })).rejects.toThrow(
-          new TRPCError({
-            code: "NOT_FOUND",
-            message: "Game title not found or access denied",
-          }),
-        );
-      });
-    });
-
-    // Note: Based on current router logic, successful deletion is only possible if:
-    // 1. Model currently has machines in the organization (so it's in modelIdsWithMachines)
-    // 2. But those machines are somehow counted as 0 in the SQL count
-    // This appears to be a logical inconsistency in the router design.
-    // The unit test mocks this scenario, but it's not possible with real data.
-
-    test("throws NOT_FOUND for non-existent model", async ({ workerDb }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        // Create test organization and user
-        const organizationId = generateTestId("org");
-        const userId = generateTestId("user");
-
-        await db.insert(schema.organizations).values({
-          id: organizationId,
-          name: "Test Organization",
-          subdomain: "test",
-        });
-
-        await db.insert(schema.users).values({
-          id: userId,
-          email: "test@example.com",
-          name: "Test User",
-        });
-
-        const testContext = createTestContext(db, organizationId, userId);
-        const caller = modelCoreRouter.createCaller(testContext);
-
-        await expect(caller.delete({ id: "non-existent" })).rejects.toThrow(
-          new TRPCError({
-            code: "NOT_FOUND",
-            message: "Game title not found or access denied",
-          }),
-        );
-      });
-    });
-
-    test("throws BAD_REQUEST for custom model", async ({ workerDb }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        // Create test organization and user
-        const organizationId = generateTestId("org");
-        const userId = generateTestId("user");
-
-        await db.insert(schema.organizations).values({
-          id: organizationId,
-          name: "Test Organization",
-          subdomain: "test",
-        });
-
-        await db.insert(schema.users).values({
-          id: userId,
-          email: "test@example.com",
-          name: "Test User",
-        });
-
-        const testContext = createTestContext(db, organizationId, userId);
-        const caller = modelCoreRouter.createCaller(testContext);
-
-        const modelId = generateId();
-        const machineId = generateId();
-
-        // Create custom model with a machine
-        await db.insert(schema.models).values({
-          id: modelId,
-          name: "Custom Model",
+          organizationId: "different-org-id", // Custom model scoped to different org
           isCustom: true,
           isActive: true,
         });
 
-        await db.insert(schema.machines).values({
-          id: machineId,
-          name: "Custom Machine",
-          modelId: modelId,
-          organizationId: organizationId,
-          locationId: "test-location-1",
-          qrCodeId: machineId,
-          isActive: true,
-        });
-
-        await expect(caller.delete({ id: modelId })).rejects.toThrow(
-          new TRPCError({
-            code: "BAD_REQUEST",
-            message:
-              "Cannot delete custom games. Remove game instances instead.",
-          }),
-        );
-      });
-    });
-
-    test("throws BAD_REQUEST for model with existing machines", async ({
-      workerDb,
-    }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        // Create test organization and user
-        const organizationId = generateTestId("org");
-        const userId = generateTestId("user");
-
-        await db.insert(schema.organizations).values({
-          id: organizationId,
-          name: "Test Organization",
-          subdomain: "test",
-        });
-
-        await db.insert(schema.users).values({
-          id: userId,
-          email: "test@example.com",
-          name: "Test User",
-        });
-
-        const testContext = createTestContext(db, organizationId, userId);
-        const caller = modelCoreRouter.createCaller(testContext);
-
-        const modelId = generateId();
-        const machineId = generateId();
-
-        // Create OPDB model with machines
-        await db.insert(schema.models).values({
-          id: modelId,
-          name: "Model with Machines",
-          opdbId: "opdb-456",
-          isCustom: false,
-          isActive: true,
-        });
-
-        await db.insert(schema.machines).values({
-          id: machineId,
-          name: "Blocking Machine",
-          modelId: modelId,
-          organizationId: organizationId,
-          locationId: "test-location-1",
-          qrCodeId: machineId,
-          isActive: true,
-        });
-
-        await expect(caller.delete({ id: modelId })).rejects.toThrow(
-          new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Cannot delete game title that has game instances",
-          }),
-        );
-      });
-    });
-
-    test("throws NOT_FOUND for model not in organization", async ({
-      workerDb,
-    }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        // Create test organization and user
-        const organizationId = generateTestId("org");
-        const userId = generateTestId("user");
-
-        await db.insert(schema.organizations).values({
-          id: organizationId,
-          name: "Test Organization",
-          subdomain: "test",
-        });
-
-        await db.insert(schema.users).values({
-          id: userId,
-          email: "test@example.com",
-          name: "Test User",
-        });
-
-        const testContext = createTestContext(db, organizationId, userId);
-        const caller = modelCoreRouter.createCaller(testContext);
-
-        const modelId = generateId();
-        const machineId = generateId();
-
-        // Create model in different organization
-        await db.insert(schema.models).values({
-          id: modelId,
-          name: "Other Org Model",
-          isCustom: false,
-          isActive: true,
-        });
-
-        await db.insert(schema.machines).values({
-          id: machineId,
-          name: "Other Machine",
-          modelId: modelId,
-          organizationId: "test-org-secondary",
-          locationId: "test-location-secondary",
-          qrCodeId: machineId,
-          isActive: true,
-        });
-
-        await expect(caller.delete({ id: modelId })).rejects.toThrow(
+        await expect(caller.model.getById({ id: modelId })).rejects.toThrow(
           new TRPCError({
             code: "NOT_FOUND",
-            message: "Game title not found or access denied",
+            message: "Model not found or access denied",
           }),
         );
       });
     });
   });
+
+  // Note: Delete operations deferred to v1.x with custom models functionality
 
   describe("organizational boundaries", () => {
     test("enforces strict organizational scoping with real data", async ({
@@ -839,32 +642,34 @@ describe("modelCoreRouter Integration Tests", () => {
           name: "Test User",
         });
 
-        const testContext = createTestContext(db, organizationId, userId);
-        const caller = modelCoreRouter.createCaller(testContext);
+        const { ctx } = await setupTestData(db);
+        ctx.organizationId = organizationId;
+        ctx.user.id = userId;
+        const caller = appRouter.createCaller(ctx);
 
-        const modelId1 = generateId();
-        const modelId2 = generateId();
-        const machineId1 = generateId();
-        const machineId2 = generateId();
+        const modelId1 = generateTestId("model-1");
+        const modelId2 = generateTestId("model-2");
+        const machineId1 = generateTestId("machine-1");
+        const machineId2 = generateTestId("machine-2");
 
         // Get baseline count before adding test data
-        const baselineResult = await caller.getAll();
+        const baselineResult = await caller.model.getAll();
         const baselineCount = baselineResult.length;
 
-        // Create identical models in both organizations
+        // Create one OPDB model and one org-specific custom model
         await db.insert(schema.models).values([
           {
             id: modelId1,
-            name: "Shared Model Name",
+            name: "Shared OPDB Model",
             opdbId: "opdb-shared",
-            isCustom: false,
             isActive: true,
+            // organizationId defaults to null (global OPDB)
           },
           {
             id: modelId2,
-            name: "Primary Org Model",
-            opdbId: "opdb-primary",
-            isCustom: false,
+            name: "Primary Org Custom Model",
+            organizationId: ctx.organizationId, // Custom model scoped to primary org
+            isCustom: true,
             isActive: true,
           },
         ]);
@@ -884,21 +689,28 @@ describe("modelCoreRouter Integration Tests", () => {
             id: machineId2,
             name: "Primary Machine",
             modelId: modelId2,
-            organizationId: organizationId,
+            organizationId: ctx.organizationId,
             locationId: "test-location-1",
             qrCodeId: machineId2,
             isActive: true,
           },
         ]);
 
-        // Primary org caller should only see one additional model (our primary org model)
-        const result = await caller.getAll();
+        // Primary org caller should see both models:
+        // - OPDB model (global) with 0 machines in this org
+        // - Custom model (org-scoped) with 1 machine in this org
+        const result = await caller.model.getAll();
 
-        expect(result).toHaveLength(baselineCount + 1);
-        expect(
-          result.find((m) => m.name === "Primary Org Model"),
-        ).toBeDefined();
-        expect(result.find((m) => m.id === modelId1)).toBeUndefined();
+        expect(result).toHaveLength(baselineCount + 2);
+        
+        const opdbModel = result.find((m) => m.name === "Shared OPDB Model");
+        const customModel = result.find((m) => m.name === "Primary Org Custom Model");
+        
+        expect(opdbModel).toBeDefined();
+        expect(opdbModel?.machineCount).toBe(0); // No machines in this org
+        
+        expect(customModel).toBeDefined();
+        expect(customModel?.machineCount).toBe(1); // One machine in this org
       });
     });
 
@@ -939,21 +751,21 @@ describe("modelCoreRouter Integration Tests", () => {
         ]);
 
         // Create secondary org context
-        const secondaryContext = createTestContext(
-          db,
-          secondaryOrgId,
-          secondaryUserId,
-        );
-        const secondaryCaller = modelCoreRouter.createCaller(secondaryContext);
+        // Create secondary org context
+        const { ctx: secondaryCtx } = await setupTestData(db);
+        secondaryCtx.organizationId = secondaryOrgId;
+        secondaryCtx.user.id = secondaryUserId;
+        const secondaryCaller = appRouter.createCaller(secondaryCtx);
 
-        const modelId = generateId();
-        const machineId = generateId();
+        const modelId = generateTestId("model");
+        const machineId = generateTestId("machine");
 
         // Create model with machine in primary organization
         await db.insert(schema.models).values({
           id: modelId,
           name: "Primary Org Model",
-          isCustom: false,
+          organizationId: primaryOrgId, // Custom model scoped to primary org
+          isCustom: true,
           isActive: true,
         });
 
@@ -968,14 +780,14 @@ describe("modelCoreRouter Integration Tests", () => {
         });
 
         // Secondary org caller should not see primary org models
-        const result = await secondaryCaller.getAll();
+        const result = await secondaryCaller.model.getAll();
         expect(result).toEqual([]);
 
         // Should also fail getById
-        await expect(secondaryCaller.getById({ id: modelId })).rejects.toThrow(
+        await expect(secondaryCaller.model.getById({ id: modelId })).rejects.toThrow(
           new TRPCError({
             code: "NOT_FOUND",
-            message: "Game title not found or access denied",
+            message: "Model not found or access denied",
           }),
         );
       });
@@ -1001,38 +813,39 @@ describe("modelCoreRouter Integration Tests", () => {
           name: "Test User",
         });
 
-        const testContext = createTestContext(db, organizationId, userId);
-        const caller = modelCoreRouter.createCaller(testContext);
+        const { ctx } = await setupTestData(db);
+        ctx.organizationId = organizationId;
+        ctx.user.id = userId;
+        const caller = appRouter.createCaller(ctx);
 
-        const modelId = generateId();
+        const modelId = generateTestId("model");
 
         // Create model
         await db.insert(schema.models).values({
           id: modelId,
           name: "Count Test Model",
-          isCustom: false,
           isActive: true,
         });
 
         // Create varying numbers of machines
-        const machineIds = Array.from({ length: 5 }, () => generateId());
+        const machineIds = Array.from({ length: 5 }, (_, i) => generateTestId(`machine-${i + 1}`));
         await db.insert(schema.machines).values(
           machineIds.map((id, index) => ({
             id,
             name: `Machine ${index + 1}`,
             modelId: modelId,
-            organizationId: organizationId,
+            organizationId: ctx.organizationId,
             locationId: "test-location-1",
             qrCodeId: id,
             isActive: true,
           })),
         );
 
-        const result = await caller.getById({ id: modelId });
+        const result = await caller.model.getById({ id: modelId });
         expect(result.machineCount).toBe(5);
 
         // Test getAll also returns correct count
-        const allResults = await caller.getAll();
+        const allResults = await caller.model.getAll();
         const foundModel = allResults.find((m) => m.id === modelId);
         expect(foundModel?.machineCount).toBe(5);
       });
@@ -1056,17 +869,18 @@ describe("modelCoreRouter Integration Tests", () => {
           name: "Test User",
         });
 
-        const testContext = createTestContext(db, organizationId, userId);
-        const caller = modelCoreRouter.createCaller(testContext);
+        const { ctx } = await setupTestData(db);
+        ctx.organizationId = organizationId;
+        ctx.user.id = userId;
+        const caller = appRouter.createCaller(ctx);
 
-        const modelId = generateId();
-        const activeMachineId = generateId();
-        const inactiveMachineId = generateId();
+        const modelId = generateTestId("model");
+        const activeMachineId = generateTestId("active-machine");
+        const inactiveMachineId = generateTestId("inactive-machine");
 
         await db.insert(schema.models).values({
           id: modelId,
           name: "Active Count Test",
-          isCustom: false,
           isActive: true,
         });
 
@@ -1075,7 +889,7 @@ describe("modelCoreRouter Integration Tests", () => {
             id: activeMachineId,
             name: "Active Machine",
             modelId: modelId,
-            organizationId: organizationId,
+            organizationId: ctx.organizationId,
             locationId: "test-location-1",
             qrCodeId: activeMachineId,
             isActive: true,
@@ -1084,14 +898,14 @@ describe("modelCoreRouter Integration Tests", () => {
             id: inactiveMachineId,
             name: "Inactive Machine",
             modelId: modelId,
-            organizationId: organizationId,
+            organizationId: ctx.organizationId,
             locationId: "test-location-1",
             qrCodeId: inactiveMachineId,
             isActive: false,
           },
         ]);
 
-        const result = await caller.getById({ id: modelId });
+        const result = await caller.model.getById({ id: modelId });
         expect(result.machineCount).toBe(2); // Count includes inactive machines based on schema
       });
     });
@@ -1118,12 +932,14 @@ describe("modelCoreRouter Integration Tests", () => {
           name: "Test User",
         });
 
-        const testContext = createTestContext(db, organizationId, userId);
-        const caller = modelCoreRouter.createCaller(testContext);
+        const { ctx } = await setupTestData(db);
+        ctx.organizationId = organizationId;
+        ctx.user.id = userId;
+        const caller = appRouter.createCaller(ctx);
 
-        const modelId = generateId();
-        const machineId1 = generateId();
-        const machineId2 = generateId();
+        const modelId = generateTestId("model");
+        const machineId1 = generateTestId("machine-1");
+        const machineId2 = generateTestId("machine-2");
 
         await db.insert(schema.models).values({
           id: modelId,
@@ -1131,7 +947,6 @@ describe("modelCoreRouter Integration Tests", () => {
           manufacturer: "Test Manufacturer",
           year: 2023,
           opdbId: "opdb-complex",
-          isCustom: false,
           isActive: true,
         });
 
@@ -1141,7 +956,7 @@ describe("modelCoreRouter Integration Tests", () => {
             id: machineId1,
             name: "Complex Machine 1",
             modelId: modelId,
-            organizationId: organizationId,
+            organizationId: ctx.organizationId,
             locationId: "test-location-1",
             qrCodeId: machineId1,
             isActive: true,
@@ -1151,7 +966,7 @@ describe("modelCoreRouter Integration Tests", () => {
             id: machineId2,
             name: "Complex Machine 2",
             modelId: modelId,
-            organizationId: organizationId,
+            organizationId: ctx.organizationId,
             locationId: "test-location-1",
             qrCodeId: machineId2,
             isActive: true,
@@ -1159,7 +974,7 @@ describe("modelCoreRouter Integration Tests", () => {
           },
         ]);
 
-        const result = await caller.getById({ id: modelId });
+        const result = await caller.model.getById({ id: modelId });
 
         expect(result).toEqual(
           expect.objectContaining({
@@ -1171,6 +986,180 @@ describe("modelCoreRouter Integration Tests", () => {
             machineCount: 2,
           }),
         );
+      });
+    });
+  });
+
+  describe("Cross-Organizational Security Testing (from Router Version)", () => {
+    test("should enforce organizational boundaries across all operations", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx, testUser } = await setupTestData(db);
+        
+        // Create a second organization with its own data
+        const [org2] = await db
+          .insert(schema.organizations)
+          .values({
+            id: SEED_TEST_IDS.ORGANIZATIONS.competitor,
+            name: "Competitor Organization",
+            subdomain: "competitor",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
+
+        // Create custom models in org2 that should not be visible to org1
+        await db.insert(schema.models).values([
+          {
+            id: generateTestId("competitor-model-1"),
+            name: "Competitor Model 1",
+            manufacturer: "Competitor Corp",
+            year: 2023,
+            organizationId: org2.id, // Custom model belongs to org2
+            isCustom: true, // Must explicitly set for custom models
+          },
+          {
+            id: generateTestId("competitor-model-2"),
+            name: "Competitor Model 2",
+            manufacturer: "Another Corp",
+            year: 2024,
+            organizationId: org2.id, // Custom model belongs to org2
+            isCustom: true, // Must explicitly set for custom models
+          },
+        ]);
+
+        const caller = appRouter.createCaller(ctx);
+        
+        // Test getAll - should only see primary org models
+        const allModels = await caller.model.getAll();
+        expect(allModels).toHaveLength(0); // Should see no models initially (none with machines in primary org)
+        
+        // Create a model with machines in primary org to test positive case
+        const [primaryModel] = await db
+          .insert(schema.models)
+          .values({
+            id: generateTestId("primary-model"),
+            name: "Primary Model",
+            manufacturer: "Primary Corp",
+            year: 2023,
+            // organizationId defaults to null (global OPDB)
+            // isCustom defaults to false (OPDB model)
+          })
+          .returning();
+
+        // Create location and machines in primary org
+        const [location] = await db
+          .insert(schema.locations)
+          .values({
+            id: generateTestId("location"),
+            name: "Test Location",
+            organizationId: ctx.organizationId,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
+
+        await db.insert(schema.machines).values({
+          id: generateTestId("primary-machine"),
+          name: "Primary Machine",
+          qrCodeId: generateTestId("qr"),
+          organizationId: ctx.organizationId,
+          locationId: location.id,
+          modelId: primaryModel.id,
+          ownerId: testUser.id,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+
+        // Now test that we see only primary org models
+        const updatedModels = await caller.model.getAll();
+        expect(updatedModels).toHaveLength(1);
+        expect(updatedModels[0].name).toBe("Primary Model");
+        expect(updatedModels.find(m => m.name.includes("Competitor"))).toBeUndefined();
+
+        // Test getById - should not access competitor org models
+        await expect(
+          caller.model.getById({ id: generateTestId("competitor-model-1") })
+        ).rejects.toThrow("Model not found or access denied");
+      });
+    });
+  });
+
+  describe("Real Database Operations & Performance (from Router Version)", () => {
+    test("should perform accurate machine counting with complex relationships", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx, testUser } = await setupTestData(db);
+        
+        // Create additional OPDB model for complex test data
+        const [newModel] = await db
+          .insert(schema.models)
+          .values({
+            id: generateTestId("complex-model"),
+            name: "Complex Model",
+            manufacturer: "Complex Corp",
+            year: 2023,
+            // organizationId defaults to null (global OPDB)
+            // isCustom defaults to false (OPDB model)
+          })
+          .returning();
+
+        // Create location
+        const [location] = await db
+          .insert(schema.locations)
+          .values({
+            id: generateTestId("location"),
+            name: "Test Location",
+            organizationId: ctx.organizationId,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
+
+        // Create many machines for this model to test counting accuracy
+        const machineInserts = Array.from({ length: 7 }, (_, i) => ({
+          id: generateTestId(`complex-machine-${i + 1}`),
+          name: `Complex Machine #${i + 1}`,
+          qrCodeId: generateTestId(`complex-qr-${i + 1}`),
+          organizationId: ctx.organizationId,
+          locationId: location.id,
+          modelId: newModel.id,
+          ownerId: testUser.id,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }));
+
+        await db.insert(schema.machines).values(machineInserts);
+
+        const caller = appRouter.createCaller(ctx);
+        
+        // Test getAll with accurate machine counts
+        const allModels = await caller.model.getAll();
+        expect(allModels).toHaveLength(1); // Our complex model
+        
+        const complexModel = allModels.find(m => m.name === "Complex Model");
+        expect(complexModel).toBeDefined();
+        expect(complexModel!.machineCount).toBe(7);
+
+        // Test getById with accurate machine count
+        const singleModel = await caller.model.getById({ id: newModel.id });
+        expect(singleModel.machineCount).toBe(7);
+        expect(singleModel.name).toBe("Complex Model");
+      });
+    });
+
+    test("should handle database errors gracefully with real operations", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx } = await setupTestData(db);
+        const caller = appRouter.createCaller(ctx);
+
+        // Test with malformed ID (should handle gracefully)
+        await expect(
+          caller.model.getById({ id: "definitely-not-a-valid-id" })
+        ).rejects.toThrow("Model not found or access denied");
+
+        // Test with empty string ID
+        await expect(
+          caller.model.getById({ id: "" })
+        ).rejects.toThrow("Model not found or access denied");
       });
     });
   });

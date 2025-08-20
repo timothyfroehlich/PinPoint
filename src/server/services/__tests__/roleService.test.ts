@@ -19,10 +19,11 @@ import {
   SYSTEM_ROLES,
 } from "~/server/auth/permissions.constants";
 import { RoleService } from "~/server/services/roleService";
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
 // Mock dependencies
 vi.mock("~/lib/utils/id-generation", () => ({
-  generatePrefixedId: vi.fn(() => "test-role-123"),
+  generatePrefixedId: vi.fn(() => SEED_TEST_IDS.MOCK_PATTERNS.ROLE),
 }));
 
 vi.mock("../permissionService", () => ({
@@ -107,7 +108,7 @@ describe("RoleService", () => {
     it("should throw NOT_FOUND when role does not exist", async () => {
       mockDrizzle.query.roles.findFirst.mockResolvedValue(null);
 
-      await expect(service.deleteRole("nonexistent-role")).rejects.toThrow(
+      await expect(service.deleteRole(`${SEED_TEST_IDS.MOCK_PATTERNS.ROLE}-nonexistent`)).rejects.toThrow(
         expect.objectContaining({
           code: "NOT_FOUND",
           message: "Role not found",
@@ -117,7 +118,7 @@ describe("RoleService", () => {
 
     it("should throw FORBIDDEN when trying to delete system role", async () => {
       const systemRole = {
-        id: "role-admin",
+        id: `${SEED_TEST_IDS.MOCK_PATTERNS.ROLE}-admin`,
         name: SYSTEM_ROLES.ADMIN,
         isSystem: true,
         memberships: [],
@@ -125,7 +126,7 @@ describe("RoleService", () => {
 
       mockDrizzle.query.roles.findFirst.mockResolvedValue(systemRole);
 
-      await expect(service.deleteRole("role-admin")).rejects.toThrow(
+      await expect(service.deleteRole(`${SEED_TEST_IDS.MOCK_PATTERNS.ROLE}-admin`)).rejects.toThrow(
         expect.objectContaining({
           code: "FORBIDDEN",
           message: "System roles cannot be deleted",
@@ -135,17 +136,17 @@ describe("RoleService", () => {
 
     it("should throw PRECONDITION_FAILED when no default role available for reassignment", async () => {
       const customRole = {
-        id: "role-custom",
+        id: `${SEED_TEST_IDS.MOCK_PATTERNS.ROLE}-custom`,
         name: "Custom Role",
         isSystem: false,
-        memberships: [{ userId: "user-123" }],
+        memberships: [{ userId: SEED_TEST_IDS.MOCK_PATTERNS.USER }],
       };
 
       mockDrizzle.query.roles.findFirst
         .mockResolvedValueOnce(customRole) // First call: find role to delete
         .mockResolvedValueOnce(null); // Second call: find default role
 
-      await expect(service.deleteRole("role-custom")).rejects.toThrow(
+      await expect(service.deleteRole(`${SEED_TEST_IDS.MOCK_PATTERNS.ROLE}-custom`)).rejects.toThrow(
         expect.objectContaining({
           code: "PRECONDITION_FAILED",
           message: "No default role available for member reassignment",
@@ -158,7 +159,7 @@ describe("RoleService", () => {
     it("should create new role when template role does not exist", async () => {
       const templateName = "MEMBER" as keyof typeof ROLE_TEMPLATES;
       const mockNewRole = {
-        id: "test-role-123",
+        id: SEED_TEST_IDS.MOCK_PATTERNS.ROLE,
         name: ROLE_TEMPLATES.MEMBER.name,
         // organizationId handled by RLS
         isSystem: false,
@@ -182,7 +183,7 @@ describe("RoleService", () => {
       expect(result).toEqual(mockNewRole);
       expect(mockDrizzle.insert).toHaveBeenCalled();
       expect(mockValues).toHaveBeenCalledWith({
-        id: "test-role-123",
+        id: SEED_TEST_IDS.MOCK_PATTERNS.ROLE,
         name: ROLE_TEMPLATES.MEMBER.name,
         // organizationId set automatically by RLS trigger
         isSystem: false,
@@ -193,7 +194,7 @@ describe("RoleService", () => {
     it("should update existing role when template role already exists", async () => {
       const templateName = "MEMBER" as keyof typeof ROLE_TEMPLATES;
       const existingRole = {
-        id: "existing-role-123",
+        id: `${SEED_TEST_IDS.MOCK_PATTERNS.ROLE}-existing`,
         name: ROLE_TEMPLATES.MEMBER.name,
         // organizationId handled by RLS
         isSystem: true, // Will be updated to false
@@ -231,7 +232,7 @@ describe("RoleService", () => {
       const templateName = "MEMBER" as keyof typeof ROLE_TEMPLATES;
       const customName = "Custom Member Role";
       const mockNewRole = {
-        id: "test-role-123",
+        id: SEED_TEST_IDS.MOCK_PATTERNS.ROLE,
         name: customName,
         // organizationId handled by RLS
         isSystem: false,
@@ -266,7 +267,7 @@ describe("RoleService", () => {
     it("should throw error when no admin users exist", async () => {
       // Admin role exists but has no memberships
       const adminRole = {
-        id: "role-admin",
+        id: `${SEED_TEST_IDS.MOCK_PATTERNS.ROLE}-admin`,
         name: SYSTEM_ROLES.ADMIN,
         memberships: [], // No admin memberships
       };
@@ -282,9 +283,9 @@ describe("RoleService", () => {
 
     it("should pass when admin users exist", async () => {
       const adminRole = {
-        id: "role-admin",
+        id: `${SEED_TEST_IDS.MOCK_PATTERNS.ROLE}-admin`,
         name: SYSTEM_ROLES.ADMIN,
-        memberships: [{ id: "membership-123", userId: "user-admin" }], // Has admin members
+        memberships: [{ id: SEED_TEST_IDS.MOCK_PATTERNS.MEMBERSHIP, userId: `${SEED_TEST_IDS.MOCK_PATTERNS.USER}-admin` }], // Has admin members
       };
       mockDrizzle.query.roles.findFirst.mockResolvedValue(adminRole);
 
@@ -306,7 +307,7 @@ describe("RoleService", () => {
 
     it("should return default role when it exists", async () => {
       const defaultRole = {
-        id: "role-default",
+        id: `${SEED_TEST_IDS.MOCK_PATTERNS.ROLE}-default`,
         name: "Default Role",
         // organizationId handled by RLS
         isDefault: true,
@@ -331,7 +332,7 @@ describe("RoleService", () => {
 
     it("should return admin role when it exists", async () => {
       const adminRole = {
-        id: "role-admin",
+        id: `${SEED_TEST_IDS.MOCK_PATTERNS.ROLE}-admin`,
         name: SYSTEM_ROLES.ADMIN,
         // organizationId handled by RLS
         isSystem: true,
@@ -350,7 +351,7 @@ describe("RoleService", () => {
       mockDrizzle.query.roles.findFirst.mockResolvedValue(null);
 
       await expect(
-        service.updateRole("nonexistent-role", { name: "New Name" }),
+        service.updateRole(`${SEED_TEST_IDS.MOCK_PATTERNS.ROLE}-nonexistent`, { name: "New Name" }),
       ).rejects.toThrow(
         expect.objectContaining({
           code: "NOT_FOUND",
@@ -361,7 +362,7 @@ describe("RoleService", () => {
 
     it("should throw FORBIDDEN when trying to update system role", async () => {
       const systemRole = {
-        id: "role-admin",
+        id: `${SEED_TEST_IDS.MOCK_PATTERNS.ROLE}-admin`,
         name: SYSTEM_ROLES.ADMIN,
         isSystem: true,
         // organizationId handled by RLS
@@ -370,7 +371,7 @@ describe("RoleService", () => {
       mockDrizzle.query.roles.findFirst.mockResolvedValue(systemRole);
 
       await expect(
-        service.updateRole("role-admin", { name: "New Admin" }),
+        service.updateRole(`${SEED_TEST_IDS.MOCK_PATTERNS.ROLE}-admin`, { name: "New Admin" }),
       ).rejects.toThrow(
         expect.objectContaining({
           code: "FORBIDDEN",

@@ -13,8 +13,8 @@ export const collectionRouter = createTRPCRouter({
   getForLocation: publicProcedure
     .input(
       z.object({
-        locationId: z.string(),
-        organizationId: z.string(), // Still needed for public API compatibility
+        locationId: z.string().min(1, "Location ID cannot be empty"),
+        organizationId: z.string().min(1, "Organization ID cannot be empty"), // Still needed for public API compatibility
       }),
     )
     .query(async ({ ctx, input }) => {
@@ -26,8 +26,8 @@ export const collectionRouter = createTRPCRouter({
   getMachines: publicProcedure
     .input(
       z.object({
-        collectionId: z.string(),
-        locationId: z.string(),
+        collectionId: z.string().min(1, "Collection ID cannot be empty"),
+        locationId: z.string().min(1, "Location ID cannot be empty"),
       }),
     )
     .query(async ({ ctx, input }) => {

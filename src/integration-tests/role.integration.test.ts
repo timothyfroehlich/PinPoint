@@ -225,9 +225,12 @@ describe("Role Router Integration Tests (PGlite)", () => {
   });
 
   describe("create - Create new role", () => {
-    it("should create role with template", async () => {
-      await withTransaction(sharedDb, async (db) => {
-        const context = createTestContext(db, sharedTestData);
+    test("should create role with template", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { context, testData } = await createTestContext(
+          db,
+          "test-org-pinpoint",
+        );
         const caller = roleRouter.createCaller(context);
 
         const result = await caller.create({
@@ -238,7 +241,7 @@ describe("Role Router Integration Tests (PGlite)", () => {
 
         expect(result).toMatchObject({
           name: "Member Template Role",
-          organizationId: sharedTestData.organization,
+          organizationId: testData.organization,
           isSystem: false,
           isDefault: false,
         });
@@ -258,7 +261,7 @@ describe("Role Router Integration Tests (PGlite)", () => {
 
         expect(dbRole).toBeDefined();
         expect(dbRole?.name).toBe("Member Template Role");
-        expect(dbRole?.organizationId).toBe(sharedTestData.organization);
+        expect(dbRole?.organizationId).toBe(testData.organization);
 
         // Verify template permissions were assigned
         const permissionNames =
@@ -270,9 +273,12 @@ describe("Role Router Integration Tests (PGlite)", () => {
       });
     });
 
-    it("should create custom role without template", async () => {
-      await withTransaction(sharedDb, async (db) => {
-        const context = createTestContext(db, sharedTestData);
+    test("should create custom role without template", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { context, testData } = await createTestContext(
+          db,
+          "test-org-pinpoint",
+        );
         const caller = roleRouter.createCaller(context);
 
         // Get available permissions
@@ -287,7 +293,7 @@ describe("Role Router Integration Tests (PGlite)", () => {
 
         expect(result).toMatchObject({
           name: "Custom Role",
-          organizationId: sharedTestData.organization,
+          organizationId: testData.organization,
           isSystem: false,
           isDefault: true,
         });
@@ -313,9 +319,12 @@ describe("Role Router Integration Tests (PGlite)", () => {
       });
     });
 
-    it("should create role without permissions", async () => {
-      await withTransaction(sharedDb, async (db) => {
-        const context = createTestContext(db, sharedTestData);
+    test("should create role without permissions", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { context, testData } = await createTestContext(
+          db,
+          "test-org-pinpoint",
+        );
         const caller = roleRouter.createCaller(context);
 
         const result = await caller.create({
@@ -325,7 +334,7 @@ describe("Role Router Integration Tests (PGlite)", () => {
 
         expect(result).toMatchObject({
           name: "Simple Role",
-          organizationId: sharedTestData.organization,
+          organizationId: testData.organization,
           isSystem: false,
           isDefault: false,
         });
@@ -342,15 +351,20 @@ describe("Role Router Integration Tests (PGlite)", () => {
       });
     });
 
-    it("should enforce organization scoping in role creation", async () => {
-      await withTransaction(sharedDb, async (db) => {
-        const context = createTestContext(db, sharedTestData);
+    test("should enforce organization scoping in role creation", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { context, testData } = await createTestContext(
+          db,
+          "test-org-pinpoint",
+        );
         const caller = roleRouter.createCaller(context);
 
         const result = await caller.create({ name: "Test Role" });
 
         // Verify role was created in correct organization
-        expect(result.organizationId).toBe(sharedTestData.organization);
+        expect(result.organizationId).toBe(testData.organization);
 
         // Verify role is not visible from other organization
         // Create other organization and membership for the user
@@ -380,14 +394,15 @@ describe("Role Router Integration Tests (PGlite)", () => {
         // Create membership for test user in other org
         await db.insert(schema.memberships).values({
           id: "other-membership",
-          userId: sharedTestData.user || "test-user-admin",
+          userId: testData.user || "test-user-admin",
           organizationId: otherOrgId,
           roleId: otherAdminRole.id,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
 
-        const baseContext = await createTestContext(db, sharedTestData);
+        const { context: baseContext, testData: baseTestData } =
+          await createTestContext(db, "test-org-pinpoint");
         const otherOrgContext = {
           ...baseContext,
           organization: {
@@ -403,9 +418,12 @@ describe("Role Router Integration Tests (PGlite)", () => {
       });
     });
 
-    it("should throw error for invalid template", async () => {
-      await withTransaction(sharedDb, async (db) => {
-        const context = createTestContext(db, sharedTestData);
+    test("should throw error for invalid template", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { context, testData } = await createTestContext(
+          db,
+          "test-org-pinpoint",
+        );
         const caller = roleRouter.createCaller(context);
 
         await expect(
@@ -419,9 +437,12 @@ describe("Role Router Integration Tests (PGlite)", () => {
   });
 
   describe("update - Update existing role", () => {
-    it("should update role name", async () => {
-      await withTransaction(sharedDb, async (db) => {
-        const context = createTestContext(db, sharedTestData);
+    test("should update role name", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { context, testData } = await createTestContext(
+          db,
+          "test-org-pinpoint",
+        );
         const caller = roleRouter.createCaller(context);
 
         // Create a test role for updating
@@ -438,7 +459,7 @@ describe("Role Router Integration Tests (PGlite)", () => {
         expect(result).toMatchObject({
           id: testRole.id,
           name: "Updated Role Name",
-          organizationId: sharedTestData.organization,
+          organizationId: testData.organization,
         });
 
         // Verify in database
@@ -449,9 +470,12 @@ describe("Role Router Integration Tests (PGlite)", () => {
       });
     });
 
-    it("should update role permissions", async () => {
-      await withTransaction(sharedDb, async (db) => {
-        const context = createTestContext(db, sharedTestData);
+    test("should update role permissions", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { context, testData } = await createTestContext(
+          db,
+          "test-org-pinpoint",
+        );
         const caller = roleRouter.createCaller(context);
 
         // Create a test role for updating
@@ -490,9 +514,12 @@ describe("Role Router Integration Tests (PGlite)", () => {
       });
     });
 
-    it("should update role default status", async () => {
-      await withTransaction(sharedDb, async (db) => {
-        const context = createTestContext(db, sharedTestData);
+    test("should update role default status", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { context, testData } = await createTestContext(
+          db,
+          "test-org-pinpoint",
+        );
         const caller = roleRouter.createCaller(context);
 
         // Create a test role for updating
@@ -519,9 +546,12 @@ describe("Role Router Integration Tests (PGlite)", () => {
       });
     });
 
-    it("should update multiple properties", async () => {
-      await withTransaction(sharedDb, async (db) => {
-        const context = createTestContext(db, sharedTestData);
+    test("should update multiple properties", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { context, testData } = await createTestContext(
+          db,
+          "test-org-pinpoint",
+        );
         const caller = roleRouter.createCaller(context);
 
         // Create a test role for updating
@@ -560,9 +590,12 @@ describe("Role Router Integration Tests (PGlite)", () => {
       });
     });
 
-    it("should throw error for nonexistent role", async () => {
-      await withTransaction(sharedDb, async (db) => {
-        const context = createTestContext(db, sharedTestData);
+    test("should throw error for nonexistent role", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { context, testData } = await createTestContext(
+          db,
+          "test-org-pinpoint",
+        );
         const caller = roleRouter.createCaller(context);
 
         await expect(
@@ -576,9 +609,12 @@ describe("Role Router Integration Tests (PGlite)", () => {
   });
 
   describe("delete - Delete role", () => {
-    it("should delete role successfully", async () => {
-      await withTransaction(sharedDb, async (db) => {
-        const context = createTestContext(db, sharedTestData);
+    test("should delete role successfully", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { context, testData } = await createTestContext(
+          db,
+          "test-org-pinpoint",
+        );
         const caller = roleRouter.createCaller(context);
 
         // Create a test role for deletion
@@ -599,27 +635,35 @@ describe("Role Router Integration Tests (PGlite)", () => {
       });
     });
 
-    it("should prevent deletion of system admin role", async () => {
-      await withTransaction(sharedDb, async (db) => {
-        const context = createTestContext(db, sharedTestData);
+    test("should prevent deletion of system admin role", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { context, testData } = await createTestContext(
+          db,
+          "test-org-pinpoint",
+        );
         const caller = roleRouter.createCaller(context);
 
         // Try to delete the system admin role
         await expect(
-          caller.delete({ roleId: sharedTestData.adminRole! }),
+          caller.delete({ roleId: testData.adminRole! }),
         ).rejects.toThrow();
 
         // Verify admin role still exists
         const stillExists = await db.query.roles.findFirst({
-          where: eq(schema.roles.id, sharedTestData.adminRole!),
+          where: eq(schema.roles.id, testData.adminRole!),
         });
         expect(stillExists).toBeDefined();
       });
     });
 
-    it("should handle nonexistent role deletion", async () => {
-      await withTransaction(sharedDb, async (db) => {
-        const context = createTestContext(db, sharedTestData);
+    test("should handle nonexistent role deletion", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { context, testData } = await createTestContext(
+          db,
+          "test-org-pinpoint",
+        );
         const caller = roleRouter.createCaller(context);
 
         await expect(
@@ -630,26 +674,36 @@ describe("Role Router Integration Tests (PGlite)", () => {
   });
 
   describe("get - Get specific role", () => {
-    it("should return role with permissions and member count", async () => {
-      await withTransaction(sharedDb, async (db) => {
-        const context = createTestContext(db, sharedTestData);
+    test("should return role with permissions and member count", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { context, testData } = await createTestContext(
+          db,
+          "test-org-pinpoint",
+        );
         const caller = roleRouter.createCaller(context);
 
-        const result = await caller.get({ roleId: sharedTestData.adminRole! });
+        const result = await caller.get({ roleId: testData.adminRole! });
 
         expect(result).toMatchObject({
-          id: sharedTestData.adminRole,
+          id: testData.adminRole,
           name: "Admin",
-          organizationId: sharedTestData.organization,
+          organizationId: testData.organization,
         });
         expect(result.memberCount).toBeGreaterThan(0);
         expect(Array.isArray(result.permissions)).toBe(true);
       });
     });
 
-    it("should throw NOT_FOUND if role does not exist", async () => {
-      await withTransaction(sharedDb, async (db) => {
-        const context = createTestContext(db, sharedTestData);
+    test("should throw NOT_FOUND if role does not exist", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { context, testData } = await createTestContext(
+          db,
+          "test-org-pinpoint",
+        );
         const caller = roleRouter.createCaller(context);
 
         await expect(
@@ -663,9 +717,12 @@ describe("Role Router Integration Tests (PGlite)", () => {
       });
     });
 
-    it("should enforce organization scoping", async () => {
-      await withTransaction(sharedDb, async (db) => {
-        const context = createTestContext(db, sharedTestData);
+    test("should enforce organization scoping", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { context, testData } = await createTestContext(
+          db,
+          "test-org-pinpoint",
+        );
         const caller = roleRouter.createCaller(context);
 
         // Create role in test organization
@@ -699,14 +756,15 @@ describe("Role Router Integration Tests (PGlite)", () => {
         // Create membership for test user in other org
         await db.insert(schema.memberships).values({
           id: "other-membership-get",
-          userId: sharedTestData.user || "test-user-admin",
+          userId: testData.user || "test-user-admin",
           organizationId: otherOrgId,
           roleId: otherAdminRole.id,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
 
-        const baseContext = await createTestContext(db, sharedTestData);
+        const { context: baseContext, testData: baseTestData } =
+          await createTestContext(db, "test-org-pinpoint");
         const otherOrgContext = {
           ...baseContext,
           organization: {
@@ -727,9 +785,14 @@ describe("Role Router Integration Tests (PGlite)", () => {
   });
 
   describe("getPermissions - Get all available permissions", () => {
-    it("should return all permissions ordered by name", async () => {
-      await withTransaction(sharedDb, async (db) => {
-        const context = createTestContext(db, sharedTestData);
+    test("should return all permissions ordered by name", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { context, testData } = await createTestContext(
+          db,
+          "test-org-pinpoint",
+        );
         const caller = roleRouter.createCaller(context);
 
         const result = await caller.getPermissions();
@@ -752,9 +815,14 @@ describe("Role Router Integration Tests (PGlite)", () => {
       });
     });
 
-    it("should return consistent permissions across calls", async () => {
-      await withTransaction(sharedDb, async (db) => {
-        const context = createTestContext(db, sharedTestData);
+    test("should return consistent permissions across calls", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { context, testData } = await createTestContext(
+          db,
+          "test-org-pinpoint",
+        );
         const caller = roleRouter.createCaller(context);
 
         const result1 = await caller.getPermissions();
@@ -766,9 +834,12 @@ describe("Role Router Integration Tests (PGlite)", () => {
   });
 
   describe("getTemplates - Get role templates", () => {
-    it("should return available role templates", async () => {
-      await withTransaction(sharedDb, async (db) => {
-        const context = createTestContext(db, sharedTestData);
+    test("should return available role templates", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { context, testData } = await createTestContext(
+          db,
+          "test-org-pinpoint",
+        );
         const caller = roleRouter.createCaller(context);
 
         const result = await caller.getTemplates();
@@ -796,9 +867,12 @@ describe("Role Router Integration Tests (PGlite)", () => {
   });
 
   describe("assignToUser - Assign role to user", () => {
-    it("should assign role to user successfully", async () => {
-      await withTransaction(sharedDb, async (db) => {
-        const context = createTestContext(db, sharedTestData);
+    test("should assign role to user successfully", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { context, testData } = await createTestContext(
+          db,
+          "test-org-pinpoint",
+        );
         const caller = roleRouter.createCaller(context);
 
         // Create a test user for assignment testing
@@ -819,8 +893,8 @@ describe("Role Router Integration Tests (PGlite)", () => {
         await db.insert(schema.memberships).values({
           id: membershipId,
           userId: targetUser.id,
-          organizationId: sharedTestData.organization,
-          roleId: sharedTestData.memberRole!,
+          organizationId: testData.organization,
+          roleId: testData.memberRole!,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
@@ -839,7 +913,7 @@ describe("Role Router Integration Tests (PGlite)", () => {
         expect(result).toMatchObject({
           userId: targetUser.id,
           roleId: testRole.id,
-          organizationId: sharedTestData.organization,
+          organizationId: testData.organization,
         });
         expect(result.role.name).toBe("Test Assignment Role");
         expect(result.user.id).toBe(targetUser.id);
@@ -848,16 +922,21 @@ describe("Role Router Integration Tests (PGlite)", () => {
         const dbMembership = await db.query.memberships.findFirst({
           where: and(
             eq(schema.memberships.userId, targetUser.id),
-            eq(schema.memberships.organizationId, sharedTestData.organization),
+            eq(schema.memberships.organizationId, testData.organization),
           ),
         });
         expect(dbMembership?.roleId).toBe(testRole.id);
       });
     });
 
-    it("should throw NOT_FOUND if target role does not exist", async () => {
-      await withTransaction(sharedDb, async (db) => {
-        const context = createTestContext(db, sharedTestData);
+    test("should throw NOT_FOUND if target role does not exist", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { context, testData } = await createTestContext(
+          db,
+          "test-org-pinpoint",
+        );
         const caller = roleRouter.createCaller(context);
 
         // Create a test user for assignment testing
@@ -887,9 +966,14 @@ describe("Role Router Integration Tests (PGlite)", () => {
       });
     });
 
-    it("should throw NOT_FOUND if user is not organization member", async () => {
-      await withTransaction(sharedDb, async (db) => {
-        const context = createTestContext(db, sharedTestData);
+    test("should throw NOT_FOUND if user is not organization member", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { context, testData } = await createTestContext(
+          db,
+          "test-org-pinpoint",
+        );
         const caller = roleRouter.createCaller(context);
 
         // Create a new test role for assignment
@@ -912,9 +996,14 @@ describe("Role Router Integration Tests (PGlite)", () => {
       });
     });
 
-    it("should throw PRECONDITION_FAILED if validation fails", async () => {
-      await withTransaction(sharedDb, async (db) => {
-        const context = createTestContext(db, sharedTestData);
+    test("should throw PRECONDITION_FAILED if validation fails", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { context, testData } = await createTestContext(
+          db,
+          "test-org-pinpoint",
+        );
         const caller = roleRouter.createCaller(context);
 
         // Create a test user for assignment testing
@@ -935,8 +1024,8 @@ describe("Role Router Integration Tests (PGlite)", () => {
         await db.insert(schema.memberships).values({
           id: membershipId,
           userId: targetUser.id,
-          organizationId: sharedTestData.organization,
-          roleId: sharedTestData.memberRole!,
+          organizationId: testData.organization,
+          roleId: testData.memberRole!,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
@@ -974,9 +1063,14 @@ describe("Role Router Integration Tests (PGlite)", () => {
       });
     });
 
-    it("should call validation with correct parameters", async () => {
-      await withTransaction(sharedDb, async (db) => {
-        const context = createTestContext(db, sharedTestData);
+    test("should call validation with correct parameters", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { context, testData } = await createTestContext(
+          db,
+          "test-org-pinpoint",
+        );
         const caller = roleRouter.createCaller(context);
 
         // Create a test user for assignment testing
@@ -997,8 +1091,8 @@ describe("Role Router Integration Tests (PGlite)", () => {
         await db.insert(schema.memberships).values({
           id: membershipId,
           userId: targetUser.id,
-          organizationId: sharedTestData.organization,
-          roleId: sharedTestData.memberRole!,
+          organizationId: testData.organization,
+          roleId: testData.memberRole!,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
@@ -1022,34 +1116,39 @@ describe("Role Router Integration Tests (PGlite)", () => {
           expect.objectContaining({
             userId: targetUser.id,
             roleId: testRole.id,
-            organizationId: sharedTestData.organization,
+            organizationId: testData.organization,
           }),
           expect.objectContaining({
             id: testRole.id,
-            organizationId: sharedTestData.organization,
+            organizationId: testData.organization,
           }),
           expect.objectContaining({
             userId: targetUser.id,
-            organizationId: sharedTestData.organization,
+            organizationId: testData.organization,
           }),
           expect.arrayContaining([
             expect.objectContaining({
               userId: expect.any(String),
-              organizationId: sharedTestData.organization,
+              organizationId: testData.organization,
             }),
           ]),
           expect.objectContaining({
-            organizationId: sharedTestData.organization,
-            actorUserId: sharedTestData.user || "test-user-admin",
+            organizationId: testData.organization,
+            actorUserId: testData.user || "test-user-admin",
             userPermissions: ["role:manage", "organization:manage"],
           }),
         );
       });
     });
 
-    it("should enforce organization scoping in all queries", async () => {
-      await withTransaction(sharedDb, async (db) => {
-        const context = createTestContext(db, sharedTestData);
+    test("should enforce organization scoping in all queries", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { context, testData } = await createTestContext(
+          db,
+          "test-org-pinpoint",
+        );
         const caller = roleRouter.createCaller(context);
 
         // Create a test user for assignment testing
@@ -1070,8 +1169,8 @@ describe("Role Router Integration Tests (PGlite)", () => {
         await db.insert(schema.memberships).values({
           id: membershipId,
           userId: targetUser.id,
-          organizationId: sharedTestData.organization,
-          roleId: sharedTestData.memberRole!,
+          organizationId: testData.organization,
+          roleId: testData.memberRole!,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
@@ -1091,20 +1190,25 @@ describe("Role Router Integration Tests (PGlite)", () => {
         const membership = await db.query.memberships.findFirst({
           where: and(
             eq(schema.memberships.userId, targetUser.id),
-            eq(schema.memberships.organizationId, sharedTestData.organization),
+            eq(schema.memberships.organizationId, testData.organization),
           ),
         });
 
-        expect(membership?.organizationId).toBe(sharedTestData.organization);
+        expect(membership?.organizationId).toBe(testData.organization);
         expect(membership?.roleId).toBe(testRole.id);
       });
     });
   });
 
   describe("Multi-tenant isolation", () => {
-    it("should enforce organization scoping across all endpoints", async () => {
-      await withTransaction(sharedDb, async (db) => {
-        const context = createTestContext(db, sharedTestData);
+    test("should enforce organization scoping across all endpoints", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { context, testData } = await createTestContext(
+          db,
+          "test-org-pinpoint",
+        );
         const caller = roleRouter.createCaller(context);
 
         // Create second organization with roles
@@ -1152,7 +1256,7 @@ describe("Role Router Integration Tests (PGlite)", () => {
         // Create membership for test user in org2
         await db.insert(schema.memberships).values({
           id: generateTestId("org2-membership"),
-          userId: sharedTestData.user || "test-user-admin",
+          userId: testData.user || "test-user-admin",
           organizationId: org2Id,
           roleId: org2AdminRole.id,
           createdAt: new Date(),
@@ -1160,7 +1264,8 @@ describe("Role Router Integration Tests (PGlite)", () => {
         });
 
         // Test org2 caller cannot see org1 roles
-        const baseContext = await createTestContext(db, sharedTestData);
+        const { context: baseContext, testData: baseTestData } =
+          await createTestContext(db, "test-org-pinpoint");
         const org2Context = {
           ...baseContext,
           organization: {
@@ -1173,9 +1278,7 @@ describe("Role Router Integration Tests (PGlite)", () => {
 
         const org2Roles = await org2Caller.list();
         expect(
-          org2Roles.find(
-            (r) => r.organizationId === sharedTestData.organization,
-          ),
+          org2Roles.find((r) => r.organizationId === testData.organization),
         ).toBeUndefined();
         expect(org2Roles.find((r) => r.id === org2RoleId)).toBeDefined();
 
@@ -1185,9 +1288,14 @@ describe("Role Router Integration Tests (PGlite)", () => {
   });
 
   describe("Permission validation", () => {
-    it("should require role:manage permission for mutations", async () => {
-      await withTransaction(sharedDb, async (db) => {
-        const context = createTestContext(db, sharedTestData);
+    test("should require role:manage permission for mutations", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { context, testData } = await createTestContext(
+          db,
+          "test-org-pinpoint",
+        );
         const caller = roleRouter.createCaller(context);
 
         // Mock permission check to fail
@@ -1210,10 +1318,13 @@ describe("Role Router Integration Tests (PGlite)", () => {
       });
     });
 
-    it("should allow organization:manage permission for queries", async () => {
-      await withTransaction(sharedDb, async (db) => {
+    test("should allow organization:manage permission for queries", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (db) => {
         // Test context with organization:manage but not role:manage
-        const baseQueryContext = await createTestContext(db, sharedTestData);
+        const { context: baseQueryContext, testData: baseTestData } =
+          await createTestContext(db, "test-org-pinpoint");
         const queryContext = {
           ...baseQueryContext,
           userPermissions: ["organization:manage"],
