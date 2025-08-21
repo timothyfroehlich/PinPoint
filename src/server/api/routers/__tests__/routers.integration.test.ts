@@ -19,7 +19,7 @@
 
 import { TRPCError } from "@trpc/server";
 import { eq } from "drizzle-orm";
-import { describe, expect, vi } from "vitest";
+import { describe, expect, vi, beforeAll } from "vitest";
 
 // Import test setup and utilities
 import type { TRPCContext } from "~/server/api/trpc.base";
@@ -27,6 +27,12 @@ import type { TestDatabase } from "~/test/helpers/pglite-test-setup";
 
 import { appRouter } from "~/server/api/root";
 import * as schema from "~/server/db/schema";
+import { 
+  createSeededTestDatabase, 
+  getSeededTestData 
+} from "~/test/helpers/pglite-test-setup";
+import { createSeededAdminTestContext } from "~/test/helpers/createSeededAdminTestContext";
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 import { generateTestId } from "~/test/helpers/test-id-generator";
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
 
@@ -88,45 +94,22 @@ vi.mock("~/server/services/factory", () => ({
 }));
 
 describe("tRPC Router Integration Tests", () => {
-  // Helper function to set up test data and context
-  async function setupTestData(db: TestDatabase) {
-    // Create seed data first
-    const organizationId = generateTestId("test-org");
+  // Suite-level variables for seeded data
+  let workerDb: TestDatabase;
+  let primaryOrgId: string;
+  let competitorOrgId: string;
+  let seededData: any;
 
-    // Create organization
-    const [org] = await db
-      .insert(schema.organizations)
-      .values({
-        id: organizationId,
-        name: "Test Organization",
-        subdomain: "test",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .returning();
-
-    // Create roles
-    const [adminRole] = await db
-      .insert(schema.roles)
-      .values({
-        id: generateTestId("admin-role"),
-        name: "Admin",
-        organizationId,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .returning();
-
-    // Create test user
-    const [testUser] = await db
-      .insert(schema.users)
-      .values({
-        id: "test-user-1",
-        name: "Test User 1",
-        email: `user1-${generateTestId("user")}@example.com`,
-        emailVerified: null,
-      })
-      .returning();
+  beforeAll(async () => {
+    // Create seeded test database with dual organizations
+    const { db, primaryOrgId: primary, secondaryOrgId: competitor } = await createSeededTestDatabase();
+    workerDb = db;
+    primaryOrgId = primary;
+    competitorOrgId = competitor;
+    
+    // Get seeded test data for primary organization
+    seededData = await getSeededTestData(db, primaryOrgId);
+  });
 
     // Create membership for the test user
     await db.insert(schema.memberships).values({

@@ -21,7 +21,7 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 
 import { eq, and } from "drizzle-orm";
-import { describe, expect, vi } from "vitest";
+import { describe, expect, vi, beforeAll } from "vitest";
 
 // Import test setup and utilities
 import type { TRPCContext } from "~/server/api/trpc.base";
@@ -34,7 +34,12 @@ import {
   withIsolatedTest,
   type TestDatabase,
 } from "~/test/helpers/worker-scoped-db";
-import { getSeededTestData } from "~/test/helpers/pglite-test-setup";
+import { 
+  createSeededTestDatabase, 
+  getSeededTestData 
+} from "~/test/helpers/pglite-test-setup";
+import { createSeededAdminTestContext } from "~/test/helpers/createSeededAdminTestContext";
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 import { generateTestId } from "~/test/helpers/test-id-generator";
 
 // Mock external dependencies that aren't database-related
@@ -57,67 +62,32 @@ vi.mock("~/lib/users/roleManagementValidation", () => ({
 }));
 
 describe("Role Router Integration Tests (PGlite)", () => {
-  // Helper to create context for each test
-  async function createTestContext(
-    db: TestDatabase,
-    organizationId: string,
-  ): Promise<{ context: TRPCContext; testData: any }> {
-    // Get seeded test data for this organization
-    const testData = await getSeededTestData(db, organizationId);
+  // Suite-level variables for seeded data
+  let workerDb: TestDatabase;
+  let primaryOrgId: string;
+  let competitorOrgId: string;
+  let seededData: any;
 
-    // Create test context with real database
-    const context: TRPCContext = {
-      user: {
-        id: testData.user || "test-user-admin",
-        email: "admin@dev.local",
-        user_metadata: { name: "Dev Admin" },
-        app_metadata: { organization_id: organizationId, role: "Admin" },
-      },
-      organization: {
-        id: organizationId,
-        name: "Test Organization",
-        subdomain: "test-org",
-      },
-      db: db,
-      supabase: {
-        auth: {
-          getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
-        },
-      } as any,
-      services: {
-        createPinballMapService: vi.fn(),
-        createNotificationService: vi.fn(),
-        createCollectionService: vi.fn(),
-        createIssueActivityService: vi.fn(),
-        createCommentCleanupService: vi.fn(),
-        createQRCodeService: vi.fn(),
-      },
-      headers: new Headers(),
-      logger: {
-        info: vi.fn(),
-        error: vi.fn(),
-        warn: vi.fn(),
-        debug: vi.fn(),
-        trace: vi.fn(),
-        child: vi.fn(() => ({}) as any),
-        withRequest: vi.fn(() => ({}) as any),
-        withUser: vi.fn(() => ({}) as any),
-        withOrganization: vi.fn(() => ({}) as any),
-        withContext: vi.fn(() => ({}) as any),
-      },
-      userPermissions: ["role:manage", "organization:manage"],
-    } as any;
-
-    return { context, testData };
-  }
+  beforeAll(async () => {
+    // Create seeded test database with dual organizations
+    const { db, primaryOrgId: primary, secondaryOrgId: competitor } = await createSeededTestDatabase();
+    workerDb = db;
+    primaryOrgId = primary;
+    competitorOrgId = competitor;
+    
+    // Get seeded test data for primary organization
+    seededData = await getSeededTestData(db, primaryOrgId);
+  });
 
   describe("list - Get all roles", () => {
-    test("should return roles with member count and permissions", async ({
-      workerDb,
-      organizationId,
-    }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        const { context } = await createTestContext(db, organizationId);
+    test("should return roles with member count and permissions", async () => {
+      await withIsolatedTest(workerDb, async (txDb) => {
+        // Create admin context using seeded data
+        const context = await createSeededAdminTestContext(
+          txDb, 
+          primaryOrgId, 
+          SEED_TEST_IDS.USERS.ADMIN
+        );
         const caller = roleRouter.createCaller(context);
 
         const result = await caller.list();
