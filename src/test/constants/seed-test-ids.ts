@@ -126,15 +126,23 @@ export const SEED_TEST_IDS = {
     MACHINE: "mock-machine-1",
     ISSUE: "mock-issue-1",
     COLLECTION: "mock-collection-1",
-  STATUS: "mock-status-1",
-  PRIORITY: "mock-priority-1",
-  COMMENT: "mock-comment-1",
+    STATUS: "mock-status-1",
+    PRIORITY: "mock-priority-1",
+    COMMENT: "mock-comment-1",
     MODEL: "mock-model-1",
     TYPE: "mock-type-1",
-  RESOURCE: "mock-resource-1",
-  ENTITY: "mock-entity-1",
+    RESOURCE: "mock-resource-1",
+    ENTITY: "mock-entity-1",
     ROLE: "mock-role-1",
     MEMBERSHIP: "mock-membership-1",
+    NOTIFICATION: "mock-notification-1",
+    /** Invalid IDs for testing error cases */
+    INVALID: {
+      USER: "mock-invalid-user",
+      MACHINE: "mock-invalid-machine",
+      ISSUE: "mock-invalid-issue",
+      NOTIFICATION: "mock-invalid-notification",
+    },
     /** Secondary patterns for cross-organization testing */
     SECONDARY: {
       ORGANIZATION: "mock-org-2",

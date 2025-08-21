@@ -23,16 +23,20 @@ import {
   getSeededTestData,
   type TestDatabase,
 } from "~/test/helpers/pglite-test-setup";
-import { generateTestId } from "~/test/helpers/test-id-generator";
+import { createSeededIssueTestContext } from "~/test/helpers/createSeededIssueTestContext";
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
 
 // Mock external dependencies that aren't database-related
 vi.mock("~/lib/utils/id-generation", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("~/lib/utils/id-generation")>();
+  const actual =
+    await importOriginal<typeof import("~/lib/utils/id-generation")>();
   return {
     ...actual,
     generateId: vi.fn(() => generateTestId("test-comment-id")),
-    generatePrefixedId: vi.fn((prefix: string) => generateTestId(`test-${prefix}-id`)),
+    generatePrefixedId: vi.fn((prefix: string) =>
+      generateTestId(`test-${prefix}-id`),
+    ),
   };
 });
 
@@ -66,180 +70,86 @@ vi.mock("~/server/services/types", () => ({
 describe("Comment Service Integration (tRPC)", () => {
   // Helper function to create test context with seeded data
   async function createTestContext(db: TestDatabase, organizationId: string) {
-    // Query actual seeded IDs instead of using hardcoded ones
-    const testData = await getSeededTestData(db, organizationId);
+    // Use seeded data infrastructure as foundation
+    const seededData = await getSeededTestData(db, organizationId);
 
-    // Create missing test data if needed
-    let machineId = testData.machine;
-    let issueId = testData.issue;
-
-    if (!machineId) {
-      // Create a model first (required for machine)
-      const modelData = {
-        id: generateTestId("test-model"),
-        name: "Test Model",
-        manufacturer: "Williams",
-        year: 2000,
-        type: "SS" as const,
-        opdbId: 1000,
+    // Create standardized TRPC context using the helper if user data is available
+    if (seededData.user) {
+      const tRPCContext = await createSeededIssueTestContext(
+        db,
         organizationId,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        seededData.user,
+      );
+
+      // Override services with mock implementations for comment testing
+      tRPCContext.services.createCommentCleanupService = vi.fn(() => ({
+        softDeleteComment: vi.fn(),
+        restoreComment: vi.fn(),
+        getDeletedComments: vi.fn(),
+        getCleanupStats: vi.fn(),
+        cleanupOldDeletedComments: vi.fn(),
+      }));
+
+      const caller = commentRouter.createCaller(tRPCContext);
+
+      return {
+        caller,
+        testData: {
+          user: seededData.user,
+          machine: seededData.machine!,
+          issue: seededData.issue!,
+          organization: organizationId,
+          location: seededData.location,
+          priority: seededData.priority,
+          status: seededData.status,
+        },
       };
+    } else {
+      // Fallback: Create minimal test context for cross-org testing
+      const testUserId = SEED_TEST_IDS.USERS.MEMBER1;
 
-      const [model] = await db
-        .insert(schema.models)
-        .values(modelData)
-        .returning();
-
-      // Create a location (required for machine)
-      const locationData = {
-        id: generateTestId("test-location"),
-        name: "Test Location",
-        organizationId,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
-      const [location] = await db
-        .insert(schema.locations)
-        .values(locationData)
-        .returning();
-
-      // Create a machine
-      const machineData = {
-        id: generateTestId("test-machine"),
-        name: "Test Machine",
-        modelId: model.id,
-        locationId: location.id,
-        organizationId,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
-      const [machine] = await db
-        .insert(schema.machines)
-        .values(machineData)
-        .returning();
-
-      machineId = machine.id;
-    }
-
-    if (!issueId) {
-      // Create priority and status if they don't exist
-      let priorityId = testData.priority;
-      let statusId = testData.status;
-
-      if (!priorityId) {
-        const priorityData = {
-          id: generateTestId("test-priority"),
-          name: "Medium",
-          organizationId,
-          order: 2,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        };
-
-        const [priority] = await db
-          .insert(schema.priorities)
-          .values(priorityData)
-          .returning();
-        priorityId = priority.id;
-      }
-
-      if (!statusId) {
-        const statusData = {
-          id: generateTestId("test-status"),
-          name: "Open",
-          category: "NEW" as const,
-          organizationId,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        };
-
-        const [status] = await db
-          .insert(schema.issueStatuses)
-          .values(statusData)
-          .returning();
-        statusId = status.id;
-      }
-
-      // Create an issue
-      const issueData = {
-        id: generateTestId("test-issue"),
-        title: "Test Issue",
-        organizationId,
-        machineId: machineId,
-        statusId: statusId,
-        priorityId: priorityId,
-        createdById: testData.user,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
-      const [issue] = await db
-        .insert(schema.issues)
-        .values(issueData)
-        .returning();
-      issueId = issue.id;
-    }
-
-    // Generate unique IDs for this test context to avoid conflicts
-    const uniqueCommentId = generateTestId("test-comment");
-
-    // Create additional test comments for complex scenarios
-    const testComment = await db
-      .insert(schema.comments)
-      .values({
-        id: uniqueCommentId,
-        content: "Test comment content",
-        organizationId,
-        issueId: issueId,
-        authorId: testData.user,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .returning()
-      .then((result) => result[0]);
-
-    const updatedTestData = {
-      ...testData,
-      issue: issueId,
-      machine: machineId,
-      comment: testComment.id,
-    };
-
-    // Create tRPC context with membership for organization procedure
-    const tRPCContext = {
-      user: {
-        id: testData.user,
-        user_metadata: { organizationId },
-      },
-      session: {
+      const tRPCContext = {
         user: {
-          id: testData.user,
+          id: testUserId,
           user_metadata: { organizationId },
         },
-      },
-      organization: { id: organizationId },
-      db,
-      services: {
-        createCommentCleanupService: () => ({
-          softDeleteComment: vi.fn(),
-          restoreComment: vi.fn(),
-          getDeletedComments: vi.fn(),
-          getCleanupStats: vi.fn(),
-          cleanupOldDeletedComments: vi.fn(),
-        }),
-        createIssueActivityService: () => ({
-          recordCommentDeleted: vi.fn(),
-        }),
-      },
-    };
+        session: {
+          user: {
+            id: testUserId,
+            user_metadata: { organizationId },
+          },
+        },
+        organization: { id: organizationId },
+        db,
+        services: {
+          createCommentCleanupService: () => ({
+            softDeleteComment: vi.fn(),
+            restoreComment: vi.fn(),
+            getDeletedComments: vi.fn(),
+            getCleanupStats: vi.fn(),
+            cleanupOldDeletedComments: vi.fn(),
+          }),
+          createIssueActivityService: () => ({
+            recordCommentDeleted: vi.fn(),
+          }),
+        },
+      };
 
-    const caller = commentRouter.createCaller(tRPCContext);
+      const caller = commentRouter.createCaller(tRPCContext);
 
-    return { caller, testData: updatedTestData };
+      return {
+        caller,
+        testData: {
+          user: testUserId,
+          machine: seededData.machine || "test-machine-fallback",
+          issue: seededData.issue || "test-issue-fallback",
+          organization: organizationId,
+          location: seededData.location,
+          priority: seededData.priority,
+          status: seededData.status,
+        },
+      };
+    }
   }
 
   describe("Comment CRUD Operations", () => {
@@ -420,8 +330,8 @@ describe("Comment Service Integration (tRPC)", () => {
 
         expect(Array.isArray(result)).toBe(true);
         expect(result.length).toBeGreaterThan(0);
-        
-        const deletedComment = result.find(c => c.id === deletedCommentId);
+
+        const deletedComment = result.find((c) => c.id === deletedCommentId);
         expect(deletedComment).toBeDefined();
         expect(deletedComment?.deletedAt).toBeInstanceOf(Date);
         expect(deletedComment?.deleter).toMatchObject({
@@ -480,7 +390,7 @@ describe("Comment Service Integration (tRPC)", () => {
 
         // Create old deleted comments
         const oldDate = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000); // 31 days ago
-        
+
         await db.insert(schema.comments).values([
           {
             id: generateTestId("old-deleted-1"),
@@ -538,20 +448,22 @@ describe("Comment Service Integration (tRPC)", () => {
         const issueComments = await caller.getForIssue({
           issueId: testData.issue,
         });
-        expect(issueComments.some(c => c.id === comment.id)).toBe(true);
+        expect(issueComments.some((c) => c.id === comment.id)).toBe(true);
 
         // 3. Soft delete comment
         await caller.delete({ commentId: comment.id });
 
         // 4. Verify it appears in deleted comments
         const deletedComments = await caller.getDeleted();
-        expect(deletedComments.some(c => c.id === comment.id)).toBe(true);
+        expect(deletedComments.some((c) => c.id === comment.id)).toBe(true);
 
         // 5. Verify it doesn't appear in issue comments
         const issueCommentsAfterDelete = await caller.getForIssue({
           issueId: testData.issue,
         });
-        expect(issueCommentsAfterDelete.some(c => c.id === comment.id)).toBe(false);
+        expect(issueCommentsAfterDelete.some((c) => c.id === comment.id)).toBe(
+          false,
+        );
 
         // 6. Restore comment
         await caller.restore({ commentId: comment.id });
@@ -560,11 +472,15 @@ describe("Comment Service Integration (tRPC)", () => {
         const issueCommentsAfterRestore = await caller.getForIssue({
           issueId: testData.issue,
         });
-        expect(issueCommentsAfterRestore.some(c => c.id === comment.id)).toBe(true);
+        expect(issueCommentsAfterRestore.some((c) => c.id === comment.id)).toBe(
+          true,
+        );
 
         // 8. Verify it doesn't appear in deleted comments
         const deletedCommentsAfterRestore = await caller.getDeleted();
-        expect(deletedCommentsAfterRestore.some(c => c.id === comment.id)).toBe(false);
+        expect(
+          deletedCommentsAfterRestore.some((c) => c.id === comment.id),
+        ).toBe(false);
       });
     });
 

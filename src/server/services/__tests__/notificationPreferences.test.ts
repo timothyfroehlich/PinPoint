@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
 // Modern Vitest hoisted mock state
 const mockDb = vi.hoisted(() => ({
@@ -8,12 +9,20 @@ const mockDb = vi.hoisted(() => ({
       findMany: vi.fn(),
     },
     machines: {
-      findFirst: vi.fn(), 
+      findFirst: vi.fn(),
       findMany: vi.fn(),
     },
   },
   insert: vi.fn().mockReturnValue({ returning: vi.fn() }),
-  update: vi.fn().mockReturnValue({ set: vi.fn().mockReturnValue({ where: vi.fn().mockReturnValue({ returning: vi.fn() }) }) }),
+  update: vi
+    .fn()
+    .mockReturnValue({
+      set: vi
+        .fn()
+        .mockReturnValue({
+          where: vi.fn().mockReturnValue({ returning: vi.fn() }),
+        }),
+    }),
 }));
 
 // Mock the database module
@@ -26,10 +35,9 @@ vi.mock("@/server/db/index", async (importOriginal) => {
 });
 
 describe("Notification preference logic", () => {
-
   const mockUser = {
-    id: "user-1",
-    email: "preferencetest@example.com",
+    id: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+    email: SEED_TEST_IDS.EMAILS.MEMBER1,
     name: "Preference Test",
     emailNotificationsEnabled: true,
     pushNotificationsEnabled: false,
@@ -41,13 +49,13 @@ describe("Notification preference logic", () => {
   };
 
   const mockMachine = {
-    id: "machine-1",
+    id: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
     serialNumber: "TEST123",
     condition: "Good",
     notes: null,
-    organizationId: "org-1",
-    locationId: "location-1",
-    modelId: "model-1",
+    organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+    locationId: SEED_TEST_IDS.MOCK_PATTERNS.LOCATION,
+    modelId: SEED_TEST_IDS.MOCK_PATTERNS.MODEL,
     ownerId: mockUser.id,
     ownerNotificationsEnabled: true,
     notifyOnNewIssues: true,
@@ -75,7 +83,11 @@ describe("Notification preference logic", () => {
     mockDb.query.machines.findFirst.mockResolvedValue(updatedMachine);
 
     // Test the mock behavior (this would normally test actual service logic)
-    const result = await mockDb.update().set({ ownerNotificationsEnabled: false }).where().returning();
+    const result = await mockDb
+      .update()
+      .set({ ownerNotificationsEnabled: false })
+      .where()
+      .returning();
     const found = await mockDb.query.machines.findFirst();
 
     expect(result[0]?.ownerNotificationsEnabled).toBe(false);
@@ -96,7 +108,11 @@ describe("Notification preference logic", () => {
     mockDb.query.users.findFirst.mockResolvedValue(updatedUser);
 
     // Test the mock behavior (this would normally test actual service logic)
-    const result = await mockDb.update().set({ emailNotificationsEnabled: false }).where().returning();
+    const result = await mockDb
+      .update()
+      .set({ emailNotificationsEnabled: false })
+      .where()
+      .returning();
     const found = await mockDb.query.users.findFirst();
 
     expect(result[0]?.emailNotificationsEnabled).toBe(false);
@@ -127,8 +143,8 @@ describe("Notification preference logic", () => {
 
   it("sets correct defaults for new users and machines", async () => {
     const newUser = {
-      id: "new-user-1",
-      email: "defaultuser@example.com",
+      id: `${SEED_TEST_IDS.MOCK_PATTERNS.USER}-new`,
+      email: SEED_TEST_IDS.EMAILS.MEMBER2,
       name: "Default User",
       emailNotificationsEnabled: true,
       pushNotificationsEnabled: false,
@@ -140,13 +156,13 @@ describe("Notification preference logic", () => {
     };
 
     const newMachine = {
-      id: "new-machine-1",
+      id: `${SEED_TEST_IDS.MOCK_PATTERNS.MACHINE}-new`,
       serialNumber: "DEFAULT123",
       condition: "Good",
       notes: null,
-      organizationId: "org-1",
-      locationId: "location-1",
-      modelId: "model-1",
+      organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+      locationId: SEED_TEST_IDS.MOCK_PATTERNS.LOCATION,
+      modelId: SEED_TEST_IDS.MOCK_PATTERNS.MODEL,
       ownerId: newUser.id,
       ownerNotificationsEnabled: true,
       notifyOnNewIssues: true,
@@ -157,7 +173,8 @@ describe("Notification preference logic", () => {
     };
 
     // Mock Drizzle insert operations
-    const mockReturning = vi.fn()
+    const mockReturning = vi
+      .fn()
       .mockResolvedValueOnce([newUser])
       .mockResolvedValueOnce([newMachine]);
     mockDb.insert.mockReturnValue({ returning: mockReturning });
