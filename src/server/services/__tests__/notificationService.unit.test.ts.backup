@@ -70,11 +70,10 @@ describe("NotificationService Unit Tests", () => {
     vi.clearAllMocks();
 
     // Mock predictable ID generation
+    let idCounter = 0;
     mockGeneratePrefixedId.mockImplementation((prefix: string) => {
-      if (prefix === "notification") {
-        return SEED_TEST_IDS.MOCK_PATTERNS.NOTIFICATION;
-      }
-      return `${prefix}-1`;
+      idCounter++;
+      return `${prefix}-${idCounter}`;
     });
 
     // Setup Drizzle function mocks to return mock conditions
@@ -237,9 +236,7 @@ describe("NotificationService Unit Tests", () => {
     it("returns all notifications for user ordered by created date desc", async () => {
       mockDb.query.notifications.findMany.mockResolvedValue(mockNotifications);
 
-      const result = await service.getUserNotifications(
-        SEED_TEST_IDS.MOCK_PATTERNS.USER,
-      );
+      const result = await service.getUserNotifications(SEED_TEST_IDS.MOCK_PATTERNS.USER);
 
       expect(mockDb.query.notifications.findMany).toHaveBeenCalledWith({
         where: {
@@ -260,12 +257,9 @@ describe("NotificationService Unit Tests", () => {
         unreadNotifications,
       );
 
-      const result = await service.getUserNotifications(
-        SEED_TEST_IDS.MOCK_PATTERNS.USER,
-        {
-          unreadOnly: true,
-        },
-      );
+      const result = await service.getUserNotifications(SEED_TEST_IDS.MOCK_PATTERNS.USER, {
+        unreadOnly: true,
+      });
 
       expect(mockDb.query.notifications.findMany).toHaveBeenCalledWith({
         where: {
@@ -291,7 +285,7 @@ describe("NotificationService Unit Tests", () => {
         mockNotifications[0],
       ]);
 
-      await service.getUserNotifications(SEED_TEST_IDS.MOCK_PATTERNS.USER, {
+      await service.getUserNotifications("user-1", {
         limit: 1,
         offset: 5,
       });
@@ -300,7 +294,7 @@ describe("NotificationService Unit Tests", () => {
         where: {
           type: "eq",
           field: schemaMocks.notifications.userId,
-          value: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+          value: "user-1",
         },
         orderBy: { type: "desc", field: schemaMocks.notifications.createdAt },
         limit: 1,
@@ -311,13 +305,13 @@ describe("NotificationService Unit Tests", () => {
     it("handles empty options object", async () => {
       mockDb.query.notifications.findMany.mockResolvedValue(mockNotifications);
 
-      await service.getUserNotifications(SEED_TEST_IDS.MOCK_PATTERNS.USER, {});
+      await service.getUserNotifications("user-1", {});
 
       expect(mockDb.query.notifications.findMany).toHaveBeenCalledWith({
         where: {
           type: "eq",
           field: schemaMocks.notifications.userId,
-          value: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+          value: "user-1",
         },
         orderBy: { type: "desc", field: schemaMocks.notifications.createdAt },
         limit: 50,
@@ -328,13 +322,13 @@ describe("NotificationService Unit Tests", () => {
     it("handles undefined options", async () => {
       mockDb.query.notifications.findMany.mockResolvedValue(mockNotifications);
 
-      await service.getUserNotifications(SEED_TEST_IDS.MOCK_PATTERNS.USER);
+      await service.getUserNotifications("user-1");
 
       expect(mockDb.query.notifications.findMany).toHaveBeenCalledWith({
         where: {
           type: "eq",
           field: schemaMocks.notifications.userId,
-          value: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+          value: "user-1",
         },
         orderBy: { type: "desc", field: schemaMocks.notifications.createdAt },
         limit: 50,
@@ -345,10 +339,7 @@ describe("NotificationService Unit Tests", () => {
 
   describe("markAsRead", () => {
     it("marks notification as read for correct user", async () => {
-      await service.markAsRead(
-        SEED_TEST_IDS.MOCK_PATTERNS.NOTIFICATION,
-        SEED_TEST_IDS.MOCK_PATTERNS.USER,
-      );
+      await service.markAsRead("notification-1", "user-1");
 
       expect(mockDb.update).toHaveBeenCalledWith(schemaMocks.notifications);
       expect(mockDb.update().set).toHaveBeenCalledWith({ read: true });
@@ -358,22 +349,19 @@ describe("NotificationService Unit Tests", () => {
           {
             type: "eq",
             field: schemaMocks.notifications.id,
-            value: SEED_TEST_IDS.MOCK_PATTERNS.NOTIFICATION,
+            value: "notification-1",
           },
           {
             type: "eq",
             field: schemaMocks.notifications.userId,
-            value: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+            value: "user-1",
           },
         ],
       });
     });
 
     it("uses proper security - filters by both notification ID and user ID", async () => {
-      await service.markAsRead(
-        SEED_TEST_IDS.MOCK_PATTERNS.NOTIFICATION,
-        SEED_TEST_IDS.MOCK_PATTERNS.USER,
-      );
+      await service.markAsRead("notification-1", "user-1");
 
       // Verify that the where clause includes both notification ID and user ID for security
       expect(mockDb.update().set().where).toHaveBeenCalledWith({
@@ -382,12 +370,12 @@ describe("NotificationService Unit Tests", () => {
           {
             type: "eq",
             field: schemaMocks.notifications.id,
-            value: SEED_TEST_IDS.MOCK_PATTERNS.NOTIFICATION,
+            value: "notification-1",
           },
           {
             type: "eq",
             field: schemaMocks.notifications.userId,
-            value: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+            value: "user-1",
           },
         ],
       });
@@ -398,17 +386,14 @@ describe("NotificationService Unit Tests", () => {
       mockDb.update().set().where.mockResolvedValue(undefined);
 
       await expect(
-        service.markAsRead(
-          SEED_TEST_IDS.MOCK_PATTERNS.INVALID.NOTIFICATION,
-          SEED_TEST_IDS.MOCK_PATTERNS.USER,
-        ),
+        service.markAsRead("non-existent", "user-1"),
       ).resolves.not.toThrow();
     });
   });
 
   describe("markAllAsRead", () => {
     it("marks all unread notifications as read for user", async () => {
-      await service.markAllAsRead(SEED_TEST_IDS.MOCK_PATTERNS.USER);
+      await service.markAllAsRead("user-1");
 
       expect(mockDb.update).toHaveBeenCalledWith(schemaMocks.notifications);
       expect(mockDb.update().set).toHaveBeenCalledWith({ read: true });
@@ -418,7 +403,7 @@ describe("NotificationService Unit Tests", () => {
           {
             type: "eq",
             field: schemaMocks.notifications.userId,
-            value: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+            value: "user-1",
           },
           { type: "eq", field: schemaMocks.notifications.read, value: false },
         ],
@@ -426,7 +411,7 @@ describe("NotificationService Unit Tests", () => {
     });
 
     it("only affects unread notifications for specific user", async () => {
-      await service.markAllAsRead(SEED_TEST_IDS.MOCK_PATTERNS.USER);
+      await service.markAllAsRead("user-1");
 
       // Verify that the where clause scopes to user ID and unread notifications only
       expect(mockDb.update().set().where).toHaveBeenCalledWith({
@@ -435,7 +420,7 @@ describe("NotificationService Unit Tests", () => {
           {
             type: "eq",
             field: schemaMocks.notifications.userId,
-            value: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+            value: "user-1",
           },
           { type: "eq", field: schemaMocks.notifications.read, value: false },
         ],
@@ -450,9 +435,7 @@ describe("NotificationService Unit Tests", () => {
         .from()
         .where.mockResolvedValue([{ count: 3 }]);
 
-      const count = await service.getUnreadCount(
-        SEED_TEST_IDS.MOCK_PATTERNS.USER,
-      );
+      const count = await service.getUnreadCount("user-1");
 
       expect(mockDb.select).toHaveBeenCalledWith({ count: { type: "count" } });
       expect(mockDb.select().from).toHaveBeenCalledWith(
@@ -464,7 +447,7 @@ describe("NotificationService Unit Tests", () => {
           {
             type: "eq",
             field: schemaMocks.notifications.userId,
-            value: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+            value: "user-1",
           },
           { type: "eq", field: schemaMocks.notifications.read, value: false },
         ],
@@ -478,9 +461,7 @@ describe("NotificationService Unit Tests", () => {
         .from()
         .where.mockResolvedValue([{ count: 0 }]);
 
-      const count = await service.getUnreadCount(
-        SEED_TEST_IDS.MOCK_PATTERNS.USER,
-      );
+      const count = await service.getUnreadCount("user-1");
 
       expect(count).toBe(0);
     });
@@ -488,9 +469,7 @@ describe("NotificationService Unit Tests", () => {
     it("handles undefined count result gracefully", async () => {
       mockDb.select().from().where.mockResolvedValue([]);
 
-      const count = await service.getUnreadCount(
-        SEED_TEST_IDS.MOCK_PATTERNS.USER,
-      );
+      const count = await service.getUnreadCount("user-1");
 
       expect(count).toBe(0);
     });
@@ -501,7 +480,7 @@ describe("NotificationService Unit Tests", () => {
         .from()
         .where.mockResolvedValue([{ count: 1 }]);
 
-      await service.getUnreadCount(SEED_TEST_IDS.MOCK_PATTERNS.USER);
+      await service.getUnreadCount("user-1");
 
       // Verify query uses select builder pattern and scopes to specific user and unread notifications
       expect(mockDb.select).toHaveBeenCalledWith({ count: { type: "count" } });
@@ -511,7 +490,7 @@ describe("NotificationService Unit Tests", () => {
           {
             type: "eq",
             field: schemaMocks.notifications.userId,
-            value: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+            value: "user-1",
           },
           { type: "eq", field: schemaMocks.notifications.read, value: false },
         ],
@@ -521,13 +500,13 @@ describe("NotificationService Unit Tests", () => {
 
   describe("notifyMachineOwnerOfIssue", () => {
     const mockMachine = {
-      id: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
+      id: "machine-1",
       name: "Test Machine",
-      ownerId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+      ownerId: "owner-1",
       ownerNotificationsEnabled: true,
       notifyOnNewIssues: true,
       owner: {
-        id: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+        id: "owner-1",
       },
       model: {
         name: "Test Model",
@@ -535,9 +514,9 @@ describe("NotificationService Unit Tests", () => {
     };
 
     const mockIssue = {
-      id: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
+      id: "issue-1",
       title: "Test Issue",
-      machineId: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
+      machineId: "machine-1",
     };
 
     beforeEach(() => {
@@ -551,16 +530,13 @@ describe("NotificationService Unit Tests", () => {
       mockDb.query.machines.findFirst.mockResolvedValue(mockMachine);
       mockDb.query.issues.findFirst.mockResolvedValue(mockIssue);
 
-      await service.notifyMachineOwnerOfIssue(
-        SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
-        SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
-      );
+      await service.notifyMachineOwnerOfIssue("issue-1", "machine-1");
 
       expect(mockDb.query.machines.findFirst).toHaveBeenCalledWith({
         where: {
           type: "eq",
           field: schemaMocks.machines.id,
-          value: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
+          value: "machine-1",
         },
         with: {
           owner: true,
@@ -569,23 +545,19 @@ describe("NotificationService Unit Tests", () => {
       });
 
       expect(mockDb.query.issues.findFirst).toHaveBeenCalledWith({
-        where: {
-          type: "eq",
-          field: schemaMocks.issues.id,
-          value: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
-        },
+        where: { type: "eq", field: schemaMocks.issues.id, value: "issue-1" },
         columns: { title: true },
       });
 
       expect(mockDb.insert).toHaveBeenCalledWith(schemaMocks.notifications);
       expect(mockDb.insert().values).toHaveBeenCalledWith({
-        id: SEED_TEST_IDS.MOCK_PATTERNS.NOTIFICATION,
-        userId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+        id: "notification-1",
+        userId: "owner-1",
         type: "ISSUE_CREATED",
         message: 'New issue reported on your Test Model: "Test Issue"',
         entityType: "ISSUE",
-        entityId: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
-        actionUrl: `/issues/${SEED_TEST_IDS.MOCK_PATTERNS.ISSUE}`,
+        entityId: "issue-1",
+        actionUrl: "/issues/issue-1",
       });
     });
 
@@ -597,10 +569,7 @@ describe("NotificationService Unit Tests", () => {
       mockDb.query.machines.findFirst.mockResolvedValue(machineNoNotifications);
       mockDb.query.issues.findFirst.mockResolvedValue(mockIssue);
 
-      await service.notifyMachineOwnerOfIssue(
-        SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
-        SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
-      );
+      await service.notifyMachineOwnerOfIssue("issue-1", "machine-1");
 
       expect(mockDb.insert).not.toHaveBeenCalled();
     });
@@ -615,10 +584,7 @@ describe("NotificationService Unit Tests", () => {
       );
       mockDb.query.issues.findFirst.mockResolvedValue(mockIssue);
 
-      await service.notifyMachineOwnerOfIssue(
-        SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
-        SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
-      );
+      await service.notifyMachineOwnerOfIssue("issue-1", "machine-1");
 
       expect(mockDb.insert).not.toHaveBeenCalled();
     });
@@ -628,10 +594,7 @@ describe("NotificationService Unit Tests", () => {
       mockDb.query.issues.findFirst.mockResolvedValue(mockIssue);
 
       await expect(
-        service.notifyMachineOwnerOfIssue(
-          SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
-          SEED_TEST_IDS.MOCK_PATTERNS.INVALID.MACHINE,
-        ),
+        service.notifyMachineOwnerOfIssue("issue-1", "non-existent-machine"),
       ).resolves.not.toThrow();
 
       expect(mockDb.insert).not.toHaveBeenCalled();
@@ -642,10 +605,7 @@ describe("NotificationService Unit Tests", () => {
       mockDb.query.issues.findFirst.mockResolvedValue(null);
 
       await expect(
-        service.notifyMachineOwnerOfIssue(
-          SEED_TEST_IDS.MOCK_PATTERNS.INVALID.ISSUE,
-          SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
-        ),
+        service.notifyMachineOwnerOfIssue("non-existent-issue", "machine-1"),
       ).resolves.not.toThrow();
 
       expect(mockDb.insert).not.toHaveBeenCalled();
@@ -659,10 +619,7 @@ describe("NotificationService Unit Tests", () => {
       mockDb.query.machines.findFirst.mockResolvedValue(machineNoOwner);
       mockDb.query.issues.findFirst.mockResolvedValue(mockIssue);
 
-      await service.notifyMachineOwnerOfIssue(
-        SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
-        SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
-      );
+      await service.notifyMachineOwnerOfIssue("issue-1", "machine-1");
 
       expect(mockDb.insert).not.toHaveBeenCalled();
     });
@@ -672,7 +629,7 @@ describe("NotificationService Unit Tests", () => {
         ...mockMachine,
         name: "Special Machine",
         owner: {
-          id: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+          id: "owner-1",
         },
         model: {
           name: "Premium Model",
@@ -686,10 +643,7 @@ describe("NotificationService Unit Tests", () => {
       mockDb.query.machines.findFirst.mockResolvedValue(machineWithDetails);
       mockDb.query.issues.findFirst.mockResolvedValue(issueWithDetails);
 
-      await service.notifyMachineOwnerOfIssue(
-        SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
-        SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
-      );
+      await service.notifyMachineOwnerOfIssue("issue-1", "machine-1");
 
       expect(mockDb.insert().values).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -702,14 +656,14 @@ describe("NotificationService Unit Tests", () => {
 
   describe("notifyMachineOwnerOfStatusChange", () => {
     const mockIssueWithMachine = {
-      id: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
+      id: "issue-1",
       title: "Test Issue",
       machine: {
-        id: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
+        id: "machine-1",
         ownerNotificationsEnabled: true,
         notifyOnStatusChanges: true,
         owner: {
-          id: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+          id: "owner-1",
         },
         model: {
           name: "Test Model",
@@ -726,17 +680,13 @@ describe("NotificationService Unit Tests", () => {
       mockDb.query.issues.findFirst.mockResolvedValue(mockIssueWithMachine);
 
       await service.notifyMachineOwnerOfStatusChange(
-        SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
+        "issue-1",
         "open",
         "in-progress",
       );
 
       expect(mockDb.query.issues.findFirst).toHaveBeenCalledWith({
-        where: {
-          type: "eq",
-          field: schemaMocks.issues.id,
-          value: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
-        },
+        where: { type: "eq", field: schemaMocks.issues.id, value: "issue-1" },
         with: {
           machine: {
             with: {
@@ -749,13 +699,13 @@ describe("NotificationService Unit Tests", () => {
 
       expect(mockDb.insert).toHaveBeenCalledWith(schemaMocks.notifications);
       expect(mockDb.insert().values).toHaveBeenCalledWith({
-        id: SEED_TEST_IDS.MOCK_PATTERNS.NOTIFICATION,
-        userId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+        id: "notification-1",
+        userId: "owner-1",
         type: "ISSUE_UPDATED",
         message: "Issue status changed on your Test Model: open → in-progress",
         entityType: "ISSUE",
-        entityId: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
-        actionUrl: `/issues/${SEED_TEST_IDS.MOCK_PATTERNS.ISSUE}`,
+        entityId: "issue-1",
+        actionUrl: "/issues/issue-1",
       });
     });
 
@@ -772,7 +722,7 @@ describe("NotificationService Unit Tests", () => {
       );
 
       await service.notifyMachineOwnerOfStatusChange(
-        SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
+        "issue-1",
         "open",
         "closed",
       );
@@ -793,7 +743,7 @@ describe("NotificationService Unit Tests", () => {
       );
 
       await service.notifyMachineOwnerOfStatusChange(
-        SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
+        "issue-1",
         "open",
         "closed",
       );
@@ -806,7 +756,7 @@ describe("NotificationService Unit Tests", () => {
 
       await expect(
         service.notifyMachineOwnerOfStatusChange(
-          SEED_TEST_IDS.MOCK_PATTERNS.INVALID.NOTIFICATION,
+          "non-existent",
           "open",
           "closed",
         ),
@@ -818,10 +768,10 @@ describe("NotificationService Unit Tests", () => {
 
   describe("notifyUserOfAssignment", () => {
     const mockIssueForAssignment = {
-      id: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
+      id: "issue-1",
       title: "Assignment Test Issue",
       machine: {
-        id: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
+        id: "machine-1",
         model: {
           name: "Assignment Test Model",
         },
@@ -836,17 +786,10 @@ describe("NotificationService Unit Tests", () => {
     it("creates notification when user is assigned to issue", async () => {
       mockDb.query.issues.findFirst.mockResolvedValue(mockIssueForAssignment);
 
-      await service.notifyUserOfAssignment(
-        SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
-        SEED_TEST_IDS.MOCK_PATTERNS.USER,
-      );
+      await service.notifyUserOfAssignment("issue-1", "user-1");
 
       expect(mockDb.query.issues.findFirst).toHaveBeenCalledWith({
-        where: {
-          type: "eq",
-          field: schemaMocks.issues.id,
-          value: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
-        },
+        where: { type: "eq", field: schemaMocks.issues.id, value: "issue-1" },
         with: {
           machine: {
             with: {
@@ -858,14 +801,14 @@ describe("NotificationService Unit Tests", () => {
 
       expect(mockDb.insert).toHaveBeenCalledWith(schemaMocks.notifications);
       expect(mockDb.insert().values).toHaveBeenCalledWith({
-        id: SEED_TEST_IDS.MOCK_PATTERNS.NOTIFICATION,
-        userId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+        id: "notification-1",
+        userId: "user-1",
         type: "ISSUE_ASSIGNED",
         message:
           'You were assigned to issue: "Assignment Test Issue" on Assignment Test Model',
         entityType: "ISSUE",
-        entityId: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
-        actionUrl: `/issues/${SEED_TEST_IDS.MOCK_PATTERNS.ISSUE}`,
+        entityId: "issue-1",
+        actionUrl: "/issues/issue-1",
       });
     });
 
@@ -873,10 +816,7 @@ describe("NotificationService Unit Tests", () => {
       mockDb.query.issues.findFirst.mockResolvedValue(null);
 
       await expect(
-        service.notifyUserOfAssignment(
-          SEED_TEST_IDS.MOCK_PATTERNS.INVALID.NOTIFICATION,
-          SEED_TEST_IDS.MOCK_PATTERNS.USER,
-        ),
+        service.notifyUserOfAssignment("non-existent", "user-1"),
       ).resolves.not.toThrow();
 
       expect(mockDb.insert).not.toHaveBeenCalled();
@@ -884,10 +824,10 @@ describe("NotificationService Unit Tests", () => {
 
     it("creates notification with proper issue title and machine model", async () => {
       const detailedIssue = {
-        id: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
+        id: "issue-1",
         title: "Complex Assignment Issue",
         machine: {
-          id: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
+          id: "machine-1",
           model: {
             name: "Detailed Test Model",
           },
@@ -895,10 +835,7 @@ describe("NotificationService Unit Tests", () => {
       };
       mockDb.query.issues.findFirst.mockResolvedValue(detailedIssue);
 
-      await service.notifyUserOfAssignment(
-        SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
-        SEED_TEST_IDS.MOCK_PATTERNS.USER,
-      );
+      await service.notifyUserOfAssignment("issue-1", "user-1");
 
       expect(mockDb.insert().values).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -911,10 +848,7 @@ describe("NotificationService Unit Tests", () => {
 
   describe("security and multi-tenancy", () => {
     it("markAsRead validates notification ownership", async () => {
-      await service.markAsRead(
-        SEED_TEST_IDS.MOCK_PATTERNS.NOTIFICATION,
-        SEED_TEST_IDS.MOCK_PATTERNS.USER,
-      );
+      await service.markAsRead("notification-1", "user-1");
 
       // Verify that the where clause includes both notification ID and user ID
       // This prevents users from marking other users' notifications as read
@@ -924,19 +858,19 @@ describe("NotificationService Unit Tests", () => {
           {
             type: "eq",
             field: schemaMocks.notifications.id,
-            value: SEED_TEST_IDS.MOCK_PATTERNS.NOTIFICATION,
+            value: "notification-1",
           },
           {
             type: "eq",
             field: schemaMocks.notifications.userId,
-            value: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+            value: "user-1",
           },
         ],
       });
     });
 
     it("markAllAsRead scopes to specific user only", async () => {
-      await service.markAllAsRead(SEED_TEST_IDS.MOCK_PATTERNS.USER);
+      await service.markAllAsRead("user-1");
 
       // Verify that only the specific user's notifications are affected
       expect(mockDb.update().set().where).toHaveBeenCalledWith({
@@ -945,7 +879,7 @@ describe("NotificationService Unit Tests", () => {
           {
             type: "eq",
             field: schemaMocks.notifications.userId,
-            value: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+            value: "user-1",
           },
           { type: "eq", field: schemaMocks.notifications.read, value: false },
         ],
@@ -955,14 +889,14 @@ describe("NotificationService Unit Tests", () => {
     it("getUserNotifications scopes to specific user only", async () => {
       mockDb.query.notifications.findMany.mockResolvedValue([]);
 
-      await service.getUserNotifications(SEED_TEST_IDS.MOCK_PATTERNS.USER);
+      await service.getUserNotifications("user-1");
 
       // Verify that only the specific user's notifications are returned
       expect(mockDb.query.notifications.findMany).toHaveBeenCalledWith({
         where: {
           type: "eq",
           field: schemaMocks.notifications.userId,
-          value: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+          value: "user-1",
         },
         orderBy: { type: "desc", field: schemaMocks.notifications.createdAt },
         limit: 50,
@@ -976,7 +910,7 @@ describe("NotificationService Unit Tests", () => {
         .from()
         .where.mockResolvedValue([{ count: 0 }]);
 
-      await service.getUnreadCount(SEED_TEST_IDS.MOCK_PATTERNS.USER);
+      await service.getUnreadCount("user-1");
 
       // Verify that only the specific user's unread notifications are counted
       expect(mockDb.select).toHaveBeenCalledWith({ count: { type: "count" } });
@@ -986,7 +920,7 @@ describe("NotificationService Unit Tests", () => {
           {
             type: "eq",
             field: schemaMocks.notifications.userId,
-            value: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+            value: "user-1",
           },
           { type: "eq", field: schemaMocks.notifications.read, value: false },
         ],
