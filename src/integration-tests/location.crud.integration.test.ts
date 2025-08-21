@@ -399,7 +399,7 @@ describe("Location Router CRUD Operations (PGlite)", () => {
           id: generateTestId("test-machine-getbyid"),
           name: "Test Machine GetById",
           qrCodeId: "qr-test-getbyid",
-          organizationId: organization.id,
+          organizationId: seededData.organization,
           locationId: seededData.location,
           modelId: model.id,
           ownerId: user.id,
