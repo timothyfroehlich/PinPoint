@@ -281,7 +281,7 @@ describe("tRPC Router Integration Tests", () => {
         expect(result.location).toBeDefined();
         expect(result.seededData.location.id).toBe(seededData.location.id);
         expect(result.model).toBeDefined();
-        expect(result.seededData.model.id).toBe(seededData.model.id);
+        expect(result.model.id).toBe(seededData.model.id);
 
         // Verify the database was actually updated
         const updatedMachineInDb = await txDb.query.machines.findFirst({
