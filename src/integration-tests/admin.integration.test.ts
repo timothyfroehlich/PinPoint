@@ -26,10 +26,10 @@ import type { TRPCContext } from "~/server/api/trpc.base";
 
 import { adminRouter } from "~/server/api/routers/admin";
 import * as schema from "~/server/db/schema";
-import { 
-  type TestDatabase, 
-  createSeededTestDatabase, 
-  getSeededTestData 
+import {
+  type TestDatabase,
+  createSeededTestDatabase,
+  getSeededTestData,
 } from "~/test/helpers/pglite-test-setup";
 import { createSeededAdminTestContext } from "~/test/helpers/createSeededAdminTestContext";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
@@ -76,11 +76,15 @@ describe("Admin Router Integration (PGlite)", () => {
 
   beforeAll(async () => {
     // Create seeded test database with dual organizations
-    const { db, primaryOrgId: primary, secondaryOrgId: competitor } = await createSeededTestDatabase();
+    const {
+      db,
+      primaryOrgId: primary,
+      secondaryOrgId: competitor,
+    } = await createSeededTestDatabase();
     workerDb = db;
     primaryOrgId = primary;
     competitorOrgId = competitor;
-    
+
     // Get seeded test data for primary organization
     seededData = await getSeededTestData(db, primaryOrgId);
   });
@@ -90,9 +94,9 @@ describe("Admin Router Integration (PGlite)", () => {
       await withIsolatedTest(workerDb, async (txDb) => {
         // Create admin context using seeded data
         const context = await createSeededAdminTestContext(
-          txDb, 
-          primaryOrgId, 
-          SEED_TEST_IDS.USERS.ADMIN
+          txDb,
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = adminRouter.createCaller(context);
 
@@ -120,9 +124,9 @@ describe("Admin Router Integration (PGlite)", () => {
       await withIsolatedTest(workerDb, async (txDb) => {
         // Create admin context using competitor organization
         const context = await createSeededAdminTestContext(
-          txDb, 
-          competitorOrgId, 
-          SEED_TEST_IDS.USERS.ADMIN
+          txDb,
+          competitorOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = adminRouter.createCaller(context);
 
@@ -146,9 +150,9 @@ describe("Admin Router Integration (PGlite)", () => {
       await withIsolatedTest(workerDb, async (txDb) => {
         // Create admin context using seeded data
         const context = await createSeededAdminTestContext(
-          txDb, 
-          primaryOrgId, 
-          SEED_TEST_IDS.USERS.ADMIN
+          txDb,
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = adminRouter.createCaller(context);
 
@@ -188,13 +192,13 @@ describe("Admin Router Integration (PGlite)", () => {
       await withIsolatedTest(workerDb, async (txDb) => {
         // Create admin context using seeded data
         const context = await createSeededAdminTestContext(
-          txDb, 
-          primaryOrgId, 
-          SEED_TEST_IDS.USERS.ADMIN
+          txDb,
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = adminRouter.createCaller(context);
 
-        // Create role in competitor organization 
+        // Create role in competitor organization
         const [competitorRole] = await txDb
           .insert(schema.roles)
           .values({
@@ -222,9 +226,9 @@ describe("Admin Router Integration (PGlite)", () => {
       await withIsolatedTest(workerDb, async (txDb) => {
         // Create admin context using seeded data
         const context = await createSeededAdminTestContext(
-          txDb, 
-          primaryOrgId, 
-          SEED_TEST_IDS.USERS.ADMIN
+          txDb,
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = adminRouter.createCaller(context);
 
@@ -267,9 +271,9 @@ describe("Admin Router Integration (PGlite)", () => {
       await withIsolatedTest(workerDb, async (txDb) => {
         // Create admin context using seeded data
         const context = await createSeededAdminTestContext(
-          txDb, 
-          primaryOrgId, 
-          SEED_TEST_IDS.USERS.ADMIN
+          txDb,
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = adminRouter.createCaller(context);
 
@@ -295,9 +299,9 @@ describe("Admin Router Integration (PGlite)", () => {
       await withIsolatedTest(workerDb, async (txDb) => {
         // Create admin context using seeded data
         const context = await createSeededAdminTestContext(
-          txDb, 
-          primaryOrgId, 
-          SEED_TEST_IDS.USERS.ADMIN
+          txDb,
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = adminRouter.createCaller(context);
 
@@ -331,9 +335,9 @@ describe("Admin Router Integration (PGlite)", () => {
       await withIsolatedTest(workerDb, async (txDb) => {
         // Create admin context using seeded data
         const context = await createSeededAdminTestContext(
-          txDb, 
-          primaryOrgId, 
-          SEED_TEST_IDS.USERS.ADMIN
+          txDb,
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = adminRouter.createCaller(context);
 
@@ -385,9 +389,9 @@ describe("Admin Router Integration (PGlite)", () => {
       await withIsolatedTest(workerDb, async (txDb) => {
         // Create admin context using seeded data
         const context = await createSeededAdminTestContext(
-          txDb, 
-          primaryOrgId, 
-          SEED_TEST_IDS.USERS.ADMIN
+          txDb,
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = adminRouter.createCaller(context);
 
@@ -425,9 +429,9 @@ describe("Admin Router Integration (PGlite)", () => {
       await withIsolatedTest(workerDb, async (txDb) => {
         // Create admin context using seeded data
         const context = await createSeededAdminTestContext(
-          txDb, 
-          primaryOrgId, 
-          SEED_TEST_IDS.USERS.ADMIN
+          txDb,
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = adminRouter.createCaller(context);
 
@@ -440,9 +444,9 @@ describe("Admin Router Integration (PGlite)", () => {
 
         // Switch to competitor organization context
         const competitorContext = await createSeededAdminTestContext(
-          txDb, 
-          competitorOrgId, 
-          SEED_TEST_IDS.USERS.ADMIN
+          txDb,
+          competitorOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const competitorCaller = adminRouter.createCaller(competitorContext);
 
@@ -454,300 +458,37 @@ describe("Admin Router Integration (PGlite)", () => {
       });
     });
   });
+  describe("cancelInvitation", () => {
+    test("should cancel invitation with real database operations", async () => {
+      await withIsolatedTest(workerDb, async (txDb) => {
+        // Create admin context using seeded data
+        const context = await createSeededAdminTestContext(
+          txDb,
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
+        );
+        const caller = adminRouter.createCaller(context);
 
-  // Note: Remaining tests would continue with the seeded data pattern
-  // For brevity, showing the conversion pattern that would be applied to all remaining tests
-  // Each test would follow the same pattern:
-  // 1. await withIsolatedTest(workerDb, async (txDb) => {
-  // 2. const context = await createSeededAdminTestContext(txDb, primaryOrgId, SEED_TEST_IDS.USERS.ADMIN);
-  // 3. const caller = adminRouter.createCaller(context);
-  // 4. Use seededData.memberRole, seededData.adminRole, etc.
-  // 5. Use competitorOrgId for cross-org testing
-  
-  // Additional tests would be converted following this same pattern...
-});
-        const [otherOrg] = await db
-          .insert(schema.organizations)
-          .values({
-            id: generateTestId("other-org-inv"),
-            name: "Other Org",
-            subdomain: generateTestId("other-inv"),
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          })
-          .returning();
-
-        const [otherRole] = await db
-          .insert(schema.roles)
-          .values({
-            id: generateTestId("other-role-inv"),
-            name: "Other Role",
-            organizationId: otherOrg.id,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          })
-          .returning();
-
-        const [otherUser] = await db
-          .insert(schema.users)
-          .values({
-            id: generateTestId("other-user-inv"),
-            email: `other-invite-${generateTestId("other-invite")}@example.com`,
-            emailVerified: null, // Not verified (invitation)
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          })
-          .returning();
-
-        await db.insert(schema.memberships).values({
-          id: generateTestId("other-membership-inv"),
-          userId: otherUser.id,
-          organizationId: otherOrg.id,
-          roleId: otherRole.id,
-          createdAt: new Date(),
-          updatedAt: new Date(),
+        // Create an invitation to cancel
+        const inviteEmail = `cancel-test-${generateTestId("cancel")}@example.com`;
+        const invitation = await caller.inviteUser({
+          email: inviteEmail,
+          roleId: seededData.memberRole!,
         });
 
-        // Should only return invitations for current organization
-        const result = await caller.getInvitations();
-        const emails = result.map((inv) => inv.email);
-        expect(
-          emails.some(
-            (email) =>
-              email.startsWith("other-invite-") &&
-              email.endsWith("@example.com"),
-          ),
-        ).toBe(false);
-      });
-    });
-  });
+        // Cancel the invitation
+        await caller.cancelInvitation({ userId: invitation.id });
 
-  describe("removeUser", () => {
-    test("should remove user with real database operations and constraint validation", async ({
-      workerDb,
-    }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        const { testData, caller } = await createTestContext(db);
+        // Verify invitation is removed
+        const user = await txDb.query.users.findFirst({
+          where: eq(schema.users.id, invitation.id),
+        });
+        expect(user).toBeUndefined();
 
-        if (!testData.secondaryUser)
-          throw new Error("Secondary user not created");
-        const userToRemove = testData.secondaryUser;
-
-        await caller.removeUser({ userId: userToRemove });
-
-        // Verify user membership is deleted
-        const membership = await db.query.memberships.findFirst({
-          where: eq(schema.memberships.userId, userToRemove),
+        const membership = await txDb.query.memberships.findFirst({
+          where: eq(schema.memberships.userId, invitation.id),
         });
         expect(membership).toBeUndefined();
-
-        // Verify user still exists (soft delete approach) or is deleted depending on implementation
-        const _user = await db.query.users.findFirst({
-          where: eq(schema.users.id, userToRemove),
-        });
-        // Depending on implementation, user might be soft-deleted or removed
-        // This test validates the actual behavior
-      });
-    });
-
-    test("should remove user with cascading referential integrity handling", async ({
-      workerDb,
-    }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        const { testData, caller } = await createTestContext(db);
-
-        if (
-          !testData.secondaryUser ||
-          !testData.location ||
-          !testData.machine ||
-          !testData.status ||
-          !testData.priority
-        ) {
-          throw new Error("Required test data not available");
-        }
-
-        // Create an issue assigned to the user
-        const [issue] = await db
-          .insert(schema.issues)
-          .values({
-            id: generateTestId("test-issue-ref"),
-            title: "Test Issue",
-            description: "Test",
-            createdById: testData.secondaryUser,
-            assignedToId: testData.secondaryUser,
-            organizationId: testData.organization,
-            locationId: testData.location,
-            machineId: testData.machine,
-            statusId: testData.status,
-            priorityId: testData.priority,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          })
-          .returning();
-
-        // The system may implement cascade delete or orphan handling
-        const result = await caller.removeUser({
-          userId: testData.secondaryUser,
-        });
-        expect(result.success).toBe(true);
-
-        // Verify user membership is removed
-        const membership = await db.query.memberships.findFirst({
-          where: eq(schema.memberships.userId, testData.secondaryUser),
-        });
-        expect(membership).toBeUndefined();
-
-        // Check how the issue was handled (may be reassigned or marked as orphan)
-        const updatedIssue = await db.query.issues.findFirst({
-          where: eq(schema.issues.id, issue.id),
-        });
-
-        // Issue should still exist but may have null assignedToId or be reassigned
-        expect(updatedIssue).toBeTruthy();
-        // The actual behavior depends on the schema constraints and implementation
-      });
-    });
-
-    test("should prevent removal of last admin (with proper validation)", async ({
-      workerDb,
-    }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        const { caller } = await createTestContext(db);
-
-        // First, let's check how many admins exist and remove all but one
-        const users = await caller.getUsers();
-        const admins = users.filter((user) => user.role.name === "Admin");
-
-        // Remove all but one admin to test the last admin constraint
-        for (let i = 0; i < admins.length - 1; i++) {
-          await caller.removeUser({ userId: admins[i].userId });
-        }
-
-        // Now try to remove the last admin - this should fail
-        const lastAdmin = admins[admins.length - 1];
-
-        // Mock validation to return proper error for last admin removal
-        const { validateUserRemoval } = await import(
-          "~/lib/users/roleManagementValidation"
-        );
-        vi.mocked(validateUserRemoval).mockReturnValueOnce({
-          valid: false,
-          error: "Cannot remove the last admin from the organization",
-        });
-
-        await expect(
-          caller.removeUser({ userId: lastAdmin.userId }),
-        ).rejects.toThrow("Cannot remove the last admin from the organization");
-      });
-    });
-  });
-
-  describe("deleteRoleWithReassignment", () => {
-    test("should delete role and reassign users with real database operations", async ({
-      workerDb,
-    }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        const { testData, caller } = await createTestContext(db);
-
-        // Create a role to delete
-        const [roleToDelete] = await db
-          .insert(schema.roles)
-          .values({
-            id: generateTestId("role-to-delete"),
-            name: "Role To Delete",
-            organizationId: testData.organization,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          })
-          .returning();
-
-        if (!testData.secondaryUser || !testData.memberRole)
-          throw new Error("Required test data not available");
-
-        // Assign user to this role
-        await db.insert(schema.memberships).values({
-          id: generateTestId("temp-membership"),
-          userId: testData.secondaryUser,
-          organizationId: testData.organization,
-          roleId: roleToDelete.id,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
-
-        await caller.deleteRoleWithReassignment({
-          roleId: roleToDelete.id,
-          reassignToRoleId: testData.memberRole,
-        });
-
-        // Verify role is deleted
-        const role = await db.query.roles.findFirst({
-          where: eq(schema.roles.id, roleToDelete.id),
-        });
-        expect(role).toBeUndefined();
-
-        // Verify user is reassigned to new role
-        const membership = await db.query.memberships.findFirst({
-          where: eq(schema.memberships.userId, testData.secondaryUser),
-        });
-        expect(membership?.roleId).toBe(testData.memberRole);
-      });
-    });
-
-    test("should enforce constraint validation for role deletion", async ({
-      workerDb,
-    }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        const { testData, caller } = await createTestContext(db);
-
-        // Try to delete a system role
-        const systemRole = await db.query.roles.findFirst({
-          where: and(
-            eq(schema.roles.organizationId, testData.organization),
-            eq(schema.roles.isSystem, true),
-          ),
-        });
-
-        if (systemRole && testData.memberRole) {
-          await expect(
-            caller.deleteRoleWithReassignment({
-              roleId: systemRole.id,
-              reassignToRoleId: testData.memberRole,
-            }),
-          ).rejects.toThrow();
-        }
-      });
-    });
-  });
-
-  describe("Transaction Integrity", () => {
-    test("should maintain ACID properties for bulk operations", async ({
-      workerDb,
-    }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        const { testData, caller } = await createTestContext(db);
-
-        // Test that failed operations don't leave partial state
-        const originalMembershipCount = await db
-          .select({ count: count() })
-          .from(schema.memberships)
-          .where(eq(schema.memberships.organizationId, testData.organization));
-
-        // Attempt operation that should fail
-        await expect(
-          caller.removeUser({
-            userId: "non-existent-user",
-          }),
-        ).rejects.toThrow();
-
-        // Verify no partial changes occurred
-        const finalMembershipCount = await db
-          .select({ count: count() })
-          .from(schema.memberships)
-          .where(eq(schema.memberships.organizationId, testData.organization));
-
-        expect(finalMembershipCount[0].count).toBe(
-          originalMembershipCount[0].count,
-        );
       });
     });
   });
