@@ -319,7 +319,7 @@ describe("tRPC Router Integration Tests", () => {
           },
           primaryOrgId: org2.id,
           user: {
-            ...ctx.user,
+            ...context.user,
             app_metadata: {
               organization_id: org2.id,
             },
