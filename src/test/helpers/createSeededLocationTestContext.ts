@@ -110,7 +110,7 @@ export async function createSeededLocationTestContext(
   if (!membership && !options?.skipMembershipValidation) {
     // Get or create a default role for the organization
     const defaultRole = await txDb.query.roles.findFirst({
-      where: eq(memberships.organizationId, organizationId),
+      where: eq(roles.organizationId, organizationId),
       with: {
         permissions: true,
       },
