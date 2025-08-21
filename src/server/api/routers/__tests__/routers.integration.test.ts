@@ -144,7 +144,7 @@ describe("tRPC Router Integration Tests", () => {
 
         // Verify relationships are loaded
         expect(result.machine).toBeDefined();
-        expect(result.seededData.machine.id).toBe(seededData.machine.id);
+        expect(result.machine.id).toBe(seededData.machine.id);
         expect(result.status).toBeDefined();
         expect(result.seededData.status.id).toBe(seededData.status.id);
         expect(result.priority).toBeDefined();
