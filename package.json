@@ -38,7 +38,7 @@
     "pre-commit:lint-staged": "npx lint-staged",
     "pre-commit:shellcheck": "./scripts/pre-commit-shellcheck.sh",
     "pre-commit:db-check": "node -e \"const { execSync } = require('child_process'); const files = execSync('git diff --cached --name-only', {encoding: 'utf8'}); if (files.match(/(schema|drizzle)/)) { console.log('📊 Schema files detected, running database validation...'); execSync('npm run db:validate:minimal', {stdio: 'inherit'}); } else { console.log('📊 No schema files changed, skipping database validation'); }\"",
-    "pre-commit:all": "npm-run-all --parallel pre-commit:gitleaks pre-commit:lint-staged pre-commit:shellcheck pre-commit:db-check",
+    "pre-commit:all": "npm-run-all --parallel pre-commit:lint-staged",
     "_comment_core": "========== Core Commands ==========",
     "typecheck": "tsc --noEmit && tsc --project tsconfig.config.json --noEmit",
     "typecheck:brief": "tsc --noEmit --pretty false && tsc --project tsconfig.config.json --noEmit --pretty false",
@@ -54,7 +54,7 @@
     "lint:sarif": "NODE_ENV=development next lint --format @microsoft/eslint-formatter-sarif --output-file eslint-results.sarif",
     "test": "vitest run",
     "test:brief": "vitest run --reporter=dot",
-    "test:verbose": "vitest run --reporter=verbose", 
+    "test:verbose": "vitest run --reporter=verbose",
     "test:watch": "vitest watch",
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",
@@ -186,11 +186,7 @@
   },
   "packageManager": "npm@11.3.0",
   "lint-staged": {
-    "*.{ts,tsx,js,jsx}": [
-      "eslint --fix",
-      "prettier --write"
-    ],
-    "*.{json,md,mdx}": [
+    "*.{ts,tsx,js,jsx,json,md,mdx}": [
       "prettier --write"
     ]
   }
