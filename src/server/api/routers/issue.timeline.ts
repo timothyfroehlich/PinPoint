@@ -11,14 +11,13 @@ export const issueTimelineRouter = createTRPCRouter({
     .input(z.object({ issueId: z.string() }))
     .query(async ({ ctx, input }) => {
       // Verify the issue exists (RLS handles org scoping)
-      const issue = await ctx.db.query.issues.findFirst({
-        where: eq(issues.id, input.issueId),
-        columns: {
-          id: true,
-        },
-      });
+      const issue = await ctx.db
+        .select({ id: issues.id })
+        .from(issues)
+        .where(eq(issues.id, input.issueId))
+        .limit(1);
 
-      if (!issue) {
+      if (!issue || issue.length === 0) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Issue not found or access denied",

@@ -15,7 +15,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
+import { SEED_TEST_IDS } from "../../../../../test/constants/seed-test-ids";
 
 import {
   validateCommentExists,
@@ -644,9 +644,14 @@ describe("Comment Validation Functions", () => {
         userId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
         userPermissions: [],
       });
+
+      const result = validateCommentDeletion(comment, null, context);
+
+      expect(result).toEqual({
+        valid: false,
         error: "User is not a member of this organization",
       });
-    });
+  });
 
     it("should fail when comment is already deleted", () => {
       const comment = createValidCommentData({

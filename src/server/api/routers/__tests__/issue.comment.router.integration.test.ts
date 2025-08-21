@@ -17,64 +17,9 @@ import {
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
 import { getSeededTestData } from "~/test/helpers/pglite-test-setup";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
+import { createSeededIssueTestContext } from "~/test/helpers/createSeededIssueTestContext";
 
-// Helper function to create test context with proper mocks
-const createTestContext = async (
-  txDb: any,
-  testOrgId: string,
-  userId: string,
-) => {
-  // Query the real membership from the database (since this is an integration test)
-  const membership = await txDb.query.memberships.findFirst({
-    where: and(
-      eq(memberships.userId, userId),
-      eq(memberships.organizationId, testOrgId),
-    ),
-    with: {
-      role: {
-        with: {
-          permissions: true,
-        },
-      },
-    },
-  });
-
-  return {
-    db: txDb, // Use Drizzle client directly
-    membership, // Real membership from database
-    services: {
-      createIssueActivityService: vi.fn(() => ({
-        recordCommentDeleted: vi.fn(),
-      })),
-      createNotificationService: vi.fn(() => ({
-        notifyMachineOwnerOfIssue: vi.fn(),
-        notifyMachineOwnerOfStatusChange: vi.fn(),
-      })),
-    },
-    user: {
-      id: userId,
-      email: "test@example.com",
-      user_metadata: { name: "Test User" },
-      app_metadata: { organization_id: testOrgId },
-    },
-    organization: {
-      id: testOrgId,
-      name: "Test Organization",
-      subdomain: "test-org",
-    },
-    session: {
-      user: {
-        id: userId,
-        email: "test@example.com",
-        name: "Test User",
-        image: null,
-      },
-      expires: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(),
-    },
-    headers: new Headers(),
-    userPermissions: ["comment:create", "comment:edit", "comment:delete"],
-  };
-};
+// Note: Replaced local createTestContext with shared createSeededIssueTestContext helper
 
 // Mock NextAuth for integration tests
 vi.mock("next-auth", () => ({
@@ -111,16 +56,7 @@ vi.mock("~/server/auth/permissions", async () => {
   };
 });
 
-// Mock service modules
-vi.mock("~/server/services/factory", () => ({
-  createIssueActivityService: vi.fn(() => ({
-    recordCommentDeleted: vi.fn(),
-  })),
-  createNotificationService: vi.fn(() => ({
-    notifyMachineOwnerOfIssue: vi.fn(),
-    notifyMachineOwnerOfStatusChange: vi.fn(),
-  })),
-}));
+// Note: Service mocks now handled by createSeededIssueTestContext helper
 
 describe("Issue Comment Router Integration Tests (PGlite)", () => {
   describe("Comment Creation", () => {
@@ -151,12 +87,12 @@ describe("Issue Comment Router Integration Tests (PGlite)", () => {
           createdById: seededData.user,
         });
 
-        // Create test context with real database
-        const testContext = (await createTestContext(
+        // Create test context with real database using shared helper
+        const testContext = await createSeededIssueTestContext(
           db,
           SEED_TEST_IDS.ORGANIZATIONS.primary,
           seededData.user,
-        )) as any;
+        );
 
         const caller = appRouter.createCaller(testContext);
 
@@ -201,11 +137,11 @@ describe("Issue Comment Router Integration Tests (PGlite)", () => {
         }
 
         // Create test context with seeded user data
-        const testContext = (await createTestContext(
+        const testContext = await createSeededIssueTestContext(
           db,
           SEED_TEST_IDS.ORGANIZATIONS.primary,
           seededData.user,
-        )) as any;
+        );
 
         const caller = appRouter.createCaller(testContext);
 
@@ -258,11 +194,11 @@ describe("Issue Comment Router Integration Tests (PGlite)", () => {
           organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
         });
 
-        const testContext = (await createTestContext(
+        const testContext = await createSeededIssueTestContext(
           db,
           SEED_TEST_IDS.ORGANIZATIONS.primary,
           seededData.user,
-        )) as any;
+        );
 
         const caller = appRouter.createCaller(testContext);
 
@@ -324,11 +260,11 @@ describe("Issue Comment Router Integration Tests (PGlite)", () => {
         });
 
         // Try to edit as user2
-        const testContext = (await createTestContext(
+        const testContext = await createSeededIssueTestContext(
           db,
           SEED_TEST_IDS.ORGANIZATIONS.primary,
           seededData.user2, // Different user
-        )) as any;
+        );
 
         const caller = appRouter.createCaller(testContext);
 
@@ -381,11 +317,11 @@ describe("Issue Comment Router Integration Tests (PGlite)", () => {
           organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
         });
 
-        const testContext = (await createTestContext(
+        const testContext = await createSeededIssueTestContext(
           db,
           SEED_TEST_IDS.ORGANIZATIONS.primary,
           seededData.user,
-        )) as any;
+        );
 
         const caller = appRouter.createCaller(testContext);
 
@@ -445,11 +381,11 @@ describe("Issue Comment Router Integration Tests (PGlite)", () => {
           deletedAt: new Date(), // Pre-deleted comment
         });
 
-        const testContext = (await createTestContext(
+        const testContext = await createSeededIssueTestContext(
           db,
           SEED_TEST_IDS.ORGANIZATIONS.primary,
           seededData.user,
-        )) as any;
+        );
 
         const caller = appRouter.createCaller(testContext);
 
@@ -509,11 +445,11 @@ describe("Issue Comment Router Integration Tests (PGlite)", () => {
           deletedAt: new Date(), // Pre-deleted comment
         });
 
-        const testContext = (await createTestContext(
+        const testContext = await createSeededIssueTestContext(
           db,
           SEED_TEST_IDS.ORGANIZATIONS.primary,
           seededData.user,
-        )) as any;
+        );
 
         const caller = appRouter.createCaller(testContext);
 
@@ -577,11 +513,11 @@ describe("Issue Comment Router Integration Tests (PGlite)", () => {
           return;
         }
 
-        const testContext = (await createTestContext(
+        const testContext = await createSeededIssueTestContext(
           db,
           SEED_TEST_IDS.ORGANIZATIONS.primary, // User's org
           primarySeededData.user,
-        )) as any;
+        );
 
         const caller = appRouter.createCaller(testContext);
 
