@@ -300,7 +300,7 @@ describe("tRPC Router Integration Tests", () => {
         );
 
         // Create a second organization
-        const [org2] = await db
+        const [org2] = await txDb
           .insert(schema.organizations)
           .values({
             id: "org-2",
