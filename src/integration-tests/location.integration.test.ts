@@ -1,32 +1,22 @@
 /**
- * Location Router Integration Tests - MIGRATION NOTICE
+ * Location Router Integration Tests - Schema & Performance Tests (PGlite)
  *
- * 🚨 THIS FILE HAS BEEN SPLIT FOR BETTER ORGANIZATION 🚨
+ * Converted to use seeded data patterns for consistent, fast, memory-safe testing.
+ * This file focuses on database schema validation, performance testing, and
+ * complex multi-tenant scenarios using the established seeded data infrastructure.
  *
- * The original 1270-line location integration test file has been split into
- * focused test files for better maintainability and memory safety:
+ * Key Features:
+ * - Uses createSeededTestDatabase() and getSeededTestData() for consistent test data
+ * - Leverages createSeededLocationTestContext() for standardized TRPC context
+ * - Uses SEED_TEST_IDS.ORGANIZATIONS.competitor for cross-org isolation testing
+ * - Maintains performance tests with seeded data baseline + additional test data
+ * - Worker-scoped PGlite integration for memory safety
  *
- * NEW STRUCTURE:
- * - location.crud.integration.test.ts      - Basic CRUD operations (create, read, update, delete)
- * - location.aggregation.integration.test.ts - Complex aggregation and count queries
- * - location.services.integration.test.ts  - External service integrations (PinballMap)
- *
- * REMAINING IN THIS FILE:
- * - Database schema validation
- * - Performance testing with large datasets
- * - Complex multi-tenant scenarios
- *
- * This split eliminates the dangerous per-test PGlite patterns that were causing
- * 1-2GB memory usage and system lockups, replacing them with safe worker-scoped
- * patterns that use shared database instances.
- *
- * Memory Impact: 1270-line file → 3 focused files = 90%+ memory reduction
- *
- * Uses modern August 2025 patterns with worker-scoped PGlite integration.
+ * Uses modern August 2025 patterns with seeded data architecture.
  */
 
 import { eq } from "drizzle-orm";
-import { describe, expect, vi } from "vitest";
+import { describe, expect, vi, beforeAll } from "vitest";
 
 // Import test setup and utilities
 import type { TRPCContext } from "~/server/api/trpc.base";
@@ -35,6 +25,13 @@ import { locationRouter } from "~/server/api/routers/location";
 import * as schema from "~/server/db/schema";
 import { generateTestId } from "~/test/helpers/test-id-generator";
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
+import {
+  createSeededTestDatabase,
+  getSeededTestData,
+  type TestDatabase,
+} from "~/test/helpers/pglite-test-setup";
+import { createSeededLocationTestContext } from "~/test/helpers/createSeededLocationTestContext";
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
 // Mock external dependencies that aren't database-related
 vi.mock("~/lib/utils/id-generation", () => ({
@@ -60,182 +57,68 @@ vi.mock("~/server/auth/permissions", () => ({
 }));
 
 describe("Location Router - Schema & Performance Tests (PGlite)", () => {
-  async function createTestContext(db: any) {
-    // Create test organization
-    const [organization] = await db
-      .insert(schema.organizations)
-      .values({
-        id: "test-org-schema",
-        name: "Test Organization Schema",
-        subdomain: "test-org-schema",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .returning();
+  let workerDb: TestDatabase;
+  let primaryOrgId: string;
+  let competitorOrgId: string;
+  let seededData: Awaited<ReturnType<typeof getSeededTestData>>;
 
-    // Create test user
-    const [user] = await db
-      .insert(schema.users)
-      .values({
-        id: "test-user-schema",
-        name: "Test User Schema",
-        email: "test.schema@example.com",
-        profilePicture: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .returning();
+  beforeAll(async () => {
+    // Create seeded test database with established infrastructure
+    const setup = await createSeededTestDatabase();
+    workerDb = setup.db;
+    primaryOrgId = setup.organizationId;
+    competitorOrgId = SEED_TEST_IDS.ORGANIZATIONS.competitor;
 
-    // Create machine model for relationships
-    const [model] = await db
-      .insert(schema.models)
-      .values({
-        id: "test-model-schema",
-        name: "Test Model Schema",
-        manufacturer: "Test Manufacturer Schema",
-      })
-      .returning();
-
-    // Create priority and status for issues
-    const [priority] = await db
-      .insert(schema.priorities)
-      .values({
-        id: "priority-schema",
-        name: "High Priority Schema",
-        organizationId: organization.id,
-        order: 1,
-      })
-      .returning();
-
-    const [status] = await db
-      .insert(schema.issueStatuses)
-      .values({
-        id: "status-schema",
-        name: "Open Schema",
-        category: "NEW",
-        organizationId: organization.id,
-      })
-      .returning();
-
-    // Create test location
-    const [location] = await db
-      .insert(schema.locations)
-      .values({
-        id: "test-location-schema",
-        name: "Test Arcade Schema",
-        organizationId: organization.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .returning();
-
-    // Create service factories for Drizzle-only services
-    const serviceFactories = {
-      createPinballMapService: vi.fn(() => ({
-        syncLocation: vi.fn().mockResolvedValue({
-          success: true,
-          data: { synced: true, machinesUpdated: 2 },
-        }),
-      })),
-      createNotificationService: vi.fn(),
-      createCollectionService: vi.fn(),
-      createIssueActivityService: vi.fn(),
-      createCommentCleanupService: vi.fn(),
-      createQRCodeService: vi.fn(),
-    };
-
-    // Create test context with real database
-    const context: TRPCContext = {
-      user: {
-        id: user.id,
-        email: user.email,
-        user_metadata: { name: user.name },
-        app_metadata: { organization_id: organization.id, role: "Admin" },
-      },
-      organization: {
-        id: organization.id,
-        name: organization.name,
-        subdomain: organization.subdomain,
-      },
-      db: db,
-      supabase: {
-        auth: {
-          getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
-        },
-      } as any,
-      services: serviceFactories,
-      headers: new Headers(),
-      logger: {
-        info: vi.fn(),
-        error: vi.fn(),
-        warn: vi.fn(),
-        debug: vi.fn(),
-        trace: vi.fn(),
-        child: vi.fn(() => context.logger),
-        withRequest: vi.fn(() => context.logger),
-        withUser: vi.fn(() => context.logger),
-        withOrganization: vi.fn(() => context.logger),
-        withContext: vi.fn(() => context.logger),
-      },
-      userPermissions: [
-        "location:edit",
-        "location:delete",
-        "organization:manage",
-      ],
-    } as any;
-
-    const caller = locationRouter.createCaller(context);
-
-    return {
-      organization,
-      user,
-      location,
-      model,
-      priority,
-      status,
-      context,
-      caller,
-    };
-  }
+    // Get seeded test data for use across tests
+    seededData = await getSeededTestData(workerDb, primaryOrgId);
+  });
 
   describe("Database Schema Validation", () => {
     test("should maintain referential integrity", async ({ workerDb }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        const { location, organization, model, user, priority, status } =
-          await createTestContext(db);
+      await withIsolatedTest(workerDb, async (txDb) => {
+        // Create context using seeded data
+        const context = await createSeededLocationTestContext(
+          txDb,
+          primaryOrgId,
+          seededData.user!,
+        );
+        
+        // Use seeded data for base entities, create test-specific additional data
+        const machineId = generateTestId("test-machine-integrity");
+        const issueId = generateTestId("test-issue-integrity");
 
-        // Create machine with relationships
-        const [machine] = await db
+        // Create machine with relationships using seeded location and model
+        const [machine] = await txDb
           .insert(schema.machines)
           .values({
-            id: "test-machine-integrity",
+            id: machineId,
             name: "Test Machine Integrity",
-            qrCodeId: "qr-test-integrity",
-            organizationId: organization.id,
-            locationId: location.id,
-            modelId: model.id,
-            ownerId: user.id,
+            qrCodeId: `qr-${machineId}`,
+            organizationId: primaryOrgId,
+            locationId: seededData.location!,
+            modelId: seededData.model!,
+            ownerId: seededData.user!,
             createdAt: new Date(),
             updatedAt: new Date(),
           })
           .returning();
 
-        // Create issue with relationships
-        await db.insert(schema.issues).values({
-          id: "test-issue-integrity",
+        // Create issue with relationships using seeded priority and status
+        await txDb.insert(schema.issues).values({
+          id: issueId,
           title: "Test Issue Integrity",
-          organizationId: organization.id,
+          organizationId: primaryOrgId,
           machineId: machine.id,
-          statusId: status.id,
-          priorityId: priority.id,
-          createdById: user.id,
+          statusId: seededData.status!,
+          priorityId: seededData.priority!,
+          createdById: seededData.user!,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
 
         // Test referential integrity with deep relations
-        const locationWithRelations = await db.query.locations.findFirst({
-          where: eq(schema.locations.id, location.id),
+        const locationWithRelations = await txDb.query.locations.findFirst({
+          where: eq(schema.locations.id, seededData.location!),
           with: {
             machines: {
               with: {
@@ -253,25 +136,31 @@ describe("Location Router - Schema & Performance Tests (PGlite)", () => {
         });
 
         expect(locationWithRelations).toBeDefined();
-        if (!locationWithRelations)
-          throw new Error("Location not found for referential integrity test");
-
-        expect(locationWithRelations.machines.length).toBe(1);
-        expect(locationWithRelations.machines[0].model.id).toBe(model.id);
-        expect(locationWithRelations.machines[0].owner.id).toBe(user.id);
-        expect(locationWithRelations.machines[0].issues.length).toBe(1);
-        expect(locationWithRelations.machines[0].issues[0].status.id).toBe(
-          status.id,
-        );
-        expect(locationWithRelations.machines[0].issues[0].priority.id).toBe(
-          priority.id,
-        );
+        expect(locationWithRelations!.machines.length).toBeGreaterThanOrEqual(1);
+        
+        // Find our test machine
+        const testMachine = locationWithRelations!.machines.find(m => m.id === machineId);
+        expect(testMachine).toBeDefined();
+        expect(testMachine!.model.id).toBe(seededData.model);
+        expect(testMachine!.owner.id).toBe(seededData.user);
+        expect(testMachine!.issues.length).toBeGreaterThanOrEqual(1);
+        
+        // Find our test issue
+        const testIssue = testMachine!.issues.find(i => i.id === issueId);
+        expect(testIssue).toBeDefined();
+        expect(testIssue!.status.id).toBe(seededData.status);
+        expect(testIssue!.priority.id).toBe(seededData.priority);
       });
     });
 
     test("should handle timestamps correctly", async ({ workerDb }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        const { caller } = await createTestContext(db);
+      await withIsolatedTest(workerDb, async (txDb) => {
+        const context = await createSeededLocationTestContext(
+          txDb,
+          primaryOrgId,
+          seededData.user!,
+        );
+        const caller = locationRouter.createCaller(context);
 
         const beforeCreate = new Date();
 
@@ -303,29 +192,33 @@ describe("Location Router - Schema & Performance Tests (PGlite)", () => {
       });
     });
 
-    test("should enforce unique constraints where applicable", async ({
+    test("should enforce organizational scoping constraints", async ({
       workerDb,
     }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        const { organization } = await createTestContext(db);
+      await withIsolatedTest(workerDb, async (txDb) => {
+        // Get existing organization from seeded data
+        const existingOrg = await txDb.query.organizations.findFirst({
+          where: eq(schema.organizations.id, primaryOrgId),
+        });
+        expect(existingOrg).toBeDefined();
 
         // Test subdomain uniqueness constraint
         const duplicateOrg = {
-          id: "duplicate-org",
+          id: generateTestId("duplicate-org"),
           name: "Duplicate Organization",
-          subdomain: organization.subdomain, // Same subdomain as existing org
+          subdomain: existingOrg!.subdomain, // Same subdomain as existing org
           createdAt: new Date(),
           updatedAt: new Date(),
         };
 
         // This should fail due to unique constraint on subdomain
         try {
-          await db.insert(schema.organizations).values(duplicateOrg);
+          await txDb.insert(schema.organizations).values(duplicateOrg);
           // If PGlite doesn't enforce constraints, check manually
-          const duplicateOrgs = await db
+          const duplicateOrgs = await txDb
             .select()
             .from(schema.organizations)
-            .where(eq(schema.organizations.subdomain, organization.subdomain));
+            .where(eq(schema.organizations.subdomain, existingOrg!.subdomain));
           expect(duplicateOrgs.length).toBeLessThanOrEqual(1);
         } catch (error) {
           // If constraint is enforced, this is expected behavior
@@ -337,34 +230,38 @@ describe("Location Router - Schema & Performance Tests (PGlite)", () => {
 
   describe("Performance & Query Optimization", () => {
     test("should handle large datasets efficiently", async ({ workerDb }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        const { caller, organization, model, user } =
-          await createTestContext(db);
+      await withIsolatedTest(workerDb, async (txDb) => {
+        const context = await createSeededLocationTestContext(
+          txDb,
+          primaryOrgId,
+          seededData.user!,
+        );
+        const caller = locationRouter.createCaller(context);
 
-        // Create many locations and machines
+        // Create many additional locations and machines (in addition to seeded data)
         const locations = Array.from({ length: 20 }, (_, i) => ({
           id: `perf-location-${i}`,
           name: `Performance Location ${i}`,
-          organizationId: organization.id,
+          organizationId: primaryOrgId,
           createdAt: new Date(),
           updatedAt: new Date(),
         }));
 
-        await db.insert(schema.locations).values(locations);
+        await txDb.insert(schema.locations).values(locations);
 
         const machines = Array.from({ length: 60 }, (_, i) => ({
           id: `perf-machine-${i}`,
           name: `Performance Machine ${i}`,
           qrCodeId: `perf-qr-${i}`,
-          organizationId: organization.id,
+          organizationId: primaryOrgId,
           locationId: `perf-location-${i % 20}`, // Distribute across locations
-          modelId: model.id,
-          ownerId: user.id,
+          modelId: seededData.model!,
+          ownerId: seededData.user!,
           createdAt: new Date(),
           updatedAt: new Date(),
         }));
 
-        await db.insert(schema.machines).values(machines);
+        await txDb.insert(schema.machines).values(machines);
 
         const startTime = Date.now();
 
@@ -372,7 +269,8 @@ describe("Location Router - Schema & Performance Tests (PGlite)", () => {
 
         const executionTime = Date.now() - startTime;
 
-        expect(result).toHaveLength(21); // 1 original + 20 new
+        // Account for seeded data + new data
+        expect(result.length).toBeGreaterThanOrEqual(20); // At least 20 new locations
         expect(executionTime).toBeLessThan(1000); // Should complete within 1 second
 
         // Verify all relationships loaded correctly
@@ -380,64 +278,67 @@ describe("Location Router - Schema & Performance Tests (PGlite)", () => {
           (sum, loc) => sum + loc.machines.length,
           0,
         );
-        expect(totalMachines).toBe(60); // All new machines
+        expect(totalMachines).toBeGreaterThanOrEqual(60); // At least our 60 new machines
       });
     });
 
     test("should optimize getPublic aggregation queries", async ({
       workerDb,
     }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        const { caller, organization, model, user, priority, status } =
-          await createTestContext(db);
+      await withIsolatedTest(workerDb, async (txDb) => {
+        const context = await createSeededLocationTestContext(
+          txDb,
+          primaryOrgId,
+          seededData.user!,
+        );
+        const caller = locationRouter.createCaller(context);
 
-        // Ensure we create locations with unique IDs that don't conflict with createTestContext
-        // createTestContext creates location with id "test-location-schema"
-        await db.insert(schema.locations).values(
+        // Create additional test locations (avoid conflicts with seeded data)
+        await txDb.insert(schema.locations).values(
           Array.from({ length: 5 }, (_, i) => ({
             id: `agg-location-${i}`,
             name: `Aggregation Location ${i}`,
-            organizationId: organization.id,
+            organizationId: primaryOrgId,
             createdAt: new Date(),
             updatedAt: new Date(),
           })),
         );
 
-        await db.insert(schema.machines).values(
+        await txDb.insert(schema.machines).values(
           Array.from({ length: 15 }, (_, i) => ({
             id: `agg-machine-${i}`,
             name: `Aggregation Machine ${i}`,
             qrCodeId: `agg-qr-${i}`,
-            organizationId: organization.id,
+            organizationId: primaryOrgId,
             locationId: `agg-location-${i % 5}`, // 3 machines per location
-            modelId: model.id,
-            ownerId: user.id,
+            modelId: seededData.model!,
+            ownerId: seededData.user!,
             createdAt: new Date(),
             updatedAt: new Date(),
           })),
         );
 
-        await db.insert(schema.issues).values(
+        await txDb.insert(schema.issues).values(
           Array.from({ length: 30 }, (_, i) => ({
             id: `agg-issue-${i}`,
             title: `Aggregation Issue ${i}`,
-            organizationId: organization.id,
+            organizationId: primaryOrgId,
             machineId: `agg-machine-${i % 15}`, // 2 issues per machine
-            statusId: status.id,
-            priorityId: priority.id,
-            createdById: user.id,
+            statusId: seededData.status!,
+            priorityId: seededData.priority!,
+            createdById: seededData.user!,
             createdAt: new Date(),
             updatedAt: new Date(),
           })),
         );
 
         // Verify that all locations were created successfully before testing getPublic
-        const allLocations = await db
+        const allLocations = await txDb
           .select()
           .from(schema.locations)
-          .where(eq(schema.locations.organizationId, organization.id));
+          .where(eq(schema.locations.organizationId, primaryOrgId));
 
-        expect(allLocations).toHaveLength(6); // 1 original + 5 new should be in DB
+        expect(allLocations.length).toBeGreaterThanOrEqual(5); // At least our 5 new locations + seeded
 
         const startTime = Date.now();
 
@@ -445,10 +346,10 @@ describe("Location Router - Schema & Performance Tests (PGlite)", () => {
 
         const executionTime = Date.now() - startTime;
 
-        expect(result).toHaveLength(6); // 1 original + 5 new
+        expect(result.length).toBeGreaterThanOrEqual(5); // At least our new locations + seeded
         expect(executionTime).toBeLessThan(2000); // Complex aggregation should still be fast
 
-        // Verify aggregation accuracy
+        // Verify aggregation accuracy for our test locations
         const aggregationLocations = result.filter((l) =>
           l.name.startsWith("Aggregation"),
         );
@@ -466,8 +367,13 @@ describe("Location Router - Schema & Performance Tests (PGlite)", () => {
     test("should handle concurrent operations efficiently", async ({
       workerDb,
     }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        const { caller } = await createTestContext(db);
+      await withIsolatedTest(workerDb, async (txDb) => {
+        const context = await createSeededLocationTestContext(
+          txDb,
+          primaryOrgId,
+          seededData.user!,
+        );
+        const caller = locationRouter.createCaller(context);
 
         // Test concurrent location creation
         const createPromises = Array.from({ length: 10 }, (_, i) =>

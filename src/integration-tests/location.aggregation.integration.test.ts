@@ -1,21 +1,23 @@
 /**
  * Location Router Aggregation Integration Tests (PGlite)
  *
- * Integration tests for complex aggregation queries on the location router.
- * Tests getPublic endpoint with machine counts, issue counts, and multi-tenant isolation.
+ * Converted to use seeded data patterns for consistent, fast, memory-safe testing.
+ * Tests complex aggregation queries on the location router, particularly getPublic 
+ * endpoint with machine counts, issue counts, and multi-tenant isolation using
+ * established seeded data infrastructure.
  *
  * Key Features:
- * - Real PostgreSQL database with PGlite
- * - Complex aggregation and count queries
- * - Multi-tenant data isolation testing
- * - Machine and issue count validation
- * - Resolved vs unresolved issue filtering
+ * - Uses createSeededTestDatabase() and getSeededTestData() for consistent test data
+ * - Leverages createSeededLocationTestContext() for standardized TRPC context
+ * - Uses SEED_TEST_IDS.ORGANIZATIONS.competitor for cross-org isolation testing
+ * - Maintains aggregation testing with seeded data baseline + additional test data
+ * - Worker-scoped PGlite integration for memory safety
  *
- * Uses modern August 2025 patterns with worker-scoped PGlite integration.
+ * Uses modern August 2025 patterns with seeded data architecture.
  */
 
 import { eq, count, and, ne } from "drizzle-orm";
-import { describe, expect, vi } from "vitest";
+import { describe, expect, vi, beforeAll } from "vitest";
 
 // Import test setup and utilities
 import type { TRPCContext } from "~/server/api/trpc.base";
@@ -24,6 +26,13 @@ import { locationRouter } from "~/server/api/routers/location";
 import * as schema from "~/server/db/schema";
 import { generateTestId } from "~/test/helpers/test-id-generator";
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
+import {
+  createSeededTestDatabase,
+  getSeededTestData,
+  type TestDatabase,
+} from "~/test/helpers/pglite-test-setup";
+import { createSeededLocationTestContext } from "~/test/helpers/createSeededLocationTestContext";
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
 // Mock external dependencies that aren't database-related
 vi.mock("~/lib/utils/id-generation", () => ({
@@ -49,55 +58,133 @@ vi.mock("~/server/auth/permissions", () => ({
 }));
 
 describe("Location Router Aggregation Operations (PGlite)", () => {
-  async function createTestContext(db: any) {
-    // Create test organization
-    const [organization] = await db
-      .insert(schema.organizations)
-      .values({
-        id: generateTestId("test-org-agg"),
-        name: "Test Organization Aggregation",
-        subdomain: generateTestId("test-org-agg-sub"),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .returning();
+  let workerDb: TestDatabase;
+  let primaryOrgId: string;
+  let competitorOrgId: string;
+  let seededData: Awaited<ReturnType<typeof getSeededTestData>>;
 
-    // Create test user
-    const [user] = await db
-      .insert(schema.users)
-      .values({
-        id: generateTestId("test-user-agg"),
-        name: "Test User Agg",
-        email: "test.agg@example.com",
-        profilePicture: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .returning();
+  beforeAll(async () => {
+    // Create seeded test database with established infrastructure
+    const setup = await createSeededTestDatabase();
+    workerDb = setup.db;
+    primaryOrgId = setup.organizationId;
+    competitorOrgId = SEED_TEST_IDS.ORGANIZATIONS.competitor;
 
-    // Create machine model for relationships
-    const [model] = await db
-      .insert(schema.models)
-      .values({
-        id: generateTestId("test-model-agg"),
-        name: "Test Model Agg",
-        manufacturer: "Test Manufacturer Agg",
-      })
-      .returning();
+  describe("Complex Aggregation Queries", () => {
+    test("should handle getPublic with machine and issue counts", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (txDb) => {
+        const context = await createSeededLocationTestContext(
+          txDb,
+          primaryOrgId,
+          seededData.user!,
+        );
+        const caller = locationRouter.createCaller(context);
 
-    // Create priority and status for issues
-    const [priority] = await db
-      .insert(schema.priorities)
-      .values({
-        id: "priority-agg",
-        name: "High Priority",
-        organizationId: organization.id,
-        order: 1,
-      })
-      .returning();
+        // Create additional test data for aggregation
+        const testLocationId = generateTestId("agg-test-location");
+        const [testLocation] = await txDb
+          .insert(schema.locations)
+          .values({
+            id: testLocationId,
+            name: "Aggregation Test Location",
+            organizationId: primaryOrgId,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
 
-    const [status] = await db
-      .insert(schema.issueStatuses)
+        // Create machines for testing
+        const testMachines = Array.from({ length: 3 }, (_, i) => ({
+          id: `agg-machine-${i}`,
+          name: `Aggregation Machine ${i}`,
+          qrCodeId: `agg-qr-${i}`,
+          organizationId: primaryOrgId,
+          locationId: testLocation.id,
+          modelId: seededData.model!,
+          ownerId: seededData.user!,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }));
+
+        await txDb.insert(schema.machines).values(testMachines);
+
+        // Create issues for aggregation testing
+        const testIssues = Array.from({ length: 6 }, (_, i) => ({
+          id: `agg-issue-${i}`,
+          title: `Aggregation Issue ${i}`,
+          organizationId: primaryOrgId,
+          machineId: `agg-machine-${i % 3}`, // 2 issues per machine
+          statusId: seededData.status!,
+          priorityId: seededData.priority!,
+          createdById: seededData.user!,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }));
+
+        await txDb.insert(schema.issues).values(testIssues);
+
+        const result = await caller.getPublic();
+
+        // Should include at least our test location + seeded locations
+        expect(result.length).toBeGreaterThanOrEqual(1);
+
+        // Find our test location in results
+        const testLocationResult = result.find(l => l.id === testLocation.id);
+        expect(testLocationResult).toBeDefined();
+        
+        // Verify aggregation counts
+        expect(testLocationResult!._count.machines).toBe(3);
+        testLocationResult!.machines.forEach(machine => {
+          expect(machine._count.issues).toBe(2); // 2 issues per machine
+        });
+      });
+    });
+
+    test("should maintain organizational isolation in aggregation", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (txDb) => {
+        // Create contexts for both organizations
+        const primaryContext = await createSeededLocationTestContext(
+          txDb,
+          primaryOrgId,
+          seededData.user!,
+        );
+        const primaryCaller = locationRouter.createCaller(primaryContext);
+
+        const competitorContext = await createSeededLocationTestContext(
+          txDb,
+          competitorOrgId,
+          seededData.user!,
+        );
+        const competitorCaller = locationRouter.createCaller(competitorContext);
+
+        // Create test location in competitor org
+        await txDb.insert(schema.locations).values({
+          id: "competitor-agg-location",
+          name: "Competitor Aggregation Location",
+          organizationId: competitorOrgId,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+
+        const primaryResults = await primaryCaller.getPublic();
+        const competitorResults = await competitorCaller.getPublic();
+
+        // Primary org should not see competitor locations
+        const primaryLocationIds = primaryResults.map(l => l.id);
+        expect(primaryLocationIds).not.toContain("competitor-agg-location");
+
+        // Competitor org should see its location but not primary's seeded location
+        const competitorLocationIds = competitorResults.map(l => l.id);
+        expect(competitorLocationIds).toContain("competitor-agg-location");
+        expect(competitorLocationIds).not.toContain(seededData.location);
+      });
+    });
+  });
+});
       .values({
         id: "status-open-agg",
         name: "Open",
