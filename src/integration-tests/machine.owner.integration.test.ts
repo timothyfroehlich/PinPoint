@@ -10,20 +10,24 @@
  * - Real Drizzle ORM operations
  * - Multi-tenant data isolation testing
  * - Owner assignment and membership validation
+ * - Uses seeded data infrastructure for predictable, fast testing
  *
  * Uses modern August 2025 patterns with Vitest and PGlite integration.
  */
 
 import { TRPCError } from "@trpc/server";
 import { eq } from "drizzle-orm";
-import { describe, expect, vi } from "vitest";
-
-// Import test setup and utilities
-import type { TRPCContext } from "~/server/api/trpc.base";
-import type { TestDatabase } from "~/test/helpers/pglite-test-setup";
+import { beforeAll, describe, expect, vi } from "vitest";
 
 import { machineOwnerRouter } from "~/server/api/routers/machine.owner";
 import * as schema from "~/server/db/schema";
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
+import { createSeededMachineTestContext } from "~/test/helpers/createSeededMachineTestContext";
+import {
+  createSeededTestDatabase,
+  getSeededTestData,
+  type TestDatabase,
+} from "~/test/helpers/pglite-test-setup";
 import { generateTestId } from "~/test/helpers/test-id-generator";
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
 
@@ -58,273 +62,155 @@ vi.mock("~/server/auth/permissions", () => ({
   })),
 }));
 
-// Mock the service factory to avoid service dependencies
-vi.mock("~/server/services/factory", () => ({
-  createServiceFactory: vi.fn(() => ({
-    createNotificationService: vi.fn(() => ({
-      notifyMachineOwnerOfIssue: vi.fn(),
-      notifyMachineOwnerOfStatusChange: vi.fn(),
-    })),
-    createIssueActivityService: vi.fn(() => ({
-      recordActivity: vi.fn(),
-    })),
-  })),
-}));
-
 describe("machine.owner router integration tests", () => {
-  // Helper function to set up test data and context
-  async function setupTestData(db: TestDatabase) {
-    // Create seed data first
-    const organizationId = generateTestId("test-org");
+  // Shared test database and seeded data
+  let workerDb: TestDatabase;
+  let seededData: Awaited<ReturnType<typeof getSeededTestData>>;
 
-    // Create organization
-    const [org] = await db
-      .insert(schema.organizations)
-      .values({
-        id: organizationId,
-        name: "Test Organization",
-        subdomain: "test",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .returning();
-
-    // Create roles
-    const [adminRole] = await db
-      .insert(schema.roles)
-      .values({
-        id: generateTestId("admin-role"),
-        name: "Admin",
-        organizationId,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .returning();
-
-    const [memberRole] = await db
-      .insert(schema.roles)
-      .values({
-        id: generateTestId("member-role"),
-        name: "Member",
-        organizationId,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .returning();
-
-    // Create location
-    const [location] = await db
-      .insert(schema.locations)
-      .values({
-        id: generateTestId("location"),
-        name: "Test Location",
-        organizationId,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .returning();
-
-    // Create model
-    const [model] = await db
-      .insert(schema.models)
-      .values({
-        id: generateTestId("model"),
-        name: "Test Model",
-        manufacturer: "Test Manufacturer",
-        year: 2024,
-      })
-      .returning();
-
-    // Create a test user to be the initial owner
-    const [testUser] = await db
-      .insert(schema.users)
-      .values({
-        id: "test-user-1",
-        name: "Test User 1",
-        email: `user1-${generateTestId("user")}@example.com`,
-        image: "https://example.com/avatar1.jpg",
-        emailVerified: null,
-      })
-      .returning();
-
-    // Create machine (initially without owner)
-    const [machine] = await db
-      .insert(schema.machines)
-      .values({
-        id: "test-machine",
-        name: "Test Machine",
-        qrCodeId: generateTestId("qr"),
-        organizationId,
-        locationId: location.id,
-        modelId: model.id,
-        ownerId: null, // No initial owner
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .returning();
-
-    // Create membership for the main test user
-    await db.insert(schema.memberships).values({
-      id: "test-membership-1",
-      userId: testUser.id,
-      organizationId,
-      roleId: adminRole.id, // Make the main user an admin so they can assign owners
-    });
-
-    // Create test data object with the created infrastructure
-    const testData = {
-      organization: organizationId,
-      location: location.id,
-      machine: machine.id,
-      model: model.id,
-      priority: undefined,
-      status: undefined,
-      issue: undefined,
-      adminRole: adminRole.id,
-      memberRole: memberRole.id,
-      user: testUser.id,
-    };
-
-    // Create additional test users for testing membership scenarios
-    const [testUser2] = await db
-      .insert(schema.users)
-      .values({
-        id: "test-user-2",
-        name: "Test User 2",
-        email: "user2@example.com",
-        image: "https://example.com/avatar2.jpg",
-        emailVerified: null,
-      })
-      .returning();
-
-    // Create membership for test user 2
-    await db.insert(schema.memberships).values({
-      id: "test-membership-2",
-      userId: testUser2.id,
-      organizationId: organizationId,
-      roleId: testData.memberRole,
-    });
-
-    // Create test context with real database
-    const ctx: TRPCContext = {
-      db: db,
-      user: {
-        id: testData.user ?? "test-user-fallback",
-        email: "test@example.com",
-        name: "Test User",
-        user_metadata: {},
-        app_metadata: {
-          organization_id: organizationId,
-        },
-      },
-      organization: {
-        id: organizationId,
-        name: "Test Organization",
-        subdomain: "test",
-      },
-      supabase: {} as any, // Not used in this router
-      headers: new Headers(),
-      userPermissions: [
-        "machine:edit",
-        "machine:delete",
-        "organization:manage",
-      ],
-      services: {} as any, // Not used in this router
-      logger: {
-        error: vi.fn(),
-        warn: vi.fn(),
-        info: vi.fn(),
-        debug: vi.fn(),
-        trace: vi.fn(),
-        child: vi.fn(() => ctx.logger),
-        withRequest: vi.fn(() => ctx.logger),
-        withUser: vi.fn(() => ctx.logger),
-        withOrganization: vi.fn(() => ctx.logger),
-        withContext: vi.fn(() => ctx.logger),
-      } as any,
-    };
-
-    return { testData, ctx, organizationId };
-  }
+  beforeAll(async () => {
+    // Create seeded test database
+    const { db, organizationId } = await createSeededTestDatabase();
+    workerDb = db;
+    
+    // Get seeded test data for primary organization
+    seededData = await getSeededTestData(db, organizationId);
+  });
 
   describe("assignOwner mutation", () => {
     describe("success scenarios", () => {
-      test("should assign owner to machine successfully", async ({
-        workerDb,
-      }) => {
+      test("should assign owner to machine successfully", async () => {
         await withIsolatedTest(workerDb, async (db) => {
-          const { testData, ctx, organizationId } = await setupTestData(db);
+          // Create test context using seeded data
+          const context = await createSeededMachineTestContext(
+            db,
+            seededData.organization,
+            seededData.user!,
+          );
+          const caller = machineOwnerRouter.createCaller(context);
 
-          // First ensure machine has no owner
-          await db
-            .update(schema.machines)
-            .set({ ownerId: null })
-            .where(eq(schema.machines.id, testData.machine ?? "test-machine"));
+          // Create test model for machine
+          const [testModel] = await db
+            .insert(schema.models)
+            .values({
+              id: generateTestId("model"),
+              name: "Test Model",
+              manufacturer: "Test Manufacturer",
+              year: 2024,
+            })
+            .returning();
 
-          const caller = machineOwnerRouter.createCaller(ctx);
+          // Create test machine (initially without owner)
+          const [testMachine] = await db
+            .insert(schema.machines)
+            .values({
+              id: generateTestId("machine"),
+              name: "Test Machine",
+              qrCodeId: generateTestId("qr"),
+              organizationId: seededData.organization,
+              locationId: seededData.location!,
+              modelId: testModel.id,
+              ownerId: null, // No initial owner
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            })
+            .returning();
+
+          // Create a test user to assign as owner
+          const [testUser2] = await db
+            .insert(schema.users)
+            .values({
+              id: "test-user-2",
+              name: "Test User 2",
+              email: "user2@example.com",
+              image: "https://example.com/avatar2.jpg",
+              emailVerified: null,
+            })
+            .returning();
+
+          // Create membership for test user 2
+          await db.insert(schema.memberships).values({
+            id: "test-membership-2",
+            userId: testUser2.id,
+            organizationId: seededData.organization,
+            roleId: seededData.memberRole!,
+          });
 
           // Verify machine has no owner initially
           const initialMachine = await db.query.machines.findFirst({
-            where: eq(schema.machines.id, testData.machine ?? "test-machine"),
+            where: eq(schema.machines.id, testMachine.id),
           });
           expect(initialMachine?.ownerId).toBeNull();
 
           const result = await caller.assignOwner({
-            machineId: testData.machine ?? "test-machine",
-            ownerId: "test-user-2",
+            machineId: testMachine.id,
+            ownerId: testUser2.id,
           });
 
           // Verify the result structure
           expect(result).toMatchObject({
-            id: testData.machine ?? "test-machine",
-            ownerId: "test-user-2",
-            organizationId: organizationId,
+            id: testMachine.id,
+            ownerId: testUser2.id,
+            organizationId: seededData.organization,
           });
 
           // Verify relationships are loaded
           expect(result.model).toBeDefined();
-          expect(result.model.id).toBe(testData.model);
+          expect(result.model.id).toBe(testModel.id);
           expect(result.location).toBeDefined();
-          expect(result.location.id).toBe(testData.location);
+          expect(result.location.id).toBe(seededData.location);
           expect(result.owner).toBeDefined();
           expect(result.owner).toMatchObject({
-            id: "test-user-2",
+            id: testUser2.id,
             name: "Test User 2",
             image: "https://example.com/avatar2.jpg",
           });
 
           // Verify the database was actually updated
           const updatedMachine = await db.query.machines.findFirst({
-            where: eq(schema.machines.id, testData.machine ?? "test-machine"),
+            where: eq(schema.machines.id, testMachine.id),
           });
-          expect(updatedMachine?.ownerId).toBe("test-user-2");
+          expect(updatedMachine?.ownerId).toBe(testUser2.id);
         });
       });
 
-      test("should remove owner from machine successfully", async ({
-        workerDb,
-      }) => {
+      test("should remove owner from machine successfully", async () => {
         await withIsolatedTest(workerDb, async (db) => {
-          const { testData, ctx, organizationId } = await setupTestData(db);
+          // Create test context using seeded data
+          const context = await createSeededMachineTestContext(
+            db,
+            seededData.organization,
+            seededData.user!,
+          );
+          const caller = machineOwnerRouter.createCaller(context);
+
+          // Create a test user and assign as owner first
+          const [testUser2] = await db
+            .insert(schema.users)
+            .values({
+              id: "test-user-2",
+              name: "Test User 2",
+              email: "user2@example.com",
+              image: "https://example.com/avatar2.jpg",
+              emailVerified: null,
+            })
+            .returning();
 
           // First assign an owner
           await db
             .update(schema.machines)
-            .set({ ownerId: "test-user-2" })
-            .where(eq(schema.machines.id, testData.machine ?? "test-machine"));
-
-          const caller = machineOwnerRouter.createCaller(ctx);
+            .set({ ownerId: testUser2.id })
+            .where(eq(schema.machines.id, seededData.machine!));
 
           const result = await caller.assignOwner({
-            machineId: testData.machine ?? "test-machine",
+            machineId: seededData.machine!,
             // ownerId is omitted to remove owner
           });
 
           // Verify the result structure
           expect(result).toMatchObject({
-            id: testData.machine ?? "test-machine",
+            id: seededData.machine,
             ownerId: null,
-            organizationId: organizationId,
+            organizationId: seededData.organization,
           });
 
           // Verify relationships are loaded but owner is null
@@ -334,7 +220,7 @@ describe("machine.owner router integration tests", () => {
 
           // Verify the database was actually updated
           const updatedMachine = await db.query.machines.findFirst({
-            where: eq(schema.machines.id, testData.machine ?? "test-machine"),
+            where: eq(schema.machines.id, seededData.machine!),
           });
           expect(updatedMachine?.ownerId).toBeNull();
         });
@@ -342,12 +228,15 @@ describe("machine.owner router integration tests", () => {
     });
 
     describe("error scenarios", () => {
-      test("should throw NOT_FOUND when machine does not exist", async ({
-        workerDb,
-      }) => {
+      test("should throw NOT_FOUND when machine does not exist", async () => {
         await withIsolatedTest(workerDb, async (db) => {
-          const { ctx } = await setupTestData(db);
-          const caller = machineOwnerRouter.createCaller(ctx);
+          // Create test context using seeded data
+          const context = await createSeededMachineTestContext(
+            db,
+            seededData.organization,
+            seededData.user!,
+          );
+          const caller = machineOwnerRouter.createCaller(context);
 
           await expect(
             caller.assignOwner({
@@ -363,11 +252,15 @@ describe("machine.owner router integration tests", () => {
         });
       });
 
-      test("should throw FORBIDDEN when user is not a member of organization", async ({
-        workerDb,
-      }) => {
+      test("should throw FORBIDDEN when user is not a member of organization", async () => {
         await withIsolatedTest(workerDb, async (db) => {
-          const { testData, ctx } = await setupTestData(db);
+          // Create test context using seeded data
+          const context = await createSeededMachineTestContext(
+            db,
+            seededData.organization,
+            seededData.user!,
+          );
+          const caller = machineOwnerRouter.createCaller(context);
 
           // Create a user that's not a member of the organization
           const [nonMemberUser] = await db
@@ -381,11 +274,9 @@ describe("machine.owner router integration tests", () => {
             })
             .returning();
 
-          const caller = machineOwnerRouter.createCaller(ctx);
-
           await expect(
             caller.assignOwner({
-              machineId: testData.machine ?? "test-machine",
+              machineId: seededData.machine!,
               ownerId: nonMemberUser.id,
             }),
           ).rejects.toThrow(
@@ -399,75 +290,89 @@ describe("machine.owner router integration tests", () => {
     });
 
     describe("organizational scoping and security", () => {
-      test("should enforce organizational boundaries", async ({ workerDb }) => {
+      test("should enforce organizational boundaries", async () => {
         await withIsolatedTest(workerDb, async (db) => {
-          const { testData, ctx } = await setupTestData(db);
+          // Create test context using seeded data
+          const context = await createSeededMachineTestContext(
+            db,
+            seededData.organization,
+            seededData.user!,
+          );
+          const caller = machineOwnerRouter.createCaller(context);
 
-          // Create a second organization
-          const [org2] = await db
-            .insert(schema.organizations)
-            .values({
-              id: "org-2",
-              name: "Organization 2",
-              subdomain: "org2",
-            })
-            .returning();
+          // Create a competitor organization context using the seeded competitor org
+          const competitorOrgId = SEED_TEST_IDS.ORGANIZATIONS.competitor;
 
-          // Update context to use different organization
-          const org2Ctx = {
-            ...ctx,
-            organization: {
-              id: org2.id,
-              name: org2.name,
-              subdomain: org2.subdomain,
-            },
-            user: {
-              ...ctx.user,
-              app_metadata: {
-                organization_id: org2.id,
-              },
-            },
-            db: {
-              membership: {
-                findFirst: async (_args: any) => {
-                  // Return null since user is not a member of org2
-                  return null;
-                },
-              },
-            } as any,
-          };
+          // Ensure competitor organization exists
+          await db.insert(schema.organizations).values({
+            id: competitorOrgId,
+            name: "Competitor Organization",
+            subdomain: "competitor",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }).onConflictDoNothing();
 
-          const caller = machineOwnerRouter.createCaller(org2Ctx);
+          // Create competitor context
+          const competitorContext = await createSeededMachineTestContext(
+            db,
+            competitorOrgId,
+            seededData.user!,
+          );
+          const competitorCaller = machineOwnerRouter.createCaller(competitorContext);
 
+          // Try to access primary org's machine from competitor org context
           await expect(
-            caller.assignOwner({
-              machineId: testData.machine ?? "test-machine", // This machine belongs to org1
-              ownerId: "test-user-2",
+            competitorCaller.assignOwner({
+              machineId: seededData.machine!, // This machine belongs to primary org
+              ownerId: seededData.user!,
             }),
           ).rejects.toThrow(
             new TRPCError({
-              code: "FORBIDDEN",
-              message: "You don't have permission to access this organization",
+              code: "NOT_FOUND",
+              message: "Machine not found",
             }),
           );
         });
       });
 
-      test("should return only safe user data in owner relationship", async ({
-        workerDb,
-      }) => {
+      test("should return only safe user data in owner relationship", async () => {
         await withIsolatedTest(workerDb, async (db) => {
-          const { testData, ctx } = await setupTestData(db);
-          const caller = machineOwnerRouter.createCaller(ctx);
+          // Create test context using seeded data
+          const context = await createSeededMachineTestContext(
+            db,
+            seededData.organization,
+            seededData.user!,
+          );
+          const caller = machineOwnerRouter.createCaller(context);
+
+          // Create a test user to assign as owner
+          const [testUser2] = await db
+            .insert(schema.users)
+            .values({
+              id: "test-user-2",
+              name: "Test User 2",
+              email: "user2@example.com",
+              image: "https://example.com/avatar2.jpg",
+              emailVerified: null,
+            })
+            .returning();
+
+          // Create membership for test user 2
+          await db.insert(schema.memberships).values({
+            id: "test-membership-2",
+            userId: testUser2.id,
+            organizationId: seededData.organization,
+            roleId: seededData.memberRole!,
+          });
 
           const result = await caller.assignOwner({
-            machineId: testData.machine ?? "test-machine",
-            ownerId: "test-user-2",
+            machineId: seededData.machine!,
+            ownerId: testUser2.id,
           });
 
           // Should only include id, name, and image (no email or other sensitive data)
           expect(result.owner).toEqual({
-            id: "test-user-2",
+            id: testUser2.id,
             name: "Test User 2",
             image: "https://example.com/avatar2.jpg",
           });
@@ -480,24 +385,49 @@ describe("machine.owner router integration tests", () => {
     });
 
     describe("data integrity and relationships", () => {
-      test("should maintain referential integrity", async ({ workerDb }) => {
+      test("should maintain referential integrity", async () => {
         await withIsolatedTest(workerDb, async (db) => {
-          const { testData, ctx, organizationId } = await setupTestData(db);
-          const caller = machineOwnerRouter.createCaller(ctx);
+          // Create test context using seeded data
+          const context = await createSeededMachineTestContext(
+            db,
+            seededData.organization,
+            seededData.user!,
+          );
+          const caller = machineOwnerRouter.createCaller(context);
+
+          // Create a test user to assign as owner
+          const [testUser2] = await db
+            .insert(schema.users)
+            .values({
+              id: "test-user-2",
+              name: "Test User 2",
+              email: "user2@example.com",
+              image: "https://example.com/avatar2.jpg",
+              emailVerified: null,
+            })
+            .returning();
+
+          // Create membership for test user 2
+          await db.insert(schema.memberships).values({
+            id: "test-membership-2",
+            userId: testUser2.id,
+            organizationId: seededData.organization,
+            roleId: seededData.memberRole!,
+          });
 
           const result = await caller.assignOwner({
-            machineId: testData.machine ?? "test-machine",
-            ownerId: "test-user-2",
+            machineId: seededData.machine!,
+            ownerId: testUser2.id,
           });
 
           // Verify all relationships exist and are consistent
-          expect(result.model.id).toBe(testData.model);
-          expect(result.location.id).toBe(testData.location);
-          expect(result.location.organizationId).toBe(organizationId);
+          expect(result.model.id).toBe(seededData.model);
+          expect(result.location.id).toBe(seededData.location);
+          expect(result.location.organizationId).toBe(seededData.organization);
 
           // Verify the relationships in the database
           const machineInDb = await db.query.machines.findFirst({
-            where: eq(schema.machines.id, testData.machine ?? "test-machine"),
+            where: eq(schema.machines.id, seededData.machine!),
             with: {
               model: true,
               location: true,
