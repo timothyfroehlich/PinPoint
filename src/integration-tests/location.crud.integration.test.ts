@@ -401,7 +401,7 @@ describe("Location Router CRUD Operations (PGlite)", () => {
           qrCodeId: "qr-test-getbyid",
           organizationId: seededData.organization,
           locationId: seededData.location,
-          modelId: model.id,
+          modelId: seededData.model!,
           ownerId: user.id,
           createdAt: new Date(),
           updatedAt: new Date(),
