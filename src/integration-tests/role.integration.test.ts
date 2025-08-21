@@ -34,9 +34,9 @@ import {
   withIsolatedTest,
   type TestDatabase,
 } from "~/test/helpers/worker-scoped-db";
-import { 
-  createSeededTestDatabase, 
-  getSeededTestData 
+import {
+  createSeededTestDatabase,
+  getSeededTestData,
 } from "~/test/helpers/pglite-test-setup";
 import { createSeededAdminTestContext } from "~/test/helpers/createSeededAdminTestContext";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
@@ -70,11 +70,15 @@ describe("Role Router Integration Tests (PGlite)", () => {
 
   beforeAll(async () => {
     // Create seeded test database with dual organizations
-    const { db, primaryOrgId: primary, secondaryOrgId: competitor } = await createSeededTestDatabase();
+    const {
+      db,
+      primaryOrgId: primary,
+      secondaryOrgId: competitor,
+    } = await createSeededTestDatabase();
     workerDb = db;
     primaryOrgId = primary;
     competitorOrgId = competitor;
-    
+
     // Get seeded test data for primary organization
     seededData = await getSeededTestData(db, primaryOrgId);
   });
@@ -84,9 +88,9 @@ describe("Role Router Integration Tests (PGlite)", () => {
       await withIsolatedTest(workerDb, async (txDb) => {
         // Create admin context using seeded data
         const context = await createSeededAdminTestContext(
-          txDb, 
-          primaryOrgId, 
-          SEED_TEST_IDS.USERS.ADMIN
+          txDb,
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = roleRouter.createCaller(context);
 
@@ -99,7 +103,7 @@ describe("Role Router Integration Tests (PGlite)", () => {
         expect(adminRole).toBeDefined();
         expect(adminRole).toMatchObject({
           name: "Admin",
-          organizationId: organizationId,
+          organizationId: primaryOrgId,
           isSystem: true,
           isDefault: false,
         });
@@ -111,7 +115,7 @@ describe("Role Router Integration Tests (PGlite)", () => {
         expect(memberRole).toBeDefined();
         expect(memberRole).toMatchObject({
           name: "Member",
-          organizationId: organizationId,
+          organizationId: primaryOrgId,
           isSystem: false, // Member role in seeds is not a system role
           isDefault: true,
         });
@@ -132,16 +136,12 @@ describe("Role Router Integration Tests (PGlite)", () => {
           updatedAt: new Date(),
         });
 
-        const { context } = await createTestContext(db, newOrgId);
-        const newContext = {
-          ...context,
-          organization: {
-            id: newOrgId,
-            name: "Empty Organization",
-            subdomain: generateTestId("empty-org-sub"),
-          },
-        };
-        const newCaller = roleRouter.createCaller(newContext as any);
+        const { context } = await createSeededAdminTestContext(
+          db,
+          newOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
+        );
+        const newCaller = roleRouter.createCaller(context);
 
         const result = await newCaller.list();
         expect(result).toEqual([]);
@@ -155,7 +155,11 @@ describe("Role Router Integration Tests (PGlite)", () => {
       organizationId,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { context } = await createTestContext(db, organizationId);
+        const context = await createSeededAdminTestContext(
+          db,
+          organizationId,
+          SEED_TEST_IDS.USERS.ADMIN,
+        );
         const caller = roleRouter.createCaller(context);
 
         // Get roles from test organization
@@ -175,16 +179,12 @@ describe("Role Router Integration Tests (PGlite)", () => {
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Create context with invalid organization but expect permission error instead of database error
-        const { context } = await createTestContext(db, organizationId);
-        const invalidContext = {
-          ...context,
-          organization: {
-            id: "nonexistent-org",
-            name: "Invalid",
-            subdomain: "invalid",
-          },
-        };
-        const invalidCaller = roleRouter.createCaller(invalidContext as any);
+        const context = await createSeededAdminTestContext(
+          db,
+          "nonexistent-org",
+          SEED_TEST_IDS.USERS.ADMIN,
+        );
+        const invalidCaller = roleRouter.createCaller(context);
 
         // This should throw a permission error because the user isn't a member of the nonexistent org
         await expect(invalidCaller.list()).rejects.toThrow(
@@ -197,9 +197,10 @@ describe("Role Router Integration Tests (PGlite)", () => {
   describe("create - Create new role", () => {
     test("should create role with template", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { context, testData } = await createTestContext(
+        const context = await createSeededAdminTestContext(
           db,
-          "test-org-pinpoint",
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = roleRouter.createCaller(context);
 
@@ -211,7 +212,7 @@ describe("Role Router Integration Tests (PGlite)", () => {
 
         expect(result).toMatchObject({
           name: "Member Template Role",
-          organizationId: testData.organization,
+          organizationId: primaryOrgId,
           isSystem: false,
           isDefault: false,
         });
@@ -231,7 +232,7 @@ describe("Role Router Integration Tests (PGlite)", () => {
 
         expect(dbRole).toBeDefined();
         expect(dbRole?.name).toBe("Member Template Role");
-        expect(dbRole?.organizationId).toBe(testData.organization);
+        expect(dbRole?.organizationId).toBe(primaryOrgId);
 
         // Verify template permissions were assigned
         const permissionNames =
@@ -245,9 +246,10 @@ describe("Role Router Integration Tests (PGlite)", () => {
 
     test("should create custom role without template", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { context, testData } = await createTestContext(
+        const context = await createSeededAdminTestContext(
           db,
-          "test-org-pinpoint",
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = roleRouter.createCaller(context);
 
@@ -263,7 +265,7 @@ describe("Role Router Integration Tests (PGlite)", () => {
 
         expect(result).toMatchObject({
           name: "Custom Role",
-          organizationId: testData.organization,
+          organizationId: primaryOrgId,
           isSystem: false,
           isDefault: true,
         });
@@ -291,9 +293,10 @@ describe("Role Router Integration Tests (PGlite)", () => {
 
     test("should create role without permissions", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { context, testData } = await createTestContext(
+        const context = await createSeededAdminTestContext(
           db,
-          "test-org-pinpoint",
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = roleRouter.createCaller(context);
 
@@ -304,7 +307,7 @@ describe("Role Router Integration Tests (PGlite)", () => {
 
         expect(result).toMatchObject({
           name: "Simple Role",
-          organizationId: testData.organization,
+          organizationId: primaryOrgId,
           isSystem: false,
           isDefault: false,
         });
@@ -325,16 +328,17 @@ describe("Role Router Integration Tests (PGlite)", () => {
       workerDb,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { context, testData } = await createTestContext(
+        const context = await createSeededAdminTestContext(
           db,
-          "test-org-pinpoint",
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = roleRouter.createCaller(context);
 
         const result = await caller.create({ name: "Test Role" });
 
         // Verify role was created in correct organization
-        expect(result.organizationId).toBe(testData.organization);
+        expect(result.organizationId).toBe(primaryOrgId);
 
         // Verify role is not visible from other organization
         // Create other organization and membership for the user
@@ -364,24 +368,24 @@ describe("Role Router Integration Tests (PGlite)", () => {
         // Create membership for test user in other org
         await db.insert(schema.memberships).values({
           id: "other-membership",
-          userId: testData.user || "test-user-admin",
+          userId: SEED_TEST_IDS.USERS.ADMIN,
           organizationId: otherOrgId,
           roleId: otherAdminRole.id,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
 
-        const { context: baseContext, testData: baseTestData } =
-          await createTestContext(db, "test-org-pinpoint");
-        const otherOrgContext = {
-          ...baseContext,
-          organization: {
-            id: otherOrgId,
-            name: "Other Org",
-            subdomain: "other",
-          },
-        };
-        const otherCaller = roleRouter.createCaller(otherOrgContext as any);
+        const baseContext = await createSeededAdminTestContext(
+          db,
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
+        );
+        const otherOrgContext = await createSeededAdminTestContext(
+          db,
+          otherOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
+        );
+        const otherCaller = roleRouter.createCaller(otherOrgContext);
 
         const otherRoles = await otherCaller.list();
         expect(otherRoles.find((r) => r.id === result.id)).toBeUndefined();
@@ -390,9 +394,10 @@ describe("Role Router Integration Tests (PGlite)", () => {
 
     test("should throw error for invalid template", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { context, testData } = await createTestContext(
+        const context = await createSeededAdminTestContext(
           db,
-          "test-org-pinpoint",
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = roleRouter.createCaller(context);
 
@@ -409,9 +414,10 @@ describe("Role Router Integration Tests (PGlite)", () => {
   describe("update - Update existing role", () => {
     test("should update role name", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { context, testData } = await createTestContext(
+        const context = await createSeededAdminTestContext(
           db,
-          "test-org-pinpoint",
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = roleRouter.createCaller(context);
 
@@ -429,7 +435,7 @@ describe("Role Router Integration Tests (PGlite)", () => {
         expect(result).toMatchObject({
           id: testRole.id,
           name: "Updated Role Name",
-          organizationId: testData.organization,
+          organizationId: primaryOrgId,
         });
 
         // Verify in database
@@ -442,9 +448,10 @@ describe("Role Router Integration Tests (PGlite)", () => {
 
     test("should update role permissions", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { context, testData } = await createTestContext(
+        const context = await createSeededAdminTestContext(
           db,
-          "test-org-pinpoint",
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = roleRouter.createCaller(context);
 
@@ -486,9 +493,10 @@ describe("Role Router Integration Tests (PGlite)", () => {
 
     test("should update role default status", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { context, testData } = await createTestContext(
+        const context = await createSeededAdminTestContext(
           db,
-          "test-org-pinpoint",
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = roleRouter.createCaller(context);
 
@@ -518,9 +526,10 @@ describe("Role Router Integration Tests (PGlite)", () => {
 
     test("should update multiple properties", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { context, testData } = await createTestContext(
+        const context = await createSeededAdminTestContext(
           db,
-          "test-org-pinpoint",
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = roleRouter.createCaller(context);
 
@@ -562,9 +571,10 @@ describe("Role Router Integration Tests (PGlite)", () => {
 
     test("should throw error for nonexistent role", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { context, testData } = await createTestContext(
+        const context = await createSeededAdminTestContext(
           db,
-          "test-org-pinpoint",
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = roleRouter.createCaller(context);
 
@@ -581,9 +591,10 @@ describe("Role Router Integration Tests (PGlite)", () => {
   describe("delete - Delete role", () => {
     test("should delete role successfully", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { context, testData } = await createTestContext(
+        const context = await createSeededAdminTestContext(
           db,
-          "test-org-pinpoint",
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = roleRouter.createCaller(context);
 
@@ -609,20 +620,21 @@ describe("Role Router Integration Tests (PGlite)", () => {
       workerDb,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { context, testData } = await createTestContext(
+        const context = await createSeededAdminTestContext(
           db,
-          "test-org-pinpoint",
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = roleRouter.createCaller(context);
 
         // Try to delete the system admin role
         await expect(
-          caller.delete({ roleId: testData.adminRole! }),
+          caller.delete({ roleId: seededData.adminRole! }),
         ).rejects.toThrow();
 
         // Verify admin role still exists
         const stillExists = await db.query.roles.findFirst({
-          where: eq(schema.roles.id, testData.adminRole!),
+          where: eq(schema.roles.id, seededData.adminRole!),
         });
         expect(stillExists).toBeDefined();
       });
@@ -630,9 +642,10 @@ describe("Role Router Integration Tests (PGlite)", () => {
 
     test("should handle nonexistent role deletion", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { context, testData } = await createTestContext(
+        const context = await createSeededAdminTestContext(
           db,
-          "test-org-pinpoint",
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = roleRouter.createCaller(context);
 
@@ -648,18 +661,19 @@ describe("Role Router Integration Tests (PGlite)", () => {
       workerDb,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { context, testData } = await createTestContext(
+        const context = await createSeededAdminTestContext(
           db,
-          "test-org-pinpoint",
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = roleRouter.createCaller(context);
 
-        const result = await caller.get({ roleId: testData.adminRole! });
+        const result = await caller.get({ roleId: seededData.adminRole! });
 
         expect(result).toMatchObject({
-          id: testData.adminRole,
+          id: seededData.adminRole,
           name: "Admin",
-          organizationId: testData.organization,
+          organizationId: primaryOrgId,
         });
         expect(result.memberCount).toBeGreaterThan(0);
         expect(Array.isArray(result.permissions)).toBe(true);
@@ -670,9 +684,10 @@ describe("Role Router Integration Tests (PGlite)", () => {
       workerDb,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { context, testData } = await createTestContext(
+        const context = await createSeededAdminTestContext(
           db,
-          "test-org-pinpoint",
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = roleRouter.createCaller(context);
 
@@ -689,9 +704,10 @@ describe("Role Router Integration Tests (PGlite)", () => {
 
     test("should enforce organization scoping", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { context, testData } = await createTestContext(
+        const context = await createSeededAdminTestContext(
           db,
-          "test-org-pinpoint",
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = roleRouter.createCaller(context);
 
@@ -726,23 +742,23 @@ describe("Role Router Integration Tests (PGlite)", () => {
         // Create membership for test user in other org
         await db.insert(schema.memberships).values({
           id: "other-membership-get",
-          userId: testData.user || "test-user-admin",
+          userId: SEED_TEST_IDS.USERS.ADMIN,
           organizationId: otherOrgId,
           roleId: otherAdminRole.id,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
 
-        const { context: baseContext, testData: baseTestData } =
-          await createTestContext(db, "test-org-pinpoint");
-        const otherOrgContext = {
-          ...baseContext,
-          organization: {
-            id: otherOrgId,
-            name: "Other Org",
-            subdomain: "other",
-          },
-        };
+        const baseContext = await createSeededAdminTestContext(
+          db,
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
+        );
+        const otherOrgContext = await createSeededAdminTestContext(
+          db,
+          otherOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
+        );
         const otherCaller = roleRouter.createCaller(otherOrgContext as any);
 
         await expect(otherCaller.get({ roleId: testRole.id })).rejects.toThrow(
@@ -759,9 +775,10 @@ describe("Role Router Integration Tests (PGlite)", () => {
       workerDb,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { context, testData } = await createTestContext(
+        const context = await createSeededAdminTestContext(
           db,
-          "test-org-pinpoint",
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = roleRouter.createCaller(context);
 
@@ -789,9 +806,10 @@ describe("Role Router Integration Tests (PGlite)", () => {
       workerDb,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { context, testData } = await createTestContext(
+        const context = await createSeededAdminTestContext(
           db,
-          "test-org-pinpoint",
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = roleRouter.createCaller(context);
 
@@ -806,9 +824,10 @@ describe("Role Router Integration Tests (PGlite)", () => {
   describe("getTemplates - Get role templates", () => {
     test("should return available role templates", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { context, testData } = await createTestContext(
+        const context = await createSeededAdminTestContext(
           db,
-          "test-org-pinpoint",
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = roleRouter.createCaller(context);
 
@@ -839,9 +858,10 @@ describe("Role Router Integration Tests (PGlite)", () => {
   describe("assignToUser - Assign role to user", () => {
     test("should assign role to user successfully", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { context, testData } = await createTestContext(
+        const context = await createSeededAdminTestContext(
           db,
-          "test-org-pinpoint",
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = roleRouter.createCaller(context);
 
@@ -863,8 +883,8 @@ describe("Role Router Integration Tests (PGlite)", () => {
         await db.insert(schema.memberships).values({
           id: membershipId,
           userId: targetUser.id,
-          organizationId: testData.organization,
-          roleId: testData.memberRole!,
+          organizationId: primaryOrgId,
+          roleId: seededData.memberRole!,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
@@ -883,7 +903,7 @@ describe("Role Router Integration Tests (PGlite)", () => {
         expect(result).toMatchObject({
           userId: targetUser.id,
           roleId: testRole.id,
-          organizationId: testData.organization,
+          organizationId: primaryOrgId,
         });
         expect(result.role.name).toBe("Test Assignment Role");
         expect(result.user.id).toBe(targetUser.id);
@@ -892,7 +912,7 @@ describe("Role Router Integration Tests (PGlite)", () => {
         const dbMembership = await db.query.memberships.findFirst({
           where: and(
             eq(schema.memberships.userId, targetUser.id),
-            eq(schema.memberships.organizationId, testData.organization),
+            eq(schema.memberships.organizationId, primaryOrgId),
           ),
         });
         expect(dbMembership?.roleId).toBe(testRole.id);
@@ -903,9 +923,10 @@ describe("Role Router Integration Tests (PGlite)", () => {
       workerDb,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { context, testData } = await createTestContext(
+        const context = await createSeededAdminTestContext(
           db,
-          "test-org-pinpoint",
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = roleRouter.createCaller(context);
 
@@ -940,9 +961,10 @@ describe("Role Router Integration Tests (PGlite)", () => {
       workerDb,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { context, testData } = await createTestContext(
+        const context = await createSeededAdminTestContext(
           db,
-          "test-org-pinpoint",
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = roleRouter.createCaller(context);
 
@@ -970,9 +992,10 @@ describe("Role Router Integration Tests (PGlite)", () => {
       workerDb,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { context, testData } = await createTestContext(
+        const context = await createSeededAdminTestContext(
           db,
-          "test-org-pinpoint",
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = roleRouter.createCaller(context);
 
@@ -994,8 +1017,8 @@ describe("Role Router Integration Tests (PGlite)", () => {
         await db.insert(schema.memberships).values({
           id: membershipId,
           userId: targetUser.id,
-          organizationId: testData.organization,
-          roleId: testData.memberRole!,
+          organizationId: primaryOrgId,
+          roleId: seededData.memberRole!,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
@@ -1037,9 +1060,10 @@ describe("Role Router Integration Tests (PGlite)", () => {
       workerDb,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { context, testData } = await createTestContext(
+        const context = await createSeededAdminTestContext(
           db,
-          "test-org-pinpoint",
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = roleRouter.createCaller(context);
 
@@ -1061,8 +1085,8 @@ describe("Role Router Integration Tests (PGlite)", () => {
         await db.insert(schema.memberships).values({
           id: membershipId,
           userId: targetUser.id,
-          organizationId: testData.organization,
-          roleId: testData.memberRole!,
+          organizationId: primaryOrgId,
+          roleId: seededData.memberRole!,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
@@ -1086,25 +1110,25 @@ describe("Role Router Integration Tests (PGlite)", () => {
           expect.objectContaining({
             userId: targetUser.id,
             roleId: testRole.id,
-            organizationId: testData.organization,
+            organizationId: primaryOrgId,
           }),
           expect.objectContaining({
             id: testRole.id,
-            organizationId: testData.organization,
+            organizationId: primaryOrgId,
           }),
           expect.objectContaining({
             userId: targetUser.id,
-            organizationId: testData.organization,
+            organizationId: primaryOrgId,
           }),
           expect.arrayContaining([
             expect.objectContaining({
               userId: expect.any(String),
-              organizationId: testData.organization,
+              organizationId: primaryOrgId,
             }),
           ]),
           expect.objectContaining({
-            organizationId: testData.organization,
-            actorUserId: testData.user || "test-user-admin",
+            organizationId: primaryOrgId,
+            actorUserId: SEED_TEST_IDS.USERS.ADMIN,
             userPermissions: ["role:manage", "organization:manage"],
           }),
         );
@@ -1115,9 +1139,10 @@ describe("Role Router Integration Tests (PGlite)", () => {
       workerDb,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { context, testData } = await createTestContext(
+        const context = await createSeededAdminTestContext(
           db,
-          "test-org-pinpoint",
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = roleRouter.createCaller(context);
 
@@ -1139,8 +1164,8 @@ describe("Role Router Integration Tests (PGlite)", () => {
         await db.insert(schema.memberships).values({
           id: membershipId,
           userId: targetUser.id,
-          organizationId: testData.organization,
-          roleId: testData.memberRole!,
+          organizationId: primaryOrgId,
+          roleId: seededData.memberRole!,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
@@ -1160,11 +1185,11 @@ describe("Role Router Integration Tests (PGlite)", () => {
         const membership = await db.query.memberships.findFirst({
           where: and(
             eq(schema.memberships.userId, targetUser.id),
-            eq(schema.memberships.organizationId, testData.organization),
+            eq(schema.memberships.organizationId, primaryOrgId),
           ),
         });
 
-        expect(membership?.organizationId).toBe(testData.organization);
+        expect(membership?.organizationId).toBe(primaryOrgId);
         expect(membership?.roleId).toBe(testRole.id);
       });
     });
@@ -1175,9 +1200,10 @@ describe("Role Router Integration Tests (PGlite)", () => {
       workerDb,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { context, testData } = await createTestContext(
+        const context = await createSeededAdminTestContext(
           db,
-          "test-org-pinpoint",
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = roleRouter.createCaller(context);
 
@@ -1226,7 +1252,7 @@ describe("Role Router Integration Tests (PGlite)", () => {
         // Create membership for test user in org2
         await db.insert(schema.memberships).values({
           id: generateTestId("org2-membership"),
-          userId: testData.user || "test-user-admin",
+          userId: SEED_TEST_IDS.USERS.ADMIN,
           organizationId: org2Id,
           roleId: org2AdminRole.id,
           createdAt: new Date(),
@@ -1234,21 +1260,16 @@ describe("Role Router Integration Tests (PGlite)", () => {
         });
 
         // Test org2 caller cannot see org1 roles
-        const { context: baseContext, testData: baseTestData } =
-          await createTestContext(db, "test-org-pinpoint");
-        const org2Context = {
-          ...baseContext,
-          organization: {
-            id: org2Id,
-            name: "Test Organization 2",
-            subdomain: generateTestId("test-org-2-sub-ctx"),
-          },
-        };
-        const org2Caller = roleRouter.createCaller(org2Context as any);
+        const org2Context = await createSeededAdminTestContext(
+          db,
+          org2Id,
+          SEED_TEST_IDS.USERS.ADMIN,
+        );
+        const org2Caller = roleRouter.createCaller(org2Context);
 
         const org2Roles = await org2Caller.list();
         expect(
-          org2Roles.find((r) => r.organizationId === testData.organization),
+          org2Roles.find((r) => r.organizationId === primaryOrgId),
         ).toBeUndefined();
         expect(org2Roles.find((r) => r.id === org2RoleId)).toBeDefined();
 
@@ -1262,9 +1283,10 @@ describe("Role Router Integration Tests (PGlite)", () => {
       workerDb,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { context, testData } = await createTestContext(
+        const context = await createSeededAdminTestContext(
           db,
-          "test-org-pinpoint",
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = roleRouter.createCaller(context);
 
@@ -1293,13 +1315,13 @@ describe("Role Router Integration Tests (PGlite)", () => {
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Test context with organization:manage but not role:manage
-        const { context: baseQueryContext, testData: baseTestData } =
-          await createTestContext(db, "test-org-pinpoint");
-        const queryContext = {
-          ...baseQueryContext,
-          userPermissions: ["organization:manage"],
-        };
-        const queryCaller = roleRouter.createCaller(queryContext as any);
+        const queryContext = await createSeededAdminTestContext(
+          db,
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
+          { permissions: ["organization:manage"] },
+        );
+        const queryCaller = roleRouter.createCaller(queryContext);
 
         // Should not throw permission errors for queries
         await expect(queryCaller.getPermissions()).resolves.toBeDefined();
