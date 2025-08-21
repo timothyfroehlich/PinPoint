@@ -282,7 +282,7 @@ describe("Location Router CRUD Operations (PGlite)", () => {
         // Use global seededData from beforeAll
         const context = await createSeededLocationTestContext(
           db,
-          seededData.organization,
+          primaryOrgId,
           seededData.user
         );
 
