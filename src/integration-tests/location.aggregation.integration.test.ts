@@ -82,7 +82,7 @@ describe("Location Router Aggregation Operations (PGlite)", () => {
         // Use global seededData from beforeAll
         const context = await createSeededLocationTestContext(
           txDb,
-          seededData.organization,
+          primaryOrgId,
           seededData.user!,
         );
         const caller = locationRouter.createCaller(context);
