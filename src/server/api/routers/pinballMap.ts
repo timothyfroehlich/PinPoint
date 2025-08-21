@@ -27,6 +27,7 @@ export const pinballMapRouter = createTRPCRouter({
       await service.configureLocationSync(
         input.locationId,
         input.pinballMapId,
+        ctx.organization.id,
       );
       return { success: true };
     }),
@@ -51,6 +52,6 @@ export const pinballMapRouter = createTRPCRouter({
   // Get sync status for organization (RLS scoped)
   getSyncStatus: organizationManageProcedure.query(async ({ ctx }) => {
     const service = ctx.services.createPinballMapService();
-    return service.getOrganizationSyncStatus();
+    return service.getOrganizationSyncStatus(ctx.organization.id);
   }),
 });

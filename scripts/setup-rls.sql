@@ -111,12 +111,12 @@ CREATE POLICY "permissions_global_read" ON permissions
   USING (true);
 
 -- Role Permissions: Scoped via role relationship
-CREATE POLICY "role_permissions_organization_isolation" ON "rolePermissions"
+CREATE POLICY "role_permissions_organization_isolation" ON "role_permissions"
   FOR ALL TO authenticated
   USING (
     EXISTS (
       SELECT 1 FROM roles
-      WHERE roles.id = "rolePermissions"."roleId"
+      WHERE roles.id = "role_permissions"."A"
       AND roles."organizationId" = (auth.jwt() ->> 'app_metadata' ->> 'organizationId')::text
     )
   );
@@ -176,7 +176,7 @@ CREATE POLICY "attachments_organization_isolation" ON attachments
   USING ("organizationId" = (auth.jwt() ->> 'app_metadata' ->> 'organizationId')::text);
 
 -- Issue History: Direct organization isolation
-CREATE POLICY "issue_history_organization_isolation" ON "issueHistory"
+CREATE POLICY "issue_history_organization_isolation" ON "issue_history"
   FOR ALL TO authenticated
   USING ("organizationId" = (auth.jwt() ->> 'app_metadata' ->> 'organizationId')::text);
 
@@ -196,7 +196,7 @@ CREATE POLICY "upvotes_organization_isolation" ON upvotes
 -- =================================================================
 
 -- Collection Types: Direct organization isolation
-CREATE POLICY "collection_types_organization_isolation" ON "collectionTypes"
+CREATE POLICY "collection_types_organization_isolation" ON "collection_types"
   FOR ALL TO authenticated
   USING ("organizationId" = (auth.jwt() ->> 'app_metadata' ->> 'organizationId')::text);
 
@@ -236,7 +236,7 @@ CREATE POLICY "notifications_organization_isolation" ON notifications
   USING ("organizationId" = (auth.jwt() ->> 'app_metadata' ->> 'organizationId')::text);
 
 -- PinballMap Configs: Direct organization isolation
-CREATE POLICY "pinball_map_configs_organization_isolation" ON "pinballMapConfigs"
+CREATE POLICY "pinball_map_configs_organization_isolation" ON "pinball_map_configs"
   FOR ALL TO authenticated
   USING ("organizationId" = (auth.jwt() ->> 'app_metadata' ->> 'organizationId')::text);
 
@@ -272,10 +272,10 @@ DROP TRIGGER IF EXISTS set_issues_organization_id ON issues;
 DROP TRIGGER IF EXISTS set_priorities_organization_id ON priorities;
 DROP TRIGGER IF EXISTS set_issue_statuses_organization_id ON "issue_statuses";
 DROP TRIGGER IF EXISTS set_attachments_organization_id ON attachments;
-DROP TRIGGER IF EXISTS set_issue_history_organization_id ON "issueHistory";
-DROP TRIGGER IF EXISTS set_collection_types_organization_id ON "collectionTypes";
+DROP TRIGGER IF EXISTS set_issue_history_organization_id ON "issue_history";
+DROP TRIGGER IF EXISTS set_collection_types_organization_id ON "collection_types";
 DROP TRIGGER IF EXISTS set_notifications_organization_id ON notifications;
-DROP TRIGGER IF EXISTS set_pinball_map_configs_organization_id ON "pinballMapConfigs";
+DROP TRIGGER IF EXISTS set_pinball_map_configs_organization_id ON "pinball_map_configs";
 DROP TRIGGER IF EXISTS set_roles_organization_id ON roles;
 DROP TRIGGER IF EXISTS set_memberships_organization_id ON memberships;
 
@@ -315,12 +315,12 @@ CREATE TRIGGER set_attachments_organization_id
   EXECUTE FUNCTION set_organization_id();
 
 CREATE TRIGGER set_issue_history_organization_id
-  BEFORE INSERT ON "issueHistory" FOR EACH ROW
+  BEFORE INSERT ON "issue_history" FOR EACH ROW
   EXECUTE FUNCTION set_organization_id();
 
 -- Collection management triggers
 CREATE TRIGGER set_collection_types_organization_id
-  BEFORE INSERT ON "collectionTypes" FOR EACH ROW
+  BEFORE INSERT ON "collection_types" FOR EACH ROW
   EXECUTE FUNCTION set_organization_id();
 
 -- Notification and configuration triggers
@@ -329,7 +329,7 @@ CREATE TRIGGER set_notifications_organization_id
   EXECUTE FUNCTION set_organization_id();
 
 CREATE TRIGGER set_pinball_map_configs_organization_id
-  BEFORE INSERT ON "pinballMapConfigs" FOR EACH ROW
+  BEFORE INSERT ON "pinball_map_configs" FOR EACH ROW
   EXECUTE FUNCTION set_organization_id();
 
 -- =================================================================
@@ -392,18 +392,18 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS attachments_org_issue_idx
   ON attachments ("organizationId", "issueId");
 
 CREATE INDEX CONCURRENTLY IF NOT EXISTS issue_history_org_issue_idx
-  ON "issueHistory" ("organizationId", "issueId", "createdAt");
+  ON "issue_history" ("organizationId", "issueId", "createdAt");
 
 -- Collection management indexes
 CREATE INDEX CONCURRENTLY IF NOT EXISTS collection_types_org_id_idx
-  ON "collectionTypes" ("organizationId", "name");
+  ON "collection_types" ("organizationId", "name");
 
 -- Inheritance-based indexes for complex policies
 CREATE INDEX CONCURRENTLY IF NOT EXISTS collections_location_id_idx
   ON collections ("locationId", "typeId");
 
 CREATE INDEX CONCURRENTLY IF NOT EXISTS collection_machines_collection_id_idx
-  ON "collectionMachines" ("collectionId", "machineId");
+  ON "collection_machines" ("collection_id", "machine_id");
 
 -- Notification indexes
 CREATE INDEX CONCURRENTLY IF NOT EXISTS notifications_org_user_idx

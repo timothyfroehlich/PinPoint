@@ -30,25 +30,29 @@ export async function withRLSSecurityContext<T>(
   context: RLSContext,
   fn: (db: TestDatabase) => Promise<T>,
 ): Promise<T> {
+  // PGlite does not support parameterized SET statements. Use raw SQL with safe escaping.
+  const esc = (v: string) => v.replace(/'/g, "''");
+
   await db.execute(
-    sql`SET app.current_organization_id = ${context.organizationId}`,
+    `SET app.current_organization_id = '${esc(context.organizationId)}'`,
   );
-  await db.execute(sql`SET app.current_user_id = ${context.userId}`);
-  await db.execute(sql`SET app.current_user_role = ${context.userRole}`);
+  await db.execute(`SET app.current_user_id = '${esc(context.userId)}'`);
+  await db.execute(`SET app.current_user_role = '${esc(context.userRole)}'`);
 
   if (context.userEmail) {
-    await db.execute(sql`SET app.current_user_email = ${context.userEmail}`);
+    await db.execute(`SET app.current_user_email = '${esc(context.userEmail)}'`);
   }
 
   return await fn(db);
 }
 
 /**
- * Clear all RLS-related session variables to simulate an anonymous/unauthenticated user.
+ * Clear all RLS session variables to simulate anonymous/unauthenticated context.
  */
 export async function clearRLSSecurityContext(db: TestDatabase): Promise<void> {
-  await db.execute(sql`RESET app.current_organization_id`);
-  await db.execute(sql`RESET app.current_user_id`);
-  await db.execute(sql`RESET app.current_user_role`);
-  await db.execute(sql`RESET app.current_user_email`);
+  // Use plain strings to avoid any driver quirks
+  await db.execute(`RESET app.current_organization_id`);
+  await db.execute(`RESET app.current_user_id`);
+  await db.execute(`RESET app.current_user_role`);
+  await db.execute(`RESET app.current_user_email`);
 }

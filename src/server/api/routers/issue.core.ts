@@ -330,9 +330,9 @@ export const issueCoreRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Get issue and membership for validation (RLS handles org scoping)
+      // Get issue and membership for validation (organization scoped)
       const issue = await ctx.db.query.issues.findFirst({
-        where: eq(issues.id, input.issueId),
+        where: and(eq(issues.id, input.issueId), eq(issues.organizationId, ctx.organizationId)),
       });
 
       const membership = await ctx.db.query.memberships.findFirst({
@@ -652,7 +652,7 @@ export const issueCoreRouter = createTRPCRouter({
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
       const issue = await ctx.db.query.issues.findFirst({
-        where: eq(issues.id, input.id),
+        where: and(eq(issues.id, input.id), eq(issues.organizationId, ctx.organizationId)),
         with: {
           status: true,
           priority: true,
@@ -727,9 +727,9 @@ export const issueCoreRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Verify the issue exists (RLS handles org scoping)
+      // Verify the issue exists (organization scoped)
       const existingIssue = await ctx.db.query.issues.findFirst({
-        where: eq(issues.id, input.id),
+        where: and(eq(issues.id, input.id), eq(issues.organizationId, ctx.organizationId)),
         with: {
           status: true,
           assignedTo: true,
@@ -798,11 +798,11 @@ export const issueCoreRouter = createTRPCRouter({
       await ctx.db
         .update(issues)
         .set(updateData)
-        .where(eq(issues.id, input.id));
+        .where(and(eq(issues.id, input.id), eq(issues.organizationId, ctx.organizationId)));
 
       // Get updated issue with relations
       const updatedIssue = await ctx.db.query.issues.findFirst({
-        where: eq(issues.id, input.id),
+        where: and(eq(issues.id, input.id), eq(issues.organizationId, ctx.organizationId)),
         with: {
           status: true,
           assignedTo: {
@@ -925,7 +925,7 @@ export const issueCoreRouter = createTRPCRouter({
           statusId: resolvedStatus.id,
           resolvedAt: new Date(),
         })
-        .where(eq(issues.id, input.id));
+        .where(and(eq(issues.id, input.id), eq(issues.organizationId, ctx.organizationId)));
 
       // Get updated issue with relations
       const updatedIssue = await ctx.db.query.issues.findFirst({
@@ -981,9 +981,9 @@ export const issueCoreRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Verify the issue exists (RLS handles org scoping)
+      // Verify the issue exists (organization scoped)
       const existingIssue = await ctx.db.query.issues.findFirst({
-        where: eq(issues.id, input.id),
+        where: and(eq(issues.id, input.id), eq(issues.organizationId, ctx.organizationId)),
         with: {
           status: true,
         },
@@ -1041,11 +1041,11 @@ export const issueCoreRouter = createTRPCRouter({
       await ctx.db
         .update(issues)
         .set(updateData)
-        .where(eq(issues.id, input.id));
+        .where(and(eq(issues.id, input.id), eq(issues.organizationId, ctx.organizationId)));
 
       // Get updated issue with relations
       const updatedIssue = await ctx.db.query.issues.findFirst({
-        where: eq(issues.id, input.id),
+        where: and(eq(issues.id, input.id), eq(issues.organizationId, ctx.organizationId)),
         with: {
           status: true,
           priority: true,

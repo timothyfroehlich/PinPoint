@@ -12,6 +12,7 @@
  */
 
 import { eq, and, inArray } from "drizzle-orm";
+import sampleIssuesData from "./sample-issues.json";
 
 // Quiet mode for tests
 const isTestMode = process.env.NODE_ENV === "test" || process.env.VITEST;
@@ -21,8 +22,7 @@ const log = (...args: unknown[]) => {
 
 import { createDrizzleClient } from "~/server/db/drizzle";
 import {
-  opdbModels,
-  customModels, 
+  models,
   machines,
   issues,
   priorities,
@@ -30,74 +30,13 @@ import {
   users,
   locations,
 } from "~/server/db/schema";
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
 const db = createDrizzleClient();
 
 type DataAmount = "minimal" | "full";
 
-/**
- * Wait for auth users to synchronize from Supabase Auth to database
- * This prevents the race condition where sample issues are created before
- * auth users appear in the users table via database triggers
- */
-async function waitForAuthUserSync(
-  dbInstance: typeof db,
-  requiredEmails: string[],
-): Promise<void> {
-  const MAX_ATTEMPTS = 10;
-  const INITIAL_DELAY_MS = 1000; // Start with 1 second
-  const MAX_DELAY_MS = 8000; // Cap at 8 seconds
-
-  log(
-    `[SAMPLE] 🔄 Waiting for ${requiredEmails.length} auth users to sync to database...`,
-  );
-  log(`[SAMPLE] Required users: ${requiredEmails.join(", ")}`);
-
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    // Query for users in database using passed dbInstance
-    const foundUsers = await dbInstance
-      .select({ id: users.id, email: users.email })
-      .from(users)
-      .where(inArray(users.email, requiredEmails));
-
-    const foundEmails = foundUsers
-      .map((u) => u.email)
-      .filter(Boolean) as string[];
-    const missingEmails = requiredEmails.filter(
-      (email) => !foundEmails.includes(email),
-    );
-
-    log(
-      `[SAMPLE] 🔍 Attempt ${attempt}/${MAX_ATTEMPTS}: Found ${foundEmails.length}/${requiredEmails.length} users`,
-    );
-
-    if (missingEmails.length === 0) {
-      log(
-        `[SAMPLE] ✅ All required users found in database after ${attempt} attempts`,
-      );
-      return;
-    }
-
-    if (attempt === MAX_ATTEMPTS) {
-      const errorMsg = `Auth user synchronization failed after ${MAX_ATTEMPTS} attempts. Missing users: ${missingEmails.join(", ")}. This indicates that Supabase auth triggers are not working or auth users were not created properly.`;
-      console.error(`[SAMPLE] ❌ ${errorMsg}`);
-      throw new Error(errorMsg);
-    }
-
-    // Exponential backoff with jitter
-    const baseDelay = Math.min(
-      INITIAL_DELAY_MS * Math.pow(1.5, attempt - 1),
-      MAX_DELAY_MS,
-    );
-    const jitter = Math.random() * 0.3; // ±30% jitter
-    const delay = Math.floor(baseDelay * (1 + jitter));
-
-    log(
-      `[SAMPLE] ⏳ Missing users: ${missingEmails.join(", ")} - waiting ${delay}ms before retry`,
-    );
-    await new Promise((resolve) => setTimeout(resolve, delay));
-  }
-}
+// Auth user synchronization no longer needed - users are created atomically
 
 interface SampleIssue {
   title: string;
@@ -126,13 +65,12 @@ async function extractUniqueGames(
   dataAmount: DataAmount,
 ): Promise<UniqueGame[]> {
   try {
-    // Note: sample-issues.json was removed during Prisma cleanup
-    // For now, use empty array to maintain build compatibility
-    const sampleIssues: SampleIssue[] = [];
+    // Restored sample-issues.json from git history
+    const sampleIssues: SampleIssue[] = sampleIssuesData;
 
     if (sampleIssues.length === 0) {
       log(
-        "[SAMPLE] No sample issues data available (file removed during Prisma cleanup)",
+        "[SAMPLE] No sample issues data available",
       );
       return [];
     }
@@ -436,6 +374,91 @@ async function createMachinesWithDb(
 }
 
 /**
+ * Create a competitor organization machine using the same model as primary organization
+ * Tests cross-org isolation with shared global OPDB models
+ */
+async function createCompetitorMachine(
+  dbInstance: typeof db,
+): Promise<void> {
+  log(`[SAMPLE] Creating competitor organization machine...`);
+  
+  try {
+    const competitorOrgId = SEED_TEST_IDS.ORGANIZATIONS.competitor;
+    const revengeFromMarsOpdbId = "G50Wr-MLeZP"; // From sample-issues.json
+    
+    // Get the competitor organization's default location
+    const competitorLocation = await dbInstance
+      .select({ id: locations.id })
+      .from(locations)
+      .where(eq(locations.organizationId, competitorOrgId))
+      .limit(1);
+      
+    if (competitorLocation.length === 0) {
+      console.warn(`[SAMPLE] ⚠️  No default location found for competitor organization, skipping competitor machine`);
+      return;
+    }
+    
+    const locationId = competitorLocation[0]!.id;
+    
+    // Get the "Revenge from Mars" model by OPDB ID
+    const revengeModel = await dbInstance
+      .select({ id: models.id, name: models.name })
+      .from(models)
+      .where(eq(models.opdbId, revengeFromMarsOpdbId))
+      .limit(1);
+      
+    if (revengeModel.length === 0) {
+      console.warn(`[SAMPLE] ⚠️  "Revenge from Mars" model not found, skipping competitor machine`);
+      return;
+    }
+    
+    const model = revengeModel[0]!;
+    
+    // Check if competitor machine already exists
+    const existingMachine = await dbInstance
+      .select({ id: machines.id })
+      .from(machines)
+      .where(
+        and(
+          eq(machines.organizationId, competitorOrgId),
+          eq(machines.modelId, model.id)
+        )
+      )
+      .limit(1);
+      
+    if (existingMachine.length > 0) {
+      log(`[SAMPLE] ⏭️  Competitor "Revenge from Mars" machine already exists`);
+      return;
+    }
+    
+    // Create the competitor machine
+    const competitorMachine = {
+      id: `machine_competitor_${model.id}`, // Unique deterministic ID
+      name: `${model.name} - Competitor #1`,
+      organizationId: competitorOrgId,
+      locationId,
+      modelId: model.id,
+      ownerId: null, // No owner for competitor machine
+      qrCodeId: `qr-competitor-revenge-from-mars`,
+      ownerNotificationsEnabled: false,
+      notifyOnNewIssues: false,
+      notifyOnStatusChanges: false,
+      notifyOnComments: false,
+    };
+    
+    await dbInstance.insert(machines).values(competitorMachine);
+    
+    log(`[SAMPLE] ✅ Created competitor machine: ${competitorMachine.name}`);
+    log(`[SAMPLE] 🎯 Testing scenario: Both organizations have "${model.name}" machines for cross-org isolation testing`);
+    
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`[SAMPLE] ❌ Competitor machine creation failed: ${errorMessage}`);
+    throw new Error(`Failed to create competitor machine: ${errorMessage}`);
+  }
+}
+
+/**
  * Map severity from sample issues to priority names
  */
 function mapSeverityToPriority(severity: string): string {
@@ -459,13 +482,12 @@ async function createSampleIssuesWithDb(
   skipAuthUsers = false,
 ): Promise<void> {
   try {
-    // Note: sample-issues.json was removed during Prisma cleanup
-    // For now, use empty array to maintain build compatibility
-    let sampleIssues: SampleIssue[] = [];
+    // Restored sample-issues.json from git history
+    let sampleIssues: SampleIssue[] = sampleIssuesData;
 
     if (sampleIssues.length === 0) {
       log(
-        "[SAMPLE] No sample issues data available (file removed during Prisma cleanup)",
+        "[SAMPLE] No sample issues data available",
       );
       return;
     }
@@ -504,20 +526,12 @@ async function createSampleIssuesWithDb(
       statusMap.set(status.name, status.id);
     }
 
-    // Wait for auth users to sync from Supabase Auth to database
-    // This prevents race condition where sample issues try to reference users
-    // that don't exist yet in the database (even though they exist in auth)
-    // Skip this step for PostgreSQL-only mode where auth users aren't created
+    // Auth users are now created atomically, no synchronization wait needed
     if (!skipAuthUsers) {
-      const requiredDevUsers = [
-        "admin@dev.local",
-        "member@dev.local",
-        "player@dev.local",
-      ];
-      await waitForAuthUserSync(dbInstance, requiredDevUsers);
+      log("[SAMPLE] ✅ Auth users created atomically - no sync wait required");
     } else {
       log(
-        "[SAMPLE] ⏭️  Skipping auth user synchronization (PostgreSQL-only mode)",
+        "[SAMPLE] ⏭️  Skipping auth user validation (PostgreSQL-only mode)",
       );
     }
 
@@ -717,6 +731,9 @@ export async function seedSampleDataWithDb(
     // Phase 3: Create machines for all models
     await createMachinesWithDb(dbInstance, organizationId, uniqueGames);
 
+    // Phase 3.5: Create competitor organization machine for cross-org testing
+    await createCompetitorMachine(dbInstance);
+
     // Phase 4: Create sample issues mapped to machines
     await createSampleIssuesWithDb(
       dbInstance,
@@ -730,8 +747,9 @@ export async function seedSampleDataWithDb(
       `[SAMPLE] ✅ Sample data seeding completed successfully in ${duration}ms!`,
     );
     log(`[SAMPLE] 📊 Summary:`);
-    log(`[SAMPLE]   - Games: ${uniqueGames.length} unique OPDB models`);
-    log(`[SAMPLE]   - Machines: ${uniqueGames.length} machines created`);
+    log(`[SAMPLE]   - Games: ${uniqueGames.length} unique OPDB models (global catalog)`);
+    log(`[SAMPLE]   - Machines: ${uniqueGames.length} primary org + 1 competitor org machine`);
+    log(`[SAMPLE]   - Cross-org testing: Shared "Revenge from Mars" model with isolated machines`);
     log(
       `[SAMPLE]   - Issues: ${dataAmount === "minimal" ? "Limited" : "Rich"} sample data from curated JSON`,
     );

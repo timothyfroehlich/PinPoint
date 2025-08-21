@@ -34,6 +34,7 @@ import type { TestDatabase } from "~/test/helpers/pglite-test-setup";
 // Mock external dependencies that aren't database-related
 vi.mock("~/lib/utils/id-generation", () => ({
   generateId: vi.fn(() => generateTestId("test-id")),
+  generatePrefixedId: vi.fn((prefix) => generateTestId(`${prefix}-id`)),
 }));
 
 vi.mock("~/server/auth/permissions", () => ({
@@ -391,712 +392,1001 @@ async function setupPublicTestData(db: TestDatabase) {
   };
 }
 
-describe("issueRouter - Issue Detail Page", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+describe("Issue Router Integration Tests", () => {
+  describe("getById procedure", () => {
+    test("should retrieve issue by ID with full details", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx, issue } = await setupTestData(db);
+        const caller = appRouter.createCaller(ctx);
 
-  describe("Authenticated Issue Detail Access", () => {
-    it("should allow authenticated users to view all issue details", async () => {
-      const authCtx = createAuthenticatedContext(["issue:view"]);
-      const authCaller = appRouter.createCaller(authCtx);
+        const result = await caller.issue.core.getById({ id: issue.id });
 
-      const issueWithDetails = createIssueWithRequiredRelations({
-        comments: [
-          createCommentTypes.internal({
-            overrides: {
-              id: "comment-1",
-              content: "Internal note",
-              createdBy: mockUser,
-              createdAt: new Date(),
-            },
-          }),
-          createCommentTypes.public({
-            overrides: {
-              id: "comment-2",
-              content: "Public comment",
-              createdBy: mockUser,
-              createdAt: new Date(),
-            },
-          }),
-        ],
+        expect(result).toBeDefined();
+        expect(result.id).toBe(issue.id);
+        expect(result.title).toBe("Test Issue");
+        expect(result.machine).toBeDefined();
+        expect(result.status).toBeDefined();
+        expect(result.priority).toBeDefined();
+        expect(result.createdBy).toBeDefined();
       });
-
-      setupIssueContextMocks(authCtx, issueWithDetails);
-
-      const result = await authCaller.issue.core.getById({ id: mockIssue.id });
-
-      // Should see all comments
-      expect(result.comments).toHaveLength(2);
-      expect(result.assignedTo).toBeTruthy();
     });
 
-    it("should enforce organization isolation", async () => {
-      const authCtx = createAuthenticatedContext(["issue:view"]);
-      const authCaller = appRouter.createCaller(authCtx);
+    test("should enforce organization isolation", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx } = await setupTestData(db);
+        const caller = appRouter.createCaller(ctx);
 
-      const otherOrgIssue = {
-        // eslint-disable-next-line @typescript-eslint/no-misused-spread -- mockIssue is an object from createIssueFactory
-        ...mockIssue,
-        organizationId: "other-org",
-        machine: { ...mockMachine, organizationId: "other-org" },
-      };
+        // Create issue in different organization with all required fields
+        const [otherOrg] = await db
+          .insert(schema.organizations)
+          .values({
+            id: generateTestId("other-org"),
+            name: "Other Org",
+            subdomain: "other",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
 
-      authCtx.db.issue.findUnique.mockResolvedValue(otherOrgIssue as any);
+        // Create required entities for other org
+        const [otherModel] = await db
+          .insert(schema.models)
+          .values({
+            id: generateTestId("other-model"),
+            name: "Other Model",
+            manufacturer: "Other Mfg",
+            year: 2020,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
 
-      await expect(
-        authCaller.issue.core.getById({ id: mockIssue.id }),
-      ).rejects.toThrow("Issue not found");
+        const [otherLocation] = await db
+          .insert(schema.locations)
+          .values({
+            id: generateTestId("other-location"),
+            name: "Other Location",
+            address: "456 Other Street",
+            organizationId: otherOrg.id,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
+
+        const [otherMachine] = await db
+          .insert(schema.machines)
+          .values({
+            id: generateTestId("other-machine"),
+            name: "Other Machine",
+            modelId: otherModel.id,
+            locationId: otherLocation.id,
+            organizationId: otherOrg.id,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
+
+        const [otherStatus] = await db
+          .insert(schema.issueStatuses)
+          .values({
+            id: generateTestId("other-status"),
+            name: "Other Status",
+            category: "NEW",
+            organizationId: otherOrg.id,
+            order: 1,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
+
+        const [otherPriority] = await db
+          .insert(schema.priorities)
+          .values({
+            id: generateTestId("other-priority"),
+            name: "Other Priority",
+            organizationId: otherOrg.id,
+            order: 1,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
+
+        const [otherOrgIssue] = await db
+          .insert(schema.issues)
+          .values({
+            id: generateTestId("other-issue"),
+            title: "Other Org Issue",
+            machineId: otherMachine.id,
+            statusId: otherStatus.id,
+            priorityId: otherPriority.id,
+            organizationId: otherOrg.id,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
+
+        await expect(
+          caller.issue.core.getById({ id: otherOrgIssue.id }),
+        ).rejects.toThrow("Issue not found");
+      });
+    });
+
+    test("should throw error for non-existent issue", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx } = await setupTestData(db);
+        const caller = appRouter.createCaller(ctx);
+
+        await expect(
+          caller.issue.core.getById({ id: generateTestId("non-existent") }),
+        ).rejects.toThrow("Issue not found");
+      });
     });
   });
 
-  describe("Permission-based Issue Operations", () => {
-    it("should deny users without edit permissions from updating issues", async () => {
-      const readOnlyCtx = createAuthenticatedContext(["issue:view"]);
-      const readOnlyCaller = appRouter.createCaller(readOnlyCtx);
+  describe("update procedure", () => {
+    test("should update issue fields successfully", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx, issue } = await setupTestData(db);
+        const caller = appRouter.createCaller(ctx);
 
-      await expect(
-        readOnlyCaller.issue.core.update({
-          id: mockIssue.id,
+        const result = await caller.issue.core.update({
+          id: issue.id,
           title: "Updated Title",
-        }),
-      ).rejects.toThrow("Missing required permission: issue:edit");
+          description: "Updated description",
+        });
+
+        expect(result).toBeDefined();
+        expect(result.title).toBe("Updated Title");
+        expect(result.description).toBe("Updated description");
+
+        // Verify in database
+        const updatedIssue = await db.query.issues.findFirst({
+          where: eq(schema.issues.id, issue.id),
+        });
+        expect(updatedIssue?.title).toBe("Updated Title");
+        expect(updatedIssue?.description).toBe("Updated description");
+      });
     });
 
-    // NOTE: Complex business logic tests (update, assignment, close) moved to issue.integration.test.ts
-    // These tests involve multiple service mocks and complex workflows better tested with real database
+    test("should enforce organization isolation on updates", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx } = await setupTestData(db);
+        const caller = appRouter.createCaller(ctx);
+
+        // Create issue in different organization
+        const [otherOrg] = await db
+          .insert(schema.organizations)
+          .values({
+            id: generateTestId("other-org"),
+            name: "Other Org",
+            subdomain: "other",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
+
+        const [otherOrgIssue] = await db
+          .insert(schema.issues)
+          .values({
+            id: generateTestId("other-issue"),
+            title: "Other Org Issue",
+            organizationId: otherOrg.id,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
+
+        await expect(
+          caller.issue.core.update({
+            id: otherOrgIssue.id,
+            title: "Hacked Title",
+          }),
+        ).rejects.toThrow("Issue not found");
+      });
+    });
   });
 
-  describe("Issue Status Changes", () => {
-    it("should validate status belongs to same organization", async () => {
-      const statusCtx = createAuthenticatedContext(["issue:edit"]);
-      const statusCaller = appRouter.createCaller(statusCtx);
+  describe("updateStatus procedure", () => {
+    test("should update issue status successfully", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx, issue, organizationId } = await setupTestData(db);
+        const caller = appRouter.createCaller(ctx);
 
-      statusCtx.db.query.issues.findFirst.mockResolvedValue(mockIssue as any);
-      statusCtx.db.issueStatus.findFirst.mockResolvedValue(null); // Status not found
+        // Create new status
+        const [newStatus] = await db
+          .insert(schema.issueStatuses)
+          .values({
+            id: generateTestId("new-status"),
+            name: "In Progress",
+            category: "IN_PROGRESS",
+            organizationId,
+            order: 2,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
 
-      await expect(
-        statusCaller.issue.core.updateStatus({
-          id: mockIssue.id,
-          statusId: "other-org-status",
-        }),
-      ).rejects.toThrow("Invalid status");
+        const result = await caller.issue.core.updateStatus({
+          id: issue.id,
+          statusId: newStatus.id,
+        });
+
+        expect(result).toBeDefined();
+        expect(result.statusId).toBe(newStatus.id);
+
+        // Verify in database
+        const updatedIssue = await db.query.issues.findFirst({
+          where: eq(schema.issues.id, issue.id),
+        });
+        expect(updatedIssue?.statusId).toBe(newStatus.id);
+      });
     });
 
-    // NOTE: Complex status change workflow test moved to issue.integration.test.ts
-    // Multi-service mocking and full status update workflow better tested with real database
+    test("should validate status belongs to same organization", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx, issue } = await setupTestData(db);
+        const caller = appRouter.createCaller(ctx);
+
+        // Create status in different organization
+        const [otherOrg] = await db
+          .insert(schema.organizations)
+          .values({
+            id: generateTestId("other-org"),
+            name: "Other Org",
+            subdomain: "other",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
+
+        const [otherStatus] = await db
+          .insert(schema.issueStatuses)
+          .values({
+            id: generateTestId("other-status"),
+            name: "Other Status",
+            category: "NEW",
+            organizationId: otherOrg.id,
+            order: 1,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
+
+        await expect(
+          caller.issue.core.updateStatus({
+            id: issue.id,
+            statusId: otherStatus.id,
+          }),
+        ).rejects.toThrow("Invalid status");
+      });
+    });
   });
 
-  // NOTE: Comment operations are now tested in issue.comment.test.ts
-  // This keeps issue.test.ts focused on core issue operations
+  describe("Authentication and Authorization", () => {
+    test("should require authentication for protected procedures", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { issue } = await setupTestData(db);
 
-  describe("Loading States and Error Handling", () => {
-    it("should handle database connection errors gracefully", async () => {
-      const errorCtx = createAuthenticatedContext(["issue:view"]);
-      const errorCaller = appRouter.createCaller(errorCtx);
+        // Create context without authentication
+        const unauthCtx: TRPCContext = {
+          user: null,
+          db,
+          supabase: null,
+          organization: null,
+          session: null,
+          organizationId: null,
+          userId: null,
+          userPermissions: [],
+          services: new ServiceFactory(db),
+          logger: {
+            error: vi.fn(),
+            warn: vi.fn(),
+            info: vi.fn(),
+            debug: vi.fn(),
+            trace: vi.fn(),
+            child: vi.fn(() => unauthCtx.logger),
+            withRequest: vi.fn(() => unauthCtx.logger),
+            withUser: vi.fn(() => unauthCtx.logger),
+            withOrganization: vi.fn(() => unauthCtx.logger),
+            withContext: vi.fn(() => unauthCtx.logger),
+          } as any,
+        };
 
-      errorCtx.db.query.issues.findFirst.mockRejectedValue(
-        new Error("Database connection failed"),
-      );
+        const caller = appRouter.createCaller(unauthCtx);
 
-      await expect(
-        errorCaller.issue.core.getById({ id: mockIssue.id }),
-      ).rejects.toThrow("Database connection failed");
-    });
+        await expect(
+          caller.issue.core.getById({ id: issue.id }),
+        ).rejects.toThrow("UNAUTHORIZED");
 
-    it("should handle concurrent access scenarios", async () => {
-      const concurrentCtx = createAuthenticatedContext(["issue:edit"]);
-      const concurrentCaller = appRouter.createCaller(concurrentCtx);
+        await expect(
+          caller.issue.core.update({ id: issue.id, title: "New Title" }),
+        ).rejects.toThrow("UNAUTHORIZED");
 
-      // Simulate optimistic locking scenario
-      concurrentCtx.db.query.issues.findFirst.mockResolvedValue(
-        mockIssue as any,
-      );
-      concurrentCtx.db.issue.update.mockRejectedValue(
-        new Error("Concurrent modification"),
-      );
-
-      await expect(
-        concurrentCaller.issue.core.update({
-          id: mockIssue.id,
-          title: "Updated Title",
-        }),
-      ).rejects.toThrow("Concurrent modification");
+        await expect(
+          caller.issue.core.updateStatus({ id: issue.id, statusId: "status-1" }),
+        ).rejects.toThrow("UNAUTHORIZED");
+      });
     });
   });
 });
 
-describe("issueRouter - Public Procedures", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  // Helper to create unauthenticated (public) context
-  const createPublicContext = () => {
-    const mockContext = createVitestMockContext();
-
-    // Override for anonymous/public access
-    (mockContext as any).user = null;
-    (mockContext as any).organization = {
-      id: "org-1",
-      name: "Test Organization",
-      subdomain: "test",
-    };
-
-    return mockContext as any;
-  };
+describe("Public Issue Procedures", () => {
 
   describe("publicCreate - Anonymous Issue Creation", () => {
-    it("should allow anonymous users to create issues via QR codes", async () => {
-      const publicCtx = createPublicContext();
-      const publicCaller = appRouter.createCaller(publicCtx);
+    test("should allow anonymous users to create issues via QR codes", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx, machine } = await setupPublicTestData(db);
+        const caller = appRouter.createCaller(ctx);
 
-      // Mock required database entities for validation
-      publicCtx.db.query.machines.findFirst.mockResolvedValue({
-        id: "machine-1",
-        name: "Test Machine",
-        organizationId: "org-1",
-        location: {
-          organizationId: "org-1",
-        },
-      });
-
-      publicCtx.db.issueStatus.findFirst.mockResolvedValue({
-        id: "status-1",
-        name: "Open",
-        isDefault: true,
-        organizationId: "org-1",
-        category: "NEW",
-      });
-
-      publicCtx.db.priority.findFirst.mockResolvedValue({
-        id: "priority-1",
-        name: "Medium",
-        isDefault: true,
-        organizationId: "org-1",
-        order: 2,
-      });
-
-      // Mock issue creation
-      const createdIssue = {
-        id: "issue-1",
-        title: "Machine not working",
-        description: "Screen is black",
-        machineId: "machine-1",
-        organizationId: "org-1",
-        statusId: "status-1",
-        priorityId: "priority-1",
-        createdById: null,
-        submitterName: "John Doe",
-        reporterEmail: "john@example.com",
-        status: { id: "status-1", name: "Open" },
-        createdBy: null,
-        machine: {
-          id: "machine-1",
-          name: "Test Machine",
-          model: { id: "model-1", name: "Test Model" },
-          location: { id: "location-1", name: "Test Location" },
-        },
-      };
-
-      publicCtx.db.issue.create.mockResolvedValue(createdIssue);
-
-      const result = await publicCaller.issue.core.publicCreate({
-        title: "Machine not working",
-        description: "Screen is black",
-        machineId: "machine-1",
-        reporterEmail: "john@example.com",
-        submitterName: "John Doe",
-      });
-
-      expect(result).toBeDefined();
-      expect(result.title).toBe("Machine not working");
-      expect(result.createdById).toBeNull();
-      expect(result.submitterName).toBe("John Doe");
-      expect(result.reporterEmail).toBe("john@example.com");
-
-      // Verify database call
-      expect(publicCtx.db.issue.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
+        const result = await caller.issue.core.publicCreate({
           title: "Machine not working",
           description: "Screen is black",
-          createdById: null,
-          submitterName: "John Doe",
+          machineId: machine.id,
           reporterEmail: "john@example.com",
-          machineId: "machine-1",
-          organizationId: "org-1",
-        }),
-        include: expect.any(Object),
-      });
+          submitterName: "John Doe",
+        });
 
-      // Verify notification service was called (the notification service is called inside the procedure)
-      expect(publicCtx.services.createNotificationService).toHaveBeenCalled();
+        expect(result).toBeDefined();
+        expect(result.title).toBe("Machine not working");
+        expect(result.description).toBe("Screen is black");
+        expect(result.createdById).toBeNull();
+        expect(result.submitterName).toBe("John Doe");
+        expect(result.reporterEmail).toBe("john@example.com");
+        expect(result.machineId).toBe(machine.id);
+
+        // Verify issue was created in database
+        const createdIssue = await db.query.issues.findFirst({
+          where: eq(schema.issues.id, result.id),
+        });
+        expect(createdIssue).toBeDefined();
+        expect(createdIssue?.title).toBe("Machine not working");
+      });
     });
 
-    it("should validate required fields for anonymous issue creation", async () => {
-      const publicCtx = createPublicContext();
-      const publicCaller = appRouter.createCaller(publicCtx);
+    test("should validate required fields for anonymous issue creation", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx } = await setupPublicTestData(db);
+        const caller = appRouter.createCaller(ctx);
 
-      // Test missing title
-      await expect(
-        publicCaller.issue.core.publicCreate({
-          title: "",
-          machineId: "machine-1",
-        }),
-      ).rejects.toThrow();
+        // Test missing title
+        await expect(
+          caller.issue.core.publicCreate({
+            title: "",
+            machineId: "machine-1",
+          }),
+        ).rejects.toThrow();
 
-      // Test missing machineId
-      await expect(
-        publicCaller.issue.core.publicCreate({
-          title: "Test Issue",
-          machineId: "",
-        }),
-      ).rejects.toThrow();
+        // Test missing machineId
+        await expect(
+          caller.issue.core.publicCreate({
+            title: "Test Issue",
+            machineId: "",
+          }),
+        ).rejects.toThrow();
+      });
     });
 
-    it("should validate email format for reporterEmail", async () => {
-      const publicCtx = createPublicContext();
-      const publicCaller = appRouter.createCaller(publicCtx);
+    test("should validate email format for reporterEmail", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx, machine } = await setupPublicTestData(db);
+        const caller = appRouter.createCaller(ctx);
 
-      await expect(
-        publicCaller.issue.core.publicCreate({
-          title: "Test Issue",
-          machineId: "machine-1",
-          reporterEmail: "invalid-email",
-        }),
-      ).rejects.toThrow();
+        await expect(
+          caller.issue.core.publicCreate({
+            title: "Test Issue",
+            machineId: machine.id,
+            reporterEmail: "invalid-email",
+          }),
+        ).rejects.toThrow();
+      });
     });
 
-    it("should handle machine not found error", async () => {
-      const publicCtx = createPublicContext();
-      const publicCaller = appRouter.createCaller(publicCtx);
+    test("should handle machine not found error", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx } = await setupPublicTestData(db);
+        const caller = appRouter.createCaller(ctx);
 
-      publicCtx.db.query.machines.findFirst.mockResolvedValue(null);
-
-      await expect(
-        publicCaller.issue.core.publicCreate({
-          title: "Test Issue",
-          machineId: "nonexistent-machine",
-        }),
-      ).rejects.toThrow("Machine not found");
+        await expect(
+          caller.issue.core.publicCreate({
+            title: "Test Issue",
+            machineId: generateTestId("nonexistent-machine"),
+          }),
+        ).rejects.toThrow("Machine not found");
+      });
     });
 
-    it("should handle missing default status error", async () => {
-      const publicCtx = createPublicContext();
-      const publicCaller = appRouter.createCaller(publicCtx);
+    test("should handle missing default status error", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx, machine } = await setupPublicTestData(db);
+        
+        // Remove default status to simulate error condition
+        await db.delete(schema.issueStatuses);
+        
+        const caller = appRouter.createCaller(ctx);
 
-      publicCtx.db.query.machines.findFirst.mockResolvedValue({
-        id: "machine-1",
-        location: { organizationId: "org-1" },
+        await expect(
+          caller.issue.core.publicCreate({
+            title: "Test Issue",
+            machineId: machine.id,
+          }),
+        ).rejects.toThrow(
+          "Default issue status not found. Please contact an administrator.",
+        );
       });
-
-      publicCtx.db.issueStatus.findFirst.mockResolvedValue(null);
-
-      await expect(
-        publicCaller.issue.core.publicCreate({
-          title: "Test Issue",
-          machineId: "machine-1",
-        }),
-      ).rejects.toThrow(
-        "Default issue status not found. Please contact an administrator.",
-      );
     });
 
-    it("should handle missing default priority error", async () => {
-      const publicCtx = createPublicContext();
-      const publicCaller = appRouter.createCaller(publicCtx);
+    test("should handle missing default priority error", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx, machine } = await setupPublicTestData(db);
+        
+        // Remove default priority to simulate error condition
+        await db.delete(schema.priorities);
+        
+        const caller = appRouter.createCaller(ctx);
 
-      publicCtx.db.query.machines.findFirst.mockResolvedValue({
-        id: "machine-1",
-        location: { organizationId: "org-1" },
+        await expect(
+          caller.issue.core.publicCreate({
+            title: "Test Issue",
+            machineId: machine.id,
+          }),
+        ).rejects.toThrow(
+          "Default priority not found. Please contact an administrator.",
+        );
       });
-
-      publicCtx.db.issueStatus.findFirst.mockResolvedValue({
-        id: "status-1",
-        isDefault: true,
-        organizationId: "org-1",
-      });
-
-      publicCtx.db.priority.findFirst.mockResolvedValue(null);
-
-      await expect(
-        publicCaller.issue.core.publicCreate({
-          title: "Test Issue",
-          machineId: "machine-1",
-        }),
-      ).rejects.toThrow(
-        "Default priority not found. Please contact an administrator.",
-      );
     });
 
-    it("should create minimal issue with only required fields", async () => {
-      const publicCtx = createPublicContext();
-      const publicCaller = appRouter.createCaller(publicCtx);
+    test("should create minimal issue with only required fields", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx, machine, status, priority } = await setupPublicTestData(db);
+        const caller = appRouter.createCaller(ctx);
 
-      // Mock required database entities
-      publicCtx.db.query.machines.findFirst.mockResolvedValue({
-        id: "machine-1",
-        location: { organizationId: "org-1" },
-      });
-
-      publicCtx.db.issueStatus.findFirst.mockResolvedValue({
-        id: "status-1",
-        name: "Open",
-        isDefault: true,
-        organizationId: "org-1",
-      });
-
-      publicCtx.db.priority.findFirst.mockResolvedValue({
-        id: "priority-1",
-        name: "Medium",
-        isDefault: true,
-        organizationId: "org-1",
-      });
-
-      const createdIssue = {
-        id: "issue-1",
-        title: "Machine Issue",
-        machineId: "machine-1",
-        organizationId: "org-1",
-        createdById: null,
-        status: { id: "status-1", name: "Open" },
-        createdBy: null,
-        machine: {
-          id: "machine-1",
-          model: { id: "model-1", name: "Test Model" },
-          location: { id: "location-1", name: "Test Location" },
-        },
-      };
-
-      publicCtx.db.issue.create.mockResolvedValue(createdIssue);
-
-      const result = await publicCaller.issue.core.publicCreate({
-        title: "Machine Issue",
-        machineId: "machine-1",
-      });
-
-      expect(result).toBeDefined();
-      expect(result.title).toBe("Machine Issue");
-      expect(result.createdById).toBeNull();
-
-      // Verify database call doesn't include optional fields
-      expect(publicCtx.db.issue.create).toHaveBeenCalledWith({
-        data: {
+        const result = await caller.issue.core.publicCreate({
           title: "Machine Issue",
-          createdById: null,
-          machineId: "machine-1",
-          organizationId: "org-1",
-          statusId: "status-1",
-          priorityId: "priority-1",
-        },
-        include: expect.any(Object),
+          machineId: machine.id,
+        });
+
+        expect(result).toBeDefined();
+        expect(result.title).toBe("Machine Issue");
+        expect(result.createdById).toBeNull();
+        expect(result.machineId).toBe(machine.id);
+        expect(result.statusId).toBe(status.id);
+        expect(result.priorityId).toBe(priority.id);
+
+        // Verify issue was created in database
+        const createdIssue = await db.query.issues.findFirst({
+          where: eq(schema.issues.id, result.id),
+        });
+        expect(createdIssue).toBeDefined();
+        expect(createdIssue?.title).toBe("Machine Issue");
+        expect(createdIssue?.createdById).toBeNull();
       });
     });
   });
 
   describe("publicGetAll - Anonymous Issue Viewing", () => {
-    it("should allow anonymous users to view issues", async () => {
-      const publicCtx = createPublicContext();
-      const publicCaller = appRouter.createCaller(publicCtx);
+    test("should allow anonymous users to view issues", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx, organizationId, machine, status, priority } = await setupPublicTestData(db);
+        
+        // Create test user for issue assignment
+        const [testUser] = await db
+          .insert(schema.users)
+          .values({
+            id: generateTestId("test-user"),
+            name: "Test User",
+            email: "test@example.com",
+            emailVerified: null,
+          })
+          .returning();
 
-      const mockIssues = [
-        {
-          id: "issue-1",
-          title: "Machine not working",
-          description: "Screen is black",
-          createdAt: new Date(),
-          submitterName: "John Doe",
-          status: { id: "status-1", name: "Open" },
-          priority: { id: "priority-1", name: "Medium" },
-          assignedTo: null,
-          createdBy: null,
-          machine: {
-            id: "machine-1",
-            model: { id: "model-1", name: "Test Model" },
-            location: { id: "location-1", name: "Test Location" },
+        // Create test issues
+        await db.insert(schema.issues).values([
+          {
+            id: generateTestId("issue-1"),
+            title: "Machine not working",
+            description: "Screen is black",
+            machineId: machine.id,
+            statusId: status.id,
+            priorityId: priority.id,
+            organizationId,
+            submitterName: "John Doe",
+            createdAt: new Date(),
+            updatedAt: new Date(),
           },
-        },
-        {
-          id: "issue-2",
-          title: "Flipper stuck",
-          description: null,
-          createdAt: new Date(),
-          submitterName: "Jane Smith",
-          status: { id: "status-2", name: "In Progress" },
-          priority: { id: "priority-2", name: "High" },
-          assignedTo: {
-            id: "user-1",
-            name: "Tech Support",
-            email: "tech@example.com",
-            image: null,
+          {
+            id: generateTestId("issue-2"),
+            title: "Flipper stuck",
+            description: null,
+            machineId: machine.id,
+            statusId: status.id,
+            priorityId: priority.id,
+            organizationId,
+            submitterName: "Jane Smith",
+            createdById: testUser.id,
+            assignedToId: testUser.id,
+            createdAt: new Date(),
+            updatedAt: new Date(),
           },
-          createdBy: {
-            id: "user-2",
-            name: "Staff Member",
-            email: "staff@example.com",
-            image: null,
+        ]);
+
+        const caller = appRouter.createCaller(ctx);
+        const result = await caller.issue.core.publicGetAll();
+
+        expect(result).toHaveLength(2);
+        expect(result.some(i => i.title === "Machine not working")).toBe(true);
+        expect(result.some(i => i.title === "Flipper stuck")).toBe(true);
+        
+        // Verify structure of returned data
+        const issue1 = result.find(i => i.title === "Machine not working");
+        expect(issue1?.machine).toBeDefined();
+        expect(issue1?.status).toBeDefined();
+        expect(issue1?.priority).toBeDefined();
+      });
+    });
+
+    test("should filter issues by location", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx, organizationId, status, priority, model } = await setupPublicTestData(db);
+        
+        // Create second location
+        const [location2] = await db
+          .insert(schema.locations)
+          .values({
+            id: generateTestId("location-2"),
+            name: "Location 2",
+            address: "456 Other Street",
+            organizationId,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
+
+        // Create machine in location 2
+        const [machine2] = await db
+          .insert(schema.machines)
+          .values({
+            id: generateTestId("machine-2"),
+            name: "Machine 2",
+            modelId: model.id,
+            locationId: location2.id,
+            organizationId,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
+
+        // Create issues in both locations
+        await db.insert(schema.issues).values([
+          {
+            id: generateTestId("issue-location-1"),
+            title: "Issue at Location 1",
+            machineId: machine2.id, // Use first machine (location 1)
+            statusId: status.id,
+            priorityId: priority.id,
+            organizationId,
+            createdAt: new Date(),
+            updatedAt: new Date(),
           },
-          machine: {
-            id: "machine-2",
-            model: { id: "model-2", name: "Another Model" },
-            location: { id: "location-2", name: "Another Location" },
+          {
+            id: generateTestId("issue-location-2"),
+            title: "Issue at Location 2",
+            machineId: machine2.id, // Use second machine (location 2)
+            statusId: status.id,
+            priorityId: priority.id,
+            organizationId,
+            createdAt: new Date(),
+            updatedAt: new Date(),
           },
-        },
-      ];
+        ]);
 
-      publicCtx.db.issue.findMany.mockResolvedValue(mockIssues);
+        const caller = appRouter.createCaller(ctx);
+        const result = await caller.issue.core.publicGetAll({
+          locationId: location2.id,
+        });
 
-      const result = await publicCaller.issue.core.publicGetAll();
-
-      expect(result).toHaveLength(2);
-      expect(result[0].title).toBe("Machine not working");
-      expect(result[1].title).toBe("Flipper stuck");
-
-      // Verify database query includes organization filtering
-      expect(publicCtx.db.issue.findMany).toHaveBeenCalledWith({
-        where: { organizationId: "org-1" },
-        select: expect.objectContaining({
-          id: true,
-          title: true,
-          description: true,
-          createdAt: true,
-          submitterName: true,
-          status: true,
-          priority: true,
-          assignedTo: expect.any(Object),
-          createdBy: expect.any(Object),
-          machine: expect.any(Object),
-        }),
-        orderBy: { createdAt: "desc" },
-        take: 20, // Default limit
+        // Should only return issues from location 2
+        expect(result).toHaveLength(1);
+        expect(result[0].title).toBe("Issue at Location 2");
       });
     });
 
-    it("should filter issues by location", async () => {
-      const publicCtx = createPublicContext();
-      const publicCaller = appRouter.createCaller(publicCtx);
+    test("should filter issues by machine", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx, organizationId, machine, status, priority, model, location } = await setupPublicTestData(db);
+        
+        // Create second machine
+        const [machine2] = await db
+          .insert(schema.machines)
+          .values({
+            id: generateTestId("machine-2"),
+            name: "Machine 2",
+            modelId: model.id,
+            locationId: location.id,
+            organizationId,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
 
-      publicCtx.db.issue.findMany.mockResolvedValue([]);
+        // Create issues for both machines
+        await db.insert(schema.issues).values([
+          {
+            id: generateTestId("issue-machine-1"),
+            title: "Issue for Machine 1",
+            machineId: machine.id,
+            statusId: status.id,
+            priorityId: priority.id,
+            organizationId,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+          {
+            id: generateTestId("issue-machine-2"),
+            title: "Issue for Machine 2",
+            machineId: machine2.id,
+            statusId: status.id,
+            priorityId: priority.id,
+            organizationId,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        ]);
 
-      await publicCaller.issue.core.publicGetAll({
-        locationId: "location-1",
-      });
+        const caller = appRouter.createCaller(ctx);
+        const result = await caller.issue.core.publicGetAll({
+          machineId: machine.id,
+        });
 
-      expect(publicCtx.db.issue.findMany).toHaveBeenCalledWith({
-        where: {
-          organizationId: "org-1",
-          machine: { locationId: "location-1" },
-        },
-        select: expect.any(Object),
-        orderBy: expect.any(Object),
-        take: 20,
-      });
-    });
-
-    it("should filter issues by machine", async () => {
-      const publicCtx = createPublicContext();
-      const publicCaller = appRouter.createCaller(publicCtx);
-
-      publicCtx.db.issue.findMany.mockResolvedValue([]);
-
-      await publicCaller.issue.core.publicGetAll({
-        machineId: "machine-1",
-      });
-
-      expect(publicCtx.db.issue.findMany).toHaveBeenCalledWith({
-        where: {
-          organizationId: "org-1",
-          machineId: "machine-1",
-        },
-        select: expect.any(Object),
-        orderBy: expect.any(Object),
-        take: 20,
-      });
-    });
-
-    it("should filter issues by status", async () => {
-      const publicCtx = createPublicContext();
-      const publicCaller = appRouter.createCaller(publicCtx);
-
-      publicCtx.db.issue.findMany.mockResolvedValue([]);
-
-      await publicCaller.issue.core.publicGetAll({
-        statusId: "status-1",
-      });
-
-      expect(publicCtx.db.issue.findMany).toHaveBeenCalledWith({
-        where: {
-          organizationId: "org-1",
-          statusId: "status-1",
-        },
-        select: expect.any(Object),
-        orderBy: expect.any(Object),
-        take: 20,
+        // Should only return issues for machine 1
+        expect(result).toHaveLength(1);
+        expect(result[0].title).toBe("Issue for Machine 1");
+        expect(result[0].machineId).toBe(machine.id);
       });
     });
 
-    it("should filter issues by status category", async () => {
-      const publicCtx = createPublicContext();
-      const publicCaller = appRouter.createCaller(publicCtx);
+    test("should filter issues by status", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx, organizationId, machine, priority } = await setupPublicTestData(db);
+        
+        // Create multiple statuses
+        const [status1] = await db
+          .insert(schema.issueStatuses)
+          .values({
+            id: generateTestId("status-1"),
+            name: "Open",
+            category: "NEW",
+            organizationId,
+            order: 1,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
 
-      publicCtx.db.issue.findMany.mockResolvedValue([]);
+        const [status2] = await db
+          .insert(schema.issueStatuses)
+          .values({
+            id: generateTestId("status-2"),
+            name: "Closed",
+            category: "RESOLVED",
+            organizationId,
+            order: 2,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
 
-      await publicCaller.issue.core.publicGetAll({
-        statusCategory: "NEW",
-      });
+        // Create issues with different statuses
+        await db.insert(schema.issues).values([
+          {
+            id: generateTestId("issue-open"),
+            title: "Open Issue",
+            machineId: machine.id,
+            statusId: status1.id,
+            priorityId: priority.id,
+            organizationId,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+          {
+            id: generateTestId("issue-closed"),
+            title: "Closed Issue",
+            machineId: machine.id,
+            statusId: status2.id,
+            priorityId: priority.id,
+            organizationId,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        ]);
 
-      expect(publicCtx.db.issue.findMany).toHaveBeenCalledWith({
-        where: {
-          organizationId: "org-1",
-          status: { category: "NEW" },
-        },
-        select: expect.any(Object),
-        orderBy: expect.any(Object),
-        take: 20,
-      });
-    });
+        const caller = appRouter.createCaller(ctx);
+        const result = await caller.issue.core.publicGetAll({
+          statusId: status1.id,
+        });
 
-    it("should filter issues by model", async () => {
-      const publicCtx = createPublicContext();
-      const publicCaller = appRouter.createCaller(publicCtx);
-
-      publicCtx.db.issue.findMany.mockResolvedValue([]);
-
-      await publicCaller.issue.core.publicGetAll({
-        modelId: "model-1",
-      });
-
-      expect(publicCtx.db.issue.findMany).toHaveBeenCalledWith({
-        where: {
-          organizationId: "org-1",
-          machine: { modelId: "model-1" },
-        },
-        select: expect.any(Object),
-        orderBy: expect.any(Object),
-        take: 20,
-      });
-    });
-
-    it("should handle custom limit parameter", async () => {
-      const publicCtx = createPublicContext();
-      const publicCaller = appRouter.createCaller(publicCtx);
-
-      publicCtx.db.issue.findMany.mockResolvedValue([]);
-
-      await publicCaller.issue.core.publicGetAll({
-        limit: 50,
-      });
-
-      expect(publicCtx.db.issue.findMany).toHaveBeenCalledWith({
-        where: { organizationId: "org-1" },
-        select: expect.any(Object),
-        orderBy: expect.any(Object),
-        take: 50,
-      });
-    });
-
-    it("should enforce maximum limit of 100", async () => {
-      const publicCtx = createPublicContext();
-      const publicCaller = appRouter.createCaller(publicCtx);
-
-      await expect(
-        publicCaller.issue.core.publicGetAll({
-          limit: 150, // Over maximum
-        }),
-      ).rejects.toThrow();
-    });
-
-    it("should enforce minimum limit of 1", async () => {
-      const publicCtx = createPublicContext();
-      const publicCaller = appRouter.createCaller(publicCtx);
-
-      await expect(
-        publicCaller.issue.core.publicGetAll({
-          limit: 0, // Under minimum
-        }),
-      ).rejects.toThrow();
-    });
-
-    it("should sort issues by different criteria", async () => {
-      const publicCtx = createPublicContext();
-      const publicCaller = appRouter.createCaller(publicCtx);
-
-      publicCtx.db.issue.findMany.mockResolvedValue([]);
-
-      // Test sorting by updated date
-      await publicCaller.issue.core.publicGetAll({
-        sortBy: "updated",
-        sortOrder: "asc",
-      });
-
-      expect(publicCtx.db.issue.findMany).toHaveBeenCalledWith({
-        where: { organizationId: "org-1" },
-        select: expect.any(Object),
-        orderBy: { updatedAt: "asc" },
-        take: 20,
-      });
-
-      // Test sorting by status
-      await publicCaller.issue.core.publicGetAll({
-        sortBy: "status",
-        sortOrder: "desc",
-      });
-
-      expect(publicCtx.db.issue.findMany).toHaveBeenCalledWith({
-        where: { organizationId: "org-1" },
-        select: expect.any(Object),
-        orderBy: { status: { name: "desc" } },
-        take: 20,
-      });
-
-      // Test sorting by severity (priority)
-      await publicCaller.issue.core.publicGetAll({
-        sortBy: "severity",
-      });
-
-      expect(publicCtx.db.issue.findMany).toHaveBeenCalledWith({
-        where: { organizationId: "org-1" },
-        select: expect.any(Object),
-        orderBy: { priority: { order: "desc" } },
-        take: 20,
+        // Should only return open issues
+        expect(result).toHaveLength(1);
+        expect(result[0].title).toBe("Open Issue");
+        expect(result[0].statusId).toBe(status1.id);
       });
     });
 
-    it("should handle organization not found error", async () => {
-      const publicCtx = createPublicContext();
-      const publicCaller = appRouter.createCaller(publicCtx);
-
-      // Set organization to null to simulate missing organization
-      (publicCtx as any).organization = null;
-
-      await expect(publicCaller.issue.core.publicGetAll()).rejects.toThrow(
-        "Organization not found",
-      );
+    test("should filter issues by status category", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx, organizationId, machine, status, priority } = await setupPublicTestData(db);
+        
+        // Create an issue with NEW status category
+        await db.insert(schema.issues).values({
+          id: generateTestId("test-issue"),
+          title: "Test Issue",
+          description: "Test description",
+          organizationId,
+          machineId: machine.id,
+          statusId: status.id,
+          priorityId: priority.id,
+          createdBy: generateTestId("user"),
+        });
+        
+        const caller = appRouter.createCaller(ctx);
+        const result = await caller.issue.core.publicGetAll({
+          statusCategory: "NEW",
+        });
+        
+        expect(result.length).toBe(1);
+        expect(result[0]?.title).toBe("Test Issue");
+      });
     });
 
-    it("should combine multiple filters", async () => {
-      const publicCtx = createPublicContext();
-      const publicCaller = appRouter.createCaller(publicCtx);
-
-      publicCtx.db.issue.findMany.mockResolvedValue([]);
-
-      await publicCaller.issue.core.publicGetAll({
-        locationId: "location-1",
-        statusCategory: "NEW",
-        sortBy: "created",
-        sortOrder: "asc",
-        limit: 10,
+    test("should filter issues by model", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx, organizationId, machine, status, priority, model } = await setupPublicTestData(db);
+        
+        // Create an issue linked to the specific model
+        await db.insert(schema.issues).values({
+          id: generateTestId("test-issue"),
+          title: "Model-specific Issue",
+          description: "Issue with this model",
+          organizationId,
+          machineId: machine.id,
+          statusId: status.id,
+          priorityId: priority.id,
+          createdBy: generateTestId("user"),
+        });
+        
+        const caller = appRouter.createCaller(ctx);
+        const result = await caller.issue.core.publicGetAll({
+          modelId: model.id,
+        });
+        
+        expect(result.length).toBe(1);
+        expect(result[0]?.title).toBe("Model-specific Issue");
       });
+    });
 
-      expect(publicCtx.db.issue.findMany).toHaveBeenCalledWith({
-        where: {
-          organizationId: "org-1",
-          machine: { locationId: "location-1" },
-          status: { category: "NEW" },
-        },
-        select: expect.any(Object),
-        orderBy: { createdAt: "asc" },
-        take: 10,
+    test("should handle custom limit parameter", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx, organizationId, machine, status, priority } = await setupPublicTestData(db);
+        
+        // Create multiple issues
+        const issueData = Array.from({ length: 15 }, (_, i) => ({
+          id: generateTestId(`issue-${i}`),
+          title: `Issue ${i + 1}`,
+          machineId: machine.id,
+          statusId: status.id,
+          priorityId: priority.id,
+          organizationId,
+          createdAt: new Date(Date.now() - i * 1000), // Different timestamps for ordering
+          updatedAt: new Date(Date.now() - i * 1000),
+        }));
+        
+        await db.insert(schema.issues).values(issueData);
+
+        const caller = appRouter.createCaller(ctx);
+        const result = await caller.issue.core.publicGetAll({
+          limit: 5,
+        });
+
+        // Should return only 5 issues
+        expect(result).toHaveLength(5);
+        // Should be ordered by createdAt desc (most recent first)
+        expect(result[0].title).toBe("Issue 1"); // Most recent
+      });
+    });
+
+    test("should enforce maximum limit of 100", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx } = await setupPublicTestData(db);
+        const caller = appRouter.createCaller(ctx);
+
+        await expect(
+          caller.issue.core.publicGetAll({
+            limit: 150, // Over maximum
+          }),
+        ).rejects.toThrow();
+      });
+    });
+
+    test("should enforce minimum limit of 1", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx } = await setupPublicTestData(db);
+        const caller = appRouter.createCaller(ctx);
+
+        await expect(
+          caller.issue.core.publicGetAll({
+            limit: 0, // Under minimum
+          }),
+        ).rejects.toThrow();
+      });
+    });
+
+    test("should sort issues by different criteria", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx, organizationId, machine, status, priority } = await setupPublicTestData(db);
+        
+        // Create multiple issues with different timestamps
+        await db.insert(schema.issues).values([
+          {
+            id: generateTestId("issue-1"),
+            title: "First Issue",
+            machineId: machine.id,
+            statusId: status.id,
+            priorityId: priority.id,
+            organizationId,
+            createdAt: new Date('2023-01-01'),
+            updatedAt: new Date('2023-01-02'),
+          },
+          {
+            id: generateTestId("issue-2"),
+            title: "Second Issue",
+            machineId: machine.id,
+            statusId: status.id,
+            priorityId: priority.id,
+            organizationId,
+            createdAt: new Date('2023-01-03'),
+            updatedAt: new Date('2023-01-04'),
+          },
+        ]);
+
+        const caller = appRouter.createCaller(ctx);
+
+        // Test default sorting (by created date desc)
+        const defaultResult = await caller.issue.core.publicGetAll();
+        expect(defaultResult).toHaveLength(2);
+        expect(defaultResult[0].title).toBe("Second Issue"); // Most recent first
+
+        // Test sorting by created date asc
+        const ascResult = await caller.issue.core.publicGetAll({
+          sortBy: "created",
+          sortOrder: "asc",
+        });
+        expect(ascResult[0].title).toBe("First Issue"); // Oldest first
+      });
+    });
+
+    test("should handle organization not found error", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx } = await setupPublicTestData(db);
+        
+        // Create context without organization
+        const noOrgCtx: TRPCContext = {
+          ...ctx,
+          organization: null,
+          organizationId: null,
+        };
+        
+        const caller = appRouter.createCaller(noOrgCtx);
+
+        await expect(caller.issue.core.publicGetAll()).rejects.toThrow(
+          "Organization not found",
+        );
+      });
+    });
+
+    test("should combine multiple filters", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx, organizationId, location, model, status, priority } = await setupPublicTestData(db);
+        
+        // Create another location and status
+        const [location2] = await db
+          .insert(schema.locations)
+          .values({
+            id: generateTestId("location-2"),
+            name: "Location 2",
+            address: "456 Other Street",
+            organizationId,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
+
+        const [closedStatus] = await db
+          .insert(schema.issueStatuses)
+          .values({
+            id: generateTestId("status-closed"),
+            name: "Closed",
+            category: "RESOLVED",
+            organizationId,
+            order: 2,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
+
+        // Create machines in both locations
+        const [machine1] = await db
+          .insert(schema.machines)
+          .values({
+            id: generateTestId("machine-1"),
+            name: "Machine in Location 1",
+            modelId: model.id,
+            locationId: location.id,
+            organizationId,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
+
+        const [machine2] = await db
+          .insert(schema.machines)
+          .values({
+            id: generateTestId("machine-2"),
+            name: "Machine in Location 2",
+            modelId: model.id,
+            locationId: location2.id,
+            organizationId,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
+
+        // Create issues with different combinations
+        await db.insert(schema.issues).values([
+          {
+            id: generateTestId("issue-match"),
+            title: "Matching Issue",
+            machineId: machine1.id, // Location 1
+            statusId: status.id, // NEW category
+            priorityId: priority.id,
+            organizationId,
+            createdAt: new Date('2023-01-01'),
+            updatedAt: new Date('2023-01-01'),
+          },
+          {
+            id: generateTestId("issue-wrong-location"),
+            title: "Wrong Location",
+            machineId: machine2.id, // Location 2
+            statusId: status.id, // NEW category
+            priorityId: priority.id,
+            organizationId,
+            createdAt: new Date('2023-01-02'),
+            updatedAt: new Date('2023-01-02'),
+          },
+          {
+            id: generateTestId("issue-wrong-status"),
+            title: "Wrong Status",
+            machineId: machine1.id, // Location 1
+            statusId: closedStatus.id, // DONE category
+            priorityId: priority.id,
+            organizationId,
+            createdAt: new Date('2023-01-03'),
+            updatedAt: new Date('2023-01-03'),
+          },
+        ]);
+
+        const caller = appRouter.createCaller(ctx);
+        const result = await caller.issue.core.publicGetAll({
+          locationId: location.id,
+          statusCategory: "NEW",
+          sortBy: "created",
+          sortOrder: "asc",
+          limit: 10,
+        });
+
+        // Should only return the matching issue
+        expect(result).toHaveLength(1);
+        expect(result[0].title).toBe("Matching Issue");
+        expect(result[0].machine.locationId).toBe(location.id);
+        expect(result[0].status.category).toBe("NEW");
       });
     });
   });

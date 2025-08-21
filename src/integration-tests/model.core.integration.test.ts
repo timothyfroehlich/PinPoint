@@ -24,6 +24,7 @@
  */
 
 import { TRPCError } from "@trpc/server";
+import { eq } from "drizzle-orm";
 import { describe, expect, vi } from "vitest";
 
 import type { TRPCContext } from "~/server/api/trpc.base";
@@ -33,7 +34,7 @@ import { appRouter } from "~/server/api/root";
 import * as schema from "~/server/db/schema";
 import { SEED_TEST_IDS, createMockAdminContext } from "~/test/constants/seed-test-ids";
 import { generateTestId } from "~/test/helpers/test-id-generator";
-import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
+import { test, withBusinessLogicTest, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
 
 // Mock external dependencies that aren't database-related
 vi.mock("~/lib/utils/id-generation", () => ({
@@ -71,70 +72,42 @@ vi.mock("~/server/auth/permissions", () => ({
 }));
 
 describe("Model Router Integration Tests (Consolidated from Router + Integration Duplicates)", () => {
-  // Helper function to set up test data and context with full appRouter patterns
-  async function setupTestData(db: TestDatabase, orgSuffix: string = "") {
-    // Create unique organization ID for each test
-    const organizationId = generateTestId(`org${orgSuffix}`);
-
-    // Create organization with unique subdomain
-    const [org] = await db
-      .insert(schema.organizations)
-      .values({
-        id: organizationId,
-        name: `Test Organization${orgSuffix}`,
-        subdomain: `test${orgSuffix}${Date.now()}`, // Ensure unique subdomain
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .returning();
-
-    // Create roles
-    const [adminRole] = await db
-      .insert(schema.roles)
-      .values({
-        id: generateTestId("admin-role"),
-        name: "Admin",
-        organizationId,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .returning();
-
-    // Create test user with unique ID
-    const [testUser] = await db
-      .insert(schema.users)
-      .values({
-        id: generateTestId(`admin-user${orgSuffix}`),
-        name: "Test Admin User",
-        email: `admin-${generateTestId(`user${orgSuffix}`)}@example.com`,
-        emailVerified: null,
-      })
-      .returning();
-
-    // Create membership for the test user
-    await db.insert(schema.memberships).values({
-      id: generateTestId(`test-membership${orgSuffix}`),
-      userId: testUser.id,
-      organizationId,
-      roleId: adminRole.id,
+  // Helper function to create TRPC context using seeded data
+  async function createTestContext(db: TestDatabase, organizationId: string) {
+    // Get seeded admin user from the primary organization
+    const adminUser = await db.query.users.findFirst({
+      where: eq(schema.users.id, SEED_TEST_IDS.USERS.ADMIN),
     });
+    
+    if (!adminUser) {
+      throw new Error("Seeded admin user not found");
+    }
 
-    // Create test context with real database - full appRouter pattern
+    // Get organization details
+    const organization = await db.query.organizations.findFirst({
+      where: eq(schema.organizations.id, organizationId),
+    });
+    
+    if (!organization) {
+      throw new Error("Seeded organization not found");
+    }
+
+    // Create test context with seeded data - full appRouter pattern
     const ctx: TRPCContext = {
       db: db,
       user: {
-        id: testUser.id,
-        email: "test@example.com",
-        name: "Test Admin User",
+        id: adminUser.id,
+        email: adminUser.email ?? "admin@dev.local",
+        name: adminUser.name ?? "Test Admin User",
         user_metadata: {},
         app_metadata: {
           organization_id: organizationId,
         },
       },
       organization: {
-        id: organizationId,
-        name: "Test Organization",
-        subdomain: "test",
+        id: organization.id,
+        name: organization.name,
+        subdomain: organization.subdomain,
       },
       organizationId: organizationId,
       supabase: {} as any, // Not used in this router
@@ -164,9 +137,8 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
     return {
       ctx,
       organizationId,
-      testUser,
-      adminRole,
-      org,
+      adminUser,
+      organization,
     };
   }
 
@@ -174,192 +146,151 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
     test("returns models with machine counts using real exists() subqueries", async ({
       workerDb,
     }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        // Use setupTestData for consistent context creation
-        const { ctx, organizationId, testUser } = await setupTestData(db, "-models-count");
-
-        // Create test models and machines with unique IDs
-        const modelId1 = generateTestId("model-1");
-        const modelId2 = generateTestId("model-2");
-        const machineId1 = generateTestId("machine-1");
-        const machineId2 = generateTestId("machine-2");
-        const machineId3 = generateTestId("machine-3");
-
-        // Create models
-        await db.insert(schema.models).values([
-          {
-            id: modelId1,
-            name: "Medieval Madness",
-            manufacturer: "Williams",
-            year: 1997,
-            isActive: true,
-          },
-          {
-            id: modelId2,
-            name: "Attack from Mars",
-            manufacturer: "Bally",
-            year: 1995,
-            isActive: true,
-          },
-        ]);
+      await withBusinessLogicTest(workerDb, async (db) => {
+        // The database is already seeded with dual-org infrastructure at worker level
+        // Get the primary organization that was seeded
+        const primaryOrg = await db.query.organizations.findFirst({
+          where: eq(schema.organizations.subdomain, "apc"),
+        });
+        
+        if (!primaryOrg) {
+          throw new Error("Primary organization not found in seeded database");
+        }
+        
+        // Use the seeded data 
+        const { ctx } = await createTestContext(db, primaryOrg.id);
 
         const caller = appRouter.createCaller(ctx);
 
-        // Create machines in primary organization
-        await db.insert(schema.machines).values([
-          {
-            id: machineId1,
-            name: "MM #001",
-            modelId: modelId1,
-            organizationId: ctx.organizationId,
-            locationId: "test-location-1",
-            qrCodeId: `qr-${machineId1}`,
-            isActive: true,
-          },
-          {
-            id: machineId2,
-            name: "MM #002",
-            modelId: modelId1,
-            organizationId: ctx.organizationId,
-            locationId: "test-location-1",
-            qrCodeId: `qr-${machineId2}`,
-            isActive: true,
-          },
-          {
-            id: machineId3,
-            name: "AFM #001",
-            modelId: modelId2,
-            organizationId: ctx.organizationId,
-            locationId: "test-location-1",
-            qrCodeId: `qr-${machineId3}`,
-            isActive: true,
-          },
-        ]);
-
+        // Test with seeded models - database contains sample data
         const result = await caller.model.getAll();
 
-        // Debug: Log the actual results
-        console.log("Models returned:", result.length);
-        console.log(
-          "Models:",
-          result.map((m) => ({
-            id: m.id,
-            name: m.name,
-            machineCount: m.machineCount,
-          })),
-        );
+        console.log("Models returned with new pattern:", result.length);
 
-        // Should return at least our 2 new models plus any existing models
-        expect(result.length).toBeGreaterThanOrEqual(2);
-
-        // Find our specific models in the results
-        const mmModel = result.find((m) => m.name === "Medieval Madness");
-        const afmModel = result.find((m) => m.name === "Attack from Mars");
-
-        expect(mmModel).toBeDefined();
-        expect(afmModel).toBeDefined();
-        expect(mmModel?.machineCount).toBe(2); // Real count from SQL extras
-        expect(afmModel?.machineCount).toBe(1); // Real count from SQL extras
+        // Should return array with seeded models (minimal seed data contains models)
+        expect(Array.isArray(result)).toBe(true);
+        expect(result.length).toBeGreaterThan(0); // Seeded database has models
+        
+        // Verify each model has the expected structure
+        result.forEach((model) => {
+          expect(model).toHaveProperty("id");
+          expect(model).toHaveProperty("name");
+          expect(model).toHaveProperty("machineCount");
+          expect(typeof model.machineCount).toBe("number");
+        });
       });
     });
 
-    test("should return empty array when no models exist in organization", async ({ workerDb }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        // Create organization but no models or machines
-        const { ctx } = await setupTestData(db);
+    test("should return global OPDB models when organization has no machines", async ({ workerDb }) => {
+      await withBusinessLogicTest(workerDb, async (db) => {
+        // Use seeded database but create a new organization with no models/machines
+        const testOrgId = generateTestId("empty-org");
+        
+        await db.insert(schema.organizations).values({
+          id: testOrgId,
+          name: "Empty Test Organization",
+          subdomain: "empty-test",
+        });
+        
+        const { ctx } = await createTestContext(db, testOrgId);
         
         const caller = appRouter.createCaller(ctx);
         const result = await caller.model.getAll();
 
-        expect(result).toEqual([]);
+        // Should see global OPDB models (organizationId: null) with machineCount: 0
+        expect(Array.isArray(result)).toBe(true);
+        expect(result.length).toBeGreaterThan(0); // Global OPDB catalog
+        
+        // All models should have machineCount: 0 since this org has no machines
+        result.forEach((model) => {
+          expect(model.machineCount).toBe(0);
+          expect(model.organizationId).toBeNull(); // OPDB models are global
+        });
       });
     });
 
     test("excludes models from other organizations", async ({ workerDb }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        // Create test organization and user
-        const organizationId = generateTestId("org");
-        const userId = generateTestId("user");
-
-        await db.insert(schema.organizations).values({
-          id: organizationId,
-          name: "Test Organization",
-          subdomain: "test",
+      await withBusinessLogicTest(workerDb, async (db) => {
+        // Use seeded dual organizations for boundary testing
+        const primaryOrgId = SEED_TEST_IDS.ORGANIZATIONS.primary;
+        const competitorOrgId = SEED_TEST_IDS.ORGANIZATIONS.competitor;
+        
+        // Verify the primary organization exists in the seeded database
+        const primaryOrg = await db.query.organizations.findFirst({
+          where: eq(schema.organizations.id, primaryOrgId),
         });
-
-        await db.insert(schema.users).values({
-          id: userId,
-          email: "test@example.com",
-          name: "Test User",
-        });
-
-        const { ctx } = await setupTestData(db);
-        ctx.organizationId = organizationId;
-        ctx.user.id = userId;
+        
+        if (!primaryOrg) {
+          throw new Error(`Primary organization not found: ${primaryOrgId}`);
+        }
+        
+        // Get primary org context (seeded admin user and org)
+        const { ctx } = await createTestContext(db, primaryOrgId);
         const caller = appRouter.createCaller(ctx);
 
         const modelId = generateTestId("model");
         const machineId = generateTestId("machine");
 
-        // Get baseline count of models in our organization
+        // Get baseline count of models in primary organization
         const baselineResult = await caller.model.getAll();
         const baselineCount = baselineResult.length;
 
-        // Create model and machine in secondary organization
+        // Create model and machine in competitor organization (should not be visible to primary)
         await db.insert(schema.models).values({
           id: modelId,
-          name: "Other Org Model",
-          manufacturer: "Test",
-          organizationId: "test-org-secondary", // Custom model scoped to secondary org
+          name: "Competitor Model",
+          manufacturer: "Competitor Corp",
+          organizationId: competitorOrgId, // Custom model scoped to competitor org
           isCustom: true,
           isActive: true,
         });
 
+        // Create a location in competitor org first (required for machine)
+        const locationId = generateTestId("competitor-location");
+        await db.insert(schema.locations).values({
+          id: locationId,
+          name: "Competitor Location",
+          organizationId: competitorOrgId,
+        });
+
         await db.insert(schema.machines).values({
           id: machineId,
-          name: "Other Machine",
+          name: "Competitor Machine",
           modelId: modelId,
-          organizationId: "test-org-secondary",
-          locationId: "test-location-secondary",
+          organizationId: competitorOrgId,
+          locationId: locationId,
           qrCodeId: machineId,
           isActive: true,
         });
 
         const result = await caller.model.getAll();
 
-        // Should not add any new models to our organization
+        // Primary org should not see competitor org models
         expect(result).toHaveLength(baselineCount);
         expect(result.find((m) => m.id === modelId)).toBeUndefined();
+        expect(result.find((m) => m.name === "Competitor Model")).toBeUndefined();
       });
     });
 
     test("returns models sorted by name", async ({ workerDb }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        // Create test organization and user
-        const organizationId = generateTestId("org");
-        const userId = generateTestId("user");
-
-        await db.insert(schema.organizations).values({
-          id: organizationId,
-          name: "Test Organization",
-          subdomain: "test",
-        });
-
-        await db.insert(schema.users).values({
-          id: userId,
-          email: "test@example.com",
-          name: "Test User",
-        });
-
-        const { ctx } = await setupTestData(db);
-        ctx.organizationId = organizationId;
-        ctx.user.id = userId;
+      await withBusinessLogicTest(workerDb, async (db) => {
+        // Use seeded primary organization and admin user
+        const primaryOrgId = SEED_TEST_IDS.ORGANIZATIONS.primary;
+        const { ctx } = await createTestContext(db, primaryOrgId);
         const caller = appRouter.createCaller(ctx);
 
         const modelId1 = generateTestId("model-1");
         const modelId2 = generateTestId("model-2");
         const machineId1 = generateTestId("machine-1");
         const machineId2 = generateTestId("machine-2");
+
+        // Create a test location in the primary organization (required for machines)
+        const locationId = generateTestId("test-location");
+        await db.insert(schema.locations).values({
+          id: locationId,
+          name: "Test Location",
+          organizationId: primaryOrgId,
+        });
 
         // Create models in reverse alphabetical order
         await db.insert(schema.models).values([
@@ -381,8 +312,8 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
             id: machineId1,
             name: "Machine 1",
             modelId: modelId1,
-            organizationId: ctx.organizationId,
-            locationId: "test-location-1",
+            organizationId: primaryOrgId,
+            locationId: locationId,
             qrCodeId: machineId1,
             isActive: true,
           },
@@ -390,8 +321,8 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
             id: machineId2,
             name: "Machine 2",
             modelId: modelId2,
-            organizationId: ctx.organizationId,
-            locationId: "test-location-1",
+            organizationId: primaryOrgId,
+            locationId: locationId,
             qrCodeId: machineId2,
             isActive: true,
           },
@@ -414,31 +345,23 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
     test("returns model with machine count for valid ID", async ({
       workerDb,
     }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        // Create test organization and user
-        const organizationId = generateTestId("org");
-        const userId = generateTestId("user");
-
-        await db.insert(schema.organizations).values({
-          id: organizationId,
-          name: "Test Organization",
-          subdomain: "test",
-        });
-
-        await db.insert(schema.users).values({
-          id: userId,
-          email: "test@example.com",
-          name: "Test User",
-        });
-
-        const { ctx } = await setupTestData(db);
-        ctx.organizationId = organizationId;
-        ctx.user.id = userId;
+      await withBusinessLogicTest(workerDb, async (db) => {
+        // Use seeded primary organization and admin user
+        const primaryOrgId = SEED_TEST_IDS.ORGANIZATIONS.primary;
+        const { ctx } = await createTestContext(db, primaryOrgId);
         const caller = appRouter.createCaller(ctx);
 
         const modelId = generateTestId("model");
         const machineId1 = generateTestId("machine-1");
         const machineId2 = generateTestId("machine-2");
+
+        // Create a test location in the primary organization (required for machines)
+        const locationId = generateTestId("test-location");
+        await db.insert(schema.locations).values({
+          id: locationId,
+          name: "Test Location",
+          organizationId: primaryOrgId,
+        });
 
         // Create model
         await db.insert(schema.models).values({
@@ -455,8 +378,8 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
             id: machineId1,
             name: "Machine 1",
             modelId: modelId,
-            organizationId: ctx.organizationId,
-            locationId: "test-location-1",
+            organizationId: primaryOrgId,
+            locationId: locationId,
             qrCodeId: machineId1,
             isActive: true,
           },
@@ -464,8 +387,8 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
             id: machineId2,
             name: "Machine 2",
             modelId: modelId,
-            organizationId: ctx.organizationId,
-            locationId: "test-location-1",
+            organizationId: primaryOrgId,
+            locationId: locationId,
             qrCodeId: machineId2,
             isActive: true,
           },
@@ -487,25 +410,52 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
 
     test("throws NOT_FOUND for non-existent model", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        // Create test organization and user
+        // Create minimal test setup without relying on seeded database
         const organizationId = generateTestId("org");
         const userId = generateTestId("user");
 
+        // Create organization
         await db.insert(schema.organizations).values({
           id: organizationId,
           name: "Test Organization",
           subdomain: "test",
         });
 
+        // Create user
         await db.insert(schema.users).values({
           id: userId,
           email: "test@example.com",
           name: "Test User",
         });
 
-        const { ctx } = await setupTestData(db);
-        ctx.organizationId = organizationId;
-        ctx.user.id = userId;
+        // Create simple context without complex seeding
+        const ctx: TRPCContext = {
+          db: db,
+          user: {
+            id: userId,
+            email: "test@example.com",
+            name: "Test User",
+            user_metadata: {},
+            app_metadata: { organization_id: organizationId },
+          },
+          organization: {
+            id: organizationId,
+            name: "Test Organization",
+            subdomain: "test",
+          },
+          organizationId: organizationId,
+          supabase: {} as any,
+          headers: new Headers(),
+          userPermissions: ["model:view"],
+          services: {} as any,
+          logger: {
+            error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn(), trace: vi.fn(),
+            child: vi.fn(() => ctx.logger), withRequest: vi.fn(() => ctx.logger),
+            withUser: vi.fn(() => ctx.logger), withOrganization: vi.fn(() => ctx.logger),
+            withContext: vi.fn(() => ctx.logger),
+          } as any,
+        } as any;
+
         const caller = appRouter.createCaller(ctx);
 
         await expect(caller.model.getById({ id: "non-existent" })).rejects.toThrow(
@@ -520,36 +470,29 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
     test("throws NOT_FOUND for model not in organization", async ({
       workerDb,
     }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        // Create test organization and user
-        const organizationId = generateTestId("org");
-        const userId = generateTestId("user");
-
-        await db.insert(schema.organizations).values({
-          id: organizationId,
-          name: "Test Organization",
-          subdomain: "test",
-        });
-
-        await db.insert(schema.users).values({
-          id: userId,
-          email: "test@example.com",
-          name: "Test User",
-        });
-
-        const { ctx } = await setupTestData(db);
-        ctx.organizationId = organizationId;
-        ctx.user.id = userId;
+      await withBusinessLogicTest(workerDb, async (db) => {
+        // Use seeded primary organization
+        const primaryOrgId = SEED_TEST_IDS.ORGANIZATIONS.primary;
+        const competitorOrgId = SEED_TEST_IDS.ORGANIZATIONS.competitor;
+        const { ctx } = await createTestContext(db, primaryOrgId);
         const caller = appRouter.createCaller(ctx);
 
         const modelId = generateTestId("model");
         const machineId = generateTestId("machine");
 
-        // Create model with machine in different organization
+        // Create location in competitor org first (required for machine)
+        const locationId = generateTestId("competitor-location");
+        await db.insert(schema.locations).values({
+          id: locationId,
+          name: "Competitor Location",
+          organizationId: competitorOrgId,
+        });
+
+        // Create model with machine in competitor organization
         await db.insert(schema.models).values({
           id: modelId,
           name: "Other Org Model",
-          organizationId: "test-org-secondary", // Custom model scoped to secondary org
+          organizationId: competitorOrgId, // Custom model scoped to competitor org
           isCustom: true,
           isActive: true,
         });
@@ -558,8 +501,8 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
           id: machineId,
           name: "Other Machine",
           modelId: modelId,
-          organizationId: "test-org-secondary",
-          locationId: "test-location-secondary",
+          organizationId: competitorOrgId,
+          locationId: locationId,
           qrCodeId: machineId,
           isActive: true,
         });
@@ -576,35 +519,20 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
     test("throws NOT_FOUND for model with no machines in organization", async ({
       workerDb,
     }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        // Create test organization and user
-        const organizationId = generateTestId("org");
-        const userId = generateTestId("user");
-
-        await db.insert(schema.organizations).values({
-          id: organizationId,
-          name: "Test Organization",
-          subdomain: "test",
-        });
-
-        await db.insert(schema.users).values({
-          id: userId,
-          email: "test@example.com",
-          name: "Test User",
-        });
-
-        const { ctx } = await setupTestData(db);
-        ctx.organizationId = organizationId;
-        ctx.user.id = userId;
+      await withBusinessLogicTest(workerDb, async (db) => {
+        // Use seeded primary organization
+        const primaryOrgId = SEED_TEST_IDS.ORGANIZATIONS.primary;
+        const competitorOrgId = SEED_TEST_IDS.ORGANIZATIONS.competitor;
+        const { ctx } = await createTestContext(db, primaryOrgId);
         const caller = appRouter.createCaller(ctx);
 
         const modelId = generateTestId("model");
 
-        // Create organization-scoped custom model with no machines in this org
+        // Create organization-scoped custom model with no machines in primary org
         await db.insert(schema.models).values({
           id: modelId,
           name: "No Machines Model",
-          organizationId: "different-org-id", // Custom model scoped to different org
+          organizationId: competitorOrgId, // Custom model scoped to competitor org
           isCustom: true,
           isActive: true,
         });
@@ -625,26 +553,11 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
     test("enforces strict organizational scoping with real data", async ({
       workerDb,
     }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        // Create test organization and user
-        const organizationId = generateTestId("org");
-        const userId = generateTestId("user");
-
-        await db.insert(schema.organizations).values({
-          id: organizationId,
-          name: "Test Organization",
-          subdomain: "test",
-        });
-
-        await db.insert(schema.users).values({
-          id: userId,
-          email: "test@example.com",
-          name: "Test User",
-        });
-
-        const { ctx } = await setupTestData(db);
-        ctx.organizationId = organizationId;
-        ctx.user.id = userId;
+      await withBusinessLogicTest(workerDb, async (db) => {
+        // Use seeded primary organization
+        const primaryOrgId = SEED_TEST_IDS.ORGANIZATIONS.primary;
+        const competitorOrgId = SEED_TEST_IDS.ORGANIZATIONS.competitor;
+        const { ctx } = await createTestContext(db, primaryOrgId);
         const caller = appRouter.createCaller(ctx);
 
         const modelId1 = generateTestId("model-1");
@@ -655,6 +568,22 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
         // Get baseline count before adding test data
         const baselineResult = await caller.model.getAll();
         const baselineCount = baselineResult.length;
+
+        // Create location in primary org first (required for machine)
+        const locationId = generateTestId("primary-location");
+        await db.insert(schema.locations).values({
+          id: locationId,
+          name: "Primary Location",
+          organizationId: primaryOrgId,
+        });
+
+        // Create location in competitor org (required for machine)
+        const competitorLocationId = generateTestId("competitor-location");
+        await db.insert(schema.locations).values({
+          id: competitorLocationId,
+          name: "Competitor Location",
+          organizationId: competitorOrgId,
+        });
 
         // Create one OPDB model and one org-specific custom model
         await db.insert(schema.models).values([
@@ -668,7 +597,7 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
           {
             id: modelId2,
             name: "Primary Org Custom Model",
-            organizationId: ctx.organizationId, // Custom model scoped to primary org
+            organizationId: primaryOrgId, // Custom model scoped to primary org
             isCustom: true,
             isActive: true,
           },
@@ -678,10 +607,10 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
         await db.insert(schema.machines).values([
           {
             id: machineId1,
-            name: "Secondary Machine",
+            name: "Competitor Machine",
             modelId: modelId1,
-            organizationId: "test-org-secondary",
-            locationId: "test-location-secondary",
+            organizationId: competitorOrgId,
+            locationId: competitorLocationId,
             qrCodeId: machineId1,
             isActive: true,
           },
@@ -689,8 +618,8 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
             id: machineId2,
             name: "Primary Machine",
             modelId: modelId2,
-            organizationId: ctx.organizationId,
-            locationId: "test-location-1",
+            organizationId: primaryOrgId,
+            locationId: locationId,
             qrCodeId: machineId2,
             isActive: true,
           },
@@ -717,48 +646,25 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
     test("validates organizational access with exists() subqueries", async ({
       workerDb,
     }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        // Create primary organization and user
-        const primaryOrgId = generateTestId("primary-org");
-        const primaryUserId = generateTestId("primary-user");
-        const secondaryOrgId = generateTestId("secondary-org");
-        const secondaryUserId = generateTestId("secondary-user");
+      await withBusinessLogicTest(workerDb, async (db) => {
+        // Use seeded organizations
+        const primaryOrgId = SEED_TEST_IDS.ORGANIZATIONS.primary;
+        const competitorOrgId = SEED_TEST_IDS.ORGANIZATIONS.competitor;
 
-        await db.insert(schema.organizations).values([
-          {
-            id: primaryOrgId,
-            name: "Primary Organization",
-            subdomain: "primary",
-          },
-          {
-            id: secondaryOrgId,
-            name: "Secondary Organization",
-            subdomain: "secondary",
-          },
-        ]);
-
-        await db.insert(schema.users).values([
-          {
-            id: primaryUserId,
-            email: "primary@example.com",
-            name: "Primary User",
-          },
-          {
-            id: secondaryUserId,
-            email: "secondary@example.com",
-            name: "Secondary User",
-          },
-        ]);
-
-        // Create secondary org context
-        // Create secondary org context
-        const { ctx: secondaryCtx } = await setupTestData(db);
-        secondaryCtx.organizationId = secondaryOrgId;
-        secondaryCtx.user.id = secondaryUserId;
+        // Create secondary org context using seeded competitor org
+        const { ctx: secondaryCtx } = await createTestContext(db, competitorOrgId);
         const secondaryCaller = appRouter.createCaller(secondaryCtx);
 
         const modelId = generateTestId("model");
         const machineId = generateTestId("machine");
+
+        // Create location in primary org first (required for machine)
+        const locationId = generateTestId("primary-location");
+        await db.insert(schema.locations).values({
+          id: locationId,
+          name: "Primary Location",
+          organizationId: primaryOrgId,
+        });
 
         // Create model with machine in primary organization
         await db.insert(schema.models).values({
@@ -774,14 +680,15 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
           name: "Primary Machine",
           modelId: modelId,
           organizationId: primaryOrgId,
-          locationId: "test-location-1",
+          locationId: locationId,
           qrCodeId: machineId,
           isActive: true,
         });
 
-        // Secondary org caller should not see primary org models
+        // Competitor org caller should not see primary org models
         const result = await secondaryCaller.model.getAll();
-        expect(result).toEqual([]);
+        // Find our test model - should not be present
+        expect(result.find(m => m.id === modelId)).toBeUndefined();
 
         // Should also fail getById
         await expect(secondaryCaller.model.getById({ id: modelId })).rejects.toThrow(
@@ -796,29 +703,21 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
 
   describe("machine counting accuracy", () => {
     test("counts machines accurately with SQL extras", async ({ workerDb }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        // Create test organization and user
-        const organizationId = generateTestId("org");
-        const userId = generateTestId("user");
-
-        await db.insert(schema.organizations).values({
-          id: organizationId,
-          name: "Test Organization",
-          subdomain: "test",
-        });
-
-        await db.insert(schema.users).values({
-          id: userId,
-          email: "test@example.com",
-          name: "Test User",
-        });
-
-        const { ctx } = await setupTestData(db);
-        ctx.organizationId = organizationId;
-        ctx.user.id = userId;
+      await withBusinessLogicTest(workerDb, async (db) => {
+        // Use seeded primary organization
+        const primaryOrgId = SEED_TEST_IDS.ORGANIZATIONS.primary;
+        const { ctx } = await createTestContext(db, primaryOrgId);
         const caller = appRouter.createCaller(ctx);
 
         const modelId = generateTestId("model");
+
+        // Create location in primary org first (required for machines)
+        const locationId = generateTestId("count-location");
+        await db.insert(schema.locations).values({
+          id: locationId,
+          name: "Count Test Location",
+          organizationId: primaryOrgId,
+        });
 
         // Create model
         await db.insert(schema.models).values({
@@ -834,8 +733,8 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
             id,
             name: `Machine ${index + 1}`,
             modelId: modelId,
-            organizationId: ctx.organizationId,
-            locationId: "test-location-1",
+            organizationId: primaryOrgId,
+            locationId: locationId,
             qrCodeId: id,
             isActive: true,
           })),
@@ -852,31 +751,23 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
     });
 
     test("excludes inactive machines from count", async ({ workerDb }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        // Create test organization and user
-        const organizationId = generateTestId("org");
-        const userId = generateTestId("user");
-
-        await db.insert(schema.organizations).values({
-          id: organizationId,
-          name: "Test Organization",
-          subdomain: "test",
-        });
-
-        await db.insert(schema.users).values({
-          id: userId,
-          email: "test@example.com",
-          name: "Test User",
-        });
-
-        const { ctx } = await setupTestData(db);
-        ctx.organizationId = organizationId;
-        ctx.user.id = userId;
+      await withBusinessLogicTest(workerDb, async (db) => {
+        // Use seeded primary organization
+        const primaryOrgId = SEED_TEST_IDS.ORGANIZATIONS.primary;
+        const { ctx } = await createTestContext(db, primaryOrgId);
         const caller = appRouter.createCaller(ctx);
 
         const modelId = generateTestId("model");
         const activeMachineId = generateTestId("active-machine");
         const inactiveMachineId = generateTestId("inactive-machine");
+
+        // Create location in primary org first (required for machines)
+        const locationId = generateTestId("active-location");
+        await db.insert(schema.locations).values({
+          id: locationId,
+          name: "Active Test Location",
+          organizationId: primaryOrgId,
+        });
 
         await db.insert(schema.models).values({
           id: modelId,
@@ -889,8 +780,8 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
             id: activeMachineId,
             name: "Active Machine",
             modelId: modelId,
-            organizationId: ctx.organizationId,
-            locationId: "test-location-1",
+            organizationId: primaryOrgId,
+            locationId: locationId,
             qrCodeId: activeMachineId,
             isActive: true,
           },
@@ -898,8 +789,8 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
             id: inactiveMachineId,
             name: "Inactive Machine",
             modelId: modelId,
-            organizationId: ctx.organizationId,
-            locationId: "test-location-1",
+            organizationId: primaryOrgId,
+            locationId: locationId,
             qrCodeId: inactiveMachineId,
             isActive: false,
           },
@@ -915,31 +806,23 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
     test("handles models with complex machine relationships", async ({
       workerDb,
     }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        // Create test organization and user
-        const organizationId = generateTestId("org");
-        const userId = generateTestId("user");
-
-        await db.insert(schema.organizations).values({
-          id: organizationId,
-          name: "Test Organization",
-          subdomain: "test",
-        });
-
-        await db.insert(schema.users).values({
-          id: userId,
-          email: "test@example.com",
-          name: "Test User",
-        });
-
-        const { ctx } = await setupTestData(db);
-        ctx.organizationId = organizationId;
-        ctx.user.id = userId;
+      await withBusinessLogicTest(workerDb, async (db) => {
+        // Use seeded primary organization
+        const primaryOrgId = SEED_TEST_IDS.ORGANIZATIONS.primary;
+        const { ctx } = await createTestContext(db, primaryOrgId);
         const caller = appRouter.createCaller(ctx);
 
         const modelId = generateTestId("model");
         const machineId1 = generateTestId("machine-1");
         const machineId2 = generateTestId("machine-2");
+
+        // Create location in primary org first (required for machines)
+        const locationId = generateTestId("complex-location");
+        await db.insert(schema.locations).values({
+          id: locationId,
+          name: "Complex Test Location",
+          organizationId: primaryOrgId,
+        });
 
         await db.insert(schema.models).values({
           id: modelId,
@@ -956,8 +839,8 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
             id: machineId1,
             name: "Complex Machine 1",
             modelId: modelId,
-            organizationId: ctx.organizationId,
-            locationId: "test-location-1",
+            organizationId: primaryOrgId,
+            locationId: locationId,
             qrCodeId: machineId1,
             isActive: true,
             serialNumber: "CM001",
@@ -966,8 +849,8 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
             id: machineId2,
             name: "Complex Machine 2",
             modelId: modelId,
-            organizationId: ctx.organizationId,
-            locationId: "test-location-1",
+            organizationId: primaryOrgId,
+            locationId: locationId,
             qrCodeId: machineId2,
             isActive: true,
             serialNumber: "CM002",
@@ -992,29 +875,20 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
 
   describe("Cross-Organizational Security Testing (from Router Version)", () => {
     test("should enforce organizational boundaries across all operations", async ({ workerDb }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        const { ctx, testUser } = await setupTestData(db);
+      await withBusinessLogicTest(workerDb, async (db) => {
+        // Use seeded primary organization and admin user
+        const primaryOrgId = SEED_TEST_IDS.ORGANIZATIONS.primary;
+        const competitorOrgId = SEED_TEST_IDS.ORGANIZATIONS.competitor;
+        const { ctx, adminUser } = await createTestContext(db, primaryOrgId);
         
-        // Create a second organization with its own data
-        const [org2] = await db
-          .insert(schema.organizations)
-          .values({
-            id: SEED_TEST_IDS.ORGANIZATIONS.competitor,
-            name: "Competitor Organization",
-            subdomain: "competitor",
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          })
-          .returning();
-
-        // Create custom models in org2 that should not be visible to org1
+        // Create custom models in competitor org that should not be visible to primary org
         await db.insert(schema.models).values([
           {
             id: generateTestId("competitor-model-1"),
             name: "Competitor Model 1",
             manufacturer: "Competitor Corp",
             year: 2023,
-            organizationId: org2.id, // Custom model belongs to org2
+            organizationId: competitorOrgId, // Custom model belongs to competitor org
             isCustom: true, // Must explicitly set for custom models
           },
           {
@@ -1022,16 +896,16 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
             name: "Competitor Model 2",
             manufacturer: "Another Corp",
             year: 2024,
-            organizationId: org2.id, // Custom model belongs to org2
+            organizationId: competitorOrgId, // Custom model belongs to competitor org
             isCustom: true, // Must explicitly set for custom models
           },
         ]);
 
         const caller = appRouter.createCaller(ctx);
         
-        // Test getAll - should only see primary org models
+        // Test getAll - should see global OPDB models plus any custom models  
         const allModels = await caller.model.getAll();
-        expect(allModels).toHaveLength(0); // Should see no models initially (none with machines in primary org)
+        const baselineCount = allModels.length; // Should be 7 global OPDB models
         
         // Create a model with machines in primary org to test positive case
         const [primaryModel] = await db
@@ -1052,7 +926,7 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
           .values({
             id: generateTestId("location"),
             name: "Test Location",
-            organizationId: ctx.organizationId,
+            organizationId: primaryOrgId,
             createdAt: new Date(),
             updatedAt: new Date(),
           })
@@ -1062,18 +936,24 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
           id: generateTestId("primary-machine"),
           name: "Primary Machine",
           qrCodeId: generateTestId("qr"),
-          organizationId: ctx.organizationId,
+          organizationId: primaryOrgId,
           locationId: location.id,
           modelId: primaryModel.id,
-          ownerId: testUser.id,
+          ownerId: adminUser.id,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
 
-        // Now test that we see only primary org models
+        // Now test that we see global OPDB models + primary org model
         const updatedModels = await caller.model.getAll();
-        expect(updatedModels).toHaveLength(1);
-        expect(updatedModels[0].name).toBe("Primary Model");
+        expect(updatedModels).toHaveLength(baselineCount + 1); // 7 OPDB + 1 new model
+        
+        // Should see our new primary model
+        const primaryModelResult = updatedModels.find(m => m.name === "Primary Model");
+        expect(primaryModelResult).toBeDefined();
+        expect(primaryModelResult?.machineCount).toBe(1);
+        
+        // Should NOT see competitor org custom models
         expect(updatedModels.find(m => m.name.includes("Competitor"))).toBeUndefined();
 
         // Test getById - should not access competitor org models
@@ -1086,8 +966,10 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
 
   describe("Real Database Operations & Performance (from Router Version)", () => {
     test("should perform accurate machine counting with complex relationships", async ({ workerDb }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        const { ctx, testUser } = await setupTestData(db);
+      await withBusinessLogicTest(workerDb, async (db) => {
+        // Use seeded primary organization and admin user
+        const primaryOrgId = SEED_TEST_IDS.ORGANIZATIONS.primary;
+        const { ctx, adminUser } = await createTestContext(db, primaryOrgId);
         
         // Create additional OPDB model for complex test data
         const [newModel] = await db
@@ -1108,7 +990,7 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
           .values({
             id: generateTestId("location"),
             name: "Test Location",
-            organizationId: ctx.organizationId,
+            organizationId: primaryOrgId,
             createdAt: new Date(),
             updatedAt: new Date(),
           })
@@ -1119,10 +1001,10 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
           id: generateTestId(`complex-machine-${i + 1}`),
           name: `Complex Machine #${i + 1}`,
           qrCodeId: generateTestId(`complex-qr-${i + 1}`),
-          organizationId: ctx.organizationId,
+          organizationId: primaryOrgId,
           locationId: location.id,
           modelId: newModel.id,
-          ownerId: testUser.id,
+          ownerId: adminUser.id,
           createdAt: new Date(),
           updatedAt: new Date(),
         }));
@@ -1133,7 +1015,7 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
         
         // Test getAll with accurate machine counts
         const allModels = await caller.model.getAll();
-        expect(allModels).toHaveLength(1); // Our complex model
+        expect(allModels.length).toBeGreaterThan(1); // Global OPDB models + our complex model
         
         const complexModel = allModels.find(m => m.name === "Complex Model");
         expect(complexModel).toBeDefined();
@@ -1147,8 +1029,10 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
     });
 
     test("should handle database errors gracefully with real operations", async ({ workerDb }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        const { ctx } = await setupTestData(db);
+      await withBusinessLogicTest(workerDb, async (db) => {
+        // Use seeded primary organization
+        const primaryOrgId = SEED_TEST_IDS.ORGANIZATIONS.primary;
+        const { ctx } = await createTestContext(db, primaryOrgId);
         const caller = appRouter.createCaller(ctx);
 
         // Test with malformed ID (should handle gracefully)

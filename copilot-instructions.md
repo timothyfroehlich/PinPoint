@@ -15,9 +15,8 @@ Purpose: Fast, safe, and correct day-to-day development guidance for this repo. 
 - Do use the worker‑scoped DB pattern in integration tests:
   - `import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db"`
   - No per‑test PGlite instances; no `new PGlite()` in tests.
-- Do set RLS session context via helper when validating boundaries:
-  - `withRLSSecurityContext(db, { organizationId, userId, userRole, userEmail? }, fn)`
-  - `clearRLSSecurityContext(db)` for anonymous tests.
+- For RLS testing use pgTAP (`supabase/tests/rls/`) - PGlite cannot test real RLS policies
+- For business logic use PGlite with RLS bypassed for speed
 - Do use single‑file validation for fast loops:
   - `npm run validate-file <file>` (all checks) or `npm run test-file <test-file>` (tests only).
 
@@ -57,13 +56,13 @@ Direct Vitest (optional):
 - Router/service integration with mocks (fast):
   - Use mock context + SEED_TEST_IDS patterns where applicable.
 - RLS boundary validation:
-  - Wrap DB logic with `withRLSSecurityContext` to assert cross‑org isolation and role behavior.
+  - Use pgTAP SQL tests in `supabase/tests/rls/` for real RLS policy testing
 
-## RLS/session helpers
+## RLS Testing
 
-- File: `src/test/helpers/rls-security-context.ts`
-  - `withRLSSecurityContext(db, { organizationId, userId, userRole, userEmail? }, async (db) => { /* assertions */ })`
-  - `clearRLSSecurityContext(db)` to simulate anonymous users.
+- Real RLS testing: `supabase/tests/rls/` (pgTAP)
+- Business logic: PGlite with RLS bypassed
+- Commands: `npm run test:rls` (pgTAP), `npm run test` (PGlite)
 
 ## Database rules (pre‑beta)
 

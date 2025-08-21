@@ -7,17 +7,23 @@
 
 ## Executive Summary
 
-**Goal**: Convert 87 test files using pgTAP + PGlite testing strategy with specialized consultant analysis for optimal implementation guidance and comprehensive coverage.
+**Goal**: Convert 87 test files using pgTAP + PGlite testing strategy with hardcoded seed data architecture and specialized consultant analysis for optimal implementation guidance and comprehensive coverage.
+
+**Seed Data Architecture Foundation**:
+- **Hardcoded SEED_TEST_IDS**: Consistent, predictable test data using `test-org-pinpoint` and `test-org-competitor` IDs
+- **Dual-Organization Setup**: Primary + competitor orgs for comprehensive boundary testing
+- **Global OPDB Catalog**: 7 OPDB models (`organizationId: null`) visible to all organizations
+- **Memory-Safe Patterns**: Worker-scoped PGlite with transaction isolation
 
 **pgTAP RLS Validation** (~15 tests)
 - Native PostgreSQL RLS policy testing
-- JWT claim simulation for organizational contexts
+- JWT claim simulation for organizational contexts  
 - Database-level security boundary validation
 
-**Business Logic Testing with integration_tester** (~80 tests)  
-- PGlite with `integration_tester` role (BYPASSRLS)
-- 5x faster execution without RLS overhead
-- Focus on pure business functionality
+**Business Logic Testing with Seeded Data** (~80 tests)  
+- PGlite with seeded dual-organization infrastructure
+- Global OPDB catalog + org-specific custom models
+- Focus on realistic business scenarios with consistent data
 
 **Inventory Analysis Achievements**:
 
@@ -36,11 +42,251 @@
 
 **Success Metrics**:
 
-- 87 test files → archetype-compliant patterns
+- 87 test files → archetype-compliant patterns with seed data foundation
 - All tests follow consultant-analyzed archetypes (no ad-hoc patterns)  
-- Test execution time improved (RLS eliminates coordination overhead)
+- Test execution time improved (seeded data eliminates setup overhead)
 - Memory usage stable (200-400MB confirmed safe range)
 - Current failures: 335 → 0 through systematic implementation
+
+---
+
+## Seed Data Architecture Foundation
+
+### Hardcoded SEED_TEST_IDS System
+
+**Core Principle**: Predictable, consistent test data using hardcoded IDs instead of random generation for debugging ease and test stability.
+
+**Architecture**: `src/test/constants/seed-test-ids.ts`
+```typescript
+export const SEED_TEST_IDS = {
+  /** Test organizations - both created during minimal seed */
+  ORGANIZATIONS: {
+    /** Primary test organization (Austin Pinball Collective) */
+    primary: "test-org-pinpoint",
+    /** Secondary organization for RLS testing (Competitor Arcade) */
+    competitor: "test-org-competitor",
+  },
+
+  /** Test users created by createMinimalUsersForTesting() */
+  USERS: {
+    ADMIN: "test-user-tim",
+    MEMBER1: "test-user-harry", 
+    MEMBER2: "test-user-escher",
+  },
+
+  /** Mock data patterns for non-database tests */
+  MOCK_PATTERNS: {
+    ORGANIZATION: "mock-org-1",
+    USER: "mock-user-1",
+    MACHINE: "mock-machine-1",
+    ISSUE: "mock-issue-1",
+  },
+} as const;
+```
+
+### Dual-Organization Testing Infrastructure
+
+**Seeded Organizations**: Infrastructure creates both organizations with hardcoded IDs:
+- **Primary**: `test-org-pinpoint` (Austin Pinball Collective, subdomain: "apc")
+- **Competitor**: `test-org-competitor` (Competitor Arcade, subdomain: "competitor")
+
+**Benefits**:
+- **Cross-org boundary testing**: Validate isolation between organizations
+- **RLS policy validation**: Test data access restrictions 
+- **Realistic multi-tenant scenarios**: Both orgs have sample data
+
+**Implementation**: `scripts/seed/shared/infrastructure.ts`
+```typescript
+const [primaryOrg, secondaryOrg] = await Promise.all([
+  createOrganizationWithRolesWithDb(dbInstance, {
+    id: SEED_TEST_IDS.ORGANIZATIONS.primary,
+    name: "Austin Pinball Collective",
+    subdomain: "apc",
+  }),
+  createOrganizationWithRolesWithDb(dbInstance, {
+    id: SEED_TEST_IDS.ORGANIZATIONS.competitor, 
+    name: "Competitor Arcade",
+    subdomain: "competitor",
+  }),
+]);
+```
+
+### Global OPDB Catalog Architecture
+
+**OPDB Models**: Global pinball machine catalog visible to all organizations
+- **organizationId**: `null` (global scope)
+- **Visibility**: All organizations see all OPDB models
+- **Machine Count**: Per-organization (shows `machineCount: 0` if org has no machines for that model)
+
+**Custom Models**: Organization-specific models
+- **organizationId**: Specific organization ID  
+- **Visibility**: Only visible to owning organization
+- **Usage**: Custom machines, location-specific models
+
+**Example from Fixed Integration Test**:
+```typescript
+// ✅ Correct expectation - sees global OPDB catalog
+test("should return global OPDB models when organization has no machines", async ({ workerDb }) => {
+  await withBusinessLogicTest(workerDb, async (db) => {
+    const result = await caller.model.getAll();
+    
+    // Should see global OPDB models (organizationId: null) with machineCount: 0
+    expect(Array.isArray(result)).toBe(true);
+    expect(result.length).toBeGreaterThan(0); // Global OPDB catalog
+    
+    // All models should have machineCount: 0 since this org has no machines
+    result.forEach((model) => {
+      expect(model.machineCount).toBe(0);
+      expect(model.organizationId).toBeNull(); // OPDB models are global
+    });
+  });
+});
+```
+
+### Memory-Safe Worker-Scoped Pattern
+
+**Critical Pattern**: Single PGlite instance per worker with transaction isolation
+```typescript
+import { test, withBusinessLogicTest } from "~/test/helpers/worker-scoped-db";
+
+test("integration test", async ({ workerDb }) => {
+  await withBusinessLogicTest(workerDb, async (db) => {
+    // Seeded database with dual orgs + OPDB catalog
+    // Transaction isolation ensures test independence
+    // Automatic cleanup on transaction rollback
+  });
+});
+```
+
+**Benefits**:
+- **Memory Safety**: Prevents 50-100MB per test memory blowout
+- **Performance**: Shared seeded data across tests  
+- **Isolation**: Transaction-based cleanup
+- **Consistency**: Same baseline data for all tests
+
+### Test Context Creation Pattern
+
+**Integration Tests**: Use seeded organizations with createTestContext helper
+```typescript
+// From model.core.integration.test.ts (WORKING PATTERN)
+async function createTestContext(db: TestDatabase, organizationId: string) {
+  // Get seeded admin user from the primary organization
+  const adminUser = await db.query.users.findFirst({
+    where: eq(schema.users.id, SEED_TEST_IDS.USERS.ADMIN),
+  });
+  
+  const organization = await db.query.organizations.findFirst({
+    where: eq(schema.organizations.id, organizationId),
+  });
+
+  const ctx: TRPCContext = {
+    db: db,
+    user: {
+      id: adminUser.id,
+      email: adminUser.email ?? "admin@dev.local", 
+      name: adminUser.name ?? "Test Admin User",
+      app_metadata: { organization_id: organizationId },
+    },
+    organization: {
+      id: organization.id,
+      name: organization.name,
+      subdomain: organization.subdomain,
+    },
+    organizationId: organizationId,
+    // ... rest of context
+  };
+  
+  return { ctx, organizationId, adminUser, organization };
+}
+```
+
+**Usage in Tests**:
+```typescript
+test("organizational boundary test", async ({ workerDb }) => {
+  await withBusinessLogicTest(workerDb, async (db) => {
+    // Use seeded primary organization
+    const primaryOrgId = SEED_TEST_IDS.ORGANIZATIONS.primary;
+    const { ctx } = await createTestContext(db, primaryOrgId);
+    const caller = appRouter.createCaller(ctx);
+    
+    // Test with realistic seeded data + global OPDB catalog
+    const result = await caller.model.getAll();
+    expect(result.length).toBeGreaterThan(0); // Global OPDB models
+  });
+});
+```
+
+### Unit Test Seed Data Usage
+
+**MOCK_PATTERNS for Unit Tests**: Consistent mock IDs without database
+```typescript
+import { SEED_TEST_IDS, createMockAdminContext } from "~/test/constants/seed-test-ids";
+
+describe("Router unit test", () => {
+  const mockContext = createMockAdminContext();
+  // Uses: organizationId: "test-org-pinpoint", userId: "test-user-tim"
+  
+  const mockData = {
+    id: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
+    organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+    // Consistent mock IDs for predictable tests
+  };
+});
+```
+
+**Benefits of Unit Test Seed Usage**:
+- **Consistent Mock IDs**: Predictable debugging ("mock-machine-1 is failing")
+- **Standardized Contexts**: createMockAdminContext() helpers
+- **No Database Overhead**: Pure unit testing without PGlite
+- **Pattern Alignment**: Same ID structure as integration tests
+
+### Cross-Organizational Boundary Testing
+
+**Dual-Org Security Validation with Shared Models**:
+```typescript
+// From model.core.integration.test.ts
+test("excludes models from other organizations", async ({ workerDb }) => {
+  await withBusinessLogicTest(workerDb, async (db) => {
+    const primaryOrgId = SEED_TEST_IDS.ORGANIZATIONS.primary;
+    const competitorOrgId = SEED_TEST_IDS.ORGANIZATIONS.competitor;
+    
+    // Create model in competitor organization  
+    await db.insert(schema.models).values({
+      id: modelId,
+      name: "Competitor Model",
+      organizationId: competitorOrgId, // Custom model scoped to competitor
+      isCustom: true,
+    });
+    
+    // Primary org context should not see competitor models
+    const { ctx } = await createTestContext(db, primaryOrgId);
+    const result = await caller.model.getAll();
+    
+    // Should see global OPDB models but NOT competitor custom models
+    expect(result.find((m) => m.id === modelId)).toBeUndefined();
+  });
+});
+```
+
+**Shared Model Testing Strategy** (NEW - August 2025):
+- **Global OPDB Models**: Both organizations see same catalog (e.g., "Revenge from Mars")
+- **Isolated Machines**: Each org has own machine instance of shared models
+- **Cross-Org Boundaries**: Primary org machine ≠ competitor org machine, even for same model
+- **Realistic Testing**: Multiple locations having popular pinball machines
+
+### Seed Data Progression Strategy  
+
+**Minimal → Full Seed Architecture**:
+1. **Minimal Seed**: Foundation dataset (2 orgs, 7 OPDB models, test users, cross-org machines)
+   - Used for: CI, development, most integration tests
+   - Fast performance, essential relationships only
+   - **NEW**: Competitor organization machine for cross-org isolation testing
+
+2. **Full Seed**: Minimal + additional sample data (49 realistic issues, more machines)
+   - Used for: Preview environments, comprehensive testing
+   - Builds on minimal foundation, never replaces it
+
+**Current Implementation**: All tests use minimal seed with dual-organization setup for cross-org boundary testing
 
 ---
 
@@ -459,34 +705,33 @@ test("should scope data by organization", async () => {
 });
 ```
 
-**After (Archetype 3 RLS-Enhanced)**:
+**After (Archetype 3 Seeded Data Enhanced)**:
 
 ```typescript
-// ✅ Memory safe + RLS automatic scoping
-import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
+// ✅ Memory safe + seeded data foundation
+import { test, withBusinessLogicTest } from "~/test/helpers/worker-scoped-db";
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
 test("should scope data by organization", async ({ workerDb }) => {
-  await withIsolatedTest(workerDb, async (db) => {
-    // Set RLS context once
-    await db.execute(sql`SET app.current_organization_id = 'test-org'`);
-    await db.execute(sql`SET app.current_user_id = 'test-user'`);
+  await withBusinessLogicTest(workerDb, async (db) => {
+    // Use seeded organizations - no setup needed
+    const primaryOrgId = SEED_TEST_IDS.ORGANIZATIONS.primary;
+    const { ctx } = await createTestContext(db, primaryOrgId);
+    const caller = appRouter.createCaller(ctx);
 
-    // Create test data - RLS handles scoping automatically
-    const [issue] = await db
-      .insert(issues)
-      .values({
-        title: "Test Issue",
-        description: "Test Description",
-        // No manual organizationId needed - RLS handles it
-      })
-      .returning();
+    // Create test data using seeded context
+    const result = await caller.issues.create({
+      title: "Test Issue",
+      description: "Test Description",
+      // organizationId automatically handled by context
+    });
 
-    // Query without manual scoping - RLS enforces boundaries
-    const foundIssues = await db.query.issues.findMany();
+    // Query through router - organizational scoping enforced
+    const foundIssues = await caller.issues.getAll();
     expect(foundIssues).toHaveLength(1);
-    expect(foundIssues[0].organizationId).toBe("test-org"); // RLS inserted this
+    expect(foundIssues[0].organizationId).toBe(primaryOrgId);
 
-    // Automatic cleanup via withIsolatedTest transaction rollback
+    // Automatic cleanup via withBusinessLogicTest transaction rollback
   });
 });
 ```
@@ -562,11 +807,12 @@ mockDb.issue.findMany.mockImplementation((args) => {
 });
 ```
 
-**After (Archetype 5 RLS-Optimized)**:
+**After (Archetype 5 Seed Data Optimized)**:
 
 ```typescript
-// ✅ Drizzle-style mocks + RLS context
+// ✅ Drizzle-style mocks + SEED_TEST_IDS consistency
 import { createVitestMockContext } from "~/test/vitestMockContext";
+import { SEED_TEST_IDS, createMockAdminContext } from "~/test/constants/seed-test-ids";
 
 const mockDb = vi.hoisted(() => ({
   query: {
@@ -574,7 +820,11 @@ const mockDb = vi.hoisted(() => ({
       findMany: vi
         .fn()
         .mockResolvedValue([
-          { id: "1", title: "Test Issue", organizationId: "test-org" },
+          { 
+            id: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE, 
+            title: "Test Issue", 
+            organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary
+          },
         ]),
       findFirst: vi.fn(),
     },
@@ -584,40 +834,36 @@ const mockDb = vi.hoisted(() => ({
       returning: vi
         .fn()
         .mockResolvedValue([
-          { id: "1", title: "New Issue", organizationId: "test-org" },
+          { 
+            id: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE, 
+            title: "New Issue", 
+            organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary
+          },
         ]),
     }),
   }),
-  // RLS context simulation
+  // Context simulation for organizational scoping
   execute: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("@/lib/db", () => ({ db: mockDb }));
 
-// Mock context with RLS-aware user
-const mockCtx = createVitestMockContext({
-  user: {
-    id: "test-user",
-    user_metadata: {
-      organizationId: "test-org",
-      role: "admin",
-    },
-  },
-});
+// Mock context with hardcoded SEED_TEST_IDS
+const mockCtx = createMockAdminContext();
+// Uses: organizationId: "test-org-pinpoint", userId: "test-user-tim"
 
-test("router respects RLS boundaries", async () => {
+test("router respects organizational boundaries", async () => {
   const caller = appRouter.createCaller(mockCtx);
 
-  // Mock simulates RLS behavior - only org-scoped data returned
+  // Mock simulates organizational scoping with consistent IDs
   const result = await caller.issues.getAll();
 
   expect(result).toHaveLength(1);
-  expect(result[0].organizationId).toBe("test-org");
+  expect(result[0].organizationId).toBe(SEED_TEST_IDS.ORGANIZATIONS.primary);
+  expect(result[0].id).toBe(SEED_TEST_IDS.MOCK_PATTERNS.ISSUE);
 
-  // Verify RLS context was set (in real implementation)
-  expect(mockDb.execute).toHaveBeenCalledWith(
-    expect.stringContaining("SET app.current_organization_id"),
-  );
+  // Verify organizational context consistency
+  expect(mockCtx.organizationId).toBe(SEED_TEST_IDS.ORGANIZATIONS.primary);
 });
 ```
 
@@ -686,44 +932,41 @@ describe("CommentService", () => {
 });
 ```
 
-**After (Proper Integration with Archetype 3)**:
+**After (Proper Integration with Archetype 3 + Seed Data)**:
 
 ```typescript
-// ✅ tRPC integration with RLS
-import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
-import { createTRPCCaller } from "~/test/helpers/trpc-caller";
+// ✅ tRPC integration with seeded data foundation
+import { test, withBusinessLogicTest } from "~/test/helpers/worker-scoped-db";
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
-test("creates comment via tRPC with RLS", async ({ workerDb }) => {
-  await withIsolatedTest(workerDb, async (db) => {
-    // Set RLS context
-    await db.execute(sql`SET app.current_organization_id = 'test-org'`);
-    await db.execute(sql`SET app.current_user_id = 'test-user'`);
+test("creates comment via tRPC with seeded data", async ({ workerDb }) => {
+  await withBusinessLogicTest(workerDb, async (db) => {
+    // Use seeded organizations and users - no setup needed
+    const primaryOrgId = SEED_TEST_IDS.ORGANIZATIONS.primary;
+    const { ctx } = await createTestContext(db, primaryOrgId);
+    const caller = appRouter.createCaller(ctx);
 
-    // Create test issue first
-    const [issue] = await db
-      .insert(issues)
-      .values({
-        title: "Test Issue",
-        description: "Test Description",
-      })
-      .returning();
-
-    // Test via tRPC caller - respects RLS
-    const caller = createTRPCCaller(db, {
-      user: {
-        id: "test-user",
-        user_metadata: { organizationId: "test-org", role: "admin" },
-      },
+    // Create test issue using seeded context
+    const issue = await caller.issues.create({
+      title: "Test Issue",
+      description: "Test Description",
+      // organizationId automatically handled by context
     });
 
+    // Test comment creation through tRPC router
     const result = await caller.comments.create({
       issueId: issue.id,
       content: "Test comment",
-      // No manual organizationId - RLS handles it
+      // organizationId automatically scoped to seeded org
     });
 
     expect(result.content).toBe("Test comment");
-    expect(result.organizationId).toBe("test-org"); // RLS enforced
+    expect(result.organizationId).toBe(primaryOrgId); // Seeded org enforced
+    
+    // Verify comment belongs to correct issue and organization
+    const comments = await caller.comments.getByIssue({ issueId: issue.id });
+    expect(comments).toHaveLength(1);
+    expect(comments[0].organizationId).toBe(primaryOrgId);
   });
 });
 ```
@@ -1123,3 +1366,174 @@ Phase 3 represents the systematic application of our carefully designed testing 
 - Consultant specialization prevents archetype violations and ensures expert-quality implementations
 
 The completion of Phase 3 will deliver a robust, maintainable testing infrastructure that fully leverages the RLS implementation from Phase 2, with consultant-guided implementation ensuring systematic conversion quality and preventing regression to poor patterns.
+
+---
+
+## Post-Phase 3: Documentation Synchronization
+
+### Critical Documentation Updates Required
+
+**Context**: The seed data architecture implementation during Phase 3 has established new foundational patterns that must be reflected across all project documentation to ensure consistency and prevent confusion.
+
+**Goal**: Update all documentation to reflect the implemented seed data architecture, hardcoded SEED_TEST_IDS system, and dual-organization testing patterns.
+
+### Documentation Update Tasks
+
+#### 1. Testing Documentation Updates
+
+**Files to Update**:
+```
+docs/testing/
+├── INDEX.md                           # Add seed data architecture overview
+├── architecture-patterns.md          # Update with SEED_TEST_IDS patterns  
+├── integration-patterns.md           # Add createTestContext() examples
+├── test-database.md                   # Document dual-org setup
+├── vitest-guide.md                    # Add MOCK_PATTERNS usage
+├── pgtap-rls-testing.md              # Update with hardcoded org IDs
+└── archetype-*.md                     # Update all archetypes with seed data examples
+```
+
+**Key Updates**:
+- Replace all random ID examples with SEED_TEST_IDS usage
+- Update integration test examples to show `createTestContext()` pattern
+- Document global OPDB catalog behavior and expectations
+- Add dual-organization boundary testing examples
+- Update memory safety patterns with worker-scoped + seeded approach
+
+#### 2. Quick Reference Updates
+
+**Files to Update**:
+```
+docs/quick-reference/
+├── INDEX.md                           # Add seed data quick reference
+├── testing-patterns.md               # ✅ ALREADY UPDATED with full architecture
+├── api-security-patterns.md          # Add dual-org security examples
+└── typescript-strictest-patterns.md  # Add SEED_TEST_IDS type safety examples
+```
+
+**Key Updates**:
+- Add quick reference for SEED_TEST_IDS usage patterns
+- Document when to use MOCK_PATTERNS vs seeded data
+- Update security examples with hardcoded organization IDs
+- Add createMockAdminContext() usage examples
+
+#### 3. Developer Guide Updates
+
+**Files to Update**:
+```
+docs/developer-guides/
+├── drizzle/                          # Update with seeded data examples
+├── supabase/                         # Update SSR patterns with SEED_TEST_IDS
+├── trpc/                             # Update router testing with seed data
+└── testing/                          # Comprehensive seed data integration
+```
+
+**Key Updates**:
+- Replace manual organization setup with seeded context examples
+- Update tRPC examples to use createTestContext() pattern
+- Document how seed data integrates with Supabase SSR patterns
+- Add examples of dual-organization testing scenarios
+
+#### 4. Migration Plan Updates
+
+**Files to Update**:
+```
+migration-plan-v2/
+├── 01-phase1-prisma-removal.md      # Note: No changes needed (pre-seed)
+├── 02-phase2-rls-implementation.md  # Update with final seed data integration
+├── 03-phase2.5-testing-architecture.md # Document seed data foundation
+└── 05-phase4-cleanup-consolidation.md # Add seed data documentation consolidation
+```
+
+**Key Updates**:
+- Document how seed data foundation supports RLS implementation
+- Update Phase 2.5 to show seed data as key architectural component
+- Plan Phase 4 consolidation of seed data documentation
+- Add success metrics related to seed data architecture
+
+#### 5. Root Documentation Updates
+
+**Files to Update**:
+```
+├── CLAUDE.md                         # Add seed data quick reference section
+├── docs/INDEX.md                     # Update with seed data architecture overview
+├── TEST_INVENTORY_*.md               # Update examples with SEED_TEST_IDS  
+└── README.md                         # Add seed data architecture highlights
+```
+
+**Key Updates**:
+- Add SEED_TEST_IDS overview to CLAUDE.md for easy agent reference
+- Update main INDEX.md with seed data as key architectural component
+- Replace random ID examples in test inventory with hardcoded patterns
+- Highlight predictable test data as key project benefit
+
+### Documentation Update Implementation Plan
+
+#### Phase 3.7: Documentation Synchronization Sprint
+
+**Duration**: 1-2 focused sessions  
+**Approach**: Systematic file-by-file updates using established patterns
+
+**Execution Steps**:
+
+1. **Testing Documentation (Priority 1)**:
+   ```bash
+   # Update core testing patterns with seed data examples
+   # Focus on: INDEX.md, integration-patterns.md, test-database.md
+   ```
+
+2. **Quick Reference Updates (Priority 2)**:
+   ```bash  
+   # Ensure quick references reflect current working patterns
+   # Focus on: api-security-patterns.md, typescript-strictest-patterns.md
+   ```
+
+3. **Developer Guides (Priority 3)**:
+   ```bash
+   # Update implementation guides with seed data integration
+   # Focus on: trpc/, testing/, supabase/ directories
+   ```
+
+4. **Migration & Root Docs (Priority 4)**:
+   ```bash
+   # Update strategic documentation and root files
+   # Focus on: migration-plan-v2/, CLAUDE.md, docs/INDEX.md
+   ```
+
+### Documentation Quality Standards
+
+**Consistency Requirements**:
+- All test examples must use SEED_TEST_IDS instead of hardcoded random values
+- Integration test examples must show `createTestContext()` pattern
+- Unit test examples must use MOCK_PATTERNS appropriately
+- All organizational boundary examples must use primary/competitor dual setup
+
+**Example Standards**:
+```typescript
+// ✅ Correct documentation example
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
+
+test("example integration test", async ({ workerDb }) => {
+  await withBusinessLogicTest(workerDb, async (db) => {
+    const primaryOrgId = SEED_TEST_IDS.ORGANIZATIONS.primary;
+    const { ctx } = await createTestContext(db, primaryOrgId);
+    // ... test implementation
+  });
+});
+
+// ❌ Incorrect documentation example (outdated pattern)
+test("example integration test", async () => {
+  const db = await createTestDatabase();
+  const orgId = "random-org-id"; // Should use SEED_TEST_IDS
+  // ... outdated pattern
+});
+```
+
+**Benefits of Documentation Synchronization**:
+- **Consistent Developer Experience**: All docs show current working patterns
+- **Reduced Confusion**: No conflicting examples across documentation
+- **Improved Onboarding**: New developers see predictable, debuggable patterns
+- **Pattern Reinforcement**: Documentation reinforces architectural decisions
+- **Future Maintenance**: Changes propagate consistently across all docs
+
+The completion of this documentation synchronization will ensure that the seed data architecture gains achieved during Phase 3 are properly communicated and maintained across the entire project documentation ecosystem.

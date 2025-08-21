@@ -5,7 +5,7 @@
  * Consolidates the common code from the old seed files.
  */
 
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { nanoid } from "nanoid";
 
 // Quiet mode for tests
@@ -15,6 +15,7 @@ const log = (...args: unknown[]) => {
 };
 
 import { createDrizzleClient } from "~/server/db/drizzle";
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 import {
   organizations,
   locations,
@@ -39,6 +40,11 @@ export interface Organization {
   id: string;
   name: string;
   subdomain: string;
+}
+
+export interface DualOrganizationSetup {
+  primary: Organization;
+  secondary: Organization;
 }
 
 /**
@@ -96,6 +102,7 @@ async function createGlobalPermissionsWithDb(
 async function createOrganizationWithRolesWithDb(
   dbInstance: typeof db,
   orgData: {
+    id?: string;
     name: string;
     subdomain: string;
     logoUrl?: string;
@@ -130,7 +137,7 @@ async function createOrganizationWithRolesWithDb(
     const created = await dbInstance
       .insert(organizations)
       .values({
-        id: nanoid(),
+        id: orgData.id ?? nanoid(),
         name: orgData.name,
         subdomain: orgData.subdomain,
         logoUrl: orgData.logoUrl,
@@ -598,9 +605,7 @@ async function createSystemRolesWithDb(
   const unauthPermissions = await dbInstance
     .select({ id: permissions.id })
     .from(permissions)
-    .where(
-      eq(permissions.name, UNAUTHENTICATED_PERMISSIONS[0] ?? "issue:view"),
-    );
+    .where(inArray(permissions.name, UNAUTHENTICATED_PERMISSIONS));
 
   // Clear existing permissions first
   await dbInstance
@@ -704,7 +709,7 @@ async function createTemplateRoleWithDb(
   const templatePermissions = await dbInstance
     .select({ id: permissions.id })
     .from(permissions)
-    .where(eq(permissions.name, template.permissions[0] ?? ""));
+    .where(inArray(permissions.name, template.permissions));
 
   // Clear existing permissions first
   await dbInstance
@@ -868,7 +873,7 @@ async function createTestDatabaseRolesWithDb(
 /**
  * Main infrastructure seeding function
  */
-export async function seedInfrastructure(): Promise<Organization> {
+export async function seedInfrastructure(): Promise<DualOrganizationSetup> {
   return await seedInfrastructureWithDb(db);
 }
 
@@ -878,42 +883,64 @@ export async function seedInfrastructure(): Promise<Organization> {
  */
 export async function seedInfrastructureWithDb(
   dbInstance: typeof db,
-): Promise<Organization> {
+): Promise<DualOrganizationSetup> {
   const startTime = Date.now();
   log("[INFRASTRUCTURE] Creating organizations, permissions, roles...");
 
   // 1. Create global permissions first
   await createGlobalPermissionsWithDb(dbInstance);
 
-  // 2. Create organization with roles
-  const organization = await createOrganizationWithRolesWithDb(dbInstance, {
-    name: "Austin Pinball Collective",
-    subdomain: "apc",
-    logoUrl:
-      "/supabase/storage/pinpoint-storage-main/austinpinballcollective-logo-outline.png",
-  });
-  log(`[INFRASTRUCTURE] Created organization: ${organization.name}`);
+  // 2. Create both organizations with roles in parallel
+  const [primaryOrg, secondaryOrg] = await Promise.all([
+    createOrganizationWithRolesWithDb(dbInstance, {
+      id: SEED_TEST_IDS.ORGANIZATIONS.primary,
+      name: "Austin Pinball Collective",
+      subdomain: "apc",
+      logoUrl: "/supabase/storage/pinpoint-storage-main/austinpinballcollective-logo-outline.png",
+    }),
+    createOrganizationWithRolesWithDb(dbInstance, {
+      id: SEED_TEST_IDS.ORGANIZATIONS.competitor,
+      name: "Competitor Arcade",
+      subdomain: "competitor",
+      logoUrl: "/supabase/storage/pinpoint-storage-main/competitor-logo.png",
+    }),
+  ]);
+  log(`[INFRASTRUCTURE] Created organizations: ${primaryOrg.name}, ${secondaryOrg.name}`);
 
   // 3. Create test database roles (only in test environments)
   await createTestDatabaseRolesWithDb(dbInstance);
 
-  // 4-7. Create organization-specific data in parallel (safe - no interdependencies)
-  log(`[INFRASTRUCTURE] Creating organization data...`);
+  // 4-7. Create organization-specific data for both orgs in parallel
+  log(`[INFRASTRUCTURE] Creating organization data for both organizations...`);
   await Promise.all([
-    createDefaultPrioritiesWithDb(dbInstance, organization.id), // Independent - creates priority records only
-    createDefaultCollectionTypesWithDb(dbInstance, organization.id), // Independent - creates collection types only
-    createDefaultStatusesWithDb(dbInstance, organization.id), // Independent - creates status records only
-    createDefaultLocationWithDb(dbInstance, organization.id), // Independent - creates location record only
+    // Primary organization data
+    createDefaultPrioritiesWithDb(dbInstance, primaryOrg.id),
+    createDefaultCollectionTypesWithDb(dbInstance, primaryOrg.id),
+    createDefaultStatusesWithDb(dbInstance, primaryOrg.id),
+    createDefaultLocationWithDb(dbInstance, primaryOrg.id),
+    
+    // Secondary organization data
+    createDefaultPrioritiesWithDb(dbInstance, secondaryOrg.id),
+    createDefaultCollectionTypesWithDb(dbInstance, secondaryOrg.id),
+    createDefaultStatusesWithDb(dbInstance, secondaryOrg.id),
+    createDefaultLocationWithDb(dbInstance, secondaryOrg.id),
   ]);
 
   const duration = Date.now() - startTime;
   log(
-    `[INFRASTRUCTURE] ✅ Infrastructure seeding complete for ${organization.name} in ${duration}ms`,
+    `[INFRASTRUCTURE] ✅ Infrastructure seeding complete for both organizations in ${duration}ms`,
   );
 
   return {
-    id: organization.id,
-    name: organization.name,
-    subdomain: organization.subdomain,
+    primary: {
+      id: primaryOrg.id,
+      name: primaryOrg.name,
+      subdomain: primaryOrg.subdomain,
+    },
+    secondary: {
+      id: secondaryOrg.id,
+      name: secondaryOrg.name,
+      subdomain: secondaryOrg.subdomain,
+    },
   };
 }

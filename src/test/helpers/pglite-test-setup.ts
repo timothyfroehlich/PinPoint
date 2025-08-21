@@ -191,13 +191,10 @@ async function configureForBusinessLogicTesting(db: TestDatabase): Promise<void>
 }
 
 /**
- * Create minimal users for PostgreSQL-only testing
- * Enables issue creation which requires createdById references
+ * Create minimal test users for PostgreSQL-only mode (GLOBAL - called once)
+ * Users are global entities that get linked to organizations via memberships
  */
-async function createMinimalUsersForTesting(
-  db: TestDatabase,
-  organizationId: string,
-): Promise<void> {
+async function createMinimalUsersForTesting(db: TestDatabase): Promise<void> {
   // Create users that match the sample data expectations for PostgreSQL-only mode
   const testUsers = [
     // Dev users for testing
@@ -270,7 +267,21 @@ async function createMinimalUsersForTesting(
 
   await db.insert(schema.users).values(testUsers);
 
-  // Create memberships linking users to organization
+  if (!process.env.VITEST) {
+    console.log("[TEST] Created minimal users for PostgreSQL-only testing");
+  }
+}
+
+/**
+ * Create memberships linking global users to a specific organization
+ * Called once per organization to create the user-org relationships
+ */
+async function createMembershipsForOrganization(
+  db: TestDatabase,
+  organizationId: string,
+  orgSuffix: string, // "primary" or "secondary" for unique membership IDs
+): Promise<void> {
+  // Get roles for this organization
   const adminRole = await db.query.roles.findFirst({
     where: and(
       eq(schema.roles.organizationId, organizationId),
@@ -288,84 +299,104 @@ async function createMinimalUsersForTesting(
   if (adminRole && memberRole) {
     await db.insert(schema.memberships).values([
       {
-        id: "test-membership-admin",
+        id: `test-membership-admin-${orgSuffix}`,
         userId: "test-user-admin",
         organizationId,
         roleId: adminRole.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
       },
       {
-        id: "test-membership-member",
+        id: `test-membership-member-${orgSuffix}`,
         userId: "test-user-member",
         organizationId,
         roleId: memberRole.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
       },
       {
-        id: "test-membership-player",
+        id: `test-membership-player-${orgSuffix}`,
         userId: "test-user-player",
         organizationId,
         roleId: memberRole.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
       },
       {
-        id: "test-membership-roger",
+        id: `test-membership-roger-${orgSuffix}`,
         userId: "test-user-roger",
         organizationId,
         roleId: adminRole.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
       },
       {
-        id: "test-membership-gary",
+        id: `test-membership-gary-${orgSuffix}`,
         userId: "test-user-gary",
         organizationId,
         roleId: memberRole.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
       },
       {
-        id: "test-membership-harry",
+        id: `test-membership-harry-${orgSuffix}`,
         userId: "test-user-harry",
         organizationId,
         roleId: memberRole.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
       },
       {
-        id: "test-membership-escher",
+        id: `test-membership-escher-${orgSuffix}`,
         userId: "test-user-escher",
         organizationId,
         roleId: memberRole.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
       },
       {
-        id: "test-membership-tim",
+        id: `test-membership-tim-${orgSuffix}`,
         userId: "test-user-tim",
         organizationId,
         roleId: adminRole.id, // Make Tim an admin
-        createdAt: new Date(),
-        updatedAt: new Date(),
       },
     ]);
-  }
 
-  if (!process.env.VITEST) {
-    console.log("[TEST] Created minimal users for PostgreSQL-only testing");
+    if (!process.env.VITEST) {
+      console.log(`[TEST] Created memberships for ${orgSuffix} organization (${organizationId})`);
+    }
   }
 }
 
 /**
+ * Create a clean test database with infrastructure only (no sample data)
+ * For integration tests that need precise control over test data
+ */
+export async function createCleanTestDatabase(): Promise<{
+  db: TestDatabase;
+  organizationId: string;
+  primaryOrgId: string;
+  secondaryOrgId: string;
+}> {
+  const db = await createTestDatabase();
+
+  // Use production seed functions for infrastructure only
+  const { seedInfrastructureWithDb } = await import(
+    "../../../scripts/seed/shared/infrastructure"
+  );
+
+  // Seed infrastructure (dual organizations, permissions, roles, statuses)
+  const organizations = await seedInfrastructureWithDb(db);
+
+  // Create minimal users for PostgreSQL-only mode in both orgs
+  await createMinimalUsersForTesting(db, organizations.primary.id);
+  await createMinimalUsersForTesting(db, organizations.secondary.id);
+
+  // NOTE: No sample data seeding - tests create their own precise data
+
+  return {
+    db,
+    organizationId: organizations.primary.id, // Default to primary for backward compatibility
+    primaryOrgId: organizations.primary.id,
+    secondaryOrgId: organizations.secondary.id,
+  };
+}
+
+/**
  * Create a test database with complete seed data using production seeds
- * This is the main entry point for integration tests
+ * For E2E tests and scenarios that need realistic data
  */
 export async function createSeededTestDatabase(): Promise<{
   db: TestDatabase;
   organizationId: string;
+  primaryOrgId: string;
+  secondaryOrgId: string;
 }> {
   const db = await createTestDatabase();
 
@@ -377,18 +408,24 @@ export async function createSeededTestDatabase(): Promise<{
     "../../../scripts/seed/shared/sample-data"
   );
 
-  // Seed infrastructure (organizations, permissions, roles, statuses)
-  const organization = await seedInfrastructureWithDb(db);
+  // Seed infrastructure (dual organizations, permissions, roles, statuses)
+  const organizations = await seedInfrastructureWithDb(db);
 
-  // Create minimal users for PostgreSQL-only mode so issues can be created
-  await createMinimalUsersForTesting(db, organization.id);
+  // Create minimal users for PostgreSQL-only mode (ONCE - users are global)
+  await createMinimalUsersForTesting(db);
 
-  // Seed sample data with minimal dataset and skipAuthUsers = false (now that we have users)
-  await seedSampleDataWithDb(db, organization.id, "minimal", false);
+  // Create memberships linking users to both organizations
+  await createMembershipsForOrganization(db, organizations.primary.id, "primary");
+  await createMembershipsForOrganization(db, organizations.secondary.id, "secondary");
+
+  // Seed sample data in primary org with minimal dataset
+  await seedSampleDataWithDb(db, organizations.primary.id, "minimal", false);
 
   return {
     db,
-    organizationId: organization.id,
+    organizationId: organizations.primary.id, // Default to primary for backward compatibility
+    primaryOrgId: organizations.primary.id,
+    secondaryOrgId: organizations.secondary.id,
   };
 }
 

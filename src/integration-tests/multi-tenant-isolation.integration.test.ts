@@ -17,16 +17,23 @@
  */
 
 import { eq, and } from "drizzle-orm";
-import { describe, expect } from "vitest";
+import { describe, expect, vi } from "vitest";
 
 import * as schema from "~/server/db/schema";
 import {
   generateTestId,
   generateTestEmail,
 } from "~/test/helpers/test-id-generator";
-import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
+import { test, withIsolatedTest, withRLSEnabledTest } from "~/test/helpers/worker-scoped-db";
+import {
+  withRLSSecurityContext,
+  clearRLSSecurityContext,
+} from "~/test/helpers/rls-security-context";
 
 describe("Multi-Tenant Isolation", () => {
+  // Only run DB-level RLS tests when explicitly enabled (requires real PostgreSQL with RLS)
+  const RUN_RLS_TS = process.env.RUN_RLS_TS === "true";
+
   describe("Organization Boundary Enforcement", () => {
     test("should enforce organizationId on all tenant-scoped tables", async ({
       workerDb,
@@ -365,10 +372,10 @@ describe("Multi-Tenant Isolation", () => {
   // Enhanced following Phase 3.1 security analysis
 
   describe("Critical RLS Policy Enforcement", () => {
-    test("CRITICAL - Database-level cross-organizational access blocking", async ({
+  test.runIf(RUN_RLS_TS)("CRITICAL - Database-level cross-organizational access blocking", async ({
       workerDb,
     }) => {
-      await withIsolatedTest(workerDb, async (db) => {
+      await withRLSEnabledTest(workerDb, async (db) => {
         // Create test organizations and data
         const org1Id = generateTestId("primary-org");
         const org2Id = generateTestId("competitor-org");
@@ -384,7 +391,7 @@ describe("Multi-Tenant Isolation", () => {
           },
           {
             id: org2Id,
-            name: "Competitor Organization", 
+            name: "Competitor Organization",
             subdomain: generateTestId("competitor-sub"),
           },
         ]);
@@ -398,7 +405,7 @@ describe("Multi-Tenant Isolation", () => {
           },
           {
             id: user2Id,
-            email: generateTestEmail("competitor-admin"), 
+            email: generateTestEmail("competitor-admin"),
             name: "Competitor Admin",
             organizationId: org2Id,
           },
@@ -415,7 +422,7 @@ describe("Multi-Tenant Isolation", () => {
           },
           {
             id: generateTestId("competitor-secret-location"),
-            name: "Competitor Org Secret Location", 
+            name: "Competitor Org Secret Location",
             address: "Confidential Competitor Address",
             organizationId: org2Id,
             createdBy: user2Id,
@@ -423,40 +430,43 @@ describe("Multi-Tenant Isolation", () => {
         ]);
 
         // CRITICAL TEST: Set RLS context for primary org and attempt cross-org access
-        // This simulates database-level security enforcement
-        await db.execute(
-          `SET app.current_organization_id = '${org1Id}'`
+        await withRLSSecurityContext(
+          db,
+          {
+            organizationId: org1Id,
+            userId: user1Id,
+            userRole: "admin",
+            userEmail: generateTestEmail("primary-admin"),
+          },
+          async (db) => {
+            // Attempt to access competitor org data WITHOUT application-level filtering
+            // RLS should block this at database level
+            const crossOrgAttempt = await db
+              .select()
+              .from(schema.locations)
+              // NO WHERE clause - testing pure RLS enforcement
+              .where(eq(schema.locations.organizationId, org2Id));
+
+            // CRITICAL: Should return empty due to RLS blocking, not application logic
+            expect(crossOrgAttempt).toHaveLength(0);
+
+            // Verify primary org data is accessible
+            const ownOrgData = await db
+              .select()
+              .from(schema.locations)
+              .where(eq(schema.locations.organizationId, org1Id));
+
+            expect(ownOrgData).toHaveLength(1);
+            expect(ownOrgData[0]?.name).toBe("Primary Org Secret Location");
+          },
         );
-        await db.execute(
-          `SET app.current_user_id = '${user1Id}'`
-        );
-
-        // Attempt to access competitor org data WITHOUT application-level filtering
-        // RLS should block this at database level
-        const crossOrgAttempt = await db
-          .select()
-          .from(schema.locations)
-          // NO WHERE clause - testing pure RLS enforcement
-          .where(eq(schema.locations.organizationId, org2Id));
-
-        // CRITICAL: Should return empty due to RLS blocking, not application logic
-        expect(crossOrgAttempt).toHaveLength(0);
-
-        // Verify primary org data is accessible
-        const ownOrgData = await db
-          .select()
-          .from(schema.locations)
-          .where(eq(schema.locations.organizationId, org1Id));
-
-        expect(ownOrgData).toHaveLength(1);
-        expect(ownOrgData[0]?.name).toBe("Primary Org Secret Location");
       });
-    });
+  });
 
-    test("CRITICAL - Zero tolerance for cross-organizational data leakage", async ({
+  test.runIf(RUN_RLS_TS)("CRITICAL - Zero tolerance for cross-organizational data leakage", async ({
       workerDb,
     }) => {
-      await withIsolatedTest(workerDb, async (db) => {
+      await withRLSEnabledTest(workerDb, async (db) => {
         // Create test data across multiple tables
         const org1Id = generateTestId("org1");
         const org2Id = generateTestId("org2");
@@ -478,35 +488,43 @@ describe("Multi-Tenant Isolation", () => {
         });
 
         // Set RLS context for org1
-        await db.execute(`SET app.current_organization_id = '${org1Id}'`);
+        await withRLSSecurityContext(
+          db,
+          {
+            organizationId: org1Id,
+            userId: generateTestId("user"),
+            userRole: "authenticated",
+          },
+          async (db) => {
+            // ZERO TOLERANCE: No competitor data should be accessible
+            const competitorLocations = await db
+              .select()
+              .from(schema.locations)
+              .where(eq(schema.locations.organizationId, org2Id));
 
-        // ZERO TOLERANCE: No competitor data should be accessible
-        const competitorLocations = await db
-          .select()
-          .from(schema.locations)
-          .where(eq(schema.locations.organizationId, org2Id));
+            const competitorMachines = await db
+              .select()
+              .from(schema.machines)
+              .where(eq(schema.machines.organizationId, org2Id));
 
-        const competitorMachines = await db
-          .select() 
-          .from(schema.machines)
-          .where(eq(schema.machines.organizationId, org2Id));
+            const competitorIssues = await db
+              .select()
+              .from(schema.issues)
+              .where(eq(schema.issues.organizationId, org2Id));
 
-        const competitorIssues = await db
-          .select()
-          .from(schema.issues)
-          .where(eq(schema.issues.organizationId, org2Id));
-
-        // CRITICAL: All should be empty due to RLS enforcement
-        expect(competitorLocations).toHaveLength(0);
-        expect(competitorMachines).toHaveLength(0); 
-        expect(competitorIssues).toHaveLength(0);
+            // CRITICAL: All should be empty due to RLS enforcement
+            expect(competitorLocations).toHaveLength(0);
+            expect(competitorMachines).toHaveLength(0);
+            expect(competitorIssues).toHaveLength(0);
+          },
+        );
       });
-    });
+  });
 
-    test("CRITICAL - Complex JOIN queries respect RLS boundaries", async ({
+  test.runIf(RUN_RLS_TS)("CRITICAL - Complex JOIN queries respect RLS boundaries", async ({
       workerDb,
     }) => {
-      await withIsolatedTest(workerDb, async (db) => {
+      await withRLSEnabledTest(workerDb, async (db) => {
         // Create comprehensive relational test data
         const org1Id = generateTestId("primary-org");
         const org2Id = generateTestId("competitor-org");
@@ -534,46 +552,62 @@ describe("Multi-Tenant Isolation", () => {
           organizationId: org2Id,
         });
 
+        // Create a minimal model to satisfy NOT NULL constraint on machines.modelId
+        const modelId = generateTestId("model-primary");
+        await db.insert(schema.models).values({ id: modelId, name: "Test Model" });
+
         await db.insert(schema.machines).values({
           id: competitorMachineId,
-          name: "Competitor Machine", 
+          name: "Competitor Machine",
           serialNumber: "COMP001",
           organizationId: org2Id,
           locationId: competitorLocationId,
+          modelId,
         });
 
         // Set RLS context for primary org
-        await db.execute(`SET app.current_organization_id = '${org1Id}'`);
-        await db.execute(`SET app.current_user_id = '${user1Id}'`);
+        await withRLSSecurityContext(
+          db,
+          {
+            organizationId: org1Id,
+            userId: user1Id,
+            userRole: "member",
+            userEmail: generateTestEmail("primary-user"),
+          },
+          async (db) => {
+            // CRITICAL: Complex JOIN attempting to access competitor data
+            const joinResult = await db
+              .select({
+                machineId: schema.machines.id,
+                machineName: schema.machines.name,
+                locationName: schema.locations.name,
+                organizationName: schema.organizations.name,
+              })
+              .from(schema.machines)
+              .innerJoin(
+                schema.locations,
+                eq(schema.machines.locationId, schema.locations.id),
+              )
+              .innerJoin(
+                schema.organizations,
+                eq(
+                  schema.machines.organizationId,
+                  schema.organizations.id,
+                ),
+              )
+              .where(eq(schema.machines.organizationId, org2Id));
 
-        // CRITICAL: Complex JOIN attempting to access competitor data
-        const joinResult = await db
-          .select({
-            machineId: schema.machines.id,
-            machineName: schema.machines.name,
-            locationName: schema.locations.name,
-            organizationName: schema.organizations.name,
-          })
-          .from(schema.machines)
-          .innerJoin(
-            schema.locations,
-            eq(schema.machines.locationId, schema.locations.id)
-          )
-          .innerJoin(
-            schema.organizations,
-            eq(schema.machines.organizationId, schema.organizations.id)  
-          )
-          .where(eq(schema.machines.organizationId, org2Id));
-
-        // CRITICAL: JOIN should return empty due to RLS blocking competitor data
-        expect(joinResult).toHaveLength(0);
+            // CRITICAL: JOIN should return empty due to RLS blocking competitor data
+            expect(joinResult).toHaveLength(0);
+          },
+        );
       });
-    });
+  });
 
-    test("CRITICAL - Anonymous access blocked by RLS", async ({
+  test.runIf(RUN_RLS_TS)("CRITICAL - Anonymous access blocked by RLS", async ({
       workerDb,
     }) => {
-      await withIsolatedTest(workerDb, async (db) => {
+      await withRLSEnabledTest(workerDb, async (db) => {
         // Create test data
         const orgId = generateTestId("test-org");
         await db.insert(schema.organizations).values({
@@ -588,9 +622,8 @@ describe("Multi-Tenant Isolation", () => {
           organizationId: orgId,
         });
 
-        // Clear RLS context (simulate anonymous user)
-        await db.execute(`RESET app.current_organization_id`);
-        await db.execute(`RESET app.current_user_id`);
+  // Clear RLS context (simulate anonymous user)
+  await clearRLSSecurityContext(db);
 
         // Anonymous users should see no data
         const anonymousAccess = await db.select().from(schema.locations);
@@ -599,12 +632,12 @@ describe("Multi-Tenant Isolation", () => {
         const anonymousOrgs = await db.select().from(schema.organizations);
         expect(anonymousOrgs).toHaveLength(0);
       });
-    });
+  });
 
-    test("CRITICAL - Invalid organization context blocks all access", async ({
+  test.runIf(RUN_RLS_TS)("CRITICAL - Invalid organization context blocks all access", async ({
       workerDb,
     }) => {
-      await withIsolatedTest(workerDb, async (db) => {
+      await withRLSEnabledTest(workerDb, async (db) => {
         // Create test data
         const realOrgId = generateTestId("real-org");
         await db.insert(schema.organizations).values({
@@ -621,24 +654,33 @@ describe("Multi-Tenant Isolation", () => {
 
         // Set invalid organization context
         const fakeOrgId = generateTestId("fake-org");
-        await db.execute(`SET app.current_organization_id = '${fakeOrgId}'`);
-        await db.execute(`SET app.current_user_id = 'fake-user'`);
+        await withRLSSecurityContext(
+          db,
+          {
+            organizationId: fakeOrgId,
+            userId: "fake-user",
+            userRole: "authenticated",
+          },
+          async (db) => {
+            // Should see no data with invalid context
+            const invalidAccess = await db.select().from(schema.locations);
+            expect(invalidAccess).toHaveLength(0);
 
-        // Should see no data with invalid context
-        const invalidAccess = await db.select().from(schema.locations);
-        expect(invalidAccess).toHaveLength(0);
-
-        const invalidOrgAccess = await db.select().from(schema.organizations);
-        expect(invalidOrgAccess).toHaveLength(0);
+            const invalidOrgAccess = await db
+              .select()
+              .from(schema.organizations);
+            expect(invalidOrgAccess).toHaveLength(0);
+          },
+        );
       });
-    });
+  });
   });
 
   describe("Edge Case Security Validation", () => {
-    test("SQL injection attempts cannot bypass RLS", async ({
+  test.runIf(RUN_RLS_TS)("SQL injection attempts cannot bypass RLS", async ({
       workerDb,
     }) => {
-      await withIsolatedTest(workerDb, async (db) => {
+      await withRLSEnabledTest(workerDb, async (db) => {
         // Create test data
         const org1Id = generateTestId("org1");
         const org2Id = generateTestId("org2");
@@ -655,33 +697,44 @@ describe("Multi-Tenant Isolation", () => {
             organizationId: org1Id,
           },
           {
-            id: generateTestId("org2-location"), 
+            id: generateTestId("org2-location"),
             name: "Org 2 Secret Location",
             organizationId: org2Id,
           },
         ]);
 
         // Set context for org1
-        await db.execute(`SET app.current_organization_id = '${org1Id}'`);
+        await withRLSSecurityContext(
+          db,
+          {
+            organizationId: org1Id,
+            userId: generateTestId("user"),
+            userRole: "authenticated",
+          },
+          async (db) => {
+            // Attempt SQL injection-style bypass (should be parameterized and blocked by RLS)
+            const maliciousAttempt = await db
+              .select()
+              .from(schema.locations)
+              .where(
+                eq(
+                  schema.locations.name,
+                  "' OR '1'='1' OR organizationId = '" + org2Id + "' --",
+                ),
+              );
 
-        // Attempt SQL injection-style bypass (should be parameterized and blocked by RLS)
-        const maliciousAttempt = await db
-          .select()
-          .from(schema.locations)
-          .where(
-            eq(schema.locations.name, "' OR '1'='1' OR organizationId = '" + org2Id + "' --")
-          );
-
-        // Should return empty - no location with that malicious name exists,
-        // and RLS prevents seeing org2 data regardless
-        expect(maliciousAttempt).toHaveLength(0);
+            // Should return empty - no location with that malicious name exists,
+            // and RLS prevents seeing org2 data regardless
+            expect(maliciousAttempt).toHaveLength(0);
+          },
+        );
       });
-    });
+  });
 
-    test("Complex WHERE conditions cannot bypass organizational boundaries", async ({
+  test.runIf(RUN_RLS_TS)("Complex WHERE conditions cannot bypass organizational boundaries", async ({
       workerDb,
     }) => {
-      await withIsolatedTest(workerDb, async (db) => {
+      await withRLSEnabledTest(workerDb, async (db) => {
         // Create test data
         const org1Id = generateTestId("org1");
         const org2Id = generateTestId("org2");
@@ -705,42 +758,50 @@ describe("Multi-Tenant Isolation", () => {
         ]);
 
         // Set context for org1
-        await db.execute(`SET app.current_organization_id = '${org1Id}'`);
+        await withRLSSecurityContext(
+          db,
+          {
+            organizationId: org1Id,
+            userId: generateTestId("user"),
+            userRole: "authenticated",
+          },
+          async (db) => {
+            // Complex OR condition attempting to access both orgs by name
+            const complexQuery = await db
+              .select()
+              .from(schema.locations)
+              .where(
+                and(
+                  eq(schema.locations.name, "Public Name"),
+                  // This OR should not help access org2 data due to RLS
+                  eq(schema.locations.organizationId, org2Id),
+                ),
+              );
 
-        // Complex OR condition attempting to access both orgs by name
-        const complexQuery = await db
-          .select()
-          .from(schema.locations)
-          .where(
-            and(
-              eq(schema.locations.name, "Public Name"),
-              // This OR should not help access org2 data due to RLS
-              eq(schema.locations.organizationId, org2Id)
-            )
-          );
+            // Should return empty - RLS blocks org2 access regardless of name match
+            expect(complexQuery).toHaveLength(0);
 
-        // Should return empty - RLS blocks org2 access regardless of name match
-        expect(complexQuery).toHaveLength(0);
+            // Verify org1 data is still accessible
+            const validQuery = await db
+              .select()
+              .from(schema.locations)
+              .where(
+                and(
+                  eq(schema.locations.name, "Public Name"),
+                  eq(schema.locations.organizationId, org1Id),
+                ),
+              );
 
-        // Verify org1 data is still accessible
-        const validQuery = await db
-          .select()
-          .from(schema.locations)
-          .where(
-            and(
-              eq(schema.locations.name, "Public Name"),
-              eq(schema.locations.organizationId, org1Id)
-            )
-          );
-
-        expect(validQuery).toHaveLength(1);
+            expect(validQuery).toHaveLength(1);
+          },
+        );
       });
-    });
+  });
 
-    test("Subquery attempts cannot access cross-organizational data", async ({
+  test.runIf(RUN_RLS_TS)("Subquery attempts cannot access cross-organizational data", async ({
       workerDb,
     }) => {
-      await withIsolatedTest(workerDb, async (db) => {
+      await withRLSEnabledTest(workerDb, async (db) => {
         // Create test organizations and locations
         const org1Id = generateTestId("org1");
         const org2Id = generateTestId("org2");
@@ -761,57 +822,74 @@ describe("Multi-Tenant Isolation", () => {
           },
           {
             id: location2Id,
-            name: "Org 2 Location", 
+            name: "Org 2 Location",
             organizationId: org2Id,
           },
         ]);
 
         // Create machines referencing these locations
-        await db.insert(schema.machines).values([
+    // Create a minimal model to satisfy NOT NULL constraint on machines.modelId
+    const modelId2 = generateTestId("model-shared");
+    await db.insert(schema.models).values({ id: modelId2, name: "Test Model 2" });
+
+    await db.insert(schema.machines).values([
           {
             id: generateTestId("org1-machine"),
             name: "Org 1 Machine",
             serialNumber: "ORG1-001",
             organizationId: org1Id,
             locationId: location1Id,
+      modelId: modelId2,
           },
           {
             id: generateTestId("org2-machine"),
-            name: "Org 2 Machine", 
+            name: "Org 2 Machine",
             serialNumber: "ORG2-001",
             organizationId: org2Id,
             locationId: location2Id,
+      modelId: modelId2,
           },
         ]);
 
         // Set context for org1
-        await db.execute(`SET app.current_organization_id = '${org1Id}'`);
+        await withRLSSecurityContext(
+          db,
+          {
+            organizationId: org1Id,
+            userId: generateTestId("user"),
+            userRole: "authenticated",
+          },
+          async (db) => {
+            // Attempt subquery to find machines in org2 locations
+            const subqueryAttempt = await db
+              .select()
+              .from(schema.machines)
+              .where(
+                eq(
+                  schema.machines.locationId,
+                  location2Id,
+                ), // Direct attempt to access org2 location
+              );
 
-        // Attempt subquery to find machines in org2 locations
-        const subqueryAttempt = await db
-          .select()
-          .from(schema.machines)
-          .where(
-            eq(schema.machines.locationId, location2Id) // Direct attempt to access org2 location
-          );
-
-        // Should return empty due to RLS blocking org2 machine access
-        expect(subqueryAttempt).toHaveLength(0);
+            // Should return empty due to RLS blocking org2 machine access
+            expect(subqueryAttempt).toHaveLength(0);
+          },
+        );
       });
-    });
+  });
   });
 
   describe("Performance Security Validation", () => {
-    test("RLS enforcement maintains performance boundaries", async ({
+  test.runIf(RUN_RLS_TS)("RLS enforcement maintains performance boundaries", async ({
       workerDb,
     }) => {
-      await withIsolatedTest(workerDb, async (db) => {
+      await withRLSEnabledTest(workerDb, async (db) => {
         // Create multiple organizations with data
         const orgs = [];
         for (let i = 1; i <= 5; i++) {
           const orgId = generateTestId(`perf-org-${i}`);
           orgs.push(orgId);
-          
+
           await db.insert(schema.organizations).values({
             id: orgId,
             name: `Performance Test Org ${i}`,
@@ -829,21 +907,31 @@ describe("Multi-Tenant Isolation", () => {
         }
 
         // Set context for first org
-        await db.execute(`SET app.current_organization_id = '${orgs[0]}'`);
+        await withRLSSecurityContext(
+          db,
+          {
+            organizationId: orgs[0]!,
+            userId: generateTestId("user"),
+            userRole: "authenticated",
+          },
+          async (db) => {
+            // Performance test: Query should only return data for current org
+            const startTime = Date.now();
+            const results = await db.select().from(schema.locations);
+            const endTime = Date.now();
 
-        // Performance test: Query should only return data for current org
-        const startTime = Date.now();
-        const results = await db.select().from(schema.locations);
-        const endTime = Date.now();
+            // Should only see first org's data (3 locations)
+            expect(results).toHaveLength(3);
+            expect(results.every((loc) => loc.organizationId === orgs[0])).toBe(
+              true,
+            );
 
-        // Should only see first org's data (3 locations)
-        expect(results).toHaveLength(3);
-        expect(results.every(loc => loc.organizationId === orgs[0])).toBe(true);
-
-        // Query should complete reasonably quickly (under 100ms for this test data)
-        const queryTime = endTime - startTime;
-        expect(queryTime).toBeLessThan(100);
+            // Query should complete reasonably quickly (under 100ms for this test data)
+            const queryTime = endTime - startTime;
+            expect(queryTime).toBeLessThan(100);
+          },
+        );
       });
-    });
+  });
   });
 });

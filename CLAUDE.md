@@ -14,8 +14,6 @@
 
 ---
 
-[... existing content ...]
-
 ## Project Context & Development Phase
 
 **CRITICAL CONTEXT**: This is a **solo development project in pre-beta phase**:
@@ -26,6 +24,19 @@
 - **Pre-beta**: Core features and navigation still being decided
 - **High risk tolerance**: Breaking things temporarily is completely acceptable
 - **E2E tests mostly disabled**: UI/UX still in flux, comprehensive testing not yet needed
+
+**🔥 NO MIGRATION FILES ALLOWED 🔥**
+
+**💥 WHY NO MIGRATIONS IN PRE-BETA:**
+
+- **Zero users**: No production data to migrate or preserve
+- **Schema in flux**: Core features and data models still being decided
+```bash
+# ❌ NEVER CREATE MIGRATION FILES
+supabase/migrations/                    # Directory should remain empty
+npm run db:generate                     # Don't generate migrations
+drizzle-kit generate                    # Don't run migration generation
+```
 
 **Impact on Technical Decisions**:
 
@@ -63,40 +74,11 @@
 
 - Don't be a yes-man and don't pander to me
 - Don't leave references to old/removed things in documentation
-- Your training ended in 2024. It's July 2025 now. Don't hesitate to look up the latest documentation if you suspect you're out of date
+- Your training ended in 2024. It's August 2025 now. Don't hesitate to look up the latest documentation if you suspect you're out of date
 - We use husky for precommits and preuploads
 - We run shellcheck against our scripts
 
 ## 🚨🚨🚨 CRITICAL SYSTEM RESTRICTIONS 🚨🚨🚨
-
-### ⛔ ABSOLUTELY FORBIDDEN: Database Migrations Until Beta Launch
-
-**🔥 NO MIGRATION FILES ALLOWED 🔥**
-
-```bash
-# ❌ NEVER CREATE MIGRATION FILES
-supabase/migrations/                    # Directory should remain empty
-npm run db:generate                     # Don't generate migrations
-drizzle-kit generate                    # Don't run migration generation
-```
-
-**💥 WHY NO MIGRATIONS IN PRE-BETA:**
-
-- **Zero users**: No production data to migrate or preserve
-- **Schema in flux**: Core features and data models still being decided
-- **Direct schema changes**: Faster to modify schema files directly 
-- **Fresh database starts**: Reset development DB as needed vs complex migrations
-- **Migration complexity**: Don't solve problems that don't exist yet
-
-**✅ ACCEPTABLE PRE-BETA APPROACH:**
-
-```bash
-supabase db reset                       # ✅ Reset local DB to latest schema
-npm run db:push                         # ✅ Push schema changes directly
-npm run db:seed                         # ✅ Re-seed with fresh data
-```
-
-**FUTURE**: Migrations will be implemented when we have real users and production data (beta launch+)
 
 ### ⛔ ABSOLUTELY FORBIDDEN: Integration Test Memory Patterns
 
@@ -108,7 +90,7 @@ beforeEach(async () => {
   const { db } = await createSeededTestDatabase(); // 50-100MB per test
 });
 
-// ❌ CAUSES 1-2GB+ MEMORY USAGE  
+// ❌ CAUSES 1-2GB+ MEMORY USAGE
 beforeAll(async () => {
   const client = new PGlite(); // Multiple instances per test file
 });
@@ -186,7 +168,7 @@ npm run test:coverage  # ✅ With coverage report
 ```bash
 # Fast single-file validation (2-3s vs 30s+ full validation)
 npm run validate-file src/server/api/routers/user.ts
-npm run check-file src/components/Header.tsx  
+npm run check-file src/components/Header.tsx
 npm run test-file src/server/api/routers/__tests__/user.test.ts
 
 # Advanced options: --skip-typecheck, --skip-lint, --verbose
@@ -197,6 +179,13 @@ node scripts/validate-single-file.cjs FILE --verbose
 
 **NEW**: `npm run test:rls` - pgTAP RLS policy validation
 **NEW**: `npm run test:all` - Complete testing (business logic + RLS)
+
+### Testing Architecture
+
+**⚠️ PGlite Cannot Test Real RLS Policies**
+- PGlite lacks Supabase's `auth.jwt()` functions that power RLS policies
+- Use **pgTAP** (`supabase/tests/rls/`) for actual RLS validation
+- Use **PGlite** (`src/test/helpers/worker-scoped-db.ts`) for business logic only (RLS bypassed)
 
 ## 📚 Quick Reference (Auto-Loaded)
 
@@ -211,7 +200,7 @@ Current development patterns (post-migration):
 @migration-plan-v2/ - Current migration plan being executed (temporary mess expected)
 @docs/quick-reference/ - Patterns for implementing current phase work
 
-**Priority approach:** 
+**Priority approach:**
 Execute the migration plan phases systematically - tests will be fixed in Phase 3 as planned
 
 - Don't commit or push with --no-verify unless explicitly told to

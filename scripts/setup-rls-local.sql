@@ -28,19 +28,19 @@ ALTER TABLE priorities ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "issue_statuses" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE comments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE attachments ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "issueHistory" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "issue_history" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE upvotes ENABLE ROW LEVEL SECURITY;
 
 -- Collection management
 ALTER TABLE collections ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "collectionTypes" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "collection_types" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "collection_machines" ENABLE ROW LEVEL SECURITY;
 
 -- Notification system
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 
 -- PinballMap integration
-ALTER TABLE "pinballMapConfigs" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "pinball_map_configs" ENABLE ROW LEVEL SECURITY;
 
 -- =================================================================
 -- 2. LOCAL DEVELOPMENT POLICIES (ALLOW ALL)
@@ -100,7 +100,7 @@ CREATE POLICY "local_dev_allow_all" ON attachments
   USING (true);
 
 -- Issue History
-CREATE POLICY "local_dev_allow_all" ON "issueHistory"
+CREATE POLICY "local_dev_allow_all" ON "issue_history"
   FOR ALL TO authenticated
   USING (true);
 
@@ -115,7 +115,7 @@ CREATE POLICY "local_dev_allow_all" ON collections
   USING (true);
 
 -- Collection Types
-CREATE POLICY "local_dev_allow_all" ON "collectionTypes"
+CREATE POLICY "local_dev_allow_all" ON "collection_types"
   FOR ALL TO authenticated
   USING (true);
 
@@ -130,7 +130,7 @@ CREATE POLICY "local_dev_allow_all" ON notifications
   USING (true);
 
 -- PinballMap Configs
-CREATE POLICY "local_dev_allow_all" ON "pinballMapConfigs"
+CREATE POLICY "local_dev_allow_all" ON "pinball_map_configs"
   FOR ALL TO authenticated
   USING (true);
 

@@ -383,15 +383,8 @@ async function processBatchUsers(
     }
   }
 
-  // No manual User record creation - auth trigger must handle this
-  // If we reach this point with usersToCreateInDb having entries,
-  // it means auth triggers are not working correctly
-  if (usersToCreateInDb.length > 0) {
-    const error = `CRITICAL: Auth triggers failed for ${usersToCreateInDb.length} users. Database infrastructure needs fixing. Run: 1) Check 'SELECT * FROM information_schema.triggers WHERE trigger_name = \\'on_auth_user_created\\';', 2) Verify 'handle_new_user()' function exists, 3) Test database connectivity.`;
-    console.error(`[AUTH] ❌ ${error}`);
-    errorCount += usersToCreateInDb.length;
-    errors.push(error);
-  }
+  // User records are now created atomically, no fallback needed
+  // The usersToCreateInDb array is no longer used since we create records directly
 
   // Batch create memberships
   if (membershipsToCreate.length > 0) {

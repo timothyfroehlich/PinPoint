@@ -143,9 +143,9 @@ async function main(): Promise<void> {
     // 4. Environment validation
     validateEnvironment(target);
 
-    // 3. Infrastructure seeding (organizations, permissions, roles, statuses)
+    // 3. Infrastructure seeding (dual organizations, permissions, roles, statuses)
     console.log("\n[SEED] 🏗️  Step 1: Infrastructure");
-    const organization = await seedInfrastructure();
+    const organizations = await seedInfrastructure();
 
     // 4 & 5. Auth users and Sample data seeding sequentially (dependencies)
     if (target !== "local:pg") {
@@ -156,9 +156,9 @@ async function main(): Promise<void> {
 
       try {
         // First, create auth users (required for sample data user references)
-        await seedAuthUsers(organization.id, target);
+        await seedAuthUsers(organizations.primary.id, target);
         // Then create sample data (depends on users existing)
-        await seedSampleData(organization.id, dataAmount);
+        await seedSampleData(organizations.primary.id, dataAmount);
         console.log("[SEED] ✅ Sequential processing completed successfully");
       } catch (error) {
         console.error("[SEED] ❌ Sequential processing failed:", error);
@@ -172,7 +172,7 @@ async function main(): Promise<void> {
       // 5. Sample data seeding only
       console.log("\n[SEED] 🎮 Step 3: Sample Data");
       const dataAmount = "minimal"; // PostgreSQL-only always uses minimal
-      await seedSampleData(organization.id, dataAmount, true); // Skip auth users for PostgreSQL-only
+      await seedSampleData(organizations.primary.id, dataAmount, true); // Skip auth users for PostgreSQL-only
     }
 
     // 6. Success summary
@@ -184,7 +184,10 @@ async function main(): Promise<void> {
     console.log("🔑 Environment Summary:");
     console.log(`   Target: ${target.toUpperCase()}`);
     console.log(
-      `   Organization: ${organization.name} (${organization.subdomain})`,
+      `   Primary Organization: ${organizations.primary.name} (${organizations.primary.subdomain})`,
+    );
+    console.log(
+      `   Secondary Organization: ${organizations.secondary.name} (${organizations.secondary.subdomain})`,
     );
     console.log(
       `   Auth Users: ${target === "local:pg" ? "Skipped" : "Created"}`,
