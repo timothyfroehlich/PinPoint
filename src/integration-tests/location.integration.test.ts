@@ -30,7 +30,6 @@ import {
   getSeededTestData,
   type TestDatabase,
 } from "~/test/helpers/pglite-test-setup";
-import { createSeededLocationTestContext } from "~/test/helpers/createSeededLocationTestContext";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
 // Mock external dependencies that aren't database-related
@@ -82,7 +81,7 @@ describe("Location Router - Schema & Performance Tests (PGlite)", () => {
           primaryOrgId,
           seededData.user!,
         );
-        
+
         // Use seeded data for base entities, create test-specific additional data
         const machineId = generateTestId("test-machine-integrity");
         const issueId = generateTestId("test-issue-integrity");
@@ -136,17 +135,21 @@ describe("Location Router - Schema & Performance Tests (PGlite)", () => {
         });
 
         expect(locationWithRelations).toBeDefined();
-        expect(locationWithRelations!.machines.length).toBeGreaterThanOrEqual(1);
-        
+        expect(locationWithRelations!.machines.length).toBeGreaterThanOrEqual(
+          1,
+        );
+
         // Find our test machine
-        const testMachine = locationWithRelations!.machines.find(m => m.id === machineId);
+        const testMachine = locationWithRelations!.machines.find(
+          (m) => m.id === machineId,
+        );
         expect(testMachine).toBeDefined();
         expect(testMachine!.model.id).toBe(seededData.model);
         expect(testMachine!.owner.id).toBe(seededData.user);
         expect(testMachine!.issues.length).toBeGreaterThanOrEqual(1);
-        
+
         // Find our test issue
-        const testIssue = testMachine!.issues.find(i => i.id === issueId);
+        const testIssue = testMachine!.issues.find((i) => i.id === issueId);
         expect(testIssue).toBeDefined();
         expect(testIssue!.status.id).toBe(seededData.status);
         expect(testIssue!.priority.id).toBe(seededData.priority);

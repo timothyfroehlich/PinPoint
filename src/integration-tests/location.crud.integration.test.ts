@@ -30,7 +30,6 @@ import {
   getSeededTestData,
   type TestDatabase,
 } from "~/test/helpers/pglite-test-setup";
-import { createSeededLocationTestContext } from "~/test/helpers/createSeededLocationTestContext";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
 // Mock external dependencies that aren't database-related
@@ -85,7 +84,9 @@ describe("Location Router CRUD Operations (PGlite)", () => {
         );
         const caller = locationRouter.createCaller(context);
 
-        const result = await caller.create({ name: "New CRUD Arcade Location" });
+        const result = await caller.create({
+          name: "New CRUD Arcade Location",
+        });
 
         expect(result).toMatchObject({
           name: "New CRUD Arcade Location",
@@ -182,14 +183,16 @@ describe("Location Router CRUD Operations (PGlite)", () => {
 
         // Should get at least the seeded location
         expect(result.length).toBeGreaterThanOrEqual(1);
-        
+
         // Find our seeded location
-        const seededLocation = result.find(l => l.id === seededData.location);
+        const seededLocation = result.find((l) => l.id === seededData.location);
         expect(seededLocation).toBeDefined();
         expect(seededLocation!.organizationId).toBe(primaryOrgId);
-        
+
         // Should include our new machine
-        expect(seededLocation!.machines.some(m => m.id === machineId)).toBeTruthy();
+        expect(
+          seededLocation!.machines.some((m) => m.id === machineId),
+        ).toBeTruthy();
       });
     });
 
@@ -226,7 +229,7 @@ describe("Location Router CRUD Operations (PGlite)", () => {
         expect(result.length).toBeGreaterThanOrEqual(3);
 
         // Check that ordering is maintained (by name ASC)
-        const names = result.map(l => l.name);
+        const names = result.map((l) => l.name);
         const sortedNames = [...names].sort();
         expect(names).toEqual(sortedNames);
       });
@@ -262,12 +265,12 @@ describe("Location Router CRUD Operations (PGlite)", () => {
         const primaryResult = await primaryCaller.getAll();
 
         // Primary org should only get its own locations (seeded + any test locations)
-        const allLocationIds = primaryResult.map(l => l.id);
+        const allLocationIds = primaryResult.map((l) => l.id);
         expect(allLocationIds).toContain(seededData.location); // Should see seeded location
         expect(allLocationIds).not.toContain("other-org-location"); // Should not see competitor location
-        
+
         // All returned locations should belong to primary org
-        primaryResult.forEach(location => {
+        primaryResult.forEach((location) => {
           expect(seededData.organization).toBe(primaryOrgId);
         });
       });
@@ -283,7 +286,7 @@ describe("Location Router CRUD Operations (PGlite)", () => {
         const context = await createSeededLocationTestContext(
           db,
           primaryOrgId,
-          seededData.user
+          seededData.user,
         );
 
         const caller = locationRouter.createCaller(context);
@@ -322,7 +325,7 @@ describe("Location Router CRUD Operations (PGlite)", () => {
         const context = await createSeededLocationTestContext(
           db,
           seededData.organization,
-          seededData.user
+          seededData.user,
         );
 
         // Try to update location from different organization
@@ -360,7 +363,7 @@ describe("Location Router CRUD Operations (PGlite)", () => {
         const context = await createSeededLocationTestContext(
           db,
           seededData.organization,
-          seededData.user
+          seededData.user,
         );
         const caller = locationRouter.createCaller(context);
 
@@ -390,7 +393,7 @@ describe("Location Router CRUD Operations (PGlite)", () => {
         const context = await createSeededLocationTestContext(
           db,
           seededData.organization,
-          seededData.user
+          seededData.user,
         );
         const caller = locationRouter.createCaller(context);
 
@@ -437,7 +440,7 @@ describe("Location Router CRUD Operations (PGlite)", () => {
         const context = await createSeededLocationTestContext(
           db,
           seededData.organization,
-          seededData.user
+          seededData.user,
         );
         const caller = locationRouter.createCaller(context);
 
@@ -481,7 +484,7 @@ describe("Location Router CRUD Operations (PGlite)", () => {
         const context = await createSeededLocationTestContext(
           db,
           seededData.organization,
-          seededData.user
+          seededData.user,
         );
         const caller = locationRouter.createCaller(context);
 
@@ -531,7 +534,7 @@ describe("Location Router CRUD Operations (PGlite)", () => {
         const context = await createSeededLocationTestContext(
           db,
           seededData.organization,
-          seededData.user
+          seededData.user,
         );
 
         const otherOrgContext = {
@@ -544,7 +547,9 @@ describe("Location Router CRUD Operations (PGlite)", () => {
         };
         const otherCaller = locationRouter.createCaller(otherOrgContext as any);
 
-        await expect(otherCaller.delete({ id: seededData.location })).rejects.toThrow(
+        await expect(
+          otherCaller.delete({ id: seededData.location }),
+        ).rejects.toThrow(
           "You don't have permission to access this organization",
         );
 
@@ -566,7 +571,7 @@ describe("Location Router CRUD Operations (PGlite)", () => {
         const context = await createSeededLocationTestContext(
           db,
           seededData.organization,
-          seededData.user
+          seededData.user,
         );
         const caller = locationRouter.createCaller(context);
 
@@ -599,7 +604,7 @@ describe("Location Router CRUD Operations (PGlite)", () => {
         const context = await createSeededLocationTestContext(
           db,
           seededData.organization,
-          seededData.user
+          seededData.user,
         );
 
         const otherOrgContext = {

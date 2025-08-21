@@ -2,7 +2,7 @@
  * Location Router Aggregation Integration Tests (PGlite)
  *
  * Converted to use seeded data patterns for consistent, fast, memory-safe testing.
- * Tests complex aggregation queries on the location router, particularly getPublic 
+ * Tests complex aggregation queries on the location router, particularly getPublic
  * endpoint with machine counts, issue counts, and multi-tenant isolation using
  * established seeded data infrastructure.
  *
@@ -31,7 +31,6 @@ import {
   getSeededTestData,
   type TestDatabase,
 } from "~/test/helpers/pglite-test-setup";
-import { createSeededLocationTestContext } from "~/test/helpers/createSeededLocationTestContext";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
 // Mock external dependencies that aren't database-related
@@ -136,12 +135,12 @@ describe("Location Router Aggregation Operations (PGlite)", () => {
         expect(result.length).toBeGreaterThanOrEqual(1);
 
         // Find our test location in results
-        const testLocationResult = result.find(l => l.id === testLocation.id);
+        const testLocationResult = result.find((l) => l.id === testLocation.id);
         expect(testLocationResult).toBeDefined();
-        
+
         // Verify aggregation counts
         expect(testLocationResult!._count.machines).toBe(3);
-        testLocationResult!.machines.forEach(machine => {
+        testLocationResult!.machines.forEach((machine) => {
           expect(machine._count.issues).toBe(2); // 2 issues per machine
         });
       });
@@ -152,7 +151,7 @@ describe("Location Router Aggregation Operations (PGlite)", () => {
     }) => {
       await withIsolatedTest(workerDb, async (txDb) => {
         // Use global seededData from beforeAll
-        
+
         // Create contexts for both organizations
         const primaryContext = await createSeededLocationTestContext(
           txDb,
@@ -181,11 +180,11 @@ describe("Location Router Aggregation Operations (PGlite)", () => {
         const competitorResults = await competitorCaller.getPublic();
 
         // Primary org should not see competitor locations
-        const primaryLocationIds = primaryResults.map(l => l.id);
+        const primaryLocationIds = primaryResults.map((l) => l.id);
         expect(primaryLocationIds).not.toContain("competitor-agg-location");
 
         // Competitor org should see its location but not primary's seeded location
-        const competitorLocationIds = competitorResults.map(l => l.id);
+        const competitorLocationIds = competitorResults.map((l) => l.id);
         expect(competitorLocationIds).toContain("competitor-agg-location");
         expect(competitorLocationIds).not.toContain(seededData.location);
       });

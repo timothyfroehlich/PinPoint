@@ -2,7 +2,7 @@
  * Location Router Services Integration Tests (PGlite)
  *
  * Converted to use seeded data patterns for consistent, fast, memory-safe testing.
- * Tests external service integrations on the location router, particularly 
+ * Tests external service integrations on the location router, particularly
  * PinballMap synchronization and service failure scenarios using established
  * seeded data infrastructure.
  *
@@ -30,7 +30,6 @@ import {
   getSeededTestData,
   type TestDatabase,
 } from "~/test/helpers/pglite-test-setup";
-import { createSeededLocationTestContext } from "~/test/helpers/createSeededLocationTestContext";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
 // Mock external dependencies that aren't database-related
@@ -114,7 +113,9 @@ describe("Location Router Services Integration (PGlite)", () => {
 
         // Override the mock to simulate failure
         context.services.createPinballMapService = vi.fn(() => ({
-          syncLocation: vi.fn().mockRejectedValue(new Error("Service unavailable")),
+          syncLocation: vi
+            .fn()
+            .mockRejectedValue(new Error("Service unavailable")),
         }));
 
         const caller = locationRouter.createCaller(context);
@@ -191,8 +192,12 @@ describe("Location Router Services Integration (PGlite)", () => {
         );
 
         // Each organization should get fresh service mocks
-        expect(primaryContext.services.createPinballMapService).toBeTypeOf("function");
-        expect(competitorContext.services.createPinballMapService).toBeTypeOf("function");
+        expect(primaryContext.services.createPinballMapService).toBeTypeOf(
+          "function",
+        );
+        expect(competitorContext.services.createPinballMapService).toBeTypeOf(
+          "function",
+        );
       });
     });
 
