@@ -402,7 +402,7 @@ describe("Location Router CRUD Operations (PGlite)", () => {
           organizationId: seededData.organization,
           locationId: seededData.location,
           modelId: seededData.model!,
-          ownerId: user.id,
+          ownerId: seededData.user!.id,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
