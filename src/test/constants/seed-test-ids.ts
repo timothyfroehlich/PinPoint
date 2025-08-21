@@ -130,6 +130,13 @@ export const SEED_TEST_IDS = {
     TYPE: "mock-type-1",
     ROLE: "mock-role-1",
     MEMBERSHIP: "mock-membership-1",
+    /** Secondary patterns for cross-organization testing */
+    SECONDARY: {
+      ORGANIZATION: "mock-org-2",
+      USER: "mock-user-2",
+      ROLE: "mock-role-2",
+      MEMBERSHIP: "mock-membership-2",
+    },
   },
 } as const;
 

@@ -15,6 +15,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
 import {
   validateCommentExists,
@@ -34,24 +35,24 @@ import {
 describe("Comment Validation Functions", () => {
   // Static test data that doesn't require database
   const staticTestData = {
-    organization: "test-org-1",
-    location: "test-location-1",
-    machine: "test-machine-1",
-    model: "test-model-1",
-    status: "test-status-1",
-    priority: "test-priority-1",
-    issue: "test-issue-1",
-    adminRole: "test-admin-role",
-    memberRole: "test-member-role",
-    user: "test-user-1",
+  organization: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+  location: SEED_TEST_IDS.MOCK_PATTERNS.LOCATION,
+  machine: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
+  model: SEED_TEST_IDS.MOCK_PATTERNS.MODEL,
+  status: SEED_TEST_IDS.MOCK_PATTERNS.STATUS,
+  priority: SEED_TEST_IDS.MOCK_PATTERNS.PRIORITY,
+  issue: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
+  adminRole: SEED_TEST_IDS.MOCK_PATTERNS.ROLE,
+  memberRole: SEED_TEST_IDS.MOCK_PATTERNS.ROLE,
+  user: SEED_TEST_IDS.MOCK_PATTERNS.USER,
   };
 
   // Test fixture data
   const createValidCommentData = (
     overrides: Partial<CommentData> = {},
   ): CommentData => ({
-    id: "test-comment-1",
-    authorId: staticTestData.user,
+  id: SEED_TEST_IDS.MOCK_PATTERNS.COMMENT,
+  authorId: staticTestData.user,
     deletedAt: null,
     issue: {
       id: staticTestData.issue,
@@ -104,8 +105,8 @@ describe("Comment Validation Functions", () => {
     it("should return invalid for comment from different organization", () => {
       const comment = createValidCommentData({
         issue: {
-          id: "other-issue",
-          organizationId: "other-org-id",
+    id: "mock-issue-2",
+    organizationId: "mock-org-2",
         },
       });
       const result = validateCommentExists(
@@ -132,8 +133,8 @@ describe("Comment Validation Functions", () => {
     it("should handle comment with empty issue organization ID", () => {
       const comment = createValidCommentData({
         issue: {
-          id: "test-issue",
-          organizationId: "",
+    id: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
+    organizationId: "",
         },
       });
       const result = validateCommentExists(
@@ -151,10 +152,10 @@ describe("Comment Validation Functions", () => {
   describe("validateCommentDeletionPermissions", () => {
     it("should allow user to delete their own comment", () => {
       const comment = createValidCommentData({
-        authorId: "user-123",
+        authorId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
       });
       const context = createValidContext({
-        userId: "user-123",
+        userId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
         userPermissions: [],
       });
 
@@ -165,10 +166,10 @@ describe("Comment Validation Functions", () => {
 
     it("should allow admin to delete any comment", () => {
       const comment = createValidCommentData({
-        authorId: "other-user",
+        authorId: "mock-user-2",
       });
       const context = createValidContext({
-        userId: "admin-user",
+        userId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
         userPermissions: ["issue:delete"],
       });
 
@@ -179,10 +180,10 @@ describe("Comment Validation Functions", () => {
 
     it("should deny deletion when user is not author and not admin", () => {
       const comment = createValidCommentData({
-        authorId: "other-user",
+        authorId: "mock-user-2",
       });
       const context = createValidContext({
-        userId: "regular-user",
+        userId: "mock-user-3",
         userPermissions: ["issue:read"],
       });
 
@@ -196,10 +197,10 @@ describe("Comment Validation Functions", () => {
 
     it("should allow deletion with any admin permission", () => {
       const comment = createValidCommentData({
-        authorId: "other-user",
+        authorId: "mock-user-2",
       });
       const context = createValidContext({
-        userId: "admin-user",
+        userId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
         userPermissions: ["issue:delete", "issue:create", "issue:update"],
       });
 
@@ -260,10 +261,10 @@ describe("Comment Validation Functions", () => {
   describe("validateCommentEditPermissions", () => {
     it("should allow user to edit their own comment", () => {
       const comment = createValidCommentData({
-        authorId: "user-123",
+        authorId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
       });
       const context = createValidContext({
-        userId: "user-123",
+        userId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
       });
 
       const result = validateCommentEditPermissions(comment, context);
@@ -273,10 +274,10 @@ describe("Comment Validation Functions", () => {
 
     it("should deny editing for non-authors", () => {
       const comment = createValidCommentData({
-        authorId: "other-user",
+        authorId: "mock-user-2",
       });
       const context = createValidContext({
-        userId: "different-user",
+        userId: "mock-user-3",
       });
 
       const result = validateCommentEditPermissions(comment, context);
@@ -289,10 +290,10 @@ describe("Comment Validation Functions", () => {
 
     it("should deny editing even for admins who are not authors", () => {
       const comment = createValidCommentData({
-        authorId: "other-user",
+        authorId: "mock-user-2",
       });
       const context = createValidContext({
-        userId: "admin-user",
+        userId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
         userPermissions: ["issue:delete", "issue:update"],
       });
 
@@ -636,13 +637,13 @@ describe("Comment Validation Functions", () => {
     });
 
     it("should fail when user is not a member", () => {
-      const comment = createValidCommentData();
-      const context = createValidContext();
-
-      const result = validateCommentDeletion(comment, null, context);
-
-      expect(result).toEqual({
-        valid: false,
+      const comment = createValidCommentData({
+        authorId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+      });
+      const context = createValidContext({
+        userId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+        userPermissions: [],
+      });
         error: "User is not a member of this organization",
       });
     });
@@ -694,8 +695,8 @@ describe("Comment Validation Functions", () => {
     it("should fail at first validation step (comment existence)", () => {
       const comment = createValidCommentData({
         issue: {
-          id: "test-issue",
-          organizationId: "wrong-org",
+          id: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
+          organizationId: "mock-org-2",
         },
       });
       const membership = {
@@ -795,8 +796,8 @@ describe("Comment Validation Functions", () => {
       const comment = createValidCommentData({
         deletedAt: new Date("2024-01-01T12:00:00Z"),
         issue: {
-          id: "other-issue",
-          organizationId: "other-org",
+          id: "mock-issue-2",
+          organizationId: "mock-org-2",
         },
       });
       const context = createValidContext({
@@ -1019,12 +1020,12 @@ describe("Comment Validation Functions", () => {
 
     it("should handle CommentData interface correctly", () => {
       const commentData: CommentData = {
-        id: "comment-1",
-        authorId: "user-1",
+        id: SEED_TEST_IDS.MOCK_PATTERNS.COMMENT,
+        authorId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
         deletedAt: new Date(),
         issue: {
-          id: "issue-1",
-          organizationId: "org-1",
+          id: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
+          organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
         },
       };
 
@@ -1037,8 +1038,8 @@ describe("Comment Validation Functions", () => {
 
     it("should handle ValidationContext interface correctly", () => {
       const context: ValidationContext = {
-        userId: "user-1",
-        organizationId: "org-1",
+        userId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+        organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
         userPermissions: ["perm1", "perm2"],
       };
 

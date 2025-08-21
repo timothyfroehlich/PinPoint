@@ -33,40 +33,43 @@ import {
   type RoleManagementContext,
 } from "../roleManagementValidation";
 
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
+// Removed MOCK_IDS import - using SEED_TEST_IDS.MOCK_PATTERNS for consistency
+
 // =============================================================================
 // TEST DATA FACTORIES - Type-safe readonly test data
 // =============================================================================
 
 const createTestUser = (overrides: Partial<User> = {}): User => ({
-  id: "user-1",
+  id: SEED_TEST_IDS.MOCK_PATTERNS.USER,
   name: "Test User",
   email: "test@example.com",
   ...overrides,
 });
 
 const createTestRole = (overrides: Partial<Role> = {}): Role => ({
-  id: "role-1",
+  id: SEED_TEST_IDS.MOCK_PATTERNS.ROLE,
   name: "Member",
-  organizationId: "org-1",
+  organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
   isSystem: false,
   isDefault: false,
   ...overrides,
 });
 
 const createAdminRole = (overrides: Partial<Role> = {}): Role => ({
-  id: "admin-role-1",
+  id: `${SEED_TEST_IDS.MOCK_PATTERNS.ROLE}-admin`,
   name: "Admin",
-  organizationId: "org-1",
+  organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
   isSystem: true,
   isDefault: false,
   ...overrides,
 });
 
 const createMembership = (overrides: Partial<Membership> = {}): Membership => ({
-  id: "membership-1",
-  userId: "user-1",
-  organizationId: "org-1",
-  roleId: "role-1",
+  id: SEED_TEST_IDS.MOCK_PATTERNS.MEMBERSHIP,
+  userId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+  organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+  roleId: SEED_TEST_IDS.MOCK_PATTERNS.ROLE,
   user: createTestUser(),
   role: createTestRole(),
   ...overrides,
@@ -75,12 +78,12 @@ const createMembership = (overrides: Partial<Membership> = {}): Membership => ({
 const createAdminMembership = (
   overrides: Partial<Membership> = {},
 ): Membership => ({
-  id: "admin-membership-1",
-  userId: "admin-user-1",
-  organizationId: "org-1",
-  roleId: "admin-role-1",
+  id: `${SEED_TEST_IDS.MOCK_PATTERNS.MEMBERSHIP}-admin`,
+  userId: `${SEED_TEST_IDS.MOCK_PATTERNS.USER}-admin`,
+  organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+  roleId: `${SEED_TEST_IDS.MOCK_PATTERNS.ROLE}-admin`,
   user: createTestUser({
-    id: "admin-user-1",
+    id: `${SEED_TEST_IDS.MOCK_PATTERNS.USER}-admin`,
     name: "Admin User",
     email: "admin@example.com",
   }),
@@ -91,8 +94,8 @@ const createAdminMembership = (
 const createTestContext = (
   overrides: Partial<RoleManagementContext> = {},
 ): RoleManagementContext => ({
-  organizationId: "org-1",
-  actorUserId: "actor-1",
+  organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+  actorUserId: `${SEED_TEST_IDS.MOCK_PATTERNS.USER}-actor`,
   userPermissions: ["user:manage", "role:manage"],
   ...overrides,
 });
@@ -103,12 +106,15 @@ const createTestContext = (
 
 describe("validateRoleAssignment", () => {
   const defaultInput: RoleAssignmentInput = {
-    userId: "user-1",
-    roleId: "role-2",
-    organizationId: "org-1",
+    userId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+    roleId: `${SEED_TEST_IDS.MOCK_PATTERNS.ROLE}-2`, // Different role for assignment
+    organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
   };
 
-  const targetRole = createTestRole({ id: "role-2", name: "Technician" });
+  const targetRole = createTestRole({
+    id: `${SEED_TEST_IDS.MOCK_PATTERNS.ROLE}-2`,
+    name: "Technician",
+  });
   const userMembership = createMembership();
   const allMemberships = [userMembership, createAdminMembership()];
   const context = createTestContext();
@@ -126,7 +132,9 @@ describe("validateRoleAssignment", () => {
   });
 
   it("should reject role assignment when target role is from different organization", () => {
-    const wrongOrgRole = createTestRole({ organizationId: "wrong-org" });
+    const wrongOrgRole = createTestRole({
+      organizationId: SEED_TEST_IDS.MOCK_PATTERNS.SECONDARY.ORGANIZATION,
+    });
     const result = validateRoleAssignment(
       defaultInput,
       wrongOrgRole,
@@ -154,7 +162,7 @@ describe("validateRoleAssignment", () => {
 
   it("should reject role assignment when user membership is from different organization", () => {
     const wrongOrgMembership = createMembership({
-      organizationId: "wrong-org",
+      organizationId: SEED_TEST_IDS.MOCK_PATTERNS.SECONDARY.ORGANIZATION,
     });
     const result = validateRoleAssignment(
       defaultInput,
@@ -188,13 +196,22 @@ describe("validateRoleAssignment", () => {
   });
 
   it("should allow removing admin when other admins exist", () => {
-    const admin1 = createAdminMembership({ id: "admin-1", userId: "admin-1" });
-    const admin2 = createAdminMembership({ id: "admin-2", userId: "admin-2" });
+    const admin1 = createAdminMembership({
+      id: `${SEED_TEST_IDS.MOCK_PATTERNS.MEMBERSHIP}-admin-1`,
+      userId: `${SEED_TEST_IDS.MOCK_PATTERNS.USER}-admin-1`,
+    });
+    const admin2 = createAdminMembership({
+      id: `${SEED_TEST_IDS.MOCK_PATTERNS.MEMBERSHIP}-admin-2`,
+      userId: `${SEED_TEST_IDS.MOCK_PATTERNS.USER}-admin-2`,
+    });
     const memberRole = createTestRole({ name: "Member" });
     const multipleAdminsMemberships = [admin1, admin2];
 
     const result = validateRoleAssignment(
-      { ...defaultInput, userId: "admin-1" },
+      {
+        ...defaultInput,
+        userId: `${SEED_TEST_IDS.MOCK_PATTERNS.USER}-admin-1`,
+      },
       memberRole,
       admin1,
       multipleAdminsMemberships,
@@ -219,9 +236,9 @@ describe("validateRoleAssignment", () => {
   });
 
   it("should reject assigning same role (no-op)", () => {
-    const sameRole = createTestRole({ id: "role-1" }); // Same as userMembership.roleId
+    const sameRole = createTestRole({ id: SEED_TEST_IDS.MOCK_PATTERNS.ROLE }); // Same as userMembership.roleId
     const result = validateRoleAssignment(
-      defaultInput,
+      { ...defaultInput, roleId: SEED_TEST_IDS.MOCK_PATTERNS.ROLE }, // Use same role ID
       sameRole,
       userMembership,
       allMemberships,
@@ -285,7 +302,9 @@ describe("validateRoleAssignment", () => {
   });
 
   it("should validate context organization matches input", () => {
-    const wrongContext = createTestContext({ organizationId: "wrong-org" });
+    const wrongContext = createTestContext({
+      organizationId: SEED_TEST_IDS.MOCK_PATTERNS.SECONDARY.ORGANIZATION,
+    });
     const result = validateRoleAssignment(
       defaultInput,
       targetRole,
@@ -300,15 +319,27 @@ describe("validateRoleAssignment", () => {
   });
 
   it("should handle complex admin count scenarios", () => {
-    const admin1 = createAdminMembership({ id: "admin-1", userId: "admin-1" });
-    const admin2 = createAdminMembership({ id: "admin-2", userId: "admin-2" });
-    const member = createMembership({ id: "member-1", userId: "member-1" });
+    const admin1 = createAdminMembership({
+      id: `${SEED_TEST_IDS.MOCK_PATTERNS.MEMBERSHIP}-admin-1`,
+      userId: `${SEED_TEST_IDS.MOCK_PATTERNS.USER}-admin-1`,
+    });
+    const admin2 = createAdminMembership({
+      id: `${SEED_TEST_IDS.MOCK_PATTERNS.MEMBERSHIP}-admin-2`,
+      userId: `${SEED_TEST_IDS.MOCK_PATTERNS.USER}-admin-2`,
+    });
+    const member = createMembership({
+      id: `${SEED_TEST_IDS.MOCK_PATTERNS.MEMBERSHIP}-1`,
+      userId: `${SEED_TEST_IDS.MOCK_PATTERNS.USER}-1`,
+    });
     const complexMemberships = [admin1, admin2, member];
 
     // Demote one admin to member (should work - still have 1 admin left)
     const memberRole = createTestRole({ name: "Member" });
     const result = validateRoleAssignment(
-      { ...defaultInput, userId: "admin-1" },
+      {
+        ...defaultInput,
+        userId: `${SEED_TEST_IDS.MOCK_PATTERNS.USER}-admin-1`,
+      },
       memberRole,
       admin1,
       complexMemberships,
@@ -319,7 +350,7 @@ describe("validateRoleAssignment", () => {
 
   it("should handle membership validation failure gracefully", () => {
     const membershipFromWrongOrg = createMembership({
-      organizationId: "wrong-org",
+      organizationId: SEED_TEST_IDS.MOCK_PATTERNS.SECONDARY.ORGANIZATION,
       user: createTestUser({ id: "user-from-wrong-org" }),
     });
 
@@ -367,8 +398,14 @@ describe("validateUserRemoval", () => {
   });
 
   it("should allow removing admin when others exist", () => {
-    const admin1 = createAdminMembership({ id: "admin-1", userId: "admin-1" });
-    const admin2 = createAdminMembership({ id: "admin-2", userId: "admin-2" });
+    const admin1 = createAdminMembership({
+      id: `${SEED_TEST_IDS.MOCK_PATTERNS.MEMBERSHIP}-admin-1`,
+      userId: `${SEED_TEST_IDS.MOCK_PATTERNS.USER}-admin-1`,
+    });
+    const admin2 = createAdminMembership({
+      id: `${SEED_TEST_IDS.MOCK_PATTERNS.MEMBERSHIP}-admin-2`,
+      userId: `${SEED_TEST_IDS.MOCK_PATTERNS.USER}-admin-2`,
+    });
     const multipleAdmins = [admin1, admin2];
 
     const result = validateUserRemoval(admin1, multipleAdmins, context);
@@ -389,7 +426,7 @@ describe("validateUserRemoval", () => {
 
   it("should handle membership from wrong organization", () => {
     const wrongOrgMembership = createMembership({
-      organizationId: "wrong-org",
+      organizationId: SEED_TEST_IDS.MOCK_PATTERNS.SECONDARY.ORGANIZATION,
     });
     const result = validateUserRemoval(
       wrongOrgMembership,
@@ -433,9 +470,18 @@ describe("validateUserRemoval", () => {
   });
 
   it("should handle complex admin scenarios", () => {
-    const admin1 = createAdminMembership({ id: "admin-1", userId: "admin-1" });
-    const admin2 = createAdminMembership({ id: "admin-2", userId: "admin-2" });
-    const admin3 = createAdminMembership({ id: "admin-3", userId: "admin-3" });
+    const admin1 = createAdminMembership({
+      id: `${SEED_TEST_IDS.MOCK_PATTERNS.MEMBERSHIP}-admin-1`,
+      userId: `${SEED_TEST_IDS.MOCK_PATTERNS.USER}-admin-1`,
+    });
+    const admin2 = createAdminMembership({
+      id: `${SEED_TEST_IDS.MOCK_PATTERNS.MEMBERSHIP}-admin-2`,
+      userId: `${SEED_TEST_IDS.MOCK_PATTERNS.USER}-admin-2`,
+    });
+    const admin3 = createAdminMembership({
+      id: `${SEED_TEST_IDS.MOCK_PATTERNS.MEMBERSHIP}-admin-3`,
+      userId: `${SEED_TEST_IDS.MOCK_PATTERNS.USER}-admin-3`,
+    });
     const member = createMembership();
     const complexMemberships = [admin1, admin2, admin3, member];
 
@@ -507,8 +553,8 @@ describe("validateRoleReassignment", () => {
     createMembership({ roleId: "role-to-delete" }),
     createMembership({
       roleId: "role-to-delete",
-      id: "membership-2",
-      userId: "user-2",
+      id: `${SEED_TEST_IDS.MOCK_PATTERNS.MEMBERSHIP}-2`,
+      userId: `${SEED_TEST_IDS.MOCK_PATTERNS.USER}-2`,
     }),
   ];
   const context = createTestContext();
@@ -569,7 +615,7 @@ describe("validateRoleReassignment", () => {
 
   it("should reject reassignment to role from different organization", () => {
     const wrongOrgReassignRole = createTestRole({
-      organizationId: "wrong-org",
+      organizationId: SEED_TEST_IDS.MOCK_PATTERNS.SECONDARY.ORGANIZATION,
     });
     const result = validateRoleReassignment(
       input,
@@ -709,7 +755,9 @@ describe("validateRoleReassignment", () => {
   });
 
   it("should validate edge case with organization boundary mismatch", () => {
-    const wrongOrgContext = createTestContext({ organizationId: "wrong-org" });
+    const wrongOrgContext = createTestContext({
+      organizationId: SEED_TEST_IDS.MOCK_PATTERNS.SECONDARY.ORGANIZATION,
+    });
     const result = validateRoleReassignment(
       input,
       roleToDelete,
@@ -745,7 +793,10 @@ describe("Utility Functions", () => {
       const memberships = [
         createAdminMembership(),
         createMembership(),
-        createAdminMembership({ id: "admin-2", userId: "admin-2" }),
+        createAdminMembership({
+          id: `${SEED_TEST_IDS.MOCK_PATTERNS.MEMBERSHIP}-admin-2`,
+          userId: `${SEED_TEST_IDS.MOCK_PATTERNS.USER}-admin-2`,
+        }),
       ];
       expect(countAdmins(memberships)).toBe(2);
     });
@@ -768,8 +819,8 @@ describe("Utility Functions", () => {
       const admin1 = createAdminMembership();
       const member = createMembership();
       const admin2 = createAdminMembership({
-        id: "admin-2",
-        userId: "admin-2",
+        id: `${SEED_TEST_IDS.MOCK_PATTERNS.MEMBERSHIP}-admin-2`,
+        userId: `${SEED_TEST_IDS.MOCK_PATTERNS.USER}-admin-2`,
       });
       const memberships = [admin1, member, admin2];
 
@@ -819,7 +870,10 @@ describe("Utility Functions", () => {
 
     it("should detect admin to admin change", () => {
       const adminRole1 = createAdminRole({ name: "Admin" });
-      const adminRole2 = createAdminRole({ name: "Admin", id: "admin-2" });
+      const adminRole2 = createAdminRole({
+        name: "Admin",
+        id: `${SEED_TEST_IDS.MOCK_PATTERNS.ROLE}-admin-2`,
+      });
       const result = isAdminRoleChange(adminRole1, adminRole2);
 
       expect(result.fromAdmin).toBe(true);
@@ -851,7 +905,10 @@ describe("Utility Functions", () => {
       const memberRole = createTestRole();
       const allMemberships = [
         adminMembership,
-        createAdminMembership({ id: "admin-2", userId: "admin-2" }),
+        createAdminMembership({
+          id: `${SEED_TEST_IDS.MOCK_PATTERNS.MEMBERSHIP}-admin-2`,
+          userId: `${SEED_TEST_IDS.MOCK_PATTERNS.USER}-admin-2`,
+        }),
       ];
 
       const effects = getRoleAssignmentEffects(
@@ -868,7 +925,7 @@ describe("Utility Functions", () => {
 
     it("should calculate effects for no role change", () => {
       const memberMembership = createMembership();
-      const sameRole = createTestRole({ id: "role-1" }); // Same ID as membership
+      const sameRole = createTestRole({ id: SEED_TEST_IDS.MOCK_PATTERNS.ROLE }); // Same ID as membership
       const allMemberships = [memberMembership];
 
       const effects = getRoleAssignmentEffects(
@@ -898,7 +955,9 @@ describe("Specific Validation Functions", () => {
     });
 
     it("should reject role from different organization", () => {
-      const role = createTestRole({ organizationId: "wrong-org" });
+      const role = createTestRole({
+        organizationId: SEED_TEST_IDS.MOCK_PATTERNS.SECONDARY.ORGANIZATION,
+      });
       const result = validateOrganizationBoundary(role, "org-1");
       expect(result.valid).toBe(false);
       expect(result.error).toBe(
@@ -921,7 +980,9 @@ describe("Specific Validation Functions", () => {
     });
 
     it("should reject membership from different organization", () => {
-      const membership = createMembership({ organizationId: "wrong-org" });
+      const membership = createMembership({
+        organizationId: SEED_TEST_IDS.MOCK_PATTERNS.SECONDARY.ORGANIZATION,
+      });
       const result = validateUserMembership(membership, "org-1");
       expect(result.valid).toBe(false);
       expect(result.error).toBe(
@@ -1038,12 +1099,12 @@ describe("Specific Validation Functions", () => {
 
     it("should handle complex batch scenarios", () => {
       const admin1 = createAdminMembership({
-        id: "admin-1",
-        userId: "admin-1",
+        id: `${SEED_TEST_IDS.MOCK_PATTERNS.MEMBERSHIP}-admin-1`,
+        userId: `${SEED_TEST_IDS.MOCK_PATTERNS.USER}-admin-1`,
       });
       const admin2 = createAdminMembership({
-        id: "admin-2",
-        userId: "admin-2",
+        id: `${SEED_TEST_IDS.MOCK_PATTERNS.MEMBERSHIP}-admin-2`,
+        userId: `${SEED_TEST_IDS.MOCK_PATTERNS.USER}-admin-2`,
       });
       const member = createMembership();
       const memberRole = createTestRole();

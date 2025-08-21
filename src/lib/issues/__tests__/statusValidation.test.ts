@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
 
+// Import test constants
+import { SEED_TEST_IDS } from "../../../test/constants/seed-test-ids";
+import { MOCK_IDS } from "../../../test/utils/mock-ids";
+
 import {
   validateStatusTransition,
   validateOrganizationBoundary,
@@ -19,7 +23,7 @@ import type { IssueStatus } from "~/types/issue";
 
 function createMockStatus(overrides: Partial<IssueStatus> = {}): IssueStatus {
   return {
-    id: "status-1",
+    id: SEED_TEST_IDS.MOCK_PATTERNS.STATUS,
     name: "New",
     category: "NEW",
     ...overrides,
