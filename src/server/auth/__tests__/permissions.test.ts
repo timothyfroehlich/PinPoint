@@ -383,7 +383,7 @@ describe("Permission System Core Functions - ENHANCED WITH ORGANIZATIONAL SCOPIN
     it("CRITICAL - Should prevent accessing roles from other organizations", async () => {
       // Arrange
       const primaryOrgMembership = { roleId: SEED_TEST_IDS.MOCK_PATTERNS.ROLE };
-      const competitorRoleId = "competitor-role-123";
+      const _competitorRoleId = "competitor-role-123";
       const permission = "issue:delete";
 
       // Mock primary org role lookup - should NOT find competitor role
@@ -520,7 +520,9 @@ describe("Permission System Core Functions - ENHANCED WITH ORGANIZATIONAL SCOPIN
 
     it("CRITICAL - Should prevent role-based attacks across organizations", async () => {
       // Arrange
-      const maliciousMembership = { roleId: "malicious-admin-role-from-competitor" };
+      const maliciousMembership = {
+        roleId: "malicious-admin-role-from-competitor",
+      };
       const sensitivePermission = "user:delete";
 
       // Mock should not find role from other organization
@@ -537,7 +539,11 @@ describe("Permission System Core Functions - ENHANCED WITH ORGANIZATIONAL SCOPIN
 
       // Should throw when required
       await expect(
-        requirePermission(maliciousMembership, sensitivePermission, mockContext.db),
+        requirePermission(
+          maliciousMembership,
+          sensitivePermission,
+          mockContext.db,
+        ),
       ).rejects.toThrow(TRPCError);
     });
   });
@@ -546,19 +552,52 @@ describe("Permission System Core Functions - ENHANCED WITH ORGANIZATIONAL SCOPIN
     it("should validate complete permission matrix for organizational boundaries", async () => {
       // Test permission matrix with organizational scoping
       const permissionMatrix = [
-        { role: "admin", org: "primary", permission: "user:delete", expected: true },
-        { role: "admin", org: "primary", permission: "cross_org_access", expected: false },
-        { role: "member", org: "primary", permission: "user:delete", expected: false },
-        { role: "member", org: "primary", permission: "issue:view", expected: true },
-        { role: "guest", org: "primary", permission: "issue:create", expected: false },
+        {
+          role: "admin",
+          org: "primary",
+          permission: "user:delete",
+          expected: true,
+        },
+        {
+          role: "admin",
+          org: "primary",
+          permission: "cross_org_access",
+          expected: false,
+        },
+        {
+          role: "member",
+          org: "primary",
+          permission: "user:delete",
+          expected: false,
+        },
+        {
+          role: "member",
+          org: "primary",
+          permission: "issue:view",
+          expected: true,
+        },
+        {
+          role: "guest",
+          org: "primary",
+          permission: "issue:create",
+          expected: false,
+        },
       ];
 
       for (const testCase of permissionMatrix) {
         // Arrange
         const membership = { roleId: `${testCase.role}-role-${testCase.org}` };
-        
-        const mockPermissions = testCase.expected 
-          ? [{ id: "perm-1", name: testCase.permission, description: "Test permission", createdAt: new Date(), updatedAt: new Date() }]
+
+        const mockPermissions = testCase.expected
+          ? [
+              {
+                id: "perm-1",
+                name: testCase.permission,
+                description: "Test permission",
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              },
+            ]
           : [];
 
         vi.mocked(mockContext.db.query.roles.findFirst).mockResolvedValue({

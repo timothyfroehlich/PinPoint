@@ -4,12 +4,12 @@
  * Memory-safe worker-scoped pattern with transaction isolation
  */
 
-import { eq, and, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { describe, expect, vi } from "vitest";
 
 import { generateId } from "~/lib/utils/id-generation";
 import { appRouter } from "~/server/api/root";
-import { comments, issues, memberships } from "~/server/db/schema";
+import { comments, issues } from "~/server/db/schema";
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 import { createSeededIssueTestContext } from "~/test/helpers/createSeededIssueTestContext";

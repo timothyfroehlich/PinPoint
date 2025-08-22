@@ -19,7 +19,6 @@ import { vi } from "vitest";
 
 import { type TestDatabase } from "~/test/helpers/pglite-test-setup";
 import { memberships } from "~/server/db/schema";
-import * as schema from "~/server/db/schema";
 
 export interface SeededAdminTestContext {
   db: TestDatabase;

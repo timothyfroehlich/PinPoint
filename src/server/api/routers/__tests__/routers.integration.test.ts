@@ -17,12 +17,10 @@
  * Uses modern August 2025 patterns with Vitest and PGlite integration.
  */
 
-import { TRPCError } from "@trpc/server";
 import { eq } from "drizzle-orm";
 import { describe, expect, vi, beforeAll } from "vitest";
 
 // Import test setup and utilities
-import type { TRPCContext } from "~/server/api/trpc.base";
 import type { TestDatabase } from "~/test/helpers/pglite-test-setup";
 
 import { appRouter } from "~/server/api/root";
@@ -97,7 +95,7 @@ describe("tRPC Router Integration Tests", () => {
   // Suite-level variables for seeded data
   let workerDb: TestDatabase;
   let primaryOrgId: string;
-  let competitorOrgId: string;
+  let _competitorOrgId: string;
   let seededData: any;
 
   beforeAll(async () => {
@@ -109,7 +107,7 @@ describe("tRPC Router Integration Tests", () => {
     } = await createSeededTestDatabase();
     workerDb = db;
     primaryOrgId = primary;
-    competitorOrgId = competitor;
+    _competitorOrgId = competitor;
 
     // Get seeded test data for primary organization
     seededData = await getSeededTestData(db, primaryOrgId);
@@ -439,7 +437,7 @@ describe("tRPC Router Integration Tests", () => {
       });
 
       // Update the machine name
-      const updatedMachine = await caller.machine.core.update({
+      const _updatedMachine = await caller.machine.core.update({
         id: seededData.machine.id,
         name: "Updated Machine for Integrity Test",
       });

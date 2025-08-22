@@ -52,6 +52,7 @@ export const machineCoreRouter = createTRPCRouter({
           modelId: input.modelId,
           locationId: input.locationId,
           qrCodeId: qrCodeId,
+          organizationId: ctx.organizationId,
         })
         .returning();
 

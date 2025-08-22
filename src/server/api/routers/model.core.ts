@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { createTRPCRouter, orgScopedProcedure } from "~/server/api/trpc";
@@ -91,8 +91,10 @@ export const modelCoreRouter = createTRPCRouter({
       }
 
       // Check if this organization has any machines of this model
-      const orgMachines = model.machines.filter(m => m.organizationId === ctx.organizationId);
-      
+      const orgMachines = model.machines.filter(
+        (m) => m.organizationId === ctx.organizationId,
+      );
+
       if (orgMachines.length === 0) {
         throw new TRPCError({
           code: "NOT_FOUND",

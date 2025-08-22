@@ -20,7 +20,7 @@
  * Covers timeline procedures with RLS awareness:
  * - Issue timeline event retrieval and filtering
  * - Activity tracking with organizational boundaries
- * 
+ *
  * Tests organizational boundaries and cross-org isolation.
  */
 
@@ -32,12 +32,6 @@ import {
   createVitestMockContext,
   type VitestMockContext,
 } from "~/test/vitestMockContext";
-import {
-  SEED_TEST_IDS,
-  createMockAdminContext,
-  createMockMemberContext,
-  type TestMockContext,
-} from "~/test/constants/seed-test-ids";
 
 // Mock Supabase SSR for modern auth patterns
 vi.mock("~/utils/supabase/server", () => ({

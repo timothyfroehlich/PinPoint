@@ -19,7 +19,7 @@
  */
 
 import { TRPCError } from "@trpc/server";
-import { eq, and, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { describe, expect, vi } from "vitest";
 
 // Import test setup and utilities
@@ -30,11 +30,7 @@ import { machineOwnerRouter } from "~/server/api/routers/machine.owner";
 import * as schema from "~/server/db/schema";
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
-import {
-  createSeededMachineTestContext,
-  createPrimaryAdminContext,
-  createCompetitorAdminContext,
-} from "~/test/helpers/createSeededMachineTestContext";
+import { createPrimaryAdminContext } from "~/test/helpers/createSeededMachineTestContext";
 
 // Mock external dependencies that aren't database-related
 vi.mock("~/server/auth/permissions", () => ({
@@ -266,11 +262,11 @@ describe("machine.owner router integration tests", () => {
         workerDb,
       }) => {
         await withIsolatedTest(workerDb, async (db) => {
-          const { testUser2, ctx } = await setupTestData(db);
+          const { testUser2: _testUser2, ctx: _ctx } = await setupTestData(db);
 
           // Use seeded competitor organization for cross-org testing
           const org2Id = SEED_TEST_IDS.ORGANIZATIONS.competitor;
-          const org2 = await db.query.organizations.findFirst({
+          const _org2 = await db.query.organizations.findFirst({
             where: eq(schema.organizations.id, org2Id),
           });
         }).returning();
@@ -475,7 +471,7 @@ describe("machine.owner router integration tests", () => {
 
         // Use seeded competitor organization for cross-org testing
         const org2Id = SEED_TEST_IDS.ORGANIZATIONS.competitor;
-        const org2 = await db.query.organizations.findFirst({
+        const _org2 = await db.query.organizations.findFirst({
           where: eq(schema.organizations.id, org2Id),
         });
 

@@ -15,10 +15,7 @@
 
 import { describe, test, expect } from "vitest";
 import { eq, and, sql, count, desc } from "drizzle-orm";
-import {
-  test as workerTest,
-  withBusinessLogicTest,
-} from "~/test/helpers/worker-scoped-db";
+import { withBusinessLogicTest } from "~/test/helpers/worker-scoped-db";
 import { verifyIntegrationTesterMode } from "~/test/helpers/pglite-test-setup";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 import * as schema from "~/server/db/schema";

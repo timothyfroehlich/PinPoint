@@ -12,8 +12,8 @@
  * This file shows Track 2 patterns only.
  */
 
-import { describe, test, expect } from "vitest";
-import { eq, sql } from "drizzle-orm";
+import { describe, expect } from "vitest";
+import { eq } from "drizzle-orm";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 import {
   test as workerTest,
@@ -36,7 +36,7 @@ describe("Dual-Track Testing Examples", () => {
     workerTest(
       "Issue priority calculation - FAST business logic focus",
       async ({ workerDb }) => {
-        await withBusinessLogicTest(workerDb, async (db) => {
+        await withBusinessLogicTest(workerDb, async (_db) => {
           // ✅ BENEFIT: RLS is bypassed - 5x faster execution
           // ✅ BENEFIT: Direct data creation - no organizational coordination
           // ✅ USE CASE: Testing business rules, calculations, workflows
@@ -91,7 +91,7 @@ describe("Dual-Track Testing Examples", () => {
     workerTest(
       "Complex workflow - Multi-step business process",
       async ({ workerDb }) => {
-        await withBusinessLogicTest(workerDb, async (db) => {
+        await withBusinessLogicTest(workerDb, async (_db) => {
           // ✅ PERFECT FOR: Complex business workflows where security isn't the focus
 
           // Use seeded organization for workflow examples
@@ -312,7 +312,7 @@ describe("Dual-Track Testing Examples", () => {
       // - Complex multi-step processes
       // - Business rule verification
 
-      await withBusinessLogicTest(workerDb, async (db) => {
+      await withBusinessLogicTest(workerDb, async (_db) => {
         // Example: Testing a complex calculation function
         const result = calculateMaintenanceSchedule({
           machineAge: 5,
@@ -472,7 +472,7 @@ function calculateAvgResolutionTime(issues: any[]) {
   const resolved = issues.filter((i) => i.resolvedAt);
   if (resolved.length === 0) return 0;
 
-  const total = resolved.reduce((sum, issue) => {
+  const total = resolved.reduce((sum: number, issue) => {
     const resolution = new Date(issue.resolvedAt).getTime();
     const creation = new Date(issue.createdAt).getTime();
     return sum + (resolution - creation);
@@ -482,16 +482,13 @@ function calculateAvgResolutionTime(issues: any[]) {
 }
 
 function getTopMachinesByIssues(issues: any[]) {
-  const machineCounts = issues.reduce(
-    (acc, issue) => {
-      const machineId = issue.machine?.id;
-      if (machineId) {
-        acc[machineId] = (acc[machineId] || 0) + 1;
-      }
-      return acc;
-    },
-    {} as Record<string, number>,
-  );
+  const machineCounts = issues.reduce<Record<string, number>>((acc, issue) => {
+    const machineId = issue.machine?.id;
+    if (machineId) {
+      acc[machineId] = (acc[machineId] || 0) + 1;
+    }
+    return acc;
+  }, {});
 
   return Object.entries(machineCounts)
     .sort(([, a], [, b]) => (b as number) - (a as number))
@@ -518,13 +515,10 @@ class ReportingService {
   }
 
   private groupByPriority(issues: any[]) {
-    return issues.reduce(
-      (acc, issue) => {
-        const priority = issue.priority || "unknown";
-        acc[priority] = (acc[priority] || 0) + 1;
-        return acc;
-      },
-      {} as Record<string, number>,
-    );
+    return issues.reduce<Record<string, number>>((acc, issue) => {
+      const priority = issue.priority || "unknown";
+      acc[priority] = (acc[priority] || 0) + 1;
+      return acc;
+    }, {});
   }
 }

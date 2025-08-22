@@ -217,7 +217,7 @@ describe("YourRouter tRPC Router", () => {
 
     // VERIFY: Database called with correct data
     expect(mockDb.insert).toHaveBeenCalled();
-    const insertCall = mockDb.insert().values as any;
+    const insertCall = mockDb.insert().values;
     expect(insertCall).toHaveBeenCalledWith({
       name: "Valid Resource",
       description: "Valid description",

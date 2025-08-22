@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/explicit-function-return-type */
+/* eslint-disable @typescript-eslint/explicit-function-return-type */
 import { faker } from "@faker-js/faker";
 import { vi } from "vitest";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";

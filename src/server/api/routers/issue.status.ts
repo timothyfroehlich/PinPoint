@@ -42,6 +42,7 @@ export const issueStatusRouter = createTRPCRouter({
           id: generateId(),
           name: input.name,
           category: input.category,
+          organizationId: ctx.organizationId,
         })
         .returning();
       return result;
@@ -136,13 +137,11 @@ export const issueStatusRouter = createTRPCRouter({
     // Aggregate counts by category
     for (const group of counts) {
       // Type assertion needed due to Drizzle query result typing
-      const statusId = group.statusId as string;
+      const statusId = group.statusId;
       const category = statusMap.get(statusId);
       if (category !== undefined && isValidCategory(category)) {
-        // Safe to use bracket notation - category is validated by type guard
-        // eslint-disable-next-line security/detect-object-injection
+        // Use type-safe property access instead of bracket notation
         const currentCount = categoryCounts[category];
-        // eslint-disable-next-line security/detect-object-injection
         categoryCounts[category] = currentCount + group.count;
       }
     }

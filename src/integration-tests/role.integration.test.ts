@@ -18,23 +18,15 @@
  * - list, create, update, delete, get, getPermissions, getTemplates, assignToUser
  */
 
-/* eslint-disable @typescript-eslint/no-non-null-assertion */
-
 import { eq, and } from "drizzle-orm";
-import { describe, expect, vi, beforeAll } from "vitest";
+import { describe, expect, vi } from "vitest";
 
 // Import test setup and utilities
-import type { TRPCContext } from "~/server/api/trpc.base";
 
 import { TRPCError } from "@trpc/server";
 import { roleRouter } from "~/server/api/routers/role";
 import * as schema from "~/server/db/schema";
-import {
-  test,
-  withIsolatedTest,
-  type TestDatabase,
-} from "~/test/helpers/worker-scoped-db";
-import { createSeededTestDatabase } from "~/test/helpers/pglite-test-setup";
+import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
 import { createSeededAdminTestContext } from "~/test/helpers/createSeededAdminTestContext";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 import { generateTestId } from "~/test/helpers/test-id-generator";
@@ -60,7 +52,7 @@ vi.mock("~/lib/users/roleManagementValidation", () => ({
 
 describe("Role Router Integration Tests (PGlite)", () => {
   const primaryOrgId = SEED_TEST_IDS.ORGANIZATIONS.primary;
-  const competitorOrgId = SEED_TEST_IDS.ORGANIZATIONS.competitor;
+  const _competitorOrgId = SEED_TEST_IDS.ORGANIZATIONS.competitor;
 
   describe("list - Get all roles", () => {
     test("should return roles with member count and permissions", async ({
@@ -149,7 +141,7 @@ describe("Role Router Integration Tests (PGlite)", () => {
 
     test("should handle database errors gracefully", async ({
       workerDb,
-      organizationId,
+      organizationId: _organizationId,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Create context with invalid organization but expect permission error instead of database error
@@ -342,7 +334,7 @@ describe("Role Router Integration Tests (PGlite)", () => {
           updatedAt: new Date(),
         });
 
-        const baseContext = await createSeededAdminTestContext(
+        const _baseContext = await createSeededAdminTestContext(
           db,
           primaryOrgId,
           SEED_TEST_IDS.USERS.ADMIN,
@@ -596,12 +588,12 @@ describe("Role Router Integration Tests (PGlite)", () => {
 
         // Try to delete the system admin role
         await expect(
-          caller.delete({ roleId: seededData.adminRole! }),
+          caller.delete({ roleId: SEED_TEST_IDS.ROLES.ADMIN_PRIMARY }),
         ).rejects.toThrow();
 
         // Verify admin role still exists
         const stillExists = await db.query.roles.findFirst({
-          where: eq(schema.roles.id, seededData.adminRole!),
+          where: eq(schema.roles.id, SEED_TEST_IDS.ROLES.ADMIN_PRIMARY),
         });
         expect(stillExists).toBeDefined();
       });
@@ -635,10 +627,12 @@ describe("Role Router Integration Tests (PGlite)", () => {
         );
         const caller = roleRouter.createCaller(context);
 
-        const result = await caller.get({ roleId: seededData.adminRole! });
+        const result = await caller.get({
+          roleId: SEED_TEST_IDS.ROLES.ADMIN_PRIMARY,
+        });
 
         expect(result).toMatchObject({
-          id: seededData.adminRole,
+          id: SEED_TEST_IDS.ROLES.ADMIN_PRIMARY,
           name: "Admin",
           organizationId: primaryOrgId,
         });
@@ -709,7 +703,7 @@ describe("Role Router Integration Tests (PGlite)", () => {
           updatedAt: new Date(),
         });
 
-        const baseContext = await createSeededAdminTestContext(
+        const _baseContext = await createSeededAdminTestContext(
           db,
           primaryOrgId,
           SEED_TEST_IDS.USERS.ADMIN,
@@ -844,7 +838,7 @@ describe("Role Router Integration Tests (PGlite)", () => {
           id: membershipId,
           userId: targetUser.id,
           organizationId: primaryOrgId,
-          roleId: seededData.memberRole!,
+          roleId: SEED_TEST_IDS.ROLES.MEMBER_PRIMARY,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
@@ -978,7 +972,7 @@ describe("Role Router Integration Tests (PGlite)", () => {
           id: membershipId,
           userId: targetUser.id,
           organizationId: primaryOrgId,
-          roleId: seededData.memberRole!,
+          roleId: SEED_TEST_IDS.ROLES.MEMBER_PRIMARY,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
@@ -1046,7 +1040,7 @@ describe("Role Router Integration Tests (PGlite)", () => {
           id: membershipId,
           userId: targetUser.id,
           organizationId: primaryOrgId,
-          roleId: seededData.memberRole!,
+          roleId: SEED_TEST_IDS.ROLES.MEMBER_PRIMARY,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
@@ -1125,7 +1119,7 @@ describe("Role Router Integration Tests (PGlite)", () => {
           id: membershipId,
           userId: targetUser.id,
           organizationId: primaryOrgId,
-          roleId: seededData.memberRole!,
+          roleId: SEED_TEST_IDS.ROLES.MEMBER_PRIMARY,
           createdAt: new Date(),
           updatedAt: new Date(),
         });

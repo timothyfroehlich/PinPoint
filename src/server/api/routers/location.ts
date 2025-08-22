@@ -32,6 +32,7 @@ export const locationRouter = createTRPCRouter({
         .values({
           id: generateId(),
           name: input.name,
+          organizationId: ctx.organizationId,
         })
         .returning();
 

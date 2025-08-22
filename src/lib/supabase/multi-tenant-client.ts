@@ -12,8 +12,6 @@
  * - Compatible with existing @supabase/ssr patterns
  */
 
-/* eslint-disable @typescript-eslint/no-unnecessary-condition */
-
 import { createClient } from "./server";
 import { getUserWithOrganization } from "./rls-helpers";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -104,7 +102,7 @@ export async function createOptionalOrganizationClient(): Promise<{
     data: { user },
   } = await supabase.auth.getUser();
 
-  const orgId = user?.app_metadata?.organizationId as unknown;
+  const orgId = user?.app_metadata?.["organizationId"] as unknown;
   const organizationId = typeof orgId === "string" ? orgId : null;
 
   return {

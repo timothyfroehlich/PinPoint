@@ -2,8 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { eq, asc, desc, isNull, and } from "drizzle-orm";
 import { z } from "zod";
 
-import { createTRPCRouter } from "../trpc";
-import { userManageProcedure, roleManageProcedure } from "../trpc.permission";
+import { createTRPCRouter, organizationProcedure } from "../trpc";
 
 import {
   validateRoleAssignment,
@@ -26,7 +25,7 @@ export const adminRouter = createTRPCRouter({
   /**
    * Get all organization members with their roles
    */
-  getUsers: userManageProcedure.query(async ({ ctx }) => {
+  getUsers: organizationProcedure.query(async ({ ctx }) => {
     const members = await ctx.db
       .select({
         id: memberships.id,
@@ -74,7 +73,7 @@ export const adminRouter = createTRPCRouter({
   /**
    * Update a user's role assignment
    */
-  updateUserRole: userManageProcedure
+  updateUserRole: organizationProcedure
     .input(
       z.object({
         userId: z.string(),
@@ -244,7 +243,7 @@ export const adminRouter = createTRPCRouter({
   /**
    * Invite a user to the organization
    */
-  inviteUser: userManageProcedure
+  inviteUser: organizationProcedure
     .input(
       z.object({
         email: z.email(),
@@ -382,7 +381,7 @@ export const adminRouter = createTRPCRouter({
   /**
    * Get pending invitations
    */
-  getInvitations: userManageProcedure.query(async ({ ctx }) => {
+  getInvitations: organizationProcedure.query(async ({ ctx }) => {
     const invitations = await ctx.db
       .select({
         id: memberships.id,
@@ -424,7 +423,7 @@ export const adminRouter = createTRPCRouter({
   /**
    * Remove a user from the organization
    */
-  removeUser: userManageProcedure
+  removeUser: organizationProcedure
     .input(
       z.object({
         userId: z.string(),
@@ -544,7 +543,7 @@ export const adminRouter = createTRPCRouter({
   /**
    * Delete a role with member reassignment
    */
-  deleteRoleWithReassignment: roleManageProcedure
+  deleteRoleWithReassignment: organizationProcedure
     .input(
       z.object({
         roleId: z.string(),
@@ -706,7 +705,7 @@ export const adminRouter = createTRPCRouter({
   /**
    * Cancel a user invitation
    */
-  cancelInvitation: userManageProcedure
+  cancelInvitation: organizationProcedure
     .input(
       z.object({
         userId: z.string(),

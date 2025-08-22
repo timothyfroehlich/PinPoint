@@ -15,7 +15,7 @@
  * - Worker-scoped database for memory safety
  *
  * Uses modern August 2025 patterns with Vitest and PGlite integration.
- * 
+ *
  * Covers all procedures:
  * - getNotifications: Retrieve user notifications with filtering
  * - getUnreadCount: Get count of unread notifications
@@ -23,7 +23,7 @@
  * - markAllAsRead: Mark all user notifications as read
  */
 
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { describe, expect, vi } from "vitest";
 
 // Import test setup and utilities
@@ -32,7 +32,6 @@ import type { TestDatabase } from "~/test/helpers/pglite-test-setup";
 
 import { appRouter } from "~/server/api/root";
 import * as schema from "~/server/db/schema";
-import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 import { generateTestId } from "~/test/helpers/test-id-generator";
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
 
@@ -44,16 +43,10 @@ vi.mock("~/lib/utils/id-generation", () => ({
 vi.mock("~/server/auth/permissions", () => ({
   getUserPermissionsForSession: vi
     .fn()
-    .mockResolvedValue([
-      "notification:read",
-      "notification:edit",
-    ]),
+    .mockResolvedValue(["notification:read", "notification:edit"]),
   getUserPermissionsForSupabaseUser: vi
     .fn()
-    .mockResolvedValue([
-      "notification:read",
-      "notification:edit",
-    ]),
+    .mockResolvedValue(["notification:read", "notification:edit"]),
   requirePermissionForSession: vi.fn().mockResolvedValue(undefined),
   supabaseUserToSession: vi.fn((user) => ({
     user: {
@@ -74,7 +67,7 @@ async function setupTestData(db: TestDatabase) {
   const organizationId = generateTestId("test-org");
 
   // Create organization
-  const [org] = await db
+  const [_org] = await db
     .insert(schema.organizations)
     .values({
       id: organizationId,
@@ -194,10 +187,7 @@ async function setupTestData(db: TestDatabase) {
     organizationId: organizationId,
     supabase: {} as any, // Not used in this router
     headers: new Headers(),
-    userPermissions: [
-      "notification:read",
-      "notification:edit",
-    ],
+    userPermissions: ["notification:read", "notification:edit"],
     services: new ServiceFactory(db),
     logger: {
       error: vi.fn(),
@@ -226,7 +216,9 @@ async function setupTestData(db: TestDatabase) {
 
 describe("Notification Router Integration Tests", () => {
   describe("getNotifications procedure", () => {
-    test("should retrieve user notifications with real database operations", async ({ workerDb }) => {
+    test("should retrieve user notifications with real database operations", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         const { ctx, notification1, notification2 } = await setupTestData(db);
         const caller = appRouter.createCaller(ctx);
@@ -235,18 +227,22 @@ describe("Notification Router Integration Tests", () => {
 
         // Verify we get the user's notifications
         expect(result).toHaveLength(2);
-        expect(result.some(n => n.id === notification1.id)).toBe(true);
-        expect(result.some(n => n.id === notification2.id)).toBe(true);
-        
+        expect(result.some((n) => n.id === notification1.id)).toBe(true);
+        expect(result.some((n) => n.id === notification2.id)).toBe(true);
+
         // Verify notification structure
-        const unreadNotification = result.find(n => n.id === notification1.id);
+        const unreadNotification = result.find(
+          (n) => n.id === notification1.id,
+        );
         expect(unreadNotification?.message).toBe("New issue created");
         expect(unreadNotification?.read).toBe(false);
         expect(unreadNotification?.type).toBe("ISSUE_CREATED");
       });
     });
 
-    test("should filter notifications by unreadOnly option", async ({ workerDb }) => {
+    test("should filter notifications by unreadOnly option", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         const { ctx, notification1 } = await setupTestData(db);
         const caller = appRouter.createCaller(ctx);
@@ -262,10 +258,12 @@ describe("Notification Router Integration Tests", () => {
       });
     });
 
-    test("should limit and offset notifications correctly", async ({ workerDb }) => {
+    test("should limit and offset notifications correctly", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         const { ctx, testUser, organizationId } = await setupTestData(db);
-        
+
         // Create additional notifications for pagination testing
         await db.insert(schema.notifications).values([
           {
@@ -306,7 +304,7 @@ describe("Notification Router Integration Tests", () => {
           offset: 2,
         });
         expect(offsetResult).toHaveLength(2);
-        
+
         // Verify different results
         expect(limitResult[0].id).not.toBe(offsetResult[0].id);
       });
@@ -331,7 +329,9 @@ describe("Notification Router Integration Tests", () => {
   });
 
   describe("getUnreadCount procedure", () => {
-    test("should return correct unread count with real database operations", async ({ workerDb }) => {
+    test("should return correct unread count with real database operations", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         const { ctx } = await setupTestData(db);
         const caller = appRouter.createCaller(ctx);
@@ -343,7 +343,9 @@ describe("Notification Router Integration Tests", () => {
       });
     });
 
-    test("should return zero for user with no unread notifications", async ({ workerDb }) => {
+    test("should return zero for user with no unread notifications", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         const { ctx, testUser } = await setupTestData(db);
 
@@ -362,7 +364,9 @@ describe("Notification Router Integration Tests", () => {
   });
 
   describe("markAsRead procedure", () => {
-    test("should mark notification as read with real database operations", async ({ workerDb }) => {
+    test("should mark notification as read with real database operations", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         const { ctx, notification1 } = await setupTestData(db);
         const caller = appRouter.createCaller(ctx);
@@ -381,7 +385,9 @@ describe("Notification Router Integration Tests", () => {
       });
     });
 
-    test("should not mark notification belonging to other users", async ({ workerDb }) => {
+    test("should not mark notification belonging to other users", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         const { ctx, otherNotification } = await setupTestData(db);
         const caller = appRouter.createCaller(ctx);
@@ -401,7 +407,9 @@ describe("Notification Router Integration Tests", () => {
       });
     });
 
-    test("should validate notification ID is required", async ({ workerDb }) => {
+    test("should validate notification ID is required", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         const { ctx } = await setupTestData(db);
         const caller = appRouter.createCaller(ctx);
@@ -412,7 +420,9 @@ describe("Notification Router Integration Tests", () => {
       });
     });
 
-    test("should handle non-existent notification gracefully", async ({ workerDb }) => {
+    test("should handle non-existent notification gracefully", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         const { ctx } = await setupTestData(db);
         const caller = appRouter.createCaller(ctx);
@@ -428,7 +438,9 @@ describe("Notification Router Integration Tests", () => {
   });
 
   describe("markAllAsRead procedure", () => {
-    test("should mark all user notifications as read with real database operations", async ({ workerDb }) => {
+    test("should mark all user notifications as read with real database operations", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         const { ctx, testUser } = await setupTestData(db);
         const caller = appRouter.createCaller(ctx);
@@ -441,12 +453,14 @@ describe("Notification Router Integration Tests", () => {
         const userNotifications = await db.query.notifications.findMany({
           where: eq(schema.notifications.userId, testUser.id),
         });
-        
-        expect(userNotifications.every(n => n.read)).toBe(true);
+
+        expect(userNotifications.every((n) => n.read)).toBe(true);
       });
     });
 
-    test("should not affect other users' notifications", async ({ workerDb }) => {
+    test("should not affect other users' notifications", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         const { ctx, otherNotification } = await setupTestData(db);
         const caller = appRouter.createCaller(ctx);
@@ -463,7 +477,9 @@ describe("Notification Router Integration Tests", () => {
   });
 
   describe("Authentication and Authorization", () => {
-    test("should require authentication for all procedures", async ({ workerDb }) => {
+    test("should require authentication for all procedures", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         const { notification1 } = await setupTestData(db);
 
@@ -493,29 +509,32 @@ describe("Notification Router Integration Tests", () => {
 
         const caller = appRouter.createCaller(unauthCtx);
 
-        await expect(
-          caller.notification.getNotifications({}),
-        ).rejects.toThrow("UNAUTHORIZED");
+        await expect(caller.notification.getNotifications({})).rejects.toThrow(
+          "UNAUTHORIZED",
+        );
 
-        await expect(
-          caller.notification.getUnreadCount(),
-        ).rejects.toThrow("UNAUTHORIZED");
+        await expect(caller.notification.getUnreadCount()).rejects.toThrow(
+          "UNAUTHORIZED",
+        );
 
         await expect(
           caller.notification.markAsRead({ notificationId: notification1.id }),
         ).rejects.toThrow("UNAUTHORIZED");
 
-        await expect(
-          caller.notification.markAllAsRead(),
-        ).rejects.toThrow("UNAUTHORIZED");
+        await expect(caller.notification.markAllAsRead()).rejects.toThrow(
+          "UNAUTHORIZED",
+        );
       });
     });
   });
 
   describe("Multi-tenant Security Testing", () => {
-    test("should enforce user-level isolation across operations", async ({ workerDb }) => {
+    test("should enforce user-level isolation across operations", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { otherUser, otherNotification, organizationId } = await setupTestData(db);
+        const { otherUser, otherNotification, organizationId } =
+          await setupTestData(db);
 
         // Create context for other user
         const otherUserCtx: TRPCContext = {
@@ -537,10 +556,7 @@ describe("Notification Router Integration Tests", () => {
           organizationId: organizationId,
           supabase: {} as any,
           headers: new Headers(),
-          userPermissions: [
-            "notification:read",
-            "notification:edit",
-          ],
+          userPermissions: ["notification:read", "notification:edit"],
           services: new ServiceFactory(db),
           logger: {
             error: vi.fn(),
@@ -559,7 +575,9 @@ describe("Notification Router Integration Tests", () => {
         const otherCaller = appRouter.createCaller(otherUserCtx);
 
         // Other user should only see their own notifications
-        const notifications = await otherCaller.notification.getNotifications({});
+        const notifications = await otherCaller.notification.getNotifications(
+          {},
+        );
         expect(notifications).toHaveLength(1);
         expect(notifications[0].id).toBe(otherNotification.id);
 
@@ -581,10 +599,12 @@ describe("Notification Router Integration Tests", () => {
       });
     });
 
-    test("should enforce cross-organizational boundaries", async ({ workerDb }) => {
+    test("should enforce cross-organizational boundaries", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         const { ctx } = await setupTestData(db);
-        
+
         // Create a second organization with its own user and notifications
         const [org2] = await db
           .insert(schema.organizations)
@@ -623,8 +643,10 @@ describe("Notification Router Integration Tests", () => {
         // Original user should not see org2 notifications
         const caller = appRouter.createCaller(ctx);
         const notifications = await caller.notification.getNotifications({});
-        
-        expect(notifications.every(n => n.id !== org2Notification.id)).toBe(true);
+
+        expect(notifications.every((n) => n.id !== org2Notification.id)).toBe(
+          true,
+        );
 
         // Original user cannot mark org2 notification as read
         const result = await caller.notification.markAsRead({
@@ -640,13 +662,16 @@ describe("Notification Router Integration Tests", () => {
       });
     });
 
-    test("should maintain data integrity across notification operations", async ({ workerDb }) => {
+    test("should maintain data integrity across notification operations", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         const { ctx, testUser, notification1 } = await setupTestData(db);
         const caller = appRouter.createCaller(ctx);
 
         // Get initial state
-        const initialNotifications = await caller.notification.getNotifications({});
+        const _initialNotifications =
+          await caller.notification.getNotifications({});
         const initialCount = await caller.notification.getUnreadCount();
 
         // Mark one notification as read
@@ -669,7 +694,7 @@ describe("Notification Router Integration Tests", () => {
         const allUserNotifications = await db.query.notifications.findMany({
           where: eq(schema.notifications.userId, testUser.id),
         });
-        expect(allUserNotifications.every(n => n.read)).toBe(true);
+        expect(allUserNotifications.every((n) => n.read)).toBe(true);
       });
     });
   });

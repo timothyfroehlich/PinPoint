@@ -1,4 +1,5 @@
 import { drizzle } from "drizzle-orm/postgres-js";
+import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
 import * as schema from "./schema";
@@ -48,8 +49,7 @@ function getDatabaseConfig(): DatabaseConfig {
   };
 }
 
-// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
-function createDrizzleClientInternal() {
+function createDrizzleClientInternal(): DrizzleClient {
   const connectionString = env.DATABASE_URL;
 
   if (!connectionString) {
@@ -85,7 +85,7 @@ function createDrizzleClientInternal() {
   });
 }
 
-export type DrizzleClient = ReturnType<typeof createDrizzleClientInternal>;
+export type DrizzleClient = PostgresJsDatabase<typeof schema>;
 
 /**
  * Controlled singleton pattern for development hot-reload optimization.

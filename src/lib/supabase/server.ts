@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unnecessary-condition */
-
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
@@ -125,9 +123,9 @@ export async function createAdminClient(): Promise<SupabaseClient> {
 /**
  * Gets the current authenticated user from server context.
  * Useful for Server Components and Server Actions.
- * 
+ *
  * @returns Promise resolving to user data or null if not authenticated
- * 
+ *
  * @example
  * ```typescript
  * const user = await getCurrentUser();
@@ -136,24 +134,29 @@ export async function createAdminClient(): Promise<SupabaseClient> {
  * }
  * ```
  */
-export async function getCurrentUser(): Promise<Awaited<ReturnType<SupabaseClient['auth']['getUser']>>['data']['user']> {
+export async function getCurrentUser(): Promise<
+  Awaited<ReturnType<SupabaseClient["auth"]["getUser"]>>["data"]["user"]
+> {
   const supabase = await createClient();
-  const { data: { user }, error } = await supabase.auth.getUser();
-  
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
   if (error) {
-    console.warn('Auth error in getCurrentUser:', error.message);
+    console.warn("Auth error in getCurrentUser:", error.message);
     return null;
   }
-  
+
   return user;
 }
 
 /**
  * Gets the current user's organization ID from app_metadata.
  * Returns null if user is not authenticated or has no organization context.
- * 
+ *
  * @returns Promise resolving to organization ID or null
- * 
+ *
  * @example
  * ```typescript
  * const orgId = await getCurrentUserOrganizationId();
@@ -164,17 +167,17 @@ export async function getCurrentUser(): Promise<Awaited<ReturnType<SupabaseClien
  */
 export async function getCurrentUserOrganizationId(): Promise<string | null> {
   const user = await getCurrentUser();
-  const orgId = user?.app_metadata?.organizationId as unknown;
-  return typeof orgId === 'string' ? orgId : null;
+  const orgId = user?.app_metadata?.["organizationId"] as unknown;
+  return typeof orgId === "string" ? orgId : null;
 }
 
 /**
  * Validates that the current user has organization context.
  * Throws an error if user is not authenticated or lacks organization context.
- * 
+ *
  * @returns Promise resolving to validated user and organization ID
  * @throws Error if validation fails
- * 
+ *
  * @example
  * ```typescript
  * const { user, organizationId } = await requireOrganizationContext();
@@ -186,16 +189,16 @@ export async function requireOrganizationContext(): Promise<{
   organizationId: string;
 }> {
   const user = await getCurrentUser();
-  
+
   if (!user) {
-    throw new Error('Authentication required');
+    throw new Error("Authentication required");
   }
-  
-  const orgId = user.app_metadata?.organizationId as unknown;
-  if (typeof orgId !== 'string' || !orgId) {
-    throw new Error('Organization context required');
+
+  const orgId = user.app_metadata?.["organizationId"] as unknown;
+  if (typeof orgId !== "string" || !orgId) {
+    throw new Error("Organization context required");
   }
-  
+
   return { user, organizationId: orgId };
 }
 

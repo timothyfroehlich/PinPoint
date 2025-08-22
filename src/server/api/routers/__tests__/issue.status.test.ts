@@ -53,7 +53,7 @@ vi.mock("~/utils/supabase/server", () => ({
 describe("Issue Status Router (RLS-Enhanced)", () => {
   let ctx: VitestMockContext;
   let adminContext: TestMockContext;
-  let memberContext: TestMockContext;
+  let _memberContext: TestMockContext;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -61,7 +61,7 @@ describe("Issue Status Router (RLS-Enhanced)", () => {
 
     // Set up test contexts with SEED_TEST_IDS
     adminContext = createMockAdminContext();
-    memberContext = createMockMemberContext();
+    _memberContext = createMockMemberContext();
 
     // Set up authenticated user with organization using SEED_TEST_IDS
     ctx.user = {

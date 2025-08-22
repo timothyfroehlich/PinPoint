@@ -46,8 +46,11 @@ export class CommentService {
         authorId: comments.authorId,
       });
 
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Drizzle update with returning throws on no rows
-    return deletedComment!; // Safe because update with returning will throw if no rows affected
+    if (!deletedComment) {
+      throw new Error(`Comment with id ${commentId} not found`);
+    }
+
+    return deletedComment;
   }
 
   /**
@@ -81,8 +84,11 @@ export class CommentService {
         authorId: comments.authorId,
       });
 
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Drizzle update with returning throws on no rows
-    return restoredComment!; // Safe because update with returning will throw if no rows affected
+    if (!restoredComment) {
+      throw new Error(`Comment with id ${commentId} not found`);
+    }
+
+    return restoredComment;
   }
 
   /**

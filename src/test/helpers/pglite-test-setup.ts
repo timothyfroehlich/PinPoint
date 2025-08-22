@@ -21,7 +21,7 @@
  */
 
 import { PGlite } from "@electric-sql/pglite";
-import { sql, eq, and } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 
 import type { PgliteDatabase } from "drizzle-orm/pglite";
@@ -189,7 +189,7 @@ async function configureForBusinessLogicTesting(
 
     if (!process.env.VITEST) {
       console.log(`[Track 2] integration_tester simulation active:`);
-      console.log(`  - RLS disabled on ${disabledCount} tables`);
+      console.log(`  - RLS disabled on ${String(disabledCount)} tables`);
       console.log(`  - Business logic mode: BYPASSRLS equivalent`);
       console.log(
         `  - Expected 5x performance improvement vs RLS-enabled testing`,

@@ -17,7 +17,7 @@
  */
 
 import { eq, and } from "drizzle-orm";
-import { describe, expect, vi } from "vitest";
+import { describe, expect } from "vitest";
 
 import * as schema from "~/server/db/schema";
 import {
@@ -474,8 +474,8 @@ describe("Multi-Tenant Isolation", () => {
 
           // Create comprehensive test data in competitor org
           const location2Id = generateTestId("competitor-location");
-          const machine2Id = generateTestId("competitor-machine");
-          const issue2Id = generateTestId("competitor-issue");
+          const _machine2Id = generateTestId("competitor-machine");
+          const _issue2Id = generateTestId("competitor-issue");
 
           await db.insert(schema.locations).values({
             id: location2Id,
@@ -921,7 +921,7 @@ describe("Multi-Tenant Isolation", () => {
           await withRLSSecurityContext(
             db,
             {
-              organizationId: orgs[0]!,
+              organizationId: orgs[0] ?? generateTestId("fallback-org"),
               userId: generateTestId("user"),
               userRole: "authenticated",
             },

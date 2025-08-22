@@ -12,11 +12,7 @@ import {
   type VitestMockContext,
 } from "~/test/vitestMockContext";
 
-import {
-  SEED_TEST_IDS,
-  createMockAdminContext,
-  createMockMemberContext,
-} from "~/test/constants/seed-test-ids";
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
 // Import the session conversion function
 function supabaseUserToSession(user: any) {
@@ -107,8 +103,14 @@ const createMockTRPCContext = (
     } as any,
     organization: {
       id: organizationId,
-      name: organizationId === SEED_TEST_IDS.ORGANIZATIONS.primary ? "Primary Organization" : "Competitor Organization",
-      subdomain: organizationId === SEED_TEST_IDS.ORGANIZATIONS.primary ? "primary" : "competitor",
+      name:
+        organizationId === SEED_TEST_IDS.ORGANIZATIONS.primary
+          ? "Primary Organization"
+          : "Competitor Organization",
+      subdomain:
+        organizationId === SEED_TEST_IDS.ORGANIZATIONS.primary
+          ? "primary"
+          : "competitor",
     },
     membership: {
       roleId,
@@ -122,7 +124,7 @@ const createCompetitorOrgContext = (permissions: string[] = []) => {
   return createMockTRPCContext(
     permissions,
     SEED_TEST_IDS.ORGANIZATIONS.competitor,
-    'test-competitor-user'
+    "test-competitor-user",
   );
 };
 
@@ -143,7 +145,6 @@ const testRouter = createTRPCRouter({
 });
 
 describe("tRPC Permission Middleware - ENHANCED WITH ORGANIZATIONAL BOUNDARY SECURITY", () => {
-  
   // === BASIC PERMISSION TESTS ===
   describe("requirePermissionForSession - Core Functionality", () => {
     it("should allow access when user has required permission", async () => {
@@ -218,8 +219,8 @@ describe("tRPC Permission Middleware - ENHANCED WITH ORGANIZATIONAL BOUNDARY SEC
     it("CRITICAL - Should prevent cross-organizational permission escalation", async () => {
       // Arrange: Primary org admin tries to use competitor org permissions
       const primaryOrgCtx = createMockTRPCContext(
-        ["admin:delete"], 
-        SEED_TEST_IDS.ORGANIZATIONS.primary
+        ["admin:delete"],
+        SEED_TEST_IDS.ORGANIZATIONS.primary,
       );
       const caller = testRouter.createCaller(primaryOrgCtx as any);
 
@@ -243,7 +244,7 @@ describe("tRPC Permission Middleware - ENHANCED WITH ORGANIZATIONAL BOUNDARY SEC
       // Arrange: Create contexts for both organizations
       const primaryOrgCtx = createMockTRPCContext(
         ["test:permission"],
-        SEED_TEST_IDS.ORGANIZATIONS.primary
+        SEED_TEST_IDS.ORGANIZATIONS.primary,
       );
       const competitorOrgCtx = createCompetitorOrgContext(["test:permission"]);
 
@@ -263,27 +264,42 @@ describe("tRPC Permission Middleware - ENHANCED WITH ORGANIZATIONAL BOUNDARY SEC
 
       vi.mocked(requirePermissionForSession).mockImplementation((session) => {
         const orgId = (session.user as any)?.app_metadata?.organization_id;
-        if (orgId && [SEED_TEST_IDS.ORGANIZATIONS.primary, SEED_TEST_IDS.ORGANIZATIONS.competitor].includes(orgId)) {
+        if (
+          orgId &&
+          [
+            SEED_TEST_IDS.ORGANIZATIONS.primary,
+            SEED_TEST_IDS.ORGANIZATIONS.competitor,
+          ].includes(orgId)
+        ) {
           return Promise.resolve(undefined);
         }
-        return Promise.reject(new TRPCError({ code: "FORBIDDEN", message: "Invalid organizational context" }));
+        return Promise.reject(
+          new TRPCError({
+            code: "FORBIDDEN",
+            message: "Invalid organizational context",
+          }),
+        );
       });
 
       // Act & Assert: Both should succeed in their own context
-      await expect(primaryCaller.testRequirePermission()).resolves.toEqual({ message: "Permission granted" });
-      await expect(competitorCaller.testRequirePermission()).resolves.toEqual({ message: "Permission granted" });
+      await expect(primaryCaller.testRequirePermission()).resolves.toEqual({
+        message: "Permission granted",
+      });
+      await expect(competitorCaller.testRequirePermission()).resolves.toEqual({
+        message: "Permission granted",
+      });
     });
 
     it("CRITICAL - Should prevent role-based attacks across organizations", async () => {
       // Arrange: Malicious user tries to access with competitor org role ID
       const maliciousCtx = createMockTRPCContext(
         ["super:admin"],
-        SEED_TEST_IDS.ORGANIZATIONS.primary
+        SEED_TEST_IDS.ORGANIZATIONS.primary,
       );
-      
+
       // Simulate tampering with role context
       maliciousCtx.membership.roleId = "competitor-admin-role-id";
-      
+
       const caller = testRouter.createCaller(maliciousCtx as any);
 
       // Mock: Permission system should reject cross-org role access
@@ -335,13 +351,15 @@ describe("tRPC Permission Middleware - ENHANCED WITH ORGANIZATIONAL BOUNDARY SEC
         // Arrange
         const ctx = createMockTRPCContext(
           testCase.shouldSucceed ? [testCase.permission] : [],
-          testCase.org
+          testCase.org,
         );
         const caller = testRouter.createCaller(ctx as any);
 
         // Mock permission response based on test case
         if (testCase.shouldSucceed) {
-          vi.mocked(getUserPermissionsForSession).mockResolvedValue([testCase.permission]);
+          vi.mocked(getUserPermissionsForSession).mockResolvedValue([
+            testCase.permission,
+          ]);
           vi.mocked(requirePermissionForSession).mockResolvedValue(undefined);
         } else {
           vi.mocked(getUserPermissionsForSession).mockResolvedValue([]);
@@ -359,7 +377,9 @@ describe("tRPC Permission Middleware - ENHANCED WITH ORGANIZATIONAL BOUNDARY SEC
             message: "Permission granted",
           });
         } else {
-          await expect(caller.testRequirePermission()).rejects.toThrow(TRPCError);
+          await expect(caller.testRequirePermission()).rejects.toThrow(
+            TRPCError,
+          );
         }
       }
     });
@@ -392,12 +412,12 @@ describe("tRPC Permission Middleware - ENHANCED WITH ORGANIZATIONAL BOUNDARY SEC
       // Arrange: Session claims to be from primary org but has competitor context
       const tamperedCtx = createMockTRPCContext(
         ["admin:everything"],
-        SEED_TEST_IDS.ORGANIZATIONS.primary
+        SEED_TEST_IDS.ORGANIZATIONS.primary,
       );
-      
+
       // Tamper with organization context
       tamperedCtx.organization.id = SEED_TEST_IDS.ORGANIZATIONS.competitor;
-      
+
       const caller = testRouter.createCaller(tamperedCtx as any);
 
       // Mock: Should detect organization mismatch
@@ -420,7 +440,7 @@ describe("tRPC Permission Middleware - ENHANCED WITH ORGANIZATIONAL BOUNDARY SEC
       // Arrange
       const ctx = createMockTRPCContext(["test:permission"]);
       ctx.user.app_metadata.organization_id = null; // Simulate missing org context
-      
+
       const caller = testRouter.createCaller(ctx as any);
 
       // Mock: Null org context should result in access denial

@@ -96,8 +96,8 @@ describe("Comment Service Integration (tRPC)", () => {
         caller,
         testData: {
           user: seededData.user,
-          machine: seededData.machine!,
-          issue: seededData.issue!,
+          machine: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
+          issue: SEED_TEST_IDS.ISSUES.MACHINE_BROKEN_1,
           organization: organizationId,
           location: seededData.location,
           priority: seededData.priority,

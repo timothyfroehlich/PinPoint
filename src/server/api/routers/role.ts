@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { eq, and, count } from "drizzle-orm";
+import { eq, count } from "drizzle-orm";
 import { z } from "zod";
 
 import { createTRPCRouter } from "../trpc";

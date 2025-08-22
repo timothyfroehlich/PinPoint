@@ -16,7 +16,7 @@ import type { RLSOrganizationTRPCContext } from "~/server/api/trpc.base";
 import { generatePrefixedId } from "~/lib/utils/id-generation";
 import {
   createTRPCRouter,
-  orgScopedProcedure,
+  organizationProcedure,
   issueCreateProcedure,
   issueEditProcedure,
 } from "~/server/api/trpc";
@@ -72,7 +72,7 @@ async function createCommentWithAuthor(
     });
   }
 
-  // Insert the comment (RLS trigger handles organizationId)
+  // Insert the comment
   const [comment] = await ctx.db
     .insert(comments)
     .values({
@@ -80,6 +80,7 @@ async function createCommentWithAuthor(
       content: input.content,
       issueId: input.issueId,
       authorId: ctx.user.id,
+      organizationId: ctx.organization.id,
     })
     .returning({
       id: comments.id,
@@ -198,6 +199,7 @@ export const issueCommentRouter = createTRPCRouter({
             deletedAt: comments.deletedAt,
             issue: {
               id: issues.id,
+              organizationId: issues.organizationId,
             },
             author: {
               id: users.id,
@@ -287,7 +289,7 @@ export const issueCommentRouter = createTRPCRouter({
     ),
 
   // Delete comment (users can delete their own, admins can delete any)
-  deleteComment: orgScopedProcedure
+  deleteComment: organizationProcedure
     .input(
       z.object({
         commentId: z.string(),
@@ -302,6 +304,7 @@ export const issueCommentRouter = createTRPCRouter({
           deletedAt: comments.deletedAt,
           issue: {
             id: issues.id,
+            organizationId: issues.organizationId,
           },
           author: {
             id: users.id,
@@ -376,7 +379,7 @@ export const issueCommentRouter = createTRPCRouter({
     }),
 
   // Restore deleted comment (admins only)
-  restoreComment: orgScopedProcedure
+  restoreComment: organizationProcedure
     .input(
       z.object({
         commentId: z.string(),
@@ -391,6 +394,7 @@ export const issueCommentRouter = createTRPCRouter({
           deletedAt: comments.deletedAt,
           issue: {
             id: issues.id,
+            organizationId: issues.organizationId,
           },
           author: {
             id: users.id,
@@ -450,7 +454,7 @@ export const issueCommentRouter = createTRPCRouter({
     }),
 
   // Get all deleted comments for organization (admin view)
-  getDeletedComments: orgScopedProcedure.query(async ({ ctx }) => {
+  getDeletedComments: organizationProcedure.query(async ({ ctx }) => {
     // Use validation functions
     const adminValidation = validateAdminPermissions(ctx.userPermissions);
     if (!adminValidation.valid) {

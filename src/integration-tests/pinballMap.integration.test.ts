@@ -23,18 +23,16 @@
  * - API error handling: External service failure scenarios
  */
 
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { describe, expect, vi, beforeEach } from "vitest";
 import { http, HttpResponse } from "msw";
 
 // Import test setup and utilities
 import { appRouter } from "~/server/api/root";
 import * as schema from "~/server/db/schema";
-import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 import { server } from "~/test/msw/setup";
 
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
-import { generateTestId } from "~/test/helpers/test-id-generator";
 
 // Use existing seeded data from worker database (much faster than complex seeding)
 async function getSimpleSeededData(db: any) {
@@ -46,7 +44,9 @@ async function getSimpleSeededData(db: any) {
   const user = await db.query.users.findFirst();
 
   if (!organization || !location || !user) {
-    throw new Error("Seeded data not found - worker database not properly initialized");
+    throw new Error(
+      "Seeded data not found - worker database not properly initialized",
+    );
   }
 
   return {
@@ -61,13 +61,12 @@ import type { TRPCContext } from "~/server/api/trpc.base";
 import type { TestDatabase } from "~/test/helpers/pglite-test-setup";
 import { ServiceFactory } from "~/server/services/factory";
 
-
 // Helper function to create proper tRPC context
 function createPinballMapTestContext(
   db: TestDatabase,
   organizationId: string,
   userId: string,
-  permissions: string[] = ["organization:manage", "location:edit"]
+  permissions: string[] = ["organization:manage", "location:edit"],
 ): TRPCContext {
   // Set the global mock permissions when creating context
   setMockPermissions(permissions);
@@ -113,19 +112,28 @@ function createPinballMapTestContext(
 // MSW handlers for PinballMap API mocking
 const pinballMapApiHandlers = {
   success: (machines: any[]) =>
-    http.get('https://pinballmap.com/api/v1/locations/:locationId/machine_details.json', () => {
-      return HttpResponse.json({ machines });
-    }),
-  
+    http.get(
+      "https://pinballmap.com/api/v1/locations/:locationId/machine_details.json",
+      () => {
+        return HttpResponse.json({ machines });
+      },
+    ),
+
   error: (status = 500) =>
-    http.get('https://pinballmap.com/api/v1/locations/:locationId/machine_details.json', () => {
-      return new HttpResponse(null, { status });
-    }),
-  
+    http.get(
+      "https://pinballmap.com/api/v1/locations/:locationId/machine_details.json",
+      () => {
+        return new HttpResponse(null, { status });
+      },
+    ),
+
   empty: () =>
-    http.get('https://pinballmap.com/api/v1/locations/:locationId/machine_details.json', () => {
-      return HttpResponse.json({ machines: [] });
-    }),
+    http.get(
+      "https://pinballmap.com/api/v1/locations/:locationId/machine_details.json",
+      () => {
+        return HttpResponse.json({ machines: [] });
+      },
+    ),
 };
 
 // Mock ID generation for consistent test data
@@ -136,12 +144,12 @@ vi.mock("~/lib/utils/id-generation", () => ({
 // Store mock permission state globally
 let mockUserPermissions: string[] = [];
 
-const mockRequirePermissionForSession = vi.hoisted(() => 
+const mockRequirePermissionForSession = vi.hoisted(() =>
   vi.fn(async (session, permission) => {
     if (!mockUserPermissions.includes(permission)) {
       throw new Error(`Missing required permission: ${permission}`);
     }
-  })
+  }),
 );
 
 vi.mock("~/server/auth/permissions", () => ({
@@ -174,15 +182,17 @@ describe("PinballMap Integration Tests", () => {
   });
 
   describe("enableIntegration", () => {
-    test("should create new config and enable integration", async ({ workerDb }) => {
+    test("should create new config and enable integration", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         const testData = await getSimpleSeededData(db);
         const adminContext = createPinballMapTestContext(
           db,
           testData.organizationId,
-          testData.userId
+          testData.userId,
         );
-        
+
         const caller = appRouter.createCaller(adminContext);
         const result = await caller.pinballMap.enableIntegration();
 
@@ -190,7 +200,10 @@ describe("PinballMap Integration Tests", () => {
 
         // Verify real database state
         const config = await db.query.pinballMapConfigs.findFirst({
-          where: eq(schema.pinballMapConfigs.organizationId, testData.organizationId),
+          where: eq(
+            schema.pinballMapConfigs.organizationId,
+            testData.organizationId,
+          ),
         });
 
         expect(config).toBeDefined();
@@ -200,10 +213,12 @@ describe("PinballMap Integration Tests", () => {
       });
     });
 
-    test("should update existing disabled config to enabled", async ({ workerDb }) => {
+    test("should update existing disabled config to enabled", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         const testData = await getSimpleSeededData(db);
-        
+
         // Create existing disabled config
         await db.insert(schema.pinballMapConfigs).values({
           id: "test-existing-config",
@@ -216,15 +231,18 @@ describe("PinballMap Integration Tests", () => {
         const adminContext = createPinballMapTestContext(
           db,
           testData.organizationId,
-          testData.userId
+          testData.userId,
         );
-        
+
         const caller = appRouter.createCaller(adminContext);
         await caller.pinballMap.enableIntegration();
 
         // Verify config was updated, not duplicated
         const configs = await db.query.pinballMapConfigs.findMany({
-          where: eq(schema.pinballMapConfigs.organizationId, testData.organizationId),
+          where: eq(
+            schema.pinballMapConfigs.organizationId,
+            testData.organizationId,
+          ),
         });
 
         expect(configs).toHaveLength(1);
@@ -232,7 +250,9 @@ describe("PinballMap Integration Tests", () => {
       });
     });
 
-    test("should require organization:manage permission", async ({ workerDb }) => {
+    test("should require organization:manage permission", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         const testData = await getSimpleSeededData(db);
         // Create member context with limited permissions
@@ -240,22 +260,25 @@ describe("PinballMap Integration Tests", () => {
           db,
           testData.organizationId,
           testData.userId,
-          ["location:edit"] // Not organization:manage
+          ["location:edit"], // Not organization:manage
         );
-        
+
         const caller = appRouter.createCaller(memberContext);
 
-        await expect(caller.pinballMap.enableIntegration())
-          .rejects.toThrow("Missing required permission: organization:manage");
+        await expect(caller.pinballMap.enableIntegration()).rejects.toThrow(
+          "Missing required permission: organization:manage",
+        );
       });
     });
   });
 
   describe("configureLocation", () => {
-    test("should configure location when integration enabled", async ({ workerDb }) => {
+    test("should configure location when integration enabled", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         const testData = await getSimpleSeededData(db);
-        
+
         // Enable integration first
         await db.insert(schema.pinballMapConfigs).values({
           id: "test-config",
@@ -270,9 +293,9 @@ describe("PinballMap Integration Tests", () => {
         const adminContext = createPinballMapTestContext(
           db,
           testData.organizationId,
-          testData.userId
+          testData.userId,
         );
-        
+
         const caller = appRouter.createCaller(adminContext);
         const result = await caller.pinballMap.configureLocation({
           locationId: testData.locationId,
@@ -291,15 +314,17 @@ describe("PinballMap Integration Tests", () => {
       });
     });
 
-    test("should throw error when integration not enabled", async ({ workerDb }) => {
+    test("should throw error when integration not enabled", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         const testData = await getSimpleSeededData(db);
         const adminContext = createPinballMapTestContext(
           db,
           testData.organizationId,
-          testData.userId
+          testData.userId,
         );
-        
+
         const caller = appRouter.createCaller(adminContext);
 
         await expect(
@@ -307,14 +332,16 @@ describe("PinballMap Integration Tests", () => {
             locationId: testData.locationId,
             pinballMapId: 26454,
           }),
-        ).rejects.toThrow("PinballMap integration not enabled for organization");
+        ).rejects.toThrow(
+          "PinballMap integration not enabled for organization",
+        );
       });
     });
 
     test("should enforce organizational boundaries", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
         const testData = await getSimpleSeededData(db);
-        
+
         // Create location in different organization
         const [competitorLocation] = await db
           .insert(schema.locations)
@@ -330,9 +357,9 @@ describe("PinballMap Integration Tests", () => {
         const adminContext = createPinballMapTestContext(
           db,
           testData.organizationId,
-          testData.userId
+          testData.userId,
         );
-        
+
         const caller = appRouter.createCaller(adminContext);
 
         // Should not be able to configure competitor's location
@@ -350,7 +377,7 @@ describe("PinballMap Integration Tests", () => {
     test("should sync machines from PinballMap API", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
         const testData = await getSimpleSeededData(db);
-        
+
         // Setup enabled integration and configured location
         await db.insert(schema.pinballMapConfigs).values({
           id: "test-config",
@@ -366,7 +393,7 @@ describe("PinballMap Integration Tests", () => {
           .update(schema.locations)
           .set({ pinballMapId: 26454, syncEnabled: true })
           .where(eq(schema.locations.id, testData.locationId));
-        
+
         // Mock successful PinballMap API response
         server.use(
           pinballMapApiHandlers.success([
@@ -377,20 +404,20 @@ describe("PinballMap Integration Tests", () => {
               year: 1997,
             },
             {
-              opdb_id: "TZ-001", 
+              opdb_id: "TZ-001",
               machine_name: "Twilight Zone",
               manufacturer: "Bally",
               year: 1993,
             },
-          ])
+          ]),
         );
 
         const adminContext = createPinballMapTestContext(
           db,
           testData.organizationId,
-          testData.userId
+          testData.userId,
         );
-        
+
         const caller = appRouter.createCaller(adminContext);
         const result = await caller.pinballMap.syncLocation({
           locationId: testData.locationId,
@@ -406,31 +433,40 @@ describe("PinballMap Integration Tests", () => {
         });
 
         expect(machines.length).toBeGreaterThan(0);
-        expect(machines.some(m => m.model?.name === "Medieval Madness")).toBe(true);
-        expect(machines.some(m => m.model?.name === "Twilight Zone")).toBe(true);
+        expect(machines.some((m) => m.model?.name === "Medieval Madness")).toBe(
+          true,
+        );
+        expect(machines.some((m) => m.model?.name === "Twilight Zone")).toBe(
+          true,
+        );
       });
     });
 
-    test("should remove machines not in PinballMap but preserve machines with issues", async ({ workerDb }) => {
+    test("should remove machines not in PinballMap but preserve machines with issues", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         const testData = await getSimpleSeededData(db);
-        
+
         // Create a test model since seeded data doesn't include models
-        const [testModel] = await db.insert(schema.models).values({
-          id: "test-model-mm",
-          name: "Medieval Madness",
-          manufacturer: "Williams",
-          year: 1997,
-          opdbId: "MM-001",
-          isActive: true,
-        }).returning();
-        
+        const [testModel] = await db
+          .insert(schema.models)
+          .values({
+            id: "test-model-mm",
+            name: "Medieval Madness",
+            manufacturer: "Williams",
+            year: 1997,
+            opdbId: "MM-001",
+            isActive: true,
+          })
+          .returning();
+
         if (!testModel) {
           throw new Error("Failed to create test model");
         }
-        
+
         const existingModel = testModel;
-        
+
         // Setup integration
         await db.insert(schema.pinballMapConfigs).values({
           id: "test-config",
@@ -448,7 +484,7 @@ describe("PinballMap Integration Tests", () => {
           .where(eq(schema.locations.id, testData.locationId));
 
         // Create machine that will be missing from API (should be removed)
-        const [machineToRemove] = await db
+        const [_machineToRemove] = await db
           .insert(schema.machines)
           .values({
             id: "machine-to-remove",
@@ -482,11 +518,11 @@ describe("PinballMap Integration Tests", () => {
         // Get existing status and priority from seeded data
         const existingStatus = await db.query.issueStatuses.findFirst();
         const existingPriority = await db.query.priorities.findFirst();
-        
+
         if (!existingStatus || !existingPriority) {
           throw new Error("No status or priority found in seeded data");
         }
-        
+
         // Create issue for the machine
         await db.insert(schema.issues).values({
           id: "test-issue",
@@ -506,9 +542,9 @@ describe("PinballMap Integration Tests", () => {
         const adminContext = createPinballMapTestContext(
           db,
           testData.organizationId,
-          testData.userId
+          testData.userId,
         );
-        
+
         const caller = appRouter.createCaller(adminContext);
         const result = await caller.pinballMap.syncLocation({
           locationId: testData.locationId,
@@ -527,10 +563,12 @@ describe("PinballMap Integration Tests", () => {
       });
     });
 
-    test("should handle PinballMap API errors gracefully", async ({ workerDb }) => {
+    test("should handle PinballMap API errors gracefully", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         const testData = await getSimpleSeededData(db);
-        
+
         // Setup integration
         await db.insert(schema.pinballMapConfigs).values({
           id: "test-config",
@@ -553,9 +591,9 @@ describe("PinballMap Integration Tests", () => {
         const adminContext = createPinballMapTestContext(
           db,
           testData.organizationId,
-          testData.userId
+          testData.userId,
         );
-        
+
         const caller = appRouter.createCaller(adminContext);
 
         const result = await caller.pinballMap.syncLocation({
@@ -569,10 +607,12 @@ describe("PinballMap Integration Tests", () => {
   });
 
   describe("getSyncStatus", () => {
-    test("should return enabled status with configured locations", async ({ workerDb }) => {
+    test("should return enabled status with configured locations", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         const testData = await getSimpleSeededData(db);
-        
+
         // Create enabled config
         await db.insert(schema.pinballMapConfigs).values({
           id: "test-config",
@@ -587,15 +627,19 @@ describe("PinballMap Integration Tests", () => {
         // Configure location for sync
         await db
           .update(schema.locations)
-          .set({ pinballMapId: 26454, syncEnabled: true, lastSyncAt: new Date() })
+          .set({
+            pinballMapId: 26454,
+            syncEnabled: true,
+            lastSyncAt: new Date(),
+          })
           .where(eq(schema.locations.id, testData.locationId));
 
         const adminContext = createPinballMapTestContext(
           db,
           testData.organizationId,
-          testData.userId
+          testData.userId,
         );
-        
+
         const caller = appRouter.createCaller(adminContext);
         const result = await caller.pinballMap.getSyncStatus();
 
@@ -608,15 +652,17 @@ describe("PinballMap Integration Tests", () => {
       });
     });
 
-    test("should return disabled status when integration not enabled", async ({ workerDb }) => {
+    test("should return disabled status when integration not enabled", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         const testData = await getSimpleSeededData(db);
         const adminContext = createPinballMapTestContext(
           db,
           testData.organizationId,
-          testData.userId
+          testData.userId,
         );
-        
+
         const caller = appRouter.createCaller(adminContext);
         const result = await caller.pinballMap.getSyncStatus();
 
@@ -629,7 +675,7 @@ describe("PinballMap Integration Tests", () => {
     test("should enforce organizational boundaries", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
         const testData = await getSimpleSeededData(db);
-        
+
         // Create config for competitor organization
         await db.insert(schema.pinballMapConfigs).values({
           id: "competitor-config",
@@ -655,9 +701,9 @@ describe("PinballMap Integration Tests", () => {
         const adminContext = createPinballMapTestContext(
           db,
           testData.organizationId,
-          testData.userId
+          testData.userId,
         );
-        
+
         const caller = appRouter.createCaller(adminContext);
         const result = await caller.pinballMap.getSyncStatus();
 

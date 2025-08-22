@@ -23,7 +23,7 @@ import {
   IconButton,
   Tooltip,
 } from "@mui/material";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { ActiveFilters } from "./ActiveFilters";
@@ -32,18 +32,17 @@ import { FilterToolbar } from "./FilterToolbar";
 import { PermissionGate } from "~/components/permissions/PermissionGate";
 import { usePermissions } from "~/hooks/usePermissions";
 import { api } from "~/trpc/react";
-import { 
-  type IssueFilters, 
-  mergeFilters, 
-  validateFilters, 
-  clearAllFilters 
+import {
+  type IssueFilters,
+  mergeFilters,
+  validateFilters,
+  clearAllFilters,
 } from "~/lib/issues/filterUtils";
 import { createFilteredUrl } from "~/lib/issues/urlUtils";
-import { 
-  toggleSelection, 
-  selectAll, 
-  selectNone, 
-  isSelected 
+import {
+  toggleSelection,
+  selectAll,
+  selectNone,
 } from "~/lib/issues/selectionUtils";
 
 // Helper function to get status color based on category
@@ -118,10 +117,11 @@ export function IssueList({
   initialFilters,
 }: IssueListProps): React.JSX.Element {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { hasPermission, isLoading: permissionsLoading } = usePermissions();
 
-  const [filters, setFilters] = useState<IssueFilters>(validateFilters(initialFilters));
+  const [filters, setFilters] = useState<IssueFilters>(
+    validateFilters(initialFilters),
+  );
   const [selectedIssues, setSelectedIssues] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
@@ -146,11 +146,11 @@ export function IssueList({
 
   // Handle issue selection
   const handleSelectIssue = (issueId: string, selected: boolean): void => {
-    setSelectedIssues(prev => toggleSelection(prev, issueId, selected));
+    setSelectedIssues((prev) => toggleSelection(prev, issueId, selected));
   };
 
   const handleSelectAll = (selected: boolean): void => {
-    const issueIds = issues?.map(issue => issue.id) ?? [];
+    const issueIds = issues?.map((issue) => issue.id) ?? [];
     setSelectedIssues(selected ? selectAll(issueIds) : selectNone());
   };
 

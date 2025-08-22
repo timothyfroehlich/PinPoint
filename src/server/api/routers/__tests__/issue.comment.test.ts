@@ -58,7 +58,7 @@ vi.mock("~/utils/supabase/server", () => ({
 // Mock external dependencies with SEED_TEST_IDS patterns
 vi.mock("~/lib/utils/id-generation", () => ({
   generatePrefixedId: vi.fn(
-    (prefix: string) => `${SEED_TEST_IDS.MOCK_PATTERNS.ISSUE}-generated`,
+    (_prefix: string) => `${SEED_TEST_IDS.MOCK_PATTERNS.ISSUE}-generated`,
   ),
 }));
 
@@ -1053,7 +1053,7 @@ describe("Issue Comment Router (RLS-Enhanced)", () => {
 
     it("should enforce organizational boundaries in deleted comments list (RLS)", async () => {
       // Test that deleted comments from other orgs are not visible
-      const competitorDeletedComments = [
+      const _competitorDeletedComments = [
         {
           id: "competitor-comment-deleted",
           content: "Competitor deleted comment",

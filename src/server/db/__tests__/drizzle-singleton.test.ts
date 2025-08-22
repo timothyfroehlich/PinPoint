@@ -16,10 +16,6 @@ import {
   type MockedFunction,
 } from "vitest";
 import { test, withIsolatedTest } from "../../../test/helpers/worker-scoped-db";
-import {
-  createSeededTestDatabase,
-  type TestDatabase,
-} from "../../../test/helpers/pglite-test-setup";
 
 // Mock postgres-js
 const mockPostgresInstance = {

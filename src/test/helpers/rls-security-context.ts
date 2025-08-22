@@ -9,7 +9,6 @@
  * via session variables before executing DB-dependent logic.
  */
 
-import { sql } from "drizzle-orm";
 import type { TestDatabase } from "./worker-scoped-db";
 
 export interface RLSContext {
@@ -40,7 +39,9 @@ export async function withRLSSecurityContext<T>(
   await db.execute(`SET app.current_user_role = '${esc(context.userRole)}'`);
 
   if (context.userEmail) {
-    await db.execute(`SET app.current_user_email = '${esc(context.userEmail)}'`);
+    await db.execute(
+      `SET app.current_user_email = '${esc(context.userEmail)}'`,
+    );
   }
 
   return await fn(db);

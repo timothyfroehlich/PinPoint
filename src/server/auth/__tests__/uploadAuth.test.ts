@@ -29,11 +29,7 @@ import type { NextRequest } from "next/server";
 import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 import type { DrizzleClient } from "~/server/db/drizzle";
 
-import {
-  SEED_TEST_IDS,
-  createMockAdminContext,
-  createMockMemberContext,
-} from "~/test/constants/seed-test-ids";
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
 // Mock external dependencies
 vi.mock("../supabase", () => ({
@@ -92,10 +88,13 @@ function createMockSupabaseUser(
 function createCompetitorOrgUser(
   overrides: Partial<PinPointSupabaseUser> = {},
 ): PinPointSupabaseUser {
-  return createMockSupabaseUser({
-    id: 'test-competitor-user',
-    ...overrides,
-  }, SEED_TEST_IDS.ORGANIZATIONS.competitor);
+  return createMockSupabaseUser(
+    {
+      id: "test-competitor-user",
+      ...overrides,
+    },
+    SEED_TEST_IDS.ORGANIZATIONS.competitor,
+  );
 }
 
 function createMockRequest(headers: Record<string, string> = {}): NextRequest {
@@ -119,11 +118,19 @@ function createMockDrizzleClient(): DrizzleClient {
   } as unknown as DrizzleClient;
 }
 
-function createMockOrganization(organizationId: string = SEED_TEST_IDS.ORGANIZATIONS.primary) {
+function createMockOrganization(
+  organizationId: string = SEED_TEST_IDS.ORGANIZATIONS.primary,
+) {
   return {
     id: organizationId,
-    name: organizationId === SEED_TEST_IDS.ORGANIZATIONS.primary ? "Primary Organization" : "Competitor Organization",
-    subdomain: organizationId === SEED_TEST_IDS.ORGANIZATIONS.primary ? "primary-org" : "competitor-org",
+    name:
+      organizationId === SEED_TEST_IDS.ORGANIZATIONS.primary
+        ? "Primary Organization"
+        : "Competitor Organization",
+    subdomain:
+      organizationId === SEED_TEST_IDS.ORGANIZATIONS.primary
+        ? "primary-org"
+        : "competitor-org",
   };
 }
 
@@ -135,7 +142,7 @@ function createCompetitorOrganization() {
 function createMockMembership(
   userId: string = SEED_TEST_IDS.USERS.ADMIN,
   organizationId: string = SEED_TEST_IDS.ORGANIZATIONS.primary,
-  permissions: string[] = ["upload:create", "file:manage"]
+  permissions: string[] = ["upload:create", "file:manage"],
 ) {
   return {
     id: `membership-${userId}-${organizationId}`,
@@ -155,9 +162,9 @@ function createMockMembership(
 // Helper for creating competitor org membership
 function createCompetitorMembership(permissions: string[] = ["upload:create"]) {
   return createMockMembership(
-    'test-competitor-user',
+    "test-competitor-user",
     SEED_TEST_IDS.ORGANIZATIONS.competitor,
-    permissions
+    permissions,
   );
 }
 
@@ -538,9 +545,12 @@ describe("uploadAuth", () => {
   describe("CRITICAL - Cross-Tenant Upload Security", () => {
     it("CRITICAL - Should prevent cross-organizational upload access via subdomain manipulation", async () => {
       // Arrange: Primary org user tries to access competitor org uploads via subdomain header
-      const primaryOrgUser = createMockSupabaseUser({}, SEED_TEST_IDS.ORGANIZATIONS.primary);
+      const primaryOrgUser = createMockSupabaseUser(
+        {},
+        SEED_TEST_IDS.ORGANIZATIONS.primary,
+      );
       const competitorOrg = createCompetitorOrganization();
-      
+
       mockGetSupabaseUser.mockResolvedValue(primaryOrgUser);
       mockIsValidOrganization.mockReturnValue(true);
       mockIsValidMembership.mockReturnValue(false); // Not a member of competitor org
@@ -549,8 +559,12 @@ describe("uploadAuth", () => {
       mockRequest = createMockRequest({ "x-subdomain": "competitor-org" });
 
       // Set up database mocks
-      vi.mocked(mockDrizzle.query.organizations.findFirst).mockResolvedValue(competitorOrg);
-      vi.mocked(mockDrizzle.query.memberships.findFirst).mockResolvedValue(null); // No membership
+      vi.mocked(mockDrizzle.query.organizations.findFirst).mockResolvedValue(
+        competitorOrg,
+      );
+      vi.mocked(mockDrizzle.query.memberships.findFirst).mockResolvedValue(
+        null,
+      ); // No membership
 
       // Act & Assert
       await expect(
@@ -569,9 +583,12 @@ describe("uploadAuth", () => {
 
     it("CRITICAL - Should validate user organization matches subdomain organization", async () => {
       // Arrange: User claims to be from primary org but subdomain points to competitor
-      const primaryOrgUser = createMockSupabaseUser({}, SEED_TEST_IDS.ORGANIZATIONS.primary);
+      const primaryOrgUser = createMockSupabaseUser(
+        {},
+        SEED_TEST_IDS.ORGANIZATIONS.primary,
+      );
       const competitorOrg = createCompetitorOrganization();
-      
+
       mockGetSupabaseUser.mockResolvedValue(primaryOrgUser);
       mockIsValidOrganization.mockReturnValue(true);
       mockIsValidMembership.mockReturnValue(false);
@@ -579,8 +596,12 @@ describe("uploadAuth", () => {
       // User's org_metadata says primary, but subdomain says competitor
       mockRequest = createMockRequest({ "x-subdomain": "competitor-org" });
 
-      vi.mocked(mockDrizzle.query.organizations.findFirst).mockResolvedValue(competitorOrg);
-      vi.mocked(mockDrizzle.query.memberships.findFirst).mockResolvedValue(null);
+      vi.mocked(mockDrizzle.query.organizations.findFirst).mockResolvedValue(
+        competitorOrg,
+      );
+      vi.mocked(mockDrizzle.query.memberships.findFirst).mockResolvedValue(
+        null,
+      );
 
       // Act & Assert: Should fail because user's org context doesn't match subdomain org
       await expect(
@@ -595,12 +616,17 @@ describe("uploadAuth", () => {
 
     it("CRITICAL - Should prevent cross-tenant upload permission escalation", async () => {
       // Arrange: Setup two separate organizational contexts
-      const primaryOrgUser = createMockSupabaseUser({}, SEED_TEST_IDS.ORGANIZATIONS.primary);
-      const primaryOrg = createMockOrganization(SEED_TEST_IDS.ORGANIZATIONS.primary);
+      const primaryOrgUser = createMockSupabaseUser(
+        {},
+        SEED_TEST_IDS.ORGANIZATIONS.primary,
+      );
+      const primaryOrg = createMockOrganization(
+        SEED_TEST_IDS.ORGANIZATIONS.primary,
+      );
       const primaryMembership = createMockMembership(
         SEED_TEST_IDS.USERS.ADMIN,
         SEED_TEST_IDS.ORGANIZATIONS.primary,
-        ["upload:create", "admin:full"] // High permissions in primary org
+        ["upload:create", "admin:full"], // High permissions in primary org
       );
 
       // Test 1: Primary org user accessing their own org (should succeed)
@@ -608,17 +634,24 @@ describe("uploadAuth", () => {
       mockIsValidOrganization.mockReturnValue(true);
       mockIsValidMembership.mockReturnValue(true);
       mockRequest = createMockRequest({ "x-subdomain": "primary-org" });
-      
-      vi.mocked(mockDrizzle.query.organizations.findFirst).mockResolvedValue(primaryOrg);
-      vi.mocked(mockDrizzle.query.memberships.findFirst).mockResolvedValue(primaryMembership);
 
-      const primaryOrgContext = await getUploadAuthContext(mockRequest, mockDrizzle);
-      
+      vi.mocked(mockDrizzle.query.organizations.findFirst).mockResolvedValue(
+        primaryOrg,
+      );
+      vi.mocked(mockDrizzle.query.memberships.findFirst).mockResolvedValue(
+        primaryMembership,
+      );
+
+      const primaryOrgContext = await getUploadAuthContext(
+        mockRequest,
+        mockDrizzle,
+      );
+
       // Should have permissions in own org
       expect(() => {
         requireUploadPermission(primaryOrgContext, "upload:create");
       }).not.toThrow();
-      
+
       expect(() => {
         requireUploadPermission(primaryOrgContext, "admin:full");
       }).not.toThrow();
@@ -626,9 +659,13 @@ describe("uploadAuth", () => {
       // Test 2: Same user context but accessing competitor org uploads (should fail)
       const competitorOrg = createCompetitorOrganization();
       mockRequest = createMockRequest({ "x-subdomain": "competitor-org" });
-      
-      vi.mocked(mockDrizzle.query.organizations.findFirst).mockResolvedValue(competitorOrg);
-      vi.mocked(mockDrizzle.query.memberships.findFirst).mockResolvedValue(null); // No membership in competitor org
+
+      vi.mocked(mockDrizzle.query.organizations.findFirst).mockResolvedValue(
+        competitorOrg,
+      );
+      vi.mocked(mockDrizzle.query.memberships.findFirst).mockResolvedValue(
+        null,
+      ); // No membership in competitor org
       mockIsValidMembership.mockReturnValue(false);
 
       // Should be denied access to competitor org
@@ -646,11 +683,13 @@ describe("uploadAuth", () => {
       // Arrange: Create auth contexts for both organizations
       const primaryOrgContext = {
         user: createMockSupabaseUser({}, SEED_TEST_IDS.ORGANIZATIONS.primary),
-        organization: createMockOrganization(SEED_TEST_IDS.ORGANIZATIONS.primary),
+        organization: createMockOrganization(
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+        ),
         membership: createMockMembership(
           SEED_TEST_IDS.USERS.ADMIN,
           SEED_TEST_IDS.ORGANIZATIONS.primary,
-          ["upload:create", "upload:delete", "admin:manage"]
+          ["upload:create", "upload:delete", "admin:manage"],
         ),
         userPermissions: ["upload:create", "upload:delete", "admin:manage"],
       };
@@ -666,11 +705,11 @@ describe("uploadAuth", () => {
       expect(() => {
         requireUploadPermission(primaryOrgContext, "upload:create");
       }).not.toThrow();
-      
+
       expect(() => {
         requireUploadPermission(primaryOrgContext, "upload:delete");
       }).not.toThrow();
-      
+
       expect(() => {
         requireUploadPermission(primaryOrgContext, "admin:manage");
       }).not.toThrow();
@@ -679,7 +718,7 @@ describe("uploadAuth", () => {
       expect(() => {
         requireUploadPermission(competitorOrgContext, "upload:create");
       }).not.toThrow();
-      
+
       expect(() => {
         requireUploadPermission(competitorOrgContext, "upload:delete");
       }).toThrow(
@@ -688,7 +727,7 @@ describe("uploadAuth", () => {
           message: "Permission required: upload:delete",
         }),
       );
-      
+
       expect(() => {
         requireUploadPermission(competitorOrgContext, "admin:manage");
       }).toThrow(
@@ -702,15 +741,27 @@ describe("uploadAuth", () => {
     it("CRITICAL - Should prevent subdomain spoofing attacks", async () => {
       // Arrange: Attempt various subdomain spoofing techniques
       const spoofingAttempts = [
-        { subdomain: "primary-org.competitor-org", description: "DNS-style spoofing" },
-        { subdomain: "primary-org/../competitor-org", description: "Path traversal attempt" },
+        {
+          subdomain: "primary-org.competitor-org",
+          description: "DNS-style spoofing",
+        },
+        {
+          subdomain: "primary-org/../competitor-org",
+          description: "Path traversal attempt",
+        },
         { subdomain: "PRIMARY-ORG", description: "Case manipulation" },
-        { subdomain: "primary-org; DROP TABLE uploads; --", description: "SQL injection attempt" },
+        {
+          subdomain: "primary-org; DROP TABLE uploads; --",
+          description: "SQL injection attempt",
+        },
         { subdomain: "", description: "Empty subdomain" },
         { subdomain: "null", description: "Null string spoofing" },
       ];
 
-      const primaryOrgUser = createMockSupabaseUser({}, SEED_TEST_IDS.ORGANIZATIONS.primary);
+      const primaryOrgUser = createMockSupabaseUser(
+        {},
+        SEED_TEST_IDS.ORGANIZATIONS.primary,
+      );
       mockGetSupabaseUser.mockResolvedValue(primaryOrgUser);
 
       for (const attempt of spoofingAttempts) {
@@ -718,15 +769,17 @@ describe("uploadAuth", () => {
         vi.clearAllMocks();
         mockGetSupabaseUser.mockResolvedValue(primaryOrgUser);
         mockIsValidOrganization.mockReturnValue(false); // Spoofed subdomains won't match valid orgs
-        
+
         mockRequest = createMockRequest({ "x-subdomain": attempt.subdomain });
-        vi.mocked(mockDrizzle.query.organizations.findFirst).mockResolvedValue(null);
+        vi.mocked(mockDrizzle.query.organizations.findFirst).mockResolvedValue(
+          null,
+        );
 
         // Act & Assert: All spoofing attempts should be denied
         await expect(
           getUploadAuthContext(mockRequest, mockDrizzle),
         ).rejects.toThrow(TRPCError);
-        
+
         // Additional check for the specific error message pattern
         try {
           await getUploadAuthContext(mockRequest, mockDrizzle);
@@ -740,15 +793,20 @@ describe("uploadAuth", () => {
 
     it("CRITICAL - Should handle concurrent cross-tenant access attempts", async () => {
       // Arrange: Simulate concurrent access attempts from different orgs
-      const primaryOrgUser = createMockSupabaseUser({}, SEED_TEST_IDS.ORGANIZATIONS.primary);
+      const primaryOrgUser = createMockSupabaseUser(
+        {},
+        SEED_TEST_IDS.ORGANIZATIONS.primary,
+      );
       const competitorOrgUser = createCompetitorOrgUser();
-      
-      const primaryOrg = createMockOrganization(SEED_TEST_IDS.ORGANIZATIONS.primary);
+
+      const primaryOrg = createMockOrganization(
+        SEED_TEST_IDS.ORGANIZATIONS.primary,
+      );
       const competitorOrg = createCompetitorOrganization();
-      
+
       const primaryMembership = createMockMembership(
         SEED_TEST_IDS.USERS.ADMIN,
-        SEED_TEST_IDS.ORGANIZATIONS.primary
+        SEED_TEST_IDS.ORGANIZATIONS.primary,
       );
       const competitorMembership = createCompetitorMembership();
 
@@ -794,10 +852,14 @@ describe("uploadAuth", () => {
         mockGetSupabaseUser.mockResolvedValue(testCase.user);
         mockIsValidOrganization.mockReturnValue(true);
         mockIsValidMembership.mockReturnValue(testCase.shouldSucceed);
-        
+
         mockRequest = createMockRequest({ "x-subdomain": testCase.subdomain });
-        vi.mocked(mockDrizzle.query.organizations.findFirst).mockResolvedValue(testCase.org);
-        vi.mocked(mockDrizzle.query.memberships.findFirst).mockResolvedValue(testCase.membership);
+        vi.mocked(mockDrizzle.query.organizations.findFirst).mockResolvedValue(
+          testCase.org,
+        );
+        vi.mocked(mockDrizzle.query.memberships.findFirst).mockResolvedValue(
+          testCase.membership,
+        );
 
         if (testCase.shouldSucceed) {
           // Should succeed
@@ -862,7 +924,7 @@ describe("uploadAuth", () => {
           membership: createMockMembership(
             SEED_TEST_IDS.USERS.ADMIN,
             testCase.org,
-            testCase.permissions
+            testCase.permissions,
           ),
           userPermissions: testCase.permissions,
         };

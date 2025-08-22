@@ -19,13 +19,11 @@
 import { describe, test, expect } from "vitest";
 import { eq, and, sql } from "drizzle-orm";
 import {
-  test as workerTest,
   withRLSAwareTest,
   withCrossOrgTest,
 } from "~/test/helpers/worker-scoped-db";
 import {
   testSessions,
-  sessionVerification,
   MultiContextManager,
 } from "~/test/helpers/session-context";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";

@@ -22,7 +22,7 @@
  * - Confirmation status toggle
  * - Issue listing with confirmation status visibility
  * - Confirmation statistics
- * 
+ *
  * Tests organizational boundaries and cross-org isolation.
  */
 
@@ -392,16 +392,16 @@ const createMockTRPCContext = (
 describe("Issue Confirmation Workflow (RLS-Enhanced)", () => {
   let ctx: VitestMockContext;
   let adminContext: TestMockContext;
-  let memberContext: TestMockContext;
+  let _memberContext: TestMockContext;
 
   beforeEach(() => {
     vi.clearAllMocks();
     ctx = createVitestMockContext();
-    
+
     // Set up test contexts with SEED_TEST_IDS
     adminContext = createMockAdminContext();
-    memberContext = createMockMemberContext();
-    
+    _memberContext = createMockMemberContext();
+
     // Set up authenticated user with organization using SEED_TEST_IDS
     ctx.user = {
       id: adminContext.userId,
@@ -409,13 +409,13 @@ describe("Issue Confirmation Workflow (RLS-Enhanced)", () => {
       user_metadata: { name: adminContext.userName },
       app_metadata: { organization_id: adminContext.organizationId },
     } as any;
-    
+
     ctx.organization = {
       id: adminContext.organizationId,
       name: "Austin Pinball Collective",
       subdomain: "pinpoint",
     };
-    
+
     // RLS context is handled at the database connection level
   });
 

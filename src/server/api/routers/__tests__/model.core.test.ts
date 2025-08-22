@@ -29,10 +29,7 @@ import type { TestDatabase } from "~/test/helpers/pglite-test-setup";
 
 import { appRouter } from "~/server/api/root";
 import * as schema from "~/server/db/schema";
-import {
-  SEED_TEST_IDS,
-  createMockAdminContext,
-} from "~/test/constants/seed-test-ids";
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 import { generateTestId } from "~/test/helpers/test-id-generator";
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
 import { getSeededTestData } from "~/test/helpers/pglite-test-setup";
@@ -87,7 +84,7 @@ describe("Model Router Integration Tests (Simplified Single-Table Architecture)"
 
     // Use seeded location (should always be available)
     const location = await db.query.locations.findFirst({
-      where: eq(schema.locations.id, seededData.location!),
+      where: eq(schema.locations.id, SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR),
     });
 
     if (!location) {
@@ -158,7 +155,7 @@ describe("Model Router Integration Tests (Simplified Single-Table Architecture)"
 
     // Get the seeded user for context
     const user = await db.query.users.findFirst({
-      where: eq(schema.users.id, seededData.user!),
+      where: eq(schema.users.id, SEED_TEST_IDS.USERS.ADMIN),
     });
 
     if (!user) {
@@ -274,7 +271,7 @@ describe("Model Router Integration Tests (Simplified Single-Table Architecture)"
         // Create organization but no models or machines
         const organizationId = SEED_TEST_IDS.ORGANIZATIONS.competitor;
 
-        const [org] = await db
+        const [_org] = await db
           .insert(schema.organizations)
           .values({
             id: organizationId,
@@ -285,7 +282,7 @@ describe("Model Router Integration Tests (Simplified Single-Table Architecture)"
           })
           .returning();
 
-        const [testUser] = await db
+        const [_testUser] = await db
           .insert(schema.users)
           .values({
             id: generateTestId("empty-user"),
@@ -471,8 +468,13 @@ describe("Model Router Integration Tests (Simplified Single-Table Architecture)"
       workerDb,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { ctx, models, organizationId, testUser, location } =
-          await setupTestData(db);
+        const {
+          ctx,
+          models,
+          organizationId,
+          testUser: _testUser,
+          location,
+        } = await setupTestData(db);
 
         // Create additional machines for model2 to test different counts
         await db.insert(schema.machines).values([
@@ -518,7 +520,7 @@ describe("Model Router Integration Tests (Simplified Single-Table Architecture)"
       workerDb,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { ctx, models } = await setupTestData(db);
+        const { ctx, models: _models } = await setupTestData(db);
 
         // Create a second organization with its own data
         const [org2] = await db
@@ -579,7 +581,8 @@ describe("Model Router Integration Tests (Simplified Single-Table Architecture)"
       workerDb,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { ctx, organizationId } = await setupTestData(db);
+        const { ctx, organizationId: _organizationId } =
+          await setupTestData(db);
 
         // Create context for competitor organization
         const [competitorUser] = await db
@@ -657,8 +660,13 @@ describe("Model Router Integration Tests (Simplified Single-Table Architecture)"
       workerDb,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { ctx, models, organizationId, testUser, location } =
-          await setupTestData(db);
+        const {
+          ctx,
+          models: _models,
+          organizationId,
+          testUser: _testUser,
+          location,
+        } = await setupTestData(db);
 
         // Create additional OPDB model for complex test data
         const [newModel] = await db
@@ -696,7 +704,7 @@ describe("Model Router Integration Tests (Simplified Single-Table Architecture)"
 
         const complexModel = allModels.find((m) => m.name === "Complex Model");
         expect(complexModel).toBeDefined();
-        expect(complexModel!.machineCount).toBe(7);
+        expect(complexModel?.machineCount).toBe(7);
 
         // Test getById with accurate machine count
         const singleModel = await caller.model.getById({ id: newModel.id });

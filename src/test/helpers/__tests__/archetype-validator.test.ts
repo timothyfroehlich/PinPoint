@@ -1,24 +1,23 @@
 /**
  * Tests for the archetype validator
- * 
+ *
  * Validates that the archetype validator correctly identifies patterns,
  * detects violations, and provides appropriate suggestions.
  */
 
-import { describe, test, expect } from "vitest";
-import { 
-  validateTestArchetype, 
+import { describe, expect } from "vitest";
+import {
+  validateTestArchetype,
   detectArchetype,
-  ARCHETYPE_DEFINITIONS 
+  ARCHETYPE_DEFINITIONS,
 } from "../archetype-validator";
 
 describe("Archetype Validator", () => {
-  
   // =============================================================================
   // ARCHETYPE DETECTION TESTS
   // =============================================================================
-  
-  test("detects Pure Function Unit Test (Archetype 1)", () => {
+
+  it("detects Pure Function Unit Test (Archetype 1)", () => {
     const content = `
       import { describe, test, expect } from "vitest";
       import { formatIssueTitle } from "../formatting";
@@ -29,12 +28,12 @@ describe("Archetype Validator", () => {
         });
       });
     `;
-    
+
     const archetype = detectArchetype(content, "formatting.test.ts");
     expect(archetype).toBe(1);
   });
-  
-  test("detects Service Business Logic Test (Archetype 2)", () => {
+
+  it("detects Service Business Logic Test (Archetype 2)", () => {
     const content = `
       import { describe, test, expect } from "vitest";
       import { withBusinessLogicTest } from "~/test/helpers/worker-scoped-db";
@@ -47,12 +46,12 @@ describe("Archetype Validator", () => {
         });
       });
     `;
-    
+
     const archetype = detectArchetype(content, "issueService.test.ts");
     expect(archetype).toBe(2);
   });
-  
-  test("detects React Component Unit Test (Archetype 4)", () => {
+
+  it("detects React Component Unit Test (Archetype 4)", () => {
     const content = `
       import { describe, test, expect } from "vitest";
       import { render, screen } from "@testing-library/react";
@@ -67,12 +66,12 @@ describe("Archetype Validator", () => {
         );
       });
     `;
-    
+
     const archetype = detectArchetype(content, "IssueList.test.tsx");
     expect(archetype).toBe(4);
   });
-  
-  test("detects tRPC Router Test (Archetype 5)", () => {
+
+  it("detects tRPC Router Test (Archetype 5)", () => {
     const content = `
       import { createVitestMockContext } from "~/test/vitestMockContext";
       import { appRouter } from "~/server/api/root";
@@ -83,25 +82,25 @@ describe("Archetype Validator", () => {
         // test logic
       });
     `;
-    
+
     const archetype = detectArchetype(content, "issue.router.test.ts");
     expect(archetype).toBe(5);
   });
-  
+
   // =============================================================================
   // MEMORY SAFETY VIOLATION DETECTION
   // =============================================================================
-  
-  test("detects dangerous PGlite per-test pattern", () => {
+
+  it("detects dangerous PGlite per-test pattern", () => {
     const dangerousContent = `
       test("dangerous test", async () => {
         const db = new PGlite(); // DANGEROUS
         // test logic
       });
     `;
-    
+
     const result = validateTestArchetype("dangerous.test.ts", dangerousContent);
-    
+
     expect(result.isValid).toBe(false);
     expect(result.compliance.memorysSafety).toBe(false);
     expect(result.errors).toHaveLength(1);
@@ -109,22 +108,24 @@ describe("Archetype Validator", () => {
     expect(result.errors[0].severity).toBe("critical");
     expect(result.errors[0].message).toContain("memory blowouts");
   });
-  
-  test("detects dangerous createSeededTestDatabase pattern", () => {
+
+  it("detects dangerous createSeededTestDatabase pattern", () => {
     const dangerousContent = `
       beforeEach(async () => {
         const { db } = await createSeededTestDatabase(); // DANGEROUS
       });
     `;
-    
+
     const result = validateTestArchetype("dangerous.test.ts", dangerousContent);
-    
+
     expect(result.isValid).toBe(false);
     expect(result.compliance.memorysSafety).toBe(false);
-    expect(result.errors.some(e => e.message.includes("memory usage"))).toBe(true);
+    expect(result.errors.some((e) => e.message.includes("memory usage"))).toBe(
+      true,
+    );
   });
-  
-  test("accepts safe worker-scoped pattern", () => {
+
+  it("accepts safe worker-scoped pattern", () => {
     const safeContent = `
       import { test, withBusinessLogicTest } from "~/test/helpers/worker-scoped-db";
       
@@ -134,18 +135,20 @@ describe("Archetype Validator", () => {
         });
       });
     `;
-    
+
     const result = validateTestArchetype("safe.test.ts", safeContent);
-    
+
     expect(result.compliance.memorysSafety).toBe(true);
-    expect(result.errors.filter(e => e.type === "memory_safety")).toHaveLength(0);
+    expect(
+      result.errors.filter((e) => e.type === "memory_safety"),
+    ).toHaveLength(0);
   });
-  
+
   // =============================================================================
   // RLS CONTEXT VALIDATION
   // =============================================================================
-  
-  test("detects missing RLS context in integration test", () => {
+
+  it("detects missing RLS context in integration test", () => {
     const missingRLSContent = `
       import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
       
@@ -156,14 +159,17 @@ describe("Archetype Validator", () => {
         });
       });
     `;
-    
-    const result = validateTestArchetype("integration.test.ts", missingRLSContent);
-    
+
+    const result = validateTestArchetype(
+      "integration.test.ts",
+      missingRLSContent,
+    );
+
     expect(result.compliance.rlsContext).toBe(false);
-    expect(result.errors.some(e => e.type === "rls_context")).toBe(true);
+    expect(result.errors.some((e) => e.type === "rls_context")).toBe(true);
   });
-  
-  test("accepts proper RLS context setup", () => {
+
+  it("accepts proper RLS context setup", () => {
     const properRLSContent = `
       import { test, withRLSAwareTest } from "~/test/helpers/worker-scoped-db";
       import { testSessions } from "~/test/helpers/session-context";
@@ -175,18 +181,23 @@ describe("Archetype Validator", () => {
         });
       });
     `;
-    
-    const result = validateTestArchetype("integration.test.ts", properRLSContent);
-    
+
+    const result = validateTestArchetype(
+      "integration.test.ts",
+      properRLSContent,
+    );
+
     expect(result.compliance.rlsContext).toBe(true);
-    expect(result.errors.filter(e => e.type === "rls_context")).toHaveLength(0);
+    expect(result.errors.filter((e) => e.type === "rls_context")).toHaveLength(
+      0,
+    );
   });
-  
+
   // =============================================================================
   // ARCHETYPE COMPLIANCE VALIDATION
   // =============================================================================
-  
-  test("detects archetype pattern violations", () => {
+
+  it("detects archetype pattern violations", () => {
     const violatingContent = `
       import { render } from "@testing-library/react"; // React import
       import { describe, test, expect } from "vitest";
@@ -199,14 +210,16 @@ describe("Archetype Validator", () => {
         });
       });
     `;
-    
+
     const result = validateTestArchetype("mixed.test.ts", violatingContent);
-    
+
     expect(result.compliance.archetypePattern).toBe(false);
-    expect(result.errors.some(e => e.type === "archetype_mismatch")).toBe(true);
+    expect(result.errors.some((e) => e.type === "archetype_mismatch")).toBe(
+      true,
+    );
   });
-  
-  test("accepts proper archetype compliance", () => {
+
+  it("accepts proper archetype compliance", () => {
     const compliantContent = `
       import { describe, test, expect } from "vitest";
       import { formatIssueTitle } from "../formatting";
@@ -217,19 +230,19 @@ describe("Archetype Validator", () => {
         });
       });
     `;
-    
+
     const result = validateTestArchetype("compliant.test.ts", compliantContent);
-    
+
     expect(result.archetype).toBe(1);
     expect(result.agent).toBe("unit-test-architect");
     expect(result.compliance.archetypePattern).toBe(true);
   });
-  
+
   // =============================================================================
   // IMPORT STRUCTURE VALIDATION
   // =============================================================================
-  
-  test("detects forbidden imports for archetype", () => {
+
+  it("detects forbidden imports for archetype", () => {
     const badImportsContent = `
       import { describe, test, expect } from "vitest";
       import { withIsolatedTest } from "~/test/helpers/worker-scoped-db"; // Forbidden for pure function test
@@ -241,18 +254,21 @@ describe("Archetype Validator", () => {
         });
       });
     `;
-    
-    const result = validateTestArchetype("bad-imports.test.ts", badImportsContent);
-    
+
+    const result = validateTestArchetype(
+      "bad-imports.test.ts",
+      badImportsContent,
+    );
+
     expect(result.compliance.importStructure).toBe(false);
-    expect(result.errors.some(e => e.type === "import_violation")).toBe(true);
+    expect(result.errors.some((e) => e.type === "import_violation")).toBe(true);
   });
-  
+
   // =============================================================================
   // INTEGRATION TESTS
   // =============================================================================
-  
-  test("validates complete good test file", () => {
+
+  it("validates complete good test file", () => {
     const goodTestContent = `
       import { describe, test, expect } from "vitest";
       import { formatIssueTitle, validateEmail } from "../utils";
@@ -274,9 +290,9 @@ describe("Archetype Validator", () => {
         });
       });
     `;
-    
+
     const result = validateTestArchetype("good-test.test.ts", goodTestContent);
-    
+
     expect(result.isValid).toBe(true);
     expect(result.archetype).toBe(1);
     expect(result.agent).toBe("unit-test-architect");
@@ -284,8 +300,8 @@ describe("Archetype Validator", () => {
     expect(result.compliance.memoryySafety).toBe(true);
     expect(result.compliance.archetypePattern).toBe(true);
   });
-  
-  test("validates complete bad test file", () => {
+
+  it("validates complete bad test file", () => {
     const badTestContent = `
       import { describe, test } from "vitest"; // Missing expect import
       import { render } from "@testing-library/react"; // Wrong archetype import
@@ -299,25 +315,25 @@ describe("Archetype Validator", () => {
         });
       });
     `;
-    
+
     const result = validateTestArchetype("bad-test.test.ts", badTestContent);
-    
+
     expect(result.isValid).toBe(false);
     expect(result.errors.length).toBeGreaterThan(0);
     expect(result.compliance.memoryySafety).toBe(false);
-    
+
     // Should have multiple error types
-    const errorTypes = result.errors.map(e => e.type);
+    const errorTypes = result.errors.map((e) => e.type);
     expect(errorTypes).toContain("memory_safety");
   });
-  
+
   // =============================================================================
   // ARCHETYPE DEFINITIONS TEST
   // =============================================================================
-  
-  test("has definitions for all 8 archetypes", () => {
+
+  it("has definitions for all 8 archetypes", () => {
     expect(Object.keys(ARCHETYPE_DEFINITIONS)).toHaveLength(8);
-    
+
     for (let i = 1; i <= 8; i++) {
       expect(ARCHETYPE_DEFINITIONS[i]).toBeDefined();
       expect(ARCHETYPE_DEFINITIONS[i].name).toMatch(/test/i);
@@ -327,11 +343,11 @@ describe("Archetype Validator", () => {
       expect(ARCHETYPE_DEFINITIONS[i].patterns.forbidden).toBeInstanceOf(Array);
     }
   });
-  
-  test("archetype definitions have correct agent assignments", () => {
+
+  it("archetype definitions have correct agent assignments", () => {
     const expectedAgents = {
       1: "unit-test-architect",
-      2: "integration-test-architect", 
+      2: "integration-test-architect",
       3: "integration-test-architect",
       4: "unit-test-architect",
       5: "integration-test-architect",
@@ -339,9 +355,11 @@ describe("Archetype Validator", () => {
       7: "security-test-architect",
       8: "security-test-architect",
     };
-    
+
     for (const [archetype, expectedAgent] of Object.entries(expectedAgents)) {
-      expect(ARCHETYPE_DEFINITIONS[parseInt(archetype)].agent).toBe(expectedAgent);
+      expect(ARCHETYPE_DEFINITIONS[parseInt(archetype)].agent).toBe(
+        expectedAgent,
+      );
     }
   });
 });
@@ -351,11 +369,10 @@ describe("Archetype Validator", () => {
 // =============================================================================
 
 describe("Template Compliance", () => {
-  
-  test("all templates should pass their own archetype validation", () => {
+  it("all templates should pass their own archetype validation", () => {
     // This is a meta-test - the actual templates should pass validation
     // when they are used as examples
-    
+
     const templateContent = `
       import { describe, test, expect } from "vitest";
       import { formatIssueTitle } from "../formatting";
@@ -371,9 +388,9 @@ describe("Template Compliance", () => {
         });
       });
     `;
-    
+
     const result = validateTestArchetype("template.test.ts", templateContent);
-    
+
     expect(result.isValid).toBe(true);
     expect(result.archetype).toBe(1);
     expect(result.errors).toHaveLength(0);

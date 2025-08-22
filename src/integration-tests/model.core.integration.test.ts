@@ -32,10 +32,7 @@ import type { TestDatabase } from "~/test/helpers/pglite-test-setup";
 
 import { appRouter } from "~/server/api/root";
 import * as schema from "~/server/db/schema";
-import {
-  SEED_TEST_IDS,
-  createMockAdminContext,
-} from "~/test/constants/seed-test-ids";
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 import { generateTestId } from "~/test/helpers/test-id-generator";
 import {
   test,
@@ -1042,7 +1039,7 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
 
         const complexModel = allModels.find((m) => m.name === "Complex Model");
         expect(complexModel).toBeDefined();
-        expect(complexModel!.machineCount).toBe(7);
+        expect(complexModel?.machineCount).toBe(7);
 
         // Test getById with accurate machine count
         const singleModel = await caller.model.getById({ id: newModel.id });

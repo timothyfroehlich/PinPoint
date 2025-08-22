@@ -13,12 +13,9 @@
  * - Worker-scoped database for memory efficiency
  */
 
-import { describe, test, expect, beforeAll } from "vitest";
-import { eq, sql } from "drizzle-orm";
-import {
-  test as workerTest,
-  withBusinessLogicTest,
-} from "~/test/helpers/worker-scoped-db";
+import { describe, test, expect } from "vitest";
+import { eq } from "drizzle-orm";
+import { withBusinessLogicTest } from "~/test/helpers/worker-scoped-db";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 import * as schema from "~/server/db/schema";
 

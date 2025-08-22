@@ -5,12 +5,11 @@
  * 
  * Usage:
  *   node scripts/validate-test-archetype.cjs <file>
- *   node scripts/validate-test-archetype.cjs src/server/**/*.test.ts
- *   node scripts/validate-test-archetype.cjs --all
+ *   node scripts/validate-test-archetype.cjs 'src/server/...' --all
  * 
  * Examples:
  *   node scripts/validate-test-archetype.cjs src/services/__tests__/userService.test.ts
- *   node scripts/validate-test-archetype.cjs src/components/**/*.test.tsx --verbose
+ *   node scripts/validate-test-archetype.cjs --all --verbose
  *   node scripts/validate-test-archetype.cjs --all --report
  */
 
@@ -92,8 +91,7 @@ function parseArgs(args) {
     help: false,
   };
   
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
+  for (const arg of args) {
     
     if (arg === '--help' || arg === '-h') {
       options.help = true;

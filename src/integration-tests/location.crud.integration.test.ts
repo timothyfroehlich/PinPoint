@@ -16,19 +16,15 @@
  */
 
 import { eq } from "drizzle-orm";
-import { describe, expect, vi, beforeAll } from "vitest";
+import { describe, expect, vi } from "vitest";
 
 // Import test setup and utilities
-import type { TRPCContext } from "~/server/api/trpc.base";
 
 import { locationRouter } from "~/server/api/routers/location";
 import * as schema from "~/server/db/schema";
 import { generateTestId } from "~/test/helpers/test-id-generator";
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
-import {
-  createSeededTestDatabase,
-  type TestDatabase,
-} from "~/test/helpers/pglite-test-setup";
+
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 import { createSeededLocationTestContext } from "~/test/helpers/createSeededLocationTestContext";
 
@@ -176,11 +172,11 @@ describe("Location Router CRUD Operations (PGlite)", () => {
           (l) => l.id === SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR,
         );
         expect(seededLocation).toBeDefined();
-        expect(seededLocation!.organizationId).toBe(primaryOrgId);
+        expect(seededLocation?.organizationId).toBe(primaryOrgId);
 
         // Should include our new machine
         expect(
-          seededLocation!.machines.some((m) => m.id === machineId),
+          seededLocation?.machines.some((m) => m.id === machineId),
         ).toBeTruthy();
       });
     });
@@ -236,7 +232,7 @@ describe("Location Router CRUD Operations (PGlite)", () => {
         );
         const primaryCaller = locationRouter.createCaller(primaryContext);
 
-        const competitorContext = await createSeededLocationTestContext(
+        const _competitorContext = await createSeededLocationTestContext(
           txDb,
           competitorOrgId,
           SEED_TEST_IDS.USERS.ADMIN,
@@ -259,7 +255,7 @@ describe("Location Router CRUD Operations (PGlite)", () => {
         expect(allLocationIds).not.toContain("other-org-location"); // Should not see competitor location
 
         // All returned locations should belong to primary org
-        primaryResult.forEach((location) => {
+        primaryResult.forEach((_location) => {
           expect(primaryOrgId).toBe(primaryOrgId);
         });
       });

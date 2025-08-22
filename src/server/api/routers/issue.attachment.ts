@@ -53,7 +53,7 @@ export const issueAttachmentRouter = createTRPCRouter({
         });
       }
 
-      // Create attachment record (RLS trigger handles organizationId)
+      // Create attachment record
       const [newAttachment] = await ctx.db
         .insert(attachments)
         .values({
@@ -62,6 +62,7 @@ export const issueAttachmentRouter = createTRPCRouter({
           fileName: input.fileName,
           fileType: input.fileType,
           issueId: input.issueId,
+          organizationId: ctx.organization.id,
         })
         .returning();
 

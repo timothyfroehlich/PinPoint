@@ -310,7 +310,7 @@ export async function createOrgContext(
   }
 
   // Create models (required for machines)
-  const [testModel] = await db
+  const [_testModel] = await db
     .insert(schema.models)
     .values({
       id: `model-test-${orgSuffix}`,
@@ -399,12 +399,12 @@ export async function createOrgContext(
  */
 export async function setupMultiOrgContext(
   db: TestDatabase,
-  count: number = 2,
-): Promise<{ [key: string]: OrgTestContext }> {
-  const orgs: { [key: string]: OrgTestContext } = {};
+  count = 2,
+): Promise<Record<string, OrgTestContext>> {
+  const orgs: Record<string, OrgTestContext> = {};
 
   for (let i = 1; i <= count; i++) {
-    const key = `org${i}`;
+    const key = `org${String(i)}`;
     orgs[key] = await createOrgContext(db, i.toString());
   }
 
@@ -455,9 +455,9 @@ export async function createOrgTestData(
     const [location] = await db
       .insert(schema.locations)
       .values({
-        id: `location-${orgContext.organization.id}-${i}`,
-        name: `Test Location ${i}`,
-        street: `${i}23 Test St`,
+        id: `location-${orgContext.organization.id}-${String(i)}`,
+        name: `Test Location ${String(i)}`,
+        street: `${String(i)}23 Test St`,
         city: "Test City",
         state: "TS",
         zip: "12345",
@@ -482,12 +482,12 @@ export async function createOrgTestData(
     const [machine] = await db
       .insert(schema.machines)
       .values({
-        id: `machine-${orgContext.organization.id}-${i}`,
-        name: `Test Machine ${i}`,
+        id: `machine-${orgContext.organization.id}-${String(i)}`,
+        name: `Test Machine ${String(i)}`,
         organizationId: orgContext.organization.id,
         locationId: locationId,
         modelId: testModel.id,
-        qrCodeId: `qr-${orgContext.organization.id}-${i}`,
+        qrCodeId: `qr-${orgContext.organization.id}-${String(i)}`,
         createdAt: new Date(),
         updatedAt: new Date(),
       })
@@ -511,9 +511,9 @@ export async function createOrgTestData(
     const [issue] = await db
       .insert(schema.issues)
       .values({
-        id: `issue-${orgContext.organization.id}-${i}`,
-        title: `Test Issue ${i} for ${orgContext.organization.name}`,
-        description: `Test issue description ${i}`,
+        id: `issue-${orgContext.organization.id}-${String(i)}`,
+        title: `Test Issue ${String(i)} for ${orgContext.organization.name}`,
+        description: `Test issue description ${String(i)}`,
         organizationId: orgContext.organization.id,
         machineId: machineId,
         statusId: orgContext.statuses.new.id,
@@ -679,10 +679,10 @@ export const OrgTestScenarios = {
   /**
    * Multiple organizations for scale testing
    */
-  scale: async (db: TestDatabase, orgCount: number = 5) => {
+  scale: async (db: TestDatabase, orgCount = 5) => {
     const orgs = await setupMultiOrgContext(db, orgCount);
 
-    for (const [key, org] of Object.entries(orgs)) {
+    for (const [_key, org] of Object.entries(orgs)) {
       await createOrgTestData(db, org, {
         issueCount: Math.floor(Math.random() * 5) + 1,
         machineCount: Math.floor(Math.random() * 3) + 1,

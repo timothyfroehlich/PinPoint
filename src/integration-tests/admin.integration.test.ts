@@ -18,11 +18,10 @@
  * Uses modern August 2025 patterns with Vitest and PGlite integration.
  */
 
-import { eq, count, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { describe, expect, vi, beforeAll } from "vitest";
 
 // Import test setup and utilities
-import type { TRPCContext } from "~/server/api/trpc.base";
 
 import { adminRouter } from "~/server/api/routers/admin";
 import * as schema from "~/server/db/schema";
@@ -364,7 +363,7 @@ describe("Admin Router Integration (PGlite)", () => {
         expect(membership).toBeUndefined();
 
         // Verify user still exists (soft delete approach) or is deleted depending on implementation
-        const user = await txDb.query.users.findFirst({
+        const _user = await txDb.query.users.findFirst({
           where: eq(schema.users.id, userToRemove),
         });
         // Depending on implementation, user might be soft-deleted or removed

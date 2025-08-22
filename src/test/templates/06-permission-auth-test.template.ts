@@ -16,7 +16,6 @@
 import { describe, test, expect } from "vitest";
 import { eq, and, sql } from "drizzle-orm";
 import {
-  test as workerTest,
   withRLSAwareTest,
   withCrossOrgTest,
 } from "~/test/helpers/worker-scoped-db";
@@ -432,7 +431,7 @@ describe("Permission and Authentication System", () => {
       organizationId,
       async (escalate, db) => {
         // START: Member permissions
-        let issues = await db.query.issues.findMany();
+        const issues = await db.query.issues.findMany();
         const memberAccessCount = issues.length;
 
         // TEST: Member cannot perform admin actions

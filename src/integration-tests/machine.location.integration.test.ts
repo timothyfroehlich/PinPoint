@@ -26,7 +26,6 @@ import { type TestDatabase } from "~/test/helpers/pglite-test-setup";
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 import {
-  createSeededMachineTestContext,
   createPrimaryAdminContext,
   createCompetitorAdminContext,
 } from "~/test/helpers/createSeededMachineTestContext";

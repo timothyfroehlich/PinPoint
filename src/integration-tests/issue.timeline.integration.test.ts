@@ -17,7 +17,6 @@
  */
 
 import { describe, expect, vi } from "vitest";
-import { eq, sql } from "drizzle-orm";
 
 // Import test setup and utilities
 import { createSeededIssueTestContext } from "~/test/helpers/createSeededIssueTestContext";
@@ -25,11 +24,7 @@ import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 import { appRouter } from "~/server/api/root";
 import * as schema from "~/server/db/schema";
 import { IssueActivityService } from "~/server/services/issueActivityService";
-import {
-  test,
-  withIsolatedTest,
-  type TestDatabase,
-} from "~/test/helpers/worker-scoped-db";
+import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
 
 // Mock external dependencies that aren't database-related
 vi.mock("~/lib/utils/id-generation", () => ({

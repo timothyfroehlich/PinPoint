@@ -10,17 +10,20 @@
 **Goal**: Convert 87 test files using pgTAP + PGlite testing strategy with hardcoded seed data architecture and specialized consultant analysis for optimal implementation guidance and comprehensive coverage.
 
 **Seed Data Architecture Foundation**:
+
 - **Hardcoded SEED_TEST_IDS**: Consistent, predictable test data using `test-org-pinpoint` and `test-org-competitor` IDs
 - **Dual-Organization Setup**: Primary + competitor orgs for comprehensive boundary testing
 - **Global OPDB Catalog**: 7 OPDB models (`organizationId: null`) visible to all organizations
 - **Memory-Safe Patterns**: Worker-scoped PGlite with transaction isolation
 
 **pgTAP RLS Validation** (~15 tests)
+
 - Native PostgreSQL RLS policy testing
-- JWT claim simulation for organizational contexts  
+- JWT claim simulation for organizational contexts
 - Database-level security boundary validation
 
-**Business Logic Testing with Seeded Data** (~80 tests)  
+**Business Logic Testing with Seeded Data** (~80 tests)
+
 - PGlite with seeded dual-organization infrastructure
 - Global OPDB catalog + org-specific custom models
 - Focus on realistic business scenarios with consistent data
@@ -35,7 +38,7 @@
 **Key Benefits Being Realized**:
 
 - **Optimal performance**: 5x faster business logic tests + comprehensive RLS validation
-- **Clear separation**: Security testing vs functionality testing  
+- **Clear separation**: Security testing vs functionality testing
 - **Simplified setup**: Direct data creation vs complex organizational coordination
 - **Memory-safe patterns**: Worker-scoped PGlite with transaction isolation
 - **Comprehensive coverage**: 100% RLS validation + complete business logic testing
@@ -43,7 +46,7 @@
 **Success Metrics**:
 
 - 87 test files → archetype-compliant patterns with seed data foundation
-- All tests follow consultant-analyzed archetypes (no ad-hoc patterns)  
+- All tests follow consultant-analyzed archetypes (no ad-hoc patterns)
 - Test execution time improved (seeded data eliminates setup overhead)
 - Memory usage stable (200-400MB confirmed safe range)
 - Current failures: 335 → 0 through systematic implementation
@@ -57,6 +60,7 @@
 **Core Principle**: Predictable, consistent test data using hardcoded IDs instead of random generation for debugging ease and test stability.
 
 **Architecture**: `src/test/constants/seed-test-ids.ts`
+
 ```typescript
 export const SEED_TEST_IDS = {
   /** Test organizations - both created during minimal seed */
@@ -70,7 +74,7 @@ export const SEED_TEST_IDS = {
   /** Test users created by createMinimalUsersForTesting() */
   USERS: {
     ADMIN: "test-user-tim",
-    MEMBER1: "test-user-harry", 
+    MEMBER1: "test-user-harry",
     MEMBER2: "test-user-escher",
   },
 
@@ -87,15 +91,18 @@ export const SEED_TEST_IDS = {
 ### Dual-Organization Testing Infrastructure
 
 **Seeded Organizations**: Infrastructure creates both organizations with hardcoded IDs:
+
 - **Primary**: `test-org-pinpoint` (Austin Pinball Collective, subdomain: "apc")
 - **Competitor**: `test-org-competitor` (Competitor Arcade, subdomain: "competitor")
 
 **Benefits**:
+
 - **Cross-org boundary testing**: Validate isolation between organizations
-- **RLS policy validation**: Test data access restrictions 
+- **RLS policy validation**: Test data access restrictions
 - **Realistic multi-tenant scenarios**: Both orgs have sample data
 
 **Implementation**: `scripts/seed/shared/infrastructure.ts`
+
 ```typescript
 const [primaryOrg, secondaryOrg] = await Promise.all([
   createOrganizationWithRolesWithDb(dbInstance, {
@@ -104,7 +111,7 @@ const [primaryOrg, secondaryOrg] = await Promise.all([
     subdomain: "apc",
   }),
   createOrganizationWithRolesWithDb(dbInstance, {
-    id: SEED_TEST_IDS.ORGANIZATIONS.competitor, 
+    id: SEED_TEST_IDS.ORGANIZATIONS.competitor,
     name: "Competitor Arcade",
     subdomain: "competitor",
   }),
@@ -114,26 +121,31 @@ const [primaryOrg, secondaryOrg] = await Promise.all([
 ### Global OPDB Catalog Architecture
 
 **OPDB Models**: Global pinball machine catalog visible to all organizations
+
 - **organizationId**: `null` (global scope)
 - **Visibility**: All organizations see all OPDB models
 - **Machine Count**: Per-organization (shows `machineCount: 0` if org has no machines for that model)
 
 **Custom Models**: Organization-specific models
-- **organizationId**: Specific organization ID  
+
+- **organizationId**: Specific organization ID
 - **Visibility**: Only visible to owning organization
 - **Usage**: Custom machines, location-specific models
 
 **Example from Fixed Integration Test**:
+
 ```typescript
 // ✅ Correct expectation - sees global OPDB catalog
-test("should return global OPDB models when organization has no machines", async ({ workerDb }) => {
+test("should return global OPDB models when organization has no machines", async ({
+  workerDb,
+}) => {
   await withBusinessLogicTest(workerDb, async (db) => {
     const result = await caller.model.getAll();
-    
+
     // Should see global OPDB models (organizationId: null) with machineCount: 0
     expect(Array.isArray(result)).toBe(true);
     expect(result.length).toBeGreaterThan(0); // Global OPDB catalog
-    
+
     // All models should have machineCount: 0 since this org has no machines
     result.forEach((model) => {
       expect(model.machineCount).toBe(0);
@@ -146,6 +158,7 @@ test("should return global OPDB models when organization has no machines", async
 ### Memory-Safe Worker-Scoped Pattern
 
 **Critical Pattern**: Single PGlite instance per worker with transaction isolation
+
 ```typescript
 import { test, withBusinessLogicTest } from "~/test/helpers/worker-scoped-db";
 
@@ -159,14 +172,16 @@ test("integration test", async ({ workerDb }) => {
 ```
 
 **Benefits**:
+
 - **Memory Safety**: Prevents 50-100MB per test memory blowout
-- **Performance**: Shared seeded data across tests  
+- **Performance**: Shared seeded data across tests
 - **Isolation**: Transaction-based cleanup
 - **Consistency**: Same baseline data for all tests
 
 ### Test Context Creation Pattern
 
 **Integration Tests**: Use seeded organizations with createTestContext helper
+
 ```typescript
 // From model.core.integration.test.ts (WORKING PATTERN)
 async function createTestContext(db: TestDatabase, organizationId: string) {
@@ -174,7 +189,7 @@ async function createTestContext(db: TestDatabase, organizationId: string) {
   const adminUser = await db.query.users.findFirst({
     where: eq(schema.users.id, SEED_TEST_IDS.USERS.ADMIN),
   });
-  
+
   const organization = await db.query.organizations.findFirst({
     where: eq(schema.organizations.id, organizationId),
   });
@@ -183,7 +198,7 @@ async function createTestContext(db: TestDatabase, organizationId: string) {
     db: db,
     user: {
       id: adminUser.id,
-      email: adminUser.email ?? "admin@dev.local", 
+      email: adminUser.email ?? "admin@dev.local",
       name: adminUser.name ?? "Test Admin User",
       app_metadata: { organization_id: organizationId },
     },
@@ -195,12 +210,13 @@ async function createTestContext(db: TestDatabase, organizationId: string) {
     organizationId: organizationId,
     // ... rest of context
   };
-  
+
   return { ctx, organizationId, adminUser, organization };
 }
 ```
 
 **Usage in Tests**:
+
 ```typescript
 test("organizational boundary test", async ({ workerDb }) => {
   await withBusinessLogicTest(workerDb, async (db) => {
@@ -208,7 +224,7 @@ test("organizational boundary test", async ({ workerDb }) => {
     const primaryOrgId = SEED_TEST_IDS.ORGANIZATIONS.primary;
     const { ctx } = await createTestContext(db, primaryOrgId);
     const caller = appRouter.createCaller(ctx);
-    
+
     // Test with realistic seeded data + global OPDB catalog
     const result = await caller.model.getAll();
     expect(result.length).toBeGreaterThan(0); // Global OPDB models
@@ -219,13 +235,17 @@ test("organizational boundary test", async ({ workerDb }) => {
 ### Unit Test Seed Data Usage
 
 **MOCK_PATTERNS for Unit Tests**: Consistent mock IDs without database
+
 ```typescript
-import { SEED_TEST_IDS, createMockAdminContext } from "~/test/constants/seed-test-ids";
+import {
+  SEED_TEST_IDS,
+  createMockAdminContext,
+} from "~/test/constants/seed-test-ids";
 
 describe("Router unit test", () => {
   const mockContext = createMockAdminContext();
   // Uses: organizationId: "test-org-pinpoint", userId: "test-user-tim"
-  
+
   const mockData = {
     id: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
     organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
@@ -235,6 +255,7 @@ describe("Router unit test", () => {
 ```
 
 **Benefits of Unit Test Seed Usage**:
+
 - **Consistent Mock IDs**: Predictable debugging ("mock-machine-1 is failing")
 - **Standardized Contexts**: createMockAdminContext() helpers
 - **No Database Overhead**: Pure unit testing without PGlite
@@ -243,25 +264,26 @@ describe("Router unit test", () => {
 ### Cross-Organizational Boundary Testing
 
 **Dual-Org Security Validation with Shared Models**:
+
 ```typescript
 // From model.core.integration.test.ts
 test("excludes models from other organizations", async ({ workerDb }) => {
   await withBusinessLogicTest(workerDb, async (db) => {
     const primaryOrgId = SEED_TEST_IDS.ORGANIZATIONS.primary;
     const competitorOrgId = SEED_TEST_IDS.ORGANIZATIONS.competitor;
-    
-    // Create model in competitor organization  
+
+    // Create model in competitor organization
     await db.insert(schema.models).values({
       id: modelId,
       name: "Competitor Model",
       organizationId: competitorOrgId, // Custom model scoped to competitor
       isCustom: true,
     });
-    
+
     // Primary org context should not see competitor models
     const { ctx } = await createTestContext(db, primaryOrgId);
     const result = await caller.model.getAll();
-    
+
     // Should see global OPDB models but NOT competitor custom models
     expect(result.find((m) => m.id === modelId)).toBeUndefined();
   });
@@ -269,14 +291,16 @@ test("excludes models from other organizations", async ({ workerDb }) => {
 ```
 
 **Shared Model Testing Strategy** (NEW - August 2025):
+
 - **Global OPDB Models**: Both organizations see same catalog (e.g., "Revenge from Mars")
 - **Isolated Machines**: Each org has own machine instance of shared models
 - **Cross-Org Boundaries**: Primary org machine ≠ competitor org machine, even for same model
 - **Realistic Testing**: Multiple locations having popular pinball machines
 
-### Seed Data Progression Strategy  
+### Seed Data Progression Strategy
 
 **Minimal → Full Seed Architecture**:
+
 1. **Minimal Seed**: Foundation dataset (2 orgs, 7 OPDB models, test users, cross-org machines)
    - Used for: CI, development, most integration tests
    - Fast performance, essential relationships only
@@ -298,13 +322,14 @@ test("excludes models from other organizations", async ({ workerDb }) => {
 
 **Consultant Analysis Matrix** (87 Files Total):
 
-| **Consultant** | **Archetypes** | **File Count** | **Analysis Focus** |
-|---|---|---|---|
-| **`security-test-analysis-consultant`** | 6, 7, 8 | ~22 (25%) | Security boundary analysis |
-| **`integration-test-analysis-consultant`** | 2, 3, 5 | ~40 (46%) | Memory safety + router conversions |
-| **`unit-test-analysis-consultant`** | 1, 4 | ~25 (29%) | Foundation pattern analysis |
+| **Consultant**                             | **Archetypes** | **File Count** | **Analysis Focus**                 |
+| ------------------------------------------ | -------------- | -------------- | ---------------------------------- |
+| **`security-test-analysis-consultant`**    | 6, 7, 8        | ~22 (25%)      | Security boundary analysis         |
+| **`integration-test-analysis-consultant`** | 2, 3, 5        | ~40 (46%)      | Memory safety + router conversions |
+| **`unit-test-analysis-consultant`**        | 1, 4           | ~25 (29%)      | Foundation pattern analysis        |
 
 **Consultant Responsibilities**:
+
 - **`security-test-analysis-consultant`**: Analyze security boundaries, RLS compliance, multi-tenant isolation
 - **`integration-test-analysis-consultant`**: Analyze memory safety, router conversions, RLS context management
 - **`unit-test-analysis-consultant`**: Analyze foundation patterns, SEED_TEST_IDS standardization, component behavior
@@ -332,23 +357,27 @@ test("excludes models from other organizations", async ({ workerDb }) => {
 
 **Goal**: Implement security test conversions following consultant roadmap
 
-**Focus**: 
-- Critical archetype alignments 
+**Focus**:
+
+- Critical archetype alignments
 - RLS policy enforcement validation
 - Cross-organizational boundary testing
 - Permission matrix validation
 
 **Critical Conversions** (5 files):
+
 - Security tests currently in wrong archetype categories
 - Need movement to proper Archetypes 6, 7, 8
 - Enhanced RLS policy testing using established templates
 
 **Enhanced RLS Coverage** (17 files):
+
 - Cross-organizational boundary testing
 - Permission matrix validation
 - Security edge case coverage
 
 **Files to Create**:
+
 ```
 supabase/tests/
 ├── setup/
@@ -356,7 +385,7 @@ supabase/tests/
 │   └── 02-test-data.sql           # Common test data
 ├── rls/
 │   ├── organizations.test.sql     # Organization RLS policies
-│   ├── issues.test.sql            # Issue RLS policies  
+│   ├── issues.test.sql            # Issue RLS policies
 │   ├── machines.test.sql          # Machine RLS policies
 │   ├── locations.test.sql         # Location RLS policies
 │   ├── comments.test.sql          # Comment RLS policies
@@ -368,6 +397,7 @@ supabase/tests/
 ```
 
 **Implementation Pattern**:
+
 ```sql
 -- Example: supabase/tests/rls/issues.test.sql
 BEGIN;
@@ -384,7 +414,7 @@ SELECT results_eq(
 );
 
 -- Test cross-org prevention
-PREPARE cross_org_insert AS 
+PREPARE cross_org_insert AS
   INSERT INTO issues (title, organization_id) VALUES ('Test', 'org-2');
 SELECT throws_ok('cross_org_insert', '42501', 'RLS prevents cross-org access');
 
@@ -399,11 +429,13 @@ ROLLBACK;
 **Revised Strategy**: Break into tightly-coupled groups by content/focus areas (4-8 files each)
 
 #### Phase 3.3a: Issue Management Analysis & Implementation (~8 files) ✅ **FULLY COMPLETE**
+
 **Focus**: Complete issue workflow testing patterns - ANALYSIS + IMPLEMENTATION COMPLETE
-- **Router Conversions**: ✅ **ALL CONVERTED** - `issue.comment.test.ts` (22/22), `issue.status.test.ts` (9/9), `issue.notification.test.ts` (6/6), `issue.timeline.test.ts` (13/13) 
+
+- **Router Conversions**: ✅ **ALL CONVERTED** - `issue.comment.test.ts` (22/22), `issue.status.test.ts` (9/9), `issue.notification.test.ts` (6/6), `issue.timeline.test.ts` (13/13)
 - **Integration Tests**: `issue.timeline.integration.test.ts`, `comment.integration.test.ts` (validation pending)
 - **Analysis Focus**: Critical router unit→tRPC conversions, comment/timeline integration patterns
-- **Implementation Results**: 
+- **Implementation Results**:
   - ✅ **50/50 tests passing** across all converted router files
   - ✅ **100% SEED_TEST_IDS integration** with consistent mock data
   - ✅ **Complete RLS context simulation** and organizational boundary validation
@@ -412,7 +444,9 @@ ROLLBACK;
   - ✅ **Memory-safe testing** - All patterns follow worker-scoped PGlite guidelines
 
 #### Phase 3.3b: Machine & Location Analysis & Implementation (~8 files) ✅ **COMPLETE**
+
 **Focus**: Physical entity management workflows
+
 - **Router Conversions**: `machine.owner.test.ts`, `machine.location.test.ts` ✅ **CONVERTED**
 - **Integration Tests**: `machine.owner.integration.test.ts`, `machine.location.integration.test.ts`, `location.integration.test.ts`, `location.crud.integration.test.ts`, `location.services.integration.test.ts`, `location.aggregation.integration.test.ts`
 - **Analysis Focus**: Physical entity management, RLS scoping for location/machine data
@@ -421,25 +455,31 @@ ROLLBACK;
 - **Status**: Unit→tRPC router conversions completed with proper `withIsolatedTest` patterns
 
 #### Phase 3.3c: Admin & Infrastructure Analysis & Implementation (~6 files) ✅ **COMPLETE**
+
 **Focus**: System administration and core infrastructure
+
 - **Integration Tests**: `admin.integration.test.ts` ✅ **MEMORY SAFETY FIXED**, `role.integration.test.ts` ✅ **PATTERNS STANDARDIZED**, `schema-data-integrity.integration.test.ts`, `schema-migration-validation.integration.test.ts`
 - **Router Conversions**: `routers.integration.test.ts` ✅ **MOCK→tRPC INTEGRATION CONVERTED**
 - **Integration**: `routers.drizzle.integration.test.ts` ✅ **CLARIFIED AS UNIT TEST** (moved to `drizzle.schema.unit.test.ts`)
 - **Analysis Focus**: Admin operations, infrastructure patterns, schema validation
-- **Critical Fixes**: 
+- **Critical Fixes**:
   - 🚨 **Memory safety violation fixed** in `admin.integration.test.ts`
   - 🔧 **Pattern standardization** completed in `role.integration.test.ts` (28 `withTransaction→withIsolatedTest` conversions)
   - 🔄 **Mock-heavy conversion** completed in `routers.integration.test.ts` (975 lines mock→real tRPC router integration)
   - 📋 **Testing intent clarified** for schema validation vs router integration
 
 #### Phase 3.3d: Model & Data Services Analysis (~6 files)
+
 **Focus**: Data models and external service integration
+
 - **Router Conversions**: `model.core.test.ts`, `model.opdb.test.ts`
 - **Integration Tests**: `model.core.integration.test.ts`, `model.opdb.integration.test.ts`, `drizzle-crud-validation.integration.test.ts`, `notification.schema.test.ts`
 - **Analysis Focus**: Model operations, external service patterns, CRUD validation
 
 #### Phase 3.3e: Service Layer & Routing Analysis (~5 files)
+
 **Focus**: Direct service testing and routing infrastructure
+
 - **Router Conversions**: `collection.test.ts`, `notification.test.ts`, `pinballMap.test.ts`
 - **Service Tests**: `pinballmapService.test.ts`, `roleService.test.ts`, `collectionService.test.ts`
 - **Analysis Focus**: Service layer patterns, "fake integration" detection, routing infrastructure
@@ -452,12 +492,14 @@ ROLLBACK;
 **Goal**: Implement integration test conversions following consultant roadmaps from each sub-phase
 
 **Focus**:
+
 - Critical router unit→tRPC router conversions (13 files)
 - Memory safety pattern enforcement
 - RLS session context establishment
 - "Fake integration" pattern elimination
 
 **Critical Router Conversions** (13 files):
+
 - `issue.test.ts`, `issue.timeline.test.ts`, `issue.notification.test.ts`
 - `model.core.test.ts`, `model.opdb.test.ts`
 - `machine.owner.test.ts`, `machine.location.test.ts`
@@ -468,17 +510,20 @@ ROLLBACK;
 **Pattern**: Unit Test (Archetype 1) → tRPC Router Test (Archetype 5)
 
 **Service & Integration Files** (27 files):
+
 - Maintain existing good patterns
 - Enhance RLS session context
 - Memory safety already excellent
 
 **Database Connection Update**:
+
 ```env
-# Update .env.test 
+# Update .env.test
 DATABASE_URL="postgresql://integration_tester:testpassword@localhost:5432/postgres"
 ```
 
 **Router Conversion Pattern** (From Actual File Analysis):
+
 ```typescript
 // BEFORE: Unit test with complex mocks (issue.comment.test.ts)
 const mockDb = {
@@ -498,9 +543,11 @@ import { createVitestMockContext } from "~/test/vitestMockContext";
 const mockDb = {
   query: {
     issues: {
-      findMany: vi.fn().mockResolvedValue([
-        { id: "1", title: "Test Issue", organizationId: "test-org" },
-      ]),
+      findMany: vi
+        .fn()
+        .mockResolvedValue([
+          { id: "1", title: "Test Issue", organizationId: "test-org" },
+        ]),
     },
   },
   execute: vi.fn().mockResolvedValue(undefined), // RLS context
@@ -533,19 +580,22 @@ test("router respects RLS boundaries", async () => {
 **Goal**: Implement unit test conversions following consultant roadmap
 
 **Focus**:
+
 - Foundation pattern establishment
 - SEED_TEST_IDS standardization across all unit tests
 - Modern Vitest v4.0 pattern adoption
 - React component behavior validation
 
 **Serial Processing Order**:
+
 1. **Security Analysis → Security Implementation** (~22 files)
-2. **Integration Analysis → Integration Implementation** (~40 files)  
+2. **Integration Analysis → Integration Implementation** (~40 files)
 3. **Unit Analysis → Unit Implementation** (~25 files)
 
 ### Implementation Quality Gates
 
 **Track 1 Quality Gates**:
+
 - [ ] All RLS policies have direct tests
 - [ ] JWT claim simulation covers all user types
 - [ ] Cross-organizational boundaries tested
@@ -553,6 +603,7 @@ test("router respects RLS boundaries", async () => {
 - [ ] Security edge cases covered
 
 **Track 2 Quality Gates**:
+
 - [ ] All tests use `integration_tester` role
 - [ ] Business logic focus (no security mixed in)
 - [ ] 5x performance improvement achieved
@@ -563,11 +614,12 @@ test("router respects RLS boundaries", async () => {
 
 ## Priority-Based Implementation Batches
 
-### **Unit Test Implementation** (Phase 3.5-3.6) - FOUNDATION**
+### **Unit Test Implementation** (Phase 3.5-3.6) - FOUNDATION\*\*
 
 **Target**: ~25 test files - foundational pattern establishment following consultant analysis
 
 **High Priority Component Tests** (15 files):
+
 - `MachineDetailView.test.tsx` - Exemplary auth integration pattern
 - `PrimaryAppBar.test.tsx` - Sophisticated permission testing
 - `PermissionGate.test.tsx` - Permission testing template
@@ -575,25 +627,28 @@ test("router respects RLS boundaries", async () => {
 - Plus 11 additional component tests
 
 **High Priority Pure Function Tests** (18 files):
+
 - Validation schemas (8 files)
-- Utility functions (5 files)  
+- Utility functions (5 files)
 - Auth helpers (3 files)
 - Business logic (2 files)
 
 **Remaining Files** (5 files):
+
 - Minor pattern alignment
 - Import path standardization
 
 **Conversion Strategy**: Apply Archetype 1 (Pure Function) & Archetype 4 (React Component) templates
 
-### **Integration Test Implementation** (Phase 3.3-3.4) - CRITICAL CONVERSIONS**
+### **Integration Test Implementation** (Phase 3.3-3.4) - CRITICAL CONVERSIONS\*\*
 
 **Target**: ~40 test files with 13 critical router conversions following consultant analysis
 
 **Critical Router Unit→tRPC Conversions** (13 files):
+
 - ✅ `issue.comment.test.ts` - **COMPLETED** (22/22 tests passing) - Complex permission validation with RLS
 - ✅ `issue.timeline.test.ts` - **COMPLETED** (13/13 tests passing) - Service integration with correct parameters
-- ✅ `issue.notification.test.ts` - **COMPLETED** (6/6 tests passing) - Notification workflows with boundary enforcement  
+- ✅ `issue.notification.test.ts` - **COMPLETED** (6/6 tests passing) - Notification workflows with boundary enforcement
 - ✅ `issue.status.test.ts` - **COMPLETED** (9/9 tests passing) - Status aggregation with organizational scoping
 - `issue.test.ts`, `issue.confirmation.test.ts` - Pending implementation
 - `model.core.test.ts`, `model.opdb.test.ts` - Complex model operations
@@ -604,39 +659,46 @@ test("router respects RLS boundaries", async () => {
 - `routers.drizzle.integration.test.ts`
 
 **PGlite Integration Files** (18 files):
+
 - Already following excellent patterns (e.g., `commentService.integration.test.ts`)
 - Minor RLS session context enhancements
 - Memory safety already validated
 
 **Service Logic Files** (7 files):
+
 - Maintain current Archetype 2 patterns
 - No major conversions needed
 
 **Infrastructure Tests** (2 files):
+
 - Minor improvements only
 
 **Conversion Strategy**: Unit Test (Archetype 1) → tRPC Router Test (Archetype 5) for router files
 
-### **Security Test Implementation** (Phase 3.1-3.2) - SECURITY COMPLIANCE**
+### **Security Test Implementation** (Phase 3.1-3.2) - SECURITY COMPLIANCE\*\*
 
 **Target**: ~22 test files focused on security boundary validation following consultant analysis
 
 **Critical Archetype Alignments** (5 files):
+
 - Security tests currently in wrong archetype categories
 - Need movement to Archetypes 6, 7, 8
 - Enhanced RLS policy testing
 
 **Permission/Auth Tests** (13 files - Archetype 6):
+
 - `permissions.test.ts`, `trpc.permission.test.ts`
 - Permission boundary validation
 - Role-based access control testing
 
 **RLS Policy Tests** (6 files - Archetype 7):
+
 - `cross-org-isolation.test.ts` - Exemplary RLS enforcement
 - `multi-tenant-isolation.integration.test.ts` - Multi-tenant boundaries
 - Direct RLS policy validation
 
 **Schema/Database Constraint Tests** (3 files - Archetype 8):
+
 - Database constraint testing with RLS context
 - Schema validation with organizational boundaries
 
@@ -656,6 +718,7 @@ test("router respects RLS boundaries", async () => {
 ✅ **Estimated memory usage**: 200-400MB total (safe operational range)
 
 **Exemplary Safe Patterns**:
+
 - `commentService.integration.test.ts` - Perfect worker-scoped PGlite usage
 - `location.integration.test.ts` - Proper transaction isolation
 - `cross-org-isolation.test.ts` - Safe multi-context testing
@@ -812,34 +875,33 @@ mockDb.issue.findMany.mockImplementation((args) => {
 ```typescript
 // ✅ Drizzle-style mocks + SEED_TEST_IDS consistency
 import { createVitestMockContext } from "~/test/vitestMockContext";
-import { SEED_TEST_IDS, createMockAdminContext } from "~/test/constants/seed-test-ids";
+import {
+  SEED_TEST_IDS,
+  createMockAdminContext,
+} from "~/test/constants/seed-test-ids";
 
 const mockDb = vi.hoisted(() => ({
   query: {
     issues: {
-      findMany: vi
-        .fn()
-        .mockResolvedValue([
-          { 
-            id: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE, 
-            title: "Test Issue", 
-            organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary
-          },
-        ]),
+      findMany: vi.fn().mockResolvedValue([
+        {
+          id: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
+          title: "Test Issue",
+          organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
+        },
+      ]),
       findFirst: vi.fn(),
     },
   },
   insert: vi.fn().mockReturnValue({
     values: vi.fn().mockReturnValue({
-      returning: vi
-        .fn()
-        .mockResolvedValue([
-          { 
-            id: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE, 
-            title: "New Issue", 
-            organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary
-          },
-        ]),
+      returning: vi.fn().mockResolvedValue([
+        {
+          id: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
+          title: "New Issue",
+          organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
+        },
+      ]),
     }),
   }),
   // Context simulation for organizational scoping
@@ -962,7 +1024,7 @@ test("creates comment via tRPC with seeded data", async ({ workerDb }) => {
 
     expect(result.content).toBe("Test comment");
     expect(result.organizationId).toBe(primaryOrgId); // Seeded org enforced
-    
+
     // Verify comment belongs to correct issue and organization
     const comments = await caller.comments.getByIssue({ issueId: issue.id });
     expect(comments).toHaveLength(1);
@@ -997,11 +1059,6 @@ test("creates comment via tRPC with seeded data", async ({ workerDb }) => {
 ## Infrastructure Test Cleanup
 
 ### File-Specific Archetype Applications
-
-#### `env-test-helpers.test.ts`
-
-**Apply**: Archetype 6 (Environment Configuration Testing)  
-**Focus**: Validate RLS configuration in test environments
 
 #### `trpc.permission.test.ts`
 
@@ -1128,7 +1185,7 @@ TOTAL: 335 failures → 0 failures
 ```bash
 # Check current test status by implementation phase
 npm run test src/components/               # Unit implementation files
-npm run test src/server/api/routers/       # Integration implementation files  
+npm run test src/server/api/routers/       # Integration implementation files
 npm run test src/integration-tests/        # Security implementation files
 
 # Phase 3.3a Issue Management Router Validation (✅ COMPLETE)
@@ -1163,7 +1220,7 @@ npm run test:all                           # Both pgTAP RLS + business logic tes
 - [x] **Phase 3.3a FULLY COMPLETE**: Issue Management router conversions (50/50 tests passing)
   - [x] `issue.comment.test.ts` - 22/22 tests passing with complex RLS validation
   - [x] `issue.status.test.ts` - 9/9 tests passing with organizational scoping
-  - [x] `issue.notification.test.ts` - 6/6 tests passing with boundary enforcement  
+  - [x] `issue.notification.test.ts` - 6/6 tests passing with boundary enforcement
   - [x] `issue.timeline.test.ts` - 13/13 tests passing with service integration
 - [x] **Archetype 5 compliance achieved** - All converted files follow tRPC Router integration patterns
 - [x] **SEED_TEST_IDS standardization** - Consistent mock data across all files
@@ -1382,10 +1439,11 @@ The completion of Phase 3 will deliver a robust, maintainable testing infrastruc
 #### 1. Testing Documentation Updates
 
 **Files to Update**:
+
 ```
 docs/testing/
 ├── INDEX.md                           # Add seed data architecture overview
-├── architecture-patterns.md          # Update with SEED_TEST_IDS patterns  
+├── architecture-patterns.md          # Update with SEED_TEST_IDS patterns
 ├── integration-patterns.md           # Add createTestContext() examples
 ├── test-database.md                   # Document dual-org setup
 ├── vitest-guide.md                    # Add MOCK_PATTERNS usage
@@ -1394,6 +1452,7 @@ docs/testing/
 ```
 
 **Key Updates**:
+
 - Replace all random ID examples with SEED_TEST_IDS usage
 - Update integration test examples to show `createTestContext()` pattern
 - Document global OPDB catalog behavior and expectations
@@ -1403,6 +1462,7 @@ docs/testing/
 #### 2. Quick Reference Updates
 
 **Files to Update**:
+
 ```
 docs/quick-reference/
 ├── INDEX.md                           # Add seed data quick reference
@@ -1412,6 +1472,7 @@ docs/quick-reference/
 ```
 
 **Key Updates**:
+
 - Add quick reference for SEED_TEST_IDS usage patterns
 - Document when to use MOCK_PATTERNS vs seeded data
 - Update security examples with hardcoded organization IDs
@@ -1420,6 +1481,7 @@ docs/quick-reference/
 #### 3. Developer Guide Updates
 
 **Files to Update**:
+
 ```
 docs/developer-guides/
 ├── drizzle/                          # Update with seeded data examples
@@ -1429,6 +1491,7 @@ docs/developer-guides/
 ```
 
 **Key Updates**:
+
 - Replace manual organization setup with seeded context examples
 - Update tRPC examples to use createTestContext() pattern
 - Document how seed data integrates with Supabase SSR patterns
@@ -1437,6 +1500,7 @@ docs/developer-guides/
 #### 4. Migration Plan Updates
 
 **Files to Update**:
+
 ```
 migration-plan-v2/
 ├── 01-phase1-prisma-removal.md      # Note: No changes needed (pre-seed)
@@ -1446,6 +1510,7 @@ migration-plan-v2/
 ```
 
 **Key Updates**:
+
 - Document how seed data foundation supports RLS implementation
 - Update Phase 2.5 to show seed data as key architectural component
 - Plan Phase 4 consolidation of seed data documentation
@@ -1454,14 +1519,16 @@ migration-plan-v2/
 #### 5. Root Documentation Updates
 
 **Files to Update**:
+
 ```
 ├── CLAUDE.md                         # Add seed data quick reference section
 ├── docs/INDEX.md                     # Update with seed data architecture overview
-├── TEST_INVENTORY_*.md               # Update examples with SEED_TEST_IDS  
+├── TEST_INVENTORY_*.md               # Update examples with SEED_TEST_IDS
 └── README.md                         # Add seed data architecture highlights
 ```
 
 **Key Updates**:
+
 - Add SEED_TEST_IDS overview to CLAUDE.md for easy agent reference
 - Update main INDEX.md with seed data as key architectural component
 - Replace random ID examples in test inventory with hardcoded patterns
@@ -1477,18 +1544,21 @@ migration-plan-v2/
 **Execution Steps**:
 
 1. **Testing Documentation (Priority 1)**:
+
    ```bash
    # Update core testing patterns with seed data examples
    # Focus on: INDEX.md, integration-patterns.md, test-database.md
    ```
 
 2. **Quick Reference Updates (Priority 2)**:
-   ```bash  
+
+   ```bash
    # Ensure quick references reflect current working patterns
    # Focus on: api-security-patterns.md, typescript-strictest-patterns.md
    ```
 
 3. **Developer Guides (Priority 3)**:
+
    ```bash
    # Update implementation guides with seed data integration
    # Focus on: trpc/, testing/, supabase/ directories
@@ -1503,12 +1573,14 @@ migration-plan-v2/
 ### Documentation Quality Standards
 
 **Consistency Requirements**:
+
 - All test examples must use SEED_TEST_IDS instead of hardcoded random values
 - Integration test examples must show `createTestContext()` pattern
 - Unit test examples must use MOCK_PATTERNS appropriately
 - All organizational boundary examples must use primary/competitor dual setup
 
 **Example Standards**:
+
 ```typescript
 // ✅ Correct documentation example
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
@@ -1530,6 +1602,7 @@ test("example integration test", async () => {
 ```
 
 **Benefits of Documentation Synchronization**:
+
 - **Consistent Developer Experience**: All docs show current working patterns
 - **Reduced Confusion**: No conflicting examples across documentation
 - **Improved Onboarding**: New developers see predictable, debuggable patterns

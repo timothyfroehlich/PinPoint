@@ -1,14 +1,14 @@
 /**
  * ✅ KEEP: Multi-org testing requires custom orgs (legitimate)
- * 
+ *
  * CURRENT STATUS: CORRECT PATTERN
  * - Multi-tenant boundary testing legitimately requires multiple organizations
  * - Custom org creation via setupMultiOrgContext() is appropriate
  * - Cannot use single seed organization for cross-org isolation testing
  * - Memory-safe worker-scoped patterns already implemented correctly
- * 
+ *
  * NO CHANGES NEEDED - This test properly creates multiple orgs for isolation testing
- * 
+ *
  * Cross-Organization Isolation Integration Tests
  *
  * Comprehensive integration tests that verify RLS enforcement at the application
@@ -31,7 +31,7 @@
  */
 
 import { describe, test, expect } from "vitest";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 import {
   test as baseTest,
@@ -43,7 +43,6 @@ import {
   withFullRLSContext,
   verifyOrganizationalIsolation,
   TestUsers,
-  TestOrganizations,
 } from "~/test/helpers/rls-test-context";
 import {
   createOrgContext,
@@ -746,7 +745,7 @@ describe("Integration with Existing Test Infrastructure", () => {
       const orgs = await setupMultiOrgContext(db, orgCount);
 
       // Perform RLS tests for each organization
-      for (const [key, org] of Object.entries(orgs)) {
+      for (const [_key, org] of Object.entries(orgs)) {
         await createOrgTestData(db, org, { issueCount: 2 });
 
         await withRLSContext(

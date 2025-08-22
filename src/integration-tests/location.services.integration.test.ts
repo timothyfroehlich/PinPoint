@@ -16,19 +16,15 @@
  * Uses modern August 2025 patterns with seeded data architecture.
  */
 
-import { describe, expect, vi, beforeAll } from "vitest";
+import { describe, expect, vi } from "vitest";
 
 // Import test setup and utilities
-import type { TRPCContext } from "~/server/api/trpc.base";
 
 import { locationRouter } from "~/server/api/routers/location";
 import * as schema from "~/server/db/schema";
 import { generateTestId } from "~/test/helpers/test-id-generator";
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
-import {
-  createSeededTestDatabase,
-  type TestDatabase,
-} from "~/test/helpers/pglite-test-setup";
+
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 import { createSeededLocationTestContext } from "~/test/helpers/createSeededLocationTestContext";
 
@@ -111,7 +107,7 @@ describe("Location Router Services Integration (PGlite)", () => {
         );
         const primaryCaller = locationRouter.createCaller(primaryContext);
 
-        const competitorContext = await createSeededLocationTestContext(
+        const _competitorContext = await createSeededLocationTestContext(
           txDb,
           competitorOrgId,
           SEED_TEST_IDS.USERS.ADMIN,

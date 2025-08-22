@@ -73,17 +73,22 @@ export function mergeFilters(
  */
 export function validateFilters(filters: Partial<IssueFilters>): IssueFilters {
   const defaults = getDefaultFilters();
-  
+
   return {
-    locationId: filters.locationId || undefined,
-    machineId: filters.machineId || undefined,
+    locationId: filters.locationId ?? undefined,
+    machineId: filters.machineId ?? undefined,
     statusIds: Array.isArray(filters.statusIds) ? filters.statusIds : undefined,
-    search: typeof filters.search === 'string' ? filters.search.trim() || undefined : undefined,
-    assigneeId: filters.assigneeId || undefined,
-    reporterId: filters.reporterId || undefined,
-    ownerId: filters.ownerId || undefined,
+    search:
+      typeof filters.search === "string"
+        ? (filters.search.trim() ?? undefined)
+        : undefined,
+    assigneeId: filters.assigneeId ?? undefined,
+    reporterId: filters.reporterId ?? undefined,
+    ownerId: filters.ownerId ?? undefined,
     sortBy: isValidSortField(filters.sortBy) ? filters.sortBy : defaults.sortBy,
-    sortOrder: isValidSortOrder(filters.sortOrder) ? filters.sortOrder : defaults.sortOrder,
+    sortOrder: isValidSortOrder(filters.sortOrder)
+      ? filters.sortOrder
+      : defaults.sortOrder,
   };
 }
 
@@ -92,12 +97,12 @@ export function validateFilters(filters: Partial<IssueFilters>): IssueFilters {
  */
 export function hasActiveFilters(filters: IssueFilters): boolean {
   return !!(
-    filters.locationId ||
-    filters.machineId ||
-    (filters.statusIds && filters.statusIds.length > 0) ||
-    filters.search ||
-    filters.assigneeId ||
-    filters.reporterId ||
+    filters.locationId ??
+    filters.machineId ??
+    (filters.statusIds && filters.statusIds.length > 0) ??
+    filters.search ??
+    filters.assigneeId ??
+    filters.reporterId ??
     filters.ownerId
   );
 }
@@ -112,13 +117,15 @@ export function clearAllFilters(): IssueFilters {
 /**
  * Type guards for validation
  */
-function isValidSortField(value: unknown): value is IssueFilters['sortBy'] {
-  return typeof value === 'string' && 
-    ['created', 'updated', 'status', 'severity', 'game'].includes(value);
+function isValidSortField(value: unknown): value is IssueFilters["sortBy"] {
+  return (
+    typeof value === "string" &&
+    ["created", "updated", "status", "severity", "game"].includes(value)
+  );
 }
 
-function isValidSortOrder(value: unknown): value is IssueFilters['sortOrder'] {
-  return value === 'asc' || value === 'desc';
+function isValidSortOrder(value: unknown): value is IssueFilters["sortOrder"] {
+  return value === "asc" || value === "desc";
 }
 
 /**
@@ -126,16 +133,16 @@ function isValidSortOrder(value: unknown): value is IssueFilters['sortOrder'] {
  */
 export function getFilterSummary(filters: IssueFilters): string[] {
   const summary: string[] = [];
-  
+
   if (filters.locationId) summary.push("Location");
   if (filters.machineId) summary.push("Machine");
   if (filters.statusIds && filters.statusIds.length > 0) {
-    summary.push(`Status (${filters.statusIds.length})`);
+    summary.push(`Status (${String(filters.statusIds.length)})`);
   }
   if (filters.search) summary.push("Search");
   if (filters.assigneeId) summary.push("Assignee");
   if (filters.reporterId) summary.push("Reporter");
   if (filters.ownerId) summary.push("Owner");
-  
+
   return summary;
 }

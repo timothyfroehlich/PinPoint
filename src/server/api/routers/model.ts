@@ -17,11 +17,11 @@ export const modelRouter = createTRPCRouter({
   // Includes: OPDB models (global) + org's custom models (future v1.x feature)
   getAll: orgScopedProcedure.query(async ({ ctx }) => {
     const allModels = await ctx.db.query.models.findMany({
-      where: 
+      where:
         // Global OPDB models (organizationId = NULL) OR org's custom models
         or(
           isNull(models.organizationId), // OPDB models
-          eq(models.organizationId, ctx.organizationId) // Custom models
+          eq(models.organizationId, ctx.organizationId), // Custom models
         ),
       with: {
         machines: {
@@ -54,8 +54,8 @@ export const modelRouter = createTRPCRouter({
           // Must be OPDB model OR org's custom model
           or(
             isNull(models.organizationId), // OPDB models
-            eq(models.organizationId, ctx.organizationId) // Custom models
-          )
+            eq(models.organizationId, ctx.organizationId), // Custom models
+          ),
         ),
         with: {
           machines: {
@@ -99,7 +99,7 @@ export const modelRouter = createTRPCRouter({
       const existingGame = await ctx.db.query.models.findFirst({
         where: and(
           eq(models.opdbId, input.opdbId),
-          isNull(models.organizationId) // OPDB models have NULL organizationId
+          isNull(models.organizationId), // OPDB models have NULL organizationId
         ),
       });
 
@@ -150,7 +150,7 @@ export const modelRouter = createTRPCRouter({
         model: {
           where: and(
             isNull(models.organizationId), // Only OPDB models
-            eq(models.isCustom, false)
+            eq(models.isCustom, false),
           ),
         },
       },
@@ -158,7 +158,7 @@ export const modelRouter = createTRPCRouter({
 
     const opdbModelsToSync = machinesInOrg
       .map((machine) => machine.model)
-      .filter((model) => model && model.opdbId)
+      .filter((model) => model?.opdbId)
       // Remove duplicates by creating a Map
       .reduce((uniqueModels, model) => {
         if (model) {

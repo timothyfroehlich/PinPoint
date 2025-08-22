@@ -167,7 +167,7 @@ export function createAuthenticatedContext(
       if (!permissions.includes(permission)) {
         throw new TRPCError({
           code: "FORBIDDEN",
-          message: `Missing required permission: ${permission}`,
+          message: `Missing required permission: ${String(permission)}`,
         });
       }
       return Promise.resolve();

@@ -29,7 +29,7 @@
  * - publicGetAll: Anonymous issue viewing with filtering
  */
 
-import { eq, and, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { describe, expect, vi } from "vitest";
 
 // Import test setup and utilities

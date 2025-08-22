@@ -15,7 +15,6 @@
  *
  * Uses modern August 2025 patterns with seeded data architecture.
  */
-import { eq, count, and, ne } from "drizzle-orm";
 import { describe, expect, vi, beforeAll } from "vitest";
 
 // Import test setup and utilities
@@ -28,10 +27,7 @@ import {
   type TestDatabase,
 } from "~/test/helpers/pglite-test-setup";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
-import {
-  createSeededLocationTestContext,
-  createCompetitorAdminContext,
-} from "~/test/helpers/createSeededLocationTestContext";
+import { createSeededLocationTestContext } from "~/test/helpers/createSeededLocationTestContext";
 
 // Mock external dependencies that aren't database-related
 vi.mock("~/lib/utils/id-generation", () => ({
@@ -40,7 +36,7 @@ vi.mock("~/lib/utils/id-generation", () => ({
 
 // Removed permission mocks to use real membership-based scoping from seeds
 describe("Location Router Aggregation Operations (PGlite)", () => {
-  let workerDb: TestDatabase;
+  let _workerDb: TestDatabase;
   let primaryOrgId: string;
   let competitorOrgId: string;
   // Using deterministic SEED_TEST_IDS directly
@@ -121,8 +117,8 @@ describe("Location Router Aggregation Operations (PGlite)", () => {
         expect(testLocationResult).toBeDefined();
 
         // Verify aggregation counts
-        expect(testLocationResult!._count.machines).toBe(3);
-        testLocationResult!.machines.forEach((machine) => {
+        expect(testLocationResult?._count.machines).toBe(3);
+        testLocationResult?.machines.forEach((machine) => {
           expect(machine._count.issues).toBe(2); // 2 issues per machine
         });
       });

@@ -1,10 +1,7 @@
-import { eq } from "drizzle-orm";
 import { vi } from "vitest";
 import { type TestDatabase } from "./pglite-test-setup";
-import { memberships, roles } from "../../server/db/schema";
 import type { TRPCContext } from "../../server/api/trpc.base";
 import { ServiceFactory } from "../../server/services/factory";
-import { generateTestId } from "./test-id-generator";
 
 export interface CreateSeededNotificationTestContextOptions {
   permissions?: string[];
@@ -65,7 +62,7 @@ export async function createSeededNotificationTestContext(
   };
 
   // Set up permissions (use provided permissions or default notification permissions)
-  const userPermissions = options?.permissions || [
+  const _userPermissions = options?.permissions || [
     "notification:read",
     "notification:edit",
   ];

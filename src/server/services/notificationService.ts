@@ -32,6 +32,7 @@ export const NotificationEntity = {
 
 export interface NotificationData {
   userId: string;
+  organizationId: string;
   type: NotificationType;
   message: string;
   entityType?: NotificationEntity;
@@ -52,6 +53,7 @@ export class NotificationService {
     const notificationData: typeof notifications.$inferInsert = {
       id: generatePrefixedId("notification"),
       userId: data.userId,
+      organizationId: data.organizationId,
       type: data.type,
       message: data.message,
       entityType: data.entityType ?? null,
@@ -90,13 +92,14 @@ export class NotificationService {
 
     const issue = await this.db.query.issues.findFirst({
       where: eq(issues.id, issueId),
-      columns: { title: true },
+      columns: { title: true, organizationId: true },
     });
 
     if (!issue) return;
 
     await this.createNotification({
       userId: machine.owner.id,
+      organizationId: issue.organizationId,
       type: NotificationType.ISSUE_CREATED,
       message: `New issue reported on your ${machine.model.name}: "${issue.title}"`,
       entityType: NotificationEntity.ISSUE,
@@ -118,6 +121,10 @@ export class NotificationService {
   ): Promise<void> {
     const issue = await this.db.query.issues.findFirst({
       where: eq(issues.id, issueId),
+      columns: {
+        organizationId: true,
+        title: true,
+      },
       with: {
         machine: {
           with: {
@@ -138,6 +145,7 @@ export class NotificationService {
 
     await this.createNotification({
       userId: issue.machine.owner.id,
+      organizationId: issue.organizationId,
       type: NotificationType.ISSUE_UPDATED,
       message: `Issue status changed on your ${issue.machine.model.name}: ${oldStatus} → ${newStatus}`,
       entityType: NotificationEntity.ISSUE,
@@ -158,6 +166,10 @@ export class NotificationService {
   ): Promise<void> {
     const issue = await this.db.query.issues.findFirst({
       where: eq(issues.id, issueId),
+      columns: {
+        organizationId: true,
+        title: true,
+      },
       with: {
         machine: {
           with: {
@@ -171,6 +183,7 @@ export class NotificationService {
 
     await this.createNotification({
       userId: assignedUserId,
+      organizationId: issue.organizationId,
       type: NotificationType.ISSUE_ASSIGNED,
       message: `You were assigned to issue: "${issue.title}" on ${issue.machine.model.name}`,
       entityType: NotificationEntity.ISSUE,

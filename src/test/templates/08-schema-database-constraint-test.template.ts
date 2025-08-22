@@ -14,9 +14,8 @@
  */
 
 import { describe, test, expect } from "vitest";
-import { eq, and, sql, count } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import {
-  test as workerTest,
   withBusinessLogicTest,
   withRLSAwareTest,
 } from "~/test/helpers/worker-scoped-db";

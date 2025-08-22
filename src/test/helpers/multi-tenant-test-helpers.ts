@@ -24,14 +24,10 @@
  * ```
  */
 
-import { eq, and, ne, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { TestDatabase } from "./pglite-test-setup";
-import { withRLSContext, withFullRLSContext } from "./rls-test-context";
-import {
-  createOrgContext,
-  verifyOrgIsolation,
-  type OrgTestContext,
-} from "./organization-context";
+import { withRLSContext } from "./rls-test-context";
+import { createOrgContext, type OrgTestContext } from "./organization-context";
 import * as schema from "~/server/db/schema";
 
 /**
@@ -122,7 +118,7 @@ export async function auditMultiTenantSecurity(
   // Create test organizations
   const testOrgs: OrgTestContext[] = [];
   for (let i = 1; i <= orgCount; i++) {
-    const org = await createOrgContext(db, `audit${i}`);
+    const org = await createOrgContext(db, `audit${String(i)}`);
     testOrgs.push(org);
 
     // Create test data based on size preference
@@ -259,14 +255,14 @@ export async function testPermissionBoundaries(
     const startTime = performance.now();
 
     try {
-      const result = await withRLSContext(db, userId, orgId, async (db) => {
+      const _result = await withRLSContext(db, userId, orgId, async (db) => {
         switch (operation.name) {
           case "create_issue":
             // Try to create a test issue
             return await db
               .insert(schema.issues)
               .values({
-                id: `test-issue-${Date.now()}`,
+                id: `test-issue-${String(Date.now())}`,
                 title: "Permission Test Issue",
                 organizationId: orgId,
                 machineId: "test-machine-id",
@@ -388,7 +384,7 @@ export async function testCrossOrgAccess(
         passed: wasBlocked, // Should be blocked
         evidence: data.length > 0 ? data : undefined,
       });
-    } catch (error) {
+    } catch {
       // Error likely means access was properly blocked
       results.push({
         sourceOrgId: sourceOrg.organization.id,
@@ -503,11 +499,11 @@ export async function validateRLSPolicies(db: TestDatabase): Promise<{
   policiesActive: boolean;
   tablesWithRLS: string[];
   tablesWithoutRLS: string[];
-  policyDetails: Array<{
+  policyDetails: {
     table: string;
     hasPolicy: boolean;
     policyNames: string[];
-  }>;
+  }[];
 }> {
   // Query PostgreSQL system tables to check RLS status
   const rlsStatus = await db.execute(sql`
@@ -532,11 +528,11 @@ export async function validateRLSPolicies(db: TestDatabase): Promise<{
 
   const tablesWithRLS: string[] = [];
   const tablesWithoutRLS: string[] = [];
-  const policyDetails: Array<{
+  const policyDetails: {
     table: string;
     hasPolicy: boolean;
     policyNames: string[];
-  }> = [];
+  }[] = [];
 
   for (const row of rlsStatus.rows as any[]) {
     const tableName = row.tablename;
@@ -591,9 +587,9 @@ async function createAuditTestData(
   // Create locations
   for (let i = 1; i <= dataSize.locations; i++) {
     await db.insert(schema.locations).values({
-      id: `audit-location-${org.organization.id}-${i}`,
-      name: `Audit Location ${i}`,
-      street: `${i}00 Audit St`,
+      id: `audit-location-${org.organization.id}-${String(i)}`,
+      name: `Audit Location ${String(i)}`,
+      street: `${String(i)}00 Audit St`,
       city: "Audit City",
       state: "AC",
       zip: "00000",
@@ -606,13 +602,13 @@ async function createAuditTestData(
   // Create machines
   for (let i = 1; i <= dataSize.machines; i++) {
     await db.insert(schema.machines).values({
-      id: `audit-machine-${org.organization.id}-${i}`,
-      name: `Audit Machine ${i}`,
+      id: `audit-machine-${org.organization.id}-${String(i)}`,
+      name: `Audit Machine ${String(i)}`,
       serialNumber: `AM${i.toString().padStart(4, "0")}`,
       condition: "Good",
       organizationId: org.organization.id,
-      locationId: `audit-location-${org.organization.id}-${Math.ceil(i / Math.ceil(dataSize.machines / dataSize.locations))}`,
-      qrCodeId: `audit-qr-${org.organization.id}-${i}`,
+      locationId: `audit-location-${org.organization.id}-${String(Math.ceil(i / Math.ceil(dataSize.machines / dataSize.locations)))}`,
+      qrCodeId: `audit-qr-${org.organization.id}-${String(i)}`,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -621,11 +617,11 @@ async function createAuditTestData(
   // Create issues
   for (let i = 1; i <= dataSize.issues; i++) {
     await db.insert(schema.issues).values({
-      id: `audit-issue-${org.organization.id}-${i}`,
-      title: `Audit Issue ${i}`,
-      description: `Audit test issue ${i}`,
+      id: `audit-issue-${org.organization.id}-${String(i)}`,
+      title: `Audit Issue ${String(i)}`,
+      description: `Audit test issue ${String(i)}`,
       organizationId: org.organization.id,
-      machineId: `audit-machine-${org.organization.id}-${Math.ceil(i / Math.ceil(dataSize.issues / dataSize.machines))}`,
+      machineId: `audit-machine-${org.organization.id}-${String(Math.ceil(i / Math.ceil(dataSize.issues / dataSize.machines)))}`,
       statusId: org.statuses.new.id,
       priorityId: org.priorities.medium.id,
       createdById: org.users.member.id,

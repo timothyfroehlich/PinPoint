@@ -3,7 +3,7 @@ import { type InferSelectModel } from "drizzle-orm";
 
 import { COMMENT_CLEANUP_CONFIG } from "~/server/constants/cleanup";
 import { type DrizzleClient } from "~/server/db/drizzle";
-import { comments, issues } from "~/server/db/schema";
+import { comments } from "~/server/db/schema";
 
 // Infer Comment type from Drizzle schema
 type Comment = InferSelectModel<typeof comments> & {

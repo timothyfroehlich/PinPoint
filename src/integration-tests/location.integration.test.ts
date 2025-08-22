@@ -16,19 +16,15 @@
  */
 
 import { eq } from "drizzle-orm";
-import { describe, expect, vi, beforeAll } from "vitest";
+import { describe, expect, vi } from "vitest";
 
 // Import test setup and utilities
-import type { TRPCContext } from "~/server/api/trpc.base";
 
 import { locationRouter } from "~/server/api/routers/location";
 import * as schema from "~/server/db/schema";
 import { generateTestId } from "~/test/helpers/test-id-generator";
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
-import {
-  createSeededTestDatabase,
-  type TestDatabase,
-} from "~/test/helpers/pglite-test-setup";
+
 import { createSeededLocationTestContext } from "~/test/helpers/createSeededLocationTestContext";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
@@ -57,13 +53,13 @@ vi.mock("~/server/auth/permissions", () => ({
 
 describe("Location Router - Schema & Performance Tests (PGlite)", () => {
   const primaryOrgId = SEED_TEST_IDS.ORGANIZATIONS.primary;
-  const competitorOrgId = SEED_TEST_IDS.ORGANIZATIONS.competitor;
+  const _competitorOrgId = SEED_TEST_IDS.ORGANIZATIONS.competitor;
 
   describe("Database Schema Validation", () => {
     test("should maintain referential integrity", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (txDb) => {
         // Create context using seeded data
-        const context = await createSeededLocationTestContext(
+        const _context = await createSeededLocationTestContext(
           txDb,
           primaryOrgId,
           SEED_TEST_IDS.USERS.ADMIN,
@@ -95,16 +91,16 @@ describe("Location Router - Schema & Performance Tests (PGlite)", () => {
           title: "Test Issue Integrity",
           organizationId: primaryOrgId,
           machineId: machine.id,
-          statusId: seededData.status!,
-          priorityId: seededData.priority!,
-          createdById: seededData.user!,
+          statusId: SEED_TEST_IDS.STATUSES.NEW_PRIMARY,
+          priorityId: SEED_TEST_IDS.PRIORITIES.HIGH_PRIMARY,
+          createdById: SEED_TEST_IDS.USERS.ADMIN,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
 
         // Test referential integrity with deep relations
         const locationWithRelations = await txDb.query.locations.findFirst({
-          where: eq(schema.locations.id, seededData.location!),
+          where: eq(schema.locations.id, SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR),
           with: {
             machines: {
               with: {
@@ -122,24 +118,26 @@ describe("Location Router - Schema & Performance Tests (PGlite)", () => {
         });
 
         expect(locationWithRelations).toBeDefined();
-        expect(locationWithRelations!.machines.length).toBeGreaterThanOrEqual(
+        expect(locationWithRelations?.machines.length).toBeGreaterThanOrEqual(
           1,
         );
 
         // Find our test machine
-        const testMachine = locationWithRelations!.machines.find(
+        const testMachine = locationWithRelations?.machines.find(
           (m) => m.id === machineId,
         );
         expect(testMachine).toBeDefined();
-        expect(testMachine!.model.id).toBe(seededData.model);
-        expect(testMachine!.owner.id).toBe(seededData.user);
-        expect(testMachine!.issues.length).toBeGreaterThanOrEqual(1);
+        expect(testMachine?.model.id).toBe("model-mm-001");
+        expect(testMachine?.owner.id).toBe(SEED_TEST_IDS.USERS.ADMIN);
+        expect(testMachine?.issues.length).toBeGreaterThanOrEqual(1);
 
         // Find our test issue
-        const testIssue = testMachine!.issues.find((i) => i.id === issueId);
+        const testIssue = testMachine?.issues.find((i) => i.id === issueId);
         expect(testIssue).toBeDefined();
-        expect(testIssue!.status.id).toBe(seededData.status);
-        expect(testIssue!.priority.id).toBe(seededData.priority);
+        expect(testIssue?.status.id).toBe(SEED_TEST_IDS.STATUSES.NEW_PRIMARY);
+        expect(testIssue?.priority.id).toBe(
+          SEED_TEST_IDS.PRIORITIES.HIGH_PRIMARY,
+        );
       });
     });
 
@@ -205,7 +203,7 @@ describe("Location Router - Schema & Performance Tests (PGlite)", () => {
         const duplicateOrg = {
           id: generateTestId("duplicate-org"),
           name: "Duplicate Organization",
-          subdomain: existingOrg!.subdomain, // Same subdomain as existing primary org
+          subdomain: existingOrg?.subdomain ?? "fallback-subdomain", // Same subdomain as existing primary org
           createdAt: new Date(),
           updatedAt: new Date(),
         };
@@ -217,7 +215,12 @@ describe("Location Router - Schema & Performance Tests (PGlite)", () => {
           const duplicateOrgs = await txDb
             .select()
             .from(schema.organizations)
-            .where(eq(schema.organizations.subdomain, existingOrg!.subdomain));
+            .where(
+              eq(
+                schema.organizations.subdomain,
+                existingOrg?.subdomain ?? "fallback-subdomain",
+              ),
+            );
           expect(duplicateOrgs.length).toBeLessThanOrEqual(1);
         } catch (error) {
           // If constraint is enforced, this is expected behavior
@@ -254,8 +257,8 @@ describe("Location Router - Schema & Performance Tests (PGlite)", () => {
           qrCodeId: `perf-qr-${i}`,
           organizationId: primaryOrgId,
           locationId: `perf-location-${i % 20}`, // Distribute across locations
-          modelId: seededData.model!,
-          ownerId: seededData.user!,
+          modelId: "model-mm-001",
+          ownerId: SEED_TEST_IDS.USERS.ADMIN,
           createdAt: new Date(),
           updatedAt: new Date(),
         }));
@@ -310,8 +313,8 @@ describe("Location Router - Schema & Performance Tests (PGlite)", () => {
             qrCodeId: `agg-qr-${i}`,
             organizationId: primaryOrgId,
             locationId: `agg-location-${i % 5}`, // 3 machines per location
-            modelId: seededData.model!,
-            ownerId: seededData.user!,
+            modelId: "model-mm-001",
+            ownerId: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date(),
             updatedAt: new Date(),
           })),

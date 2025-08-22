@@ -46,7 +46,7 @@ export const test = baseTest.extend<
     async ({}, use) => {
       const workerId = process.env.VITEST_WORKER_ID ?? "unknown";
       console.log(
-        `[Worker ${workerId}] Creating shared PGlite instance with seeded data`,
+        `[Worker ${String(workerId)}] Creating shared PGlite instance with seeded data`,
       );
 
       // Create single seeded database instance for this worker
@@ -56,7 +56,7 @@ export const test = baseTest.extend<
       await use(db);
 
       // Cleanup when worker exits
-      console.log(`[Worker ${workerId}] Cleaning up PGlite instance`);
+      console.log(`[Worker ${String(workerId)}] Cleaning up PGlite instance`);
       await cleanupTestDatabase(db);
     },
     { scope: "worker" }, // Critical: worker scope, not test scope
@@ -165,11 +165,10 @@ export async function withExplicitRollback<T>(
   return await db.transaction(async (tx) => {
     try {
       // Run the test function
-      const result = await testFn(tx);
+      const _result = await testFn(tx);
 
       // Explicitly rollback the transaction
       // Note: tx.rollback() throws an error that triggers rollback
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (tx as any).rollback?.();
 
       // This line should not be reached if rollback() works correctly
@@ -205,7 +204,7 @@ export async function withExplicitRollback<T>(
  * (Currently unused but kept for potential future use)
  */
 // eslint-disable-next-line @typescript-eslint/require-await
-async function cleanupAllTestData(_db: TestDatabase): Promise<void> {
+async function _cleanupAllTestData(_db: TestDatabase): Promise<void> {
   try {
     // Note: This function is not currently used since worker-scoped databases
     // provide sufficient isolation. Kept for potential future cleanup needs.
@@ -252,8 +251,7 @@ async function cleanupAllTestData(_db: TestDatabase): Promise<void> {
  * to determine organizational and user context during testing.
  */
 
-import { sql, eq } from "drizzle-orm";
-import { organizations } from "~/server/db/schema";
+import { sql } from "drizzle-orm";
 
 /**
  * Set RLS session context for testing
@@ -287,14 +285,18 @@ export const rlsContexts = {
   /**
    * Admin user context - full organizational access
    */
-  admin: async (db: TestDatabase, orgId: string, userId: string = "admin-user-id") => {
+  admin: async (db: TestDatabase, orgId: string, userId = "admin-user-id") => {
     await setTestSession(db, orgId, userId, "admin");
   },
 
   /**
    * Member user context - standard organizational access
    */
-  member: async (db: TestDatabase, orgId: string, userId: string = "member-user-id") => {
+  member: async (
+    db: TestDatabase,
+    orgId: string,
+    userId = "member-user-id",
+  ) => {
     await setTestSession(db, orgId, userId, "member");
   },
 
@@ -348,14 +350,14 @@ export async function withMultiOrgTest<T>(
   contexts: { orgId: string; role?: string; userId?: string }[],
   testFn: (
     setContext: (contextIndex: number) => Promise<void>,
-    tx: TestDatabase
+    tx: TestDatabase,
   ) => Promise<T>,
 ): Promise<T> {
   return await withIsolatedTest(db, async (tx) => {
     const setContext = async (contextIndex: number) => {
       const context = contexts[contextIndex];
       if (!context) {
-        throw new Error(`Context ${contextIndex} not provided`);
+        throw new Error(`Context ${String(contextIndex)} not provided`);
       }
 
       await setTestSession(tx, context.orgId, context.userId, context.role);
@@ -453,7 +455,7 @@ export async function withCrossOrgTest<T>(
   contexts: { orgId: string; role?: string; userId?: string }[],
   testFn: (
     setContext: (contextIndex: number) => Promise<void>,
-    tx: TestDatabase
+    tx: TestDatabase,
   ) => Promise<T>,
 ): Promise<T> {
   return await withMultiOrgTest(db, contexts, testFn);
@@ -479,26 +481,28 @@ export async function withRLSEnabledTest<T>(
 
     // Re-enable RLS on the same tables disabled during business-logic setup
     const rlsTables = [
-      'organizations',
-      'users',
-      'memberships',
-      'roles',
-      'role_permissions',
-      'locations',
-      'machines',
-      'models',
-      'issues',
-      'issue_statuses',
-      'priorities',
-      'comments',
-      'attachments',
-      'issue_history',
-      'upvotes',
+      "organizations",
+      "users",
+      "memberships",
+      "roles",
+      "role_permissions",
+      "locations",
+      "machines",
+      "models",
+      "issues",
+      "issue_statuses",
+      "priorities",
+      "comments",
+      "attachments",
+      "issue_history",
+      "upvotes",
     ];
 
     for (const table of rlsTables) {
       try {
-        await tx.execute(sql.raw(`ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY`));
+        await tx.execute(
+          sql.raw(`ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY`),
+        );
       } catch {
         // Non-fatal if table doesn't exist in current schema
       }

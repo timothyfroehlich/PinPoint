@@ -14,19 +14,15 @@ const mockDb = vi.hoisted(() => ({
     },
   },
   insert: vi.fn().mockReturnValue({ returning: vi.fn() }),
-  update: vi
-    .fn()
-    .mockReturnValue({
-      set: vi
-        .fn()
-        .mockReturnValue({
-          where: vi.fn().mockReturnValue({ returning: vi.fn() }),
-        }),
+  update: vi.fn().mockReturnValue({
+    set: vi.fn().mockReturnValue({
+      where: vi.fn().mockReturnValue({ returning: vi.fn() }),
     }),
+  }),
 }));
 
 // Mock the database module
-vi.mock("@/server/db/index", async (importOriginal) => {
+vi.mock("@/server/db/index", async (_importOriginal) => {
   const actual = await vi.importActual("@/server/db/index");
   return {
     ...actual,

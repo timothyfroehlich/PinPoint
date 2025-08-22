@@ -1,8 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 // Import test constants
-import { SEED_TEST_IDS } from "../../../test/constants/seed-test-ids";
-import { MOCK_IDS } from "../../../test/utils/mock-ids";
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
 import {
   validateStatusTransition,

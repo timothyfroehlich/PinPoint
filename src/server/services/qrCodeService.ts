@@ -1,4 +1,4 @@
-import { eq, and, isNull, count } from "drizzle-orm";
+import { eq, isNull, count } from "drizzle-orm";
 import * as QRCode from "qrcode";
 
 import { imageStorage } from "~/lib/image-storage/local-storage";
@@ -311,9 +311,7 @@ export class QRCodeService {
     withoutQRCodes: number;
   }> {
     const [totalResult, withoutQRCodesResult] = await Promise.all([
-      this.db
-        .select({ count: count() })
-        .from(machines),
+      this.db.select({ count: count() }).from(machines),
       this.db
         .select({ count: count() })
         .from(machines)

@@ -78,7 +78,7 @@ const getMockIssue = (context: TestMockContext) => ({
 describe("Issue Notification Router (RLS-Enhanced)", () => {
   let ctx: VitestMockContext;
   let adminContext: TestMockContext;
-  let memberContext: TestMockContext;
+  let _memberContext: TestMockContext;
   let mockUser: ReturnType<typeof getMockUser>;
   let mockMachine: ReturnType<typeof getMockMachine>;
   let mockIssue: ReturnType<typeof getMockIssue>;
@@ -89,7 +89,7 @@ describe("Issue Notification Router (RLS-Enhanced)", () => {
 
     // Set up test contexts with SEED_TEST_IDS
     adminContext = createMockAdminContext();
-    memberContext = createMockMemberContext();
+    _memberContext = createMockMemberContext();
 
     // Create mock data using consistent IDs
     mockUser = getMockUser(adminContext);
@@ -355,7 +355,7 @@ describe("Issue Notification Router (RLS-Enhanced)", () => {
     const competitorIssue = getMockIssue(competitorContext);
 
     // Mock notification for competitor organization
-    const competitorNotification = {
+    const _competitorNotification = {
       id: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE + "-competitor-notification",
       userId: competitorUser.id,
       type: NotificationType.ISSUE_CREATED,

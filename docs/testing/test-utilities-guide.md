@@ -36,13 +36,6 @@ import {
   expectSSLConfiguration,
   importDrizzleModule,
 } from "~/server/db/__tests__/drizzle-test-helpers";
-
-import {
-  createCleanEnvironment,
-  setTestEnvironmentVars,
-  setupDevelopmentScenario,
-  configureDotenvMocks,
-} from "~/lib/env-loaders/__tests__/env-test-helpers";
 ```
 
 ### Quick Test Template
@@ -80,27 +73,27 @@ describe('ComponentName', () => {
 #### Infrastructure Testing Template
 
 ```typescript
-import { cleanupTestData, createTestOrganization, type TestDataIds } from "~/test/database-test-helpers";
-import { createCleanEnvironment } from "~/lib/env-loaders/__tests__/env-test-helpers";
+import {
+  cleanupTestData,
+  createTestOrganization,
+  type TestDataIds,
+} from "~/test/database-test-helpers";
 import { configureDevelopmentMocks } from "~/server/db/__tests__/drizzle-test-helpers";
 
-describe('Infrastructure Test', () => {
+describe("Infrastructure Test", () => {
   let testIds: TestDataIds = {};
-  let restoreEnv: () => void;
 
   beforeEach(() => {
     vi.clearAllMocks();
     configureDevelopmentMocks();
-    restoreEnv = createCleanEnvironment();
   });
 
   afterEach(async () => {
     await cleanupTestData(db, testIds);
     testIds = {};
-    restoreEnv();
   });
 
-  it('should handle database operations with proper cleanup', async () => {
+  it("should handle database operations with proper cleanup", async () => {
     const org = await createTestOrganization(db, { name: "Test Org" });
     testIds.orgIds = [org.id];
 
@@ -463,7 +456,10 @@ describe("Service Integration", () => {
 #### Database Cleanup Utilities
 
 ```typescript
-import { cleanupTestData, type TestDataIds } from "~/test/database-test-helpers";
+import {
+  cleanupTestData,
+  type TestDataIds,
+} from "~/test/database-test-helpers";
 
 describe("Database Integration Test", () => {
   let testIds: TestDataIds = {};
@@ -477,9 +473,9 @@ describe("Database Integration Test", () => {
   it("should create and cleanup test data properly", async () => {
     const org = await createTestOrganization(db, { name: "Test Organization" });
     testIds.orgIds = [org.id];
-    
-    const machine = await createTestMachine(db, org.id, { 
-      machineName: "Test Machine" 
+
+    const machine = await createTestMachine(db, org.id, {
+      machineName: "Test Machine",
     });
     testIds.machineId = machine.machine.id;
 
@@ -494,17 +490,17 @@ describe("Database Integration Test", () => {
 ```typescript
 // Create complete organizational structure
 const { user, membership, role } = await createTestUserWithMembership(
-  db, 
-  organizationId, 
-  'admin', 
-  { name: "Admin User", email: "admin@test.com" }
+  db,
+  organizationId,
+  "admin",
+  { name: "Admin User", email: "admin@test.com" },
 );
 
 // Create machine with related location and model
 const { machine, location, model } = await createTestMachine(
   db,
   organizationId,
-  { machineName: "Medieval Madness" }
+  { machineName: "Medieval Madness" },
 );
 
 // Create issue with priority and status
@@ -512,7 +508,7 @@ const { issue, priority, status } = await createTestIssue(
   db,
   machineId,
   organizationId,
-  { description: "Flipper needs adjustment" }
+  { description: "Flipper needs adjustment" },
 );
 ```
 
@@ -523,7 +519,7 @@ import { createMultiTenantTestEnvironment } from "~/test/database-test-helpers";
 
 describe("Multi-tenant Isolation", () => {
   it("should prevent cross-organization data access", async () => {
-    const { orgA, orgB, userInOrgA, userInOrgB } = 
+    const { orgA, orgB, userInOrgA, userInOrgB } =
       await createMultiTenantTestEnvironment(db);
 
     // Test that userInOrgA cannot access orgB data
@@ -531,7 +527,7 @@ describe("Multi-tenant Isolation", () => {
       .select()
       .from(issues)
       .where(eq(issues.organizationId, orgB.id));
-    
+
     // Verify isolation...
   });
 });
@@ -546,10 +542,10 @@ describe("Multi-tenant Isolation", () => {
 #### Environment Configuration Presets
 
 ```typescript
-import { 
+import {
   configureDevelopmentMocks,
   configureProductionMocks,
-  configureCIMocks 
+  configureCIMocks,
 } from "~/server/db/__tests__/drizzle-test-helpers";
 
 describe("Drizzle Client Configuration", () => {
@@ -559,13 +555,13 @@ describe("Drizzle Client Configuration", () => {
 
   it("should configure development environment correctly", () => {
     configureDevelopmentMocks();
-    
+
     // Test development-specific behavior
   });
 
   it("should configure production environment correctly", () => {
     configureProductionMocks();
-    
+
     // Test production-specific SSL, pooling, etc.
   });
 });
@@ -574,10 +570,10 @@ describe("Drizzle Client Configuration", () => {
 #### Connection String Builders
 
 ```typescript
-import { 
+import {
   createLocalhost5432URL,
   createRemoteURL,
-  create127001URL 
+  create127001URL,
 } from "~/server/db/__tests__/drizzle-test-helpers";
 
 // Generate test connection strings
@@ -594,104 +590,18 @@ const ipUrl = create127001URL("dev_db");
 #### Mock Validation Helpers
 
 ```typescript
-import { 
+import {
   expectSSLConfiguration,
   expectPoolConfiguration,
-  expectTimeoutConfiguration 
+  expectTimeoutConfiguration,
 } from "~/server/db/__tests__/drizzle-test-helpers";
 
 it("should configure SSL properly in production", () => {
   configureProductionMocks();
-  
+
   expectSSLConfiguration(true);
   expectPoolConfiguration(20);
   expectTimeoutConfiguration(30000, 5000);
-});
-```
-
-### Environment Test Helpers
-
-**Location**: `src/lib/env-loaders/__tests__/env-test-helpers.ts`
-
-**Purpose**: Environment variable management for loader testing with automatic cleanup and scenario presets.
-
-#### Clean Environment Management
-
-```typescript
-import { createCleanEnvironment } from "~/lib/env-loaders/__tests__/env-test-helpers";
-
-describe("Environment Loader", () => {
-  let restoreEnv: () => void;
-
-  beforeEach(() => {
-    // Creates clean environment, returns restore function
-    restoreEnv = createCleanEnvironment(['DATABASE_URL', 'CUSTOM_VAR']);
-  });
-
-  afterEach(() => {
-    restoreEnv(); // Automatically restores original environment
-  });
-
-  it("should load environment variables correctly", () => {
-    // Test with clean environment
-  });
-});
-```
-
-#### File Content Simulation
-
-```typescript
-import { simulateEnvFileContents } from "~/lib/env-loaders/__tests__/env-test-helpers";
-
-it("should respect file precedence order", () => {
-  simulateEnvFileContents({
-    '.env': { DATABASE_URL: 'base-url', COMMON_VAR: 'base' },
-    '.env.local': { COMMON_VAR: 'local-override', DATABASE_URL: 'local-dev-url' }
-  });
-
-  // Test that local environment takes precedence
-});
-```
-
-#### Environment Scenario Presets
-
-```typescript
-import { 
-  setupDevelopmentScenario,
-  setupProductionScenario,
-  setupCIScenario 
-} from "~/lib/env-loaders/__tests__/env-test-helpers";
-
-describe("Environment-specific Behavior", () => {
-  it("should handle development environment", () => {
-    setupDevelopmentScenario();
-    // Automatically sets NODE_ENV=development, local URLs, etc.
-  });
-
-  it("should handle CI environment", () => {
-    setupCIScenario();
-    // Sets CI=true, test database URLs, etc.
-  });
-});
-```
-
-#### Load Order Validation
-
-```typescript
-import { 
-  configureDotenvMocks,
-  expectFileLoadOrder 
-} from "~/lib/env-loaders/__tests__/env-test-helpers";
-
-it("should load files in correct order", async () => {
-  const { mockDotenvConfig } = configureDotenvMocks();
-  
-  await import("../development");
-  
-  expectFileLoadOrder([
-    '.env',
-    '.env.local'
-  ], mockDotenvConfig);
 });
 ```
 

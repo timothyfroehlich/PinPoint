@@ -11,8 +11,6 @@
  * - Automatic organizational scoping without manual filtering
  */
 
-/* eslint-disable @typescript-eslint/no-unnecessary-condition */
-
 import { createAdminClient, createClient } from "./server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -93,7 +91,7 @@ export async function getUserOrganizationId(
     return null;
   }
 
-  const orgId = user.app_metadata?.organizationId as unknown;
+  const orgId = user.app_metadata?.["organizationId"] as unknown;
   return typeof orgId === "string" ? orgId : null;
 }
 
@@ -136,7 +134,7 @@ export async function getUserWithOrganization(
     throw new OrganizationContextError("User is not authenticated");
   }
 
-  const orgId = user.app_metadata?.organizationId as unknown;
+  const orgId = user.app_metadata?.["organizationId"] as unknown;
   if (typeof orgId !== "string" || !orgId) {
     throw new OrganizationContextError(
       "User does not have organization context",
@@ -184,7 +182,7 @@ export function hasOrganizationContext(
 ): user is NonNullable<typeof user> & {
   app_metadata: { organizationId: string };
 } {
-  const orgId = user?.app_metadata?.organizationId as unknown;
+  const orgId = user?.app_metadata?.["organizationId"] as unknown;
   return typeof orgId === "string" && !!orgId;
 }
 

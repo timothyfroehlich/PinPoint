@@ -11,7 +11,7 @@ import { SEED_TEST_IDS } from "../constants/seed-test-ids";
  * Helper function to create numbered variations of mock patterns
  */
 const createNumberedId = (pattern: string, number: number): string => {
-  return pattern.replace('-1', `-${number}`);
+  return pattern.replace("-1", `-${String(number)}`);
 };
 
 /**
@@ -68,12 +68,15 @@ export const MOCK_IDS = {
  * Helper function to create admin-style IDs
  */
 export const createAdminId = (base: string, suffix: string): string => {
-  return `${base.replace('-1', '')}-${suffix}`;
+  return `${base.replace("-1", "")}-${suffix}`;
 };
 
 /**
  * Helper function to create numbered variations
  */
-export const createNumberedVariation = (pattern: string, number: number): string => {
+export const createNumberedVariation = (
+  pattern: string,
+  number: number,
+): string => {
   return createNumberedId(pattern, number);
 };

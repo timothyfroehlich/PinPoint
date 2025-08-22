@@ -27,7 +27,7 @@ import {
 
 describe("Schema Migration Validation", () => {
   // Helper function to create test context
-  async function createTestContext(db: TestDatabase) {
+  async function createTestContext(_db: TestDatabase) {
     // Use seeded primary organization for schema validation tests
     const organizationId = SEED_TEST_IDS.ORGANIZATIONS.primary;
 
@@ -38,7 +38,7 @@ describe("Schema Migration Validation", () => {
 
   describe("Schema Structure Validation", () => {
     test("should have all expected tables defined", async ({ workerDb }) => {
-      await withIsolatedTest(workerDb, async (db) => {
+      await withIsolatedTest(workerDb, async (_db) => {
         // This test verifies that the Drizzle schema has the expected structure
         // Check that all expected tables are defined
         expect(schema.organizations).toBeDefined();

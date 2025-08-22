@@ -16,7 +16,6 @@ import {
 import { generatePrefixedId } from "~/lib/utils/id-generation";
 import {
   createTRPCRouter,
-  orgScopedProcedure,
   publicProcedure,
   issueEditProcedure,
 } from "~/server/api/trpc";
@@ -112,7 +111,7 @@ export const issueCoreRouter = createTRPCRouter({
         throw new Error("Default priority validation failed");
       }
 
-      // Create the issue without a user (anonymous) - RLS trigger handles organizationId
+      // Create the issue without a user (anonymous)
       const issueData: {
         id: string;
         title: string;
@@ -120,6 +119,7 @@ export const issueCoreRouter = createTRPCRouter({
         reporterEmail?: string | null;
         submitterName?: string | null;
         createdById?: string | null;
+        organizationId: string;
         machineId: string;
         statusId: string;
         priorityId: string;
@@ -127,6 +127,7 @@ export const issueCoreRouter = createTRPCRouter({
         id: generatePrefixedId("issue"),
         title: input.title,
         createdById: null, // Anonymous issue
+        organizationId: organization.id,
         machineId: input.machineId,
         statusId: defaultStatus.id,
         priorityId: defaultPriority.id,
@@ -257,12 +258,13 @@ export const issueCoreRouter = createTRPCRouter({
       // User is guaranteed to exist in protected procedure
       const createdById = ctx.user.id;
 
-      // Create the issue (RLS trigger handles organizationId)
+      // Create the issue
       const issueData: {
         id: string;
         title: string;
         description?: string | null;
         createdById: string;
+        organizationId: string;
         machineId: string;
         statusId: string;
         priorityId: string;
@@ -270,6 +272,7 @@ export const issueCoreRouter = createTRPCRouter({
         id: generatePrefixedId("issue"),
         title: input.title,
         createdById,
+        organizationId: organization.id,
         machineId: input.machineId,
         statusId: defaultStatus.id,
         priorityId: defaultPriority.id,
@@ -332,7 +335,10 @@ export const issueCoreRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       // Get issue and membership for validation (organization scoped)
       const issue = await ctx.db.query.issues.findFirst({
-        where: and(eq(issues.id, input.issueId), eq(issues.organizationId, ctx.organizationId)),
+        where: and(
+          eq(issues.id, input.issueId),
+          eq(issues.organizationId, ctx.organizationId),
+        ),
       });
 
       const membership = await ctx.db.query.memberships.findFirst({
@@ -434,7 +440,7 @@ export const issueCoreRouter = createTRPCRouter({
     }),
 
   // Get all issues for an organization
-  getAll: orgScopedProcedure
+  getAll: issueViewProcedure
     .input(
       z
         .object({
@@ -652,7 +658,10 @@ export const issueCoreRouter = createTRPCRouter({
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
       const issue = await ctx.db.query.issues.findFirst({
-        where: and(eq(issues.id, input.id), eq(issues.organizationId, ctx.organizationId)),
+        where: and(
+          eq(issues.id, input.id),
+          eq(issues.organizationId, ctx.organizationId),
+        ),
         with: {
           status: true,
           priority: true,
@@ -729,7 +738,10 @@ export const issueCoreRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       // Verify the issue exists (organization scoped)
       const existingIssue = await ctx.db.query.issues.findFirst({
-        where: and(eq(issues.id, input.id), eq(issues.organizationId, ctx.organizationId)),
+        where: and(
+          eq(issues.id, input.id),
+          eq(issues.organizationId, ctx.organizationId),
+        ),
         with: {
           status: true,
           assignedTo: true,
@@ -798,11 +810,19 @@ export const issueCoreRouter = createTRPCRouter({
       await ctx.db
         .update(issues)
         .set(updateData)
-        .where(and(eq(issues.id, input.id), eq(issues.organizationId, ctx.organizationId)));
+        .where(
+          and(
+            eq(issues.id, input.id),
+            eq(issues.organizationId, ctx.organizationId),
+          ),
+        );
 
       // Get updated issue with relations
       const updatedIssue = await ctx.db.query.issues.findFirst({
-        where: and(eq(issues.id, input.id), eq(issues.organizationId, ctx.organizationId)),
+        where: and(
+          eq(issues.id, input.id),
+          eq(issues.organizationId, ctx.organizationId),
+        ),
         with: {
           status: true,
           assignedTo: {
@@ -925,7 +945,12 @@ export const issueCoreRouter = createTRPCRouter({
           statusId: resolvedStatus.id,
           resolvedAt: new Date(),
         })
-        .where(and(eq(issues.id, input.id), eq(issues.organizationId, ctx.organizationId)));
+        .where(
+          and(
+            eq(issues.id, input.id),
+            eq(issues.organizationId, ctx.organizationId),
+          ),
+        );
 
       // Get updated issue with relations
       const updatedIssue = await ctx.db.query.issues.findFirst({
@@ -983,7 +1008,10 @@ export const issueCoreRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       // Verify the issue exists (organization scoped)
       const existingIssue = await ctx.db.query.issues.findFirst({
-        where: and(eq(issues.id, input.id), eq(issues.organizationId, ctx.organizationId)),
+        where: and(
+          eq(issues.id, input.id),
+          eq(issues.organizationId, ctx.organizationId),
+        ),
         with: {
           status: true,
         },
@@ -1041,11 +1069,19 @@ export const issueCoreRouter = createTRPCRouter({
       await ctx.db
         .update(issues)
         .set(updateData)
-        .where(and(eq(issues.id, input.id), eq(issues.organizationId, ctx.organizationId)));
+        .where(
+          and(
+            eq(issues.id, input.id),
+            eq(issues.organizationId, ctx.organizationId),
+          ),
+        );
 
       // Get updated issue with relations
       const updatedIssue = await ctx.db.query.issues.findFirst({
-        where: and(eq(issues.id, input.id), eq(issues.organizationId, ctx.organizationId)),
+        where: and(
+          eq(issues.id, input.id),
+          eq(issues.organizationId, ctx.organizationId),
+        ),
         with: {
           status: true,
           priority: true,
