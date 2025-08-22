@@ -15,6 +15,11 @@ import {
   vi,
   type MockedFunction,
 } from "vitest";
+import { test, withIsolatedTest } from "../../../test/helpers/worker-scoped-db";
+import {
+  createSeededTestDatabase,
+  type TestDatabase,
+} from "../../../test/helpers/pglite-test-setup";
 
 // Mock postgres-js
 const mockPostgresInstance = {
@@ -38,13 +43,13 @@ const mockDrizzle = vi
   .mockImplementation(() => createMockDrizzleInstance());
 vi.mock("drizzle-orm/postgres-js", () => ({ drizzle: mockDrizzle }));
 
-// Mock schema
-const mockSchema = {
+// Mock schema - use vi.hoisted for proper initialization order
+const mockSchema = vi.hoisted(() => ({
   organizations: {},
   users: {},
   machines: {},
   issues: {},
-};
+}));
 vi.mock("../schema", () => mockSchema);
 
 // Mock environment utilities
@@ -769,6 +774,362 @@ describe("Drizzle Client Singleton Pattern", () => {
           },
         }),
       );
+    });
+  });
+
+  describe("Worker-Scoped Pattern Integration", () => {
+    describe("Singleton Compatibility with Worker-Scoped Databases", () => {
+      test("should work correctly with worker-scoped PGlite databases", async ({
+        workerDb,
+      }) => {
+        await withIsolatedTest(workerDb, async (txDb) => {
+          // Verify that singleton pattern doesn't interfere with worker-scoped databases
+          mockEnv.NODE_ENV = "development";
+          mockIsDevelopment.mockReturnValue(true);
+
+          const { createDrizzleClient } = await importDrizzleModule();
+          const singletonClient = createDrizzleClient();
+
+          // Worker-scoped database should be independent of singleton
+          expect(txDb).toBeDefined();
+          expect(singletonClient).toBeDefined();
+          expect(singletonClient.__isMockDrizzle).toBe(true);
+
+          // Both should be able to operate independently
+          expect(typeof txDb.select).toBe("function");
+          expect(typeof singletonClient.organizations?.findMany).toBe(
+            "function",
+          );
+        });
+      });
+
+      test("should maintain singleton behavior within transaction contexts", async ({
+        workerDb,
+      }) => {
+        await withIsolatedTest(workerDb, async (txDb) => {
+          mockEnv.NODE_ENV = "development";
+          mockIsDevelopment.mockReturnValue(true);
+
+          const { createDrizzleClient } = await importDrizzleModule();
+
+          // Multiple calls within transaction should still use singleton
+          const client1 = createDrizzleClient();
+          const client2 = createDrizzleClient();
+
+          expect(client1).toBe(client2);
+          expect(mockPostgres).toHaveBeenCalledTimes(1);
+
+          // Worker-scoped database should remain isolated
+          expect(txDb).not.toBe(client1);
+          expect(txDb).not.toBe(client2);
+        });
+      });
+
+      test("should handle connection cleanup without affecting worker-scoped databases", async ({
+        workerDb,
+      }) => {
+        await withIsolatedTest(workerDb, async (txDb) => {
+          mockEnv.NODE_ENV = "development";
+          mockIsDevelopment.mockReturnValue(true);
+
+          const { createDrizzleClient, closeDrizzleConnection } =
+            await importDrizzleModule();
+
+          // Create singleton instance
+          const client = createDrizzleClient();
+          expect(client.__isMockDrizzle).toBe(true);
+
+          // Cleanup singleton should not affect worker-scoped database
+          await closeDrizzleConnection();
+          expect(mockPostgresInstance.end).toHaveBeenCalledTimes(1);
+
+          // Worker-scoped database should still work
+          expect(txDb).toBeDefined();
+          expect(typeof txDb.select).toBe("function");
+        });
+      });
+    });
+
+    describe("Memory Safety with Worker-Scoped Patterns", () => {
+      test("should not accumulate memory when used with worker-scoped databases", async ({
+        workerDb,
+      }) => {
+        await withIsolatedTest(workerDb, async (txDb) => {
+          mockEnv.NODE_ENV = "development";
+          mockIsDevelopment.mockReturnValue(true);
+
+          const { createDrizzleClient } = await importDrizzleModule();
+
+          // Multiple accesses within transaction should not accumulate
+          const clients = [];
+          for (let i = 0; i < 50; i++) {
+            clients.push(createDrizzleClient());
+          }
+
+          // All should be the same instance (no memory accumulation)
+          const firstClient = clients[0];
+          for (const client of clients) {
+            expect(client).toBe(firstClient);
+          }
+
+          // Only one connection should have been created
+          expect(mockPostgres).toHaveBeenCalledTimes(1);
+
+          // Worker-scoped database should remain efficient
+          expect(txDb).toBeDefined();
+        });
+      });
+
+      test("should handle rapid singleton access without memory leaks in transaction contexts", async ({
+        workerDb,
+      }) => {
+        await withIsolatedTest(workerDb, async (txDb) => {
+          mockEnv.NODE_ENV = "development";
+          mockIsDevelopment.mockReturnValue(true);
+
+          const { createDrizzleClient } = await importDrizzleModule();
+
+          // Simulate rapid concurrent access within transaction
+          const promises = [];
+          for (let i = 0; i < 20; i++) {
+            promises.push(Promise.resolve(createDrizzleClient()));
+          }
+
+          const clients = await Promise.all(promises);
+
+          // All should be the same instance
+          const firstClient = clients[0];
+          for (const client of clients) {
+            expect(client).toBe(firstClient);
+            expect(client.__isMockDrizzle).toBe(true);
+          }
+
+          // Memory efficient - only one connection
+          expect(mockPostgres).toHaveBeenCalledTimes(1);
+
+          // Transaction database should be unaffected
+          expect(txDb).toBeDefined();
+          expect(txDb).not.toBe(firstClient);
+        });
+      });
+    });
+
+    describe("Transaction Isolation Compatibility", () => {
+      test("should not interfere with transaction-based isolation", async ({
+        workerDb,
+      }) => {
+        await withIsolatedTest(workerDb, async (txDb) => {
+          mockEnv.NODE_ENV = "development";
+          mockIsDevelopment.mockReturnValue(true);
+
+          const { createDrizzleClient } = await importDrizzleModule();
+          const singletonClient = createDrizzleClient();
+
+          // Singleton and transaction database should be completely independent
+          expect(singletonClient).toBeDefined();
+          expect(txDb).toBeDefined();
+          expect(singletonClient).not.toBe(txDb);
+
+          // Changes in transaction should not affect singleton behavior
+          // (This is a structural test - actual DB operations would need real DB)
+          expect(singletonClient.__isMockDrizzle).toBe(true);
+          expect(typeof txDb.select).toBe("function");
+        });
+      });
+
+      test("should maintain consistent singleton behavior across multiple transactions", async ({
+        workerDb,
+      }) => {
+        mockEnv.NODE_ENV = "development";
+        mockIsDevelopment.mockReturnValue(true);
+
+        const { createDrizzleClient } = await importDrizzleModule();
+        let singletonFromTx1: any;
+        let singletonFromTx2: any;
+
+        // First transaction
+        await withIsolatedTest(workerDb, async (txDb1) => {
+          singletonFromTx1 = createDrizzleClient();
+          expect(singletonFromTx1.__isMockDrizzle).toBe(true);
+          expect(txDb1).not.toBe(singletonFromTx1);
+        });
+
+        // Second transaction
+        await withIsolatedTest(workerDb, async (txDb2) => {
+          singletonFromTx2 = createDrizzleClient();
+          expect(singletonFromTx2.__isMockDrizzle).toBe(true);
+          expect(txDb2).not.toBe(singletonFromTx2);
+        });
+
+        // Singleton should be the same across transactions
+        expect(singletonFromTx1).toBe(singletonFromTx2);
+        expect(mockPostgres).toHaveBeenCalledTimes(1); // Only one connection created
+      });
+    });
+  });
+
+  describe("Memory Safety Validation", () => {
+    describe("Connection Lifecycle Memory Management", () => {
+      test("should not accumulate connections with repeated module resets", async () => {
+        const connectionCounts = [];
+
+        for (let i = 0; i < 5; i++) {
+          mockEnv.NODE_ENV = "development";
+          mockIsDevelopment.mockReturnValue(true);
+
+          const { createDrizzleClient } = await importDrizzleModule();
+          createDrizzleClient();
+
+          connectionCounts.push(mockPostgres.mock.calls.length);
+
+          // Reset for next iteration
+          resetSingleton();
+          vi.clearAllMocks();
+        }
+
+        // Each iteration should create exactly one connection
+        expect(connectionCounts).toEqual([1, 1, 1, 1, 1]);
+      });
+
+      test("should handle cleanup errors without memory accumulation", async () => {
+        mockEnv.NODE_ENV = "development";
+        mockIsDevelopment.mockReturnValue(true);
+
+        // Mock console.warn to track error handling
+        const consoleWarnSpy = vi
+          .spyOn(console, "warn")
+          .mockImplementation(() => {});
+
+        for (let i = 0; i < 3; i++) {
+          // Make cleanup fail for this iteration
+          mockPostgresInstance.end.mockRejectedValueOnce(
+            new Error(`Cleanup failed ${i}`),
+          );
+
+          const { createDrizzleClient, closeDrizzleConnection } =
+            await importDrizzleModule();
+          createDrizzleClient();
+
+          // Cleanup should handle error gracefully
+          await expect(closeDrizzleConnection()).resolves.not.toThrow();
+
+          resetSingleton();
+          vi.clearAllMocks();
+        }
+
+        // Should have logged warnings for failed cleanups
+        expect(consoleWarnSpy).toHaveBeenCalledTimes(3);
+
+        consoleWarnSpy.mockRestore();
+      });
+    });
+
+    describe("Production vs Development Memory Patterns", () => {
+      test("should not accumulate instances in production mode", async () => {
+        mockEnv.NODE_ENV = "production";
+        mockIsDevelopment.mockReturnValue(false);
+
+        const { createDrizzleClient } = await importDrizzleModule();
+
+        // Create multiple clients in production
+        const clients = [];
+        for (let i = 0; i < 10; i++) {
+          clients.push(createDrizzleClient());
+        }
+
+        // Each should be a unique instance in production
+        const uniqueClients = new Set(clients);
+        expect(uniqueClients.size).toBe(10);
+
+        // Should have created separate connections
+        expect(mockPostgres).toHaveBeenCalledTimes(10);
+        expect(mockDrizzle).toHaveBeenCalledTimes(10);
+
+        // All should be valid mock instances
+        for (const client of clients) {
+          expect(client.__isMockDrizzle).toBe(true);
+        }
+      });
+
+      test("should properly manage singleton memory in development mode", async () => {
+        mockEnv.NODE_ENV = "development";
+        mockIsDevelopment.mockReturnValue(true);
+
+        const { createDrizzleClient } = await importDrizzleModule();
+
+        // Create many clients in development
+        const clients = [];
+        for (let i = 0; i < 100; i++) {
+          clients.push(createDrizzleClient());
+        }
+
+        // All should be the same instance (memory efficient)
+        const uniqueClients = new Set(clients);
+        expect(uniqueClients.size).toBe(1);
+
+        // Only one connection should exist
+        expect(mockPostgres).toHaveBeenCalledTimes(1);
+        expect(mockDrizzle).toHaveBeenCalledTimes(1);
+
+        // All references should point to the same mock instance
+        for (const client of clients) {
+          expect(client).toBe(clients[0]);
+          expect(client.__isMockDrizzle).toBe(true);
+        }
+      });
+    });
+
+    describe("Hot Reload Memory Safety", () => {
+      test("should handle hot reload cycles without memory accumulation", async () => {
+        const moduleLoadCounts = [];
+
+        for (let cycle = 0; cycle < 5; cycle++) {
+          mockEnv.NODE_ENV = "development";
+          mockIsDevelopment.mockReturnValue(true);
+
+          // Simulate hot reload
+          resetSingleton();
+          vi.clearAllMocks();
+
+          const { createDrizzleClient } = await importDrizzleModule();
+          createDrizzleClient();
+
+          moduleLoadCounts.push(mockPostgres.mock.calls.length);
+        }
+
+        // Each hot reload cycle should create exactly one connection
+        expect(moduleLoadCounts).toEqual([1, 1, 1, 1, 1]);
+      });
+
+      test("should maintain memory efficiency across hot reload with concurrent access", async () => {
+        for (let cycle = 0; cycle < 3; cycle++) {
+          mockEnv.NODE_ENV = "development";
+          mockIsDevelopment.mockReturnValue(true);
+
+          resetSingleton();
+          vi.clearAllMocks();
+
+          const { createDrizzleClient } = await importDrizzleModule();
+
+          // Concurrent access after hot reload
+          const promises = [];
+          for (let i = 0; i < 20; i++) {
+            promises.push(Promise.resolve(createDrizzleClient()));
+          }
+
+          const clients = await Promise.all(promises);
+
+          // All should be the same instance (singleton behavior maintained)
+          const firstClient = clients[0];
+          for (const client of clients) {
+            expect(client).toBe(firstClient);
+            expect(client.__isMockDrizzle).toBe(true);
+          }
+
+          // Only one connection per hot reload cycle
+          expect(mockPostgres).toHaveBeenCalledTimes(1);
+        }
+      });
     });
   });
 });

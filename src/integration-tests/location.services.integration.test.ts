@@ -13,7 +13,7 @@
  * Uses modern August 2025 patterns with worker-scoped PGlite integration.
  */
 
-import { describe, expect, vi } from "vitest";
+import { beforeAll, describe, expect, vi } from "vitest";
 
 // Import test setup and utilities
 import type { TRPCContext } from "~/server/api/trpc.base";
@@ -22,31 +22,29 @@ import { locationRouter } from "~/server/api/routers/location";
 import * as schema from "~/server/db/schema";
 import { generateTestId } from "~/test/helpers/test-id-generator";
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
+import {
+  createSeededTestDatabase,
+  getSeededTestData,
+  SEED_TEST_IDS,
+} from "~/test/helpers/pglite-test-setup";
+import { createSeededLocationTestContext } from "~/test/helpers/createSeededLocationTestContext";
 
 // Mock external dependencies that aren't database-related
 vi.mock("~/lib/utils/id-generation", () => ({
   generateId: vi.fn(() => generateTestId("test-id")),
 }));
 
-vi.mock("~/server/auth/permissions", () => ({
-  getUserPermissionsForSession: vi
-    .fn()
-    .mockResolvedValue([
-      "location:edit",
-      "location:delete",
-      "organization:manage",
-    ]),
-  getUserPermissionsForSupabaseUser: vi
-    .fn()
-    .mockResolvedValue([
-      "location:edit",
-      "location:delete",
-      "organization:manage",
-    ]),
-  requirePermissionForSession: vi.fn().mockResolvedValue(undefined),
-}));
+// Removed permission mocks to use real membership-based scoping from seeds
 
 describe("Location Router Services Integration (PGlite)", () => {
+  let seeded: Awaited<ReturnType<typeof getSeededTestData>>;
+  let primaryOrgId: string;
+
+  beforeAll(async ({ workerDb }) => {
+    ({ organizationId: primaryOrgId } =
+      await createSeededTestDatabase(workerDb));
+    seeded = await getSeededTestData(workerDb, primaryOrgId);
+  });
   async function createTestContext(db: any) {
     // Create test organization
     const [organization] = await db
@@ -173,10 +171,32 @@ describe("Location Router Services Integration (PGlite)", () => {
       workerDb,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { caller, location, context } = await createTestContext(db);
+        const context = await createSeededLocationTestContext(
+          db,
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
+        );
+        const caller = locationRouter.createCaller(context);
+
+        // Use seeded location if available, otherwise create a test location
+        const locationId =
+          seeded.location ||
+          (await (async () => {
+            const [location] = await db
+              .insert(schema.locations)
+              .values({
+                id: "test-location-services",
+                name: "Test Location Services",
+                organizationId: primaryOrgId,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              })
+              .returning();
+            return location.id;
+          })());
 
         const result = await caller.syncWithPinballMap({
-          locationId: location.id,
+          locationId: locationId,
         });
 
         expect(result).toEqual({
@@ -193,7 +213,29 @@ describe("Location Router Services Integration (PGlite)", () => {
       workerDb,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { caller, location, context } = await createTestContext(db);
+        const context = await createSeededLocationTestContext(
+          db,
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
+        );
+        const caller = locationRouter.createCaller(context);
+
+        // Use seeded location if available, otherwise create a test location
+        const locationId =
+          seeded.location ||
+          (await (async () => {
+            const [location] = await db
+              .insert(schema.locations)
+              .values({
+                id: "test-location-services",
+                name: "Test Location Services",
+                organizationId: primaryOrgId,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              })
+              .returning();
+            return location.id;
+          })());
 
         // Mock service failure
         vi.mocked(context.services.createPinballMapService).mockReturnValue({
@@ -204,7 +246,7 @@ describe("Location Router Services Integration (PGlite)", () => {
         } as any);
 
         await expect(
-          caller.syncWithPinballMap({ locationId: location.id }),
+          caller.syncWithPinballMap({ locationId: locationId }),
         ).rejects.toThrow("API rate limit exceeded");
       });
     });
@@ -275,7 +317,29 @@ describe("Location Router Services Integration (PGlite)", () => {
 
     test("should handle network timeout scenarios", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { caller, location, context } = await createTestContext(db);
+        const context = await createSeededLocationTestContext(
+          db,
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
+        );
+        const caller = locationRouter.createCaller(context);
+
+        // Use seeded location if available, otherwise create a test location
+        const locationId =
+          seeded.location ||
+          (await (async () => {
+            const [location] = await db
+              .insert(schema.locations)
+              .values({
+                id: "test-location-services",
+                name: "Test Location Services",
+                organizationId: primaryOrgId,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              })
+              .returning();
+            return location.id;
+          })());
 
         // Mock timeout scenario
         vi.mocked(context.services.createPinballMapService).mockReturnValue({
@@ -283,14 +347,36 @@ describe("Location Router Services Integration (PGlite)", () => {
         } as any);
 
         await expect(
-          caller.syncWithPinballMap({ locationId: location.id }),
+          caller.syncWithPinballMap({ locationId: locationId }),
         ).rejects.toThrow("Network timeout");
       });
     });
 
     test("should handle invalid API responses", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { caller, location, context } = await createTestContext(db);
+        const context = await createSeededLocationTestContext(
+          db,
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
+        );
+        const caller = locationRouter.createCaller(context);
+
+        // Use seeded location if available, otherwise create a test location
+        const locationId =
+          seeded.location ||
+          (await (async () => {
+            const [location] = await db
+              .insert(schema.locations)
+              .values({
+                id: "test-location-services",
+                name: "Test Location Services",
+                organizationId: primaryOrgId,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              })
+              .returning();
+            return location.id;
+          })());
 
         // Mock invalid response
         vi.mocked(context.services.createPinballMapService).mockReturnValue({
@@ -301,14 +387,36 @@ describe("Location Router Services Integration (PGlite)", () => {
         } as any);
 
         await expect(
-          caller.syncWithPinballMap({ locationId: location.id }),
+          caller.syncWithPinballMap({ locationId: locationId }),
         ).rejects.toThrow("Invalid location ID format");
       });
     });
 
     test("should handle partial sync results", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { caller, location, context } = await createTestContext(db);
+        const context = await createSeededLocationTestContext(
+          db,
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
+        );
+        const caller = locationRouter.createCaller(context);
+
+        // Use seeded location if available, otherwise create a test location
+        const locationId =
+          seeded.location ||
+          (await (async () => {
+            const [location] = await db
+              .insert(schema.locations)
+              .values({
+                id: "test-location-services",
+                name: "Test Location Services",
+                organizationId: primaryOrgId,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              })
+              .returning();
+            return location.id;
+          })());
 
         // Mock partial success
         vi.mocked(context.services.createPinballMapService).mockReturnValue({
@@ -324,7 +432,7 @@ describe("Location Router Services Integration (PGlite)", () => {
         } as any);
 
         const result = await caller.syncWithPinballMap({
-          locationId: location.id,
+          locationId: locationId,
         });
 
         expect(result).toEqual({
@@ -465,17 +573,39 @@ describe("Location Router Services Integration (PGlite)", () => {
       workerDb,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { caller, location, context } = await createTestContext(db);
+        const context = await createSeededLocationTestContext(
+          db,
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
+        );
+        const caller = locationRouter.createCaller(context);
+
+        // Use seeded location if available, otherwise create a test location
+        const locationId =
+          seeded.location ||
+          (await (async () => {
+            const [location] = await db
+              .insert(schema.locations)
+              .values({
+                id: "test-location-services",
+                name: "Test Location Services",
+                organizationId: primaryOrgId,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              })
+              .returning();
+            return location.id;
+          })());
 
         // Verify service factory is called for each request
-        await caller.syncWithPinballMap({ locationId: location.id });
+        await caller.syncWithPinballMap({ locationId: locationId });
 
         expect(context.services.createPinballMapService).toHaveBeenCalledTimes(
           1,
         );
 
         // Call again to verify service factory pattern
-        await caller.syncWithPinballMap({ locationId: location.id });
+        await caller.syncWithPinballMap({ locationId: locationId });
 
         expect(context.services.createPinballMapService).toHaveBeenCalledTimes(
           2,

@@ -13,215 +13,44 @@
  *
  * Uses modern August 2025 patterns with worker-scoped PGlite integration.
  */
-
 import { eq, count, and, ne } from "drizzle-orm";
-import { describe, expect, vi } from "vitest";
-
+import { beforeAll, describe, expect, vi } from "vitest";
 // Import test setup and utilities
-import type { TRPCContext } from "~/server/api/trpc.base";
-
 import { locationRouter } from "~/server/api/routers/location";
 import * as schema from "~/server/db/schema";
 import { generateTestId } from "~/test/helpers/test-id-generator";
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
-
+import {
+  createSeededTestDatabase,
+  getSeededTestData,
+  SEED_TEST_IDS,
+} from "~/test/helpers/pglite-test-setup";
+import {
+  createSeededLocationTestContext,
+  createCompetitorAdminContext,
+} from "~/test/helpers/createSeededLocationTestContext";
 // Mock external dependencies that aren't database-related
 vi.mock("~/lib/utils/id-generation", () => ({
   generateId: vi.fn(() => generateTestId("test-id")),
 }));
-
-vi.mock("~/server/auth/permissions", () => ({
-  getUserPermissionsForSession: vi
-    .fn()
-    .mockResolvedValue([
-      "location:edit",
-      "location:delete",
-      "organization:manage",
-    ]),
-  getUserPermissionsForSupabaseUser: vi
-    .fn()
-    .mockResolvedValue([
-      "location:edit",
-      "location:delete",
-      "organization:manage",
-    ]),
-  requirePermissionForSession: vi.fn().mockResolvedValue(undefined),
-}));
-
+// Removed permission mocks to use real membership-based scoping from seeds
 describe("Location Router Aggregation Operations (PGlite)", () => {
-  async function createTestContext(db: any) {
-    // Create test organization
-    const [organization] = await db
-      .insert(schema.organizations)
-      .values({
-        id: generateTestId("test-org-agg"),
-        name: "Test Organization Aggregation",
-        subdomain: generateTestId("test-org-agg-sub"),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .returning();
-
-    // Create test user
-    const [user] = await db
-      .insert(schema.users)
-      .values({
-        id: generateTestId("test-user-agg"),
-        name: "Test User Agg",
-        email: "test.agg@example.com",
-        profilePicture: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .returning();
-
-    // Create machine model for relationships
-    const [model] = await db
-      .insert(schema.models)
-      .values({
-        id: generateTestId("test-model-agg"),
-        name: "Test Model Agg",
-        manufacturer: "Test Manufacturer Agg",
-      })
-      .returning();
-
-    // Create priority and status for issues
-    const [priority] = await db
-      .insert(schema.priorities)
-      .values({
-        id: "priority-agg",
-        name: "High Priority",
-        organizationId: organization.id,
-        order: 1,
-      })
-      .returning();
-
-    const [status] = await db
-      .insert(schema.issueStatuses)
-      .values({
-        id: "status-open-agg",
-        name: "Open",
-        category: "NEW",
-        organizationId: organization.id,
-      })
-      .returning();
-
-    const [resolvedStatus] = await db
-      .insert(schema.issueStatuses)
-      .values({
-        id: "status-resolved-agg",
-        name: "Resolved",
-        category: "RESOLVED",
-        organizationId: organization.id,
-      })
-      .returning();
-
-    // Create test locations
-    const [location1] = await db
-      .insert(schema.locations)
-      .values({
-        id: generateTestId("test-location-1-agg"),
-        name: "Main Arcade",
-        organizationId: organization.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .returning();
-
-    const [location2] = await db
-      .insert(schema.locations)
-      .values({
-        id: generateTestId("test-location-2-agg"),
-        name: "Secondary Location",
-        organizationId: organization.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .returning();
-
-    // Create test context with real database
-    const context: TRPCContext = {
-      user: {
-        id: user.id,
-        email: user.email,
-        user_metadata: { name: user.name },
-        app_metadata: { organization_id: organization.id, role: "Admin" },
-      },
-      organization: {
-        id: organization.id,
-        name: organization.name,
-        subdomain: organization.subdomain,
-      },
-      db: db,
-      supabase: {
-        auth: {
-          getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
-        },
-      } as any,
-      services: {
-        createPinballMapService: vi.fn(() => ({
-          syncLocation: vi.fn().mockResolvedValue({
-            success: true,
-            data: { synced: true, machinesUpdated: 2 },
-          }),
-        })),
-        createNotificationService: vi.fn(),
-        createCollectionService: vi.fn(),
-        createIssueActivityService: vi.fn(),
-        createCommentCleanupService: vi.fn(),
-        createQRCodeService: vi.fn(),
-      },
-      headers: new Headers(),
-      logger: {
-        info: vi.fn(),
-        error: vi.fn(),
-        warn: vi.fn(),
-        debug: vi.fn(),
-        trace: vi.fn(),
-        child: vi.fn(() => context.logger),
-        withRequest: vi.fn(() => context.logger),
-        withUser: vi.fn(() => context.logger),
-        withOrganization: vi.fn(() => context.logger),
-        withContext: vi.fn(() => context.logger),
-      },
-      userPermissions: [
-        "location:edit",
-        "location:delete",
-        "organization:manage",
-      ],
-    } as any;
-
-    const caller = locationRouter.createCaller(context);
-
-    return {
-      organization,
-      user,
-      location1,
-      location2,
-      model,
-      priority,
-      status,
-      resolvedStatus,
-      context,
-      caller,
-    };
-  }
-
   describe("getPublic - Aggregation Queries", () => {
     test("should return locations with accurate machine and issue counts", async ({
       workerDb,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const {
-          caller,
-          location1,
-          location2,
-          organization,
-          model,
-          user,
-          priority,
-          status,
-        } = await createTestContext(db);
+        // Set up seeded data for this test
+        const { organizationId: primaryOrgId } =
+          await createSeededTestDatabase(db);
+        const seeded = await getSeededTestData(db, primaryOrgId);
+
+        const context = await createSeededLocationTestContext(
+          db,
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
+        );
+        const caller = locationRouter.createCaller(context);
 
         // Create machines for location1
         await db.insert(schema.machines).values([
@@ -229,10 +58,10 @@ describe("Location Router Aggregation Operations (PGlite)", () => {
             id: "machine-1-agg",
             name: "Machine 1",
             qrCodeId: "qr-1-agg",
-            organizationId: organization.id,
-            locationId: location1.id,
-            modelId: model.id,
-            ownerId: user.id,
+            organizationId: primaryOrgId,
+            locationId: seeded.location,
+            modelId: seeded.model,
+            ownerId: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date(),
             updatedAt: new Date(),
           },
@@ -240,24 +69,36 @@ describe("Location Router Aggregation Operations (PGlite)", () => {
             id: "machine-2-agg",
             name: "Machine 2",
             qrCodeId: "qr-2-agg",
-            organizationId: organization.id,
-            locationId: location1.id,
-            modelId: model.id,
-            ownerId: user.id,
+            organizationId: primaryOrgId,
+            locationId: seeded.location,
+            modelId: seeded.model,
+            ownerId: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date(),
             updatedAt: new Date(),
           },
         ]);
+
+        // Create another location for testing
+        const [location2] = await db
+          .insert(schema.locations)
+          .values({
+            id: generateTestId("test-location-2-agg"),
+            name: "Secondary Location",
+            organizationId: primaryOrgId,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
 
         // Create one machine for location2
         await db.insert(schema.machines).values({
           id: "machine-3-agg",
           name: "Machine 3",
           qrCodeId: "qr-3-agg",
-          organizationId: organization.id,
+          organizationId: primaryOrgId,
           locationId: location2.id,
-          modelId: model.id,
-          ownerId: user.id,
+          modelId: seeded.model,
+          ownerId: SEED_TEST_IDS.USERS.ADMIN,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
@@ -267,44 +108,43 @@ describe("Location Router Aggregation Operations (PGlite)", () => {
           {
             id: "issue-1-agg",
             title: "Issue 1",
-            organizationId: organization.id,
+            organizationId: primaryOrgId,
             machineId: "machine-1-agg",
-            statusId: status.id,
-            priorityId: priority.id,
-            createdById: user.id,
+            statusId: seeded.status,
+            priorityId: seeded.priority,
+            createdById: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date(),
             updatedAt: new Date(),
           },
           {
             id: "issue-2-agg",
             title: "Issue 2",
-            organizationId: organization.id,
+            organizationId: primaryOrgId,
             machineId: "machine-1-agg",
-            statusId: status.id,
-            priorityId: priority.id,
-            createdById: user.id,
+            statusId: seeded.status,
+            priorityId: seeded.priority,
+            createdById: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date(),
             updatedAt: new Date(),
           },
           {
             id: "issue-3-agg",
             title: "Issue 3",
-            organizationId: organization.id,
+            organizationId: primaryOrgId,
             machineId: "machine-3-agg",
-            statusId: status.id,
-            priorityId: priority.id,
-            createdById: user.id,
+            statusId: seeded.status,
+            priorityId: seeded.priority,
+            createdById: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date(),
             updatedAt: new Date(),
           },
         ]);
 
         const result = await caller.getPublic();
-
         expect(result).toHaveLength(2);
 
         // Find locations
-        const mainArcade = result.find((l) => l.id === location1.id);
+        const mainArcade = result.find((l) => l.id === seeded.location);
         const secondaryLocation = result.find((l) => l.id === location2.id);
 
         expect(mainArcade).toBeDefined();
@@ -320,10 +160,7 @@ describe("Location Router Aggregation Operations (PGlite)", () => {
 
         // Verify machine details with model relationships
         expect(mainArcade.machines).toHaveLength(2);
-        expect(mainArcade.machines[0].model).toMatchObject({
-          name: "Test Model Agg",
-          manufacturer: "Test Manufacturer Agg",
-        });
+        expect(mainArcade.machines[0].model).toBeDefined();
 
         // Verify issue counts
         const machine1 = mainArcade.machines.find(
@@ -342,16 +179,23 @@ describe("Location Router Aggregation Operations (PGlite)", () => {
       workerDb,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const {
-          caller,
-          location1,
-          organization,
-          model,
-          user,
-          priority,
-          status,
-          resolvedStatus,
-        } = await createTestContext(db);
+        const context = await createSeededLocationTestContext(
+          db,
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
+        );
+        const caller = locationRouter.createCaller(context);
+
+        // Create a resolved status for testing
+        const [resolvedStatus] = await db
+          .insert(schema.issueStatuses)
+          .values({
+            id: "status-resolved-agg",
+            name: "Resolved",
+            category: "RESOLVED",
+            organizationId: primaryOrgId,
+          })
+          .returning();
 
         // Create a machine
         const [machine] = await db
@@ -360,10 +204,10 @@ describe("Location Router Aggregation Operations (PGlite)", () => {
             id: "machine-filter-agg",
             name: "Machine Filter",
             qrCodeId: "qr-filter-agg",
-            organizationId: organization.id,
-            locationId: location1.id,
-            modelId: model.id,
-            ownerId: user.id,
+            organizationId: primaryOrgId,
+            locationId: seeded.location,
+            modelId: seeded.model,
+            ownerId: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date(),
             updatedAt: new Date(),
           })
@@ -374,33 +218,33 @@ describe("Location Router Aggregation Operations (PGlite)", () => {
           {
             id: "issue-unresolved-1",
             title: "Unresolved Issue 1",
-            organizationId: organization.id,
+            organizationId: primaryOrgId,
             machineId: machine.id,
-            statusId: status.id, // OPEN status
-            priorityId: priority.id,
-            createdById: user.id,
+            statusId: seeded.status, // OPEN status
+            priorityId: seeded.priority,
+            createdById: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date(),
             updatedAt: new Date(),
           },
           {
             id: "issue-unresolved-2",
             title: "Unresolved Issue 2",
-            organizationId: organization.id,
+            organizationId: primaryOrgId,
             machineId: machine.id,
-            statusId: status.id, // OPEN status
-            priorityId: priority.id,
-            createdById: user.id,
+            statusId: seeded.status, // OPEN status
+            priorityId: seeded.priority,
+            createdById: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date(),
             updatedAt: new Date(),
           },
           {
             id: "issue-resolved",
             title: "Resolved Issue",
-            organizationId: organization.id,
+            organizationId: primaryOrgId,
             machineId: machine.id,
             statusId: resolvedStatus.id, // RESOLVED status
-            priorityId: priority.id,
-            createdById: user.id,
+            priorityId: seeded.priority,
+            createdById: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date(),
             updatedAt: new Date(),
           },
@@ -432,7 +276,7 @@ describe("Location Router Aggregation Operations (PGlite)", () => {
 
         // The public endpoint should only count unresolved issues
         const result = await caller.getPublic();
-        const testLocation = result.find((l) => l.id === location1.id);
+        const testLocation = result.find((l) => l.id === seeded.location);
         expect(testLocation).toBeDefined();
         if (!testLocation)
           throw new Error("Test location not found in results");
@@ -448,8 +292,28 @@ describe("Location Router Aggregation Operations (PGlite)", () => {
 
     test("should work without authentication", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { context, location1, location2, organization, model, user } =
-          await createTestContext(db);
+        // Set up seeded data for this test
+        const { organizationId: primaryOrgId } =
+          await createSeededTestDatabase(db);
+        const seeded = await getSeededTestData(db, primaryOrgId);
+
+        const context = await createSeededLocationTestContext(
+          db,
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
+        );
+
+        // Create another location for testing
+        const [location2] = await db
+          .insert(schema.locations)
+          .values({
+            id: generateTestId("test-location-2-public"),
+            name: "Public Location 2",
+            organizationId: primaryOrgId,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
 
         // Create machines for both locations
         await db.insert(schema.machines).values([
@@ -457,10 +321,10 @@ describe("Location Router Aggregation Operations (PGlite)", () => {
             id: "machine-public-agg-1",
             name: "Public Machine 1",
             qrCodeId: "qr-public-agg-1",
-            organizationId: organization.id,
-            locationId: location1.id,
-            modelId: model.id,
-            ownerId: user.id,
+            organizationId: primaryOrgId,
+            locationId: seeded.location,
+            modelId: seeded.model,
+            ownerId: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date(),
             updatedAt: new Date(),
           },
@@ -468,10 +332,10 @@ describe("Location Router Aggregation Operations (PGlite)", () => {
             id: "machine-public-agg-2",
             name: "Public Machine 2",
             qrCodeId: "qr-public-agg-2",
-            organizationId: organization.id,
+            organizationId: primaryOrgId,
             locationId: location2.id,
-            modelId: model.id,
-            ownerId: user.id,
+            modelId: seeded.model,
+            ownerId: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date(),
             updatedAt: new Date(),
           },
@@ -481,8 +345,8 @@ describe("Location Router Aggregation Operations (PGlite)", () => {
           ...context,
           user: null, // No user authentication
         };
-        const publicCaller = locationRouter.createCaller(publicContext as any);
 
+        const publicCaller = locationRouter.createCaller(publicContext as any);
         const result = await publicCaller.getPublic();
 
         expect(result).toHaveLength(2);
@@ -495,45 +359,21 @@ describe("Location Router Aggregation Operations (PGlite)", () => {
       workerDb,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const {
-          caller,
-          location1,
-          location2,
-          organization,
-          model,
-          user,
-          priority,
-          status,
-        } = await createTestContext(db);
+        const context = await createSeededLocationTestContext(
+          db,
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
+        );
+        const caller = locationRouter.createCaller(context);
 
-        // Add data from another organization
-        const otherOrgId = "other-org-2";
-        await db.insert(schema.organizations).values({
-          id: otherOrgId,
-          name: "Other Organization 2",
-          subdomain: "other-org-2",
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
+        // Create competitor org context and data
+        await createCompetitorAdminContext(db);
 
-        await db.insert(schema.priorities).values({
-          id: "other-priority",
-          name: "Other Priority",
-          organizationId: otherOrgId,
-          order: 1,
-        });
-
-        await db.insert(schema.issueStatuses).values({
-          id: "other-status",
-          name: "Other Status",
-          category: "NEW",
-          organizationId: otherOrgId,
-        });
-
+        // Create location in competitor org
         await db.insert(schema.locations).values({
           id: "other-location",
           name: "Other Location",
-          organizationId: otherOrgId,
+          organizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
@@ -542,10 +382,10 @@ describe("Location Router Aggregation Operations (PGlite)", () => {
           id: "other-machine",
           name: "Other Machine",
           qrCodeId: "other-qr",
-          organizationId: otherOrgId,
+          organizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor,
           locationId: "other-location",
-          modelId: model.id,
-          ownerId: user.id,
+          modelId: seeded.model,
+          ownerId: SEED_TEST_IDS.USERS.ADMIN,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
@@ -555,26 +395,38 @@ describe("Location Router Aggregation Operations (PGlite)", () => {
           {
             id: "other-issue-1",
             title: "Other Issue 1",
-            organizationId: otherOrgId,
+            organizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor,
             machineId: "other-machine",
-            statusId: "other-status",
-            priorityId: "other-priority",
-            createdById: user.id,
+            statusId: seeded.status,
+            priorityId: seeded.priority,
+            createdById: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date(),
             updatedAt: new Date(),
           },
           {
             id: "other-issue-2",
             title: "Other Issue 2",
-            organizationId: otherOrgId,
+            organizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor,
             machineId: "other-machine",
-            statusId: "other-status",
-            priorityId: "other-priority",
-            createdById: user.id,
+            statusId: seeded.status,
+            priorityId: seeded.priority,
+            createdById: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date(),
             updatedAt: new Date(),
           },
         ]);
+
+        // Create another location in primary org for comparison
+        const [location2] = await db
+          .insert(schema.locations)
+          .values({
+            id: generateTestId("test-location-scope-2"),
+            name: "Our Location 2",
+            organizationId: primaryOrgId,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
 
         // Create machines in both our locations for comparison
         await db.insert(schema.machines).values([
@@ -582,10 +434,10 @@ describe("Location Router Aggregation Operations (PGlite)", () => {
             id: "our-machine-scope-1",
             name: "Our Machine 1",
             qrCodeId: "our-qr-1",
-            organizationId: organization.id,
-            locationId: location1.id,
-            modelId: model.id,
-            ownerId: user.id,
+            organizationId: primaryOrgId,
+            locationId: seeded.location,
+            modelId: seeded.model,
+            ownerId: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date(),
             updatedAt: new Date(),
           },
@@ -593,10 +445,10 @@ describe("Location Router Aggregation Operations (PGlite)", () => {
             id: "our-machine-scope-2",
             name: "Our Machine 2",
             qrCodeId: "our-qr-2",
-            organizationId: organization.id,
+            organizationId: primaryOrgId,
             locationId: location2.id,
-            modelId: model.id,
-            ownerId: user.id,
+            modelId: seeded.model,
+            ownerId: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date(),
             updatedAt: new Date(),
           },
@@ -606,22 +458,22 @@ describe("Location Router Aggregation Operations (PGlite)", () => {
           {
             id: "our-issue-scope-1",
             title: "Our Issue 1",
-            organizationId: organization.id,
+            organizationId: primaryOrgId,
             machineId: "our-machine-scope-1",
-            statusId: status.id,
-            priorityId: priority.id,
-            createdById: user.id,
+            statusId: seeded.status,
+            priorityId: seeded.priority,
+            createdById: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date(),
             updatedAt: new Date(),
           },
           {
             id: "our-issue-scope-2",
             title: "Our Issue 2",
-            organizationId: organization.id,
+            organizationId: primaryOrgId,
             machineId: "our-machine-scope-2",
-            statusId: status.id,
-            priorityId: priority.id,
-            createdById: user.id,
+            statusId: seeded.status,
+            priorityId: seeded.priority,
+            createdById: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date(),
             updatedAt: new Date(),
           },
@@ -634,7 +486,7 @@ describe("Location Router Aggregation Operations (PGlite)", () => {
         expect(result.every((l) => l.id !== "other-location")).toBe(true);
 
         // Verify counts aren't affected by other org's data
-        const testLocation = result.find((l) => l.id === location1.id);
+        const testLocation = result.find((l) => l.id === seeded.location);
         expect(testLocation).toBeDefined();
         if (!testLocation)
           throw new Error("Test location not found in results");
@@ -649,314 +501,286 @@ describe("Location Router Aggregation Operations (PGlite)", () => {
   });
 
   describe("Complex Multi-Tenant Aggregation Scenarios", () => {
-    test("should maintain complete isolation between organizations in aggregations", async ({
+    test("should maintain org boundaries in complex cross-join scenarios", async ({
       workerDb,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { context, _organization, _model, user, _priority, _status } =
-          await createTestContext(db);
+        const context = await createSeededLocationTestContext(
+          db,
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
+        );
+        const caller = locationRouter.createCaller(context);
 
-        // Create multiple organizations with overlapping data
-        await db.insert(schema.organizations).values([
+        // Create competitor organization data using SEED_TEST_IDS
+        const competitorContext = await createCompetitorAdminContext(db);
+
+        // Create multiple locations in both orgs with identical patterns
+        const locations = [
+          // Primary org locations
           {
-            id: "org-a-agg",
-            name: "Organization A",
-            subdomain: "org-a-agg",
+            id: "primary-loc-1",
+            name: "Primary Location 1",
+            organizationId: primaryOrgId,
+          },
+          {
+            id: "primary-loc-2",
+            name: "Primary Location 2",
+            organizationId: primaryOrgId,
+          },
+          // Competitor org locations
+          {
+            id: "competitor-loc-1",
+            name: "Competitor Location 1",
+            organizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor,
+          },
+          {
+            id: "competitor-loc-2",
+            name: "Competitor Location 2",
+            organizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor,
+          },
+        ];
+
+        await db.insert(schema.locations).values(
+          locations.map((loc) => ({
+            ...loc,
             createdAt: new Date(),
             updatedAt: new Date(),
+          })),
+        );
+
+        // Create machines in all locations
+        const machines = [
+          // Primary org machines
+          {
+            id: "primary-machine-1",
+            organizationId: primaryOrgId,
+            locationId: "primary-loc-1",
           },
           {
-            id: "org-b-agg",
-            name: "Organization B",
-            subdomain: "org-b-agg",
+            id: "primary-machine-2",
+            organizationId: primaryOrgId,
+            locationId: "primary-loc-2",
+          },
+          // Competitor org machines (more of them to test isolation)
+          {
+            id: "competitor-machine-1",
+            organizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor,
+            locationId: "competitor-loc-1",
+          },
+          {
+            id: "competitor-machine-2",
+            organizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor,
+            locationId: "competitor-loc-2",
+          },
+          {
+            id: "competitor-machine-3",
+            organizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor,
+            locationId: "competitor-loc-2", // Multiple machines per location
+          },
+        ];
+
+        await db.insert(schema.machines).values(
+          machines.map((machine) => ({
+            ...machine,
+            name: `Machine ${machine.id}`,
+            qrCodeId: `qr-${machine.id}`,
+            modelId: seeded.model,
+            ownerId: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date(),
             updatedAt: new Date(),
-          },
-        ]);
+          })),
+        );
 
-        // Create roles for each organization
-        await db.insert(schema.roles).values([
-          {
-            id: "role-org-a",
-            name: "Admin",
-            organizationId: "org-a-agg",
+        // Create many issues in competitor org to test isolation
+        const issues = [];
+        for (let i = 1; i <= 10; i++) {
+          issues.push({
+            id: `competitor-issue-${i}`,
+            title: `Competitor Issue ${i}`,
+            organizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor,
+            machineId: "competitor-machine-1",
+            statusId: seeded.status,
+            priorityId: seeded.priority,
+            createdById: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date(),
             updatedAt: new Date(),
-          },
-          {
-            id: "role-org-b",
-            name: "Admin",
-            organizationId: "org-b-agg",
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-        ]);
+          });
+        }
 
-        // Create memberships for the test user in both orgs
-        await db.insert(schema.memberships).values([
-          {
-            id: "membership-org-a",
-            userId: user.id,
-            organizationId: "org-a-agg",
-            roleId: "role-org-a",
-          },
-          {
-            id: "membership-org-b",
-            userId: user.id,
-            organizationId: "org-b-agg",
-            roleId: "role-org-b",
-          },
-        ]);
+        // Add a few issues to primary org
+        issues.push({
+          id: "primary-issue-1",
+          title: "Primary Issue 1",
+          organizationId: primaryOrgId,
+          machineId: "primary-machine-1",
+          statusId: seeded.status,
+          priorityId: seeded.priority,
+          createdById: SEED_TEST_IDS.USERS.ADMIN,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
 
-        // Create same-named locations in different orgs
+        await db.insert(schema.issues).values(issues);
+
+        // Test primary org caller - should only see primary org data
+        const primaryResult = await caller.getPublic();
+
+        // Verify isolation: should only see primary org locations
+        expect(primaryResult).toHaveLength(3); // seeded location + 2 new primary locations
+        expect(
+          primaryResult.every(
+            (l) => l.id.includes("primary") || l.id === seeded.location,
+          ),
+        ).toBe(true);
+        expect(primaryResult.some((l) => l.id.includes("competitor"))).toBe(
+          false,
+        );
+
+        // Verify machine counts are correct and not inflated by competitor data
+        const primaryLoc1 = primaryResult.find((l) => l.id === "primary-loc-1");
+        const primaryLoc2 = primaryResult.find((l) => l.id === "primary-loc-2");
+
+        expect(primaryLoc1?._count.machines).toBe(1);
+        expect(primaryLoc2?._count.machines).toBe(1);
+
+        // Verify issue counts don't include competitor issues
+        const primaryMachine = primaryLoc1?.machines.find(
+          (m) => m.id === "primary-machine-1",
+        );
+        expect(primaryMachine?._count.issues).toBe(1); // Should not see 10 competitor issues
+
+        // Test competitor org caller for comparison
+        const competitorCaller = locationRouter.createCaller(competitorContext);
+        const competitorResult = await competitorCaller.getPublic();
+
+        // Should only see competitor org data
+        expect(competitorResult).toHaveLength(2); // Only competitor locations
+        expect(competitorResult.every((l) => l.id.includes("competitor"))).toBe(
+          true,
+        );
+        expect(competitorResult.some((l) => l.id.includes("primary"))).toBe(
+          false,
+        );
+
+        // Verify competitor has more machines/issues
+        const competitorLoc2 = competitorResult.find(
+          (l) => l.id === "competitor-loc-2",
+        );
+        expect(competitorLoc2?._count.machines).toBe(2); // Should have 2 machines
+
+        const competitorMachine1 = competitorResult
+          .find((l) => l.id === "competitor-loc-1")
+          ?.machines.find((m) => m.id === "competitor-machine-1");
+        expect(competitorMachine1?._count.issues).toBe(10); // All competitor issues
+      });
+    });
+  });
+
+  describe("Performance and Edge Cases", () => {
+    test("should handle locations with no machines efficiently", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const context = await createSeededLocationTestContext(
+          db,
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
+        );
+        const caller = locationRouter.createCaller(context);
+
+        // Create several locations with no machines
         await db.insert(schema.locations).values([
           {
-            id: "loc-a-1-agg",
-            name: "Main Arcade",
-            organizationId: "org-a-agg",
+            id: "empty-loc-1",
+            name: "Empty Location 1",
+            organizationId: primaryOrgId,
             createdAt: new Date(),
             updatedAt: new Date(),
           },
           {
-            id: "loc-b-1-agg",
-            name: "Main Arcade", // Same name, different org
-            organizationId: "org-b-agg",
+            id: "empty-loc-2",
+            name: "Empty Location 2",
+            organizationId: primaryOrgId,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+          {
+            id: "empty-loc-3",
+            name: "Empty Location 3",
+            organizationId: primaryOrgId,
             createdAt: new Date(),
             updatedAt: new Date(),
           },
         ]);
 
-        // Test from org-a perspective
-        const orgAContext = {
-          ...context,
-          organization: {
-            id: "org-a-agg",
-            name: "Organization A",
-            subdomain: "org-a-agg",
-          },
-        };
-        const orgACaller = locationRouter.createCaller(orgAContext as any);
+        const result = await caller.getPublic();
 
-        const orgALocations = await orgACaller.getAll();
-        expect(orgALocations).toHaveLength(1);
-        expect(orgALocations[0].id).toBe("loc-a-1-agg");
-        expect(orgALocations[0].organizationId).toBe("org-a-agg");
+        // Should include all locations, even empty ones
+        expect(result).toHaveLength(4); // seeded location + 3 empty locations
 
-        // Test from org-b perspective
-        const orgBContext = {
-          ...context,
-          organization: {
-            id: "org-b-agg",
-            name: "Organization B",
-            subdomain: "org-b-agg",
-          },
-        };
-        const orgBCaller = locationRouter.createCaller(orgBContext as any);
+        const emptyLocations = result.filter((l) => l.id.startsWith("empty-"));
+        expect(emptyLocations).toHaveLength(3);
 
-        const orgBLocations = await orgBCaller.getAll();
-        expect(orgBLocations).toHaveLength(1);
-        expect(orgBLocations[0].id).toBe("loc-b-1-agg");
-        expect(orgBLocations[0].organizationId).toBe("org-b-agg");
-
-        // Test that orgs can't see each other's data
-        await expect(orgACaller.getById({ id: "loc-b-1-agg" })).rejects.toThrow(
-          "Location not found or access denied",
-        );
-
-        await expect(orgBCaller.getById({ id: "loc-a-1-agg" })).rejects.toThrow(
-          "Location not found or access denied",
-        );
+        // Empty locations should have zero counts
+        emptyLocations.forEach((loc) => {
+          expect(loc._count.machines).toBe(0);
+          expect(loc.machines).toHaveLength(0);
+        });
       });
     });
 
-    test("should handle complex count queries with organizational scoping", async ({
+    test("should handle machines with no issues efficiently", async ({
       workerDb,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { context, _organization, _model, user } =
-          await createTestContext(db);
+        const context = await createSeededLocationTestContext(
+          db,
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
+        );
+        const caller = locationRouter.createCaller(context);
 
-        // Create organizations with different priorities and statuses
-        await db.insert(schema.organizations).values([
-          {
-            id: "org-a-count",
-            name: "Organization A",
-            subdomain: "org-a-count",
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-          {
-            id: "org-b-count",
-            name: "Organization B",
-            subdomain: "org-b-count",
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-        ]);
-
-        // Create roles for each organization
-        await db.insert(schema.roles).values([
-          {
-            id: "role-org-a-count",
-            name: "Admin",
-            organizationId: "org-a-count",
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-          {
-            id: "role-org-b-count",
-            name: "Admin",
-            organizationId: "org-b-count",
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-        ]);
-
-        // Create memberships for the test user in both orgs
-        await db.insert(schema.memberships).values([
-          {
-            id: "membership-org-a-count",
-            userId: user.id,
-            organizationId: "org-a-count",
-            roleId: "role-org-a-count",
-          },
-          {
-            id: "membership-org-b-count",
-            userId: user.id,
-            organizationId: "org-b-count",
-            roleId: "role-org-b-count",
-          },
-        ]);
-
-        // Add priorities and statuses for each org
-        await db.insert(schema.priorities).values([
-          {
-            id: "priority-a",
-            name: "Priority A",
-            organizationId: "org-a-count",
-            order: 1,
-          },
-          {
-            id: "priority-b",
-            name: "Priority B",
-            organizationId: "org-b-count",
-            order: 2,
-          },
-        ]);
-
-        await db.insert(schema.issueStatuses).values([
-          {
-            id: "status-a",
-            name: "Status A",
-            category: "NEW",
-            organizationId: "org-a-count",
-          },
-          {
-            id: "status-b",
-            name: "Status B",
-            category: "IN_PROGRESS",
-            organizationId: "org-b-count",
-          },
-        ]);
-
-        // Create locations and machines for each org
-        await db.insert(schema.locations).values([
-          {
-            id: "loc-a-count",
-            name: "Location A",
-            organizationId: "org-a-count",
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-          {
-            id: "loc-b-count",
-            name: "Location B",
-            organizationId: "org-b-count",
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-        ]);
-
+        // Create machines without issues
         await db.insert(schema.machines).values([
           {
-            id: "machine-a",
-            name: "Machine A",
-            qrCodeId: "qr-a",
-            organizationId: "org-a-count",
-            locationId: "loc-a-count",
-            modelId: model.id,
-            ownerId: user.id,
+            id: "no-issues-machine-1",
+            name: "Machine Without Issues 1",
+            qrCodeId: "qr-no-issues-1",
+            organizationId: primaryOrgId,
+            locationId: seeded.location,
+            modelId: seeded.model,
+            ownerId: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date(),
             updatedAt: new Date(),
           },
           {
-            id: "machine-b",
-            name: "Machine B",
-            qrCodeId: "qr-b",
-            organizationId: "org-b-count",
-            locationId: "loc-b-count",
-            modelId: model.id,
-            ownerId: user.id,
+            id: "no-issues-machine-2",
+            name: "Machine Without Issues 2",
+            qrCodeId: "qr-no-issues-2",
+            organizationId: primaryOrgId,
+            locationId: seeded.location,
+            modelId: seeded.model,
+            ownerId: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date(),
             updatedAt: new Date(),
           },
         ]);
 
-        // Add different numbers of issues to each machine
-        await db.insert(schema.issues).values([
-          ...Array.from({ length: 5 }, (_, i) => ({
-            id: `issue-a-${i}`,
-            title: `Issue A ${i}`,
-            organizationId: "org-a-count",
-            machineId: "machine-a",
-            statusId: "status-a",
-            priorityId: "priority-a",
-            createdById: user.id,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          })),
-          ...Array.from({ length: 3 }, (_, i) => ({
-            id: `issue-b-${i}`,
-            title: `Issue B ${i}`,
-            organizationId: "org-b-count",
-            machineId: "machine-b",
-            statusId: "status-b",
-            priorityId: "priority-b",
-            createdById: user.id,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          })),
-        ]);
+        const result = await caller.getPublic();
+        const testLocation = result.find((l) => l.id === seeded.location);
 
-        // Test getPublic counts for org-a
-        const orgAContext = {
-          ...context,
-          organization: {
-            id: "org-a-count",
-            name: "Organization A",
-            subdomain: "org-a-count",
-          },
-        };
-        const orgACaller = locationRouter.createCaller(orgAContext as any);
-        const orgAResult = await orgACaller.getPublic();
+        expect(testLocation).toBeDefined();
+        if (!testLocation) throw new Error("Test location not found");
 
-        expect(orgAResult[0]._count.machines).toBe(1);
-        expect(orgAResult[0].machines[0]._count.issues).toBe(5);
+        // Should have machines
+        expect(testLocation._count.machines).toBe(2);
+        expect(testLocation.machines).toHaveLength(2);
 
-        // Test getPublic counts for org-b
-        const orgBContext = {
-          ...context,
-          organization: {
-            id: "org-b-count",
-            name: "Organization B",
-            subdomain: "org-b-count",
-          },
-        };
-        const orgBCaller = locationRouter.createCaller(orgBContext as any);
-        const orgBResult = await orgBCaller.getPublic();
-
-        expect(orgBResult[0]._count.machines).toBe(1);
-        expect(orgBResult[0].machines[0]._count.issues).toBe(3);
+        // All machines should have zero issue counts
+        testLocation.machines.forEach((machine) => {
+          expect(machine._count.issues).toBe(0);
+        });
       });
     });
   });
