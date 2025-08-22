@@ -268,568 +268,549 @@ describe("machine.owner router integration tests", () => {
         await withIsolatedTest(workerDb, async (db) => {
           const { testUser2, ctx } = await setupTestData(db);
 
-          // Create a second organization
-          const [org2] = await db
-            .insert(schema.organizations)
-            .values({
-              id: generateTestId("org-2"),
-              name: "Organization 2",
-              subdomain: "org2",
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            })
-            .returning();
-
-          // Create a location in the second organization
-          const [location2] = await db
-            .insert(schema.locations)
-            .values({
-              id: generateTestId("location-2"),
-              name: "Location 2",
-              organizationId: org2.id,
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            })
-            .returning();
-
-          // Create a model for the machine
-          const [model2] = await db
-            .insert(schema.models)
-            .values({
-              id: generateTestId("model-2"),
-              name: "Test Model 2",
-              manufacturer: "Test Manufacturer 2",
-              year: 2024,
-            })
-            .returning();
-
-          // Create a machine in the second organization
-          const [machine2] = await db
-            .insert(schema.machines)
-            .values({
-              id: generateTestId("machine-2"),
-              name: "Machine 2",
-              modelId: model2.id,
-              locationId: location2.id,
-              organizationId: org2.id,
-              qrCodeId: generateTestId("qr-code-2"),
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            })
-            .returning();
-
-          const caller = machineOwnerRouter.createCaller(ctx);
-
-          await expect(
-            caller.assignOwner({
-              machineId: machine2.id, // Machine belongs to org2, but user is in org1
-              ownerId: testUser2.id,
-            }),
-          ).rejects.toThrow(
-            new TRPCError({
-              code: "NOT_FOUND",
-              message: "Machine not found",
-            }),
-          );
-        });
-      });
-
-      test("should throw FORBIDDEN when user is not a member of organization", async ({
-        workerDb,
-      }) => {
-        await withIsolatedTest(workerDb, async (db) => {
-          const { machine, ctx } = await setupTestData(db);
-
-          // Create a user that's not a member of the organization
-          const [nonMemberUser] = await db
-            .insert(schema.users)
-            .values({
-              id: "test-non-member-user",
-              name: "Non Member User",
-              email: "nonmember@example.com",
-              image: null,
-              emailVerified: null,
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            })
-            .returning();
-
-          const caller = machineOwnerRouter.createCaller(ctx);
-
-          await expect(
-            caller.assignOwner({
-              machineId: machine,
-              ownerId: nonMemberUser.id,
-            }),
-          ).rejects.toThrow(
-            new TRPCError({
-              code: "FORBIDDEN",
-              message: "User is not a member of this organization",
-            }),
-          );
-        });
-      });
-    });
-
-    describe("input validation", () => {
-      test("should accept valid machineId", async ({ workerDb }) => {
-        await withIsolatedTest(workerDb, async (db) => {
-          const { machine, testUser2, ctx } = await setupTestData(db);
-          const caller = machineOwnerRouter.createCaller(ctx);
-
-          // Should not throw for valid machineId
-          await expect(
-            caller.assignOwner({
-              machineId: machine,
-              ownerId: testUser2.id,
-            }),
-          ).resolves.toBeDefined();
-        });
-      });
-
-      test("should accept optional ownerId", async ({ workerDb }) => {
-        await withIsolatedTest(workerDb, async (db) => {
-          const { machine, testUser2, ctx } = await setupTestData(db);
-
-          // First assign an owner
-          await db
-            .update(schema.machines)
-            .set({ ownerId: testUser2.id })
-            .where(eq(schema.machines.id, machine));
-
-          const caller = machineOwnerRouter.createCaller(ctx);
-
-          // Should not throw for undefined ownerId (removes owner)
-          await expect(
-            caller.assignOwner({
-              machineId: machine,
-              // ownerId is undefined
-            }),
-          ).resolves.toBeDefined();
-        });
-      });
-
-      test("should handle empty string ownerId as removal", async ({
-        workerDb,
-      }) => {
-        await withIsolatedTest(workerDb, async (db) => {
-          const { machine, testUser2, ctx } = await setupTestData(db);
-
-          // First assign an owner
-          await db
-            .update(schema.machines)
-            .set({ ownerId: testUser2.id })
-            .where(eq(schema.machines.id, machine));
-
-          const caller = machineOwnerRouter.createCaller(ctx);
-
-          // Empty string should remove owner
-          const result = await caller.assignOwner({
-            machineId: machine,
-            ownerId: "", // Empty string should be treated as removal
+          // Use seeded competitor organization for cross-org testing
+          const org2Id = SEED_TEST_IDS.ORGANIZATIONS.competitor;
+          const org2 = await db.query.organizations.findFirst({
+            where: eq(schema.organizations.id, org2Id),
           });
+        }).returning();
 
-          expect(result.ownerId).toBeNull();
-        });
-      });
-    });
-
-    describe("organizational scoping and security", () => {
-      test("should only find machines within user's organization", async ({
-        workerDb,
-      }) => {
-        await withIsolatedTest(workerDb, async (db) => {
-          const { machine, testUser2, ctx } = await setupTestData(db);
-          const caller = machineOwnerRouter.createCaller(ctx);
-
-          // This should work - machine is in user's organization
-          await expect(
-            caller.assignOwner({
-              machineId: machine,
-              ownerId: testUser2.id,
-            }),
-          ).resolves.toBeDefined();
-        });
-      });
-
-      test("should only validate membership within user's organization", async ({
-        workerDb,
-      }) => {
-        await withIsolatedTest(workerDb, async (db) => {
-          const { machine, testUser2, ctx } = await setupTestData(db);
-          const caller = machineOwnerRouter.createCaller(ctx);
-
-          // This should work - both machine and user are in same organization
-          await expect(
-            caller.assignOwner({
-              machineId: machine,
-              ownerId: testUser2.id,
-            }),
-          ).resolves.toBeDefined();
-        });
-      });
-
-      test("should use correct organization context", async ({ workerDb }) => {
-        await withIsolatedTest(workerDb, async (db) => {
-          // Set up first organization (with our main test data)
-          const {
-            machine: machine1,
-            testUser2: user1,
-            organizationId: org1Id,
-          } = await setupTestData(db);
-
-          // Create a second organization with different users
-          const org2Id = generateTestId("test-org-2");
-          const [org2] = await db
-            .insert(schema.organizations)
-            .values({
-              id: org2Id,
-              name: "Test Organization 2",
-              subdomain: "test2",
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            })
-            .returning();
-
-          // Create a role in org2
-          const [adminRole2] = await db
-            .insert(schema.roles)
-            .values({
-              id: generateTestId("admin-role-2"),
-              name: "Admin",
-              organizationId: org2Id,
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            })
-            .returning();
-
-          // Create a user in org2
-          const [user2] = await db
-            .insert(schema.users)
-            .values({
-              id: generateTestId("user-2"),
-              name: "User 2",
-              email: "user2@example.com",
-              image: "https://example.com/avatar.jpg",
-              emailVerified: null,
-            })
-            .returning();
-
-          // Create membership in org2
-          await db.insert(schema.memberships).values({
-            id: generateTestId("membership-org2"),
-            userId: user2.id,
-            organizationId: org2Id,
-            roleId: adminRole2.id,
-          });
-
-          // Create location in org2
-          const [location2] = await db
-            .insert(schema.locations)
-            .values({
-              id: generateTestId("location-2"),
-              name: "Location 2",
-              organizationId: org2Id,
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            })
-            .returning();
-
-          // Create model for org2 machine
-          const [model2] = await db
-            .insert(schema.models)
-            .values({
-              id: generateTestId("model-2"),
-              name: "Model 2",
-              manufacturer: "Manufacturer 2",
-              year: 2024,
-            })
-            .returning();
-
-          // Create machine in org2
-          const [machine2] = await db
-            .insert(schema.machines)
-            .values({
-              id: generateTestId("machine-2"),
-              name: "Machine 2",
-              modelId: model2.id,
-              locationId: location2.id,
-              organizationId: org2Id,
-              qrCodeId: generateTestId("qr-code-2"),
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            })
-            .returning();
-
-          // Context for org1 user trying to access org1 machine (should work)
-          const ctx1: TRPCContext = {
-            db: db,
-            user: {
-              id: user1.id,
-              email: "user1@example.com",
-              name: "User 1",
-              user_metadata: {},
-              app_metadata: {
-                organization_id: org1Id,
-              },
-            },
-            organization: {
-              id: org1Id,
-              name: "Test Organization",
-              subdomain: "test",
-            },
-            organizationId: org1Id,
-            supabase: {} as any,
-            headers: new Headers(),
-            userPermissions: ["machine:edit", "machine:delete"],
-            services: {} as any,
-            logger: {
-              error: vi.fn(),
-              warn: vi.fn(),
-              info: vi.fn(),
-              debug: vi.fn(),
-              trace: vi.fn(),
-              child: vi.fn(() => ctx1.logger),
-              withRequest: vi.fn(() => ctx1.logger),
-              withUser: vi.fn(() => ctx1.logger),
-              withOrganization: vi.fn(() => ctx1.logger),
-              withContext: vi.fn(() => ctx1.logger),
-            } as any,
-          } as any;
-
-          // Context for org1 user trying to access org2 machine (should fail)
-          const caller = machineOwnerRouter.createCaller(ctx1);
-
-          // Try to assign owner to machine in same organization (should work)
-          await expect(
-            caller.assignOwner({
-              machineId: machine1.id,
-              ownerId: user1.id,
-            }),
-          ).resolves.toBeDefined();
-
-          // Try to assign owner to machine in different organization (should fail)
-          await expect(
-            caller.assignOwner({
-              machineId: machine2.id, // Machine in org2
-              ownerId: user1.id, // User in org1
-            }),
-          ).rejects.toThrow(
-            new TRPCError({
-              code: "NOT_FOUND",
-              message: "Machine not found",
-            }),
-          );
-        });
-      });
-
-      test("should enforce organizational boundaries", async ({ workerDb }) => {
-        await withIsolatedTest(workerDb, async (db) => {
-          const { machine, ctx } = await setupTestData(db);
-
-          // Create a second organization
-          const [org2] = await db
-            .insert(schema.organizations)
-            .values({
-              id: "org-2",
-              name: "Organization 2",
-              subdomain: "org2",
-            })
-            .returning();
-
-          // Update context to use different organization
-          const org2Ctx = {
-            ...ctx,
-            organization: {
-              id: org2.id,
-              name: org2.name,
-              subdomain: org2.subdomain,
-            },
+        // Create a location in the second organization
+        const [location2] = await db
+          .insert(schema.locations)
+          .values({
+            id: generateTestId("location-2"),
+            name: "Location 2",
             organizationId: org2.id,
-            user: {
-              ...ctx.user,
-              app_metadata: {
-                organization_id: org2.id,
-              },
-            },
-          };
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
 
-          const caller = machineOwnerRouter.createCaller(org2Ctx);
+        // Create a model for the machine
+        const [model2] = await db
+          .insert(schema.models)
+          .values({
+            id: generateTestId("model-2"),
+            name: "Test Model 2",
+            manufacturer: "Test Manufacturer 2",
+            year: 2024,
+          })
+          .returning();
 
-          await expect(
-            caller.assignOwner({
-              machineId: machine, // This machine belongs to org1
-              ownerId: "test-user-2",
-            }),
-          ).rejects.toThrow(
-            new TRPCError({
-              code: "NOT_FOUND",
-              message: "Machine not found",
-            }),
-          );
-        });
+        // Create a machine in the second organization
+        const [machine2] = await db
+          .insert(schema.machines)
+          .values({
+            id: generateTestId("machine-2"),
+            name: "Machine 2",
+            modelId: model2.id,
+            locationId: location2.id,
+            organizationId: org2.id,
+            qrCodeId: generateTestId("qr-code-2"),
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
+
+        const caller = machineOwnerRouter.createCaller(ctx);
+
+        await expect(
+          caller.assignOwner({
+            machineId: machine2.id, // Machine belongs to org2, but user is in org1
+            ownerId: testUser2.id,
+          }),
+        ).rejects.toThrow(
+          new TRPCError({
+            code: "NOT_FOUND",
+            message: "Machine not found",
+          }),
+        );
       });
+    });
 
-      test("should return only safe user data in owner relationship", async ({
-        workerDb,
-      }) => {
-        await withIsolatedTest(workerDb, async (db) => {
-          const { machine, testUser2, ctx } = await setupTestData(db);
-          const caller = machineOwnerRouter.createCaller(ctx);
+    test("should throw FORBIDDEN when user is not a member of organization", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { machine, ctx } = await setupTestData(db);
 
-          const result = await caller.assignOwner({
+        // Create a user that's not a member of the organization
+        const [nonMemberUser] = await db
+          .insert(schema.users)
+          .values({
+            id: "test-non-member-user",
+            name: "Non Member User",
+            email: "nonmember@example.com",
+            image: null,
+            emailVerified: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
+
+        const caller = machineOwnerRouter.createCaller(ctx);
+
+        await expect(
+          caller.assignOwner({
+            machineId: machine,
+            ownerId: nonMemberUser.id,
+          }),
+        ).rejects.toThrow(
+          new TRPCError({
+            code: "FORBIDDEN",
+            message: "User is not a member of this organization",
+          }),
+        );
+      });
+    });
+  });
+
+  describe("input validation", () => {
+    test("should accept valid machineId", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { machine, testUser2, ctx } = await setupTestData(db);
+        const caller = machineOwnerRouter.createCaller(ctx);
+
+        // Should not throw for valid machineId
+        await expect(
+          caller.assignOwner({
             machineId: machine,
             ownerId: testUser2.id,
-          });
+          }),
+        ).resolves.toBeDefined();
+      });
+    });
 
-          // Should only include id, name, and profilePicture (no email or other sensitive data)
-          expect(result.owner).toEqual({
-            id: testUser2.id,
-            name: testUser2.name,
-            profilePicture: null,
-          });
+    test("should accept optional ownerId", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { machine, testUser2, ctx } = await setupTestData(db);
 
-          // Make sure no sensitive data is leaked
-          expect(result.owner).not.toHaveProperty("email");
-          expect(result.owner).not.toHaveProperty("emailVerified");
+        // First assign an owner
+        await db
+          .update(schema.machines)
+          .set({ ownerId: testUser2.id })
+          .where(eq(schema.machines.id, machine));
+
+        const caller = machineOwnerRouter.createCaller(ctx);
+
+        // Should not throw for undefined ownerId (removes owner)
+        await expect(
+          caller.assignOwner({
+            machineId: machine,
+            // ownerId is undefined
+          }),
+        ).resolves.toBeDefined();
+      });
+    });
+
+    test("should handle empty string ownerId as removal", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { machine, testUser2, ctx } = await setupTestData(db);
+
+        // First assign an owner
+        await db
+          .update(schema.machines)
+          .set({ ownerId: testUser2.id })
+          .where(eq(schema.machines.id, machine));
+
+        const caller = machineOwnerRouter.createCaller(ctx);
+
+        // Empty string should remove owner
+        const result = await caller.assignOwner({
+          machineId: machine,
+          ownerId: "", // Empty string should be treated as removal
+        });
+
+        expect(result.ownerId).toBeNull();
+      });
+    });
+  });
+
+  describe("organizational scoping and security", () => {
+    test("should only find machines within user's organization", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { machine, testUser2, ctx } = await setupTestData(db);
+        const caller = machineOwnerRouter.createCaller(ctx);
+
+        // This should work - machine is in user's organization
+        await expect(
+          caller.assignOwner({
+            machineId: machine,
+            ownerId: testUser2.id,
+          }),
+        ).resolves.toBeDefined();
+      });
+    });
+
+    test("should only validate membership within user's organization", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { machine, testUser2, ctx } = await setupTestData(db);
+        const caller = machineOwnerRouter.createCaller(ctx);
+
+        // This should work - both machine and user are in same organization
+        await expect(
+          caller.assignOwner({
+            machineId: machine,
+            ownerId: testUser2.id,
+          }),
+        ).resolves.toBeDefined();
+      });
+    });
+
+    test("should use correct organization context", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        // Set up first organization (with our main test data)
+        const {
+          machine: machine1,
+          testUser2: user1,
+          organizationId: org1Id,
+        } = await setupTestData(db);
+
+        // Use seeded competitor organization for cross-org testing
+        const org2Id = SEED_TEST_IDS.ORGANIZATIONS.competitor;
+        const org2 = await db.query.organizations.findFirst({
+          where: eq(schema.organizations.id, org2Id),
+        });
+
+        // Create a role in org2
+        const [adminRole2] = await db
+          .insert(schema.roles)
+          .values({
+            id: generateTestId("admin-role-2"),
+            name: "Admin",
+            organizationId: org2Id,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
+
+        // Create a user in org2
+        const [user2] = await db
+          .insert(schema.users)
+          .values({
+            id: generateTestId("user-2"),
+            name: "User 2",
+            email: "user2@example.com",
+            image: "https://example.com/avatar.jpg",
+            emailVerified: null,
+          })
+          .returning();
+
+        // Create membership in org2
+        await db.insert(schema.memberships).values({
+          id: generateTestId("membership-org2"),
+          userId: user2.id,
+          organizationId: org2Id,
+          roleId: adminRole2.id,
+        });
+
+        // Create location in org2
+        const [location2] = await db
+          .insert(schema.locations)
+          .values({
+            id: generateTestId("location-2"),
+            name: "Location 2",
+            organizationId: org2Id,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
+
+        // Create model for org2 machine
+        const [model2] = await db
+          .insert(schema.models)
+          .values({
+            id: generateTestId("model-2"),
+            name: "Model 2",
+            manufacturer: "Manufacturer 2",
+            year: 2024,
+          })
+          .returning();
+
+        // Create machine in org2
+        const [machine2] = await db
+          .insert(schema.machines)
+          .values({
+            id: generateTestId("machine-2"),
+            name: "Machine 2",
+            modelId: model2.id,
+            locationId: location2.id,
+            organizationId: org2Id,
+            qrCodeId: generateTestId("qr-code-2"),
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
+
+        // Context for org1 user trying to access org1 machine (should work)
+        const ctx1: TRPCContext = {
+          db: db,
+          user: {
+            id: user1.id,
+            email: "user1@example.com",
+            name: "User 1",
+            user_metadata: {},
+            app_metadata: {
+              organization_id: org1Id,
+            },
+          },
+          organization: {
+            id: org1Id,
+            name: "Test Organization",
+            subdomain: "test",
+          },
+          organizationId: org1Id,
+          supabase: {} as any,
+          headers: new Headers(),
+          userPermissions: ["machine:edit", "machine:delete"],
+          services: {} as any,
+          logger: {
+            error: vi.fn(),
+            warn: vi.fn(),
+            info: vi.fn(),
+            debug: vi.fn(),
+            trace: vi.fn(),
+            child: vi.fn(() => ctx1.logger),
+            withRequest: vi.fn(() => ctx1.logger),
+            withUser: vi.fn(() => ctx1.logger),
+            withOrganization: vi.fn(() => ctx1.logger),
+            withContext: vi.fn(() => ctx1.logger),
+          } as any,
+        } as any;
+
+        // Context for org1 user trying to access org2 machine (should fail)
+        const caller = machineOwnerRouter.createCaller(ctx1);
+
+        // Try to assign owner to machine in same organization (should work)
+        await expect(
+          caller.assignOwner({
+            machineId: machine1.id,
+            ownerId: user1.id,
+          }),
+        ).resolves.toBeDefined();
+
+        // Try to assign owner to machine in different organization (should fail)
+        await expect(
+          caller.assignOwner({
+            machineId: machine2.id, // Machine in org2
+            ownerId: user1.id, // User in org1
+          }),
+        ).rejects.toThrow(
+          new TRPCError({
+            code: "NOT_FOUND",
+            message: "Machine not found",
+          }),
+        );
+      });
+    });
+
+    test("should enforce organizational boundaries", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { machine, ctx } = await setupTestData(db);
+
+        // Use seeded competitor organization for organizational boundary testing
+        const org2Id = SEED_TEST_IDS.ORGANIZATIONS.competitor;
+        const org2 = await db.query.organizations.findFirst({
+          where: eq(schema.organizations.id, org2Id),
+        });
+
+        // Update context to use different organization
+        const org2Ctx = {
+          ...ctx,
+          organization: {
+            id: org2.id,
+            name: org2.name,
+            subdomain: org2.subdomain,
+          },
+          organizationId: org2.id,
+          user: {
+            ...ctx.user,
+            app_metadata: {
+              organization_id: org2.id,
+            },
+          },
+        };
+
+        const caller = machineOwnerRouter.createCaller(org2Ctx);
+
+        await expect(
+          caller.assignOwner({
+            machineId: machine, // This machine belongs to org1
+            ownerId: "test-user-2",
+          }),
+        ).rejects.toThrow(
+          new TRPCError({
+            code: "NOT_FOUND",
+            message: "Machine not found",
+          }),
+        );
+      });
+    });
+
+    test("should return only safe user data in owner relationship", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { machine, testUser2, ctx } = await setupTestData(db);
+        const caller = machineOwnerRouter.createCaller(ctx);
+
+        const result = await caller.assignOwner({
+          machineId: machine,
+          ownerId: testUser2.id,
+        });
+
+        // Should only include id, name, and profilePicture (no email or other sensitive data)
+        expect(result.owner).toEqual({
+          id: testUser2.id,
+          name: testUser2.name,
+          profilePicture: null,
+        });
+
+        // Make sure no sensitive data is leaked
+        expect(result.owner).not.toHaveProperty("email");
+        expect(result.owner).not.toHaveProperty("emailVerified");
+      });
+    });
+  });
+
+  describe("relationship loading", () => {
+    test("should load machine model relationship", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { machine, testUser2, ctx } = await setupTestData(db);
+        const caller = machineOwnerRouter.createCaller(ctx);
+
+        const result = await caller.assignOwner({
+          machineId: machine,
+          ownerId: testUser2.id,
+        });
+
+        expect(result.model).toBeDefined();
+        expect(result.model).toMatchObject({
+          id: expect.any(String),
+          name: expect.any(String),
+          manufacturer: expect.any(String),
+        });
+        // Year can be null in seeded data
+        expect(
+          typeof result.model.year === "number" || result.model.year === null,
+        ).toBe(true);
+      });
+    });
+
+    test("should load machine location relationship", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { machine, testUser2, ctx } = await setupTestData(db);
+        const caller = machineOwnerRouter.createCaller(ctx);
+
+        const result = await caller.assignOwner({
+          machineId: machine,
+          ownerId: testUser2.id,
+        });
+
+        expect(result.location).toBeDefined();
+        expect(result.location).toMatchObject({
+          id: expect.any(String),
+          name: expect.any(String),
+          street: expect.any(String),
+          city: expect.any(String),
+          state: expect.any(String),
+          zip: expect.any(String),
         });
       });
     });
 
-    describe("relationship loading", () => {
-      test("should load machine model relationship", async ({ workerDb }) => {
-        await withIsolatedTest(workerDb, async (db) => {
-          const { machine, testUser2, ctx } = await setupTestData(db);
-          const caller = machineOwnerRouter.createCaller(ctx);
+    test("should handle null owner relationship", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { machine, ctx } = await setupTestData(db);
+        const caller = machineOwnerRouter.createCaller(ctx);
 
-          const result = await caller.assignOwner({
-            machineId: machine,
-            ownerId: testUser2.id,
-          });
-
-          expect(result.model).toBeDefined();
-          expect(result.model).toMatchObject({
-            id: expect.any(String),
-            name: expect.any(String),
-            manufacturer: expect.any(String),
-          });
-          // Year can be null in seeded data
-          expect(
-            typeof result.model.year === "number" || result.model.year === null,
-          ).toBe(true);
+        // Remove owner
+        const result = await caller.assignOwner({
+          machineId: machine,
+          // ownerId omitted to remove owner
         });
+
+        expect(result.owner).toBeNull();
+        expect(result.model).toBeDefined();
+        expect(result.location).toBeDefined();
       });
+    });
+  });
 
-      test("should load machine location relationship", async ({
-        workerDb,
-      }) => {
-        await withIsolatedTest(workerDb, async (db) => {
-          const { machine, testUser2, ctx } = await setupTestData(db);
-          const caller = machineOwnerRouter.createCaller(ctx);
+  describe("data integrity and relationships", () => {
+    test("should maintain referential integrity", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { machine, testUser2, ctx } = await setupTestData(db);
+        const caller = machineOwnerRouter.createCaller(ctx);
 
-          const result = await caller.assignOwner({
-            machineId: machine,
-            ownerId: testUser2.id,
-          });
-
-          expect(result.location).toBeDefined();
-          expect(result.location).toMatchObject({
-            id: expect.any(String),
-            name: expect.any(String),
-            street: expect.any(String),
-            city: expect.any(String),
-            state: expect.any(String),
-            zip: expect.any(String),
-          });
+        const result = await caller.assignOwner({
+          machineId: machine,
+          ownerId: testUser2.id,
         });
-      });
 
-      test("should handle null owner relationship", async ({ workerDb }) => {
-        await withIsolatedTest(workerDb, async (db) => {
-          const { machine, ctx } = await setupTestData(db);
-          const caller = machineOwnerRouter.createCaller(ctx);
+        // Verify all relationships exist and are consistent
+        expect(result.model.id).toBeDefined();
+        expect(result.location.id).toBeDefined();
+        expect(result.location.organizationId).toBe(ctx.organizationId);
 
-          // Remove owner
-          const result = await caller.assignOwner({
-            machineId: machine,
-            // ownerId omitted to remove owner
-          });
-
-          expect(result.owner).toBeNull();
-          expect(result.model).toBeDefined();
-          expect(result.location).toBeDefined();
+        // Verify the relationships in the database
+        const machineInDb = await db.query.machines.findFirst({
+          where: eq(schema.machines.id, machine),
+          with: {
+            model: true,
+            location: true,
+            owner: true,
+          },
         });
+
+        expect(machineInDb?.model?.id).toBe(result.model.id);
+        expect(machineInDb?.location?.id).toBe(result.location.id);
+        expect(machineInDb?.owner?.id).toBe(result.owner?.id);
       });
     });
 
-    describe("data integrity and relationships", () => {
-      test("should maintain referential integrity", async ({ workerDb }) => {
-        await withIsolatedTest(workerDb, async (db) => {
-          const { machine, testUser2, ctx } = await setupTestData(db);
-          const caller = machineOwnerRouter.createCaller(ctx);
+    test("should preserve other machine fields during owner assignment", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { machine, testUser2, ctx } = await setupTestData(db);
 
-          const result = await caller.assignOwner({
-            machineId: machine,
-            ownerId: testUser2.id,
-          });
-
-          // Verify all relationships exist and are consistent
-          expect(result.model.id).toBeDefined();
-          expect(result.location.id).toBeDefined();
-          expect(result.location.organizationId).toBe(ctx.organizationId);
-
-          // Verify the relationships in the database
-          const machineInDb = await db.query.machines.findFirst({
-            where: eq(schema.machines.id, machine),
-            with: {
-              model: true,
-              location: true,
-              owner: true,
-            },
-          });
-
-          expect(machineInDb?.model?.id).toBe(result.model.id);
-          expect(machineInDb?.location?.id).toBe(result.location.id);
-          expect(machineInDb?.owner?.id).toBe(result.owner?.id);
+        // Get original machine data
+        const originalMachine = await db.query.machines.findFirst({
+          where: eq(schema.machines.id, machine),
         });
-      });
 
-      test("should preserve other machine fields during owner assignment", async ({
-        workerDb,
-      }) => {
-        await withIsolatedTest(workerDb, async (db) => {
-          const { machine, testUser2, ctx } = await setupTestData(db);
+        const caller = machineOwnerRouter.createCaller(ctx);
 
-          // Get original machine data
-          const originalMachine = await db.query.machines.findFirst({
-            where: eq(schema.machines.id, machine),
-          });
-
-          const caller = machineOwnerRouter.createCaller(ctx);
-
-          await caller.assignOwner({
-            machineId: machine,
-            ownerId: testUser2.id,
-          });
-
-          // Verify other fields weren't modified
-          const updatedMachine = await db.query.machines.findFirst({
-            where: eq(schema.machines.id, machine),
-          });
-
-          expect(updatedMachine?.name).toBe(originalMachine?.name);
-          expect(updatedMachine?.modelId).toBe(originalMachine?.modelId);
-          expect(updatedMachine?.locationId).toBe(originalMachine?.locationId);
-          expect(updatedMachine?.organizationId).toBe(
-            originalMachine?.organizationId,
-          );
-          expect(updatedMachine?.qrCodeId).toBe(originalMachine?.qrCodeId);
-          expect(updatedMachine?.qrCodeUrl).toBe(originalMachine?.qrCodeUrl);
-
-          // Only ownerId should have changed
-          expect(updatedMachine?.ownerId).toBe(testUser2.id);
-          expect(updatedMachine?.ownerId).not.toBe(originalMachine?.ownerId);
+        await caller.assignOwner({
+          machineId: machine,
+          ownerId: testUser2.id,
         });
+
+        // Verify other fields weren't modified
+        const updatedMachine = await db.query.machines.findFirst({
+          where: eq(schema.machines.id, machine),
+        });
+
+        expect(updatedMachine?.name).toBe(originalMachine?.name);
+        expect(updatedMachine?.modelId).toBe(originalMachine?.modelId);
+        expect(updatedMachine?.locationId).toBe(originalMachine?.locationId);
+        expect(updatedMachine?.organizationId).toBe(
+          originalMachine?.organizationId,
+        );
+        expect(updatedMachine?.qrCodeId).toBe(originalMachine?.qrCodeId);
+        expect(updatedMachine?.qrCodeUrl).toBe(originalMachine?.qrCodeUrl);
+
+        // Only ownerId should have changed
+        expect(updatedMachine?.ownerId).toBe(testUser2.id);
+        expect(updatedMachine?.ownerId).not.toBe(originalMachine?.ownerId);
       });
     });
   });

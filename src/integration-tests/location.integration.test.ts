@@ -192,11 +192,20 @@ describe("Location Router - Schema & Performance Tests (PGlite)", () => {
         });
         expect(existingOrg).toBeDefined();
 
-        // Test subdomain uniqueness constraint
+        // Test subdomain uniqueness constraint using competitor org
+        const competitorOrg = await txDb.query.organizations.findFirst({
+          where: eq(
+            schema.organizations.id,
+            SEED_TEST_IDS.ORGANIZATIONS.competitor,
+          ),
+        });
+        expect(competitorOrg).toBeDefined();
+
+        // Test that trying to create an org with existing subdomain fails
         const duplicateOrg = {
           id: generateTestId("duplicate-org"),
           name: "Duplicate Organization",
-          subdomain: existingOrg!.subdomain, // Same subdomain as existing org
+          subdomain: existingOrg!.subdomain, // Same subdomain as existing primary org
           createdAt: new Date(),
           updatedAt: new Date(),
         };

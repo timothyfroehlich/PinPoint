@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/explicit-function-return-type */
 import { faker } from "@faker-js/faker";
 import { vi } from "vitest";
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
 /**
  * Test data factories for creating consistent test data across unit, integration, and E2E tests.
@@ -21,7 +22,7 @@ export const createIssueFactory = (options: FactoryOptions = {}) => {
     id: faker.string.uuid(),
     title: faker.lorem.sentence({ min: 3, max: 8 }),
     description: faker.lorem.paragraph({ min: 2, max: 4 }),
-    organizationId: "org-test",
+    organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
     machineId: "machine-test",
     statusId: "status-open",
     priorityId: "priority-medium",
@@ -272,7 +273,7 @@ export const createMachineFactory = (options: FactoryOptions = {}) => {
       "Poor",
     ]),
     notes: faker.lorem.sentence(),
-    organizationId: "org-test",
+    organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
     locationId: "location-test",
     modelId: "model-test",
     ownerId: null,
@@ -318,7 +319,7 @@ export const createModelFactory = (options: FactoryOptions = {}) => {
     year: faker.number.int({ min: 1970, max: 2024 }),
     type: faker.helpers.arrayElement(["SS", "EM", "PM"]),
     opdbId: faker.number.int({ min: 1000, max: 9999 }),
-    organizationId: "org-test",
+    organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
     createdAt: faker.date.past({ years: 2 }),
     updatedAt: faker.date.recent({ days: 30 }),
 
@@ -339,7 +340,7 @@ export const createLocationFactory = (options: FactoryOptions = {}) => {
     zip: faker.location.zipCode(),
     phone: faker.phone.number(),
     website: faker.internet.url(),
-    organizationId: "org-test",
+    organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
     pinballMapId: faker.number.int({ min: 1000, max: 99999 }),
     latitude: faker.number.float({ min: -90, max: 90, multipleOf: 0.000001 }),
     longitude: faker.number.float({
@@ -372,7 +373,7 @@ export const createStatusFactory = (options: FactoryOptions = {}) => {
       "Closed",
     ]),
     color: faker.color.rgb(),
-    organizationId: "org-test",
+    organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
     isDefault: false,
     createdAt: faker.date.past({ years: 1 }),
     updatedAt: faker.date.recent({ days: 30 }),
@@ -390,7 +391,7 @@ export const createPriorityFactory = (options: FactoryOptions = {}) => {
     name: faker.helpers.arrayElement(["Low", "Medium", "High", "Critical"]),
     color: faker.color.rgb(),
     level: faker.number.int({ min: 1, max: 4 }),
-    organizationId: "org-test",
+    organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
     isDefault: false,
     createdAt: faker.date.past({ years: 1 }),
     updatedAt: faker.date.recent({ days: 30 }),
@@ -411,7 +412,7 @@ export const createRoleFactory = (options: FactoryOptions = {}) => {
       "Member",
       "Owner",
     ]),
-    organizationId: "org-test",
+    organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
     createdAt: faker.date.past({ years: 1 }),
     updatedAt: faker.date.recent({ days: 30 }),
 
@@ -422,14 +423,14 @@ export const createRoleFactory = (options: FactoryOptions = {}) => {
   };
 };
 
-// Organization factory
+// Organization factory - prefer using SEED_TEST_IDS for integration tests
 export const createOrganizationFactory = (options: FactoryOptions = {}) => {
   const { overrides = {} } = options;
 
   return {
-    id: faker.string.uuid(),
-    name: faker.company.name(),
-    subdomain: faker.internet.domainWord(),
+    id: SEED_TEST_IDS.ORGANIZATIONS.primary, // Use consistent seeded ID
+    name: "Austin Pinball", // Match seeded organization name
+    subdomain: "austin-pinball", // Match seeded subdomain
     logoUrl: faker.image.url(),
     createdAt: faker.date.past({ years: 2 }),
     updatedAt: faker.date.recent({ days: 30 }),

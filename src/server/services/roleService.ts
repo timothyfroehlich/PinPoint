@@ -16,7 +16,7 @@ import { type DrizzleClient } from "~/server/db/drizzle";
 import {
   roles,
   permissions,
-  role_permissions,
+  rolePermissions,
   memberships,
 } from "~/server/db/schema";
 
@@ -32,7 +32,10 @@ type Role = typeof roles.$inferSelect;
 export class RoleService {
   private permissionService: PermissionService;
 
-  constructor(private drizzle: DrizzleClient) {
+  constructor(
+    private drizzle: DrizzleClient,
+    private organizationId: string,
+  ) {
     this.permissionService = new PermissionService(this.drizzle);
   }
 
@@ -57,7 +60,7 @@ export class RoleService {
         .values({
           id: generatePrefixedId("role"),
           name: SYSTEM_ROLES.ADMIN,
-          // organizationId set automatically by RLS trigger
+          organizationId: this.organizationId, // Explicit for local dev, redundant in production (triggers override)
           isSystem: true,
           isDefault: false,
         })
@@ -91,12 +94,12 @@ export class RoleService {
 
     // Clear existing permissions
     await this.drizzle
-      .delete(role_permissions)
-      .where(eq(role_permissions.roleId, adminRole.id));
+      .delete(rolePermissions)
+      .where(eq(rolePermissions.roleId, adminRole.id));
 
     // Insert all permissions
     if (allPermissions.length > 0) {
-      await this.drizzle.insert(role_permissions).values(
+      await this.drizzle.insert(rolePermissions).values(
         allPermissions.map((p) => ({
           roleId: adminRole.id,
           permissionId: p.id,
@@ -116,7 +119,7 @@ export class RoleService {
         .values({
           id: generatePrefixedId("role"),
           name: SYSTEM_ROLES.UNAUTHENTICATED,
-          // organizationId set automatically by RLS trigger
+          organizationId: this.organizationId, // Explicit for local dev, redundant in production (triggers override)
           isSystem: true,
           isDefault: false,
         })
@@ -153,12 +156,12 @@ export class RoleService {
 
     // Clear existing permissions
     await this.drizzle
-      .delete(role_permissions)
-      .where(eq(role_permissions.roleId, unauthRole.id));
+      .delete(rolePermissions)
+      .where(eq(rolePermissions.roleId, unauthRole.id));
 
     // Insert unauthenticated permissions
     if (unauthPermissions.length > 0) {
-      await this.drizzle.insert(role_permissions).values(
+      await this.drizzle.insert(rolePermissions).values(
         unauthPermissions.map((p) => ({
           roleId: unauthRole.id,
           permissionId: p.id,
@@ -193,7 +196,7 @@ export class RoleService {
         .values({
           id: generatePrefixedId("role"),
           name: roleName,
-          // organizationId set automatically by RLS trigger
+          organizationId: this.organizationId, // Explicit for local dev, redundant in production (triggers override)
           isSystem: false,
           isDefault: overrides.isDefault ?? true,
         })
@@ -236,12 +239,12 @@ export class RoleService {
 
     // Clear existing permissions
     await this.drizzle
-      .delete(role_permissions)
-      .where(eq(role_permissions.roleId, role.id));
+      .delete(rolePermissions)
+      .where(eq(rolePermissions.roleId, role.id));
 
     // Assign permissions to role
     if (permissionRecords.length > 0) {
-      await this.drizzle.insert(role_permissions).values(
+      await this.drizzle.insert(rolePermissions).values(
         permissionRecords.map((p) => ({
           roleId: role.id,
           permissionId: p.id,
@@ -271,7 +274,7 @@ export class RoleService {
     const role = await this.drizzle.query.roles.findFirst({
       where: eq(roles.id, roleId),
       with: {
-        role_permissions: {
+        rolePermissions: {
           with: {
             permission: true,
           },
@@ -339,12 +342,12 @@ export class RoleService {
     if (updates.permissionIds) {
       // Clear existing permissions
       await this.drizzle
-        .delete(role_permissions)
-        .where(eq(role_permissions.roleId, roleId));
+        .delete(rolePermissions)
+        .where(eq(rolePermissions.roleId, roleId));
 
       // Insert new permissions
       if (updates.permissionIds.length > 0) {
-        await this.drizzle.insert(role_permissions).values(
+        await this.drizzle.insert(rolePermissions).values(
           updates.permissionIds.map((permissionId) => ({
             roleId,
             permissionId,
@@ -404,8 +407,8 @@ export class RoleService {
 
     // Delete role permissions
     await this.drizzle
-      .delete(role_permissions)
-      .where(eq(role_permissions.roleId, roleId));
+      .delete(rolePermissions)
+      .where(eq(rolePermissions.roleId, roleId));
 
     // Delete the role
     await this.drizzle.delete(roles).where(eq(roles.id, roleId));
@@ -446,12 +449,12 @@ export class RoleService {
               id: permissions.id,
               name: permissions.name,
             })
-            .from(role_permissions)
+            .from(rolePermissions)
             .innerJoin(
               permissions,
-              eq(role_permissions.permissionId, permissions.id),
+              eq(rolePermissions.permissionId, permissions.id),
             )
-            .where(eq(role_permissions.roleId, role.id)),
+            .where(eq(rolePermissions.roleId, role.id)),
           this.drizzle
             .select()
             .from(memberships)

@@ -35,6 +35,8 @@ describe("Schema Data Integrity", () => {
           subdomain: generateTestId("test-org"),
         });
 
+        // NOTE: This test creates users to test FK constraints and data integrity
+        // This is legitimate user creation for testing database schema behavior
         // Create test user
         const testUser1Id = generateTestId("test-user1");
         await db.insert(schema.users).values({
@@ -382,6 +384,8 @@ describe("Schema Data Integrity", () => {
           subdomain: generateTestId("test-org"),
         });
 
+        // NOTE: This test creates users to test FK constraints and data integrity
+        // This is legitimate user creation for testing database schema behavior
         const testUser1Id = generateTestId("test-user1");
         await db.insert(schema.users).values({
           id: testUser1Id,
@@ -663,6 +667,8 @@ describe("Schema Data Integrity", () => {
           subdomain: generateTestId("test-org"),
         });
 
+        // NOTE: This test creates users to test FK constraints and data integrity
+        // This is legitimate user creation for testing database schema behavior
         // Create test user
         const testUser1Id = generateTestId("test-user1");
         await db.insert(schema.users).values({

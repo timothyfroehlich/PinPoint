@@ -47,14 +47,12 @@ describe("YourModule Integration Tests", () => {
   }) => {
     await withBusinessLogicTest(workerDb, async (db) => {
       // ARRANGE: Create related data
-      const [organization] = await db
-        .insert(schema.organizations)
-        .values({
-          id: "integration-org",
-          name: "Integration Test Organization",
-          settings: { theme: "light", notifications: true },
-        })
-        .returning();
+      // Use seeded organization for integration tests
+      const organizationId = SEED_TEST_IDS.ORGANIZATIONS.primary;
+      const organization = await db.query.organizations.findFirst({
+        where: eq(schema.organizations.id, organizationId),
+      });
+      expect(organization).toBeDefined();
 
       const [user] = await db
         .insert(schema.users)
@@ -396,13 +394,12 @@ describe("YourModule Integration Tests", () => {
 // Helper functions use static SEED_TEST_IDS for predictable test data.
 // No dynamic queries needed - static constants provide consistency.
 async function createBasicTestData(db: any) {
-  const [organization] = await db
-    .insert(schema.organizations)
-    .values({
-      id: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
-      name: "Basic Test Organization",
-    })
-    .returning();
+  // Use seeded organization for integration test helpers
+  const organizationId = SEED_TEST_IDS.ORGANIZATIONS.primary;
+  const organization = await db.query.organizations.findFirst({
+    where: eq(schema.organizations.id, organizationId),
+  });
+  if (!organization) throw new Error("Seeded organization not found");
 
   const [user] = await db
     .insert(schema.users)

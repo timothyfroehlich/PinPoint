@@ -11,9 +11,9 @@
  * - Modern error handling with detailed logging
  */
 
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, sql } from "drizzle-orm";
 import minimalIssues from "./minimal-issues";
-import allIssues from "./all-issues";
+import fullIssues from "./full-issues";
 
 // Quiet mode for tests
 const isTestMode = process.env.NODE_ENV === "test" || process.env.VITEST;
@@ -46,7 +46,7 @@ async function extractUniqueGames(
 ): Promise<UniqueGame[]> {
   try {
     // Use TypeScript static data instead of JSON
-    const issueData = dataAmount === "minimal" ? minimalIssues : allIssues;
+    const issueData = dataAmount === "minimal" ? minimalIssues : fullIssues;
 
     if (issueData.length === 0) {
       log("[SAMPLE] No sample issues data available");
@@ -223,6 +223,7 @@ async function createMachinesWithDb(
   dbInstance: typeof db,
   organizationId: string,
   games: UniqueGame[],
+  dataAmount: DataAmount,
 ): Promise<void> {
   log(`[SAMPLE] Creating machines for ${games.length.toString()} models...`);
 
@@ -260,7 +261,7 @@ async function createMachinesWithDb(
       .select({ id: users.id, email: users.email })
       .from(users)
       .where(
-        eq(users.email, "admin@dev.local"), // Start with dev admin
+        eq(users.email, SEED_TEST_IDS.EMAILS.ADMIN), // Use seeded admin user for machine ownership
       )
       .limit(1);
 
@@ -273,6 +274,10 @@ async function createMachinesWithDb(
       .from(models);
 
     const modelsMap = new Map(modelsData.map((m) => [m.opdbId, m]));
+
+    log(
+      `[SAMPLE] Found ${modelsData.length} models in database, processing ${games.length} games`,
+    );
 
     // Get existing machines for this organization and location
     const existingMachines = await dbInstance
@@ -296,8 +301,8 @@ async function createMachinesWithDb(
     for (const game of games) {
       const model = modelsMap.get(game.opdbId);
       if (!model) {
-        console.warn(
-          `[SAMPLE] ⚠️  Model not found for ${game.name}, skipping machine`,
+        log(
+          `[SAMPLE] ⚠️  Model not found for ${game.name} (opdbId: ${game.opdbId}), skipping machine`,
         );
         continue;
       }
@@ -323,15 +328,41 @@ async function createMachinesWithDb(
       }
     }
 
-    // Batch create all missing machines
+    // Batch upsert all machines
     if (machinesToCreate.length > 0) {
       try {
-        await dbInstance.insert(machines).values(machinesToCreate);
+        await dbInstance
+          .insert(machines)
+          .values(machinesToCreate)
+          .onConflictDoUpdate({
+            target: machines.id,
+            set: {
+              name: sql.raw(`excluded.name`),
+              ownerId: sql.raw(`excluded."ownerId"`),
+              qrCodeId: sql.raw(`excluded."qrCodeId"`),
+              ownerNotificationsEnabled: sql.raw(
+                `excluded."ownerNotificationsEnabled"`,
+              ),
+              notifyOnNewIssues: sql.raw(`excluded."notifyOnNewIssues"`),
+              notifyOnStatusChanges: sql.raw(
+                `excluded."notifyOnStatusChanges"`,
+              ),
+              notifyOnComments: sql.raw(`excluded."notifyOnComments"`),
+              updatedAt: new Date(),
+            },
+          });
         log(
-          `[SAMPLE] ✅ Created ${machinesToCreate.length.toString()} machines via batch insert`,
+          `[SAMPLE] ✅ Upserted ${machinesToCreate.length.toString()} machines via batch upsert`,
         );
+
+        // Add verification log for minimal mode
+        if (dataAmount === "minimal") {
+          log(
+            `[SAMPLE] 📊 Verification: Upserted ${machinesToCreate.length} machines for minimal mode (expected: 6)`,
+          );
+        }
       } catch (error) {
-        console.error(`[SAMPLE] ❌ Failed to batch create machines:`, error);
+        console.error(`[SAMPLE] ❌ Failed to batch upsert machines:`, error);
         throw new Error(
           `Machine creation failed: ${error instanceof Error ? error.message : String(error)}`,
         );
@@ -439,9 +470,26 @@ async function createCompetitorMachine(dbInstance: typeof db): Promise<void> {
       notifyOnComments: false,
     };
 
-    await dbInstance.insert(machines).values(competitorMachine);
+    await dbInstance
+      .insert(machines)
+      .values(competitorMachine)
+      .onConflictDoUpdate({
+        target: machines.id,
+        set: {
+          name: sql.raw(`excluded.name`),
+          ownerId: sql.raw(`excluded."ownerId"`),
+          qrCodeId: sql.raw(`excluded."qrCodeId"`),
+          ownerNotificationsEnabled: sql.raw(
+            `excluded."ownerNotificationsEnabled"`,
+          ),
+          notifyOnNewIssues: sql.raw(`excluded."notifyOnNewIssues"`),
+          notifyOnStatusChanges: sql.raw(`excluded."notifyOnStatusChanges"`),
+          notifyOnComments: sql.raw(`excluded."notifyOnComments"`),
+          updatedAt: new Date(),
+        },
+      });
 
-    log(`[SAMPLE] ✅ Created competitor machine: ${competitorMachine.name}`);
+    log(`[SAMPLE] ✅ Upserted competitor machine: ${competitorMachine.name}`);
     log(
       `[SAMPLE] 🎯 Testing scenario: Both organizations have "${model.name}" machines for cross-org isolation testing`,
     );
@@ -465,7 +513,7 @@ async function createSampleIssuesWithDb(
 ): Promise<void> {
   try {
     // Use static TypeScript data instead of JSON
-    const issuesData = allIssues;
+    const issuesData = dataAmount === "minimal" ? minimalIssues : fullIssues;
 
     if (issuesData.length === 0) {
       log("[SAMPLE] No sample issues data available");
@@ -508,14 +556,28 @@ async function createSampleIssuesWithDb(
       return;
     }
 
-    // Batch create all issues using static SEED_TEST_IDS data
+    log(`[SAMPLE] Preparing to upsert ${issuesToCreate.length} issues`);
+
+    // Batch upsert all issues using static SEED_TEST_IDS data
     try {
-      await dbInstance.insert(issues).values(issuesToCreate);
+      await dbInstance
+        .insert(issues)
+        .values(issuesToCreate)
+        .onConflictDoUpdate({
+          target: issues.id,
+          set: {
+            title: sql.raw(`excluded.title`),
+            description: sql.raw(`excluded.description`),
+            priority: sql.raw(`excluded.priority`),
+            status: sql.raw(`excluded.status`),
+            updatedAt: new Date(),
+          },
+        });
       log(
-        `[SAMPLE] ✅ Created ${issuesToCreate.length.toString()} issues via batch insert`,
+        `[SAMPLE] ✅ Upserted ${issuesToCreate.length.toString()} issues via batch upsert`,
       );
     } catch (error) {
-      console.error(`[SAMPLE] ❌ Failed to batch create issues:`, error);
+      console.error(`[SAMPLE] ❌ Failed to batch upsert issues:`, error);
       throw new Error(
         `Issue creation failed: ${error instanceof Error ? error.message : String(error)}`,
       );
@@ -573,7 +635,12 @@ export async function seedSampleDataWithDb(
     await createModelsWithDb(dbInstance, uniqueGames);
 
     // Phase 3: Create machines for all models
-    await createMachinesWithDb(dbInstance, organizationId, uniqueGames);
+    await createMachinesWithDb(
+      dbInstance,
+      organizationId,
+      uniqueGames,
+      dataAmount,
+    );
 
     // Phase 3.5: Create competitor organization machine for cross-org testing
     await createCompetitorMachine(dbInstance);
@@ -592,16 +659,16 @@ export async function seedSampleDataWithDb(
     );
     log(`[SAMPLE] 📊 Summary:`);
     log(
-      `[SAMPLE]   - Games: ${uniqueGames.length} unique OPDB models (global catalog)`,
+      `[SAMPLE]   - Games: ${uniqueGames.length} unique OPDB models (${dataAmount === "minimal" ? "6 for minimal" : "full catalog"})`,
     );
     log(
-      `[SAMPLE]   - Machines: ${uniqueGames.length} primary org + 1 competitor org machine`,
+      `[SAMPLE]   - Machines: ${uniqueGames.length} primary org machines + 1 competitor machine (${dataAmount === "minimal" ? "6 + 1 = 7 total" : "full dataset"})`,
     );
     log(
       `[SAMPLE]   - Cross-org testing: Shared "Revenge from Mars" model with isolated machines`,
     );
     log(
-      `[SAMPLE]   - Issues: ${dataAmount === "minimal" ? "Limited" : "Rich"} sample data from curated JSON`,
+      `[SAMPLE]   - Issues: ${dataAmount === "minimal" ? "10 minimal issues" : "Full dataset"} from curated data`,
     );
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);

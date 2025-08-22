@@ -21,10 +21,10 @@ import { roles, memberships } from "~/server/db/schema";
 import { RoleService } from "~/server/services/roleService";
 
 /**
- * Create role service (RLS handles organizational scoping)
+ * Create role service (Three-environment compatibility: local dev + production)
  */
 function createRoleService(ctx: TRPCContext): RoleService {
-  return new RoleService(ctx.db);
+  return new RoleService(ctx.db, ctx.organizationId);
 }
 
 export const roleRouter = createTRPCRouter({

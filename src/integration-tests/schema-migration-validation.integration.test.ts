@@ -28,17 +28,8 @@ import {
 describe("Schema Migration Validation", () => {
   // Helper function to create test context
   async function createTestContext(db: TestDatabase) {
-    // Create seed data for this test run
-    const organizationId = generateTestId("test-org");
-
-    // Create test organization
-    await db.insert(schema.organizations).values({
-      id: organizationId,
-      name: "Test Organization",
-      subdomain: generateTestId("test-org"),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
+    // Use seeded primary organization for schema validation tests
+    const organizationId = SEED_TEST_IDS.ORGANIZATIONS.primary;
 
     const testLocationId = generateTestId("test-location");
 

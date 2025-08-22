@@ -12,6 +12,7 @@ import { eq, sql } from "drizzle-orm";
 import type { DrizzleClient } from "~/server/db/drizzle";
 
 import * as schema from "~/server/db/schema";
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
 // =================================
 // TYPES & INTERFACES
@@ -239,43 +240,38 @@ export async function cleanupTestData(
 // =================================
 
 /**
- * Creates a test organization with unique, timestamp-based identifiers.
+ * Get a seeded test organization (prefer using SEED_TEST_IDS directly)
  *
  * @param db - Drizzle client instance
- * @param overrides - Optional partial organization data to override defaults
- * @returns Promise<Organization> - Created organization record
+ * @param orgType - Which seeded organization to use
+ * @returns Promise<Organization> - Seeded organization record
  *
  * @example
  * ```typescript
- * const testOrg = await createTestOrganization(db, {
- *   name: "Test Pinball League",
- *   subdomain: "test-league"
- * });
+ * const testOrg = await createTestOrganization(db, "primary");
+ * // Or better, use directly:
+ * // const orgId = SEED_TEST_IDS.ORGANIZATIONS.primary;
  * ```
  */
 export async function createTestOrganization(
   db: DrizzleClient,
-  overrides: Partial<Organization> = {},
+  orgType: "primary" | "competitor" = "primary",
 ): Promise<Organization> {
-  const timestamp = Date.now();
-  const uniqueId = `test-org-${timestamp.toString()}`;
+  const orgId =
+    orgType === "primary"
+      ? SEED_TEST_IDS.ORGANIZATIONS.primary
+      : SEED_TEST_IDS.ORGANIZATIONS.competitor;
 
-  const orgData: Organization = {
-    id: uniqueId,
-    name: "Test Organization",
-    subdomain: `test-subdomain-${timestamp.toString()}`,
-    logoUrl: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    ...overrides,
-  };
+  const organization = await db.query.organizations.findFirst({
+    where: eq(schema.organizations.id, orgId),
+  });
 
-  const [organization] = await db
-    .insert(schema.organizations)
-    .values(orgData)
-    .returning();
+  if (!organization) {
+    throw new Error(
+      `Seeded organization ${orgType} not found. Ensure seed data is loaded.`,
+    );
+  }
 
-  // Organization should be created successfully
   return organization;
 }
 
@@ -639,16 +635,10 @@ export async function createMultiTenantTestEnvironment(
 }> {
   const timestamp = Date.now();
 
-  // Create two test organizations
-  const org1 = await createTestOrganization(db, {
-    name: "Test Organization 1",
-    subdomain: `test-org1-${timestamp.toString()}`,
-  });
+  // Get two seeded organizations
+  const org1 = await createTestOrganization(db, "primary");
 
-  const org2 = await createTestOrganization(db, {
-    name: "Test Organization 2",
-    subdomain: `test-org2-${timestamp.toString()}`,
-  });
+  const org2 = await createTestOrganization(db, "competitor");
 
   // Create users with memberships for each org
   const org1Admin = await createTestUserWithMembership(db, org1.id, "admin", {

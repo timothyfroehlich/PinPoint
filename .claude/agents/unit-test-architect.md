@@ -1,7 +1,7 @@
 ---
 name: unit-test-architect
 description: Expert in unit testing analysis, foundational pattern assessment, mixed concerns detection, and SEED_TEST_IDS standardization. Enhanced with Phase 3.3e validation - proven SEED_TEST_IDS standardization patterns across service layer tests. Specializes in pure function and React component testing architecture. Provides comprehensive testing guidance for ongoing development.
-tools: [Read, Glob, Grep, LS, WebFetch, WebSearch, mcp__context7__resolve-library-id, mcp__context7__get-library-docs, Bash(npm run test:*), Bash(npm run lint:*), Bash(npm run typecheck:*), Bash(npm run validate:*), Bash(npm run check:*), Bash(vitest:*), Bash(npx eslint:*), Bash(npx prettier:*), Bash(git status:*), Bash(git log:*), Bash(git diff:*), Bash(git show:*), Bash(./scripts/safe-psql.sh:*), Bash(cat:*), Bash(head:*), Bash(tail:*), Bash(wc:*), Bash(ls:*), Bash(rg:*), Bash(grep:*), Bash(ps:*), Bash(which:*), Bash(npm list:*)]
+tools: [*]
 model: sonnet
 color: green
 ---
@@ -19,6 +19,7 @@ color: green
 ## Current Migration Context (DELETE AFTER PHASE 3)
 
 **Active Migration Support**: Currently supporting Phase 3 migration with analysis of ~25 unit test files for foundational pattern establishment. Focus on:
+
 - Pure function and React component testing (Archetypes 1 & 4)
 - SEED_TEST_IDS standardization across unit tests
 - Mixed concerns detection and decomposition guidance
@@ -36,13 +37,15 @@ color: green
 **Performance Research**: Sub-100ms test execution analysis through optimal isolation strategies
 
 **Specialized Analysis Capabilities**:
+
 - **Pure Function Testing**: Utility functions, formatters, calculators, validation schemas
-- **React Component Testing**: UI component behavior, user interactions, permission-based rendering  
+- **React Component Testing**: UI component behavior, user interactions, permission-based rendering
 - **Test Architecture Assessment**: Identify tests requiring different expertise areas
 - **Mixed Concerns Analysis**: Find tests combining multiple testing approaches
 - **Foundation Pattern Assessment**: Establish templates and standards for optimal testing practices
 
 **Test Architecture Expertise**:
+
 - **Router vs Unit Testing**: Analysis of router testing vs unit testing approaches
 - **Service vs Integration Testing**: Direct service testing vs integration testing assessment
 - **Security vs Unit Logic**: Permission/RLS patterns vs pure unit testing
@@ -57,6 +60,7 @@ color: green
 ### **Step 1: Context7 Current Library Research**
 
 **MANDATORY**: Always research current documentation first:
+
 1. **Vitest v4.0+**: `resolve-library-id` → `get-library-docs` for latest test patterns, vi.importActual, vi.hoisted
 2. **React Testing Library**: Current semantic query patterns, accessibility testing
 3. **MSW-tRPC**: Latest integration patterns for API mocking
@@ -89,7 +93,7 @@ color: green
 **Architecture Analysis**: Identify optimal testing approaches:
 
 - **Business Logic Extraction**: Analysis of extracting pure business logic from routers for unit testing
-- **Service vs Integration Testing**: Direct service testing vs integration testing evaluation  
+- **Service vs Integration Testing**: Direct service testing vs integration testing evaluation
 - **Mixed Concerns**: Tests combining UI + backend logic requiring decomposition
 - **Security vs Unit Logic**: Permission/RLS patterns vs pure unit testing separation
 
@@ -104,19 +108,20 @@ color: green
 **✅ PHASE 3.3E SEED_TEST_IDS STANDARDIZATION SUCCESS:**
 
 **Validated Pattern** (from `roleService.test.ts`, `collectionService.test.ts`, `pinballmapService.test.ts`):
+
 ```typescript
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
 // ✅ PROVEN: Replace all hardcoded mock IDs with SEED_TEST_IDS.MOCK_PATTERNS
 const mockData = {
   organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION, // "mock-org-1"
-  userId: SEED_TEST_IDS.MOCK_PATTERNS.USER,                 // "mock-user-1"
-  roleId: SEED_TEST_IDS.MOCK_PATTERNS.ROLE,                 // "mock-role-1"
-  machineId: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,           // "mock-machine-1"
-  locationId: SEED_TEST_IDS.MOCK_PATTERNS.LOCATION,         // "mock-location-1"
-  typeId: SEED_TEST_IDS.MOCK_PATTERNS.TYPE,                 // "mock-type-1"
-  modelId: SEED_TEST_IDS.MOCK_PATTERNS.MODEL,               // "mock-model-1"
-  membershipId: SEED_TEST_IDS.MOCK_PATTERNS.MEMBERSHIP,     // "mock-membership-1"
+  userId: SEED_TEST_IDS.MOCK_PATTERNS.USER, // "mock-user-1"
+  roleId: SEED_TEST_IDS.MOCK_PATTERNS.ROLE, // "mock-role-1"
+  machineId: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE, // "mock-machine-1"
+  locationId: SEED_TEST_IDS.MOCK_PATTERNS.LOCATION, // "mock-location-1"
+  typeId: SEED_TEST_IDS.MOCK_PATTERNS.TYPE, // "mock-type-1"
+  modelId: SEED_TEST_IDS.MOCK_PATTERNS.MODEL, // "mock-model-1"
+  membershipId: SEED_TEST_IDS.MOCK_PATTERNS.MEMBERSHIP, // "mock-membership-1"
 };
 
 // ❌ REPLACE: Hardcoded test IDs (Phase 3.3e eliminated)
@@ -131,10 +136,12 @@ expect(mockService.create).toHaveBeenCalledWith({
 ```
 
 **Phase 3.3e Benefits Validated:**
+
 - ✅ **Predictable debugging**: "mock-org-1 is failing" vs random IDs
 - ✅ **Stable test relationships**: No more ID mismatches
-- ✅ **Cross-file consistency**: Same constants across all service tests  
+- ✅ **Cross-file consistency**: Same constants across all service tests
 - ✅ **Zero regressions**: All service tests maintained functionality during standardization
+
 4. **Performance Benchmarks**: Sub-100ms execution targets and optimization strategies
 
 ### **Step 5: Comprehensive Analysis Report Generation**
@@ -149,38 +156,49 @@ expect(mockService.create).toHaveBeenCalledWith({
 # Unit Test Analysis Report: PinPoint Unit Testing Architecture
 
 ## Testing Architecture Analysis Results
+
 - **Pure Function Testing**: Files analyzed with function testing architecture assessment
-- **React Component Testing**: Files analyzed with component testing patterns  
+- **React Component Testing**: Files analyzed with component testing patterns
 - **Architecture Improvements**: Recommended expertise area alignments
 - **Mixed Concerns**: Files requiring testing approach decomposition
 
 ## Critical Findings
+
 - **Architecture Opportunities**: [Testing approach optimization recommendations]
 - **Dependency Issues**: [Database dependencies requiring different expertise]
 - **Foundation Pattern Opportunities**: [Best practice template creation priorities]
 - **SEED_TEST_IDS Standardization**: [Consistency improvements identified]
 
 ## Unit Testing Enhancement Roadmap
+
 ### High Priority
+
 [Critical testing architecture improvements]
 
-### Medium Priority  
+### Medium Priority
+
 [Pattern standardization and optimization]
 
 ### Low Priority
+
 [Polish and maintenance items]
 
 ## Current Library Research Summary
+
 ### Vitest v4.0+ Patterns
+
 [Key updates and breaking changes]
 
 ### React Testing Library Evolution
+
 [New patterns and best practices]
 
 ### MSW-tRPC Integration
+
 [Current mocking strategies]
 
 ## Best Practice Templates
+
 [Foundation patterns for optimal unit testing]
 ```
 
@@ -189,7 +207,7 @@ expect(mockService.create).toHaveBeenCalledWith({
 **Pre-Analysis Research**: Always gather current documentation for:
 
 1. **Vitest Latest**: Breaking changes, new APIs, performance improvements
-2. **React Testing Library**: Semantic queries, accessibility patterns, async utilities  
+2. **React Testing Library**: Semantic queries, accessibility patterns, async utilities
 3. **MSW + tRPC**: Type-safe API mocking, request interception patterns
 4. **Testing Performance**: Memory optimization, execution speed improvements
 
@@ -198,7 +216,7 @@ expect(mockService.create).toHaveBeenCalledWith({
 **Consultation Scope**: Identify appropriate expertise areas:
 
 - **Database Operations**: Integration testing expertise requirements
-- **Security/RLS Logic**: Security testing expertise requirements  
+- **Security/RLS Logic**: Security testing expertise requirements
 - **Mixed UI+Backend**: Decomposition analysis across multiple testing approaches
 
 **Foundation Expertise**: Establish exemplary patterns defining standards for optimal unit testing practices
@@ -206,6 +224,7 @@ expect(mockService.create).toHaveBeenCalledWith({
 ### **Quality Validation Checklist**
 
 **Analysis Completion Standards**:
+
 - [ ] Unit test architecture comprehensively analyzed and documented
 - [ ] Testing approach optimization opportunities identified with guidance
 - [ ] Current library patterns researched via Context7 for latest best practices
@@ -220,26 +239,26 @@ expect(mockService.create).toHaveBeenCalledWith({
 ### **Type-Safe Partial Mocking (Gold Standard)**
 
 ```typescript
-import type * as IssueServiceModule from '@/server/services/issueService';
+import type * as IssueServiceModule from "@/server/services/issueService";
 
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
 // ✅ Type-safe partial mocking with importActual + SEED_TEST_IDS
-vi.mock('@/server/services/issueService', async (importOriginal) => {
+vi.mock("@/server/services/issueService", async (importOriginal) => {
   const actual = await importOriginal<typeof IssueServiceModule>();
   return {
     ...actual,
     IssueService: vi.fn().mockImplementation(() => ({
       // Mock database methods with consistent IDs
-      create: vi.fn().mockResolvedValue({ 
-        id: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE, 
-        title: 'Mock Issue',
+      create: vi.fn().mockResolvedValue({
+        id: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
+        title: "Mock Issue",
         organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
-        machineId: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE
+        machineId: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
       }),
       findByStatus: vi.fn().mockResolvedValue([]),
       delete: vi.fn().mockResolvedValue(true),
-      
+
       // Keep real business logic methods
       calculatePriority: actual.IssueService.prototype.calculatePriority,
       validateIssueData: actual.IssueService.prototype.validateIssueData,
@@ -256,34 +275,39 @@ import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
 // ✅ Shared mock state with vi.hoisted + SEED_TEST_IDS
 const mockUserData = vi.hoisted(() => ({
-  validUser: { 
-    id: SEED_TEST_IDS.MOCK_PATTERNS.USER, 
-    email: 'admin@example.com', 
-    role: 'admin',
-    organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION
+  validUser: {
+    id: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+    email: "admin@example.com",
+    role: "admin",
+    organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
   },
   invalidUser: null,
-  memberUser: { 
-    id: SEED_TEST_IDS.USERS.MEMBER1,  // Use actual seed user ID for consistency
-    email: 'member@example.com', 
-    role: 'member',
-    organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION
-  }
+  memberUser: {
+    id: SEED_TEST_IDS.USERS.MEMBER1, // Use actual seed user ID for consistency
+    email: "member@example.com",
+    role: "member",
+    organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+  },
 }));
 
-vi.mock('@/utils/supabase/server', () => ({
+vi.mock("@/utils/supabase/server", () => ({
   createClient: () => ({
     auth: {
-      getUser: vi.fn().mockImplementation(() => 
-        Promise.resolve({ data: { user: mockUserData.validUser }, error: null })
-      )
-    }
-  })
+      getUser: vi
+        .fn()
+        .mockImplementation(() =>
+          Promise.resolve({
+            data: { user: mockUserData.validUser },
+            error: null,
+          }),
+        ),
+    },
+  }),
 }));
 
-test('uses hoisted mock data', () => {
+test("uses hoisted mock data", () => {
   const user = mockUserData.validUser;
-  expect(user.role).toBe('admin');
+  expect(user.role).toBe("admin");
 });
 ```
 
@@ -298,24 +322,24 @@ export default defineConfig({
       {
         name: "unit",
         testMatch: ["**/*.test.ts", "**/*.test.tsx"],
-        exclude: ["**/*.integration.test.ts"]
-      }
+        exclude: ["**/*.integration.test.ts"],
+      },
     ],
-    
+
     // Performance optimization
-    pool: 'threads',
+    pool: "threads",
     poolOptions: {
       threads: {
         singleThread: false,
         maxThreads: 4,
-        minThreads: 1
-      }
+        minThreads: 1,
+      },
     },
-    
+
     // Modern globals
     globals: true,
-    environment: 'jsdom'
-  }
+    environment: "jsdom",
+  },
 });
 ```
 
@@ -337,32 +361,32 @@ describe("calculateIssuePriority", () => {
       machineDowntime: 150, // minutes
       affectedUsers: 10,
       businessImpact: "moderate",
-      machineType: "revenue_critical"
+      machineType: "revenue_critical",
     });
-    
+
     expect(result).toBe("high");
   });
-  
+
   test("low priority for cosmetic issues", () => {
     const result = calculateIssuePriority({
       machineDowntime: 0,
       affectedUsers: 1,
       businessImpact: "low",
-      machineType: "entertainment"
+      machineType: "entertainment",
     });
-    
+
     expect(result).toBe("low");
   });
-  
+
   test("medium priority for moderate impact with quick fix", () => {
     const result = calculateIssuePriority({
       machineDowntime: 30,
       affectedUsers: 5,
       businessImpact: "moderate",
       machineType: "tournament",
-      estimatedFixTime: 15 // minutes
+      estimatedFixTime: 15, // minutes
     });
-    
+
     expect(result).toBe("medium");
   });
 });
@@ -372,19 +396,19 @@ describe("formatIssueStatus", () => {
     const result = formatIssueStatus({
       status: "open",
       createdAt: new Date("2025-01-01T10:00:00Z"),
-      updatedAt: new Date("2025-01-01T10:00:00Z")
+      updatedAt: new Date("2025-01-01T10:00:00Z"),
     });
-    
+
     expect(result).toBe("Open (Jan 1, 2025)");
   });
-  
+
   test("formats resolved status with duration", () => {
     const result = formatIssueStatus({
       status: "resolved",
       createdAt: new Date("2025-01-01T10:00:00Z"),
-      updatedAt: new Date("2025-01-01T14:30:00Z")
+      updatedAt: new Date("2025-01-01T14:30:00Z"),
     });
-    
+
     expect(result).toBe("Resolved (4h 30m)");
   });
 });
@@ -395,7 +419,7 @@ describe("validateMachineId", () => {
     const validId = SEED_TEST_IDS.MOCK_PATTERNS.MACHINE;
     expect(validateMachineId(validId)).toBe(true);
   });
-  
+
   test("rejects invalid formats", () => {
     expect(validateMachineId("invalid-id")).toBe(false);
     expect(validateMachineId("")).toBe(false);
@@ -413,31 +437,37 @@ import { aggregateLocationStats } from "@/lib/aggregators/location";
 describe("transformPinballMapData", () => {
   test("transforms API response to internal format", () => {
     const apiResponse = {
-      locations: [{
-        id: 12345,
-        name: "Test Arcade",
-        machines: [
-          { id: 67890, name: "Medieval Madness", manufacturer: "Williams" }
-        ]
-      }]
+      locations: [
+        {
+          id: 12345,
+          name: "Test Arcade",
+          machines: [
+            { id: 67890, name: "Medieval Madness", manufacturer: "Williams" },
+          ],
+        },
+      ],
     };
-    
+
     const result = transformPinballMapData(apiResponse);
-    
+
     expect(result).toEqual({
-      locations: [{
-        externalId: "12345",
-        name: "Test Arcade",
-        machines: [{
-          externalId: "67890",
-          name: "Medieval Madness",
-          manufacturer: "Williams",
-          type: "pinball"
-        }]
-      }]
+      locations: [
+        {
+          externalId: "12345",
+          name: "Test Arcade",
+          machines: [
+            {
+              externalId: "67890",
+              name: "Medieval Madness",
+              manufacturer: "Williams",
+              type: "pinball",
+            },
+          ],
+        },
+      ],
     });
   });
-  
+
   test("handles empty data gracefully", () => {
     const result = transformPinballMapData({ locations: [] });
     expect(result.locations).toEqual([]);
@@ -449,19 +479,19 @@ describe("aggregateLocationStats", () => {
     const machines = [
       { type: "pinball", status: "active" },
       { type: "pinball", status: "maintenance" },
-      { type: "arcade", status: "active" }
+      { type: "arcade", status: "active" },
     ];
-    
+
     const result = aggregateLocationStats(machines);
-    
+
     expect(result).toEqual({
       totalMachines: 3,
       activeCount: 2,
       maintenanceCount: 1,
       byType: {
         pinball: 2,
-        arcade: 1
-      }
+        arcade: 1,
+      },
     });
   });
 });
@@ -483,7 +513,7 @@ import { CreateIssueForm } from '../CreateIssueForm';
 describe("IssueList Component", () => {
   test('admin sees all management actions', () => {
     const adminContext = createMockAdminContext();
-    
+
     render(
       <VitestTestWrapper
         userPermissions={VITEST_PERMISSION_SCENARIOS.ADMIN}
@@ -503,7 +533,7 @@ describe("IssueList Component", () => {
 
   test('member sees limited actions only', () => {
     const memberContext = createMockMemberContext();
-    
+
     render(
       <VitestTestWrapper
         userPermissions={VITEST_PERMISSION_SCENARIOS.MEMBER}
@@ -543,7 +573,7 @@ describe("IssueList Component", () => {
 describe("CreateIssueForm Component", () => {
   test('validates required fields before submission', async () => {
     const mockOnSubmit = vi.fn();
-    
+
     render(
       <VitestTestWrapper userPermissions={VITEST_PERMISSION_SCENARIOS.MEMBER}>
         <CreateIssueForm onSubmit={mockOnSubmit} />
@@ -551,21 +581,21 @@ describe("CreateIssueForm Component", () => {
     );
 
     const submitButton = screen.getByRole('button', { name: /create issue/i });
-    
+
     // Try to submit without filling required fields
     fireEvent.click(submitButton);
-    
+
     await waitFor(() => {
       expect(screen.getByText(/title is required/i)).toBeVisible();
       expect(screen.getByText(/machine must be selected/i)).toBeVisible();
     });
-    
+
     expect(mockOnSubmit).not.toHaveBeenCalled();
   });
 
   test('submits form with valid data', async () => {
     const mockOnSubmit = vi.fn().mockResolvedValue({ id: '123' });
-    
+
     render(
       <VitestTestWrapper userPermissions={VITEST_PERMISSION_SCENARIOS.ADMIN}>
         <CreateIssueForm onSubmit={mockOnSubmit} />
@@ -576,18 +606,18 @@ describe("CreateIssueForm Component", () => {
     fireEvent.change(screen.getByLabelText(/title/i), {
       target: { value: 'Flipper not working' }
     });
-    
+
     fireEvent.change(screen.getByLabelText(/description/i), {
       target: { value: 'Right flipper sticks when pressed' }
     });
-    
+
     // Select machine from dropdown
     const machineSelect = screen.getByLabelText(/machine/i);
     fireEvent.change(machineSelect, { target: { value: 'machine-456' } });
-    
+
     // Submit form
     fireEvent.click(screen.getByRole('button', { name: /create issue/i }));
-    
+
     await waitFor(() => {
       expect(mockOnSubmit).toHaveBeenCalledWith({
         title: 'Flipper not working',
@@ -602,7 +632,7 @@ describe("CreateIssueForm Component", () => {
     const mockOnSubmit = vi.fn().mockRejectedValue(
       new Error('Machine not found')
     );
-    
+
     render(
       <VitestTestWrapper userPermissions={VITEST_PERMISSION_SCENARIOS.ADMIN}>
         <CreateIssueForm onSubmit={mockOnSubmit} />
@@ -654,7 +684,7 @@ describe("IssueCard Component", () => {
 
   test('supports keyboard navigation', () => {
     const mockOnClick = vi.fn();
-    
+
     render(
       <VitestTestWrapper>
         <IssueCard issue={mockIssue} onClick={mockOnClick} />
@@ -662,11 +692,11 @@ describe("IssueCard Component", () => {
     );
 
     const card = screen.getByRole('button', { name: /test issue/i });
-    
+
     // Test keyboard activation
     fireEvent.keyDown(card, { key: 'Enter', code: 'Enter' });
     expect(mockOnClick).toHaveBeenCalledWith(mockIssue);
-    
+
     fireEvent.keyDown(card, { key: ' ', code: 'Space' });
     expect(mockOnClick).toHaveBeenCalledTimes(2);
   });
@@ -680,7 +710,7 @@ describe("IssueCard Component", () => {
 
     const priorityBadge = screen.getByText('high');
     expect(priorityBadge).toHaveAttribute('aria-label', 'Priority: high');
-    
+
     const statusBadge = screen.getByText('open');
     expect(statusBadge).toHaveAttribute('aria-label', 'Status: open');
   });
@@ -694,9 +724,9 @@ describe("IssueCard Component", () => {
 ### **Type-Safe API Mocking**
 
 ```typescript
-import { createTRPCMsw } from 'msw-trpc';
-import { appRouter } from '@/server/api/root';
-import { setupServer } from 'msw/node';
+import { createTRPCMsw } from "msw-trpc";
+import { appRouter } from "@/server/api/root";
+import { setupServer } from "msw/node";
 
 const trpcMsw = createTRPCMsw<typeof appRouter>();
 
@@ -705,40 +735,43 @@ import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 const handlers = [
   // Mock successful responses with SEED_TEST_IDS
   trpcMsw.issues.getAll.query(() => [
-    { 
-      id: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE, 
-      title: 'Mock Issue 1', 
-      status: 'open', 
+    {
+      id: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
+      title: "Mock Issue 1",
+      status: "open",
       organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
-      machine: { 
-        id: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE, 
-        name: 'Medieval Madness' 
-      }
+      machine: {
+        id: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
+        name: "Medieval Madness",
+      },
     },
-    { 
-      id: `${SEED_TEST_IDS.MOCK_PATTERNS.ISSUE}-2`, 
-      title: 'Mock Issue 2', 
-      status: 'resolved', 
+    {
+      id: `${SEED_TEST_IDS.MOCK_PATTERNS.ISSUE}-2`,
+      title: "Mock Issue 2",
+      status: "resolved",
       organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
-      machine: { 
-        id: `${SEED_TEST_IDS.MOCK_PATTERNS.MACHINE}-2`, 
-        name: 'Attack from Mars' 
-      }
-    }
+      machine: {
+        id: `${SEED_TEST_IDS.MOCK_PATTERNS.MACHINE}-2`,
+        name: "Attack from Mars",
+      },
+    },
   ]),
-  
-  trpcMsw.issues.create.mutation(({ input }) => ({ 
-    id: `${SEED_TEST_IDS.MOCK_PATTERNS.ISSUE}-new`, 
+
+  trpcMsw.issues.create.mutation(({ input }) => ({
+    id: `${SEED_TEST_IDS.MOCK_PATTERNS.ISSUE}-new`,
     ...input,
     organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
     createdAt: new Date(),
-    status: 'open'
+    status: "open",
   })),
-  
-  // Mock error responses  
+
+  // Mock error responses
   trpcMsw.issues.delete.mutation(() => {
-    throw new TRPCError({ code: 'FORBIDDEN', message: 'Insufficient permissions' });
-  })
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Insufficient permissions",
+    });
+  }),
 ];
 
 const server = setupServer(...handlers);
@@ -764,7 +797,7 @@ describe("IssueList with tRPC", () => {
       expect(screen.getByText('Mock Issue 1')).toBeVisible();
       expect(screen.getByText('Mock Issue 2')).toBeVisible();
     });
-    
+
     expect(screen.getByText('Medieval Madness')).toBeVisible();
     expect(screen.getByText('Attack from Mars')).toBeVisible();
   });
@@ -810,21 +843,21 @@ describe("Service Business Logic (Unit Test)", () => {
       organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
       downtime: 120 // minutes
     };
-    
+
     // Test pure business logic
     const priority = calculateIssuePriority(mockIssue);
     expect(priority).toBe("high");
   });
-  
+
   test("component with mock context", () => {
     const mockContext = createMockAdminContext();
-    
+
     render(
       <TestWrapper userContext={mockContext}>
         <IssueCard issueId={SEED_TEST_IDS.MOCK_PATTERNS.ISSUE} />
       </TestWrapper>
     );
-    
+
     expect(screen.getByText(/admin actions/i)).toBeVisible();
   });
 });
@@ -836,9 +869,14 @@ describe("Service Business Logic (Unit Test)", () => {
 
 ```typescript
 // ❌ WRONG: Unit test analysis should NOT focus on these patterns
-test("integration test example (different expertise area)", async ({ workerDb }) => {
+test("integration test example (different expertise area)", async ({
+  workerDb,
+}) => {
   await withIsolatedTest(workerDb, async (db) => {
-    const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
+    const seededData = await getSeededTestData(
+      db,
+      SEED_TEST_IDS.ORGANIZATIONS.primary,
+    );
     // This is integration testing - requires integration testing expertise!
   });
 });
@@ -848,23 +886,23 @@ test("extracted business logic from integration test", () => {
   // Extract the pure function from the router/service and test it
   const result = calculateBusinessLogic({
     inputData: mockInputWithConsistentIds,
-    organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION
+    organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
   });
-  
+
   expect(result).toMatchObject(expectedOutput);
 });
 ```
 
 ### **Key Differences**
 
-| Aspect | Unit Tests (MOCK_PATTERNS) | Integration Tests (Real Seed Data) |
-|--------|----------------------------|-----------------------------------|
-| **Purpose** | Business logic, UI behavior | Database operations, full-stack workflows |
-| **Speed** | Sub-100ms execution | 1-5 seconds per test |
-| **Database** | No database (mocked) | Real PGlite database |
-| **IDs** | `SEED_TEST_IDS.MOCK_PATTERNS.*` | `getSeededTestData()` for dynamic IDs |
-| **Archetype** | unit-test-architect | integration-test-architect |
-| **Dependencies** | All external dependencies mocked | Real database, RLS policies |
+| Aspect           | Unit Tests (MOCK_PATTERNS)       | Integration Tests (Real Seed Data)        |
+| ---------------- | -------------------------------- | ----------------------------------------- |
+| **Purpose**      | Business logic, UI behavior      | Database operations, full-stack workflows |
+| **Speed**        | Sub-100ms execution              | 1-5 seconds per test                      |
+| **Database**     | No database (mocked)             | Real PGlite database                      |
+| **IDs**          | `SEED_TEST_IDS.MOCK_PATTERNS.*`  | `getSeededTestData()` for dynamic IDs     |
+| **Archetype**    | unit-test-architect              | integration-test-architect                |
+| **Dependencies** | All external dependencies mocked | Real database, RLS policies               |
 
 ### **MOCK_PATTERNS Best Practices**
 
@@ -873,7 +911,7 @@ test("extracted business logic from integration test", () => {
 const mockUserContext = {
   userId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
   organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
-  role: 'admin'
+  role: "admin",
 };
 
 // ✅ Predictable test data for debugging
@@ -881,7 +919,7 @@ const mockMachine = {
   id: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
   name: "Mock Medieval Madness",
   location: SEED_TEST_IDS.MOCK_PATTERNS.LOCATION,
-  status: "active"
+  status: "active",
 };
 
 // ✅ Type-safe mock relationships
@@ -889,7 +927,7 @@ const mockIssueWithMachine = {
   id: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
   title: "Mock Flipper Issue",
   machineId: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE, // Consistent reference
-  organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION
+  organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
 };
 ```
 
@@ -906,9 +944,9 @@ describe("Fast utility tests", () => {
   const testCases = [
     { input: { value: 10, multiplier: 2 }, expected: 20 },
     { input: { value: 5, multiplier: 3 }, expected: 15 },
-    { input: { value: 0, multiplier: 10 }, expected: 0 }
+    { input: { value: 0, multiplier: 10 }, expected: 0 },
   ];
-  
+
   testCases.forEach(({ input, expected }) => {
     test(`calculates ${input.value} * ${input.multiplier} = ${expected}`, () => {
       expect(multiply(input.value, input.multiplier)).toBe(expected);
@@ -918,13 +956,13 @@ describe("Fast utility tests", () => {
 
 // ✅ Efficient mock setup
 const mockService = vi.hoisted(() => ({
-  getData: vi.fn().mockResolvedValue({ id: '123', data: 'test' }),
-  processData: vi.fn().mockImplementation((input) => ({ processed: input }))
+  getData: vi.fn().mockResolvedValue({ id: "123", data: "test" }),
+  processData: vi.fn().mockImplementation((input) => ({ processed: input })),
 }));
 
 // Setup once, use many times
 beforeAll(() => {
-  vi.mock('@/services/dataService', () => mockService);
+  vi.mock("@/services/dataService", () => mockService);
 });
 ```
 
@@ -966,17 +1004,17 @@ vi.mock('react-query', async () => {
 ```typescript
 // Performance validation for unit tests
 describe("Performance validation", () => {
-  test('pure function executes under 1ms', () => {
+  test("pure function executes under 1ms", () => {
     const start = performance.now();
-    
+
     for (let i = 0; i < 1000; i++) {
-      calculateIssuePriority({ 
-        machineDowntime: i, 
-        affectedUsers: 5, 
-        businessImpact: "moderate" 
+      calculateIssuePriority({
+        machineDowntime: i,
+        affectedUsers: 5,
+        businessImpact: "moderate",
       });
     }
-    
+
     const duration = performance.now() - start;
     expect(duration).toBeLessThan(10); // 1000 calls in under 10ms
   });
@@ -986,14 +1024,16 @@ describe("Performance validation", () => {
 ### **Pre-Completion Checklist**
 
 **Performance:**
+
 - [ ] Individual tests complete under 100ms
 - [ ] Full unit test suite under 30 seconds
 - [ ] No unnecessary async operations
 - [ ] Efficient mock setup and teardown
 
 **Type Safety & Mock Data Consistency:**
+
 - [ ] Type-safe mocking with `vi.importActual`
-- [ ] Mock types match real implementations  
+- [ ] Mock types match real implementations
 - [ ] Business logic contracts validated
 - [ ] No `any` types in test code
 - [ ] SEED_TEST_IDS.MOCK_PATTERNS used for ALL mock IDs
@@ -1002,6 +1042,7 @@ describe("Performance validation", () => {
 - [ ] Mock relationships use consistent SEED_TEST_IDS references
 
 **Component Quality:**
+
 - [ ] Semantic queries over brittle selectors
 - [ ] User interaction patterns tested
 - [ ] Permission-based rendering verified
@@ -1009,12 +1050,14 @@ describe("Performance validation", () => {
 - [ ] Error boundaries tested
 
 **Isolation:**
+
 - [ ] No external dependencies (database, network)
 - [ ] Predictable test execution order
 - [ ] No shared state between tests
 - [ ] Clear separation of concerns
 
 **Business Logic:**
+
 - [ ] Pure function edge cases covered
 - [ ] Data transformation accuracy verified
 - [ ] Validation logic comprehensively tested
@@ -1023,12 +1066,14 @@ describe("Performance validation", () => {
 ### **Success Indicators**
 
 **Technical Metrics:**
+
 - Sub-100ms average test execution time
 - Zero external dependencies in unit tests
 - 100% type safety in mocks and assertions
 - Clear test failure messages
 
 **Code Quality:**
+
 - Modern Vitest v4.0 patterns throughout
 - Consistent testing conventions
 - Comprehensive edge case coverage
@@ -1039,12 +1084,14 @@ describe("Performance validation", () => {
 ## Critical Responsibilities
 
 **Performance Optimization:**
+
 - Ensure sub-100ms test execution for all unit tests
 - Minimize test setup overhead through efficient patterns
 - Use optimal mocking strategies for external dependencies
 - Eliminate unnecessary async operations
 
 **Type Safety Excellence & Mock Data Consistency:**
+
 - Implement type-safe mocking with `vi.importActual`
 - Ensure mock types perfectly match real implementations
 - Validate business logic contracts through testing
@@ -1054,12 +1101,14 @@ describe("Performance validation", () => {
 - Ensure predictable mock data across all unit tests for better debugging
 
 **Component Testing Mastery:**
+
 - Test user interaction patterns comprehensively
 - Verify permission-based rendering scenarios
 - Ensure accessibility compliance through semantic queries
 - Use React Testing Library best practices
 
 **Business Logic Validation:**
+
 - Test pure functions with comprehensive edge cases
 - Validate data transformation accuracy
 - Ensure validation logic covers all scenarios

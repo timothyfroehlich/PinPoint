@@ -29,6 +29,7 @@
     "src/integration-tests/**/*.tsx",
     "e2e/**/*.ts",
     "e2e/**/*.tsx",
-    "src/test/setup/**/*.ts"
+    "src/test/setup/**/*.ts",
+    "src/test/examples/**/*.ts"
   ]
 }

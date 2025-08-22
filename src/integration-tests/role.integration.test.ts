@@ -107,15 +107,8 @@ describe("Role Router Integration Tests (PGlite)", () => {
       workerDb,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        // Create a new organization with no roles
-        const newOrgId = generateTestId("empty-org");
-        await db.insert(schema.organizations).values({
-          id: newOrgId,
-          name: "Empty Organization",
-          subdomain: generateTestId("empty-org-sub"),
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
+        // Use seeded competitor organization (should have minimal role setup)
+        const newOrgId = SEED_TEST_IDS.ORGANIZATIONS.competitor;
 
         const { context } = await createSeededAdminTestContext(
           db,
@@ -322,15 +315,8 @@ describe("Role Router Integration Tests (PGlite)", () => {
         expect(result.organizationId).toBe(primaryOrgId);
 
         // Verify role is not visible from other organization
-        // Create other organization and membership for the user
-        const otherOrgId = "other-org-test";
-        await db.insert(schema.organizations).values({
-          id: otherOrgId,
-          name: "Other Org",
-          subdomain: "other",
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
+        // Use seeded competitor organization for cross-org testing
+        const otherOrgId = SEED_TEST_IDS.ORGANIZATIONS.competitor;
 
         // Create admin role in other org
         const [otherAdminRole] = await db
@@ -696,15 +682,8 @@ describe("Role Router Integration Tests (PGlite)", () => {
         const testRole = await caller.create({ name: "Scoped Role" });
 
         // Try to access from different organization
-        // Create other organization and membership for the user
-        const otherOrgId = "other-org-get-test";
-        await db.insert(schema.organizations).values({
-          id: otherOrgId,
-          name: "Other Org",
-          subdomain: "other",
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
+        // Use seeded competitor organization for cross-org testing
+        const otherOrgId = SEED_TEST_IDS.ORGANIZATIONS.competitor;
 
         // Create admin role in other org
         const [otherAdminRole] = await db

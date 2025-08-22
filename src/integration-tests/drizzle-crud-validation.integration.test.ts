@@ -12,6 +12,7 @@ import { eq, and, sql } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
 import * as schema from "~/server/db/schema";
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 import { generateTestId } from "~/test/helpers/test-id-generator";
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
 
@@ -41,6 +42,16 @@ describe("Drizzle CRUD Operations (Integration)", () => {
 
     test("should insert an organization successfully", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
+        // Verify that seeded organization exists and test insertion with new org
+        const seededOrg = await db.query.organizations.findFirst({
+          where: eq(
+            schema.organizations.id,
+            SEED_TEST_IDS.ORGANIZATIONS.primary,
+          ),
+        });
+        expect(seededOrg).toBeDefined();
+
+        // Test new organization insertion
         const testOrgId = generateTestId("org");
         const [org] = await db
           .insert(schema.organizations)
@@ -171,6 +182,8 @@ describe("Drizzle CRUD Operations (Integration)", () => {
         const testUserId = generateTestId("user");
         const selectTestEmail = `select-test-${generateTestId("email")}@example.com`;
 
+        // NOTE: This test creates users to test CRUD operations and database functionality
+        // This is legitimate user creation for testing database operations, not organizational data
         // Setup test data
         await db.insert(schema.users).values({
           id: testUserId,
@@ -313,6 +326,8 @@ describe("Drizzle CRUD Operations (Integration)", () => {
         const testUserId = generateTestId("user");
         const updateTestEmail = `update-test-${generateTestId("email")}@example.com`;
 
+        // NOTE: This test creates users to test CRUD operations and database functionality
+        // This is legitimate user creation for testing database operations, not organizational data
         await db.insert(schema.users).values({
           id: testUserId,
           email: updateTestEmail,
@@ -382,6 +397,8 @@ describe("Drizzle CRUD Operations (Integration)", () => {
       await withIsolatedTest(workerDb, async (db) => {
         const testUserId = generateTestId("user");
 
+        // NOTE: This test creates users to test CRUD operations and database functionality
+        // This is legitimate user creation for testing database operations, not organizational data
         await db.insert(schema.users).values({
           id: testUserId,
           email: `delete-test-${generateTestId("email")}@example.com`,

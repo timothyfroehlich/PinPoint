@@ -5,7 +5,7 @@
  * Consolidates the common code from the old seed files.
  */
 
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, sql } from "drizzle-orm";
 
 // Quiet mode for tests
 const isTestMode = process.env.NODE_ENV === "test" || process.env.VITEST;
@@ -250,49 +250,33 @@ async function createOrganizationWithRolesWithDb(
     logoUrl?: string;
   },
 ): Promise<Organization> {
-  // Check if organization exists
-  const existing = await dbInstance
-    .select()
-    .from(organizations)
-    .where(eq(organizations.subdomain, orgData.subdomain))
-    .limit(1);
+  // Upsert organization with deterministic ID
+  const result = await dbInstance
+    .insert(organizations)
+    .values({
+      id: orgData.id ?? `org-fallback-${orgData.subdomain}`,
+      name: orgData.name,
+      subdomain: orgData.subdomain,
+      logoUrl: orgData.logoUrl,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: organizations.subdomain,
+      set: {
+        id: orgData.id ?? `org-fallback-${orgData.subdomain}`, // Ensure deterministic ID is set on update too
+        name: orgData.name,
+        logoUrl: orgData.logoUrl,
+        updatedAt: new Date(),
+      },
+    })
+    .returning();
 
-  let organization;
-  if (existing.length > 0) {
-    // Update existing organization
-    const updated = await dbInstance
-      .update(organizations)
-      .set({
-        name: orgData.name,
-        logoUrl: orgData.logoUrl,
-        updatedAt: new Date(),
-      })
-      .where(eq(organizations.subdomain, orgData.subdomain))
-      .returning();
-    organization =
-      updated[0] ??
-      (() => {
-        throw new Error("Failed to update organization");
-      })();
-  } else {
-    // Create new organization
-    const created = await dbInstance
-      .insert(organizations)
-      .values({
-        id: orgData.id ?? `org-fallback-${orgData.subdomain}`,
-        name: orgData.name,
-        subdomain: orgData.subdomain,
-        logoUrl: orgData.logoUrl,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .returning();
-    organization =
-      created[0] ??
-      (() => {
-        throw new Error("Failed to create organization");
-      })();
-  }
+  const organization =
+    result[0] ??
+    (() => {
+      throw new Error("Failed to upsert organization");
+    })();
 
   // Create system roles directly with Drizzle
   await createSystemRolesWithDb(dbInstance, organization.id);
@@ -897,21 +881,10 @@ async function createDefaultLocationWithDb(
   dbInstance: typeof db,
   organizationId: string,
 ): Promise<void> {
-  // Check if location exists
-  const existing = await dbInstance
-    .select()
-    .from(locations)
-    .where(
-      and(
-        eq(locations.name, "Austin Pinball Collective"),
-        eq(locations.organizationId, organizationId),
-      ),
-    )
-    .limit(1);
-
-  if (existing.length === 0) {
-    // Create new location
-    await dbInstance.insert(locations).values({
+  // Upsert location to ensure deterministic ID
+  await dbInstance
+    .insert(locations)
+    .values({
       id: getDefaultLocationId(organizationId),
       name: "Austin Pinball Collective",
       street: "8777 Research Blvd",
@@ -919,13 +892,21 @@ async function createDefaultLocationWithDb(
       state: "TX",
       zip: "78758",
       organizationId,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: locations.id,
+      set: {
+        name: sql.raw(`excluded.name`),
+        street: sql.raw(`excluded.street`),
+        city: sql.raw(`excluded.city`),
+        state: sql.raw(`excluded.state`),
+        zip: sql.raw(`excluded.zip`),
+        updatedAt: new Date(),
+      },
     });
-    log("[INFRASTRUCTURE] Created default location: Austin Pinball Collective");
-  } else {
-    log(
-      "[INFRASTRUCTURE] Default location already exists: Austin Pinball Collective",
-    );
-  }
+  log("[INFRASTRUCTURE] Upserted default location: Austin Pinball Collective");
 }
 
 /**

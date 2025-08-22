@@ -440,15 +440,8 @@ describe("Location Router CRUD Operations (PGlite)", () => {
         );
         const caller = locationRouter.createCaller(context);
 
-        // Create location in another org
-        const otherOrgId = "other-org-getbyid";
-        await db.insert(schema.organizations).values({
-          id: otherOrgId,
-          name: "Other Organization",
-          subdomain: "other-org",
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
+        // Use seeded competitor organization for cross-org testing
+        const otherOrgId = SEED_TEST_IDS.ORGANIZATIONS.competitor;
 
         const otherLocationId = "other-location-getbyid";
         await db.insert(schema.locations).values({

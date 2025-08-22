@@ -201,6 +201,16 @@ export const SEED_TEST_IDS = {
     NOT_REPRODUCIBLE_COMPETITOR: "status-not-reproducible-competitor-001",
   },
 
+  /** Static membership IDs used by seed data */
+  MEMBERSHIPS: {
+    ADMIN_PRIMARY: "membership-admin-primary-001",
+    MEMBER1_PRIMARY: "membership-member1-primary-001",
+    MEMBER2_PRIMARY: "membership-member2-primary-001",
+    ADMIN_COMPETITOR: "membership-admin-competitor-001",
+    MEMBER1_COMPETITOR: "membership-member1-competitor-001",
+    MEMBER2_COMPETITOR: "membership-member2-competitor-001",
+  },
+
   /** Static location IDs used in minimal seed data */
   LOCATIONS: {
     MAIN_FLOOR: "location-main-floor-001",

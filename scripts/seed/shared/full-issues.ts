@@ -1,5 +1,5 @@
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
-import minimalIssues, { MinimalIssue } from "./minimal-issues";
+import minimalIssues, { type MinimalIssue } from "./minimal-issues";
 
 // Helper mappers and assumptions
 const mapSeverityToPriority = (severity?: string) => {
@@ -84,7 +84,7 @@ const knownMachineByTitle = (title?: string, opdb?: string) => {
 };
 
 // Source data converted from scripts/seed/shared/sample-issues.json
-const sampleData: Array<Record<string, any>> = [
+const sampleData: Record<string, any>[] = [
   {
     title: "Kaiju figures on left ramp are not responding",
     description: "Kaiju figures on left ramp are not responding",
@@ -373,6 +373,6 @@ if (!Array.isArray(minimalIssues) || !minimalIssues.every(isMinimalIssue)) {
   );
 }
 
-export const allIssues: MinimalIssue[] = [...minimalIssues, ...otherIssues];
+export const fullIssues: MinimalIssue[] = [...minimalIssues, ...otherIssues];
 
-export default allIssues;
+export default fullIssues;

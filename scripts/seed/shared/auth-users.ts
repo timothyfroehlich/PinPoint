@@ -26,21 +26,20 @@ function getMembershipId(email: string, organizationId: string): string {
 
   // Map test user emails to membership IDs
   switch (email) {
-    case "admin@dev.local":
+    case "tim@example.com":
       return isPrimary
         ? SEED_TEST_IDS.MEMBERSHIPS.ADMIN_PRIMARY
         : SEED_TEST_IDS.MEMBERSHIPS.ADMIN_COMPETITOR;
-    case "member@dev.local":
+    case "harry@example.com":
       return isPrimary
         ? SEED_TEST_IDS.MEMBERSHIPS.MEMBER1_PRIMARY
         : SEED_TEST_IDS.MEMBERSHIPS.MEMBER1_COMPETITOR;
-    case "player@dev.local":
+    case "escher@example.com":
       return isPrimary
         ? SEED_TEST_IDS.MEMBERSHIPS.MEMBER2_PRIMARY
         : SEED_TEST_IDS.MEMBERSHIPS.MEMBER2_COMPETITOR;
     default:
-      // For other users (pinball personalities), generate a dynamic ID
-      // This maintains compatibility while using static IDs for test users
+      // For other users, generate a dynamic ID
       return nanoid();
   }
 }
@@ -59,50 +58,23 @@ type SeedTarget = "local:pg" | "local:sb" | "preview";
  * Consistent across development, preview, and production
  */
 const STANDARD_USERS: UserData[] = [
-  // Dev Users (3) - for development and testing
   {
-    name: "Dev Admin",
-    email: "admin@dev.local",
+    name: "Tim Froehlich",
+    email: "tim@example.com",
     role: "Admin",
-    bio: "Development admin test account.",
+    bio: "Admin user for testing.",
   },
   {
-    name: "Dev Member",
-    email: "member@dev.local",
+    name: "Harry Williams",
+    email: "harry@example.com",
     role: "Member",
-    bio: "Development member test account.",
+    bio: "Member user for testing.",
   },
   {
-    name: "Dev Player",
-    email: "player@dev.local",
+    name: "Escher Lefkoff",
+    email: "escher@example.com",
     role: "Member",
-    bio: "Development player test account.",
-  },
-
-  // Pinball Personalities (4) - industry figures for realistic data
-  {
-    name: "Roger Sharpe",
-    email: "roger.sharpe@pinpoint.dev",
-    role: "Admin",
-    bio: "Pinball ambassador and historian.",
-  },
-  {
-    name: "Gary Stern",
-    email: "gary.stern@pinpoint.dev",
-    role: "Member",
-    bio: "Founder of Stern Pinball.",
-  },
-  {
-    name: "Steve Ritchie",
-    email: "steve.ritchie@pinpoint.dev",
-    role: "Member",
-    bio: "Legendary pinball designer.",
-  },
-  {
-    name: "Keith Elwin",
-    email: "keith.elwin@pinpoint.dev",
-    role: "Member",
-    bio: "Modern pinball design innovator.",
+    bio: "Member user for testing.",
   },
 ];
 
@@ -297,6 +269,15 @@ async function processBatchUsers(
     };
   }
 
+  const expectedEmails = userList.map((u) => u.email);
+  const existingEmails = expectedEmails.filter((email) =>
+    existingUsers.has(email),
+  );
+
+  console.log(
+    `[AUTH] Processing ${expectedEmails.length} users (${existingEmails.length} existing, ${expectedEmails.length - existingEmails.length} to create)`,
+  );
+
   // Get existing database users and memberships in batch
   const existingDbUsers = await db
     .select({ id: users.id, email: users.email })
@@ -425,6 +406,12 @@ async function processBatchUsers(
       console.log(
         `[AUTH] ✅ Created ${membershipsToCreate.length.toString()} memberships via batch insert`,
       );
+      console.log(
+        `[AUTH] ✅ Verified: Created exactly ${STANDARD_USERS.length} users as expected`,
+      );
+      console.log(
+        `[AUTH] 📊 User emails: ${STANDARD_USERS.map((u) => u.email).join(", ")}`,
+      );
     } catch (error) {
       console.error(`[AUTH] ❌ Failed to batch create memberships:`, error);
       errorCount += membershipsToCreate.length;
@@ -503,6 +490,124 @@ async function deleteExistingDevUsers(userList: UserData[]): Promise<void> {
 }
 
 /**
+ * Create users directly in database for PostgreSQL-only mode
+ * Used when Supabase Auth API is not available (local:pg mode)
+ */
+async function createUsersDirectly(
+  userList: UserData[],
+  organizationId: string,
+): Promise<void> {
+  console.log(
+    `[AUTH] Creating ${userList.length} users directly in database...`,
+  );
+
+  // Create users directly in the users table
+  const usersToCreate = userList.map((userData, index) => {
+    let userId: string;
+    // Map emails to SEED_TEST_IDS
+    switch (userData.email) {
+      case "tim@example.com":
+        userId = SEED_TEST_IDS.USERS.ADMIN;
+        break;
+      case "harry@example.com":
+        userId = SEED_TEST_IDS.USERS.MEMBER1;
+        break;
+      case "escher@example.com":
+        userId = SEED_TEST_IDS.USERS.MEMBER2;
+        break;
+      default:
+        userId = nanoid(); // Fallback for any other users
+    }
+
+    return {
+      id: userId,
+      email: userData.email,
+      name: userData.name,
+      bio: userData.bio,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+  });
+
+  try {
+    await db.insert(users).values(usersToCreate).onConflictDoNothing();
+    console.log(
+      `[AUTH] ✅ Created ${usersToCreate.length} users directly in database`,
+    );
+    console.log(
+      `[AUTH] ✅ Verified: Created exactly ${STANDARD_USERS.length} users as expected`,
+    );
+    console.log(
+      `[AUTH] 📊 User emails: ${STANDARD_USERS.map((u) => u.email).join(", ")}`,
+    );
+  } catch (error) {
+    console.error(`[AUTH] ❌ Failed to create users directly:`, error);
+    throw error;
+  }
+
+  // Create memberships for the users
+  const membershipsToCreate: {
+    id: string;
+    userId: string;
+    organizationId: string;
+    roleId: string;
+  }[] = [];
+  for (const userData of userList) {
+    // Find the role for membership
+    const roleResults = await db
+      .select({ id: roles.id })
+      .from(roles)
+      .where(
+        and(
+          eq(roles.name, userData.role),
+          eq(roles.organizationId, organizationId),
+        ),
+      )
+      .limit(1);
+
+    if (roleResults.length > 0 && roleResults[0]) {
+      // Get the correct user ID for this email
+      let userId: string;
+      switch (userData.email) {
+        case "tim@example.com":
+          userId = SEED_TEST_IDS.USERS.ADMIN;
+          break;
+        case "harry@example.com":
+          userId = SEED_TEST_IDS.USERS.MEMBER1;
+          break;
+        case "escher@example.com":
+          userId = SEED_TEST_IDS.USERS.MEMBER2;
+          break;
+        default:
+          userId = nanoid(); // Fallback
+      }
+
+      membershipsToCreate.push({
+        id: getMembershipId(userData.email, organizationId),
+        userId: userId,
+        organizationId,
+        roleId: roleResults[0].id,
+      });
+    }
+  }
+
+  if (membershipsToCreate.length > 0) {
+    try {
+      await db
+        .insert(memberships)
+        .values(membershipsToCreate)
+        .onConflictDoNothing();
+      console.log(
+        `[AUTH] ✅ Created ${membershipsToCreate.length} memberships directly in database`,
+      );
+    } catch (error) {
+      console.error(`[AUTH] ❌ Failed to create memberships directly:`, error);
+      throw error;
+    }
+  }
+}
+
+/**
  * Main auth users seeding function
  */
 export async function seedAuthUsers(
@@ -516,6 +621,25 @@ export async function seedAuthUsers(
   );
 
   try {
+    if (target === "local:pg") {
+      // PostgreSQL-only mode: create users directly in database
+      console.log(
+        "[AUTH] 🔒 LOCAL:PG MODE: Creating users directly in database (no Supabase Auth)",
+      );
+      await createUsersDirectly(users, organizationId);
+
+      // Report results
+      const duration = Date.now() - startTime;
+      console.log(
+        `[AUTH] ✅ Auth user seeding complete: ${users.length} users created directly in ${duration}ms`,
+      );
+      console.log(
+        `[AUTH] 📊 Both local:pg and local:sb modes create identical user data`,
+      );
+      return;
+    }
+
+    // Supabase modes: use Auth API
     // PREVIEW: Aggressive reset for clean demos
     // LOCAL/OTHER: Preserve existing users for safety
     if (target === "preview") {
@@ -552,11 +676,13 @@ export async function seedAuthUsers(
       }
     }
 
-    console.log("[AUTH] 🔑 Development Login Credentials:");
-    console.log("[AUTH]   Password: dev-login-123 (for all dev users)");
-    console.log(
-      "[AUTH]   Compatible with existing dev login panel - one-click login preserved",
-    );
+    if (target !== ("local:pg" as any)) {
+      console.log("[AUTH] 🔑 Development Login Credentials:");
+      console.log("[AUTH]   Password: dev-login-123 (for all dev users)");
+      console.log(
+        "[AUTH]   Compatible with existing dev login panel - one-click login preserved",
+      );
+    }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error(`[AUTH] ❌ Auth user seeding failed: ${errorMessage}`);

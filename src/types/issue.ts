@@ -42,7 +42,7 @@ export interface Machine {
   id: string;
   name: string;
   serialNumber?: string | null;
-  qrCodeId: string;
+  qrCodeId: string | null;
   model: Model;
   location: Location;
 }

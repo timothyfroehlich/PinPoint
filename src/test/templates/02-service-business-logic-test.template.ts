@@ -47,14 +47,12 @@ describe("YourService Business Logic", () => {
 
   test("creates resource with correct business logic", async ({ workerDb }) => {
     await withBusinessLogicTest(workerDb, async (db) => {
-      // ARRANGE: Set up test data (direct creation - RLS bypassed)
-      const [org] = await db
-        .insert(schema.organizations)
-        .values({
-          id: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
-          name: "Service Test Organization",
-        })
-        .returning();
+      // ARRANGE: Use seeded organization for service tests (RLS bypassed)
+      const orgId = SEED_TEST_IDS.ORGANIZATIONS.primary;
+      const org = await db.query.organizations.findFirst({
+        where: eq(schema.organizations.id, orgId),
+      });
+      expect(org).toBeDefined();
 
       const [user] = await db
         .insert(schema.users)
@@ -319,13 +317,12 @@ describe("YourService Business Logic", () => {
 // =============================================================================
 
 async function createTestData(db: any) {
-  const [org] = await db
-    .insert(schema.organizations)
-    .values({
-      id: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
-      name: "Service Test Org",
-    })
-    .returning();
+  // Use seeded organization for helper functions
+  const orgId = SEED_TEST_IDS.ORGANIZATIONS.primary;
+  const org = await db.query.organizations.findFirst({
+    where: eq(schema.organizations.id, orgId),
+  });
+  if (!org) throw new Error("Seeded organization not found");
 
   const [user] = await db
     .insert(schema.users)

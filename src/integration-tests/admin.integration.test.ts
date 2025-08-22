@@ -67,6 +67,8 @@ vi.mock("~/lib/utils/membership-transformers", () => ({
 }));
 
 describe("Admin Router Integration (PGlite)", () => {
+  // NOTE: This test suite expects seeded data (3 users from SEED_TEST_IDS)
+  // User creation in inviteUser/removeUser tests is legitimate for testing user management functionality
   // Suite-level variables for seeded data
   let workerDb: TestDatabase;
 
@@ -89,13 +91,13 @@ describe("Admin Router Integration (PGlite)", () => {
 
         const result = await caller.getUsers();
 
-        // Expect 8 users from seeded data (seeded data provides 8 users total)
-        expect(result).toHaveLength(8);
+        // Expect 3 users from minimal seed data (SEED_TEST_IDS.USERS: admin, member1, member2)
+        expect(result).toHaveLength(3);
 
         // Check that seeded users are included
         const emails = result.map((member) => member.email);
-        expect(emails).toContain("admin@dev.local");
-        expect(emails).toContain("member@dev.local");
+        expect(emails).toContain("tim@example.com");
+        expect(emails).toContain("harry@example.com");
 
         // Verify all are from same organization
         result.forEach((member) => {
@@ -119,8 +121,8 @@ describe("Admin Router Integration (PGlite)", () => {
 
         const result = await caller.getUsers();
 
-        // Should only see users from competitor organization (8 users)
-        expect(result).toHaveLength(8);
+        // Should only see users from competitor organization (3 users)
+        expect(result).toHaveLength(3);
 
         // Verify users are scoped to competitor organization - none should be from primary org
         result.forEach((member) => {

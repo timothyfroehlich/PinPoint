@@ -6,9 +6,10 @@
  * Eliminates environment detection complexity in favor of explicit commands.
  *
  * Usage:
- *   tsx scripts/seed/index.ts local:pg    # PostgreSQL-only (CI tests)
- *   tsx scripts/seed/index.ts local:sb    # Local Supabase (development)
- *   tsx scripts/seed/index.ts preview     # Remote preview environment
+ *   tsx scripts/seed/index.ts local:pg minimal    # PostgreSQL-only (CI tests)
+ *   tsx scripts/seed/index.ts local:sb minimal    # Local Supabase (development)
+ *   tsx scripts/seed/index.ts local:sb full       # Local Supabase with full dataset
+ *   tsx scripts/seed/index.ts preview full        # Remote preview environment
  */
 
 // Load development environment variables for standalone script execution
@@ -20,6 +21,7 @@ import { seedAuthUsers } from "./shared/auth-users";
 import { seedSampleData } from "./shared/sample-data";
 
 type SeedTarget = "local:pg" | "local:sb" | "preview";
+type DataAmount = "minimal" | "full";
 
 /**
  * Get environment type using official detection logic
@@ -39,9 +41,17 @@ function validateTarget(target: string): target is SeedTarget {
 }
 
 /**
+ * Validate data amount parameter
+ */
+function validateDataAmount(dataAmount: string): dataAmount is DataAmount {
+  const validAmounts: DataAmount[] = ["minimal", "full"];
+  return validAmounts.includes(dataAmount as DataAmount);
+}
+
+/**
  * Validate environment-specific requirements
  */
-function validateEnvironment(target: SeedTarget): void {
+function validateEnvironment(target: SeedTarget, dataAmount: DataAmount): void {
   // Only validate preview environment (needs remote Supabase URL)
   if (target === "preview") {
     const supabaseUrl = process.env["SUPABASE_URL"];
@@ -54,10 +64,11 @@ function validateEnvironment(target: SeedTarget): void {
 
   // Local targets require no validation - errors will surface naturally
   console.log(`[SEED] Target: ${target.toUpperCase()}`);
-  console.log(`[SEED] Auth users: ${target === "local:pg" ? "NO" : "YES"}`);
+  console.log(`[SEED] Data Amount: ${dataAmount.toUpperCase()}`);
   console.log(
-    `[SEED] Sample data: ${target === "preview" ? "FULL" : "MINIMAL"}`,
+    `[SEED] Auth users: YES (${target === "local:pg" ? "direct DB" : "Supabase Auth"})`,
   );
+  console.log(`[SEED] Sample data: ${dataAmount.toUpperCase()}`);
 }
 
 /**
@@ -68,17 +79,34 @@ async function main(): Promise<void> {
   console.log("[SEED] 🌱 Starting explicit database seeding...");
 
   try {
-    // 1. Validate target parameter
+    // 1. Validate target and data amount parameters
     const target = process.argv[2];
-    if (!target || !validateTarget(target)) {
-      console.error(
-        "Usage: tsx scripts/seed/index.ts <local:pg|local:sb|preview>",
-      );
+    const dataAmount = process.argv[3];
+
+    if (
+      !target ||
+      !validateTarget(target) ||
+      !dataAmount ||
+      !validateDataAmount(dataAmount)
+    ) {
+      console.error("Usage: tsx scripts/seed/index.ts <target> <dataAmount>");
       console.error("");
       console.error("Targets:");
       console.error("  local:pg  - PostgreSQL-only seeding for CI tests");
       console.error("  local:sb  - Local Supabase seeding for development");
       console.error("  preview   - Remote preview environment seeding");
+      console.error("");
+      console.error("Data Amounts:");
+      console.error(
+        "  minimal   - Basic test data (3 users, 6 machines, 10 issues)",
+      );
+      console.error(
+        "  full      - Complete sample data (3 users, 60+ machines, 200+ issues)",
+      );
+      console.error("");
+      console.error("Examples:");
+      console.error("  tsx scripts/seed/index.ts local:sb minimal");
+      console.error("  tsx scripts/seed/index.ts preview full");
       process.exit(1);
     }
 
@@ -89,6 +117,7 @@ async function main(): Promise<void> {
     console.log("\n[DEBUG] 🔍 Environment Detection Debug Info:");
     console.log(`[DEBUG] Command line args: ${process.argv.join(" ")}`);
     console.log(`[DEBUG] Requested target: ${target}`);
+    console.log(`[DEBUG] Requested data amount: ${dataAmount}`);
     console.log(`[DEBUG] Official environment: ${officialEnv}`);
     console.log(`[DEBUG] NODE_ENV: ${process.env["NODE_ENV"] || "not-set"}`);
     console.log(
@@ -141,38 +170,27 @@ async function main(): Promise<void> {
     }
 
     // 4. Environment validation
-    validateEnvironment(target);
+    validateEnvironment(target, dataAmount);
 
     // 3. Infrastructure seeding (dual organizations, permissions, roles, statuses)
     console.log("\n[SEED] 🏗️  Step 1: Infrastructure");
     const organizations = await seedInfrastructure();
 
     // 4 & 5. Auth users and Sample data seeding sequentially (dependencies)
-    if (target !== "local:pg") {
-      console.log(
-        "\n[SEED] 👥🎮 Step 2 & 3: Auth Users + Sample Data (sequential for dependencies)",
-      );
-      const dataAmount = target === "preview" ? "full" : "minimal";
+    console.log(
+      "\n[SEED] 👥🎮 Step 2 & 3: Auth Users + Sample Data (sequential for dependencies)",
+    );
 
-      try {
-        // First, create auth users (required for sample data user references)
-        await seedAuthUsers(organizations.primary.id, target);
-        // Then create sample data (depends on users existing)
-        await seedSampleData(organizations.primary.id, dataAmount);
-        console.log("[SEED] ✅ Sequential processing completed successfully");
-      } catch (error) {
-        console.error("[SEED] ❌ Sequential processing failed:", error);
-        throw error;
-      }
-    } else {
-      console.log(
-        "\n[SEED] ⏭️  Step 2: Auth Users (SKIPPED for PostgreSQL-only)",
-      );
-
-      // 5. Sample data seeding only
-      console.log("\n[SEED] 🎮 Step 3: Sample Data");
-      const dataAmount = "minimal"; // PostgreSQL-only always uses minimal
-      await seedSampleData(organizations.primary.id, dataAmount, true); // Skip auth users for PostgreSQL-only
+    try {
+      // First, create auth users (required for sample data user references)
+      // All modes now create users: local:pg uses direct DB, others use Supabase Auth
+      await seedAuthUsers(organizations.primary.id, target);
+      // Then create sample data (depends on users existing)
+      await seedSampleData(organizations.primary.id, dataAmount, false); // All modes have users now
+      console.log("[SEED] ✅ Sequential processing completed successfully");
+    } catch (error) {
+      console.error("[SEED] ❌ Sequential processing failed:", error);
+      throw error;
     }
 
     // 6. Success summary
@@ -190,20 +208,38 @@ async function main(): Promise<void> {
       `   Secondary Organization: ${organizations.secondary.name} (${organizations.secondary.subdomain})`,
     );
     console.log(
-      `   Auth Users: ${target === "local:pg" ? "Skipped" : "Created"}`,
+      `   Auth Users: Created (${target === "local:pg" ? "direct DB" : "Supabase Auth"})`,
     );
-    const dataAmount = target === "preview" ? "full" : "minimal";
     console.log(
-      `   Sample Data: ${dataAmount === "full" ? "Full dataset" : "Minimal dataset"}`,
+      `   Sample Data: ${dataAmount === "full" ? "Full dataset (60+ machines, 200+ issues)" : "Minimal dataset (6 machines, 10 issues)"}`,
+    );
+    console.log(
+      `   Behavior: Upsert-based (idempotent) - always creates complete dataset`,
     );
 
-    if (target !== "local:pg") {
-      console.log("");
-      console.log("🧪 Development Credentials:");
-      console.log("   Admin: admin@dev.local");
-      console.log("   Member: member@dev.local");
-      console.log("   Player: player@dev.local");
+    console.log("");
+    console.log("🧪 Development Credentials:");
+    if (target === "local:pg") {
+      console.log("   Admin: tim@example.com (direct DB user)");
+      console.log("   Member1: harry@example.com (direct DB user)");
+      console.log("   Member2: escher@example.com (direct DB user)");
+    } else {
+      console.log("   Admin: tim@example.com");
+      console.log("   Member1: harry@example.com");
+      console.log("   Member2: escher@example.com");
       console.log("   Password: dev-login-123 (for all dev users)");
+    }
+
+    console.log("");
+    console.log("📊 Data Summary (both modes create identical counts):");
+    if (dataAmount === "minimal") {
+      console.log("   Users: 3 (tim, harry, escher)");
+      console.log("   Organizations: 2 (primary, competitor)");
+      console.log("   Machines: 6 primary + 1 competitor = 7 total");
+      console.log("   Issues: 10 (minimal dataset)");
+      console.log(
+        "   Only difference: User creation method (direct DB vs Supabase Auth)",
+      );
     }
   } catch (error) {
     console.error(

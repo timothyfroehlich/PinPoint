@@ -203,171 +203,8 @@ async function configureForBusinessLogicTesting(
   }
 }
 
-/**
- * Create minimal test users for PostgreSQL-only mode (GLOBAL - called once)
- * Users are global entities that get linked to organizations via memberships
- */
-async function createMinimalUsersForTesting(db: TestDatabase): Promise<void> {
-  // Create users that match the sample data expectations for PostgreSQL-only mode
-  const testUsers = [
-    // Dev users for testing
-    {
-      id: "test-user-admin",
-      email: "admin@dev.local",
-      name: "Dev Admin",
-      profilePicture: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: "test-user-member",
-      email: "member@dev.local",
-      name: "Dev Member",
-      profilePicture: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: "test-user-player",
-      email: "player@dev.local",
-      name: "Dev Player",
-      profilePicture: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    // Pinball personalities that sample data references
-    {
-      id: "test-user-roger",
-      email: "roger.sharpe@pinpoint.dev",
-      name: "Roger Sharpe",
-      profilePicture: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: "test-user-gary",
-      email: "gary.stern@pinpoint.dev",
-      name: "Gary Stern",
-      profilePicture: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: "test-user-harry",
-      email: "harry.williams@pinpoint.dev",
-      name: "Harry Williams",
-      profilePicture: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: "test-user-escher",
-      email: "escher.lefkoff@pinpoint.dev",
-      name: "Escher Lefkoff",
-      profilePicture: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: "test-user-tim",
-      email: "timfroehlich@pinpoint.dev",
-      name: "Tim Froehlich",
-      profilePicture: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-  ];
-
-  await db.insert(schema.users).values(testUsers);
-
-  if (!process.env.VITEST) {
-    console.log("[TEST] Created minimal users for PostgreSQL-only testing");
-  }
-}
-
-/**
- * Create memberships linking global users to a specific organization
- * Called once per organization to create the user-org relationships
- */
-async function createMembershipsForOrganization(
-  db: TestDatabase,
-  organizationId: string,
-  orgSuffix: string, // "primary" or "secondary" for unique membership IDs
-): Promise<void> {
-  // Get roles for this organization
-  const adminRole = await db.query.roles.findFirst({
-    where: and(
-      eq(schema.roles.organizationId, organizationId),
-      eq(schema.roles.name, "Admin"),
-    ),
-  });
-
-  const memberRole = await db.query.roles.findFirst({
-    where: and(
-      eq(schema.roles.organizationId, organizationId),
-      eq(schema.roles.name, "Member"),
-    ),
-  });
-
-  if (adminRole && memberRole) {
-    await db.insert(schema.memberships).values([
-      {
-        id: `test-membership-admin-${orgSuffix}`,
-        userId: "test-user-admin",
-        organizationId,
-        roleId: adminRole.id,
-      },
-      {
-        id: `test-membership-member-${orgSuffix}`,
-        userId: "test-user-member",
-        organizationId,
-        roleId: memberRole.id,
-      },
-      {
-        id: `test-membership-player-${orgSuffix}`,
-        userId: "test-user-player",
-        organizationId,
-        roleId: memberRole.id,
-      },
-      {
-        id: `test-membership-roger-${orgSuffix}`,
-        userId: "test-user-roger",
-        organizationId,
-        roleId: adminRole.id,
-      },
-      {
-        id: `test-membership-gary-${orgSuffix}`,
-        userId: "test-user-gary",
-        organizationId,
-        roleId: memberRole.id,
-      },
-      {
-        id: `test-membership-harry-${orgSuffix}`,
-        userId: "test-user-harry",
-        organizationId,
-        roleId: memberRole.id,
-      },
-      {
-        id: `test-membership-escher-${orgSuffix}`,
-        userId: "test-user-escher",
-        organizationId,
-        roleId: memberRole.id,
-      },
-      {
-        id: `test-membership-tim-${orgSuffix}`,
-        userId: "test-user-tim",
-        organizationId,
-        roleId: adminRole.id, // Make Tim an admin
-      },
-    ]);
-
-    if (!process.env.VITEST) {
-      console.log(
-        `[TEST] Created memberships for ${orgSuffix} organization (${organizationId})`,
-      );
-    }
-  }
-}
+// Removed: createMembershipsForOrganization function
+// Users and memberships are now created by the seed scripts instead of test helpers
 
 /**
  * Create a clean test database with infrastructure only (no sample data)
@@ -389,9 +226,7 @@ export async function createCleanTestDatabase(): Promise<{
   // Seed infrastructure (dual organizations, permissions, roles, statuses)
   const organizations = await seedInfrastructureWithDb(db);
 
-  // Create minimal users for PostgreSQL-only mode in both orgs
-  await createMinimalUsersForTesting(db, organizations.primary.id);
-  await createMinimalUsersForTesting(db, organizations.secondary.id);
+  // Note: Users and memberships now created by seed scripts
 
   // NOTE: No sample data seeding - tests create their own precise data
 
@@ -426,20 +261,7 @@ export async function createSeededTestDatabase(): Promise<{
   // Seed infrastructure (dual organizations, permissions, roles, statuses)
   const organizations = await seedInfrastructureWithDb(db);
 
-  // Create minimal users for PostgreSQL-only mode (ONCE - users are global)
-  await createMinimalUsersForTesting(db);
-
-  // Create memberships linking users to both organizations
-  await createMembershipsForOrganization(
-    db,
-    organizations.primary.id,
-    "primary",
-  );
-  await createMembershipsForOrganization(
-    db,
-    organizations.secondary.id,
-    "secondary",
-  );
+  // Note: Users and memberships now created by seed scripts
 
   // Seed sample data in primary org with minimal dataset
   await seedSampleDataWithDb(db, organizations.primary.id, "minimal", false);

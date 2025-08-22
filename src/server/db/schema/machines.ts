@@ -52,7 +52,7 @@ export const locations = pgTable(
 export const models = pgTable("models", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
-  organizationId: text("organizationId").default(null), // NULL for OPDB (global), set for custom (org-scoped)
+  organizationId: text("organizationId"), // NULL for OPDB (global), set for custom (org-scoped)
   manufacturer: text("manufacturer"),
   year: integer("year"),
 
@@ -78,7 +78,6 @@ export const models = pgTable("models", {
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
-
 // Replaces GameInstance
 export const machines = pgTable(
   "machines",
@@ -101,7 +100,7 @@ export const machines = pgTable(
       .notNull(), // Notify when issue status changes
     notifyOnComments: boolean("notifyOnComments").default(false).notNull(), // Notify on new comments
 
-    // QR Code system  
+    // QR Code system
     qrCodeId: text("qrCodeId").unique(),
     qrCodeUrl: text("qrCodeUrl"),
     qrCodeGeneratedAt: timestamp("qrCodeGeneratedAt"),
