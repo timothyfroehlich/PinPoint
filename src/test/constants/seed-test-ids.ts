@@ -32,10 +32,10 @@
  * const mockContext = { organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION };
  * ```
  *
- * **Integration Tests**: Use getSeededTestData() for dynamic IDs
+ * **Integration Tests**: Use direct static constants
  * ```typescript
- * const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATION);
- * // Use: seededData.machine, seededData.location, etc.
+ * const machineId = SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1;
+ * const priorityId = SEED_TEST_IDS.PRIORITIES.HIGH;
  * ```
  *
  * **SQL/pgTAP Tests**: Use generated SQL functions
@@ -96,11 +96,14 @@ export const SEED_TEST_IDS = {
     MEMBER2: "test-user-escher",
   },
 
-  /** Role IDs from infrastructure seed - NOTE: These are dynamic! */
+  /** Static role IDs used by infrastructure seed */
   ROLES: {
-    // These IDs are generated dynamically during seed, use getSeededTestData() instead
-    // ADMIN: "admin-role-id",      // Use: seededData.adminRole
-    // MEMBER: "member-role-id",    // Use: seededData.memberRole
+    ADMIN_PRIMARY: "role-admin-primary-001",
+    MEMBER_PRIMARY: "role-member-primary-001",
+    UNAUTHENTICATED_PRIMARY: "role-unauth-primary-001",
+    ADMIN_COMPETITOR: "role-admin-competitor-001",
+    MEMBER_COMPETITOR: "role-member-competitor-001",
+    UNAUTHENTICATED_COMPETITOR: "role-unauth-competitor-001",
   },
 
   /** Static email addresses for consistent mock setups */
@@ -113,8 +116,122 @@ export const SEED_TEST_IDS = {
   /** Static names for consistent mock setups */
   NAMES: {
     ADMIN: "Tim Froehlich",
-    MEMBER1: "Harry Potter",
-    MEMBER2: "M.C. Escher",
+    MEMBER1: "Harry Williams",
+    MEMBER2: "Escher Lefkoff",
+  },
+
+  /** Static machine IDs used in minimal seed data */
+  MACHINES: {
+    MEDIEVAL_MADNESS_1: "machine-mm-001",
+    CACTUS_CANYON_1: "machine-cc-001",
+    REVENGE_FROM_MARS_1: "machine-rfm-001",
+    CLEOPATRA_1: "machine-cleopatra-001",
+    XENON_1: "machine-xenon-001",
+    ULTRAMAN_KAIJU: "machine-ultraman-001",
+  },
+
+  /** Global permission IDs - NOT per-organization */
+  PERMISSIONS: {
+    // Core permissions
+    ISSUE_VIEW: "perm-issue-view-001",
+    ISSUE_CREATE: "perm-issue-create-002",
+    ISSUE_EDIT: "perm-issue-edit-003",
+    ISSUE_DELETE: "perm-issue-delete-004",
+    ISSUE_ASSIGN: "perm-issue-assign-005",
+    ISSUE_BULK_MANAGE: "perm-issue-bulk-manage-006",
+    MACHINE_VIEW: "perm-machine-view-007",
+    MACHINE_CREATE: "perm-machine-create-008",
+    MACHINE_EDIT: "perm-machine-edit-009",
+    MACHINE_DELETE: "perm-machine-delete-010",
+    LOCATION_VIEW: "perm-location-view-011",
+    LOCATION_CREATE: "perm-location-create-012",
+    LOCATION_EDIT: "perm-location-edit-013",
+    LOCATION_DELETE: "perm-location-delete-014",
+    ATTACHMENT_VIEW: "perm-attachment-view-015",
+    ATTACHMENT_CREATE: "perm-attachment-create-016",
+    ATTACHMENT_DELETE: "perm-attachment-delete-017",
+    ORGANIZATION_MANAGE: "perm-org-manage-018",
+    ROLE_MANAGE: "perm-role-manage-019",
+    USER_MANAGE: "perm-user-manage-020",
+    ADMIN_VIEW_ANALYTICS: "perm-admin-view-analytics-021",
+  },
+
+  /** Static priorities used by seed data */
+  PRIORITIES: {
+    LOW: "priority-low-001",
+    MEDIUM: "priority-medium-001",
+    HIGH: "priority-high-001",
+    CRITICAL: "priority-critical-001",
+    // Per-organization priorities - primary org
+    LOW_PRIMARY: "priority-low-primary-001",
+    MEDIUM_PRIMARY: "priority-medium-primary-001",
+    HIGH_PRIMARY: "priority-high-primary-001",
+    CRITICAL_PRIMARY: "priority-critical-primary-001",
+    // Per-organization priorities - competitor org
+    LOW_COMPETITOR: "priority-low-competitor-001",
+    MEDIUM_COMPETITOR: "priority-medium-competitor-001",
+    HIGH_COMPETITOR: "priority-high-competitor-001",
+    CRITICAL_COMPETITOR: "priority-critical-competitor-001",
+  },
+
+  /** Static statuses used by seed data */
+  STATUSES: {
+    NEW: "status-new-001",
+    IN_PROGRESS: "status-in-progress-001",
+    NEEDS_EXPERT: "status-needs-expert-001",
+    NEEDS_PARTS: "status-needs-parts-001",
+    FIXED: "status-fixed-001",
+    NOT_TO_BE_FIXED: "status-not-to-be-fixed-001",
+    NOT_REPRODUCIBLE: "status-not-reproducible-001",
+    // Per-organization statuses - primary org
+    NEW_PRIMARY: "status-new-primary-001",
+    IN_PROGRESS_PRIMARY: "status-in-progress-primary-001",
+    NEEDS_EXPERT_PRIMARY: "status-needs-expert-primary-001",
+    NEEDS_PARTS_PRIMARY: "status-needs-parts-primary-001",
+    FIXED_PRIMARY: "status-fixed-primary-001",
+    NOT_TO_BE_FIXED_PRIMARY: "status-not-to-be-fixed-primary-001",
+    NOT_REPRODUCIBLE_PRIMARY: "status-not-reproducible-primary-001",
+    // Per-organization statuses - competitor org
+    NEW_COMPETITOR: "status-new-competitor-001",
+    IN_PROGRESS_COMPETITOR: "status-in-progress-competitor-001",
+    NEEDS_EXPERT_COMPETITOR: "status-needs-expert-competitor-001",
+    NEEDS_PARTS_COMPETITOR: "status-needs-parts-competitor-001",
+    FIXED_COMPETITOR: "status-fixed-competitor-001",
+    NOT_TO_BE_FIXED_COMPETITOR: "status-not-to-be-fixed-competitor-001",
+    NOT_REPRODUCIBLE_COMPETITOR: "status-not-reproducible-competitor-001",
+  },
+
+  /** Static location IDs used in minimal seed data */
+  LOCATIONS: {
+    MAIN_FLOOR: "location-main-floor-001",
+    UPSTAIRS: "location-upstairs-001",
+    // Default location per organization
+    DEFAULT_PRIMARY: "location-default-primary-001",
+    DEFAULT_COMPETITOR: "location-default-competitor-001",
+  },
+
+  /** Collection types per organization */
+  COLLECTION_TYPES: {
+    ROOMS_PRIMARY: "collection-rooms-primary-001",
+    MANUFACTURER_PRIMARY: "collection-manufacturer-primary-001",
+    ERA_PRIMARY: "collection-era-primary-001",
+    ROOMS_COMPETITOR: "collection-rooms-competitor-001",
+    MANUFACTURER_COMPETITOR: "collection-manufacturer-competitor-001",
+    ERA_COMPETITOR: "collection-era-competitor-001",
+  },
+
+  /** Canonical issue IDs referenced by minimal sample data */
+  ISSUES: {
+    KAIJU_FIGURES: "issue-kaiju-figures-001",
+    LOUD_BUZZING: "issue-loud-buzzing-002",
+    LEFT_ROLLOVER: "issue-left-rollover-003",
+    RIGHT_GUN_OPTO: "issue-right-gun-opto-004",
+    B_TOP_ROLLOVER: "issue-b-top-rollover-005",
+    GUN_CALIBRATION: "issue-gun-calibration-006",
+    CENTER_POP_BUMPER: "issue-center-pop-bumper-007",
+    TRAIN_WRECK_MULTIBALL: "issue-train-wreck-008",
+    MAGNA_SAVE: "issue-magna-save-009",
+    CASTLE_GATE: "issue-castle-gate-010",
   },
 
   /** Mock data patterns for non-database tests */
@@ -154,25 +271,17 @@ export const SEED_TEST_IDS = {
 } as const;
 
 /**
- * Dynamic IDs that must be queried from database
+ * Static ID Architecture
  *
- * For integration tests using real database, use getSeededTestData() to get
- * actual IDs created by the seed scripts:
+ * All seed data uses the static constants defined above for predictable,
+ * consistent test data across all environments.
  *
  * ```typescript
- * const seededData = await getSeededTestData(db, organizationId);
- * // Use: seededData.machine, seededData.location, seededData.adminRole, etc.
+ * // Always use direct static constants
+ * const machineId = SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1;
+ * const locationId = SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR;
+ * const issueId = SEED_TEST_IDS.ISSUES.CASTLE_GATE;
  * ```
- *
- * Dynamic IDs include:
- * - location (first location from sample data)
- * - machine (first machine from sample data)
- * - model (first model from sample data)
- * - priority (first priority from infrastructure)
- * - status (first status from infrastructure)
- * - issue (first issue from sample data)
- * - adminRole (admin role from infrastructure)
- * - memberRole (member role from infrastructure)
  */
 
 /**
@@ -222,9 +331,9 @@ export const createMockMemberContext = (
 /**
  * Usage Guidelines:
  *
- * 1. Router Unit Tests: Use SEED_TEST_IDS.MOCK_PATTERNS for consistent mock data
- * 2. Service Unit Tests: Use SEED_TEST_IDS.MOCK_PATTERNS for mock IDs
- * 3. Integration Tests (single-org): Use getSeededTestData() for dynamic IDs
- * 4. Integration Tests (multi-org): Use custom org creation, not these constants
- * 5. Mock Contexts: Use createMockAdminContext() / createMockMemberContext()
+ * 1. Unit Tests: Use SEED_TEST_IDS.MOCK_PATTERNS for consistent mock data
+ * 2. Integration Tests: Use direct SEED_TEST_IDS constants (MACHINES, ISSUES, etc.)
+ * 3. Security Tests: Use ORGANIZATIONS.primary and ORGANIZATIONS.competitor
+ * 4. Mock Contexts: Use createMockAdminContext() / createMockMemberContext()
+ * 5. All seed scripts: Reference these constants directly for consistency
  */

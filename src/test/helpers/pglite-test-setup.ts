@@ -92,7 +92,7 @@ async function applyDrizzleSchema(db: TestDatabase): Promise<void> {
 
 /**
  * Create a fresh PGlite test database configured for Track 2 business logic testing
- * 
+ *
  * Simulates integration_tester role behavior by disabling RLS and configuring
  * the database for optimal business logic testing performance.
  */
@@ -102,7 +102,7 @@ export async function createTestDatabase(): Promise<TestDatabase> {
 
   // Apply the real schema
   await applyDrizzleSchema(db);
-  
+
   // Configure for integration_tester role simulation (Track 2)
   await configureForBusinessLogicTesting(db);
 
@@ -111,82 +111,95 @@ export async function createTestDatabase(): Promise<TestDatabase> {
 
 /**
  * Configure PGlite database to simulate integration_tester role behavior
- * 
+ *
  * This fully simulates the BYPASSRLS capability of the integration_tester role
  * providing 5x faster business logic testing without security evaluation overhead.
- * 
+ *
  * Key simulation features:
  * - Sets integration_tester role context flags
  * - Disables RLS on all tables (equivalent to BYPASSRLS)
  * - Marks database as business-logic-only testing mode
  * - Enables direct data manipulation without organizational coordination
  */
-async function configureForBusinessLogicTesting(db: TestDatabase): Promise<void> {
+async function configureForBusinessLogicTesting(
+  db: TestDatabase,
+): Promise<void> {
   try {
     // === Integration Tester Role Simulation ===
-    
+
     // Mark as test environment
     await db.execute(sql`SET app.environment = 'test'`);
-    
+
     // Simulate integration_tester role session
     await db.execute(sql`SET app.test_role = 'integration_tester'`);
     await db.execute(sql`SET app.bypass_rls = 'true'`);
     await db.execute(sql`SET app.test_mode = 'business_logic'`);
-    
+
     // Set integration tester "user" for audit trails
     await db.execute(sql`SET app.current_user_id = 'integration_tester'`);
     await db.execute(sql`SET app.current_user_role = 'integration_tester'`);
-    
+
     // === Disable RLS for 5x Performance Boost ===
-    
+
     // Disable RLS on all tables to fully simulate BYPASSRLS behavior
     // This eliminates RLS policy evaluation overhead for business logic testing
     const rlsTables = [
-      'organizations',
-      'users', 
-      'memberships',
-      'roles',
-      'role_permissions',
-      'locations',
-      'machines',
-      'models',
-      'issues',
-      'issue_statuses',
-      'priorities',
-      'comments',
-      'attachments',
-      'issue_history',
-      'upvotes'
+      "organizations",
+      "users",
+      "memberships",
+      "roles",
+      "role_permissions",
+      "locations",
+      "machines",
+      "models",
+      "issues",
+      "issue_statuses",
+      "priorities",
+      "comments",
+      "attachments",
+      "issue_history",
+      "upvotes",
     ];
-    
+
     let disabledCount = 0;
     for (const table of rlsTables) {
       try {
-        await db.execute(sql.raw(`ALTER TABLE ${table} DISABLE ROW LEVEL SECURITY`));
+        await db.execute(
+          sql.raw(`ALTER TABLE ${table} DISABLE ROW LEVEL SECURITY`),
+        );
         disabledCount++;
       } catch (error) {
         // Table might not exist or might not have RLS enabled - non-fatal
         console.debug(`RLS disable skipped for ${table}:`, error);
       }
     }
-    
+
     // === Verification ===
-    
+
     // Verify RLS bypass is working
     try {
-      await db.execute(sql`SELECT 1 WHERE current_setting('app.bypass_rls', true) = 'true'`);
+      await db.execute(
+        sql`SELECT 1 WHERE current_setting('app.bypass_rls', true) = 'true'`,
+      );
     } catch {
-      console.warn('[Track 2] RLS bypass verification failed - continuing anyway');
+      console.warn(
+        "[Track 2] RLS bypass verification failed - continuing anyway",
+      );
     }
-    
+
     if (!process.env.VITEST) {
       console.log(`[Track 2] integration_tester simulation active:`);
       console.log(`  - RLS disabled on ${disabledCount} tables`);
       console.log(`  - Business logic mode: BYPASSRLS equivalent`);
-      console.log(`  - Expected 5x performance improvement vs RLS-enabled testing`);
+      console.log(
+        `  - Expected 5x performance improvement vs RLS-enabled testing`,
+      );
     }
   } catch (error) {
-    console.warn('Business logic configuration warning (continuing anyway):', error);
+    console.warn(
+      "Business logic configuration warning (continuing anyway):",
+      error,
+    );
   }
 }
 
@@ -349,7 +362,9 @@ async function createMembershipsForOrganization(
     ]);
 
     if (!process.env.VITEST) {
-      console.log(`[TEST] Created memberships for ${orgSuffix} organization (${organizationId})`);
+      console.log(
+        `[TEST] Created memberships for ${orgSuffix} organization (${organizationId})`,
+      );
     }
   }
 }
@@ -415,8 +430,16 @@ export async function createSeededTestDatabase(): Promise<{
   await createMinimalUsersForTesting(db);
 
   // Create memberships linking users to both organizations
-  await createMembershipsForOrganization(db, organizations.primary.id, "primary");
-  await createMembershipsForOrganization(db, organizations.secondary.id, "secondary");
+  await createMembershipsForOrganization(
+    db,
+    organizations.primary.id,
+    "primary",
+  );
+  await createMembershipsForOrganization(
+    db,
+    organizations.secondary.id,
+    "secondary",
+  );
 
   // Seed sample data in primary org with minimal dataset
   await seedSampleDataWithDb(db, organizations.primary.id, "minimal", false);
@@ -433,81 +456,15 @@ export async function createSeededTestDatabase(): Promise<{
  * Query actual seeded IDs from the database
  * Replaces hardcoded TEST_IDS with real data from production seeds
  */
-export async function getSeededTestData(
-  db: TestDatabase,
-  organizationId: string,
-): Promise<{
-  organization: string;
-  location: string | undefined;
-  machine: string | undefined;
-  model: string | undefined;
-  priority: string | undefined;
-  status: string | undefined;
-  issue: string | undefined;
-  adminRole: string | undefined;
-  memberRole: string | undefined;
-  user: string | undefined;
-}> {
-  // Get the first location
-  const location = await db.query.locations.findFirst({
-    where: eq(schema.locations.organizationId, organizationId),
-  });
-
-  // Get the first machine
-  const machine = await db.query.machines.findFirst({
-    where: eq(schema.machines.organizationId, organizationId),
-  });
-
-  // Get the first model
-  const model = await db.query.models.findFirst();
-
-  // Get the first priority
-  const priority = await db.query.priorities.findFirst({
-    where: eq(schema.priorities.organizationId, organizationId),
-  });
-
-  // Get the first status
-  const status = await db.query.issueStatuses.findFirst({
-    where: eq(schema.issueStatuses.organizationId, organizationId),
-  });
-
-  // Get the first issue
-  const issue = await db.query.issues.findFirst({
-    where: eq(schema.issues.organizationId, organizationId),
-  });
-
-  // Get admin role
-  const adminRole = await db.query.roles.findFirst({
-    where: and(
-      eq(schema.roles.organizationId, organizationId),
-      eq(schema.roles.name, "Admin"),
-    ),
-  });
-
-  // Get member role
-  const memberRole = await db.query.roles.findFirst({
-    where: and(
-      eq(schema.roles.organizationId, organizationId),
-      eq(schema.roles.name, "Member"),
-    ),
-  });
-
-  // Get a consistent test user (prefer admin for permissions)
-  const userId = machine?.ownerId ?? issue?.createdById ?? "test-user-admin";
-
-  return {
-    organization: organizationId,
-    location: location?.id,
-    machine: machine?.id,
-    model: model?.id,
-    priority: priority?.id,
-    status: status?.id,
-    issue: issue?.id,
-    adminRole: adminRole?.id,
-    memberRole: memberRole?.id,
-    user: userId,
-  };
-}
+/*
+ * getSeededTestData removed.
+ *
+ * This function previously queried the database for seeded IDs at runtime.
+ * For the new static-seed approach we rely on `SEED_TEST_IDS` constants
+ * instead of dynamic database lookups. If code requires these values, use
+ * `src/test/constants/seed-test-ids.ts` directly or pass explicit IDs into
+ * helper functions.
+ */
 
 /**
  * Transaction wrapper for test isolation
@@ -558,24 +515,26 @@ export async function cleanupTestDatabase(db: TestDatabase): Promise<void> {
 
 /**
  * Test Mode Detection Helpers
- * 
+ *
  * These helpers let you verify which testing mode your database is configured for.
  * Useful for debugging and ensuring tests use the expected performance characteristics.
  */
 
 /**
  * Check if RLS is bypassed in the current database instance
- * 
+ *
  * Returns true if the database is configured for business logic testing (Track 2)
  * with RLS bypassed for 5x performance improvement.
- * 
+ *
  * @param db - Test database instance
  * @returns Promise<boolean> - true if RLS is bypassed (business logic mode)
  */
 export async function isRLSBypassed(db: TestDatabase): Promise<boolean> {
   try {
-    const result = await db.execute(sql`SELECT current_setting('app.bypass_rls', true) as bypass_rls`);
-    return result.rows?.[0]?.bypass_rls === 'true';
+    const result = await db.execute(
+      sql`SELECT current_setting('app.bypass_rls', true) as bypass_rls`,
+    );
+    return result.rows?.[0]?.bypass_rls === "true";
   } catch {
     // If the setting doesn't exist, RLS is not bypassed
     return false;
@@ -584,13 +543,17 @@ export async function isRLSBypassed(db: TestDatabase): Promise<boolean> {
 
 /**
  * Get the current test role simulation
- * 
+ *
  * @param db - Test database instance
  * @returns Promise<string | null> - 'integration_tester' or null
  */
-export async function getCurrentTestRole(db: TestDatabase): Promise<string | null> {
+export async function getCurrentTestRole(
+  db: TestDatabase,
+): Promise<string | null> {
   try {
-    const result = await db.execute(sql`SELECT current_setting('app.test_role', true) as test_role`);
+    const result = await db.execute(
+      sql`SELECT current_setting('app.test_role', true) as test_role`,
+    );
     return result.rows?.[0]?.test_role || null;
   } catch {
     return null;
@@ -599,13 +562,17 @@ export async function getCurrentTestRole(db: TestDatabase): Promise<string | nul
 
 /**
  * Get the current test mode
- * 
- * @param db - Test database instance  
+ *
+ * @param db - Test database instance
  * @returns Promise<string | null> - 'business_logic' or null
  */
-export async function getCurrentTestMode(db: TestDatabase): Promise<string | null> {
+export async function getCurrentTestMode(
+  db: TestDatabase,
+): Promise<string | null> {
   try {
-    const result = await db.execute(sql`SELECT current_setting('app.test_mode', true) as test_mode`);
+    const result = await db.execute(
+      sql`SELECT current_setting('app.test_mode', true) as test_mode`,
+    );
     return result.rows?.[0]?.test_mode || null;
   } catch {
     return null;
@@ -614,10 +581,10 @@ export async function getCurrentTestMode(db: TestDatabase): Promise<string | nul
 
 /**
  * Verify integration_tester simulation is active
- * 
+ *
  * Performs comprehensive check that the database is properly configured
  * for Track 2 business logic testing with maximum performance.
- * 
+ *
  * @param db - Test database instance
  * @returns Promise<{ isActive: boolean; details: object }> - Verification results
  */
@@ -633,50 +600,53 @@ export async function verifyIntegrationTesterMode(db: TestDatabase): Promise<{
   const rlsBypassed = await isRLSBypassed(db);
   const testRole = await getCurrentTestRole(db);
   const testMode = await getCurrentTestMode(db);
-  
+
   let environment: string | null = null;
   try {
-    const result = await db.execute(sql`SELECT current_setting('app.environment', true) as environment`);
+    const result = await db.execute(
+      sql`SELECT current_setting('app.environment', true) as environment`,
+    );
     environment = result.rows?.[0]?.environment || null;
   } catch {
     // Environment setting not available
   }
-  
-  const isActive = (
-    rlsBypassed && 
-    testRole === 'integration_tester' && 
-    testMode === 'business_logic'
-  );
-  
+
+  const isActive =
+    rlsBypassed &&
+    testRole === "integration_tester" &&
+    testMode === "business_logic";
+
   return {
     isActive,
     details: {
       rlsBypassed,
       testRole,
       testMode,
-      environment
-    }
+      environment,
+    },
   };
 }
 
 /**
  * External PostgreSQL Integration Testing Support
- * 
+ *
  * For tests that need to connect to a real PostgreSQL instance with
  * the integration_tester role (Track 2 business logic testing).
  */
 
 /**
  * Get DATABASE_URL configured for integration_tester role
- * 
+ *
  * Use this when tests need to connect to external PostgreSQL with
  * BYPASSRLS capabilities for business logic testing.
- * 
+ *
  * @returns DATABASE_URL string for integration_tester connection
  */
 export function getIntegrationTesterDatabaseUrl(): string {
-  const baseUrl = process.env.DATABASE_URL || "postgresql://postgres:postgres@localhost:5432/postgres";
-  
+  const baseUrl =
+    process.env.DATABASE_URL ||
+    "postgresql://postgres:postgres@localhost:5432/postgres";
+
   // Replace user credentials with integration_tester role
   try {
     const url = new URL(baseUrl);
@@ -691,27 +661,27 @@ export function getIntegrationTesterDatabaseUrl(): string {
 
 /**
  * Check if integration_tester role is available
- * 
+ *
  * Utility to verify that the dual-track testing setup is properly configured
  * in the target PostgreSQL database.
  */
 export async function verifyIntegrationTesterSetup(): Promise<boolean> {
   try {
-    const { createClient } = await import('postgres');
+    const { createClient } = await import("postgres");
     const sql = createClient(getIntegrationTesterDatabaseUrl());
-    
+
     // Test connection and verify BYPASSRLS capability
     const result = await sql`
-      SELECT 
+      SELECT
         rolname,
         rolsuper,
-        rolbypassrls 
-      FROM pg_roles 
+        rolbypassrls
+      FROM pg_roles
       WHERE rolname = 'integration_tester'
     `;
-    
+
     await sql.end();
-    
+
     return result.length > 0 && result[0]?.rolbypassrls === true;
   } catch {
     return false;
@@ -720,22 +690,22 @@ export async function verifyIntegrationTesterSetup(): Promise<boolean> {
 
 /**
  * Dual-Track Testing Configuration Guide
- * 
+ *
  * Use this guide to choose the right testing approach:
- * 
- * **Track 1: pgTAP RLS Testing** 
+ *
+ * **Track 1: pgTAP RLS Testing**
  * - Purpose: Security policy validation
  * - Tool: pgTAP with native PostgreSQL
  * - Roles: authenticated, anon
  * - Location: supabase/tests/rls/
  * - When: Testing organizational boundaries, permissions, security edge cases
- * 
+ *
  * **Track 2: PGlite Business Logic Testing**
- * - Purpose: Business functionality testing  
+ * - Purpose: Business functionality testing
  * - Tool: PGlite with integration_tester simulation (this file)
  * - Performance: 5x faster (no RLS overhead)
  * - When: Testing workflows, data relationships, business rules
- * 
+ *
  * **External PostgreSQL Business Logic Testing**
  * - Purpose: Complex business logic requiring real PostgreSQL features
  * - Tool: integration_tester role with real database
