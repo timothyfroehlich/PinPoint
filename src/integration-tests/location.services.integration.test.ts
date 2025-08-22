@@ -7,7 +7,7 @@
  * seeded data infrastructure.
  *
  * Key Features:
- * - Uses createSeededTestDatabase() and getSeededTestData() for consistent test data
+ * - Uses createSeededTestDatabase() and SEED_TEST_IDS for consistent test data
  * - Leverages createSeededLocationTestContext() for standardized TRPC context
  * - Uses SEED_TEST_IDS.ORGANIZATIONS.competitor for cross-org isolation testing
  * - Maintains service integration testing with enhanced mocking
@@ -27,7 +27,6 @@ import { generateTestId } from "~/test/helpers/test-id-generator";
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
 import {
   createSeededTestDatabase,
-  getSeededTestData,
   type TestDatabase,
 } from "~/test/helpers/pglite-test-setup";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
@@ -41,21 +40,8 @@ vi.mock("~/lib/utils/id-generation", () => ({
 // Removed permission mocks to use real membership-based scoping from seeds
 
 describe("Location Router Services Integration (PGlite)", () => {
-  let workerDb: TestDatabase;
-  let primaryOrgId: string;
-  let competitorOrgId: string;
-  let seededData: Awaited<ReturnType<typeof getSeededTestData>>;
-
-  beforeAll(async () => {
-    // Create seeded test database with established infrastructure
-    const setup = await createSeededTestDatabase();
-    workerDb = setup.db;
-    primaryOrgId = setup.organizationId;
-    competitorOrgId = SEED_TEST_IDS.ORGANIZATIONS.competitor;
-
-    // Get seeded test data for use across tests
-    seededData = await getSeededTestData(workerDb, primaryOrgId);
-  });
+  const primaryOrgId = SEED_TEST_IDS.ORGANIZATIONS.primary;
+  const competitorOrgId = SEED_TEST_IDS.ORGANIZATIONS.competitor;
 
   describe("syncWithPinballMap", () => {
     test("should handle successful sync with service integration", async ({
@@ -65,7 +51,7 @@ describe("Location Router Services Integration (PGlite)", () => {
         const context = await createSeededLocationTestContext(
           txDb,
           primaryOrgId,
-          seededData.user!,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = locationRouter.createCaller(context);
 
@@ -73,7 +59,7 @@ describe("Location Router Services Integration (PGlite)", () => {
         expect(context.services.createPinballMapService).toBeDefined();
 
         const result = await caller.syncWithPinballMap({
-          locationId: seededData.location!,
+          locationId: SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR,
         });
 
         expect(result).toEqual({
@@ -93,7 +79,7 @@ describe("Location Router Services Integration (PGlite)", () => {
         const context = await createSeededLocationTestContext(
           txDb,
           primaryOrgId,
-          seededData.user!,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
 
         // Override the mock to simulate failure
@@ -107,7 +93,7 @@ describe("Location Router Services Integration (PGlite)", () => {
 
         await expect(
           caller.syncWithPinballMap({
-            locationId: seededData.location!,
+            locationId: SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR,
           }),
         ).rejects.toThrow("Service unavailable");
       });
@@ -121,14 +107,14 @@ describe("Location Router Services Integration (PGlite)", () => {
         const primaryContext = await createSeededLocationTestContext(
           txDb,
           primaryOrgId,
-          seededData.user!,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const primaryCaller = locationRouter.createCaller(primaryContext);
 
         const competitorContext = await createSeededLocationTestContext(
           txDb,
           competitorOrgId,
-          seededData.user!,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
 
         // Create a location in competitor org
@@ -162,13 +148,13 @@ describe("Location Router Services Integration (PGlite)", () => {
         const primaryContext = await createSeededLocationTestContext(
           txDb,
           primaryOrgId,
-          seededData.user!,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
 
         const competitorContext = await createSeededLocationTestContext(
           txDb,
           competitorOrgId,
-          seededData.user!,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
 
         // Verify that each context has isolated service instances
@@ -193,7 +179,7 @@ describe("Location Router Services Integration (PGlite)", () => {
         const context = await createSeededLocationTestContext(
           txDb,
           primaryOrgId,
-          seededData.user!,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
 
         // Verify all required services are available
@@ -207,7 +193,7 @@ describe("Location Router Services Integration (PGlite)", () => {
         // Service injection should work correctly for all operations
         const caller = locationRouter.createCaller(context);
         const result = await caller.syncWithPinballMap({
-          locationId: seededData.location!,
+          locationId: SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR,
         });
 
         expect(result.success).toBe(true);

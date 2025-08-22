@@ -53,6 +53,7 @@ export default defineConfig({
 ### 🚨 CRITICAL: Memory Safety Rules
 
 **❌ NEVER USE (causes system lockups):**
+
 ```typescript
 beforeEach(async () => {
   const { db } = await createSeededTestDatabase(); // 50-100MB per test
@@ -60,6 +61,7 @@ beforeEach(async () => {
 ```
 
 **✅ ALWAYS USE (memory-safe):**
+
 ```typescript
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
 
@@ -133,7 +135,10 @@ test("form submission calls server action", async () => {
 ### Multi-Tenant Scoping Tests with SEED_TEST_IDS
 
 ```typescript
-import { SEED_TEST_IDS, createMockAdminContext } from "~/test/constants/seed-test-ids";
+import {
+  SEED_TEST_IDS,
+  createMockAdminContext,
+} from "~/test/constants/seed-test-ids";
 
 test("enforces organizational boundaries", async () => {
   const adminContext = createMockAdminContext();
@@ -166,13 +171,17 @@ permissionCases.forEach(({ role, action, allowed }) => {
     });
 
     if (allowed) {
-      await expect(caller.post[action]({ 
-        id: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE 
-      })).resolves.toBeDefined();
+      await expect(
+        caller.post[action]({
+          id: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
+        }),
+      ).resolves.toBeDefined();
     } else {
-      await expect(caller.post[action]({ 
-        id: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE 
-      })).rejects.toThrow();
+      await expect(
+        caller.post[action]({
+          id: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
+        }),
+      ).rejects.toThrow();
     }
   });
 });
@@ -189,13 +198,13 @@ permissionCases.forEach(({ role, action, allowed }) => {
 ```
 Minimal Seed (Foundation)
 ├── 2 organizations (primary + competitor)
-├── ~8 test users (admin, members, guests)  
+├── ~8 test users (admin, members, guests)
 ├── ~10 machines across different games
 ├── ~20 sample issues
 └── All infrastructure (roles, statuses, priorities)
 
 Full Seed (Additive)
-├── Minimal seed (always included) 
+├── Minimal seed (always included)
 ├── +50 additional machines
 ├── +180 additional issues
 └── Rich sample data for demos
@@ -206,24 +215,28 @@ Full Seed (Additive)
 **Hardcoded IDs for predictability** → [`src/test/constants/seed-test-ids.ts`](../../src/test/constants/seed-test-ids.ts)
 
 ```typescript
-import { SEED_TEST_IDS, createMockAdminContext } from "~/test/constants/seed-test-ids";
+import {
+  SEED_TEST_IDS,
+  createMockAdminContext,
+} from "~/test/constants/seed-test-ids";
 
 // Two organizations for security testing
-SEED_TEST_IDS.ORGANIZATIONS.primary      // "test-org-pinpoint" (Austin Pinball)
-SEED_TEST_IDS.ORGANIZATIONS.competitor   // "test-org-competitor" (Competitor Arcade)
+SEED_TEST_IDS.ORGANIZATIONS.primary; // "test-org-pinpoint" (Austin Pinball)
+SEED_TEST_IDS.ORGANIZATIONS.competitor; // "test-org-competitor" (Competitor Arcade)
 
 // Predictable user IDs
-SEED_TEST_IDS.USERS.ADMIN                // "test-user-tim"
-SEED_TEST_IDS.USERS.MEMBER1              // "test-user-harry"
+SEED_TEST_IDS.USERS.ADMIN; // "test-user-tim"
+SEED_TEST_IDS.USERS.MEMBER1; // "test-user-harry"
 
 // Mock patterns for unit tests
-SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION // "mock-org-1"
-SEED_TEST_IDS.MOCK_PATTERNS.MACHINE      // "mock-machine-1"
+SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION; // "mock-org-1"
+SEED_TEST_IDS.MOCK_PATTERNS.MACHINE; // "mock-machine-1"
 ```
 
 ### **Usage Patterns by Test Type**
 
 **Unit Tests** (mocked database):
+
 ```typescript
 // Use MOCK_PATTERNS for consistent mock IDs
 const mockContext = createMockAdminContext();
@@ -231,36 +244,38 @@ const mockData = { organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION };
 ```
 
 **Integration Tests** (real PGlite database):
+
 ```typescript
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
 
 test("integration test", async ({ workerDb }) => {
   await withIsolatedTest(workerDb, async (db) => {
-    // Use seeded data for real relationships
-    const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
-    expect(result.machineId).toBe(seededData.machine);
+    // Use SEED_TEST_IDS constants directly for predictable relationships
+    expect(result.machineId).toBe(SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1);
   });
 });
 ```
 
 **Security Tests** (cross-org isolation):
+
 ```typescript
 test("enforces cross-org boundaries", async ({ workerDb }) => {
   await withIsolatedTest(workerDb, async (db) => {
     // Create data in primary org
     await setOrgContext(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
     const issue1 = await createIssue(db, { title: "Primary Org Secret" });
-    
+
     // Switch to competitor org - should not see primary org data
     await setOrgContext(db, SEED_TEST_IDS.ORGANIZATIONS.competitor);
     const visibleIssues = await db.query.issues.findMany();
-    
+
     expect(visibleIssues).not.toContainEqual(issue1);
   });
 });
 ```
 
 **pgTAP SQL Tests** (database-level RLS validation):
+
 ```sql
 -- Load generated constants from TypeScript
 \i constants.sql
@@ -285,8 +300,8 @@ SELECT results_eq(
 ### **When to Use What**
 
 - **Unit Tests**: `SEED_TEST_IDS.MOCK_PATTERNS` for consistent mock IDs
-- **Service Unit Tests**: `SEED_TEST_IDS.MOCK_PATTERNS` for standardized mocks  
-- **Single-Org Integration**: `getSeededTestData()` for dynamic seeded relationships
+- **Service Unit Tests**: `SEED_TEST_IDS.MOCK_PATTERNS` for standardized mocks
+- **Single-Org Integration**: `SEED_TEST_IDS` constants for predictable seeded relationships
 - **Multi-Org Security**: `SEED_TEST_IDS.ORGANIZATIONS` for boundary testing
 - **pgTAP RLS Tests**: Generated SQL functions for database-level validation
 
@@ -297,7 +312,7 @@ SELECT results_eq(
 ```
 Testing Need:
 ├── Unit tests (mocked DB)? → Use SEED_TEST_IDS.MOCK_PATTERNS
-├── Integration tests (real DB)? → Use getSeededTestData() + withIsolatedTest
+├── Integration tests (real DB)? → Use SEED_TEST_IDS + withIsolatedTest
 ├── Security/RLS tests? → Use SEED_TEST_IDS.ORGANIZATIONS for cross-org scenarios
 ├── pgTAP database tests? → Use generated SQL constants from build script
 ├── Memory safety? → ALWAYS use withIsolatedTest pattern

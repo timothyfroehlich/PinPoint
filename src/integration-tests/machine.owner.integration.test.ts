@@ -14,7 +14,7 @@
  * - Advanced RLS context switching tests
  *
  * Uses modern August 2025 patterns with Vitest and worker-scoped PGlite integration.
- * 
+ *
  * CONSOLIDATED: Combines comprehensive coverage from router test with integration test patterns.
  */
 
@@ -30,8 +30,11 @@ import { machineOwnerRouter } from "~/server/api/routers/machine.owner";
 import * as schema from "~/server/db/schema";
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
-import { getSeededTestData } from "~/test/helpers/pglite-test-setup";
-import { createSeededMachineTestContext, createPrimaryAdminContext, createCompetitorAdminContext } from "~/test/helpers/createSeededMachineTestContext";
+import {
+  createSeededMachineTestContext,
+  createPrimaryAdminContext,
+  createCompetitorAdminContext,
+} from "~/test/helpers/createSeededMachineTestContext";
 
 // Mock external dependencies that aren't database-related
 vi.mock("~/server/auth/permissions", () => ({
@@ -78,21 +81,16 @@ describe("machine.owner router integration tests", () => {
   async function setupTestData(db: TestDatabase) {
     // Use seeded data from primary organization
     const organizationId = SEED_TEST_IDS.ORGANIZATIONS.primary;
-    const seededData = await getSeededTestData(db, organizationId);
-    
-    if (!seededData.machine || !seededData.location || !seededData.model) {
-      throw new Error("Missing required seeded data: machine, location, or model");
-    }
 
     // Get seeded users
     const testUser1 = await db.query.users.findFirst({
       where: eq(schema.users.id, SEED_TEST_IDS.USERS.ADMIN),
     });
-    
+
     const testUser2 = await db.query.users.findFirst({
       where: eq(schema.users.id, SEED_TEST_IDS.USERS.MEMBER1),
     });
-    
+
     if (!testUser1 || !testUser2) {
       throw new Error("Missing seeded test users");
     }
@@ -102,13 +100,13 @@ describe("machine.owner router integration tests", () => {
 
     return {
       organizationId,
-      adminRole: seededData.adminRole,
-      memberRole: seededData.memberRole,
+      adminRole: SEED_TEST_IDS.ROLES.ADMIN_PRIMARY,
+      memberRole: SEED_TEST_IDS.ROLES.MEMBER_PRIMARY,
       testUser1,
       testUser2,
-      model: seededData.model,
-      location: seededData.location,
-      machine: seededData.machine,
+      model: "model-mm-001",
+      location: SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR,
+      machine: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
       ctx,
     };
   }
@@ -198,7 +196,8 @@ describe("machine.owner router integration tests", () => {
         workerDb,
       }) => {
         await withIsolatedTest(workerDb, async (db) => {
-          const { machine, testUser1, testUser2, ctx } = await setupTestData(db);
+          const { machine, testUser1, testUser2, ctx } =
+            await setupTestData(db);
 
           // First assign initial owner
           await db
@@ -473,8 +472,11 @@ describe("machine.owner router integration tests", () => {
       test("should use correct organization context", async ({ workerDb }) => {
         await withIsolatedTest(workerDb, async (db) => {
           // Set up first organization (with our main test data)
-          const { machine: machine1, testUser2: user1, organizationId: org1Id } =
-            await setupTestData(db);
+          const {
+            machine: machine1,
+            testUser2: user1,
+            organizationId: org1Id,
+          } = await setupTestData(db);
 
           // Create a second organization with different users
           const org2Id = generateTestId("test-org-2");
@@ -712,11 +714,15 @@ describe("machine.owner router integration tests", () => {
             manufacturer: expect.any(String),
           });
           // Year can be null in seeded data
-          expect(typeof result.model.year === 'number' || result.model.year === null).toBe(true);
+          expect(
+            typeof result.model.year === "number" || result.model.year === null,
+          ).toBe(true);
         });
       });
 
-      test("should load machine location relationship", async ({ workerDb }) => {
+      test("should load machine location relationship", async ({
+        workerDb,
+      }) => {
         await withIsolatedTest(workerDb, async (db) => {
           const { machine, testUser2, ctx } = await setupTestData(db);
           const caller = machineOwnerRouter.createCaller(ctx);
@@ -814,10 +820,12 @@ describe("machine.owner router integration tests", () => {
           expect(updatedMachine?.name).toBe(originalMachine?.name);
           expect(updatedMachine?.modelId).toBe(originalMachine?.modelId);
           expect(updatedMachine?.locationId).toBe(originalMachine?.locationId);
-          expect(updatedMachine?.organizationId).toBe(originalMachine?.organizationId);
+          expect(updatedMachine?.organizationId).toBe(
+            originalMachine?.organizationId,
+          );
           expect(updatedMachine?.qrCodeId).toBe(originalMachine?.qrCodeId);
           expect(updatedMachine?.qrCodeUrl).toBe(originalMachine?.qrCodeUrl);
-          
+
           // Only ownerId should have changed
           expect(updatedMachine?.ownerId).toBe(testUser2.id);
           expect(updatedMachine?.ownerId).not.toBe(originalMachine?.ownerId);

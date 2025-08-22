@@ -302,7 +302,7 @@ npm run db:seed:local:pg
 **✅ DO:**
 
 - Use `SEED_TEST_IDS` constants for predictable IDs
-- Use `getSeededTestData()` for dynamic relationship IDs
+- Use `SEED_TEST_IDS constants()` for dynamic relationship IDs
 - Add minimal additional data only when tests require it
 - Use both organizations for security boundary testing
 

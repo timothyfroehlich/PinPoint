@@ -12,7 +12,8 @@
  */
 
 import { eq, and, inArray } from "drizzle-orm";
-import sampleIssuesData from "./sample-issues.json";
+import minimalIssues from "./minimal-issues";
+import allIssues from "./all-issues";
 
 // Quiet mode for tests
 const isTestMode = process.env.NODE_ENV === "test" || process.env.VITEST;
@@ -21,15 +22,7 @@ const log = (...args: unknown[]) => {
 };
 
 import { createDrizzleClient } from "~/server/db/drizzle";
-import {
-  models,
-  machines,
-  issues,
-  priorities,
-  issueStatuses,
-  users,
-  locations,
-} from "~/server/db/schema";
+import { models, machines, issues, users, locations } from "~/server/db/schema";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
 const db = createDrizzleClient();
@@ -37,19 +30,6 @@ const db = createDrizzleClient();
 type DataAmount = "minimal" | "full";
 
 // Auth user synchronization no longer needed - users are created atomically
-
-interface SampleIssue {
-  title: string;
-  description: string;
-  severity: string; // Will map to priority
-  consistency: string;
-  status: string;
-  gameTitle: string;
-  reporterEmail: string;
-  createdAt: string;
-  updatedAt: string;
-  gameOpdbId: string;
-}
 
 interface UniqueGame {
   opdbId: string;
@@ -59,63 +39,62 @@ interface UniqueGame {
 }
 
 /**
- * Extract unique games from sample issues JSON
+ * Extract unique games from TypeScript issue data
  */
 async function extractUniqueGames(
   dataAmount: DataAmount,
 ): Promise<UniqueGame[]> {
   try {
-    // Restored sample-issues.json from git history
-    const sampleIssues: SampleIssue[] = sampleIssuesData;
+    // Use TypeScript static data instead of JSON
+    const issueData = dataAmount === "minimal" ? minimalIssues : allIssues;
 
-    if (sampleIssues.length === 0) {
-      log(
-        "[SAMPLE] No sample issues data available",
-      );
+    if (issueData.length === 0) {
+      log("[SAMPLE] No sample issues data available");
       return [];
     }
 
-    log(
-      `[SAMPLE] Processing ${sampleIssues.length.toString()} sample issues...`,
-    );
+    log(`[SAMPLE] Processing ${issueData.length.toString()} sample issues...`);
 
-    // Create map to deduplicate by OPDB ID
+    // Since we're using pre-defined SEED_TEST_IDS.MACHINES, we can extract the known games
     const gameMap = new Map<string, UniqueGame>();
 
-    for (const issue of sampleIssues) {
-      if (!gameMap.has(issue.gameOpdbId)) {
-        // Extract manufacturer and year from game title if possible
-        const { manufacturer, year } = parseGameTitle(issue.gameTitle);
+    // Known machine to game mapping from SEED_TEST_IDS
+    const knownGames: UniqueGame[] = [
+      {
+        opdbId: "GBLLd-MdEON-A94po",
+        name: "Ultraman: Kaiju Rumble (Blood Sucker Edition)",
+        manufacturer: "Stern",
+      },
+      { opdbId: "G42Pk-MZe2e", name: "Xenon", manufacturer: "Bally" },
+      { opdbId: "GrknN-MQrdv", name: "Cleopatra", manufacturer: "Gottlieb" },
+      {
+        opdbId: "G50Wr-MLeZP",
+        name: "Revenge from Mars",
+        manufacturer: "Williams",
+      },
+      {
+        opdbId: "GR6d8-M1rZd",
+        name: "Star Trek: The Next Generation",
+        manufacturer: "Stern",
+      },
+      {
+        opdbId: "GrqZX-MD15w",
+        name: "Lord of the Rings",
+        manufacturer: "Stern",
+      },
+      { opdbId: "G5n2D-MLn85", name: "Transporter the Rescue" },
+    ];
 
-        gameMap.set(issue.gameOpdbId, {
-          opdbId: issue.gameOpdbId,
-          name: issue.gameTitle,
-          manufacturer,
-          year,
-        });
-      }
-    }
+    // Add known games to map
+    knownGames.forEach((game) => gameMap.set(game.opdbId, game));
 
-    let uniqueGames = Array.from(gameMap.values());
+    const uniqueGames = Array.from(gameMap.values());
     log(`[SAMPLE] Found ${uniqueGames.length.toString()} unique games`);
 
-    // Limit data for minimal mode (for CI tests and local development)
+    // For minimal mode, we already have the right set since we selected the right data source
     if (dataAmount === "minimal") {
-      const MINIMAL_ISSUE_LIMIT = 10;
-
-      // Get OPDB IDs from first 10 issues to ensure consistency
-      const issuesSubset = sampleIssues.slice(0, MINIMAL_ISSUE_LIMIT);
-      const requiredOpdbIds = new Set(
-        issuesSubset.map((issue) => issue.gameOpdbId),
-      );
-
-      // Only keep games that are actually referenced in the issues subset
-      uniqueGames = uniqueGames.filter((game) =>
-        requiredOpdbIds.has(game.opdbId),
-      );
-
       log(
-        `[SAMPLE] Limited to ${uniqueGames.length.toString()} games for minimal seeding (all games referenced in first ${MINIMAL_ISSUE_LIMIT} issues)`,
+        `[SAMPLE] Limited to ${uniqueGames.length.toString()} games for minimal seeding (all games referenced in minimal issues)`,
       );
     }
 
@@ -377,43 +356,57 @@ async function createMachinesWithDb(
  * Create a competitor organization machine using the same model as primary organization
  * Tests cross-org isolation with shared global OPDB models
  */
-async function createCompetitorMachine(
-  dbInstance: typeof db,
-): Promise<void> {
+async function createCompetitorMachine(dbInstance: typeof db): Promise<void> {
   log(`[SAMPLE] Creating competitor organization machine...`);
-  
+
   try {
     const competitorOrgId = SEED_TEST_IDS.ORGANIZATIONS.competitor;
     const revengeFromMarsOpdbId = "G50Wr-MLeZP"; // From sample-issues.json
-    
+
     // Get the competitor organization's default location
     const competitorLocation = await dbInstance
       .select({ id: locations.id })
       .from(locations)
       .where(eq(locations.organizationId, competitorOrgId))
       .limit(1);
-      
+
     if (competitorLocation.length === 0) {
-      console.warn(`[SAMPLE] ⚠️  No default location found for competitor organization, skipping competitor machine`);
+      console.warn(
+        `[SAMPLE] ⚠️  No default location found for competitor organization, skipping competitor machine`,
+      );
       return;
     }
-    
-    const locationId = competitorLocation[0]!.id;
-    
+
+    const locationId = competitorLocation[0]?.id;
+    if (!locationId) {
+      console.warn(
+        `[SAMPLE] ⚠️  No location ID found for competitor organization, skipping competitor machine`,
+      );
+      return;
+    }
+
     // Get the "Revenge from Mars" model by OPDB ID
     const revengeModel = await dbInstance
       .select({ id: models.id, name: models.name })
       .from(models)
       .where(eq(models.opdbId, revengeFromMarsOpdbId))
       .limit(1);
-      
+
     if (revengeModel.length === 0) {
-      console.warn(`[SAMPLE] ⚠️  "Revenge from Mars" model not found, skipping competitor machine`);
+      console.warn(
+        `[SAMPLE] ⚠️  "Revenge from Mars" model not found, skipping competitor machine`,
+      );
       return;
     }
-    
-    const model = revengeModel[0]!;
-    
+
+    const model = revengeModel[0];
+    if (!model) {
+      console.warn(
+        `[SAMPLE] ⚠️  Model data not found, skipping competitor machine`,
+      );
+      return;
+    }
+
     // Check if competitor machine already exists
     const existingMachine = await dbInstance
       .select({ id: machines.id })
@@ -421,16 +414,16 @@ async function createCompetitorMachine(
       .where(
         and(
           eq(machines.organizationId, competitorOrgId),
-          eq(machines.modelId, model.id)
-        )
+          eq(machines.modelId, model.id),
+        ),
       )
       .limit(1);
-      
+
     if (existingMachine.length > 0) {
       log(`[SAMPLE] ⏭️  Competitor "Revenge from Mars" machine already exists`);
       return;
     }
-    
+
     // Create the competitor machine
     const competitorMachine = {
       id: `machine_competitor_${model.id}`, // Unique deterministic ID
@@ -445,31 +438,20 @@ async function createCompetitorMachine(
       notifyOnStatusChanges: false,
       notifyOnComments: false,
     };
-    
+
     await dbInstance.insert(machines).values(competitorMachine);
-    
+
     log(`[SAMPLE] ✅ Created competitor machine: ${competitorMachine.name}`);
-    log(`[SAMPLE] 🎯 Testing scenario: Both organizations have "${model.name}" machines for cross-org isolation testing`);
-    
+    log(
+      `[SAMPLE] 🎯 Testing scenario: Both organizations have "${model.name}" machines for cross-org isolation testing`,
+    );
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error(`[SAMPLE] ❌ Competitor machine creation failed: ${errorMessage}`);
+    console.error(
+      `[SAMPLE] ❌ Competitor machine creation failed: ${errorMessage}`,
+    );
     throw new Error(`Failed to create competitor machine: ${errorMessage}`);
   }
-}
-
-/**
- * Map severity from sample issues to priority names
- */
-function mapSeverityToPriority(severity: string): string {
-  const severityMap: Record<string, string> = {
-    Cosmetic: "Low",
-    Minor: "Medium",
-    Major: "High",
-    Severe: "Critical",
-  };
-
-  return severityMap[severity] || "Medium"; // Default to Medium
 }
 
 /**
@@ -482,203 +464,65 @@ async function createSampleIssuesWithDb(
   skipAuthUsers = false,
 ): Promise<void> {
   try {
-    // Restored sample-issues.json from git history
-    let sampleIssues: SampleIssue[] = sampleIssuesData;
+    // Use static TypeScript data instead of JSON
+    const issuesData = allIssues;
 
-    if (sampleIssues.length === 0) {
+    if (issuesData.length === 0) {
+      log("[SAMPLE] No sample issues data available");
+      return;
+    }
+
+    log(`[SAMPLE] Found ${issuesData.length.toString()} sample issues...`);
+
+    // Filter issues for the target organization
+    const targetIssues = issuesData.filter(
+      (issue) => issue.organizationId === organizationId,
+    );
+
+    if (targetIssues.length === 0) {
       log(
-        "[SAMPLE] No sample issues data available",
+        `[SAMPLE] No issues found for organization ${organizationId}, skipping`,
       );
       return;
     }
 
-    log(`[SAMPLE] Found ${sampleIssues.length.toString()} sample issues...`);
+    log(
+      `[SAMPLE] Creating ${targetIssues.length.toString()} issues for organization`,
+    );
 
-    // Limit issues for minimal mode (for CI tests and local development)
-    if (dataAmount === "minimal") {
-      const MINIMAL_ISSUE_LIMIT = 10;
-      sampleIssues = sampleIssues.slice(0, MINIMAL_ISSUE_LIMIT);
-      log(
-        `[SAMPLE] Limited to ${sampleIssues.length.toString()} issues for minimal seeding`,
-      );
-    }
-
-    log(`[SAMPLE] Creating ${sampleIssues.length.toString()} sample issues...`);
-
-    // Get priority and status mappings in batch
-    const priorityMap = new Map<string, string>();
-    const allPriorities = await dbInstance
-      .select({ id: priorities.id, name: priorities.name })
-      .from(priorities)
-      .where(eq(priorities.organizationId, organizationId));
-
-    for (const priority of allPriorities) {
-      priorityMap.set(priority.name, priority.id);
-    }
-
-    const statusMap = new Map<string, string>();
-    const allStatuses = await dbInstance
-      .select({ id: issueStatuses.id, name: issueStatuses.name })
-      .from(issueStatuses)
-      .where(eq(issueStatuses.organizationId, organizationId));
-
-    for (const status of allStatuses) {
-      statusMap.set(status.name, status.id);
-    }
-
-    // Auth users are now created atomically, no synchronization wait needed
-    if (!skipAuthUsers) {
-      log("[SAMPLE] ✅ Auth users created atomically - no sync wait required");
-    } else {
-      log(
-        "[SAMPLE] ⏭️  Skipping auth user validation (PostgreSQL-only mode)",
-      );
-    }
-
-    // Get user mappings for creators
-    const userMap = new Map<string, string>();
-    const allUsers = await dbInstance
-      .select({ id: users.id, email: users.email })
-      .from(users);
-
-    log(`[SAMPLE] 📋 Found ${allUsers.length} total users in database`);
-    const devUserEmails = allUsers
-      .filter((u) => u.email?.includes("@dev.local"))
-      .map((u) => u.email);
-    log(`[SAMPLE] 🔧 Dev users available: ${devUserEmails.join(", ")}`);
-
-    for (const user of allUsers) {
-      if (user.email) {
-        userMap.set(user.email, user.id);
-      }
-    }
-
-    // Get machines with models in batch
-    const machineData = await dbInstance
-      .select({
-        id: machines.id,
-        name: machines.name,
-        opdbId: models.opdbId,
-      })
-      .from(machines)
-      .innerJoin(models, eq(machines.modelId, models.id))
-      .where(eq(machines.organizationId, organizationId));
-
-    const machineMap = new Map(machineData.map((m) => [m.opdbId, m]));
-
-    // Get existing issues to avoid duplicates
+    // Check for existing issues to avoid duplicates
     const existingIssues = await dbInstance
-      .select({ title: issues.title, machineId: issues.machineId })
+      .select({ id: issues.id })
       .from(issues)
       .where(eq(issues.organizationId, organizationId));
 
-    const existingIssuesSet = new Set(
-      existingIssues.map((i) => `${i.machineId}_${i.title}`),
+    const existingIssueIds = new Set(existingIssues.map((i) => i.id));
+
+    // Filter out issues that already exist
+    const issuesToCreate = targetIssues.filter(
+      (issue) => !existingIssueIds.has(issue.id),
     );
 
-    // Build issues to create
-    const issuesToCreate: (typeof issues.$inferInsert)[] = [];
-    let skippedCount = 0;
-
-    for (const issueData of sampleIssues) {
-      try {
-        // Find machine by OPDB ID
-        const machine = machineMap.get(issueData.gameOpdbId);
-        if (!machine) {
-          console.warn(
-            `[SAMPLE] ⚠️  Machine not found for OPDB ID ${issueData.gameOpdbId}, skipping issue`,
-          );
-          skippedCount++;
-          continue;
-        }
-
-        // Check if issue already exists
-        const issueKey = `${machine.id}_${issueData.title}`;
-        if (existingIssuesSet.has(issueKey)) {
-          log(`[SAMPLE] ⏭️  Issue exists: ${issueData.title}`);
-          continue;
-        }
-
-        // Map priority
-        const priorityName = mapSeverityToPriority(issueData.severity);
-        const priorityId = priorityMap.get(priorityName);
-        if (!priorityId) {
-          console.warn(
-            `[SAMPLE] ⚠️  Priority '${priorityName}' not found, skipping issue`,
-          );
-          skippedCount++;
-          continue;
-        }
-
-        // Map status
-        const statusId = statusMap.get(issueData.status);
-        if (!statusId) {
-          console.warn(
-            `[SAMPLE] ⚠️  Status '${issueData.status}' not found, skipping issue`,
-          );
-          skippedCount++;
-          continue;
-        }
-
-        // Map creator - fail fast for dev users, skip gracefully for sample data users
-        const createdById = userMap.get(issueData.reporterEmail);
-        if (!createdById) {
-          // Fail fast if this is a dev user that should exist
-          if (issueData.reporterEmail.includes("@dev.local")) {
-            const errorMsg = `Critical: Required dev user '${issueData.reporterEmail}' not found in database. This indicates auth user synchronization failed.`;
-            console.error(`[SAMPLE] ❌ ${errorMsg}`);
-            throw new Error(errorMsg);
-          }
-
-          // Skip gracefully for sample data users (these are from the JSON and may not exist)
-          log(
-            `[SAMPLE] ⏭️  Sample user '${issueData.reporterEmail}' not found, skipping issue "${issueData.title}"`,
-          );
-          skippedCount++;
-          continue;
-        }
-
-        issuesToCreate.push({
-          id: `issue_${issuesToCreate.length}_${Date.now()}`, // Unique ID
-          title: issueData.title,
-          description: issueData.description,
-          consistency: issueData.consistency,
-          organizationId,
-          machineId: machine.id,
-          statusId,
-          priorityId,
-          createdById,
-          createdAt: new Date(issueData.createdAt),
-          updatedAt: new Date(issueData.updatedAt),
-        });
-      } catch (error) {
-        console.warn(
-          `[SAMPLE] ⚠️  Failed to process issue '${issueData.title}':`,
-          error,
-        );
-        skippedCount++;
-      }
+    if (issuesToCreate.length === 0) {
+      log(`[SAMPLE] ⏭️  All issues already exist, skipping creation`);
+      return;
     }
 
-    // Batch create all issues
-    if (issuesToCreate.length > 0) {
-      try {
-        await dbInstance.insert(issues).values(issuesToCreate);
-        log(
-          `[SAMPLE] ✅ Created ${issuesToCreate.length.toString()} issues via batch insert`,
-        );
-      } catch (error) {
-        console.error(`[SAMPLE] ❌ Failed to batch create issues:`, error);
-        throw new Error(
-          `Issue creation failed: ${error instanceof Error ? error.message : String(error)}`,
-        );
-      }
-    } else {
-      log(`[SAMPLE] ⏭️  No new issues to create`);
+    // Batch create all issues using static SEED_TEST_IDS data
+    try {
+      await dbInstance.insert(issues).values(issuesToCreate);
+      log(
+        `[SAMPLE] ✅ Created ${issuesToCreate.length.toString()} issues via batch insert`,
+      );
+    } catch (error) {
+      console.error(`[SAMPLE] ❌ Failed to batch create issues:`, error);
+      throw new Error(
+        `Issue creation failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
 
     log(
-      `[SAMPLE] ✅ Issue creation completed: ${issuesToCreate.length} created, ${skippedCount} skipped`,
+      `[SAMPLE] ✅ Issue creation completed: ${issuesToCreate.length} created, ${targetIssues.length - issuesToCreate.length} already existed`,
     );
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -747,9 +591,15 @@ export async function seedSampleDataWithDb(
       `[SAMPLE] ✅ Sample data seeding completed successfully in ${duration}ms!`,
     );
     log(`[SAMPLE] 📊 Summary:`);
-    log(`[SAMPLE]   - Games: ${uniqueGames.length} unique OPDB models (global catalog)`);
-    log(`[SAMPLE]   - Machines: ${uniqueGames.length} primary org + 1 competitor org machine`);
-    log(`[SAMPLE]   - Cross-org testing: Shared "Revenge from Mars" model with isolated machines`);
+    log(
+      `[SAMPLE]   - Games: ${uniqueGames.length} unique OPDB models (global catalog)`,
+    );
+    log(
+      `[SAMPLE]   - Machines: ${uniqueGames.length} primary org + 1 competitor org machine`,
+    );
+    log(
+      `[SAMPLE]   - Cross-org testing: Shared "Revenge from Mars" model with isolated machines`,
+    );
     log(
       `[SAMPLE]   - Issues: ${dataAmount === "minimal" ? "Limited" : "Rich"} sample data from curated JSON`,
     );

@@ -6,7 +6,7 @@
  * complex multi-tenant scenarios using the established seeded data infrastructure.
  *
  * Key Features:
- * - Uses createSeededTestDatabase() and getSeededTestData() for consistent test data
+ * - Uses createSeededTestDatabase() and SEED_TEST_IDS for consistent test data
  * - Leverages createSeededLocationTestContext() for standardized TRPC context
  * - Uses SEED_TEST_IDS.ORGANIZATIONS.competitor for cross-org isolation testing
  * - Maintains performance tests with seeded data baseline + additional test data
@@ -27,9 +27,9 @@ import { generateTestId } from "~/test/helpers/test-id-generator";
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
 import {
   createSeededTestDatabase,
-  getSeededTestData,
   type TestDatabase,
 } from "~/test/helpers/pglite-test-setup";
+import { createSeededLocationTestContext } from "~/test/helpers/createSeededLocationTestContext";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
 // Mock external dependencies that aren't database-related
@@ -56,21 +56,8 @@ vi.mock("~/server/auth/permissions", () => ({
 }));
 
 describe("Location Router - Schema & Performance Tests (PGlite)", () => {
-  let workerDb: TestDatabase;
-  let primaryOrgId: string;
-  let competitorOrgId: string;
-  let seededData: Awaited<ReturnType<typeof getSeededTestData>>;
-
-  beforeAll(async () => {
-    // Create seeded test database with established infrastructure
-    const setup = await createSeededTestDatabase();
-    workerDb = setup.db;
-    primaryOrgId = setup.organizationId;
-    competitorOrgId = SEED_TEST_IDS.ORGANIZATIONS.competitor;
-
-    // Get seeded test data for use across tests
-    seededData = await getSeededTestData(workerDb, primaryOrgId);
-  });
+  const primaryOrgId = SEED_TEST_IDS.ORGANIZATIONS.primary;
+  const competitorOrgId = SEED_TEST_IDS.ORGANIZATIONS.competitor;
 
   describe("Database Schema Validation", () => {
     test("should maintain referential integrity", async ({ workerDb }) => {
@@ -79,7 +66,7 @@ describe("Location Router - Schema & Performance Tests (PGlite)", () => {
         const context = await createSeededLocationTestContext(
           txDb,
           primaryOrgId,
-          seededData.user!,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
 
         // Use seeded data for base entities, create test-specific additional data
@@ -94,9 +81,9 @@ describe("Location Router - Schema & Performance Tests (PGlite)", () => {
             name: "Test Machine Integrity",
             qrCodeId: `qr-${machineId}`,
             organizationId: primaryOrgId,
-            locationId: seededData.location!,
-            modelId: seededData.model!,
-            ownerId: seededData.user!,
+            locationId: SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR,
+            modelId: "model-mm-001",
+            ownerId: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date(),
             updatedAt: new Date(),
           })
@@ -161,7 +148,7 @@ describe("Location Router - Schema & Performance Tests (PGlite)", () => {
         const context = await createSeededLocationTestContext(
           txDb,
           primaryOrgId,
-          seededData.user!,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = locationRouter.createCaller(context);
 
@@ -237,7 +224,7 @@ describe("Location Router - Schema & Performance Tests (PGlite)", () => {
         const context = await createSeededLocationTestContext(
           txDb,
           primaryOrgId,
-          seededData.user!,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = locationRouter.createCaller(context);
 
@@ -292,7 +279,7 @@ describe("Location Router - Schema & Performance Tests (PGlite)", () => {
         const context = await createSeededLocationTestContext(
           txDb,
           primaryOrgId,
-          seededData.user!,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = locationRouter.createCaller(context);
 
@@ -327,9 +314,9 @@ describe("Location Router - Schema & Performance Tests (PGlite)", () => {
             title: `Aggregation Issue ${i}`,
             organizationId: primaryOrgId,
             machineId: `agg-machine-${i % 15}`, // 2 issues per machine
-            statusId: seededData.status!,
-            priorityId: seededData.priority!,
-            createdById: seededData.user!,
+            statusId: SEED_TEST_IDS.STATUSES.NEW_PRIMARY,
+            priorityId: SEED_TEST_IDS.PRIORITIES.HIGH_PRIMARY,
+            createdById: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date(),
             updatedAt: new Date(),
           })),
@@ -374,7 +361,7 @@ describe("Location Router - Schema & Performance Tests (PGlite)", () => {
         const context = await createSeededLocationTestContext(
           txDb,
           primaryOrgId,
-          seededData.user!,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = locationRouter.createCaller(context);
 

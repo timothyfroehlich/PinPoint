@@ -29,9 +29,13 @@ import type { TestDatabase } from "~/test/helpers/pglite-test-setup";
 
 import { appRouter } from "~/server/api/root";
 import * as schema from "~/server/db/schema";
-import { SEED_TEST_IDS, createMockAdminContext } from "~/test/constants/seed-test-ids";
+import {
+  SEED_TEST_IDS,
+  createMockAdminContext,
+} from "~/test/constants/seed-test-ids";
 import { generateTestId } from "~/test/helpers/test-id-generator";
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
+import { getSeededTestData } from "~/test/helpers/pglite-test-setup";
 
 // Mock external dependencies that aren't database-related
 vi.mock("~/lib/utils/id-generation", () => ({
@@ -42,7 +46,7 @@ vi.mock("~/server/auth/permissions", () => ({
   getUserPermissionsForSession: vi
     .fn()
     .mockResolvedValue([
-      "model:view", 
+      "model:view",
       "model:create",
       "model:edit",
       "model:delete",
@@ -51,7 +55,7 @@ vi.mock("~/server/auth/permissions", () => ({
   getUserPermissionsForSupabaseUser: vi
     .fn()
     .mockResolvedValue([
-      "model:view", 
+      "model:view",
       "model:create",
       "model:edit",
       "model:delete",
@@ -69,65 +73,26 @@ vi.mock("~/server/auth/permissions", () => ({
 }));
 
 describe("Model Router Integration Tests (Simplified Single-Table Architecture)", () => {
-  // Helper function to set up test data and context
+  // Helper function to get seeded test data and context
   async function setupTestData(db: TestDatabase) {
-    // Create seed data first
+    // Use pre-seeded data instead of creating duplicates
     const organizationId = SEED_TEST_IDS.ORGANIZATIONS.primary;
+    const seededData = await getSeededTestData(db, organizationId);
 
-    // Create organization
-    const [org] = await db
-      .insert(schema.organizations)
-      .values({
-        id: organizationId,
-        name: "Test Organization",
-        subdomain: "test",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .returning();
+    if (!seededData.adminRole || !seededData.user) {
+      throw new Error(
+        "Pre-seeded test data not found - check worker database setup",
+      );
+    }
 
-    // Create roles
-    const [adminRole] = await db
-      .insert(schema.roles)
-      .values({
-        id: generateTestId("admin-role"),
-        name: "Admin",
-        organizationId,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .returning();
-
-    // Create test user
-    const [testUser] = await db
-      .insert(schema.users)
-      .values({
-        id: generateTestId("admin-user"),
-        name: "Test Admin User",
-        email: `admin-${generateTestId("user")}@example.com`,
-        emailVerified: null,
-      })
-      .returning();
-
-    // Create membership for the test user
-    await db.insert(schema.memberships).values({
-      id: generateTestId("test-membership"),
-      userId: testUser.id,
-      organizationId,
-      roleId: adminRole.id,
+    // Use seeded location (should always be available)
+    const location = await db.query.locations.findFirst({
+      where: eq(schema.locations.id, seededData.location!),
     });
 
-    // Create location
-    const [location] = await db
-      .insert(schema.locations)
-      .values({
-        id: generateTestId("location"),
-        name: "Test Location",
-        organizationId,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .returning();
+    if (!location) {
+      throw new Error(`Seeded location ${seededData.location} not found`);
+    }
 
     // Create OPDB models (global - use schema defaults)
     const [model1] = await db
@@ -149,7 +114,7 @@ describe("Model Router Integration Tests (Simplified Single-Table Architecture)"
         name: "Attack from Mars",
         manufacturer: "Bally",
         year: 1995,
-        // organizationId defaults to null (global OPDB) 
+        // organizationId defaults to null (global OPDB)
         // isCustom defaults to false (OPDB model)
       })
       .returning();
@@ -163,7 +128,7 @@ describe("Model Router Integration Tests (Simplified Single-Table Architecture)"
         organizationId,
         locationId: location.id,
         modelId: model1.id,
-        ownerId: testUser.id,
+        ownerId: seededData.user,
         createdAt: new Date(),
         updatedAt: new Date(),
       },
@@ -174,7 +139,7 @@ describe("Model Router Integration Tests (Simplified Single-Table Architecture)"
         organizationId,
         locationId: location.id,
         modelId: model1.id,
-        ownerId: testUser.id,
+        ownerId: seededData.user,
         createdAt: new Date(),
         updatedAt: new Date(),
       },
@@ -185,34 +150,52 @@ describe("Model Router Integration Tests (Simplified Single-Table Architecture)"
         organizationId,
         locationId: location.id,
         modelId: model2.id,
-        ownerId: testUser.id,
+        ownerId: seededData.user,
         createdAt: new Date(),
         updatedAt: new Date(),
       },
     ]);
 
-    // Create test context with real database
+    // Get the seeded user for context
+    const user = await db.query.users.findFirst({
+      where: eq(schema.users.id, seededData.user!),
+    });
+
+    if (!user) {
+      throw new Error(`Seeded user ${seededData.user} not found`);
+    }
+
+    // Get the seeded organization for context
+    const organization = await db.query.organizations.findFirst({
+      where: eq(schema.organizations.id, organizationId),
+    });
+
+    if (!organization) {
+      throw new Error(`Seeded organization ${organizationId} not found`);
+    }
+
+    // Create test context with seeded data
     const ctx: TRPCContext = {
       db: db,
       user: {
-        id: testUser.id,
-        email: "test@example.com",
-        name: "Test Admin User",
+        id: user.id,
+        email: user.email,
+        name: user.name,
         user_metadata: {},
         app_metadata: {
           organization_id: organizationId,
         },
       },
       organization: {
-        id: organizationId,
-        name: "Test Organization",
-        subdomain: "test",
+        id: organization.id,
+        name: organization.name,
+        subdomain: organization.subdomain,
       },
       organizationId: organizationId,
       supabase: {} as any, // Not used in this router
       headers: new Headers(),
       userPermissions: [
-        "model:view", 
+        "model:view",
         "model:create",
         "model:edit",
         "model:delete",
@@ -236,26 +219,30 @@ describe("Model Router Integration Tests (Simplified Single-Table Architecture)"
     return {
       ctx,
       organizationId,
-      testUser,
-      adminRole,
+      user,
       location,
       models: { model1, model2 },
+      seededData,
     };
   }
 
   describe("Model Retrieval Operations", () => {
-    test("should return models with machine counts using real database operations", async ({ workerDb }) => {
+    test("should return models with machine counts using real database operations", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         const { ctx, models } = await setupTestData(db);
         const caller = appRouter.createCaller(ctx);
 
         const result = await caller.model.getAll();
 
-        // Verify the result structure with real machine counts
-        expect(result).toHaveLength(2);
-        
+        // Verify the result includes our test models (plus any seeded models)
+        expect(result.length).toBeGreaterThanOrEqual(2);
+
         // Find Medieval Madness model (has 2 machines)
-        const medievalMadness = result.find(m => m.name === "Medieval Madness");
+        const medievalMadness = result.find(
+          (m) => m.name === "Medieval Madness" && m.id === models.model1.id,
+        );
         expect(medievalMadness).toMatchObject({
           id: models.model1.id,
           name: "Medieval Madness",
@@ -266,7 +253,9 @@ describe("Model Router Integration Tests (Simplified Single-Table Architecture)"
         });
 
         // Find Attack from Mars model (has 1 machine)
-        const attackFromMars = result.find(m => m.name === "Attack from Mars");
+        const attackFromMars = result.find(
+          (m) => m.name === "Attack from Mars",
+        );
         expect(attackFromMars).toMatchObject({
           id: models.model2.id,
           name: "Attack from Mars",
@@ -278,11 +267,13 @@ describe("Model Router Integration Tests (Simplified Single-Table Architecture)"
       });
     });
 
-    test("should return empty array when no models exist in organization", async ({ workerDb }) => {
+    test("should return empty array when no models exist in organization", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Create organization but no models or machines
         const organizationId = SEED_TEST_IDS.ORGANIZATIONS.competitor;
-        
+
         const [org] = await db
           .insert(schema.organizations)
           .values({
@@ -346,10 +337,12 @@ describe("Model Router Integration Tests (Simplified Single-Table Architecture)"
       });
     });
 
-    test("should enforce organizational scoping and isolation", async ({ workerDb }) => {
+    test("should enforce organizational scoping and isolation", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         const { ctx } = await setupTestData(db);
-        
+
         // Create a second organization with its own models
         const [org2] = await db
           .insert(schema.organizations)
@@ -377,14 +370,22 @@ describe("Model Router Integration Tests (Simplified Single-Table Architecture)"
 
         // Should only see models from primary organization
         expect(result).toHaveLength(2); // Only our test models
-        expect(result.every(m => ["Medieval Madness", "Attack from Mars"].includes(m.name))).toBe(true);
-        expect(result.find(m => m.name === "Competitor Model")).toBeUndefined();
+        expect(
+          result.every((m) =>
+            ["Medieval Madness", "Attack from Mars"].includes(m.name),
+          ),
+        ).toBe(true);
+        expect(
+          result.find((m) => m.name === "Competitor Model"),
+        ).toBeUndefined();
       });
     });
   });
 
   describe("Model Individual Retrieval", () => {
-    test("should return model by ID with real machine count", async ({ workerDb }) => {
+    test("should return model by ID with real machine count", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         const { ctx, models } = await setupTestData(db);
         const caller = appRouter.createCaller(ctx);
@@ -406,25 +407,29 @@ describe("Model Router Integration Tests (Simplified Single-Table Architecture)"
       });
     });
 
-    test("should throw NOT_FOUND when model doesn't exist", async ({ workerDb }) => {
+    test("should throw NOT_FOUND when model doesn't exist", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         const { ctx } = await setupTestData(db);
         const caller = appRouter.createCaller(ctx);
 
         await expect(
-          caller.model.getById({ id: generateTestId("nonexistent") })
+          caller.model.getById({ id: generateTestId("nonexistent") }),
         ).rejects.toThrow(TRPCError);
-        
+
         await expect(
-          caller.model.getById({ id: generateTestId("nonexistent") })
+          caller.model.getById({ id: generateTestId("nonexistent") }),
         ).rejects.toThrow("Model not found or access denied");
       });
     });
 
-    test("should throw NOT_FOUND when model exists but not in organization", async ({ workerDb }) => {
+    test("should throw NOT_FOUND when model exists but not in organization", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         const { ctx } = await setupTestData(db);
-        
+
         // Create a model in a different organization
         const [org2] = await db
           .insert(schema.organizations)
@@ -453,19 +458,22 @@ describe("Model Router Integration Tests (Simplified Single-Table Architecture)"
 
         // Should not be able to access model from different organization
         await expect(
-          caller.model.getById({ id: otherOrgModel.id })
+          caller.model.getById({ id: otherOrgModel.id }),
         ).rejects.toThrow(TRPCError);
-        
+
         await expect(
-          caller.model.getById({ id: otherOrgModel.id })
+          caller.model.getById({ id: otherOrgModel.id }),
         ).rejects.toThrow("Model not found or access denied");
       });
     });
 
-    test("should include accurate machine count in response", async ({ workerDb }) => {
+    test("should include accurate machine count in response", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { ctx, models, organizationId, testUser, location } = await setupTestData(db);
-        
+        const { ctx, models, organizationId, testUser, location } =
+          await setupTestData(db);
+
         // Create additional machines for model2 to test different counts
         await db.insert(schema.machines).values([
           {
@@ -475,7 +483,7 @@ describe("Model Router Integration Tests (Simplified Single-Table Architecture)"
             organizationId,
             locationId: location.id,
             modelId: models.model2.id,
-            ownerId: testUser.id,
+            ownerId: seededData.user,
             createdAt: new Date(),
             updatedAt: new Date(),
           },
@@ -486,7 +494,7 @@ describe("Model Router Integration Tests (Simplified Single-Table Architecture)"
             organizationId,
             locationId: location.id,
             modelId: models.model2.id,
-            ownerId: testUser.id,
+            ownerId: seededData.user,
             createdAt: new Date(),
             updatedAt: new Date(),
           },
@@ -506,10 +514,12 @@ describe("Model Router Integration Tests (Simplified Single-Table Architecture)"
   // Custom model deletion will be implemented in v1.x
 
   describe("Cross-Organizational Security Testing", () => {
-    test("should enforce organizational boundaries across all operations", async ({ workerDb }) => {
+    test("should enforce organizational boundaries across all operations", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         const { ctx, models } = await setupTestData(db);
-        
+
         // Create a second organization with its own data
         const [org2] = await db
           .insert(schema.organizations)
@@ -543,26 +553,34 @@ describe("Model Router Integration Tests (Simplified Single-Table Architecture)"
         ]);
 
         const caller = appRouter.createCaller(ctx);
-        
+
         // Test getAll - should only see primary org models
         const allModels = await caller.model.getAll();
         expect(allModels).toHaveLength(2); // Only our test models
-        expect(allModels.every(m => ["Medieval Madness", "Attack from Mars"].includes(m.name))).toBe(true);
-        expect(allModels.find(m => m.name.includes("Competitor"))).toBeUndefined();
+        expect(
+          allModels.every((m) =>
+            ["Medieval Madness", "Attack from Mars"].includes(m.name),
+          ),
+        ).toBe(true);
+        expect(
+          allModels.find((m) => m.name.includes("Competitor")),
+        ).toBeUndefined();
 
         // Test getById - should not access competitor org models
         await expect(
-          caller.model.getById({ id: generateTestId("competitor-model-1") })
+          caller.model.getById({ id: generateTestId("competitor-model-1") }),
         ).rejects.toThrow("Model not found or access denied");
 
         // Note: Delete operations removed - OPDB models are read-only in beta
       });
     });
 
-    test("should maintain data integrity across organizations", async ({ workerDb }) => {
+    test("should maintain data integrity across organizations", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         const { ctx, organizationId } = await setupTestData(db);
-        
+
         // Create context for competitor organization
         const [competitorUser] = await db
           .insert(schema.users)
@@ -593,7 +611,13 @@ describe("Model Router Integration Tests (Simplified Single-Table Architecture)"
           organizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor,
           supabase: {} as any,
           headers: new Headers(),
-          userPermissions: ["model:view", "model:create", "model:edit", "model:delete", "organization:manage"],
+          userPermissions: [
+            "model:view",
+            "model:create",
+            "model:edit",
+            "model:delete",
+            "organization:manage",
+          ],
           services: {} as any,
           logger: {
             error: vi.fn(),
@@ -612,7 +636,7 @@ describe("Model Router Integration Tests (Simplified Single-Table Architecture)"
         const primaryCaller = appRouter.createCaller(ctx);
         const competitorCaller = appRouter.createCaller(competitorCtx);
 
-        // Primary org should see global OPDB models (2) + no custom models 
+        // Primary org should see global OPDB models (2) + no custom models
         const primaryModels = await primaryCaller.model.getAll();
         expect(primaryModels).toHaveLength(2); // Global OPDB models
 
@@ -621,16 +645,21 @@ describe("Model Router Integration Tests (Simplified Single-Table Architecture)"
         expect(competitorModels).toHaveLength(2); // Same global OPDB models
 
         // Verify complete organizational isolation
-        expect(primaryModels.every(m => m.name !== "Competitor Model")).toBe(true);
+        expect(primaryModels.every((m) => m.name !== "Competitor Model")).toBe(
+          true,
+        );
       });
     });
   });
 
   describe("Real Database Operations & Performance", () => {
-    test("should perform accurate machine counting with complex relationships", async ({ workerDb }) => {
+    test("should perform accurate machine counting with complex relationships", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { ctx, models, organizationId, testUser, location } = await setupTestData(db);
-        
+        const { ctx, models, organizationId, testUser, location } =
+          await setupTestData(db);
+
         // Create additional OPDB model for complex test data
         const [newModel] = await db
           .insert(schema.models)
@@ -652,7 +681,7 @@ describe("Model Router Integration Tests (Simplified Single-Table Architecture)"
           organizationId,
           locationId: location.id,
           modelId: newModel.id,
-          ownerId: testUser.id,
+          ownerId: seededData.user,
           createdAt: new Date(),
           updatedAt: new Date(),
         }));
@@ -660,12 +689,12 @@ describe("Model Router Integration Tests (Simplified Single-Table Architecture)"
         await db.insert(schema.machines).values(machineInserts);
 
         const caller = appRouter.createCaller(ctx);
-        
+
         // Test getAll with accurate machine counts
         const allModels = await caller.model.getAll();
         expect(allModels).toHaveLength(3); // Original 2 + 1 new
-        
-        const complexModel = allModels.find(m => m.name === "Complex Model");
+
+        const complexModel = allModels.find((m) => m.name === "Complex Model");
         expect(complexModel).toBeDefined();
         expect(complexModel!.machineCount).toBe(7);
 
@@ -676,20 +705,22 @@ describe("Model Router Integration Tests (Simplified Single-Table Architecture)"
       });
     });
 
-    test("should handle database errors gracefully with real operations", async ({ workerDb }) => {
+    test("should handle database errors gracefully with real operations", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         const { ctx } = await setupTestData(db);
         const caller = appRouter.createCaller(ctx);
 
         // Test with malformed ID (should handle gracefully)
         await expect(
-          caller.model.getById({ id: "definitely-not-a-valid-id" })
+          caller.model.getById({ id: "definitely-not-a-valid-id" }),
         ).rejects.toThrow("Model not found or access denied");
 
         // Test with empty string ID
-        await expect(
-          caller.model.getById({ id: "" })
-        ).rejects.toThrow("Model not found or access denied");
+        await expect(caller.model.getById({ id: "" })).rejects.toThrow(
+          "Model not found or access denied",
+        );
       });
     });
 

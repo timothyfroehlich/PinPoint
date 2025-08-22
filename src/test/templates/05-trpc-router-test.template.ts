@@ -1,10 +1,10 @@
 /**
  * TEMPLATE: Archetype 5 - tRPC Router Test
- * 
+ *
  * USE FOR: Testing tRPC router procedures with mocked database
  * RLS IMPACT: MASSIVELY SIMPLIFIED - No organizational context complexity
  * AGENT: integration-test-architect
- * 
+ *
  * CHARACTERISTICS:
  * - Tests tRPC router procedures and middleware
  * - Uses mocked database for fast, isolated testing
@@ -69,29 +69,28 @@ vi.mock("~/server/db", async (importOriginal) => {
 const mockDb = vi.mocked((await import("~/server/db")).db);
 
 describe("YourRouter tRPC Router", () => {
-  
   beforeEach(() => {
     vi.clearAllMocks();
   });
-  
+
   // =============================================================================
   // AUTHENTICATION AND AUTHORIZATION TESTS
   // =============================================================================
-  
+
   test("protected procedure requires authentication", async () => {
     // ARRANGE: Create context without authentication
     const mockCtx = createVitestMockContext({
       session: null, // No authentication
     });
-    
+
     const caller = appRouter.createCaller(mockCtx);
-    
+
     // ACT & ASSERT: Should throw authentication error
     await expect(
-      caller.yourRouter.protectedProcedure({ id: "test-id" })
+      caller.yourRouter.protectedProcedure({ id: "test-id" }),
     ).rejects.toThrow("UNAUTHORIZED");
   });
-  
+
   test("protected procedure works with valid authentication", async () => {
     // ARRANGE: Mock database response
     const mockResource = {
@@ -100,25 +99,27 @@ describe("YourRouter tRPC Router", () => {
       organizationId: "test-org",
       createdById: "test-user",
     };
-    
+
     mockDb.query.yourTable.findFirst.mockResolvedValue(mockResource);
-    
+
     // ARRANGE: Create authenticated context
     const mockCtx = createVitestMockContext({
-      user: { 
-        id: "test-user", 
-        user_metadata: { organizationId: "test-org" } 
+      user: {
+        id: "test-user",
+        user_metadata: { organizationId: "test-org" },
       },
     });
-    
+
     const caller = appRouter.createCaller(mockCtx);
-    
+
     // ACT: Call protected procedure
-    const result = await caller.yourRouter.protectedProcedure({ id: "test-resource-1" });
-    
+    const result = await caller.yourRouter.protectedProcedure({
+      id: "test-resource-1",
+    });
+
     // ASSERT: Returns expected result
     expect(result).toEqual(mockResource);
-    
+
     // VERIFY: RLS session context was set
     expect(mockDb.execute).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -126,58 +127,58 @@ describe("YourRouter tRPC Router", () => {
       }),
     );
   });
-  
+
   test("enforces organizational isolation", async () => {
     // ARRANGE: Mock resource from different organization
     mockDb.query.yourTable.findFirst.mockResolvedValue(null); // RLS blocks access
-    
+
     const mockCtx = createVitestMockContext({
-      user: { 
-        id: "test-user", 
-        user_metadata: { organizationId: "user-org" } 
+      user: {
+        id: "test-user",
+        user_metadata: { organizationId: "user-org" },
       },
     });
-    
+
     const caller = appRouter.createCaller(mockCtx);
-    
+
     // ACT & ASSERT: Should not find resource from different org
     await expect(
-      caller.yourRouter.getById({ id: "other-org-resource" })
+      caller.yourRouter.getById({ id: "other-org-resource" }),
     ).rejects.toThrow("NOT_FOUND");
   });
-  
+
   // =============================================================================
   // INPUT VALIDATION TESTS
   // =============================================================================
-  
+
   test("validates input schema correctly", async () => {
     const mockCtx = createVitestMockContext({
-      user: { 
-        id: "test-user", 
-        user_metadata: { organizationId: "test-org" } 
+      user: {
+        id: "test-user",
+        user_metadata: { organizationId: "test-org" },
       },
     });
-    
+
     const caller = appRouter.createCaller(mockCtx);
-    
+
     // Test invalid input types
     await expect(
       caller.yourRouter.create({
         name: "", // Invalid: empty string
         description: null, // Invalid: null when string expected
         count: "not-a-number", // Invalid: string when number expected
-      } as any)
+      } as any),
     ).rejects.toThrow("BAD_REQUEST");
-    
+
     // Test missing required fields
     await expect(
       caller.yourRouter.create({
         // Missing required 'name' field
         description: "Valid description",
-      } as any)
+      } as any),
     ).rejects.toThrow("BAD_REQUEST");
   });
-  
+
   test("accepts valid input and transforms correctly", async () => {
     // ARRANGE: Mock successful database operation
     const mockCreated = {
@@ -188,32 +189,32 @@ describe("YourRouter tRPC Router", () => {
       createdById: "test-user",
       createdAt: new Date(),
     };
-    
+
     mockDb.insert.mockReturnValue({
       values: vi.fn().mockReturnValue({
         returning: vi.fn().mockResolvedValue([mockCreated]),
       }),
     } as any);
-    
+
     const mockCtx = createVitestMockContext({
-      user: { 
-        id: "test-user", 
-        user_metadata: { organizationId: "test-org" } 
+      user: {
+        id: "test-user",
+        user_metadata: { organizationId: "test-org" },
       },
     });
-    
+
     const caller = appRouter.createCaller(mockCtx);
-    
+
     // ACT: Call with valid input
     const result = await caller.yourRouter.create({
       name: "Valid Resource",
       description: "Valid description",
       metadata: { key: "value" }, // Optional field
     });
-    
+
     // ASSERT: Returns transformed result
     expect(result).toEqual(mockCreated);
-    
+
     // VERIFY: Database called with correct data
     expect(mockDb.insert).toHaveBeenCalled();
     const insertCall = mockDb.insert().values as any;
@@ -225,11 +226,11 @@ describe("YourRouter tRPC Router", () => {
       createdById: "test-user", // Automatically added from auth context
     });
   });
-  
+
   // =============================================================================
   // CRUD OPERATIONS TESTING
   // =============================================================================
-  
+
   test("list procedure returns paginated results", async () => {
     // ARRANGE: Mock database results
     const mockResources = [
@@ -237,18 +238,18 @@ describe("YourRouter tRPC Router", () => {
       { id: "2", name: "Resource 2", organizationId: "test-org" },
       { id: "3", name: "Resource 3", organizationId: "test-org" },
     ];
-    
+
     mockDb.query.yourTable.findMany.mockResolvedValue(mockResources);
-    
+
     const mockCtx = createVitestMockContext({
-      user: { 
-        id: "test-user", 
-        user_metadata: { organizationId: "test-org" } 
+      user: {
+        id: "test-user",
+        user_metadata: { organizationId: "test-org" },
       },
     });
-    
+
     const caller = appRouter.createCaller(mockCtx);
-    
+
     // ACT: Call list procedure with pagination
     const result = await caller.yourRouter.list({
       page: 1,
@@ -256,7 +257,7 @@ describe("YourRouter tRPC Router", () => {
       sortBy: "name",
       sortOrder: "asc",
     });
-    
+
     // ASSERT: Returns expected structure
     expect(result).toEqual({
       items: mockResources,
@@ -267,7 +268,7 @@ describe("YourRouter tRPC Router", () => {
         hasMore: false,
       },
     });
-    
+
     // VERIFY: Database called with correct parameters
     expect(mockDb.query.yourTable.findMany).toHaveBeenCalledWith({
       where: expect.any(Object), // RLS where clause
@@ -276,7 +277,7 @@ describe("YourRouter tRPC Router", () => {
       orderBy: expect.any(Array),
     });
   });
-  
+
   test("update procedure validates ownership", async () => {
     // ARRANGE: Mock existing resource
     const existingResource = {
@@ -285,27 +286,27 @@ describe("YourRouter tRPC Router", () => {
       organizationId: "test-org",
       createdById: "other-user", // Different user
     };
-    
+
     mockDb.query.yourTable.findFirst.mockResolvedValue(existingResource);
-    
+
     const mockCtx = createVitestMockContext({
-      user: { 
+      user: {
         id: "test-user", // Different from creator
-        user_metadata: { organizationId: "test-org", role: "member" } 
+        user_metadata: { organizationId: "test-org", role: "member" },
       },
     });
-    
+
     const caller = appRouter.createCaller(mockCtx);
-    
+
     // ACT & ASSERT: Should check ownership/permissions
     await expect(
       caller.yourRouter.update({
         id: "resource-1",
         name: "Updated Name",
-      })
+      }),
     ).rejects.toThrow("FORBIDDEN");
   });
-  
+
   test("delete procedure works for authorized users", async () => {
     // ARRANGE: Mock existing resource owned by user
     const existingResource = {
@@ -314,153 +315,158 @@ describe("YourRouter tRPC Router", () => {
       organizationId: "test-org",
       createdById: "test-user",
     };
-    
+
     mockDb.query.yourTable.findFirst.mockResolvedValue(existingResource);
     mockDb.delete.mockReturnValue({
       where: vi.fn().mockResolvedValue({ count: 1 }),
     } as any);
-    
+
     const mockCtx = createVitestMockContext({
-      user: { 
-        id: "test-user", 
-        user_metadata: { organizationId: "test-org" } 
+      user: {
+        id: "test-user",
+        user_metadata: { organizationId: "test-org" },
       },
     });
-    
+
     const caller = appRouter.createCaller(mockCtx);
-    
+
     // ACT: Delete resource
     const result = await caller.yourRouter.delete({ id: "resource-1" });
-    
+
     // ASSERT: Returns success
     expect(result).toEqual({ success: true });
-    
+
     // VERIFY: Database delete was called
     expect(mockDb.delete).toHaveBeenCalled();
   });
-  
+
   // =============================================================================
   // ERROR HANDLING TESTS
   // =============================================================================
-  
+
   test("handles database errors gracefully", async () => {
     // ARRANGE: Mock database error
-    mockDb.query.yourTable.findMany.mockRejectedValue(new Error("Database connection failed"));
-    
+    mockDb.query.yourTable.findMany.mockRejectedValue(
+      new Error("Database connection failed"),
+    );
+
     const mockCtx = createVitestMockContext({
-      user: { 
-        id: "test-user", 
-        user_metadata: { organizationId: "test-org" } 
+      user: {
+        id: "test-user",
+        user_metadata: { organizationId: "test-org" },
       },
     });
-    
+
     const caller = appRouter.createCaller(mockCtx);
-    
+
     // ACT & ASSERT: Should throw internal server error
-    await expect(
-      caller.yourRouter.list({})
-    ).rejects.toThrow("INTERNAL_SERVER_ERROR");
+    await expect(caller.yourRouter.list({})).rejects.toThrow(
+      "INTERNAL_SERVER_ERROR",
+    );
   });
-  
+
   test("handles not found scenarios", async () => {
     // ARRANGE: Mock empty result
     mockDb.query.yourTable.findFirst.mockResolvedValue(null);
-    
+
     const mockCtx = createVitestMockContext({
-      user: { 
-        id: "test-user", 
-        user_metadata: { organizationId: "test-org" } 
+      user: {
+        id: "test-user",
+        user_metadata: { organizationId: "test-org" },
       },
     });
-    
+
     const caller = appRouter.createCaller(mockCtx);
-    
+
     // ACT & ASSERT: Should throw not found error
     await expect(
-      caller.yourRouter.getById({ id: "nonexistent-id" })
+      caller.yourRouter.getById({ id: "nonexistent-id" }),
     ).rejects.toThrow("NOT_FOUND");
   });
-  
+
   // =============================================================================
   // MIDDLEWARE TESTING
   // =============================================================================
-  
+
   test("RLS middleware sets correct session context", async () => {
     // ARRANGE: Mock database response
     mockDb.query.yourTable.findMany.mockResolvedValue([]);
-    
+
     const mockCtx = createVitestMockContext({
-      user: { 
-        id: "test-user", 
-        user_metadata: { 
+      user: {
+        id: "test-user",
+        user_metadata: {
           organizationId: "test-org",
-          role: "admin" 
-        } 
+          role: "admin",
+        },
       },
     });
-    
+
     const caller = appRouter.createCaller(mockCtx);
-    
+
     // ACT: Call any protected procedure
     await caller.yourRouter.list({});
-    
+
     // ASSERT: RLS context was set correctly
     expect(mockDb.execute).toHaveBeenCalledWith(
       expect.objectContaining({
-        sql: expect.stringContaining("SET app.current_organization_id = 'test-org'"),
+        sql: expect.stringContaining(
+          "SET app.current_organization_id = 'test-org'",
+        ),
       }),
     );
-    
+
     expect(mockDb.execute).toHaveBeenCalledWith(
       expect.objectContaining({
         sql: expect.stringContaining("SET app.current_user_id = 'test-user'"),
       }),
     );
-    
+
     expect(mockDb.execute).toHaveBeenCalledWith(
       expect.objectContaining({
         sql: expect.stringContaining("SET app.current_user_role = 'admin'"),
       }),
     );
   });
-  
+
   test("rate limiting middleware works correctly", async () => {
     const mockCtx = createVitestMockContext({
-      user: { 
-        id: "test-user", 
-        user_metadata: { organizationId: "test-org" } 
+      user: {
+        id: "test-user",
+        user_metadata: { organizationId: "test-org" },
       },
     });
-    
+
     const caller = appRouter.createCaller(mockCtx);
-    
+
     // ACT: Make multiple rapid requests
     const promises = Array.from({ length: 10 }, () =>
-      caller.yourRouter.rateLimitedProcedure({})
+      caller.yourRouter.rateLimitedProcedure({}),
     );
-    
+
     const results = await Promise.allSettled(promises);
-    
+
     // ASSERT: Some requests should be rate limited
-    const successful = results.filter(r => r.status === "fulfilled");
+    const successful = results.filter((r) => r.status === "fulfilled");
     const rateLimited = results.filter(
-      r => r.status === "rejected" && 
-      (r.reason as TRPCError).code === "TOO_MANY_REQUESTS"
+      (r) =>
+        r.status === "rejected" &&
+        (r.reason as TRPCError).code === "TOO_MANY_REQUESTS",
     );
-    
+
     expect(successful.length).toBeLessThan(10);
     expect(rateLimited.length).toBeGreaterThan(0);
   });
-  
+
   // =============================================================================
   // COMPLEX BUSINESS LOGIC TESTS
   // =============================================================================
-  
+
   test("complex procedure handles multi-step workflow", async () => {
     // ARRANGE: Mock all required database calls
     const mockResource = { id: "resource-1", status: "draft" };
     const mockUpdatedResource = { ...mockResource, status: "published" };
-    
+
     mockDb.query.yourTable.findFirst.mockResolvedValue(mockResource);
     mockDb.update.mockReturnValue({
       set: vi.fn().mockReturnValue({
@@ -469,23 +475,23 @@ describe("YourRouter tRPC Router", () => {
         }),
       }),
     } as any);
-    
+
     // Mock notification creation
     mockDb.insert.mockReturnValue({
       values: vi.fn().mockReturnValue({
         returning: vi.fn().mockResolvedValue([{ id: "notification-1" }]),
       }),
     } as any);
-    
+
     const mockCtx = createVitestMockContext({
-      user: { 
-        id: "test-user", 
-        user_metadata: { organizationId: "test-org" } 
+      user: {
+        id: "test-user",
+        user_metadata: { organizationId: "test-org" },
       },
     });
-    
+
     const caller = appRouter.createCaller(mockCtx);
-    
+
     // ACT: Call complex workflow procedure
     const result = await caller.yourRouter.publishResource({
       id: "resource-1",
@@ -494,14 +500,14 @@ describe("YourRouter tRPC Router", () => {
         scheduleDate: new Date(),
       },
     });
-    
+
     // ASSERT: Returns workflow result
     expect(result).toEqual({
       resource: mockUpdatedResource,
       notificationSent: true,
       workflowComplete: true,
     });
-    
+
     // VERIFY: All expected database operations occurred
     expect(mockDb.query.yourTable.findFirst).toHaveBeenCalled();
     expect(mockDb.update).toHaveBeenCalled();
@@ -520,10 +526,14 @@ SETUP INSTRUCTIONS:
 2. Replace 'yourTable' with your actual database table/schema name
 3. Update import paths to match your project structure
 4. Customize mock database responses for your specific procedures
-5. Update authentication context for your user/session structure
+5. Update authentication context for your user/session structure.
+   - Note: When testing with real database, reference SEED_TEST_IDS constants.
+   - Example: For integration tests, use SEED_TEST_IDS.ORGANIZATIONS.primary.
 6. Remove unused test cases and add router-specific tests
 
 TRPC ROUTER TEST CHARACTERISTICS:
+- This template uses mocked data - no static constants needed for database mocking.
+- For actual database tests, use static SEED_TEST_IDS constants.
 - Tests API endpoints and their contracts
 - Uses mocked database for fast, isolated testing
 - Tests authentication, authorization, and input validation

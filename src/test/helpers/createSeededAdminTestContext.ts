@@ -6,7 +6,7 @@
  * duplicated context construction logic across admin, role, and router tests.
  *
  * Key Features:
- * - Uses seeded test data from getSeededTestData()
+ * - Uses seeded test data with static SEED_TEST_IDS constants
  * - Standardized service mocks for admin operations
  * - Proper organizational scoping
  * - Real membership relationships with admin permissions
@@ -76,8 +76,8 @@ export async function createSeededAdminTestContext(
   userId: string,
   options: AdminContextOptions = {},
 ): Promise<SeededAdminTestContext> {
-  // Query or create membership record for the user in the organization
-  let membership = await txDb.query.memberships.findFirst({
+  // Query membership and expect it to exist in seeded data with permissions
+  const membership = await txDb.query.memberships.findFirst({
     where: and(
       eq(memberships.userId, userId),
       eq(memberships.organizationId, organizationId),
@@ -91,37 +91,10 @@ export async function createSeededAdminTestContext(
     },
   });
 
-  // If no membership exists, create one within the transaction for testing
   if (!membership) {
-    // Get admin role for this organization
-    const adminRole = await txDb.query.roles.findFirst({
-      where: and(
-        eq(schema.roles.organizationId, organizationId),
-        eq(schema.roles.name, "Admin"),
-      ),
-      with: {
-        permissions: true,
-      },
-    });
-
-    if (adminRole) {
-      // Create membership within transaction
-      const [newMembership] = await txDb
-        .insert(memberships)
-        .values({
-          userId,
-          organizationId,
-          roleId: adminRole.id,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .returning();
-
-      membership = {
-        ...newMembership,
-        role: adminRole,
-      };
-    }
+    throw new Error(
+      `Membership not found in seeded data for user ${userId} in organization ${organizationId}. Ensure your test database includes proper seeded memberships with admin roles.`,
+    );
   }
 
   // Set up minimal service mocks for admin operations

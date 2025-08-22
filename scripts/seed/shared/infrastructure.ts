@@ -6,7 +6,6 @@
  */
 
 import { eq, and, inArray } from "drizzle-orm";
-import { nanoid } from "nanoid";
 
 // Quiet mode for tests
 const isTestMode = process.env.NODE_ENV === "test" || process.env.VITEST;
@@ -36,6 +35,147 @@ import {
 
 const db = createDrizzleClient();
 
+// Map permission names to static IDs
+const PERMISSION_ID_MAP: Record<string, string> = {
+  "issue:view": SEED_TEST_IDS.PERMISSIONS.ISSUE_VIEW,
+  "issue:create": SEED_TEST_IDS.PERMISSIONS.ISSUE_CREATE,
+  "issue:edit": SEED_TEST_IDS.PERMISSIONS.ISSUE_EDIT,
+  "issue:delete": SEED_TEST_IDS.PERMISSIONS.ISSUE_DELETE,
+  "issue:assign": SEED_TEST_IDS.PERMISSIONS.ISSUE_ASSIGN,
+  "issue:bulk_manage": SEED_TEST_IDS.PERMISSIONS.ISSUE_BULK_MANAGE,
+  "machine:view": SEED_TEST_IDS.PERMISSIONS.MACHINE_VIEW,
+  "machine:create": SEED_TEST_IDS.PERMISSIONS.MACHINE_CREATE,
+  "machine:edit": SEED_TEST_IDS.PERMISSIONS.MACHINE_EDIT,
+  "machine:delete": SEED_TEST_IDS.PERMISSIONS.MACHINE_DELETE,
+  "location:view": SEED_TEST_IDS.PERMISSIONS.LOCATION_VIEW,
+  "location:create": SEED_TEST_IDS.PERMISSIONS.LOCATION_CREATE,
+  "location:edit": SEED_TEST_IDS.PERMISSIONS.LOCATION_EDIT,
+  "location:delete": SEED_TEST_IDS.PERMISSIONS.LOCATION_DELETE,
+  "attachment:view": SEED_TEST_IDS.PERMISSIONS.ATTACHMENT_VIEW,
+  "attachment:create": SEED_TEST_IDS.PERMISSIONS.ATTACHMENT_CREATE,
+  "attachment:delete": SEED_TEST_IDS.PERMISSIONS.ATTACHMENT_DELETE,
+  "organization:manage": SEED_TEST_IDS.PERMISSIONS.ORGANIZATION_MANAGE,
+  "role:manage": SEED_TEST_IDS.PERMISSIONS.ROLE_MANAGE,
+  "user:manage": SEED_TEST_IDS.PERMISSIONS.USER_MANAGE,
+  "admin:view_analytics": SEED_TEST_IDS.PERMISSIONS.ADMIN_VIEW_ANALYTICS,
+};
+
+// Helper functions for deterministic ID generation
+function getPriorityId(priorityName: string, orgId: string): string {
+  const isPrimary = orgId === SEED_TEST_IDS.ORGANIZATIONS.primary;
+  const suffix = isPrimary ? "PRIMARY" : "COMPETITOR";
+
+  switch (priorityName) {
+    case "Low":
+      return SEED_TEST_IDS.PRIORITIES[
+        `LOW_${suffix}` as keyof typeof SEED_TEST_IDS.PRIORITIES
+      ];
+    case "Medium":
+      return SEED_TEST_IDS.PRIORITIES[
+        `MEDIUM_${suffix}` as keyof typeof SEED_TEST_IDS.PRIORITIES
+      ];
+    case "High":
+      return SEED_TEST_IDS.PRIORITIES[
+        `HIGH_${suffix}` as keyof typeof SEED_TEST_IDS.PRIORITIES
+      ];
+    case "Critical":
+      return SEED_TEST_IDS.PRIORITIES[
+        `CRITICAL_${suffix}` as keyof typeof SEED_TEST_IDS.PRIORITIES
+      ];
+    default:
+      throw new Error(`Unknown priority: ${priorityName}`);
+  }
+}
+
+function getStatusId(statusName: string, orgId: string): string {
+  const isPrimary = orgId === SEED_TEST_IDS.ORGANIZATIONS.primary;
+  const suffix = isPrimary ? "PRIMARY" : "COMPETITOR";
+
+  switch (statusName) {
+    case "New":
+      return SEED_TEST_IDS.STATUSES[
+        `NEW_${suffix}` as keyof typeof SEED_TEST_IDS.STATUSES
+      ];
+    case "In Progress":
+      return SEED_TEST_IDS.STATUSES[
+        `IN_PROGRESS_${suffix}` as keyof typeof SEED_TEST_IDS.STATUSES
+      ];
+    case "Needs expert help":
+      return SEED_TEST_IDS.STATUSES[
+        `NEEDS_EXPERT_${suffix}` as keyof typeof SEED_TEST_IDS.STATUSES
+      ];
+    case "Needs Parts":
+      return SEED_TEST_IDS.STATUSES[
+        `NEEDS_PARTS_${suffix}` as keyof typeof SEED_TEST_IDS.STATUSES
+      ];
+    case "Fixed":
+      return SEED_TEST_IDS.STATUSES[
+        `FIXED_${suffix}` as keyof typeof SEED_TEST_IDS.STATUSES
+      ];
+    case "Not to be Fixed":
+      return SEED_TEST_IDS.STATUSES[
+        `NOT_TO_BE_FIXED_${suffix}` as keyof typeof SEED_TEST_IDS.STATUSES
+      ];
+    case "Not Reproducible":
+      return SEED_TEST_IDS.STATUSES[
+        `NOT_REPRODUCIBLE_${suffix}` as keyof typeof SEED_TEST_IDS.STATUSES
+      ];
+    default:
+      throw new Error(`Unknown status: ${statusName}`);
+  }
+}
+
+function getRoleId(roleName: string, orgId: string): string {
+  const isPrimary = orgId === SEED_TEST_IDS.ORGANIZATIONS.primary;
+  const suffix = isPrimary ? "PRIMARY" : "COMPETITOR";
+
+  switch (roleName) {
+    case "Admin":
+      return SEED_TEST_IDS.ROLES[
+        `ADMIN_${suffix}` as keyof typeof SEED_TEST_IDS.ROLES
+      ];
+    case "Member":
+      return SEED_TEST_IDS.ROLES[
+        `MEMBER_${suffix}` as keyof typeof SEED_TEST_IDS.ROLES
+      ];
+    case "Unauthenticated":
+      return SEED_TEST_IDS.ROLES[
+        `UNAUTHENTICATED_${suffix}` as keyof typeof SEED_TEST_IDS.ROLES
+      ];
+    default:
+      throw new Error(`Unknown role: ${roleName}`);
+  }
+}
+
+function getCollectionTypeId(typeName: string, orgId: string): string {
+  const isPrimary = orgId === SEED_TEST_IDS.ORGANIZATIONS.primary;
+  const suffix = isPrimary ? "PRIMARY" : "COMPETITOR";
+
+  switch (typeName) {
+    case "Rooms":
+      return SEED_TEST_IDS.COLLECTION_TYPES[
+        `ROOMS_${suffix}` as keyof typeof SEED_TEST_IDS.COLLECTION_TYPES
+      ];
+    case "Manufacturer":
+      return SEED_TEST_IDS.COLLECTION_TYPES[
+        `MANUFACTURER_${suffix}` as keyof typeof SEED_TEST_IDS.COLLECTION_TYPES
+      ];
+    case "Era":
+      return SEED_TEST_IDS.COLLECTION_TYPES[
+        `ERA_${suffix}` as keyof typeof SEED_TEST_IDS.COLLECTION_TYPES
+      ];
+    default:
+      throw new Error(`Unknown collection type: ${typeName}`);
+  }
+}
+
+function getDefaultLocationId(orgId: string): string {
+  const isPrimary = orgId === SEED_TEST_IDS.ORGANIZATIONS.primary;
+  return isPrimary
+    ? SEED_TEST_IDS.LOCATIONS.DEFAULT_PRIMARY
+    : SEED_TEST_IDS.LOCATIONS.DEFAULT_COMPETITOR;
+}
+
 export interface Organization {
   id: string;
   name: string;
@@ -64,7 +204,9 @@ async function createGlobalPermissionsWithDb(
   const permissionsToCreate = ALL_PERMISSIONS.filter(
     (permName) => !existingSet.has(permName),
   ).map((permName) => ({
-    id: nanoid(),
+    id:
+      PERMISSION_ID_MAP[permName] ||
+      `perm-fallback-${permName.replace(/[^a-z0-9]/gi, "-")}`,
     name: permName,
     description: PERMISSION_DESCRIPTIONS[permName] ?? `Permission: ${permName}`,
   }));
@@ -137,7 +279,7 @@ async function createOrganizationWithRolesWithDb(
     const created = await dbInstance
       .insert(organizations)
       .values({
-        id: orgData.id ?? nanoid(),
+        id: orgData.id ?? `org-fallback-${orgData.subdomain}`,
         name: orgData.name,
         subdomain: orgData.subdomain,
         logoUrl: orgData.logoUrl,
@@ -201,7 +343,7 @@ async function createDefaultPrioritiesWithDb(
   const prioritiesToCreate = priorityData
     .filter((priority) => !existingSet.has(priority.name))
     .map((priority) => ({
-      id: nanoid(),
+      id: getPriorityId(priority.name, organizationId),
       name: priority.name,
       order: priority.order,
       organizationId,
@@ -289,7 +431,7 @@ async function createDefaultCollectionTypesWithDb(
   if (typesToCreate.length > 0) {
     try {
       const createValues = typesToCreate.map((typeData) => ({
-        id: nanoid(),
+        id: getCollectionTypeId(typeData.name, organizationId),
         name: typeData.name,
         organizationId,
         displayName: typeData.displayName,
@@ -396,7 +538,7 @@ async function createDefaultStatusesWithDb(
   if (statusesToCreate.length > 0) {
     try {
       const createValues = statusesToCreate.map((statusData) => ({
-        id: nanoid(),
+        id: getStatusId(statusData.name, organizationId),
         name: statusData.name,
         category: statusData.category,
         organizationId,
@@ -497,7 +639,7 @@ async function createSystemRolesWithDb(
     const created = await dbInstance
       .insert(roles)
       .values({
-        id: nanoid(),
+        id: getRoleId(SYSTEM_ROLES.ADMIN, organizationId),
         name: SYSTEM_ROLES.ADMIN,
         organizationId,
         isSystem: true,
@@ -585,7 +727,7 @@ async function createSystemRolesWithDb(
     const created = await dbInstance
       .insert(roles)
       .values({
-        id: nanoid(),
+        id: getRoleId(SYSTEM_ROLES.UNAUTHENTICATED, organizationId),
         name: SYSTEM_ROLES.UNAUTHENTICATED,
         organizationId,
         isSystem: true,
@@ -689,7 +831,7 @@ async function createTemplateRoleWithDb(
     const created = await dbInstance
       .insert(roles)
       .values({
-        id: nanoid(),
+        id: getRoleId(template.name, organizationId),
         name: template.name,
         organizationId,
         isSystem: false,
@@ -770,7 +912,7 @@ async function createDefaultLocationWithDb(
   if (existing.length === 0) {
     // Create new location
     await dbInstance.insert(locations).values({
-      id: nanoid(),
+      id: getDefaultLocationId(organizationId),
       name: "Austin Pinball Collective",
       street: "8777 Research Blvd",
       city: "Austin",
@@ -796,28 +938,39 @@ async function createTestDatabaseRolesWithDb(
   // Only create test roles in test environments
   const nodeEnv = process.env.NODE_ENV;
   const isTestEnv = nodeEnv === "test" || process.env.VITEST;
-  
+
   if (!isTestEnv) {
-    log("[INFRASTRUCTURE] Skipping test roles creation (not in test environment)");
+    log(
+      "[INFRASTRUCTURE] Skipping test roles creation (not in test environment)",
+    );
     return;
   }
 
   log("[INFRASTRUCTURE] Creating test database roles...");
 
   // Check and create integration_tester role (Track 2: Business Logic Testing)
-  const integrationTesterExists = await dbInstance.execute(`
+  const integrationTesterExists = await dbInstance
+    .execute(
+      `
     SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'integration_tester'
-  `).then(result => result.length > 0).catch(() => false);
+  `,
+    )
+    .then((result) => result.length > 0)
+    .catch(() => false);
 
   if (!integrationTesterExists) {
     try {
       await dbInstance.execute(`
         CREATE ROLE integration_tester WITH LOGIN BYPASSRLS PASSWORD 'testpassword'
       `);
-      log("[INFRASTRUCTURE] Created integration_tester role for business logic testing");
+      log(
+        "[INFRASTRUCTURE] Created integration_tester role for business logic testing",
+      );
     } catch (error) {
       // Role creation might fail if not superuser - that's okay, tests can still run
-      log("[INFRASTRUCTURE] Could not create integration_tester role (may require superuser)");
+      log(
+        "[INFRASTRUCTURE] Could not create integration_tester role (may require superuser)",
+      );
     }
   } else {
     log("[INFRASTRUCTURE] integration_tester role already exists");
@@ -825,29 +978,43 @@ async function createTestDatabaseRolesWithDb(
 
   // authenticated and anon roles are typically created by Supabase
   // but we'll ensure they exist for completeness
-  const authenticatedExists = await dbInstance.execute(`
+  const authenticatedExists = await dbInstance
+    .execute(
+      `
     SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'authenticated'
-  `).then(result => result.length > 0).catch(() => false);
+  `,
+    )
+    .then((result) => result.length > 0)
+    .catch(() => false);
 
   if (!authenticatedExists) {
     try {
       await dbInstance.execute(`CREATE ROLE authenticated`);
       log("[INFRASTRUCTURE] Created authenticated role for RLS testing");
     } catch (error) {
-      log("[INFRASTRUCTURE] Could not create authenticated role (may already exist in Supabase)");
+      log(
+        "[INFRASTRUCTURE] Could not create authenticated role (may already exist in Supabase)",
+      );
     }
   }
 
-  const anonExists = await dbInstance.execute(`
+  const anonExists = await dbInstance
+    .execute(
+      `
     SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'anon'
-  `).then(result => result.length > 0).catch(() => false);
+  `,
+    )
+    .then((result) => result.length > 0)
+    .catch(() => false);
 
   if (!anonExists) {
     try {
       await dbInstance.execute(`CREATE ROLE anon`);
       log("[INFRASTRUCTURE] Created anon role for anonymous testing");
     } catch (error) {
-      log("[INFRASTRUCTURE] Could not create anon role (may already exist in Supabase)");
+      log(
+        "[INFRASTRUCTURE] Could not create anon role (may already exist in Supabase)",
+      );
     }
   }
 
@@ -864,7 +1031,9 @@ async function createTestDatabaseRolesWithDb(
     `);
     log("[INFRASTRUCTURE] Granted permissions to test roles");
   } catch (error) {
-    log("[INFRASTRUCTURE] Could not grant all permissions to test roles (may require superuser)");
+    log(
+      "[INFRASTRUCTURE] Could not grant all permissions to test roles (may require superuser)",
+    );
   }
 
   log("[INFRASTRUCTURE] ✅ Test database roles setup complete");
@@ -896,7 +1065,8 @@ export async function seedInfrastructureWithDb(
       id: SEED_TEST_IDS.ORGANIZATIONS.primary,
       name: "Austin Pinball Collective",
       subdomain: "apc",
-      logoUrl: "/supabase/storage/pinpoint-storage-main/austinpinballcollective-logo-outline.png",
+      logoUrl:
+        "/supabase/storage/pinpoint-storage-main/austinpinballcollective-logo-outline.png",
     }),
     createOrganizationWithRolesWithDb(dbInstance, {
       id: SEED_TEST_IDS.ORGANIZATIONS.competitor,
@@ -905,7 +1075,9 @@ export async function seedInfrastructureWithDb(
       logoUrl: "/supabase/storage/pinpoint-storage-main/competitor-logo.png",
     }),
   ]);
-  log(`[INFRASTRUCTURE] Created organizations: ${primaryOrg.name}, ${secondaryOrg.name}`);
+  log(
+    `[INFRASTRUCTURE] Created organizations: ${primaryOrg.name}, ${secondaryOrg.name}`,
+  );
 
   // 3. Create test database roles (only in test environments)
   await createTestDatabaseRolesWithDb(dbInstance);
@@ -918,7 +1090,7 @@ export async function seedInfrastructureWithDb(
     createDefaultCollectionTypesWithDb(dbInstance, primaryOrg.id),
     createDefaultStatusesWithDb(dbInstance, primaryOrg.id),
     createDefaultLocationWithDb(dbInstance, primaryOrg.id),
-    
+
     // Secondary organization data
     createDefaultPrioritiesWithDb(dbInstance, secondaryOrg.id),
     createDefaultCollectionTypesWithDb(dbInstance, secondaryOrg.id),

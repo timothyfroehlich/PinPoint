@@ -281,18 +281,8 @@ export async function createSeededTestDatabase() {
   return { db, organizationId: orgId };
 }
 
-export async function getSeededTestData(db: TestDatabase, orgId: string) {
-  // Query actual seeded IDs from database
-  const location = await db.query.locations.findFirst({
-    where: eq(schema.locations.organizationId, orgId),
-  });
-
-  return {
-    organization: orgId,
-    location: location?.id,
-    // ... other test data IDs
-  };
-}
+// Use SEED_TEST_IDS constants directly for predictable test data
+// No dynamic database queries needed - all IDs are hardcoded constants
 ```
 
 ### Integration Test Structure
@@ -301,10 +291,8 @@ export async function getSeededTestData(db: TestDatabase, orgId: string) {
 // src/integration-tests/admin.integration.test.ts
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { adminRouter } from "~/server/api/routers/admin";
-import {
-  createSeededTestDatabase,
-  getSeededTestData,
-} from "~/test/helpers/pglite-test-setup";
+import { createSeededTestDatabase } from "~/test/helpers/pglite-test-setup";
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
 describe("Admin Router Integration (PGlite)", () => {
   let db: TestDatabase;
@@ -316,7 +304,7 @@ describe("Admin Router Integration (PGlite)", () => {
     // Fresh database for each test
     const setup = await createSeededTestDatabase();
     db = setup.db;
-    testData = await getSeededTestData(db, setup.organizationId);
+    // Use SEED_TEST_IDS constants directly - no database queries needed
 
     // Create test context with real database
     context = {

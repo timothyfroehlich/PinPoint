@@ -76,8 +76,8 @@ export async function createSeededLocationTestContext(
     throw new Error(`User not found in seeded data: ${userId}`);
   }
 
-  // Check if membership exists, create if needed
-  let membership = await db.query.memberships.findFirst({
+  // Check membership exists in seeded data and fail fast if missing
+  const membership = await db.query.memberships.findFirst({
     where: and(
       eq(schema.memberships.userId, userId),
       eq(schema.memberships.organizationId, organizationId),
@@ -88,42 +88,9 @@ export async function createSeededLocationTestContext(
   });
 
   if (!membership) {
-    // Find an admin role in the organization to assign
-    const adminRole = await db.query.roles.findFirst({
-      where: and(
-        eq(schema.roles.organizationId, organizationId),
-        eq(schema.roles.name, "Admin"),
-      ),
-    });
-
-    if (!adminRole) {
-      throw new Error(`No admin role found in organization: ${organizationId}`);
-    }
-
-    // Create the membership
-    const [newMembership] = await db
-      .insert(schema.memberships)
-      .values({
-        id: `membership-${userId}-${organizationId}`,
-        userId,
-        organizationId,
-        roleId: adminRole.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .returning();
-
-    // Refetch with role information
-    membership = await db.query.memberships.findFirst({
-      where: eq(schema.memberships.id, newMembership.id),
-      with: {
-        role: true,
-      },
-    });
-  }
-
-  if (!membership) {
-    throw new Error("Failed to create or find membership");
+    throw new Error(
+      `Membership not found in seeded data for user ${userId} in organization ${organizationId}. Ensure your test database includes proper seeded memberships.`,
+    );
   }
 
   // Default user permissions for location operations

@@ -38,8 +38,8 @@ export async function createSeededNotificationTestContext(
     throw new Error(`User with ID ${userId} not found in seeded data`);
   }
 
-  // Query or create membership record for the user in the organization
-  let membership = await txDb.query.memberships.findFirst({
+  // Query membership and expect it to exist in seeded data
+  const membership = await txDb.query.memberships.findFirst({
     where: (memberships, { and, eq }) =>
       and(
         eq(memberships.userId, userId),
@@ -47,40 +47,9 @@ export async function createSeededNotificationTestContext(
       ),
   });
 
-  // If no membership exists, create one within the transaction
-  if (!membership) {
-    // Get the admin role for the organization
-    const adminRole = await txDb.query.roles.findFirst({
-      where: (roles, { and, eq }) =>
-        and(eq(roles.organizationId, organizationId), eq(roles.name, "admin")),
-    });
-
-    if (!adminRole) {
-      throw new Error(
-        `Admin role not found for organization ${organizationId}`,
-      );
-    }
-
-    // Create the membership
-    await txDb.insert(memberships).values({
-      id: generateTestId("membership"),
-      userId,
-      organizationId,
-      roleId: adminRole.id,
-    });
-
-    // Re-query the membership
-    membership = await txDb.query.memberships.findFirst({
-      where: (memberships, { and, eq }) =>
-        and(
-          eq(memberships.userId, userId),
-          eq(memberships.organizationId, organizationId),
-        ),
-    });
-  }
   if (!membership) {
     throw new Error(
-      `Failed to create or find membership for user ${userId} in organization ${organizationId}`,
+      `Membership not found in seeded data for user ${userId} in organization ${organizationId}. Ensure your test database includes proper seeded memberships.`,
     );
   }
 

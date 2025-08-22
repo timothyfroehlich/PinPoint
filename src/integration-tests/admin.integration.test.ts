@@ -29,7 +29,6 @@ import * as schema from "~/server/db/schema";
 import {
   type TestDatabase,
   createSeededTestDatabase,
-  getSeededTestData,
 } from "~/test/helpers/pglite-test-setup";
 import { createSeededAdminTestContext } from "~/test/helpers/createSeededAdminTestContext";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
@@ -70,32 +69,20 @@ vi.mock("~/lib/utils/membership-transformers", () => ({
 describe("Admin Router Integration (PGlite)", () => {
   // Suite-level variables for seeded data
   let workerDb: TestDatabase;
-  let primaryOrgId: string;
-  let competitorOrgId: string;
-  let seededData: any;
 
   beforeAll(async () => {
     // Create seeded test database with dual organizations
-    const {
-      db,
-      primaryOrgId: primary,
-      secondaryOrgId: competitor,
-    } = await createSeededTestDatabase();
+    const { db } = await createSeededTestDatabase();
     workerDb = db;
-    primaryOrgId = primary;
-    competitorOrgId = competitor;
-
-    // Get seeded test data for primary organization
-    seededData = await getSeededTestData(db, primaryOrgId);
   });
 
   describe("getUsers", () => {
     test("should retrieve all organization members with real database operations", async () => {
       await withIsolatedTest(workerDb, async (txDb) => {
-        // Create admin context using seeded data
+        // Create admin context using static IDs
         const context = await createSeededAdminTestContext(
           txDb,
-          primaryOrgId,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
           SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = adminRouter.createCaller(context);
@@ -125,7 +112,7 @@ describe("Admin Router Integration (PGlite)", () => {
         // Create admin context using competitor organization
         const context = await createSeededAdminTestContext(
           txDb,
-          competitorOrgId,
+          SEED_TEST_IDS.ORGANIZATIONS.competitor,
           SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = adminRouter.createCaller(context);
@@ -148,10 +135,10 @@ describe("Admin Router Integration (PGlite)", () => {
   describe("updateUserRole", () => {
     test("should update user role with real database operations", async () => {
       await withIsolatedTest(workerDb, async (txDb) => {
-        // Create admin context using seeded data
+        // Create admin context using static IDs
         const context = await createSeededAdminTestContext(
           txDb,
-          primaryOrgId,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
           SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = adminRouter.createCaller(context);
@@ -162,7 +149,7 @@ describe("Admin Router Integration (PGlite)", () => {
           .values({
             id: generateTestId("new-role"),
             name: "New Role",
-            organizationId: primaryOrgId,
+            organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
             createdAt: new Date(),
             updatedAt: new Date(),
           })
@@ -190,10 +177,10 @@ describe("Admin Router Integration (PGlite)", () => {
 
     test("should enforce role exists in organization constraint", async () => {
       await withIsolatedTest(workerDb, async (txDb) => {
-        // Create admin context using seeded data
+        // Create admin context using static IDs
         const context = await createSeededAdminTestContext(
           txDb,
-          primaryOrgId,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
           SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = adminRouter.createCaller(context);
@@ -204,7 +191,7 @@ describe("Admin Router Integration (PGlite)", () => {
           .values({
             id: generateTestId("competitor-role"),
             name: "Competitor Role",
-            organizationId: competitorOrgId,
+            organizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor,
             createdAt: new Date(),
             updatedAt: new Date(),
           })
@@ -227,7 +214,7 @@ describe("Admin Router Integration (PGlite)", () => {
         // Create admin context using seeded data
         const context = await createSeededAdminTestContext(
           txDb,
-          primaryOrgId,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
           SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = adminRouter.createCaller(context);
@@ -236,7 +223,7 @@ describe("Admin Router Integration (PGlite)", () => {
 
         const result = await caller.inviteUser({
           email: inviteEmail,
-          roleId: seededData.memberRole!,
+          roleId: SEED_TEST_IDS.ROLES.MEMBER_PRIMARY,
         });
 
         expect(result).toMatchObject({
@@ -261,8 +248,8 @@ describe("Admin Router Integration (PGlite)", () => {
           where: eq(schema.memberships.userId, user.id),
         });
         expect(membership).toMatchObject({
-          organizationId: primaryOrgId,
-          roleId: seededData.memberRole!,
+          organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
+          roleId: SEED_TEST_IDS.ROLES.MEMBER_PRIMARY,
         });
       });
     });
@@ -272,7 +259,7 @@ describe("Admin Router Integration (PGlite)", () => {
         // Create admin context using seeded data
         const context = await createSeededAdminTestContext(
           txDb,
-          primaryOrgId,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
           SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = adminRouter.createCaller(context);
@@ -282,14 +269,14 @@ describe("Admin Router Integration (PGlite)", () => {
         // First invitation
         await caller.inviteUser({
           email: duplicateEmail,
-          roleId: seededData.memberRole!,
+          roleId: SEED_TEST_IDS.ROLES.MEMBER_PRIMARY,
         });
 
         // Second invitation with same email - should handle gracefully or throw appropriate error
         await expect(
           caller.inviteUser({
             email: duplicateEmail,
-            roleId: seededData.adminRole!,
+            roleId: SEED_TEST_IDS.ROLES.ADMIN_PRIMARY,
           }),
         ).rejects.toThrow(); // Expects appropriate error handling
       });
@@ -300,7 +287,7 @@ describe("Admin Router Integration (PGlite)", () => {
         // Create admin context using seeded data
         const context = await createSeededAdminTestContext(
           txDb,
-          primaryOrgId,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
           SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = adminRouter.createCaller(context);
@@ -311,7 +298,7 @@ describe("Admin Router Integration (PGlite)", () => {
           .values({
             id: generateTestId("competitor-invite-role"),
             name: "Competitor Role",
-            organizationId: competitorOrgId,
+            organizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor,
             createdAt: new Date(),
             updatedAt: new Date(),
           })
@@ -336,7 +323,7 @@ describe("Admin Router Integration (PGlite)", () => {
         // Create admin context using seeded data
         const context = await createSeededAdminTestContext(
           txDb,
-          primaryOrgId,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
           SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = adminRouter.createCaller(context);
@@ -358,8 +345,8 @@ describe("Admin Router Integration (PGlite)", () => {
         await txDb.insert(schema.memberships).values({
           id: generateTestId("test-membership-remove"),
           userId: testUser.id,
-          organizationId: primaryOrgId,
-          roleId: seededData.memberRole!,
+          organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
+          roleId: SEED_TEST_IDS.ROLES.MEMBER_PRIMARY,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
@@ -390,7 +377,7 @@ describe("Admin Router Integration (PGlite)", () => {
         // Create admin context using seeded data
         const context = await createSeededAdminTestContext(
           txDb,
-          primaryOrgId,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
           SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = adminRouter.createCaller(context);
@@ -401,12 +388,12 @@ describe("Admin Router Integration (PGlite)", () => {
         // Create some invitations
         await caller.inviteUser({
           email: pending1Email,
-          roleId: seededData.memberRole!,
+          roleId: SEED_TEST_IDS.ROLES.MEMBER_PRIMARY,
         });
 
         await caller.inviteUser({
           email: pending2Email,
-          roleId: seededData.adminRole!,
+          roleId: SEED_TEST_IDS.ROLES.ADMIN_PRIMARY,
         });
 
         const result = await caller.getInvitations();
@@ -430,7 +417,7 @@ describe("Admin Router Integration (PGlite)", () => {
         // Create admin context using seeded data
         const context = await createSeededAdminTestContext(
           txDb,
-          primaryOrgId,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
           SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = adminRouter.createCaller(context);
@@ -439,13 +426,13 @@ describe("Admin Router Integration (PGlite)", () => {
         const testEmail = `isolation-test-${generateTestId("isolation")}@example.com`;
         await caller.inviteUser({
           email: testEmail,
-          roleId: seededData.memberRole!,
+          roleId: SEED_TEST_IDS.ROLES.MEMBER_PRIMARY,
         });
 
         // Switch to competitor organization context
         const competitorContext = await createSeededAdminTestContext(
           txDb,
-          competitorOrgId,
+          SEED_TEST_IDS.ORGANIZATIONS.competitor,
           SEED_TEST_IDS.USERS.ADMIN,
         );
         const competitorCaller = adminRouter.createCaller(competitorContext);
@@ -464,7 +451,7 @@ describe("Admin Router Integration (PGlite)", () => {
         // Create admin context using seeded data
         const context = await createSeededAdminTestContext(
           txDb,
-          primaryOrgId,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
           SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = adminRouter.createCaller(context);
@@ -473,20 +460,20 @@ describe("Admin Router Integration (PGlite)", () => {
         const inviteEmail = `cancel-test-${generateTestId("cancel")}@example.com`;
         const invitation = await caller.inviteUser({
           email: inviteEmail,
-          roleId: seededData.memberRole!,
+          roleId: SEED_TEST_IDS.ROLES.MEMBER_PRIMARY,
         });
 
         // Cancel the invitation
-        await caller.cancelInvitation({ userId: invitation.id });
+        await caller.cancelInvitation({ userId: invitation.userId });
 
         // Verify invitation is removed
         const user = await txDb.query.users.findFirst({
-          where: eq(schema.users.id, invitation.id),
+          where: eq(schema.users.id, invitation.userId),
         });
         expect(user).toBeUndefined();
 
         const membership = await txDb.query.memberships.findFirst({
-          where: eq(schema.memberships.userId, invitation.id),
+          where: eq(schema.memberships.userId, invitation.userId),
         });
         expect(membership).toBeUndefined();
       });

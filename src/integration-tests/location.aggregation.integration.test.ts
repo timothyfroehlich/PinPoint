@@ -7,7 +7,7 @@
  * established seeded data infrastructure.
  *
  * Key Features:
- * - Uses createSeededTestDatabase() and getSeededTestData() for consistent test data
+ * - Uses createSeededTestDatabase() and SEED_TEST_IDS for consistent test data
  * - Leverages createSeededLocationTestContext() for standardized TRPC context
  * - Uses SEED_TEST_IDS.ORGANIZATIONS.competitor for cross-org isolation testing
  * - Maintains aggregation testing with seeded data baseline + additional test data
@@ -25,7 +25,6 @@ import { generateTestId } from "~/test/helpers/test-id-generator";
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
 import {
   createSeededTestDatabase,
-  getSeededTestData,
   type TestDatabase,
 } from "~/test/helpers/pglite-test-setup";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
@@ -44,7 +43,7 @@ describe("Location Router Aggregation Operations (PGlite)", () => {
   let workerDb: TestDatabase;
   let primaryOrgId: string;
   let competitorOrgId: string;
-  let seededData: Awaited<ReturnType<typeof getSeededTestData>>;
+  // Using deterministic SEED_TEST_IDS directly
 
   beforeAll(async () => {
     // Create seeded test database with established infrastructure
@@ -53,8 +52,7 @@ describe("Location Router Aggregation Operations (PGlite)", () => {
     primaryOrgId = setup.organizationId;
     competitorOrgId = SEED_TEST_IDS.ORGANIZATIONS.competitor;
 
-    // Get seeded test data for use across tests
-    seededData = await getSeededTestData(workerDb, primaryOrgId);
+    // no-op: tests will reference SEED_TEST_IDS directly
   });
 
   describe("Complex Aggregation Queries", () => {
@@ -66,7 +64,7 @@ describe("Location Router Aggregation Operations (PGlite)", () => {
         const context = await createSeededLocationTestContext(
           txDb,
           primaryOrgId,
-          seededData.user!,
+          SEED_TEST_IDS.USERS.MEMBER1,
         );
         const caller = locationRouter.createCaller(context);
 
@@ -90,8 +88,8 @@ describe("Location Router Aggregation Operations (PGlite)", () => {
           qrCodeId: `agg-qr-${i}`,
           organizationId: primaryOrgId,
           locationId: testLocation.id,
-          modelId: seededData.model!,
-          ownerId: seededData.user!,
+          modelId: SEED_TEST_IDS.MOCK_PATTERNS.MODEL,
+          ownerId: SEED_TEST_IDS.USERS.MEMBER1,
           createdAt: new Date(),
           updatedAt: new Date(),
         }));
@@ -104,9 +102,9 @@ describe("Location Router Aggregation Operations (PGlite)", () => {
           title: `Aggregation Issue ${i}`,
           organizationId: primaryOrgId,
           machineId: `agg-machine-${i % 3}`, // 2 issues per machine
-          statusId: seededData.status!,
-          priorityId: seededData.priority!,
-          createdById: seededData.user!,
+          statusId: SEED_TEST_IDS.STATUSES.NEW_PRIMARY,
+          priorityId: SEED_TEST_IDS.PRIORITIES.MEDIUM_PRIMARY,
+          createdById: SEED_TEST_IDS.USERS.MEMBER1,
           createdAt: new Date(),
           updatedAt: new Date(),
         }));
@@ -139,15 +137,15 @@ describe("Location Router Aggregation Operations (PGlite)", () => {
         // Create contexts for both organizations
         const primaryContext = await createSeededLocationTestContext(
           txDb,
-          seededData.organization,
-          seededData.user!,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+          SEED_TEST_IDS.USERS.MEMBER1,
         );
         const primaryCaller = locationRouter.createCaller(primaryContext);
 
         const competitorContext = await createSeededLocationTestContext(
           txDb,
           SEED_TEST_IDS.ORGANIZATIONS.competitor,
-          seededData.user!,
+          SEED_TEST_IDS.USERS.MEMBER2,
         );
         const competitorCaller = locationRouter.createCaller(competitorContext);
 
@@ -170,7 +168,9 @@ describe("Location Router Aggregation Operations (PGlite)", () => {
         // Competitor org should see its location but not primary's seeded location
         const competitorLocationIds = competitorResults.map((l) => l.id);
         expect(competitorLocationIds).toContain("competitor-agg-location");
-        expect(competitorLocationIds).not.toContain(seededData.location);
+        expect(competitorLocationIds).not.toContain(
+          SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR,
+        );
       });
     });
   });

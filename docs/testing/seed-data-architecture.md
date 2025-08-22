@@ -41,7 +41,7 @@ Minimal Seed - Always Present
 │   └── Machine types and manufacturers
 └── Relationship Foundation
     ├── Organizations → Users
-    ├── Organizations → Locations  
+    ├── Organizations → Locations
     ├── Locations → Machines
     └── Machines → Issues
 ```
@@ -79,28 +79,28 @@ All test data IDs originate from [`src/test/constants/seed-test-ids.ts`](../../s
 export const SEED_TEST_IDS = {
   // Two-Organization Architecture
   ORGANIZATIONS: {
-    primary: "test-org-pinpoint",        // Austin Pinball Collective  
-    competitor: "test-org-competitor",   // Competitor Arcade
+    primary: "test-org-pinpoint", // Austin Pinball Collective
+    competitor: "test-org-competitor", // Competitor Arcade
   },
-  
+
   // Predictable User IDs
   USERS: {
-    ADMIN: "test-user-tim",             // Admin across orgs
-    MEMBER1: "test-user-harry",         // Primary member
-    MEMBER2: "test-user-sarah",         // Secondary member
-    GUEST: "test-user-guest",           // Limited access
+    ADMIN: "test-user-tim", // Admin across orgs
+    MEMBER1: "test-user-harry", // Primary member
+    MEMBER2: "test-user-sarah", // Secondary member
+    GUEST: "test-user-guest", // Limited access
   },
-  
+
   // Infrastructure IDs
   LOCATIONS: {
     PINBALL_HQ: "test-location-austin-hq",
     COMPETITOR_MAIN: "test-location-competitor-main",
   },
-  
+
   // Mock Patterns for Unit Tests
   MOCK_PATTERNS: {
     ORGANIZATION: "mock-org-1",
-    USER: "mock-user-1", 
+    USER: "mock-user-1",
     MACHINE: "mock-machine-1",
     ISSUE: "mock-issue-1",
     LOCATION: "mock-location-1",
@@ -111,8 +111,9 @@ export const SEED_TEST_IDS = {
 ### **Human-Readable Design**
 
 **Benefits of Hardcoded IDs**:
+
 - 🎯 **Debugging**: "machine-mm-001 failed" vs "8f2e9d4c-1234-..." failed
-- 🔗 **Stable Relationships**: Foreign keys never break from ID changes  
+- 🔗 **Stable Relationships**: Foreign keys never break from ID changes
 - ⚡ **Performance**: No runtime nanoid() generation overhead
 - 🔍 **Searchability**: Easy to grep for specific test scenarios
 - 🧪 **Reproducibility**: Same test data across all environments
@@ -135,10 +136,10 @@ describe('Business Logic Unit Tests', () => {
       machineId: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
       organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
     };
-    
+
     expect(calculatePriority(mockIssue)).toBe("high");
   });
-  
+
   test('component renders with mock context', () => {
     const mockContext = createMockAdminContext();
     render(
@@ -152,7 +153,7 @@ describe('Business Logic Unit Tests', () => {
 
 ### **Integration Tests (Real PGlite Database)**
 
-Use `getSeededTestData()` for dynamic relationships:
+Use `SEED_TEST_IDS` constants for predictable relationships:
 
 ```typescript
 import { test, withIsolatedTest } from '~/test/helpers/worker-scoped-db';
@@ -160,14 +161,14 @@ import { test, withIsolatedTest } from '~/test/helpers/worker-scoped-db';
 test('integration with seeded data', async ({ workerDb }) => {
   await withIsolatedTest(workerDb, async (db) => {
     // Get dynamic relationship IDs from seeded data
-    const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
-    
+    const seededData = await SEED_TEST_IDS for (db, SEED_TEST_IDS.ORGANIZATIONS.primary);
+
     const newIssue = await db.insert(issues).values({
       title: "Integration Test Issue",
       machineId: seededData.machine, // Real seeded machine ID
       priority: "medium"
     });
-    
+
     expect(newIssue.organizationId).toBe(SEED_TEST_IDS.ORGANIZATIONS.primary);
   });
 });
@@ -178,20 +179,23 @@ test('integration with seeded data', async ({ workerDb }) => {
 Use both organizations for RLS validation:
 
 ```typescript
-test('enforces organizational boundaries', async ({ workerDb }) => {
+test("enforces organizational boundaries", async ({ workerDb }) => {
   await withIsolatedTest(workerDb, async (db) => {
     // Create data in primary org
     await setOrgContext(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
     const primaryIssue = await createIssue(db, { title: "Primary Secret" });
-    
+
     // Switch to competitor org - should not see primary org data
     await setOrgContext(db, SEED_TEST_IDS.ORGANIZATIONS.competitor);
     const visibleIssues = await db.query.issues.findMany();
-    
+
     expect(visibleIssues).not.toContainEqual(primaryIssue);
-    expect(visibleIssues.every(issue => 
-      issue.organizationId === SEED_TEST_IDS.ORGANIZATIONS.competitor
-    )).toBe(true);
+    expect(
+      visibleIssues.every(
+        (issue) =>
+          issue.organizationId === SEED_TEST_IDS.ORGANIZATIONS.competitor,
+      ),
+    ).toBe(true);
   });
 });
 ```
@@ -236,24 +240,25 @@ npm run generate:sql-constants
 ```
 
 **Generated Output**:
+
 ```sql
 -- DO NOT EDIT: Generated from src/test/constants/seed-test-ids.ts
 
 -- Organization functions
-CREATE OR REPLACE FUNCTION test_org_primary() 
+CREATE OR REPLACE FUNCTION test_org_primary()
 RETURNS TEXT AS $$ SELECT 'test-org-pinpoint'::TEXT $$ LANGUAGE SQL IMMUTABLE;
 
-CREATE OR REPLACE FUNCTION test_org_competitor() 
+CREATE OR REPLACE FUNCTION test_org_competitor()
 RETURNS TEXT AS $$ SELECT 'test-org-competitor'::TEXT $$ LANGUAGE SQL IMMUTABLE;
 
--- User functions  
-CREATE OR REPLACE FUNCTION test_user_admin() 
+-- User functions
+CREATE OR REPLACE FUNCTION test_user_admin()
 RETURNS TEXT AS $$ SELECT 'test-user-tim'::TEXT $$ LANGUAGE SQL IMMUTABLE;
 
 -- Helper functions for testing
 CREATE OR REPLACE FUNCTION set_jwt_claims_for_test(
-  org_id TEXT, 
-  user_id TEXT DEFAULT NULL, 
+  org_id TEXT,
+  user_id TEXT DEFAULT NULL,
   role_name TEXT DEFAULT 'member'
 ) RETURNS VOID AS $$
 BEGIN
@@ -275,6 +280,7 @@ $$ LANGUAGE plpgsql;
 ### **CRITICAL: Worker-Scoped PGlite**
 
 **❌ NEVER USE (causes system lockups)**:
+
 ```typescript
 beforeEach(async () => {
   const { db } = await createSeededTestDatabase(); // 50-100MB per test
@@ -282,19 +288,21 @@ beforeEach(async () => {
 ```
 
 **✅ ALWAYS USE (memory-safe)**:
+
 ```typescript
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
 
 test("memory-safe integration test", async ({ workerDb }) => {
   await withIsolatedTest(workerDb, async (db) => {
     // Single shared instance, transaction isolation, automatic cleanup
-    const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
+    const seededData = await SEED_TEST_IDS for (db, SEED_TEST_IDS.ORGANIZATIONS.primary);
     // Test logic here
   });
 });
 ```
 
 **Why This Matters**:
+
 - **12+ integration tests** using per-test PGlite = **20+ database instances**
 - **50-100MB per instance** = **1-2GB+ total memory usage**
 - **Causes system freezes** and development environment instability
@@ -313,7 +321,7 @@ What type of testing?
 │   ├── Component tests? → createMockAdminContext(), createMockMemberContext()
 │   └── Service methods? → MOCK_PATTERNS with type-safe mocks
 ├── Integration Tests (real PGlite DB)
-│   ├── Single organization? → getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary)
+│   ├── Single organization? → SEED_TEST_IDS for (db, SEED_TEST_IDS.ORGANIZATIONS.primary)
 │   ├── Cross-org security? → Test both SEED_TEST_IDS.ORGANIZATIONS
 │   └── Complex workflows? → withIsolatedTest + seeded relationships
 ├── SQL/pgTAP Tests (database RLS)
@@ -336,9 +344,9 @@ npm run seed:minimal     # Load minimal seed (foundation)
 npm run seed:full       # Load full seed (minimal + extended)
 npm run seed:reset      # Reset and reload minimal
 
-# Testing commands  
+# Testing commands
 npm run test           # Business logic tests (use MOCK_PATTERNS)
-npm run test:integration # PGlite tests (use getSeededTestData)
+npm run test:integration # PGlite tests (use SEED_TEST_IDS constants)
 npm run test:rls       # pgTAP RLS tests (use SQL constants)
 npm run test:all       # Complete dual-track testing
 
@@ -349,6 +357,7 @@ npm run generate:sql-constants  # TypeScript → SQL functions
 ### **Development Workflow**
 
 1. **New Feature Development**:
+
    ```bash
    npm run seed:minimal          # Start with foundation
    # Develop with predictable data
@@ -357,6 +366,7 @@ npm run generate:sql-constants  # TypeScript → SQL functions
    ```
 
 2. **Security Testing**:
+
    ```bash
    npm run test:rls              # Validate RLS policies
    npm run test:security         # Cross-org boundary tests
@@ -395,7 +405,7 @@ ls -la supabase/tests/constants.sql         # Should exist and be recent
 ```bash
 # Test execution performance
 npm run test:brief               # Should complete under 30 seconds
-npm run test:integration:brief   # Should complete under 60 seconds  
+npm run test:integration:brief   # Should complete under 60 seconds
 
 # Memory usage validation
 npm run test:memory-check        # Ensures stable memory usage
@@ -410,13 +420,13 @@ npm run test:memory-check        # Ensures stable memory usage
 ```typescript
 // ❌ Old approach - unpredictable, hard to debug
 const testOrg = nanoid();
-const testUser = nanoid();  
+const testUser = nanoid();
 const testMachine = nanoid();
 
 test("issue creation", async () => {
   const issue = await createIssue({
-    organizationId: testOrg,    // Changes every test run
-    machineId: testMachine,     // Breaks relationships randomly
+    organizationId: testOrg, // Changes every test run
+    machineId: testMachine, // Breaks relationships randomly
   });
   // Debugging: "Why is a8f2bc failing?" - impossible to trace
 });
@@ -426,15 +436,15 @@ test("issue creation", async () => {
 
 ```typescript
 // ✅ New approach - predictable, debuggable
-import { SEED_TEST_IDS, getSeededTestData } from '~/test/constants/seed-test-ids';
+import { SEED_TEST_IDS, SEED_TEST_IDS constants } from '~/test/constants/seed-test-ids';
 
 test("issue creation", async ({ workerDb }) => {
   await withIsolatedTest(workerDb, async (db) => {
-    const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
-    
+    const seededData = await SEED_TEST_IDS for (db, SEED_TEST_IDS.ORGANIZATIONS.primary);
+
     const issue = await createIssue({
       organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary, // Always "test-org-pinpoint"
-      machineId: seededData.machine,                       // Stable relationship  
+      machineId: seededData.machine,                       // Stable relationship
     });
     // Debugging: "test-org-pinpoint machine-mm-001 failing" - immediately traceable
   });
@@ -444,7 +454,7 @@ test("issue creation", async ({ workerDb }) => {
 ### **Migration Checklist**
 
 - [ ] Replace all `nanoid()` calls in test files with SEED_TEST_IDS constants
-- [ ] Convert `beforeEach` database creation to `withIsolatedTest` pattern  
+- [ ] Convert `beforeEach` database creation to `withIsolatedTest` pattern
 - [ ] Update hardcoded strings ("org-1", "user-123") to SEED_TEST_IDS usage
 - [ ] Verify cross-org security tests use both SEED_TEST_IDS.ORGANIZATIONS
 - [ ] Generate SQL constants for pgTAP tests
@@ -461,8 +471,8 @@ For specialized testing scenarios, extend the base seed data:
 ```typescript
 // src/test/helpers/custom-seed-extensions.ts
 export async function createExtendedSecurityScenario(db: Database) {
-  const baseData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
-  
+  const baseData = await SEED_TEST_IDS for (db, SEED_TEST_IDS.ORGANIZATIONS.primary);
+
   // Add specific security test data while preserving base relationships
   const sensitiveIssue = await db.insert(issues).values({
     title: "CONFIDENTIAL: Security Audit",
@@ -470,7 +480,7 @@ export async function createExtendedSecurityScenario(db: Database) {
     priority: "critical",
     isConfidential: true,
   });
-  
+
   return { ...baseData, sensitiveIssue: sensitiveIssue.id };
 }
 ```
@@ -480,18 +490,21 @@ export async function createExtendedSecurityScenario(db: Database) {
 ```typescript
 // Load testing with predictable data volumes
 export async function createPerformanceTestData(db: Database) {
-  const orgs = [SEED_TEST_IDS.ORGANIZATIONS.primary, SEED_TEST_IDS.ORGANIZATIONS.competitor];
-  
+  const orgs = [
+    SEED_TEST_IDS.ORGANIZATIONS.primary,
+    SEED_TEST_IDS.ORGANIZATIONS.competitor,
+  ];
+
   for (const orgId of orgs) {
     await setOrgContext(db, orgId);
-    
+
     // Create exactly 1000 issues per org for consistent performance testing
     const issueData = Array.from({ length: 1000 }, (_, i) => ({
       title: `Performance Test Issue ${i}`,
-      priority: i % 4 === 0 ? 'high' : 'medium',
+      priority: i % 4 === 0 ? "high" : "medium",
       organizationId: orgId,
     }));
-    
+
     await db.insert(issues).values(issueData);
   }
 }
@@ -502,21 +515,25 @@ export async function createPerformanceTestData(db: Database) {
 ## 📚 Related Documentation
 
 **Core Architecture**:
+
 - [`SEED_TEST_IDS` Constants](../../src/test/constants/seed-test-ids.ts) - Single source of truth
 - [Test Database Guide](./test-database.md) - Memory safety and PGlite patterns
 - [Testing Patterns](../quick-reference/testing-patterns.md) - Usage examples
 
 **Testing Strategies**:
+
 - [Integration Testing](./archetype-integration-testing.md) - Full-stack patterns with seed data
-- [Security Testing](./archetype-security-testing.md) - Cross-org boundary validation  
+- [Security Testing](./archetype-security-testing.md) - Cross-org boundary validation
 - [pgTAP RLS Testing](./pgtap-rls-testing.md) - Database-level policy validation
 
 **Agent Guidance**:
+
 - [Integration Test Architect](../../.claude/agents/integration-test-architect.md) - Memory-safe patterns
 - [Security Test Architect](../../.claude/agents/security-test-architect.md) - Cross-org testing
 - [Unit Test Architect](../../.claude/agents/unit-test-architect.md) - Mock patterns
 
 **Implementation Details**:
+
 - [Database Auth Architect](../../.claude/agents/database-auth-architect.md) - RLS integration
 - [Quick Reference](../quick-reference/testing-patterns.md) - Decision trees and commands
 
@@ -525,26 +542,30 @@ export async function createPerformanceTestData(db: Database) {
 ## ✅ Success Indicators
 
 **Predictability Achieved**:
+
 - [ ] Zero `nanoid()` calls in test files
 - [ ] All test data uses SEED_TEST_IDS constants
 - [ ] Debugging messages reference human-readable IDs
 - [ ] Cross-environment test consistency verified
 
 **Memory Safety Enforced**:
+
 - [ ] All integration tests use `withIsolatedTest` pattern
 - [ ] Zero `new PGlite()` instances in test files
 - [ ] Memory usage stable across test runs
 - [ ] No system freezes during test execution
 
 **Security Boundaries Validated**:
+
 - [ ] Two-organization architecture implemented
 - [ ] Cross-org data isolation verified via pgTAP
 - [ ] RLS policies tested with generated SQL constants
 - [ ] Security test coverage comprehensive
 
 **Developer Experience Enhanced**:
+
 - [ ] Test failures immediately debuggable via readable IDs
-- [ ] Consistent test data across all environments  
+- [ ] Consistent test data across all environments
 - [ ] Fast test execution with predictable data
 - [ ] Comprehensive documentation and examples available
 

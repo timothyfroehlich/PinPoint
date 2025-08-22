@@ -34,10 +34,7 @@ import {
   withIsolatedTest,
   type TestDatabase,
 } from "~/test/helpers/worker-scoped-db";
-import {
-  createSeededTestDatabase,
-  getSeededTestData,
-} from "~/test/helpers/pglite-test-setup";
+import { createSeededTestDatabase } from "~/test/helpers/pglite-test-setup";
 import { createSeededAdminTestContext } from "~/test/helpers/createSeededAdminTestContext";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 import { generateTestId } from "~/test/helpers/test-id-generator";
@@ -62,29 +59,13 @@ vi.mock("~/lib/users/roleManagementValidation", () => ({
 }));
 
 describe("Role Router Integration Tests (PGlite)", () => {
-  // Suite-level variables for seeded data
-  let workerDb: TestDatabase;
-  let primaryOrgId: string;
-  let competitorOrgId: string;
-  let seededData: any;
-
-  beforeAll(async () => {
-    // Create seeded test database with dual organizations
-    const {
-      db,
-      primaryOrgId: primary,
-      secondaryOrgId: competitor,
-    } = await createSeededTestDatabase();
-    workerDb = db;
-    primaryOrgId = primary;
-    competitorOrgId = competitor;
-
-    // Get seeded test data for primary organization
-    seededData = await getSeededTestData(db, primaryOrgId);
-  });
+  const primaryOrgId = SEED_TEST_IDS.ORGANIZATIONS.primary;
+  const competitorOrgId = SEED_TEST_IDS.ORGANIZATIONS.competitor;
 
   describe("list - Get all roles", () => {
-    test("should return roles with member count and permissions", async () => {
+    test("should return roles with member count and permissions", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (txDb) => {
         // Create admin context using seeded data
         const context = await createSeededAdminTestContext(

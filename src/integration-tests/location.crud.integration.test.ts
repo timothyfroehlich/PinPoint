@@ -6,7 +6,7 @@
  * using the established seeded data infrastructure.
  *
  * Key Features:
- * - Uses createSeededTestDatabase() and getSeededTestData() for consistent test data
+ * - Uses createSeededTestDatabase() and SEED_TEST_IDS for consistent test data
  * - Leverages createSeededLocationTestContext() for standardized TRPC context
  * - Uses SEED_TEST_IDS.ORGANIZATIONS.competitor for cross-org isolation testing
  * - Maintains CRUD operation testing with seeded data baseline
@@ -27,10 +27,10 @@ import { generateTestId } from "~/test/helpers/test-id-generator";
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
 import {
   createSeededTestDatabase,
-  getSeededTestData,
   type TestDatabase,
 } from "~/test/helpers/pglite-test-setup";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
+import { createSeededLocationTestContext } from "~/test/helpers/createSeededLocationTestContext";
 
 // Mock external dependencies that aren't database-related
 vi.mock("~/lib/utils/id-generation", () => ({
@@ -56,21 +56,8 @@ vi.mock("~/server/auth/permissions", () => ({
 }));
 
 describe("Location Router CRUD Operations (PGlite)", () => {
-  let workerDb: TestDatabase;
-  let primaryOrgId: string;
-  let competitorOrgId: string;
-  let seededData: Awaited<ReturnType<typeof getSeededTestData>>;
-
-  beforeAll(async () => {
-    // Create seeded test database with established infrastructure
-    const setup = await createSeededTestDatabase();
-    workerDb = setup.db;
-    primaryOrgId = setup.organizationId;
-    competitorOrgId = SEED_TEST_IDS.ORGANIZATIONS.competitor;
-
-    // Get seeded test data for use across tests
-    seededData = await getSeededTestData(workerDb, primaryOrgId);
-  });
+  const primaryOrgId = SEED_TEST_IDS.ORGANIZATIONS.primary;
+  const competitorOrgId = SEED_TEST_IDS.ORGANIZATIONS.competitor;
 
   describe("create", () => {
     test("should create location with real database operations", async ({
@@ -80,7 +67,7 @@ describe("Location Router CRUD Operations (PGlite)", () => {
         const context = await createSeededLocationTestContext(
           txDb,
           primaryOrgId,
-          seededData.user!,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = locationRouter.createCaller(context);
 
@@ -117,14 +104,14 @@ describe("Location Router CRUD Operations (PGlite)", () => {
         const primaryContext = await createSeededLocationTestContext(
           txDb,
           primaryOrgId,
-          seededData.user!,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const primaryCaller = locationRouter.createCaller(primaryContext);
 
         const competitorContext = await createSeededLocationTestContext(
           txDb,
           competitorOrgId,
-          seededData.user!,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const competitorCaller = locationRouter.createCaller(competitorContext);
 
@@ -161,7 +148,7 @@ describe("Location Router CRUD Operations (PGlite)", () => {
         const context = await createSeededLocationTestContext(
           txDb,
           primaryOrgId,
-          seededData.user!,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = locationRouter.createCaller(context);
 
@@ -172,9 +159,9 @@ describe("Location Router CRUD Operations (PGlite)", () => {
           name: "Test Machine CRUD",
           qrCodeId: `qr-${machineId}`,
           organizationId: primaryOrgId,
-          locationId: seededData.location!,
-          modelId: seededData.model!,
-          ownerId: seededData.user!,
+          locationId: SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR,
+          modelId: "model-mm-001",
+          ownerId: SEED_TEST_IDS.USERS.ADMIN,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
@@ -185,7 +172,9 @@ describe("Location Router CRUD Operations (PGlite)", () => {
         expect(result.length).toBeGreaterThanOrEqual(1);
 
         // Find our seeded location
-        const seededLocation = result.find((l) => l.id === seededData.location);
+        const seededLocation = result.find(
+          (l) => l.id === SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR,
+        );
         expect(seededLocation).toBeDefined();
         expect(seededLocation!.organizationId).toBe(primaryOrgId);
 
@@ -201,7 +190,7 @@ describe("Location Router CRUD Operations (PGlite)", () => {
         const context = await createSeededLocationTestContext(
           txDb,
           primaryOrgId,
-          seededData.user!,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = locationRouter.createCaller(context);
 
@@ -243,14 +232,14 @@ describe("Location Router CRUD Operations (PGlite)", () => {
         const primaryContext = await createSeededLocationTestContext(
           txDb,
           primaryOrgId,
-          seededData.user!,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const primaryCaller = locationRouter.createCaller(primaryContext);
 
         const competitorContext = await createSeededLocationTestContext(
           txDb,
           competitorOrgId,
-          seededData.user!,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
 
         // Insert location in competitor org
@@ -266,12 +255,12 @@ describe("Location Router CRUD Operations (PGlite)", () => {
 
         // Primary org should only get its own locations (seeded + any test locations)
         const allLocationIds = primaryResult.map((l) => l.id);
-        expect(allLocationIds).toContain(seededData.location); // Should see seeded location
+        expect(allLocationIds).toContain(SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR); // Should see seeded location
         expect(allLocationIds).not.toContain("other-org-location"); // Should not see competitor location
 
         // All returned locations should belong to primary org
         primaryResult.forEach((location) => {
-          expect(seededData.organization).toBe(primaryOrgId);
+          expect(primaryOrgId).toBe(primaryOrgId);
         });
       });
     });
@@ -282,29 +271,29 @@ describe("Location Router CRUD Operations (PGlite)", () => {
       workerDb,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        // Use global seededData from beforeAll
+        // Use static seed constants
         const context = await createSeededLocationTestContext(
           db,
           primaryOrgId,
-          seededData.user,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
 
         const caller = locationRouter.createCaller(context);
 
         const result = await caller.update({
-          id: seededData.location,
+          id: SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR,
           name: "Updated Test Arcade",
         });
 
         expect(result).toMatchObject({
-          id: seededData.location,
+          id: SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR,
           name: "Updated Test Arcade",
-          organizationId: seededData.organization,
+          organizationId: primaryOrgId,
         });
 
         // Verify in database
         const dbLocation = await db.query.locations.findFirst({
-          where: eq(schema.locations.id, seededData.location),
+          where: eq(schema.locations.id, SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR),
         });
 
         expect(dbLocation).toBeDefined();
@@ -321,11 +310,11 @@ describe("Location Router CRUD Operations (PGlite)", () => {
       workerDb,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        // Use global seededData from beforeAll
+        // Use static seed constants
         const context = await createSeededLocationTestContext(
           db,
-          seededData.organization,
-          seededData.user,
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
 
         // Try to update location from different organization
@@ -340,14 +329,17 @@ describe("Location Router CRUD Operations (PGlite)", () => {
         const otherCaller = locationRouter.createCaller(otherOrgContext as any);
 
         await expect(
-          otherCaller.update({ id: seededData.location, name: "Hacked Name" }),
+          otherCaller.update({
+            id: SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR,
+            name: "Hacked Name",
+          }),
         ).rejects.toThrow(
           "You don't have permission to access this organization",
         );
 
         // Verify original name unchanged
         const dbLocation = await db.query.locations.findFirst({
-          where: eq(schema.locations.id, seededData.location),
+          where: eq(schema.locations.id, SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR),
         });
         expect(dbLocation).toBeDefined();
         if (!dbLocation)
@@ -359,19 +351,21 @@ describe("Location Router CRUD Operations (PGlite)", () => {
 
     test("should handle partial updates correctly", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        // Use global seededData from beforeAll
+        // Use static seed constants
         const context = await createSeededLocationTestContext(
           db,
-          seededData.organization,
-          seededData.user,
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = locationRouter.createCaller(context);
 
         const originalData = await db.query.locations.findFirst({
-          where: eq(schema.locations.id, seededData.location),
+          where: eq(schema.locations.id, SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR),
         });
 
-        const result = await caller.update({ id: seededData.location }); // No name provided
+        const result = await caller.update({
+          id: SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR,
+        }); // No name provided
 
         expect(originalData).toBeDefined();
         if (!originalData) throw new Error("Original location data not found");
@@ -389,11 +383,11 @@ describe("Location Router CRUD Operations (PGlite)", () => {
       workerDb,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        // Use global seededData from beforeAll
+        // Use static seed constants
         const context = await createSeededLocationTestContext(
           db,
-          seededData.organization,
-          seededData.user,
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = locationRouter.createCaller(context);
 
@@ -402,19 +396,21 @@ describe("Location Router CRUD Operations (PGlite)", () => {
           id: generateTestId("test-machine-getbyid"),
           name: "Test Machine GetById",
           qrCodeId: "qr-test-getbyid",
-          organizationId: seededData.organization,
-          locationId: seededData.location,
-          modelId: seededData.model!,
-          ownerId: seededData.user!.id,
+          organizationId: primaryOrgId,
+          locationId: SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR,
+          modelId: "model-mm-001",
+          ownerId: SEED_TEST_IDS.USERS.ADMIN.id,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
 
-        const result = await caller.getById({ id: seededData.location });
+        const result = await caller.getById({
+          id: SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR,
+        });
 
         expect(result).toMatchObject({
-          id: seededData.location,
-          organizationId: organization.id,
+          id: SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR,
+          organizationId: primaryOrgId,
           name: "Test Arcade CRUD",
         });
 
@@ -427,7 +423,7 @@ describe("Location Router CRUD Operations (PGlite)", () => {
           manufacturer: "Test Manufacturer",
         });
         expect(result.machines[0].owner).toMatchObject({
-          id: user.id,
+          id: SEED_TEST_IDS.USERS.ADMIN,
           name: "Test User",
           profilePicture: null,
         });
@@ -436,11 +432,11 @@ describe("Location Router CRUD Operations (PGlite)", () => {
 
     test("should enforce organizational scoping", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        // Use global seededData from beforeAll
+        // Use static seed constants
         const context = await createSeededLocationTestContext(
           db,
-          seededData.organization,
-          seededData.user,
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = locationRouter.createCaller(context);
 
@@ -469,8 +465,10 @@ describe("Location Router CRUD Operations (PGlite)", () => {
         );
 
         // But should be able to access own org's location
-        const result = await caller.getById({ id: seededData.location });
-        expect(result.id).toBe(seededData.location);
+        const result = await caller.getById({
+          id: SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR,
+        });
+        expect(result.id).toBe(SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR);
       });
     });
   });
@@ -480,11 +478,11 @@ describe("Location Router CRUD Operations (PGlite)", () => {
       workerDb,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        // Use global seededData from beforeAll
+        // Use static seed constants
         const context = await createSeededLocationTestContext(
           db,
-          seededData.organization,
-          seededData.user,
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = locationRouter.createCaller(context);
 
@@ -495,10 +493,10 @@ describe("Location Router CRUD Operations (PGlite)", () => {
             id: generateTestId("test-machine-delete"),
             name: "Test Machine Delete",
             qrCodeId: "qr-test-delete",
-            organizationId: organization.id,
-            locationId: seededData.location,
-            modelId: model.id,
-            ownerId: user.id,
+            organizationId: primaryOrgId,
+            locationId: SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR,
+            modelId: "model-mm-001",
+            ownerId: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date(),
             updatedAt: new Date(),
           })
@@ -510,17 +508,19 @@ describe("Location Router CRUD Operations (PGlite)", () => {
           .where(eq(schema.machines.id, machine.id));
 
         // Now delete the location
-        const result = await caller.delete({ id: seededData.location });
+        const result = await caller.delete({
+          id: SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR,
+        });
 
         expect(result).toMatchObject({
-          id: seededData.location,
-          organizationId: organization.id,
+          id: SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR,
+          organizationId: primaryOrgId,
           name: "Test Arcade CRUD",
         });
 
         // Verify location deletion in database
         const dbLocation = await db.query.locations.findFirst({
-          where: eq(schema.locations.id, seededData.location),
+          where: eq(schema.locations.id, SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR),
         });
         expect(dbLocation).toBeUndefined();
       });
@@ -530,11 +530,11 @@ describe("Location Router CRUD Operations (PGlite)", () => {
       workerDb,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        // Use global seededData from beforeAll
+        // Use static seed constants
         const context = await createSeededLocationTestContext(
           db,
-          seededData.organization,
-          seededData.user,
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
 
         const otherOrgContext = {
@@ -548,14 +548,14 @@ describe("Location Router CRUD Operations (PGlite)", () => {
         const otherCaller = locationRouter.createCaller(otherOrgContext as any);
 
         await expect(
-          otherCaller.delete({ id: seededData.location }),
+          otherCaller.delete({ id: SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR }),
         ).rejects.toThrow(
           "You don't have permission to access this organization",
         );
 
         // Verify location still exists
         const dbLocation = await db.query.locations.findFirst({
-          where: eq(schema.locations.id, seededData.location),
+          where: eq(schema.locations.id, SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR),
         });
         expect(dbLocation).toBeDefined();
       });
@@ -567,16 +567,16 @@ describe("Location Router CRUD Operations (PGlite)", () => {
       workerDb,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        // Use global seededData from beforeAll
+        // Use static seed constants
         const context = await createSeededLocationTestContext(
           db,
-          seededData.organization,
-          seededData.user,
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = locationRouter.createCaller(context);
 
         const result = await caller.setPinballMapId({
-          locationId: seededData.location,
+          locationId: SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR,
           pinballMapId: 12345,
         });
 
@@ -584,7 +584,7 @@ describe("Location Router CRUD Operations (PGlite)", () => {
 
         // Verify in database
         const dbLocation = await db.query.locations.findFirst({
-          where: eq(schema.locations.id, seededData.location),
+          where: eq(schema.locations.id, SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR),
         });
         expect(dbLocation).toBeDefined();
         if (!dbLocation)
@@ -600,11 +600,11 @@ describe("Location Router CRUD Operations (PGlite)", () => {
       workerDb,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        // Use global seededData from beforeAll
+        // Use static seed constants
         const context = await createSeededLocationTestContext(
           db,
-          seededData.organization,
-          seededData.user,
+          primaryOrgId,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
 
         const otherOrgContext = {
@@ -619,7 +619,7 @@ describe("Location Router CRUD Operations (PGlite)", () => {
 
         await expect(
           otherCaller.setPinballMapId({
-            locationId: seededData.location,
+            locationId: SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR,
             pinballMapId: 999,
           }),
         ).rejects.toThrow(
@@ -628,7 +628,7 @@ describe("Location Router CRUD Operations (PGlite)", () => {
 
         // Verify pinballMapId unchanged
         const dbLocation = await db.query.locations.findFirst({
-          where: eq(schema.locations.id, seededData.location),
+          where: eq(schema.locations.id, SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR),
         });
         expect(dbLocation).toBeDefined();
         if (!dbLocation)

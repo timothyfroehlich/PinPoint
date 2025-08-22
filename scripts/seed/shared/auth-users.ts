@@ -13,8 +13,37 @@ import { nanoid } from "nanoid";
 
 import { createDrizzleClient } from "~/server/db/drizzle";
 import { users, roles, memberships } from "~/server/db/schema";
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
 const db = createDrizzleClient();
+
+/**
+ * Helper function to get static membership ID for a user
+ * Maps user emails to their corresponding static membership constants
+ */
+function getMembershipId(email: string, organizationId: string): string {
+  const isPrimary = organizationId === SEED_TEST_IDS.ORGANIZATIONS.primary;
+
+  // Map test user emails to membership IDs
+  switch (email) {
+    case "admin@dev.local":
+      return isPrimary
+        ? SEED_TEST_IDS.MEMBERSHIPS.ADMIN_PRIMARY
+        : SEED_TEST_IDS.MEMBERSHIPS.ADMIN_COMPETITOR;
+    case "member@dev.local":
+      return isPrimary
+        ? SEED_TEST_IDS.MEMBERSHIPS.MEMBER1_PRIMARY
+        : SEED_TEST_IDS.MEMBERSHIPS.MEMBER1_COMPETITOR;
+    case "player@dev.local":
+      return isPrimary
+        ? SEED_TEST_IDS.MEMBERSHIPS.MEMBER2_PRIMARY
+        : SEED_TEST_IDS.MEMBERSHIPS.MEMBER2_COMPETITOR;
+    default:
+      // For other users (pinball personalities), generate a dynamic ID
+      // This maintains compatibility while using static IDs for test users
+      return nanoid();
+  }
+}
 
 export interface UserData {
   name: string;
@@ -360,7 +389,7 @@ async function processBatchUsers(
 
         if (roleResults.length > 0 && roleResults[0]) {
           membershipsToCreate.push({
-            id: nanoid(),
+            id: getMembershipId(userData.email, organizationId),
             userId: authResult.userId,
             organizationId,
             roleId: roleResults[0].id,

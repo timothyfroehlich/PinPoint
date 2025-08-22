@@ -10,6 +10,7 @@
 ## 🚨 CRITICAL: Memory Safety Requirements
 
 **NEVER USE** (causes 1-2GB+ memory usage and system lockups):
+
 ```typescript
 // ❌ FORBIDDEN: Per-test PGlite instances
 beforeEach(async () => {
@@ -23,6 +24,7 @@ test("...", async () => {
 ```
 
 **ALWAYS USE** (memory-safe, prevents lockups):
+
 ```typescript
 // ✅ MANDATORY: Worker-scoped pattern
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
@@ -39,6 +41,7 @@ test("integration test", async ({ workerDb }) => {
 ## When to Use This Archetype
 
 ✅ **Perfect for**:
+
 - Database queries and constraints
 - Service layer business logic (with database)
 - tRPC router operations
@@ -48,6 +51,7 @@ test("integration test", async ({ workerDb }) => {
 - RLS context testing
 
 ❌ **Wrong archetype for**:
+
 - Pure functions → Use Unit Testing Archetype
 - UI component rendering → Use Unit Testing Archetype
 - Security boundaries → Use Security Testing Archetype
@@ -94,19 +98,21 @@ export async function withIsolatedTest<T>(
   db: ReturnType<typeof drizzle>,
   testFn: (db: ReturnType<typeof drizzle>) => Promise<T>,
 ): Promise<T> {
-  return await db.transaction(async (tx) => {
-    try {
-      return await testFn(tx);
-    } finally {
-      // Transaction rollback provides automatic cleanup
-      throw new Error("Test transaction rollback");
-    }
-  }).catch((error) => {
-    if (error.message === "Test transaction rollback") {
-      return; // Expected rollback
-    }
-    throw error; // Re-throw actual errors
-  });
+  return await db
+    .transaction(async (tx) => {
+      try {
+        return await testFn(tx);
+      } finally {
+        // Transaction rollback provides automatic cleanup
+        throw new Error("Test transaction rollback");
+      }
+    })
+    .catch((error) => {
+      if (error.message === "Test transaction rollback") {
+        return; // Expected rollback
+      }
+      throw error; // Re-throw actual errors
+    });
 }
 
 // Vitest test helper with proper types
@@ -123,11 +129,13 @@ export const test = vitest.test.extend<{
 ### Memory Safety Guidelines
 
 **✅ ALWAYS USE:**
+
 - Worker-scoped PGlite instances (one per worker)
 - Transaction-based test isolation
 - Automatic cleanup via rollback
 
 **❌ NEVER USE:**
+
 - `new PGlite()` in individual tests (50-100MB each)
 - `createSeededTestDatabase()` per test (memory blowout)
 - External database containers (slow, complex)
@@ -174,26 +182,29 @@ export const testSessions = {
 **Use hardcoded, predictable IDs** from the seed data architecture for consistent testing:
 
 ```typescript
-import { SEED_TEST_IDS, createMockAdminContext } from "~/test/constants/seed-test-ids";
-import { getSeededTestData } from "~/test/helpers/pglite-test-setup";
+import {
+  SEED_TEST_IDS,
+  createMockAdminContext,
+} from "~/test/constants/seed-test-ids";
+// Use SEED_TEST_IDS constants directly - no import needed
 
 // ✅ PREFERRED: Use seed constants for organizational context
 test("integration test with seed data", async ({ workerDb }) => {
   await withIsolatedTest(workerDb, async (db) => {
     // Use hardcoded organization IDs for predictability
     await testSessions.admin(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
-    
+
     // Get dynamic relationship IDs from seeded data
-    const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
-    
+    // Use SEED_TEST_IDS constants directly for predictable test data
+
     // Test with consistent, predictable IDs
     const service = new IssueService(db);
     const issue = await service.create({
       title: "Integration Test Issue",
-      machineId: seededData.machine!, // Real seeded machine
-      priorityId: seededData.priority!, // Real seeded priority
+      machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1, // Real seeded machine
+      priorityId: SEED_TEST_IDS.PRIORITIES.HIGH, // Real seeded priority
     });
-    
+
     expect(issue.organizationId).toBe(SEED_TEST_IDS.ORGANIZATIONS.primary);
     expect(issue.machineId).toBe(seededData.machine);
   });
@@ -205,11 +216,11 @@ test("cross-org data isolation", async ({ workerDb }) => {
     // Create data in primary org
     await testSessions.admin(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
     const primaryIssue = await createIssue(db, { title: "Primary Org Issue" });
-    
+
     // Switch to competitor org - should not see primary org data
     await testSessions.admin(db, SEED_TEST_IDS.ORGANIZATIONS.competitor);
     const visibleIssues = await db.query.issues.findMany();
-    
+
     // Verify complete isolation
     expect(visibleIssues).not.toContainEqual(primaryIssue);
     expect(visibleIssues.length).toBe(0); // No cross-contamination
@@ -218,6 +229,7 @@ test("cross-org data isolation", async ({ workerDb }) => {
 ```
 
 **Benefits of SEED_TEST_IDS approach:**
+
 - 🎯 **Predictable debugging**: "machine-mm-001" vs random UUIDs
 - 🔗 **Stable relationships**: Foreign keys never break
 - 🧪 **Cross-test consistency**: Same IDs across all test types
@@ -227,32 +239,36 @@ test("cross-org data isolation", async ({ workerDb }) => {
 
 ```typescript
 // src/services/__tests__/issueService.test.ts
-import { test, withIsolatedTest, testSessions } from "~/test/helpers/worker-scoped-db";
+import {
+  test,
+  withIsolatedTest,
+  testSessions,
+} from "~/test/helpers/worker-scoped-db";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
-import { getSeededTestData } from "~/test/helpers/pglite-test-setup";
+// Use SEED_TEST_IDS constants directly - no import needed
 import { IssueService } from "../issueService";
 import { sql } from "drizzle-orm";
 
 test("calculates issue priority with RLS context", async ({ workerDb }) => {
   await withIsolatedTest(workerDb, async (db) => {
-    // Use hardcoded organization ID for predictability  
+    // Use hardcoded organization ID for predictability
     await testSessions.admin(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
 
     const service = new IssueService(db);
-    
+
     // Use seeded data for consistent relationships
-    const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
+    // Use SEED_TEST_IDS constants directly for predictable test data
 
     // No organizationId needed - RLS handles it automatically
     const issue = await service.createIssue({
       title: "High Priority Issue",
-      machineId: seededData.machine!, // Use seeded machine
+      machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1, // Use seeded machine
       machineDowntime: 120, // 2 hours
     });
 
     expect(issue.calculatedPriority).toBe("high");
     expect(issue.organizationId).toBe(SEED_TEST_IDS.ORGANIZATIONS.primary); // RLS inserted this
-    
+
     // Verify automatic cleanup via transaction rollback
   });
 });
@@ -262,34 +278,36 @@ test("service respects RLS organizational boundaries", async ({ workerDb }) => {
     // Create data in primary org
     await testSessions.admin(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
     const service = new IssueService(db);
-    
+
     // Use seeded data instead of creating custom data
-    const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
+    // Use SEED_TEST_IDS constants directly for predictable test data
 
     const issue1 = await service.createIssue({
       title: "Primary Org Issue",
-      machineId: seededData.machine!,
+      machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
     });
 
-    // Switch to competitor org context  
+    // Switch to competitor org context
     await testSessions.admin(db, SEED_TEST_IDS.ORGANIZATIONS.competitor);
-    
+
     // Service should only see competitor org data (none from primary)
     const issues = await service.getIssuesByStatus("open");
     expect(issues).toHaveLength(0); // RLS filters out primary org data
 
     // Get seeded data for competitor org (will be minimal)
-    const competitorSeededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.competitor);
+    // Use competitor organization constants
 
     const issue2 = await service.createIssue({
-      title: "Competitor Org Issue", 
-      machineId: competitorSeededData.machine!, // Use seeded competitor machine
+      title: "Competitor Org Issue",
+      machineId: SEED_TEST_IDS.MACHINES.AFM_COMPETITOR_1, // Use seeded competitor machine
     });
 
     const competitorIssues = await service.getIssuesByStatus("open");
     expect(competitorIssues).toHaveLength(1);
     expect(competitorIssues[0].title).toBe("Competitor Org Issue");
-    expect(competitorIssues[0].organizationId).toBe(SEED_TEST_IDS.ORGANIZATIONS.competitor);
+    expect(competitorIssues[0].organizationId).toBe(
+      SEED_TEST_IDS.ORGANIZATIONS.competitor,
+    );
   });
 });
 ```
@@ -302,7 +320,11 @@ test("service respects RLS organizational boundaries", async ({ workerDb }) => {
 
 ```typescript
 // src/integration-tests/schema-constraints.integration.test.ts
-import { test, withIsolatedTest, testSessions } from "~/test/helpers/worker-scoped-db";
+import {
+  test,
+  withIsolatedTest,
+  testSessions,
+} from "~/test/helpers/worker-scoped-db";
 import { sql } from "drizzle-orm";
 
 test("foreign key constraint with RLS context", async ({ workerDb }) => {
@@ -357,7 +379,7 @@ test("cross-organization constraint isolation", async ({ workerDb }) => {
       db.insert(schema.issues).values({
         title: "Cross-org issue attempt",
         machineId: org1Machine.id, // References org-1 machine from org-2 context
-      })
+      }),
     ).rejects.toThrow(); // RLS + foreign key violation
   });
 });
@@ -513,13 +535,15 @@ describe("Issue Router", () => {
     // Mock issue creation
     mockDb.insert.mockReturnValue({
       values: vi.fn().mockReturnValue({
-        returning: vi.fn().mockResolvedValue([{
-          id: "issue-1",
-          title: "Test Issue",
-          machineId: "machine-1",
-          organizationId: "test-org", // RLS would set this
-          createdById: "test-user",
-        }]),
+        returning: vi.fn().mockResolvedValue([
+          {
+            id: "issue-1",
+            title: "Test Issue",
+            machineId: "machine-1",
+            organizationId: "test-org", // RLS would set this
+            createdById: "test-user",
+          },
+        ]),
       }),
     });
 
@@ -615,6 +639,7 @@ describe("Issue Router", () => {
 ### Transform Direct Service Calls to tRPC Integration
 
 **BEFORE (Problematic "Fake Integration")**:
+
 ```typescript
 // ❌ Direct service testing bypasses tRPC and RLS
 describe("CommentService", () => {
@@ -640,9 +665,14 @@ describe("CommentService", () => {
 ```
 
 **AFTER (Proper tRPC Integration)**:
+
 ```typescript
 // ✅ Full-stack tRPC integration with RLS
-import { test, withIsolatedTest, testSessions } from "~/test/helpers/worker-scoped-db";
+import {
+  test,
+  withIsolatedTest,
+  testSessions,
+} from "~/test/helpers/worker-scoped-db";
 import { createTRPCCaller } from "~/test/helpers/trpc-caller";
 
 test("creates comment via tRPC with RLS", async ({ workerDb }) => {
@@ -703,7 +733,7 @@ test("multi-org data isolation validation", async ({ workerDb }) => {
       .insert(schema.machines)
       .values({ name: "Org 1 Machine" })
       .returning();
-    
+
     const [org1Issue] = await db
       .insert(schema.issues)
       .values({
@@ -722,7 +752,7 @@ test("multi-org data isolation validation", async ({ workerDb }) => {
     const [org2Issue] = await db
       .insert(schema.issues)
       .values({
-        title: "Org 2 Issue", 
+        title: "Org 2 Issue",
         machineId: org2Machine.id,
       })
       .returning();
@@ -785,7 +815,7 @@ test("role-based RLS context validation", async ({ workerDb }) => {
 
     // Member should only see public issues
     const memberVisibleIssues = await db.query.issues.findMany();
-    
+
     expect(memberVisibleIssues).toHaveLength(1);
     expect(memberVisibleIssues[0].title).toBe("Public Issue");
 
@@ -832,9 +862,9 @@ test("handles large datasets efficiently with RLS", async ({ workerDb }) => {
 
     expect(results).toHaveLength(50);
     expect(duration).toBeLessThan(100); // Should be fast with proper indexes
-    
+
     // Verify all results are properly scoped
-    results.forEach(issue => {
+    results.forEach((issue) => {
       expect(issue.organizationId).toBe("test-org");
     });
   });
@@ -852,6 +882,7 @@ test("handles large datasets efficiently with RLS", async ({ workerDb }) => {
 **Context**: Part of dual-track approach - pgTAP handles RLS validation separately
 
 **Key Benefits**:
+
 - **5x faster execution**: No RLS policy evaluation overhead
 - **Focus on business logic**: Test functionality without security complexity
 - **Clean data setup**: Direct database operations without organizational coordination
@@ -873,26 +904,35 @@ test("calculates issue priority correctly", async ({ workerDb }) => {
     const service = new IssueService(db);
 
     // Create test data directly - no organizational setup needed
-    const [organization] = await db.insert(schema.organizations).values({
-      id: "test-org",
-      name: "Test Organization",
-    }).returning();
+    const [organization] = await db
+      .insert(schema.organizations)
+      .values({
+        id: "test-org",
+        name: "Test Organization",
+      })
+      .returning();
 
-    const [location] = await db.insert(schema.locations).values({
-      name: "Test Location",
-      organizationId: organization.id, // Explicit assignment
-    }).returning();
+    const [location] = await db
+      .insert(schema.locations)
+      .values({
+        name: "Test Location",
+        organizationId: organization.id, // Explicit assignment
+      })
+      .returning();
 
-    const [machine] = await db.insert(schema.machines).values({
-      name: "Critical Production Machine",
-      locationId: location.id,
-      organizationId: organization.id, // Explicit assignment
-      importance: "high",
-    }).returning();
+    const [machine] = await db
+      .insert(schema.machines)
+      .values({
+        name: "Critical Production Machine",
+        locationId: location.id,
+        organizationId: organization.id, // Explicit assignment
+        importance: "high",
+      })
+      .returning();
 
     // Test business logic without RLS interference
     const issue = await service.createIssue({
-      title: "Machine Down", 
+      title: "Machine Down",
       machineId: machine.id,
       organizationId: organization.id, // Explicit assignment
       estimatedDowntime: 240, // 4 hours
@@ -912,30 +952,42 @@ test("calculates issue priority correctly", async ({ workerDb }) => {
 test("issue comment workflow with notifications", async ({ workerDb }) => {
   await withIsolatedTest(workerDb, async (db) => {
     // Setup: Create complete test scenario directly
-    const [org] = await db.insert(schema.organizations).values({
-      id: "workflow-org",
-      name: "Workflow Test Org",
-    }).returning();
+    const [org] = await db
+      .insert(schema.organizations)
+      .values({
+        id: "workflow-org",
+        name: "Workflow Test Org",
+      })
+      .returning();
 
-    const [adminUser] = await db.insert(schema.users).values({
-      id: "admin-user",
-      email: "admin@test.com",
-      name: "Admin User",
-    }).returning();
+    const [adminUser] = await db
+      .insert(schema.users)
+      .values({
+        id: "admin-user",
+        email: "admin@test.com",
+        name: "Admin User",
+      })
+      .returning();
 
-    const [memberUser] = await db.insert(schema.users).values({
-      id: "member-user", 
-      email: "member@test.com",
-      name: "Member User",
-    }).returning();
+    const [memberUser] = await db
+      .insert(schema.users)
+      .values({
+        id: "member-user",
+        email: "member@test.com",
+        name: "Member User",
+      })
+      .returning();
 
-    const [issue] = await db.insert(schema.issues).values({
-      id: "test-issue",
-      title: "Test Issue",
-      organizationId: org.id,
-      createdById: memberUser.id,
-      statusId: "new",
-    }).returning();
+    const [issue] = await db
+      .insert(schema.issues)
+      .values({
+        id: "test-issue",
+        title: "Test Issue",
+        organizationId: org.id,
+        createdById: memberUser.id,
+        statusId: "new",
+      })
+      .returning();
 
     const commentService = new CommentService(db);
 
@@ -979,27 +1031,54 @@ test("issue comment workflow with notifications", async ({ workerDb }) => {
 test("machine collection aggregation logic", async ({ workerDb }) => {
   await withIsolatedTest(workerDb, async (db) => {
     // Create hierarchical test data
-    const [org] = await db.insert(schema.organizations).values({
-      id: "collection-org",
-      name: "Collection Test Org",
-    }).returning();
+    const [org] = await db
+      .insert(schema.organizations)
+      .values({
+        id: "collection-org",
+        name: "Collection Test Org",
+      })
+      .returning();
 
-    const [location] = await db.insert(schema.locations).values({
-      name: "Test Arcade",
-      organizationId: org.id,
-    }).returning();
+    const [location] = await db
+      .insert(schema.locations)
+      .values({
+        name: "Test Arcade",
+        organizationId: org.id,
+      })
+      .returning();
 
     // Create multiple machines
-    const machines = await db.insert(schema.machines).values([
-      { name: "Pinball A", locationId: location.id, organizationId: org.id, isActive: true },
-      { name: "Pinball B", locationId: location.id, organizationId: org.id, isActive: true },
-      { name: "Pinball C", locationId: location.id, organizationId: org.id, isActive: false },
-    ]).returning();
+    const machines = await db
+      .insert(schema.machines)
+      .values([
+        {
+          name: "Pinball A",
+          locationId: location.id,
+          organizationId: org.id,
+          isActive: true,
+        },
+        {
+          name: "Pinball B",
+          locationId: location.id,
+          organizationId: org.id,
+          isActive: true,
+        },
+        {
+          name: "Pinball C",
+          locationId: location.id,
+          organizationId: org.id,
+          isActive: false,
+        },
+      ])
+      .returning();
 
-    const [collection] = await db.insert(schema.collections).values({
-      name: "Classic Collection",
-      locationId: location.id,
-    }).returning();
+    const [collection] = await db
+      .insert(schema.collections)
+      .values({
+        name: "Classic Collection",
+        locationId: location.id,
+      })
+      .returning();
 
     // Add machines to collection
     await db.insert(schema.collectionMachines).values([
@@ -1027,10 +1106,13 @@ test("machine collection aggregation logic", async ({ workerDb }) => {
 test("handles large dataset operations efficiently", async ({ workerDb }) => {
   await withIsolatedTest(workerDb, async (db) => {
     // Create large test dataset
-    const [org] = await db.insert(schema.organizations).values({
-      id: "perf-org",
-      name: "Performance Test Org",
-    }).returning();
+    const [org] = await db
+      .insert(schema.organizations)
+      .values({
+        id: "perf-org",
+        name: "Performance Test Org",
+      })
+      .returning();
 
     // Create 1000 issues for performance testing
     const issueData = Array.from({ length: 1000 }, (_, i) => ({
@@ -1067,6 +1149,7 @@ test("handles large dataset operations efficiently", async ({ workerDb }) => {
 ### Database Connection Configuration
 
 **Test Environment Setup**:
+
 ```env
 # .env.test - integration_tester bypasses RLS
 DATABASE_URL="postgresql://integration_tester:testpassword@localhost:5432/postgres"
@@ -1076,6 +1159,7 @@ DATABASE_URL="postgresql://integration_tester:testpassword@localhost:5432/postgr
 ```
 
 **Role Creation** (test environment only):
+
 ```sql
 -- Created by setup script - see dual-track strategy
 CREATE ROLE integration_tester WITH LOGIN SUPERUSER BYPASSRLS PASSWORD 'testpassword';
@@ -1084,13 +1168,14 @@ CREATE ROLE integration_tester WITH LOGIN SUPERUSER BYPASSRLS PASSWORD 'testpass
 ### Migration from RLS-Enforced Tests
 
 **Before (RLS-enforced complexity)**:
+
 ```typescript
 test("issue creation with org context", async ({ workerDb }) => {
   await withIsolatedTest(workerDb, async (db) => {
     // Complex organizational setup
     const { org } = await setupOrgContext(db);
     await db.execute(sql`SET app.current_organization_id = ${org.id}`);
-    
+
     // Mixed business logic + security verification
     const issue = await service.createIssue({...});
     expect(issue.organizationId).toBe(org.id); // Security check mixed with logic
@@ -1099,12 +1184,13 @@ test("issue creation with org context", async ({ workerDb }) => {
 ```
 
 **After (business logic focus)**:
+
 ```typescript
 test("issue priority calculation", async ({ workerDb }) => {
   await withIsolatedTest(workerDb, async (db) => {
     // Direct data setup - no organizational complexity
     const issue = await service.createIssue({...});
-    
+
     // Pure business logic validation
     expect(issue.calculatedPriority).toBe("high");
   });
@@ -1114,16 +1200,19 @@ test("issue priority calculation", async ({ workerDb }) => {
 ### Integration with Dual-Track Strategy
 
 **Clear Responsibility Split**:
+
 - **This pattern (integration_tester)**: Business logic, workflows, data relationships
 - **pgTAP Security Track**: RLS policies, organizational boundaries, permissions
 - **No overlap**: Each track focuses on its specific concern
 
 **Performance Benefits**:
+
 - **5x faster test execution**: No RLS evaluation overhead
 - **Simpler test setup**: Direct data creation without organizational coordination
 - **Clearer test intent**: Focus on functionality, not security
 
 **Cross-references**:
+
 - **Security testing**: [📖 archetype-security-testing.md](./archetype-security-testing.md)
 - **pgTAP RLS testing**: [📖 pgtap-rls-testing.md](./pgtap-rls-testing.md)
 - **Complete strategy**: [📖 dual-track-testing-strategy.md](./dual-track-testing-strategy.md)
@@ -1162,7 +1251,7 @@ await service.create({
 
 // Manual scoping validation
 const issues = await service.list();
-expect(issues.every(i => i.organizationId === "test-org")).toBe(true);
+expect(issues.every((i) => i.organizationId === "test-org")).toBe(true);
 ```
 
 ### ❌ Mixed Testing Patterns
@@ -1181,16 +1270,19 @@ vi.mock("@/lib/db"); // Should use real database
 ## Quality Guidelines
 
 ### Memory Safety Validation
+
 - **Monitor memory usage**: Tests should stay under 500MB total
 - **Single PGlite instance**: One per worker, not per test
 - **Transaction isolation**: Automatic cleanup via rollback
 
-### RLS Context Validation  
+### RLS Context Validation
+
 - **Session establishment**: Every test must set organizational context
 - **Boundary verification**: Test cross-org isolation
 - **Role enforcement**: Verify role-based access control
 
 ### Performance Targets
+
 - **Fast execution**: Integration tests should complete in 2-5 seconds per file
 - **Efficient queries**: Database operations should be optimized
 - **Parallel safety**: Tests must be completely independent
@@ -1202,6 +1294,7 @@ vi.mock("@/lib/db"); // Should use real database
 **This archetype is handled by**: `integration-test-architect`
 
 **Agent responsibilities**:
+
 - **CRITICAL**: Enforce memory safety patterns (prevent system lockups)
 - Establish RLS context for all database operations
 - Validate organizational boundary enforcement
@@ -1209,6 +1302,7 @@ vi.mock("@/lib/db"); // Should use real database
 - Convert "fake integration" patterns to proper tRPC integration
 
 **Quality validation**:
+
 - All tests use worker-scoped PGlite pattern
 - RLS session context is properly established
 - Organizational boundaries are verified
@@ -1219,12 +1313,14 @@ vi.mock("@/lib/db"); // Should use real database
 ## When to Escalate to Other Archetypes
 
 **Switch to Unit Testing Archetype when**:
+
 - No database interaction required
 - Testing pure business logic
 - React component rendering only
 - Performance requires <100ms execution
 
 **Switch to Security Testing Archetype when**:
+
 - Primary focus is security boundaries
 - Testing RLS policies directly
 - Cross-organizational access validation

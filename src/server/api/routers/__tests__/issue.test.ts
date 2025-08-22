@@ -5,7 +5,7 @@
  * Tests actual router operations with proper authentication, permissions, and database operations.
  *
  * Refactored to use seeded test data architecture for consistent, predictable testing:
- * - Uses getSeededTestData() instead of manual setup functions
+ * - Uses static SEED_TEST_IDS instead of dynamic data queries
  * - Uses createSeededIssueTestContext() for standardized context
  * - Worker-scoped database with withIsolatedTest pattern for memory safety
  * - Real seeded relationships instead of manually created test data
@@ -20,7 +20,7 @@
  * - Memory-safe worker-scoped database
  *
  * Uses modern August 2025 patterns with Vitest and PGlite integration.
- * 
+ *
  * Covers all issue procedures:
  * - getById: Retrieve issue by ID with full details
  * - update: Update issue fields with permissions
@@ -75,17 +75,15 @@ import * as schema from "~/server/db/schema";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 import { generateTestId } from "~/test/helpers/test-id-generator";
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
-import { getSeededTestData } from "~/test/helpers/pglite-test-setup";
 import { createSeededIssueTestContext } from "~/test/helpers/createSeededIssueTestContext";
 
 // Import real service factory for true integration testing
 import { ServiceFactory } from "~/server/services/factory";
 
-// Helper function to create a test issue using seeded data
+// Helper function to create a test issue using static seed data
 async function createTestIssue(
   db: TestDatabase,
-  seededData: Awaited<ReturnType<typeof getSeededTestData>>,
-  overrides: Partial<typeof schema.issues.$inferInsert> = {}
+  overrides: Partial<typeof schema.issues.$inferInsert> = {},
 ) {
   const issueId = generateTestId("issue");
   const [issue] = await db
@@ -94,24 +92,24 @@ async function createTestIssue(
       id: issueId,
       title: "Test Issue",
       description: "Test issue description",
-      machineId: seededData.machine!,
-      statusId: seededData.status!,
-      priorityId: seededData.priority!,
-      createdById: seededData.user!,
-      organizationId: seededData.organization,
+      machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
+      statusId: SEED_TEST_IDS.STATUSES.NEW_PRIMARY,
+      priorityId: SEED_TEST_IDS.PRIORITIES.MEDIUM_PRIMARY,
+      createdById: SEED_TEST_IDS.USERS.ADMIN,
+      organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
       createdAt: new Date(),
       updatedAt: new Date(),
       ...overrides,
     })
     .returning();
-  
+
   return issue;
 }
 
 // Helper function to create public (anonymous) context using seeded data
 async function createPublicContext(
   db: TestDatabase,
-  organizationId: string
+  organizationId: string,
 ): Promise<TRPCContext> {
   const ctx: TRPCContext = {
     user: null,
@@ -146,34 +144,25 @@ async function createPublicContext(
 
 describe("Issue Router Integration Tests", () => {
   describe("getById procedure", () => {
-    test("should retrieve issue by ID with full details", async ({ workerDb }) => {
+    test("should retrieve issue by ID with full details", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Set RLS context for primary organization
-        await db.execute(sql.raw(`SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`));
-        
-        // Try to get seeded data, but handle errors gracefully
-        let seededData;
-        try {
-          seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
-        } catch (error) {
-          console.log("Skipping test - seeded data not available or schema issues:", error);
-          return;
-        }
-        
-        // Skip if no seeded data available
-        if (!seededData.user || !seededData.machine) {
-          console.log("Skipping test - insufficient seeded data");
-          return;
-        }
-        
-        // Create a test issue using seeded data
-        const issue = await createTestIssue(db, seededData);
-        
-        // Create context with seeded data
+        await db.execute(
+          sql.raw(
+            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
+          ),
+        );
+
+        // Create a test issue using static seed data
+        const issue = await createTestIssue(db);
+
+        // Create context with static seed data
         const ctx = await createSeededIssueTestContext(
           db,
           SEED_TEST_IDS.ORGANIZATIONS.primary,
-          seededData.user
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = appRouter.createCaller(ctx);
 
@@ -192,42 +181,29 @@ describe("Issue Router Integration Tests", () => {
     test("should enforce organization isolation", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Set RLS context for primary organization
-        await db.execute(sql.raw(`SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`));
-        
-        // Get seeded data for primary org
-        const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
-        
-        // Skip if no seeded data available
-        if (!seededData.user) {
-          console.log("Skipping test - no seeded user available");
-          return;
-        }
-        
+        await db.execute(
+          sql.raw(
+            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
+          ),
+        );
+
         // Create context for primary org user
         const ctx = await createSeededIssueTestContext(
           db,
           SEED_TEST_IDS.ORGANIZATIONS.primary,
-          seededData.user
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = appRouter.createCaller(ctx);
 
-        // Get competitor org seeded data for cross-org test
-        const competitorData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.competitor);
-        
-        if (!competitorData.machine || !competitorData.status || !competitorData.priority) {
-          console.log("Skipping test - insufficient competitor org data");
-          return;
-        }
-        
-        // Create issue in competitor organization
+        // Create issue in competitor organization using static seed data
         const [competitorIssue] = await db
           .insert(schema.issues)
           .values({
             id: generateTestId("competitor-issue"),
             title: "Competitor Org Issue",
-            machineId: competitorData.machine,
-            statusId: competitorData.status,
-            priorityId: competitorData.priority,
+            machineId: SEED_TEST_IDS.MACHINES.CACTUS_CANYON_1,
+            statusId: SEED_TEST_IDS.STATUSES.NEW_COMPETITOR,
+            priorityId: SEED_TEST_IDS.PRIORITIES.MEDIUM_COMPETITOR,
             organizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor,
             createdAt: new Date(),
             updatedAt: new Date(),
@@ -244,21 +220,17 @@ describe("Issue Router Integration Tests", () => {
     test("should throw error for non-existent issue", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Set RLS context
-        await db.execute(sql.raw(`SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`));
-        
-        // Get seeded data
-        const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
-        
-        if (!seededData.user) {
-          console.log("Skipping test - no seeded user available");
-          return;
-        }
-        
-        // Create context with seeded data
+        await db.execute(
+          sql.raw(
+            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
+          ),
+        );
+
+        // Create context with static seed data
         const ctx = await createSeededIssueTestContext(
           db,
           SEED_TEST_IDS.ORGANIZATIONS.primary,
-          seededData.user
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = appRouter.createCaller(ctx);
 
@@ -273,22 +245,18 @@ describe("Issue Router Integration Tests", () => {
     test("should update issue fields successfully", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Set RLS context
-        await db.execute(sql.raw(`SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`));
-        
-        // Get seeded data
-        const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
-        
-        if (!seededData.user || !seededData.machine) {
-          console.log("Skipping test - insufficient seeded data");
-          return;
-        }
-        
-        // Create test issue and context
-        const issue = await createTestIssue(db, seededData);
+        await db.execute(
+          sql.raw(
+            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
+          ),
+        );
+
+        // Create test issue and context using static seed data
+        const issue = await createTestIssue(db);
         const ctx = await createSeededIssueTestContext(
           db,
           SEED_TEST_IDS.ORGANIZATIONS.primary,
-          seededData.user
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = appRouter.createCaller(ctx);
 
@@ -311,25 +279,22 @@ describe("Issue Router Integration Tests", () => {
       });
     });
 
-    test("should enforce organization isolation on updates", async ({ workerDb }) => {
+    test("should enforce organization isolation on updates", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Set RLS context for primary org
-        await db.execute(sql.raw(`SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`));
-        
-        // Get seeded data
-        const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
-        const competitorData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.competitor);
-        
-        if (!seededData.user || !competitorData.machine) {
-          console.log("Skipping test - insufficient seeded data");
-          return;
-        }
-        
-        // Create context for primary org user
+        await db.execute(
+          sql.raw(
+            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
+          ),
+        );
+
+        // Create context for primary org user using static seed data
         const ctx = await createSeededIssueTestContext(
           db,
           SEED_TEST_IDS.ORGANIZATIONS.primary,
-          seededData.user
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = appRouter.createCaller(ctx);
 
@@ -339,9 +304,9 @@ describe("Issue Router Integration Tests", () => {
           .values({
             id: generateTestId("competitor-issue"),
             title: "Competitor Org Issue",
-            machineId: competitorData.machine!,
-            statusId: competitorData.status!,
-            priorityId: competitorData.priority!,
+            machineId: SEED_TEST_IDS.MACHINES.CACTUS_CANYON_1,
+            statusId: SEED_TEST_IDS.STATUSES.NEW_COMPETITOR,
+            priorityId: SEED_TEST_IDS.PRIORITIES.MEDIUM_COMPETITOR,
             organizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor,
             createdAt: new Date(),
             updatedAt: new Date(),
@@ -363,22 +328,18 @@ describe("Issue Router Integration Tests", () => {
     test("should update issue status successfully", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Set RLS context
-        await db.execute(sql.raw(`SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`));
-        
-        // Get seeded data
-        const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
-        
-        if (!seededData.user || !seededData.machine) {
-          console.log("Skipping test - insufficient seeded data");
-          return;
-        }
-        
-        // Create test issue and context
-        const issue = await createTestIssue(db, seededData);
+        await db.execute(
+          sql.raw(
+            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
+          ),
+        );
+
+        // Create test issue and context using static seed data
+        const issue = await createTestIssue(db);
         const ctx = await createSeededIssueTestContext(
           db,
           SEED_TEST_IDS.ORGANIZATIONS.primary,
-          seededData.user
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = appRouter.createCaller(ctx);
 
@@ -412,25 +373,23 @@ describe("Issue Router Integration Tests", () => {
       });
     });
 
-    test("should validate status belongs to same organization", async ({ workerDb }) => {
+    test("should validate status belongs to same organization", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Set RLS context for primary org
-        await db.execute(sql.raw(`SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`));
-        
-        // Get seeded data
-        const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
-        
-        if (!seededData.user || !seededData.machine) {
-          console.log("Skipping test - insufficient seeded data");
-          return;
-        }
-        
-        // Create test issue and context
-        const issue = await createTestIssue(db, seededData);
+        await db.execute(
+          sql.raw(
+            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
+          ),
+        );
+
+        // Create test issue and context using static seed data
+        const issue = await createTestIssue(db);
         const ctx = await createSeededIssueTestContext(
           db,
           SEED_TEST_IDS.ORGANIZATIONS.primary,
-          seededData.user
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = appRouter.createCaller(ctx);
 
@@ -460,21 +419,19 @@ describe("Issue Router Integration Tests", () => {
   });
 
   describe("Authentication and Authorization", () => {
-    test("should require authentication for protected procedures", async ({ workerDb }) => {
+    test("should require authentication for protected procedures", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Set RLS context
-        await db.execute(sql.raw(`SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`));
-        
-        // Get seeded data to create test issue
-        const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
-        
-        if (!seededData.machine) {
-          console.log("Skipping test - insufficient seeded data");
-          return;
-        }
-        
-        // Create test issue
-        const issue = await createTestIssue(db, seededData);
+        await db.execute(
+          sql.raw(
+            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
+          ),
+        );
+
+        // Create test issue using static seed data
+        const issue = await createTestIssue(db);
 
         // Create context without authentication
         const unauthCtx: TRPCContext = {
@@ -512,7 +469,10 @@ describe("Issue Router Integration Tests", () => {
         ).rejects.toThrow("UNAUTHORIZED");
 
         await expect(
-          caller.issue.core.updateStatus({ id: issue.id, statusId: "status-1" }),
+          caller.issue.core.updateStatus({
+            id: issue.id,
+            statusId: "status-1",
+          }),
         ).rejects.toThrow("UNAUTHORIZED");
       });
     });
@@ -520,29 +480,29 @@ describe("Issue Router Integration Tests", () => {
 });
 
 describe("Public Issue Procedures", () => {
-
   describe("publicCreate - Anonymous Issue Creation", () => {
-    test("should allow anonymous users to create issues via QR codes", async ({ workerDb }) => {
+    test("should allow anonymous users to create issues via QR codes", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Set RLS context for primary org
-        await db.execute(sql.raw(`SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`));
-        
-        // Get seeded data
-        const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
-        
-        if (!seededData.machine) {
-          console.log("Skipping test - no seeded machine available");
-          return;
-        }
-        
+        await db.execute(
+          sql.raw(
+            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
+          ),
+        );
+
         // Create public (anonymous) context
-        const ctx = await createPublicContext(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
+        const ctx = await createPublicContext(
+          db,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+        );
         const caller = appRouter.createCaller(ctx);
 
         const result = await caller.issue.core.publicCreate({
           title: "Machine not working",
           description: "Screen is black",
-          machineId: seededData.machine,
+          machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
           reporterEmail: "john@example.com",
           submitterName: "John Doe",
         });
@@ -553,7 +513,9 @@ describe("Public Issue Procedures", () => {
         expect(result.createdById).toBeNull();
         expect(result.submitterName).toBe("John Doe");
         expect(result.reporterEmail).toBe("john@example.com");
-        expect(result.machineId).toBe(seededData.machine);
+        expect(result.machineId).toBe(
+          SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
+        );
 
         // Verify issue was created in database
         const createdIssue = await db.query.issues.findFirst({
@@ -564,13 +526,22 @@ describe("Public Issue Procedures", () => {
       });
     });
 
-    test("should validate required fields for anonymous issue creation", async ({ workerDb }) => {
+    test("should validate required fields for anonymous issue creation", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Set RLS context
-        await db.execute(sql.raw(`SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`));
-        
+        await db.execute(
+          sql.raw(
+            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
+          ),
+        );
+
         // Create public context
-        const ctx = await createPublicContext(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
+        const ctx = await createPublicContext(
+          db,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+        );
         const caller = appRouter.createCaller(ctx);
 
         // Test missing title
@@ -591,24 +562,27 @@ describe("Public Issue Procedures", () => {
       });
     });
 
-    test("should validate email format for reporterEmail", async ({ workerDb }) => {
+    test("should validate email format for reporterEmail", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        // Set RLS context and get seeded data
-        await db.execute(sql.raw(`SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`));
-        const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
-        
-        if (!seededData.machine) {
-          console.log("Skipping test - no seeded machine available");
-          return;
-        }
-        
-        const ctx = await createPublicContext(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
+        // Set RLS context
+        await db.execute(
+          sql.raw(
+            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
+          ),
+        );
+
+        const ctx = await createPublicContext(
+          db,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+        );
         const caller = appRouter.createCaller(ctx);
 
         await expect(
           caller.issue.core.publicCreate({
             title: "Test Issue",
-            machineId: seededData.machine,
+            machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
             reporterEmail: "invalid-email",
           }),
         ).rejects.toThrow();
@@ -618,9 +592,16 @@ describe("Public Issue Procedures", () => {
     test("should handle machine not found error", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Set RLS context
-        await db.execute(sql.raw(`SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`));
-        
-        const ctx = await createPublicContext(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
+        await db.execute(
+          sql.raw(
+            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
+          ),
+        );
+
+        const ctx = await createPublicContext(
+          db,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+        );
         const caller = appRouter.createCaller(ctx);
 
         await expect(
@@ -634,28 +615,34 @@ describe("Public Issue Procedures", () => {
 
     test("should handle missing default status error", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        // Set RLS context and get seeded data
-        await db.execute(sql.raw(`SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`));
-        const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
-        
-        if (!seededData.machine) {
-          console.log("Skipping test - no seeded machine available");
-          return;
-        }
-        
-        const ctx = await createPublicContext(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
-        
-        // Remove default status to simulate error condition
-        await db.delete(schema.issueStatuses).where(
-          eq(schema.issueStatuses.organizationId, SEED_TEST_IDS.ORGANIZATIONS.primary)
+        // Set RLS context
+        await db.execute(
+          sql.raw(
+            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
+          ),
         );
-        
+
+        const ctx = await createPublicContext(
+          db,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+        );
+
+        // Remove default status to simulate error condition
+        await db
+          .delete(schema.issueStatuses)
+          .where(
+            eq(
+              schema.issueStatuses.organizationId,
+              SEED_TEST_IDS.ORGANIZATIONS.primary,
+            ),
+          );
+
         const caller = appRouter.createCaller(ctx);
 
         await expect(
           caller.issue.core.publicCreate({
             title: "Test Issue",
-            machineId: seededData.machine,
+            machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
           }),
         ).rejects.toThrow(
           "Default issue status not found. Please contact an administrator.",
@@ -663,24 +650,37 @@ describe("Public Issue Procedures", () => {
       });
     });
 
-    test("should handle missing default priority error", async ({ workerDb }) => {
+    test("should handle missing default priority error", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Set RLS context and get seeded data
-        await db.execute(sql.raw(`SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`));
-        const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
-        
+        await db.execute(
+          sql.raw(
+            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
+          ),
+        );
+
         if (!seededData.machine) {
           console.log("Skipping test - no seeded machine available");
           return;
         }
-        
-        const ctx = await createPublicContext(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
-        
-        // Remove default priority to simulate error condition
-        await db.delete(schema.priorities).where(
-          eq(schema.priorities.organizationId, SEED_TEST_IDS.ORGANIZATIONS.primary)
+
+        const ctx = await createPublicContext(
+          db,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
         );
-        
+
+        // Remove default priority to simulate error condition
+        await db
+          .delete(schema.priorities)
+          .where(
+            eq(
+              schema.priorities.organizationId,
+              SEED_TEST_IDS.ORGANIZATIONS.primary,
+            ),
+          );
+
         const caller = appRouter.createCaller(ctx);
 
         await expect(
@@ -694,18 +694,26 @@ describe("Public Issue Procedures", () => {
       });
     });
 
-    test("should create minimal issue with only required fields", async ({ workerDb }) => {
+    test("should create minimal issue with only required fields", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Set RLS context and get seeded data
-        await db.execute(sql.raw(`SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`));
-        const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
-        
+        await db.execute(
+          sql.raw(
+            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
+          ),
+        );
+
         if (!seededData.machine || !seededData.status || !seededData.priority) {
           console.log("Skipping test - insufficient seeded data");
           return;
         }
-        
-        const ctx = await createPublicContext(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
+
+        const ctx = await createPublicContext(
+          db,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+        );
         const caller = appRouter.createCaller(ctx);
 
         const result = await caller.issue.core.publicCreate({
@@ -716,7 +724,9 @@ describe("Public Issue Procedures", () => {
         expect(result).toBeDefined();
         expect(result.title).toBe("Machine Issue");
         expect(result.createdById).toBeNull();
-        expect(result.machineId).toBe(seededData.machine);
+        expect(result.machineId).toBe(
+          SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
+        );
         expect(result.statusId).toBe(seededData.status);
         expect(result.priorityId).toBe(seededData.priority);
 
@@ -732,28 +742,31 @@ describe("Public Issue Procedures", () => {
   });
 
   describe("publicGetAll - Anonymous Issue Viewing", () => {
-    test("should allow anonymous users to view issues", async ({ workerDb }) => {
+    test("should allow anonymous users to view issues", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        // Set RLS context and get seeded data
-        await db.execute(sql.raw(`SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`));
-        const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
-        
-        if (!seededData.machine || !seededData.status || !seededData.priority || !seededData.user) {
-          console.log("Skipping test - insufficient seeded data");
-          return;
-        }
-        
-        const ctx = await createPublicContext(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
+        // Set RLS context
+        await db.execute(
+          sql.raw(
+            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
+          ),
+        );
 
-        // Create test issues using seeded data
+        const ctx = await createPublicContext(
+          db,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+        );
+
+        // Create test issues using static seed data
         await db.insert(schema.issues).values([
           {
             id: generateTestId("issue-1"),
             title: "Machine not working",
             description: "Screen is black",
-            machineId: seededData.machine,
-            statusId: seededData.status,
-            priorityId: seededData.priority,
+            machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
+            statusId: SEED_TEST_IDS.STATUSES.NEW_PRIMARY,
+            priorityId: SEED_TEST_IDS.PRIORITIES.MEDIUM_PRIMARY,
             organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
             submitterName: "John Doe",
             createdAt: new Date(),
@@ -763,13 +776,13 @@ describe("Public Issue Procedures", () => {
             id: generateTestId("issue-2"),
             title: "Flipper stuck",
             description: null,
-            machineId: seededData.machine,
-            statusId: seededData.status,
-            priorityId: seededData.priority,
+            machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
+            statusId: SEED_TEST_IDS.STATUSES.NEW_PRIMARY,
+            priorityId: SEED_TEST_IDS.PRIORITIES.MEDIUM_PRIMARY,
             organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
             submitterName: "Jane Smith",
-            createdById: seededData.user,
-            assignedToId: seededData.user,
+            createdById: SEED_TEST_IDS.USERS.ADMIN,
+            assignedToId: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date(),
             updatedAt: new Date(),
           },
@@ -779,11 +792,13 @@ describe("Public Issue Procedures", () => {
         const result = await caller.issue.core.publicGetAll();
 
         expect(result).toHaveLength(2);
-        expect(result.some(i => i.title === "Machine not working")).toBe(true);
-        expect(result.some(i => i.title === "Flipper stuck")).toBe(true);
-        
+        expect(result.some((i) => i.title === "Machine not working")).toBe(
+          true,
+        );
+        expect(result.some((i) => i.title === "Flipper stuck")).toBe(true);
+
         // Verify structure of returned data
-        const issue1 = result.find(i => i.title === "Machine not working");
+        const issue1 = result.find((i) => i.title === "Machine not working");
         expect(issue1?.machine).toBeDefined();
         expect(issue1?.status).toBeDefined();
         expect(issue1?.priority).toBeDefined();
@@ -792,7 +807,7 @@ describe("Public Issue Procedures", () => {
 
     // NOTE: Remaining tests in this file follow the same refactoring pattern:
     // 1. Set RLS context: await db.execute(sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`);
-    // 2. Get seeded data: const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
+    // 2. Use static seed data: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1, etc.
     // 3. Use createPublicContext() for anonymous tests or createSeededIssueTestContext() for authenticated tests
     // 4. Create test-specific data using seeded IDs for relationships
     // 5. Skip tests gracefully if required seeded data is not available
@@ -802,8 +817,9 @@ describe("Public Issue Procedures", () => {
 
     test("should filter issues by location", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { ctx, organizationId, status, priority, model } = await setupPublicTestData(db);
-        
+        const { ctx, organizationId, status, priority, model } =
+          await setupPublicTestData(db);
+
         // Create second location
         const [location2] = await db
           .insert(schema.locations)
@@ -868,8 +884,16 @@ describe("Public Issue Procedures", () => {
 
     test("should filter issues by machine", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { ctx, organizationId, machine, status, priority, model, location } = await setupPublicTestData(db);
-        
+        const {
+          ctx,
+          organizationId,
+          machine,
+          status,
+          priority,
+          model,
+          location,
+        } = await setupPublicTestData(db);
+
         // Create second machine
         const [machine2] = await db
           .insert(schema.machines)
@@ -922,8 +946,9 @@ describe("Public Issue Procedures", () => {
 
     test("should filter issues by status", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { ctx, organizationId, machine, priority } = await setupPublicTestData(db);
-        
+        const { ctx, organizationId, machine, priority } =
+          await setupPublicTestData(db);
+
         // Create multiple statuses
         const [status1] = await db
           .insert(schema.issueStatuses)
@@ -989,8 +1014,9 @@ describe("Public Issue Procedures", () => {
 
     test("should filter issues by status category", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { ctx, organizationId, machine, status, priority } = await setupPublicTestData(db);
-        
+        const { ctx, organizationId, machine, status, priority } =
+          await setupPublicTestData(db);
+
         // Create an issue with NEW status category
         await db.insert(schema.issues).values({
           id: generateTestId("test-issue"),
@@ -1002,12 +1028,12 @@ describe("Public Issue Procedures", () => {
           priorityId: priority.id,
           createdBy: generateTestId("user"),
         });
-        
+
         const caller = appRouter.createCaller(ctx);
         const result = await caller.issue.core.publicGetAll({
           statusCategory: "NEW",
         });
-        
+
         expect(result.length).toBe(1);
         expect(result[0]?.title).toBe("Test Issue");
       });
@@ -1015,8 +1041,9 @@ describe("Public Issue Procedures", () => {
 
     test("should filter issues by model", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { ctx, organizationId, machine, status, priority, model } = await setupPublicTestData(db);
-        
+        const { ctx, organizationId, machine, status, priority, model } =
+          await setupPublicTestData(db);
+
         // Create an issue linked to the specific model
         await db.insert(schema.issues).values({
           id: generateTestId("test-issue"),
@@ -1028,12 +1055,12 @@ describe("Public Issue Procedures", () => {
           priorityId: priority.id,
           createdBy: generateTestId("user"),
         });
-        
+
         const caller = appRouter.createCaller(ctx);
         const result = await caller.issue.core.publicGetAll({
           modelId: model.id,
         });
-        
+
         expect(result.length).toBe(1);
         expect(result[0]?.title).toBe("Model-specific Issue");
       });
@@ -1041,8 +1068,9 @@ describe("Public Issue Procedures", () => {
 
     test("should handle custom limit parameter", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { ctx, organizationId, machine, status, priority } = await setupPublicTestData(db);
-        
+        const { ctx, organizationId, machine, status, priority } =
+          await setupPublicTestData(db);
+
         // Create multiple issues
         const issueData = Array.from({ length: 15 }, (_, i) => ({
           id: generateTestId(`issue-${i}`),
@@ -1054,7 +1082,7 @@ describe("Public Issue Procedures", () => {
           createdAt: new Date(Date.now() - i * 1000), // Different timestamps for ordering
           updatedAt: new Date(Date.now() - i * 1000),
         }));
-        
+
         await db.insert(schema.issues).values(issueData);
 
         const caller = appRouter.createCaller(ctx);
@@ -1097,8 +1125,9 @@ describe("Public Issue Procedures", () => {
 
     test("should sort issues by different criteria", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { ctx, organizationId, machine, status, priority } = await setupPublicTestData(db);
-        
+        const { ctx, organizationId, machine, status, priority } =
+          await setupPublicTestData(db);
+
         // Create multiple issues with different timestamps
         await db.insert(schema.issues).values([
           {
@@ -1108,8 +1137,8 @@ describe("Public Issue Procedures", () => {
             statusId: status.id,
             priorityId: priority.id,
             organizationId,
-            createdAt: new Date('2023-01-01'),
-            updatedAt: new Date('2023-01-02'),
+            createdAt: new Date("2023-01-01"),
+            updatedAt: new Date("2023-01-02"),
           },
           {
             id: generateTestId("issue-2"),
@@ -1118,8 +1147,8 @@ describe("Public Issue Procedures", () => {
             statusId: status.id,
             priorityId: priority.id,
             organizationId,
-            createdAt: new Date('2023-01-03'),
-            updatedAt: new Date('2023-01-04'),
+            createdAt: new Date("2023-01-03"),
+            updatedAt: new Date("2023-01-04"),
           },
         ]);
 
@@ -1142,14 +1171,14 @@ describe("Public Issue Procedures", () => {
     test("should handle organization not found error", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
         const { ctx } = await setupPublicTestData(db);
-        
+
         // Create context without organization
         const noOrgCtx: TRPCContext = {
           ...ctx,
           organization: null,
           organizationId: null,
         };
-        
+
         const caller = appRouter.createCaller(noOrgCtx);
 
         await expect(caller.issue.core.publicGetAll()).rejects.toThrow(
@@ -1160,8 +1189,9 @@ describe("Public Issue Procedures", () => {
 
     test("should combine multiple filters", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        const { ctx, organizationId, location, model, status, priority } = await setupPublicTestData(db);
-        
+        const { ctx, organizationId, location, model, status, priority } =
+          await setupPublicTestData(db);
+
         // Create another location and status
         const [location2] = await db
           .insert(schema.locations)
@@ -1224,8 +1254,8 @@ describe("Public Issue Procedures", () => {
             statusId: status.id, // NEW category
             priorityId: priority.id,
             organizationId,
-            createdAt: new Date('2023-01-01'),
-            updatedAt: new Date('2023-01-01'),
+            createdAt: new Date("2023-01-01"),
+            updatedAt: new Date("2023-01-01"),
           },
           {
             id: generateTestId("issue-wrong-location"),
@@ -1234,8 +1264,8 @@ describe("Public Issue Procedures", () => {
             statusId: status.id, // NEW category
             priorityId: priority.id,
             organizationId,
-            createdAt: new Date('2023-01-02'),
-            updatedAt: new Date('2023-01-02'),
+            createdAt: new Date("2023-01-02"),
+            updatedAt: new Date("2023-01-02"),
           },
           {
             id: generateTestId("issue-wrong-status"),
@@ -1244,8 +1274,8 @@ describe("Public Issue Procedures", () => {
             statusId: closedStatus.id, // DONE category
             priorityId: priority.id,
             organizationId,
-            createdAt: new Date('2023-01-03'),
-            updatedAt: new Date('2023-01-03'),
+            createdAt: new Date("2023-01-03"),
+            updatedAt: new Date("2023-01-03"),
           },
         ]);
 

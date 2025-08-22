@@ -9,13 +9,8 @@ import { describe, expect, vi } from "vitest";
 
 import { generateId } from "~/lib/utils/id-generation";
 import { appRouter } from "~/server/api/root";
-import {
-  comments,
-  issues,
-  memberships,
-} from "~/server/db/schema";
+import { comments, issues, memberships } from "~/server/db/schema";
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
-import { getSeededTestData } from "~/test/helpers/pglite-test-setup";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 import { createSeededIssueTestContext } from "~/test/helpers/createSeededIssueTestContext";
 
@@ -40,7 +35,7 @@ vi.mock("~/server/auth/permissions", async () => {
       .fn()
       .mockResolvedValue([
         "comment:create",
-        "comment:edit", 
+        "comment:edit",
         "comment:delete",
         "admin:view",
       ]),
@@ -49,7 +44,7 @@ vi.mock("~/server/auth/permissions", async () => {
       .mockResolvedValue([
         "comment:create",
         "comment:edit",
-        "comment:delete", 
+        "comment:delete",
         "admin:view",
       ]),
     requirePermissionForSession: vi.fn().mockResolvedValue(undefined),
@@ -60,38 +55,33 @@ vi.mock("~/server/auth/permissions", async () => {
 
 describe("Issue Comment Router Integration Tests (PGlite)", () => {
   describe("Comment Creation", () => {
-    test("should create comment with proper organizational scoping", async ({ workerDb }) => {
+    test("should create comment with proper organizational scoping", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Set RLS context for primary org
-        await db.execute(sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`);
-        
-        // Use seeded data for real relationships
-        const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
-        
-        // Skip if no seeded data available
-        if (!seededData.user) {
-          console.log("Skipping test - no seeded user available");
-          return;
-        }
+        await db.execute(
+          sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`,
+        );
 
-        // Create an issue first using seeded data
+        // Create an issue first using static seed data
         const issueId = generateId();
         await db.insert(issues).values({
           id: issueId,
           title: "Test Issue for Comment",
           description: "Test description",
-          machineId: seededData.machine,
+          machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
           organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
-          statusId: seededData.status,
-          priorityId: seededData.priority,
-          createdById: seededData.user,
+          statusId: SEED_TEST_IDS.STATUSES.NEW_PRIMARY,
+          priorityId: SEED_TEST_IDS.PRIORITIES.MEDIUM_PRIMARY,
+          createdById: SEED_TEST_IDS.USERS.ADMIN,
         });
 
         // Create test context with real database using shared helper
         const testContext = await createSeededIssueTestContext(
           db,
           SEED_TEST_IDS.ORGANIZATIONS.primary,
-          seededData.user,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
 
         const caller = appRouter.createCaller(testContext);
@@ -106,7 +96,7 @@ describe("Issue Comment Router Integration Tests (PGlite)", () => {
         expect(result.id).toBeDefined();
         expect(result.content).toBe("This is a test comment");
         expect(result.issueId).toBe(issueId);
-        expect(result.authorId).toBe(seededData.user);
+        expect(result.authorId).toBe(SEED_TEST_IDS.USERS.ADMIN);
         expect(result.author).toBeDefined();
         expect(result.author.id).toBe(seededData.user);
 
@@ -116,20 +106,29 @@ describe("Issue Comment Router Integration Tests (PGlite)", () => {
         });
 
         expect(dbComment).toBeDefined();
-        expect(dbComment?.organizationId).toBe(SEED_TEST_IDS.ORGANIZATIONS.primary);
+        expect(dbComment?.organizationId).toBe(
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+        );
         expect(dbComment?.issueId).toBe(issueId);
         expect(dbComment?.authorId).toBe(seededData.user);
       });
     });
 
-    test("should enforce issue accessibility for comment creation", async ({ workerDb }) => {
+    test("should enforce issue accessibility for comment creation", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Set RLS context for primary org
-        await db.execute(sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`);
-        
+        await db.execute(
+          sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`,
+        );
+
         // Use seeded data for real relationships
-        const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
-        
+        const seededData = await getSeededTestData(
+          db,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+        );
+
         // Skip if no seeded data available
         if (!seededData.user) {
           console.log("Skipping test - no seeded user available");
@@ -157,14 +156,21 @@ describe("Issue Comment Router Integration Tests (PGlite)", () => {
   });
 
   describe("Comment Editing", () => {
-    test("should allow users to edit their own comments", async ({ workerDb }) => {
+    test("should allow users to edit their own comments", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Set RLS context for primary org
-        await db.execute(sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`);
-        
+        await db.execute(
+          sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`,
+        );
+
         // Use seeded data for real relationships
-        const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
-        
+        const seededData = await getSeededTestData(
+          db,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+        );
+
         // Skip if no seeded data available
         if (!seededData.user) {
           console.log("Skipping test - no seeded user available");
@@ -174,7 +180,7 @@ describe("Issue Comment Router Integration Tests (PGlite)", () => {
         // Create an issue and comment first
         const issueId = generateId();
         const commentId = generateId();
-        
+
         await db.insert(issues).values({
           id: issueId,
           title: "Test Issue for Comment Edit",
@@ -222,14 +228,21 @@ describe("Issue Comment Router Integration Tests (PGlite)", () => {
       });
     });
 
-    test("should prevent users from editing others' comments", async ({ workerDb }) => {
+    test("should prevent users from editing others' comments", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Set RLS context for primary org
-        await db.execute(sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`);
-        
+        await db.execute(
+          sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`,
+        );
+
         // Use seeded data for real relationships
-        const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
-        
+        const seededData = await getSeededTestData(
+          db,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+        );
+
         // Skip if no seeded data available (need two users)
         if (!seededData.user || !seededData.user2) {
           console.log("Skipping test - need two seeded users");
@@ -239,7 +252,7 @@ describe("Issue Comment Router Integration Tests (PGlite)", () => {
         // Create an issue and comment by user1
         const issueId = generateId();
         const commentId = generateId();
-        
+
         await db.insert(issues).values({
           id: issueId,
           title: "Test Issue for Comment Edit Block",
@@ -280,14 +293,21 @@ describe("Issue Comment Router Integration Tests (PGlite)", () => {
   });
 
   describe("Comment Deletion", () => {
-    test("should allow users to delete their own comments", async ({ workerDb }) => {
+    test("should allow users to delete their own comments", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Set RLS context for primary org
-        await db.execute(sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`);
-        
+        await db.execute(
+          sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`,
+        );
+
         // Use seeded data for real relationships
-        const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
-        
+        const seededData = await getSeededTestData(
+          db,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+        );
+
         // Skip if no seeded data available
         if (!seededData.user) {
           console.log("Skipping test - no seeded user available");
@@ -297,7 +317,7 @@ describe("Issue Comment Router Integration Tests (PGlite)", () => {
         // Create an issue and comment first
         const issueId = generateId();
         const commentId = generateId();
-        
+
         await db.insert(issues).values({
           id: issueId,
           title: "Test Issue for Comment Delete",
@@ -343,14 +363,21 @@ describe("Issue Comment Router Integration Tests (PGlite)", () => {
   });
 
   describe("Comment Restoration", () => {
-    test("should allow admins to restore deleted comments", async ({ workerDb }) => {
+    test("should allow admins to restore deleted comments", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Set RLS context for primary org
-        await db.execute(sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`);
-        
+        await db.execute(
+          sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`,
+        );
+
         // Use seeded data for real relationships
-        const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
-        
+        const seededData = await getSeededTestData(
+          db,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+        );
+
         // Skip if no seeded data available
         if (!seededData.user) {
           console.log("Skipping test - no seeded user available");
@@ -360,7 +387,7 @@ describe("Issue Comment Router Integration Tests (PGlite)", () => {
         // Create an issue and deleted comment first
         const issueId = generateId();
         const commentId = generateId();
-        
+
         await db.insert(issues).values({
           id: issueId,
           title: "Test Issue for Comment Restore",
@@ -407,14 +434,21 @@ describe("Issue Comment Router Integration Tests (PGlite)", () => {
   });
 
   describe("Deleted Comments Admin View", () => {
-    test("should allow admins to view deleted comments", async ({ workerDb }) => {
+    test("should allow admins to view deleted comments", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Set RLS context for primary org
-        await db.execute(sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`);
-        
+        await db.execute(
+          sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`,
+        );
+
         // Use seeded data for real relationships
-        const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
-        
+        const seededData = await getSeededTestData(
+          db,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+        );
+
         // Skip if no seeded data available
         if (!seededData.user) {
           console.log("Skipping test - no seeded user available");
@@ -424,7 +458,7 @@ describe("Issue Comment Router Integration Tests (PGlite)", () => {
         // Create an issue and deleted comment first
         const issueId = generateId();
         const commentId = generateId();
-        
+
         await db.insert(issues).values({
           id: issueId,
           title: "Test Issue for Deleted View",
@@ -459,7 +493,7 @@ describe("Issue Comment Router Integration Tests (PGlite)", () => {
         expect(result).toBeDefined();
         expect(Array.isArray(result)).toBe(true);
         // Should contain our deleted comment (among any others)
-        const foundComment = result.find(c => c.id === commentId);
+        const foundComment = result.find((c) => c.id === commentId);
         expect(foundComment).toBeDefined();
         expect(foundComment?.deletedAt).toBeDefined();
       });
@@ -467,17 +501,26 @@ describe("Issue Comment Router Integration Tests (PGlite)", () => {
   });
 
   describe("Organizational Boundaries", () => {
-    test("should enforce cross-organizational comment access", async ({ workerDb }) => {
+    test("should enforce cross-organizational comment access", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Set RLS context for competitor org first to create data there
-        await db.execute(sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.competitor}`);
-        
+        await db.execute(
+          sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.competitor}`,
+        );
+
         // Get seeded data for competitor org
-        const competitorSeededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.competitor);
-        
+        const competitorSeededData = await getSeededTestData(
+          db,
+          SEED_TEST_IDS.ORGANIZATIONS.competitor,
+        );
+
         // Skip if no seeded data available
         if (!competitorSeededData.user) {
-          console.log("Skipping test - no competitor org seeded user available");
+          console.log(
+            "Skipping test - no competitor org seeded user available",
+          );
           return;
         }
 
@@ -505,9 +548,14 @@ describe("Issue Comment Router Integration Tests (PGlite)", () => {
         });
 
         // Now switch to primary org and try to access competitor org data
-        await db.execute(sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`);
-        const primarySeededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
-        
+        await db.execute(
+          sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`,
+        );
+        const primarySeededData = await getSeededTestData(
+          db,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+        );
+
         if (!primarySeededData.user) {
           console.log("Skipping test - no primary org seeded user available");
           return;

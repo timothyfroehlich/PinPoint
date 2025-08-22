@@ -6,7 +6,7 @@
  * duplicated context construction logic across tests.
  *
  * Key Features:
- * - Uses seeded test data from getSeededTestData()
+ * - Uses seeded test data with static SEED_TEST_IDS constants
  * - Standardized service mocks
  * - Proper organizational scoping
  * - Real membership relationships
@@ -17,6 +17,7 @@ import { eq, and } from "drizzle-orm";
 import { vi } from "vitest";
 import { type TestDatabase } from "~/test/helpers/pglite-test-setup";
 import { memberships } from "~/server/db/schema";
+import { ServiceFactory } from "~/server/services/factory";
 
 export interface SeededIssueTestContext {
   db: TestDatabase;
@@ -52,7 +53,7 @@ export interface SeededIssueTestContext {
 
 /**
  * Creates standardized TRPC context for issue-related tests using seeded data
- * 
+ *
  * @param txDb - Transaction database instance
  * @param organizationId - Organization ID (typically from SEED_TEST_IDS.ORGANIZATIONS)
  * @param userId - User ID (typically from seeded test data)
@@ -72,51 +73,24 @@ export async function createSeededIssueTestContext(
     with: {
       role: {
         with: {
-          permissions: true,
+          rolePermissions: {
+            with: {
+              permission: true,
+            },
+          },
         },
       },
     },
   });
 
-  // Create standardized service mocks
+  // Create real service instances for integration tests
+  const serviceFactory = new ServiceFactory(txDb);
   const services = {
-    createIssueActivityService: vi.fn(() => ({
-      recordCommentDeleted: vi.fn(),
-      getIssueTimeline: vi.fn((issueId: string) => Promise.resolve([
-        {
-          id: "activity-1",
-          type: "comment",
-          content: "Test comment in timeline",
-          createdAt: new Date(),
-          authorId: userId,
-          author: {
-            id: userId,
-            name: "Test User",
-            email: "test@example.com",
-          },
-        },
-        {
-          id: "activity-2", 
-          type: "status_change",
-          content: "Status changed from Open to In Progress",
-          createdAt: new Date(),
-          authorId: userId,
-          author: {
-            id: userId,
-            name: "Test User",
-            email: "test@example.com",
-          },
-        },
-      ])),
-    })),
-    createNotificationService: vi.fn(() => ({
-      notifyMachineOwnerOfIssue: vi.fn(),
-      notifyMachineOwnerOfStatusChange: vi.fn(),
-    })),
-    createCommentCleanupService: vi.fn(() => ({
-      getCleanupStats: vi.fn(),
-      performCleanup: vi.fn(),
-    })),
+    createIssueActivityService: () =>
+      serviceFactory.createIssueActivityService(),
+    createNotificationService: () => serviceFactory.createNotificationService(),
+    createCommentCleanupService: () =>
+      serviceFactory.createCommentCleanupService(),
   };
 
   return {
@@ -127,6 +101,7 @@ export async function createSeededIssueTestContext(
       user_metadata: { name: "Test User" },
       app_metadata: { organization_id: organizationId },
     },
+    organizationId, // Add the missing organizationId property for TRPC context
     organization: {
       id: organizationId,
       name: "Test Organization",
@@ -136,7 +111,7 @@ export async function createSeededIssueTestContext(
     session: {
       user: {
         id: userId,
-        email: "test@example.com", 
+        email: "test@example.com",
         name: "Test User",
         image: null,
       },
@@ -146,7 +121,7 @@ export async function createSeededIssueTestContext(
     headers: new Headers(),
     userPermissions: [
       "issue:view",
-      "issue:create", 
+      "issue:create",
       "issue:edit",
       "issue:delete",
       "comment:create",

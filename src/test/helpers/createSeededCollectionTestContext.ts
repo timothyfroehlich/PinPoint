@@ -6,7 +6,7 @@
  * duplicated context construction logic across tests.
  *
  * Key Features:
- * - Uses seeded test data from getSeededTestData()
+ * - Uses seeded test data with static SEED_TEST_IDS constants
  * - Standardized service mocks for collection operations
  * - Proper organizational scoping
  * - Real membership relationships
@@ -189,8 +189,8 @@ export async function createSeededCollectionTestContext(
     );
   }
 
-  // Query real membership from database for integration tests
-  let membership = await txDb.query.memberships.findFirst({
+  // Query real membership from database for integration tests and expect it to exist
+  const membership = await txDb.query.memberships.findFirst({
     where: and(
       eq(memberships.userId, userId),
       eq(memberships.organizationId, organizationId),
@@ -204,59 +204,10 @@ export async function createSeededCollectionTestContext(
     },
   });
 
-  // If membership doesn't exist, create one within the transaction for testing
   if (!membership) {
-    console.warn(
-      `Creating membership for userId ${userId} in organizationId ${organizationId} within test transaction`,
+    throw new Error(
+      `Membership not found in seeded data for user ${userId} in organization ${organizationId}. Ensure your test database includes proper seeded memberships.`,
     );
-
-    // Find existing Member role or create one
-    let memberRole = await txDb.query.roles.findFirst({
-      where: and(
-        eq(roles.organizationId, organizationId),
-        eq(roles.name, "Member"),
-      ),
-    });
-
-    if (!memberRole) {
-      // Create a minimal Member role for testing
-      const [createdRole] = await txDb
-        .insert(roles)
-        .values({
-          id: generateTestId("test-member-role"),
-          name: "Member",
-          organizationId,
-          isDefault: true,
-          isSystem: false,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .returning();
-      memberRole = createdRole;
-    }
-
-    // Create the membership
-    const [createdMembership] = await txDb
-      .insert(memberships)
-      .values({
-        id: generateTestId("test-membership"),
-        userId,
-        organizationId,
-        roleId: memberRole.id,
-      })
-      .returning();
-
-    // Query the full membership with role and permissions
-    membership = await txDb.query.memberships.findFirst({
-      where: eq(memberships.id, createdMembership.id),
-      with: {
-        role: {
-          with: {
-            permissions: true,
-          },
-        },
-      },
-    });
   }
 
   // Create standardized service mocks for collection operations

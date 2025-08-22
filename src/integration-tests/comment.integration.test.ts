@@ -21,7 +21,6 @@ import { describe, expect, vi } from "vitest";
 import { eq, sql } from "drizzle-orm";
 import { appRouter } from "~/server/api/root";
 import * as schema from "~/server/db/schema";
-import { getSeededTestData } from "~/test/helpers/pglite-test-setup";
 import { generateTestId } from "~/test/helpers/test-id-generator";
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
 import { createSeededIssueTestContext } from "~/test/helpers/createSeededIssueTestContext";
@@ -76,24 +75,16 @@ describe("Comment Router Integration (PGlite)", () => {
       await withIsolatedTest(workerDb, async (db) => {
         // Set RLS context for primary org
         await db.execute(
-          sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`,
+          sql.raw(
+            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
+          ),
         );
 
-        // Get seeded data
-        const seededData = await getSeededTestData(
-          db,
-          SEED_TEST_IDS.ORGANIZATIONS.primary,
-        );
-        if (!seededData.user || !seededData.issue) {
-          console.log("Skipping test - no seeded data available");
-          return;
-        }
-
-        // Create test context using seeded data
+        // Create test context using static seed data
         const testContext = await createSeededIssueTestContext(
           db,
           SEED_TEST_IDS.ORGANIZATIONS.primary,
-          seededData.user,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
 
         const caller = appRouter.createCaller(testContext);
@@ -104,8 +95,8 @@ describe("Comment Router Integration (PGlite)", () => {
           id: uniqueCommentId,
           content: "Test comment content",
           organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
-          issueId: seededData.issue,
-          authorId: seededData.user,
+          issueId: SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
+          authorId: SEED_TEST_IDS.USERS.ADMIN,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
@@ -120,8 +111,8 @@ describe("Comment Router Integration (PGlite)", () => {
             id: comment2Id,
             content: "Second test comment",
             organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
-            issueId: seededData.issue,
-            authorId: seededData.user,
+            issueId: SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
+            authorId: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date("2024-01-02"),
             updatedAt: new Date("2024-01-02"),
           },
@@ -129,17 +120,17 @@ describe("Comment Router Integration (PGlite)", () => {
             id: comment3Id,
             content: "Deleted comment",
             organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
-            issueId: seededData.issue,
-            authorId: seededData.user,
+            issueId: SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
+            authorId: SEED_TEST_IDS.USERS.ADMIN,
             deletedAt: new Date(), // Soft deleted
-            deletedBy: seededData.user,
+            deletedBy: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date("2024-01-03"),
             updatedAt: new Date("2024-01-03"),
           },
         ]);
 
         const result = await caller.comment.getForIssue({
-          issueId: seededData.issue,
+          issueId: SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
         });
 
         expect(result).toHaveLength(2); // Should exclude deleted comment
@@ -150,13 +141,13 @@ describe("Comment Router Integration (PGlite)", () => {
         expect(result[0]).toMatchObject({
           id: comment2Id,
           content: "Second test comment",
-          issueId: seededData.issue,
-          authorId: seededData.user,
+          issueId: SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
+          authorId: SEED_TEST_IDS.USERS.ADMIN,
           deletedAt: null,
           deletedBy: null,
           author: {
-            id: seededData.user,
-            name: "Dev Admin",
+            id: SEED_TEST_IDS.USERS.ADMIN,
+            name: "Tim Froehlich",
             profilePicture: null,
           },
         });
@@ -181,22 +172,15 @@ describe("Comment Router Integration (PGlite)", () => {
       await withIsolatedTest(workerDb, async (db) => {
         // Set RLS context
         await db.execute(
-          sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`,
+          sql.raw(
+            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
+          ),
         );
-
-        const seededData = await getSeededTestData(
-          db,
-          SEED_TEST_IDS.ORGANIZATIONS.primary,
-        );
-        if (!seededData.user) {
-          console.log("Skipping test - no seeded data available");
-          return;
-        }
 
         const testContext = await createSeededIssueTestContext(
           db,
           SEED_TEST_IDS.ORGANIZATIONS.primary,
-          seededData.user,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = appRouter.createCaller(testContext);
 
@@ -214,22 +198,15 @@ describe("Comment Router Integration (PGlite)", () => {
       await withIsolatedTest(workerDb, async (db) => {
         // Set RLS context
         await db.execute(
-          sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`,
+          sql.raw(
+            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
+          ),
         );
-
-        const seededData = await getSeededTestData(
-          db,
-          SEED_TEST_IDS.ORGANIZATIONS.primary,
-        );
-        if (!seededData.user || !seededData.issue) {
-          console.log("Skipping test - no seeded data available");
-          return;
-        }
 
         const testContext = await createSeededIssueTestContext(
           db,
           SEED_TEST_IDS.ORGANIZATIONS.primary,
-          seededData.user,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = appRouter.createCaller(testContext);
 
@@ -243,8 +220,8 @@ describe("Comment Router Integration (PGlite)", () => {
             id: comment1Id,
             content: "First test comment",
             organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
-            issueId: seededData.issue,
-            authorId: seededData.user,
+            issueId: SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
+            authorId: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date("2024-01-01"),
             updatedAt: new Date("2024-01-01"),
           },
@@ -252,15 +229,15 @@ describe("Comment Router Integration (PGlite)", () => {
             id: comment2Id,
             content: "Second test comment",
             organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
-            issueId: seededData.issue,
-            authorId: seededData.user,
+            issueId: SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
+            authorId: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date("2024-01-02"),
             updatedAt: new Date("2024-01-02"),
           },
         ]);
 
         const result = await caller.comment.getForIssue({
-          issueId: seededData.issue,
+          issueId: SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
         });
 
         expect(result).toHaveLength(2);
@@ -277,22 +254,15 @@ describe("Comment Router Integration (PGlite)", () => {
       await withIsolatedTest(workerDb, async (db) => {
         // Set RLS context for primary org
         await db.execute(
-          sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`,
+          sql.raw(
+            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
+          ),
         );
-
-        const seededData = await getSeededTestData(
-          db,
-          SEED_TEST_IDS.ORGANIZATIONS.primary,
-        );
-        if (!seededData.user || !seededData.issue) {
-          console.log("Skipping test - no seeded data available");
-          return;
-        }
 
         const testContext = await createSeededIssueTestContext(
           db,
           SEED_TEST_IDS.ORGANIZATIONS.primary,
-          seededData.user,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = appRouter.createCaller(testContext);
 
@@ -305,39 +275,28 @@ describe("Comment Router Integration (PGlite)", () => {
             id: comment2Id,
             content: "Second test comment",
             organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
-            issueId: seededData.issue,
-            authorId: seededData.user,
+            issueId: SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
+            authorId: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date("2024-01-02"),
             updatedAt: new Date("2024-01-02"),
           },
         ]);
 
-        // Use competitor org instead of creating ad-hoc organization
-        const competitorSeededData = await getSeededTestData(
-          db,
-          SEED_TEST_IDS.ORGANIZATIONS.competitor,
-        );
-        if (!competitorSeededData.issue) {
-          console.log(
-            "Skipping competitor org test - no seeded issue available",
-          );
-        } else {
-          // Create comment in competitor organization
-          const otherCommentId = generateTestId("other-comment");
+        // Create comment in competitor organization using static seed data
+        const otherCommentId = generateTestId("other-comment");
 
-          await db.insert(schema.comments).values({
-            id: otherCommentId,
-            content: "Competitor org comment",
-            organizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor,
-            issueId: competitorSeededData.issue,
-            authorId: competitorSeededData.user || seededData.user,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          });
-        }
+        await db.insert(schema.comments).values({
+          id: otherCommentId,
+          content: "Competitor org comment",
+          organizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor,
+          issueId: SEED_TEST_IDS.ISSUES.LOUD_BUZZING,
+          authorId: SEED_TEST_IDS.USERS.MEMBER1,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
 
         const result = await caller.comment.getForIssue({
-          issueId: seededData.issue,
+          issueId: SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
         });
 
         // Should only get comments from our organization's issue
@@ -355,22 +314,15 @@ describe("Comment Router Integration (PGlite)", () => {
       await withIsolatedTest(workerDb, async (db) => {
         // Set RLS context
         await db.execute(
-          sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`,
+          sql.raw(
+            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
+          ),
         );
-
-        const seededData = await getSeededTestData(
-          db,
-          SEED_TEST_IDS.ORGANIZATIONS.primary,
-        );
-        if (!seededData.user || !seededData.issue) {
-          console.log("Skipping test - no seeded data available");
-          return;
-        }
 
         const testContext = await createSeededIssueTestContext(
           db,
           SEED_TEST_IDS.ORGANIZATIONS.primary,
-          seededData.user,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = appRouter.createCaller(testContext);
 
@@ -380,8 +332,8 @@ describe("Comment Router Integration (PGlite)", () => {
           id: testCommentId,
           content: "Comment to delete",
           organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
-          issueId: seededData.issue,
-          authorId: seededData.user,
+          issueId: SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
+          authorId: SEED_TEST_IDS.USERS.ADMIN,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
@@ -405,17 +357,20 @@ describe("Comment Router Integration (PGlite)", () => {
         });
         expect(afterDeletion).toBeDefined();
         expect(afterDeletion?.deletedAt).toBeInstanceOf(Date);
-        expect(afterDeletion?.deletedBy).toBe(seededData.user);
+        expect(afterDeletion?.deletedBy).toBe(SEED_TEST_IDS.USERS.ADMIN);
 
         // Verify comment is filtered out of normal queries
         const comments = await caller.comment.getForIssue({
-          issueId: seededData.issue,
+          issueId: SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
         });
         expect(comments.find((c) => c.id === testCommentId)).toBeUndefined();
 
         // Verify issue activity was recorded
         const activities = await db.query.issueHistory.findMany({
-          where: eq(schema.issueHistory.issueId, seededData.issue),
+          where: eq(
+            schema.issueHistory.issueId,
+            SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
+          ),
         });
         expect(
           activities.some(
@@ -432,22 +387,15 @@ describe("Comment Router Integration (PGlite)", () => {
       await withIsolatedTest(workerDb, async (db) => {
         // Set RLS context
         await db.execute(
-          sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`,
+          sql.raw(
+            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
+          ),
         );
-
-        const seededData = await getSeededTestData(
-          db,
-          SEED_TEST_IDS.ORGANIZATIONS.primary,
-        );
-        if (!seededData.user) {
-          console.log("Skipping test - no seeded data available");
-          return;
-        }
 
         const testContext = await createSeededIssueTestContext(
           db,
           SEED_TEST_IDS.ORGANIZATIONS.primary,
-          seededData.user,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = appRouter.createCaller(testContext);
 
@@ -464,46 +412,27 @@ describe("Comment Router Integration (PGlite)", () => {
       await withIsolatedTest(workerDb, async (db) => {
         // Set RLS context for primary org
         await db.execute(
-          sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`,
+          sql.raw(
+            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
+          ),
         );
-
-        const seededData = await getSeededTestData(
-          db,
-          SEED_TEST_IDS.ORGANIZATIONS.primary,
-        );
-        if (!seededData.user) {
-          console.log("Skipping test - no seeded data available");
-          return;
-        }
 
         const testContext = await createSeededIssueTestContext(
           db,
           SEED_TEST_IDS.ORGANIZATIONS.primary,
-          seededData.user,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = appRouter.createCaller(testContext);
 
-        // Use competitor org instead of creating ad-hoc organization
-        const competitorSeededData = await getSeededTestData(
-          db,
-          SEED_TEST_IDS.ORGANIZATIONS.competitor,
-        );
-        if (!competitorSeededData.issue || !competitorSeededData.user) {
-          console.log(
-            "Skipping competitor org test - no seeded data available",
-          );
-          return;
-        }
-
         const otherCommentId = generateTestId("other-comment-forbidden");
 
-        // Create comment in competitor organization
+        // Create comment in competitor organization using static seed data
         await db.insert(schema.comments).values({
           id: otherCommentId,
           content: "Other org comment",
           organizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor,
-          issueId: competitorSeededData.issue,
-          authorId: competitorSeededData.user,
+          issueId: SEED_TEST_IDS.ISSUES.LOUD_BUZZING,
+          authorId: SEED_TEST_IDS.USERS.MEMBER1,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
@@ -523,22 +452,15 @@ describe("Comment Router Integration (PGlite)", () => {
       await withIsolatedTest(workerDb, async (db) => {
         // Set RLS context
         await db.execute(
-          sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`,
+          sql.raw(
+            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
+          ),
         );
-
-        const seededData = await getSeededTestData(
-          db,
-          SEED_TEST_IDS.ORGANIZATIONS.primary,
-        );
-        if (!seededData.user || !seededData.issue) {
-          console.log("Skipping test - no seeded data available");
-          return;
-        }
 
         const testContext = await createSeededIssueTestContext(
           db,
           SEED_TEST_IDS.ORGANIZATIONS.primary,
-          seededData.user,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = appRouter.createCaller(testContext);
 
@@ -552,10 +474,10 @@ describe("Comment Router Integration (PGlite)", () => {
             id: deletedComment1Id,
             content: "First deleted comment",
             organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
-            issueId: seededData.issue,
-            authorId: seededData.user,
+            issueId: SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
+            authorId: SEED_TEST_IDS.USERS.ADMIN,
             deletedAt: new Date("2024-01-01"),
-            deletedBy: seededData.user,
+            deletedBy: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date("2024-01-01"),
             updatedAt: new Date("2024-01-01"),
           },
@@ -563,10 +485,10 @@ describe("Comment Router Integration (PGlite)", () => {
             id: deletedComment2Id,
             content: "Second deleted comment",
             organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
-            issueId: seededData.issue,
-            authorId: seededData.user,
+            issueId: SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
+            authorId: SEED_TEST_IDS.USERS.ADMIN,
             deletedAt: new Date("2024-01-02"),
-            deletedBy: seededData.user,
+            deletedBy: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date("2024-01-02"),
             updatedAt: new Date("2024-01-02"),
           },
@@ -579,7 +501,7 @@ describe("Comment Router Integration (PGlite)", () => {
           id: deletedComment2Id, // Ordered by deletedAt desc
           content: "Second deleted comment",
           deletedAt: expect.any(Date),
-          deletedBy: seededData.user,
+          deletedBy: SEED_TEST_IDS.USERS.ADMIN,
         });
         expect(result[1]).toMatchObject({
           id: deletedComment1Id,
@@ -599,22 +521,15 @@ describe("Comment Router Integration (PGlite)", () => {
       await withIsolatedTest(workerDb, async (db) => {
         // Set RLS context for primary org
         await db.execute(
-          sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`,
+          sql.raw(
+            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
+          ),
         );
-
-        const seededData = await getSeededTestData(
-          db,
-          SEED_TEST_IDS.ORGANIZATIONS.primary,
-        );
-        if (!seededData.user || !seededData.issue) {
-          console.log("Skipping test - no seeded data available");
-          return;
-        }
 
         const testContext = await createSeededIssueTestContext(
           db,
           SEED_TEST_IDS.ORGANIZATIONS.primary,
-          seededData.user,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = appRouter.createCaller(testContext);
 
@@ -628,10 +543,10 @@ describe("Comment Router Integration (PGlite)", () => {
             id: deletedComment1Id,
             content: "First deleted comment",
             organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
-            issueId: seededData.issue,
-            authorId: seededData.user,
+            issueId: SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
+            authorId: SEED_TEST_IDS.USERS.ADMIN,
             deletedAt: new Date("2024-01-01"),
-            deletedBy: seededData.user,
+            deletedBy: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date("2024-01-01"),
             updatedAt: new Date("2024-01-01"),
           },
@@ -639,40 +554,29 @@ describe("Comment Router Integration (PGlite)", () => {
             id: deletedComment2Id,
             content: "Second deleted comment",
             organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
-            issueId: seededData.issue,
-            authorId: seededData.user,
+            issueId: SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
+            authorId: SEED_TEST_IDS.USERS.ADMIN,
             deletedAt: new Date("2024-01-02"),
-            deletedBy: seededData.user,
+            deletedBy: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date("2024-01-02"),
             updatedAt: new Date("2024-01-02"),
           },
         ]);
 
-        // Use competitor org instead of creating ad-hoc organization
-        const competitorSeededData = await getSeededTestData(
-          db,
-          SEED_TEST_IDS.ORGANIZATIONS.competitor,
-        );
-        if (!competitorSeededData.issue || !competitorSeededData.user) {
-          console.log(
-            "Skipping competitor org test - no seeded data available",
-          );
-        } else {
-          const otherDeletedCommentId = generateTestId("other-deleted-comment");
+        // Create deleted comment in competitor organization using static seed data
+        const otherDeletedCommentId = generateTestId("other-deleted-comment");
 
-          // Create deleted comment in competitor organization
-          await db.insert(schema.comments).values({
-            id: otherDeletedCommentId,
-            content: "Other org deleted comment",
-            organizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor,
-            issueId: competitorSeededData.issue,
-            authorId: competitorSeededData.user,
-            deletedAt: new Date(),
-            deletedBy: competitorSeededData.user,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          });
-        }
+        await db.insert(schema.comments).values({
+          id: otherDeletedCommentId,
+          content: "Other org deleted comment",
+          organizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor,
+          issueId: SEED_TEST_IDS.ISSUES.LOUD_BUZZING,
+          authorId: SEED_TEST_IDS.USERS.MEMBER1,
+          deletedAt: new Date(),
+          deletedBy: SEED_TEST_IDS.USERS.MEMBER1,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
 
         const result = await caller.comment.getDeleted();
 
@@ -690,22 +594,15 @@ describe("Comment Router Integration (PGlite)", () => {
       await withIsolatedTest(workerDb, async (db) => {
         // Set RLS context
         await db.execute(
-          sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`,
+          sql.raw(
+            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
+          ),
         );
-
-        const seededData = await getSeededTestData(
-          db,
-          SEED_TEST_IDS.ORGANIZATIONS.primary,
-        );
-        if (!seededData.user || !seededData.issue) {
-          console.log("Skipping test - no seeded data available");
-          return;
-        }
 
         const testContext = await createSeededIssueTestContext(
           db,
           SEED_TEST_IDS.ORGANIZATIONS.primary,
-          seededData.user,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = appRouter.createCaller(testContext);
 
@@ -717,10 +614,10 @@ describe("Comment Router Integration (PGlite)", () => {
           id: restoreCommentId,
           content: "Comment to restore",
           organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
-          issueId: seededData.issue,
-          authorId: seededData.user,
+          issueId: SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
+          authorId: SEED_TEST_IDS.USERS.ADMIN,
           deletedAt: new Date(),
-          deletedBy: seededData.user,
+          deletedBy: SEED_TEST_IDS.USERS.ADMIN,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
@@ -748,7 +645,7 @@ describe("Comment Router Integration (PGlite)", () => {
 
         // Verify comment appears in normal queries again
         const comments = await caller.comment.getForIssue({
-          issueId: seededData.issue,
+          issueId: SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
         });
         expect(comments.find((c) => c.id === restoreCommentId)).toBeDefined();
       });
@@ -763,22 +660,15 @@ describe("Comment Router Integration (PGlite)", () => {
       await withIsolatedTest(workerDb, async (db) => {
         // Set RLS context
         await db.execute(
-          sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`,
+          sql.raw(
+            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
+          ),
         );
-
-        const seededData = await getSeededTestData(
-          db,
-          SEED_TEST_IDS.ORGANIZATIONS.primary,
-        );
-        if (!seededData.user || !seededData.issue) {
-          console.log("Skipping test - no seeded data available");
-          return;
-        }
 
         const testContext = await createSeededIssueTestContext(
           db,
           SEED_TEST_IDS.ORGANIZATIONS.primary,
-          seededData.user,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = appRouter.createCaller(testContext);
 
@@ -799,10 +689,10 @@ describe("Comment Router Integration (PGlite)", () => {
             id: oldDeleted1Id,
             content: "Old deleted comment 1",
             organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
-            issueId: seededData.issue,
-            authorId: seededData.user,
+            issueId: SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
+            authorId: SEED_TEST_IDS.USERS.ADMIN,
             deletedAt: oldDate,
-            deletedBy: seededData.user,
+            deletedBy: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date(),
             updatedAt: new Date(),
           },
@@ -810,10 +700,10 @@ describe("Comment Router Integration (PGlite)", () => {
             id: oldDeleted2Id,
             content: "Old deleted comment 2",
             organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
-            issueId: seededData.issue,
-            authorId: seededData.user,
+            issueId: SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
+            authorId: SEED_TEST_IDS.USERS.ADMIN,
             deletedAt: oldDate,
-            deletedBy: seededData.user,
+            deletedBy: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date(),
             updatedAt: new Date(),
           },
@@ -821,10 +711,10 @@ describe("Comment Router Integration (PGlite)", () => {
             id: recentDeletedId,
             content: "Recent deleted comment",
             organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
-            issueId: seededData.issue,
-            authorId: seededData.user,
+            issueId: SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
+            authorId: SEED_TEST_IDS.USERS.ADMIN,
             deletedAt: recentDate,
-            deletedBy: seededData.user,
+            deletedBy: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date(),
             updatedAt: new Date(),
           },
@@ -848,22 +738,15 @@ describe("Comment Router Integration (PGlite)", () => {
       await withIsolatedTest(workerDb, async (db) => {
         // Set RLS context
         await db.execute(
-          sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`,
+          sql.raw(
+            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
+          ),
         );
-
-        const seededData = await getSeededTestData(
-          db,
-          SEED_TEST_IDS.ORGANIZATIONS.primary,
-        );
-        if (!seededData.user || !seededData.issue) {
-          console.log("Skipping test - no seeded data available");
-          return;
-        }
 
         const testContext = await createSeededIssueTestContext(
           db,
           SEED_TEST_IDS.ORGANIZATIONS.primary,
-          seededData.user,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = appRouter.createCaller(testContext);
 
@@ -877,8 +760,8 @@ describe("Comment Router Integration (PGlite)", () => {
             id: concurrent1Id,
             content: "Concurrent comment 1",
             organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
-            issueId: seededData.issue,
-            authorId: seededData.user,
+            issueId: SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
+            authorId: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date(),
             updatedAt: new Date(),
           },
@@ -886,8 +769,8 @@ describe("Comment Router Integration (PGlite)", () => {
             id: concurrent2Id,
             content: "Concurrent comment 2",
             organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
-            issueId: seededData.issue,
-            authorId: seededData.user,
+            issueId: SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
+            authorId: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date(),
             updatedAt: new Date(),
           },
@@ -915,7 +798,10 @@ describe("Comment Router Integration (PGlite)", () => {
 
         // Verify activity records were created for both
         const activities = await db.query.issueHistory.findMany({
-          where: eq(schema.issueHistory.issueId, seededData.issue),
+          where: eq(
+            schema.issueHistory.issueId,
+            SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
+          ),
         });
         expect(
           activities.filter((a) => a.type === "COMMENT_DELETED"),
@@ -930,22 +816,15 @@ describe("Comment Router Integration (PGlite)", () => {
       await withIsolatedTest(workerDb, async (db) => {
         // Set RLS context
         await db.execute(
-          sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`,
+          sql.raw(
+            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
+          ),
         );
-
-        const seededData = await getSeededTestData(
-          db,
-          SEED_TEST_IDS.ORGANIZATIONS.primary,
-        );
-        if (!seededData.user || !seededData.issue) {
-          console.log("Skipping test - no seeded data available");
-          return;
-        }
 
         const testContext = await createSeededIssueTestContext(
           db,
           SEED_TEST_IDS.ORGANIZATIONS.primary,
-          seededData.user,
+          SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = appRouter.createCaller(testContext);
 
@@ -955,8 +834,8 @@ describe("Comment Router Integration (PGlite)", () => {
           id: testCommentId,
           content: "Comment for lifecycle test",
           organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
-          issueId: seededData.issue,
-          authorId: seededData.user,
+          issueId: SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
+          authorId: SEED_TEST_IDS.USERS.ADMIN,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
@@ -983,7 +862,7 @@ describe("Comment Router Integration (PGlite)", () => {
 
         // 5. Verify it appears in normal queries
         const normalComments = await caller.comment.getForIssue({
-          issueId: seededData.issue,
+          issueId: SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
         });
         expect(
           normalComments.find((c) => c.id === testCommentId),

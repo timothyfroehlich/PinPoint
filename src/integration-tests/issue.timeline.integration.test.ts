@@ -21,7 +21,6 @@ import { eq, sql } from "drizzle-orm";
 
 // Import test setup and utilities
 import { createSeededIssueTestContext } from "~/test/helpers/createSeededIssueTestContext";
-import { getSeededTestData } from "~/test/helpers/pglite-test-setup";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 import { appRouter } from "~/server/api/root";
 import * as schema from "~/server/db/schema";
@@ -65,22 +64,19 @@ vi.mock("~/server/services/types", () => ({
 }));
 
 describe("Issue Timeline Router Integration (PGlite)", () => {
-
   describe("getTimeline", () => {
     test("should get timeline with comments and activities for valid issue", async ({
       workerDb,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Note: RLS context not needed in PGlite - bypasses RLS for business logic testing
-        
-        // Get seeded test data
-        const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
-        if (!seededData.user || !seededData.issue) {
-          throw new Error("Required seeded data not found");
-        }
 
-        // Create test context using seeded data
-        const testContext = await createSeededIssueTestContext(db, SEED_TEST_IDS.ORGANIZATIONS.primary, seededData.user);
+        // Create test context using static seed data
+        const testContext = await createSeededIssueTestContext(
+          db,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+          SEED_TEST_IDS.USERS.ADMIN,
+        );
         const caller = appRouter.createCaller(testContext);
 
         // Create additional test data for comprehensive timeline testing
@@ -90,8 +86,8 @@ describe("Issue Timeline Router Integration (PGlite)", () => {
             id: "test-comment-1",
             content: "First comment on the issue",
             organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
-            issueId: seededData.issue,
-            authorId: seededData.user,
+            issueId: SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
+            authorId: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date("2024-01-01T10:00:00Z"),
             updatedAt: new Date("2024-01-01T10:00:00Z"),
           },
@@ -99,8 +95,8 @@ describe("Issue Timeline Router Integration (PGlite)", () => {
             id: "test-comment-2",
             content: "Second comment for discussion",
             organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
-            issueId: seededData.issue,
-            authorId: seededData.user,
+            issueId: SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
+            authorId: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date("2024-01-02T14:30:00Z"),
             updatedAt: new Date("2024-01-02T14:30:00Z"),
           },
@@ -110,30 +106,30 @@ describe("Issue Timeline Router Integration (PGlite)", () => {
         await db.insert(schema.issueHistory).values([
           {
             id: "test-activity-1",
-            issueId: seededData.issue,
+            issueId: SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
             organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
             type: "STATUS_CHANGED",
             field: "status",
-            oldValue: seededData.status,
+            oldValue: SEED_TEST_IDS.STATUSES.NEW_PRIMARY,
             newValue: "new-status",
-            actorId: seededData.user,
+            actorId: SEED_TEST_IDS.USERS.ADMIN,
             changedAt: new Date("2024-01-01T15:00:00Z"),
           },
           {
             id: "test-activity-2",
-            issueId: seededData.issue,
+            issueId: SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
             organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
             type: "ASSIGNED",
             field: "assignedTo",
             oldValue: null,
-            newValue: seededData.user,
-            actorId: seededData.user,
+            newValue: SEED_TEST_IDS.USERS.ADMIN,
+            actorId: SEED_TEST_IDS.USERS.ADMIN,
             changedAt: new Date("2024-01-03T09:15:00Z"),
           },
         ]);
 
         const result = await caller.issue.timeline.getTimeline({
-          issueId: seededData.issue,
+          issueId: SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
         });
 
         expect(result).toBeDefined();
@@ -186,15 +182,13 @@ describe("Issue Timeline Router Integration (PGlite)", () => {
     test("should handle issue with no timeline data", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Note: RLS context not needed in PGlite - bypasses RLS for business logic testing
-        
-        // Get seeded test data
-        const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
-        if (!seededData.user || !seededData.machine || !seededData.status || !seededData.priority) {
-          throw new Error("Required seeded data not found");
-        }
 
-        // Create test context using seeded data
-        const testContext = await createSeededIssueTestContext(db, SEED_TEST_IDS.ORGANIZATIONS.primary, seededData.user);
+        // Create test context using static seed data
+        const testContext = await createSeededIssueTestContext(
+          db,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+          SEED_TEST_IDS.USERS.ADMIN,
+        );
         const caller = appRouter.createCaller(testContext);
 
         // Create an issue without comments or activities
@@ -204,17 +198,19 @@ describe("Issue Timeline Router Integration (PGlite)", () => {
             id: "empty-issue",
             title: "Empty Issue",
             organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
-            machineId: seededData.machine,
-            statusId: seededData.status,
-            priorityId: seededData.priority,
-            createdById: seededData.user,
+            machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
+            statusId: SEED_TEST_IDS.STATUSES.NEW_PRIMARY,
+            priorityId: SEED_TEST_IDS.PRIORITIES.MEDIUM_PRIMARY,
+            createdById: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date(),
             updatedAt: new Date(),
           })
           .returning()
           .then((result) => result[0]);
 
-        const result = await caller.issue.timeline.getTimeline({ issueId: emptyIssue.id });
+        const result = await caller.issue.timeline.getTimeline({
+          issueId: emptyIssue.id,
+        });
 
         expect(result).toEqual([]);
       });
@@ -225,15 +221,13 @@ describe("Issue Timeline Router Integration (PGlite)", () => {
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Note: RLS context not needed in PGlite - bypasses RLS for business logic testing
-        
-        // Get seeded test data
-        const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
-        if (!seededData.user) {
-          throw new Error("Required seeded data not found");
-        }
 
-        // Create test context using seeded data
-        const testContext = await createSeededIssueTestContext(db, SEED_TEST_IDS.ORGANIZATIONS.primary, seededData.user);
+        // Create test context using static seed data
+        const testContext = await createSeededIssueTestContext(
+          db,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+          SEED_TEST_IDS.USERS.ADMIN,
+        );
         const caller = appRouter.createCaller(testContext);
 
         await expect(
@@ -250,22 +244,14 @@ describe("Issue Timeline Router Integration (PGlite)", () => {
     test("should enforce organizational scoping", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Note: RLS context not needed in PGlite - bypasses RLS for business logic testing
-        
-        // Get seeded test data for primary org
-        const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
-        if (!seededData.user || !seededData.machine) {
-          throw new Error("Required seeded data not found");
-        }
 
-        // Create test context using primary org data
-        const testContext = await createSeededIssueTestContext(db, SEED_TEST_IDS.ORGANIZATIONS.primary, seededData.user);
+        // Create test context using static seed data
+        const testContext = await createSeededIssueTestContext(
+          db,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+          SEED_TEST_IDS.USERS.ADMIN,
+        );
         const caller = appRouter.createCaller(testContext);
-
-        // Get seeded data for competitor org
-        const competitorSeededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.competitor);
-        if (!competitorSeededData.machine || !competitorSeededData.status || !competitorSeededData.priority) {
-          throw new Error("Required competitor seeded data not found");
-        }
 
         // Create issue in competitor organization
         const otherOrgIssue = await db
@@ -274,10 +260,10 @@ describe("Issue Timeline Router Integration (PGlite)", () => {
             id: "other-org-issue",
             title: "Other Org Issue",
             organizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor,
-            machineId: competitorSeededData.machine,
-            statusId: competitorSeededData.status,
-            priorityId: competitorSeededData.priority,
-            createdById: seededData.user,
+            machineId: SEED_TEST_IDS.MACHINES.CACTUS_CANYON_1,
+            statusId: SEED_TEST_IDS.STATUSES.NEW_COMPETITOR,
+            priorityId: SEED_TEST_IDS.PRIORITIES.MEDIUM_COMPETITOR,
+            createdById: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date(),
             updatedAt: new Date(),
           })
@@ -290,7 +276,7 @@ describe("Issue Timeline Router Integration (PGlite)", () => {
           content: "Comment in other org",
           organizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor,
           issueId: otherOrgIssue.id,
-          authorId: seededData.user,
+          authorId: SEED_TEST_IDS.USERS.ADMIN,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
@@ -310,15 +296,13 @@ describe("Issue Timeline Router Integration (PGlite)", () => {
     test("should handle timeline with only comments", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Note: RLS context not needed in PGlite - bypasses RLS for business logic testing
-        
-        // Get seeded test data
-        const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
-        if (!seededData.user || !seededData.machine || !seededData.status || !seededData.priority) {
-          throw new Error("Required seeded data not found");
-        }
 
-        // Create test context using seeded data
-        const testContext = await createSeededIssueTestContext(db, SEED_TEST_IDS.ORGANIZATIONS.primary, seededData.user);
+        // Create test context using static seed data
+        const testContext = await createSeededIssueTestContext(
+          db,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+          SEED_TEST_IDS.USERS.ADMIN,
+        );
         const caller = appRouter.createCaller(testContext);
 
         // Create issue with only comments, no activities
@@ -328,10 +312,10 @@ describe("Issue Timeline Router Integration (PGlite)", () => {
             id: "comments-only-issue",
             title: "Comments Only Issue",
             organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
-            machineId: seededData.machine,
-            statusId: seededData.status,
-            priorityId: seededData.priority,
-            createdById: seededData.user,
+            machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
+            statusId: SEED_TEST_IDS.STATUSES.NEW_PRIMARY,
+            priorityId: SEED_TEST_IDS.PRIORITIES.MEDIUM_PRIMARY,
+            createdById: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date(),
             updatedAt: new Date(),
           })
@@ -344,7 +328,7 @@ describe("Issue Timeline Router Integration (PGlite)", () => {
             content: "First comment only",
             organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
             issueId: commentsOnlyIssue.id,
-            authorId: seededData.user,
+            authorId: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date("2024-01-01"),
             updatedAt: new Date("2024-01-01"),
           },
@@ -353,7 +337,7 @@ describe("Issue Timeline Router Integration (PGlite)", () => {
             content: "Second comment only",
             organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
             issueId: commentsOnlyIssue.id,
-            authorId: seededData.user,
+            authorId: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date("2024-01-02"),
             updatedAt: new Date("2024-01-02"),
           },
@@ -378,15 +362,13 @@ describe("Issue Timeline Router Integration (PGlite)", () => {
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Note: RLS context not needed in PGlite - bypasses RLS for business logic testing
-        
-        // Get seeded test data
-        const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
-        if (!seededData.user || !seededData.machine || !seededData.status || !seededData.priority) {
-          throw new Error("Required seeded data not found");
-        }
 
-        // Create test context using seeded data
-        const testContext = await createSeededIssueTestContext(db, SEED_TEST_IDS.ORGANIZATIONS.primary, seededData.user);
+        // Create test context using static seed data
+        const testContext = await createSeededIssueTestContext(
+          db,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+          SEED_TEST_IDS.USERS.ADMIN,
+        );
         const caller = appRouter.createCaller(testContext);
 
         // Create issue with only activities, no comments
@@ -396,10 +378,10 @@ describe("Issue Timeline Router Integration (PGlite)", () => {
             id: "activities-only-issue",
             title: "Activities Only Issue",
             organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
-            machineId: seededData.machine,
-            statusId: seededData.status,
-            priorityId: seededData.priority,
-            createdById: seededData.user,
+            machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
+            statusId: SEED_TEST_IDS.STATUSES.NEW_PRIMARY,
+            priorityId: SEED_TEST_IDS.PRIORITIES.MEDIUM_PRIMARY,
+            createdById: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date(),
             updatedAt: new Date(),
           })
@@ -415,7 +397,7 @@ describe("Issue Timeline Router Integration (PGlite)", () => {
             field: "status",
             oldValue: "old-status",
             newValue: "new-status",
-            actorId: seededData.user,
+            actorId: SEED_TEST_IDS.USERS.ADMIN,
             changedAt: new Date("2024-01-01"),
           },
           {
@@ -426,7 +408,7 @@ describe("Issue Timeline Router Integration (PGlite)", () => {
             field: "priority",
             oldValue: "low",
             newValue: "high",
-            actorId: seededData.user,
+            actorId: SEED_TEST_IDS.USERS.ADMIN,
             changedAt: new Date("2024-01-02"),
           },
         ]);
@@ -456,15 +438,13 @@ describe("Issue Timeline Router Integration (PGlite)", () => {
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Note: RLS context not needed in PGlite - bypasses RLS for business logic testing
-        
-        // Get seeded test data
-        const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
-        if (!seededData.user || !seededData.machine || !seededData.status || !seededData.priority) {
-          throw new Error("Required seeded data not found");
-        }
 
-        // Create test context using seeded data
-        const testContext = await createSeededIssueTestContext(db, SEED_TEST_IDS.ORGANIZATIONS.primary, seededData.user);
+        // Create test context using static seed data
+        const testContext = await createSeededIssueTestContext(
+          db,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+          SEED_TEST_IDS.USERS.ADMIN,
+        );
         const caller = appRouter.createCaller(testContext);
 
         // Create issue and add timeline items with specific timestamps for testing ordering
@@ -474,10 +454,10 @@ describe("Issue Timeline Router Integration (PGlite)", () => {
             id: "mixed-timeline-issue",
             title: "Mixed Timeline Issue",
             organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
-            machineId: seededData.machine,
-            statusId: seededData.status,
-            priorityId: seededData.priority,
-            createdById: seededData.user,
+            machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
+            statusId: SEED_TEST_IDS.STATUSES.NEW_PRIMARY,
+            priorityId: SEED_TEST_IDS.PRIORITIES.MEDIUM_PRIMARY,
+            createdById: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date(),
             updatedAt: new Date(),
           })
@@ -491,7 +471,7 @@ describe("Issue Timeline Router Integration (PGlite)", () => {
             content: "First comment",
             organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
             issueId: mixedTimelineIssue.id,
-            authorId: seededData.user,
+            authorId: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date("2024-01-01T09:00:00Z"), // First
             updatedAt: new Date("2024-01-01T09:00:00Z"),
           },
@@ -500,7 +480,7 @@ describe("Issue Timeline Router Integration (PGlite)", () => {
             content: "Third item chronologically",
             organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
             issueId: mixedTimelineIssue.id,
-            authorId: seededData.user,
+            authorId: SEED_TEST_IDS.USERS.ADMIN,
             createdAt: new Date("2024-01-01T15:00:00Z"), // Third
             updatedAt: new Date("2024-01-01T15:00:00Z"),
           },
@@ -515,7 +495,7 @@ describe("Issue Timeline Router Integration (PGlite)", () => {
             field: "status",
             oldValue: "open",
             newValue: "in-progress",
-            actorId: seededData.user,
+            actorId: SEED_TEST_IDS.USERS.ADMIN,
             changedAt: new Date("2024-01-01T12:00:00Z"), // Second
           },
           {
@@ -525,8 +505,8 @@ describe("Issue Timeline Router Integration (PGlite)", () => {
             type: "ASSIGNED",
             field: "assignedTo",
             oldValue: null,
-            newValue: seededData.user,
-            actorId: seededData.user,
+            newValue: SEED_TEST_IDS.USERS.ADMIN,
+            actorId: SEED_TEST_IDS.USERS.ADMIN,
             changedAt: new Date("2024-01-01T18:00:00Z"), // Fourth
           },
         ]);
@@ -569,15 +549,13 @@ describe("Issue Timeline Router Integration (PGlite)", () => {
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Note: RLS context not needed in PGlite - bypasses RLS for business logic testing
-        
-        // Get seeded test data
-        const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
-        if (!seededData.user || !seededData.issue) {
-          throw new Error("Required seeded data not found");
-        }
 
-        // Create test context using seeded data
-        const testContext = await createSeededIssueTestContext(db, SEED_TEST_IDS.ORGANIZATIONS.primary, seededData.user);
+        // Create test context using static seed data
+        const testContext = await createSeededIssueTestContext(
+          db,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+          SEED_TEST_IDS.USERS.ADMIN,
+        );
         const caller = appRouter.createCaller(testContext);
 
         // Create a spy to track service method calls
@@ -594,24 +572,28 @@ describe("Issue Timeline Router Integration (PGlite)", () => {
           recordIssueAssigned: vi.fn(),
         };
 
-        vi.mocked(testContext.services.createIssueActivityService).mockReturnValue(
-          mockService,
-        );
+        vi.mocked(
+          testContext.services.createIssueActivityService,
+        ).mockReturnValue(mockService);
 
         // Test with non-existent issue
         await expect(
-          caller.issue.timeline.getTimeline({ issueId: "definitely-does-not-exist" }),
+          caller.issue.timeline.getTimeline({
+            issueId: "definitely-does-not-exist",
+          }),
         ).rejects.toThrow("Issue not found or access denied");
 
         // Verify service method was never called
         expect(serviceMethodSpy).not.toHaveBeenCalled();
 
         // Now test with valid issue
-        await caller.issue.timeline.getTimeline({ issueId: seededData.issue });
+        await caller.issue.timeline.getTimeline({
+          issueId: SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
+        });
 
         // Verify service method was called for valid issue
         expect(serviceMethodSpy).toHaveBeenCalledWith(
-          seededData.issue,
+          SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
           SEED_TEST_IDS.ORGANIZATIONS.primary,
         );
       });
@@ -624,27 +606,25 @@ describe("Issue Timeline Router Integration (PGlite)", () => {
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Note: RLS context not needed in PGlite - bypasses RLS for business logic testing
-        
-        // Get seeded test data
-        const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
-        if (!seededData.user || !seededData.issue) {
-          throw new Error("Required seeded data not found");
-        }
 
-        // Create test context using seeded data
-        const testContext = await createSeededIssueTestContext(db, SEED_TEST_IDS.ORGANIZATIONS.primary, seededData.user);
+        // Create test context using static seed data
+        const testContext = await createSeededIssueTestContext(
+          db,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+          SEED_TEST_IDS.USERS.ADMIN,
+        );
         const caller = appRouter.createCaller(testContext);
 
         // Create real service instance for testing integration
         const realService = new IssueActivityService(testContext.db);
 
         // Mock the service factory to return real service
-        vi.mocked(testContext.services.createIssueActivityService).mockReturnValue(
-          realService,
-        );
+        vi.mocked(
+          testContext.services.createIssueActivityService,
+        ).mockReturnValue(realService);
 
         const result = await caller.issue.timeline.getTimeline({
-          issueId: seededData.issue,
+          issueId: SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
         });
 
         // Verify service was called and returned data
@@ -664,15 +644,13 @@ describe("Issue Timeline Router Integration (PGlite)", () => {
     test("should handle service errors gracefully", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Note: RLS context not needed in PGlite - bypasses RLS for business logic testing
-        
-        // Get seeded test data
-        const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
-        if (!seededData.user || !seededData.issue) {
-          throw new Error("Required seeded data not found");
-        }
 
-        // Create test context using seeded data
-        const testContext = await createSeededIssueTestContext(db, SEED_TEST_IDS.ORGANIZATIONS.primary, seededData.user);
+        // Create test context using static seed data
+        const testContext = await createSeededIssueTestContext(
+          db,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+          SEED_TEST_IDS.USERS.ADMIN,
+        );
         const caller = appRouter.createCaller(testContext);
 
         // Create a service that throws an error
@@ -690,17 +668,19 @@ describe("Issue Timeline Router Integration (PGlite)", () => {
           recordIssueAssigned: vi.fn(),
         };
 
-        vi.mocked(testContext.services.createIssueActivityService).mockReturnValue(
-          failingService,
-        );
+        vi.mocked(
+          testContext.services.createIssueActivityService,
+        ).mockReturnValue(failingService);
 
         await expect(
-          caller.issue.timeline.getTimeline({ issueId: seededData.issue }),
+          caller.issue.timeline.getTimeline({
+            issueId: SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
+          }),
         ).rejects.toThrow("Database connection lost");
 
         // Verify the service method was actually called
         expect(failingService.getIssueTimeline).toHaveBeenCalledWith(
-          seededData.issue,
+          SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
           SEED_TEST_IDS.ORGANIZATIONS.primary,
         );
       });

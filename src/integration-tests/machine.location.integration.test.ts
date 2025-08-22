@@ -22,10 +22,14 @@ import { describe, expect, vi } from "vitest";
 // Import test setup and utilities
 import { machineLocationRouter } from "~/server/api/routers/machine.location";
 import * as schema from "~/server/db/schema";
-import { type TestDatabase, getSeededTestData } from "~/test/helpers/pglite-test-setup";
+import { type TestDatabase } from "~/test/helpers/pglite-test-setup";
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
-import { createSeededMachineTestContext, createPrimaryAdminContext, createCompetitorAdminContext } from "~/test/helpers/createSeededMachineTestContext";
+import {
+  createSeededMachineTestContext,
+  createPrimaryAdminContext,
+  createCompetitorAdminContext,
+} from "~/test/helpers/createSeededMachineTestContext";
 
 // Mock external dependencies that aren't database-related
 
@@ -52,11 +56,6 @@ describe("Machine Location Router Integration (PGlite)", () => {
   async function setupTestData(db: TestDatabase) {
     // Use seeded data from primary organization
     const organizationId = SEED_TEST_IDS.ORGANIZATIONS.primary;
-    const seededData = await getSeededTestData(db, organizationId);
-    
-    if (!seededData.location || !seededData.machine) {
-      throw new Error("Missing required seeded data: location or machine");
-    }
 
     // Create a second location for testing moves
     const [secondLocation] = await db
@@ -78,9 +77,9 @@ describe("Machine Location Router Integration (PGlite)", () => {
         name: "Second Test Machine",
         qrCodeId: "test-qr-second-move",
         organizationId,
-        locationId: seededData.location, // Start at first location
-        modelId: seededData.model!,
-        ownerId: seededData.user!,
+        locationId: SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR, // Start at first location
+        modelId: "model-mm-001", // Use a standard model ID
+        ownerId: SEED_TEST_IDS.USERS.ADMIN,
         createdAt: new Date(),
         updatedAt: new Date(),
       })
@@ -93,15 +92,15 @@ describe("Machine Location Router Integration (PGlite)", () => {
     return {
       testData: {
         organization: organizationId,
-        location: seededData.location,
-        machine: seededData.machine,
-        model: seededData.model,
-        priority: seededData.priority,
-        status: seededData.status,
-        issue: seededData.issue,
-        adminRole: seededData.adminRole,
-        memberRole: seededData.memberRole,
-        user: seededData.user,
+        location: SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR,
+        machine: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
+        model: "model-mm-001",
+        priority: SEED_TEST_IDS.PRIORITIES.HIGH_PRIMARY,
+        status: SEED_TEST_IDS.STATUSES.NEW_PRIMARY,
+        issue: SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
+        adminRole: SEED_TEST_IDS.ROLES.ADMIN_PRIMARY,
+        memberRole: SEED_TEST_IDS.ROLES.MEMBER_PRIMARY,
+        user: SEED_TEST_IDS.USERS.ADMIN,
         secondLocation: secondLocation.id,
         secondMachine: secondMachine.id,
       },
@@ -244,19 +243,11 @@ describe("Machine Location Router Integration (PGlite)", () => {
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
         const { testData, caller } = await setupTestData(db);
-        
-        // Get seeded data for competitor organization
-        const competitorOrgId = SEED_TEST_IDS.ORGANIZATIONS.competitor;
-        const competitorSeededData = await getSeededTestData(db, competitorOrgId);
-        
-        if (!competitorSeededData.machine) {
-          throw new Error("Missing competitor machine in seeded data");
-        }
 
         // Try to move competitor org's machine
         await expect(
           caller.moveToLocation({
-            machineId: competitorSeededData.machine,
+            machineId: SEED_TEST_IDS.MACHINES.CACTUS_CANYON_1, // Competitor org machine
             locationId: testData.secondLocation,
           }),
         ).rejects.toThrow(
@@ -272,20 +263,12 @@ describe("Machine Location Router Integration (PGlite)", () => {
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
         const { testData, caller } = await setupTestData(db);
-        
-        // Get seeded data for competitor organization  
-        const competitorOrgId = SEED_TEST_IDS.ORGANIZATIONS.competitor;
-        const competitorSeededData = await getSeededTestData(db, competitorOrgId);
-        
-        if (!competitorSeededData.location) {
-          throw new Error("Missing competitor location in seeded data");
-        }
 
         // Try to move our machine to competitor org's location
         await expect(
           caller.moveToLocation({
             machineId: testData.machine,
-            locationId: competitorSeededData.location,
+            locationId: SEED_TEST_IDS.LOCATIONS.DEFAULT_COMPETITOR, // Competitor location
           }),
         ).rejects.toThrow(
           expect.objectContaining({
@@ -435,31 +418,27 @@ describe("Machine Location Router Integration (PGlite)", () => {
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
         const { testData, caller } = await setupTestData(db);
-        
+
         // Use seeded competitor organization
         const competitorOrgId = SEED_TEST_IDS.ORGANIZATIONS.competitor;
-        const competitorSeededData = await getSeededTestData(db, competitorOrgId);
-        
-        if (!competitorSeededData.location || !competitorSeededData.machine) {
-          throw new Error("Missing competitor seeded data: location or machine");
-        }
 
         // Create competitor context
         const competitorContext = await createCompetitorAdminContext(db);
-        const competitorCaller = machineLocationRouter.createCaller(competitorContext);
+        const competitorCaller =
+          machineLocationRouter.createCaller(competitorContext);
 
         // Competitor org should not be able to access primary org's data
         await expect(
           competitorCaller.moveToLocation({
             machineId: testData.machine, // Primary org's machine
-            locationId: competitorSeededData.location, // Competitor location
+            locationId: SEED_TEST_IDS.LOCATIONS.DEFAULT_COMPETITOR, // Competitor location
           }),
         ).rejects.toThrow();
 
         // Primary org should not be able to access competitor data
         await expect(
           caller.moveToLocation({
-            machineId: competitorSeededData.machine, // Competitor machine
+            machineId: SEED_TEST_IDS.MACHINES.CACTUS_CANYON_1, // Competitor machine
             locationId: testData.secondLocation, // Primary location
           }),
         ).rejects.toThrow("Game instance not found");
@@ -478,7 +457,7 @@ describe("Machine Location Router Integration (PGlite)", () => {
           .returning();
 
         const competitorResult = await competitorCaller.moveToLocation({
-          machineId: competitorSeededData.machine,
+          machineId: SEED_TEST_IDS.MACHINES.CACTUS_CANYON_1,
           locationId: anotherCompetitorLocation.id,
         });
 
@@ -590,8 +569,8 @@ describe("Machine Location Router Integration (PGlite)", () => {
                 qrCodeId: `test-concurrent-qr-${i}`,
                 organizationId: testData.organization,
                 locationId: testData.location,
-                modelId: testData.model!,
-                ownerId: testData.user!,
+                modelId: testData.model,
+                ownerId: testData.user,
                 createdAt: new Date(),
                 updatedAt: new Date(),
               })

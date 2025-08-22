@@ -1,19 +1,19 @@
 /**
  * ✅ GOOD: Uses seed data properly, minor RLS context enhancements only
- * 
+ *
  * CURRENT STATUS: EXEMPLARY IMPLEMENTATION
- * - Correctly uses createSeededTestDatabase() and getSeededTestData()
+ * - Correctly uses createSeededTestDatabase() and SEED_TEST_IDS
  * - Proper memory-safe PGlite patterns with withTransaction()
  * - Real database integration testing with seeded data
  * - Good organizational scoping patterns
- * 
+ *
  * MINOR ENHANCEMENT OPPORTUNITIES:
  * - Could add more RLS session context testing
  * - Could enhance organizational boundary validation
  * - Consider standardizing context creation patterns
- * 
+ *
  * NO MAJOR CHANGES NEEDED - This is a good example of integration testing
- * 
+ *
  * Issue Router Integration Tests (PGlite)
  * Tests issue router procedures with real database operations using seeded data
  */
@@ -31,11 +31,11 @@ import {
 } from "~/server/db/schema";
 import {
   createSeededTestDatabase,
-  getSeededTestData,
   withTransaction,
   type TestDatabase,
 } from "~/test/helpers/pglite-test-setup";
 import { createMachineFactory } from "~/test/testDataFactories";
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
 // Helper function to create test context with proper mocks
 const createTestContext = async (
@@ -148,32 +148,21 @@ vi.mock("~/server/services/factory", () => ({
 describe("Issue Router Integration Tests (PGlite)", () => {
   let testDb: TestDatabase;
   let testOrgId: string;
-  let seededData: Awaited<ReturnType<typeof getSeededTestData>>;
-
   beforeAll(async () => {
     // Use existing seeded test database infrastructure
     const { db, organizationId } = await createSeededTestDatabase();
     testDb = db;
     testOrgId = organizationId;
-
-    // Get seeded test data for consistent IDs - all data is already created!
-    seededData = await getSeededTestData(testDb, testOrgId);
   });
 
   describe("Issue Creation with Real Database", () => {
     it("should create issue with proper organizational scoping", async () => {
-      // Skip if no seeded data available
-      if (!seededData.machine || !seededData.user) {
-        console.log("Skipping test - no seeded machine or user available");
-        return;
-      }
-
       await withTransaction(testDb, async (txDb) => {
         // Create test context with real database
         const testContext = (await createTestContext(
           txDb,
           testOrgId,
-          seededData.user,
+          SEED_TEST_IDS.USERS.ADMIN,
         )) as any;
 
         const caller = appRouter.createCaller(testContext);
@@ -182,14 +171,16 @@ describe("Issue Router Integration Tests (PGlite)", () => {
         const result = await caller.issue.core.create({
           title: "Integration Test Issue",
           description: "Test description",
-          machineId: seededData.machine,
+          machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
         });
 
         // Verify issue was created with correct organization scoping
         expect(result.id).toBeDefined();
         expect(result.title).toBe("Integration Test Issue");
         expect(result.organizationId).toBe(testOrgId);
-        expect(result.machineId).toBe(seededData.machine);
+        expect(result.machineId).toBe(
+          SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
+        );
         expect(result.statusId).toBeDefined();
         expect(result.priorityId).toBeDefined();
 
@@ -217,12 +208,6 @@ describe("Issue Router Integration Tests (PGlite)", () => {
     });
 
     it("should enforce organizational scoping during issue creation", async () => {
-      // Skip if no seeded data available
-      if (!seededData.machine || !seededData.user) {
-        console.log("Skipping organizational scoping test - no seeded data");
-        return;
-      }
-
       await withTransaction(testDb, async (txDb) => {
         // Create a machine in a different organization to test scoping
         const otherOrgId = "other-org-id";
@@ -246,7 +231,7 @@ describe("Issue Router Integration Tests (PGlite)", () => {
         const testContext = (await createTestContext(
           txDb,
           testOrgId,
-          seededData.user,
+          SEED_TEST_IDS.USERS.ADMIN,
         )) as any;
 
         const caller = appRouter.createCaller(testContext);
@@ -264,12 +249,6 @@ describe("Issue Router Integration Tests (PGlite)", () => {
 
   describe("Issue Querying with Complex Filters", () => {
     it("should filter issues by search term with proper scoping", async () => {
-      // Skip if no seeded data available
-      if (!seededData.machine || !seededData.user) {
-        console.log("Skipping search test - no seeded data");
-        return;
-      }
-
       await withTransaction(testDb, async (txDb) => {
         // Create test issues with different titles for search testing
         const testIssues = [
@@ -277,21 +256,21 @@ describe("Issue Router Integration Tests (PGlite)", () => {
             id: generateId(),
             title: "Critical Production Issue",
             description: "System down",
-            machineId: seededData.machine,
+            machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
             organizationId: testOrgId,
-            statusId: seededData.status,
-            priorityId: seededData.priority,
-            createdById: seededData.user,
+            statusId: SEED_TEST_IDS.STATUSES.NEW,
+            priorityId: SEED_TEST_IDS.PRIORITIES.HIGH,
+            createdById: SEED_TEST_IDS.USERS.ADMIN,
           },
           {
             id: generateId(),
             title: "Maintenance Required",
             description: "Routine check",
-            machineId: seededData.machine,
+            machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
             organizationId: testOrgId,
-            statusId: seededData.status,
-            priorityId: seededData.priority,
-            createdById: seededData.user,
+            statusId: SEED_TEST_IDS.STATUSES.NEW,
+            priorityId: SEED_TEST_IDS.PRIORITIES.HIGH,
+            createdById: SEED_TEST_IDS.USERS.ADMIN,
           },
         ];
 
@@ -300,7 +279,7 @@ describe("Issue Router Integration Tests (PGlite)", () => {
         const testContext = (await createTestContext(
           txDb,
           testOrgId,
-          seededData.user,
+          SEED_TEST_IDS.USERS.ADMIN,
         )) as any;
 
         const caller = appRouter.createCaller(testContext);
@@ -316,23 +295,17 @@ describe("Issue Router Integration Tests (PGlite)", () => {
     });
 
     it("should filter issues by machine with relational data", async () => {
-      // Skip if no seeded data available
-      if (!seededData.machine || !seededData.user) {
-        console.log("Skipping machine filter test - no seeded data");
-        return;
-      }
-
       await withTransaction(testDb, async (txDb) => {
         // Create a test issue for the seeded machine
         const testIssue = {
           id: generateId(),
           title: "Machine-specific Issue",
           description: "Test machine issue",
-          machineId: seededData.machine,
+          machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
           organizationId: testOrgId,
-          statusId: seededData.status,
-          priorityId: seededData.priority,
-          createdById: seededData.user,
+          statusId: SEED_TEST_IDS.STATUSES.NEW,
+          priorityId: SEED_TEST_IDS.PRIORITIES.HIGH,
+          createdById: SEED_TEST_IDS.USERS.ADMIN,
         };
 
         await txDb.insert(issues).values([testIssue]);
@@ -340,19 +313,21 @@ describe("Issue Router Integration Tests (PGlite)", () => {
         const testContext = (await createTestContext(
           txDb,
           testOrgId,
-          seededData.user,
+          SEED_TEST_IDS.USERS.ADMIN,
         )) as any;
 
         const caller = appRouter.createCaller(testContext);
 
         // Filter by machine
         const results = await caller.issue.core.getAll({
-          machineId: seededData.machine,
+          machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
         });
 
         expect(results.length).toBeGreaterThan(0);
         results.forEach((issue) => {
-          expect(issue.machineId).toBe(seededData.machine);
+          expect(issue.machineId).toBe(
+            SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
+          );
           expect(issue.machine?.name).toBeDefined();
           expect(issue.machine?.location?.name).toBeDefined();
         });
@@ -360,41 +335,35 @@ describe("Issue Router Integration Tests (PGlite)", () => {
     });
 
     it("should return paginated results", async () => {
-      // Skip if no seeded data available
-      if (!seededData.machine || !seededData.user) {
-        console.log("Skipping pagination test - no seeded data");
-        return;
-      }
-
       await withTransaction(testDb, async (txDb) => {
         // Create multiple issues for pagination testing
         const testIssues = [
           {
             id: generateId(),
             title: "Issue 1",
-            machineId: seededData.machine,
+            machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
             organizationId: testOrgId,
-            statusId: seededData.status,
-            priorityId: seededData.priority,
-            createdById: seededData.user,
+            statusId: SEED_TEST_IDS.STATUSES.NEW,
+            priorityId: SEED_TEST_IDS.PRIORITIES.HIGH,
+            createdById: SEED_TEST_IDS.USERS.ADMIN,
           },
           {
             id: generateId(),
             title: "Issue 2",
-            machineId: seededData.machine,
+            machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
             organizationId: testOrgId,
-            statusId: seededData.status,
-            priorityId: seededData.priority,
-            createdById: seededData.user,
+            statusId: SEED_TEST_IDS.STATUSES.NEW,
+            priorityId: SEED_TEST_IDS.PRIORITIES.HIGH,
+            createdById: SEED_TEST_IDS.USERS.ADMIN,
           },
           {
             id: generateId(),
             title: "Issue 3",
-            machineId: seededData.machine,
+            machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
             organizationId: testOrgId,
-            statusId: seededData.status,
-            priorityId: seededData.priority,
-            createdById: seededData.user,
+            statusId: SEED_TEST_IDS.STATUSES.NEW,
+            priorityId: SEED_TEST_IDS.PRIORITIES.HIGH,
+            createdById: SEED_TEST_IDS.USERS.ADMIN,
           },
         ];
 
@@ -403,7 +372,7 @@ describe("Issue Router Integration Tests (PGlite)", () => {
         const testContext = (await createTestContext(
           txDb,
           testOrgId,
-          seededData.user,
+          SEED_TEST_IDS.USERS.ADMIN,
         )) as any;
 
         const caller = appRouter.createCaller(testContext);
@@ -422,29 +391,23 @@ describe("Issue Router Integration Tests (PGlite)", () => {
 
   describe("Issue Assignment with Database Operations", () => {
     it("should assign issue to user within same organization", async () => {
-      // Skip if no seeded data available
-      if (!seededData.machine || !seededData.user) {
-        console.log("Skipping assignment test - no seeded data");
-        return;
-      }
-
       await withTransaction(testDb, async (txDb) => {
         // Create an issue first using seeded data
         const issueId = generateId();
         await txDb.insert(issues).values({
           id: issueId,
           title: "Test Assignment Issue",
-          machineId: seededData.machine,
+          machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
           organizationId: testOrgId,
-          statusId: seededData.status,
-          priorityId: seededData.priority,
-          createdById: seededData.user,
+          statusId: SEED_TEST_IDS.STATUSES.NEW,
+          priorityId: SEED_TEST_IDS.PRIORITIES.HIGH,
+          createdById: SEED_TEST_IDS.USERS.ADMIN,
         });
 
         const testContext = (await createTestContext(
           txDb,
           testOrgId,
-          seededData.user,
+          SEED_TEST_IDS.USERS.ADMIN,
         )) as any;
 
         const caller = appRouter.createCaller(testContext);
@@ -452,10 +415,10 @@ describe("Issue Router Integration Tests (PGlite)", () => {
         // Assign issue to user
         const result = await caller.issue.core.assign({
           issueId,
-          userId: seededData.user,
+          userId: SEED_TEST_IDS.USERS.ADMIN,
         });
 
-        expect(result.issue.assignedToId).toBe(seededData.user);
+        expect(result.issue.assignedToId).toBe(SEED_TEST_IDS.USERS.ADMIN);
 
         // Verify assignment in database
         const dbIssue = await txDb.query.issues.findFirst({
@@ -465,7 +428,7 @@ describe("Issue Router Integration Tests (PGlite)", () => {
           },
         });
 
-        expect(dbIssue?.assignedToId).toBe(seededData.user);
+        expect(dbIssue?.assignedToId).toBe(SEED_TEST_IDS.USERS.ADMIN);
         expect(dbIssue?.assignedTo?.email).toBeDefined();
       });
     });
@@ -473,12 +436,6 @@ describe("Issue Router Integration Tests (PGlite)", () => {
 
   describe("Issue Status Updates with Validation", () => {
     it("should update issue status with proper validation", async () => {
-      // Skip if no seeded data available
-      if (!seededData.machine || !seededData.user) {
-        console.log("Skipping status update test - no seeded data");
-        return;
-      }
-
       await withTransaction(testDb, async (txDb) => {
         // Create resolved status
         const resolvedStatusId = generateId();
@@ -494,17 +451,17 @@ describe("Issue Router Integration Tests (PGlite)", () => {
         await txDb.insert(issues).values({
           id: issueId,
           title: "Test Status Update Issue",
-          machineId: seededData.machine,
+          machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
           organizationId: testOrgId,
-          statusId: seededData.status,
-          priorityId: seededData.priority,
-          createdById: seededData.user,
+          statusId: SEED_TEST_IDS.STATUSES.NEW,
+          priorityId: SEED_TEST_IDS.PRIORITIES.HIGH,
+          createdById: SEED_TEST_IDS.USERS.ADMIN,
         });
 
         const testContext = (await createTestContext(
           txDb,
           testOrgId,
-          seededData.user,
+          SEED_TEST_IDS.USERS.ADMIN,
         )) as any;
 
         const caller = appRouter.createCaller(testContext);

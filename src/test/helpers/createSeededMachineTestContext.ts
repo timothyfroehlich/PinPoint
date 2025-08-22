@@ -26,17 +26,17 @@ interface CreateSeededMachineTestContextOptions {
    * @default ["machine:edit", "machine:delete", "organization:manage"]
    */
   userPermissions?: string[];
-  
+
   /**
    * Custom logger implementation
    */
   customLogger?: any;
-  
+
   /**
    * Additional user metadata
    */
   userMetadata?: Record<string, any>;
-  
+
   /**
    * Additional app metadata
    */
@@ -56,7 +56,7 @@ export async function createSeededMachineTestContext(
   db: TestDatabase,
   organizationId: string,
   userId: string,
-  options: CreateSeededMachineTestContextOptions = {}
+  options: CreateSeededMachineTestContextOptions = {},
 ): Promise<TRPCContext> {
   // Fetch the organization from seeded data
   const organization = await db.query.organizations.findFirst({
@@ -76,49 +76,20 @@ export async function createSeededMachineTestContext(
     throw new Error(`User not found in seeded data: ${userId}`);
   }
 
-  // Check if membership exists, create if needed
-  let membership = await db.query.memberships.findFirst({
-    where: eq(schema.memberships.userId, userId)
-      && eq(schema.memberships.organizationId, organizationId),
+  // Check membership exists in seeded data and fail fast if missing
+  const membership = await db.query.memberships.findFirst({
+    where:
+      eq(schema.memberships.userId, userId) &&
+      eq(schema.memberships.organizationId, organizationId),
     with: {
       role: true,
     },
   });
 
   if (!membership) {
-    // Find an admin role in the organization to assign
-    const adminRole = await db.query.roles.findFirst({
-      where: eq(schema.roles.organizationId, organizationId),
-    });
-
-    if (!adminRole) {
-      throw new Error(`No roles found in organization: ${organizationId}`);
-    }
-
-    // Create the membership
-    const [newMembership] = await db
-      .insert(schema.memberships)
-      .values({
-        id: `membership-${userId}-${organizationId}`,
-        userId,
-        organizationId,
-        roleId: adminRole.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .returning();
-
-    // Refetch with role information
-    membership = await db.query.memberships.findFirst({
-      where: eq(schema.memberships.id, newMembership.id),
-      with: {
-        role: true,
-      },
-    });
-  }
-
-  if (!membership) {
-    throw new Error("Failed to create or find membership");
+    throw new Error(
+      `Membership not found in seeded data for user ${userId} in organization ${organizationId}. Ensure your test database includes proper seeded memberships.`,
+    );
   }
 
   // Default user permissions for machine operations
@@ -190,9 +161,9 @@ export async function createSeededMachineTestContext(
     db: db,
     supabase: {
       auth: {
-        getUser: vi.fn().mockResolvedValue({ 
-          data: { user: null }, 
-          error: null 
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: null },
+          error: null,
         }),
       },
     } as any,
@@ -210,28 +181,28 @@ export async function createSeededMachineTestContext(
  */
 export async function createPrimaryAdminContext(
   db: TestDatabase,
-  options?: CreateSeededMachineTestContextOptions
+  options?: CreateSeededMachineTestContextOptions,
 ): Promise<TRPCContext> {
   return createSeededMachineTestContext(
     db,
     SEED_TEST_IDS.ORGANIZATIONS.primary,
     SEED_TEST_IDS.USERS.ADMIN,
-    options
+    options,
   );
 }
 
 /**
- * Creates a context for the competitor organization with admin user  
+ * Creates a context for the competitor organization with admin user
  */
 export async function createCompetitorAdminContext(
   db: TestDatabase,
-  options?: CreateSeededMachineTestContextOptions
+  options?: CreateSeededMachineTestContextOptions,
 ): Promise<TRPCContext> {
   return createSeededMachineTestContext(
     db,
     SEED_TEST_IDS.ORGANIZATIONS.competitor,
     SEED_TEST_IDS.USERS.ADMIN,
-    options
+    options,
   );
 }
 
@@ -241,16 +212,17 @@ export async function createCompetitorAdminContext(
 export async function createPrimaryMemberContext(
   db: TestDatabase,
   memberNumber: 1 | 2 = 1,
-  options?: CreateSeededMachineTestContextOptions
+  options?: CreateSeededMachineTestContextOptions,
 ): Promise<TRPCContext> {
-  const userId = memberNumber === 1 
-    ? SEED_TEST_IDS.USERS.MEMBER1 
-    : SEED_TEST_IDS.USERS.MEMBER2;
-    
+  const userId =
+    memberNumber === 1
+      ? SEED_TEST_IDS.USERS.MEMBER1
+      : SEED_TEST_IDS.USERS.MEMBER2;
+
   return createSeededMachineTestContext(
     db,
     SEED_TEST_IDS.ORGANIZATIONS.primary,
     userId,
-    options
+    options,
   );
 }
