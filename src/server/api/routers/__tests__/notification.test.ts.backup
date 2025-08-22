@@ -1,0 +1,738 @@
+/**
+ * Notification Router Integration Tests (tRPC + PGlite)
+ *
+ * Real tRPC router integration tests using PGlite in-memory PostgreSQL database.
+ * Tests actual router operations with proper authentication, permissions, and database operation    test("should retrieve user notifications with real database operations", async ({ workerDb: testDb }) => {
+      await withIsolatedTest(testDb, async (txDb) => {
+        // Create context using seeded data
+        const ctx = await createSeededNotificationTestContext(txDb, primaryOrgId, seededData.user.id);
+        
+        // Create test-specific notifications for this test
+        const [notification1] = await txDb
+          .insert(schema.notifications)
+          .values({
+            id: generateTestId("notification-1"),
+            userId: seededData.user.id,
+            type: "ISSUE_CREATED",
+            message: "New issue created",
+            read: false,
+            entityType: "ISSUE",
+            entityId: generateTestId("issue"),
+            organizationId: primaryOrgId,
+            createdAt: new Date(),
+          })
+          .returning();
+
+        const [notification2] = await txDb
+          .insert(schema.notifications)
+          .values({
+            id: generateTestId("notification-2"),
+            userId: seededData.user.id,
+            type: "ISSUE_UPDATED",
+            message: "Issue status changed",
+            read: true,
+            entityType: "ISSUE",
+            entityId: generateTestId("issue"),
+            organizationId: primaryOrgId,
+            createdAt: new Date(),
+          })
+          .returning();
+
+        const caller = appRouter.createCaller(ctx);
+
+        const result = await caller.notification.getNotifications({});
+
+        // Verify we get the user's notifications
+        expect(result).toHaveLength(2);
+        expect(result.some(n => n.id === notification1.id)).toBe(true);
+        expect(result.some(n => n.id === notification2.id)).toBe(true);
+        
+        // Verify notification structure
+        const unreadNotification = result.find(n => n.id === notification1.id);
+        expect(unreadNotification?.message).toBe("New issue created");
+        expect(unreadNotification?.read).toBe(false);
+        expect(unreadNotification?.type).toBe("ISSUE_CREATED");d from unit tests to proper Archetype 5 (tRPC Router Integration) patterns.
+ *
+ * Key Features:
+ * - Real PostgreSQL database with PGlite
+ * - Complete schema migrations applied
+ * - Real tRPC router operations
+ * - Actual permission enforcement via RLS
+ * - Multi-tenant data isolation testing
+ * - Worker-scoped database for memory safety
+ *
+ * Uses modern August 2025 patterns with Vitest and PGlite integration.
+ * 
+ * Covers all procedures:
+ * - getNotifications: Retrieve user notifications with filtering
+ * - getUnreadCount: Get count of unread notifications
+ * - markAsRead: Mark specific notification as read
+ * - markAllAsRead: Mark all user notifications as read
+ */
+
+import { eq, and } from "drizzle-orm";
+import { describe, expect, vi, beforeAll } from "vitest";
+
+// Import test setup and utilities
+import type { TRPCContext } from "~/server/api/trpc.base";
+import type { TestDatabase } from "~/test/helpers/pglite-test-setup";
+import { createSeededTestDatabase, getSeededTestData } from "~/test/helpers/pglite-test-setup";
+import { createSeededNotificationTestContext } from "~/test/helpers/createSeededNotificationTestContext";
+
+import { appRouter } from "~/server/api/root";
+import * as schema from "~/server/db/schema";
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
+import { generateTestId } from "~/test/helpers/test-id-generator";
+import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
+
+// Mock external dependencies that aren't database-related
+vi.mock("~/lib/utils/id-generation", () => ({
+  generateId: vi.fn(() => generateTestId("test-id")),
+}));
+
+vi.mock("~/server/auth/permissions", () => ({
+  getUserPermissionsForSession: vi
+    .fn()
+    .mockResolvedValue([
+      "notification:read",
+      "notification:edit",
+    ]),
+  getUserPermissionsForSupabaseUser: vi
+    .fn()
+    .mockResolvedValue([
+      "notification:read",
+      "notification:edit",
+    ]),
+  requirePermissionForSession: vi.fn().mockResolvedValue(undefined),
+  supabaseUserToSession: vi.fn((user) => ({
+    user: {
+      id: user?.id ?? generateTestId("fallback-user"),
+      email: user?.email ?? "test@example.com",
+      name: user?.name ?? "Test User",
+    },
+    expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+  })),
+}));
+
+// Import real service factory for true integration testing
+import { ServiceFactory } from "~/server/services/factory";
+
+// Helper function to set up test data and context
+async function setupTestData(db: TestDatabase) {
+  // Create seed data first
+  const organizationId = generateTestId("test-org");
+
+  // Create organization
+  const [org] = await db
+    .insert(schema.organizations)
+    .values({
+      id: organizationId,
+      name: "Test Organization",
+      subdomain: "test",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .returning();
+
+  // Create test user with dynamic ID for integration tests
+  const [testUser] = await db
+    .insert(schema.users)
+    .values({
+      id: generateTestId("user-admin"),
+      name: "Test Admin",
+      email: `admin-${generateTestId("user")}@example.com`,
+      emailVerified: null,
+    })
+    .returning();
+
+  // Create another user for cross-org testing
+  const [otherUser] = await db
+    .insert(schema.users)
+    .values({
+      id: generateTestId("user-other"),
+      name: "Other User",
+      email: `member-${generateTestId("user")}@example.com`,
+      emailVerified: null,
+    })
+    .returning();
+
+  // Create roles
+  const [adminRole] = await db
+    .insert(schema.roles)
+    .values({
+      id: generateTestId("admin-role"),
+      name: "Admin",
+      organizationId,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .returning();
+
+  // Create membership for the test user
+  await db.insert(schema.memberships).values({
+    id: "test-membership-1",
+    userId: testUser.id,
+    organizationId,
+    roleId: adminRole.id,
+  });
+
+  // Create some test notifications
+  const [notification1] = await db
+    .insert(schema.notifications)
+    .values({
+      id: generateTestId("notification-1"),
+      userId: testUser.id,
+      type: "ISSUE_CREATED",
+      message: "New issue created",
+      read: false,
+      entityType: "ISSUE",
+      entityId: generateTestId("issue"),
+      organizationId: organizationId,
+      createdAt: new Date(),
+    })
+    .returning();
+
+  const [notification2] = await db
+    .insert(schema.notifications)
+    .values({
+      id: generateTestId("notification-2"),
+      userId: testUser.id,
+      type: "ISSUE_UPDATED",
+      message: "Issue status changed",
+      read: true,
+      entityType: "ISSUE",
+      entityId: generateTestId("issue"),
+      organizationId: organizationId,
+      createdAt: new Date(),
+    })
+    .returning();
+
+  // Create notification for other user (for cross-user testing)
+  const [otherNotification] = await db
+    .insert(schema.notifications)
+    .values({
+      id: generateTestId("other-notification"),
+      userId: otherUser.id,
+      type: "ISSUE_CREATED",
+      message: "Other user notification",
+      read: false,
+      entityType: "ISSUE",
+      entityId: generateTestId("other-issue"),
+      organizationId: organizationId,
+      createdAt: new Date(),
+    })
+    .returning();
+
+  // Create test context with real database
+  const ctx: TRPCContext = {
+    db: db,
+    user: {
+      id: testUser.id,
+      email: "test@example.com",
+      name: "Test Admin",
+      user_metadata: {},
+      app_metadata: {
+        organization_id: organizationId,
+      },
+    },
+    organization: {
+      id: organizationId,
+      name: "Test Organization",
+      subdomain: "test",
+    },
+    organizationId: organizationId,
+    supabase: {} as any, // Not used in this router
+    headers: new Headers(),
+    userPermissions: [
+      "notification:read",
+      "notification:edit",
+    ],
+    services: new ServiceFactory(db),
+    logger: {
+      error: vi.fn(),
+      warn: vi.fn(),
+      info: vi.fn(),
+      debug: vi.fn(),
+      trace: vi.fn(),
+      child: vi.fn(() => ctx.logger),
+      withRequest: vi.fn(() => ctx.logger),
+      withUser: vi.fn(() => ctx.logger),
+      withOrganization: vi.fn(() => ctx.logger),
+      withContext: vi.fn(() => ctx.logger),
+    } as any,
+  };
+
+  return {
+    ctx,
+    organizationId,
+    testUser,
+    otherUser,
+    notification1,
+    notification2,
+    otherNotification,
+  };
+}
+
+describe("Notification Router Integration Tests", () => {
+  let workerDb: TestDatabase;
+  let primaryOrgId: string;
+  let competitorOrgId: string;
+  let seededData: Awaited<ReturnType<typeof getSeededTestData>>;
+
+  beforeAll(async () => {
+    const { db, primaryOrgId: primary, competitorOrgId: competitor } = await createSeededTestDatabase();
+    workerDb = db;
+    primaryOrgId = primary;
+    competitorOrgId = competitor;
+    seededData = await getSeededTestData(workerDb, primaryOrgId);
+  });
+
+  describe("getNotifications procedure", () => {
+    test("should retrieve user notifications with real database operations", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx, notification1, notification2 } = await setupTestData(db);
+        const caller = appRouter.createCaller(ctx);
+
+        const result = await caller.notification.getNotifications({});
+
+        // Verify we get the user's notifications
+        expect(result).toHaveLength(2);
+        expect(result.some(n => n.id === notification1.id)).toBe(true);
+        expect(result.some(n => n.id === notification2.id)).toBe(true);
+        
+        // Verify notification structure
+        const unreadNotification = result.find(n => n.id === notification1.id);
+        expect(unreadNotification?.message).toBe("New issue created");
+        expect(unreadNotification?.read).toBe(false);
+        expect(unreadNotification?.type).toBe("ISSUE_CREATED");
+      });
+    });
+
+    test("should filter notifications by unreadOnly option", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx, notification1 } = await setupTestData(db);
+        const caller = appRouter.createCaller(ctx);
+
+        const result = await caller.notification.getNotifications({
+          unreadOnly: true,
+        });
+
+        // Should only return unread notifications
+        expect(result).toHaveLength(1);
+        expect(result[0].id).toBe(notification1.id);
+        expect(result[0].read).toBe(false);
+      });
+    });
+
+    test("should limit and offset notifications correctly", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx, testUser, organizationId } = await setupTestData(db);
+        
+        // Create additional notifications for pagination testing
+        await db.insert(schema.notifications).values([
+          {
+            id: generateTestId("notification-3"),
+            userId: testUser.id,
+            type: "ISSUE_UPDATED",
+            message: "Third notification",
+            read: false,
+            entityType: "ISSUE",
+            entityId: generateTestId("issue-3"),
+            organizationId: organizationId,
+            createdAt: new Date(),
+          },
+          {
+            id: generateTestId("notification-4"),
+            userId: testUser.id,
+            type: "ISSUE_CREATED",
+            message: "Fourth notification",
+            read: false,
+            entityType: "ISSUE",
+            entityId: generateTestId("issue-4"),
+            organizationId: organizationId,
+            createdAt: new Date(),
+          },
+        ]);
+
+        const caller = appRouter.createCaller(ctx);
+
+        // Test limit
+        const limitResult = await caller.notification.getNotifications({
+          limit: 2,
+        });
+        expect(limitResult).toHaveLength(2);
+
+        // Test offset
+        const offsetResult = await caller.notification.getNotifications({
+          limit: 2,
+          offset: 2,
+        });
+        expect(offsetResult).toHaveLength(2);
+        
+        // Verify different results
+        expect(limitResult[0].id).not.toBe(offsetResult[0].id);
+      });
+    });
+
+    test("should validate input parameters", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx } = await setupTestData(db);
+        const caller = appRouter.createCaller(ctx);
+
+        // Invalid limit (too high)
+        await expect(
+          caller.notification.getNotifications({ limit: 200 }),
+        ).rejects.toThrow();
+
+        // Invalid offset (negative)
+        await expect(
+          caller.notification.getNotifications({ offset: -1 }),
+        ).rejects.toThrow();
+      });
+    });
+  });
+
+  describe("getUnreadCount procedure", () => {
+    test("should return correct unread count with real database operations", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx } = await setupTestData(db);
+        const caller = appRouter.createCaller(ctx);
+
+        const count = await caller.notification.getUnreadCount();
+
+        // Should count only unread notifications for the user
+        expect(count).toBe(1); // Only notification1 is unread
+      });
+    });
+
+    test("should return zero for user with no unread notifications", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx, testUser } = await setupTestData(db);
+
+        // Mark all notifications as read
+        await db
+          .update(schema.notifications)
+          .set({ read: true })
+          .where(eq(schema.notifications.userId, testUser.id));
+
+        const caller = appRouter.createCaller(ctx);
+        const count = await caller.notification.getUnreadCount();
+
+        expect(count).toBe(0);
+      });
+    });
+  });
+
+  describe("markAsRead procedure", () => {
+    test("should mark notification as read with real database operations", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx, notification1 } = await setupTestData(db);
+        const caller = appRouter.createCaller(ctx);
+
+        const result = await caller.notification.markAsRead({
+          notificationId: notification1.id,
+        });
+
+        expect(result).toEqual({ success: true });
+
+        // Verify the notification was marked as read in the database
+        const updatedNotification = await db.query.notifications.findFirst({
+          where: eq(schema.notifications.id, notification1.id),
+        });
+        expect(updatedNotification?.read).toBe(true);
+      });
+    });
+
+    test("should not mark notification belonging to other users", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx, otherNotification } = await setupTestData(db);
+        const caller = appRouter.createCaller(ctx);
+
+        // Attempt to mark other user's notification as read
+        const result = await caller.notification.markAsRead({
+          notificationId: otherNotification.id,
+        });
+
+        expect(result).toEqual({ success: true });
+
+        // Verify the other user's notification was NOT marked as read
+        const otherNotificationAfter = await db.query.notifications.findFirst({
+          where: eq(schema.notifications.id, otherNotification.id),
+        });
+        expect(otherNotificationAfter?.read).toBe(false); // Should remain unread
+      });
+    });
+
+    test("should validate notification ID is required", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx } = await setupTestData(db);
+        const caller = appRouter.createCaller(ctx);
+
+        await expect(
+          caller.notification.markAsRead({} as { notificationId: string }),
+        ).rejects.toThrow("Invalid input");
+      });
+    });
+
+    test("should handle non-existent notification gracefully", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx } = await setupTestData(db);
+        const caller = appRouter.createCaller(ctx);
+
+        const result = await caller.notification.markAsRead({
+          notificationId: generateTestId("non-existent"),
+        });
+
+        // Should succeed but not affect any notifications
+        expect(result).toEqual({ success: true });
+      });
+    });
+  });
+
+  describe("markAllAsRead procedure", () => {
+    test("should mark all user notifications as read with real database operations", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx, testUser } = await setupTestData(db);
+        const caller = appRouter.createCaller(ctx);
+
+        const result = await caller.notification.markAllAsRead();
+
+        expect(result).toEqual({ success: true });
+
+        // Verify all user's notifications are marked as read
+        const userNotifications = await db.query.notifications.findMany({
+          where: eq(schema.notifications.userId, testUser.id),
+        });
+        
+        expect(userNotifications.every(n => n.read)).toBe(true);
+      });
+    });
+
+    test("should not affect other users' notifications", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx, otherNotification } = await setupTestData(db);
+        const caller = appRouter.createCaller(ctx);
+
+        await caller.notification.markAllAsRead();
+
+        // Verify other user's notification is unaffected
+        const otherNotificationAfter = await db.query.notifications.findFirst({
+          where: eq(schema.notifications.id, otherNotification.id),
+        });
+        expect(otherNotificationAfter?.read).toBe(false);
+      });
+    });
+  });
+
+  describe("Authentication and Authorization", () => {
+    test("should require authentication for all procedures", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { notification1 } = await setupTestData(db);
+
+        // Create context without authentication
+        const unauthCtx: TRPCContext = {
+          db: db,
+          user: null,
+          organization: null,
+          organizationId: null,
+          supabase: {} as any,
+          headers: new Headers(),
+          userPermissions: [],
+          services: {} as any,
+          logger: {
+            error: vi.fn(),
+            warn: vi.fn(),
+            info: vi.fn(),
+            debug: vi.fn(),
+            trace: vi.fn(),
+            child: vi.fn(() => unauthCtx.logger),
+            withRequest: vi.fn(() => unauthCtx.logger),
+            withUser: vi.fn(() => unauthCtx.logger),
+            withOrganization: vi.fn(() => unauthCtx.logger),
+            withContext: vi.fn(() => unauthCtx.logger),
+          } as any,
+        };
+
+        const caller = appRouter.createCaller(unauthCtx);
+
+        await expect(
+          caller.notification.getNotifications({}),
+        ).rejects.toThrow("UNAUTHORIZED");
+
+        await expect(
+          caller.notification.getUnreadCount(),
+        ).rejects.toThrow("UNAUTHORIZED");
+
+        await expect(
+          caller.notification.markAsRead({ notificationId: notification1.id }),
+        ).rejects.toThrow("UNAUTHORIZED");
+
+        await expect(
+          caller.notification.markAllAsRead(),
+        ).rejects.toThrow("UNAUTHORIZED");
+      });
+    });
+  });
+
+  describe("Multi-tenant Security Testing", () => {
+    test("should enforce user-level isolation across operations", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { otherUser, otherNotification, organizationId } = await setupTestData(db);
+
+        // Create context for other user
+        const otherUserCtx: TRPCContext = {
+          db: db,
+          user: {
+            id: otherUser.id,
+            email: "other@example.com",
+            name: "Other User",
+            user_metadata: {},
+            app_metadata: {
+              organization_id: organizationId,
+            },
+          },
+          organization: {
+            id: organizationId,
+            name: "Test Organization",
+            subdomain: "test",
+          },
+          organizationId: organizationId,
+          supabase: {} as any,
+          headers: new Headers(),
+          userPermissions: [
+            "notification:read",
+            "notification:edit",
+          ],
+          services: new ServiceFactory(db),
+          logger: {
+            error: vi.fn(),
+            warn: vi.fn(),
+            info: vi.fn(),
+            debug: vi.fn(),
+            trace: vi.fn(),
+            child: vi.fn(() => otherUserCtx.logger),
+            withRequest: vi.fn(() => otherUserCtx.logger),
+            withUser: vi.fn(() => otherUserCtx.logger),
+            withOrganization: vi.fn(() => otherUserCtx.logger),
+            withContext: vi.fn(() => otherUserCtx.logger),
+          } as any,
+        };
+
+        const otherCaller = appRouter.createCaller(otherUserCtx);
+
+        // Other user should only see their own notifications
+        const notifications = await otherCaller.notification.getNotifications({});
+        expect(notifications).toHaveLength(1);
+        expect(notifications[0].id).toBe(otherNotification.id);
+
+        // Other user should get their own unread count
+        const count = await otherCaller.notification.getUnreadCount();
+        expect(count).toBe(1); // Only their unread notification
+
+        // Other user can mark their own notification as read
+        const result = await otherCaller.notification.markAsRead({
+          notificationId: otherNotification.id,
+        });
+        expect(result).toEqual({ success: true });
+
+        // Verify their notification was marked as read
+        const updatedNotification = await db.query.notifications.findFirst({
+          where: eq(schema.notifications.id, otherNotification.id),
+        });
+        expect(updatedNotification?.read).toBe(true);
+      });
+    });
+
+    test("should enforce cross-organizational boundaries", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx } = await setupTestData(db);
+        
+        // Create a second organization with its own user and notifications
+        const [org2] = await db
+          .insert(schema.organizations)
+          .values({
+            id: "org-2",
+            name: "Organization 2",
+            subdomain: "org2",
+          })
+          .returning();
+
+        const [org2User] = await db
+          .insert(schema.users)
+          .values({
+            id: generateTestId("org2-user"),
+            name: "Org2 User",
+            email: "org2user@example.com",
+            emailVerified: null,
+          })
+          .returning();
+
+        const [org2Notification] = await db
+          .insert(schema.notifications)
+          .values({
+            id: generateTestId("org2-notification"),
+            userId: org2User.id,
+            type: "ISSUE_CREATED",
+            message: "Org2 notification",
+            read: false,
+            entityType: "ISSUE",
+            entityId: generateTestId("org2-issue"),
+            organizationId: org2.id,
+            createdAt: new Date(),
+          })
+          .returning();
+
+        // Original user should not see org2 notifications
+        const caller = appRouter.createCaller(ctx);
+        const notifications = await caller.notification.getNotifications({});
+        
+        expect(notifications.every(n => n.id !== org2Notification.id)).toBe(true);
+
+        // Original user cannot mark org2 notification as read
+        const result = await caller.notification.markAsRead({
+          notificationId: org2Notification.id,
+        });
+        expect(result).toEqual({ success: true }); // Succeeds but does nothing
+
+        // Verify org2 notification remains unaffected
+        const org2NotificationAfter = await db.query.notifications.findFirst({
+          where: eq(schema.notifications.id, org2Notification.id),
+        });
+        expect(org2NotificationAfter?.read).toBe(false);
+      });
+    });
+
+    test("should maintain data integrity across notification operations", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (db) => {
+        const { ctx, testUser, notification1 } = await setupTestData(db);
+        const caller = appRouter.createCaller(ctx);
+
+        // Get initial state
+        const initialNotifications = await caller.notification.getNotifications({});
+        const initialCount = await caller.notification.getUnreadCount();
+
+        // Mark one notification as read
+        await caller.notification.markAsRead({
+          notificationId: notification1.id,
+        });
+
+        // Verify counts updated correctly
+        const updatedCount = await caller.notification.getUnreadCount();
+        expect(updatedCount).toBe(initialCount - 1);
+
+        // Mark all as read
+        await caller.notification.markAllAsRead();
+
+        // Verify all notifications are read
+        const finalCount = await caller.notification.getUnreadCount();
+        expect(finalCount).toBe(0);
+
+        // Verify database consistency
+        const allUserNotifications = await db.query.notifications.findMany({
+          where: eq(schema.notifications.userId, testUser.id),
+        });
+        expect(allUserNotifications.every(n => n.read)).toBe(true);
+      });
+    });
+  });
+});

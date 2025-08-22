@@ -1,0 +1,122 @@
+[
+  {
+    "title": "Kaiju figures on left ramp are not responding",
+    "description": "Kaiju figures on left ramp are not responding",
+    "severity": "Cosmetic",
+    "consistency": "Every game",
+    "status": "New",
+    "gameTitle": "Ultraman: Kaiju Rumble (Blood Sucker Edition)",
+    "reporterEmail": "roger.sharpe@pinpoint.dev",
+    "createdAt": "2025-06-21T13:40:02.000Z",
+    "updatedAt": "2025-07-01T19:09:30.000Z",
+    "gameOpdbId": "GBLLd-MdEON-A94po"
+  },
+  {
+    "title": "Loud buzzing noise then crashes",
+    "description": "Loud buzzing noise then crashes",
+    "severity": "Severe",
+    "consistency": "Always",
+    "status": "Needs expert help",
+    "gameTitle": "Xenon",
+    "reporterEmail": "gary.stern@pinpoint.dev",
+    "createdAt": "2025-06-27T19:05:40.000Z",
+    "updatedAt": "2025-07-06T10:27:36.000Z",
+    "gameOpdbId": "G42Pk-MZe2e"
+  },
+  {
+    "title": "Left top rollover target not responding",
+    "description": "Left top rollover target not responding",
+    "severity": "Minor",
+    "consistency": "Every game",
+    "status": "New",
+    "gameTitle": "Cleopatra",
+    "reporterEmail": "harry.williams@pinpoint.dev",
+    "createdAt": "2025-06-27T20:12:44.000Z",
+    "updatedAt": "2025-07-01T19:10:53.000Z",
+    "gameOpdbId": "GrknN-MQrdv"
+  },
+  {
+    "title": "Right gun opto is flakey - auto fires",
+    "description": "Right gun opto is flakey - auto fires (current workaround -> power cycle)",
+    "severity": "Major",
+    "consistency": "Occasionally",
+    "status": "In Progress",
+    "gameTitle": "Cactus Canyon (Remake Special)",
+    "reporterEmail": "escher.lefkoff@pinpoint.dev",
+    "createdAt": "2025-07-05T15:07:02.000Z",
+    "updatedAt": "2025-07-06T10:32:27.000Z",
+    "gameOpdbId": "G4835-M2YPK-AR5ln"
+  },
+  {
+    "title": "b top roll over does not register",
+    "description": "b top roll over does not register",
+    "severity": "Minor",
+    "consistency": "Always",
+    "status": "Fixed",
+    "gameTitle": "Cactus Canyon (Remake Special)",
+    "reporterEmail": "roger.sharpe@pinpoint.dev",
+    "createdAt": "2025-06-16T22:00:40.000Z",
+    "updatedAt": "2025-06-16T22:00:40.000Z",
+    "gameOpdbId": "G4835-M2YPK-AR5ln"
+  },
+  {
+    "title": "Gun calibration was off - left side hits poor",
+    "description": "Gun calibration was off - left side hits poor",
+    "severity": "Minor",
+    "consistency": "Always",
+    "status": "Not to be Fixed",
+    "gameTitle": "Revenge from Mars",
+    "reporterEmail": "gary.stern@pinpoint.dev",
+    "createdAt": "2025-06-28T12:59:21.000Z",
+    "updatedAt": "2025-07-04T23:34:55.000Z",
+    "gameOpdbId": "G50Wr-MLeZP"
+  },
+  {
+    "title": "Center pop bumper is out",
+    "description": "Center pop bumper is out",
+    "severity": "Minor",
+    "consistency": "Every game",
+    "status": "New",
+    "gameTitle": "Cleopatra",
+    "reporterEmail": "escher.lefkoff@pinpoint.dev",
+    "createdAt": "2025-06-27T20:13:27.000Z",
+    "updatedAt": "2025-07-01T19:10:58.000Z",
+    "gameOpdbId": "GrknN-MQrdv"
+  },
+  {
+    "title": "Train Wreck multiball drains too fast",
+    "description": "Train Wreck multiball drains too fast - outlanes need adjustment",
+    "severity": "Major",
+    "consistency": "Every game",
+    "status": "New",
+    "gameTitle": "Cactus Canyon (Remake Special)",
+    "reporterEmail": "tim@example.com",
+    "createdAt": "2025-07-08T14:22:15.000Z",
+    "updatedAt": "2025-07-08T14:22:15.000Z",
+    "gameOpdbId": "G4835-M2YPK-AR5ln"
+  },
+  {
+    "title": "Magna save not responding consistently",
+    "description": "Magna save button on the right side is intermittent",
+    "severity": "Minor",
+    "consistency": "Occasionally",
+    "status": "New",
+    "gameTitle": "Revenge from Mars",
+    "reporterEmail": "harry@example.com",
+    "createdAt": "2025-07-09T10:15:30.000Z",
+    "updatedAt": "2025-07-09T10:15:30.000Z",
+    "gameOpdbId": "G50Wr-MLeZP"
+  },
+  {
+    "title": "Castle gate mechanism sticking",
+    "description": "Castle gate mechanism sticking during Battle for the Kingdom mode",
+    "severity": "Major",
+    "consistency": "Every game",
+    "status": "In Progress",
+    "gameTitle": "Medieval Madness",
+    "reporterEmail": "tim@example.com",
+    "createdAt": "2025-07-10T16:45:00.000Z",
+    "updatedAt": "2025-07-10T16:45:00.000Z",
+    "gameOpdbId": "G50Wr-MdeZA"
+  }
+]
