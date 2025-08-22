@@ -11,6 +11,7 @@
 Two proven patterns emerged from systematic Phase 3.3 implementation:
 
 ### **Archetype 5: tRPC Router Integration with Mocks**
+
 ✅ **Validated in Phase 3.3a (Issue Management) & 3.3e (Service Layer)**
 
 - **Performance**: Fast execution (200-400ms per test)
@@ -19,6 +20,7 @@ Two proven patterns emerged from systematic Phase 3.3 implementation:
 - **Best for**: Complex router logic, permission scenarios, rapid feedback
 
 **Core Pattern**:
+
 ```typescript
 import { createVitestMockContext } from "~/test/vitestMockContext";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
@@ -27,11 +29,11 @@ import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 const mockContext = createVitestMockContext({
   user: {
     id: SEED_TEST_IDS.USERS.ADMIN,
-    user_metadata: { 
+    user_metadata: {
       organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
-      role: "admin" 
-    }
-  }
+      role: "admin",
+    },
+  },
 });
 
 // Simulated RLS behavior via mocks
@@ -39,6 +41,7 @@ const caller = appRouter.createCaller(mockContext);
 ```
 
 ### **Archetype 3: PGlite Integration RLS-Enhanced**
+
 ✅ **Validated in Phase 3.3b (Machine/Location) & 3.3c (Admin/Infrastructure)**
 
 - **Reality**: Real database operations with full constraints
@@ -48,20 +51,30 @@ const caller = appRouter.createCaller(mockContext);
 - **Best for**: Complex workflows, constraint validation, end-to-end verification
 
 **Core Pattern**:
+
 ```typescript
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
 test("real database integration", async ({ workerDb }) => {
   await withIsolatedTest(workerDb, async (db) => {
+    // Use seeded organizations - no setup needed
+    const primaryOrgId = SEED_TEST_IDS.ORGANIZATIONS.primary;
+    const { ctx } = await createTestContext(db, primaryOrgId);
+    const caller = appRouter.createCaller(ctx);
+
     // Real database operations with actual constraints
-    const caller = appRouter.createCaller(realContext);
-    const result = await caller.procedure.call(input);
-    
-    // Verify in actual database
-    const dbRecord = await db.query.table.findFirst({
-      where: eq(schema.table.id, result.id)
+    const result = await caller.issues.create({
+      title: "Test Issue",
+      description: "Integration test with seed data",
+    });
+
+    // Verify in actual database with predictable seeded context
+    const dbRecord = await db.query.issues.findFirst({
+      where: eq(schema.issues.id, result.id),
     });
     expect(dbRecord).toBeDefined();
+    expect(dbRecord.organizationId).toBe(primaryOrgId);
   });
 });
 ```
@@ -71,6 +84,7 @@ test("real database integration", async ({ workerDb }) => {
 ## 🚨 **Critical Memory Safety Patterns (Phase 3.3 Validated)**
 
 **❌ NEVER USE** (causes system lockups):
+
 ```typescript
 beforeEach(async () => {
   const { db } = await createSeededTestDatabase(); // 50-100MB per test - DANGEROUS
@@ -78,6 +92,7 @@ beforeEach(async () => {
 ```
 
 **✅ ALWAYS USE** (memory-safe, Phase 3.3 proven):
+
 ```typescript
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
 
@@ -99,6 +114,7 @@ test("memory-safe pattern", async ({ workerDb }) => {
 **Root Cause**: RLS context not properly established in real PGlite tests
 
 **❌ Problematic Pattern**:
+
 ```typescript
 // Real PGlite without proper RLS context
 const result = await caller.assignOwner({
@@ -110,13 +126,14 @@ const result = await caller.assignOwner({
 ```
 
 **✅ Required Fix Pattern**:
+
 ```typescript
 // Proper RLS context establishment needed
 await withIsolatedTest(workerDb, async (db) => {
   // Set RLS context BEFORE operations
   await db.execute(sql`SET app.current_organization_id = ${organizationId}`);
   await db.execute(sql`SET app.current_user_id = ${userId}`);
-  
+
   const caller = appRouter.createCaller(contextWithRLS);
   // Now RLS boundaries properly enforced
 });
@@ -127,7 +144,10 @@ await withIsolatedTest(workerDb, async (db) => {
 **Proven in Phase 3.3e**: Complete standardization across service layer tests
 
 ```typescript
-import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
+import {
+  SEED_TEST_IDS,
+  createMockAdminContext,
+} from "~/test/constants/seed-test-ids";
 
 // Consistent test IDs across all patterns
 export const mockData = {
@@ -135,9 +155,14 @@ export const mockData = {
   userId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
   machineId: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
 };
+
+// Helper for consistent mock context
+const mockContext = createMockAdminContext();
+// Uses: organizationId: "test-org-pinpoint", userId: "test-user-tim"
 ```
 
 **Benefits Validated**:
+
 - Predictable debugging ("mock-org-1 is failing" vs random UUIDs)
 - Stable test relationships
 - Cross-language consistency (TypeScript → SQL → Seed data)
@@ -147,12 +172,14 @@ export const mockData = {
 ## 🎯 **Archetype Selection Guide (Phase 3.3 Updated)**
 
 **Use Archetype 5 (Mocked tRPC Router) when**:
+
 - Testing complex router logic
 - Permission scenario validation
 - Rapid feedback needed
 - Complex organizational boundary simulation
 
 **Use Archetype 3 (Real PGlite) when**:
+
 - Testing database constraints
 - Multi-table workflow validation
 - True organizational boundary enforcement needed
@@ -167,10 +194,11 @@ This file now contains **validated safe patterns** from Phase 3.3. Use the docum
 **👉 [archetype-integration-testing.md](./archetype-integration-testing.md)** - Complete archetype documentation
 
 **Phase 3.3 Validated Benefits**:
+
 - **🚨 Memory safety confirmed** (prevents 1-2GB+ memory usage and system lockups)
 - **Worker-scoped PGlite patterns** (MANDATORY for Archetype 3)
 - **RLS session context management** (requires proper setup for real PGlite)
-- **Agent assignment validated** (`integration-test-architect`) 
+- **Agent assignment validated** (`integration-test-architect`)
 - **Conversion procedures proven** through systematic implementation
 
 ---
@@ -529,61 +557,72 @@ describe("Issue Workflow Integration", () => {
 
 ### RLS Policy Testing (Modern Pattern)
 
-Using memory-safe PGlite with RLS session helpers:
+Using memory-safe PGlite with SEED_TEST_IDS and RLS session helpers:
 
 ```typescript
-import { test, withIsolatedTest, rlsContexts } from "~/test/helpers/worker-scoped-db";
+import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
 test("RLS enforces organizational boundaries", async ({ workerDb }) => {
   await withIsolatedTest(workerDb, async (db) => {
-    // Create data in org-1 context
-    await rlsContexts.admin(db, "org-1");
-    const [org1Issue] = await db.insert(issues).values({
-      title: "Org 1 Confidential Issue",
-      priority: "high"
-    }).returning();
+    // Use seeded organizations for predictable testing
+    const primaryOrgId = SEED_TEST_IDS.ORGANIZATIONS.primary;
+    const competitorOrgId = SEED_TEST_IDS.ORGANIZATIONS.competitor;
 
-    // Create data in org-2 context  
-    await rlsContexts.admin(db, "org-2");
-    const [org2Issue] = await db.insert(issues).values({
-      title: "Org 2 Confidential Issue",
-      priority: "low"
-    }).returning();
+    // Create data in primary org context
+    const { ctx: primaryCtx } = await createTestContext(db, primaryOrgId);
+    const primaryCaller = appRouter.createCaller(primaryCtx);
+    const primaryIssue = await primaryCaller.issues.create({
+      title: "Primary Org Confidential Issue",
+      priority: "high",
+    });
 
-    // Verify complete isolation - org-2 context only sees org-2 data
-    const org2VisibleIssues = await db.query.issues.findMany();
-    expect(org2VisibleIssues).toHaveLength(1);
-    expect(org2VisibleIssues[0].id).toBe(org2Issue.id);
-    
-    // Switch to org-1 context and verify isolation
-    await rlsContexts.admin(db, "org-1");
-    const org1VisibleIssues = await db.query.issues.findMany();
-    expect(org1VisibleIssues).toHaveLength(1);
-    expect(org1VisibleIssues[0].id).toBe(org1Issue.id);
+    // Create data in competitor org context
+    const { ctx: competitorCtx } = await createTestContext(db, competitorOrgId);
+    const competitorCaller = appRouter.createCaller(competitorCtx);
+    const competitorIssue = await competitorCaller.issues.create({
+      title: "Competitor Org Confidential Issue",
+      priority: "low",
+    });
+
+    // Verify complete isolation - competitor context only sees competitor data
+    const competitorVisibleIssues = await competitorCaller.issues.getAll();
+    expect(competitorVisibleIssues).toHaveLength(1);
+    expect(competitorVisibleIssues[0].id).toBe(competitorIssue.id);
+    expect(competitorVisibleIssues[0].organizationId).toBe(competitorOrgId);
+
+    // Primary context only sees primary data
+    const primaryVisibleIssues = await primaryCaller.issues.getAll();
+    expect(primaryVisibleIssues).toHaveLength(1);
+    expect(primaryVisibleIssues[0].id).toBe(primaryIssue.id);
+    expect(primaryVisibleIssues[0].organizationId).toBe(primaryOrgId);
   });
 });
 
-test("multi-context testing with helper", async ({ workerDb }) => {
-  await withMultiOrgTest(
+test("cross-org boundary testing with seeded orgs", async ({ workerDb }) => {
+  await withCrossOrgTest(
     workerDb,
     [
-      { orgId: "org-1", role: "admin", userId: "admin-1" },
-      { orgId: "org-2", role: "member", userId: "member-2" }
+      { orgId: SEED_TEST_IDS.ORGANIZATIONS.primary, role: "admin" },
+      { orgId: SEED_TEST_IDS.ORGANIZATIONS.competitor, role: "member" },
     ],
-    async (setContext, db) => {
-      // Start in org-1 as admin
-      await setContext(0);
-      await db.insert(issues).values({ title: "Admin Issue" });
-      
-      // Switch to org-2 as member  
-      await setContext(1);
-      await db.insert(issues).values({ title: "Member Issue" });
-      
+    async (contexts, db) => {
+      // Start in primary org as admin
+      const [primaryCaller, competitorCaller] = contexts;
+
+      await primaryCaller.issues.create({ title: "Primary Admin Issue" });
+      await competitorCaller.issues.create({
+        title: "Competitor Member Issue",
+      });
+
       // Each context only sees their own org's data
-      const org2Issues = await db.query.issues.findMany();
-      expect(org2Issues).toHaveLength(1);
-      expect(org2Issues[0].title).toBe("Member Issue");
-    }
+      const competitorIssues = await competitorCaller.issues.getAll();
+      expect(competitorIssues).toHaveLength(1);
+      expect(competitorIssues[0].title).toBe("Competitor Member Issue");
+      expect(competitorIssues[0].organizationId).toBe(
+        SEED_TEST_IDS.ORGANIZATIONS.competitor,
+      );
+    },
   );
 });
 ```
@@ -599,12 +638,14 @@ describe("Manual Organization Filtering (Legacy)", () => {
     const issues = await db.query.issues.findMany({
       where: and(
         eq(issues.organizationId, ctx.organization.id), // Manual filter
-        eq(issues.statusId, input.statusId)
-      )
+        eq(issues.statusId, input.statusId),
+      ),
     });
-    
+
     // OLD: Manual validation required
-    expect(issues.every(i => i.organizationId === ctx.organization.id)).toBe(true);
+    expect(issues.every((i) => i.organizationId === ctx.organization.id)).toBe(
+      true,
+    );
   });
 });
 ```

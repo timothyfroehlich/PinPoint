@@ -10,6 +10,7 @@
 ## When to Use This Archetype
 
 ✅ **Perfect for**:
+
 - Pure utility functions
 - React component behavior
 - Business logic calculations
@@ -19,8 +20,9 @@
 - Hook testing (without external services)
 
 ❌ **Wrong archetype for**:
+
 - Database queries → Use Integration Testing Archetype
-- tRPC procedures → Use Integration Testing Archetype  
+- tRPC procedures → Use Integration Testing Archetype
 - Security boundaries → Use Security Testing Archetype
 - Multi-table operations → Use Integration Testing Archetype
 
@@ -222,7 +224,7 @@ describe("ScoringService.calculateIssuePriority", () => {
   it("caps age penalty at 7 days", () => {
     const score7Days = ScoringService.calculateIssuePriority({
       severity: "medium",
-      machineUsage: "medium", 
+      machineUsage: "medium",
       reportCount: 1,
       daysSinceReport: 7,
     });
@@ -319,20 +321,17 @@ describe("Permission Utils", () => {
     });
 
     it("combines role and additional permissions", () => {
-      const result = combinePermissions(
-        ["issue:view"], 
-        ["machine:edit"]
-      );
+      const result = combinePermissions(["issue:view"], ["machine:edit"]);
       expect(result).toContain("issue:view");
       expect(result).toContain("machine:edit");
     });
 
     it("removes duplicates", () => {
       const result = combinePermissions(
-        ["issue:view"], 
-        ["issue:view", "machine:edit"]
+        ["issue:view"],
+        ["issue:view", "machine:edit"],
       );
-      const viewCount = result.filter(p => p === "issue:view").length;
+      const viewCount = result.filter((p) => p === "issue:view").length;
       expect(viewCount).toBe(1);
     });
   });
@@ -409,7 +408,7 @@ describe('IssueCard', () => {
 
   it('calls onEdit when edit button is clicked', () => {
     const onEdit = vi.fn();
-    
+
     render(
       <VitestTestWrapper
         userPermissions={VITEST_PERMISSION_SCENARIOS.ADMIN}
@@ -554,12 +553,12 @@ describe("useDebounce", () => {
 
     // Change value before timeout
     rerender({ value: "second", delay: 500 });
-    
+
     // Advance part way
     act(() => {
       vi.advanceTimersByTime(250);
     });
-    
+
     expect(result.current).toBe("first"); // Still original
 
     // Advance to complete new timeout
@@ -574,21 +573,101 @@ describe("useDebounce", () => {
 
 ---
 
-## Pattern 5: Type-Safe Mocking
+## Pattern 5: Consistent Test Data with SEED_TEST_IDS
+
+### Mock Patterns for Unit Tests
+
+```typescript
+// src/server/api/routers/__tests__/machine.test.ts
+import {
+  SEED_TEST_IDS,
+  createMockAdminContext,
+} from "~/test/constants/seed-test-ids";
+import { machineRouter } from "../machine";
+
+describe("Machine Router Unit Tests", () => {
+  // Consistent mock context using SEED_TEST_IDS
+  const mockContext = createMockAdminContext();
+  // Uses: organizationId: "test-org-pinpoint", userId: "test-user-tim"
+
+  const mockMachineData = {
+    id: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
+    name: "Test Machine",
+    organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+    locationId: SEED_TEST_IDS.MOCK_PATTERNS.LOCATION,
+    model: "Stern Pinball",
+  };
+
+  it("creates machine with consistent mock data", async () => {
+    const caller = machineRouter.createCaller(mockContext);
+
+    // Mock database operations with predictable IDs
+    vi.mocked(mockDb.insert).mockReturnValue({
+      values: vi.fn().mockReturnValue({
+        returning: vi.fn().mockResolvedValue([mockMachineData]),
+      }),
+    });
+
+    const result = await caller.create({
+      name: "Test Machine",
+      model: "Stern Pinball",
+    });
+
+    expect(result.id).toBe(SEED_TEST_IDS.MOCK_PATTERNS.MACHINE);
+    expect(result.organizationId).toBe(mockContext.organizationId);
+  });
+});
+```
+
+### Benefits of MOCK_PATTERNS
+
+```typescript
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
+
+// ✅ Predictable debugging
+const mockIssue = {
+  id: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE, // "mock-issue-1"
+  title: "Test Issue",
+  machineId: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE, // "mock-machine-1"
+};
+// Error message: "mock-issue-1 is failing" vs random UUID
+
+// ✅ Consistent relationships
+const mockData = {
+  organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+  userId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+  machineId: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
+  // Same IDs across all unit tests
+};
+
+// ✅ Helper functions for common scenarios
+const createMockIssue = (overrides = {}) => ({
+  id: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
+  title: "Test Issue",
+  organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+  machineId: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
+  createdBy: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+  ...overrides,
+});
+```
+
+---
+
+## Pattern 6: Type-Safe Mocking
 
 ### Partial Module Mocking
 
 ```typescript
 // src/services/__tests__/reportService.test.ts
-import type * as IssueServiceModule from '@/server/services/issueService';
+import type * as IssueServiceModule from "@/server/services/issueService";
 
 // Type-safe partial mocking
-vi.mock('@/server/services/issueService', async (importOriginal) => {
+vi.mock("@/server/services/issueService", async (importOriginal) => {
   const actual = await importOriginal<typeof IssueServiceModule>();
   return {
     ...actual,
     IssueService: vi.fn().mockImplementation(() => ({
-      create: vi.fn().mockResolvedValue({ id: '1', title: 'Mock Issue' }),
+      create: vi.fn().mockResolvedValue({ id: "1", title: "Mock Issue" }),
       findByStatus: vi.fn().mockResolvedValue([]),
       // Keep real business logic for testing
       calculatePriority: actual.IssueService.prototype.calculatePriority,
@@ -596,13 +675,13 @@ vi.mock('@/server/services/issueService', async (importOriginal) => {
   };
 });
 
-describe('ReportService', () => {
-  it('generates priority report using real calculation logic', async () => {
+describe("ReportService", () => {
+  it("generates priority report using real calculation logic", async () => {
     const reportService = new ReportService();
-    
+
     // This test uses real calculatePriority logic with mocked data fetching
     const report = await reportService.generatePriorityReport();
-    
+
     expect(report).toBeDefined();
     // Test the report structure, knowing priority calculations are real
   });
@@ -633,7 +712,9 @@ const mockDb = {
 ```typescript
 // ❌ BAD: Testing private methods
 class IssueService {
-  private formatTitle(title: string) { /* ... */ }
+  private formatTitle(title: string) {
+    /* ... */
+  }
 }
 // Don't test formatTitle directly
 
@@ -665,16 +746,19 @@ beforeEach(() => {
 ## Quality Guidelines
 
 ### Performance Targets
+
 - **<100ms per test**: Unit tests should execute extremely quickly
 - **Minimal setup**: Keep beforeEach/beforeAll lightweight
 - **Parallel execution**: Tests should be completely independent
 
 ### Test Structure
+
 - **Arrange-Act-Assert**: Clear three-phase structure
 - **One concept per test**: Each test validates a single behavior
 - **Descriptive names**: Test name explains the scenario being tested
 
 ### Best Practices
+
 1. **Test behavior, not implementation**: Focus on what the code does
 2. **Use real implementations when possible**: Only mock external dependencies
 3. **Keep tests focused**: One responsibility per test
@@ -688,6 +772,7 @@ beforeEach(() => {
 **This archetype is handled by**: `unit-test-architect`
 
 **Agent responsibilities**:
+
 - Ensure sub-100ms execution times
 - Implement type-safe mocking patterns
 - Test component behavior and permission-based rendering
@@ -695,6 +780,7 @@ beforeEach(() => {
 - Maintain testing patterns that resist refactoring
 
 **Quality validation**:
+
 - No database operations in unit tests
 - All mocks use type-safe patterns
 - Tests focus on behavior, not implementation
@@ -705,12 +791,14 @@ beforeEach(() => {
 ## When to Escalate to Other Archetypes
 
 **Switch to Integration Testing Archetype when**:
+
 - Test involves database queries
 - Testing tRPC procedures
 - Need to validate multi-table operations
 - Testing complete user workflows
 
 **Switch to Security Testing Archetype when**:
+
 - Testing organizational boundaries
 - Validating permission enforcement
 - Testing cross-tenant isolation

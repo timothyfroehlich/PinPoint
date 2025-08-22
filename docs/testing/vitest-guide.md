@@ -14,16 +14,19 @@ This guide consolidates all Vitest testing patterns, mocking strategies, and per
 ### Testing Archetype Mapping
 
 **Unit Testing Archetype** → `unit-test-architect`
+
 - **Vitest Patterns**: Component testing, mock factories, pure function testing
 - **Focus**: Fast execution, isolated testing, type-safe mocking
 - **See**: [archetype-unit-testing.md](./archetype-unit-testing.md)
 
-**Integration Testing Archetype** → `integration-test-architect`  
+**Integration Testing Archetype** → `integration-test-architect`
+
 - **Vitest Patterns**: Service layer testing, multi-tenant validation, dependency injection
 - **Focus**: Real database operations, transaction isolation, memory safety
 - **See**: [archetype-integration-testing.md](./archetype-integration-testing.md)
 
 **Security Testing Archetype** → `security-test-architect`
+
 - **Vitest Patterns**: Permission testing, RLS validation, cross-org isolation
 - **Focus**: Security boundaries, policy enforcement, compliance testing
 - **See**: [archetype-security-testing.md](./archetype-security-testing.md)
@@ -72,6 +75,29 @@ const { mockData } = vi.hoisted(() => ({ mockData: { id: 1 } }));
 beforeEach(() => vi.clearAllMocks());
 ```
 
+### Consistent Test Data with SEED_TEST_IDS
+
+```typescript
+import {
+  SEED_TEST_IDS,
+  createMockAdminContext,
+} from "~/test/constants/seed-test-ids";
+
+// ✅ Predictable mock data for unit tests
+const mockContext = createMockAdminContext();
+// Uses: organizationId: "test-org-pinpoint", userId: "test-user-tim"
+
+const mockData = {
+  organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION, // "mock-org-1"
+  userId: SEED_TEST_IDS.MOCK_PATTERNS.USER, // "mock-user-1"
+  machineId: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE, // "mock-machine-1"
+  issueId: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE, // "mock-issue-1"
+};
+
+// ✅ Benefits: Predictable debugging vs random UUIDs
+// "mock-machine-1 is failing" vs "a7b2c3d4-e5f6-g7h8-i9j0-k1l2m3n4o5p6"
+```
+
 ### Performance Data (Real Migration Results)
 
 - **7-65x faster** than Jest on pure functions
@@ -82,6 +108,7 @@ beforeEach(() => vi.clearAllMocks());
 ### 🎯 Archetype-Specific Patterns
 
 **Unit Testing Archetype** (handled by `unit-test-architect`):
+
 ```typescript
 // Fast, isolated patterns - no database
 import { describe, it, expect, vi } from "vitest";
@@ -99,6 +126,7 @@ test("component rendering", () => {
 ```
 
 **Integration Testing Archetype** (handled by `integration-test-architect`):
+
 ```typescript
 // Memory-safe database testing - NO per-test PGlite instances
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
@@ -111,6 +139,7 @@ test("database operations", async ({ workerDb }) => {
 ```
 
 **Security Testing Archetype** (handled by `security-test-architect`):
+
 ```typescript
 // RLS policy and boundary testing
 test("organizational isolation", async ({ workerDb }) => {
@@ -528,11 +557,12 @@ const mockResult = { id: 1, name: "Test" }; // Only selected fields
 
 ```
 ┌─ No database needed? ──→ Unit Testing Archetype + Vitest mocking patterns
-├─ Database operations? ──→ Integration Testing Archetype + memory-safe PGlite  
+├─ Database operations? ──→ Integration Testing Archetype + memory-safe PGlite
 └─ Security boundaries? ──→ Security Testing Archetype + RLS validation patterns
 ```
 
 **Cross-references**:
+
 - **[archetype-unit-testing.md](./archetype-unit-testing.md)** - Pure functions, React components, business logic
 - **[archetype-integration-testing.md](./archetype-integration-testing.md)** - Database operations, memory safety
 - **[archetype-security-testing.md](./archetype-security-testing.md)** - Security boundaries, RLS policies

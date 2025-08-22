@@ -55,6 +55,7 @@ GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO integration_tester;
 Test roles should only exist in test environments:
 
 **`.env.test`**:
+
 ```env
 # pgTAP tests use superuser for role switching
 DATABASE_URL="postgresql://integration_tester:testpassword@localhost:5432/postgres"
@@ -91,6 +92,7 @@ npm run generate:sql-constants
 ```
 
 **Generated functions** (from [`SEED_TEST_IDS`](../../src/test/constants/seed-test-ids.ts)):
+
 ```sql
 -- Organization functions
 CREATE OR REPLACE FUNCTION test_org_primary() RETURNS TEXT AS $$ SELECT 'test-org-pinpoint'::TEXT $$ LANGUAGE SQL IMMUTABLE;
@@ -101,7 +103,7 @@ CREATE OR REPLACE FUNCTION test_user_admin() RETURNS TEXT AS $$ SELECT 'test-use
 CREATE OR REPLACE FUNCTION test_user_member1() RETURNS TEXT AS $$ SELECT 'test-user-harry'::TEXT $$ LANGUAGE SQL IMMUTABLE;
 
 -- Helper functions for JWT claims
-CREATE OR REPLACE FUNCTION set_jwt_claims_for_test(org_id TEXT, user_id TEXT DEFAULT NULL, role_name TEXT DEFAULT 'member', permissions TEXT[] DEFAULT ARRAY['issue:view']) 
+CREATE OR REPLACE FUNCTION set_jwt_claims_for_test(org_id TEXT, user_id TEXT DEFAULT NULL, role_name TEXT DEFAULT 'member', permissions TEXT[] DEFAULT ARRAY['issue:view'])
 RETURNS VOID AS $$
 BEGIN
   PERFORM set_config('request.jwt.claims', json_build_object(
@@ -122,6 +124,8 @@ $$ LANGUAGE plpgsql;
 
 ### Pattern 1: Basic Organizational Isolation with SEED_TEST_IDS
 
+**Benefits**: Predictable cross-org boundary testing with consistent "test-org-pinpoint" vs "test-org-competitor" IDs
+
 ```sql
 -- supabase/tests/rls/issues.test.sql
 BEGIN;
@@ -133,7 +137,8 @@ BEGIN;
 SELECT plan(6);
 
 -- Setup: Create test organizations and data using hardcoded IDs
-INSERT INTO organizations (id, name) VALUES 
+-- Dual-organization architecture enables comprehensive RLS boundary testing
+INSERT INTO organizations (id, name) VALUES
   (test_org_primary(), 'Austin Pinball Collective'),
   (test_org_competitor(), 'Competitor Arcade');
 
@@ -210,14 +215,14 @@ SELECT plan(8);
 
 -- Setup test data using hardcoded IDs
 INSERT INTO organizations (id, name) VALUES (test_org_primary(), 'Austin Pinball Collective');
-INSERT INTO issues (id, title, organization_id) VALUES 
+INSERT INTO issues (id, title, organization_id) VALUES
   (test_issue_primary(), 'Admin Test Issue', test_org_primary());
 
 -- Test admin role permissions
 SET LOCAL role = 'authenticated';
 SELECT set_jwt_claims_for_test(
-  test_org_primary(), 
-  test_user_admin(), 
+  test_org_primary(),
+  test_user_admin(),
   'admin',
   ARRAY['issue:view', 'issue:create', 'issue:delete']
 );
@@ -234,13 +239,13 @@ PREPARE admin_delete AS DELETE FROM issues WHERE id = test_issue_primary();
 SELECT lives_ok('admin_delete', 'Admin can delete issues');
 
 -- Re-create for member tests
-INSERT INTO issues (id, title, organization_id) VALUES 
+INSERT INTO issues (id, title, organization_id) VALUES
   (test_issue_member(), 'Member Test Issue', test_org_primary());
 
 -- Test member role permissions
 SELECT set_jwt_claims_for_test(
-  test_org_primary(), 
-  test_user_member1(), 
+  test_org_primary(),
+  test_user_member1(),
   'member',
   ARRAY['issue:view', 'issue:create']
 );
@@ -253,7 +258,7 @@ SELECT results_eq(
 );
 
 -- Member can create
-PREPARE member_create AS 
+PREPARE member_create AS
   INSERT INTO issues (title, organization_id) VALUES ('Member Issue', test_org_primary());
 SELECT lives_ok('member_create', 'Member can create issues');
 
@@ -268,8 +273,8 @@ SELECT throws_ok(
 
 -- Test guest role (minimal permissions)
 SELECT set_jwt_claims_for_test(
-  test_org_primary(), 
-  test_user_guest(), 
+  test_org_primary(),
+  test_user_guest(),
   'guest',
   ARRAY['issue:view']
 );
@@ -281,7 +286,7 @@ SELECT ok(
 );
 
 -- Guest cannot create
-PREPARE guest_create AS 
+PREPARE guest_create AS
   INSERT INTO issues (title, organization_id) VALUES ('Guest Issue', test_org_primary());
 SELECT throws_ok(
   'guest_create',
@@ -306,7 +311,7 @@ BEGIN;
 SELECT plan(5);
 
 -- Setup hierarchical data using hardcoded IDs
-INSERT INTO organizations (id, name) VALUES 
+INSERT INTO organizations (id, name) VALUES
   (test_org_primary(), 'Austin Pinball Collective'),
   (test_org_competitor(), 'Competitor Arcade');
 
@@ -328,10 +333,10 @@ SELECT set_jwt_claims_for_test(test_org_primary(), test_user_member1());
 
 -- User sees only their org's data through relationships
 SELECT results_eq(
-  $$SELECT i.id 
-    FROM issues i 
-    JOIN machines m ON i.machine_id = m.id 
-    JOIN locations l ON m.location_id = l.id 
+  $$SELECT i.id
+    FROM issues i
+    JOIN machines m ON i.machine_id = m.id
+    JOIN locations l ON m.location_id = l.id
     ORDER BY i.id$$,
   ARRAY[test_issue_primary()],
   'Relationships respect organizational boundaries'
@@ -339,7 +344,7 @@ SELECT results_eq(
 
 -- Cannot create issue referencing other org machine
 PREPARE cross_org_issue AS
-  INSERT INTO issues (title, machine_id, organization_id) 
+  INSERT INTO issues (title, machine_id, organization_id)
   VALUES ('Cross Org Issue', test_machine_competitor(), test_org_primary());
 
 SELECT throws_ok(
@@ -356,9 +361,9 @@ SELECT results_eq(
   'Aggregations respect org boundaries'
 );
 
--- Test subqueries are scoped  
+-- Test subqueries are scoped
 SELECT results_eq(
-  $$SELECT COUNT(*)::int FROM issues 
+  $$SELECT COUNT(*)::int FROM issues
     WHERE machine_id IN (SELECT id FROM machines)$$,
   $$VALUES (1)$$,
   'Subqueries respect org boundaries'
@@ -367,7 +372,7 @@ SELECT results_eq(
 -- Test CTEs are scoped
 SELECT results_eq(
   $$WITH org_machines AS (SELECT id FROM machines)
-    SELECT COUNT(*)::int FROM issues 
+    SELECT COUNT(*)::int FROM issues
     WHERE machine_id IN (SELECT id FROM org_machines)$$,
   $$VALUES (1)$$,
   'CTEs respect org boundaries'
@@ -389,7 +394,7 @@ BEGIN;
 SELECT plan(4);
 
 -- Setup edge case data using hardcoded IDs
-INSERT INTO organizations (id, name) VALUES 
+INSERT INTO organizations (id, name) VALUES
   (test_org_primary(), 'Austin Pinball Collective'),
   (test_org_competitor(), 'Competitor Arcade');
 
@@ -412,7 +417,7 @@ SELECT results_eq(
 SELECT set_jwt_claims_for_test(test_org_competitor());
 
 PREPARE info_disclosure AS
-  INSERT INTO issues (title, machine_id, organization_id) 
+  INSERT INTO issues (title, machine_id, organization_id)
   VALUES ('Probe', test_machine_primary(), test_org_competitor());
 
 -- Error should not reveal information about other orgs
@@ -449,6 +454,7 @@ ROLLBACK;
 ### Local Test Runner
 
 **`supabase/tests/run-tests.sh`**:
+
 ```bash
 #!/bin/bash
 set -e
@@ -512,7 +518,7 @@ on: [push, pull_request]
 jobs:
   rls-tests:
     runs-on: ubuntu-latest
-    
+
     services:
       postgres:
         image: supabase/postgres:15
@@ -526,7 +532,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Install pgTAP
         run: |
           sudo apt-get update
@@ -586,16 +592,16 @@ SELECT set_jwt_claims_for_test(test_org_primary());
 
 -- With role and user information
 SELECT set_jwt_claims_for_test(
-  test_org_primary(), 
-  test_user_admin(), 
+  test_org_primary(),
+  test_user_admin(),
   'admin',
   ARRAY['issue:view', 'issue:create', 'issue:delete']
 );
 
 -- Member with limited permissions
 SELECT set_jwt_claims_for_test(
-  test_org_competitor(), 
-  test_user_member1(), 
+  test_org_competitor(),
+  test_user_member1(),
   'member',
   ARRAY['issue:view', 'issue:create']
 );
@@ -617,26 +623,30 @@ SELECT set_jwt_claims_for_test(
 ### Common Issues
 
 **pgTAP not found**:
+
 ```sql
 -- Install pgTAP extension
 CREATE EXTENSION IF NOT EXISTS pgtap;
 ```
 
 **Permission denied errors**:
+
 ```bash
 # Ensure test roles have proper permissions
 GRANT USAGE ON SCHEMA public TO authenticated;
 ```
 
 **RLS policy not working**:
+
 ```sql
 -- Verify RLS is enabled
-SELECT schemaname, tablename, rowsecurity 
-FROM pg_tables 
+SELECT schemaname, tablename, rowsecurity
+FROM pg_tables
 WHERE rowsecurity = true;
 ```
 
 **JWT claims not set**:
+
 ```sql
 -- Check current JWT claims
 SELECT current_setting('request.jwt.claims', true);
@@ -645,13 +655,15 @@ SELECT current_setting('request.jwt.claims', true);
 ### Debugging Tips
 
 1. **Check policy definitions**:
+
    ```sql
    SELECT schemaname, tablename, policyname, permissive, roles, cmd, qual, with_check
-   FROM pg_policies 
+   FROM pg_policies
    WHERE tablename = 'your_table';
    ```
 
 2. **Verify role settings**:
+
    ```sql
    SELECT current_user, session_user, current_setting('role');
    ```
@@ -678,6 +690,7 @@ See [dual-track-testing-strategy.md](./dual-track-testing-strategy.md) for compl
 ## Migration from Current Patterns
 
 ### Before (Application-level testing)
+
 ```typescript
 test("org isolation", async () => {
   const org1Issues = await getIssuesForOrg("org-1");
@@ -687,18 +700,20 @@ test("org isolation", async () => {
 ```
 
 ### After (pgTAP RLS testing with SEED_TEST_IDS)
+
 ```sql
 -- Direct RLS policy validation with generated constants
 \i constants.sql
 SELECT set_jwt_claims_for_test(test_org_primary());
 SELECT results_eq(
-  'SELECT organization_id FROM issues', 
+  'SELECT organization_id FROM issues',
   ARRAY[test_org_primary()],
   'Primary org user sees only their issues'
 );
 ```
 
 **Key Benefits of Generated Constants:**
+
 - **Consistency**: Same IDs used in TypeScript tests, SQL tests, and seed data
 - **Predictability**: "test-org-pinpoint" instead of random UUIDs for debugging
 - **Maintainability**: Single source of truth in [`SEED_TEST_IDS`](../../src/test/constants/seed-test-ids.ts)

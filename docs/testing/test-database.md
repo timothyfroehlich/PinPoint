@@ -48,19 +48,21 @@ export async function withIsolatedTest<T>(
   db: ReturnType<typeof drizzle>,
   testFn: (db: ReturnType<typeof drizzle>) => Promise<T>,
 ): Promise<T> {
-  return await db.transaction(async (tx) => {
-    try {
-      return await testFn(tx);
-    } finally {
-      // Transaction rollback provides automatic cleanup
-      throw new Error("Test transaction rollback");
-    }
-  }).catch((error) => {
-    if (error.message === "Test transaction rollback") {
-      return; // Expected rollback
-    }
-    throw error; // Re-throw actual errors
-  });
+  return await db
+    .transaction(async (tx) => {
+      try {
+        return await testFn(tx);
+      } finally {
+        // Transaction rollback provides automatic cleanup
+        throw new Error("Test transaction rollback");
+      }
+    })
+    .catch((error) => {
+      if (error.message === "Test transaction rollback") {
+        return; // Expected rollback
+      }
+      throw error; // Re-throw actual errors
+    });
 }
 
 // Vitest test helper with proper types
@@ -160,8 +162,9 @@ npm install @electric-sql/pglite --save-dev
 PinPoint uses a **hardcoded ID approach** for test data to provide consistency and predictability across all test environments (CI, local, pgTAP).
 
 **Key Benefits:**
+
 - 🎯 **Consistent debugging**: "machine-mm-001 is failing" instead of random UUIDs
-- 🔗 **Stable relationships**: Foreign keys never break due to ID changes  
+- 🔗 **Stable relationships**: Foreign keys never break due to ID changes
 - ⚡ **Fast tests**: No random generation overhead
 - 🔄 **Cross-language compatibility**: Same IDs in TypeScript and SQL tests
 
@@ -170,19 +173,20 @@ PinPoint uses a **hardcoded ID approach** for test data to provide consistency a
 ```
 Minimal Seed (Foundation)
 ├── 2 organizations (primary + competitor)
-├── ~8 test users (admin, members, guests)  
+├── ~8 test users (admin, members, guests)
 ├── ~10 machines across different games
 ├── ~20 sample issues
 └── All infrastructure (roles, statuses, priorities)
 
 Full Seed (Additive)
-├── Minimal seed (always included) 
+├── Minimal seed (always included)
 ├── +50 additional machines
 ├── +180 additional issues
 └── Rich sample data for demos
 ```
 
 **Usage:**
+
 - **Development/CI**: Uses minimal seed (fast, essential data)
 - **Preview environments**: Uses full seed (rich demonstration data)
 - **Tests**: Always use minimal as foundation, add specific data as needed
@@ -193,41 +197,67 @@ Full Seed (Additive)
 
 ```typescript
 // Example usage in tests
-import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
+import {
+  SEED_TEST_IDS,
+  createMockAdminContext,
+} from "~/test/constants/seed-test-ids";
 
-// Unit tests - use mock patterns
-const mockOrg = SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION;
+// Unit tests - use mock patterns with standardized helpers
+const mockContext = createMockAdminContext();
+// Uses: organizationId: "test-org-pinpoint", userId: "test-user-tim"
 
-// Integration tests - use real seeded data  
-const seededData = await getSeededTestData(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
-expect(result.machineId).toBe(seededData.machine);
+const mockData = {
+  organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+  machineId: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
+  issueId: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
+};
+
+// Integration tests - use seeded organizations directly
+const primaryOrgId = SEED_TEST_IDS.ORGANIZATIONS.primary;
+const { ctx } = await createTestContext(db, primaryOrgId);
+const caller = appRouter.createCaller(ctx);
 ```
 
 ### Two Organizations for Security Testing
 
 **Primary Organization**: `test-org-pinpoint` (Austin Pinball Collective)
+
 - Used for standard testing scenarios
 - Contains majority of seeded data
 - Default organization for single-org tests
 
-**Competitor Organization**: `test-org-competitor` (Competitor Arcade) 
+**Competitor Organization**: `test-org-competitor` (Competitor Arcade)
+
 - Used for RLS boundary testing
 - Enables cross-org isolation validation
 - Critical for multi-tenant security tests
 
 ```typescript
-// Example: Testing organizational boundaries
+// Example: Testing organizational boundaries with seeded data
+import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
+
 test("cross-org isolation", async ({ workerDb }) => {
   await withIsolatedTest(workerDb, async (db) => {
-    // Create data in primary org
-    await setOrgContext(db, SEED_TEST_IDS.ORGANIZATIONS.primary);
-    const issue1 = await createIssue(db, { title: "Primary Org Issue" });
-    
+    // Use seeded organizations for predictable testing
+    const primaryOrgId = SEED_TEST_IDS.ORGANIZATIONS.primary;
+    const competitorOrgId = SEED_TEST_IDS.ORGANIZATIONS.competitor;
+
+    // Create data in primary org using seeded context
+    const { ctx: primaryCtx } = await createTestContext(db, primaryOrgId);
+    const primaryCaller = appRouter.createCaller(primaryCtx);
+    const primaryIssue = await primaryCaller.issues.create({
+      title: "Primary Org Issue",
+    });
+
     // Switch to competitor org - should not see primary org data
-    await setOrgContext(db, SEED_TEST_IDS.ORGANIZATIONS.competitor);
-    const visibleIssues = await db.query.issues.findMany();
-    
-    expect(visibleIssues).not.toContainEqual(issue1);
+    const { ctx: competitorCtx } = await createTestContext(db, competitorOrgId);
+    const competitorCaller = appRouter.createCaller(competitorCtx);
+    const visibleIssues = await competitorCaller.issues.getAll();
+
+    // Competitor should only see their own data
+    expect(visibleIssues).toHaveLength(0);
+    expect(visibleIssues).not.toContainEqual(primaryIssue);
   });
 });
 ```
@@ -244,10 +274,11 @@ npm run generate:sql-constants
 ```
 
 **pgTAP usage example:**
+
 ```sql
 -- Use generated functions instead of hardcoded strings
 SELECT results_eq(
-  'SELECT organization_id FROM issues WHERE id = test_issue_primary()',  
+  'SELECT organization_id FROM issues WHERE id = test_issue_primary()',
   'SELECT test_org_primary()',
   'Issue belongs to primary organization'
 );
@@ -259,7 +290,7 @@ SELECT results_eq(
 # Development - minimal dataset (fast)
 npm run db:seed:local:sb
 
-# Preview - full dataset (comprehensive)  
+# Preview - full dataset (comprehensive)
 npm run db:seed:preview
 
 # CI - PostgreSQL only (no auth)
@@ -269,12 +300,14 @@ npm run db:seed:local:pg
 ### Best Practices
 
 **✅ DO:**
+
 - Use `SEED_TEST_IDS` constants for predictable IDs
 - Use `getSeededTestData()` for dynamic relationship IDs
 - Add minimal additional data only when tests require it
 - Use both organizations for security boundary testing
 
 **❌ DON'T:**
+
 - Create custom organizations unless testing multi-tenant scenarios
 - Use `nanoid()` or random IDs in seed data
 - Modify hardcoded IDs without updating all references

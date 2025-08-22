@@ -31,6 +31,7 @@
 
 - **Zero users**: No production data to migrate or preserve
 - **Schema in flux**: Core features and data models still being decided
+
 ```bash
 # ❌ NEVER CREATE MIGRATION FILES
 supabase/migrations/                    # Directory should remain empty
@@ -51,12 +52,14 @@ drizzle-kit generate                    # Don't run migration generation
 **CURRENT REALITY**: We're actively executing the migration plan from @migration-plan-v2/ and everything will be messy/broken until completion
 
 **EXPECTED TEMPORARY ISSUES:**
+
 - **🔥 313 failing tests**: Normal during migration - tests will be fixed in Phase 3
 - **⚠️ Mixed auth patterns**: Transitional state while implementing RLS
 - **🧩 Partial Prisma cleanup**: Being systematically removed following the plan
 - **📚 Multiple migration docs**: Part of planned phases, will be consolidated at end
 
 **MIGRATION PROGRESS (Following @migration-plan-v2/):**
+
 - ✅ **Phase 0**: Configuration audit - COMPLETE
 - ✅ **Phase 1**: Prisma removal - COMPLETE
 - ✅ **Phase 2**: RLS implementation - COMPLETE
@@ -65,6 +68,7 @@ drizzle-kit generate                    # Don't run migration generation
 - ⏳ **Phase 4**: Cleanup & consolidation
 
 **CRITICAL UNDERSTANDING:**
+
 - The 313 failing tests are **expected** and will remain broken until Phase 3
 - **NEW**: Testing architecture implemented (pgTAP for RLS + PGlite for business logic)
 - We're following the migration plan, not doing ad-hoc fixes
@@ -175,17 +179,80 @@ npm run test-file src/server/api/routers/__tests__/user.test.ts
 node scripts/validate-single-file.cjs FILE --verbose
 ```
 
-## 🧪 RLS Testing
+## 🎯 Seed Data Architecture (FOUNDATION PATTERN)
 
-**NEW**: `npm run test:rls` - pgTAP RLS policy validation
-**NEW**: `npm run test:all` - Complete testing (business logic + RLS)
+**CRITICAL**: All tests use hardcoded SEED_TEST_IDS for predictable debugging
+
+```typescript
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
+
+// Primary patterns
+SEED_TEST_IDS.ORGANIZATIONS.primary; // "test-org-pinpoint"
+SEED_TEST_IDS.ORGANIZATIONS.competitor; // "test-org-competitor"
+SEED_TEST_IDS.USERS.ADMIN; // "test-user-tim"
+SEED_TEST_IDS.MOCK_PATTERNS.MACHINE; // "mock-machine-1"
+```
+
+**Why**: Predictable debugging vs random UUIDs
+
+## 📐 Testing Archetypes (MANDATORY)
+
+**Every test must follow one archetype pattern**:
+
+1. Pure Function Unit Test
+2. Service Business Logic Test
+3. PGlite Integration Test (worker-scoped + seed data)
+4. React Component Unit Test
+5. tRPC Router Test (mock DB with RLS context)
+6. Permission/Auth Test
+7. RLS Policy Test (pgTAP)
+8. Schema/Database Constraint Test
+
+**Quality Gate**: No ad-hoc test patterns allowed
+
+## 🤖 Phase 3 Consultant Workflow (NO AD-HOC FIXES)
+
+**Specialized Agents**:
+
+- `unit-test-architect`: Foundation patterns (Archetypes 1 & 4)
+- `integration-test-architect`: Router conversions (Archetypes 2, 3 & 5)
+- `security-test-architect`: Security boundaries (Archetypes 6, 7 & 8)
+
+**Rule**: Analysis → Roadmap → Implementation (no shortcuts)
+
+## 🏢 Dual-Organization Testing
+
+**Infrastructure**:
+
+- Primary: "test-org-pinpoint" (Austin Pinball)
+- Competitor: "test-org-competitor" (Competitor Arcade)
+- Global OPDB catalog visible to both
+- Cross-org boundary validation ready
+
+**Usage**: Test organizational isolation with both orgs
+
+## 🧪 Testing Infrastructure
+
+**pgTAP RLS Testing**: `npm run test:rls` - Native PostgreSQL RLS validation
+**Business Logic**: Worker-scoped PGlite with BYPASSRLS role
+**Complete Testing**: `npm run test:all` - Both tracks together
+
+**Architecture**: pgTAP for security + PGlite for business logic
 
 ### Testing Architecture
 
 **⚠️ PGlite Cannot Test Real RLS Policies**
+
 - PGlite lacks Supabase's `auth.jwt()` functions that power RLS policies
 - Use **pgTAP** (`supabase/tests/rls/`) for actual RLS validation
 - Use **PGlite** (`src/test/helpers/worker-scoped-db.ts`) for business logic only (RLS bypassed)
+
+## 📚 Documentation Synchronization
+
+**WHEN TO UPDATE**: Any seed data or testing pattern changes
+
+**Critical Rule**: All examples must use SEED_TEST_IDS (no random IDs)
+**Files**: `docs/testing/`, `docs/quick-reference/`, `docs/developer-guides/`
 
 ## 📚 Quick Reference (Auto-Loaded)
 
