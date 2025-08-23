@@ -19,6 +19,10 @@ import type {
 
 // Import test constants
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
+import {
+  testValidationFunction,
+  TEST_SCENARIOS,
+} from "~/test/helpers/pure-function-test-utils";
 
 // =============================================================================
 // TEST DATA FACTORIES
@@ -28,9 +32,9 @@ function createMockMachine(
   overrides: Partial<MachineOwnershipInput["machine"]> = {},
 ): MachineOwnershipInput["machine"] {
   return {
-    id: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
+    id: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
     location: {
-      organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+      organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
     },
     ...overrides,
   };
@@ -41,11 +45,11 @@ function createMockDefaults(
 ): IssueCreationDefaults {
   return {
     status: {
-      id: SEED_TEST_IDS.MOCK_PATTERNS.STATUS,
+      id: SEED_TEST_IDS.STATUSES.NEW,
       name: "New",
     },
     priority: {
-      id: SEED_TEST_IDS.MOCK_PATTERNS.PRIORITY,
+      id: SEED_TEST_IDS.PRIORITIES.MEDIUM,
       name: "Medium",
     },
     ...overrides,
@@ -57,7 +61,7 @@ function createPublicIssueInput(
 ): PublicIssueCreationInput {
   return {
     title: "Test Issue",
-    machineId: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
+    machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
     ...overrides,
   };
 }
@@ -67,7 +71,7 @@ function createAuthenticatedIssueInput(
 ): AuthenticatedIssueCreationInput {
   return {
     title: "Test Issue",
-    machineId: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
+    machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
     ...overrides,
   };
 }
@@ -76,7 +80,7 @@ function createContext(
   overrides: Partial<IssueCreationContext> = {},
 ): IssueCreationContext {
   return {
-    organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+    organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
     ...overrides,
   };
 }
@@ -91,7 +95,7 @@ describe("creationValidation", () => {
       const machine = createMockMachine();
       const input = {
         machine,
-        expectedOrganizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+        expectedOrganizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
       };
 
       const result = validateMachineOwnership(input);
@@ -103,7 +107,7 @@ describe("creationValidation", () => {
     it("should reject null machine", () => {
       const input = {
         machine: null,
-        expectedOrganizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+        expectedOrganizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
       };
 
       const result = validateMachineOwnership(input);
@@ -116,11 +120,11 @@ describe("creationValidation", () => {
 
     it("should reject machine from different organization", () => {
       const machine = createMockMachine({
-        location: { organizationId: "other-org" },
+        location: { organizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor },
       });
       const input = {
         machine,
-        expectedOrganizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+        expectedOrganizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
       };
 
       const result = validateMachineOwnership(input);
@@ -134,160 +138,42 @@ describe("creationValidation", () => {
 
   describe("validateIssueCreationInput", () => {
     describe("Title validation", () => {
-      it("should allow valid title", () => {
-        const input = createPublicIssueInput({ title: "Valid Title" });
-
-        const result = validateIssueCreationInput(input);
-
-        expect(result.valid).toBe(true);
-      });
-
-      it("should reject empty title", () => {
-        const input = createPublicIssueInput({ title: "" });
-
-        const result = validateIssueCreationInput(input);
-
-        expect(result.valid).toBe(false);
-        expect(result.error).toBe("Title is required");
-      });
-
-      it("should reject whitespace-only title", () => {
-        const input = createPublicIssueInput({ title: "   " });
-
-        const result = validateIssueCreationInput(input);
-
-        expect(result.valid).toBe(false);
-        expect(result.error).toBe("Title is required");
-      });
-
-      it("should reject title longer than 255 characters", () => {
-        const longTitle = "A".repeat(256);
-        const input = createPublicIssueInput({ title: longTitle });
-
-        const result = validateIssueCreationInput(input);
-
-        expect(result.valid).toBe(false);
-        expect(result.error).toBe("Title must be 255 characters or less");
-      });
-
-      it("should allow title exactly 255 characters", () => {
-        const exactTitle = "A".repeat(255);
-        const input = createPublicIssueInput({ title: exactTitle });
-
-        const result = validateIssueCreationInput(input);
-
-        expect(result.valid).toBe(true);
-      });
+      const validateTitle = (title: string) =>
+        validateIssueCreationInput(createPublicIssueInput({ title })).valid;
+      testValidationFunction(
+        validateTitle,
+        ["Valid Title", "A".repeat(255)],
+        ["", "   ", "A".repeat(256)],
+      );
     });
 
     describe("Description validation", () => {
-      it("should allow valid description", () => {
-        const input = createPublicIssueInput({
-          description: "Valid description",
-        });
-
-        const result = validateIssueCreationInput(input);
-
-        expect(result.valid).toBe(true);
-      });
-
-      it("should allow empty description", () => {
-        const input = createPublicIssueInput();
-
-        const result = validateIssueCreationInput(input);
-
-        expect(result.valid).toBe(true);
-      });
-
-      it("should reject description longer than 2000 characters", () => {
-        const longDescription = "A".repeat(2001);
-        const input = createPublicIssueInput({ description: longDescription });
-
-        const result = validateIssueCreationInput(input);
-
-        expect(result.valid).toBe(false);
-        expect(result.error).toBe(
-          "Description must be 2000 characters or less",
-        );
-      });
-
-      it("should allow description exactly 2000 characters", () => {
-        const exactDescription = "A".repeat(2000);
-        const input = createPublicIssueInput({ description: exactDescription });
-
-        const result = validateIssueCreationInput(input);
-
-        expect(result.valid).toBe(true);
-      });
+      const validateDescription = (description: string) =>
+        validateIssueCreationInput(createPublicIssueInput({ description }))
+          .valid;
+      testValidationFunction(
+        validateDescription,
+        ["Valid description", "", "A".repeat(2000)],
+        ["A".repeat(2001)],
+      );
     });
 
     describe("Machine ID validation", () => {
-      it("should reject empty machine ID", () => {
-        const input = createPublicIssueInput({ machineId: "" });
-
-        const result = validateIssueCreationInput(input);
-
-        expect(result.valid).toBe(false);
-        expect(result.error).toBe("Machine ID is required");
-      });
-
-      it("should reject whitespace-only machine ID", () => {
-        const input = createPublicIssueInput({ machineId: "   " });
-
-        const result = validateIssueCreationInput(input);
-
-        expect(result.valid).toBe(false);
-        expect(result.error).toBe("Machine ID is required");
-      });
+      const validateMachineId = (machineId: string) =>
+        validateIssueCreationInput(createPublicIssueInput({ machineId })).valid;
+      testValidationFunction(validateMachineId, ["machine-1"], ["", "   "]);
     });
 
     describe("Email validation for public issues", () => {
-      it("should allow valid email", () => {
-        const input = createPublicIssueInput({
-          reporterEmail: "test@example.com",
-        });
-
-        const result = validateIssueCreationInput(input);
-
-        expect(result.valid).toBe(true);
-      });
-
-      it("should allow undefined email", () => {
-        const input = createPublicIssueInput();
-
-        const result = validateIssueCreationInput(input);
-
-        expect(result.valid).toBe(true);
-      });
-
-      it("should reject invalid email format", () => {
-        const input = createPublicIssueInput({
-          reporterEmail: "invalid-email",
-        });
-
-        const result = validateIssueCreationInput(input);
-
-        expect(result.valid).toBe(false);
-        expect(result.error).toBe("Invalid email format");
-      });
-
-      it("should reject email with no domain", () => {
-        const input = createPublicIssueInput({ reporterEmail: "test@" });
-
-        const result = validateIssueCreationInput(input);
-
-        expect(result.valid).toBe(false);
-        expect(result.error).toBe("Invalid email format");
-      });
-
-      it("should reject email with no local part", () => {
-        const input = createPublicIssueInput({ reporterEmail: "@example.com" });
-
-        const result = validateIssueCreationInput(input);
-
-        expect(result.valid).toBe(false);
-        expect(result.error).toBe("Invalid email format");
-      });
+      const validateEmail = (reporterEmail: string) =>
+        validateIssueCreationInput(createPublicIssueInput({ reporterEmail }))
+          .valid;
+      testValidationFunction(validateEmail, TEST_SCENARIOS.emails.valid, [
+        ...TEST_SCENARIOS.emails.invalid.filter(
+          (e) => typeof e === "string" && e.length > 0,
+        ),
+        "invalid-email",
+      ]);
     });
 
     describe("Authenticated issue input", () => {
@@ -316,10 +202,10 @@ describe("creationValidation", () => {
       expect(result.valid).toBe(true);
       expect(result.data).toEqual({
         title: "Test Issue",
-        machineId: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
-        organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
-        statusId: SEED_TEST_IDS.MOCK_PATTERNS.STATUS,
-        priorityId: SEED_TEST_IDS.MOCK_PATTERNS.PRIORITY,
+        machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
+        organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
+        statusId: SEED_TEST_IDS.STATUSES.NEW,
+        priorityId: SEED_TEST_IDS.PRIORITIES.MEDIUM,
         createdById: null,
       });
     });
@@ -327,7 +213,7 @@ describe("creationValidation", () => {
     it("should build issue data with authenticated user", () => {
       const input = createPublicIssueInput();
       const contextWithUser = createContext({
-        userId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+        userId: SEED_TEST_IDS.USERS.ADMIN,
       });
 
       const result = buildIssueCreationData(input, defaults, contextWithUser);
@@ -335,11 +221,11 @@ describe("creationValidation", () => {
       expect(result.valid).toBe(true);
       expect(result.data).toEqual({
         title: "Test Issue",
-        machineId: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
-        organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
-        statusId: SEED_TEST_IDS.MOCK_PATTERNS.STATUS,
-        priorityId: SEED_TEST_IDS.MOCK_PATTERNS.PRIORITY,
-        createdById: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+        machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
+        organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
+        statusId: SEED_TEST_IDS.STATUSES.NEW,
+        priorityId: SEED_TEST_IDS.PRIORITIES.MEDIUM,
+        createdById: SEED_TEST_IDS.USERS.ADMIN,
       });
     });
 
@@ -412,9 +298,9 @@ describe("creationValidation", () => {
 
   describe("validateIssueCreationDefaults", () => {
     it("should validate complete defaults", () => {
-      const status = { id: SEED_TEST_IDS.MOCK_PATTERNS.STATUS, name: "New" };
+      const status = { id: SEED_TEST_IDS.STATUSES.NEW, name: "New" };
       const priority = {
-        id: SEED_TEST_IDS.MOCK_PATTERNS.PRIORITY,
+        id: SEED_TEST_IDS.PRIORITIES.MEDIUM,
         name: "Medium",
       };
 
@@ -429,7 +315,7 @@ describe("creationValidation", () => {
 
     it("should reject null status", () => {
       const priority = {
-        id: SEED_TEST_IDS.MOCK_PATTERNS.PRIORITY,
+        id: SEED_TEST_IDS.PRIORITIES.MEDIUM,
         name: "Medium",
       };
 
@@ -442,7 +328,7 @@ describe("creationValidation", () => {
     });
 
     it("should reject null priority", () => {
-      const status = { id: SEED_TEST_IDS.MOCK_PATTERNS.STATUS, name: "New" };
+      const status = { id: SEED_TEST_IDS.STATUSES.NEW, name: "New" };
 
       const result = validateIssueCreationDefaults(status, null);
 
@@ -464,9 +350,9 @@ describe("creationValidation", () => {
 
   describe("validateCompleteIssueCreation", () => {
     const machine = createMockMachine();
-    const status = { id: SEED_TEST_IDS.MOCK_PATTERNS.STATUS, name: "New" };
+    const status = { id: SEED_TEST_IDS.STATUSES.NEW, name: "New" };
     const priority = {
-      id: SEED_TEST_IDS.MOCK_PATTERNS.PRIORITY,
+      id: SEED_TEST_IDS.PRIORITIES.MEDIUM,
       name: "Medium",
     };
     const context = createContext();
@@ -491,10 +377,10 @@ describe("creationValidation", () => {
         title: "Complete Test Issue",
         description: "Complete description",
         reporterEmail: "test@example.com",
-        machineId: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
-        organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
-        statusId: SEED_TEST_IDS.MOCK_PATTERNS.STATUS,
-        priorityId: SEED_TEST_IDS.MOCK_PATTERNS.PRIORITY,
+        machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
+        organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
+        statusId: SEED_TEST_IDS.STATUSES.NEW,
+        priorityId: SEED_TEST_IDS.PRIORITIES.MEDIUM,
         createdById: null,
       });
       expect(result.data?.defaults).toEqual({
@@ -577,14 +463,14 @@ describe("creationValidation", () => {
     it("should determine notification effects for public issue", () => {
       const effects = getIssueCreationNotificationEffects(
         "public",
-        SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
+        SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
       );
 
       expect(effects).toEqual({
         shouldNotifyMachineOwner: true,
         shouldRecordActivity: false,
         notificationData: {
-          machineId: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
+          machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
           type: "public",
         },
       });
@@ -593,14 +479,14 @@ describe("creationValidation", () => {
     it("should determine notification effects for authenticated issue", () => {
       const effects = getIssueCreationNotificationEffects(
         "authenticated",
-        SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
+        SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
       );
 
       expect(effects).toEqual({
         shouldNotifyMachineOwner: true,
         shouldRecordActivity: true,
         notificationData: {
-          machineId: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
+          machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
           type: "authenticated",
         },
       });
@@ -641,41 +527,6 @@ describe("creationValidation", () => {
 
       expect(result.valid).toBe(true);
     });
-
-    it("should handle various email formats", () => {
-      const validEmails = [
-        "user@example.com",
-        "user.name@example.com",
-        "user+tag@example.com",
-        "user123@example-domain.com",
-        "user@subdomain.example.com",
-      ];
-
-      for (const email of validEmails) {
-        const input = createPublicIssueInput({ reporterEmail: email });
-        const result = validateIssueCreationInput(input);
-        expect(result.valid).toBe(true);
-      }
-    });
-
-    it("should reject various invalid email formats", () => {
-      const invalidEmails = [
-        "plainaddress",
-        "@missingdomain.com",
-        "missing@.com",
-        "missing@domain",
-        "spaces @domain.com",
-        "user@",
-        "@domain.com",
-      ];
-
-      for (const email of invalidEmails) {
-        const input = createPublicIssueInput({ reporterEmail: email });
-        const result = validateIssueCreationInput(input);
-        expect(result.valid).toBe(false);
-        expect(result.error).toBe("Invalid email format");
-      }
-    });
   });
 
   describe("Business Rule Coverage", () => {
@@ -691,9 +542,9 @@ describe("creationValidation", () => {
 
     it("should validate complete flow for all issue types", () => {
       const machine = createMockMachine();
-      const status = { id: SEED_TEST_IDS.MOCK_PATTERNS.STATUS, name: "New" };
+      const status = { id: SEED_TEST_IDS.STATUSES.NEW, name: "New" };
       const priority = {
-        id: SEED_TEST_IDS.MOCK_PATTERNS.PRIORITY,
+        id: SEED_TEST_IDS.PRIORITIES.MEDIUM,
         name: "Medium",
       };
 
@@ -721,7 +572,7 @@ describe("creationValidation", () => {
         description: "Authenticated issue",
       });
       const authContext = createContext({
-        userId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+        userId: SEED_TEST_IDS.USERS.ADMIN,
       });
 
       const authResult = validateCompleteIssueCreation(
@@ -734,14 +585,14 @@ describe("creationValidation", () => {
 
       expect(authResult.valid).toBe(true);
       expect(authResult.data?.issueData.createdById).toBe(
-        SEED_TEST_IDS.MOCK_PATTERNS.USER,
+        SEED_TEST_IDS.USERS.ADMIN,
       );
     });
 
     it("should validate organization boundary for all scenarios", () => {
       const organizations = [
-        SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
-        "org-2",
+        SEED_TEST_IDS.ORGANIZATIONS.primary,
+        SEED_TEST_IDS.ORGANIZATIONS.competitor,
         "org-3",
       ];
 

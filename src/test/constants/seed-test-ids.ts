@@ -244,6 +244,12 @@ export const SEED_TEST_IDS = {
     CASTLE_GATE: "issue-castle-gate-010",
   },
 
+  /** Static comment IDs for consistent testing */
+  COMMENTS: {
+    COMMENT_1: "comment-001",
+    COMMENT_2: "comment-002",
+  },
+
   /** Mock data patterns for non-database tests */
   MOCK_PATTERNS: {
     /** Use these for consistent mock IDs in unit tests */

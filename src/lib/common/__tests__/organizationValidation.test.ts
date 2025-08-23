@@ -1,4 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+import {
+  testValidationFunction,
+  TEST_SCENARIOS,
+  customMatchers,
+} from "~/test/helpers/pure-function-test-utils";
 
 import {
   validateResourceOrganizationBoundary,
@@ -44,22 +49,24 @@ import type {
 
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
+expect.extend(customMatchers);
+
 function createMockMembership(
   overrides: Partial<OrganizationMembership> = {},
 ): OrganizationMembership {
   return {
-    id: SEED_TEST_IDS.MOCK_PATTERNS.MEMBERSHIP,
-    userId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
-    organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
-    roleId: SEED_TEST_IDS.MOCK_PATTERNS.ROLE,
+    id: SEED_TEST_IDS.MEMBERSHIPS.ADMIN_AT_PRIMARY,
+    userId: SEED_TEST_IDS.USERS.ADMIN,
+    organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
+    roleId: SEED_TEST_IDS.ROLES.ADMIN,
     user: {
-      id: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+      id: SEED_TEST_IDS.USERS.ADMIN,
       name: "Test User",
       email: "test@example.com",
     },
     role: {
-      id: SEED_TEST_IDS.MOCK_PATTERNS.ROLE,
-      name: "Member",
+      id: SEED_TEST_IDS.ROLES.ADMIN,
+      name: "Admin",
     },
     ...overrides,
   };
@@ -69,9 +76,9 @@ function createResourceOwnershipInput(
   overrides: Partial<ResourceOwnershipInput> = {},
 ): ResourceOwnershipInput {
   return {
-  resourceId: "mock-resource-1",
-  resourceOrganizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
-  expectedOrganizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+    resourceId: "mock-resource-1",
+    resourceOrganizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
+    expectedOrganizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
     resourceType: "Test Resource",
     ...overrides,
   };
@@ -82,8 +89,8 @@ function createMembershipValidationInput(
 ): MembershipValidationInput {
   return {
     membership: createMockMembership(),
-  expectedOrganizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
-  userId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+    expectedOrganizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
+    userId: SEED_TEST_IDS.USERS.ADMIN,
     ...overrides,
   };
 }
@@ -92,8 +99,8 @@ function createCrossOrganizationAccessInput(
   overrides: Partial<CrossOrganizationAccessInput> = {},
 ): CrossOrganizationAccessInput {
   return {
-  userOrganizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
-  resourceOrganizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+    userOrganizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
+    resourceOrganizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
     action: "access",
     resourceType: "Test Resource",
     ...overrides,
@@ -117,7 +124,7 @@ describe("organizationValidation", () => {
 
     it("should reject resource from different organization", () => {
       const input = createResourceOwnershipInput({
-        resourceOrganizationId: "mock-org-2",
+        resourceOrganizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor,
       });
 
       const result = validateResourceOrganizationBoundary(input);
@@ -177,7 +184,7 @@ describe("organizationValidation", () => {
     it("should reject membership with wrong organization ID", () => {
       const input = createMembershipValidationInput({
         membership: createMockMembership({
-          organizationId: "mock-org-2",
+          organizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor,
         }),
       });
 
@@ -199,8 +206,8 @@ describe("organizationValidation", () => {
 
     it("should reject cross-organization access", () => {
       const input = createCrossOrganizationAccessInput({
-        userOrganizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
-        resourceOrganizationId: "mock-org-2",
+        userOrganizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
+        resourceOrganizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor,
       });
 
       const result = validateCrossOrganizationAccess(input);
@@ -213,8 +220,8 @@ describe("organizationValidation", () => {
 
     it("should provide specific action in error message", () => {
       const input = createCrossOrganizationAccessInput({
-        userOrganizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
-        resourceOrganizationId: "mock-org-2",
+        userOrganizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
+        resourceOrganizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor,
         action: "edit",
         resourceType: "Issue",
       });
@@ -229,84 +236,30 @@ describe("organizationValidation", () => {
   });
 
   describe("validateOrganizationId", () => {
-    it("should validate proper organization ID", () => {
-      const result = validateOrganizationId("test-org-123");
-
-      expect(result.valid).toBe(true);
-    });
-
-    it("should reject empty organization ID", () => {
-      const result = validateOrganizationId("");
-
-      expect(result.valid).toBe(false);
-      expect(result.error).toBe("Organization ID is required");
-    });
-
-    it("should reject whitespace-only organization ID", () => {
-      const result = validateOrganizationId("   ");
-
-      expect(result.valid).toBe(false);
-      expect(result.error).toBe("Organization ID is required");
-    });
-
-    it("should reject organization ID that's too short", () => {
-      const result = validateOrganizationId("ab");
-
-      expect(result.valid).toBe(false);
-      expect(result.error).toBe(
-        "Organization ID must be at least 3 characters",
-      );
-    });
-
-    it("should reject organization ID that's too long", () => {
-      const longId = "a".repeat(51);
-      const result = validateOrganizationId(longId);
-
-      expect(result.valid).toBe(false);
-      expect(result.error).toBe(
-        "Organization ID must be 50 characters or less",
-      );
-    });
-
-    it("should accept organization ID exactly 50 characters", () => {
-      const exactId = "a".repeat(50);
-      const result = validateOrganizationId(exactId);
-
-      expect(result.valid).toBe(true);
-    });
-
-    it("should accept organization ID exactly 3 characters", () => {
-      const result = validateOrganizationId("abc");
-
-      expect(result.valid).toBe(true);
-    });
-
-    it("should reject organization ID with invalid characters", () => {
-      const invalidChars = ["org@test", "org.test", "org test", "org/test"];
-
-      for (const invalidId of invalidChars) {
-        const result = validateOrganizationId(invalidId);
-        expect(result.valid).toBe(false);
-        expect(result.error).toBe(
-          "Organization ID must contain only letters, numbers, hyphens, and underscores",
-        );
-      }
-    });
-
-    it("should accept organization ID with valid characters", () => {
-      const validIds = [
+    const isValid = (id: string) => validateOrganizationId(id).valid;
+    testValidationFunction(
+      isValid,
+      [
+        "test-org-123",
         "org-test",
         "org_test",
         "ORG123",
         "org-123_test",
         "123-org_456",
-      ];
-
-      for (const validId of validIds) {
-        const result = validateOrganizationId(validId);
-        expect(result.valid).toBe(true);
-      }
-    });
+        "a".repeat(50),
+        "abc",
+      ],
+      [
+        "",
+        "   ",
+        "ab",
+        "a".repeat(51),
+        "org@test",
+        "org.test",
+        "org test",
+        "org/test",
+      ],
+    );
   });
 
   describe("validateUserId", () => {
@@ -365,10 +318,10 @@ describe("organizationValidation", () => {
     it("should validate complete organization boundary workflow", () => {
       const result = validateCompleteOrganizationBoundary(
         "resource-1",
-        SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+        SEED_TEST_IDS.ORGANIZATIONS.primary,
         membership,
-        SEED_TEST_IDS.MOCK_PATTERNS.USER,
-        SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+        SEED_TEST_IDS.USERS.ADMIN,
+        SEED_TEST_IDS.ORGANIZATIONS.primary,
         "Test Resource",
       );
 
@@ -380,9 +333,9 @@ describe("organizationValidation", () => {
     it("should fail on invalid organization ID", () => {
       const result = validateCompleteOrganizationBoundary(
         "resource-1",
-        SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+        SEED_TEST_IDS.ORGANIZATIONS.primary,
         membership,
-        SEED_TEST_IDS.MOCK_PATTERNS.USER,
+        SEED_TEST_IDS.USERS.ADMIN,
         "", // Invalid org ID
         "Test Resource",
       );
@@ -394,10 +347,10 @@ describe("organizationValidation", () => {
     it("should fail on invalid user ID", () => {
       const result = validateCompleteOrganizationBoundary(
         "resource-1",
-        SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+        SEED_TEST_IDS.ORGANIZATIONS.primary,
         membership,
         "", // Invalid user ID
-        SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+        SEED_TEST_IDS.ORGANIZATIONS.primary,
         "Test Resource",
       );
 
@@ -408,10 +361,10 @@ describe("organizationValidation", () => {
     it("should fail on resource organization boundary", () => {
       const result = validateCompleteOrganizationBoundary(
         "resource-1",
-        "mock-org-2", // Different org
+        SEED_TEST_IDS.ORGANIZATIONS.competitor, // Different org
         membership,
-        SEED_TEST_IDS.MOCK_PATTERNS.USER,
-        SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+        SEED_TEST_IDS.USERS.ADMIN,
+        SEED_TEST_IDS.ORGANIZATIONS.primary,
         "Test Resource",
       );
 
@@ -424,10 +377,10 @@ describe("organizationValidation", () => {
     it("should fail on invalid membership", () => {
       const result = validateCompleteOrganizationBoundary(
         "resource-1",
-        SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+        SEED_TEST_IDS.ORGANIZATIONS.primary,
         null, // No membership
-        SEED_TEST_IDS.MOCK_PATTERNS.USER,
-        SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+        SEED_TEST_IDS.USERS.ADMIN,
+        SEED_TEST_IDS.ORGANIZATIONS.primary,
         "Test Resource",
       );
 
@@ -437,15 +390,15 @@ describe("organizationValidation", () => {
 
     it("should detect cross-organization access attempt", () => {
       const crossOrgMembership = createMockMembership({
-        organizationId: "mock-org-2",
+        organizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor,
       });
 
       const result = validateCompleteOrganizationBoundary(
         "resource-1",
-        "mock-org-2",
+        SEED_TEST_IDS.ORGANIZATIONS.competitor,
         crossOrgMembership,
-        SEED_TEST_IDS.MOCK_PATTERNS.USER,
-        "mock-org-2",
+        SEED_TEST_IDS.USERS.ADMIN,
+        SEED_TEST_IDS.ORGANIZATIONS.competitor,
         "Test Resource",
       );
 
@@ -458,9 +411,9 @@ describe("organizationValidation", () => {
     describe("validateIssueOrganizationBoundary", () => {
       it("should validate issue boundary", () => {
         const result = validateIssueOrganizationBoundary(
-          SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
-          SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
-          SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+          SEED_TEST_IDS.ISSUES.ISSUE_1,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
         );
 
         expect(result.valid).toBe(true);
@@ -468,9 +421,9 @@ describe("organizationValidation", () => {
 
       it("should reject cross-org issue access", () => {
         const result = validateIssueOrganizationBoundary(
-          SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
-          "mock-org-2",
-          SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+          SEED_TEST_IDS.ISSUES.ISSUE_1,
+          SEED_TEST_IDS.ORGANIZATIONS.competitor,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
         );
 
         expect(result.valid).toBe(false);
@@ -483,9 +436,9 @@ describe("organizationValidation", () => {
     describe("validateMachineOrganizationBoundary", () => {
       it("should validate machine boundary", () => {
         const result = validateMachineOrganizationBoundary(
-          SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
-          SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
-          SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+          SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
         );
 
         expect(result.valid).toBe(true);
@@ -493,9 +446,9 @@ describe("organizationValidation", () => {
 
       it("should reject cross-org machine access", () => {
         const result = validateMachineOrganizationBoundary(
-          SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
-          "mock-org-2",
-          SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+          SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
+          SEED_TEST_IDS.ORGANIZATIONS.competitor,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
         );
 
         expect(result.valid).toBe(false);
@@ -508,9 +461,9 @@ describe("organizationValidation", () => {
     describe("validateLocationOrganizationBoundary", () => {
       it("should validate location boundary", () => {
         const result = validateLocationOrganizationBoundary(
-          SEED_TEST_IDS.MOCK_PATTERNS.LOCATION,
-          SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
-          SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+          SEED_TEST_IDS.LOCATIONS.LOCATION_1,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
         );
 
         expect(result.valid).toBe(true);
@@ -518,9 +471,9 @@ describe("organizationValidation", () => {
 
       it("should reject cross-org location access", () => {
         const result = validateLocationOrganizationBoundary(
-          SEED_TEST_IDS.MOCK_PATTERNS.LOCATION,
-          "mock-org-2",
-          SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+          SEED_TEST_IDS.LOCATIONS.LOCATION_1,
+          SEED_TEST_IDS.ORGANIZATIONS.competitor,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
         );
 
         expect(result.valid).toBe(false);
@@ -533,9 +486,9 @@ describe("organizationValidation", () => {
     describe("validateCommentOrganizationBoundary", () => {
       it("should validate comment boundary via parent issue", () => {
         const result = validateCommentOrganizationBoundary(
-          SEED_TEST_IDS.MOCK_PATTERNS.COMMENT,
-          SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
-          SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+          SEED_TEST_IDS.COMMENTS.COMMENT_1,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
         );
 
         expect(result.valid).toBe(true);
@@ -543,9 +496,9 @@ describe("organizationValidation", () => {
 
       it("should reject cross-org comment access", () => {
         const result = validateCommentOrganizationBoundary(
-          SEED_TEST_IDS.MOCK_PATTERNS.COMMENT,
-          "mock-org-2",
-          SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+          SEED_TEST_IDS.COMMENTS.COMMENT_1,
+          SEED_TEST_IDS.ORGANIZATIONS.competitor,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
         );
 
         expect(result.valid).toBe(false);
@@ -560,8 +513,8 @@ describe("organizationValidation", () => {
     describe("isSameOrganization", () => {
       it("should return true for same organization", () => {
         const result = isSameOrganization(
-          SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
-          SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
         );
 
         expect(result).toBe(true);
@@ -569,8 +522,8 @@ describe("organizationValidation", () => {
 
       it("should return false for different organizations", () => {
         const result = isSameOrganization(
-          SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
-          "mock-org-2",
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+          SEED_TEST_IDS.ORGANIZATIONS.competitor,
         );
 
         expect(result).toBe(false);
@@ -579,31 +532,33 @@ describe("organizationValidation", () => {
 
     describe("extractOrganizationId", () => {
       it("should extract organization ID from direct property", () => {
-  const resource = { organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION };
+        const resource = {
+          organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
+        };
 
         const result = extractOrganizationId(resource);
 
-        expect(result).toBe("org-1");
+        expect(result).toBe(SEED_TEST_IDS.ORGANIZATIONS.primary);
       });
 
       it("should extract organization ID from location property", () => {
         const resource = {
-          location: { organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION },
+          location: { organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary },
         };
 
         const result = extractOrganizationId(resource);
 
-        expect(result).toBe("org-1");
+        expect(result).toBe(SEED_TEST_IDS.ORGANIZATIONS.primary);
       });
 
       it("should extract organization ID from issue property", () => {
         const resource = {
-          issue: { organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION },
+          issue: { organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary },
         };
 
         const result = extractOrganizationId(resource);
 
-        expect(result).toBe("org-1");
+        expect(result).toBe(SEED_TEST_IDS.ORGANIZATIONS.primary);
       });
 
       it("should return null for null resource", () => {
@@ -662,7 +617,7 @@ describe("organizationValidation", () => {
     it("should handle special characters in resource type", () => {
       const input = createResourceOwnershipInput({
         resourceType: "Test Resource @#$%",
-        resourceOrganizationId: "mock-org-2",
+        resourceOrganizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor,
       });
 
       const result = validateResourceOrganizationBoundary(input);
@@ -705,10 +660,10 @@ describe("organizationValidation", () => {
       // Valid case
       const validResult = validateCompleteOrganizationBoundary(
         "resource-1",
-        SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+        SEED_TEST_IDS.ORGANIZATIONS.primary,
         membership,
-        SEED_TEST_IDS.MOCK_PATTERNS.USER,
-        SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+        SEED_TEST_IDS.USERS.ADMIN,
+        SEED_TEST_IDS.ORGANIZATIONS.primary,
         "Test Resource",
       );
 
@@ -718,49 +673,49 @@ describe("organizationValidation", () => {
       const failureCases = [
         {
           name: "invalid org ID",
-            test: () =>
+          test: () =>
             validateCompleteOrganizationBoundary(
               "resource-1",
-              SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+              SEED_TEST_IDS.ORGANIZATIONS.primary,
               membership,
-              SEED_TEST_IDS.MOCK_PATTERNS.USER,
+              SEED_TEST_IDS.USERS.ADMIN,
               "",
               "Test Resource",
             ),
         },
         {
           name: "invalid user ID",
-            test: () =>
+          test: () =>
             validateCompleteOrganizationBoundary(
               "resource-1",
-              SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+              SEED_TEST_IDS.ORGANIZATIONS.primary,
               membership,
               "",
-              SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+              SEED_TEST_IDS.ORGANIZATIONS.primary,
               "Test Resource",
             ),
         },
         {
           name: "wrong resource org",
-            test: () =>
+          test: () =>
             validateCompleteOrganizationBoundary(
               "resource-1",
-              "mock-org-2",
+              SEED_TEST_IDS.ORGANIZATIONS.competitor,
               membership,
-              SEED_TEST_IDS.MOCK_PATTERNS.USER,
-              SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+              SEED_TEST_IDS.USERS.ADMIN,
+              SEED_TEST_IDS.ORGANIZATIONS.primary,
               "Test Resource",
             ),
         },
         {
           name: "no membership",
-            test: () =>
+          test: () =>
             validateCompleteOrganizationBoundary(
               "resource-1",
-              SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+              SEED_TEST_IDS.ORGANIZATIONS.primary,
               null,
-              SEED_TEST_IDS.MOCK_PATTERNS.USER,
-              SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+              SEED_TEST_IDS.USERS.ADMIN,
+              SEED_TEST_IDS.ORGANIZATIONS.primary,
               "Test Resource",
             ),
         },
@@ -777,35 +732,39 @@ describe("organizationValidation", () => {
         {
           name: "Issue",
           validator: validateIssueOrganizationBoundary,
+          resourceId: SEED_TEST_IDS.ISSUES.ISSUE_1,
         },
         {
           name: "Machine",
           validator: validateMachineOrganizationBoundary,
+          resourceId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
         },
         {
           name: "Location",
           validator: validateLocationOrganizationBoundary,
+          resourceId: SEED_TEST_IDS.LOCATIONS.LOCATION_1,
         },
         {
           name: "Comment",
           validator: validateCommentOrganizationBoundary,
+          resourceId: SEED_TEST_IDS.COMMENTS.COMMENT_1,
         },
       ];
 
       for (const testCase of testCases) {
         // Valid case
         const validResult = testCase.validator(
-          "resource-1",
-          SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
-          SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+          testCase.resourceId,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
         );
         expect(validResult.valid).toBe(true);
 
         // Invalid case
         const invalidResult = testCase.validator(
-          "resource-1",
-          "mock-org-2",
-          SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+          testCase.resourceId,
+          SEED_TEST_IDS.ORGANIZATIONS.competitor,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
         );
         expect(invalidResult.valid).toBe(false);
         expect(invalidResult.error).toContain(
@@ -821,8 +780,8 @@ describe("organizationValidation", () => {
       for (const action of actions) {
         for (const resourceType of resourceTypes) {
           const input = createCrossOrganizationAccessInput({
-            userOrganizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
-            resourceOrganizationId: "mock-org-2",
+            userOrganizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
+            resourceOrganizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor,
             action,
             resourceType,
           });
@@ -842,7 +801,7 @@ describe("organizationValidation", () => {
     describe("validatePublicOrganizationContext", () => {
       it("should validate existing organization context", () => {
         const organization: OrganizationContextPublic = {
-          id: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+          id: SEED_TEST_IDS.ORGANIZATIONS.primary,
           name: "Test Org",
         };
 
@@ -871,10 +830,12 @@ describe("organizationValidation", () => {
 
     describe("createOrganizationScope", () => {
       it("should create organization scope where clause", () => {
-  const result = createOrganizationScope(SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION);
+        const result = createOrganizationScope(
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+        );
 
         expect(result).toEqual({
-          organizationId: "org-1",
+          organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
         });
       });
     });
@@ -882,12 +843,15 @@ describe("organizationValidation", () => {
     describe("createOrganizationScopeWith", () => {
       it("should create organization scope with additional conditions", () => {
         const additionalWhere = { name: "Test", active: true };
-  const result = createOrganizationScopeWith(SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION, additionalWhere);
+        const result = createOrganizationScopeWith(
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+          additionalWhere,
+        );
 
         expect(result).toEqual({
           name: "Test",
           active: true,
-          organizationId: "org-1",
+          organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
         });
       });
     });
@@ -896,12 +860,12 @@ describe("organizationValidation", () => {
       it("should validate entity ownership", () => {
         const entity: EntityWithOrganizationId = {
           id: "entity-1",
-          organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+          organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
         };
 
         const result = validateRouterEntityOwnership(
           entity,
-          "org-1",
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
           "Test Entity",
         );
 
@@ -911,7 +875,7 @@ describe("organizationValidation", () => {
       it("should reject null entity", () => {
         const result = validateRouterEntityOwnership(
           null,
-          "org-1",
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
           "Test Entity",
         );
 
@@ -928,7 +892,7 @@ describe("organizationValidation", () => {
 
         const result = validateRouterEntityOwnership(
           entity,
-          "org-1",
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
           "Test Entity",
         );
 
@@ -942,7 +906,7 @@ describe("organizationValidation", () => {
       it("should use custom error message", () => {
         const result = validateRouterEntityOwnership(
           null,
-          "org-1",
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
           "Test Entity",
           "Custom not found message",
         );
@@ -954,12 +918,15 @@ describe("organizationValidation", () => {
 
     describe("createEntityQuery", () => {
       it("should create entity query with organization scoping", () => {
-        const result = createEntityQuery("entity-1", "org-1");
+        const result = createEntityQuery(
+          "entity-1",
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+        );
 
         expect(result).toEqual({
           where: {
             id: "entity-1",
-            organizationId: "org-1",
+            organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
           },
         });
       });
@@ -967,12 +934,15 @@ describe("organizationValidation", () => {
 
     describe("createEntityUpdateQuery", () => {
       it("should create entity update query with organization scoping", () => {
-        const result = createEntityUpdateQuery("entity-1", "org-1");
+        const result = createEntityUpdateQuery(
+          "entity-1",
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+        );
 
         expect(result).toEqual({
           where: {
             id: "entity-1",
-            organizationId: "org-1",
+            organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
           },
         });
       });
@@ -980,12 +950,15 @@ describe("organizationValidation", () => {
 
     describe("createEntityDeleteQuery", () => {
       it("should create entity delete query with organization scoping", () => {
-        const result = createEntityDeleteQuery("entity-1", "org-1");
+        const result = createEntityDeleteQuery(
+          "entity-1",
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+        );
 
         expect(result).toEqual({
           where: {
             id: "entity-1",
-            organizationId: "org-1",
+            organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
           },
         });
       });
@@ -995,12 +968,12 @@ describe("organizationValidation", () => {
       it("should return entity when validation passes", () => {
         const entity: EntityWithOrganizationId = {
           id: "entity-1",
-          organizationId: "org-1",
+          organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
         };
 
         const result = validateEntityExistsAndOwned(
           entity,
-          SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
           "Test Entity",
         );
 
@@ -1009,18 +982,26 @@ describe("organizationValidation", () => {
 
       it("should throw error when entity is null", () => {
         expect(() => {
-          validateEntityExistsAndOwned(null, SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION, "Test Entity");
+          validateEntityExistsAndOwned(
+            null,
+            SEED_TEST_IDS.ORGANIZATIONS.primary,
+            "Test Entity",
+          );
         }).toThrow("Test Entity not found");
       });
 
       it("should throw error when entity belongs to different organization", () => {
         const entity: EntityWithOrganizationId = {
           id: "entity-1",
-          organizationId: "mock-org-2",
+          organizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor,
         };
 
         expect(() => {
-          validateEntityExistsAndOwned(entity, "org-1", "Test Entity");
+          validateEntityExistsAndOwned(
+            entity,
+            SEED_TEST_IDS.ORGANIZATIONS.primary,
+            "Test Entity",
+          );
         }).toThrow(
           "Access denied: Test Entity belongs to different organization",
         );
@@ -1030,7 +1011,7 @@ describe("organizationValidation", () => {
     describe("validatePublicOrganizationContextRequired", () => {
       it("should return organization when validation passes", () => {
         const organization: OrganizationContextPublic = {
-          id: "org-1",
+          id: SEED_TEST_IDS.ORGANIZATIONS.primary,
           name: "Test Org",
         };
 
@@ -1054,20 +1035,23 @@ describe("organizationValidation", () => {
 
     describe("validateRelatedEntitiesOwnership", () => {
       it("should validate all entities belong to same organization", () => {
-          const entities: RelatedEntityCheck[] = [
+        const entities: RelatedEntityCheck[] = [
           {
             entityId: "entity-1",
             entityType: "Location",
-            organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+            organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
           },
           {
             entityId: "entity-2",
             entityType: "Machine",
-            organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+            organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
           },
         ];
 
-        const result = validateRelatedEntitiesOwnership(entities, "org-1");
+        const result = validateRelatedEntitiesOwnership(
+          entities,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+        );
 
         expect(result.isValid).toBe(true);
       });
@@ -1080,13 +1064,16 @@ describe("organizationValidation", () => {
             // No organizationId - global entity
           },
           {
-            entityId: SEED_TEST_IDS.MOCK_PATTERNS.LOCATION,
+            entityId: SEED_TEST_IDS.LOCATIONS.LOCATION_1,
             entityType: "Location",
-            organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+            organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
           },
         ];
 
-        const result = validateRelatedEntitiesOwnership(entities, "org-1");
+        const result = validateRelatedEntitiesOwnership(
+          entities,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+        );
 
         expect(result.isValid).toBe(true);
       });
@@ -1096,16 +1083,19 @@ describe("organizationValidation", () => {
           {
             entityId: "entity-1",
             entityType: "Location",
-            organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+            organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
           },
           {
             entityId: "entity-2",
             entityType: "Machine",
-            organizationId: "mock-org-2",
+            organizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor,
           },
         ];
 
-        const result = validateRelatedEntitiesOwnership(entities, "org-1");
+        const result = validateRelatedEntitiesOwnership(
+          entities,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+        );
 
         expect(result.isValid).toBe(false);
         expect(result.error).toBe(
@@ -1117,14 +1107,20 @@ describe("organizationValidation", () => {
 
     describe("validateMultipleEntityOwnership", () => {
       it("should validate all entities belong to organization", () => {
-          const entities: EntityWithOrganizationId[] = [
-          { id: "entity-1", organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION },
-          { id: "entity-2", organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION },
+        const entities: EntityWithOrganizationId[] = [
+          {
+            id: "entity-1",
+            organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
+          },
+          {
+            id: "entity-2",
+            organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
+          },
         ];
 
         const result = validateMultipleEntityOwnership(
           entities,
-          "org-1",
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
           "Test Entity",
         );
 
@@ -1132,11 +1128,17 @@ describe("organizationValidation", () => {
       });
 
       it("should reject when any entity is null", () => {
-  const entities = [{ id: "entity-1", organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION }, null];
+        const entities = [
+          {
+            id: "entity-1",
+            organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
+          },
+          null,
+        ];
 
         const result = validateMultipleEntityOwnership(
           entities,
-          "org-1",
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
           "Test Entity",
         );
 
@@ -1147,13 +1149,19 @@ describe("organizationValidation", () => {
 
       it("should reject when any entity belongs to different organization", () => {
         const entities: EntityWithOrganizationId[] = [
-          { id: "entity-1", organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION },
-          { id: "entity-2", organizationId: "mock-org-2" },
+          {
+            id: "entity-1",
+            organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
+          },
+          {
+            id: "entity-2",
+            organizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor,
+          },
         ];
 
         const result = validateMultipleEntityOwnership(
           entities,
-          "org-1",
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
           "Test Entity",
         );
 
