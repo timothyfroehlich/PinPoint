@@ -30,6 +30,7 @@
     "e2e/**/*.ts",
     "e2e/**/*.tsx",
     "src/test/setup/**/*.ts",
-    "src/test/examples/**/*.ts"
+    "src/test/examples/**/*.ts",
+    "src/test/helpers/**/*.ts"
   ]
 }

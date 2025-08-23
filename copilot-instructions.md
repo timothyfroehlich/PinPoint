@@ -4,11 +4,12 @@ Purpose: Fast, safe, and correct day-to-day development guidance for this repo. 
 
 ## Context you must assume
 
-- Project phase: Pre‑beta, solo dev, high velocity, temporary breakage OK.
-- Active migration: Phase 3 test conversion; many tests failing by design until finished.
-- Tech: Next.js 15, React 19, Drizzle ORM, PGlite for tests, Supabase RLS, Vitest.
-- Path alias: `~/*` -> `src/*` (see tsconfig.base.json). Tests use tsconfig.tests.json.
-- Use Context7 for docs when unsure: Drizzle, Vitest, Next.js, Supabase evolve quickly.
+- Project phase: Pre‑beta, solo dev, high velocity, Phase 3A TypeScript error elimination (systematic recovery)
+- Schema & seed data: LOCKED/IMMUTABLE - code conforms to schema, not vice versa
+- Active migration: Phase 3 test conversion; many tests failing by design until finished
+- Tech: Next.js 15, React 19, Drizzle ORM, PGlite for tests, Supabase RLS, Vitest
+- Path alias: `~/*` -> `src/*` (see tsconfig.base.json). Tests use tsconfig.tests.json
+- Use Context7 for docs when unsure: Drizzle, Vitest, Next.js, Supabase evolve quickly
 
 ## Do / Don’t (critical)
 
@@ -54,15 +55,25 @@ Direct Vitest (optional):
 - Worker‑scoped PGlite integration tests (real DB, memory‑safe):
   - `test("..", async ({ workerDb }) => { await withIsolatedTest(workerDb, async (db) => { /* db ops */ }); });`
 - Router/service integration with mocks (fast):
-  - Use mock context + SEED_TEST_IDS patterns where applicable.
+  - Use mock context + SEED_TEST_IDS patterns where applicable
 - RLS boundary validation:
   - Use pgTAP SQL tests in `supabase/tests/rls/` for real RLS policy testing
 
+## Hardcoded test data (SEED_TEST_IDS)
+
+- All tests use hardcoded IDs for predictable debugging
+- Primary org: `SEED_TEST_IDS.ORGANIZATIONS.primary` ("test-org-pinpoint")
+- Competitor org: `SEED_TEST_IDS.ORGANIZATIONS.competitor` ("test-org-competitor") 
+- Admin user: `SEED_TEST_IDS.USERS.ADMIN` ("test-user-tim")
+- Cross-org isolation testing with dual organizations
+
 ## RLS Testing
 
-- Real RLS testing: `supabase/tests/rls/` (pgTAP)
-- Business logic: PGlite with RLS bypassed
+- **Critical**: PGlite CANNOT test real RLS policies (lacks `auth.jwt()` functions)
+- Real RLS testing: `supabase/tests/rls/` (pgTAP) - actual policy enforcement
+- Business logic: PGlite with RLS bypassed - fast, memory-safe
 - Commands: `npm run test:rls` (pgTAP), `npm run test` (PGlite)
+- Complete: `npm run test:all` (dual-track testing)
 
 ## Database rules (pre‑beta)
 

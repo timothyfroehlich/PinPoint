@@ -11,6 +11,18 @@
           }
         ]
       }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/pattern-reminder.cjs",
+            "timeout": 10000
+          }
+        ]
+      }
     ]
   },
   "permissions": {

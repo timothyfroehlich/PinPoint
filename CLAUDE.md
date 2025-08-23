@@ -193,6 +193,20 @@ npm run test:coverage  # ✅ With coverage report
 - **NEVER use the `find` command** - it's dangerous due to the `-exec` flag which can execute arbitrary commands
 - **NEVER use the `psql` command directly** - use `./scripts/safe-psql.sh` instead for database safety
 
+### ⛔ PostgreSQL Query Limitations
+
+**🚨 CRITICAL: SET Statements Cannot Use Parameters**
+
+```typescript
+// ❌ NEVER: Parameterized SET statements (will fail)
+await db.execute(sql`SET session.user_id = ${userId}`); // PostgreSQL error
+
+// ✅ ALWAYS: Use sql.raw() with proper escaping for SET statements
+await db.execute(sql.raw(`SET session.user_id = '${escapeString(userId)}'`));
+```
+
+**Why**: PostgreSQL SET commands are DDL statements, not DML statements - parameters don't work with DDL.
+
 ### ✅ Safe Command Alternatives
 
 - **ripgrep (rg)** - for content searching: `rg --files | rg "pattern"`, `rg -l "content" --type js`

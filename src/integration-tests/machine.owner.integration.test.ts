@@ -31,6 +31,8 @@ import * as schema from "~/server/db/schema";
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 import { createPrimaryAdminContext } from "~/test/helpers/createSeededMachineTestContext";
+import { withAdminContext } from "~/test/helpers/rls-test-context";
+import { generateTestId } from "~/test/helpers/test-id-generator";
 
 // Mock external dependencies that aren't database-related
 vi.mock("~/server/auth/permissions", () => ({
@@ -91,9 +93,9 @@ describe("machine.owner router integration tests", () => {
       throw new Error("Missing seeded test users");
     }
 
-    // Create context using seeded data helper
-    const ctx = await createPrimaryAdminContext(db);
-
+    // Create context using seeded data helper (returned to callers inside RLS wrapper)
+    // Note: callers will create the ctx inside withAdminContext to ensure session vars
+    // are set properly for the RLS policies.
     return {
       organizationId,
       adminRole: SEED_TEST_IDS.ROLES.ADMIN_PRIMARY,
@@ -103,7 +105,7 @@ describe("machine.owner router integration tests", () => {
       model: "model-mm-001",
       location: SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR,
       machine: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
-      ctx,
+      // ctx removed; tests should create ctx inside withAdminContext
     };
   }
 
@@ -113,9 +115,10 @@ describe("machine.owner router integration tests", () => {
         workerDb,
       }) => {
         await withIsolatedTest(workerDb, async (db) => {
-          const { machine, testUser2, ctx } = await setupTestData(db);
-
-          const caller = machineOwnerRouter.createCaller(ctx);
+          const { machine, testUser2 } = await setupTestData(db);
+          await withAdminContext(db, async (db) => {
+            const ctx = await createPrimaryAdminContext(db);
+            const caller = machineOwnerRouter.createCaller(ctx);
 
           const result = await caller.assignOwner({
             machineId: machine,
@@ -153,15 +156,17 @@ describe("machine.owner router integration tests", () => {
         workerDb,
       }) => {
         await withIsolatedTest(workerDb, async (db) => {
-          const { machine, testUser2, ctx } = await setupTestData(db);
+            const { machine, testUser2 } = await setupTestData(db);
 
-          // First assign an owner
-          await db
-            .update(schema.machines)
-            .set({ ownerId: testUser2.id })
-            .where(eq(schema.machines.id, machine));
+            // First assign an owner inside admin context
+            await withAdminContext(db, async (db) => {
+              const ctx = await createPrimaryAdminContext(db);
+              await db
+                .update(schema.machines)
+                .set({ ownerId: testUser2.id })
+                .where(eq(schema.machines.id, machine));
 
-          const caller = machineOwnerRouter.createCaller(ctx);
+              const caller = machineOwnerRouter.createCaller(ctx);
 
           const result = await caller.assignOwner({
             machineId: machine,
@@ -192,22 +197,23 @@ describe("machine.owner router integration tests", () => {
         workerDb,
       }) => {
         await withIsolatedTest(workerDb, async (db) => {
-          const { machine, testUser1, testUser2, ctx } =
-            await setupTestData(db);
+            const { machine, testUser1, testUser2 } = await setupTestData(db);
 
-          // First assign initial owner
-          await db
-            .update(schema.machines)
-            .set({ ownerId: testUser1.id })
-            .where(eq(schema.machines.id, machine));
+            // First assign initial owner inside admin context
+            await withAdminContext(db, async (db) => {
+              const ctx = await createPrimaryAdminContext(db);
+              await db
+                .update(schema.machines)
+                .set({ ownerId: testUser1.id })
+                .where(eq(schema.machines.id, machine));
 
-          const caller = machineOwnerRouter.createCaller(ctx);
+              const caller = machineOwnerRouter.createCaller(ctx);
 
-          // Reassign to different user
-          const result = await caller.assignOwner({
-            machineId: machine,
-            ownerId: testUser2.id,
-          });
+              // Reassign to different user
+              const result = await caller.assignOwner({
+                machineId: machine,
+                ownerId: testUser2.id,
+              });
 
           // Verify the result structure
           expect(result).toMatchObject({
@@ -241,20 +247,23 @@ describe("machine.owner router integration tests", () => {
         workerDb,
       }) => {
         await withIsolatedTest(workerDb, async (db) => {
-          const { testUser2, ctx } = await setupTestData(db);
-          const caller = machineOwnerRouter.createCaller(ctx);
+          const { testUser2 } = await setupTestData(db);
+          await withAdminContext(db, async (db) => {
+            const ctx = await createPrimaryAdminContext(db);
+            const caller = machineOwnerRouter.createCaller(ctx);
 
-          await expect(
-            caller.assignOwner({
-              machineId: "nonexistent-machine",
-              ownerId: testUser2.id,
-            }),
-          ).rejects.toThrow(
-            new TRPCError({
-              code: "NOT_FOUND",
-              message: "Machine not found",
-            }),
-          );
+            await expect(
+              caller.assignOwner({
+                machineId: "nonexistent-machine",
+                ownerId: testUser2.id,
+              }),
+            ).rejects.toThrow(
+              new TRPCError({
+                code: "NOT_FOUND",
+                message: "Machine not found",
+              }),
+            );
+          });
         });
       });
 
@@ -262,14 +271,15 @@ describe("machine.owner router integration tests", () => {
         workerDb,
       }) => {
         await withIsolatedTest(workerDb, async (db) => {
-          const { testUser2: _testUser2, ctx: _ctx } = await setupTestData(db);
+          const { testUser2: _testUser2 } = await setupTestData(db);
 
           // Use seeded competitor organization for cross-org testing
           const org2Id = SEED_TEST_IDS.ORGANIZATIONS.competitor;
-          const _org2 = await db.query.organizations.findFirst({
+          const org2 = await db.query.organizations.findFirst({
             where: eq(schema.organizations.id, org2Id),
           });
-        }).returning();
+
+          if (!org2) throw new Error("Competitor organization not found");
 
         // Create a location in the second organization
         const [location2] = await db
@@ -328,37 +338,39 @@ describe("machine.owner router integration tests", () => {
     test("should throw FORBIDDEN when user is not a member of organization", async ({
       workerDb,
     }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        const { machine, ctx } = await setupTestData(db);
+        await withIsolatedTest(workerDb, async (db) => {
+          const { machine } = await setupTestData(db);
+          // Create a user that's not a member of the organization
+          const [nonMemberUser] = await db
+            .insert(schema.users)
+            .values({
+              id: "test-non-member-user",
+              name: "Non Member User",
+              email: "nonmember@example.com",
+              image: null,
+              emailVerified: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            })
+            .returning();
 
-        // Create a user that's not a member of the organization
-        const [nonMemberUser] = await db
-          .insert(schema.users)
-          .values({
-            id: "test-non-member-user",
-            name: "Non Member User",
-            email: "nonmember@example.com",
-            image: null,
-            emailVerified: null,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          })
-          .returning();
+          await withAdminContext(db, async (db) => {
+            const ctx = await createPrimaryAdminContext(db);
+            const caller = machineOwnerRouter.createCaller(ctx);
 
-        const caller = machineOwnerRouter.createCaller(ctx);
-
-        await expect(
-          caller.assignOwner({
-            machineId: machine,
-            ownerId: nonMemberUser.id,
-          }),
-        ).rejects.toThrow(
-          new TRPCError({
-            code: "FORBIDDEN",
-            message: "User is not a member of this organization",
-          }),
-        );
-      });
+            await expect(
+              caller.assignOwner({
+                machineId: machine,
+                ownerId: nonMemberUser.id,
+              }),
+            ).rejects.toThrow(
+              new TRPCError({
+                code: "FORBIDDEN",
+                message: "User is not a member of this organization",
+              }),
+            );
+          });
+        });
     });
   });
 
@@ -653,14 +665,16 @@ describe("machine.owner router integration tests", () => {
     test("should return only safe user data in owner relationship", async ({
       workerDb,
     }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        const { machine, testUser2, ctx } = await setupTestData(db);
-        const caller = machineOwnerRouter.createCaller(ctx);
+        await withIsolatedTest(workerDb, async (db) => {
+          const { machine, testUser2 } = await setupTestData(db);
+          await withAdminContext(db, async (db) => {
+            const ctx = await createPrimaryAdminContext(db);
+            const caller = machineOwnerRouter.createCaller(ctx);
 
-        const result = await caller.assignOwner({
-          machineId: machine,
-          ownerId: testUser2.id,
-        });
+            const result = await caller.assignOwner({
+              machineId: machine,
+              ownerId: testUser2.id,
+            });
 
         // Should only include id, name, and profilePicture (no email or other sensitive data)
         expect(result.owner).toEqual({
@@ -678,14 +692,16 @@ describe("machine.owner router integration tests", () => {
 
   describe("relationship loading", () => {
     test("should load machine model relationship", async ({ workerDb }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        const { machine, testUser2, ctx } = await setupTestData(db);
-        const caller = machineOwnerRouter.createCaller(ctx);
+        await withIsolatedTest(workerDb, async (db) => {
+          const { machine, testUser2 } = await setupTestData(db);
+          await withAdminContext(db, async (db) => {
+            const ctx = await createPrimaryAdminContext(db);
+            const caller = machineOwnerRouter.createCaller(ctx);
 
-        const result = await caller.assignOwner({
-          machineId: machine,
-          ownerId: testUser2.id,
-        });
+            const result = await caller.assignOwner({
+              machineId: machine,
+              ownerId: testUser2.id,
+            });
 
         expect(result.model).toBeDefined();
         expect(result.model).toMatchObject({
@@ -699,6 +715,7 @@ describe("machine.owner router integration tests", () => {
         ).toBe(true);
       });
     });
+  });
 
     test("should load machine location relationship", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (db) => {

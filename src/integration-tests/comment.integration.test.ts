@@ -21,23 +21,14 @@ import { describe, expect, vi } from "vitest";
 import { eq, sql } from "drizzle-orm";
 import { appRouter } from "~/server/api/root";
 import * as schema from "~/server/db/schema";
-import { generateTestId } from "~/test/helpers/test-id-generator";
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
 import { createSeededIssueTestContext } from "~/test/helpers/createSeededIssueTestContext";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
+import { withAdminContext } from "~/test/helpers/rls-test-context";
+import { generateTestId } from "~/test/helpers/test-id-generator";
 
-// Mock external dependencies that aren't database-related
-vi.mock("~/lib/utils/id-generation", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("~/lib/utils/id-generation")>();
-  return {
-    ...actual,
-    generateId: vi.fn(() => generateTestId("test-comment-id")),
-    generatePrefixedId: vi.fn((prefix: string) =>
-      generateTestId(`test-${prefix}-id`),
-    ),
-  };
-});
+// Mock external dependencies that aren't database-related (but not ID generation for integration tests)
+// Integration tests use real seeded data with SEED_TEST_IDS constants
 
 vi.mock("~/server/auth/permissions", () => ({
   getUserPermissionsForSession: vi
@@ -73,21 +64,15 @@ describe("Comment Router Integration (PGlite)", () => {
       organizationId: _organizationId,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        // Set RLS context for primary org
-        await db.execute(
-          sql.raw(
-            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
-          ),
-        );
+        await withAdminContext(db, async (db) => {
+          // Create test context using static seed data
+          const testContext = await createSeededIssueTestContext(
+            db,
+            SEED_TEST_IDS.ORGANIZATIONS.primary,
+            SEED_TEST_IDS.USERS.ADMIN,
+          );
 
-        // Create test context using static seed data
-        const testContext = await createSeededIssueTestContext(
-          db,
-          SEED_TEST_IDS.ORGANIZATIONS.primary,
-          SEED_TEST_IDS.USERS.ADMIN,
-        );
-
-        const caller = appRouter.createCaller(testContext);
+          const caller = appRouter.createCaller(testContext);
 
         // Create a comment for testing
         const uniqueCommentId = generateTestId("test-comment");
@@ -162,6 +147,7 @@ describe("Comment Router Integration (PGlite)", () => {
 
         // Verify soft-deleted comment is excluded
         expect(result.find((c) => c.id === comment3Id)).toBeUndefined();
+        });
       });
     });
 
@@ -170,24 +156,19 @@ describe("Comment Router Integration (PGlite)", () => {
       organizationId: _organizationId,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        // Set RLS context
-        await db.execute(
-          sql.raw(
-            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
-          ),
-        );
-
-        const testContext = await createSeededIssueTestContext(
-          db,
-          SEED_TEST_IDS.ORGANIZATIONS.primary,
-          SEED_TEST_IDS.USERS.ADMIN,
-        );
-        const caller = appRouter.createCaller(testContext);
+        await withAdminContext(db, async (db) => {
+          const testContext = await createSeededIssueTestContext(
+            db,
+            SEED_TEST_IDS.ORGANIZATIONS.primary,
+            SEED_TEST_IDS.USERS.ADMIN,
+          );
+          const caller = appRouter.createCaller(testContext);
 
         const result = await caller.comment.getForIssue({
           issueId: "nonexistent-issue",
         });
         expect(result).toEqual([]);
+        });
       });
     });
 
@@ -196,19 +177,13 @@ describe("Comment Router Integration (PGlite)", () => {
       organizationId: _organizationId,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        // Set RLS context
-        await db.execute(
-          sql.raw(
-            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
-          ),
-        );
-
-        const testContext = await createSeededIssueTestContext(
-          db,
-          SEED_TEST_IDS.ORGANIZATIONS.primary,
-          SEED_TEST_IDS.USERS.ADMIN,
-        );
-        const caller = appRouter.createCaller(testContext);
+        await withAdminContext(db, async (db) => {
+          const testContext = await createSeededIssueTestContext(
+            db,
+            SEED_TEST_IDS.ORGANIZATIONS.primary,
+            SEED_TEST_IDS.USERS.ADMIN,
+          );
+          const caller = appRouter.createCaller(testContext);
 
         // Create test comments
         const comment1Id = generateTestId("comment-1");
@@ -244,6 +219,7 @@ describe("Comment Router Integration (PGlite)", () => {
         expect(result[0].createdAt.getTime()).toBeLessThanOrEqual(
           result[1].createdAt.getTime(),
         );
+        });
       });
     });
 
@@ -252,19 +228,13 @@ describe("Comment Router Integration (PGlite)", () => {
       organizationId: _organizationId,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        // Set RLS context for primary org
-        await db.execute(
-          sql.raw(
-            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
-          ),
-        );
-
-        const testContext = await createSeededIssueTestContext(
-          db,
-          SEED_TEST_IDS.ORGANIZATIONS.primary,
-          SEED_TEST_IDS.USERS.ADMIN,
-        );
-        const caller = appRouter.createCaller(testContext);
+        await withAdminContext(db, async (db) => {
+          const testContext = await createSeededIssueTestContext(
+            db,
+            SEED_TEST_IDS.ORGANIZATIONS.primary,
+            SEED_TEST_IDS.USERS.ADMIN,
+          );
+          const caller = appRouter.createCaller(testContext);
 
         // Generate unique IDs for this test to avoid conflicts
         const comment2Id = generateTestId("comment-2");
@@ -312,19 +282,13 @@ describe("Comment Router Integration (PGlite)", () => {
       organizationId: _organizationId,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        // Set RLS context
-        await db.execute(
-          sql.raw(
-            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
-          ),
-        );
-
-        const testContext = await createSeededIssueTestContext(
-          db,
-          SEED_TEST_IDS.ORGANIZATIONS.primary,
-          SEED_TEST_IDS.USERS.ADMIN,
-        );
-        const caller = appRouter.createCaller(testContext);
+        await withAdminContext(db, async (db) => {
+          const testContext = await createSeededIssueTestContext(
+            db,
+            SEED_TEST_IDS.ORGANIZATIONS.primary,
+            SEED_TEST_IDS.USERS.ADMIN,
+          );
+          const caller = appRouter.createCaller(testContext);
 
         // Create a comment to delete
         const testCommentId = generateTestId("test-comment-to-delete");
@@ -385,19 +349,13 @@ describe("Comment Router Integration (PGlite)", () => {
       organizationId: _organizationId,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        // Set RLS context
-        await db.execute(
-          sql.raw(
-            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
-          ),
-        );
-
-        const testContext = await createSeededIssueTestContext(
-          db,
-          SEED_TEST_IDS.ORGANIZATIONS.primary,
-          SEED_TEST_IDS.USERS.ADMIN,
-        );
-        const caller = appRouter.createCaller(testContext);
+        await withAdminContext(db, async (db) => {
+          const testContext = await createSeededIssueTestContext(
+            db,
+            SEED_TEST_IDS.ORGANIZATIONS.primary,
+            SEED_TEST_IDS.USERS.ADMIN,
+          );
+          const caller = appRouter.createCaller(testContext);
 
         await expect(
           caller.comment.delete({ commentId: "nonexistent" }),
@@ -410,19 +368,13 @@ describe("Comment Router Integration (PGlite)", () => {
       organizationId: _organizationId,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        // Set RLS context for primary org
-        await db.execute(
-          sql.raw(
-            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
-          ),
-        );
-
-        const testContext = await createSeededIssueTestContext(
-          db,
-          SEED_TEST_IDS.ORGANIZATIONS.primary,
-          SEED_TEST_IDS.USERS.ADMIN,
-        );
-        const caller = appRouter.createCaller(testContext);
+        await withAdminContext(db, async (db) => {
+          const testContext = await createSeededIssueTestContext(
+            db,
+            SEED_TEST_IDS.ORGANIZATIONS.primary,
+            SEED_TEST_IDS.USERS.ADMIN,
+          );
+          const caller = appRouter.createCaller(testContext);
 
         const otherCommentId = generateTestId("other-comment-forbidden");
 
@@ -450,19 +402,13 @@ describe("Comment Router Integration (PGlite)", () => {
       organizationId: _organizationId,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        // Set RLS context
-        await db.execute(
-          sql.raw(
-            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
-          ),
-        );
-
-        const testContext = await createSeededIssueTestContext(
-          db,
-          SEED_TEST_IDS.ORGANIZATIONS.primary,
-          SEED_TEST_IDS.USERS.ADMIN,
-        );
-        const caller = appRouter.createCaller(testContext);
+        await withAdminContext(db, async (db) => {
+          const testContext = await createSeededIssueTestContext(
+            db,
+            SEED_TEST_IDS.ORGANIZATIONS.primary,
+            SEED_TEST_IDS.USERS.ADMIN,
+          );
+          const caller = appRouter.createCaller(testContext);
 
         // Generate unique IDs for this test to avoid conflicts
         const deletedComment1Id = generateTestId("deleted-comment-1");
@@ -582,6 +528,7 @@ describe("Comment Router Integration (PGlite)", () => {
 
         // Should only see deleted comments from our organization
         expect(result).toHaveLength(2);
+        });
       });
     });
   });
@@ -592,19 +539,13 @@ describe("Comment Router Integration (PGlite)", () => {
       organizationId: _organizationId,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        // Set RLS context
-        await db.execute(
-          sql.raw(
-            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
-          ),
-        );
-
-        const testContext = await createSeededIssueTestContext(
-          db,
-          SEED_TEST_IDS.ORGANIZATIONS.primary,
-          SEED_TEST_IDS.USERS.ADMIN,
-        );
-        const caller = appRouter.createCaller(testContext);
+        await withAdminContext(db, async (db) => {
+          const testContext = await createSeededIssueTestContext(
+            db,
+            SEED_TEST_IDS.ORGANIZATIONS.primary,
+            SEED_TEST_IDS.USERS.ADMIN,
+          );
+          const caller = appRouter.createCaller(testContext);
 
         // Generate unique IDs for this test to avoid conflicts
         const restoreCommentId = generateTestId("restore-comment");
@@ -658,19 +599,13 @@ describe("Comment Router Integration (PGlite)", () => {
       organizationId: _organizationId,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        // Set RLS context
-        await db.execute(
-          sql.raw(
-            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
-          ),
-        );
-
-        const testContext = await createSeededIssueTestContext(
-          db,
-          SEED_TEST_IDS.ORGANIZATIONS.primary,
-          SEED_TEST_IDS.USERS.ADMIN,
-        );
-        const caller = appRouter.createCaller(testContext);
+        await withAdminContext(db, async (db) => {
+          const testContext = await createSeededIssueTestContext(
+            db,
+            SEED_TEST_IDS.ORGANIZATIONS.primary,
+            SEED_TEST_IDS.USERS.ADMIN,
+          );
+          const caller = appRouter.createCaller(testContext);
 
         // Create old deleted comments that qualify for cleanup
         const oldDate = new Date();
@@ -726,6 +661,7 @@ describe("Comment Router Integration (PGlite)", () => {
           candidateCount: 2, // Only the 2 old deleted comments qualify
           cleanupThresholdDays: 90,
         });
+        });
       });
     });
   });
@@ -736,19 +672,13 @@ describe("Comment Router Integration (PGlite)", () => {
       organizationId: _organizationId,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        // Set RLS context
-        await db.execute(
-          sql.raw(
-            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
-          ),
-        );
-
-        const testContext = await createSeededIssueTestContext(
-          db,
-          SEED_TEST_IDS.ORGANIZATIONS.primary,
-          SEED_TEST_IDS.USERS.ADMIN,
-        );
-        const caller = appRouter.createCaller(testContext);
+        await withAdminContext(db, async (db) => {
+          const testContext = await createSeededIssueTestContext(
+            db,
+            SEED_TEST_IDS.ORGANIZATIONS.primary,
+            SEED_TEST_IDS.USERS.ADMIN,
+          );
+          const caller = appRouter.createCaller(testContext);
 
         // Generate unique IDs for this test to avoid conflicts
         const concurrent1Id = generateTestId("concurrent-1");
@@ -806,6 +736,7 @@ describe("Comment Router Integration (PGlite)", () => {
         expect(
           activities.filter((a) => a.type === "COMMENT_DELETED"),
         ).toHaveLength(2);
+        });
       });
     });
 
@@ -814,19 +745,13 @@ describe("Comment Router Integration (PGlite)", () => {
       organizationId: _organizationId,
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
-        // Set RLS context
-        await db.execute(
-          sql.raw(
-            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
-          ),
-        );
-
-        const testContext = await createSeededIssueTestContext(
-          db,
-          SEED_TEST_IDS.ORGANIZATIONS.primary,
-          SEED_TEST_IDS.USERS.ADMIN,
-        );
-        const caller = appRouter.createCaller(testContext);
+        await withAdminContext(db, async (db) => {
+          const testContext = await createSeededIssueTestContext(
+            db,
+            SEED_TEST_IDS.ORGANIZATIONS.primary,
+            SEED_TEST_IDS.USERS.ADMIN,
+          );
+          const caller = appRouter.createCaller(testContext);
 
         // Create a test comment for the lifecycle test
         const testCommentId = generateTestId("lifecycle-comment");

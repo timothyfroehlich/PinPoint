@@ -33,6 +33,7 @@ import { createSeededAdminTestContext } from "~/test/helpers/createSeededAdminTe
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 import { generateTestId } from "~/test/helpers/test-id-generator";
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
+import { withAdminContext } from "~/test/helpers/rls-test-context";
 
 // Mock external dependencies that aren't database-related
 vi.mock("~/lib/utils/id-generation", () => ({

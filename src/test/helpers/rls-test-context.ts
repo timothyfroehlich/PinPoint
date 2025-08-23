@@ -27,7 +27,9 @@
  */
 
 import { vi } from "vitest";
+import { sql } from "drizzle-orm";
 import type { TestDatabase } from "./pglite-test-setup";
+import { SEED_TEST_IDS } from "../constants/seed-test-ids";
 
 // Types for Supabase auth mocking
 interface MockSupabaseUser {
@@ -220,10 +222,17 @@ export async function withTestUser<T>(
       .mockResolvedValue(rlsContextManager.getMockSupabaseClient());
 
     // Store original and apply mock
-    const { createClient } = await import("~/lib/supabase/server");
-    rlsContextManager.setOriginalCreateClient(createClient);
+    // Note: This import may fail in test environment - that's expected
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const supabaseModule = await import("../../lib/supabase/server");
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      rlsContextManager.setOriginalCreateClient(supabaseModule.createClient);
+    } catch {
+      // Import may fail in test environment - continue without it
+    }
 
-    vi.doMock("~/lib/supabase/server", () => ({
+    vi.doMock("../../lib/supabase/server", () => ({
       createClient: mockCreateClient,
       createAdminClient: vi
         .fn()
@@ -236,7 +245,7 @@ export async function withTestUser<T>(
   } finally {
     // Clean up context
     rlsContextManager.clearUser();
-    vi.doUnmock("~/lib/supabase/server");
+    vi.doUnmock("../../lib/supabase/server");
   }
 }
 
@@ -266,21 +275,137 @@ export async function withRLSContext<T>(
 ): Promise<T> {
   const { role = "authenticated", email = `${userId}@test.dev` } = options;
 
-  // Set PostgreSQL session variables that RLS policies read
-  await db.execute(`SET app.current_user_id = '${userId}'`);
-  await db.execute(`SET app.current_organization_id = '${organizationId}'`);
-  await db.execute(`SET app.current_user_role = '${role}'`);
-  await db.execute(`SET app.current_user_email = '${email}'`);
+  // Set PostgreSQL session variables that RLS policies read using safe string escaping
+  // PostgreSQL SET statements don't support parameterized queries, so we use safe string escaping
+  await db.execute(sql.raw(`SET app.current_user_id = '${userId.replace(/'/g, "''")}'`));
+  await db.execute(sql.raw(`SET app.current_organization_id = '${organizationId.replace(/'/g, "''")}'`));
+  await db.execute(sql.raw(`SET app.current_user_role = '${role.replace(/'/g, "''")}'`));
+  await db.execute(sql.raw(`SET app.current_user_email = '${email.replace(/'/g, "''")}'`));
+
+  // Verify session variables were set correctly
+  await verifyRLSContext(db, {
+    userId,
+    organizationId,
+    role,
+    email,
+  });
 
   try {
     return await operation(db);
   } finally {
-    // Clear session variables
-    await db.execute(`RESET app.current_user_id`);
-    await db.execute(`RESET app.current_organization_id`);
-    await db.execute(`RESET app.current_user_role`);
-    await db.execute(`RESET app.current_user_email`);
+    // Clear session variables using safe SQL
+    await db.execute(sql`RESET app.current_user_id`);
+    await db.execute(sql`RESET app.current_organization_id`);
+    await db.execute(sql`RESET app.current_user_role`);
+    await db.execute(sql`RESET app.current_user_email`);
   }
+}
+
+/**
+ * Verify that the current session variables match expected values.
+ * Throws descriptive error if any mismatch is found.
+ */
+export async function verifyRLSContext(
+  db: TestDatabase,
+  expected: {
+    organizationId?: string;
+    userId?: string;
+    role?: string;
+    email?: string;
+  },
+): Promise<void> {
+  const checks: Array<{
+    name: string;
+    query: ReturnType<typeof sql>;
+    expected?: string;
+  }> = [
+    {
+      name: "organizationId",
+      query: sql`SELECT current_setting('app.current_organization_id', true) as value`,
+      expected: expected.organizationId,
+    },
+    {
+      name: "userId",
+      query: sql`SELECT current_setting('app.current_user_id', true) as value`,
+      expected: expected.userId,
+    },
+    {
+      name: "role",
+      query: sql`SELECT current_setting('app.current_user_role', true) as value`,
+      expected: expected.role,
+    },
+    {
+      name: "email",
+      query: sql`SELECT current_setting('app.current_user_email', true) as value`,
+      expected: expected.email,
+    },
+  ];
+
+  const mismatches: string[] = [];
+
+  for (const check of checks) {
+    if (typeof check.expected === "undefined") continue;
+
+    const result = await db.execute(check.query);
+    const row = result.rows?.[0] as { value?: string } | undefined;
+    const actual = row?.value ?? null;
+
+    if (String(actual) !== String(check.expected)) {
+      mismatches.push(
+        `Session variable mismatch for ${check.name}: expected=${String(
+          check.expected,
+        )} actual=${String(actual)}`,
+      );
+    }
+  }
+
+  if (mismatches.length > 0) {
+    throw new Error(
+      `RLS session verification failed:\n` + mismatches.join("\n"),
+    );
+  }
+}
+
+/**
+ * Convenience helper: run an operation as an admin user using SEED_TEST_IDS defaults
+ */
+export async function withAdminContext<T>(
+  db: TestDatabase,
+  operation: (db: TestDatabase) => Promise<T>,
+  options?: { organizationId?: string },
+): Promise<T> {
+  const organizationId = options?.organizationId ?? SEED_TEST_IDS.ORGANIZATIONS.primary;
+  const userId = SEED_TEST_IDS.USERS.ADMIN;
+  const email = SEED_TEST_IDS.EMAILS.ADMIN;
+  const role = "admin";
+
+  return await withFullRLSContext(db, userId, organizationId, operation, {
+    email,
+    role,
+    name: SEED_TEST_IDS.NAMES.ADMIN,
+  });
+}
+
+/**
+ * Convenience helper: run an operation as a member user (supports memberNumber 1|2)
+ */
+export async function withMemberContext<T>(
+  db: TestDatabase,
+  operation: (db: TestDatabase) => Promise<T>,
+  options?: { organizationId?: string; memberNumber?: 1 | 2 },
+): Promise<T> {
+  const organizationId = options?.organizationId ?? SEED_TEST_IDS.ORGANIZATIONS.primary;
+  const memberNumber = options?.memberNumber ?? 1;
+  const userId = memberNumber === 1 ? SEED_TEST_IDS.USERS.MEMBER1 : SEED_TEST_IDS.USERS.MEMBER2;
+  const email = memberNumber === 1 ? SEED_TEST_IDS.EMAILS.MEMBER1 : SEED_TEST_IDS.EMAILS.MEMBER2;
+  const name = memberNumber === 1 ? SEED_TEST_IDS.NAMES.MEMBER1 : SEED_TEST_IDS.NAMES.MEMBER2;
+  const role = "member";
+
+  return await withFullRLSContext(db, userId, organizationId, operation, {
+    email,
+    role,
+    name,
+  });
 }
 
 /**
@@ -446,8 +571,3 @@ export function mockNextHeaders(): void {
  * Export the context manager for advanced use cases
  */
 export { rlsContextManager as RLSContextManager };
-
-/**
- * Type exports for external usage
- */
-export type { RLSTestUser, MockSupabaseUser, MockSupabaseClient };
