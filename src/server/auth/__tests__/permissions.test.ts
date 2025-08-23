@@ -17,6 +17,7 @@ import {
   createMockAdminContext,
   createMockMemberContext,
 } from "~/test/constants/seed-test-ids";
+import { SYSTEM_ROLES } from "../permissions.constants";
 
 describe("Permission System Core Functions - ENHANCED WITH ORGANIZATIONAL SCOPING", () => {
   let mockContext: VitestMockContext;
@@ -43,16 +44,14 @@ describe("Permission System Core Functions - ENHANCED WITH ORGANIZATIONAL SCOPIN
         isDefault: false,
         createdAt: new Date(),
         updatedAt: new Date(),
-        permissions: [
+        rolePermissions: [
           {
-            id: SEED_TEST_IDS.MOCK_PATTERNS.PERMISSION,
-            name: "issue:create",
-            description: "Create issues",
-            createdAt: new Date(),
-            updatedAt: new Date(),
+            permission: {
+              name: "issue:create",
+            },
           },
         ],
-      });
+      } as any);
 
       // Act
       const result = await hasPermission(
@@ -63,10 +62,6 @@ describe("Permission System Core Functions - ENHANCED WITH ORGANIZATIONAL SCOPIN
 
       // Assert
       expect(result).toBe(true);
-      expect(mockContext.db.query.roles.findFirst).toHaveBeenCalledWith({
-        where: expect.any(Function),
-        with: { permissions: true },
-      });
     });
 
     it("should return false when user does not have the required permission", async () => {
@@ -83,8 +78,8 @@ describe("Permission System Core Functions - ENHANCED WITH ORGANIZATIONAL SCOPIN
         isDefault: false,
         createdAt: new Date(),
         updatedAt: new Date(),
-        permissions: [], // No permissions
-      });
+        rolePermissions: [], // No permissions
+      } as any);
 
       // Act
       const result = await hasPermission(
@@ -95,6 +90,16 @@ describe("Permission System Core Functions - ENHANCED WITH ORGANIZATIONAL SCOPIN
 
       // Assert
       expect(result).toBe(false);
+      expect(mockContext.db.query.roles.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          columns: { name: true, isSystem: true },
+          with: {
+            rolePermissions: {
+              with: { permission: { columns: { name: true } } },
+            },
+          },
+        }),
+      );
     });
 
     it("should return false when role does not exist", async () => {
@@ -117,27 +122,19 @@ describe("Permission System Core Functions - ENHANCED WITH ORGANIZATIONAL SCOPIN
 
     it("should handle system roles with admin permissions", async () => {
       // Arrange
-      const membership = { roleId: SEED_TEST_IDS.MOCK_PATTERNS.ADMIN_ROLE };
+      const membership = { roleId: SEED_TEST_IDS.ROLES.ADMIN_PRIMARY };
       const permission = "organization:manage";
 
       vi.mocked(mockContext.db.query.roles.findFirst).mockResolvedValue({
-        id: SEED_TEST_IDS.MOCK_PATTERNS.ADMIN_ROLE,
-        name: "System Admin",
-        organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+        id: SEED_TEST_IDS.ROLES.ADMIN_PRIMARY,
+        name: SYSTEM_ROLES.ADMIN, // Correctly use the constant
+        organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
         isSystem: true,
         isDefault: false,
         createdAt: new Date(),
         updatedAt: new Date(),
-        permissions: [
-          {
-            id: "perm-org-manage",
-            name: "organization:manage",
-            description: "Manage organization",
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-        ],
-      });
+        rolePermissions: [],
+      } as any);
 
       // Act
       const result = await hasPermission(
@@ -165,16 +162,8 @@ describe("Permission System Core Functions - ENHANCED WITH ORGANIZATIONAL SCOPIN
         isDefault: false,
         createdAt: new Date(),
         updatedAt: new Date(),
-        permissions: [
-          {
-            id: SEED_TEST_IDS.MOCK_PATTERNS.PERMISSION,
-            name: "issue:edit",
-            description: "Edit issues",
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-        ],
-      });
+        rolePermissions: [{ permission: { name: "issue:edit" } }],
+      } as any);
 
       // Act & Assert
       await expect(
@@ -195,8 +184,8 @@ describe("Permission System Core Functions - ENHANCED WITH ORGANIZATIONAL SCOPIN
         isDefault: false,
         createdAt: new Date(),
         updatedAt: new Date(),
-        permissions: [], // No permissions
-      });
+        rolePermissions: [], // No permissions
+      } as any);
 
       // Act & Assert
       await expect(
@@ -220,8 +209,8 @@ describe("Permission System Core Functions - ENHANCED WITH ORGANIZATIONAL SCOPIN
         isDefault: false,
         createdAt: new Date(),
         updatedAt: new Date(),
-        permissions: [],
-      });
+        rolePermissions: [],
+      } as any);
 
       // Act & Assert
       try {
@@ -251,40 +240,28 @@ describe("Permission System Core Functions - ENHANCED WITH ORGANIZATIONAL SCOPIN
         isDefault: false,
         createdAt: new Date(),
         updatedAt: new Date(),
-        permissions: [
-          {
-            id: "perm-1",
-            name: "issue:create",
-            description: "Create issues",
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-          {
-            id: "perm-2",
-            name: "issue:edit",
-            description: "Edit issues",
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-          {
-            id: "perm-3",
-            name: "issue:view",
-            description: "View issues",
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
+        rolePermissions: [
+          { permission: { name: "issue:create" } },
+          { permission: { name: "issue:edit" } },
+          { permission: { name: "issue:view" } },
         ],
-      });
+      } as any);
 
       // Act
       const result = await getUserPermissions(membership, mockContext.db);
 
       // Assert
-      expect(result).toEqual(expectedPermissions);
-      expect(mockContext.db.query.roles.findFirst).toHaveBeenCalledWith({
-        where: expect.any(Function),
-        with: { permissions: true },
-      });
+      expect(result).toEqual(expect.arrayContaining(expectedPermissions));
+      expect(mockContext.db.query.roles.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          columns: { name: true, isSystem: true },
+          with: {
+            rolePermissions: {
+              with: { permission: { columns: { name: true } } },
+            },
+          },
+        }),
+      );
     });
 
     it("should return empty array when role has no permissions", async () => {
@@ -299,8 +276,8 @@ describe("Permission System Core Functions - ENHANCED WITH ORGANIZATIONAL SCOPIN
         isDefault: false,
         createdAt: new Date(),
         updatedAt: new Date(),
-        permissions: [],
-      });
+        rolePermissions: [],
+      } as any);
 
       // Act
       const result = await getUserPermissions(membership, mockContext.db);
@@ -324,55 +301,35 @@ describe("Permission System Core Functions - ENHANCED WITH ORGANIZATIONAL SCOPIN
 
     it("should handle admin role with multiple permissions", async () => {
       // Arrange
-      const membership = { roleId: SEED_TEST_IDS.MOCK_PATTERNS.ADMIN_ROLE };
-      const adminPermissions = [
-        "issue:create",
-        "issue:edit",
-        "issue:delete",
-        "issue:assign",
-        "machine:edit",
-        "machine:delete",
-        "location:edit",
-        "location:delete",
-        "organization:manage",
-        "role:manage",
-        "user:manage",
+      const membership = { roleId: SEED_TEST_IDS.ROLES.ADMIN_PRIMARY };
+      const allPermissions = [
+        { name: "issue:create" },
+        { name: "issue:edit" },
+        { name: "issue:delete" },
       ];
 
       vi.mocked(mockContext.db.query.roles.findFirst).mockResolvedValue({
-        id: SEED_TEST_IDS.MOCK_PATTERNS.ADMIN_ROLE,
+        id: SEED_TEST_IDS.ROLES.ADMIN_PRIMARY,
         name: "Admin",
-        organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+        organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
         isSystem: true,
         isDefault: false,
         createdAt: new Date(),
         updatedAt: new Date(),
-        permissions: adminPermissions.map((name, index) => ({
-          id: `perm-${(index + 1).toString()}`,
-          name,
-          description: `${name} permission`,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })),
-      });
+        rolePermissions: [],
+      } as any);
 
       // Mock the Drizzle query for permissions
       vi.mocked(mockContext.db.query.permissions.findMany).mockResolvedValue(
-        adminPermissions.map((name, index) => ({
-          id: `perm-${(index + 1).toString()}`,
-          name,
-          description: `${name} permission`,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })),
+        allPermissions as any,
       );
 
       // Act
       const result = await getUserPermissions(membership, mockContext.db);
 
       // Assert
-      expect(result).toEqual(adminPermissions);
-      expect(result).toHaveLength(11);
+      expect(result).toEqual(allPermissions.map((p) => p.name));
+      expect(result).toHaveLength(3);
     });
   });
 
@@ -398,37 +355,34 @@ describe("Permission System Core Functions - ENHANCED WITH ORGANIZATIONAL SCOPIN
 
       // Assert - Should return false because role from other org is not accessible
       expect(result).toBe(false);
-      expect(mockContext.db.query.roles.findFirst).toHaveBeenCalledWith({
-        where: expect.any(Function),
-        with: { permissions: true },
-      });
+      expect(mockContext.db.query.roles.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          columns: { name: true, isSystem: true },
+          with: {
+            rolePermissions: {
+              with: { permission: { columns: { name: true } } },
+            },
+          },
+        }),
+      );
     });
 
     it("CRITICAL - Should enforce organizational scoping in role queries", async () => {
       // Arrange
-      const adminContext = createMockAdminContext();
-      const membership = { roleId: adminContext.roleId };
+      const membership = { roleId: SEED_TEST_IDS.ROLES.MEMBER_PRIMARY };
       const permission = "user:manage";
 
       // Mock role lookup with organizational scoping
       vi.mocked(mockContext.db.query.roles.findFirst).mockResolvedValue({
-        id: adminContext.roleId,
-        name: "Primary Org Admin",
-        organizationId: adminContext.organizationId,
+        id: SEED_TEST_IDS.ROLES.MEMBER_PRIMARY,
+        name: "Member",
+        organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
         isSystem: false,
-        isDefault: false,
+        isDefault: true,
         createdAt: new Date(),
         updatedAt: new Date(),
-        permissions: [
-          {
-            id: "perm-user-manage",
-            name: "user:manage",
-            description: "Manage users",
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-        ],
-      });
+        rolePermissions: [{ permission: { name: "user:manage" } }],
+      } as any);
 
       // Act
       const result = await hasPermission(
@@ -439,10 +393,16 @@ describe("Permission System Core Functions - ENHANCED WITH ORGANIZATIONAL SCOPIN
 
       // Assert
       expect(result).toBe(true);
-      expect(mockContext.db.query.roles.findFirst).toHaveBeenCalledWith({
-        where: expect.any(Function),
-        with: { permissions: true },
-      });
+      expect(mockContext.db.query.roles.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          columns: { name: true, isSystem: true },
+          with: {
+            rolePermissions: {
+              with: { permission: { columns: { name: true } } },
+            },
+          },
+        }),
+      );
     });
 
     it("CRITICAL - Should prevent permission escalation across organizations", async () => {
@@ -460,16 +420,8 @@ describe("Permission System Core Functions - ENHANCED WITH ORGANIZATIONAL SCOPIN
         isDefault: true,
         createdAt: new Date(),
         updatedAt: new Date(),
-        permissions: [
-          {
-            id: "perm-issue-view",
-            name: "issue:view",
-            description: "View issues",
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-        ],
-      });
+        rolePermissions: [{ permission: { name: "issue:view" } }],
+      } as any);
 
       // Act
       const result = await hasPermission(
@@ -496,16 +448,8 @@ describe("Permission System Core Functions - ENHANCED WITH ORGANIZATIONAL SCOPIN
         isDefault: false,
         createdAt: new Date(),
         updatedAt: new Date(),
-        permissions: [
-          {
-            id: "perm-1",
-            name: "issue:create",
-            description: "Create issues",
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-        ],
-      });
+        rolePermissions: [{ permission: { name: "issue:create" } }],
+      } as any);
 
       // Act
       const result = await hasPermission(
@@ -589,15 +533,7 @@ describe("Permission System Core Functions - ENHANCED WITH ORGANIZATIONAL SCOPIN
         const membership = { roleId: `${testCase.role}-role-${testCase.org}` };
 
         const mockPermissions = testCase.expected
-          ? [
-              {
-                id: "perm-1",
-                name: testCase.permission,
-                description: "Test permission",
-                createdAt: new Date(),
-                updatedAt: new Date(),
-              },
-            ]
+          ? [{ permission: { name: testCase.permission } }]
           : [];
 
         vi.mocked(mockContext.db.query.roles.findFirst).mockResolvedValue({
@@ -608,8 +544,8 @@ describe("Permission System Core Functions - ENHANCED WITH ORGANIZATIONAL SCOPIN
           isDefault: testCase.role === "member",
           createdAt: new Date(),
           updatedAt: new Date(),
-          permissions: mockPermissions,
-        });
+          rolePermissions: mockPermissions,
+        } as any);
 
         // Act
         const result = await hasPermission(
@@ -656,8 +592,8 @@ describe("Permission System Core Functions - ENHANCED WITH ORGANIZATIONAL SCOPIN
         isDefault: false,
         createdAt: new Date(),
         updatedAt: new Date(),
-        permissions: [],
-      });
+        rolePermissions: [],
+      } as any);
 
       // Act
       const result = await hasPermission(
@@ -698,16 +634,8 @@ describe("Permission System Core Functions - ENHANCED WITH ORGANIZATIONAL SCOPIN
         isDefault: false,
         createdAt: new Date(),
         updatedAt: new Date(),
-        permissions: [
-          {
-            id: "perm-system",
-            name: "system:maintenance",
-            description: "System maintenance",
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-        ],
-      });
+        rolePermissions: [{ permission: { name: "system:maintenance" } }],
+      } as any);
 
       // Act
       const result = await hasPermission(

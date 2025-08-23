@@ -37,7 +37,7 @@ export async function hasPermission(
 
   const role = await db.query.roles.findFirst({
     where: eq(roles.id, membership.roleId),
-    columns: { name: true },
+    columns: { name: true, isSystem: true },
     with: {
       rolePermissions: {
         with: {
@@ -53,7 +53,7 @@ export async function hasPermission(
     return false;
   }
 
-  if (role.name === SYSTEM_ROLES.ADMIN) {
+  if (role.isSystem && role.name === SYSTEM_ROLES.ADMIN) {
     return true;
   }
 
@@ -102,7 +102,7 @@ export async function getUserPermissions(
   }
   const role = await db.query.roles.findFirst({
     where: eq(roles.id, membership.roleId),
-    columns: { name: true },
+    columns: { name: true, isSystem: true },
     with: {
       rolePermissions: {
         with: {
@@ -118,7 +118,7 @@ export async function getUserPermissions(
     return [];
   }
 
-  if (role.name === SYSTEM_ROLES.ADMIN) {
+  if (role.isSystem && role.name === SYSTEM_ROLES.ADMIN) {
     const allPermissions = await db.query.permissions.findMany({
       columns: { name: true },
     });

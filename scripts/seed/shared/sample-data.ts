@@ -337,7 +337,7 @@ async function createMachinesWithDb(
           .onConflictDoUpdate({
             target: machines.id,
             set: {
-              name: sql.raw(`excluded.name`),
+              name: sql.raw(`excluded."name"`),
               ownerId: sql.raw(`excluded."ownerId"`),
               qrCodeId: sql.raw(`excluded."qrCodeId"`),
               ownerNotificationsEnabled: sql.raw(
@@ -476,7 +476,7 @@ async function createCompetitorMachine(dbInstance: typeof db): Promise<void> {
       .onConflictDoUpdate({
         target: machines.id,
         set: {
-          name: sql.raw(`excluded.name`),
+          name: sql.raw(`excluded."name"`),
           ownerId: sql.raw(`excluded."ownerId"`),
           qrCodeId: sql.raw(`excluded."qrCodeId"`),
           ownerNotificationsEnabled: sql.raw(
@@ -566,10 +566,10 @@ async function createSampleIssuesWithDb(
         .onConflictDoUpdate({
           target: issues.id,
           set: {
-            title: sql.raw(`excluded.title`),
-            description: sql.raw(`excluded.description`),
-            priorityId: sql.raw(`excluded.priorityId`),
-            statusId: sql.raw(`excluded.statusId`),
+            title: sql.raw(`excluded."title"`),
+            description: sql.raw(`excluded."description"`),
+            priorityId: sql.raw(`excluded."priorityId"`),
+            statusId: sql.raw(`excluded."statusId"`),
             updatedAt: new Date(),
           },
         });
