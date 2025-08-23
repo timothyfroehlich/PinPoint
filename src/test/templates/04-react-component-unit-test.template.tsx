@@ -384,9 +384,11 @@ describe("YourComponent", () => {
 
   test("handles component errors gracefully", () => {
     // Mock console.error to prevent test output pollution
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {
+      // Intentionally empty for test cleanup
+    });
 
-    const ThrowingComponent = () => {
+    const ThrowingComponent = (): JSX.Element => {
       throw new Error("Test error");
     };
 

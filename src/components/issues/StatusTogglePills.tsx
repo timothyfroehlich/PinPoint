@@ -98,6 +98,7 @@ export function StatusTogglePills({
       const category = issue.status.category;
       // Only count issues with valid status categories
       if (category in counts) {
+        // eslint-disable-next-line security/detect-object-injection
         counts[category]++;
       }
     });

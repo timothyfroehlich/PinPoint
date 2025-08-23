@@ -218,6 +218,7 @@ describe("Permission and Authentication System", () => {
           await testSessions.member(db, organizationId);
         else if (role === "viewer")
           await testSessions.viewer(db, organizationId);
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         else if (role === "anonymous")
           await testSessions.anonymous(db, organizationId);
 
