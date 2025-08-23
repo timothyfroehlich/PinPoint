@@ -26,7 +26,7 @@ import { drizzle } from "drizzle-orm/pglite";
 
 import type { PgliteDatabase } from "drizzle-orm/pglite";
 
-import { schema } from "~/server/db/schema";
+import * as schema from "~/server/db/schema";
 
 export type TestDatabase = PgliteDatabase<typeof schema>;
 

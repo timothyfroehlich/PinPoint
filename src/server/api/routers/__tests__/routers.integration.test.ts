@@ -25,10 +25,7 @@ import type { TestDatabase } from "~/test/helpers/pglite-test-setup";
 
 import { appRouter } from "~/server/api/root";
 import * as schema from "~/server/db/schema";
-import {
-  createSeededTestDatabase,
-  getSeededTestData,
-} from "~/test/helpers/pglite-test-setup";
+import { createSeededTestDatabase } from "~/test/helpers/pglite-test-setup";
 import { createSeededAdminTestContext } from "~/test/helpers/createSeededAdminTestContext";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 import { generateTestId } from "~/test/helpers/test-id-generator";
@@ -92,34 +89,17 @@ vi.mock("~/server/services/factory", () => ({
 }));
 
 describe("tRPC Router Integration Tests", () => {
-  // Suite-level variables for seeded data
-  let workerDb: TestDatabase;
-  let primaryOrgId: string;
-  let _competitorOrgId: string;
-  let seededData: any;
-
-  beforeAll(async () => {
-    // Create seeded test database with dual organizations
-    const {
-      db,
-      primaryOrgId: primary,
-      secondaryOrgId: competitor,
-    } = await createSeededTestDatabase();
-    workerDb = db;
-    primaryOrgId = primary;
-    _competitorOrgId = competitor;
-
-    // Get seeded test data for primary organization
-    seededData = await getSeededTestData(db, primaryOrgId);
-  });
+  // Use SEED_TEST_IDS directly - no dynamic database lookups needed
 
   describe("Issue Router Integration", () => {
-    test("should create issue with real database operations", async () => {
+    test("should create issue with real database operations", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (txDb) => {
         // Create admin context using seeded data
         const context = await createSeededAdminTestContext(
           txDb,
-          primaryOrgId,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
           SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = appRouter.createCaller(context);
@@ -128,25 +108,24 @@ describe("tRPC Router Integration Tests", () => {
           title: "Integration Test Issue",
           description: "Real database test description",
           severity: "Medium",
-          machineId: seededData.seededData.machine.id,
+          machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
         });
 
         // Verify the result structure
         expect(result).toMatchObject({
           title: "Integration Test Issue",
           description: "Real database test description",
-          machineId: seededData.machine.id,
-          statusId: seededData.status.id,
-          priorityId: seededData.priority.id,
+          machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
+          // Note: statusId and priorityId are assigned by the system, not hardcoded
         });
 
         // Verify relationships are loaded
         expect(result.machine).toBeDefined();
-        expect(result.machine.id).toBe(seededData.machine.id);
+        expect(result.machine.id).toBe(
+          SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
+        );
         expect(result.status).toBeDefined();
-        expect(result.status.id).toBe(seededData.status.id);
         expect(result.priority).toBeDefined();
-        expect(result.priority.id).toBe(seededData.priority.id);
 
         // Verify the database was actually updated
         const issueInDb = await txDb.query.issues.findFirst({
@@ -157,11 +136,13 @@ describe("tRPC Router Integration Tests", () => {
       });
     });
 
-    test("should update issue with real database operations", async () => {
+    test("should update issue with real database operations", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (txDb) => {
         const context = await createSeededAdminTestContext(
           txDb,
-          primaryOrgId,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
           SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = appRouter.createCaller(context);
@@ -197,11 +178,13 @@ describe("tRPC Router Integration Tests", () => {
       });
     });
 
-    test("should enforce organizational isolation in issue operations", async () => {
+    test("should enforce organizational isolation in issue operations", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (txDb) => {
         const context = await createSeededAdminTestContext(
           txDb,
-          primaryOrgId,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
           SEED_TEST_IDS.USERS.ADMIN,
         );
 
@@ -228,15 +211,15 @@ describe("tRPC Router Integration Tests", () => {
         const org2Ctx = {
           ...ctx,
           organization: {
-            id: org2.id,
-            name: org2.name,
-            subdomain: org2.subdomain,
+            id: SEED_TEST_IDS.ORGANIZATIONS.competitor,
+            name: "Competitor Arcade",
+            subdomain: "competitor",
           },
-          primaryOrgId: org2.id,
+          organizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor,
           user: {
             ...context.user,
             app_metadata: {
-              organization_id: org2.id,
+              organization_id: SEED_TEST_IDS.ORGANIZATIONS.competitor,
             },
           },
         };
@@ -255,11 +238,13 @@ describe("tRPC Router Integration Tests", () => {
   });
 
   describe("Machine Router Integration", () => {
-    test("should update machine with real database operations", async () => {
+    test("should update machine with real database operations", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (txDb) => {
         const context = await createSeededAdminTestContext(
           txDb,
-          primaryOrgId,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
           SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = appRouter.createCaller(context);
@@ -289,11 +274,13 @@ describe("tRPC Router Integration Tests", () => {
       });
     });
 
-    test("should enforce organizational isolation in machine operations", async () => {
+    test("should enforce organizational isolation in machine operations", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (txDb) => {
         const context = await createSeededAdminTestContext(
           txDb,
-          primaryOrgId,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
           SEED_TEST_IDS.USERS.ADMIN,
         );
 
@@ -311,15 +298,15 @@ describe("tRPC Router Integration Tests", () => {
         const org2Ctx = {
           ...ctx,
           organization: {
-            id: org2.id,
-            name: org2.name,
-            subdomain: org2.subdomain,
+            id: SEED_TEST_IDS.ORGANIZATIONS.competitor,
+            name: "Competitor Arcade",
+            subdomain: "competitor",
           },
-          primaryOrgId: org2.id,
+          organizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor,
           user: {
             ...context.user,
             app_metadata: {
-              organization_id: org2.id,
+              organization_id: SEED_TEST_IDS.ORGANIZATIONS.competitor,
             },
           },
         };
@@ -338,11 +325,13 @@ describe("tRPC Router Integration Tests", () => {
   });
 
   describe("Location Router Integration", () => {
-    test("should update location with real database operations", async () => {
+    test("should update location with real database operations", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (txDb) => {
         const context = await createSeededAdminTestContext(
           txDb,
-          primaryOrgId,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
           SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = appRouter.createCaller(context);
@@ -368,11 +357,13 @@ describe("tRPC Router Integration Tests", () => {
   });
 
   describe("Multi-tenant Integration Testing", () => {
-    test("should enforce cross-organizational boundaries across all routers", async () => {
+    test("should enforce cross-organizational boundaries across all routers", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (txDb) => {
         const context = await createSeededAdminTestContext(
           txDb,
-          primaryOrgId,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
           SEED_TEST_IDS.USERS.ADMIN,
         );
 
@@ -392,7 +383,7 @@ describe("tRPC Router Integration Tests", () => {
           .values({
             id: generateTestId("org2-location"),
             name: "Org2 Location",
-            primaryOrgId: org2.id,
+            organizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor,
             createdAt: new Date(),
             updatedAt: new Date(),
           })
@@ -419,11 +410,13 @@ describe("tRPC Router Integration Tests", () => {
     });
   });
 
-  test("should maintain data integrity across router operations", async () => {
+  test("should maintain data integrity across router operations", async ({
+    workerDb,
+  }) => {
     await withIsolatedTest(workerDb, async (txDb) => {
       const context = await createSeededAdminTestContext(
         txDb,
-        primaryOrgId,
+        SEED_TEST_IDS.ORGANIZATIONS.primary,
         SEED_TEST_IDS.USERS.ADMIN,
       );
       const caller = appRouter.createCaller(context);

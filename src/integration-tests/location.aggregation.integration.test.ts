@@ -36,30 +36,17 @@ vi.mock("~/lib/utils/id-generation", () => ({
 
 // Removed permission mocks to use real membership-based scoping from seeds
 describe("Location Router Aggregation Operations (PGlite)", () => {
-  let _workerDb: TestDatabase;
-  let primaryOrgId: string;
-  let competitorOrgId: string;
-  // Using deterministic SEED_TEST_IDS directly
-
-  beforeAll(async () => {
-    // Create seeded test database with established infrastructure
-    const setup = await createSeededTestDatabase();
-    workerDb = setup.db;
-    primaryOrgId = setup.organizationId;
-    competitorOrgId = SEED_TEST_IDS.ORGANIZATIONS.competitor;
-
-    // no-op: tests will reference SEED_TEST_IDS directly
-  });
+  // Using deterministic SEED_TEST_IDS directly - no beforeAll setup needed
 
   describe("Complex Aggregation Queries", () => {
     test("should handle getPublic with machine and issue counts", async ({
       workerDb,
     }) => {
       await withIsolatedTest(workerDb, async (txDb) => {
-        // Use global seededData from beforeAll
+        // Use SEED_TEST_IDS directly
         const context = await createSeededLocationTestContext(
           txDb,
-          primaryOrgId,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
           SEED_TEST_IDS.USERS.MEMBER1,
         );
         const caller = locationRouter.createCaller(context);
@@ -71,7 +58,7 @@ describe("Location Router Aggregation Operations (PGlite)", () => {
           .values({
             id: testLocationId,
             name: "Aggregation Test Location",
-            organizationId: primaryOrgId,
+            organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
             createdAt: new Date(),
             updatedAt: new Date(),
           })
@@ -82,7 +69,7 @@ describe("Location Router Aggregation Operations (PGlite)", () => {
           id: `agg-machine-${i}`,
           name: `Aggregation Machine ${i}`,
           qrCodeId: `agg-qr-${i}`,
-          organizationId: primaryOrgId,
+          organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
           locationId: testLocation.id,
           modelId: SEED_TEST_IDS.MOCK_PATTERNS.MODEL,
           ownerId: SEED_TEST_IDS.USERS.MEMBER1,
@@ -96,7 +83,7 @@ describe("Location Router Aggregation Operations (PGlite)", () => {
         const testIssues = Array.from({ length: 6 }, (_, i) => ({
           id: `agg-issue-${i}`,
           title: `Aggregation Issue ${i}`,
-          organizationId: primaryOrgId,
+          organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
           machineId: `agg-machine-${i % 3}`, // 2 issues per machine
           statusId: SEED_TEST_IDS.STATUSES.NEW_PRIMARY,
           priorityId: SEED_TEST_IDS.PRIORITIES.MEDIUM_PRIMARY,
@@ -149,7 +136,7 @@ describe("Location Router Aggregation Operations (PGlite)", () => {
         await txDb.insert(schema.locations).values({
           id: "competitor-agg-location",
           name: "Competitor Aggregation Location",
-          organizationId: competitorOrgId,
+          organizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor,
           createdAt: new Date(),
           updatedAt: new Date(),
         });

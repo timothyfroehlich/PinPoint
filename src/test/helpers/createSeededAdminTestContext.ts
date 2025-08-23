@@ -84,7 +84,11 @@ export async function createSeededAdminTestContext(
     with: {
       role: {
         with: {
-          permissions: true,
+          rolePermissions: {
+            with: {
+              permission: true,
+            },
+          },
         },
       },
     },

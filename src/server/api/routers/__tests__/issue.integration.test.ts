@@ -52,7 +52,11 @@ const createTestContext = async (
     with: {
       role: {
         with: {
-          permissions: true,
+          rolePermissions: {
+            with: {
+              permission: true,
+            },
+          },
         },
       },
     },

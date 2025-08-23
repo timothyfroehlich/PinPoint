@@ -197,7 +197,11 @@ export async function createSeededCollectionTestContext(
     with: {
       role: {
         with: {
-          permissions: true,
+          rolePermissions: {
+            with: {
+              permission: true,
+            },
+          },
         },
       },
     },
