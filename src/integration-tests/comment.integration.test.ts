@@ -1,30 +1,34 @@
 /**
- * Comment Router Integration Tests (PGlite)
+ * Comment Router Business Logic Integration Tests (PGlite)
  *
- * Integration tests for the comment router using PGlite in-memory PostgreSQL database.
- * Tests real database operations with proper schema, relationships, and data integrity.
+ * Tests comment router functionality and database operations with PGlite in-memory database.
  *
- * Key Features:
- * - Real PostgreSQL database with PGlite
- * - Complete schema migrations applied
- * - Real Drizzle ORM operations
- * - Multi-tenant data isolation testing
- * - Complex query validation with actual results
- * - Service integration testing (CommentCleanupService, IssueActivityService)
- * - Soft delete patterns with real database constraints
+ * ⚠️  SECURITY BOUNDARIES ARE NOT TESTED HERE
+ * Security boundary testing is done in pgTAP tests (supabase/tests/rls/)
+ * PGlite cannot enforce RLS policies - this tests business logic only
  *
- * Uses modern August 2025 patterns with Vitest and PGlite integration.
+ * What this tests:
+ * - Router function execution and error handling
+ * - Database record creation, updates, and soft deletes
+ * - Service integrations (CommentCleanupService, IssueActivityService)
+ * - Data relationships and foreign key constraints
+ * - Soft delete patterns and restoration logic
+ *
+ * What this does NOT test:
+ * - Organizational data isolation (tested in pgTAP)
+ * - RLS policy enforcement (impossible in PGlite)
+ * - Cross-organizational access prevention (tested in pgTAP)
+ *
+ * Uses modern August 2025 patterns with memory-safe PGlite integration.
  */
 
 import { describe, expect, vi } from "vitest";
-
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { appRouter } from "~/server/api/root";
 import * as schema from "~/server/db/schema";
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
 import { createSeededIssueTestContext } from "~/test/helpers/createSeededIssueTestContext";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
-import { withAdminContext } from "~/test/helpers/rls-test-context";
 import { generateTestId } from "~/test/helpers/test-id-generator";
 
 // Mock external dependencies that aren't database-related (but not ID generation for integration tests)
@@ -57,23 +61,45 @@ vi.mock("~/server/services/types", () => ({
   },
 }));
 
+/**
+ * Business Logic Test Setup Helper
+ *
+ * Tests application functionality and database operations ONLY.
+ *
+ * ⚠️  SECURITY BOUNDARIES ARE NOT TESTED HERE
+ * Security boundary testing is done in pgTAP tests (supabase/tests/rls/)
+ * PGlite cannot enforce RLS policies - this tests business logic only
+ *
+ * What this tests:
+ * - Router function execution
+ * - Database record creation/updates
+ * - Service integrations
+ * - Data relationships and constraints
+ *
+ * What this does NOT test:
+ * - Organizational data isolation (pgTAP only)
+ * - RLS policy enforcement (impossible in PGlite)
+ * - Cross-organizational access prevention (pgTAP only)
+ */
+async function withCommentBusinessLogicSetup(workerDb, testFn) {
+  await withIsolatedTest(workerDb, async (db) => {
+    // Direct business logic setup - no RLS context needed
+    const testContext = await createSeededIssueTestContext(
+      db,
+      SEED_TEST_IDS.ORGANIZATIONS.primary,
+      SEED_TEST_IDS.USERS.ADMIN,
+    );
+    const caller = appRouter.createCaller(testContext);
+    await testFn(db, caller, testContext);
+  });
+}
+
 describe("Comment Router Integration (PGlite)", () => {
   describe("getForIssue", () => {
     test("should get comments for an issue with author info", async ({
       workerDb,
-      organizationId: _organizationId,
     }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        await withAdminContext(db, async (db) => {
-          // Create test context using static seed data
-          const testContext = await createSeededIssueTestContext(
-            db,
-            SEED_TEST_IDS.ORGANIZATIONS.primary,
-            SEED_TEST_IDS.USERS.ADMIN,
-          );
-
-          const caller = appRouter.createCaller(testContext);
-
+      await withCommentBusinessLogicSetup(workerDb, async (db, caller) => {
         // Create a comment for testing
         const uniqueCommentId = generateTestId("test-comment");
         await db.insert(schema.comments).values({
@@ -147,44 +173,20 @@ describe("Comment Router Integration (PGlite)", () => {
 
         // Verify soft-deleted comment is excluded
         expect(result.find((c) => c.id === comment3Id)).toBeUndefined();
-        });
       });
     });
 
-    test("should handle empty results", async ({
-      workerDb,
-      organizationId: _organizationId,
-    }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        await withAdminContext(db, async (db) => {
-          const testContext = await createSeededIssueTestContext(
-            db,
-            SEED_TEST_IDS.ORGANIZATIONS.primary,
-            SEED_TEST_IDS.USERS.ADMIN,
-          );
-          const caller = appRouter.createCaller(testContext);
-
+    test("should handle empty results", async ({ workerDb }) => {
+      await withCommentBusinessLogicSetup(workerDb, async (db, caller) => {
         const result = await caller.comment.getForIssue({
           issueId: "nonexistent-issue",
         });
         expect(result).toEqual([]);
-        });
       });
     });
 
-    test("should order comments by creation date", async ({
-      workerDb,
-      organizationId: _organizationId,
-    }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        await withAdminContext(db, async (db) => {
-          const testContext = await createSeededIssueTestContext(
-            db,
-            SEED_TEST_IDS.ORGANIZATIONS.primary,
-            SEED_TEST_IDS.USERS.ADMIN,
-          );
-          const caller = appRouter.createCaller(testContext);
-
+    test("should order comments by creation date", async ({ workerDb }) => {
+      await withCommentBusinessLogicSetup(workerDb, async (db, caller) => {
         // Create test comments
         const comment1Id = generateTestId("comment-1");
         const comment2Id = generateTestId("comment-2");
@@ -219,77 +221,13 @@ describe("Comment Router Integration (PGlite)", () => {
         expect(result[0].createdAt.getTime()).toBeLessThanOrEqual(
           result[1].createdAt.getTime(),
         );
-        });
-      });
-    });
-
-    test("should maintain organizational scoping", async ({
-      workerDb,
-      organizationId: _organizationId,
-    }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        await withAdminContext(db, async (db) => {
-          const testContext = await createSeededIssueTestContext(
-            db,
-            SEED_TEST_IDS.ORGANIZATIONS.primary,
-            SEED_TEST_IDS.USERS.ADMIN,
-          );
-          const caller = appRouter.createCaller(testContext);
-
-        // Generate unique IDs for this test to avoid conflicts
-        const comment2Id = generateTestId("comment-2");
-
-        // Create additional test comments for comprehensive testing
-        await db.insert(schema.comments).values([
-          {
-            id: comment2Id,
-            content: "Second test comment",
-            organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
-            issueId: SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
-            authorId: SEED_TEST_IDS.USERS.ADMIN,
-            createdAt: new Date("2024-01-02"),
-            updatedAt: new Date("2024-01-02"),
-          },
-        ]);
-
-        // Create comment in competitor organization using static seed data
-        const otherCommentId = generateTestId("other-comment");
-
-        await db.insert(schema.comments).values({
-          id: otherCommentId,
-          content: "Competitor org comment",
-          organizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor,
-          issueId: SEED_TEST_IDS.ISSUES.LOUD_BUZZING,
-          authorId: SEED_TEST_IDS.USERS.MEMBER1,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
-
-        const result = await caller.comment.getForIssue({
-          issueId: SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
-        });
-
-        // Should only get comments from our organization's issue
-        expect(result).toHaveLength(1);
-        expect(result.find((c) => c.id === comment2Id)).toBeDefined();
       });
     });
   });
 
   describe("delete (soft delete)", () => {
-    test("should soft delete a comment successfully", async ({
-      workerDb,
-      organizationId: _organizationId,
-    }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        await withAdminContext(db, async (db) => {
-          const testContext = await createSeededIssueTestContext(
-            db,
-            SEED_TEST_IDS.ORGANIZATIONS.primary,
-            SEED_TEST_IDS.USERS.ADMIN,
-          );
-          const caller = appRouter.createCaller(testContext);
-
+    test("should soft delete a comment successfully", async ({ workerDb }) => {
+      await withCommentBusinessLogicSetup(workerDb, async (db, caller) => {
         // Create a comment to delete
         const testCommentId = generateTestId("test-comment-to-delete");
         await db.insert(schema.comments).values({
@@ -346,52 +284,11 @@ describe("Comment Router Integration (PGlite)", () => {
 
     test("should throw NOT_FOUND for non-existent comment", async ({
       workerDb,
-      organizationId: _organizationId,
     }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        await withAdminContext(db, async (db) => {
-          const testContext = await createSeededIssueTestContext(
-            db,
-            SEED_TEST_IDS.ORGANIZATIONS.primary,
-            SEED_TEST_IDS.USERS.ADMIN,
-          );
-          const caller = appRouter.createCaller(testContext);
-
+      await withCommentBusinessLogicSetup(workerDb, async (db, caller) => {
         await expect(
           caller.comment.delete({ commentId: "nonexistent" }),
         ).rejects.toThrow("Comment not found");
-      });
-    });
-
-    test("should throw FORBIDDEN for comment not in user's organization", async ({
-      workerDb,
-      organizationId: _organizationId,
-    }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        await withAdminContext(db, async (db) => {
-          const testContext = await createSeededIssueTestContext(
-            db,
-            SEED_TEST_IDS.ORGANIZATIONS.primary,
-            SEED_TEST_IDS.USERS.ADMIN,
-          );
-          const caller = appRouter.createCaller(testContext);
-
-        const otherCommentId = generateTestId("other-comment-forbidden");
-
-        // Create comment in competitor organization using static seed data
-        await db.insert(schema.comments).values({
-          id: otherCommentId,
-          content: "Other org comment",
-          organizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor,
-          issueId: SEED_TEST_IDS.ISSUES.LOUD_BUZZING,
-          authorId: SEED_TEST_IDS.USERS.MEMBER1,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
-
-        await expect(
-          caller.comment.delete({ commentId: otherCommentId }),
-        ).rejects.toThrow("Comment not in organization");
       });
     });
   });
@@ -399,17 +296,8 @@ describe("Comment Router Integration (PGlite)", () => {
   describe("getDeleted (admin)", () => {
     test("should get deleted comments for organization managers", async ({
       workerDb,
-      organizationId: _organizationId,
     }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        await withAdminContext(db, async (db) => {
-          const testContext = await createSeededIssueTestContext(
-            db,
-            SEED_TEST_IDS.ORGANIZATIONS.primary,
-            SEED_TEST_IDS.USERS.ADMIN,
-          );
-          const caller = appRouter.createCaller(testContext);
-
+      await withCommentBusinessLogicSetup(workerDb, async (db, caller) => {
         // Generate unique IDs for this test to avoid conflicts
         const deletedComment1Id = generateTestId("deleted-comment-1");
         const deletedComment2Id = generateTestId("deleted-comment-2");
@@ -459,94 +347,11 @@ describe("Comment Router Integration (PGlite)", () => {
         expect(result[0]).toHaveProperty("issue");
       });
     });
-
-    test("should maintain organizational scoping", async ({
-      workerDb,
-      organizationId: _organizationId,
-    }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        // Set RLS context for primary org
-        await db.execute(
-          sql.raw(
-            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
-          ),
-        );
-
-        const testContext = await createSeededIssueTestContext(
-          db,
-          SEED_TEST_IDS.ORGANIZATIONS.primary,
-          SEED_TEST_IDS.USERS.ADMIN,
-        );
-        const caller = appRouter.createCaller(testContext);
-
-        // Generate unique IDs for this test to avoid conflicts
-        const deletedComment1Id = generateTestId("deleted-comment-1");
-        const deletedComment2Id = generateTestId("deleted-comment-2");
-
-        // Create deleted comments for testing
-        await db.insert(schema.comments).values([
-          {
-            id: deletedComment1Id,
-            content: "First deleted comment",
-            organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
-            issueId: SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
-            authorId: SEED_TEST_IDS.USERS.ADMIN,
-            deletedAt: new Date("2024-01-01"),
-            deletedBy: SEED_TEST_IDS.USERS.ADMIN,
-            createdAt: new Date("2024-01-01"),
-            updatedAt: new Date("2024-01-01"),
-          },
-          {
-            id: deletedComment2Id,
-            content: "Second deleted comment",
-            organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
-            issueId: SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
-            authorId: SEED_TEST_IDS.USERS.ADMIN,
-            deletedAt: new Date("2024-01-02"),
-            deletedBy: SEED_TEST_IDS.USERS.ADMIN,
-            createdAt: new Date("2024-01-02"),
-            updatedAt: new Date("2024-01-02"),
-          },
-        ]);
-
-        // Create deleted comment in competitor organization using static seed data
-        const otherDeletedCommentId = generateTestId("other-deleted-comment");
-
-        await db.insert(schema.comments).values({
-          id: otherDeletedCommentId,
-          content: "Other org deleted comment",
-          organizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor,
-          issueId: SEED_TEST_IDS.ISSUES.LOUD_BUZZING,
-          authorId: SEED_TEST_IDS.USERS.MEMBER1,
-          deletedAt: new Date(),
-          deletedBy: SEED_TEST_IDS.USERS.MEMBER1,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
-
-        const result = await caller.comment.getDeleted();
-
-        // Should only see deleted comments from our organization
-        expect(result).toHaveLength(2);
-        });
-      });
-    });
   });
 
   describe("restore (admin)", () => {
-    test("should restore a deleted comment", async ({
-      workerDb,
-      organizationId: _organizationId,
-    }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        await withAdminContext(db, async (db) => {
-          const testContext = await createSeededIssueTestContext(
-            db,
-            SEED_TEST_IDS.ORGANIZATIONS.primary,
-            SEED_TEST_IDS.USERS.ADMIN,
-          );
-          const caller = appRouter.createCaller(testContext);
-
+    test("should restore a deleted comment", async ({ workerDb }) => {
+      await withCommentBusinessLogicSetup(workerDb, async (db, caller) => {
         // Generate unique IDs for this test to avoid conflicts
         const restoreCommentId = generateTestId("restore-comment");
 
@@ -594,19 +399,8 @@ describe("Comment Router Integration (PGlite)", () => {
   });
 
   describe("getCleanupStats (admin)", () => {
-    test("should get cleanup statistics", async ({
-      workerDb,
-      organizationId: _organizationId,
-    }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        await withAdminContext(db, async (db) => {
-          const testContext = await createSeededIssueTestContext(
-            db,
-            SEED_TEST_IDS.ORGANIZATIONS.primary,
-            SEED_TEST_IDS.USERS.ADMIN,
-          );
-          const caller = appRouter.createCaller(testContext);
-
+    test("should get cleanup statistics", async ({ workerDb }) => {
+      await withCommentBusinessLogicSetup(workerDb, async (db, caller) => {
         // Create old deleted comments that qualify for cleanup
         const oldDate = new Date();
         oldDate.setDate(oldDate.getDate() - 200); // 200 days ago (way > 90 day threshold)
@@ -661,7 +455,6 @@ describe("Comment Router Integration (PGlite)", () => {
           candidateCount: 2, // Only the 2 old deleted comments qualify
           cleanupThresholdDays: 90,
         });
-        });
       });
     });
   });
@@ -669,17 +462,8 @@ describe("Comment Router Integration (PGlite)", () => {
   describe("Complex Integration Scenarios", () => {
     test("should handle concurrent soft delete operations correctly", async ({
       workerDb,
-      organizationId: _organizationId,
     }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        await withAdminContext(db, async (db) => {
-          const testContext = await createSeededIssueTestContext(
-            db,
-            SEED_TEST_IDS.ORGANIZATIONS.primary,
-            SEED_TEST_IDS.USERS.ADMIN,
-          );
-          const caller = appRouter.createCaller(testContext);
-
+      await withCommentBusinessLogicSetup(workerDb, async (db, caller) => {
         // Generate unique IDs for this test to avoid conflicts
         const concurrent1Id = generateTestId("concurrent-1");
         const concurrent2Id = generateTestId("concurrent-2");
@@ -736,23 +520,13 @@ describe("Comment Router Integration (PGlite)", () => {
         expect(
           activities.filter((a) => a.type === "COMMENT_DELETED"),
         ).toHaveLength(2);
-        });
       });
     });
 
     test("should maintain referential integrity across service operations", async ({
       workerDb,
-      organizationId: _organizationId,
     }) => {
-      await withIsolatedTest(workerDb, async (db) => {
-        await withAdminContext(db, async (db) => {
-          const testContext = await createSeededIssueTestContext(
-            db,
-            SEED_TEST_IDS.ORGANIZATIONS.primary,
-            SEED_TEST_IDS.USERS.ADMIN,
-          );
-          const caller = appRouter.createCaller(testContext);
-
+      await withCommentBusinessLogicSetup(workerDb, async (db, caller) => {
         // Create a test comment for the lifecycle test
         const testCommentId = generateTestId("lifecycle-comment");
         await db.insert(schema.comments).values({
