@@ -21,17 +21,17 @@ type Session = {
 /**
  * Checks if a given membership has a specific permission.
  *
- * @param membership - The membership object, containing the roleId.
+ * @param membership - The membership object, containing the roleId. Can be null or undefined.
  * @param permission - The permission string to check for.
  * @param db - The Drizzle client instance.
  * @returns A boolean indicating whether the permission is granted.
  */
 export async function hasPermission(
-  membership: { roleId: string | null },
+  membership: { roleId: string | null } | null | undefined,
   permission: string,
   db: DrizzleClient,
 ): Promise<boolean> {
-  if (!membership.roleId) {
+  if (!membership?.roleId) {
     return false;
   }
 
@@ -69,12 +69,12 @@ export async function hasPermission(
  * Enforces that a given membership has a specific permission.
  * Throws a TRPCError if the permission is not granted.
  *
- * @param membership - The membership object, containing the roleId.
+ * @param membership - The membership object, containing the roleId. Can be null or undefined.
  * @param permission - The permission string to require.
  * @param db - The Drizzle client instance.
  */
 export async function requirePermission(
-  membership: { roleId: string | null },
+  membership: { roleId: string | null } | null | undefined,
   permission: string,
   db: DrizzleClient,
 ): Promise<void> {
@@ -89,15 +89,15 @@ export async function requirePermission(
 /**
  * Retrieves all permissions for a given membership.
  *
- * @param membership - The membership object, containing the roleId.
+ * @param membership - The membership object, containing the roleId. Can be null or undefined.
  * @param db - The Drizzle client instance.
  * @returns A string array of all granted permissions.
  */
 export async function getUserPermissions(
-  membership: { roleId: string | null },
+  membership: { roleId: string | null } | null | undefined,
   db: DrizzleClient,
 ): Promise<string[]> {
-  if (!membership.roleId) {
+  if (!membership?.roleId) {
     return [];
   }
   const role = await db.query.roles.findFirst({
