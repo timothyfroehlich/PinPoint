@@ -30,7 +30,7 @@ PinPoint has completed the Prisma-to-Drizzle migration with full removal of all 
 - [`latest-updates/`](./latest-updates/) - **CRITICAL**: Post-training tech stack updates (August 2025)
 - [`architecture/`](./architecture/) - System design, patterns, and current state
 - [`developer-guides/`](./developer-guides/) - Technology-specific implementation guides
-- [`testing/`](./testing/) - Testing philosophy and patterns (now integration-first, with shared SEED_TEST_IDS constants)
+- [`testing/`](./testing/) - **REBOOT IN PROGRESS**: Complete test system rebuild with strict archetype enforcement
 - [`security/`](./security/) - Security patterns and audit findings
 
 ### Planning & Process
@@ -45,11 +45,15 @@ PinPoint has completed the Prisma-to-Drizzle migration with full removal of all 
 - [`deployment/`](./deployment/) - Environment and deployment guides
 - [`research/`](./research/) - Technical research and experimental patterns
 
+### Deprecated
+
+- [`deprecated/`](./deprecated/) - Legacy documentation being phased out during system reboot
+
 ## Key Resources
 
 ### Quick References (Auto-Loaded)
 
-- **Tactical Patterns**: [`quick-reference/`](./quick-reference/) - Auto-loaded guides with SEED_TEST_IDS usage patterns
+- **Tactical Patterns**: [`quick-reference/`](./quick-reference/) - Auto-loaded guides (testing patterns deprecated during reboot)
 - **Essential Commands**: [`CLAUDE.md`](../CLAUDE.md) - Command reference and project context
 - **Latest Updates**: [`latest-updates/quick-reference.md`](./latest-updates/quick-reference.md) - Post-training breaking changes
 
@@ -58,6 +62,6 @@ PinPoint has completed the Prisma-to-Drizzle migration with full removal of all 
 1. **Before coding**: Check migration status and use current patterns
 2. **Validation**: Run `npm run validate` before commits
 3. **Documentation**: Update relevant docs with any pattern changes
-4. **Testing**: Write integration tests with transaction cleanup
+4. **Testing**: Follow new archetype system (see testing/TEST_SYSTEM_REBOOT_PLAN.md)
 
 For detailed contribution guidelines, see the developer guides.

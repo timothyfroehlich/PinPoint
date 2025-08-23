@@ -13,6 +13,7 @@ This file has been **superseded** by the comprehensive **Unit Testing Archetype*
 **👉 [archetype-unit-testing.md](./archetype-unit-testing.md)**
 
 The new archetype provides:
+
 - **Comprehensive patterns** for pure functions, React components, and business logic
 - **Agent assignment** (`unit-test-architect`) for expert assistance
 - **Performance targets** (<100ms per test)

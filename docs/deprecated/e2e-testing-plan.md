@@ -9,16 +9,19 @@ Our E2E testing strategy focuses on validating the complete user workflows defin
 ## Current State Analysis
 
 ### ✅ Working
+
 - Basic auth flow tests (with minor selector issues)
 - Playwright configuration with multiple browsers
 - Dev quick login authentication helpers
 
 ### 🔧 Needs Fixing
+
 - Auth flow test selectors (case sensitivity issues)
 - Session persistence validation
 - Permission-based navigation testing
 
 ### ❌ Missing
+
 - Core CUJ flows from design docs
 - Issue reporting workflows
 - Location and machine management flows
@@ -31,6 +34,7 @@ Our E2E testing strategy focuses on validating the complete user workflows defin
 **Goal**: Make all existing authentication tests pass reliably
 
 **Tasks**:
+
 1. **Fix Selector Issues**:
    - Update login form heading selector (`Welcome to PinPoint` casing)
    - Fix navigation link selectors (`link:has-text("PinPoint")`)
@@ -48,7 +52,8 @@ Our E2E testing strategy focuses on validating the complete user workflows defin
    - No flaky tests or timing issues
    - Clear test output and failure reporting
 
-**Acceptance Criteria**: 
+**Acceptance Criteria**:
+
 - `npx playwright test auth-flow.spec.ts` passes 100%
 - Tests are stable across multiple runs
 - All user roles (Admin, Member, Player) auth flows work
@@ -60,17 +65,20 @@ Our E2E testing strategy focuses on validating the complete user workflows defin
 #### 2.1 Anonymous/Public User Journeys (CUJ 1.x)
 
 **File**: `e2e/qr-code-flow.spec.ts`
+
 - **CUJ 1.1**: QR code discovery → Issue detail → Report new issue
 - **CUJ 1.4**: Duplicate issue reporting handling
 - Photo attachment capabilities
 - Anonymous vs authenticated flow differences
 
 **File**: `e2e/location-browsing.spec.ts`
+
 - **CUJ 1.2**: Homepage → Location selection → Machine browsing
 - **CUJ 1.3**: Machine filtering and text search
 - Mobile responsive design validation
 
 **File**: `e2e/registration-flow.spec.ts`
+
 - **CUJ 1.5**: New user registration and login
 - Email magic link workflow
 - Google OAuth integration
@@ -79,6 +87,7 @@ Our E2E testing strategy focuses on validating the complete user workflows defin
 #### 2.2 Authenticated Member Journeys (CUJ 2.x)
 
 **File**: `e2e/member-issue-flow.spec.ts`
+
 - **CUJ 2.1**: Authenticated issue reporting with identity attachment
 - **CUJ 2.2**: Profile management and avatar updates
 - Issue tracking and status monitoring
@@ -86,13 +95,15 @@ Our E2E testing strategy focuses on validating the complete user workflows defin
 #### 2.3 Machine Owner Journeys (CUJ 3.x)
 
 **File**: `e2e/machine-owner-flow.spec.ts`
+
 - **CUJ 3.1**: Viewing owned machines list
-- **CUJ 3.2**: Notification preferences management  
+- **CUJ 3.2**: Notification preferences management
 - **CUJ 3.3**: Machine issue history review
 
 #### 2.4 Technician Journeys (CUJ 4.x)
 
 **File**: `e2e/technician-triage.spec.ts`
+
 - **CUJ 4.1**: Daily triage - filtering "New" issues
 - **CUJ 4.2**: Acknowledge/close invalid or duplicate issues
 - **CUJ 4.3**: Complete issue lifecycle management
@@ -101,12 +112,14 @@ Our E2E testing strategy focuses on validating the complete user workflows defin
 #### 2.5 Admin Journeys (CUJ 5.x)
 
 **File**: `e2e/admin-location-management.spec.ts`
+
 - **CUJ 5.1**: Onboard new physical locations
 - **CUJ 5.2**: Add machines (OPDB search + custom titles)
 - **CUJ 5.3**: Assign machine owners
 - **CUJ 5.4**: Generate and download QR codes
 
 **File**: `e2e/admin-user-management.spec.ts`
+
 - **CUJ 5.5**: User role management (promote Member → Technician)
 - **CUJ 5.6**: Photo upload permission configuration
 - User removal and access control
@@ -116,6 +129,7 @@ Our E2E testing strategy focuses on validating the complete user workflows defin
 **Goal**: Complete the existing issue detail test coverage
 
 **Tasks**:
+
 1. **Update Issue Detail Tests** (`issue-detail-*.spec.ts`):
    - Replace placeholder data-testid selectors with actual UI elements
    - Enable fixme'd tests one by one based on current UI implementation
@@ -131,6 +145,7 @@ Our E2E testing strategy focuses on validating the complete user workflows defin
 **Goal**: Build robust, maintainable E2E test foundation
 
 **Tasks**:
+
 1. **Enhanced Authentication**:
    - Real authentication flow integration (not just session mocking)
    - Multi-tenant/organization support
@@ -174,13 +189,15 @@ e2e/
 ## Success Criteria
 
 ### Phase 1 Success
+
 - [ ] All auth flow tests pass consistently
 - [ ] No flaky or timing-dependent test failures
 - [ ] All three user roles (Admin, Member, Player) can authenticate
 - [ ] Session persistence works across page reloads
 - [ ] Permission-based navigation is properly tested
 
-### Phase 2 Success  
+### Phase 2 Success
+
 - [ ] All Beta CUJs have corresponding E2E test coverage
 - [ ] Tests validate complete user workflows end-to-end
 - [ ] Role-specific capabilities are properly tested
@@ -188,6 +205,7 @@ e2e/
 - [ ] Mobile responsiveness is validated
 
 ### Overall Success
+
 - [ ] 95%+ test pass rate in CI
 - [ ] Tests run in under 10 minutes total
 - [ ] Clear test failure reporting and debugging
@@ -197,7 +215,7 @@ e2e/
 ## Implementation Timeline
 
 - **Week 1**: Phase 1 completion (auth flow fixes)
-- **Week 2**: Phase 2.1-2.2 (Anonymous + Member flows) 
+- **Week 2**: Phase 2.1-2.2 (Anonymous + Member flows)
 - **Week 3**: Phase 2.3-2.4 (Machine Owner + Technician flows)
 - **Week 4**: Phase 2.5 (Admin flows)
 - **Week 5**: Phase 3 (Enhance existing tests)
@@ -213,4 +231,4 @@ e2e/
 
 ---
 
-*This document will be updated as implementation progresses and requirements evolve.*
+_This document will be updated as implementation progresses and requirements evolve._

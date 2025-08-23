@@ -8,41 +8,45 @@ Vitest delivers **3-65x faster test execution** compared to Jest, with the most 
 
 ### Overall Performance Improvements
 
-| Test Type | Jest Avg | Vitest Avg | Improvement |
-|-----------|----------|------------|-------------|
-| Pure Functions | 650ms | 10ms | **65x faster** |
-| Simple Services | 200ms | 15ms | **13x faster** |
-| Complex Services | 500ms | 25ms | **20x faster** |
-| Integration Tests | 1500ms | 300ms | **5x faster** |
+| Test Type         | Jest Avg | Vitest Avg | Improvement    |
+| ----------------- | -------- | ---------- | -------------- |
+| Pure Functions    | 650ms    | 10ms       | **65x faster** |
+| Simple Services   | 200ms    | 15ms       | **13x faster** |
+| Complex Services  | 500ms    | 25ms       | **20x faster** |
+| Integration Tests | 1500ms   | 300ms      | **5x faster**  |
 
 ### Real Migration Data
 
-| Test File | Test Count | Jest Time | Vitest Time | Improvement |
-|-----------|------------|-----------|-------------|-------------|
-| utils.test.ts | 15 | 658ms | 10ms | **65x** |
-| factory.test.ts | 6 | 539ms | 14ms | **38x** |
-| provider.test.ts | 2 | 6ms | 2ms | **3x** |
-| config.test.ts | 11 | 310ms | 42ms | **7x** |
-| pinballmapService.test.ts | 25 | N/A | 37ms | Very fast |
+| Test File                 | Test Count | Jest Time | Vitest Time | Improvement |
+| ------------------------- | ---------- | --------- | ----------- | ----------- |
+| utils.test.ts             | 15         | 658ms     | 10ms        | **65x**     |
+| factory.test.ts           | 6          | 539ms     | 14ms        | **38x**     |
+| provider.test.ts          | 2          | 6ms       | 2ms         | **3x**      |
+| config.test.ts            | 11         | 310ms     | 42ms        | **7x**      |
+| pinballmapService.test.ts | 25         | N/A       | 37ms        | Very fast   |
 
 ## Why Vitest is Faster
 
 ### 1. Native ESM Support
+
 - No transformation overhead
 - Direct module execution
 - Faster imports
 
 ### 2. Parallel Execution
+
 - Projects run concurrently
 - Better CPU utilization
 - Isolated environments
 
 ### 3. Smart Caching
+
 - Module graph caching
 - Transformation caching
 - Dependency tracking
 
 ### 4. Lightweight Architecture
+
 - Minimal abstraction
 - Direct Node.js integration
 - Optimized for speed
@@ -85,9 +89,9 @@ Vitest delivers **3-65x faster test execution** compared to Jest, with the most 
 ```typescript
 // Parallel execution for different environments
 projects: [
-  { name: 'node', environment: 'node' },
-  { name: 'jsdom', environment: 'jsdom' }
-]
+  { name: "node", environment: "node" },
+  { name: "jsdom", environment: "jsdom" },
+];
 ```
 
 ### 2. Minimize Setup Overhead
@@ -110,7 +114,7 @@ beforeEach(() => {
 
 ```typescript
 // ❌ Slow: Real API calls
-const response = await fetch('https://api.example.com/data');
+const response = await fetch("https://api.example.com/data");
 
 // ✅ Fast: Mocked responses
 mockFetch.mockResolvedValue({ data: mockData });
@@ -142,10 +146,10 @@ npm run test:vitest -- --reporter=verbose
 
 ```typescript
 // Add custom timing
-it('should be fast', async () => {
-  console.time('test-duration');
+it("should be fast", async () => {
+  console.time("test-duration");
   // ... test code ...
-  console.timeEnd('test-duration');
+  console.timeEnd("test-duration");
 });
 ```
 
@@ -153,10 +157,10 @@ it('should be fast', async () => {
 
 Coverage collection adds ~20-30% overhead:
 
-| Mode | Time | Overhead |
-|------|------|----------|
-| Normal | 1.5s | - |
-| With Coverage | 2.0s | +33% |
+| Mode          | Time | Overhead |
+| ------------- | ---- | -------- |
+| Normal        | 1.5s | -        |
+| With Coverage | 2.0s | +33%     |
 
 ## CI/CD Optimization
 
@@ -184,11 +188,13 @@ test-jsdom:
 ## Startup Time Comparison
 
 ### Cold Start
+
 - **Jest**: 800-1200ms
 - **Vitest**: 200-400ms
 - **Improvement**: 4x faster
 
 ### Warm Start (Watch Mode)
+
 - **Jest**: 200-400ms
 - **Vitest**: 50-100ms
 - **Improvement**: 4x faster
@@ -198,19 +204,21 @@ test-jsdom:
 ### Test Suite Size Impact
 
 | Tests | Jest Memory | Vitest Memory | Savings |
-|-------|-------------|---------------|---------|
-| 100 | 250MB | 150MB | 40% |
-| 500 | 600MB | 350MB | 42% |
-| 1000 | 1.2GB | 650MB | 46% |
+| ----- | ----------- | ------------- | ------- |
+| 100   | 250MB       | 150MB         | 40%     |
+| 500   | 600MB       | 350MB         | 42%     |
+| 1000  | 1.2GB       | 650MB         | 46%     |
 
 ## Real-World Impact
 
 ### Developer Experience
+
 - **Faster feedback loop**: 10s → 2s for typical changes
 - **Better watch mode**: Near-instant re-runs
 - **Lower resource usage**: Can run other tools simultaneously
 
 ### CI/CD Benefits
+
 - **Reduced build times**: 5 min → 2 min for full suite
 - **Lower costs**: Less compute time needed
 - **Faster deployments**: Quicker validation

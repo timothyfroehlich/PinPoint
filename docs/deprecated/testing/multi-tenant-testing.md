@@ -13,6 +13,7 @@ This file has been **superseded** by the comprehensive **Security Testing Archet
 **👉 [archetype-security-testing.md](./archetype-security-testing.md)**
 
 The new archetype provides:
+
 - **RLS policy direct testing** patterns (NEW archetype not in this legacy file)
 - **Permission matrix validation** with comprehensive coverage
 - **Cross-organizational data leakage prevention** testing
