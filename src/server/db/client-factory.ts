@@ -1,23 +1,30 @@
 import { drizzle as pgDrizzle } from "drizzle-orm/postgres-js";
+import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { drizzle as pgliteDrizzle } from "drizzle-orm/pglite";
+import type { PgliteDatabase } from "drizzle-orm/pglite";
+import type { Sql } from "postgres";
+import type { PGlite } from "@electric-sql/pglite";
 
 import * as schema from "./schema";
 
 /**
  * Create a Drizzle client with consistent options across drivers.
- * Tries the PGlite drizzle factory first, falls back to Postgres-js drizzle.
+ * Determines the appropriate driver based on the adapter type.
  */
-export function createDrizzle(adapter: unknown, loggerEnabled?: boolean) {
+export function createDrizzle(
+  adapter: Sql | PGlite,
+  loggerEnabled?: boolean,
+): PostgresJsDatabase<typeof schema> | PgliteDatabase<typeof schema> {
   const options = {
     schema,
-    casing: "snake_case" as const,
-    logger: loggerEnabled,
+    ...(loggerEnabled !== undefined && { logger: loggerEnabled }),
   };
 
-  // Try pglite first (for in-memory test adapters), fall back to postgres-js
-  try {
-    return pgliteDrizzle(adapter as any, options as any);
-  } catch {
-    return pgDrizzle(adapter as any, options as any);
+  // Check if adapter is PGlite instance (has .exec method)
+  if ("exec" in adapter && typeof adapter.exec === "function") {
+    return pgliteDrizzle(adapter as PGlite, options);
   }
+
+  // Otherwise, use postgres-js
+  return pgDrizzle(adapter as Sql, options);
 }

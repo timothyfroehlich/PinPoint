@@ -1,4 +1,3 @@
-import { drizzle } from "drizzle-orm/postgres-js";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { createDrizzle } from "./client-factory";
 import postgres from "postgres";

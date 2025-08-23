@@ -27,7 +27,14 @@ export async function GET(): Promise<NextResponse> {
     const user = await getSupabaseUser();
 
     // Get the organization to fetch memberships
-    const organizationResults = await db.select().from(organizations).limit(1);
+    const organizationResults = await db
+      .select({
+        id: organizations.id,
+        name: organizations.name,
+        subdomain: organizations.subdomain,
+      })
+      .from(organizations)
+      .limit(1);
 
     const organization = organizationResults[0];
     console.log("[DEV-API] Found organization:", organization?.name ?? "none");

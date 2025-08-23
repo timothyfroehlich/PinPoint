@@ -63,11 +63,17 @@ export const issueCoreRouter = createTRPCRouter({
       });
 
       const defaultStatus = await ctx.db.query.issueStatuses.findFirst({
-        where: eq(issueStatuses.isDefault, true),
+        where: and(
+          eq(issueStatuses.isDefault, true),
+          eq(issueStatuses.organizationId, organization.id),
+        ),
       });
 
       const defaultPriority = await ctx.db.query.priorities.findFirst({
-        where: eq(priorities.isDefault, true),
+        where: and(
+          eq(priorities.isDefault, true),
+          eq(priorities.organizationId, organization.id),
+        ),
       });
 
       // Create validation input (handle exactOptionalPropertyTypes)
@@ -208,11 +214,17 @@ export const issueCoreRouter = createTRPCRouter({
       });
 
       const defaultStatus = await ctx.db.query.issueStatuses.findFirst({
-        where: eq(issueStatuses.isDefault, true),
+        where: and(
+          eq(issueStatuses.isDefault, true),
+          eq(issueStatuses.organizationId, organization.id),
+        ),
       });
 
       const defaultPriority = await ctx.db.query.priorities.findFirst({
-        where: eq(priorities.isDefault, true),
+        where: and(
+          eq(priorities.isDefault, true),
+          eq(priorities.organizationId, organization.id),
+        ),
       });
 
       // Create validation input (handle exactOptionalPropertyTypes)

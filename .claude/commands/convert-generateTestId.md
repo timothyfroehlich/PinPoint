@@ -12,6 +12,12 @@
 
 You are a specialized conversion agent. Your job is to convert `generateTestId()` calls to proper `SEED_TEST_IDS` patterns while logging cases that need architectural decisions.
 
+### ⚠️ CRITICAL CONTEXT: generateTestId() IS COMPLETELY DELETED
+
+**THE FUNCTION NO LONGER EXISTS** - `src/test/helpers/test-id-generator.ts` now throws errors instead of generating IDs. Any remaining `generateTestId()` calls will cause **TypeScript compilation errors** and **test failures**. This is intentional "scorched earth" enforcement.
+
+**Your job:** Convert every single `generateTestId()` call or the file won't compile.
+
 ### CRITICAL FILES TO READ FIRST:
 
 1. **Target file** (provided by user)
@@ -20,10 +26,12 @@ You are a specialized conversion agent. Your job is to convert `generateTestId()
 
 ### CONVERSION PATTERNS:
 
-#### Phase 1: Direct SEED_TEST_IDS Mappings
+#### CONVERSION RULE: Use Real SEED_TEST_IDS Constants Only
+
+**Convert ONLY what maps to actual minimal seed constants:**
 
 ```typescript
-// ✅ Use actual seed data constants
+// ✅ CONVERT: Direct mappings to real seed data
 generateTestId("user") → SEED_TEST_IDS.USERS.ADMIN
 generateTestId("org") → SEED_TEST_IDS.ORGANIZATIONS.primary
 generateTestId("machine") → SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1
@@ -33,24 +41,31 @@ generateTestId("status") → SEED_TEST_IDS.STATUSES.NEW_PRIMARY
 generateTestId("priority") → SEED_TEST_IDS.PRIORITIES.HIGH_PRIMARY
 generateTestId("role") → SEED_TEST_IDS.ROLES.ADMIN_PRIMARY
 
-// For unit test mocks
+// ✅ CONVERT: Mock patterns for unit tests
 generateTestId("model") → SEED_TEST_IDS.MOCK_PATTERNS.MODEL
 generateTestId("collection") → SEED_TEST_IDS.MOCK_PATTERNS.COLLECTION
 generateTestId("comment") → SEED_TEST_IDS.MOCK_PATTERNS.COMMENT
 generateTestId("notification") → SEED_TEST_IDS.MOCK_PATTERNS.NOTIFICATION
+generateTestId("type") → SEED_TEST_IDS.MOCK_PATTERNS.TYPE
+generateTestId("entity") → SEED_TEST_IDS.MOCK_PATTERNS.ENTITY
 ```
 
-#### Phase 2: Sequential Pattern Conversions
+#### LOG (Don't Convert): Cases Needing More Than Minimal Seed
 
 ```typescript
-// ✅ Convert numbered sequences to static strings
-generateTestId("model-1") → "mock-model-1"
-generateTestId("model-2") → "mock-model-2"
-generateTestId("qr-1") → "mock-qr-1"
-generateTestId("auto-1") → "mock-auto-1"
-generateTestId("type-1") → "mock-type-1"
-generateTestId("competitor-model-1") → "mock-competitor-model-1"
+// ❌ LOG ONLY - needs multiple distinct entities
+generateTestId("model-1"); // Test needs multiple models
+generateTestId("model-2"); // But minimal seed only has MOCK_PATTERNS.MODEL
+generateTestId("qr-1"); // Test needs multiple QR codes
+generateTestId("auto-1"); // Test needs multiple collections
+
+// ❌ LOG ONLY - template literals
+generateTestId(`machine-${i + 1}`) // Dynamic generation
+// ❌ LOG ONLY - email construction
+`user-${generateTestId("user")}@test.com`;
 ```
+
+**🚨 NEVER create arbitrary strings like "mock-williams-model" - use real constants or log it!**
 
 #### Phase 3: Import Cleanup
 
