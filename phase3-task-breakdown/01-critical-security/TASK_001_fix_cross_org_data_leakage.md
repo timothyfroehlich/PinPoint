@@ -119,17 +119,17 @@ Tests create massive amounts of dynamic test data instead of using the establish
    - Use existing minimal seed: 6 primary machines + 1 competitor + 10 issues
    - Use `SEED_TEST_IDS.ORGANIZATIONS.primary` and `SEED_TEST_IDS.ORGANIZATIONS.competitor`
 
-### Phase 2: Create Real RLS Testing (pgTAP) (Day 2)
+### Phase 2: Run Existing pgTAP RLS Tests (Day 2)
 
-1. **Implement Actual RLS Policy Testing**
-   - Create `supabase/tests/rls/` directory structure
-   - Write pgTAP tests using real PostgreSQL + Supabase `auth.jwt()` functions
-   - Test organizational isolation with actual authentication context
+1. **Execute Existing RLS Policy Tests**
+   - Run comprehensive pgTAP test suite: `npm run test:rls`
+   - Tests in `supabase/tests/rls/` already validate real PostgreSQL RLS policies
+   - Existing tests use `SEED_TEST_IDS` via generated SQL constants
 
 2. **Validate Database-Level Security**
-   - Ensure RLS policies are active and enforcing boundaries
-   - Test cross-org access is properly blocked at database level
-   - Validate joins maintain organizational isolation
+   - Verify existing RLS policies are active and enforcing boundaries
+   - Confirm cross-org access is properly blocked at database level
+   - Validate joins maintain organizational isolation with real auth context
 
 ## Technical Specifications
 
@@ -257,24 +257,24 @@ export async function auditMultiTenantSecurity(
 - [ ] Memory-safe testing with worker-scoped PGlite instances
 - [ ] Business logic properly scopes queries by organizationId
 
-### Ultimate Success (pgTAP RLS Implementation)
+### Ultimate Success (pgTAP RLS Validation)
 
-- [ ] pgTAP RLS tests validate real PostgreSQL policy enforcement
+- [ ] Existing pgTAP RLS tests (`npm run test:rls`) all pass
 - [ ] Database-level policies confirmed working with auth.jwt() functions
 - [ ] Cross-organizational access blocked at database level
-- [ ] Dual-track architecture: business logic (PGlite) + RLS policies (pgTAP)
+- [ ] Dual-track architecture operational: business logic (PGlite) + RLS policies (pgTAP)
 
 ## Validation Commands
 
 ```bash
-# Test the specific failing test file
+# Test the specific failing business logic test file
 npm run test src/integration-tests/cross-org-isolation.test.ts
 
-# Run all RLS-related tests
+# Run existing pgTAP RLS tests (database-level validation)
 npm run test:rls
 
-# Validate pgTAP tests (once implemented)
-supabase test db
+# Run both tracks together
+npm run test:all
 ```
 
 ## Dependencies
@@ -308,8 +308,10 @@ This is the **most critical testing architecture task** in the project. The curr
 **Critical Success Factors**:
 
 - Convert PGlite tests to business logic validation only
-- Use pgTAP for actual database RLS policy testing
+- Run existing pgTAP test suite (`npm run test:rls`) for database RLS policy validation
 - Eliminate dynamic test data generation for seeded data architecture
 - Focus on what each testing tool can actually validate
+
+**Important Discovery**: We already have comprehensive pgTAP RLS tests in `supabase/tests/rls/` - no need to create new ones!
 
 **This is not a data leakage issue** - it's a fundamental misunderstanding of PGlite capabilities.
