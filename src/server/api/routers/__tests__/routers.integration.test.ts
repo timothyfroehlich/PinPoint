@@ -109,8 +109,16 @@ describe("tRPC Router Integration Tests", () => {
     primaryOrgId = primary;
     _competitorOrgId = competitor;
 
-    // Get seeded test data for primary organization
-    seededData = await getSeededTestData(db, primaryOrgId);
+    // Manually construct seededData from constants
+    seededData = {
+      machine: { id: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1 },
+      status: { id: SEED_TEST_IDS.STATUSES.NEW },
+      priority: { id: SEED_TEST_IDS.PRIORITIES.LOW },
+      location: { id: SEED_TEST_IDS.LOCATIONS.DEFAULT_PRIMARY },
+      model: { id: "model_G42Pk-MZe2e" }, // Xenon
+      user: { id: SEED_TEST_IDS.USERS.ADMIN },
+      organization: { id: SEED_TEST_IDS.ORGANIZATIONS.primary },
+    };
   });
 
   describe("Issue Router Integration", () => {
@@ -209,7 +217,7 @@ describe("tRPC Router Integration Tests", () => {
         const [org2] = await txDb
           .insert(schema.organizations)
           .values({
-            id: "org-2",
+            id: SEED_TEST_IDS.ORGANIZATIONS.competitor,
             name: "Organization 2",
             subdomain: "org2",
           })
@@ -301,7 +309,7 @@ describe("tRPC Router Integration Tests", () => {
         const [org2] = await txDb
           .insert(schema.organizations)
           .values({
-            id: "org-2",
+            id: SEED_TEST_IDS.ORGANIZATIONS.competitor,
             name: "Organization 2",
             subdomain: "org2",
           })
@@ -380,7 +388,7 @@ describe("tRPC Router Integration Tests", () => {
         const [org2] = await txDb
           .insert(schema.organizations)
           .values({
-            id: "org-2",
+            id: SEED_TEST_IDS.ORGANIZATIONS.competitor,
             name: "Organization 2",
             subdomain: "org2",
           })

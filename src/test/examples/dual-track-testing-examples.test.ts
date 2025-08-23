@@ -341,7 +341,10 @@ describe("Dual-Track Testing Examples", () => {
       // - Testing cross-org permission checks in application code
       // - Validating that services properly scope queries
 
-      const contexts = [{ orgId: "test-org-1" }, { orgId: "test-org-2" }];
+      const contexts = [
+        { orgId: SEED_TEST_IDS.ORGANIZATIONS.primary },
+        { orgId: SEED_TEST_IDS.ORGANIZATIONS.competitor },
+      ];
 
       await withCrossOrgTest(workerDb, contexts, async (setContext, db) => {
         // Example: Testing service boundary enforcement
@@ -350,7 +353,10 @@ describe("Dual-Track Testing Examples", () => {
         const report = await service.generateReport();
 
         expect(
-          report.data.every((item) => item.organizationId === "test-org-1"),
+          report.data.every(
+            (item) =>
+              item.organizationId === SEED_TEST_IDS.ORGANIZATIONS.primary,
+          ),
         ).toBe(true);
       });
     });

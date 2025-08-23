@@ -44,7 +44,7 @@ describe("Location Router Aggregation Operations (PGlite)", () => {
   beforeAll(async () => {
     // Create seeded test database with established infrastructure
     const setup = await createSeededTestDatabase();
-    workerDb = setup.db;
+    _workerDb = setup.db;
     primaryOrgId = setup.organizationId;
     competitorOrgId = SEED_TEST_IDS.ORGANIZATIONS.competitor;
 

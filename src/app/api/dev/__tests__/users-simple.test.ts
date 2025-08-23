@@ -2,6 +2,7 @@
  * Simplified dev users API tests that avoid NextAuth imports
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
 function setNodeEnv(value: string) {
   Object.defineProperty(process.env, "NODE_ENV", {
@@ -73,7 +74,7 @@ describe("/api/dev/users (simplified)", () => {
       const expectedResponse: DevUsersResponse = {
         users: [
           {
-            id: "user-1",
+            id: SEED_TEST_IDS.USERS.ADMIN,
             name: "User 1",
             email: "user1@example.com",
           },

@@ -568,8 +568,8 @@ async function createSampleIssuesWithDb(
           set: {
             title: sql.raw(`excluded.title`),
             description: sql.raw(`excluded.description`),
-            priorityId: sql.raw(`excluded.priorityId`),
-            statusId: sql.raw(`excluded.statusId`),
+            priorityId: sql.raw(`excluded."priorityId"`),
+            statusId: sql.raw(`excluded."statusId"`),
             updatedAt: new Date(),
           },
         });

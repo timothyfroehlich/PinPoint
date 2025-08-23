@@ -1162,7 +1162,7 @@ describe("Role Router Integration Tests (PGlite)", () => {
         const caller = roleRouter.createCaller(context);
 
         // Create second organization with roles
-        const org2Id = generateTestId("test-org-2");
+        const org2Id = generateTestId(SEED_TEST_IDS.ORGANIZATIONS.competitor);
         await db.insert(schema.organizations).values({
           id: org2Id,
           name: "Test Organization 2",

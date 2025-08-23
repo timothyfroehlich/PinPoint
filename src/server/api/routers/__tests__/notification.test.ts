@@ -60,6 +60,7 @@ vi.mock("~/server/auth/permissions", () => ({
 
 // Import real service factory for true integration testing
 import { ServiceFactory } from "~/server/services/factory";
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
 // Helper function to set up test data and context
 async function setupTestData(db: TestDatabase) {
@@ -82,7 +83,7 @@ async function setupTestData(db: TestDatabase) {
   const [testUser] = await db
     .insert(schema.users)
     .values({
-      id: generateTestId("user-admin"),
+      id: generateTestId(SEED_TEST_IDS.USERS.ADMIN),
       name: "Test Admin",
       email: `admin-${generateTestId("user")}@example.com`,
       emailVerified: null,
@@ -609,7 +610,7 @@ describe("Notification Router Integration Tests", () => {
         const [org2] = await db
           .insert(schema.organizations)
           .values({
-            id: "org-2",
+            id: SEED_TEST_IDS.ORGANIZATIONS.competitor,
             name: "Organization 2",
             subdomain: "org2",
           })

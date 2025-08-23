@@ -993,7 +993,7 @@ describe("Utility Functions", () => {
 describe("validateBatchAssignments", () => {
   const issues = [
     createTestIssue({ id: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE }),
-    createTestIssue({ id: "issue-2" }),
+    createTestIssue({ id: SEED_TEST_IDS.ISSUES.ISSUE_2 }),
   ];
   const memberships = [
     createTestMembership({ userId: SEED_TEST_IDS.MOCK_PATTERNS.USER }),
@@ -1008,7 +1008,11 @@ describe("validateBatchAssignments", () => {
         issueId: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
         userId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
       },
-      { type: "assign" as const, issueId: "issue-2", userId: "user-2" },
+      {
+        type: "assign" as const,
+        issueId: SEED_TEST_IDS.ISSUES.ISSUE_2,
+        userId: "user-2",
+      },
     ];
     const result = validateBatchAssignments(
       operations,
@@ -1022,7 +1026,7 @@ describe("validateBatchAssignments", () => {
   it("should validate batch unassignments", () => {
     const operations = [
       { type: "unassign" as const, issueId: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE },
-      { type: "unassign" as const, issueId: "issue-2" },
+      { type: "unassign" as const, issueId: SEED_TEST_IDS.ISSUES.ISSUE_2 },
     ];
     const result = validateBatchAssignments(
       operations,

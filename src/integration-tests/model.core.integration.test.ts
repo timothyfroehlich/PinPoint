@@ -283,7 +283,9 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
 
         const modelId1 = generateTestId("model-1");
         const modelId2 = generateTestId("model-2");
-        const machineId1 = generateTestId("machine-1");
+        const machineId1 = generateTestId(
+          SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
+        );
         const machineId2 = generateTestId("machine-2");
 
         // Create a test location in the primary organization (required for machines)
@@ -354,7 +356,9 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
         const caller = appRouter.createCaller(ctx);
 
         const modelId = generateTestId("model");
-        const machineId1 = generateTestId("machine-1");
+        const machineId1 = generateTestId(
+          SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
+        );
         const machineId2 = generateTestId("machine-2");
 
         // Create a test location in the primary organization (required for machines)
@@ -565,7 +569,9 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
 
         const modelId1 = generateTestId("model-1");
         const modelId2 = generateTestId("model-2");
-        const machineId1 = generateTestId("machine-1");
+        const machineId1 = generateTestId(
+          SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
+        );
         const machineId2 = generateTestId("machine-2");
 
         // Get baseline count before adding test data
@@ -825,7 +831,9 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
         const caller = appRouter.createCaller(ctx);
 
         const modelId = generateTestId("model");
-        const machineId1 = generateTestId("machine-1");
+        const machineId1 = generateTestId(
+          SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
+        );
         const machineId2 = generateTestId("machine-2");
 
         // Create location in primary org first (required for machines)

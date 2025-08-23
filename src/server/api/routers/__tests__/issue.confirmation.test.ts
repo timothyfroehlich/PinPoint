@@ -247,7 +247,7 @@ const issueConfirmationRouter = createTRPCRouter({
         // Mock confirmation fields - in reality these would come from the database
         isConfirmed: Math.random() > 0.3, // Random for testing
         confirmedAt: Math.random() > 0.5 ? new Date() : null,
-        confirmedById: Math.random() > 0.5 ? "user-1" : null,
+        confirmedById: Math.random() > 0.5 ? SEED_TEST_IDS.USERS.ADMIN : null,
       }));
     }),
 
@@ -481,7 +481,7 @@ describe("Issue Confirmation Workflow (RLS-Enhanced)", () => {
       const result = await caller.create({
         title: "Test Issue",
         description: "Test description",
-        machineId: "machine-1",
+        machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
         statusId: "status-1",
         priorityId: "priority-1",
         formType: "basic",
@@ -495,8 +495,8 @@ describe("Issue Confirmation Workflow (RLS-Enhanced)", () => {
         data: expect.objectContaining({
           title: "Test Issue",
           description: "Test description",
-          organizationId: "org-1",
-          createdById: "user-1",
+          organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
+          createdById: SEED_TEST_IDS.USERS.ADMIN,
         }),
         include: expect.any(Object),
       });
@@ -508,48 +508,48 @@ describe("Issue Confirmation Workflow (RLS-Enhanced)", () => {
       const caller = issueConfirmationRouter.createCaller(ctx);
 
       const mockIssue = {
-        id: "issue-1",
+        id: SEED_TEST_IDS.ISSUES.ISSUE_1,
         title: "Test Issue",
         description: "Test description",
-        machineId: "machine-1",
+        machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
         statusId: "status-1",
         priorityId: "priority-1",
-        organizationId: "org-1",
-        createdById: "user-1",
+        organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
+        createdById: SEED_TEST_IDS.USERS.ADMIN,
         createdAt: new Date(),
         updatedAt: new Date(),
         resolvedAt: null,
         checklist: null,
         machine: {
-          id: "machine-1",
+          id: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
           name: "Test Machine",
-          organizationId: "org-1",
+          organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
           locationId: "location-1",
           modelId: "model-1",
           ownerId: null,
           location: {
             id: "location-1",
             name: "Test Location",
-            organizationId: "org-1",
+            organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
           },
           model: {
             id: "model-1",
             name: "Test Model",
-            organizationId: "org-1",
+            organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
           },
         },
         status: {
           id: "status-1",
           name: "Open",
-          organizationId: "org-1",
+          organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
         },
         priority: {
           id: "priority-1",
           name: "Medium",
-          organizationId: "org-1",
+          organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
         },
         createdBy: {
-          id: "user-1",
+          id: SEED_TEST_IDS.USERS.ADMIN,
           name: "Test User",
           email: "user@example.com",
         },
@@ -561,7 +561,7 @@ describe("Issue Confirmation Workflow (RLS-Enhanced)", () => {
       const result = await caller.create({
         title: "Test Issue",
         description: "Test description",
-        machineId: "machine-1",
+        machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
         statusId: "status-1",
         priorityId: "priority-1",
         formType: "full",
@@ -570,7 +570,7 @@ describe("Issue Confirmation Workflow (RLS-Enhanced)", () => {
       // Assert
       expect(result.isConfirmed).toBe(true);
       expect(result.confirmedAt).not.toBeNull();
-      expect(result.confirmedById).toBe("user-1");
+      expect(result.confirmedById).toBe(SEED_TEST_IDS.USERS.ADMIN);
     });
 
     it("should allow explicit override of confirmation status in full form", async () => {
@@ -579,16 +579,19 @@ describe("Issue Confirmation Workflow (RLS-Enhanced)", () => {
       const caller = issueConfirmationRouter.createCaller(ctx);
 
       const mockIssue = {
-        id: "issue-1",
+        id: SEED_TEST_IDS.ISSUES.ISSUE_1,
         title: "Test Issue",
-        organizationId: "org-1",
-        createdById: "user-1",
+        organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
+        createdById: SEED_TEST_IDS.USERS.ADMIN,
         createdAt: new Date(),
         updatedAt: new Date(),
-        machine: { id: "machine-1", name: "Test Machine" },
+        machine: {
+          id: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
+          name: "Test Machine",
+        },
         status: { id: "status-1", name: "Open" },
         priority: { id: "priority-1", name: "Medium" },
-        createdBy: { id: "user-1", name: "Test User" },
+        createdBy: { id: SEED_TEST_IDS.USERS.ADMIN, name: "Test User" },
       };
 
       vi.mocked(ctx.db.issue.create).mockResolvedValue(mockIssue as any);
@@ -596,7 +599,7 @@ describe("Issue Confirmation Workflow (RLS-Enhanced)", () => {
       // Act
       const result = await caller.create({
         title: "Test Issue",
-        machineId: "machine-1",
+        machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
         statusId: "status-1",
         priorityId: "priority-1",
         formType: "full",
@@ -618,7 +621,7 @@ describe("Issue Confirmation Workflow (RLS-Enhanced)", () => {
       await expect(
         caller.create({
           title: "Test Issue",
-          machineId: "machine-1",
+          machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
           statusId: "status-1",
           priorityId: "priority-1",
           formType: "basic",
@@ -634,16 +637,19 @@ describe("Issue Confirmation Workflow (RLS-Enhanced)", () => {
       const caller = issueConfirmationRouter.createCaller(ctx);
 
       const mockIssue = {
-        id: "issue-1",
+        id: SEED_TEST_IDS.ISSUES.ISSUE_1,
         title: "Test Issue",
-        organizationId: "org-1",
-        createdById: "user-1",
+        organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
+        createdById: SEED_TEST_IDS.USERS.ADMIN,
         createdAt: new Date(),
         updatedAt: new Date(),
-        machine: { id: "machine-1", name: "Test Machine" },
+        machine: {
+          id: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
+          name: "Test Machine",
+        },
         status: { id: "status-1", name: "Open" },
         priority: { id: "priority-1", name: "Medium" },
-        createdBy: { id: "user-1", name: "Test User" },
+        createdBy: { id: SEED_TEST_IDS.USERS.ADMIN, name: "Test User" },
       };
 
       vi.mocked(ctx.db.query.issues.findFirst).mockResolvedValue(
@@ -653,16 +659,16 @@ describe("Issue Confirmation Workflow (RLS-Enhanced)", () => {
 
       // Act
       const result = await caller.toggleConfirmation({
-        issueId: "issue-1",
+        issueId: SEED_TEST_IDS.ISSUES.ISSUE_1,
         isConfirmed: true,
       });
 
       // Assert
       expect(result.isConfirmed).toBe(true);
       expect(result.confirmedAt).not.toBeNull();
-      expect(result.confirmedById).toBe("user-1");
+      expect(result.confirmedById).toBe(SEED_TEST_IDS.USERS.ADMIN);
       expect(ctx.db.issue.update).toHaveBeenCalledWith({
-        where: { id: "issue-1" },
+        where: { id: SEED_TEST_IDS.ISSUES.ISSUE_1 },
         data: {},
         include: expect.any(Object),
       });
@@ -676,7 +682,7 @@ describe("Issue Confirmation Workflow (RLS-Enhanced)", () => {
       // Act & Assert
       await expect(
         caller.toggleConfirmation({
-          issueId: "issue-1",
+          issueId: SEED_TEST_IDS.ISSUES.ISSUE_1,
           isConfirmed: true,
         }),
       ).rejects.toThrow("Missing required permission: issue:confirm");
@@ -704,16 +710,19 @@ describe("Issue Confirmation Workflow (RLS-Enhanced)", () => {
       const caller = issueConfirmationRouter.createCaller(ctx);
 
       const mockIssue = {
-        id: "issue-1",
+        id: SEED_TEST_IDS.ISSUES.ISSUE_1,
         title: "Test Issue",
-        organizationId: "org-1",
-        createdById: "user-1",
+        organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
+        createdById: SEED_TEST_IDS.USERS.ADMIN,
         createdAt: new Date(),
         updatedAt: new Date(),
-        machine: { id: "machine-1", name: "Test Machine" },
+        machine: {
+          id: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
+          name: "Test Machine",
+        },
         status: { id: "status-1", name: "Open" },
         priority: { id: "priority-1", name: "Medium" },
-        createdBy: { id: "user-1", name: "Test User" },
+        createdBy: { id: SEED_TEST_IDS.USERS.ADMIN, name: "Test User" },
       };
 
       vi.mocked(ctx.db.query.issues.findFirst).mockResolvedValue(
@@ -723,7 +732,7 @@ describe("Issue Confirmation Workflow (RLS-Enhanced)", () => {
 
       // Act
       const result = await caller.toggleConfirmation({
-        issueId: "issue-1",
+        issueId: SEED_TEST_IDS.ISSUES.ISSUE_1,
         isConfirmed: false,
       });
 
@@ -742,26 +751,26 @@ describe("Issue Confirmation Workflow (RLS-Enhanced)", () => {
 
       const mockIssues = [
         {
-          id: "issue-1",
+          id: SEED_TEST_IDS.ISSUES.ISSUE_1,
           title: "Confirmed Issue",
-          organizationId: "org-1",
-          createdById: "user-1",
+          organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
+          createdById: SEED_TEST_IDS.USERS.ADMIN,
           createdAt: new Date(),
           updatedAt: new Date(),
           machine: {
-            id: "machine-1",
+            id: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
             name: "Test Machine",
             location: { id: "location-1", name: "Test Location" },
             model: { id: "model-1", name: "Test Model" },
           },
           status: { id: "status-1", name: "Open" },
           priority: { id: "priority-1", name: "Medium" },
-          createdBy: { id: "user-1", name: "Test User" },
+          createdBy: { id: SEED_TEST_IDS.USERS.ADMIN, name: "Test User" },
         },
         {
-          id: "issue-2",
+          id: SEED_TEST_IDS.ISSUES.ISSUE_2,
           title: "Unconfirmed Issue",
-          organizationId: "org-1",
+          organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
           createdById: "user-2",
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -809,7 +818,7 @@ describe("Issue Confirmation Workflow (RLS-Enhanced)", () => {
       // Assert
       expect(ctx.db.issue.findMany).toHaveBeenCalledWith({
         where: {
-          organizationId: "org-1",
+          organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
           machine: { locationId: "location-1" },
         },
         include: expect.any(Object),
@@ -826,14 +835,14 @@ describe("Issue Confirmation Workflow (RLS-Enhanced)", () => {
 
       // Act
       await caller.listWithConfirmationStatus({
-        machineId: "machine-1",
+        machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
       });
 
       // Assert
       expect(ctx.db.issue.findMany).toHaveBeenCalledWith({
         where: {
-          organizationId: "org-1",
-          machineId: "machine-1",
+          organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
+          machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
         },
         include: expect.any(Object),
         orderBy: [{ createdAt: "desc" }],
@@ -901,7 +910,7 @@ describe("Issue Confirmation Workflow (RLS-Enhanced)", () => {
       // Assert
       expect(ctx.db.issue.count).toHaveBeenCalledWith({
         where: {
-          organizationId: "org-1",
+          organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
           createdAt: {
             gte: fromDate,
             lte: toDate,
@@ -925,7 +934,7 @@ describe("Issue Confirmation Workflow (RLS-Enhanced)", () => {
       // Assert
       expect(ctx.db.issue.count).toHaveBeenCalledWith({
         where: {
-          organizationId: "org-1",
+          organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
           machine: { locationId: "location-1" },
         },
       });
@@ -942,7 +951,7 @@ describe("Issue Confirmation Workflow (RLS-Enhanced)", () => {
       await expect(
         caller.create({
           title: "Test Issue",
-          machineId: "machine-1",
+          machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
           statusId: "status-1",
           priorityId: "priority-1",
           formType: "basic",
@@ -959,7 +968,7 @@ describe("Issue Confirmation Workflow (RLS-Enhanced)", () => {
       await expect(
         caller.create({
           title: "Test Issue",
-          machineId: "machine-1",
+          machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
           statusId: "status-1",
           priorityId: "priority-1",
           formType: "full",
@@ -973,16 +982,19 @@ describe("Issue Confirmation Workflow (RLS-Enhanced)", () => {
       const caller = issueConfirmationRouter.createCaller(ctx);
 
       const mockIssue = {
-        id: "issue-1",
+        id: SEED_TEST_IDS.ISSUES.ISSUE_1,
         title: "Test Issue",
-        organizationId: "org-1",
-        createdById: "user-1",
+        organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
+        createdById: SEED_TEST_IDS.USERS.ADMIN,
         createdAt: new Date(),
         updatedAt: new Date(),
-        machine: { id: "machine-1", name: "Test Machine" },
+        machine: {
+          id: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
+          name: "Test Machine",
+        },
         status: { id: "status-1", name: "Open" },
         priority: { id: "priority-1", name: "Medium" },
-        createdBy: { id: "user-1", name: "Test User" },
+        createdBy: { id: SEED_TEST_IDS.USERS.ADMIN, name: "Test User" },
       };
 
       vi.mocked(ctx.db.issue.create).mockResolvedValue(mockIssue as any);
@@ -991,7 +1003,7 @@ describe("Issue Confirmation Workflow (RLS-Enhanced)", () => {
       await expect(
         caller.create({
           title: "Test Issue",
-          machineId: "machine-1",
+          machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
           statusId: "status-1",
           priorityId: "priority-1",
           formType: "basic",

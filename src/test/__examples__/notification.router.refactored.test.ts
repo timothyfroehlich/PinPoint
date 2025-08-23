@@ -14,6 +14,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 import { appRouter } from "~/server/api/root";
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 import {
   createAuthenticatedContext,
   PermissionTests,
@@ -29,7 +30,7 @@ import {
 const mockNotifications = [
   {
     id: "notification-1",
-    userId: "user-1",
+    userId: SEED_TEST_IDS.USERS.ADMIN,
     type: "ISSUE_CREATED",
     message: "New issue created",
     read: false,
@@ -37,7 +38,7 @@ const mockNotifications = [
   },
   {
     id: "notification-2",
-    userId: "user-1",
+    userId: SEED_TEST_IDS.USERS.ADMIN,
     type: "ISSUE_UPDATED",
     message: "Issue status changed",
     read: true,
@@ -77,7 +78,7 @@ describe("notificationRouter - Refactored", () => {
             validInput,
           );
 
-        expectServiceCalled(["user-1", validInput]);
+        expectServiceCalled([SEED_TEST_IDS.USERS.ADMIN, validInput]);
         expect(result).toEqual(mockNotifications);
         return result;
       }),
@@ -132,7 +133,7 @@ describe("notificationRouter - Refactored", () => {
           const result =
             await context.authenticatedCaller.notification.getUnreadCount();
 
-          expectServiceCalled(["user-1"]);
+          expectServiceCalled([SEED_TEST_IDS.USERS.ADMIN]);
           expect(result).toBe(3);
           return result;
         },
@@ -167,7 +168,7 @@ describe("notificationRouter - Refactored", () => {
               validInput,
             );
 
-          expectServiceCalled(["notification-1", "user-1"]);
+          expectServiceCalled(["notification-1", SEED_TEST_IDS.USERS.ADMIN]);
           expect(result).toEqual({ success: true });
           return result;
         },
@@ -224,7 +225,7 @@ describe("notificationRouter - Refactored", () => {
           const result =
             await context.authenticatedCaller.notification.markAllAsRead();
 
-          expectServiceCalled(["user-1"]);
+          expectServiceCalled([SEED_TEST_IDS.USERS.ADMIN]);
           expect(result).toEqual({ success: true });
           return result;
         },

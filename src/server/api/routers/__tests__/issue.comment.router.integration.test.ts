@@ -61,7 +61,9 @@ describe("Issue Comment Router Integration Tests (PGlite)", () => {
       await withIsolatedTest(workerDb, async (db) => {
         // Set RLS context for primary org
         await db.execute(
-          sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`,
+          sql.raw(
+            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
+          ),
         );
 
         // Create an issue first using static seed data
@@ -120,7 +122,9 @@ describe("Issue Comment Router Integration Tests (PGlite)", () => {
       await withIsolatedTest(workerDb, async (db) => {
         // Set RLS context for primary org
         await db.execute(
-          sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`,
+          sql.raw(
+            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
+          ),
         );
 
         // Use seeded data for real relationships
@@ -162,7 +166,9 @@ describe("Issue Comment Router Integration Tests (PGlite)", () => {
       await withIsolatedTest(workerDb, async (db) => {
         // Set RLS context for primary org
         await db.execute(
-          sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`,
+          sql.raw(
+            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
+          ),
         );
 
         // Use seeded data for real relationships
@@ -234,7 +240,9 @@ describe("Issue Comment Router Integration Tests (PGlite)", () => {
       await withIsolatedTest(workerDb, async (db) => {
         // Set RLS context for primary org
         await db.execute(
-          sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`,
+          sql.raw(
+            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
+          ),
         );
 
         // Use seeded data for real relationships
@@ -299,7 +307,9 @@ describe("Issue Comment Router Integration Tests (PGlite)", () => {
       await withIsolatedTest(workerDb, async (db) => {
         // Set RLS context for primary org
         await db.execute(
-          sql`SET app.current_organization_id = ${SEED_TEST_IDS.ORGANIZATIONS.primary}`,
+          sql.raw(
+            `SET app.current_organization_id = '${SEED_TEST_IDS.ORGANIZATIONS.primary}'`,
+          ),
         );
 
         // Use seeded data for real relationships
