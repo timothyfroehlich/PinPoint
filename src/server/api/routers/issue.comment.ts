@@ -324,6 +324,7 @@ export const issueCommentRouter = createTRPCRouter({
         .select({
           id: memberships.id,
           userId: memberships.userId,
+          organizationId: memberships.organizationId,
         })
         .from(memberships)
         .where(eq(memberships.userId, ctx.user.id))

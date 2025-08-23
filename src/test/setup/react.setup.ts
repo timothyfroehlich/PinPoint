@@ -28,6 +28,7 @@ afterEach(() => {
 // Verify React is properly loaded
 beforeAll(() => {
   // Debug: Verify React hook dispatcher is available
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   if (!React || typeof React.useState !== "function") {
     throw new Error("React is not properly loaded in test environment");
   }

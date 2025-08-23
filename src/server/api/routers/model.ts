@@ -147,23 +147,24 @@ export const modelRouter = createTRPCRouter({
     const machinesInOrg = await ctx.db.query.machines.findMany({
       where: eq(machines.organizationId, ctx.organizationId),
       with: {
-        model: {
-          where: and(
-            isNull(models.organizationId), // Only OPDB models
-            eq(models.isCustom, false),
-          ),
-        },
+        model: true,
       },
     });
 
     const opdbModelsToSync = machinesInOrg
       .map((machine) => machine.model)
-      .filter((model) => model?.opdbId)
+      .filter(
+        (model): model is NonNullable<typeof model> =>
+          model !== null &&
+          model !== undefined &&
+          model.opdbId !== null &&
+          model.opdbId !== undefined &&
+          model.organizationId === null && // Only OPDB models
+          !model.isCustom,
+      )
       // Remove duplicates by creating a Map
       .reduce((uniqueModels, model) => {
-        if (model) {
-          uniqueModels.set(model.id, model);
-        }
+        uniqueModels.set(model.id, model);
         return uniqueModels;
       }, new Map<string, NonNullable<(typeof machinesInOrg)[0]["model"]>>());
 

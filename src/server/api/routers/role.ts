@@ -8,7 +8,7 @@ import {
   organizationManageProcedure,
 } from "../trpc.permission";
 
-import type { TRPCContext } from "../trpc.base";
+import type { RLSOrganizationTRPCContext } from "../trpc.base";
 
 import {
   validateRoleAssignment,
@@ -23,7 +23,7 @@ import { RoleService } from "~/server/services/roleService";
 /**
  * Create role service (Three-environment compatibility: local dev + production)
  */
-function createRoleService(ctx: TRPCContext): RoleService {
+function createRoleService(ctx: RLSOrganizationTRPCContext): RoleService {
   return new RoleService(ctx.db, ctx.organizationId);
 }
 
@@ -91,6 +91,7 @@ export const roleRouter = createTRPCRouter({
         .values({
           id: generatePrefixedId("role"),
           name: input.name,
+          organizationId: ctx.organization.id,
           isSystem: false,
           isDefault: input.isDefault,
         })

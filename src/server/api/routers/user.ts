@@ -89,7 +89,6 @@ export const userRouter = createTRPCRouter({
     const userPermissions = await getUserPermissionsForSupabaseUser(
       ctx.user,
       ctx.db,
-      ctx.organizationId,
     );
 
     return {

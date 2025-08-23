@@ -46,7 +46,7 @@ export const test = baseTest.extend<
     async ({}, use) => {
       const workerId = process.env.VITEST_WORKER_ID ?? "unknown";
       console.log(
-        `[Worker ${String(workerId)}] Creating shared PGlite instance with seeded data`,
+        `[Worker ${workerId}] Creating shared PGlite instance with seeded data`,
       );
 
       // Create single seeded database instance for this worker
@@ -56,7 +56,7 @@ export const test = baseTest.extend<
       await use(db);
 
       // Cleanup when worker exits
-      console.log(`[Worker ${String(workerId)}] Cleaning up PGlite instance`);
+      console.log(`[Worker ${workerId}] Cleaning up PGlite instance`);
       await cleanupTestDatabase(db);
     },
     { scope: "worker" }, // Critical: worker scope, not test scope
@@ -266,7 +266,7 @@ async function setTestSession(
   orgId: string,
   userId?: string,
   role?: string,
-) {
+): Promise<void> {
   await db.execute(sql`SET app.current_organization_id = ${orgId}`);
 
   if (userId) {
@@ -354,10 +354,11 @@ export async function withMultiOrgTest<T>(
   ) => Promise<T>,
 ): Promise<T> {
   return await withIsolatedTest(db, async (tx) => {
-    const setContext = async (contextIndex: number) => {
+    const setContext = async (contextIndex: number): Promise<void> => {
       const context = contexts[contextIndex];
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       if (!context) {
-        throw new Error(`Context ${String(contextIndex)} not provided`);
+        throw new Error(`Context ${contextIndex} not provided`);
       }
 
       await setTestSession(tx, context.orgId, context.userId, context.role);

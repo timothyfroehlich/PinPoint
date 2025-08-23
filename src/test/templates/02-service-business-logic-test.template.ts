@@ -28,7 +28,7 @@ describe("YourService Business Logic", () => {
   // =============================================================================
 
   test("creates service instance correctly", async ({ workerDb }) => {
-    await withBusinessLogicTest(workerDb, async (db) => {
+    await withBusinessLogicTest(workerDb, (db) => {
       // ARRANGE: Create service instance
       const service = new YourService(db);
 
@@ -313,7 +313,7 @@ describe("YourService Business Logic", () => {
 // HELPER FUNCTIONS
 // =============================================================================
 
-async function createTestData(db: any) {
+async function createTestData(db: any): Promise<void> {
   // Use seeded organization for helper functions
   const orgId = SEED_TEST_IDS.ORGANIZATIONS.primary;
   const org = await db.query.organizations.findFirst({

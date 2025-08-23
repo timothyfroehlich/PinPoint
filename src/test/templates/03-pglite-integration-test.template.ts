@@ -390,7 +390,7 @@ describe("YourModule Integration Tests", () => {
 
 // Helper functions use static SEED_TEST_IDS for predictable test data.
 // No dynamic queries needed - static constants provide consistency.
-async function createBasicTestData(db: any) {
+async function createBasicTestData(db: any): Promise<void> {
   // Use seeded organization for integration test helpers
   const organizationId = SEED_TEST_IDS.ORGANIZATIONS.primary;
   const organization = await db.query.organizations.findFirst({
@@ -415,7 +415,7 @@ async function createBasicTestData(db: any) {
   };
 }
 
-async function createComplexTestDataset(db: any) {
+async function createComplexTestDataset(db: any): Promise<void> {
   const { organizationId, userId } = await createBasicTestData(db);
 
   // Create multiple machines

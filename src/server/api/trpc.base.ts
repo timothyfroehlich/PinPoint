@@ -7,7 +7,7 @@
  */
 
 import { initTRPC, TRPCError } from "@trpc/server";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import superjson from "superjson";
 import { ZodError } from "zod";
 
@@ -28,7 +28,7 @@ import { createTraceContext, traceStorage } from "~/lib/tracing";
 import { getUserPermissionsForSupabaseUser } from "~/server/auth/permissions";
 import { getSupabaseUser } from "~/server/auth/supabase";
 import { getGlobalDatabaseProvider } from "~/server/db/provider";
-import { organizations } from "~/server/db/schema";
+import { organizations, memberships } from "~/server/db/schema";
 import { ServiceFactory } from "~/server/services/factory";
 
 /**
@@ -333,11 +333,10 @@ export const organizationProcedure = protectedProcedure.use(
 
     // RLS automatically scopes this query to user's organization
     const membership = await ctx.db.query.memberships.findFirst({
-      where: (memberships, { and, eq }) =>
-        and(
-          eq(memberships.organizationId, ctx.organizationId),
-          eq(memberships.userId, ctx.user.id),
-        ),
+      where: and(
+        eq(memberships.organizationId, ctx.organizationId),
+        eq(memberships.userId, ctx.user.id),
+      ),
       with: {
         role: {
           with: {
@@ -362,7 +361,6 @@ export const organizationProcedure = protectedProcedure.use(
     const userPermissions = await getUserPermissionsForSupabaseUser(
       ctx.user,
       ctx.db,
-      ctx.organizationId,
     );
 
     return next({

@@ -897,7 +897,6 @@ export const issueCoreRouter = createTRPCRouter({
       if (input.title && existingIssue.title !== input.title) {
         await activityService.recordFieldUpdate(
           input.id,
-          ctx.organization.id,
           userId,
           "title",
           existingIssue.title,
@@ -911,7 +910,6 @@ export const issueCoreRouter = createTRPCRouter({
       ) {
         await activityService.recordFieldUpdate(
           input.id,
-          ctx.organization.id,
           userId,
           "description",
           existingIssue.description ?? "",

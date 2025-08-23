@@ -47,16 +47,38 @@ drizzle-kit generate                    # Don't run migration generation
 - Parallel validation, complex migration infrastructure, and extensive safety measures are **waste** in this phase
 - Direct conversion approaches are preferred - cleanup issues as they arise
 
-## 🚧 MIGRATION STATUS: ACTIVE EXECUTION - TEMPORARY BREAKAGE EXPECTED 🚧
+## 🔒 SCHEMA & SEED DATA LOCK-IN (IMMUTABLE FOUNDATION) 🔒
 
-**CURRENT REALITY**: We're actively executing the migration plan from @migration-plan-v2/ and everything will be messy/broken until completion
+**CRITICAL CONSTRAINT**: Schema and seed data are **LOCKED IN** and considered immutable:
 
-**EXPECTED TEMPORARY ISSUES:**
+### **Schema is KING**
 
-- **🔥 313 failing tests**: Normal during migration - tests will be fixed in Phase 3
-- **⚠️ Mixed auth patterns**: Transitional state while implementing RLS
-- **🧩 Partial Prisma cleanup**: Being systematically removed following the plan
-- **📚 Multiple migration docs**: Part of planned phases, will be consolidated at end
+- **Database schema is COMPLETE and LOCKED** - no changes allowed
+- **All TypeScript errors must be fixed by conforming CODE to SCHEMA**
+- Schema defines the source of truth - code adapts to schema, not vice versa
+- Only exceptional circumstances justify schema modifications
+
+### **Seed Data is KING**
+
+- **Seed data structure is COMPLETE and LOCKED** - no changes allowed
+- All SEED_TEST_IDS are finalized and hardcoded for predictable testing
+- Test infrastructure built around existing seed data patterns
+- Code and tests must work with existing seed data structure
+
+### **Development Approach**
+
+- ✅ Fix imports to match actual schema exports (`collectionTypes` not `collection_types`)
+- ✅ Add required fields that schema demands (`organizationId` in inserts)
+- ✅ Use correct property names from schema (`modelId` not `model`)
+- ✅ Conform function signatures to existing schema structure
+- ❌ **NO** schema changes to fix TypeScript errors
+- ❌ **NO** seed data modifications to make code easier
+
+**Why**: Schema and seed represent the completed data architecture. Code quality comes from proper alignment, not schema workarounds.
+
+## 🚧 MIGRATION STATUS: SYSTEMATIC CLEANUP PHASE 🚧
+
+**CURRENT PHASE**: Migration infrastructure complete - now making everything work again
 
 **MIGRATION PROGRESS (Following @migration-plan-v2/):**
 
@@ -64,15 +86,30 @@ drizzle-kit generate                    # Don't run migration generation
 - ✅ **Phase 1**: Prisma removal - COMPLETE
 - ✅ **Phase 2**: RLS implementation - COMPLETE
 - ✅ **Phase 2.5**: Testing architecture (pgTAP + PGlite) - COMPLETE
-- 🔄 **Phase 3**: Test implementation - converting 313 failing tests to RLS patterns
-- ⏳ **Phase 4**: Cleanup & consolidation
+- 🔄 **Phase 3**: **TypeScript Error Elimination + Test Recovery** - CURRENT PHASE
+- ⏳ **Phase 4**: Final cleanup & consolidation
 
-**CRITICAL UNDERSTANDING:**
+## 🎯 CURRENT PRIORITIES (SYSTEMATIC RECOVERY)
 
-- The 313 failing tests are **expected** and will remain broken until Phase 3
-- **NEW**: Testing architecture implemented (pgTAP for RLS + PGlite for business logic)
-- We're following the migration plan, not doing ad-hoc fixes
-- Everything will be messy until we complete the full architectural transformation
+**PHASE 3A: TypeScript Error Elimination** (ACTIVE NOW)
+
+- ✅ Eliminate ALL TypeScript errors with proper fixes (no suppressions)
+- ✅ Code conforms to locked schema and seed data
+- ✅ Maintain type safety while respecting existing architecture
+
+**PHASE 3B: Test Recovery** (NEXT)
+
+- 🔄 Convert 313 failing tests to new RLS + PGlite architecture
+- 🔄 All tests use SEED_TEST_IDS and dual-track testing patterns
+- 🔄 Achieve 100% test pass rate with new testing infrastructure
+
+**PHASE 3C: Validation** (FINAL)
+
+- ⏳ Full system validation: builds, lints, tests all green
+- ⏳ Performance verification with new architecture
+- ⏳ Ready for Phase 4 cleanup
+
+**APPROACH**: We're past the "breaking things" phase. Now it's systematic, methodical fixes respecting the locked foundation.
 
 ## Claude Memories
 

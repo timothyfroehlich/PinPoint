@@ -39,7 +39,7 @@ export class PinballMapService {
   async enableIntegration(organizationId: string): Promise<void> {
     // Generate ID using current timestamp for uniqueness
     const configId = `pmc_${Date.now().toString()}`;
-    
+
     await this.db
       .insert(pinballMapConfigs)
       .values({
@@ -193,6 +193,21 @@ export class PinballMapService {
     let updated = 0;
     let removed = 0;
 
+    // Get location to obtain organizationId
+    const location = await this.db.query.locations.findFirst({
+      where: eq(locations.id, locationId),
+    });
+
+    if (!location) {
+      return {
+        success: false,
+        added: 0,
+        updated: 0,
+        removed: 0,
+        error: "Location not found",
+      };
+    }
+
     // Get current machines at this location
     const currentMachines = await this.db.query.machines.findMany({
       where: eq(machines.locationId, locationId),
@@ -236,10 +251,11 @@ export class PinballMapService {
             updated++;
           }
         } else {
-          // Create new machine (organizationId set by RLS trigger)
+          // Create new machine (organizationId from location)
           await this.db.insert(machines).values({
             id: `machine_${Date.now().toString()}_${Math.random().toString(36).substring(2, 11)}`,
             name: model.name, // Use model name as default instance name
+            organizationId: location.organizationId,
             locationId,
             modelId: model.id,
             qrCodeId: `qr_${Date.now().toString()}_${Math.random().toString(36).substring(2, 11)}`,
@@ -446,6 +462,15 @@ export async function processFixtureData(
   locationId: string,
 ): Promise<{ created: number; error?: string }> {
   try {
+    // Get location to obtain organizationId
+    const location = await db.query.locations.findFirst({
+      where: eq(locations.id, locationId),
+    });
+
+    if (!location) {
+      return { created: 0, error: "Location not found" };
+    }
+
     let created = 0;
     const service = new PinballMapService(db);
 
@@ -454,10 +479,11 @@ export async function processFixtureData(
       const model = await service.findOrCreateModel(machine, true);
 
       if (model) {
-        // Create machine instance (organizationId set by RLS trigger)
+        // Create machine instance with organizationId
         await db.insert(machines).values({
           id: `machine_${Date.now().toString()}_${Math.random().toString(36).substring(2, 11)}`,
           name: model.name, // Use model name as default instance name
+          organizationId: location.organizationId,
           modelId: model.id,
           locationId,
           qrCodeId: `qr_${Date.now().toString()}_${Math.random().toString(36).substring(2, 11)}`,

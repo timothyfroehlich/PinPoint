@@ -167,7 +167,7 @@ export async function getCurrentUser(): Promise<
  */
 export async function getCurrentUserOrganizationId(): Promise<string | null> {
   const user = await getCurrentUser();
-  const orgId = user?.app_metadata?.["organizationId"] as unknown;
+  const orgId = user?.app_metadata["organizationId"] as unknown;
   return typeof orgId === "string" ? orgId : null;
 }
 
@@ -194,7 +194,7 @@ export async function requireOrganizationContext(): Promise<{
     throw new Error("Authentication required");
   }
 
-  const orgId = user.app_metadata?.["organizationId"] as unknown;
+  const orgId = user.app_metadata["organizationId"] as unknown;
   if (typeof orgId !== "string" || !orgId) {
     throw new Error("Organization context required");
   }

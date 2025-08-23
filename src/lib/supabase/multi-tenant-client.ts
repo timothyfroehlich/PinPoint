@@ -102,7 +102,7 @@ export async function createOptionalOrganizationClient(): Promise<{
     data: { user },
   } = await supabase.auth.getUser();
 
-  const orgId = user?.app_metadata?.["organizationId"] as unknown;
+  const orgId = user?.app_metadata["organizationId"] as unknown;
   const organizationId = typeof orgId === "string" ? orgId : null;
 
   return {
