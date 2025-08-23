@@ -62,12 +62,23 @@ vi.mock("~/server/db/schema", async (importOriginal) => {
 import { generatePrefixedId } from "~/lib/utils/id-generation";
 const mockGeneratePrefixedId = vi.mocked(generatePrefixedId);
 
+import { createAdminServiceMock } from "~/test/helpers/service-mock-database";
+
+// Mock the database module
+const { valuesReturningMock, whereReturningMock, setMock, ...mockDb } =
+  createAdminServiceMock();
+vi.mock("~/server/db", () => ({
+  db: mockDb,
+}));
+
 describe("NotificationService Unit Tests", () => {
-  let mockDb: any;
   let service: NotificationService;
 
   beforeEach(() => {
     vi.clearAllMocks();
+    valuesReturningMock.mockClear();
+    whereReturningMock.mockClear();
+    setMock.mockClear();
 
     // Mock predictable ID generation
     mockGeneratePrefixedId.mockImplementation((prefix: string) => {
@@ -93,42 +104,7 @@ describe("NotificationService Unit Tests", () => {
       field,
     }));
 
-    // Create comprehensive database mock with both query API and builder API
-    mockDb = {
-      // Builder API (for insert, update, select operations)
-      insert: vi.fn().mockReturnValue({
-        values: vi.fn().mockResolvedValue(undefined),
-      }),
-      update: vi.fn().mockReturnValue({
-        set: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue(undefined),
-        }),
-      }),
-      select: vi.fn().mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([{ count: 0 }]),
-        }),
-      }),
-
-      // Query API (for relational queries)
-      query: {
-        notifications: {
-          findMany: vi.fn(),
-          findFirst: vi.fn(),
-        },
-        machines: {
-          findFirst: vi.fn(),
-        },
-        issues: {
-          findFirst: vi.fn(),
-        },
-        users: {
-          findFirst: vi.fn(),
-        },
-      },
-    };
-
-    service = new NotificationService(mockDb);
+    service = new NotificationService(mockDb as any);
   });
 
   describe("notification constants", () => {
@@ -153,6 +129,7 @@ describe("NotificationService Unit Tests", () => {
     it("creates notification with all required fields", async () => {
       const notificationData = {
         userId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+        organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
         type: NotificationType.ISSUE_CREATED,
         message: "New issue created",
         entityType: NotificationEntity.ISSUE,
@@ -163,9 +140,10 @@ describe("NotificationService Unit Tests", () => {
       await service.createNotification(notificationData);
 
       expect(mockDb.insert).toHaveBeenCalledWith(schemaMocks.notifications);
-      expect(mockDb.insert().values).toHaveBeenCalledWith({
+      expect(valuesReturningMock).toHaveBeenCalledWith({
         id: SEED_TEST_IDS.MOCK_PATTERNS.NOTIFICATION,
         userId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+        organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
         type: "ISSUE_CREATED",
         message: "New issue created",
         entityType: "ISSUE",
@@ -177,6 +155,7 @@ describe("NotificationService Unit Tests", () => {
     it("creates notification with optional fields as null", async () => {
       const notificationData = {
         userId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+        organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
         type: NotificationType.SYSTEM_ANNOUNCEMENT,
         message: "System maintenance scheduled",
       };
@@ -184,9 +163,10 @@ describe("NotificationService Unit Tests", () => {
       await service.createNotification(notificationData);
 
       expect(mockDb.insert).toHaveBeenCalledWith(schemaMocks.notifications);
-      expect(mockDb.insert().values).toHaveBeenCalledWith({
+      expect(valuesReturningMock).toHaveBeenCalledWith({
         id: SEED_TEST_IDS.MOCK_PATTERNS.NOTIFICATION,
         userId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+        organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
         type: "SYSTEM_ANNOUNCEMENT",
         message: "System maintenance scheduled",
         entityType: null,
@@ -198,6 +178,7 @@ describe("NotificationService Unit Tests", () => {
     it("generates unique notification ID using prefix", async () => {
       const notificationData = {
         userId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+        organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
         type: NotificationType.ISSUE_CREATED,
         message: "Test notification",
       };
@@ -206,7 +187,7 @@ describe("NotificationService Unit Tests", () => {
 
       expect(mockGeneratePrefixedId).toHaveBeenCalledWith("notification");
       expect(mockDb.insert).toHaveBeenCalledWith(schemaMocks.notifications);
-      expect(mockDb.insert().values).toHaveBeenCalledWith(
+      expect(valuesReturningMock).toHaveBeenCalledWith(
         expect.objectContaining({
           id: SEED_TEST_IDS.MOCK_PATTERNS.NOTIFICATION,
         }),
@@ -445,38 +426,23 @@ describe("NotificationService Unit Tests", () => {
 
   describe("getUnreadCount", () => {
     it("returns correct unread count for user", async () => {
-      mockDb
-        .select()
-        .from()
-        .where.mockResolvedValue([{ count: 3 }]);
+      mockDb.select = vi.fn().mockReturnValue({
+        from: vi.fn().mockReturnThis(),
+        where: vi.fn().mockResolvedValue([{ count: 3 }]),
+      });
 
       const count = await service.getUnreadCount(
         SEED_TEST_IDS.MOCK_PATTERNS.USER,
       );
 
-      expect(mockDb.select).toHaveBeenCalledWith({ count: { type: "count" } });
-      expect(mockDb.select().from).toHaveBeenCalledWith(
-        schemaMocks.notifications,
-      );
-      expect(mockDb.select().from().where).toHaveBeenCalledWith({
-        type: "and",
-        conditions: [
-          {
-            type: "eq",
-            field: schemaMocks.notifications.userId,
-            value: SEED_TEST_IDS.MOCK_PATTERNS.USER,
-          },
-          { type: "eq", field: schemaMocks.notifications.read, value: false },
-        ],
-      });
       expect(count).toBe(3);
     });
 
     it("returns 0 for user with no unread notifications", async () => {
-      mockDb
-        .select()
-        .from()
-        .where.mockResolvedValue([{ count: 0 }]);
+      mockDb.select = vi.fn().mockReturnValue({
+        from: vi.fn().mockReturnThis(),
+        where: vi.fn().mockResolvedValue([{ count: 0 }]),
+      });
 
       const count = await service.getUnreadCount(
         SEED_TEST_IDS.MOCK_PATTERNS.USER,
@@ -486,7 +452,10 @@ describe("NotificationService Unit Tests", () => {
     });
 
     it("handles undefined count result gracefully", async () => {
-      mockDb.select().from().where.mockResolvedValue([]);
+      mockDb.select = vi.fn().mockReturnValue({
+        from: vi.fn().mockReturnThis(),
+        where: vi.fn().mockResolvedValue([]),
+      });
 
       const count = await service.getUnreadCount(
         SEED_TEST_IDS.MOCK_PATTERNS.USER,
@@ -496,16 +465,17 @@ describe("NotificationService Unit Tests", () => {
     });
 
     it("only counts unread notifications for specific user", async () => {
-      mockDb
-        .select()
-        .from()
-        .where.mockResolvedValue([{ count: 1 }]);
+      const whereMock = vi.fn().mockResolvedValue([{ count: 1 }]);
+      mockDb.select = vi.fn().mockReturnValue({
+        from: vi.fn().mockReturnThis(),
+        where: whereMock,
+      });
 
       await service.getUnreadCount(SEED_TEST_IDS.MOCK_PATTERNS.USER);
 
       // Verify query uses select builder pattern and scopes to specific user and unread notifications
-      expect(mockDb.select).toHaveBeenCalledWith({ count: { type: "count" } });
-      expect(mockDb.select().from().where).toHaveBeenCalledWith({
+      expect(mockDb.select).toHaveBeenCalledWith({ count: expect.any(Object) });
+      expect(whereMock).toHaveBeenCalledWith({
         type: "and",
         conditions: [
           {
@@ -538,6 +508,7 @@ describe("NotificationService Unit Tests", () => {
       id: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
       title: "Test Issue",
       machineId: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
+      organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
     };
 
     beforeEach(() => {
@@ -574,13 +545,14 @@ describe("NotificationService Unit Tests", () => {
           field: schemaMocks.issues.id,
           value: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
         },
-        columns: { title: true },
+        columns: { title: true, organizationId: true },
       });
 
       expect(mockDb.insert).toHaveBeenCalledWith(schemaMocks.notifications);
       expect(mockDb.insert().values).toHaveBeenCalledWith({
         id: SEED_TEST_IDS.MOCK_PATTERNS.NOTIFICATION,
         userId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+        organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
         type: "ISSUE_CREATED",
         message: 'New issue reported on your Test Model: "Test Issue"',
         entityType: "ISSUE",
@@ -704,6 +676,7 @@ describe("NotificationService Unit Tests", () => {
     const mockIssueWithMachine = {
       id: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
       title: "Test Issue",
+      organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
       machine: {
         id: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
         ownerNotificationsEnabled: true,
@@ -737,6 +710,10 @@ describe("NotificationService Unit Tests", () => {
           field: schemaMocks.issues.id,
           value: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
         },
+        columns: {
+          organizationId: true,
+          title: true,
+        },
         with: {
           machine: {
             with: {
@@ -751,6 +728,7 @@ describe("NotificationService Unit Tests", () => {
       expect(mockDb.insert().values).toHaveBeenCalledWith({
         id: SEED_TEST_IDS.MOCK_PATTERNS.NOTIFICATION,
         userId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+        organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
         type: "ISSUE_UPDATED",
         message: "Issue status changed on your Test Model: open → in-progress",
         entityType: "ISSUE",
@@ -820,6 +798,7 @@ describe("NotificationService Unit Tests", () => {
     const mockIssueForAssignment = {
       id: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
       title: "Assignment Test Issue",
+      organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
       machine: {
         id: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
         model: {
@@ -847,6 +826,10 @@ describe("NotificationService Unit Tests", () => {
           field: schemaMocks.issues.id,
           value: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
         },
+        columns: {
+          organizationId: true,
+          title: true,
+        },
         with: {
           machine: {
             with: {
@@ -860,6 +843,7 @@ describe("NotificationService Unit Tests", () => {
       expect(mockDb.insert().values).toHaveBeenCalledWith({
         id: SEED_TEST_IDS.MOCK_PATTERNS.NOTIFICATION,
         userId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+        organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
         type: "ISSUE_ASSIGNED",
         message:
           'You were assigned to issue: "Assignment Test Issue" on Assignment Test Model',

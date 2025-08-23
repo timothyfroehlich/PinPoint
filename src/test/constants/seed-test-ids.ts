@@ -94,6 +94,8 @@ export const SEED_TEST_IDS = {
     MEMBER1: "test-user-harry",
     /** Another member user for multi-user scenarios */
     MEMBER2: "test-user-escher",
+    /** Competitor admin user */
+    COMPETITOR_ADMIN: "test-user-competitor-admin",
   },
 
   /** Static role IDs used by infrastructure seed */
@@ -220,6 +222,12 @@ export const SEED_TEST_IDS = {
     DEFAULT_COMPETITOR: "location-default-competitor-001",
   },
 
+  /** Static model IDs used in minimal seed data */
+  MODELS: {
+    MEDIEVAL_MADNESS: "model-mm-001",
+    ATTACK_FROM_MARS: "model-afm-001",
+  },
+
   /** Collection types per organization */
   COLLECTION_TYPES: {
     ROOMS_PRIMARY: "collection-rooms-primary-001",
@@ -232,6 +240,8 @@ export const SEED_TEST_IDS = {
 
   /** Canonical issue IDs referenced by minimal sample data */
   ISSUES: {
+    ISSUE_1: "issue-1",
+    ISSUE_2: "issue-2",
     KAIJU_FIGURES: "issue-kaiju-figures-001",
     LOUD_BUZZING: "issue-loud-buzzing-002",
     LEFT_ROLLOVER: "issue-left-rollover-003",
