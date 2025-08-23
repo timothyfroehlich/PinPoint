@@ -29,11 +29,10 @@ import * as schema from "~/server/db/schema";
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
 import { createSeededAdminTestContext } from "~/test/helpers/createSeededAdminTestContext";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
-import { generateTestId } from "~/test/helpers/test-id-generator";
 
 // Mock external dependencies that aren't database-related
 vi.mock("~/lib/utils/id-generation", () => ({
-  generatePrefixedId: vi.fn(() => generateTestId("test-role")),
+  generatePrefixedId: vi.fn(() => SEED_TEST_IDS.ROLES.ADMIN_PRIMARY),
 }));
 
 vi.mock("~/server/auth/permissions", () => ({
@@ -820,7 +819,7 @@ describe("Role Router Integration Tests (PGlite)", () => {
         const caller = roleRouter.createCaller(context);
 
         // Create a test user for assignment testing
-        const targetUserId = generateTestId("target-user");
+        const targetUserId = SEED_TEST_IDS.USERS.MEMBER1;
         const [targetUser] = await db
           .insert(schema.users)
           .values({
@@ -885,7 +884,7 @@ describe("Role Router Integration Tests (PGlite)", () => {
         const caller = roleRouter.createCaller(context);
 
         // Create a test user for assignment testing
-        const targetUserId = generateTestId("target-user");
+        const targetUserId = SEED_TEST_IDS.USERS.MEMBER1;
         const [targetUser] = await db
           .insert(schema.users)
           .values({
@@ -954,7 +953,7 @@ describe("Role Router Integration Tests (PGlite)", () => {
         const caller = roleRouter.createCaller(context);
 
         // Create a test user for assignment testing
-        const targetUserId = generateTestId("target-user");
+        const targetUserId = SEED_TEST_IDS.USERS.MEMBER1;
         const [targetUser] = await db
           .insert(schema.users)
           .values({
@@ -1022,7 +1021,7 @@ describe("Role Router Integration Tests (PGlite)", () => {
         const caller = roleRouter.createCaller(context);
 
         // Create a test user for assignment testing
-        const targetUserId = generateTestId("target-user");
+        const targetUserId = SEED_TEST_IDS.USERS.MEMBER1;
         const [targetUser] = await db
           .insert(schema.users)
           .values({
@@ -1101,7 +1100,7 @@ describe("Role Router Integration Tests (PGlite)", () => {
         const caller = roleRouter.createCaller(context);
 
         // Create a test user for assignment testing
-        const targetUserId = generateTestId("target-user");
+        const targetUserId = SEED_TEST_IDS.USERS.MEMBER1;
         const [targetUser] = await db
           .insert(schema.users)
           .values({

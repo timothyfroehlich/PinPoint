@@ -38,7 +38,7 @@ import type { TestDatabase } from "~/test/helpers/pglite-test-setup";
 
 // Mock external dependencies that aren't database-related
 vi.mock("~/lib/utils/id-generation", () => ({
-  generateId: vi.fn(() => generateTestId("test-id")),
+  generateId: vi.fn(() => SEED_TEST_IDS.MOCK_PATTERNS.ENTITY),
   generatePrefixedId: vi.fn((prefix) => generateTestId(`${prefix}-id`)),
 }));
 
@@ -62,7 +62,7 @@ vi.mock("~/server/auth/permissions", () => ({
   requirePermissionForSession: vi.fn().mockResolvedValue(undefined),
   supabaseUserToSession: vi.fn((user) => ({
     user: {
-      id: user?.id ?? generateTestId("fallback-user"),
+      id: user?.id ?? SEED_TEST_IDS.USERS.MEMBER2,
       email: user?.email ?? "test@example.com",
       name: user?.name ?? "Test User",
     },
@@ -73,7 +73,7 @@ vi.mock("~/server/auth/permissions", () => ({
 import { appRouter } from "~/server/api/root";
 import * as schema from "~/server/db/schema";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
-import { generateTestId } from "~/test/helpers/test-id-generator";
+
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
 import { createSeededIssueTestContext } from "~/test/helpers/createSeededIssueTestContext";
 
@@ -85,7 +85,7 @@ async function createTestIssue(
   db: TestDatabase,
   overrides: Partial<typeof schema.issues.$inferInsert> = {},
 ) {
-  const issueId = generateTestId("issue");
+  const issueId = SEED_TEST_IDS.ISSUES.KAIJU_FIGURES;
   const [issue] = await db
     .insert(schema.issues)
     .values({
@@ -199,7 +199,7 @@ describe("Issue Router Integration Tests", () => {
         const [competitorIssue] = await db
           .insert(schema.issues)
           .values({
-            id: generateTestId("competitor-issue"),
+            id: SEED_TEST_IDS.ISSUES.LOUD_BUZZING,
             title: "Competitor Org Issue",
             machineId: SEED_TEST_IDS.MACHINES.CACTUS_CANYON_1,
             statusId: SEED_TEST_IDS.STATUSES.NEW_COMPETITOR,
@@ -302,7 +302,7 @@ describe("Issue Router Integration Tests", () => {
         const [competitorIssue] = await db
           .insert(schema.issues)
           .values({
-            id: generateTestId("competitor-issue"),
+            id: SEED_TEST_IDS.ISSUES.LOUD_BUZZING,
             title: "Competitor Org Issue",
             machineId: SEED_TEST_IDS.MACHINES.CACTUS_CANYON_1,
             statusId: SEED_TEST_IDS.STATUSES.NEW_COMPETITOR,
@@ -607,7 +607,7 @@ describe("Public Issue Procedures", () => {
         await expect(
           caller.issue.core.publicCreate({
             title: "Test Issue",
-            machineId: generateTestId("nonexistent-machine"),
+            machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
           }),
         ).rejects.toThrow("Machine not found");
       });
@@ -761,7 +761,7 @@ describe("Public Issue Procedures", () => {
         // Create test issues using static seed data
         await db.insert(schema.issues).values([
           {
-            id: generateTestId(SEED_TEST_IDS.ISSUES.ISSUE_1),
+            id: SEED_TEST_IDS.ISSUES.ISSUE_1,
             title: "Machine not working",
             description: "Screen is black",
             machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
@@ -773,7 +773,7 @@ describe("Public Issue Procedures", () => {
             updatedAt: new Date(),
           },
           {
-            id: generateTestId(SEED_TEST_IDS.ISSUES.ISSUE_2),
+            id: SEED_TEST_IDS.ISSUES.ISSUE_2,
             title: "Flipper stuck",
             description: null,
             machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
@@ -824,7 +824,7 @@ describe("Public Issue Procedures", () => {
         const [location2] = await db
           .insert(schema.locations)
           .values({
-            id: generateTestId("location-2"),
+            id: SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR,
             name: "Location 2",
             address: "456 Other Street",
             organizationId,
@@ -837,7 +837,7 @@ describe("Public Issue Procedures", () => {
         const [machine2] = await db
           .insert(schema.machines)
           .values({
-            id: generateTestId("machine-2"),
+            id: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
             name: "Machine 2",
             modelId: model.id,
             locationId: location2.id,
@@ -850,7 +850,7 @@ describe("Public Issue Procedures", () => {
         // Create issues in both locations
         await db.insert(schema.issues).values([
           {
-            id: generateTestId("issue-location-1"),
+            id: SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR,
             title: "Issue at Location 1",
             machineId: machine2.id, // Use first machine (location 1)
             statusId: status.id,
@@ -860,7 +860,7 @@ describe("Public Issue Procedures", () => {
             updatedAt: new Date(),
           },
           {
-            id: generateTestId("issue-location-2"),
+            id: SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR,
             title: "Issue at Location 2",
             machineId: machine2.id, // Use second machine (location 2)
             statusId: status.id,
@@ -898,7 +898,7 @@ describe("Public Issue Procedures", () => {
         const [machine2] = await db
           .insert(schema.machines)
           .values({
-            id: generateTestId("machine-2"),
+            id: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
             name: "Machine 2",
             modelId: model.id,
             locationId: location.id,
@@ -911,7 +911,7 @@ describe("Public Issue Procedures", () => {
         // Create issues for both machines
         await db.insert(schema.issues).values([
           {
-            id: generateTestId("issue-machine-1"),
+            id: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
             title: "Issue for Machine 1",
             machineId: machine.id,
             statusId: status.id,
@@ -921,7 +921,7 @@ describe("Public Issue Procedures", () => {
             updatedAt: new Date(),
           },
           {
-            id: generateTestId("issue-machine-2"),
+            id: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
             title: "Issue for Machine 2",
             machineId: machine2.id,
             statusId: status.id,
@@ -1026,7 +1026,7 @@ describe("Public Issue Procedures", () => {
           machineId: machine.id,
           statusId: status.id,
           priorityId: priority.id,
-          createdBy: generateTestId("user"),
+          createdBy: SEED_TEST_IDS.USERS.ADMIN,
         });
 
         const caller = appRouter.createCaller(ctx);
@@ -1053,7 +1053,7 @@ describe("Public Issue Procedures", () => {
           machineId: machine.id,
           statusId: status.id,
           priorityId: priority.id,
-          createdBy: generateTestId("user"),
+          createdBy: SEED_TEST_IDS.USERS.ADMIN,
         });
 
         const caller = appRouter.createCaller(ctx);
@@ -1131,7 +1131,7 @@ describe("Public Issue Procedures", () => {
         // Create multiple issues with different timestamps
         await db.insert(schema.issues).values([
           {
-            id: generateTestId(SEED_TEST_IDS.ISSUES.ISSUE_1),
+            id: SEED_TEST_IDS.ISSUES.ISSUE_1,
             title: "First Issue",
             machineId: machine.id,
             statusId: status.id,
@@ -1141,7 +1141,7 @@ describe("Public Issue Procedures", () => {
             updatedAt: new Date("2023-01-02"),
           },
           {
-            id: generateTestId(SEED_TEST_IDS.ISSUES.ISSUE_2),
+            id: SEED_TEST_IDS.ISSUES.ISSUE_2,
             title: "Second Issue",
             machineId: machine.id,
             statusId: status.id,
@@ -1196,7 +1196,7 @@ describe("Public Issue Procedures", () => {
         const [location2] = await db
           .insert(schema.locations)
           .values({
-            id: generateTestId("location-2"),
+            id: SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR,
             name: "Location 2",
             address: "456 Other Street",
             organizationId,
@@ -1222,7 +1222,7 @@ describe("Public Issue Procedures", () => {
         const [machine1] = await db
           .insert(schema.machines)
           .values({
-            id: generateTestId(SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1),
+            id: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
             name: "Machine in Location 1",
             modelId: model.id,
             locationId: location.id,
@@ -1235,7 +1235,7 @@ describe("Public Issue Procedures", () => {
         const [machine2] = await db
           .insert(schema.machines)
           .values({
-            id: generateTestId("machine-2"),
+            id: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
             name: "Machine in Location 2",
             modelId: model.id,
             locationId: location2.id,
@@ -1258,7 +1258,7 @@ describe("Public Issue Procedures", () => {
             updatedAt: new Date("2023-01-01"),
           },
           {
-            id: generateTestId("issue-wrong-location"),
+            id: SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR,
             title: "Wrong Location",
             machineId: machine2.id, // Location 2
             statusId: status.id, // NEW category

@@ -33,7 +33,7 @@ import type { TestDatabase } from "~/test/helpers/pglite-test-setup";
 import { appRouter } from "~/server/api/root";
 import * as schema from "~/server/db/schema";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
-import { generateTestId } from "~/test/helpers/test-id-generator";
+
 import {
   test,
   withBusinessLogicTest,
@@ -42,7 +42,7 @@ import {
 
 // Mock external dependencies that aren't database-related
 vi.mock("~/lib/utils/id-generation", () => ({
-  generateId: vi.fn(() => generateTestId("test-id")),
+  generateId: vi.fn(() => SEED_TEST_IDS.MOCK_PATTERNS.ENTITY),
 }));
 
 vi.mock("~/server/auth/permissions", () => ({
@@ -67,7 +67,7 @@ vi.mock("~/server/auth/permissions", () => ({
   requirePermissionForSession: vi.fn().mockResolvedValue(undefined),
   supabaseUserToSession: vi.fn((user) => ({
     user: {
-      id: user?.id ?? generateTestId("fallback-user"),
+      id: user?.id ?? SEED_TEST_IDS.USERS.MEMBER2,
       email: user?.email ?? "test@example.com",
       name: user?.name ?? "Test User",
     },
@@ -228,8 +228,8 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
         const { ctx } = await createTestContext(db, primaryOrgId);
         const caller = appRouter.createCaller(ctx);
 
-        const modelId = generateTestId("model");
-        const machineId = generateTestId("machine");
+        const modelId = SEED_TEST_IDS.MOCK_PATTERNS.MODEL;
+        const machineId = SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1;
 
         // Get baseline count of models in primary organization
         const baselineResult = await caller.model.getAll();
@@ -246,7 +246,7 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
         });
 
         // Create a location in competitor org first (required for machine)
-        const locationId = generateTestId("competitor-location");
+        const locationId = SEED_TEST_IDS.LOCATIONS.UPSTAIRS;
         await db.insert(schema.locations).values({
           id: locationId,
           name: "Competitor Location",
@@ -286,10 +286,10 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
         const machineId1 = generateTestId(
           SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
         );
-        const machineId2 = generateTestId("machine-2");
+        const machineId2 = SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1;
 
         // Create a test location in the primary organization (required for machines)
-        const locationId = generateTestId("test-location");
+        const locationId = SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR;
         await db.insert(schema.locations).values({
           id: locationId,
           name: "Test Location",
@@ -355,14 +355,14 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
         const { ctx } = await createTestContext(db, primaryOrgId);
         const caller = appRouter.createCaller(ctx);
 
-        const modelId = generateTestId("model");
+        const modelId = SEED_TEST_IDS.MOCK_PATTERNS.MODEL;
         const machineId1 = generateTestId(
           SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
         );
-        const machineId2 = generateTestId("machine-2");
+        const machineId2 = SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1;
 
         // Create a test location in the primary organization (required for machines)
-        const locationId = generateTestId("test-location");
+        const locationId = SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR;
         await db.insert(schema.locations).values({
           id: locationId,
           name: "Test Location",
@@ -484,11 +484,11 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
         const { ctx } = await createTestContext(db, primaryOrgId);
         const caller = appRouter.createCaller(ctx);
 
-        const modelId = generateTestId("model");
-        const machineId = generateTestId("machine");
+        const modelId = SEED_TEST_IDS.MOCK_PATTERNS.MODEL;
+        const machineId = SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1;
 
         // Create location in competitor org first (required for machine)
-        const locationId = generateTestId("competitor-location");
+        const locationId = SEED_TEST_IDS.LOCATIONS.UPSTAIRS;
         await db.insert(schema.locations).values({
           id: locationId,
           name: "Competitor Location",
@@ -533,7 +533,7 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
         const { ctx } = await createTestContext(db, primaryOrgId);
         const caller = appRouter.createCaller(ctx);
 
-        const modelId = generateTestId("model");
+        const modelId = SEED_TEST_IDS.MOCK_PATTERNS.MODEL;
 
         // Create organization-scoped custom model with no machines in primary org
         await db.insert(schema.models).values({
@@ -572,14 +572,14 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
         const machineId1 = generateTestId(
           SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
         );
-        const machineId2 = generateTestId("machine-2");
+        const machineId2 = SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1;
 
         // Get baseline count before adding test data
         const baselineResult = await caller.model.getAll();
         const baselineCount = baselineResult.length;
 
         // Create location in primary org first (required for machine)
-        const locationId = generateTestId("primary-location");
+        const locationId = SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR;
         await db.insert(schema.locations).values({
           id: locationId,
           name: "Primary Location",
@@ -587,7 +587,7 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
         });
 
         // Create location in competitor org (required for machine)
-        const competitorLocationId = generateTestId("competitor-location");
+        const competitorLocationId = SEED_TEST_IDS.LOCATIONS.UPSTAIRS;
         await db.insert(schema.locations).values({
           id: competitorLocationId,
           name: "Competitor Location",
@@ -669,11 +669,11 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
         );
         const secondaryCaller = appRouter.createCaller(secondaryCtx);
 
-        const modelId = generateTestId("model");
-        const machineId = generateTestId("machine");
+        const modelId = SEED_TEST_IDS.MOCK_PATTERNS.MODEL;
+        const machineId = SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1;
 
         // Create location in primary org first (required for machine)
-        const locationId = generateTestId("primary-location");
+        const locationId = SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR;
         await db.insert(schema.locations).values({
           id: locationId,
           name: "Primary Location",
@@ -725,10 +725,10 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
         const { ctx } = await createTestContext(db, primaryOrgId);
         const caller = appRouter.createCaller(ctx);
 
-        const modelId = generateTestId("model");
+        const modelId = SEED_TEST_IDS.MOCK_PATTERNS.MODEL;
 
         // Create location in primary org first (required for machines)
-        const locationId = generateTestId("count-location");
+        const locationId = SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR;
         await db.insert(schema.locations).values({
           id: locationId,
           name: "Count Test Location",
@@ -775,12 +775,12 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
         const { ctx } = await createTestContext(db, primaryOrgId);
         const caller = appRouter.createCaller(ctx);
 
-        const modelId = generateTestId("model");
-        const activeMachineId = generateTestId("active-machine");
-        const inactiveMachineId = generateTestId("inactive-machine");
+        const modelId = SEED_TEST_IDS.MOCK_PATTERNS.MODEL;
+        const activeMachineId = SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1;
+        const inactiveMachineId = SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1;
 
         // Create location in primary org first (required for machines)
-        const locationId = generateTestId("active-location");
+        const locationId = SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR;
         await db.insert(schema.locations).values({
           id: locationId,
           name: "Active Test Location",
@@ -830,14 +830,14 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
         const { ctx } = await createTestContext(db, primaryOrgId);
         const caller = appRouter.createCaller(ctx);
 
-        const modelId = generateTestId("model");
+        const modelId = SEED_TEST_IDS.MOCK_PATTERNS.MODEL;
         const machineId1 = generateTestId(
           SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
         );
-        const machineId2 = generateTestId("machine-2");
+        const machineId2 = SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1;
 
         // Create location in primary org first (required for machines)
-        const locationId = generateTestId("complex-location");
+        const locationId = SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR;
         await db.insert(schema.locations).values({
           id: locationId,
           name: "Complex Test Location",
@@ -946,7 +946,7 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
         const [location] = await db
           .insert(schema.locations)
           .values({
-            id: generateTestId("location"),
+            id: SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR,
             name: "Test Location",
             organizationId: primaryOrgId,
             createdAt: new Date(),
@@ -955,7 +955,7 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
           .returning();
 
         await db.insert(schema.machines).values({
-          id: generateTestId("primary-machine"),
+          id: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
           name: "Primary Machine",
           qrCodeId: generateTestId("qr"),
           organizationId: primaryOrgId,
@@ -1016,7 +1016,7 @@ describe("Model Router Integration Tests (Consolidated from Router + Integration
         const [location] = await db
           .insert(schema.locations)
           .values({
-            id: generateTestId("location"),
+            id: SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR,
             name: "Test Location",
             organizationId: primaryOrgId,
             createdAt: new Date(),

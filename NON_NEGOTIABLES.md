@@ -6,7 +6,11 @@ _Critical file content patterns that MUST be enforced during static analysis_
 
 **Memory Safety Violations**: Per-test PGlite instances cause system lockups. Use worker-scoped pattern.
 
+**Migration Files**: Any files in `supabase/migrations/` directory. Pre-beta has zero users.
+
 **Schema Modifications**: Schema is locked. Code adapts to schema, not vice versa.
+
+**Deprecated Imports**: `@supabase/auth-helpers-nextjs` is deprecated. Use modern SSR patterns.
 
 **TypeScript Safety Defeats**: No `any`, `!.`, unsafe `as`. Use proper type guards.
 

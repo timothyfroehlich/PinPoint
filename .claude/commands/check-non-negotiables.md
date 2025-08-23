@@ -27,11 +27,8 @@ Analyze specified files for violations of PinPoint's critical non-negotiable pat
 ### 🚨 CRITICAL (Auto-Block)
 
 - **Memory Safety**: `createSeededTestDatabase()` in `beforeEach()`, `new PGlite()` per test
-- **Migration Files**: Any files in `supabase/migrations/`
-- **Vitest Redirection**: `npm test 2>&1`, `vitest >>`
-- **Parameterized SET**: `sql\`SET._\$\{._\}\``
-- **Dangerous Commands**: `find.*-exec`, direct `psql` usage
-- **Deprecated Imports**: `@supabase/auth-helpers`
+- **Migration Files**: Any files in `supabase/migrations/` directory
+- **Deprecated Imports**: `@supabase/auth-helpers` package usage
 - **TypeScript Safety**: `!\.` (non-null assertion), `: any`, unsafe `as \w+` without validation
 - **Import Paths**: `\.\.\/.*\.\.\/.` (deep relative imports like `../../../lib/`)
 

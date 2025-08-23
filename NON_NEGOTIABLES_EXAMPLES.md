@@ -35,6 +35,19 @@ test("integration test", async ({ workerDb }) => {
 
 **RATIONALE:** 12+ integration tests using per-test PGlite = 20+ database instances. 50-100MB per instance = 1-2GB+ total memory usage. Causes system lockups and computer freezing. Vitest workers multiply the problem (4 workers × many instances).
 
+## Migration Files
+
+**Violation**: Any files in `supabase/migrations/` directory.
+
+```bash
+# ❌ NEVER CREATE THESE FILES
+supabase/migrations/20240101000000_create_users.sql
+supabase/migrations/20240101000001_add_organizations.sql
+supabase/migrations/any_file_at_all.sql
+```
+
+**RATIONALE:** Zero users, schema in flux, velocity over safety in pre-beta phase. Migration files suggest production readiness when we're still in rapid development mode.
+
 ## Schema Modifications
 
 **Violation**: Schema is locked, code adapts to schema.
@@ -49,6 +62,20 @@ const data = { modelId: machine.modelId }; // not model
 ```
 
 **RATIONALE:** Schema defines the source of truth - code adapts to schema, not vice versa. Only exceptional circumstances justify schema modifications.
+
+## Deprecated Imports
+
+**Violation**: `@supabase/auth-helpers-nextjs` is deprecated.
+
+```typescript
+// ❌ NEVER - Deprecated package
+import { createClient } from "@supabase/auth-helpers-nextjs";
+
+// ✅ REQUIRED - Modern SSR patterns
+import { createClient } from "~/lib/supabase/server";
+```
+
+**RATIONALE:** Deprecated packages lack security updates and modern features. Modern SSR patterns provide better performance and reliability.
 
 ## TypeScript Safety Defeats
 

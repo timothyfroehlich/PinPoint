@@ -18,8 +18,9 @@ import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
 import * as schema from "~/server/db/schema";
-import { generateTestId } from "~/test/helpers/test-id-generator";
+
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
 describe("Schema Data Integrity", () => {
   describe("Organization Relations", () => {
@@ -28,11 +29,11 @@ describe("Schema Data Integrity", () => {
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Create test organization first
-        const seededOrgId = generateTestId("test-org");
+        const seededOrgId = SEED_TEST_IDS.ORGANIZATIONS.primary;
         await db.insert(schema.organizations).values({
           id: seededOrgId,
           name: "Test Organization",
-          subdomain: generateTestId("test-org"),
+          subdomain: SEED_TEST_IDS.ORGANIZATIONS.primary,
         });
 
         // NOTE: This test creates users to test FK constraints and data integrity
@@ -46,14 +47,14 @@ describe("Schema Data Integrity", () => {
         });
 
         // Create role and membership
-        const roleId = generateTestId("role");
+        const roleId = SEED_TEST_IDS.ROLES.ADMIN_PRIMARY;
         await db.insert(schema.roles).values({
           id: roleId,
           name: "Test Role",
           organizationId: seededOrgId,
         });
 
-        const membershipId = generateTestId("membership");
+        const membershipId = SEED_TEST_IDS.MEMBERSHIPS.ADMIN_PRIMARY;
         await db.insert(schema.memberships).values({
           id: membershipId,
           userId: testUser1Id,
@@ -93,14 +94,14 @@ describe("Schema Data Integrity", () => {
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Create test organization and base data
-        const seededOrgId = generateTestId("test-org");
+        const seededOrgId = SEED_TEST_IDS.ORGANIZATIONS.primary;
         await db.insert(schema.organizations).values({
           id: seededOrgId,
           name: "Test Organization",
-          subdomain: generateTestId("test-org"),
+          subdomain: SEED_TEST_IDS.ORGANIZATIONS.primary,
         });
 
-        const testLocationId = generateTestId("test-location");
+        const testLocationId = SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR;
         await db.insert(schema.locations).values({
           id: testLocationId,
           name: "FK Test Location",
@@ -115,7 +116,7 @@ describe("Schema Data Integrity", () => {
           year: 2024,
         });
 
-        const testMachineId = generateTestId("test-machine");
+        const testMachineId = SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1;
         await db.insert(schema.machines).values({
           id: testMachineId,
           name: "FK Test Machine",
@@ -211,14 +212,14 @@ describe("Schema Data Integrity", () => {
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Create test organization and base data
-        const seededOrgId = generateTestId("test-org");
+        const seededOrgId = SEED_TEST_IDS.ORGANIZATIONS.primary;
         await db.insert(schema.organizations).values({
           id: seededOrgId,
           name: "Test Organization",
-          subdomain: generateTestId("test-org"),
+          subdomain: SEED_TEST_IDS.ORGANIZATIONS.primary,
         });
 
-        const testLocationId = generateTestId("test-location");
+        const testLocationId = SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR;
         await db.insert(schema.locations).values({
           id: testLocationId,
           name: "FK Test Location",
@@ -233,7 +234,7 @@ describe("Schema Data Integrity", () => {
           year: 2024,
         });
 
-        const testMachineId = generateTestId("test-machine");
+        const testMachineId = SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1;
         await db.insert(schema.machines).values({
           id: testMachineId,
           name: "FK Test Machine",
@@ -244,7 +245,7 @@ describe("Schema Data Integrity", () => {
         });
 
         await db.insert(schema.priorities).values({
-          id: generateTestId("priority"),
+          id: SEED_TEST_IDS.PRIORITIES.HIGH_PRIMARY,
           name: "High",
           order: 1,
           organizationId: seededOrgId,
@@ -252,7 +253,7 @@ describe("Schema Data Integrity", () => {
         });
 
         await db.insert(schema.issueStatuses).values({
-          id: generateTestId("status"),
+          id: SEED_TEST_IDS.STATUSES.NEW_PRIMARY,
           name: "Open",
           category: "NEW",
           organizationId: seededOrgId,
@@ -295,14 +296,14 @@ describe("Schema Data Integrity", () => {
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Create test organization and base data
-        const seededOrgId = generateTestId("test-org");
+        const seededOrgId = SEED_TEST_IDS.ORGANIZATIONS.primary;
         await db.insert(schema.organizations).values({
           id: seededOrgId,
           name: "Test Organization",
-          subdomain: generateTestId("test-org"),
+          subdomain: SEED_TEST_IDS.ORGANIZATIONS.primary,
         });
 
-        const testLocationId = generateTestId("test-location");
+        const testLocationId = SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR;
         await db.insert(schema.locations).values({
           id: testLocationId,
           name: "FK Test Location",
@@ -317,7 +318,7 @@ describe("Schema Data Integrity", () => {
           year: 2024,
         });
 
-        const testMachineId = generateTestId("test-machine");
+        const testMachineId = SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1;
         await db.insert(schema.machines).values({
           id: testMachineId,
           name: "FK Test Machine",
@@ -328,7 +329,7 @@ describe("Schema Data Integrity", () => {
         });
 
         await db.insert(schema.priorities).values({
-          id: generateTestId("priority"),
+          id: SEED_TEST_IDS.PRIORITIES.HIGH_PRIMARY,
           name: "High",
           order: 1,
           organizationId: seededOrgId,
@@ -336,7 +337,7 @@ describe("Schema Data Integrity", () => {
         });
 
         await db.insert(schema.issueStatuses).values({
-          id: generateTestId("status"),
+          id: SEED_TEST_IDS.STATUSES.NEW_PRIMARY,
           name: "Open",
           category: "NEW",
           organizationId: seededOrgId,
@@ -377,11 +378,11 @@ describe("Schema Data Integrity", () => {
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Create test organization and base data
-        const seededOrgId = generateTestId("test-org");
+        const seededOrgId = SEED_TEST_IDS.ORGANIZATIONS.primary;
         await db.insert(schema.organizations).values({
           id: seededOrgId,
           name: "Test Organization",
-          subdomain: generateTestId("test-org"),
+          subdomain: SEED_TEST_IDS.ORGANIZATIONS.primary,
         });
 
         // NOTE: This test creates users to test FK constraints and data integrity
@@ -393,7 +394,7 @@ describe("Schema Data Integrity", () => {
           name: "FK Test User",
         });
 
-        const testLocationId = generateTestId("test-location");
+        const testLocationId = SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR;
         await db.insert(schema.locations).values({
           id: testLocationId,
           name: "FK Test Location",
@@ -408,7 +409,7 @@ describe("Schema Data Integrity", () => {
           year: 2024,
         });
 
-        const testMachineId = generateTestId("test-machine");
+        const testMachineId = SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1;
         await db.insert(schema.machines).values({
           id: testMachineId,
           name: "FK Test Machine",
@@ -419,7 +420,7 @@ describe("Schema Data Integrity", () => {
         });
 
         await db.insert(schema.priorities).values({
-          id: generateTestId("priority"),
+          id: SEED_TEST_IDS.PRIORITIES.HIGH_PRIMARY,
           name: "High",
           order: 1,
           organizationId: seededOrgId,
@@ -427,7 +428,7 @@ describe("Schema Data Integrity", () => {
         });
 
         await db.insert(schema.issueStatuses).values({
-          id: generateTestId("status"),
+          id: SEED_TEST_IDS.STATUSES.NEW_PRIMARY,
           name: "Open",
           category: "NEW",
           organizationId: seededOrgId,
@@ -456,7 +457,7 @@ describe("Schema Data Integrity", () => {
         });
 
         // Create comment
-        const commentId = generateTestId("comment");
+        const commentId = SEED_TEST_IDS.MOCK_PATTERNS.COMMENT;
         await db.insert(schema.comments).values({
           id: commentId,
           organizationId,
@@ -494,11 +495,11 @@ describe("Schema Data Integrity", () => {
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Create first organization and location
-        const seededOrgId = generateTestId("test-org");
+        const seededOrgId = SEED_TEST_IDS.ORGANIZATIONS.primary;
         await db.insert(schema.organizations).values({
           id: seededOrgId,
           name: "Test Organization",
-          subdomain: generateTestId("test-org"),
+          subdomain: SEED_TEST_IDS.ORGANIZATIONS.primary,
         });
 
         const testModelId = generateTestId("test-model");
@@ -511,7 +512,7 @@ describe("Schema Data Integrity", () => {
 
         // Create another organization and location
         const otherOrgId = generateTestId("other-org");
-        const otherLocationId = generateTestId("other-location");
+        const otherLocationId = SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR;
 
         await db.insert(schema.organizations).values({
           id: otherOrgId,
@@ -530,7 +531,7 @@ describe("Schema Data Integrity", () => {
         const [machine] = await db
           .insert(schema.machines)
           .values({
-            id: generateTestId("cross-org-machine"),
+            id: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
             name: "Cross-Org Machine",
             organizationId: seededOrgId,
             locationId: otherLocationId, // Wrong organization!
@@ -561,14 +562,14 @@ describe("Schema Data Integrity", () => {
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Create test organization and base data
-        const seededOrgId = generateTestId("test-org");
+        const seededOrgId = SEED_TEST_IDS.ORGANIZATIONS.primary;
         await db.insert(schema.organizations).values({
           id: seededOrgId,
           name: "Test Organization",
-          subdomain: generateTestId("test-org"),
+          subdomain: SEED_TEST_IDS.ORGANIZATIONS.primary,
         });
 
-        const testLocationId = generateTestId("test-location");
+        const testLocationId = SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR;
         await db.insert(schema.locations).values({
           id: testLocationId,
           name: "FK Test Location",
@@ -583,7 +584,7 @@ describe("Schema Data Integrity", () => {
           year: 2024,
         });
 
-        const testMachineId = generateTestId("test-machine");
+        const testMachineId = SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1;
         await db.insert(schema.machines).values({
           id: testMachineId,
           name: "FK Test Machine",
@@ -594,7 +595,7 @@ describe("Schema Data Integrity", () => {
         });
 
         await db.insert(schema.priorities).values({
-          id: generateTestId("priority"),
+          id: SEED_TEST_IDS.PRIORITIES.HIGH_PRIMARY,
           name: "High",
           order: 1,
           organizationId: seededOrgId,
@@ -602,7 +603,7 @@ describe("Schema Data Integrity", () => {
         });
 
         await db.insert(schema.issueStatuses).values({
-          id: generateTestId("status"),
+          id: SEED_TEST_IDS.STATUSES.NEW_PRIMARY,
           name: "Open",
           category: "NEW",
           organizationId: seededOrgId,
@@ -619,7 +620,7 @@ describe("Schema Data Integrity", () => {
           .where(eq(schema.issueStatuses.organizationId, seededOrgId));
 
         // Create issue for the machine
-        const issueId = generateTestId("issue-machine");
+        const issueId = SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1;
         await db.insert(schema.issues).values({
           id: issueId,
           title: "Machine Issue",
@@ -660,11 +661,11 @@ describe("Schema Data Integrity", () => {
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Create first organization
-        const seededOrgId = generateTestId("test-org");
+        const seededOrgId = SEED_TEST_IDS.ORGANIZATIONS.primary;
         await db.insert(schema.organizations).values({
           id: seededOrgId,
           name: "Test Organization",
-          subdomain: generateTestId("test-org"),
+          subdomain: SEED_TEST_IDS.ORGANIZATIONS.primary,
         });
 
         // NOTE: This test creates users to test FK constraints and data integrity
