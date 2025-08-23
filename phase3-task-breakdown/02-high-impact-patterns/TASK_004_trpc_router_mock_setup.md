@@ -4,8 +4,8 @@
 
 **Status**: HIGH IMPACT - 126 router tests failing due to missing mock database setup  
 **Impact**: API development blocked, router testing non-functional  
-**Agent Type**: integration-test-architect  
-**Estimated Effort**: 2-3 days  
+**Agent Type**: unit-test-architect (primary), integration-test-architect (file organization), security-test-architect (boundary testing)  
+**Estimated Effort**: 1-2 days (reduced due to existing infrastructure discovery)  
 **Dependencies**: TASK_002 (permission system), TASK_003 (RLS context patterns)
 
 ## Objective
@@ -98,81 +98,89 @@ Mock database operations don't simulate organizational scoping that the routers 
 
 ## Requirements
 
-### Phase 1: Create Mock Infrastructure (Day 1)
+### Phase 1: Consolidate Existing Mock Infrastructure (Day 1)
 
-1. **Create `createMockTRPCContext` factory** with organizational scoping
-2. **Create comprehensive database mocks** for all CRUD operations
+**CRITICAL DISCOVERY**: Infrastructure analysis reveals we already have competing mock systems:
+
+- `src/test/vitestMockContext.ts` (187 lines) - Current system with SEED_TEST_IDS integration
+- `src/test/mockContext.ts` (351 lines) - Alternative system with vitest-mock-extended
+
+**Approach**: Enhance existing `vitestMockContext.ts` rather than create duplicate infrastructure.
+
+1. **Enhance existing `createVitestMockContext` function** with tRPC-specific organizational scoping
+2. **Add security-aware mock database factory** for cross-organizational boundary testing
 3. **Test the pattern** on a few router files to validate approach
 
-### Phase 2: Apply Systematic Pattern (Days 2-3)
+### Phase 2: Memory Safety & File Organization (Day 1-2)
 
-1. **Update all 126 router tests** to use proper mock context
-2. **Clarify testing boundaries** (router tests vs integration tests)
-3. **Fix mixed concerns** in "router.integration.test.ts" files
-4. **Standardize mock data** using SEED_TEST_IDS
+**CRITICAL PRIORITY**: Address memory safety violations from PGlite misuse in router tests.
+
+1. **Remove dangerous PGlite usage** from router test files:
+   - `issue.comment.router.integration.test.ts` - Remove `withIsolatedTest` imports
+   - `issue.timeline.router.integration.test.ts` - Convert to mock-based or move to integration-tests/
+   - `routers.integration.test.ts` - Relocate to proper integration test directory
+
+2. **File organization cleanup**:
+   - Move true integration tests to `integration-tests/` directory
+   - Convert mixed-concern files to pure router tests using enhanced mock infrastructure
+   - Rename files to remove "integration" from router test names where appropriate
+
+### Phase 3: Systematic Router Test Migration (Day 2-3)
+
+1. **Update all 126 router tests** to use enhanced mock context
+2. **Apply security-aware organizational boundary testing** patterns
+3. **Standardize mock data** using existing SEED_TEST_IDS patterns
 
 ## Technical Specifications
 
-### Fix 1: Mock tRPC Context Factory
+### Fix 1: Enhanced Mock tRPC Context Factory
 
-**File**: `src/test/vitestMockContext.ts`
+**File**: `src/test/vitestMockContext.ts` (**ENHANCE EXISTING FILE**)
+
+**CRITICAL**: Do not create new files - enhance existing infrastructure to avoid duplication.
 
 ```typescript
-import { vi } from "vitest";
+// ADD to existing vitestMockContext.ts
 import { SEED_TEST_IDS } from "./constants/seed-test-ids";
-import { createMockDatabase } from "./mocks/database-mocks";
-
-export type MockTRPCContext = {
-  user: {
-    id: string;
-    user_metadata: {
-      organizationId: string;
-      role: string;
-    };
-  };
-  session: {
-    user: {
-      id: string;
-    };
-  };
-  db: ReturnType<typeof createMockDatabase>;
-  organizationId: string; // For convenience
-};
 
 /**
- * Creates a mock tRPC context with organizational scoping
- * Use this for all router unit tests
+ * Enhanced mock tRPC context with organizational scoping
+ * Builds on existing createVitestMockContext infrastructure
  */
 export function createMockTRPCContext(
   options: {
     organizationId?: string;
     userId?: string;
     userRole?: "admin" | "member" | "guest";
+    permissions?: string[];
   } = {},
-): MockTRPCContext {
+): VitestMockContext & {
+  organizationId: string;
+  userPermissions: string[];
+} {
   const {
     organizationId = SEED_TEST_IDS.ORGANIZATIONS.primary,
     userId = SEED_TEST_IDS.USERS.ADMIN,
     userRole = "admin",
+    permissions,
   } = options;
 
-  const mockDb = createMockDatabase(organizationId);
+  // Build on existing infrastructure
+  const baseContext = createVitestMockContext();
 
   return {
+    ...baseContext,
     user: {
       id: userId,
       user_metadata: {
         organizationId,
         role: userRole,
       },
-    },
-    session: {
-      user: {
-        id: userId,
-      },
-    },
-    db: mockDb,
-    organizationId, // Convenience property
+    } as PinPointSupabaseUser,
+    organizationId,
+    userPermissions: permissions || getDefaultPermissionsForRole(userRole),
+    // Enhanced database with organizational scoping
+    db: createSecurityAwareMockDatabase(organizationId),
   };
 }
 
@@ -203,38 +211,39 @@ export const VITEST_CONTEXT_SCENARIOS = {
 } as const;
 ```
 
-### Fix 2: Mock Database Factory
+### Fix 2: Security-Aware Mock Database Factory
 
-**File**: `src/test/mocks/database-mocks.ts`
+**File**: `src/test/vitestMockContext.ts` (**ADD TO EXISTING FILE**)
+
+**CRITICAL**: Do not create `src/test/mocks/database-mocks.ts` - this will create more duplication.
 
 ```typescript
-import { vi } from "vitest";
-import { SEED_TEST_IDS } from "../constants/seed-test-ids";
+// ADD to existing vitestMockContext.ts
 
 /**
- * Creates a mock database with organizational scoping
- * Returns mock data filtered by organizationId
+ * Creates security-aware mock database with cross-organizational boundary testing
+ * CRITICAL: Stores data for BOTH organizations to enable boundary violation testing
  */
-export function createMockDatabase(organizationId: string) {
-  // Mock data scoped to organization
-  const mockIssues = [
-    {
-      id: SEED_TEST_IDS.ISSUES.ISSUE_1,
-      title: "Test Issue 1",
-      organizationId,
-      machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: SEED_TEST_IDS.ISSUES.ISSUE_2,
-      title: "Test Issue 2",
-      organizationId,
-      machineId: SEED_TEST_IDS.MACHINES.ATTACK_FROM_MARS_1,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-  ];
+export function createSecurityAwareMockDatabase(currentOrgId: string) {
+  // SECURITY: Store data for BOTH organizations to test boundaries
+  const allMockData = {
+    [SEED_TEST_IDS.ORGANIZATIONS.primary]: [
+      {
+        id: SEED_TEST_IDS.ISSUES.ISSUE_1,
+        title: "Primary Org Issue",
+        organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
+        machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
+      },
+    ],
+    [SEED_TEST_IDS.ORGANIZATIONS.competitor]: [
+      {
+        id: SEED_TEST_IDS.ISSUES.ISSUE_2,
+        title: "Competitor Org Secret",
+        organizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor,
+        machineId: SEED_TEST_IDS.MACHINES.ATTACK_FROM_MARS_1,
+      },
+    ],
+  };
 
   const mockMachines = [
     {
@@ -250,16 +259,17 @@ export function createMockDatabase(organizationId: string) {
     query: {
       issues: {
         findMany: vi.fn().mockImplementation(async (options = {}) => {
-          let results = [...mockIssues];
+          // SECURITY: Only return data for current organization
+          const orgData = allMockData[currentOrgId] || [];
 
-          // Apply where filters
+          // CRITICAL: Filter by organizationId to prevent cross-org leakage
+          let results = orgData.filter(
+            (item) => item.organizationId === currentOrgId,
+          );
+
+          // Apply additional where filters if provided
           if (options.where) {
-            // Simulate organizational scoping
-            if (options.where.organizationId) {
-              results = results.filter(
-                (item) => item.organizationId === options.where.organizationId,
-              );
-            }
+            // Additional filtering logic here
           }
 
           return results;
@@ -551,6 +561,56 @@ npm run test -- --reporter=verbose | grep "router.integration"
 - **SEED_TEST_IDS**: Consistent test data constants for mocking
 - **Testing architecture**: Integration vs unit test separation principles
 
+## Expert Analysis Summary
+
+### **Critical Discovery: Infrastructure Already Exists**
+
+**Unit-Test-Architect Assessment**:
+
+> "The task proposes creating infrastructure that **already exists**. We have competing mock systems that need consolidation, not duplication."
+
+**Key Findings**:
+
+- ✅ `src/test/vitestMockContext.ts` already provides 90% of needed functionality
+- ❌ Creating new `src/test/mocks/database-mocks.ts` will add to duplication problem
+- ✅ SEED_TEST_IDS organizational architecture already established
+- ⚠️ Need enhancement of existing infrastructure, not new creation
+
+### **Memory Safety Critical Priority**
+
+**Integration-Test-Architect Assessment**:
+
+> "**CONFIRMED DANGER**: Multiple files are attempting to use PGlite integration patterns (`withIsolatedTest`) inside router test directories that should be using mocks."
+
+**Immediate Actions Required**:
+
+1. Remove `withIsolatedTest` imports from router test files
+2. Convert dangerous PGlite usage to mock-based testing
+3. File organization cleanup to prevent testing boundary confusion
+
+### **Security Enhancement Requirements**
+
+**Security-Test-Architect Assessment**:
+
+> "**HIGH RISK** - The proposed mock patterns have significant security testing gaps that could lead to undetected organizational boundary violations in production."
+
+**Critical Security Pattern**: Dual-organization mock architecture for zero-tolerance cross-org data leakage testing.
+
+## Implementation Strategy Refinement
+
+### **✅ DO (High Value)**:
+
+1. **Enhance existing `vitestMockContext.ts`** with tRPC-specific patterns
+2. **Add security-aware organizational boundary testing** using existing SEED_TEST_IDS
+3. **Remove dangerous PGlite usage** from router test files immediately
+4. **Apply consolidated mock pattern** to all 126 failing router tests
+
+### **❌ AVOID (Creates Duplication)**:
+
+1. Creating new `src/test/mocks/database-mocks.ts` file
+2. Creating separate `createMockTRPCContext` in new files
+3. Adding infrastructure before consolidating existing systems
+
 ## Notes for Agent
 
 This is the **second-highest impact fix pattern** after RLS context establishment. tRPC router tests are essential for:
@@ -560,13 +620,14 @@ This is the **second-highest impact fix pattern** after RLS context establishmen
 - **Permission testing** - API-level security depends on router tests
 - **Regression prevention** - Router tests catch breaking changes
 
-**Key principles**:
+**Key principles** (validated by expert analysis):
 
-1. **Router tests should be fast** - Use mocks, not real database
-2. **Mock organizational scoping** - Simulate multi-tenant behavior
-3. **Test business logic, not database** - Focus on router-specific concerns
-4. **Separate from integration tests** - Clear boundary between unit and integration
+1. **Router tests should be fast** - Use mocks, not real database ✅
+2. **Mock organizational scoping** - Simulate multi-tenant behavior with security awareness ✅
+3. **Test business logic, not database** - Focus on router-specific concerns ✅
+4. **Separate from integration tests** - Clear boundary between API and database integration ✅
+5. **Leverage existing infrastructure** - Enhance rather than duplicate ⭐ **NEW**
 
-**Success metric**: When complete, all API routes will have fast, reliable unit tests that catch business logic errors without database dependencies.
+**Success metric**: When complete, all API routes will have fast, reliable integration tests at the API layer that catch business logic errors without database dependencies or memory safety issues.
 
-**Testing philosophy**: Router tests validate that the right database operations are called with the right parameters. Integration tests validate that those operations work correctly with the real database.
+**Testing philosophy**: Router tests validate that the right database operations are called with the right parameters and organizational context. Integration tests validate that those operations work correctly with the real database and RLS policies.
