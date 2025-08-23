@@ -1,54 +1,61 @@
 /**
- * Test ID Generator
+ * ❌ DEPRECATED: Test ID Generator Functions
  *
- * Provides utilities for generating unique, collision-free IDs for tests.
- * Uses crypto.randomUUID() and worker-specific prefixes to ensure uniqueness
- * even when tests run in parallel across multiple workers.
+ * These functions violate NON_NEGOTIABLES.md and have been replaced with
+ * helpful error messages to guide conversion to SEED_TEST_IDS pattern.
+ *
+ * @see NON_NEGOTIABLES.md - SEED_TEST_IDS Usage section
+ * @see src/test/constants/seed-test-ids.ts - Predefined test constants
  */
 
+const CONVERSION_GUIDE = `
+❌ DEPRECATED: Random test IDs violate NON_NEGOTIABLES.md
+
+✅ REQUIRED: Use SEED_TEST_IDS for predictable testing:
+
+// ❌ OLD (random IDs break predictable debugging)
+const testUserId = generateTestId("user");
+const testOrgId = generateTestId("org");
+
+// ✅ NEW (hardcoded predictable IDs)
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
+const testUserId = SEED_TEST_IDS.USERS.ADMIN;
+const testOrgId = SEED_TEST_IDS.ORGANIZATIONS.primary;
+
+Available SEED_TEST_IDS patterns:
+- ORGANIZATIONS.primary / .competitor
+- USERS.ADMIN / .REGULAR_USER / .COMPETITOR_USER  
+- MACHINES.* (various test machines)
+- LOCATIONS.* (various test locations)
+- MOCK_PATTERNS.* (for test-specific data)
+
+See NON_NEGOTIABLES.md and src/test/constants/seed-test-ids.ts for complete patterns.
+`;
+
 /**
- * Generate a unique test ID
- *
- * @param prefix - Optional prefix for the ID (e.g., 'test-org', 'test-user')
- * @returns Unique ID guaranteed to be collision-free across parallel tests
+ * @deprecated Use SEED_TEST_IDS instead - see error message for conversion guide
  */
-export function generateTestId(prefix = "test"): string {
-  const workerId = process.env.VITEST_WORKER_ID ?? "w0";
-  const randomId = crypto.randomUUID().slice(0, 8); // Use first 8 chars for brevity
-  return `${prefix}-${workerId}-${randomId}`;
+export function generateTestId(prefix = "test"): never {
+  throw new Error(CONVERSION_GUIDE);
 }
 
 /**
- * Generate a unique test email
- *
- * @param prefix - Optional prefix for the email username
- * @returns Unique email guaranteed to be collision-free across parallel tests
+ * @deprecated Use SEED_TEST_IDS instead - see error message for conversion guide
  */
-export function generateTestEmail(prefix = "test"): string {
-  const workerId = process.env.VITEST_WORKER_ID ?? "w0";
-  const randomId = crypto.randomUUID().slice(0, 8);
-  return `${prefix}-${workerId}-${randomId}@example.com`;
+export function generateTestEmail(prefix = "test"): never {
+  throw new Error(CONVERSION_GUIDE);
 }
 
 /**
- * Generate a unique test subdomain
- *
- * @param prefix - Optional prefix for the subdomain
- * @returns Unique subdomain guaranteed to be collision-free across parallel tests
+ * @deprecated Use SEED_TEST_IDS instead - see error message for conversion guide
  */
-export function generateTestSubdomain(prefix = "test"): string {
-  const workerId = process.env.VITEST_WORKER_ID ?? "w0";
-  const randomId = crypto.randomUUID().slice(0, 8);
-  return `${prefix}-${workerId}-${randomId}`;
+export function generateTestSubdomain(prefix = "test"): never {
+  throw new Error(CONVERSION_GUIDE);
 }
 
 /**
- * Generate multiple unique test IDs at once
- *
- * @param count - Number of IDs to generate
- * @param prefix - Optional prefix for the IDs
- * @returns Array of unique IDs
+ * @deprecated Use SEED_TEST_IDS instead - see error message for conversion guide
  */
-export function generateTestIds(count: number, prefix = "test"): string[] {
-  return Array.from({ length: count }, () => generateTestId(prefix));
+export function generateTestIds(count: number, prefix = "test"): never {
+  throw new Error(CONVERSION_GUIDE);
 }

@@ -1,5 +1,6 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
+import { createDrizzle } from "./client-factory";
 import postgres from "postgres";
 
 import * as schema from "./schema";
@@ -79,10 +80,9 @@ function createDrizzleClientInternal(): DrizzleClient {
     },
   });
 
-  return drizzle(sql, {
-    schema,
-    logger: isDevelopment() && !isTest, // Disable logging in CI for performance
-  });
+  return createDrizzle(sql, isDevelopment() && !isTest) as PostgresJsDatabase<
+    typeof schema
+  >;
 }
 
 export type DrizzleClient = PostgresJsDatabase<typeof schema>;
@@ -140,10 +140,9 @@ class DatabaseSingleton {
     });
 
     this._sql = sql;
-    return drizzle(sql, {
-      schema,
-      logger: isDevelopment() && !isTest,
-    });
+    return createDrizzle(sql, isDevelopment() && !isTest) as PostgresJsDatabase<
+      typeof schema
+    >;
   }
 
   async cleanup(): Promise<void> {

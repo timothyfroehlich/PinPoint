@@ -34,7 +34,7 @@ describe("Permission System Core Functions - ENHANCED WITH ORGANIZATIONAL SCOPIN
       const membership = { roleId: SEED_TEST_IDS.MOCK_PATTERNS.ROLE };
       const permission = "issue:create";
 
-      // Mock Drizzle query pattern instead of Prisma
+      // Mock Drizzle query pattern with correct rolePermissions structure
       vi.mocked(mockContext.db.query.roles.findFirst).mockResolvedValue({
         id: SEED_TEST_IDS.MOCK_PATTERNS.ROLE,
         name: "Test Role",
@@ -43,13 +43,15 @@ describe("Permission System Core Functions - ENHANCED WITH ORGANIZATIONAL SCOPIN
         isDefault: false,
         createdAt: new Date(),
         updatedAt: new Date(),
-        permissions: [
+        rolePermissions: [
           {
-            id: SEED_TEST_IDS.MOCK_PATTERNS.PERMISSION,
-            name: "issue:create",
-            description: "Create issues",
-            createdAt: new Date(),
-            updatedAt: new Date(),
+            roleId: SEED_TEST_IDS.MOCK_PATTERNS.ROLE,
+            permissionId: SEED_TEST_IDS.MOCK_PATTERNS.PERMISSION,
+            permission: {
+              id: SEED_TEST_IDS.MOCK_PATTERNS.PERMISSION,
+              name: "issue:create",
+              description: "Create issues",
+            },
           },
         ],
       });
@@ -65,7 +67,16 @@ describe("Permission System Core Functions - ENHANCED WITH ORGANIZATIONAL SCOPIN
       expect(result).toBe(true);
       expect(mockContext.db.query.roles.findFirst).toHaveBeenCalledWith({
         where: expect.any(Function),
-        with: { permissions: true },
+        columns: { name: true },
+        with: {
+          rolePermissions: {
+            with: {
+              permission: {
+                columns: { name: true },
+              },
+            },
+          },
+        },
       });
     });
 
@@ -83,7 +94,7 @@ describe("Permission System Core Functions - ENHANCED WITH ORGANIZATIONAL SCOPIN
         isDefault: false,
         createdAt: new Date(),
         updatedAt: new Date(),
-        permissions: [], // No permissions
+        rolePermissions: [], // No permissions
       });
 
       // Act
@@ -128,13 +139,15 @@ describe("Permission System Core Functions - ENHANCED WITH ORGANIZATIONAL SCOPIN
         isDefault: false,
         createdAt: new Date(),
         updatedAt: new Date(),
-        permissions: [
+        rolePermissions: [
           {
-            id: "perm-org-manage",
-            name: "organization:manage",
-            description: "Manage organization",
-            createdAt: new Date(),
-            updatedAt: new Date(),
+            roleId: SEED_TEST_IDS.MOCK_PATTERNS.ROLE,
+            permissionId: "perm-org-manage",
+            permission: {
+              id: "perm-org-manage",
+              name: "organization:manage",
+              description: "Manage organization",
+            },
           },
         ],
       });
@@ -195,7 +208,7 @@ describe("Permission System Core Functions - ENHANCED WITH ORGANIZATIONAL SCOPIN
         isDefault: false,
         createdAt: new Date(),
         updatedAt: new Date(),
-        permissions: [], // No permissions
+        rolePermissions: [], // No permissions
       });
 
       // Act & Assert
@@ -220,7 +233,7 @@ describe("Permission System Core Functions - ENHANCED WITH ORGANIZATIONAL SCOPIN
         isDefault: false,
         createdAt: new Date(),
         updatedAt: new Date(),
-        permissions: [],
+        rolePermissions: [],
       });
 
       // Act & Assert
@@ -299,7 +312,7 @@ describe("Permission System Core Functions - ENHANCED WITH ORGANIZATIONAL SCOPIN
         isDefault: false,
         createdAt: new Date(),
         updatedAt: new Date(),
-        permissions: [],
+        rolePermissions: [],
       });
 
       // Act
@@ -656,7 +669,7 @@ describe("Permission System Core Functions - ENHANCED WITH ORGANIZATIONAL SCOPIN
         isDefault: false,
         createdAt: new Date(),
         updatedAt: new Date(),
-        permissions: [],
+        rolePermissions: [],
       });
 
       // Act

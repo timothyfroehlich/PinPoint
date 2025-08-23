@@ -29,7 +29,6 @@ import * as schema from "~/server/db/schema";
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
 import { createSeededIssueTestContext } from "~/test/helpers/createSeededIssueTestContext";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
-import { generateTestId } from "~/test/helpers/test-id-generator";
 
 // Mock external dependencies that aren't database-related (but not ID generation for integration tests)
 // Integration tests use real seeded data with SEED_TEST_IDS constants
@@ -101,7 +100,7 @@ describe("Comment Router Integration (PGlite)", () => {
     }) => {
       await withCommentBusinessLogicSetup(workerDb, async (db, caller) => {
         // Create a comment for testing
-        const uniqueCommentId = generateTestId("test-comment");
+        const uniqueCommentId = "mock-comment-unique";
         await db.insert(schema.comments).values({
           id: uniqueCommentId,
           content: "Test comment content",
@@ -113,8 +112,8 @@ describe("Comment Router Integration (PGlite)", () => {
         });
 
         // Generate unique IDs for this test to avoid conflicts
-        const comment2Id = generateTestId("comment-2");
-        const comment3Id = generateTestId("comment-3-deleted");
+        const comment2Id = "mock-comment-2";
+        const comment3Id = "mock-comment-3-deleted";
 
         // Create additional test comments for comprehensive testing
         await db.insert(schema.comments).values([
@@ -188,8 +187,8 @@ describe("Comment Router Integration (PGlite)", () => {
     test("should order comments by creation date", async ({ workerDb }) => {
       await withCommentBusinessLogicSetup(workerDb, async (db, caller) => {
         // Create test comments
-        const comment1Id = generateTestId("comment-1");
-        const comment2Id = generateTestId("comment-2");
+        const comment1Id = "mock-comment-list-1";
+        const comment2Id = "mock-comment-list-2";
 
         // Create additional test comments for comprehensive testing
         await db.insert(schema.comments).values([
@@ -229,7 +228,7 @@ describe("Comment Router Integration (PGlite)", () => {
     test("should soft delete a comment successfully", async ({ workerDb }) => {
       await withCommentBusinessLogicSetup(workerDb, async (db, caller) => {
         // Create a comment to delete
-        const testCommentId = generateTestId("test-comment-to-delete");
+        const testCommentId = "mock-comment-to-delete";
         await db.insert(schema.comments).values({
           id: testCommentId,
           content: "Comment to delete",
@@ -299,8 +298,8 @@ describe("Comment Router Integration (PGlite)", () => {
     }) => {
       await withCommentBusinessLogicSetup(workerDb, async (db, caller) => {
         // Generate unique IDs for this test to avoid conflicts
-        const deletedComment1Id = generateTestId("deleted-comment-1");
-        const deletedComment2Id = generateTestId("deleted-comment-2");
+        const deletedComment1Id = "mock-deleted-comment-1";
+        const deletedComment2Id = "mock-deleted-comment-2";
 
         // Create deleted comments for testing
         await db.insert(schema.comments).values([
@@ -353,7 +352,7 @@ describe("Comment Router Integration (PGlite)", () => {
     test("should restore a deleted comment", async ({ workerDb }) => {
       await withCommentBusinessLogicSetup(workerDb, async (db, caller) => {
         // Generate unique IDs for this test to avoid conflicts
-        const restoreCommentId = generateTestId("restore-comment");
+        const restoreCommentId = "mock-restore-comment";
 
         // Create deleted comment for restoration testing
         await db.insert(schema.comments).values({
@@ -409,9 +408,9 @@ describe("Comment Router Integration (PGlite)", () => {
         recentDate.setDate(recentDate.getDate() - 30); // 30 days ago (way < 90 day threshold)
 
         // Generate unique IDs for this test to avoid conflicts
-        const oldDeleted1Id = generateTestId("old-deleted-1");
-        const oldDeleted2Id = generateTestId("old-deleted-2");
-        const recentDeletedId = generateTestId("recent-deleted");
+        const oldDeleted1Id = "mock-old-deleted-1";
+        const oldDeleted2Id = "mock-old-deleted-2";
+        const recentDeletedId = "mock-recent-deleted";
 
         await db.insert(schema.comments).values([
           {
@@ -465,8 +464,8 @@ describe("Comment Router Integration (PGlite)", () => {
     }) => {
       await withCommentBusinessLogicSetup(workerDb, async (db, caller) => {
         // Generate unique IDs for this test to avoid conflicts
-        const concurrent1Id = generateTestId("concurrent-1");
-        const concurrent2Id = generateTestId("concurrent-2");
+        const concurrent1Id = "mock-concurrent-1";
+        const concurrent2Id = "mock-concurrent-2";
 
         // Create multiple comments for concurrent deletion
         await db.insert(schema.comments).values([
@@ -528,7 +527,7 @@ describe("Comment Router Integration (PGlite)", () => {
     }) => {
       await withCommentBusinessLogicSetup(workerDb, async (db, caller) => {
         // Create a test comment for the lifecycle test
-        const testCommentId = generateTestId("lifecycle-comment");
+        const testCommentId = "mock-lifecycle-comment";
         await db.insert(schema.comments).values({
           id: testCommentId,
           content: "Comment for lifecycle test",

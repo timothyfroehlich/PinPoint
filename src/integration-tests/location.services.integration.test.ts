@@ -22,7 +22,6 @@ import { describe, expect, vi } from "vitest";
 
 import { locationRouter } from "~/server/api/routers/location";
 import * as schema from "~/server/db/schema";
-import { generateTestId } from "~/test/helpers/test-id-generator";
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
 
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
@@ -30,7 +29,7 @@ import { createSeededLocationTestContext } from "~/test/helpers/createSeededLoca
 
 // Mock external dependencies that aren't database-related
 vi.mock("~/lib/utils/id-generation", () => ({
-  generateId: vi.fn(() => generateTestId("test-id")),
+  generateId: vi.fn(() => "mock-generated-id"),
 }));
 
 // Removed permission mocks to use real membership-based scoping from seeds
@@ -117,7 +116,7 @@ describe("Location Router Services Integration (PGlite)", () => {
         const [competitorLocation] = await txDb
           .insert(schema.locations)
           .values({
-            id: generateTestId("competitor-location"),
+            id: "mock-competitor-location",
             name: "Competitor Location",
             organizationId: competitorOrgId,
             createdAt: new Date(),

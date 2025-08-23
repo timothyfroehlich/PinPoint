@@ -1,5 +1,19 @@
 # PinPoint Development Instructions
 
+## 🚨 CRITICAL: Non-Negotiable Patterns 🚨
+
+**ENFORCEMENT REFERENCE:** @NON_NEGOTIABLES.md - Static analysis patterns that MUST be enforced during file reviews
+
+**KEY VIOLATIONS:**
+
+- Memory safety (PGlite per-test instances) → System lockups
+- Migration files in pre-beta → Architectural violation
+- Vitest redirection → Breaks test execution
+- Schema modifications → Breaks locked foundation
+- Missing organization scoping → Security vulnerability
+
+---
+
 ## 🚨 MANDATORY: USE CONTEXT7 EXTENSIVELY 🚨
 
 **CRITICAL DIRECTIVE:** Always use Context7 for current library documentation when:

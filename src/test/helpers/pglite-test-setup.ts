@@ -29,6 +29,8 @@
 import { PGlite } from "@electric-sql/pglite";
 import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
+import { pushSchema } from "drizzle-kit/api";
+import { createDrizzle } from "~/server/db/client-factory";
 
 import type { PgliteDatabase } from "drizzle-orm/pglite";
 
@@ -44,34 +46,12 @@ export type TestDatabase = PgliteDatabase<typeof schema>;
  */
 async function applyDrizzleSchema(db: TestDatabase): Promise<void> {
   console.log("[DB_INIT] Applying Drizzle schema to create tables...");
-  
+
   try {
-    // Generate schema SQL from Drizzle definitions
-    // This approach creates tables directly from the schema without migration files
-    const { getTableConfig, getTableName } = await import("drizzle-orm");
-    const tableEntries = Object.entries(schema);
-    
-    const createStatements: string[] = [];
-    
-    for (const [name, table] of tableEntries) {
-      if (table && typeof table === 'object' && 'getSQL' in table) {
-        try {
-          // Generate CREATE TABLE statement for this table
-          const tableName = getTableName(table);
-          console.log(`[DB_INIT] Processing table: ${tableName}`);
-          
-          // For now, let's use a simpler approach - directly execute schema creation
-          // We'll create the essential tables needed for testing
-          
-        } catch (tableError) {
-          console.warn(`[DB_INIT] Skipping table ${name}:`, tableError);
-        }
-      }
-    }
-    
-    // Create core tables needed for testing (manual approach for now)
-    await createCoreTables(db);
-    
+    // Use pushSchema from drizzle-kit/api to apply schema definitions
+    const { apply } = await pushSchema(schema, db);
+    await apply();
+
     console.log("[DB_INIT] ✅ Schema applied successfully");
   } catch (error) {
     console.error("[DB_INIT] ❌ Schema application failed:", error);
@@ -82,259 +62,52 @@ async function applyDrizzleSchema(db: TestDatabase): Promise<void> {
 }
 
 /**
- * Create core tables needed for integration testing
- * Based on the required tables list from TASK_003 verification
- */
-async function createCoreTables(db: TestDatabase): Promise<void> {
-  console.log("[DB_INIT] Creating core tables...");
-  
-  // Create organizations table first (referenced by most other tables)
-  await db.execute(sql`
-    CREATE TABLE IF NOT EXISTS organizations (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      subdomain TEXT UNIQUE,
-      "logoUrl" TEXT,
-      "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-      "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-  
-  // Create users table
-  await db.execute(sql`
-    CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY,
-      name TEXT,
-      email TEXT UNIQUE NOT NULL,
-      image TEXT,
-      "emailVerified" TIMESTAMP WITH TIME ZONE,
-      "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-      "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-  
-  // Create roles table (referenced by memberships)
-  await db.execute(sql`
-    CREATE TABLE IF NOT EXISTS roles (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      "organizationId" TEXT NOT NULL REFERENCES organizations(id),
-      "isDefault" BOOLEAN DEFAULT FALSE,
-      "isSystem" BOOLEAN DEFAULT FALSE,
-      "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-      "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-  
-  // Create memberships table (critical for admin tests)
-  await db.execute(sql`
-    CREATE TABLE IF NOT EXISTS memberships (
-      id TEXT PRIMARY KEY,
-      "userId" TEXT NOT NULL REFERENCES users(id),
-      "organizationId" TEXT NOT NULL REFERENCES organizations(id),
-      "roleId" TEXT NOT NULL REFERENCES roles(id),
-      "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-      "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-  
-  // Create permissions table
-  await db.execute(sql`
-    CREATE TABLE IF NOT EXISTS permissions (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL UNIQUE,
-      description TEXT,
-      "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-      "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-  
-  // Create role_permissions junction table  
-  await db.execute(sql`
-    CREATE TABLE IF NOT EXISTS role_permissions (
-      "roleId" TEXT NOT NULL REFERENCES roles(id),
-      "permissionId" TEXT NOT NULL REFERENCES permissions(id),
-      "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-      PRIMARY KEY ("roleId", "permissionId")
-    )
-  `);
-  
-  // Create locations table
-  await db.execute(sql`
-    CREATE TABLE IF NOT EXISTS locations (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      "organizationId" TEXT NOT NULL REFERENCES organizations(id),
-      "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-      "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-  
-  // Create models table
-  await db.execute(sql`
-    CREATE TABLE IF NOT EXISTS models (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      manufacturer TEXT,
-      year INTEGER,
-      "opdbId" TEXT,
-      "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-      "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-  
-  // Create machines table
-  await db.execute(sql`
-    CREATE TABLE IF NOT EXISTS machines (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      "modelId" TEXT REFERENCES models(id),
-      "locationId" TEXT REFERENCES locations(id),
-      "organizationId" TEXT NOT NULL REFERENCES organizations(id),
-      "ownerId" TEXT REFERENCES users(id),
-      "qrCodeId" TEXT,
-      "qrCodeUrl" TEXT,
-      "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-      "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-  
-  // Create priorities table
-  await db.execute(sql`
-    CREATE TABLE IF NOT EXISTS priorities (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      level INTEGER NOT NULL,
-      color TEXT,
-      "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-      "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-  
-  // Create issue_statuses table
-  await db.execute(sql`
-    CREATE TABLE IF NOT EXISTS issue_statuses (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      color TEXT,
-      "organizationId" TEXT NOT NULL REFERENCES organizations(id),
-      "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-      "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-  
-  // Create issues table
-  await db.execute(sql`
-    CREATE TABLE IF NOT EXISTS issues (
-      id TEXT PRIMARY KEY,
-      title TEXT NOT NULL,
-      description TEXT,
-      "machineId" TEXT REFERENCES machines(id),
-      "organizationId" TEXT NOT NULL REFERENCES organizations(id),
-      "createdBy" TEXT REFERENCES users(id),
-      "priorityId" TEXT REFERENCES priorities(id),
-      "statusId" TEXT REFERENCES issue_statuses(id),
-      "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-      "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-  
-  // Create comments table
-  await db.execute(sql`
-    CREATE TABLE IF NOT EXISTS comments (
-      id TEXT PRIMARY KEY,
-      content TEXT NOT NULL,
-      "issueId" TEXT NOT NULL REFERENCES issues(id),
-      "authorId" TEXT NOT NULL REFERENCES users(id),
-      "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-      "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-  
-  // Create attachments table
-  await db.execute(sql`
-    CREATE TABLE IF NOT EXISTS attachments (
-      id TEXT PRIMARY KEY,
-      filename TEXT NOT NULL,
-      url TEXT NOT NULL,
-      "issueId" TEXT REFERENCES issues(id),
-      "commentId" TEXT REFERENCES comments(id),
-      "uploadedBy" TEXT NOT NULL REFERENCES users(id),
-      "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-      "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-  
-  // Create upvotes table
-  await db.execute(sql`
-    CREATE TABLE IF NOT EXISTS upvotes (
-      id TEXT PRIMARY KEY,
-      "userId" TEXT NOT NULL REFERENCES users(id),
-      "issueId" TEXT NOT NULL REFERENCES issues(id),
-      "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE("userId", "issueId")
-    )
-  `);
-  
-  // Create collections table
-  await db.execute(sql`
-    CREATE TABLE IF NOT EXISTS collections (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      "organizationId" TEXT NOT NULL REFERENCES organizations(id),
-      "createdBy" TEXT NOT NULL REFERENCES users(id),
-      "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-      "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-  
-  // Create notifications table
-  await db.execute(sql`
-    CREATE TABLE IF NOT EXISTS notifications (
-      id TEXT PRIMARY KEY,
-      "userId" TEXT NOT NULL REFERENCES users(id),
-      title TEXT NOT NULL,
-      message TEXT,
-      read BOOLEAN DEFAULT FALSE,
-      "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-      "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-  
-  console.log("[DB_INIT] ✅ Core tables created");
-}
-
-/**
  * Verify that all required tables were created by migrations
  * STEP 2 of TASK_003: Ensure tables exist before proceeding
  */
 async function verifyMigrationComplete(db: TestDatabase): Promise<void> {
   console.log("[DB_INIT] Verifying migration completion...");
-  
+
   const requiredTables = [
-    'organizations', 'users', 'memberships', 'roles', 'permissions',
-    'locations', 'machines', 'models', 'issues', 'priorities', 'issue_statuses',
-    'comments', 'attachments', 'upvotes', 'collections', 'notifications'
+    "organizations",
+    "users",
+    "memberships",
+    "roles",
+    "permissions",
+    "locations",
+    "machines",
+    "models",
+    "issues",
+    "priorities",
+    "issue_statuses",
+    "comments",
+    "attachments",
+    "upvotes",
+    "collections",
+    "notifications",
   ];
 
   for (const tableName of requiredTables) {
     try {
       const result = await db.execute(sql`
-        SELECT COUNT(*) FROM information_schema.tables 
+        SELECT COUNT(*) FROM information_schema.tables
         WHERE table_name = ${tableName} AND table_schema = 'public'
       `);
-      
+
       if (Number(result.rows[0]?.count) === 0) {
         throw new Error(`Required table missing: ${tableName}`);
       }
-      
+
       console.log(`[VERIFY] ✅ Table exists: ${tableName}`);
     } catch (error) {
-      console.error(`[VERIFY] ❌ Table verification failed: ${tableName}`, error);
+      console.error(
+        `[VERIFY] ❌ Table verification failed: ${tableName}`,
+        error,
+      );
       throw new Error(`Database setup incomplete: ${tableName} table missing`);
     }
   }
-  
+
   console.log("[DB_INIT] ✅ All required tables verified");
 }
 
@@ -347,19 +120,19 @@ async function verifyMigrationComplete(db: TestDatabase): Promise<void> {
 export async function createTestDatabase(): Promise<TestDatabase> {
   console.log("[DB_INIT] Creating PGlite instance...");
   const pgClient = new PGlite();
-  const db = drizzle(pgClient, { schema });
-  
+  const db = createDrizzle(pgClient, true) as TestDatabase;
+
   try {
     // STEP 1: Apply schema FIRST (create tables)
     await applyDrizzleSchema(db);
-    
+
     // STEP 2: Verify tables exist before proceeding
     await verifyMigrationComplete(db);
-    
+
     // STEP 3: Configure for business logic testing (disable RLS on existing tables)
     console.log("[DB_INIT] Configuring for business logic testing...");
     await configureForBusinessLogicTesting(db);
-    
+
     console.log("[DB_INIT] ✅ Database setup complete");
     return db;
   } catch (error) {
@@ -378,24 +151,30 @@ async function configureForBusinessLogicTesting(
   db: TestDatabase,
 ): Promise<void> {
   console.log("[RLS_CONFIG] Configuring PGlite for business logic testing...");
-  
+
   try {
     // Set session variables for business logic testing
     await db.execute(sql.raw(`SET app.environment = 'test'`));
     await db.execute(sql.raw(`SET app.test_role = 'integration_tester'`));
     await db.execute(sql.raw(`SET app.bypass_rls = 'true'`));
     await db.execute(sql.raw(`SET app.test_mode = 'business_logic'`));
-    
+
     // Set integration tester context for audit trails
     await db.execute(sql.raw(`SET app.current_user_id = 'integration_tester'`));
-    await db.execute(sql.raw(`SET app.current_user_role = 'integration_tester'`));
-    await db.execute(sql.raw(`SET app.current_organization_id = 'test-organization'`));
-    await db.execute(sql.raw(`SET app.current_user_email = 'integration_tester@test.dev'`));
+    await db.execute(
+      sql.raw(`SET app.current_user_role = 'integration_tester'`),
+    );
+    await db.execute(
+      sql.raw(`SET app.current_organization_id = 'test-organization'`),
+    );
+    await db.execute(
+      sql.raw(`SET app.current_user_email = 'integration_tester@test.dev'`),
+    );
 
     // Get list of existing tables with RLS enabled (SAFE APPROACH)
     const tablesWithRLS = await db.execute(sql`
-      SELECT schemaname, tablename, rowsecurity 
-      FROM pg_tables 
+      SELECT schemaname, tablename, rowsecurity
+      FROM pg_tables
       WHERE schemaname = 'public' AND rowsecurity = true
       ORDER BY tablename
     `);
@@ -407,18 +186,28 @@ async function configureForBusinessLogicTesting(
     for (const row of tablesWithRLS.rows) {
       try {
         const tableName = row.tablename as string;
-        await db.execute(sql.raw(`ALTER TABLE ${tableName} DISABLE ROW LEVEL SECURITY`));
+        await db.execute(
+          sql.raw(`ALTER TABLE ${tableName} DISABLE ROW LEVEL SECURITY`),
+        );
         console.log(`[RLS_CONFIG] ✅ Disabled RLS on ${tableName}`);
         disabledCount++;
       } catch (error) {
-        console.warn(`[RLS_CONFIG] ⚠️ RLS disable skipped for ${row.tablename}:`, (error as Error).message);
+        console.warn(
+          `[RLS_CONFIG] ⚠️ RLS disable skipped for ${row.tablename}:`,
+          (error as Error).message,
+        );
         // Continue with other tables - this is not fatal for business logic testing
       }
     }
-    
-    console.log(`[RLS_CONFIG] ✅ RLS disabled on ${disabledCount} tables for business logic testing`);
+
+    console.log(
+      `[RLS_CONFIG] ✅ RLS disabled on ${disabledCount} tables for business logic testing`,
+    );
   } catch (error) {
-    console.warn("[RLS_CONFIG] ⚠️ Business logic configuration warning (continuing anyway):", error);
+    console.warn(
+      "[RLS_CONFIG] ⚠️ Business logic configuration warning (continuing anyway):",
+      error,
+    );
   }
 }
 

@@ -40,28 +40,28 @@ export const activityTypeEnum = pgEnum("activity_type", [
 export const issues = pgTable(
   "issues",
   {
-    id: text("id").primaryKey(),
-    title: text("title").notNull(),
-    description: text("description"),
-    consistency: text("consistency"), // e.g., "Always", "Occasionally"
+    id: text().primaryKey(),
+    title: text().notNull(),
+    description: text(),
+    consistency: text(), // e.g., "Always", "Occasionally"
 
     // For V1.0 checklists
-    checklist: json("checklist"), // Store checklist items as JSON: [{ text: "...", completed: false }]
+    checklist: json(), // Store checklist items as JSON: [{ text: "...", completed: false }]
 
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt").defaultNow().notNull(),
-    resolvedAt: timestamp("resolvedAt"),
+    createdAt: timestamp().defaultNow().notNull(),
+    updatedAt: timestamp().defaultNow().notNull(),
+    resolvedAt: timestamp(),
     // Anonymous reporting support
-    reporterEmail: text("reporterEmail"), // For anonymous issue reporting
-    submitterName: text("submitterName"), // Optional name for anonymous issue reporting
+    reporterEmail: text(), // For anonymous issue reporting
+    submitterName: text(), // Optional name for anonymous issue reporting
 
     // Relations
-    organizationId: text("organizationId").notNull(),
-    machineId: text("machineId").notNull(),
-    statusId: text("statusId").notNull(),
-    priorityId: text("priorityId").notNull(),
-    createdById: text("createdById"),
-    assignedToId: text("assignedToId"),
+    organizationId: text().notNull(),
+    machineId: text().notNull(),
+    statusId: text().notNull(),
+    priorityId: text().notNull(),
+    createdById: text(),
+    assignedToId: text(),
   },
   (table) => [
     // Multi-tenancy: organizationId filtering (most critical)
@@ -80,11 +80,11 @@ export const issues = pgTable(
 export const priorities = pgTable(
   "priorities",
   {
-    id: text("id").primaryKey(),
-    name: text("name").notNull(), // e.g., "Low", "Medium", "High"
-    order: integer("order").notNull(), // For sorting purposes
-    organizationId: text("organizationId").notNull(),
-    isDefault: boolean("isDefault").default(false).notNull(),
+    id: text().primaryKey(),
+    name: text().notNull(), // e.g., "Low", "Medium", "High"
+    order: integer().notNull(), // For sorting purposes
+    organizationId: text().notNull(),
+    isDefault: boolean().default(false).notNull(),
   },
   (table) => [index("priorities_organization_id_idx").on(table.organizationId)],
 );
@@ -92,31 +92,33 @@ export const priorities = pgTable(
 export const issueStatuses = pgTable(
   "issue_statuses",
   {
-    id: text("id").primaryKey(),
-    name: text("name").notNull(), // e.g., "Reported", "Diagnosing", "Awaiting Parts", "Fixed"
-    category: statusCategoryEnum("category").notNull(), // "NEW", "IN_PROGRESS", "RESOLVED"
-    organizationId: text("organizationId").notNull(),
-    isDefault: boolean("isDefault").default(false).notNull(),
+    id: text().primaryKey(),
+    name: text().notNull(), // e.g., "Reported", "Diagnosing", "Awaiting Parts", "Fixed"
+    category: statusCategoryEnum().notNull(), // "NEW", "IN_PROGRESS", "RESOLVED"
+    organizationId: text().notNull(),
+    isDefault: boolean().default(false).notNull(),
   },
-  (table) => [index("issue_statuses_organization_id_idx").on(table.organizationId)],
+  (table) => [
+    index("issue_statuses_organization_id_idx").on(table.organizationId),
+  ],
 );
 
 export const comments = pgTable(
   "comments",
   {
-    id: text("id").primaryKey(),
-    content: text("content").notNull(),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+    id: text().primaryKey(),
+    content: text().notNull(),
+    createdAt: timestamp().defaultNow().notNull(),
+    updatedAt: timestamp().defaultNow().notNull(),
 
     // Soft delete fields
-    deletedAt: timestamp("deletedAt"), // Null = not deleted, Date = soft deleted
-    deletedBy: text("deletedBy"), // Who deleted the comment (for audit trail)
+    deletedAt: timestamp(), // Null = not deleted, Date = soft deleted
+    deletedBy: text(), // Who deleted the comment (for audit trail)
 
     // Relations
-    organizationId: text("organizationId").notNull(),
-    issueId: text("issueId").notNull(),
-    authorId: text("authorId").notNull(),
+    organizationId: text().notNull(),
+    issueId: text().notNull(),
+    authorId: text().notNull(),
   },
   (table) => [
     // Comments: multi-tenancy and lookups
@@ -129,17 +131,17 @@ export const comments = pgTable(
 export const attachments = pgTable(
   "attachments",
   {
-    id: text("id").primaryKey(),
-    url: text("url").notNull(),
-    fileName: text("fileName").notNull(),
-    fileType: text("fileType").notNull(),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    id: text().primaryKey(),
+    url: text().notNull(),
+    fileName: text().notNull(),
+    fileType: text().notNull(),
+    createdAt: timestamp().defaultNow().notNull(),
 
     // Add multi-tenancy
-    organizationId: text("organizationId").notNull(),
+    organizationId: text().notNull(),
 
     // Relations
-    issueId: text("issueId").notNull(),
+    issueId: text().notNull(),
   },
   (table) => [
     index("attachments_organization_id_idx").on(table.organizationId),
@@ -150,19 +152,19 @@ export const attachments = pgTable(
 export const issueHistory = pgTable(
   "issue_history",
   {
-    id: text("id").primaryKey(),
-    field: text("field").notNull(), // e.g., "status", "assignee", "priority"
-    oldValue: text("oldValue"),
-    newValue: text("newValue"),
-    changedAt: timestamp("changedAt").defaultNow().notNull(),
+    id: text().primaryKey(),
+    field: text().notNull(), // e.g., "status", "assignee", "priority"
+    oldValue: text(),
+    newValue: text(),
+    changedAt: timestamp().defaultNow().notNull(),
 
     // Add missing fields
-    organizationId: text("organizationId").notNull(), // For multi-tenancy
-    actorId: text("actorId"), // Who performed the action (null for system actions)
-    type: activityTypeEnum("type").notNull(), // Replace string with proper enum
+    organizationId: text().notNull(), // For multi-tenancy
+    actorId: text(), // Who performed the action (null for system actions)
+    type: activityTypeEnum().notNull(), // Replace string with proper enum
 
     // Relations
-    issueId: text("issueId").notNull(),
+    issueId: text().notNull(),
   },
   (table) => [
     index("issue_history_organization_id_idx").on(table.organizationId),
@@ -174,10 +176,10 @@ export const issueHistory = pgTable(
 export const upvotes = pgTable(
   "upvotes",
   {
-    id: text("id").primaryKey(),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-    issueId: text("issueId").notNull(),
-    userId: text("userId").notNull(),
+    id: text().primaryKey(),
+    createdAt: timestamp().defaultNow().notNull(),
+    issueId: text().notNull(),
+    userId: text().notNull(),
   },
   (table) => [
     index("upvotes_issue_id_idx").on(table.issueId),
