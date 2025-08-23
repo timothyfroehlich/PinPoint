@@ -223,18 +223,11 @@ export async function createCleanTestDatabase(): Promise<{
     "../../../scripts/seed/shared/infrastructure"
   );
 
-  // Seed infrastructure (dual organizations, permissions, roles, statuses)
-  const organizations = await seedInfrastructureWithDb(db);
-
-  // Note: Users and memberships now created by seed scripts
-
-  // NOTE: No sample data seeding - tests create their own precise data
-
   return {
     db,
-    organizationId: organizations.primary.id, // Default to primary for backward compatibility
-    primaryOrgId: organizations.primary.id,
-    secondaryOrgId: organizations.secondary.id,
+    organizationId: "test-org-pinpoint", // Default to primary for backward compatibility
+    primaryOrgId: "test-org-pinpoint",
+    secondaryOrgId: "test-org-competitor",
   };
 }
 

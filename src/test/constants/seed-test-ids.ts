@@ -123,11 +123,18 @@ export const SEED_TEST_IDS = {
   /** Static machine IDs used in minimal seed data */
   MACHINES: {
     MEDIEVAL_MADNESS_1: "machine-mm-001",
+    ATTACK_FROM_MARS_1: "machine-afm-001",
     CACTUS_CANYON_1: "machine-cc-001",
     REVENGE_FROM_MARS_1: "machine-rfm-001",
     CLEOPATRA_1: "machine-cleopatra-001",
     XENON_1: "machine-xenon-001",
     ULTRAMAN_KAIJU: "machine-ultraman-001",
+  },
+
+  /** Static model IDs used by seed data */
+  MODELS: {
+    MEDIEVAL_MADNESS: "model-mm-001",
+    ATTACK_FROM_MARS: "model-afm-001",
   },
 
   /** Global permission IDs - NOT per-organization */
@@ -214,6 +221,7 @@ export const SEED_TEST_IDS = {
   /** Static location IDs used in minimal seed data */
   LOCATIONS: {
     MAIN_FLOOR: "location-main-floor-001",
+    BACK_ROOM: "location-back-room-001",
     UPSTAIRS: "location-upstairs-001",
     // Default location per organization
     DEFAULT_PRIMARY: "location-default-primary-001",
@@ -232,6 +240,8 @@ export const SEED_TEST_IDS = {
 
   /** Canonical issue IDs referenced by minimal sample data */
   ISSUES: {
+    ISSUE_1: "issue-1",
+    ISSUE_2: "issue-2",
     KAIJU_FIGURES: "issue-kaiju-figures-001",
     LOUD_BUZZING: "issue-loud-buzzing-002",
     LEFT_ROLLOVER: "issue-left-rollover-003",

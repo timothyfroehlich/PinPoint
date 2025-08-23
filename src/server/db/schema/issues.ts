@@ -8,6 +8,9 @@ import {
   json,
   index,
 } from "drizzle-orm/pg-core";
+import { organizations } from "./organizations";
+import { machines } from "./machines";
+import { users } from "./auth";
 
 // =================================
 // ENUMS
@@ -56,12 +59,20 @@ export const issues = pgTable(
     submitterName: text("submitterName"), // Optional name for anonymous issue reporting
 
     // Relations
-    organizationId: text("organizationId").notNull(),
-    machineId: text("machineId").notNull(),
-    statusId: text("statusId").notNull(),
-    priorityId: text("priorityId").notNull(),
-    createdById: text("createdById"),
-    assignedToId: text("assignedToId"),
+    organizationId: text("organizationId")
+      .notNull()
+      .references(() => organizations.id),
+    machineId: text("machineId")
+      .notNull()
+      .references(() => machines.id),
+    statusId: text("statusId")
+      .notNull()
+      .references(() => issueStatuses.id),
+    priorityId: text("priorityId")
+      .notNull()
+      .references(() => priorities.id),
+    createdById: text("createdById").references(() => users.id),
+    assignedToId: text("assignedToId").references(() => users.id),
   },
   (table) => [
     // Multi-tenancy: organizationId filtering (most critical)
@@ -98,7 +109,9 @@ export const issueStatuses = pgTable(
     organizationId: text("organizationId").notNull(),
     isDefault: boolean("isDefault").default(false).notNull(),
   },
-  (table) => [index("issue_statuses_organization_id_idx").on(table.organizationId)],
+  (table) => [
+    index("issue_statuses_organization_id_idx").on(table.organizationId),
+  ],
 );
 
 export const comments = pgTable(
@@ -114,9 +127,15 @@ export const comments = pgTable(
     deletedBy: text("deletedBy"), // Who deleted the comment (for audit trail)
 
     // Relations
-    organizationId: text("organizationId").notNull(),
-    issueId: text("issueId").notNull(),
-    authorId: text("authorId").notNull(),
+    organizationId: text("organizationId")
+      .notNull()
+      .references(() => organizations.id),
+    issueId: text("issueId")
+      .notNull()
+      .references(() => issues.id),
+    authorId: text("authorId")
+      .notNull()
+      .references(() => users.id),
   },
   (table) => [
     // Comments: multi-tenancy and lookups
@@ -139,7 +158,9 @@ export const attachments = pgTable(
     organizationId: text("organizationId").notNull(),
 
     // Relations
-    issueId: text("issueId").notNull(),
+    issueId: text("issueId")
+      .notNull()
+      .references(() => issues.id),
   },
   (table) => [
     index("attachments_organization_id_idx").on(table.organizationId),
@@ -158,11 +179,13 @@ export const issueHistory = pgTable(
 
     // Add missing fields
     organizationId: text("organizationId").notNull(), // For multi-tenancy
-    actorId: text("actorId"), // Who performed the action (null for system actions)
     type: activityTypeEnum("type").notNull(), // Replace string with proper enum
 
     // Relations
-    issueId: text("issueId").notNull(),
+    issueId: text("issueId")
+      .notNull()
+      .references(() => issues.id),
+    actorId: text("actorId").references(() => users.id),
   },
   (table) => [
     index("issue_history_organization_id_idx").on(table.organizationId),
@@ -176,8 +199,12 @@ export const upvotes = pgTable(
   {
     id: text("id").primaryKey(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
-    issueId: text("issueId").notNull(),
-    userId: text("userId").notNull(),
+    issueId: text("issueId")
+      .notNull()
+      .references(() => issues.id),
+    userId: text("userId")
+      .notNull()
+      .references(() => users.id),
   },
   (table) => [
     index("upvotes_issue_id_idx").on(table.issueId),

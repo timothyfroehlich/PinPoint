@@ -26,7 +26,7 @@
 import { test as baseTest } from "vitest";
 
 import {
-  createSeededTestDatabase,
+  createCleanTestDatabase,
   cleanupTestDatabase,
 } from "./pglite-test-setup";
 
@@ -50,7 +50,7 @@ export const test = baseTest.extend<
       );
 
       // Create single seeded database instance for this worker
-      const { db } = await createSeededTestDatabase();
+      const { db } = await createCleanTestDatabase();
 
       // Provide database to all tests in this worker
       await use(db);

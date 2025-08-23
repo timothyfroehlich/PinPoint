@@ -7,6 +7,9 @@ import {
   integer,
   index,
 } from "drizzle-orm/pg-core";
+import { organizations } from "./organizations";
+import { users } from "./auth";
+import { locations, models } from "./machines";
 
 // =================================
 // CORE ASSET TABLES
@@ -17,7 +20,9 @@ export const locations = pgTable(
   {
     id: text("id").primaryKey(),
     name: text("name").notNull(),
-    organizationId: text("organizationId").notNull(),
+    organizationId: text("organizationId")
+      .notNull()
+      .references(() => organizations.id),
 
     // Timestamps
     createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -84,11 +89,17 @@ export const machines = pgTable(
   {
     id: text("id").primaryKey(),
     name: text("name").notNull(), // Instance-specific name (e.g., "Medieval Madness #1")
-    organizationId: text("organizationId").notNull(),
-    locationId: text("locationId").notNull(),
+    organizationId: text("organizationId")
+      .notNull()
+      .references(() => organizations.id),
+    locationId: text("locationId")
+      .notNull()
+      .references(() => locations.id),
     // Model reference
-    modelId: text("modelId").notNull(), // References models.id
-    ownerId: text("ownerId"),
+    modelId: text("modelId")
+      .notNull()
+      .references(() => models.id), // References models.id
+    ownerId: text("ownerId").references(() => users.id),
 
     // Add notification preferences for owner
     ownerNotificationsEnabled: boolean("ownerNotificationsEnabled")

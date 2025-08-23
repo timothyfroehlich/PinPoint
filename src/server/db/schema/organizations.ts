@@ -1,4 +1,5 @@
 import { pgTable, text, timestamp, boolean, index } from "drizzle-orm/pg-core";
+import { users } from "./auth";
 
 // =================================
 // ORGANIZATION & TENANCY TABLES
@@ -24,9 +25,15 @@ export const memberships = pgTable(
   "memberships",
   {
     id: text("id").primaryKey(),
-    userId: text("userId").notNull(),
-    organizationId: text("organizationId").notNull(),
-    roleId: text("roleId").notNull(),
+    userId: text("userId")
+      .notNull()
+      .references(() => users.id),
+    organizationId: text("organizationId")
+      .notNull()
+      .references(() => organizations.id),
+    roleId: text("roleId")
+      .notNull()
+      .references(() => roles.id),
   },
   (table) => [
     // Multi-tenancy: organizationId filtering (most critical for performance)
@@ -44,7 +51,9 @@ export const roles = pgTable(
   {
     id: text("id").primaryKey(),
     name: text("name").notNull(), // e.g., "Admin", "Technician", "Manager"
-    organizationId: text("organizationId").notNull(),
+    organizationId: text("organizationId")
+      .notNull()
+      .references(() => organizations.id),
     isDefault: boolean("isDefault").default(false).notNull(), // To identify system-default roles
     isSystem: boolean("isSystem").default(false).notNull(), // To identify system roles (Admin, Unauthenticated)
     createdAt: timestamp("createdAt").defaultNow().notNull(),
