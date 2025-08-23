@@ -196,20 +196,28 @@ export const mockRolePermissionsTable = pgTable("role_permissions", {
   permissionId: text("permission_id").notNull(),
 });
 
-// Mock with test data
+// Mock with test data using SEED_TEST_IDS
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
+
 export const mockRolePermissions = {
   findMany: vi.fn().mockResolvedValue([
     {
-      roleId: "admin",
-      permissionId: "issue:create",
-      permission: { id: "issue:create", name: "Create Issues" },
+      roleId: SEED_TEST_IDS.ROLES.ADMIN,
+      permissionId: SEED_TEST_IDS.PERMISSIONS.ISSUE_CREATE,
+      permission: {
+        id: SEED_TEST_IDS.PERMISSIONS.ISSUE_CREATE,
+        name: "Create Issues",
+      },
     },
     {
-      roleId: "admin",
-      permissionId: "issue:edit",
-      permission: { id: "issue:edit", name: "Edit Issues" },
+      roleId: SEED_TEST_IDS.ROLES.ADMIN,
+      permissionId: SEED_TEST_IDS.PERMISSIONS.ISSUE_EDIT,
+      permission: {
+        id: SEED_TEST_IDS.PERMISSIONS.ISSUE_EDIT,
+        name: "Edit Issues",
+      },
     },
-    // ... other permissions
+    // ... other permissions using SEED_TEST_IDS constants
   ]),
   create: vi.fn(),
   update: vi.fn(),
@@ -374,6 +382,7 @@ npm run test src/components/issues/__tests__/IssueDetailView.auth.integration.te
 2. **Production Permission Data**: Are roles and permissions properly seeded in the database?
 3. **Permission Matrix Completeness**: Do we have all required permissions defined?
 4. **Cross-System Integration**: How do Supabase RLS policies integrate with application-level permissions?
+5. **Test Data Strategy**: Ensure permission tests use seeded data (SEED_TEST_IDS) instead of dynamic generation
 
 ## Related Documentation
 
@@ -391,6 +400,8 @@ This task restores the **foundation of the entire authorization system**. Withou
 - **No admin operations** (user management, role assignment broken)
 
 The permission system is independent of RLS policies but complementary - **application-level permissions** work with **database-level RLS** to provide defense in depth.
+
+**Important Testing Context**: This task focuses on **application-level permission testing** which can be properly validated with PGlite. Database-level RLS policy testing requires pgTAP with real PostgreSQL (see TASK_001 dual-track approach).
 
 **Priority order within this task:**
 
