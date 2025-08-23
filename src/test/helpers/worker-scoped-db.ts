@@ -26,7 +26,7 @@
 import { test as baseTest } from "vitest";
 
 import {
-  createSeededTestDatabase,
+  createInfrastructureOnlyTestDatabase,
   cleanupTestDatabase,
 } from "./pglite-test-setup";
 
@@ -49,8 +49,8 @@ export const test = baseTest.extend<
         `[Worker ${workerId}] Creating shared PGlite instance with seeded data`,
       );
 
-      // Create single seeded database instance for this worker
-      const { db } = await createSeededTestDatabase();
+      // Create single infrastructure-only database instance for this worker
+      const { db } = await createInfrastructureOnlyTestDatabase();
 
       // Provide database to all tests in this worker
       await use(db);

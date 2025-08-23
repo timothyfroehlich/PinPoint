@@ -1,7 +1,25 @@
 /**
  * PGlite Test Database Setup - Dual-Track Testing Strategy
  *
- * Creates PGlite in-memory PostgreSQL databases configured for Track 2 of the
+ * Creates PGlite in-memory PostgreSQL databases configured  try {
+    // === Integration Tester Role Simulation ===
+
+    // Initialize custom configuration parameters using safe string escaping
+    // PostgreSQL custom configuration parameters need to be set, not created first
+
+    // Mark as test environment
+    await db.execute(sql.raw(`SELECT set_config('app.environment', 'test', false)`));
+
+    // Simulate integration_tester role session
+    await db.execute(sql.raw(`SELECT set_config('app.test_role', 'integration_tester', false)`));
+    await db.execute(sql.raw(`SELECT set_config('app.bypass_rls', 'true', false)`));
+    await db.execute(sql.raw(`SELECT set_config('app.test_mode', 'business_logic', false)`));
+
+    // Set integration tester "user" for audit trails
+    await db.execute(sql.raw(`SELECT set_config('app.current_user_id', 'integration_tester', false)`));
+    await db.execute(sql.raw(`SELECT set_config('app.current_user_role', 'integration_tester', false)`));
+    await db.execute(sql.raw(`SELECT set_config('app.current_organization_id', 'test-organization', false)`));
+    await db.execute(sql.raw(`SELECT set_config('app.current_user_email', 'integration_tester@test.dev', false)`));f the
  * dual-track testing strategy: business logic testing with integration_tester role simulation.
  *
  * Key Features:
@@ -230,6 +248,32 @@ export async function createCleanTestDatabase(): Promise<{
 
   // NOTE: No sample data seeding - tests create their own precise data
 
+  return {
+    db,
+    organizationId: organizations.primary.id, // Default to primary for backward compatibility
+    primaryOrgId: organizations.primary.id,
+    secondaryOrgId: organizations.secondary.id,
+  };
+}
+
+/**
+ * Create a test database with infrastructure only (no sample data)
+ * For tests that create their own data or work with minimal fixtures
+ * Avoids sample data creation failures while providing necessary infrastructure
+ */
+export async function createInfrastructureOnlyTestDatabase(): Promise<{
+  db: TestDatabase;
+  organizationId: string;
+  primaryOrgId: string;
+  secondaryOrgId: string;
+}> {
+  const db = await createTestDatabase();
+  // Use production seed functions directly (same as CI)
+  const { seedInfrastructureWithDb } = await import(
+    "../../../scripts/seed/shared/infrastructure"
+  );
+  // Seed only infrastructure (dual organizations, permissions, roles, statuses)
+  const organizations = await seedInfrastructureWithDb(db);
   return {
     db,
     organizationId: organizations.primary.id, // Default to primary for backward compatibility
