@@ -390,7 +390,7 @@ If you spend > 30 minutes debugging mocks, consider:
 
 ```bash
 # Run tests and categorize failures by type
-npm test 2>&1 | grep -E "(FAIL|Error|TypeError)" | sort | uniq -c
+npm run test:brief | grep -E "(FAIL|Error|TypeError)" | sort | uniq -c
 ```
 
 **Common Pattern Categories**:
@@ -519,10 +519,10 @@ permissions: [
 
    ```bash
    # Before fixes
-   npm test 2>&1 | grep -c "✓\|×"  # 171 passed, 25 failed
+   npm run test:brief | grep -c "✓\|×"  # 171 passed, 25 failed
 
    # After core fixes
-   npm test 2>&1 | grep -c "✓\|×"  # 171 passed, 11 failed
+   npm run test:brief | grep -c "✓\|×"  # 171 passed, 11 failed
    ```
 
 ### Mock Configuration Strategy Evolution

@@ -9,6 +9,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 
 import { appRouter } from "~/server/api/root";
 import { PermissionTests } from "~/test/permissionTestHelpers";
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 import {
   testAuthenticatedProcedure,
   testAdminOnlyProcedure,
@@ -47,22 +48,22 @@ describe("Collection Router - ORIGINAL PATTERN", () => {
     beforeEach(() => {
       // 20+ lines of manual setup for authenticated context
       ctx.user = {
-        id: "user-1",
+        id: SEED_TEST_IDS.USERS.ADMIN,
         email: "test@example.com",
         user_metadata: { name: "Test User" },
-        app_metadata: { organization_id: "org-1" },
+        app_metadata: { organization_id: SEED_TEST_IDS.ORGANIZATIONS.primary },
       } as any;
 
       ctx.organization = {
-        id: "org-1",
+        id: SEED_TEST_IDS.ORGANIZATIONS.primary,
         name: "Test Organization",
         subdomain: "test",
       };
 
       const mockMembership = {
         id: "membership-1",
-        userId: "user-1",
-        organizationId: "org-1",
+        userId: SEED_TEST_IDS.USERS.ADMIN,
+        organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
         roleId: "role-1",
         role: {
           id: "role-1",
@@ -110,12 +111,15 @@ describe("Collection Router - ORIGINAL PATTERN", () => {
         });
 
         expect(result).toEqual(mockCollection);
-        expect(mockCreateManualCollection).toHaveBeenCalledWith("org-1", {
-          name: "Test Collection",
-          typeId: "type-1",
-          locationId: "location-1",
-          description: "Test description",
-        });
+        expect(mockCreateManualCollection).toHaveBeenCalledWith(
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+          {
+            name: "Test Collection",
+            typeId: "type-1",
+            locationId: "location-1",
+            description: "Test description",
+          },
+        );
       });
 
       // 10+ lines for authentication requirement test
@@ -136,22 +140,22 @@ describe("Collection Router - ORIGINAL PATTERN", () => {
     beforeEach(() => {
       // Another 25+ lines of admin context setup
       ctx.user = {
-        id: "user-1",
+        id: SEED_TEST_IDS.USERS.ADMIN,
         email: "admin@example.com",
         user_metadata: { name: "Admin User" },
-        app_metadata: { organization_id: "org-1" },
+        app_metadata: { organization_id: SEED_TEST_IDS.ORGANIZATIONS.primary },
       } as any;
 
       ctx.organization = {
-        id: "org-1",
+        id: SEED_TEST_IDS.ORGANIZATIONS.primary,
         name: "Test Organization",
         subdomain: "test",
       };
 
       const mockMembership = {
         id: "membership-1",
-        userId: "user-1",
-        organizationId: "org-1",
+        userId: SEED_TEST_IDS.USERS.ADMIN,
+        organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
         roleId: "admin-role-1",
         role: {
           id: "admin-role-1",
@@ -195,7 +199,9 @@ describe("Collection Router - ORIGINAL PATTERN", () => {
         const result = await caller.collection.generateAuto();
 
         expect(result).toEqual(mockGeneratedCollections);
-        expect(mockGenerateAutoCollections).toHaveBeenCalledWith("org-1");
+        expect(mockGenerateAutoCollections).toHaveBeenCalledWith(
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+        );
       });
 
       // 15+ lines for admin permission testing
@@ -280,7 +286,10 @@ describe("Collection Router - NEW PATTERN", () => {
               validInput,
             );
 
-          expectServiceCalled(["org-1", validInput]);
+          expectServiceCalled([
+            SEED_TEST_IDS.ORGANIZATIONS.primary,
+            validInput,
+          ]);
           expect(result.name).toBe("Test Collection");
           expect(result.isManual).toBe(true);
           return result;
@@ -326,7 +335,7 @@ describe("Collection Router - NEW PATTERN", () => {
 
           const result = await context.adminCaller.collection.generateAuto();
 
-          expectServiceCalled(["org-1"]);
+          expectServiceCalled([SEED_TEST_IDS.ORGANIZATIONS.primary]);
           expect(result).toHaveLength(1);
           expect(result[0].type).toBe("manufacturer");
           return result;

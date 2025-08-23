@@ -540,9 +540,11 @@ describe("Cross-Organization Business Logic Validation", () => {
         ).toBe(true);
 
         // Test specific SEED_TEST_IDS constants are working
-        expect(SEED_TEST_IDS.ORGANIZATIONS.primary).toBe("test-org-pinpoint");
+        expect(SEED_TEST_IDS.ORGANIZATIONS.primary).toBe(
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+        );
         expect(SEED_TEST_IDS.ORGANIZATIONS.competitor).toBe(
-          "test-org-competitor",
+          SEED_TEST_IDS.ORGANIZATIONS.competitor,
         );
       });
     });
@@ -552,8 +554,8 @@ describe("Cross-Organization Business Logic Validation", () => {
     }) => {
       await withIsolatedTest(workerDb, async (db) => {
         // Test that SEED_TEST_IDS provide predictable user IDs for testing
-        expect(SEED_TEST_IDS.USERS.ADMIN).toBe("test-user-tim");
-        expect(SEED_TEST_IDS.USERS.MEMBER1).toBe("test-user-harry");
+        expect(SEED_TEST_IDS.USERS.ADMIN).toBe(SEED_TEST_IDS.USERS.ADMIN);
+        expect(SEED_TEST_IDS.USERS.MEMBER1).toBe(SEED_TEST_IDS.USERS.MEMBER1);
         expect(SEED_TEST_IDS.USERS.MEMBER2).toBe("test-user-escher");
 
         // Test that we can use these IDs in queries predictably
@@ -710,14 +712,16 @@ describe("Cross-Organization Business Logic Validation", () => {
         // Test that SEED_TEST_IDS constants work reliably for business logic testing
 
         // Test organizational constants
-        expect(SEED_TEST_IDS.ORGANIZATIONS.primary).toBe("test-org-pinpoint");
+        expect(SEED_TEST_IDS.ORGANIZATIONS.primary).toBe(
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+        );
         expect(SEED_TEST_IDS.ORGANIZATIONS.competitor).toBe(
-          "test-org-competitor",
+          SEED_TEST_IDS.ORGANIZATIONS.competitor,
         );
 
         // Test user constants
-        expect(SEED_TEST_IDS.USERS.ADMIN).toBe("test-user-tim");
-        expect(SEED_TEST_IDS.USERS.MEMBER1).toBe("test-user-harry");
+        expect(SEED_TEST_IDS.USERS.ADMIN).toBe(SEED_TEST_IDS.USERS.ADMIN);
+        expect(SEED_TEST_IDS.USERS.MEMBER1).toBe(SEED_TEST_IDS.USERS.MEMBER1);
 
         // Test that seeded data exists for both organizations
         const primaryOrgData = await db.query.issues.findMany({

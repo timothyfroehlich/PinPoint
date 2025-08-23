@@ -20,6 +20,7 @@ import {
 import type { DrizzleClient } from "~/server/db/drizzle";
 
 import * as schema from "~/server/db/schema";
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
 // Mock the Drizzle client and schema
 const mockDb = {
@@ -68,7 +69,9 @@ describe("Database Test Helpers", () => {
         }),
       } as unknown as DrizzleClient;
 
-      const testIds: TestDataIds = { orgIds: ["test-org-1"] };
+      const testIds: TestDataIds = {
+        orgIds: [SEED_TEST_IDS.ORGANIZATIONS.primary],
+      };
 
       // Should not throw, should log warning
       await expect(cleanupTestData(errorDb, testIds)).resolves.not.toThrow();
@@ -96,7 +99,7 @@ describe("Database Test Helpers", () => {
 
     it("should execute delete operations in correct dependency order", async () => {
       const testIds: TestDataIds = {
-        orgIds: ["test-org-1"],
+        orgIds: [SEED_TEST_IDS.ORGANIZATIONS.primary],
         userIds: ["test-user-1"],
         issueId: "test-issue-1",
         machineId: "test-machine-1",

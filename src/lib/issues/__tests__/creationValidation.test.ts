@@ -741,7 +741,7 @@ describe("creationValidation", () => {
     it("should validate organization boundary for all scenarios", () => {
       const organizations = [
         SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
-        "org-2",
+        SEED_TEST_IDS.ORGANIZATIONS.competitor,
         "org-3",
       ];
 

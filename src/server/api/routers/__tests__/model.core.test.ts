@@ -119,7 +119,7 @@ describe("Model Router Integration Tests (Simplified Single-Table Architecture)"
     // Create machines to test machine counts
     await db.insert(schema.machines).values([
       {
-        id: generateTestId("machine-1"),
+        id: generateTestId(SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1),
         name: "Medieval Madness #1",
         qrCodeId: generateTestId("qr-1"),
         organizationId,

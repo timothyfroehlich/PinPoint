@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 import { getUserPermissionsForSupabaseUser } from "~/server/auth/permissions";
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 import {
   createServerMockContext,
   createMockSupabaseUser,
@@ -27,7 +28,7 @@ describe("tRPC Supabase Authentication - Basic Tests", () => {
         id: "user-123",
         email: "test@example.com",
         app_metadata: {
-          organization_id: "org-1",
+          organization_id: SEED_TEST_IDS.ORGANIZATIONS.primary,
           role: "member",
         },
         user_metadata: {
@@ -38,7 +39,7 @@ describe("tRPC Supabase Authentication - Basic Tests", () => {
       // Set up mock context with Supabase user
       ctx.user = mockUser;
       ctx.organization = {
-        id: "org-1",
+        id: SEED_TEST_IDS.ORGANIZATIONS.primary,
         name: "Test Organization",
         subdomain: "test-org",
       };
@@ -53,14 +54,16 @@ describe("tRPC Supabase Authentication - Basic Tests", () => {
       // We'll expand this once the pattern is established
       expect(ctx.user).toBeDefined();
       expect(ctx.user?.id).toBe("user-123");
-      expect(ctx.user?.app_metadata.organization_id).toBe("org-1");
+      expect(ctx.user?.app_metadata.organization_id).toBe(
+        SEED_TEST_IDS.ORGANIZATIONS.primary,
+      );
     });
 
     it("should reject unauthenticated user", async () => {
       // Set up mock context without user
       ctx.user = null;
       ctx.organization = {
-        id: "org-1",
+        id: SEED_TEST_IDS.ORGANIZATIONS.primary,
         name: "Test Organization",
         subdomain: "test-org",
       };

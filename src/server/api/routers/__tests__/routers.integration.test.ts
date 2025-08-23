@@ -25,10 +25,7 @@ import type { TestDatabase } from "~/test/helpers/pglite-test-setup";
 
 import { appRouter } from "~/server/api/root";
 import * as schema from "~/server/db/schema";
-import {
-  createSeededTestDatabase,
-  getSeededTestData,
-} from "~/test/helpers/pglite-test-setup";
+// Removed: dangerous createSeededTestDatabase - now using worker-scoped pattern
 import { createSeededAdminTestContext } from "~/test/helpers/createSeededAdminTestContext";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 import { generateTestId } from "~/test/helpers/test-id-generator";
@@ -92,34 +89,18 @@ vi.mock("~/server/services/factory", () => ({
 }));
 
 describe("tRPC Router Integration Tests", () => {
-  // Suite-level variables for seeded data
-  let workerDb: TestDatabase;
-  let primaryOrgId: string;
-  let _competitorOrgId: string;
-  let seededData: any;
-
-  beforeAll(async () => {
-    // Create seeded test database with dual organizations
-    const {
-      db,
-      primaryOrgId: primary,
-      secondaryOrgId: competitor,
-    } = await createSeededTestDatabase();
-    workerDb = db;
-    primaryOrgId = primary;
-    _competitorOrgId = competitor;
-
-    // Get seeded test data for primary organization
-    seededData = await getSeededTestData(db, primaryOrgId);
-  });
+  // Uses worker-scoped PGlite database for memory safety
+  // All tests use SEED_TEST_IDS constants for predictable data
 
   describe("Issue Router Integration", () => {
-    test("should create issue with real database operations", async () => {
+    test("should create issue with real database operations", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (txDb) => {
         // Create admin context using seeded data
         const context = await createSeededAdminTestContext(
           txDb,
-          primaryOrgId,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
           SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = appRouter.createCaller(context);
@@ -128,25 +109,27 @@ describe("tRPC Router Integration Tests", () => {
           title: "Integration Test Issue",
           description: "Real database test description",
           severity: "Medium",
-          machineId: seededData.seededData.machine.id,
+          machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
         });
 
         // Verify the result structure
         expect(result).toMatchObject({
           title: "Integration Test Issue",
           description: "Real database test description",
-          machineId: seededData.machine.id,
-          statusId: seededData.status.id,
-          priorityId: seededData.priority.id,
+          machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
+          statusId: SEED_TEST_IDS.STATUSES.NEW_PRIMARY,
+          priorityId: SEED_TEST_IDS.PRIORITIES.HIGH_PRIMARY,
         });
 
         // Verify relationships are loaded
         expect(result.machine).toBeDefined();
-        expect(result.machine.id).toBe(seededData.machine.id);
+        expect(result.machine.id).toBe(
+          SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
+        );
         expect(result.status).toBeDefined();
-        expect(result.status.id).toBe(seededData.status.id);
+        expect(result.status.id).toBe(SEED_TEST_IDS.STATUSES.NEW_PRIMARY);
         expect(result.priority).toBeDefined();
-        expect(result.priority.id).toBe(seededData.priority.id);
+        expect(result.priority.id).toBe(SEED_TEST_IDS.PRIORITIES.HIGH_PRIMARY);
 
         // Verify the database was actually updated
         const issueInDb = await txDb.query.issues.findFirst({
@@ -157,11 +140,13 @@ describe("tRPC Router Integration Tests", () => {
       });
     });
 
-    test("should update issue with real database operations", async () => {
+    test("should update issue with real database operations", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (txDb) => {
         const context = await createSeededAdminTestContext(
           txDb,
-          primaryOrgId,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
           SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = appRouter.createCaller(context);
@@ -171,7 +156,7 @@ describe("tRPC Router Integration Tests", () => {
           title: "Original Title",
           description: "Original description",
           severity: "Medium",
-          machineId: seededData.machine.id,
+          machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
         });
 
         // Then update it
@@ -197,11 +182,13 @@ describe("tRPC Router Integration Tests", () => {
       });
     });
 
-    test("should enforce organizational isolation in issue operations", async () => {
+    test("should enforce organizational isolation in issue operations", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (txDb) => {
         const context = await createSeededAdminTestContext(
           txDb,
-          primaryOrgId,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
           SEED_TEST_IDS.USERS.ADMIN,
         );
 
@@ -209,7 +196,7 @@ describe("tRPC Router Integration Tests", () => {
         const [org2] = await txDb
           .insert(schema.organizations)
           .values({
-            id: "org-2",
+            id: SEED_TEST_IDS.ORGANIZATIONS.competitor,
             name: "Organization 2",
             subdomain: "org2",
           })
@@ -221,7 +208,7 @@ describe("tRPC Router Integration Tests", () => {
           title: "Org 1 Issue",
           description: "Should be isolated",
           severity: "Medium",
-          machineId: seededData.machine.id,
+          machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
         });
 
         // Create context for second organization
@@ -232,7 +219,7 @@ describe("tRPC Router Integration Tests", () => {
             name: org2.name,
             subdomain: org2.subdomain,
           },
-          primaryOrgId: org2.id,
+          organizationId: org2.id,
           user: {
             ...context.user,
             app_metadata: {
@@ -255,45 +242,54 @@ describe("tRPC Router Integration Tests", () => {
   });
 
   describe("Machine Router Integration", () => {
-    test("should update machine with real database operations", async () => {
+    test("should update machine with real database operations", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (txDb) => {
         const context = await createSeededAdminTestContext(
           txDb,
-          primaryOrgId,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
           SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = appRouter.createCaller(context);
 
         const result = await caller.machine.core.update({
-          id: seededData.machine.id,
+          id: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
           name: "Updated Machine Name",
         });
 
         // Verify the result structure
         expect(result).toMatchObject({
-          id: seededData.machine.id,
+          id: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
           name: "Updated Machine Name",
         });
 
         // Verify relationships are loaded
         expect(result.location).toBeDefined();
-        expect(result.location.id).toBe(seededData.location.id);
+        expect(result.location.id).toBe(
+          SEED_TEST_IDS.LOCATIONS.DEFAULT_PRIMARY,
+        );
         expect(result.model).toBeDefined();
-        expect(result.model.id).toBe(seededData.model.id);
+        expect(result.model.id).toBe(SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1);
 
         // Verify the database was actually updated
         const updatedMachineInDb = await txDb.query.machines.findFirst({
-          where: eq(schema.machines.id, seededData.machine.id),
+          where: eq(
+            schema.machines.id,
+            SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
+          ),
         });
         expect(updatedMachineInDb?.name).toBe("Updated Machine Name");
       });
     });
 
-    test("should enforce organizational isolation in machine operations", async () => {
+    test("should enforce organizational isolation in machine operations", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (txDb) => {
         const context = await createSeededAdminTestContext(
           txDb,
-          primaryOrgId,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
           SEED_TEST_IDS.USERS.ADMIN,
         );
 
@@ -301,7 +297,7 @@ describe("tRPC Router Integration Tests", () => {
         const [org2] = await txDb
           .insert(schema.organizations)
           .values({
-            id: "org-2",
+            id: SEED_TEST_IDS.ORGANIZATIONS.competitor,
             name: "Organization 2",
             subdomain: "org2",
           })
@@ -315,7 +311,7 @@ describe("tRPC Router Integration Tests", () => {
             name: org2.name,
             subdomain: org2.subdomain,
           },
-          primaryOrgId: org2.id,
+          organizationId: org2.id,
           user: {
             ...context.user,
             app_metadata: {
@@ -329,7 +325,7 @@ describe("tRPC Router Integration Tests", () => {
         // Should not be able to access machine from different organization
         await expect(
           org2Caller.machine.core.update({
-            id: seededData.machine.id,
+            id: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
             name: "Malicious Update",
           }),
         ).rejects.toThrow("Machine not found or not accessible");
@@ -338,29 +334,34 @@ describe("tRPC Router Integration Tests", () => {
   });
 
   describe("Location Router Integration", () => {
-    test("should update location with real database operations", async () => {
+    test("should update location with real database operations", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (txDb) => {
         const context = await createSeededAdminTestContext(
           txDb,
-          primaryOrgId,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
           SEED_TEST_IDS.USERS.ADMIN,
         );
         const caller = appRouter.createCaller(context);
 
         const result = await caller.location.update({
-          id: seededData.location.id,
+          id: SEED_TEST_IDS.LOCATIONS.DEFAULT_PRIMARY,
           name: "Updated Location Name",
         });
 
         // Verify the result structure
         expect(result).toMatchObject({
-          id: seededData.location.id,
+          id: SEED_TEST_IDS.LOCATIONS.DEFAULT_PRIMARY,
           name: "Updated Location Name",
         });
 
         // Verify the database was actually updated
         const updatedLocationInDb = await txDb.query.locations.findFirst({
-          where: eq(schema.locations.id, seededData.location.id),
+          where: eq(
+            schema.locations.id,
+            SEED_TEST_IDS.LOCATIONS.DEFAULT_PRIMARY,
+          ),
         });
         expect(updatedLocationInDb?.name).toBe("Updated Location Name");
       });
@@ -368,11 +369,13 @@ describe("tRPC Router Integration Tests", () => {
   });
 
   describe("Multi-tenant Integration Testing", () => {
-    test("should enforce cross-organizational boundaries across all routers", async () => {
+    test("should enforce cross-organizational boundaries across all routers", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (txDb) => {
         const context = await createSeededAdminTestContext(
           txDb,
-          primaryOrgId,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
           SEED_TEST_IDS.USERS.ADMIN,
         );
 
@@ -380,7 +383,7 @@ describe("tRPC Router Integration Tests", () => {
         const [org2] = await txDb
           .insert(schema.organizations)
           .values({
-            id: "org-2",
+            id: SEED_TEST_IDS.ORGANIZATIONS.competitor,
             name: "Organization 2",
             subdomain: "org2",
           })
@@ -392,7 +395,7 @@ describe("tRPC Router Integration Tests", () => {
           .values({
             id: generateTestId("org2-location"),
             name: "Org2 Location",
-            primaryOrgId: org2.id,
+            organizationId: org2.id,
             createdAt: new Date(),
             updatedAt: new Date(),
           })
@@ -411,7 +414,7 @@ describe("tRPC Router Integration Tests", () => {
 
         // Verify org1 user can still access org1 resources
         const result = await caller.location.update({
-          id: seededData.location.id,
+          id: SEED_TEST_IDS.LOCATIONS.DEFAULT_PRIMARY,
           name: "Legitimate Update",
         });
         expect(result.name).toBe("Legitimate Update");
@@ -423,7 +426,7 @@ describe("tRPC Router Integration Tests", () => {
     await withIsolatedTest(workerDb, async (txDb) => {
       const context = await createSeededAdminTestContext(
         txDb,
-        primaryOrgId,
+        SEED_TEST_IDS.ORGANIZATIONS.primary,
         SEED_TEST_IDS.USERS.ADMIN,
       );
       const caller = appRouter.createCaller(context);
@@ -433,12 +436,12 @@ describe("tRPC Router Integration Tests", () => {
         title: "Integration Test Issue",
         description: "Test referential integrity",
         severity: "Medium",
-        machineId: seededData.machine.id,
+        machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
       });
 
       // Update the machine name
       const _updatedMachine = await caller.machine.core.update({
-        id: seededData.machine.id,
+        id: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
         name: "Updated Machine for Integrity Test",
       });
 
@@ -450,12 +453,14 @@ describe("tRPC Router Integration Tests", () => {
         },
       });
 
-      expect(issueInDb?.machine?.id).toBe(seededData.machine.id);
+      expect(issueInDb?.machine?.id).toBe(
+        SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
+      );
       expect(issueInDb?.machine?.name).toBe(
         "Updated Machine for Integrity Test",
       );
-      expect(issueInDb?.statusId).toBe(seededData.status.id);
-      expect(issueInDb?.priorityId).toBe(seededData.priority.id);
+      expect(issueInDb?.statusId).toBe(SEED_TEST_IDS.STATUSES.NEW_PRIMARY);
+      expect(issueInDb?.priorityId).toBe(SEED_TEST_IDS.PRIORITIES.HIGH_PRIMARY);
     });
   });
 });

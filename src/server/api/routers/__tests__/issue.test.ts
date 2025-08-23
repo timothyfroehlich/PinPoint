@@ -548,7 +548,7 @@ describe("Public Issue Procedures", () => {
         await expect(
           caller.issue.core.publicCreate({
             title: "",
-            machineId: "machine-1",
+            machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
           }),
         ).rejects.toThrow();
 
@@ -761,7 +761,7 @@ describe("Public Issue Procedures", () => {
         // Create test issues using static seed data
         await db.insert(schema.issues).values([
           {
-            id: generateTestId("issue-1"),
+            id: generateTestId(SEED_TEST_IDS.ISSUES.ISSUE_1),
             title: "Machine not working",
             description: "Screen is black",
             machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
@@ -773,7 +773,7 @@ describe("Public Issue Procedures", () => {
             updatedAt: new Date(),
           },
           {
-            id: generateTestId("issue-2"),
+            id: generateTestId(SEED_TEST_IDS.ISSUES.ISSUE_2),
             title: "Flipper stuck",
             description: null,
             machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
@@ -1131,7 +1131,7 @@ describe("Public Issue Procedures", () => {
         // Create multiple issues with different timestamps
         await db.insert(schema.issues).values([
           {
-            id: generateTestId("issue-1"),
+            id: generateTestId(SEED_TEST_IDS.ISSUES.ISSUE_1),
             title: "First Issue",
             machineId: machine.id,
             statusId: status.id,
@@ -1141,7 +1141,7 @@ describe("Public Issue Procedures", () => {
             updatedAt: new Date("2023-01-02"),
           },
           {
-            id: generateTestId("issue-2"),
+            id: generateTestId(SEED_TEST_IDS.ISSUES.ISSUE_2),
             title: "Second Issue",
             machineId: machine.id,
             statusId: status.id,
@@ -1222,7 +1222,7 @@ describe("Public Issue Procedures", () => {
         const [machine1] = await db
           .insert(schema.machines)
           .values({
-            id: generateTestId("machine-1"),
+            id: generateTestId(SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1),
             name: "Machine in Location 1",
             modelId: model.id,
             locationId: location.id,

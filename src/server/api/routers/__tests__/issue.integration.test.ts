@@ -1,25 +1,24 @@
 /**
- * ✅ GOOD: Uses seed data properly, minor RLS context enhancements only
+ * Issue Router Integration Tests (PGlite) - Memory-Safe Pattern
  *
- * CURRENT STATUS: EXEMPLARY IMPLEMENTATION
- * - Correctly uses createSeededTestDatabase() and SEED_TEST_IDS
- * - Proper memory-safe PGlite patterns with withTransaction()
- * - Real database integration testing with seeded data
- * - Good organizational scoping patterns
+ * CURRENT STATUS: CONVERTED TO WORKER-SCOPED PATTERN
+ * - Uses worker-scoped PGlite database for memory safety
+ * - Uses SEED_TEST_IDS constants for predictable data
+ * - Uses withIsolatedTest() for transaction-based test isolation
+ * - Real database integration testing with seeded infrastructure
+ * - Proper organizational scoping patterns
  *
- * MINOR ENHANCEMENT OPPORTUNITIES:
- * - Could add more RLS session context testing
- * - Could enhance organizational boundary validation
- * - Consider standardizing context creation patterns
+ * Key Features:
+ * - Memory-safe: No per-test database instances
+ * - Worker-scoped: Shared PGlite instance per worker process
+ * - Transaction isolation: Each test runs in isolated transaction
+ * - Predictable data: Uses hardcoded SEED_TEST_IDS constants
  *
- * NO MAJOR CHANGES NEEDED - This is a good example of integration testing
- *
- * Issue Router Integration Tests (PGlite)
  * Tests issue router procedures with real database operations using seeded data
  */
 
 import { eq, and } from "drizzle-orm";
-import { describe, it, expect, beforeAll, vi } from "vitest";
+import { describe, expect, vi } from "vitest";
 
 import { generateId } from "~/lib/utils/id-generation";
 import { appRouter } from "~/server/api/root";
@@ -29,25 +28,22 @@ import {
   issueStatuses,
   memberships,
 } from "~/server/db/schema";
-import {
-  createSeededTestDatabase,
-  withTransaction,
-  type TestDatabase,
-} from "~/test/helpers/pglite-test-setup";
+import { type TestDatabase } from "~/test/helpers/pglite-test-setup";
+import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
 import { createMachineFactory } from "~/test/testDataFactories";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
 // Helper function to create test context with proper mocks
 const createTestContext = async (
   txDb: any,
-  testOrgId: string,
+  organizationId: string,
   userId: string,
 ) => {
   // Query the real membership from the database (since this is an integration test)
   const membership = await txDb.query.memberships.findFirst({
     where: and(
       eq(memberships.userId, userId),
-      eq(memberships.organizationId, testOrgId),
+      eq(memberships.organizationId, organizationId),
     ),
     with: {
       role: {
@@ -77,10 +73,10 @@ const createTestContext = async (
       id: userId,
       email: "test@example.com",
       user_metadata: { name: "Test User" },
-      app_metadata: { organization_id: testOrgId },
+      app_metadata: { organization_id: SEED_TEST_IDS.ORGANIZATIONS.primary },
     },
     organization: {
-      id: testOrgId,
+      id: SEED_TEST_IDS.ORGANIZATIONS.primary,
       name: "Test Organization",
       subdomain: "test-org",
     },
@@ -146,22 +142,18 @@ vi.mock("~/server/services/factory", () => ({
 }));
 
 describe("Issue Router Integration Tests (PGlite)", () => {
-  let testDb: TestDatabase;
-  let testOrgId: string;
-  beforeAll(async () => {
-    // Use existing seeded test database infrastructure
-    const { db, organizationId } = await createSeededTestDatabase();
-    testDb = db;
-    testOrgId = organizationId;
-  });
+  // Uses worker-scoped PGlite database for memory safety
+  // Tests use SEED_TEST_IDS constants for predictable data
 
   describe("Issue Creation with Real Database", () => {
-    it("should create issue with proper organizational scoping", async () => {
-      await withTransaction(testDb, async (txDb) => {
+    test("should create issue with proper organizational scoping", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (txDb) => {
         // Create test context with real database
         const testContext = (await createTestContext(
           txDb,
-          testOrgId,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
           SEED_TEST_IDS.USERS.ADMIN,
         )) as any;
 
@@ -177,7 +169,7 @@ describe("Issue Router Integration Tests (PGlite)", () => {
         // Verify issue was created with correct organization scoping
         expect(result.id).toBeDefined();
         expect(result.title).toBe("Integration Test Issue");
-        expect(result.organizationId).toBe(testOrgId);
+        expect(result.organizationId).toBe(SEED_TEST_IDS.ORGANIZATIONS.primary);
         expect(result.machineId).toBe(
           SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
         );
@@ -201,14 +193,22 @@ describe("Issue Router Integration Tests (PGlite)", () => {
         });
 
         expect(dbIssue).toBeDefined();
-        expect(dbIssue?.machine?.organizationId).toBe(testOrgId);
-        expect(dbIssue?.status?.organizationId).toBe(testOrgId);
-        expect(dbIssue?.priority?.organizationId).toBe(testOrgId);
+        expect(dbIssue?.machine?.organizationId).toBe(
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+        );
+        expect(dbIssue?.status?.organizationId).toBe(
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+        );
+        expect(dbIssue?.priority?.organizationId).toBe(
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
+        );
       });
     });
 
-    it("should enforce organizational scoping during issue creation", async () => {
-      await withTransaction(testDb, async (txDb) => {
+    test("should enforce organizational scoping during issue creation", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (txDb) => {
         // Create a machine in a different organization to test scoping
         const otherOrgId = "other-org-id";
         const otherMachineId = "other-machine-id";
@@ -230,7 +230,7 @@ describe("Issue Router Integration Tests (PGlite)", () => {
         // Create test context with seeded user data
         const testContext = (await createTestContext(
           txDb,
-          testOrgId,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
           SEED_TEST_IDS.USERS.ADMIN,
         )) as any;
 
@@ -248,8 +248,10 @@ describe("Issue Router Integration Tests (PGlite)", () => {
   });
 
   describe("Issue Querying with Complex Filters", () => {
-    it("should filter issues by search term with proper scoping", async () => {
-      await withTransaction(testDb, async (txDb) => {
+    test("should filter issues by search term with proper scoping", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (txDb) => {
         // Create test issues with different titles for search testing
         const testIssues = [
           {
@@ -257,7 +259,7 @@ describe("Issue Router Integration Tests (PGlite)", () => {
             title: "Critical Production Issue",
             description: "System down",
             machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
-            organizationId: testOrgId,
+            organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
             statusId: SEED_TEST_IDS.STATUSES.NEW,
             priorityId: SEED_TEST_IDS.PRIORITIES.HIGH,
             createdById: SEED_TEST_IDS.USERS.ADMIN,
@@ -267,7 +269,7 @@ describe("Issue Router Integration Tests (PGlite)", () => {
             title: "Maintenance Required",
             description: "Routine check",
             machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
-            organizationId: testOrgId,
+            organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
             statusId: SEED_TEST_IDS.STATUSES.NEW,
             priorityId: SEED_TEST_IDS.PRIORITIES.HIGH,
             createdById: SEED_TEST_IDS.USERS.ADMIN,
@@ -278,7 +280,7 @@ describe("Issue Router Integration Tests (PGlite)", () => {
 
         const testContext = (await createTestContext(
           txDb,
-          testOrgId,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
           SEED_TEST_IDS.USERS.ADMIN,
         )) as any;
 
@@ -294,15 +296,17 @@ describe("Issue Router Integration Tests (PGlite)", () => {
       });
     });
 
-    it("should filter issues by machine with relational data", async () => {
-      await withTransaction(testDb, async (txDb) => {
+    test("should filter issues by machine with relational data", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (txDb) => {
         // Create a test issue for the seeded machine
         const testIssue = {
           id: generateId(),
           title: "Machine-specific Issue",
           description: "Test machine issue",
           machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
-          organizationId: testOrgId,
+          organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
           statusId: SEED_TEST_IDS.STATUSES.NEW,
           priorityId: SEED_TEST_IDS.PRIORITIES.HIGH,
           createdById: SEED_TEST_IDS.USERS.ADMIN,
@@ -312,7 +316,7 @@ describe("Issue Router Integration Tests (PGlite)", () => {
 
         const testContext = (await createTestContext(
           txDb,
-          testOrgId,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
           SEED_TEST_IDS.USERS.ADMIN,
         )) as any;
 
@@ -334,15 +338,15 @@ describe("Issue Router Integration Tests (PGlite)", () => {
       });
     });
 
-    it("should return paginated results", async () => {
-      await withTransaction(testDb, async (txDb) => {
+    test("should return paginated results", async ({ workerDb }) => {
+      await withIsolatedTest(workerDb, async (txDb) => {
         // Create multiple issues for pagination testing
         const testIssues = [
           {
             id: generateId(),
             title: "Issue 1",
             machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
-            organizationId: testOrgId,
+            organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
             statusId: SEED_TEST_IDS.STATUSES.NEW,
             priorityId: SEED_TEST_IDS.PRIORITIES.HIGH,
             createdById: SEED_TEST_IDS.USERS.ADMIN,
@@ -351,7 +355,7 @@ describe("Issue Router Integration Tests (PGlite)", () => {
             id: generateId(),
             title: "Issue 2",
             machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
-            organizationId: testOrgId,
+            organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
             statusId: SEED_TEST_IDS.STATUSES.NEW,
             priorityId: SEED_TEST_IDS.PRIORITIES.HIGH,
             createdById: SEED_TEST_IDS.USERS.ADMIN,
@@ -360,7 +364,7 @@ describe("Issue Router Integration Tests (PGlite)", () => {
             id: generateId(),
             title: "Issue 3",
             machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
-            organizationId: testOrgId,
+            organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
             statusId: SEED_TEST_IDS.STATUSES.NEW,
             priorityId: SEED_TEST_IDS.PRIORITIES.HIGH,
             createdById: SEED_TEST_IDS.USERS.ADMIN,
@@ -371,7 +375,7 @@ describe("Issue Router Integration Tests (PGlite)", () => {
 
         const testContext = (await createTestContext(
           txDb,
-          testOrgId,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
           SEED_TEST_IDS.USERS.ADMIN,
         )) as any;
 
@@ -390,15 +394,17 @@ describe("Issue Router Integration Tests (PGlite)", () => {
   });
 
   describe("Issue Assignment with Database Operations", () => {
-    it("should assign issue to user within same organization", async () => {
-      await withTransaction(testDb, async (txDb) => {
+    test("should assign issue to user within same organization", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (txDb) => {
         // Create an issue first using seeded data
         const issueId = generateId();
         await txDb.insert(issues).values({
           id: issueId,
           title: "Test Assignment Issue",
           machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
-          organizationId: testOrgId,
+          organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
           statusId: SEED_TEST_IDS.STATUSES.NEW,
           priorityId: SEED_TEST_IDS.PRIORITIES.HIGH,
           createdById: SEED_TEST_IDS.USERS.ADMIN,
@@ -406,7 +412,7 @@ describe("Issue Router Integration Tests (PGlite)", () => {
 
         const testContext = (await createTestContext(
           txDb,
-          testOrgId,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
           SEED_TEST_IDS.USERS.ADMIN,
         )) as any;
 
@@ -435,15 +441,17 @@ describe("Issue Router Integration Tests (PGlite)", () => {
   });
 
   describe("Issue Status Updates with Validation", () => {
-    it("should update issue status with proper validation", async () => {
-      await withTransaction(testDb, async (txDb) => {
+    test("should update issue status with proper validation", async ({
+      workerDb,
+    }) => {
+      await withIsolatedTest(workerDb, async (txDb) => {
         // Create resolved status
         const resolvedStatusId = generateId();
         await txDb.insert(issueStatuses).values({
           id: resolvedStatusId,
           name: "Resolved",
           category: "RESOLVED",
-          organizationId: testOrgId,
+          organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
         });
 
         // Create an issue using seeded data
@@ -452,7 +460,7 @@ describe("Issue Router Integration Tests (PGlite)", () => {
           id: issueId,
           title: "Test Status Update Issue",
           machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
-          organizationId: testOrgId,
+          organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
           statusId: SEED_TEST_IDS.STATUSES.NEW,
           priorityId: SEED_TEST_IDS.PRIORITIES.HIGH,
           createdById: SEED_TEST_IDS.USERS.ADMIN,
@@ -460,7 +468,7 @@ describe("Issue Router Integration Tests (PGlite)", () => {
 
         const testContext = (await createTestContext(
           txDb,
-          testOrgId,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
           SEED_TEST_IDS.USERS.ADMIN,
         )) as any;
 

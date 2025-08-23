@@ -13,6 +13,7 @@ import {
 import type { PinballMapMachine } from "~/lib/pinballmap/types";
 
 import fixtureData from "~/lib/pinballmap/__tests__/fixtures/api_responses/locations/location_26454_machine_details.json";
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
 describe("pinballmapTransformer", () => {
   // Use real fixture data for comprehensive testing
@@ -258,7 +259,7 @@ describe("pinballmapTransformer", () => {
 
   describe("findMatchingMachine", () => {
     const currentMachines = [
-      { id: "machine-1", modelId: "model-mm" },
+      { id: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1, modelId: "model-mm" },
       { id: "machine-2", modelId: "model-tz" },
       { id: "machine-3", modelId: "model-bk" },
     ];
@@ -267,7 +268,7 @@ describe("pinballmapTransformer", () => {
       const result = findMatchingMachine("model-mm", currentMachines);
 
       expect(result).toEqual({
-        existingMachineId: "machine-1",
+        existingMachineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
         isNewMachine: false,
         shouldUpdate: false,
       });

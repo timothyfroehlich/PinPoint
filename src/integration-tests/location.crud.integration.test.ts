@@ -6,7 +6,7 @@
  * using the established seeded data infrastructure.
  *
  * Key Features:
- * - Uses createSeededTestDatabase() and SEED_TEST_IDS for consistent test data
+ * - Uses worker-scoped PGlite database and SEED_TEST_IDS for consistent test data
  * - Leverages createSeededLocationTestContext() for standardized TRPC context
  * - Uses SEED_TEST_IDS.ORGANIZATIONS.competitor for cross-org isolation testing
  * - Maintains CRUD operation testing with seeded data baseline

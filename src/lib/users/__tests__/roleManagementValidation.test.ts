@@ -538,7 +538,7 @@ describe("validateRoleReassignment", () => {
   const input: RoleReassignmentInput = {
     roleId: "role-to-delete",
     reassignRoleId: "reassign-role",
-    organizationId: "org-1",
+    organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
   };
 
   const roleToDelete = createTestRole({
@@ -949,8 +949,13 @@ describe("Utility Functions", () => {
 describe("Specific Validation Functions", () => {
   describe("validateOrganizationBoundary", () => {
     it("should validate role from correct organization", () => {
-      const role = createTestRole({ organizationId: "org-1" });
-      const result = validateOrganizationBoundary(role, "org-1");
+      const role = createTestRole({
+        organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
+      });
+      const result = validateOrganizationBoundary(
+        role,
+        SEED_TEST_IDS.ORGANIZATIONS.primary,
+      );
       expect(result.valid).toBe(true);
     });
 
@@ -958,7 +963,10 @@ describe("Specific Validation Functions", () => {
       const role = createTestRole({
         organizationId: SEED_TEST_IDS.MOCK_PATTERNS.SECONDARY.ORGANIZATION,
       });
-      const result = validateOrganizationBoundary(role, "org-1");
+      const result = validateOrganizationBoundary(
+        role,
+        SEED_TEST_IDS.ORGANIZATIONS.primary,
+      );
       expect(result.valid).toBe(false);
       expect(result.error).toBe(
         "Role not found or does not belong to this organization",
@@ -968,13 +976,21 @@ describe("Specific Validation Functions", () => {
 
   describe("validateUserMembership", () => {
     it("should validate existing membership from correct organization", () => {
-      const membership = createMembership({ organizationId: "org-1" });
-      const result = validateUserMembership(membership, "org-1");
+      const membership = createMembership({
+        organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
+      });
+      const result = validateUserMembership(
+        membership,
+        SEED_TEST_IDS.ORGANIZATIONS.primary,
+      );
       expect(result.valid).toBe(true);
     });
 
     it("should reject null membership", () => {
-      const result = validateUserMembership(null, "org-1");
+      const result = validateUserMembership(
+        null,
+        SEED_TEST_IDS.ORGANIZATIONS.primary,
+      );
       expect(result.valid).toBe(false);
       expect(result.error).toBe("User is not a member of this organization");
     });
@@ -983,7 +999,10 @@ describe("Specific Validation Functions", () => {
       const membership = createMembership({
         organizationId: SEED_TEST_IDS.MOCK_PATTERNS.SECONDARY.ORGANIZATION,
       });
-      const result = validateUserMembership(membership, "org-1");
+      const result = validateUserMembership(
+        membership,
+        SEED_TEST_IDS.ORGANIZATIONS.primary,
+      );
       expect(result.valid).toBe(false);
       expect(result.error).toBe(
         "User membership does not belong to this organization",

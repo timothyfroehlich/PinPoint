@@ -19,6 +19,7 @@ import type { DrizzleClient } from "~/server/db/drizzle";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
 import * as drizzleSchema from "~/server/db/schema";
 import { createVitestMockContext } from "~/test/vitestMockContext";
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
 describe("Drizzle Schema & tRPC Context Unit Tests", () => {
   let mockContext: TRPCContext;
@@ -41,22 +42,22 @@ describe("Drizzle Schema & tRPC Context Unit Tests", () => {
       ...baseContext,
       db: mockDrizzleClient, // Use single client pattern
       user: {
-        id: "user-1",
+        id: SEED_TEST_IDS.USERS.ADMIN,
         email: "test@example.com",
         aud: "authenticated",
         created_at: new Date().toISOString(),
         user_metadata: { name: "Test User" },
-        app_metadata: { organization_id: "org-1" },
+        app_metadata: { organization_id: SEED_TEST_IDS.ORGANIZATIONS.primary },
       } as any,
       organization: {
-        id: "org-1",
+        id: SEED_TEST_IDS.ORGANIZATIONS.primary,
         name: "Test Organization",
         subdomain: "test",
       },
       membership: {
         id: "membership-1",
-        userId: "user-1",
-        organizationId: "org-1",
+        userId: SEED_TEST_IDS.USERS.ADMIN,
+        organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
         roleId: "role-1",
       },
       userPermissions: ["issue:view"],

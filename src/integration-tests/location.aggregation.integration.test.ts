@@ -7,7 +7,7 @@
  * established seeded data infrastructure.
  *
  * Key Features:
- * - Uses createSeededTestDatabase() and SEED_TEST_IDS for consistent test data
+ * - Uses worker-scoped PGlite database and SEED_TEST_IDS for consistent test data
  * - Leverages createSeededLocationTestContext() for standardized TRPC context
  * - Uses SEED_TEST_IDS.ORGANIZATIONS.competitor for cross-org isolation testing
  * - Maintains aggregation testing with seeded data baseline + additional test data
@@ -22,10 +22,7 @@ import { locationRouter } from "~/server/api/routers/location";
 import * as schema from "~/server/db/schema";
 import { generateTestId } from "~/test/helpers/test-id-generator";
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
-import {
-  createSeededTestDatabase,
-  type TestDatabase,
-} from "~/test/helpers/pglite-test-setup";
+import { type TestDatabase } from "~/test/helpers/pglite-test-setup";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 import { createSeededLocationTestContext } from "~/test/helpers/createSeededLocationTestContext";
 
@@ -36,20 +33,8 @@ vi.mock("~/lib/utils/id-generation", () => ({
 
 // Removed permission mocks to use real membership-based scoping from seeds
 describe("Location Router Aggregation Operations (PGlite)", () => {
-  let _workerDb: TestDatabase;
-  let primaryOrgId: string;
-  let competitorOrgId: string;
-  // Using deterministic SEED_TEST_IDS directly
-
-  beforeAll(async () => {
-    // Create seeded test database with established infrastructure
-    const setup = await createSeededTestDatabase();
-    workerDb = setup.db;
-    primaryOrgId = setup.organizationId;
-    competitorOrgId = SEED_TEST_IDS.ORGANIZATIONS.competitor;
-
-    // no-op: tests will reference SEED_TEST_IDS directly
-  });
+  // Uses worker-scoped PGlite database for memory safety
+  // Tests use SEED_TEST_IDS constants for predictable data
 
   describe("Complex Aggregation Queries", () => {
     test("should handle getPublic with machine and issue counts", async ({
@@ -59,7 +44,7 @@ describe("Location Router Aggregation Operations (PGlite)", () => {
         // Use global seededData from beforeAll
         const context = await createSeededLocationTestContext(
           txDb,
-          primaryOrgId,
+          SEED_TEST_IDS.ORGANIZATIONS.primary,
           SEED_TEST_IDS.USERS.MEMBER1,
         );
         const caller = locationRouter.createCaller(context);
@@ -71,7 +56,7 @@ describe("Location Router Aggregation Operations (PGlite)", () => {
           .values({
             id: testLocationId,
             name: "Aggregation Test Location",
-            organizationId: primaryOrgId,
+            organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
             createdAt: new Date(),
             updatedAt: new Date(),
           })
@@ -82,7 +67,7 @@ describe("Location Router Aggregation Operations (PGlite)", () => {
           id: `agg-machine-${i}`,
           name: `Aggregation Machine ${i}`,
           qrCodeId: `agg-qr-${i}`,
-          organizationId: primaryOrgId,
+          organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
           locationId: testLocation.id,
           modelId: SEED_TEST_IDS.MOCK_PATTERNS.MODEL,
           ownerId: SEED_TEST_IDS.USERS.MEMBER1,
@@ -96,7 +81,7 @@ describe("Location Router Aggregation Operations (PGlite)", () => {
         const testIssues = Array.from({ length: 6 }, (_, i) => ({
           id: `agg-issue-${i}`,
           title: `Aggregation Issue ${i}`,
-          organizationId: primaryOrgId,
+          organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
           machineId: `agg-machine-${i % 3}`, // 2 issues per machine
           statusId: SEED_TEST_IDS.STATUSES.NEW_PRIMARY,
           priorityId: SEED_TEST_IDS.PRIORITIES.MEDIUM_PRIMARY,
@@ -149,7 +134,7 @@ describe("Location Router Aggregation Operations (PGlite)", () => {
         await txDb.insert(schema.locations).values({
           id: "competitor-agg-location",
           name: "Competitor Aggregation Location",
-          organizationId: competitorOrgId,
+          organizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor,
           createdAt: new Date(),
           updatedAt: new Date(),
         });

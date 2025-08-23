@@ -25,10 +25,7 @@ import { describe, expect, vi, beforeAll } from "vitest";
 
 import { adminRouter } from "~/server/api/routers/admin";
 import * as schema from "~/server/db/schema";
-import {
-  type TestDatabase,
-  createSeededTestDatabase,
-} from "~/test/helpers/pglite-test-setup";
+import { type TestDatabase } from "~/test/helpers/pglite-test-setup";
 import { createSeededAdminTestContext } from "~/test/helpers/createSeededAdminTestContext";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 import { generateTestId } from "~/test/helpers/test-id-generator";
@@ -67,19 +64,14 @@ vi.mock("~/lib/utils/membership-transformers", () => ({
 }));
 
 describe("Admin Router Integration (PGlite)", () => {
-  // NOTE: This test suite expects seeded data (3 users from SEED_TEST_IDS)
-  // User creation in inviteUser/removeUser tests is legitimate for testing user management functionality
-  // Suite-level variables for seeded data
-  let workerDb: TestDatabase;
-
-  beforeAll(async () => {
-    // Create seeded test database with dual organizations
-    const { db } = await createSeededTestDatabase();
-    workerDb = db;
-  });
+  // NOTE: This test suite uses worker-scoped PGlite database for memory safety
+  // Uses seeded data from infrastructure seed (3 users from SEED_TEST_IDS)
+  // Worker-scoped database prevents memory blowouts from per-test instances
 
   describe("getUsers", () => {
-    test("should retrieve all organization members with real database operations", async () => {
+    test("should retrieve all organization members with real database operations", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (txDb) => {
         // Create admin context using static IDs
         const context = await createSeededAdminTestContext(
@@ -109,7 +101,7 @@ describe("Admin Router Integration (PGlite)", () => {
       });
     });
 
-    test("should enforce organizational isolation", async () => {
+    test("should enforce organizational isolation", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (txDb) => {
         // Create admin context using competitor organization
         const context = await createSeededAdminTestContext(
@@ -135,7 +127,9 @@ describe("Admin Router Integration (PGlite)", () => {
   });
 
   describe("updateUserRole", () => {
-    test("should update user role with real database operations", async () => {
+    test("should update user role with real database operations", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (txDb) => {
         // Create admin context using static IDs
         const context = await createSeededAdminTestContext(
@@ -177,7 +171,9 @@ describe("Admin Router Integration (PGlite)", () => {
       });
     });
 
-    test("should enforce role exists in organization constraint", async () => {
+    test("should enforce role exists in organization constraint", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (txDb) => {
         // Create admin context using static IDs
         const context = await createSeededAdminTestContext(
@@ -211,7 +207,9 @@ describe("Admin Router Integration (PGlite)", () => {
   });
 
   describe("inviteUser", () => {
-    test("should create invitation with real database operations", async () => {
+    test("should create invitation with real database operations", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (txDb) => {
         // Create admin context using seeded data
         const context = await createSeededAdminTestContext(
@@ -256,7 +254,7 @@ describe("Admin Router Integration (PGlite)", () => {
       });
     });
 
-    test("should handle duplicate email invitations", async () => {
+    test("should handle duplicate email invitations", async ({ workerDb }) => {
       await withIsolatedTest(workerDb, async (txDb) => {
         // Create admin context using seeded data
         const context = await createSeededAdminTestContext(
@@ -284,7 +282,9 @@ describe("Admin Router Integration (PGlite)", () => {
       });
     });
 
-    test("should enforce organizational isolation for invitations", async () => {
+    test("should enforce organizational isolation for invitations", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (txDb) => {
         // Create admin context using seeded data
         const context = await createSeededAdminTestContext(
@@ -320,7 +320,9 @@ describe("Admin Router Integration (PGlite)", () => {
   });
 
   describe("removeUser", () => {
-    test("should remove user successfully with cascading data handling", async () => {
+    test("should remove user successfully with cascading data handling", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (txDb) => {
         // Create admin context using seeded data
         const context = await createSeededAdminTestContext(
@@ -374,7 +376,9 @@ describe("Admin Router Integration (PGlite)", () => {
   });
 
   describe("getInvitations", () => {
-    test("should retrieve pending invitations with real database operations", async () => {
+    test("should retrieve pending invitations with real database operations", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (txDb) => {
         // Create admin context using seeded data
         const context = await createSeededAdminTestContext(
@@ -414,7 +418,9 @@ describe("Admin Router Integration (PGlite)", () => {
       });
     });
 
-    test("should enforce organizational isolation for invitations", async () => {
+    test("should enforce organizational isolation for invitations", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (txDb) => {
         // Create admin context using seeded data
         const context = await createSeededAdminTestContext(
@@ -448,7 +454,9 @@ describe("Admin Router Integration (PGlite)", () => {
     });
   });
   describe("cancelInvitation", () => {
-    test("should cancel invitation with real database operations", async () => {
+    test("should cancel invitation with real database operations", async ({
+      workerDb,
+    }) => {
       await withIsolatedTest(workerDb, async (txDb) => {
         // Create admin context using seeded data
         const context = await createSeededAdminTestContext(

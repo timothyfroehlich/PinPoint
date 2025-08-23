@@ -72,7 +72,7 @@ describe("Issue Timeline Router (Unit Tests)", () => {
     vi.mocked(mockContext.db.query.memberships.findFirst).mockResolvedValue({
       id: "test-membership",
       organizationId: mockContext.organizationId, // Use mock context organization ID
-      userId: "user-1",
+      userId: SEED_TEST_IDS.USERS.ADMIN,
       roleId: "role-1",
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -115,7 +115,7 @@ describe("Issue Timeline Router (Unit Tests)", () => {
         content: "Test comment",
         createdAt: new Date("2024-01-01"),
         author: {
-          id: "user-1",
+          id: SEED_TEST_IDS.USERS.ADMIN,
           name: "Test User",
           profilePicture: null,
         },
@@ -127,7 +127,7 @@ describe("Issue Timeline Router (Unit Tests)", () => {
         description: "Status changed from Open to In Progress",
         createdAt: new Date("2024-01-02"),
         actor: {
-          id: "user-1",
+          id: SEED_TEST_IDS.USERS.ADMIN,
           name: "Test User",
           profilePicture: null,
         },
@@ -224,7 +224,11 @@ describe("Issue Timeline Router (Unit Tests)", () => {
             id: "comment-1",
             content: "Initial comment",
             createdAt: new Date("2024-01-01"),
-            author: { id: "user-1", name: "User 1", profilePicture: null },
+            author: {
+              id: SEED_TEST_IDS.USERS.ADMIN,
+              name: "User 1",
+              profilePicture: null,
+            },
           },
           {
             type: "activity" as const,
@@ -249,7 +253,11 @@ describe("Issue Timeline Router (Unit Tests)", () => {
             activityType: "ASSIGNED" as const,
             description: "Issue assigned",
             createdAt: new Date("2024-01-04"),
-            actor: { id: "user-1", name: "User 1", profilePicture: null },
+            actor: {
+              id: SEED_TEST_IDS.USERS.ADMIN,
+              name: "User 1",
+              profilePicture: null,
+            },
             oldValue: null,
             newValue: "user-3",
           },
@@ -426,7 +434,7 @@ describe("Issue Timeline Router (Unit Tests)", () => {
 
         // Test various valid ID formats
         const validIds = [
-          "issue-1",
+          SEED_TEST_IDS.ISSUES.ISSUE_1,
           "test-issue-123",
           "UUID-like-string-12345",
           "simple",
@@ -525,7 +533,11 @@ describe("Issue Timeline Router (Unit Tests)", () => {
             activityType: "CREATED" as const,
             description: "Issue created",
             createdAt: new Date(),
-            actor: { id: "user-1", name: "Creator", profilePicture: null },
+            actor: {
+              id: SEED_TEST_IDS.USERS.ADMIN,
+              name: "Creator",
+              profilePicture: null,
+            },
             oldValue: null,
             newValue: "test-issue-1",
           },
