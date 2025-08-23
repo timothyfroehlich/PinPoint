@@ -329,6 +329,32 @@ jobs:
             2. **Query Adjustments**: Verify that all database queries are updated to use the new Drizzle syntax and features.
             3. **Testing**: Ensure that comprehensive tests are in place to validate the migration and catch any issues early.
 
+            ### 🚨 CRITICAL: Integration Test Memory Pattern Analysis
+            **MANDATORY FOR ALL PRs TOUCHING INTEGRATION TESTS:**
+
+            4. **Memory Safety Audit**: Run these commands and report results:
+               ```bash
+               # Check for dangerous per-test PGlite patterns
+               grep -r "createSeededTestDatabase\|new PGlite" src/integration-tests/ || echo "✅ No dangerous patterns"
+               
+               # Count worker-scoped adoption
+               grep -r "worker-scoped-db\|withIsolatedTest" src/integration-tests/ || echo "❌ No worker-scoped patterns"
+               
+               # Calculate memory impact
+               echo "Integration test count: $(ls src/integration-tests/*.test.ts 2>/dev/null | wc -l)"
+               ```
+
+            5. **Memory Impact Assessment**: 
+               - **CRITICAL BLOCKER**: Any `createSeededTestDatabase()` in integration tests
+               - **CRITICAL BLOCKER**: Any `new PGlite()` in individual test files  
+               - **SAFE PATTERN**: Only `import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db"`
+               - **Risk Level**: Per-test = 1-2GB+ (system lockups), Worker-scoped = 200MB (safe)
+
+            6. **Required Actions**: 
+               - If dangerous patterns found: Mark as **critical severity** and block PR
+               - If worker-scoped pattern missing: Require immediate conversion
+               - Report estimated memory usage in review comments
+
 
             **CRITICAL CONSTRAINTS:**
 

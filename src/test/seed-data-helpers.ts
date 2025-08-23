@@ -559,5 +559,5 @@ export async function setupAuthTestData() {
  */
 export function cleanupSeedDataHelpers(): void {
   clearSeedDataCache();
-  // Note: Drizzle doesn't require explicit disconnect like Prisma
+  // Note: Drizzle doesn't require explicit disconnect
 }

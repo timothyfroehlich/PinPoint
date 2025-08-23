@@ -37,7 +37,6 @@ export const INCLUDE_PATTERNS = {
     "./*.config.{js,ts}",
     "./vitest.setup.*.ts",
     "./scripts/**/*.{js,ts}",
-    "./prisma/**/*.ts",
   ],
 } as const;
 

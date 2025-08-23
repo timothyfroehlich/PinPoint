@@ -1,11 +1,22 @@
+/**
+ * Vitest Configuration for PinPoint
+ *
+ * Three-project setup for optimal performance and memory safety:
+ * - node: Unit tests with mocked database (256MB limit)
+ * - integration: Real PGlite database tests (512MB limit)
+ * - jsdom: React component tests
+ *
+ * Memory safety: Worker threads isolated, limited parallelism
+ * for PGlite stability. See CONFIG_GUIDE.md for full details.
+ */
 /// <reference types="vitest" />
 import { defineConfig } from "vitest/config";
+import { loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import tsconfigPaths from "vite-tsconfig-paths";
 import path from "path";
 
-// Load environment variables before any tests run
-import "./src/lib/env-loaders/test";
+// Environment variables loaded by Vitest's native env handling
 
 // Smart coverage: enabled in CI, disabled in development for performance
 const enableCoverage =
@@ -20,6 +31,8 @@ export default defineConfig({
     conditions: ["node", "import"],
   },
   test: {
+    // Native environment loading - Vitest will load .env, .env.test, and .env.local automatically
+    env: loadEnv("test", process.cwd(), ""),
     coverage: {
       enabled: enableCoverage,
       provider: "v8",
@@ -37,7 +50,6 @@ export default defineConfig({
         "test-results/",
         "*.config.{ts,js}",
         "scripts/",
-        "prisma/",
         ".next/",
         "docs/",
       ],
@@ -76,7 +88,7 @@ export default defineConfig({
           name: "node",
           globals: true,
           environment: "node",
-          setupFiles: ["src/test/vitest.setup.ts"],
+          setupFiles: ["src/test/setup/node.setup.ts"],
           typecheck: {
             tsconfig: "./tsconfig.tests.json",
           },
@@ -84,11 +96,14 @@ export default defineConfig({
           poolOptions: {
             threads: {
               isolate: true,
+              maxThreads: 2, // Limit parallelism for memory safety
+              memoryLimit: "768MB", // Increased from 256MB - user has more RAM
             },
           },
           include: [
             "src/lib/**/*.test.{ts,tsx}",
             "src/server/**/*.test.{ts,tsx}",
+            "src/test/**/*.test.{ts,tsx}",
           ],
           exclude: [
             "node_modules",
@@ -112,21 +127,22 @@ export default defineConfig({
           name: "integration",
           globals: true,
           environment: "node",
-          setupFiles: ["src/test/vitest.integration.setup.ts"],
-          hookTimeout: 300000, // 5 minutes for PGlite database setup/seeding
+          setupFiles: ["src/test/setup/integration.setup.ts"],
+          hookTimeout: 30000, // 30 seconds - PGlite should initialize quickly
           typecheck: {
             tsconfig: "./tsconfig.tests.json",
           },
           // Memory optimization: limit workers to reduce PGlite memory usage
           poolOptions: {
             threads: {
-              maxThreads: 4, // Increased from 2 - memory optimization allows more workers
+              maxThreads: 2, // Reduced for memory safety - each worker can use 512MB
               minThreads: 1, // Minimum 1 worker
               isolate: true, // Maintain test isolation
+              memoryLimit: "512MB", // Hard memory limit per worker thread
             },
           },
-          // Enable memory monitoring to track optimization impact
-          logHeapUsage: true,
+          // Disabled: Memory monitoring can cause performance issues
+          // logHeapUsage: true,
           include: ["src/integration-tests/**/*.test.{ts,tsx}"],
           exclude: [
             "node_modules",
@@ -149,7 +165,7 @@ export default defineConfig({
           name: "jsdom",
           globals: true,
           environment: "jsdom",
-          setupFiles: ["vitest.setup.react.ts"],
+          setupFiles: ["src/test/setup/react.setup.ts"],
           pool: "forks",
           typecheck: {
             tsconfig: "./tsconfig.tests.json",

@@ -32,7 +32,7 @@ export const organizationRouter = createTRPCRouter({
       }
 
       // Execute Drizzle update
-      const [organization] = await ctx.drizzle
+      const [organization] = await ctx.db
         .update(organizations)
         .set(updateData)
         .where(eq(organizations.id, ctx.organization.id))

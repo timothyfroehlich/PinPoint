@@ -1,12 +1,13 @@
-import { and, asc, count, eq, inArray } from "drizzle-orm";
+import { asc, count, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import { imageStorage } from "~/lib/image-storage/local-storage";
 import { getDefaultAvatarUrl } from "~/lib/utils/image-processing";
+import { getUserPermissionsForSupabaseUser } from "~/server/auth/permissions";
 import {
   createTRPCRouter,
   protectedProcedure,
-  organizationProcedure,
+  orgScopedProcedure,
 } from "~/server/api/trpc";
 import { userManageProcedure } from "~/server/api/trpc.permission";
 import {
@@ -21,7 +22,7 @@ import {
 export const userRouter = createTRPCRouter({
   // Get current user's profile
   getProfile: protectedProcedure.query(async ({ ctx }) => {
-    const user = await ctx.drizzle.query.users.findFirst({
+    const user = await ctx.db.query.users.findFirst({
       where: eq(users.id, ctx.user.id),
       with: {
         ownedMachines: {
@@ -46,15 +47,15 @@ export const userRouter = createTRPCRouter({
     // Get counts separately using individual queries
     const [ownedMachinesCount, issuesCreatedCount, commentsCount] =
       await Promise.all([
-        ctx.drizzle
+        ctx.db
           .select({ count: count() })
           .from(machines)
           .where(eq(machines.ownerId, ctx.user.id)),
-        ctx.drizzle
+        ctx.db
           .select({ count: count() })
           .from(issues)
           .where(eq(issues.createdById, ctx.user.id)),
-        ctx.drizzle
+        ctx.db
           .select({ count: count() })
           .from(comments)
           .where(eq(comments.authorId, ctx.user.id)),
@@ -71,12 +72,30 @@ export const userRouter = createTRPCRouter({
   }),
 
   // Get current user's membership info in the current organization
-  getCurrentMembership: organizationProcedure.query(({ ctx }) => {
+  getCurrentMembership: orgScopedProcedure.query(async ({ ctx }) => {
+    // RLS handles organizational scoping automatically
+    const membership = await ctx.db.query.memberships.findFirst({
+      where: eq(memberships.userId, ctx.user.id),
+      with: {
+        role: true,
+      },
+    });
+
+    if (!membership) {
+      throw new Error("User membership not found");
+    }
+
+    // Get user permissions separately
+    const userPermissions = await getUserPermissionsForSupabaseUser(
+      ctx.user,
+      ctx.db,
+    );
+
     return {
-      userId: ctx.membership.userId,
-      role: ctx.membership.role.name,
-      organizationId: ctx.membership.organizationId,
-      permissions: ctx.userPermissions,
+      userId: membership.userId,
+      role: membership.role.name,
+      organizationId: membership.organizationId,
+      permissions: userPermissions,
     };
   }),
 
@@ -98,7 +117,7 @@ export const userRouter = createTRPCRouter({
         updateData.bio = input.bio;
       }
 
-      const [user] = await ctx.drizzle
+      const [user] = await ctx.db
         .update(users)
         .set(updateData)
         .where(eq(users.id, ctx.user.id))
@@ -133,7 +152,7 @@ export const userRouter = createTRPCRouter({
         );
 
         // Delete old profile picture if it exists
-        const [currentUser] = await ctx.drizzle
+        const [currentUser] = await ctx.db
           .select({ profilePicture: users.profilePicture })
           .from(users)
           .where(eq(users.id, ctx.user.id))
@@ -163,7 +182,7 @@ export const userRouter = createTRPCRouter({
         }
 
         // Update user's profile picture
-        const [updatedUser] = await ctx.drizzle
+        const [updatedUser] = await ctx.db
           .update(users)
           .set({ profilePicture: imagePath })
           .where(eq(users.id, ctx.user.id))
@@ -195,11 +214,11 @@ export const userRouter = createTRPCRouter({
     }),
 
   // Get user by ID (public info only - within organization context)
-  getUser: organizationProcedure
+  getUser: orgScopedProcedure
     .input(z.object({ userId: z.string() }))
     .query(async ({ ctx, input }) => {
-      // Verify user is a member of the current organization
-      const [membership] = await ctx.drizzle
+      // Verify user is a member of the current organization (RLS handles org scoping)
+      const [membership] = await ctx.db
         .select({
           user: {
             id: users.id,
@@ -211,12 +230,7 @@ export const userRouter = createTRPCRouter({
         })
         .from(memberships)
         .innerJoin(users, eq(memberships.userId, users.id))
-        .where(
-          and(
-            eq(memberships.userId, input.userId),
-            eq(memberships.organizationId, ctx.membership.organizationId),
-          ),
-        )
+        .where(eq(memberships.userId, input.userId))
         .limit(1);
 
       if (!membership) {
@@ -226,15 +240,15 @@ export const userRouter = createTRPCRouter({
       // Get counts separately using individual queries
       const [ownedMachinesCount, issuesCreatedCount, commentsCount] =
         await Promise.all([
-          ctx.drizzle
+          ctx.db
             .select({ count: count() })
             .from(machines)
             .where(eq(machines.ownerId, input.userId)),
-          ctx.drizzle
+          ctx.db
             .select({ count: count() })
             .from(issues)
             .where(eq(issues.createdById, input.userId)),
-          ctx.drizzle
+          ctx.db
             .select({ count: count() })
             .from(comments)
             .where(eq(comments.authorId, input.userId)),
@@ -251,9 +265,9 @@ export const userRouter = createTRPCRouter({
     }),
 
   // Get all users in the current organization
-  getAllInOrganization: organizationProcedure.query(async ({ ctx }) => {
+  getAllInOrganization: orgScopedProcedure.query(async ({ ctx }) => {
     // Get memberships with user and role data
-    const membershipData = await ctx.drizzle
+    const membershipData = await ctx.db
       .select({
         user: {
           id: users.id,
@@ -269,7 +283,6 @@ export const userRouter = createTRPCRouter({
       .from(memberships)
       .innerJoin(users, eq(memberships.userId, users.id))
       .innerJoin(roles, eq(memberships.roleId, roles.id))
-      .where(eq(memberships.organizationId, ctx.membership.organizationId))
       .orderBy(asc(users.name));
 
     // Get counts for each user (batched approach for performance)
@@ -283,7 +296,7 @@ export const userRouter = createTRPCRouter({
       // Get all counts in parallel for better performance
       const [machinesCountRows, issuesCountRows, commentsCountRows] =
         await Promise.all([
-          ctx.drizzle
+          ctx.db
             .select({
               userId: machines.ownerId,
               count: count(),
@@ -291,7 +304,7 @@ export const userRouter = createTRPCRouter({
             .from(machines)
             .where(inArray(machines.ownerId, userIds))
             .groupBy(machines.ownerId),
-          ctx.drizzle
+          ctx.db
             .select({
               userId: issues.createdById,
               count: count(),
@@ -299,7 +312,7 @@ export const userRouter = createTRPCRouter({
             .from(issues)
             .where(inArray(issues.createdById, userIds))
             .groupBy(issues.createdById),
-          ctx.drizzle
+          ctx.db
             .select({
               userId: comments.authorId,
               count: count(),
@@ -355,7 +368,7 @@ export const userRouter = createTRPCRouter({
 
   // Assign default avatar to user (used during account creation)
   assignDefaultAvatar: protectedProcedure.mutation(async ({ ctx }) => {
-    const [user] = await ctx.drizzle
+    const [user] = await ctx.db
       .select({ profilePicture: users.profilePicture })
       .from(users)
       .where(eq(users.id, ctx.user.id))
@@ -365,7 +378,7 @@ export const userRouter = createTRPCRouter({
     if (!user?.profilePicture) {
       const defaultAvatarUrl = getDefaultAvatarUrl();
 
-      const [updatedUser] = await ctx.drizzle
+      const [updatedUser] = await ctx.db
         .update(users)
         .set({ profilePicture: defaultAvatarUrl })
         .where(eq(users.id, ctx.user.id))
@@ -390,45 +403,33 @@ export const userRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Verify the role exists and belongs to the current organization
-      const [role] = await ctx.drizzle
-        .select({ organizationId: roles.organizationId })
+      // Verify the role exists
+      const [role] = await ctx.db
+        .select({ id: roles.id })
         .from(roles)
         .where(eq(roles.id, input.roleId))
         .limit(1);
 
-      if (!role || role.organizationId !== ctx.organization.id) {
-        throw new Error(
-          "Role not found or does not belong to this organization",
-        );
+      if (!role) {
+        throw new Error("Role not found");
       }
 
-      // Verify the user is a member of the current organization
-      const [membership] = await ctx.drizzle
+      // Verify the user is a member
+      const [membership] = await ctx.db
         .select({ userId: memberships.userId })
         .from(memberships)
-        .where(
-          and(
-            eq(memberships.userId, input.userId),
-            eq(memberships.organizationId, ctx.organization.id),
-          ),
-        )
+        .where(eq(memberships.userId, input.userId))
         .limit(1);
 
       if (!membership) {
-        throw new Error("User is not a member of this organization");
+        throw new Error("User membership not found");
       }
 
       // Update the membership
-      const [updatedMembership] = await ctx.drizzle
+      const [updatedMembership] = await ctx.db
         .update(memberships)
         .set({ roleId: input.roleId })
-        .where(
-          and(
-            eq(memberships.userId, input.userId),
-            eq(memberships.organizationId, ctx.organization.id),
-          ),
-        )
+        .where(eq(memberships.userId, input.userId))
         .returning();
 
       if (!updatedMembership) {
@@ -436,7 +437,7 @@ export const userRouter = createTRPCRouter({
       }
 
       // Get the updated role and user details for response
-      const [membershipDetails] = await ctx.drizzle
+      const [membershipDetails] = await ctx.db
         .select({
           userId: memberships.userId,
           roleId: memberships.roleId,
@@ -450,12 +451,7 @@ export const userRouter = createTRPCRouter({
         .from(memberships)
         .innerJoin(roles, eq(memberships.roleId, roles.id))
         .innerJoin(users, eq(memberships.userId, users.id))
-        .where(
-          and(
-            eq(memberships.userId, input.userId),
-            eq(memberships.organizationId, ctx.organization.id),
-          ),
-        )
+        .where(eq(memberships.userId, input.userId))
         .limit(1);
 
       if (!membershipDetails) {

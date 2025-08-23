@@ -34,3 +34,24 @@ server.events.on("request:match", ({ request }) => {
 server.events.on("request:unhandled", ({ request }) => {
   console.log(`[MSW] Unhandled request: ${request.method} ${request.url}`);
 });
+
+// MSW server lifecycle management to prevent double initialization
+let isListening = false;
+
+export const ensureListening = () => {
+  if (!isListening) {
+    server.listen({ onUnhandledRequest: "warn" });
+    isListening = true;
+    console.log("[MSW] Server started");
+  } else {
+    console.log("[MSW] Server already listening, skipping initialization");
+  }
+};
+
+export const ensureClosed = () => {
+  if (isListening) {
+    server.close();
+    isListening = false;
+    console.log("[MSW] Server stopped");
+  }
+};

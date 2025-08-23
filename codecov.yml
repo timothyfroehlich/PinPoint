@@ -38,7 +38,6 @@ ignore:
   - "*.config.ts"
   - "*.config.js"
   - "scripts/"
-  - "prisma/"
   - ".next/"
   - "docs/"
 

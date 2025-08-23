@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
 // Mock the database with proper typing
 const mockUserFindMany = vi.fn();
@@ -69,7 +70,7 @@ describe("/api/dev/users", () => {
     it("should mock user lookup correctly", async () => {
       const mockUsers = [
         {
-          id: "user-1",
+          id: SEED_TEST_IDS.USERS.ADMIN,
           name: "Test User 1",
           email: "user1@example.com",
           bio: null,
@@ -103,15 +104,15 @@ describe("/api/dev/users", () => {
       const mockMemberships = [
         {
           id: "membership-1",
-          userId: "user-1",
-          organizationId: "org-1",
+          userId: SEED_TEST_IDS.USERS.ADMIN,
+          organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
           roleId: "role-1",
           createdAt: new Date(),
           updatedAt: new Date(),
           role: {
             id: "role-1",
             name: "Member",
-            organizationId: "org-1",
+            organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
             permissions: [
               {
                 id: "perm-1",
@@ -133,7 +134,7 @@ describe("/api/dev/users", () => {
     it("should mock organization lookup correctly", async () => {
       const mockOrganizations = [
         {
-          id: "org-1",
+          id: SEED_TEST_IDS.ORGANIZATIONS.primary,
           name: "Test Organization",
           subdomain: "test-org",
           logoUrl: null,
@@ -154,7 +155,7 @@ describe("/api/dev/users", () => {
     it("should return users with proper structure", async () => {
       const mockUsers = [
         {
-          id: "user-1",
+          id: SEED_TEST_IDS.USERS.ADMIN,
           name: "Test User",
           email: "test@example.com",
           bio: "Test bio",
@@ -166,7 +167,7 @@ describe("/api/dev/users", () => {
           memberships: [
             {
               id: "membership-1",
-              organizationId: "org-1",
+              organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
               roleId: "role-1",
               role: {
                 id: "role-1",
@@ -188,7 +189,7 @@ describe("/api/dev/users", () => {
       const result = await mockDb.user.findMany();
 
       expect(result).toHaveLength(1);
-      expect(result[0]?.id).toBe("user-1");
+      expect(result[0]?.id).toBe(SEED_TEST_IDS.USERS.ADMIN);
       expect(result[0]?.name).toBe("Test User");
       expect(result[0]?.email).toBe("test@example.com");
       expect(result[0]?.memberships).toHaveLength(1);
@@ -224,7 +225,7 @@ describe("/api/dev/users", () => {
     it("should format response correctly", () => {
       const users = [
         {
-          id: "user-1",
+          id: SEED_TEST_IDS.USERS.ADMIN,
           name: "User 1",
           email: "user1@example.com",
         },

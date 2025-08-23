@@ -92,7 +92,7 @@
         "showReuseMessage": true,
         "clear": false
       },
-      "detail": "Push Prisma schema changes to database"
+      "detail": "Push Drizzle schema changes to database"
     },
     {
       "label": "Database: Reset & Seed",
@@ -125,7 +125,7 @@
         "showReuseMessage": true,
         "clear": false
       },
-      "detail": "Open Prisma Studio in browser"
+      "detail": "Open Drizzle Studio in browser"
     },
     {
       "label": "Format Code",

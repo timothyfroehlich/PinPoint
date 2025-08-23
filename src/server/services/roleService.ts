@@ -1,6 +1,5 @@
-import { type Role } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
-import { eq } from "drizzle-orm";
+import { eq, and, ne, asc } from "drizzle-orm";
 
 import {
   SYSTEM_ROLES,
@@ -12,7 +11,7 @@ import {
 
 import { PermissionService } from "./permissionService";
 
-import { type ExtendedPrismaClient } from "~/server/db";
+import { generatePrefixedId } from "~/lib/utils/id-generation";
 import { type DrizzleClient } from "~/server/db/drizzle";
 import {
   roles,
@@ -21,21 +20,23 @@ import {
   memberships,
 } from "~/server/db/schema";
 
+// Define Role type from Drizzle schema
+type Role = typeof roles.$inferSelect;
+
 /**
  * Role Service
  *
  * Handles role management operations including system roles, templates,
- * and business logic enforcement.
+ * and business logic enforcement using Drizzle ORM.
  */
 export class RoleService {
   private permissionService: PermissionService;
 
   constructor(
-    private prisma: ExtendedPrismaClient,
+    private drizzle: DrizzleClient,
     private organizationId: string,
-    private drizzle?: DrizzleClient,
   ) {
-    this.permissionService = new PermissionService(prisma);
+    this.permissionService = new PermissionService(this.drizzle);
   }
 
   /**
@@ -47,72 +48,126 @@ export class RoleService {
     // Ensure all permissions exist in the database first
     await this.ensurePermissionsExist();
 
-    // Create Admin role with all permissions
-    const adminRole = await this.prisma.role.upsert({
-      where: {
-        name_organizationId: {
-          name: SYSTEM_ROLES.ADMIN,
-          organizationId: this.organizationId,
-        },
-      },
-      update: {
-        isSystem: true,
-        isDefault: false,
-      },
-      create: {
-        name: SYSTEM_ROLES.ADMIN,
-        organizationId: this.organizationId,
-        isSystem: true,
-        isDefault: false,
-      },
+    // Create Admin role with all permissions (check if exists first)
+    // RLS automatically scopes to user's organization
+    let adminRole = await this.drizzle.query.roles.findFirst({
+      where: eq(roles.name, SYSTEM_ROLES.ADMIN),
     });
+
+    if (!adminRole) {
+      const [newAdminRole] = await this.drizzle
+        .insert(roles)
+        .values({
+          id: generatePrefixedId("role"),
+          name: SYSTEM_ROLES.ADMIN,
+          organizationId: this.organizationId, // Explicit for local dev, redundant in production (triggers override)
+          isSystem: true,
+          isDefault: false,
+        })
+        .returning();
+
+      adminRole = newAdminRole;
+    } else {
+      // Update existing admin role
+      const [updatedAdminRole] = await this.drizzle
+        .update(roles)
+        .set({
+          isSystem: true,
+          isDefault: false,
+          updatedAt: new Date(),
+        })
+        .where(eq(roles.id, adminRole.id))
+        .returning();
+
+      adminRole = updatedAdminRole;
+    }
+
+    if (!adminRole) {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Failed to create admin role",
+      });
+    }
 
     // Assign all permissions to admin role
-    const allPermissions = await this.prisma.permission.findMany();
-    await this.prisma.role.update({
-      where: { id: adminRole.id },
-      data: {
-        permissions: {
-          connect: allPermissions.map((p: { id: string }) => ({ id: p.id })),
-        },
-      },
+    const allPermissions = await this.drizzle.query.permissions.findMany();
+
+    // Clear existing permissions
+    await this.drizzle
+      .delete(rolePermissions)
+      .where(eq(rolePermissions.roleId, adminRole.id));
+
+    // Insert all permissions
+    if (allPermissions.length > 0) {
+      await this.drizzle.insert(rolePermissions).values(
+        allPermissions.map((p) => ({
+          roleId: adminRole.id,
+          permissionId: p.id,
+        })),
+      );
+    }
+
+    // Create Unauthenticated role with limited permissions (check if exists first)
+    // RLS automatically scopes to user's organization
+    let unauthRole = await this.drizzle.query.roles.findFirst({
+      where: eq(roles.name, SYSTEM_ROLES.UNAUTHENTICATED),
     });
 
-    // Create Unauthenticated role with limited permissions
-    const unauthRole = await this.prisma.role.upsert({
-      where: {
-        name_organizationId: {
+    if (!unauthRole) {
+      const [newUnauthRole] = await this.drizzle
+        .insert(roles)
+        .values({
+          id: generatePrefixedId("role"),
           name: SYSTEM_ROLES.UNAUTHENTICATED,
-          organizationId: this.organizationId,
-        },
-      },
-      update: {
-        isSystem: true,
-        isDefault: false,
-      },
-      create: {
-        name: SYSTEM_ROLES.UNAUTHENTICATED,
-        organizationId: this.organizationId,
-        isSystem: true,
-        isDefault: false,
-      },
-    });
+          organizationId: this.organizationId, // Explicit for local dev, redundant in production (triggers override)
+          isSystem: true,
+          isDefault: false,
+        })
+        .returning();
+
+      unauthRole = newUnauthRole;
+    } else {
+      // Update existing unauthenticated role
+      const [updatedUnauthRole] = await this.drizzle
+        .update(roles)
+        .set({
+          isSystem: true,
+          isDefault: false,
+          updatedAt: new Date(),
+        })
+        .where(eq(roles.id, unauthRole.id))
+        .returning();
+
+      unauthRole = updatedUnauthRole;
+    }
+
+    if (!unauthRole) {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Failed to create unauthenticated role",
+      });
+    }
 
     // Assign unauthenticated permissions
-    const unauthPermissions = await this.prisma.permission.findMany({
-      where: {
-        name: { in: UNAUTHENTICATED_PERMISSIONS },
-      },
+    const unauthPermissions = await this.drizzle.query.permissions.findMany({
+      where: (permissions, { inArray }) =>
+        inArray(permissions.name, UNAUTHENTICATED_PERMISSIONS),
     });
 
-    await this.prisma.role.update({
-      where: { id: unauthRole.id },
-      data: {
-        permissions: {
-          connect: unauthPermissions.map((p: { id: string }) => ({ id: p.id })),
-        },
-      },
-    });
+    // Clear existing permissions
+    await this.drizzle
+      .delete(rolePermissions)
+      .where(eq(rolePermissions.roleId, unauthRole.id));
+
+    // Insert unauthenticated permissions
+    if (unauthPermissions.length > 0) {
+      await this.drizzle.insert(rolePermissions).values(
+        unauthPermissions.map((p) => ({
+          roleId: unauthRole.id,
+          permissionId: p.id,
+        })),
+      );
+    }
   }
 
   /**
@@ -127,26 +182,48 @@ export class RoleService {
     overrides: Partial<{ name: string; isDefault: boolean }> = {},
   ): Promise<Role> {
     const template = ROLE_TEMPLATES[templateName];
+    const roleName = overrides.name ?? template.name;
 
-    // Create the role
-    const role = await this.prisma.role.upsert({
-      where: {
-        name_organizationId: {
-          name: overrides.name ?? template.name,
-          organizationId: this.organizationId,
-        },
-      },
-      update: {
-        isSystem: false,
-        isDefault: overrides.isDefault ?? true,
-      },
-      create: {
-        name: overrides.name ?? template.name,
-        organizationId: this.organizationId,
-        isSystem: false,
-        isDefault: overrides.isDefault ?? true,
-      },
+    // Check if role already exists (RLS scoped)
+    let role = await this.drizzle.query.roles.findFirst({
+      where: eq(roles.name, roleName),
     });
+
+    if (!role) {
+      // Create new role
+      const [newRole] = await this.drizzle
+        .insert(roles)
+        .values({
+          id: generatePrefixedId("role"),
+          name: roleName,
+          organizationId: this.organizationId, // Explicit for local dev, redundant in production (triggers override)
+          isSystem: false,
+          isDefault: overrides.isDefault ?? true,
+        })
+        .returning();
+
+      role = newRole;
+    } else {
+      // Update existing role
+      const [updatedRole] = await this.drizzle
+        .update(roles)
+        .set({
+          isSystem: false,
+          isDefault: overrides.isDefault ?? true,
+          updatedAt: new Date(),
+        })
+        .where(eq(roles.id, role.id))
+        .returning();
+
+      role = updatedRole;
+    }
+
+    if (!role) {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Failed to create template role",
+      });
+    }
 
     // Get permissions with dependencies
     const expandedPermissions =
@@ -155,21 +232,25 @@ export class RoleService {
       ]);
 
     // Find permission records
-    const permissions = await this.prisma.permission.findMany({
-      where: {
-        name: { in: expandedPermissions },
-      },
+    const permissionRecords = await this.drizzle.query.permissions.findMany({
+      where: (permissions, { inArray }) =>
+        inArray(permissions.name, expandedPermissions),
     });
 
+    // Clear existing permissions
+    await this.drizzle
+      .delete(rolePermissions)
+      .where(eq(rolePermissions.roleId, role.id));
+
     // Assign permissions to role
-    await this.prisma.role.update({
-      where: { id: role.id },
-      data: {
-        permissions: {
-          connect: permissions.map((p: { id: string }) => ({ id: p.id })),
-        },
-      },
-    });
+    if (permissionRecords.length > 0) {
+      await this.drizzle.insert(rolePermissions).values(
+        permissionRecords.map((p) => ({
+          roleId: role.id,
+          permissionId: p.id,
+        })),
+      );
+    }
 
     return role;
   }
@@ -190,9 +271,15 @@ export class RoleService {
     },
   ): Promise<Role> {
     // Get the current role
-    const role = await this.prisma.role.findUnique({
-      where: { id: roleId },
-      include: { permissions: true },
+    const role = await this.drizzle.query.roles.findFirst({
+      where: eq(roles.id, roleId),
+      with: {
+        rolePermissions: {
+          with: {
+            permission: true,
+          },
+        },
+      },
     });
 
     if (!role) {
@@ -224,8 +311,10 @@ export class RoleService {
     const updateData: {
       name?: string;
       isDefault?: boolean;
-      permissions?: { connect: { id: string }[] };
-    } = {};
+      updatedAt: Date;
+    } = {
+      updatedAt: new Date(),
+    };
 
     if (updates.name) {
       updateData.name = updates.name;
@@ -235,31 +324,39 @@ export class RoleService {
       updateData.isDefault = updates.isDefault;
     }
 
-    // Handle permission updates
-    if (updates.permissionIds) {
-      // Disconnect all current permissions
-      await this.prisma.role.update({
-        where: { id: roleId },
-        data: {
-          permissions: {
-            disconnect: role.permissions.map((p: { id: string }) => ({
-              id: p.id,
-            })),
-          },
-        },
-      });
+    // Update the role
+    const [updatedRole] = await this.drizzle
+      .update(roles)
+      .set(updateData)
+      .where(eq(roles.id, roleId))
+      .returning();
 
-      // Connect new permissions
-      updateData.permissions = {
-        connect: updates.permissionIds.map((id) => ({ id })),
-      };
+    if (!updatedRole) {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Failed to update role",
+      });
     }
 
-    // Update the role
-    return this.prisma.role.update({
-      where: { id: roleId },
-      data: updateData,
-    });
+    // Handle permission updates
+    if (updates.permissionIds) {
+      // Clear existing permissions
+      await this.drizzle
+        .delete(rolePermissions)
+        .where(eq(rolePermissions.roleId, roleId));
+
+      // Insert new permissions
+      if (updates.permissionIds.length > 0) {
+        await this.drizzle.insert(rolePermissions).values(
+          updates.permissionIds.map((permissionId) => ({
+            roleId,
+            permissionId,
+          })),
+        );
+      }
+    }
+
+    return updatedRole;
   }
 
   /**
@@ -268,9 +365,11 @@ export class RoleService {
    * @param roleId - ID of the role to delete
    */
   async deleteRole(roleId: string): Promise<void> {
-    const role = await this.prisma.role.findUnique({
-      where: { id: roleId },
-      include: { memberships: true },
+    const role = await this.drizzle.query.roles.findFirst({
+      where: eq(roles.id, roleId),
+      with: {
+        memberships: true,
+      },
     });
 
     if (!role) {
@@ -288,13 +387,9 @@ export class RoleService {
       });
     }
 
-    // Find default role for reassignment
-    const defaultRole = await this.prisma.role.findFirst({
-      where: {
-        organizationId: this.organizationId,
-        isDefault: true,
-        id: { not: roleId },
-      },
+    // Find default role for reassignment (RLS scoped)
+    const defaultRole = await this.drizzle.query.roles.findFirst({
+      where: and(eq(roles.isDefault, true), ne(roles.id, roleId)),
     });
 
     if (!defaultRole) {
@@ -305,25 +400,24 @@ export class RoleService {
     }
 
     // Reassign all members to default role
-    await this.prisma.membership.updateMany({
-      where: { roleId },
-      data: { roleId: defaultRole.id },
-    });
+    await this.drizzle
+      .update(memberships)
+      .set({ roleId: defaultRole.id })
+      .where(eq(memberships.roleId, roleId));
+
+    // Delete role permissions
+    await this.drizzle
+      .delete(rolePermissions)
+      .where(eq(rolePermissions.roleId, roleId));
 
     // Delete the role
-    await this.prisma.role.delete({
-      where: { id: roleId },
-    });
+    await this.drizzle.delete(roles).where(eq(roles.id, roleId));
   }
 
   /**
    * Get all roles for the organization
    *
    * @returns Promise<Role[]> - Array of roles with permissions and member counts
-   *
-   * OPTIMIZATION NOTE: Currently uses junction table for Prisma parity.
-   * Future optimization: Consider JSONB column for permissions to reduce joins.
-   * Example JSONB query: ctx.drizzle.select().from(roles).where(sql`permissions @> '["issue:create"]'`)
    */
   async getRoles(): Promise<
     (Role & {
@@ -331,82 +425,54 @@ export class RoleService {
       _count: { memberships: number };
     })[]
   > {
-    // Use Drizzle if available, otherwise fallback to Prisma
-    if (this.drizzle) {
-      const drizzleDb = this.drizzle;
+    // Get roles with permissions and membership counts (RLS scoped)
+    const rolesWithPermissions = await this.drizzle
+      .select({
+        id: roles.id,
+        name: roles.name,
+        organizationId: roles.organizationId,
+        isSystem: roles.isSystem,
+        isDefault: roles.isDefault,
+        createdAt: roles.createdAt,
+        updatedAt: roles.updatedAt,
+      })
+      .from(roles)
+      .orderBy(asc(roles.isSystem), asc(roles.name));
 
-      // Drizzle implementation with explicit joins and subqueries
-      const rolesWithPermissions = await drizzleDb
-        .select({
-          id: roles.id,
-          name: roles.name,
-          organizationId: roles.organizationId,
-          isSystem: roles.isSystem,
-          isDefault: roles.isDefault,
-          createdAt: roles.createdAt,
-          updatedAt: roles.updatedAt,
-        })
-        .from(roles)
-        .where(eq(roles.organizationId, this.organizationId))
-        .orderBy(roles.isSystem, roles.name);
+    // Get permissions and membership counts for each role
+    const rolesWithDetails = await Promise.all(
+      rolesWithPermissions.map(async (role) => {
+        // Get permissions and count memberships in parallel
+        const [rolePermissionsList, membershipCount] = await Promise.all([
+          this.drizzle
+            .select({
+              id: permissions.id,
+              name: permissions.name,
+            })
+            .from(rolePermissions)
+            .innerJoin(
+              permissions,
+              eq(rolePermissions.permissionId, permissions.id),
+            )
+            .where(eq(rolePermissions.roleId, role.id)),
+          this.drizzle
+            .select()
+            .from(memberships)
+            .where(eq(memberships.roleId, role.id)),
+        ]);
 
-      // Get permissions for each role
-      const rolesWithDetails = await Promise.all(
-        rolesWithPermissions.map(async (role) => {
-          // PERFORMANCE: Get permissions and count memberships in parallel
-          const [rolePermissionsList, membershipCount] = await Promise.all([
-            drizzleDb
-              .select({
-                id: permissions.id,
-                name: permissions.name,
-              })
-              .from(rolePermissions)
-              .innerJoin(
-                permissions,
-                eq(rolePermissions.permissionId, permissions.id),
-              )
-              .where(eq(rolePermissions.roleId, role.id)),
-            drizzleDb
-              .select()
-              .from(memberships)
-              .where(eq(memberships.roleId, role.id)),
-          ]);
+        return {
+          ...role,
+          permissions: rolePermissionsList,
+          _count: { memberships: membershipCount.length },
+        };
+      }),
+    );
 
-          return {
-            ...role,
-            permissions: rolePermissionsList,
-            _count: { memberships: membershipCount.length },
-          };
-        }),
-      );
-
-      return rolesWithDetails as (Role & {
-        permissions: { id: string; name: string }[];
-        _count: { memberships: number };
-      })[];
-    }
-
-    // Prisma fallback (existing implementation)
-    return this.prisma.role.findMany({
-      where: { organizationId: this.organizationId },
-      include: {
-        permissions: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        _count: {
-          select: { memberships: true },
-        },
-      },
-      orderBy: [{ isSystem: "desc" }, { name: "asc" }],
-    }) as unknown as Promise<
-      (Role & {
-        permissions: { id: string; name: string }[];
-        _count: { memberships: number };
-      })[]
-    >;
+    return rolesWithDetails as (Role & {
+      permissions: { id: string; name: string }[];
+      _count: { memberships: number };
+    })[];
   }
 
   /**
@@ -415,12 +481,12 @@ export class RoleService {
    * @throws TRPCError if no admin exists
    */
   async ensureAtLeastOneAdmin(): Promise<void> {
-    const adminRole = await this.prisma.role.findFirst({
-      where: {
-        organizationId: this.organizationId,
-        name: SYSTEM_ROLES.ADMIN,
+    // RLS automatically scopes to user's organization
+    const adminRole = await this.drizzle.query.roles.findFirst({
+      where: eq(roles.name, SYSTEM_ROLES.ADMIN),
+      with: {
+        memberships: true,
       },
-      include: { memberships: true },
     });
 
     if (!adminRole || adminRole.memberships.length === 0) {
@@ -437,13 +503,12 @@ export class RoleService {
    * @returns Promise<Role | null> - Default role or null if none exists
    */
   async getDefaultRole(): Promise<Role | null> {
-    return this.prisma.role.findFirst({
-      where: {
-        organizationId: this.organizationId,
-        isDefault: true,
-        isSystem: false,
-      },
+    // RLS automatically scopes to user's organization
+    const result = await this.drizzle.query.roles.findFirst({
+      where: and(eq(roles.isDefault, true), eq(roles.isSystem, false)),
     });
+
+    return result ?? null;
   }
 
   /**
@@ -452,21 +517,21 @@ export class RoleService {
    * @returns Promise<Role | null> - Admin role or null if none exists
    */
   async getAdminRole(): Promise<Role | null> {
-    return this.prisma.role.findFirst({
-      where: {
-        organizationId: this.organizationId,
-        name: SYSTEM_ROLES.ADMIN,
-      },
+    // RLS automatically scopes to user's organization
+    const result = await this.drizzle.query.roles.findFirst({
+      where: eq(roles.name, SYSTEM_ROLES.ADMIN),
     });
+
+    return result ?? null;
   }
 
   /**
    * Ensure all permissions exist in the database
    */
   private async ensurePermissionsExist(): Promise<void> {
-    const existingPermissions = await this.prisma.permission.findMany();
+    const existingPermissions = await this.drizzle.query.permissions.findMany();
     const existingPermissionNames = new Set(
-      existingPermissions.map((p: { name: string }) => p.name),
+      existingPermissions.map((p) => p.name),
     );
 
     const permissionsToCreate = ALL_PERMISSIONS.filter(
@@ -474,13 +539,27 @@ export class RoleService {
     );
 
     if (permissionsToCreate.length > 0) {
-      await this.prisma.permission.createMany({
-        data: permissionsToCreate.map((name) => ({
-          name,
-          description: PERMISSION_DESCRIPTIONS[name] ?? `Permission: ${name}`,
-        })),
-        skipDuplicates: true,
-      });
+      // Insert permissions one by one to handle potential duplicates
+      for (const name of permissionsToCreate) {
+        try {
+          await this.drizzle.insert(permissions).values({
+            id: generatePrefixedId("perm"),
+            name,
+            description: PERMISSION_DESCRIPTIONS[name] ?? `Permission: ${name}`,
+          });
+        } catch (error) {
+          // Ignore unique constraint violations - permission already exists
+          // This can happen with concurrent test execution
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          if (
+            !errorMessage.includes("unique") &&
+            !errorMessage.includes("duplicate")
+          ) {
+            throw error;
+          }
+        }
+      }
     }
   }
 }

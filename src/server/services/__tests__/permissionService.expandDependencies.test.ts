@@ -32,14 +32,14 @@ vi.mock("../../auth/permissions.constants", () => ({
   ],
 }));
 
-// Mock ExtendedPrismaClient since we're only testing expandPermissionsWithDependencies
-const mockPrisma = {} as any;
+// Mock DrizzleClient since we're only testing expandPermissionsWithDependencies
+const mockDrizzle = {} as any;
 
 describe("PermissionService - expandPermissionsWithDependencies", () => {
   let permissionService: PermissionService;
 
   beforeEach(() => {
-    permissionService = new PermissionService(mockPrisma);
+    permissionService = new PermissionService(mockDrizzle);
   });
 
   describe("with no dependencies", () => {

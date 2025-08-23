@@ -2,7 +2,7 @@ import { vi } from "vitest";
 import { mockDeep, mockReset, type DeepMockProxy } from "vitest-mock-extended";
 
 import type { PinPointSupabaseUser } from "~/lib/supabase/types";
-import type { ExtendedPrismaClient } from "~/server/db";
+import type { DrizzleClient } from "~/server/db/drizzle";
 import type { ServiceFactory } from "~/server/services/factory";
 
 // Mock individual services with all methods
@@ -79,7 +79,7 @@ const mockSupabaseClient = {
 };
 
 export interface MockContext {
-  db: DeepMockProxy<ExtendedPrismaClient>;
+  db: DeepMockProxy<DrizzleClient>;
   services: DeepMockProxy<ServiceFactory>;
   user: PinPointSupabaseUser | null;
   supabase: typeof mockSupabaseClient;
@@ -92,76 +92,53 @@ export interface MockContext {
 }
 
 export function createMockContext(): MockContext {
-  const mockDb: DeepMockProxy<ExtendedPrismaClient> =
-    mockDeep<ExtendedPrismaClient>();
+  const mockDb: DeepMockProxy<DrizzleClient> = mockDeep<DrizzleClient>();
   const mockServices = createMockServiceFactory();
 
-  // Mock the $accelerate property that comes from Prisma Accelerate extension
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-  mockDb.$accelerate = {
-    invalidate: vi.fn(),
-    ttl: vi.fn(),
-  } as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+  // Set up Drizzle query API defaults for relational queries
+  mockDb.query.memberships.findFirst.mockResolvedValue(mockMembership);
+  mockDb.query.organizations.findFirst.mockResolvedValue(mockOrganization);
+  mockDb.query.locations.findFirst.mockResolvedValue(mockLocation);
 
-  // Set up default membership mock - can be overridden in individual tests
-  mockDb.membership.findFirst.mockResolvedValue(mockMembership);
-  mockDb.membership.findUnique.mockResolvedValue(mockMembership);
+  // Set up default issue query mocks
+  mockDb.query.issues.findMany.mockResolvedValue([mockIssue]);
+  mockDb.query.issues.findFirst.mockResolvedValue(mockIssue);
 
-  // Set up default organization mock
-  mockDb.organization.findUnique.mockResolvedValue(mockOrganization);
+  // Set up default machine query mocks
+  mockDb.query.machines.findMany.mockResolvedValue([mockMachine]);
+  mockDb.query.machines.findFirst.mockResolvedValue(mockMachine);
 
-  // Set up default location mock
-  mockDb.location.findUnique.mockResolvedValue(mockLocation);
+  // Set up default model query mocks
+  mockDb.query.models.findMany.mockResolvedValue([mockModel]);
+  mockDb.query.models.findFirst.mockResolvedValue(mockModel);
 
-  // Set up default issue mock
-  mockDb.issue.findMany.mockResolvedValue([mockIssue]);
-  mockDb.issue.findUnique.mockResolvedValue(mockIssue);
-  mockDb.issue.findFirst.mockResolvedValue(mockIssue);
-  mockDb.issue.create.mockResolvedValue(mockIssue);
-  mockDb.issue.update.mockResolvedValue(mockIssue);
+  // Set up default notification query mocks
+  mockDb.query.notifications.findMany.mockResolvedValue([]);
 
-  // Set up default machine mock
-  mockDb.machine.findMany.mockResolvedValue([mockMachine]);
-  mockDb.machine.findUnique.mockResolvedValue(mockMachine);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
-  mockDb.machine.create.mockResolvedValue(mockMachine as any);
+  // Set up default comment query mocks
+  mockDb.query.comments.findMany.mockResolvedValue([]);
 
-  // Set up default model mock
-  mockDb.model.findMany.mockResolvedValue([mockModel]);
-  mockDb.model.findUnique.mockResolvedValue(mockModel);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
-  mockDb.model.create.mockResolvedValue(mockModel as any);
+  // Set up default status and priority query mocks
+  mockDb.query.issueStatuses.findFirst.mockResolvedValue(mockStatus);
+  mockDb.query.priorities.findFirst.mockResolvedValue(mockPriority);
 
-  // Set up default notification mock
-  mockDb.notification.findMany.mockResolvedValue([]);
-  mockDb.notification.create.mockResolvedValue({
-    id: "notification-1",
-    userId: "user-1",
-    type: "ISSUE_CREATED",
-    message: "Test notification",
-    entityType: null,
-    entityId: null,
-    actionUrl: null,
-    read: false,
-    createdAt: new Date(),
-  });
+  // Set up insert operation mocks with returning pattern
+  mockDb.insert.mockReturnValue({
+    values: vi.fn().mockReturnThis(),
+    returning: vi.fn().mockResolvedValue([mockIssue]),
+  } as any);
 
-  // Set up default comment mock
-  mockDb.comment.create.mockResolvedValue({
-    id: "comment-1",
-    content: "Test comment",
-    issueId: "issue-1",
-    authorId: "user-1",
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    deletedAt: null,
-    deletedBy: null,
-  });
+  // Set up update operation mocks
+  mockDb.update.mockReturnValue({
+    set: vi.fn().mockReturnThis(),
+    where: vi.fn().mockReturnThis(),
+    returning: vi.fn().mockResolvedValue([mockIssue]),
+  } as any);
 
-  // Set up default status and priority mocks
-  mockDb.issueStatus.findUnique.mockResolvedValue(mockStatus);
-
-  mockDb.priority.findUnique.mockResolvedValue(mockPriority);
+  // Set up delete operation mocks
+  mockDb.delete.mockReturnValue({
+    where: vi.fn().mockResolvedValue({ changes: 1 }),
+  } as any);
 
   return {
     db: mockDb,
@@ -175,6 +152,22 @@ export function createMockContext(): MockContext {
 
 export function resetMockContext(ctx: MockContext): void {
   mockReset(ctx.db);
+
+  // Re-setup default Drizzle query mocks after reset
+  ctx.db.query.memberships.findFirst.mockResolvedValue(mockMembership);
+  ctx.db.query.organizations.findFirst.mockResolvedValue(mockOrganization);
+  ctx.db.query.locations.findFirst.mockResolvedValue(mockLocation);
+  ctx.db.query.issues.findMany.mockResolvedValue([mockIssue]);
+  ctx.db.query.issues.findFirst.mockResolvedValue(mockIssue);
+  ctx.db.query.machines.findMany.mockResolvedValue([mockMachine]);
+  ctx.db.query.machines.findFirst.mockResolvedValue(mockMachine);
+  ctx.db.query.models.findMany.mockResolvedValue([mockModel]);
+  ctx.db.query.models.findFirst.mockResolvedValue(mockModel);
+  ctx.db.query.notifications.findMany.mockResolvedValue([]);
+  ctx.db.query.comments.findMany.mockResolvedValue([]);
+  ctx.db.query.issueStatuses.findFirst.mockResolvedValue(mockStatus);
+  ctx.db.query.priorities.findFirst.mockResolvedValue(mockPriority);
+
   // Reset all service mocks
   Object.values(mockNotificationService).forEach((method: unknown) => {
     if (vi.isMockFunction(method)) {

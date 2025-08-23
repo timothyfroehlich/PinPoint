@@ -185,8 +185,13 @@ export function validateCommentDeletion(
   }
 
   // Validate comment is not already deleted
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- comment existence validated above
-  const deletionStateValidation = validateCommentDeletionState(comment!, false);
+  if (!comment) {
+    throw new Error(
+      "Comment validation failed - comment is null after existence check",
+    );
+  }
+
+  const deletionStateValidation = validateCommentDeletionState(comment, false);
   if (!deletionStateValidation.valid) {
     return {
       valid: false,
@@ -196,8 +201,7 @@ export function validateCommentDeletion(
 
   // Validate permissions
   const permissionValidation = validateCommentDeletionPermissions(
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- comment existence validated above
-    comment!,
+    comment,
     context,
   );
   if (!permissionValidation.valid) {
@@ -224,8 +228,13 @@ export function validateCommentRestoration(
   }
 
   // Validate comment is deleted
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- comment existence validated above
-  const deletionStateValidation = validateCommentDeletionState(comment!, true);
+  if (!comment) {
+    throw new Error(
+      "Comment validation failed - comment is null after existence check",
+    );
+  }
+
+  const deletionStateValidation = validateCommentDeletionState(comment, true);
   if (!deletionStateValidation.valid) {
     return deletionStateValidation;
   }
@@ -259,8 +268,13 @@ export function validateCommentEdit(
   }
 
   // Validate comment is not deleted
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- comment existence validated above
-  const deletionStateValidation = validateCommentDeletionState(comment!, false);
+  if (!comment) {
+    throw new Error(
+      "Comment validation failed - comment is null after existence check",
+    );
+  }
+
+  const deletionStateValidation = validateCommentDeletionState(comment, false);
   if (!deletionStateValidation.valid) {
     return {
       valid: false,
@@ -269,8 +283,7 @@ export function validateCommentEdit(
   }
 
   // Validate edit permissions
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- comment existence validated above
-  const editValidation = validateCommentEditPermissions(comment!, context);
+  const editValidation = validateCommentEditPermissions(comment, context);
   if (!editValidation.valid) {
     return editValidation;
   }

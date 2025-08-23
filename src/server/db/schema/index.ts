@@ -72,6 +72,7 @@ export const organizationsRelations = relations(organizations, ({ many }) => ({
   locations: many(locations),
   roles: many(roles),
   machines: many(machines),
+  models: many(models), // Organization-owned custom models (where organizationId IS NOT NULL)
   issues: many(issues),
   priorities: many(priorities),
   issueStatuses: many(issueStatuses),
@@ -133,7 +134,12 @@ export const locationsRelations = relations(locations, ({ one, many }) => ({
   collections: many(collections),
 }));
 
-export const modelsRelations = relations(models, ({ many }) => ({
+// Models Relations (OPDB + Future Custom Models)
+export const modelsRelations = relations(models, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [models.organizationId],
+    references: [organizations.id],
+  }),
   machines: many(machines),
 }));
 
@@ -146,6 +152,7 @@ export const machinesRelations = relations(machines, ({ one, many }) => ({
     fields: [machines.locationId],
     references: [locations.id],
   }),
+  // Model relation
   model: one(models, {
     fields: [machines.modelId],
     references: [models.id],

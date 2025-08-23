@@ -30,12 +30,10 @@ ALTER TABLE issues FORCE ROW LEVEL SECURITY;
 
 ```sql
 -- Users can only see issues from their organization
-CREATE POLICY "Organization members can view issues"
+CREATE POLICY "organization_isolation" 
   ON issues
-  FOR SELECT
-  USING (
-    organization_id = auth.jwt()->>'organizationId'
-  );
+  FOR ALL TO authenticated
+  USING ("organizationId" = (auth.jwt() ->> 'app_metadata' ->> 'organizationId')::text);
 
 -- Public users can see non-sensitive issue data
 CREATE POLICY "Public can view issue summaries"
@@ -116,17 +114,49 @@ CREATE POLICY "Admins can delete issues"
   );
 ```
 
-## Multi-Tenant Patterns
+## PinPoint RLS Implementation
 
-### Organization Isolation
+### Supabase-Native Pattern
+
+Our RLS implementation uses Supabase's authentication system with `app_metadata`:
 
 ```sql
--- Base policy for all tenant tables
-CREATE POLICY "Tenant isolation"
-  ON tenant_table
-  FOR ALL
-  USING (organization_id = auth.jwt()->>'organizationId')
-  WITH CHECK (organization_id = auth.jwt()->>'organizationId');
+-- Standard organizational isolation for all multi-tenant tables
+CREATE POLICY "organization_isolation" ON issues
+  FOR ALL TO authenticated  
+  USING ("organizationId" = (auth.jwt() ->> 'app_metadata' ->> 'organizationId')::text);
+
+CREATE POLICY "organization_isolation" ON machines  
+  FOR ALL TO authenticated
+  USING ("organizationId" = (auth.jwt() ->> 'app_metadata' ->> 'organizationId')::text);
+
+CREATE POLICY "organization_isolation" ON locations
+  FOR ALL TO authenticated
+  USING ("organizationId" = (auth.jwt() ->> 'app_metadata' ->> 'organizationId')::text);
+```
+
+### Automatic Organization Injection
+
+We use triggers to automatically set organizationId on INSERT:
+
+```sql  
+-- Trigger function for automatic organizationId injection
+CREATE OR REPLACE FUNCTION set_organization_id()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW."organizationId" = (auth.jwt() ->> 'app_metadata' ->> 'organizationId')::text;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Apply to core tables
+CREATE TRIGGER set_issues_organization_id
+  BEFORE INSERT ON issues FOR EACH ROW
+  EXECUTE FUNCTION set_organization_id();
+
+CREATE TRIGGER set_machines_organization_id  
+  BEFORE INSERT ON machines FOR EACH ROW
+  EXECUTE FUNCTION set_organization_id();
 ```
 
 ### Cross-Organization Access

@@ -48,7 +48,6 @@ ignore:
   - "src/middleware.ts"
   - "src/env.js"
   - "scripts/**"
-  - "prisma/**"
   - "public/**"
   - "docs/**"
   - "*.config.js"

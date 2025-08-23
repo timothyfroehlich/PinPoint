@@ -210,7 +210,7 @@ const usersWithIssues = await db.select().from(users).where(sql`EXISTS (
 const issuesByStatus = await db
   .select({
     statusId: issues.statusId,
-    statusName: issueStatuses.name,
+    statusName: issue_statuses.name,
     count: count(issues.id),
   })
   .from(issues)
@@ -548,7 +548,7 @@ const issueWithAll = await ctx.drizzle
     machine: machines,
     model: models,
     location: locations,
-    status: issueStatuses,
+    status: issue_statuses,
     createdBy: {
       id: users.id,
       name: users.name,

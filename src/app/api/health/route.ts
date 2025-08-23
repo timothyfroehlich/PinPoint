@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { getGlobalDatabaseProvider } from "~/server/db/provider";
@@ -8,7 +9,7 @@ export async function GET(): Promise<NextResponse> {
   const db = dbProvider.getClient();
   try {
     // Check database connectivity
-    await db.$queryRaw`SELECT 1`;
+    await db.execute(sql`SELECT 1`);
 
     return NextResponse.json({
       status: "healthy",

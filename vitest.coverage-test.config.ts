@@ -19,7 +19,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "node",
-    setupFiles: ["src/test/vitest.setup.ts"],
+    setupFiles: ["src/test/setup/node.setup.ts"],
     include: ["src/lib/**/*.test.{ts,tsx}"],
     coverage: {
       enabled: true,

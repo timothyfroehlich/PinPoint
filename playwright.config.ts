@@ -1,4 +1,9 @@
 import { defineConfig, devices } from "@playwright/test";
+import { config } from "dotenv";
+
+// Load environment variables from .env files
+config({ path: ".env" });
+config({ path: ".env.local", override: false });
 
 export default defineConfig({
   testDir: "e2e",

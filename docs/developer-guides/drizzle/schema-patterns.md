@@ -24,7 +24,7 @@ import { pgTable, text, timestamp, boolean } from "drizzle-orm/pg-core";
 import { createId } from "@paralleldrive/cuid2";
 
 // IMPORTANT: Use exact Prisma table names for compatibility
-export const users = pgTable("User", {  // Note: "User" not "users"
+export const users = pgTable("users", {  // Note: "User" not "users"
   id: text("id")
     .primaryKey()
     .$defaultFn(() => createId()),
@@ -117,7 +117,7 @@ import { index, uniqueIndex } from "drizzle-orm/pg-core";
 
 // ✅ CORRECT: Indexes MUST be defined in table callback
 export const memberships = pgTable(
-  "Membership",
+  "memberships",
   {
     id: text("id")
       .primaryKey()
@@ -153,7 +153,7 @@ Essential multi-tenant indexes implemented:
 
 ```typescript
 export const machines = pgTable(
-  "Machine",
+  "machines",
   {
     id: text("id").primaryKey().$defaultFn(() => createId()),
     qrCodeId: text("qrCodeId").unique().notNull(),
@@ -295,7 +295,7 @@ PinPoint maintains Prisma's junction table pattern for exact migration compatibi
 ```typescript
 // Prisma-style junction table for many-to-many relationships
 export const rolePermissions = pgTable(
-  "_RolePermissions",  // Prisma naming convention
+  "role_permissions",  // Prisma naming convention
   {
     roleId: text("A").notNull(),  // Prisma uses A/B naming
     permissionId: text("B").notNull(),
@@ -337,7 +337,7 @@ export { machineRelations } from "./machines";
 export { issueRelations } from "./issues";
 
 // src/server/db/schema/organizations.ts
-export const organizations = pgTable("Organization", {...});
+export const organizations = pgTable("organizations", {...});
 export const organizationRelations = relations(organizations, {...});
 ```
 

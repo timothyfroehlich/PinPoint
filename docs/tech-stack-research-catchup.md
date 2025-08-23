@@ -38,7 +38,7 @@ return `tsvector`;
 export const posts = pgTable(
 'posts',
 {
-id: serial('id').primaryKey(),
+id: serial().primaryKey(),
 title: text('title').notNull(),
 body: text('body').notNull(),
 // The generated column combines title and body with different weights.
@@ -69,14 +69,14 @@ import { relations } from 'drizzle-orm';
 import { integer } from 'drizzle-orm/pg-core';
 
 export const users = pgTable('users', {
-id: serial('id').primaryKey(),
+id: serial().primaryKey(),
 name: text('name').notNull(),
 });
 
 export const comments = pgTable('comments', {
-id: serial('id').primaryKey(),
+id: serial().primaryKey(),
 text: text('text').notNull(),
-postId: integer('post_id').references(() => posts.id),
+postId: integer().references(() => posts.id),
 authorId: integer('author_id').references(() => users.id),
 });
 

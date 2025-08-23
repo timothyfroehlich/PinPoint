@@ -17,6 +17,9 @@ import type {
   IssueCreationContext,
 } from "../creationValidation";
 
+// Import test constants
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
+
 // =============================================================================
 // TEST DATA FACTORIES
 // =============================================================================
@@ -25,9 +28,9 @@ function createMockMachine(
   overrides: Partial<MachineOwnershipInput["machine"]> = {},
 ): MachineOwnershipInput["machine"] {
   return {
-    id: "machine-1",
+    id: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
     location: {
-      organizationId: "org-1",
+      organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
     },
     ...overrides,
   };
@@ -38,11 +41,11 @@ function createMockDefaults(
 ): IssueCreationDefaults {
   return {
     status: {
-      id: "status-1",
+      id: SEED_TEST_IDS.MOCK_PATTERNS.STATUS,
       name: "New",
     },
     priority: {
-      id: "priority-1",
+      id: SEED_TEST_IDS.MOCK_PATTERNS.PRIORITY,
       name: "Medium",
     },
     ...overrides,
@@ -54,7 +57,7 @@ function createPublicIssueInput(
 ): PublicIssueCreationInput {
   return {
     title: "Test Issue",
-    machineId: "machine-1",
+    machineId: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
     ...overrides,
   };
 }
@@ -64,7 +67,7 @@ function createAuthenticatedIssueInput(
 ): AuthenticatedIssueCreationInput {
   return {
     title: "Test Issue",
-    machineId: "machine-1",
+    machineId: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
     ...overrides,
   };
 }
@@ -73,7 +76,7 @@ function createContext(
   overrides: Partial<IssueCreationContext> = {},
 ): IssueCreationContext {
   return {
-    organizationId: "org-1",
+    organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
     ...overrides,
   };
 }
@@ -88,7 +91,7 @@ describe("creationValidation", () => {
       const machine = createMockMachine();
       const input = {
         machine,
-        expectedOrganizationId: "org-1",
+        expectedOrganizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
       };
 
       const result = validateMachineOwnership(input);
@@ -100,7 +103,7 @@ describe("creationValidation", () => {
     it("should reject null machine", () => {
       const input = {
         machine: null,
-        expectedOrganizationId: "org-1",
+        expectedOrganizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
       };
 
       const result = validateMachineOwnership(input);
@@ -117,7 +120,7 @@ describe("creationValidation", () => {
       });
       const input = {
         machine,
-        expectedOrganizationId: "org-1",
+        expectedOrganizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
       };
 
       const result = validateMachineOwnership(input);
@@ -313,28 +316,30 @@ describe("creationValidation", () => {
       expect(result.valid).toBe(true);
       expect(result.data).toEqual({
         title: "Test Issue",
-        machineId: "machine-1",
-        organizationId: "org-1",
-        statusId: "status-1",
-        priorityId: "priority-1",
+        machineId: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
+        organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+        statusId: SEED_TEST_IDS.MOCK_PATTERNS.STATUS,
+        priorityId: SEED_TEST_IDS.MOCK_PATTERNS.PRIORITY,
         createdById: null,
       });
     });
 
     it("should build issue data with authenticated user", () => {
       const input = createPublicIssueInput();
-      const contextWithUser = createContext({ userId: "user-1" });
+      const contextWithUser = createContext({
+        userId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+      });
 
       const result = buildIssueCreationData(input, defaults, contextWithUser);
 
       expect(result.valid).toBe(true);
       expect(result.data).toEqual({
         title: "Test Issue",
-        machineId: "machine-1",
-        organizationId: "org-1",
-        statusId: "status-1",
-        priorityId: "priority-1",
-        createdById: "user-1",
+        machineId: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
+        organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+        statusId: SEED_TEST_IDS.MOCK_PATTERNS.STATUS,
+        priorityId: SEED_TEST_IDS.MOCK_PATTERNS.PRIORITY,
+        createdById: SEED_TEST_IDS.MOCK_PATTERNS.USER,
       });
     });
 
@@ -407,8 +412,11 @@ describe("creationValidation", () => {
 
   describe("validateIssueCreationDefaults", () => {
     it("should validate complete defaults", () => {
-      const status = { id: "status-1", name: "New" };
-      const priority = { id: "priority-1", name: "Medium" };
+      const status = { id: SEED_TEST_IDS.MOCK_PATTERNS.STATUS, name: "New" };
+      const priority = {
+        id: SEED_TEST_IDS.MOCK_PATTERNS.PRIORITY,
+        name: "Medium",
+      };
 
       const result = validateIssueCreationDefaults(status, priority);
 
@@ -420,7 +428,10 @@ describe("creationValidation", () => {
     });
 
     it("should reject null status", () => {
-      const priority = { id: "priority-1", name: "Medium" };
+      const priority = {
+        id: SEED_TEST_IDS.MOCK_PATTERNS.PRIORITY,
+        name: "Medium",
+      };
 
       const result = validateIssueCreationDefaults(null, priority);
 
@@ -431,7 +442,7 @@ describe("creationValidation", () => {
     });
 
     it("should reject null priority", () => {
-      const status = { id: "status-1", name: "New" };
+      const status = { id: SEED_TEST_IDS.MOCK_PATTERNS.STATUS, name: "New" };
 
       const result = validateIssueCreationDefaults(status, null);
 
@@ -453,8 +464,11 @@ describe("creationValidation", () => {
 
   describe("validateCompleteIssueCreation", () => {
     const machine = createMockMachine();
-    const status = { id: "status-1", name: "New" };
-    const priority = { id: "priority-1", name: "Medium" };
+    const status = { id: SEED_TEST_IDS.MOCK_PATTERNS.STATUS, name: "New" };
+    const priority = {
+      id: SEED_TEST_IDS.MOCK_PATTERNS.PRIORITY,
+      name: "Medium",
+    };
     const context = createContext();
 
     it("should validate complete issue creation flow", () => {
@@ -477,10 +491,10 @@ describe("creationValidation", () => {
         title: "Complete Test Issue",
         description: "Complete description",
         reporterEmail: "test@example.com",
-        machineId: "machine-1",
-        organizationId: "org-1",
-        statusId: "status-1",
-        priorityId: "priority-1",
+        machineId: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
+        organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+        statusId: SEED_TEST_IDS.MOCK_PATTERNS.STATUS,
+        priorityId: SEED_TEST_IDS.MOCK_PATTERNS.PRIORITY,
         createdById: null,
       });
       expect(result.data?.defaults).toEqual({
@@ -563,14 +577,14 @@ describe("creationValidation", () => {
     it("should determine notification effects for public issue", () => {
       const effects = getIssueCreationNotificationEffects(
         "public",
-        "machine-1",
+        SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
       );
 
       expect(effects).toEqual({
         shouldNotifyMachineOwner: true,
         shouldRecordActivity: false,
         notificationData: {
-          machineId: "machine-1",
+          machineId: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
           type: "public",
         },
       });
@@ -579,14 +593,14 @@ describe("creationValidation", () => {
     it("should determine notification effects for authenticated issue", () => {
       const effects = getIssueCreationNotificationEffects(
         "authenticated",
-        "machine-1",
+        SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
       );
 
       expect(effects).toEqual({
         shouldNotifyMachineOwner: true,
         shouldRecordActivity: true,
         notificationData: {
-          machineId: "machine-1",
+          machineId: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
           type: "authenticated",
         },
       });
@@ -677,8 +691,11 @@ describe("creationValidation", () => {
 
     it("should validate complete flow for all issue types", () => {
       const machine = createMockMachine();
-      const status = { id: "status-1", name: "New" };
-      const priority = { id: "priority-1", name: "Medium" };
+      const status = { id: SEED_TEST_IDS.MOCK_PATTERNS.STATUS, name: "New" };
+      const priority = {
+        id: SEED_TEST_IDS.MOCK_PATTERNS.PRIORITY,
+        name: "Medium",
+      };
 
       // Public issue
       const publicInput = createPublicIssueInput({
@@ -703,7 +720,9 @@ describe("creationValidation", () => {
         severity: "High",
         description: "Authenticated issue",
       });
-      const authContext = createContext({ userId: "user-1" });
+      const authContext = createContext({
+        userId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+      });
 
       const authResult = validateCompleteIssueCreation(
         authInput,
@@ -714,11 +733,17 @@ describe("creationValidation", () => {
       );
 
       expect(authResult.valid).toBe(true);
-      expect(authResult.data?.issueData.createdById).toBe("user-1");
+      expect(authResult.data?.issueData.createdById).toBe(
+        SEED_TEST_IDS.MOCK_PATTERNS.USER,
+      );
     });
 
     it("should validate organization boundary for all scenarios", () => {
-      const organizations = ["org-1", "org-2", "org-3"];
+      const organizations = [
+        SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+        SEED_TEST_IDS.ORGANIZATIONS.competitor,
+        "org-3",
+      ];
 
       for (const expectedOrg of organizations) {
         for (const machineOrg of organizations) {

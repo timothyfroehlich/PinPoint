@@ -36,7 +36,7 @@ import { vi } from "vitest";
 
 /**
  * Mock issue type matching the exact structure returned by issue.core.getAll
- * Based on the Prisma query include structure from issue.core.ts:
+ * Based on the Drizzle query structure from issue.core.ts:
  * - status: true
  * - priority: true
  * - assignedTo: { select: { id, name, email, image } }

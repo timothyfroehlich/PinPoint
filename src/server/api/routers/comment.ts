@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import {
   createTRPCRouter,
-  organizationProcedure,
+  orgScopedProcedure,
   issueDeleteProcedure,
   organizationManageProcedure,
 } from "~/server/api/trpc";
@@ -14,10 +14,10 @@ import { excludeSoftDeleted } from "~/server/db/utils/common-queries";
 
 export const commentRouter = createTRPCRouter({
   // Get comments for an issue (excludes deleted)
-  getForIssue: organizationProcedure
+  getForIssue: orgScopedProcedure
     .input(z.object({ issueId: z.string() }))
     .query(({ ctx, input }) => {
-      return ctx.drizzle
+      return ctx.db
         .select({
           id: comments.id,
           content: comments.content,
@@ -48,7 +48,7 @@ export const commentRouter = createTRPCRouter({
   delete: issueDeleteProcedure
     .input(z.object({ commentId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      const [comment] = await ctx.drizzle
+      const [comment] = await ctx.db
         .select({
           id: comments.id,
           issueId: comments.issueId,
@@ -68,14 +68,7 @@ export const commentRouter = createTRPCRouter({
         });
       }
 
-      // Verify comment belongs to user's organization
-
-      if (comment.issue.organizationId !== ctx.organization.id) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Comment not in organization",
-        });
-      }
+      // RLS ensures comment belongs to user's organization
 
       const cleanupService = ctx.services.createCommentCleanupService();
       await cleanupService.softDeleteComment(input.commentId, ctx.user.id);
@@ -84,7 +77,6 @@ export const commentRouter = createTRPCRouter({
       const activityService = ctx.services.createIssueActivityService();
       await activityService.recordCommentDeleted(
         comment.issueId,
-        ctx.organization.id,
         ctx.user.id,
         input.commentId,
       );
@@ -95,7 +87,7 @@ export const commentRouter = createTRPCRouter({
   // Admin: Get deleted comments
   getDeleted: organizationManageProcedure.query(({ ctx }) => {
     const cleanupService = ctx.services.createCommentCleanupService();
-    return cleanupService.getDeletedComments(ctx.organization.id);
+    return cleanupService.getDeletedComments();
   }),
 
   // Admin: Restore deleted comment

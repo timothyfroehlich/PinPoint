@@ -61,7 +61,7 @@ After configuration, you can verify the setup:
 
 ### Local Development
 
-For local development, the variable is automatically set in `.env.development`:
+For local development, the variable is automatically pulled from Vercel's Development environment via `npm run env:pull`:
 
 ```bash
 NEXT_PUBLIC_ENABLE_DEV_FEATURES="true"
@@ -75,7 +75,7 @@ The four-tier environment strategy:
 
 | Environment     | Database             | Dev Features | Variable Source    |
 | --------------- | -------------------- | ------------ | ------------------ |
-| **Development** | Local Supabase       | ✅ Enabled   | `.env.development` |
+| **Development** | Local Supabase       | ✅ Enabled   | `.env.local` (Vercel) |
 | **CI/Test**     | Ephemeral PostgreSQL | ❌ Disabled  | Default (`false`)  |
 | **Preview**     | Cloud Supabase       | ✅ Enabled   | Vercel Dashboard   |
 | **Production**  | Cloud Supabase       | ❌ Disabled  | Vercel Dashboard   |

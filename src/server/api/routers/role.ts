@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { eq, and, count } from "drizzle-orm";
+import { eq, count } from "drizzle-orm";
 import { z } from "zod";
 
 import { createTRPCRouter } from "../trpc";
@@ -8,9 +8,8 @@ import {
   organizationManageProcedure,
 } from "../trpc.permission";
 
-import type { TRPCContext } from "../trpc.base";
+import type { RLSOrganizationTRPCContext } from "../trpc.base";
 
-import { env } from "~/env.js";
 import {
   validateRoleAssignment,
   type RoleAssignmentInput,
@@ -19,34 +18,13 @@ import {
 import { generatePrefixedId } from "~/lib/utils/id-generation";
 import { ROLE_TEMPLATES } from "~/server/auth/permissions.constants";
 import { roles, memberships } from "~/server/db/schema";
-import { DrizzleRoleService } from "~/server/services/drizzleRoleService";
 import { RoleService } from "~/server/services/roleService";
 
 /**
- * Create appropriate role service based on context
- *
- * In test environments with PGlite, use DrizzleRoleService for native integration.
- * In production or when Prisma client is preferred, use RoleService.
+ * Create role service (Three-environment compatibility: local dev + production)
  */
-// Type-safe way to detect Vitest environment
-function isVitestEnvironment(): boolean {
-  return typeof globalThis !== "undefined" && "__vitest_worker__" in globalThis;
-}
-
-function createRoleService(
-  ctx: TRPCContext,
-  organizationId: string,
-): RoleService | DrizzleRoleService {
-  // Use DrizzleRoleService in test environments
-  const isTestEnvironment = env.NODE_ENV === "test" || isVitestEnvironment();
-
-  // If we're in a test environment and have Drizzle, use DrizzleRoleService
-  if (isTestEnvironment) {
-    return new DrizzleRoleService(ctx.drizzle, organizationId);
-  }
-
-  // Use RoleService with Prisma in production
-  return new RoleService(ctx.db, organizationId, ctx.drizzle);
+function createRoleService(ctx: RLSOrganizationTRPCContext): RoleService {
+  return new RoleService(ctx.db, ctx.organizationId);
 }
 
 export const roleRouter = createTRPCRouter({
@@ -54,7 +32,7 @@ export const roleRouter = createTRPCRouter({
    * List all roles in the organization
    */
   list: organizationManageProcedure.query(async ({ ctx }) => {
-    const roleService = createRoleService(ctx, ctx.organization.id);
+    const roleService = createRoleService(ctx);
     const roles = await roleService.getRoles();
 
     return roles.map(
@@ -97,7 +75,7 @@ export const roleRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const roleService = createRoleService(ctx, ctx.organization.id);
+      const roleService = createRoleService(ctx);
 
       // If template is specified, create from template
       if (input.template) {
@@ -108,7 +86,7 @@ export const roleRouter = createTRPCRouter({
       }
 
       // Otherwise create custom role
-      const insertedRoles = await ctx.drizzle
+      const insertedRoles = await ctx.db
         .insert(roles)
         .values({
           id: generatePrefixedId("role"),
@@ -158,7 +136,7 @@ export const roleRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const roleService = createRoleService(ctx, ctx.organization.id);
+      const roleService = createRoleService(ctx);
 
       const updateData: {
         name?: string;
@@ -184,7 +162,7 @@ export const roleRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const roleService = createRoleService(ctx, ctx.organization.id);
+      const roleService = createRoleService(ctx);
 
       // Ensure we maintain at least one admin before deletion
       await roleService.ensureAtLeastOneAdmin();
@@ -205,11 +183,8 @@ export const roleRouter = createTRPCRouter({
     )
     .query(async ({ ctx, input }) => {
       // Get role details
-      const role = await ctx.drizzle.query.roles.findFirst({
-        where: and(
-          eq(roles.id, input.roleId),
-          eq(roles.organizationId, ctx.organization.id),
-        ),
+      const role = await ctx.db.query.roles.findFirst({
+        where: eq(roles.id, input.roleId),
         with: {
           rolePermissions: {
             with: {
@@ -227,7 +202,7 @@ export const roleRouter = createTRPCRouter({
       }
 
       // Get membership count
-      const memberCountResult = await ctx.drizzle
+      const memberCountResult = await ctx.db
         .select({ count: count() })
         .from(memberships)
         .where(eq(memberships.roleId, input.roleId));
@@ -249,7 +224,7 @@ export const roleRouter = createTRPCRouter({
    * Get all available permissions
    */
   getPermissions: organizationManageProcedure.query(async ({ ctx }) => {
-    const allPermissions = await ctx.drizzle.query.permissions.findMany({
+    const allPermissions = await ctx.db.query.permissions.findMany({
       orderBy: (permissions, { asc }) => [asc(permissions.name)],
     });
 
@@ -278,11 +253,8 @@ export const roleRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       // Get the target role and verify it exists in this organization
-      const role = await ctx.drizzle.query.roles.findFirst({
-        where: and(
-          eq(roles.id, input.roleId),
-          eq(roles.organizationId, ctx.organization.id),
-        ),
+      const role = await ctx.db.query.roles.findFirst({
+        where: eq(roles.id, input.roleId),
       });
 
       if (!role) {
@@ -293,11 +265,8 @@ export const roleRouter = createTRPCRouter({
       }
 
       // Get the current user membership with user and role details
-      const currentMembership = await ctx.drizzle.query.memberships.findFirst({
-        where: and(
-          eq(memberships.userId, input.userId),
-          eq(memberships.organizationId, ctx.organization.id),
-        ),
+      const currentMembership = await ctx.db.query.memberships.findFirst({
+        where: eq(memberships.userId, input.userId),
         with: {
           user: true,
           role: true,
@@ -312,8 +281,7 @@ export const roleRouter = createTRPCRouter({
       }
 
       // Get all memberships for validation
-      const allMemberships = await ctx.drizzle.query.memberships.findMany({
-        where: eq(memberships.organizationId, ctx.organization.id),
+      const allMemberships = await ctx.db.query.memberships.findMany({
         with: {
           user: true,
           role: true,
@@ -397,15 +365,10 @@ export const roleRouter = createTRPCRouter({
       }
 
       // Update the user's membership
-      const updatedMemberships = await ctx.drizzle
+      const updatedMemberships = await ctx.db
         .update(memberships)
         .set({ roleId: input.roleId })
-        .where(
-          and(
-            eq(memberships.userId, input.userId),
-            eq(memberships.organizationId, ctx.organization.id),
-          ),
-        )
+        .where(eq(memberships.userId, input.userId))
         .returning();
 
       if (updatedMemberships.length === 0) {
@@ -425,7 +388,7 @@ export const roleRouter = createTRPCRouter({
       }
 
       // Get the updated membership with related data
-      const membership = await ctx.drizzle.query.memberships.findFirst({
+      const membership = await ctx.db.query.memberships.findFirst({
         where: eq(memberships.id, updatedMembership.id),
         with: {
           role: true,

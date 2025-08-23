@@ -5,11 +5,11 @@ import type { DrizzleClient } from "~/server/db/drizzle";
 import { comments, issues, users } from "~/server/db/schema";
 
 /**
- * Comment service utilities for Drizzle operations.
- * This provides reusable comment business logic with Drizzle ORM.
+ * Comment service utilities.
+ * This provides reusable comment business logic.
  * TODO: Consolidate with CommentCleanupService for unified comment management.
  */
-export class DrizzleCommentService {
+export class CommentService {
   constructor(private drizzle: DrizzleClient) {}
 
   /**
@@ -46,8 +46,11 @@ export class DrizzleCommentService {
         authorId: comments.authorId,
       });
 
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Drizzle update with returning throws on no rows
-    return deletedComment!; // Safe because update with returning will throw if no rows affected
+    if (!deletedComment) {
+      throw new Error(`Comment with id ${commentId} not found`);
+    }
+
+    return deletedComment;
   }
 
   /**
@@ -81,8 +84,11 @@ export class DrizzleCommentService {
         authorId: comments.authorId,
       });
 
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Drizzle update with returning throws on no rows
-    return restoredComment!; // Safe because update with returning will throw if no rows affected
+    if (!restoredComment) {
+      throw new Error(`Comment with id ${commentId} not found`);
+    }
+
+    return restoredComment;
   }
 
   /**

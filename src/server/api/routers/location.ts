@@ -1,12 +1,12 @@
 import { TRPCError } from "@trpc/server";
-import { and, eq, asc, sql } from "drizzle-orm";
+import { eq, asc, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { generateId } from "~/lib/utils/id-generation";
 import {
   createTRPCRouter,
   publicProcedure,
-  organizationProcedure,
+  orgScopedProcedure,
   locationEditProcedure,
   locationDeleteProcedure,
   organizationManageProcedure,
@@ -27,21 +27,20 @@ export const locationRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const [location] = await ctx.drizzle
+      const [location] = await ctx.db
         .insert(locations)
         .values({
           id: generateId(),
           name: input.name,
-          organizationId: ctx.organization.id,
+          organizationId: ctx.organizationId,
         })
         .returning();
 
       return location;
     }),
 
-  getAll: organizationProcedure.query(async ({ ctx }) => {
-    return await ctx.drizzle.query.locations.findMany({
-      where: eq(locations.organizationId, ctx.organization.id),
+  getAll: orgScopedProcedure.query(async ({ ctx }) => {
+    return await ctx.db.query.locations.findMany({
       with: {
         machines: true,
       },
@@ -59,7 +58,7 @@ export const locationRouter = createTRPCRouter({
     }
 
     // Use single optimized query with JOINs instead of separate queries
-    const result = await ctx.drizzle
+    const result = await ctx.db
       .select({
         locationId: locations.id,
         locationName: locations.name,
@@ -74,7 +73,7 @@ export const locationRouter = createTRPCRouter({
       .innerJoin(models, eq(models.id, machines.modelId))
       .leftJoin(issues, eq(issues.machineId, machines.id))
       .leftJoin(issueStatuses, eq(issueStatuses.id, issues.statusId))
-      .where(eq(locations.organizationId, ctx.organization.id))
+      .where(sql`1=1`)
       .groupBy(
         locations.id,
         locations.name,
@@ -156,15 +155,10 @@ export const locationRouter = createTRPCRouter({
         updates.name = input.name;
       }
 
-      const [updatedLocation] = await ctx.drizzle
+      const [updatedLocation] = await ctx.db
         .update(locations)
         .set(updates)
-        .where(
-          and(
-            eq(locations.id, input.id),
-            eq(locations.organizationId, ctx.organization.id), // Ensure user can only update their org's locations
-          ),
-        )
+        .where(eq(locations.id, input.id))
         .returning();
 
       if (!updatedLocation) {
@@ -178,14 +172,11 @@ export const locationRouter = createTRPCRouter({
     }),
 
   // Get a single location with detailed info
-  getById: organizationProcedure
+  getById: orgScopedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
-      const location = await ctx.drizzle.query.locations.findFirst({
-        where: and(
-          eq(locations.id, input.id),
-          eq(locations.organizationId, ctx.organization.id),
-        ),
+      const location = await ctx.db.query.locations.findFirst({
+        where: eq(locations.id, input.id),
         with: {
           machines: {
             orderBy: [asc(machines.id)],
@@ -216,14 +207,9 @@ export const locationRouter = createTRPCRouter({
   delete: locationDeleteProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      const [deletedLocation] = await ctx.drizzle
+      const [deletedLocation] = await ctx.db
         .delete(locations)
-        .where(
-          and(
-            eq(locations.id, input.id),
-            eq(locations.organizationId, ctx.organization.id), // Ensure user can only delete their org's locations
-          ),
-        )
+        .where(eq(locations.id, input.id))
         .returning();
 
       if (!deletedLocation) {
@@ -245,17 +231,12 @@ export const locationRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const [updatedLocation] = await ctx.drizzle
+      const [updatedLocation] = await ctx.db
         .update(locations)
         .set({
           pinballMapId: input.pinballMapId,
         })
-        .where(
-          and(
-            eq(locations.id, input.locationId),
-            eq(locations.organizationId, ctx.organization.id),
-          ),
-        )
+        .where(eq(locations.id, input.locationId))
         .returning();
 
       if (!updatedLocation) {

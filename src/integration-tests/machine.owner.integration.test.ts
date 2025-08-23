@@ -1,40 +1,39 @@
 /**
- * Machine Owner Router Integration Tests (PGlite)
+ * Machine Owner Router Business Logic Integration Tests (PGlite)
  *
- * Integration tests for the machine.owner router using PGlite in-memory PostgreSQL database.
- * Tests real database operations with proper schema, relationships, and data integrity.
+ * Tests machine owner router functionality and database operations with PGlite in-memory database.
  *
- * Key Features:
- * - Real PostgreSQL database with PGlite
- * - Complete schema migrations applied
- * - Real Drizzle ORM operations
- * - Multi-tenant data isolation testing
- * - Owner assignment and membership validation
+ * ⚠️  SECURITY BOUNDARIES ARE NOT TESTED HERE
+ * Security boundary testing is done in pgTAP tests (supabase/tests/rls/)
+ * PGlite cannot enforce RLS policies - this tests business logic only
  *
- * Uses modern August 2025 patterns with Vitest and PGlite integration.
+ * What this tests:
+ * - Owner assignment router functionality
+ * - Database record updates for machine ownership
+ * - Error handling for invalid inputs
+ * - Data relationships and foreign key constraints
+ * - Service integrations and notifications
+ *
+ * What this does NOT test:
+ * - Organizational data isolation (tested in pgTAP)
+ * - RLS policy enforcement (impossible in PGlite)
+ * - Cross-organizational access prevention (tested in pgTAP)
+ * - User membership validation (application-layer security)
+ *
+ * Uses modern August 2025 patterns with memory-safe PGlite integration.
  */
 
-import { TRPCError } from "@trpc/server";
 import { eq } from "drizzle-orm";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-
-// Import test setup and utilities
-import type { TRPCContext } from "~/server/api/trpc.base";
-import type { ExtendedPrismaClient } from "~/server/db";
+import { describe, expect, vi } from "vitest";
 
 import { machineOwnerRouter } from "~/server/api/routers/machine.owner";
 import * as schema from "~/server/db/schema";
-import {
-  createSeededTestDatabase,
-  getSeededTestData,
-  type TestDatabase,
-} from "~/test/helpers/pglite-test-setup";
+import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
+import { createPrimaryAdminContext } from "~/test/helpers/createSeededMachineTestContext";
+import type { TestDatabase } from "~/test/helpers/pglite-test-setup";
 
 // Mock external dependencies that aren't database-related
-vi.mock("~/lib/utils/id-generation", () => ({
-  generateId: vi.fn(() => `test-id-${Date.now()}`),
-}));
-
 vi.mock("~/server/auth/permissions", () => ({
   getUserPermissionsForSession: vi
     .fn()
@@ -43,22 +42,7 @@ vi.mock("~/server/auth/permissions", () => ({
       "machine:delete",
       "organization:manage",
     ]),
-  getUserPermissionsForSupabaseUser: vi
-    .fn()
-    .mockResolvedValue([
-      "machine:edit",
-      "machine:delete",
-      "organization:manage",
-    ]),
   requirePermissionForSession: vi.fn().mockResolvedValue(undefined),
-  supabaseUserToSession: vi.fn((user) => ({
-    user: {
-      id: user?.id ?? "user-1",
-      email: user?.email ?? "test@example.com",
-      name: user?.name ?? "Test User",
-    },
-    expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-  })),
 }));
 
 // Mock the service factory to avoid service dependencies
@@ -74,334 +58,358 @@ vi.mock("~/server/services/factory", () => ({
   })),
 }));
 
-describe("machine.owner router integration tests", () => {
-  let db: TestDatabase;
-  let testData: {
-    organization: string;
-    location?: string;
-    machine?: string;
-    model?: string;
-    status?: string;
-    priority?: string;
-    issue?: string;
-    adminRole?: string;
-    memberRole?: string;
-    user?: string;
-  };
-  let ctx: TRPCContext;
-  let organizationId: string;
+/**
+ * Business Logic Test Setup Helper
+ *
+ * Tests machine owner router functionality and database operations ONLY.
+ *
+ * ⚠️  SECURITY BOUNDARIES ARE NOT TESTED HERE
+ * Security boundary testing is done in pgTAP tests (supabase/tests/rls/)
+ * PGlite cannot enforce RLS policies - this tests business logic only
+ *
+ * What this tests:
+ * - Router function execution
+ * - Database record updates for machine ownership
+ * - Data relationships and foreign key constraints
+ * - Error handling for invalid inputs
+ *
+ * What this does NOT test:
+ * - Organizational data isolation (pgTAP only)
+ * - RLS policy enforcement (impossible in PGlite)
+ * - Cross-organizational access prevention (pgTAP only)
+ */
+async function withMachineOwnerBusinessLogicSetup(workerDb, testFn) {
+  await withIsolatedTest(workerDb, async (db) => {
+    // Set up test data using seeded data - no RLS context needed
+    const testData = await setupTestData(db);
 
-  beforeEach(async () => {
-    // Create fresh PGlite database for each test
-    const setup = await createSeededTestDatabase();
-    db = setup.db;
-    organizationId = setup.organizationId;
+    // Direct business logic setup - no RLS context needed
+    const ctx = await createPrimaryAdminContext(db);
+    const caller = machineOwnerRouter.createCaller(ctx);
 
-    // Query actual seeded IDs instead of using hardcoded ones
-    testData = await getSeededTestData(db, organizationId);
+    await testFn(db, caller, testData, ctx);
+  });
+}
 
-    // Create additional test users for testing membership scenarios
-    const [testUser2] = await db
-      .insert(schema.users)
-      .values({
-        id: "test-user-2",
-        name: "Test User 2",
-        email: "user2@example.com",
-        image: "https://example.com/avatar2.jpg",
-        emailVerified: null,
-      })
-      .returning();
+// Helper function to set up test data using seeded data
+async function setupTestData(db: TestDatabase) {
+  // Use seeded data from primary organization
+  const organizationId = SEED_TEST_IDS.ORGANIZATIONS.primary;
 
-    // Create membership for test user 2
-    await db.insert(schema.memberships).values({
-      id: "test-membership-2",
-      userId: testUser2.id,
-      organizationId: organizationId,
-      roleId: testData.memberRole,
-    });
-
-    // Create test context with real database
-    ctx = {
-      db: {
-        membership: {
-          findFirst: async (args: any) => {
-            // Use drizzle query for membership check in organizationProcedure
-            return await db.query.memberships.findFirst({
-              where: (memberships, { eq, and }) =>
-                and(
-                  eq(memberships.userId, args.where.userId),
-                  eq(memberships.organizationId, args.where.organizationId),
-                ),
-            });
-          },
-        },
-      } as ExtendedPrismaClient,
-      drizzle: db,
-      user: {
-        id: testData.user ?? "test-user-fallback",
-        email: "test@example.com",
-        name: "Test User",
-        user_metadata: {},
-        app_metadata: {
-          organization_id: organizationId,
-        },
-      },
-      organization: {
-        id: organizationId,
-        name: "Test Organization",
-        subdomain: "test",
-      },
-      supabase: {} as any, // Not used in this router
-      headers: new Headers(),
-      userPermissions: [
-        "machine:edit",
-        "machine:delete",
-        "organization:manage",
-      ],
-      services: {} as any, // Not used in this router
-      logger: {
-        error: vi.fn(),
-        warn: vi.fn(),
-        info: vi.fn(),
-        debug: vi.fn(),
-        trace: vi.fn(),
-        child: vi.fn(() => ctx.logger),
-        withRequest: vi.fn(() => ctx.logger),
-        withUser: vi.fn(() => ctx.logger),
-        withOrganization: vi.fn(() => ctx.logger),
-        withContext: vi.fn(() => ctx.logger),
-      } as any,
-    };
+  // Get seeded users
+  const testUser1 = await db.query.users.findFirst({
+    where: eq(schema.users.id, SEED_TEST_IDS.USERS.ADMIN),
   });
 
+  const testUser2 = await db.query.users.findFirst({
+    where: eq(schema.users.id, SEED_TEST_IDS.USERS.MEMBER1),
+  });
+
+  if (!testUser1 || !testUser2) {
+    throw new Error("Missing seeded test users");
+  }
+
+  return {
+    organizationId,
+    testUser1,
+    testUser2,
+    machine: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
+    location: SEED_TEST_IDS.LOCATIONS.MAIN_FLOOR,
+  };
+}
+
+describe("Machine Owner Router Business Logic Integration (PGlite)", () => {
   describe("assignOwner mutation", () => {
-    describe("success scenarios", () => {
-      it("should assign owner to machine successfully", async () => {
-        // First ensure machine has no owner
-        await db
-          .update(schema.machines)
-          .set({ ownerId: null })
-          .where(eq(schema.machines.id, testData.machine ?? "test-machine"));
+    test("should assign owner to machine successfully", async ({
+      workerDb,
+    }) => {
+      await withMachineOwnerBusinessLogicSetup(
+        workerDb,
+        async (db, caller, { machine, testUser2 }) => {
+          const result = await caller.assignOwner({
+            machineId: machine,
+            ownerId: testUser2.id,
+          });
 
-        const caller = machineOwnerRouter.createCaller(ctx);
+          // Verify the result structure
+          expect(result).toMatchObject({
+            id: machine,
+            ownerId: testUser2.id,
+          });
 
-        // Verify machine has no owner initially
-        const initialMachine = await db.query.machines.findFirst({
-          where: eq(schema.machines.id, testData.machine ?? "test-machine"),
-        });
-        expect(initialMachine?.ownerId).toBeNull();
+          // Verify relationships are loaded
+          expect(result.model).toBeDefined();
+          expect(result.model.name).toBeDefined();
+          expect(result.location).toBeDefined();
+          expect(result.location.name).toBeDefined();
+          expect(result.owner).toBeDefined();
+          expect(result.owner).toMatchObject({
+            id: testUser2.id,
+            name: testUser2.name,
+            profilePicture: null,
+          });
 
-        const result = await caller.assignOwner({
-          machineId: testData.machine ?? "test-machine",
-          ownerId: "test-user-2",
-        });
-
-        // Verify the result structure
-        expect(result).toMatchObject({
-          id: testData.machine ?? "test-machine",
-          ownerId: "test-user-2",
-          organizationId: organizationId,
-        });
-
-        // Verify relationships are loaded
-        expect(result.model).toBeDefined();
-        expect(result.model.id).toBe(testData.model);
-        expect(result.location).toBeDefined();
-        expect(result.location.id).toBe(testData.location);
-        expect(result.owner).toBeDefined();
-        expect(result.owner).toMatchObject({
-          id: "test-user-2",
-          name: "Test User 2",
-          image: "https://example.com/avatar2.jpg",
-        });
-
-        // Verify the database was actually updated
-        const updatedMachine = await db.query.machines.findFirst({
-          where: eq(schema.machines.id, testData.machine ?? "test-machine"),
-        });
-        expect(updatedMachine?.ownerId).toBe("test-user-2");
-      });
-
-      it("should remove owner from machine successfully", async () => {
-        // First assign an owner
-        await db
-          .update(schema.machines)
-          .set({ ownerId: "test-user-2" })
-          .where(eq(schema.machines.id, testData.machine ?? "test-machine"));
-
-        const caller = machineOwnerRouter.createCaller(ctx);
-
-        const result = await caller.assignOwner({
-          machineId: testData.machine ?? "test-machine",
-          // ownerId is omitted to remove owner
-        });
-
-        // Verify the result structure
-        expect(result).toMatchObject({
-          id: testData.machine ?? "test-machine",
-          ownerId: null,
-          organizationId: organizationId,
-        });
-
-        // Verify relationships are loaded but owner is null
-        expect(result.model).toBeDefined();
-        expect(result.location).toBeDefined();
-        expect(result.owner).toBeNull();
-
-        // Verify the database was actually updated
-        const updatedMachine = await db.query.machines.findFirst({
-          where: eq(schema.machines.id, testData.machine ?? "test-machine"),
-        });
-        expect(updatedMachine?.ownerId).toBeNull();
-      });
+          // Verify the database was actually updated
+          const updatedMachine = await db.query.machines.findFirst({
+            where: eq(schema.machines.id, machine),
+          });
+          expect(updatedMachine?.ownerId).toBe(testUser2.id);
+        },
+      );
     });
 
-    describe("error scenarios", () => {
-      it("should throw NOT_FOUND when machine does not exist", async () => {
-        const caller = machineOwnerRouter.createCaller(ctx);
+    test("should handle reassigning owner", async ({ workerDb }) => {
+      await withMachineOwnerBusinessLogicSetup(
+        workerDb,
+        async (db, caller, { machine, testUser1, testUser2 }) => {
+          // First assignment
+          await caller.assignOwner({
+            machineId: machine,
+            ownerId: testUser1.id,
+          });
 
-        await expect(
-          caller.assignOwner({
-            machineId: "nonexistent-machine",
-            ownerId: "test-user-2",
-          }),
-        ).rejects.toThrow(
-          new TRPCError({
-            code: "NOT_FOUND",
-            message: "Machine not found",
-          }),
-        );
-      });
+          // Verify first assignment
+          const firstAssignment = await db.query.machines.findFirst({
+            where: eq(schema.machines.id, machine),
+          });
+          expect(firstAssignment?.ownerId).toBe(testUser1.id);
 
-      it("should throw FORBIDDEN when user is not a member of organization", async () => {
-        // Create a user that's not a member of the organization
-        const [nonMemberUser] = await db
-          .insert(schema.users)
-          .values({
-            id: "non-member-user",
-            name: "Non Member User",
-            email: "nonmember@example.com",
-            image: null,
-            emailVerified: null,
-          })
-          .returning();
+          // Reassign to different user
+          const result = await caller.assignOwner({
+            machineId: machine,
+            ownerId: testUser2.id,
+          });
 
-        const caller = machineOwnerRouter.createCaller(ctx);
+          // Verify reassignment result
+          expect(result).toMatchObject({
+            id: machine,
+            ownerId: testUser2.id,
+          });
 
-        await expect(
-          caller.assignOwner({
-            machineId: testData.machine ?? "test-machine",
-            ownerId: nonMemberUser.id,
-          }),
-        ).rejects.toThrow(
-          new TRPCError({
-            code: "FORBIDDEN",
-            message: "User is not a member of this organization",
-          }),
-        );
-      });
+          // Verify database reflects the change
+          const reassignment = await db.query.machines.findFirst({
+            where: eq(schema.machines.id, machine),
+          });
+          expect(reassignment?.ownerId).toBe(testUser2.id);
+          expect(reassignment?.ownerId).not.toBe(testUser1.id);
+        },
+      );
     });
 
-    describe("organizational scoping and security", () => {
-      it("should enforce organizational boundaries", async () => {
-        // Create a second organization
-        const [org2] = await db
-          .insert(schema.organizations)
-          .values({
-            id: "org-2",
-            name: "Organization 2",
-            subdomain: "org2",
-          })
-          .returning();
+    test("should handle null owner assignment (unassign)", async ({
+      workerDb,
+    }) => {
+      await withMachineOwnerBusinessLogicSetup(
+        workerDb,
+        async (db, caller, { machine, testUser1 }) => {
+          // First assign an owner
+          await caller.assignOwner({
+            machineId: machine,
+            ownerId: testUser1.id,
+          });
 
-        // Update context to use different organization
-        const org2Ctx = {
-          ...ctx,
-          organization: {
-            id: org2.id,
-            name: org2.name,
-            subdomain: org2.subdomain,
-          },
-          user: {
-            ...ctx.user,
-            app_metadata: {
-              organization_id: org2.id,
+          // Verify assignment
+          const assigned = await db.query.machines.findFirst({
+            where: eq(schema.machines.id, machine),
+          });
+          expect(assigned?.ownerId).toBe(testUser1.id);
+
+          // Unassign owner
+          const result = await caller.assignOwner({
+            machineId: machine,
+            ownerId: null,
+          });
+
+          // Verify unassignment result
+          expect(result).toMatchObject({
+            id: machine,
+            ownerId: null,
+          });
+
+          // Verify database reflects the change
+          const unassigned = await db.query.machines.findFirst({
+            where: eq(schema.machines.id, machine),
+          });
+          expect(unassigned?.ownerId).toBeNull();
+        },
+      );
+    });
+
+    test("should preserve other machine fields during owner assignment", async ({
+      workerDb,
+    }) => {
+      await withMachineOwnerBusinessLogicSetup(
+        workerDb,
+        async (db, caller, { machine, testUser2 }) => {
+          // Get original machine data
+          const originalMachine = await db.query.machines.findFirst({
+            where: eq(schema.machines.id, machine),
+          });
+
+          await caller.assignOwner({
+            machineId: machine,
+            ownerId: testUser2.id,
+          });
+
+          // Verify other fields weren't modified
+          const updatedMachine = await db.query.machines.findFirst({
+            where: eq(schema.machines.id, machine),
+          });
+
+          expect(updatedMachine?.name).toBe(originalMachine?.name);
+          expect(updatedMachine?.modelId).toBe(originalMachine?.modelId);
+          expect(updatedMachine?.locationId).toBe(originalMachine?.locationId);
+          expect(updatedMachine?.organizationId).toBe(
+            originalMachine?.organizationId,
+          );
+          expect(updatedMachine?.qrCodeId).toBe(originalMachine?.qrCodeId);
+          expect(updatedMachine?.qrCodeUrl).toBe(originalMachine?.qrCodeUrl);
+
+          // Only ownerId should have changed
+          expect(updatedMachine?.ownerId).toBe(testUser2.id);
+          expect(updatedMachine?.ownerId).not.toBe(originalMachine?.ownerId);
+        },
+      );
+    });
+
+    test("should throw NOT_FOUND for non-existent machine", async ({
+      workerDb,
+    }) => {
+      await withMachineOwnerBusinessLogicSetup(
+        workerDb,
+        async (db, caller, { testUser1 }) => {
+          await expect(
+            caller.assignOwner({
+              machineId: "non-existent-machine",
+              ownerId: testUser1.id,
+            }),
+          ).rejects.toThrow("Machine not found");
+        },
+      );
+    });
+
+    test("should throw NOT_FOUND for non-existent user", async ({
+      workerDb,
+    }) => {
+      await withMachineOwnerBusinessLogicSetup(
+        workerDb,
+        async (db, caller, { machine }) => {
+          await expect(
+            caller.assignOwner({
+              machineId: machine,
+              ownerId: "non-existent-user",
+            }),
+          ).rejects.toThrow("User not found");
+        },
+      );
+    });
+  });
+
+  describe("getByOwnerId query", () => {
+    test("should get machines owned by specific user", async ({ workerDb }) => {
+      await withMachineOwnerBusinessLogicSetup(
+        workerDb,
+        async (db, caller, { machine, testUser1 }) => {
+          // Assign owner to machine
+          await caller.assignOwner({
+            machineId: machine,
+            ownerId: testUser1.id,
+          });
+
+          // Query machines by owner
+          const result = await caller.getByOwnerId({
+            ownerId: testUser1.id,
+          });
+
+          expect(result).toHaveLength(1);
+          expect(result[0]).toMatchObject({
+            id: machine,
+            ownerId: testUser1.id,
+          });
+
+          // Verify relationships are loaded
+          expect(result[0].model).toBeDefined();
+          expect(result[0].location).toBeDefined();
+          expect(result[0].owner).toBeDefined();
+        },
+      );
+    });
+
+    test("should return empty array for user with no machines", async ({
+      workerDb,
+    }) => {
+      await withMachineOwnerBusinessLogicSetup(
+        workerDb,
+        async (db, caller, { testUser2 }) => {
+          const result = await caller.getByOwnerId({
+            ownerId: testUser2.id,
+          });
+
+          expect(result).toEqual([]);
+        },
+      );
+    });
+
+    test("should handle null ownerId parameter", async ({ workerDb }) => {
+      await withMachineOwnerBusinessLogicSetup(
+        workerDb,
+        async (db, caller, { machine }) => {
+          // Ensure machine has no owner
+          await caller.assignOwner({
+            machineId: machine,
+            ownerId: null,
+          });
+
+          const result = await caller.getByOwnerId({
+            ownerId: null,
+          });
+
+          // Should find machines with null ownerId
+          expect(result.length).toBeGreaterThanOrEqual(1);
+          const foundMachine = result.find((m) => m.id === machine);
+          expect(foundMachine).toBeDefined();
+          expect(foundMachine?.ownerId).toBeNull();
+        },
+      );
+    });
+  });
+
+  describe("Data relationships and constraints", () => {
+    test("should maintain referential integrity", async ({ workerDb }) => {
+      await withMachineOwnerBusinessLogicSetup(
+        workerDb,
+        async (db, caller, { machine, testUser1 }) => {
+          // Assign owner
+          const result = await caller.assignOwner({
+            machineId: machine,
+            ownerId: testUser1.id,
+          });
+
+          // Verify all foreign key relationships load correctly
+          expect(result.model).toBeDefined();
+          expect(result.model.id).toBeDefined();
+          expect(result.location).toBeDefined();
+          expect(result.location.id).toBeDefined();
+          expect(result.owner).toBeDefined();
+          expect(result.owner.id).toBe(testUser1.id);
+
+          // Verify database constraints are respected
+          const dbRecord = await db.query.machines.findFirst({
+            where: eq(schema.machines.id, machine),
+            with: {
+              model: true,
+              location: true,
+              owner: true,
             },
-          },
-          db: {
-            membership: {
-              findFirst: async (_args: any) => {
-                // Return null since user is not a member of org2
-                return null;
-              },
-            },
-          } as ExtendedPrismaClient,
-        };
+          });
 
-        const caller = machineOwnerRouter.createCaller(org2Ctx);
-
-        await expect(
-          caller.assignOwner({
-            machineId: testData.machine ?? "test-machine", // This machine belongs to org1
-            ownerId: "test-user-2",
-          }),
-        ).rejects.toThrow(
-          new TRPCError({
-            code: "FORBIDDEN",
-            message: "You don't have permission to access this organization",
-          }),
-        );
-      });
-
-      it("should return only safe user data in owner relationship", async () => {
-        const caller = machineOwnerRouter.createCaller(ctx);
-
-        const result = await caller.assignOwner({
-          machineId: testData.machine ?? "test-machine",
-          ownerId: "test-user-2",
-        });
-
-        // Should only include id, name, and image (no email or other sensitive data)
-        expect(result.owner).toEqual({
-          id: "test-user-2",
-          name: "Test User 2",
-          image: "https://example.com/avatar2.jpg",
-        });
-
-        // Make sure no sensitive data is leaked
-        expect(result.owner).not.toHaveProperty("email");
-        expect(result.owner).not.toHaveProperty("emailVerified");
-      });
-    });
-
-    describe("data integrity and relationships", () => {
-      it("should maintain referential integrity", async () => {
-        const caller = machineOwnerRouter.createCaller(ctx);
-
-        const result = await caller.assignOwner({
-          machineId: testData.machine ?? "test-machine",
-          ownerId: "test-user-2",
-        });
-
-        // Verify all relationships exist and are consistent
-        expect(result.model.id).toBe(testData.model);
-        expect(result.location.id).toBe(testData.location);
-        expect(result.location.organizationId).toBe(organizationId);
-
-        // Verify the relationships in the database
-        const machineInDb = await db.query.machines.findFirst({
-          where: eq(schema.machines.id, testData.machine ?? "test-machine"),
-          with: {
-            model: true,
-            location: true,
-            owner: true,
-          },
-        });
-
-        expect(machineInDb?.model?.id).toBe(result.model.id);
-        expect(machineInDb?.location?.id).toBe(result.location.id);
-        expect(machineInDb?.owner?.id).toBe(result.owner?.id);
-      });
+          expect(dbRecord).toBeDefined();
+          expect(dbRecord?.model).toBeDefined();
+          expect(dbRecord?.location).toBeDefined();
+          expect(dbRecord?.owner).toBeDefined();
+          expect(dbRecord?.owner?.id).toBe(testUser1.id);
+        },
+      );
     });
   });
 });

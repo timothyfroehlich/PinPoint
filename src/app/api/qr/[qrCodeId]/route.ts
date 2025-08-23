@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 
 import { getGlobalDatabaseProvider } from "~/server/db/provider";
 import { ServiceFactory } from "~/server/services/factory";
@@ -9,8 +10,7 @@ export async function GET(
   { params }: { params: Promise<{ qrCodeId: string }> },
 ): Promise<NextResponse> {
   const dbProvider = getGlobalDatabaseProvider();
-  const db = dbProvider.getClient();
-  const drizzle = dbProvider.getDrizzleClient();
+  const drizzle = dbProvider.getClient();
   try {
     const { qrCodeId } = await params;
 
@@ -22,7 +22,7 @@ export async function GET(
     }
 
     // Initialize services
-    const services = new ServiceFactory(db, drizzle);
+    const services = new ServiceFactory(drizzle);
     const qrCodeService = services.createQRCodeService();
 
     // Resolve machine information from QR code
@@ -58,8 +58,7 @@ export async function HEAD(
   { params }: { params: Promise<{ qrCodeId: string }> },
 ): Promise<NextResponse> {
   const dbProvider = getGlobalDatabaseProvider();
-  const db = dbProvider.getClient();
-  const drizzle = dbProvider.getDrizzleClient();
+  const drizzle = dbProvider.getClient();
   try {
     const { qrCodeId } = await params;
 
@@ -67,7 +66,7 @@ export async function HEAD(
       return new NextResponse(null, { status: 400 });
     }
 
-    const services = new ServiceFactory(db, drizzle);
+    const services = new ServiceFactory(drizzle);
     const qrCodeService = services.createQRCodeService();
     const machine = await qrCodeService.resolveMachineFromQR(qrCodeId);
 

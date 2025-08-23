@@ -1,13 +1,13 @@
 # PinPoint Documentation
 
-## 🚨 Active Migration
+## ✅ Migration Status: Prisma Removal Complete
 
-PinPoint is completing a direct conversion migration from Prisma to Drizzle optimized for solo development velocity.
+PinPoint has completed the Prisma-to-Drizzle migration with full removal of all Prisma dependencies.
 
-**Migration Status**: Phase 2B-E (Router Conversions)  
-**Progress**: Phase 2A Drizzle Foundation Complete, 3 routers converted  
-**Timeline**: 2-3 weeks total direct conversion approach  
-**Details**: [`migration/supabase-drizzle/`](./migration/supabase-drizzle/)
+**Migration Status**: ✅ **Prisma Removal COMPLETE** (Phase 0 + Phase 1)  
+**Progress**: 100% Drizzle-only architecture achieved  
+**Next Phase**: Ready for Phase 2 - RLS Implementation  
+**Task Management**: [`migration-plan-v2/`](../migration-plan-v2/) - Unified migration and RLS implementation plan
 
 ## Quick Start
 
@@ -17,12 +17,11 @@ PinPoint is completing a direct conversion migration from Prisma to Drizzle opti
 2. Review [`architecture/current-state.md`](./architecture/current-state.md) - System overview
 3. Check [`migration/supabase-drizzle/developer-guide.md`](./migration/supabase-drizzle/developer-guide.md) - Current patterns
 
-### For Migration Participants
+### For Phase 2: RLS Implementation
 
-- **🚨 CRITICAL**: [`latest-updates/`](./latest-updates/) - Post-training breaking changes and new patterns
-- **Migration Hub**: [`migration/supabase-drizzle/`](./migration/supabase-drizzle/)
-- **Quick References**: [`migration/supabase-drizzle/quick-reference/`](./migration/supabase-drizzle/quick-reference/)
-- **New Stack Guides**: [`developer-guides/`](./developer-guides/) (Supabase, Drizzle, RLS)
+- **🎯 NEXT PHASE**: [`migration-plan-v2/02-phase2-rls-implementation.md`](../migration-plan-v2/02-phase2-rls-implementation.md) - Row-Level Security implementation
+- **Clean Foundation**: Phase 0 + Phase 1 complete - modern tooling and 100% Drizzle architecture
+- **Current Patterns**: [`developer-guides/`](./developer-guides/) - Modern Drizzle + Supabase SSR patterns
 
 ## Documentation Structure
 
@@ -31,13 +30,12 @@ PinPoint is completing a direct conversion migration from Prisma to Drizzle opti
 - [`latest-updates/`](./latest-updates/) - **CRITICAL**: Post-training tech stack updates (August 2025)
 - [`architecture/`](./architecture/) - System design, patterns, and current state
 - [`developer-guides/`](./developer-guides/) - Technology-specific implementation guides
-- [`testing/`](./testing/) - Testing philosophy and patterns (now integration-first)
+- [`testing/`](./testing/) - **REBOOT IN PROGRESS**: Complete test system rebuild with strict archetype enforcement
 - [`security/`](./security/) - Security patterns and audit findings
 
 ### Planning & Process
 
 - [`planning/`](./planning/) - Roadmap, future features, and archived ideas
-- [`migration/`](./migration/) - Active and completed migrations
 - [`orchestrator-system/`](./orchestrator-system/) - Multi-agent development workflow
 
 ### Reference
@@ -47,11 +45,15 @@ PinPoint is completing a direct conversion migration from Prisma to Drizzle opti
 - [`deployment/`](./deployment/) - Environment and deployment guides
 - [`research/`](./research/) - Technical research and experimental patterns
 
+### Deprecated
+
+- [`deprecated/`](./deprecated/) - Legacy documentation being phased out during system reboot
+
 ## Key Resources
 
 ### Quick References (Auto-Loaded)
 
-- **Tactical Patterns**: [`quick-reference/`](./quick-reference/) - Auto-loaded guides for immediate action
+- **Tactical Patterns**: [`quick-reference/`](./quick-reference/) - Auto-loaded guides (testing patterns deprecated during reboot)
 - **Essential Commands**: [`CLAUDE.md`](../CLAUDE.md) - Command reference and project context
 - **Latest Updates**: [`latest-updates/quick-reference.md`](./latest-updates/quick-reference.md) - Post-training breaking changes
 
@@ -60,6 +62,6 @@ PinPoint is completing a direct conversion migration from Prisma to Drizzle opti
 1. **Before coding**: Check migration status and use current patterns
 2. **Validation**: Run `npm run validate` before commits
 3. **Documentation**: Update relevant docs with any pattern changes
-4. **Testing**: Write integration tests with transaction cleanup
+4. **Testing**: Follow new archetype system (see testing/TEST_SYSTEM_REBOOT_PLAN.md)
 
-For detailed contribution guidelines, see the migration developer guide.
+For detailed contribution guidelines, see the developer guides.

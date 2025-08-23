@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-properties, @typescript-eslint/no-unnecessary-condition */
 /**
  * Development environment loader for standalone scripts
  * Ensures consistent environment variable loading for development contexts
@@ -31,10 +32,8 @@ export function loadDevelopmentEnvironment(): void {
   config({ path: resolve(projectRoot, ".env.local") });
 
   // Ensure development environment has NODE_ENV set
-  // eslint-disable-next-line @typescript-eslint/dot-notation, no-restricted-properties, @typescript-eslint/no-unnecessary-condition
-  if (!process.env["NODE_ENV"]) {
-    // eslint-disable-next-line no-restricted-properties, @typescript-eslint/dot-notation
-    (process.env as { NODE_ENV?: string })["NODE_ENV"] = "development";
+  if (!process.env.NODE_ENV) {
+    (process.env as Record<string, string>)["NODE_ENV"] = "development";
   }
 }
 

@@ -1,4 +1,4 @@
-import { eq, and, isNull, count } from "drizzle-orm";
+import { eq, isNull, count } from "drizzle-orm";
 import * as QRCode from "qrcode";
 
 import { imageStorage } from "~/lib/image-storage/local-storage";
@@ -97,7 +97,7 @@ export class QRCodeService {
     }
 
     return {
-      id: updatedMachine.qrCodeId,
+      id: updatedMachine.qrCodeId ?? "",
       url: updatedMachine.qrCodeUrl,
       generatedAt: updatedMachine.qrCodeGeneratedAt,
     };
@@ -220,16 +220,11 @@ export class QRCodeService {
   }
 
   /**
-   * Generate QR codes for all machines in an organization
+   * Generate QR codes for all machines in organization (RLS scoped)
    */
-  async generateQRCodesForOrganization(
-    organizationId: string,
-  ): Promise<BulkGenerationResult> {
+  async generateQRCodesForOrganization(): Promise<BulkGenerationResult> {
     const machineList = await this.db.query.machines.findMany({
-      where: and(
-        eq(machines.organizationId, organizationId),
-        isNull(machines.qrCodeUrl), // Only generate for machines without QR codes
-      ),
+      where: isNull(machines.qrCodeUrl), // Only generate for machines without QR codes
       columns: { id: true },
     });
 
@@ -246,7 +241,6 @@ export class QRCodeService {
           msg: "Failed to generate QR code for machine",
           component: "qrCodeService.generateQRCodesForOrganization",
           context: {
-            organizationId,
             machineId: machine.id,
             operation: "bulk_generate",
             stats: { generated, failed, total },
@@ -263,13 +257,10 @@ export class QRCodeService {
   }
 
   /**
-   * Generate QR codes for all machines in an organization (including regeneration)
+   * Generate QR codes for all machines in organization (including regeneration, RLS scoped)
    */
-  async regenerateQRCodesForOrganization(
-    organizationId: string,
-  ): Promise<BulkGenerationResult> {
+  async regenerateQRCodesForOrganization(): Promise<BulkGenerationResult> {
     const machineList = await this.db.query.machines.findMany({
-      where: eq(machines.organizationId, organizationId),
       columns: { id: true },
     });
 
@@ -286,7 +277,6 @@ export class QRCodeService {
           msg: "Failed to regenerate QR code for machine",
           component: "qrCodeService.regenerateQRCodesForOrganization",
           context: {
-            organizationId,
             machineId: machine.id,
             operation: "bulk_regenerate",
             stats: { generated, failed, total },
@@ -313,27 +303,19 @@ export class QRCodeService {
   }
 
   /**
-   * Get QR code statistics for an organization
+   * Get QR code statistics for organization (RLS scoped)
    */
-  async getOrganizationQRCodeStats(organizationId: string): Promise<{
+  async getOrganizationQRCodeStats(): Promise<{
     total: number;
     withQRCodes: number;
     withoutQRCodes: number;
   }> {
     const [totalResult, withoutQRCodesResult] = await Promise.all([
+      this.db.select({ count: count() }).from(machines),
       this.db
         .select({ count: count() })
         .from(machines)
-        .where(eq(machines.organizationId, organizationId)),
-      this.db
-        .select({ count: count() })
-        .from(machines)
-        .where(
-          and(
-            eq(machines.organizationId, organizationId),
-            isNull(machines.qrCodeUrl),
-          ),
-        ),
+        .where(isNull(machines.qrCodeUrl)),
     ]);
 
     const total = totalResult[0]?.count ?? 0;

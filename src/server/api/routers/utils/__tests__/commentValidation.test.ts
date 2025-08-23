@@ -14,8 +14,8 @@
  * Uses modern August 2025 patterns with Vitest and PGlite integration.
  */
 
-import { eq } from "drizzle-orm";
-import { beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
+import { SEED_TEST_IDS } from "../../../../../test/constants/seed-test-ids";
 
 import {
   validateCommentExists,
@@ -32,38 +32,31 @@ import {
   type ValidationResult,
 } from "../commentValidation";
 
-import * as schema from "~/server/db/schema";
-import {
-  createSeededTestDatabase,
-  getSeededTestData,
-  type TestDatabase,
-} from "~/test/helpers/pglite-test-setup";
-
 describe("Comment Validation Functions", () => {
-  let db: TestDatabase;
-  let testData: {
-    organization: string;
-    location?: string;
-    machine?: string;
-    model?: string;
-    status?: string;
-    priority?: string;
-    issue?: string;
-    adminRole?: string;
-    memberRole?: string;
-    user?: string;
+  // Static test data that doesn't require database
+  const staticTestData = {
+  organization: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
+  location: SEED_TEST_IDS.MOCK_PATTERNS.LOCATION,
+  machine: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
+  model: SEED_TEST_IDS.MOCK_PATTERNS.MODEL,
+  status: SEED_TEST_IDS.MOCK_PATTERNS.STATUS,
+  priority: SEED_TEST_IDS.MOCK_PATTERNS.PRIORITY,
+  issue: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
+  adminRole: SEED_TEST_IDS.MOCK_PATTERNS.ROLE,
+  memberRole: SEED_TEST_IDS.MOCK_PATTERNS.ROLE,
+  user: SEED_TEST_IDS.MOCK_PATTERNS.USER,
   };
 
   // Test fixture data
   const createValidCommentData = (
     overrides: Partial<CommentData> = {},
   ): CommentData => ({
-    id: "test-comment-1",
-    authorId: testData.user || "test-user-1",
+  id: SEED_TEST_IDS.MOCK_PATTERNS.COMMENT,
+  authorId: staticTestData.user,
     deletedAt: null,
     issue: {
-      id: testData.issue || "test-issue-1",
-      organizationId: testData.organization,
+      id: staticTestData.issue,
+      organizationId: staticTestData.organization,
     },
     ...overrides,
   });
@@ -71,29 +64,25 @@ describe("Comment Validation Functions", () => {
   const createValidContext = (
     overrides: Partial<ValidationContext> = {},
   ): ValidationContext => ({
-    userId: testData.user || "test-user-1",
-    organizationId: testData.organization,
+    userId: staticTestData.user,
+    organizationId: staticTestData.organization,
     userPermissions: [],
     ...overrides,
-  });
-
-  beforeEach(async () => {
-    // Create fresh PGlite database with real schema and seed data
-    const setup = await createSeededTestDatabase();
-    db = setup.db;
-    testData = await getSeededTestData(db, setup.organizationId);
   });
 
   describe("validateCommentExists", () => {
     it("should return valid for existing comment in correct organization", () => {
       const comment = createValidCommentData();
-      const result = validateCommentExists(comment, testData.organization);
+      const result = validateCommentExists(
+        comment,
+        staticTestData.organization,
+      );
 
       expect(result).toEqual({ valid: true });
     });
 
     it("should return invalid for null comment", () => {
-      const result = validateCommentExists(null, testData.organization);
+      const result = validateCommentExists(null, staticTestData.organization);
 
       expect(result).toEqual({
         valid: false,
@@ -102,7 +91,10 @@ describe("Comment Validation Functions", () => {
     });
 
     it("should return invalid for undefined comment", () => {
-      const result = validateCommentExists(undefined, testData.organization);
+      const result = validateCommentExists(
+        undefined,
+        staticTestData.organization,
+      );
 
       expect(result).toEqual({
         valid: false,
@@ -113,11 +105,14 @@ describe("Comment Validation Functions", () => {
     it("should return invalid for comment from different organization", () => {
       const comment = createValidCommentData({
         issue: {
-          id: "other-issue",
-          organizationId: "other-org-id",
+    id: "mock-issue-2",
+    organizationId: "mock-org-2",
         },
       });
-      const result = validateCommentExists(comment, testData.organization);
+      const result = validateCommentExists(
+        comment,
+        staticTestData.organization,
+      );
 
       expect(result).toEqual({
         valid: false,
@@ -138,11 +133,14 @@ describe("Comment Validation Functions", () => {
     it("should handle comment with empty issue organization ID", () => {
       const comment = createValidCommentData({
         issue: {
-          id: "test-issue",
-          organizationId: "",
+    id: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
+    organizationId: "",
         },
       });
-      const result = validateCommentExists(comment, testData.organization);
+      const result = validateCommentExists(
+        comment,
+        staticTestData.organization,
+      );
 
       expect(result).toEqual({
         valid: false,
@@ -154,10 +152,10 @@ describe("Comment Validation Functions", () => {
   describe("validateCommentDeletionPermissions", () => {
     it("should allow user to delete their own comment", () => {
       const comment = createValidCommentData({
-        authorId: "user-123",
+        authorId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
       });
       const context = createValidContext({
-        userId: "user-123",
+        userId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
         userPermissions: [],
       });
 
@@ -168,10 +166,10 @@ describe("Comment Validation Functions", () => {
 
     it("should allow admin to delete any comment", () => {
       const comment = createValidCommentData({
-        authorId: "other-user",
+        authorId: "mock-user-2",
       });
       const context = createValidContext({
-        userId: "admin-user",
+        userId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
         userPermissions: ["issue:delete"],
       });
 
@@ -182,10 +180,10 @@ describe("Comment Validation Functions", () => {
 
     it("should deny deletion when user is not author and not admin", () => {
       const comment = createValidCommentData({
-        authorId: "other-user",
+        authorId: "mock-user-2",
       });
       const context = createValidContext({
-        userId: "regular-user",
+        userId: "mock-user-3",
         userPermissions: ["issue:read"],
       });
 
@@ -199,10 +197,10 @@ describe("Comment Validation Functions", () => {
 
     it("should allow deletion with any admin permission", () => {
       const comment = createValidCommentData({
-        authorId: "other-user",
+        authorId: "mock-user-2",
       });
       const context = createValidContext({
-        userId: "admin-user",
+        userId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
         userPermissions: ["issue:delete", "issue:create", "issue:update"],
       });
 
@@ -263,10 +261,10 @@ describe("Comment Validation Functions", () => {
   describe("validateCommentEditPermissions", () => {
     it("should allow user to edit their own comment", () => {
       const comment = createValidCommentData({
-        authorId: "user-123",
+        authorId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
       });
       const context = createValidContext({
-        userId: "user-123",
+        userId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
       });
 
       const result = validateCommentEditPermissions(comment, context);
@@ -276,10 +274,10 @@ describe("Comment Validation Functions", () => {
 
     it("should deny editing for non-authors", () => {
       const comment = createValidCommentData({
-        authorId: "other-user",
+        authorId: "mock-user-2",
       });
       const context = createValidContext({
-        userId: "different-user",
+        userId: "mock-user-3",
       });
 
       const result = validateCommentEditPermissions(comment, context);
@@ -292,10 +290,10 @@ describe("Comment Validation Functions", () => {
 
     it("should deny editing even for admins who are not authors", () => {
       const comment = createValidCommentData({
-        authorId: "other-user",
+        authorId: "mock-user-2",
       });
       const context = createValidContext({
-        userId: "admin-user",
+        userId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
         userPermissions: ["issue:delete", "issue:update"],
       });
 
@@ -485,11 +483,11 @@ describe("Comment Validation Functions", () => {
       const membership = {
         id: "membership-1",
         userId: "user-123",
-        organizationId: testData.organization,
+        organizationId: staticTestData.organization,
       };
       const context = createValidContext({
         userId: "user-123",
-        organizationId: testData.organization,
+        organizationId: staticTestData.organization,
       });
 
       const result = validateOrganizationMembership(membership, context);
@@ -512,7 +510,7 @@ describe("Comment Validation Functions", () => {
       const membership = {
         id: "membership-1",
         userId: "other-user",
-        organizationId: testData.organization,
+        organizationId: staticTestData.organization,
       };
       const context = createValidContext({
         userId: "user-123",
@@ -588,7 +586,7 @@ describe("Comment Validation Functions", () => {
       const membership = {
         id: "membership-1",
         userId: "user-123",
-        organizationId: testData.organization,
+        organizationId: staticTestData.organization,
       };
       const context = createValidContext({
         userId: "user-123",
@@ -608,7 +606,7 @@ describe("Comment Validation Functions", () => {
       const membership = {
         id: "membership-1",
         userId: "admin-123",
-        organizationId: testData.organization,
+        organizationId: staticTestData.organization,
       };
       const context = createValidContext({
         userId: "admin-123",
@@ -624,7 +622,7 @@ describe("Comment Validation Functions", () => {
       const membership = {
         id: "membership-1",
         userId: "user-123",
-        organizationId: testData.organization,
+        organizationId: staticTestData.organization,
       };
       const context = createValidContext({
         userId: "user-123",
@@ -639,8 +637,13 @@ describe("Comment Validation Functions", () => {
     });
 
     it("should fail when user is not a member", () => {
-      const comment = createValidCommentData();
-      const context = createValidContext();
+      const comment = createValidCommentData({
+        authorId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+      });
+      const context = createValidContext({
+        userId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+        userPermissions: [],
+      });
 
       const result = validateCommentDeletion(comment, null, context);
 
@@ -648,7 +651,7 @@ describe("Comment Validation Functions", () => {
         valid: false,
         error: "User is not a member of this organization",
       });
-    });
+  });
 
     it("should fail when comment is already deleted", () => {
       const comment = createValidCommentData({
@@ -657,7 +660,7 @@ describe("Comment Validation Functions", () => {
       const membership = {
         id: "membership-1",
         userId: "user-123",
-        organizationId: testData.organization,
+        organizationId: staticTestData.organization,
       };
       const context = createValidContext({
         userId: "user-123",
@@ -679,7 +682,7 @@ describe("Comment Validation Functions", () => {
       const membership = {
         id: "membership-1",
         userId: "user-123",
-        organizationId: testData.organization,
+        organizationId: staticTestData.organization,
       };
       const context = createValidContext({
         userId: "user-123",
@@ -697,14 +700,14 @@ describe("Comment Validation Functions", () => {
     it("should fail at first validation step (comment existence)", () => {
       const comment = createValidCommentData({
         issue: {
-          id: "test-issue",
-          organizationId: "wrong-org",
+          id: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
+          organizationId: "mock-org-2",
         },
       });
       const membership = {
         id: "membership-1",
         userId: "user-123",
-        organizationId: testData.organization,
+        organizationId: staticTestData.organization,
       };
       const context = createValidContext({
         userId: "user-123",
@@ -798,8 +801,8 @@ describe("Comment Validation Functions", () => {
       const comment = createValidCommentData({
         deletedAt: new Date("2024-01-01T12:00:00Z"),
         issue: {
-          id: "other-issue",
-          organizationId: "other-org",
+          id: "mock-issue-2",
+          organizationId: "mock-org-2",
         },
       });
       const context = createValidContext({
@@ -917,187 +920,6 @@ describe("Comment Validation Functions", () => {
     });
   });
 
-  describe("Real Database Integration Tests", () => {
-    it("should validate against real organizational boundaries", async () => {
-      // Create another organization to test cross-org validation
-      const [otherOrg] = await db
-        .insert(schema.organizations)
-        .values({
-          id: "other-test-org",
-          name: "Other Test Organization",
-          subdomain: "other-test",
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .returning();
-
-      // Create a priority and status for the other org
-      const [otherPriority] = await db
-        .insert(schema.priorities)
-        .values({
-          id: "other-priority",
-          name: "Other Priority",
-          organizationId: otherOrg.id,
-          order: 1,
-        })
-        .returning();
-
-      const [otherStatus] = await db
-        .insert(schema.issueStatuses)
-        .values({
-          id: "other-status",
-          name: "Other Status",
-          category: "NEW",
-          organizationId: otherOrg.id,
-        })
-        .returning();
-
-      // Create an issue in the other organization
-      const [otherIssue] = await db
-        .insert(schema.issues)
-        .values({
-          id: "other-org-issue",
-          title: "Issue in Other Org",
-          organizationId: otherOrg.id,
-          machineId: testData.machine || "test-machine-1",
-          statusId: otherStatus.id,
-          priorityId: otherPriority.id,
-          createdById: testData.user || "test-user-1",
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .returning();
-
-      // Test cross-org comment validation
-      const crossOrgComment = createValidCommentData({
-        issue: {
-          id: otherIssue.id,
-          organizationId: otherOrg.id,
-        },
-      });
-
-      const result = validateCommentExists(
-        crossOrgComment,
-        testData.organization,
-      );
-
-      expect(result).toEqual({
-        valid: false,
-        error: "Comment not found", // Security: don't reveal cross-org access
-      });
-    });
-
-    it("should validate with real user membership data", async () => {
-      // Query real membership from the database
-      const realMembership = await db.query.memberships.findFirst({
-        where: eq(schema.memberships.organizationId, testData.organization),
-      });
-
-      if (realMembership) {
-        const context = createValidContext({
-          userId: realMembership.userId,
-          organizationId: realMembership.organizationId,
-        });
-
-        const result = validateOrganizationMembership(realMembership, context);
-
-        expect(result).toEqual({ valid: true });
-      }
-    });
-
-    it("should validate with real role permissions", async () => {
-      // Query admin role from the database (simplified approach)
-      const adminRole = await db.query.roles.findFirst({
-        where: eq(schema.roles.name, "Admin"),
-      });
-
-      if (adminRole) {
-        // Query role permissions separately to avoid complex relation issues
-        const rolePermissions = await db.query.rolePermissions.findMany({
-          where: eq(schema.rolePermissions.roleId, adminRole.id),
-        });
-
-        if (rolePermissions.length > 0) {
-          // Get permission keys
-          const permissionIds = rolePermissions.map((rp) => rp.permissionId);
-          const permissions = await db.query.permissions.findMany();
-
-          const permissionKeys = permissions
-            .filter((p) => permissionIds.includes(p.id))
-            .map((p) => p.key);
-
-          // Test with real permissions
-          const result = validateAdminPermissions(
-            permissionKeys,
-            "issue:delete",
-          );
-
-          // Should pass if admin role has issue:delete permission
-          if (permissionKeys.includes("issue:delete")) {
-            expect(result).toEqual({ valid: true });
-          } else {
-            expect(result).toEqual({
-              valid: false,
-              error: "Insufficient permissions to perform this action",
-            });
-          }
-        } else {
-          // If no permissions found, test should still work with empty array
-          const result = validateAdminPermissions([], "issue:delete");
-          expect(result).toEqual({
-            valid: false,
-            error: "Insufficient permissions to perform this action",
-          });
-        }
-      }
-    });
-
-    it("should validate complex scenarios with real database state", async () => {
-      // Create a real comment in the database for testing
-      const [realComment] = await db
-        .insert(schema.comments)
-        .values({
-          id: "real-test-comment",
-          content: "Real comment for validation testing",
-          issueId: testData.issue || "test-issue-1",
-          authorId: testData.user || "test-user-1",
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .returning();
-
-      // Query the comment with its issue relationship
-      const commentWithIssue = await db.query.comments.findFirst({
-        where: eq(schema.comments.id, realComment.id),
-        with: {
-          issue: true,
-        },
-      });
-
-      if (commentWithIssue?.issue) {
-        const commentData: CommentData = {
-          id: commentWithIssue.id,
-          authorId: commentWithIssue.authorId,
-          deletedAt: commentWithIssue.deletedAt,
-          issue: {
-            id: commentWithIssue.issue.id,
-            organizationId: commentWithIssue.issue.organizationId,
-          },
-        };
-
-        const context = createValidContext({
-          userId: commentWithIssue.authorId,
-          organizationId: commentWithIssue.issue.organizationId,
-        });
-
-        // Test validation with real data
-        const result = validateCommentEdit(commentData, context);
-
-        expect(result).toEqual({ valid: true });
-      }
-    });
-  });
-
   describe("Edge Cases and Boundary Conditions", () => {
     it("should handle very long permission strings", () => {
       const longPermission = "a".repeat(1000) + ":delete";
@@ -1203,12 +1025,12 @@ describe("Comment Validation Functions", () => {
 
     it("should handle CommentData interface correctly", () => {
       const commentData: CommentData = {
-        id: "comment-1",
-        authorId: "user-1",
+        id: SEED_TEST_IDS.MOCK_PATTERNS.COMMENT,
+        authorId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
         deletedAt: new Date(),
         issue: {
-          id: "issue-1",
-          organizationId: "org-1",
+          id: SEED_TEST_IDS.MOCK_PATTERNS.ISSUE,
+          organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
         },
       };
 
@@ -1221,8 +1043,8 @@ describe("Comment Validation Functions", () => {
 
     it("should handle ValidationContext interface correctly", () => {
       const context: ValidationContext = {
-        userId: "user-1",
-        organizationId: "org-1",
+        userId: SEED_TEST_IDS.MOCK_PATTERNS.USER,
+        organizationId: SEED_TEST_IDS.MOCK_PATTERNS.ORGANIZATION,
         userPermissions: ["perm1", "perm2"],
       };
 

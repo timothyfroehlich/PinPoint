@@ -7,10 +7,12 @@ import { DatabaseProvider, getGlobalDatabaseProvider } from "../provider";
 
 // Mock the database provider at the module level for Vitest
 vi.mock("~/server/db", () => ({
-  createPrismaClient: vi.fn().mockReturnValue({
+  createDrizzleClient: vi.fn().mockReturnValue({
     $disconnect: vi.fn().mockResolvedValue(undefined),
-    organization: { findMany: vi.fn() },
-    user: { findMany: vi.fn() },
+    query: {
+      organizations: { findMany: vi.fn() },
+      users: { findMany: vi.fn() },
+    },
   }),
 }));
 

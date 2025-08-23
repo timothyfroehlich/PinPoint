@@ -11,7 +11,23 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 
-import type { User, NotificationFrequency } from "@prisma/client";
+// Local types for testing
+type NotificationFrequency = "IMMEDIATE" | "DAILY" | "WEEKLY";
+
+interface User {
+  id: string;
+  name: string | null;
+  email: string;
+  emailVerified: Date | null;
+  image: string | null;
+  bio: string | null;
+  profilePicture: string | null;
+  emailNotificationsEnabled: boolean;
+  pushNotificationsEnabled: boolean;
+  notificationFrequency: NotificationFrequency;
+  createdAt: Date;
+  updatedAt: Date;
+}
 import type { ReactNode } from "react";
 import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 
@@ -123,12 +139,7 @@ function createMockMembershipQuery(
   } = {},
 ) {
   // Mock function that accepts tRPC hook arguments (input, options) but ignores them
-  return (
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    _input?: any,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    _queryOptions?: any,
-  ) => ({
+  return (_input?: any, _queryOptions?: any) => ({
     data:
       permissions.length > 0
         ? { permissions, role, userId: "test-user", organizationId: "test-org" }
@@ -354,14 +365,8 @@ export function VitestTestWrapper({
   if (injectPermissionDeps) {
     return (
       <PermissionDepsProvider
-        authHook={
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
-          mockSessionHook as any
-        }
-        membershipQuery={
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
-          mockMembershipQuery as any
-        }
+        authHook={mockSessionHook as any}
+        membershipQuery={mockMembershipQuery as any}
       >
         {content}
       </PermissionDepsProvider>

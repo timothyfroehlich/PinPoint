@@ -29,7 +29,7 @@ function findProjectRoot(startPath) {
   return process.cwd();
 }
 
-const projectRoot = findProjectRoot(__dirname);
+const projectRoot = findProjectRoot(process.cwd());
 
 /**
  * Intelligent TypeScript Config Cache with checksum validation
