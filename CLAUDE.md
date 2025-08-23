@@ -305,6 +305,28 @@ SEED_TEST_IDS.MOCK_PATTERNS.MACHINE; // "mock-machine-1"
 **Critical Rule**: All examples must use SEED_TEST_IDS (no random IDs)
 **Files**: `docs/testing/`, `docs/quick-reference/`, `docs/developer-guides/`
 
+### 🚨 MANDATORY: Pattern Discovery Synchronization
+
+**CRITICAL WORKFLOW**: When ANY new pattern or "don't" is discovered during development:
+
+1. **ALWAYS UPDATE BOTH** (keep synchronized):
+   - `@docs/developer-guides/general-code-review-procedure.md` - Add to appropriate category checklist
+   - `@.claude/agents/code-review-architect.md` - Add to XML validation patterns and critical safety scan
+
+2. **Pattern Types Requiring Updates**:
+   - **Forbidden patterns** (memory safety, schema violations, etc.)
+   - **Enforced patterns** (SEED_TEST_IDS, worker-scoped testing, modern auth)
+   - **Quality gates** (new validation commands or expectations)
+   - **File categorization** (new file types or patterns)
+
+3. **Synchronization Areas**:
+   - Critical safety validations (blocked patterns)
+   - Category-specific validation rules
+   - XML workflow scan patterns
+   - Quality gate commands and expectations
+
+**WHY CRITICAL**: Both documents serve as the foundation for code quality enforcement - they must remain synchronized to ensure comprehensive coverage and consistent guidance.
+
 ## 📚 Quick Reference (Auto-Loaded)
 
 Current development patterns (post-migration):
