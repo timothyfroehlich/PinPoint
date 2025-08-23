@@ -2,6 +2,18 @@
 
 **Status**: ✅ **Phase 3.3 Complete** - Two validated archetype approaches established through systematic implementation
 
+> ## 🚨 CRITICAL: PGlite RLS Policy Limitations
+>
+> **Key Discovery**: PGlite v0.3.7 **cannot enforce RLS policies**. It creates policies successfully but completely ignores them during query execution.
+>
+> **Impact on Testing Archetypes**:
+>
+> - **Archetype 3 (PGlite)**: Business logic only - RLS policies silently ignored
+> - **Security Testing**: Must use pgTAP with real PostgreSQL for actual RLS validation
+> - **Dual-Track Required**: PGlite for business logic + pgTAP for security boundaries
+>
+> See [Dual-Track Testing Strategy](./dual-track-testing-strategy.md#critical-pglite-rls-limitations) for complete details.
+
 Three specialized testing archetypes with clear agent assignment, now enhanced with validated Phase 3.3 implementation patterns.
 
 ## 🎯 Testing Archetype Decision Guide (Updated from Phase 3.3)
@@ -39,13 +51,13 @@ Three specialized testing archetypes with clear agent assignment, now enhanced w
 - ✅ Example: `issue.comment.test.ts` (22/22 passing)
 - 🎯 Best for: Complex router logic, permission scenarios
 
-**Archetype 3 (PGlite Integration RLS-Enhanced)**:
+**Archetype 3 (PGlite Integration)**:
 
 - ✅ Real database operations with constraints
-- ✅ True organizational boundary validation
 - ✅ Worker-scoped memory safety
-- ⚠️ Requires proper RLS context establishment
-- 🎯 Best for: Complex workflows, constraint validation
+- ❌ **Cannot validate organizational boundaries** (RLS policies ignored)
+- ❌ **No RLS enforcement** - business logic only
+- 🎯 Best for: Complex workflows, database constraints, business rules (non-security)
 
 ---
 

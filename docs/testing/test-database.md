@@ -76,37 +76,66 @@ export const test = vitest.test.extend<{
 });
 ```
 
+## 🚨 CRITICAL: PGlite RLS Policy Limitations
+
+### RLS Limitation Overview
+
+**PGlite has a fundamental limitation**: It creates RLS policies successfully but **completely ignores them during query execution**.
+
+**🔥 CRITICAL RLS LIMITATION FACTS:**
+
+- ✅ **Policy Creation**: `CREATE POLICY` commands succeed without errors
+- ✅ **Schema Setup**: `ALTER TABLE ENABLE ROW LEVEL SECURITY` works
+- ❌ **Policy Enforcement**: Data filtering policies are silently ignored
+- ❌ **Query Results**: Cross-organizational data is visible despite policies
+- ❌ **Security Boundaries**: No organizational isolation occurs
+
+### Impact on Test Design
+
+**What This Means for Testing**:
+
+- **PGlite**: Business logic only - cannot validate security boundaries
+- **Security Testing**: Must use pgTAP with real PostgreSQL for RLS validation
+- **Architecture**: Dual-track approach required (not optional)
+
+**Correct Test Categorization**:
+
+- ✅ PGlite: Database constraints, business rules, data relationships
+- ❌ PGlite: Organizational isolation, permission boundaries, security policies
+- ✅ pgTAP: All RLS policy validation and security boundary testing
+
 ### Memory-Safe Usage Example (REQUIRED PATTERN)
 
 **Reference**: Integration Testing Archetype
 
 ```typescript
-// ✅ CORRECT: Memory-safe integration testing
+// ✅ CORRECT: Memory-safe integration testing (business logic only)
 import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
 import { sql } from "drizzle-orm";
 
-test("database constraints with RLS", async ({ workerDb }) => {
+test("database constraints and business logic", async ({ workerDb }) => {
   await withIsolatedTest(workerDb, async (db) => {
-    // Set RLS context
-    await db.execute(sql`SET app.current_organization_id = 'test-org'`);
-
-    // Create test data - RLS handles organizational scoping
+    // Create test data with explicit organizationId (PGlite cannot enforce RLS)
     const [machine] = await db
       .insert(schema.machines)
-      .values({ name: "Test Machine" })
+      .values({
+        name: "Test Machine",
+        organizationId: "test-org", // Must be explicit - no RLS enforcement
+      })
       .returning();
 
-    // Test foreign key constraints with RLS
+    // Test foreign key constraints and business logic
     const [issue] = await db
       .insert(schema.issues)
       .values({
         title: "Test Issue",
         machineId: machine.id,
-        // No organizationId needed - RLS handles it
+        organizationId: "test-org", // Required - PGlite ignores RLS policies
       })
       .returning();
 
-    expect(issue.organizationId).toBe("test-org"); // RLS automatic
+    expect(issue.organizationId).toBe("test-org"); // Explicit assignment
+    expect(issue.machineId).toBe(machine.id); // FK constraint works
     // Automatic cleanup via transaction rollback
   });
 });
@@ -135,13 +164,13 @@ test("BAD: Multiple instances", async () => {
   // Multiplies memory usage, causes lockups
 });
 
-// ❌ COORDINATION COMPLEXITY: Manual organizational management
+// ❌ COORDINATION COMPLEXITY: Unnecessary organizational management
 test("BAD: Manual coordination", async () => {
   const org = await db.insert(organizations).values({...});
   const user = await db.insert(users).values({
     organizationId: org.id, // Manual coordination
   });
-  // Complex, error-prone, misses RLS benefits
+  // Complex, error-prone for business logic tests
 });
 ```
 

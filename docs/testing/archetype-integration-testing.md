@@ -1,9 +1,21 @@
 # Integration Testing Archetype
 
 **Agent**: `integration-test-architect`  
-**Purpose**: Full-stack integration testing with memory-safe PGlite and RLS context  
-**Characteristics**: Real database operations, organizational scoping, transaction isolation  
+**Purpose**: Full-stack integration testing with memory-safe PGlite (business logic only)  
+**Characteristics**: Real database operations, business logic validation, transaction isolation  
 **Critical**: Memory safety patterns prevent system lockups
+
+> ## ⚠️ CRITICAL: PGlite RLS Limitations
+>
+> **PGlite cannot enforce RLS policies** - it creates them but ignores them during queries.
+>
+> **This archetype is for**:
+>
+> - ✅ Business logic and database constraints
+> - ✅ Data relationships and workflows
+> - ❌ **NOT for security boundaries or organizational isolation**
+>
+> **For RLS testing**: Use Security Testing Archetype with pgTAP + real PostgreSQL.
 
 ---
 
@@ -48,7 +60,7 @@ test("integration test", async ({ workerDb }) => {
 - Multi-table operations
 - Complete user workflows
 - Schema constraint validation
-- RLS context testing
+- Data relationships and foreign keys
 
 ❌ **Wrong archetype for**:
 
@@ -56,6 +68,8 @@ test("integration test", async ({ workerDb }) => {
 - UI component rendering → Use Unit Testing Archetype
 - Security boundaries → Use Security Testing Archetype
 - RLS policy validation → Use Security Testing Archetype
+- **Organizational isolation → Use Security Testing Archetype**
+- **Cross-org data leakage testing → Use Security Testing Archetype**
 
 ---
 

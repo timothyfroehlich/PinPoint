@@ -78,6 +78,25 @@ test("integration test", async ({ workerDb }) => {
 **Integration tests**: Real database calls with RLS context → @docs/testing/archetype-integration-testing.md  
 **pgTAP RLS tests**: Native PostgreSQL policy validation → @docs/testing/pgtap-rls-testing.md
 
+### 🚨 CRITICAL: PGlite RLS Limitations
+
+> **⚠️ PGlite Does NOT Enforce RLS Policies**
+>
+> **Key Facts**:
+>
+> - ✅ `CREATE POLICY` and `ALTER TABLE ENABLE ROW LEVEL SECURITY` succeed
+> - ❌ **Data filtering policies are completely ignored during queries**
+> - ❌ Cross-organizational data leakage occurs despite policies existing
+> - ❌ `USING` clauses have no effect on result sets
+>
+> **Impact**:
+>
+> - **PGlite tests**: Business logic only - cannot validate security boundaries
+> - **Security testing**: Must use pgTAP with real PostgreSQL
+> - **Architecture**: Dual-track approach required, not optional
+>
+> This is a fundamental limitation, not a configuration issue.
+
 ---
 
 ## 🔐 Authentication Testing
@@ -131,6 +150,16 @@ test("form submission calls server action", async () => {
 ---
 
 ## 🛡️ Security & Permission Testing
+
+> **⚠️ PGlite RLS Limitation Warning**  
+> **PGlite cannot enforce RLS policies** - it creates them but ignores them during queries. The patterns below test **application-level security** only.
+>
+> **For database-level RLS validation**, use pgTAP with real PostgreSQL:
+>
+> - ✅ pgTAP tests (`npm run test:rls`) - Actual RLS policy enforcement
+> - ❌ PGlite tests - Business logic only, RLS policies silently ignored
+>
+> See [Dual-Track Testing Strategy](../testing/dual-track-testing-strategy.md#critical-pglite-rls-limitations) for details.
 
 ### Multi-Tenant Scoping Tests with SEED_TEST_IDS
 
