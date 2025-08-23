@@ -69,18 +69,18 @@ You are an elite database architect specializing in **Drizzle ORM optimization**
 ```typescript
 // ✅ Move application logic to database level
 export const users = pgTable("users", {
-  firstName: text("first_name").notNull(),
-  lastName: text("last_name").notNull(),
+  firstName: text().notNull(),
+  lastName: text().notNull(),
 
   // Generated column for full name
-  fullName: text("full_name").generatedAlwaysAs(
+  fullName: text().generatedAlwaysAs(
     sql`${users.firstName} || ' ' || ${users.lastName}`,
     { mode: "stored" },
   ),
 
   // Full-text search vector
-  searchVector: tsvector("search_vector").generatedAlwaysAs(
-    sql`setweight(to_tsvector('english', ${users.firstName}), 'A') || 
+  searchVector: tsvector().generatedAlwaysAs(
+    sql`setweight(to_tsvector('english', ${users.firstName}), 'A') ||
         setweight(to_tsvector('english', ${users.lastName}), 'B')`,
     { mode: "stored" },
   ),
@@ -100,9 +100,9 @@ const users = await db.query.users.findMany({
 export const issues = pgTable(
   "issues",
   {
-    title: text("title").notNull(),
-    createdAt: timestamp("created_at").defaultNow(),
-    organizationId: text("organization_id").notNull(),
+  title: text().notNull(),
+  createdAt: timestamp().defaultNow(),
+  organizationId: text().notNull(),
   },
   (table) => ({
     // Modern syntax with column-specific sorting
@@ -123,20 +123,20 @@ export const issues = pgTable(
 ```typescript
 // ✅ Native vector support (pg_vector)
 export const documents = pgTable("documents", {
-  content: text("content").notNull(),
-  embedding: vector("embedding", { dimensions: 1536 }),
+  content: text().notNull(),
+  embedding: vector({ dimensions: 1536 }),
 });
 
 // ✅ Native geometry support (PostGIS)
 export const locations = pgTable("locations", {
-  name: text("name").notNull(),
-  coordinates: geometry("coordinates", { type: "point", srid: 4326 }),
+  name: text().notNull(),
+  coordinates: geometry({ type: "point", srid: 4326 }),
 });
 
 // ✅ Native JSON operations
 export const analytics = pgTable("analytics", {
-  data: jsonb("data").notNull(),
-  extractedValue: text("extracted_value").generatedAlwaysAs(
+  data: jsonb().notNull(),
+  extractedValue: text().generatedAlwaysAs(
     sql`(${analytics.data}->>'key')::text`,
     { mode: "stored" },
   ),
@@ -225,7 +225,7 @@ const getOptimizedIssues = async (orgId: string) => {
     },
     extras: {
       commentCount: sql<number>`(
-        SELECT COUNT(*) FROM ${comments} 
+        SELECT COUNT(*) FROM ${comments}
         WHERE ${comments.issueId} = ${issues.id}
       )`.as("comment_count"),
     },

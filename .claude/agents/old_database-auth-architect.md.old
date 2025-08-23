@@ -8,15 +8,15 @@ color: green
 
 # Database & Auth Integration Architect
 
-**Purpose**: Specialized Claude Code agent for RLS implementation, Supabase SSR auth integration, and database security architecture  
-**Context**: Phase 2+ implementation focusing on database-level multi-tenancy and authentication  
+**Purpose**: Specialized Claude Code agent for RLS implementation, Supabase SSR auth integration, and database security architecture
+**Context**: Phase 2+ implementation focusing on database-level multi-tenancy and authentication
 **Expertise**: Supabase RLS + Drizzle ORM + @supabase/ssr patterns with August 2025 best practices
 
 ## 🎯 Core Expertise
 
-**Primary Focus**: Database security, authentication integration, and multi-tenant architecture  
-**Key Technologies**: Supabase RLS, Drizzle ORM, @supabase/ssr, PostgreSQL security, app_metadata  
-**Security Philosophy**: Database-level enforcement over application-level filtering  
+**Primary Focus**: Database security, authentication integration, and multi-tenant architecture
+**Key Technologies**: Supabase RLS, Drizzle ORM, @supabase/ssr, PostgreSQL security, app_metadata
+**Security Philosophy**: Database-level enforcement over application-level filtering
 **Architecture Approach**: Supabase-native patterns with Drizzle type safety
 
 ### **Current Tech Stack Knowledge (August 2025)**
@@ -177,9 +177,9 @@ import { pgTable, text, timestamp, boolean } from "drizzle-orm/pg-core";
 export const organizations = pgTable(
   "organizations",
   {
-    id: text("id").primaryKey(),
-    name: text("name").notNull(),
-    createdAt: timestamp("created_at").defaultNow(),
+  id: text().primaryKey(),
+  name: text().notNull(),
+  createdAt: timestamp().defaultNow(),
   },
   (table) => ({
     // RLS will be enabled via migration scripts
@@ -187,13 +187,13 @@ export const organizations = pgTable(
 ).enableRLS(); // Drizzle v0.32+ RLS metadata
 
 export const issues = pgTable("issues", {
-  id: text("id").primaryKey(),
-  title: text("title").notNull(),
-  organizationId: text("organization_id")
+  id: text().primaryKey(),
+  title: text().notNull(),
+  organizationId: text()
     .notNull()
     .references(() => organizations.id),
-  createdBy: text("created_by").notNull(),
-  createdAt: timestamp("created_at").defaultNow(),
+  createdBy: text().notNull(),
+  createdAt: timestamp().defaultNow(),
 }).enableRLS();
 ```
 
@@ -443,10 +443,10 @@ export const issues = pgTable("issues", {
   organizationId: text("organization_id").notNull(),
   // Generated column example - computed at database level
   urgencyScore: integer("urgency_score").generatedAlwaysAs(
-    sql`CASE 
+    sql`CASE
       WHEN priority_level = 'critical' THEN 100
-      WHEN priority_level = 'high' THEN 75  
-      ELSE 50 
+      WHEN priority_level = 'high' THEN 75
+      ELSE 50
     END`,
   ),
 }).enableRLS();

@@ -1,8 +1,8 @@
 # Phase 1: Complete Prisma Removal - Execution Plan
 
-**Context:** Final 15% of Prisma-to-Drizzle migration - converting service layer and cleaning infrastructure  
-**Status:** ✅ **COMPLETE** (2025-08-18) - All Prisma references removed, services converted to Drizzle-only  
-**Dependency Chain:** This phase MUST complete before RLS implementation (technical impossibility with dual ORMs) ✅  
+**Context:** Final 15% of Prisma-to-Drizzle migration - converting service layer and cleaning infrastructure
+**Status:** ✅ **COMPLETE** (2025-08-18) - All Prisma references removed, services converted to Drizzle-only
+**Dependency Chain:** This phase MUST complete before RLS implementation (technical impossibility with dual ORMs) ✅
 **Complexity:** Intensive focus phase requiring systematic service layer modernization ✅
 
 ---
@@ -100,18 +100,18 @@ rg "PrismaClient|@prisma" src/server/services/SERVICE_NAME.ts
 ```typescript
 // ✅ Move computed logic to database level
 export const users = pgTable("users", {
-  firstName: text("first_name").notNull(),
-  lastName: text("last_name").notNull(),
+  firstName: text().notNull(),
+  lastName: text().notNull(),
 
   // Generated column for full name
-  fullName: text("full_name").generatedAlwaysAs(
+  fullName: text().generatedAlwaysAs(
     sql`${users.firstName} || ' ' || ${users.lastName}`,
     { mode: "stored" },
   ),
 
   // Full-text search vector
   searchVector: tsvector("search_vector").generatedAlwaysAs(
-    sql`setweight(to_tsvector('english', ${users.firstName}), 'A') || 
+    sql`setweight(to_tsvector('english', ${users.firstName}), 'A') ||
         setweight(to_tsvector('english', ${users.lastName}), 'B')`,
     { mode: "stored" },
   ),
@@ -125,9 +125,9 @@ export const users = pgTable("users", {
 export const issues = pgTable(
   "issues",
   {
-    title: text("title").notNull(),
-    createdAt: timestamp("created_at").defaultNow(),
-    organizationId: text("organization_id").notNull(),
+    title: text().notNull(),
+    createdAt: timestamp().defaultNow(),
+    organizationId: text().notNull(),
   },
   (table) => ({
     // Modern column-specific sorting
@@ -594,11 +594,12 @@ Upon Phase 1 completion, verify readiness for RLS implementation:
 
 ## 🏁 PHASE 1 COMPLETION STATUS
 
-**Status:** ✅ **COMPLETE** (2025-08-18)  
-**Duration:** Service layer conversion and infrastructure cleanup completed  
+**Status:** ✅ **COMPLETE** (2025-08-18)
+**Duration:** Service layer conversion and infrastructure cleanup completed
 **Outcome:** 100% Prisma removal achieved - Clean Drizzle-only architecture established
 
 ### Accomplished ✅
+
 - **Service Layer**: All services converted to Drizzle-only dependency injection
 - **Infrastructure**: tRPC context simplified to single database client
 - **Test Mocks**: All updated to modern Vitest patterns with vi.hoisted()
@@ -607,10 +608,12 @@ Upon Phase 1 completion, verify readiness for RLS implementation:
 - **Naming**: DrizzleRoleService → RoleService, DrizzleSingleton → DatabaseSingleton
 
 ### Technical Validation ✅
+
 - **TypeScript compilation**: PASSES
 - **Zero Prisma references**: `rg -c "prisma" src/` returns 0
 - **Service architecture**: Single Drizzle client throughout
 - **Test infrastructure**: Memory-safe patterns maintained
 
 ### Ready for Phase 2: RLS Implementation
+
 With Phase 1 complete, the project has a clean single-ORM architecture required for Row-Level Security implementation.

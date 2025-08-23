@@ -331,14 +331,14 @@ SEED_TEST_IDS.MOCK_PATTERNS.MACHINE; // "mock-machine-1"
 
 Current development patterns (post-migration):
 @docs/INDEX.md
-@docs/quick-reference/INDEX.md
-@docs/quick-reference/testing-patterns.md
+docs/quick-reference/INDEX.md
+docs/quick-reference/testing-patterns.md
 @docs/quick-reference/api-security-patterns.md
 @docs/quick-reference/typescript-strictest-patterns.md
 
 **Active migration execution:**
-@migration-plan-v2/ - Current migration plan being executed (temporary mess expected)
-@docs/quick-reference/ - Patterns for implementing current phase work
+migration-plan-v2/ - Current migration plan being executed (temporary mess expected)
+docs/quick-reference/ - Patterns for implementing current phase work
 
 **Priority approach:**
 Execute the migration plan phases systematically - tests will be fixed in Phase 3 as planned
