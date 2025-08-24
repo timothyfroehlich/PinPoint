@@ -27,6 +27,8 @@ PinPoint has completed the Prisma-to-Drizzle migration with full removal of all 
 
 ### Core Documentation
 
+- [`NON_NEGOTIABLES.md`](./NON_NEGOTIABLES.md) - **CRITICAL**: File content patterns that MUST be enforced during code reviews
+- [`NON_NEGOTIABLES_EXAMPLES.md`](./NON_NEGOTIABLES_EXAMPLES.md) - Detailed code examples for non-negotiable patterns
 - [`latest-updates/`](./latest-updates/) - **CRITICAL**: Post-training tech stack updates (August 2025)
 - [`architecture/`](./architecture/) - System design, patterns, and current state
 - [`developer-guides/`](./developer-guides/) - Technology-specific implementation guides

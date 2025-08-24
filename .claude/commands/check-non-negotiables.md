@@ -6,7 +6,7 @@ description: Check files for non-negotiable pattern violations with automated de
 
 # Check Non-Negotiables
 
-Analyze specified files for violations of PinPoint's critical non-negotiable patterns from @NON_NEGOTIABLES.md.
+Analyze specified files for violations of PinPoint's critical non-negotiable patterns from @docs/NON_NEGOTIABLES.md.
 
 ## File Scope Arguments
 

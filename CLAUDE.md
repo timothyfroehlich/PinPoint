@@ -2,7 +2,7 @@
 
 ## 🚨 CRITICAL: Non-Negotiable Patterns 🚨
 
-**ENFORCEMENT REFERENCE:** @NON_NEGOTIABLES.md - Static analysis patterns that MUST be enforced during file reviews
+**ENFORCEMENT REFERENCE:** @docs/NON_NEGOTIABLES.md - Static analysis patterns that MUST be enforced during file reviews
 
 **KEY VIOLATIONS:**
 

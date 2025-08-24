@@ -20,7 +20,7 @@ export default tseslint.config(
   ...tseslint.configs.stylistic,
   ...tseslint.configs.strictTypeChecked,
   ...tseslint.configs.stylisticTypeChecked,
-  
+
   {
     // Enable type-aware linting with multi-config support
     languageOptions: {
@@ -43,7 +43,7 @@ export default tseslint.config(
       "@next/next": nextPlugin,
       promise: promisePlugin,
       "unused-imports": unusedImportsPlugin,
-      // Phase 0: Modern security and quality plugins  
+      // Phase 0: Modern security and quality plugins
       vitest: vitestPlugin,
       security: securityPlugin,
       "@microsoft/sdl": sdlPlugin,
@@ -54,38 +54,40 @@ export default tseslint.config(
       ...nextPlugin.configs["core-web-vitals"].rules,
 
       // Phase 0: Modern security and quality rules
-      
+
       // Security hardening (Phase 0)
       // Critical security vulnerabilities
       "security/detect-eval-with-expression": "error",
       "security/detect-non-literal-require": "error",
-      "security/detect-child-process": "error", 
+      "security/detect-child-process": "error",
       "security/detect-object-injection": "warn", // Many false positives in TypeScript
       "security/detect-unsafe-regex": "error",
       "security/detect-possible-timing-attacks": "warn", // Can be noisy in tests
-      
+
       // Web security essentials
       "@microsoft/sdl/no-inner-html": "error",
       "@microsoft/sdl/no-document-write": "error",
-      "@microsoft/sdl/no-insecure-url": "error", 
+      "@microsoft/sdl/no-insecure-url": "error",
       "@microsoft/sdl/no-postmessage-star-origin": "error",
-      
+
       // Test quality (only for test files - will be properly scoped)
       "vitest/consistent-test-it": "off", // Enable only in test files
-      "vitest/no-disabled-tests": "off",  // Enable only in test files
-      "vitest/no-focused-tests": "off",   // Enable only in test files
-      
+      "vitest/no-disabled-tests": "off", // Enable only in test files
+      "vitest/no-focused-tests": "off", // Enable only in test files
+
       // Custom Drizzle safety (replaces abandoned plugin)
       "no-restricted-syntax": [
         "error",
         {
-          "selector": "CallExpression[callee.property.name='delete']:not([arguments.0])",
-          "message": "DELETE operations must include WHERE clause"
+          selector:
+            "CallExpression[callee.property.name='delete']:not([arguments.0])",
+          message: "DELETE operations must include WHERE clause",
         },
         {
-          "selector": "CallExpression[callee.property.name='update']:not([arguments.0])",
-          "message": "UPDATE operations must include WHERE clause"
-        }
+          selector:
+            "CallExpression[callee.property.name='update']:not([arguments.0])",
+          message: "UPDATE operations must include WHERE clause",
+        },
       ],
 
       // Rule to enforce use of validated env object
@@ -229,7 +231,7 @@ export default tseslint.config(
       "@typescript-eslint/unbound-method": "off",
       // Allow dynamic imports in tests (can't use import type)
       "@typescript-eslint/consistent-type-imports": "off",
-      
+
       // Phase 0: Test quality rules (enabled for test files)
       "vitest/consistent-test-it": "error",
       "vitest/no-disabled-tests": "warn",
@@ -326,6 +328,7 @@ export default tseslint.config(
       "test-results/**/*", // Playwright test results
       "src/_archived_frontend/**/*",
       ".claude/**/*",
+      ".archived-tests-2025-08-23/**/*", // Archived test files
       "add-location-seed.ts", // Temporary script file
       "next-env.d.ts", // Next.js generated file
       "eslint.config.js",

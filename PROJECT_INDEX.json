@@ -1,5 +1,5 @@
 {
-  "at": "2025-08-23T18:09:47.846304",
+  "at": "2025-08-23T19:24:43.179102",
   "root": ".",
   "tree": [
     ".",
@@ -25,14 +25,13 @@
   ],
   "stats": {
     "total_files": 386,
-    "total_directories": 172,
-    "fully_parsed": { "javascript": 5, "typescript": 348, "shell": 3 },
-    "listed_only": { "json": 12, "shell": 3, "sql": 15 },
-    "markdown_files": 203
+    "total_directories": 321,
+    "fully_parsed": { "typescript": 348, "javascript": 5, "shell": 3 },
+    "listed_only": { "json": 12, "sql": 15, "shell": 3 },
+    "markdown_files": 206
   },
   "f": {
-    "analyze-type-warnings.js": ["j", ["analyzeTypeWarnings:9:async ()::"]],
-    "e2e/helpers/auth.ts": [
+    ".archived-tests-2025-08-23/e2e/helpers/auth.ts": [
       "t",
       [
         "loginAsTechnician:30:async (page:Page):loginAsUserWithPermissions:",
@@ -43,7 +42,7 @@
         "setupTestIssue:129:async (page:Page, issueData?:Record<string, unknown>,)::"
       ]
     ],
-    "e2e/helpers/unified-dashboard.ts": [
+    ".archived-tests-2025-08-23/e2e/helpers/unified-dashboard.ts": [
       "t",
       [
         "loginAsUser:7:async (page:Page, userType:\"Test Admin\" | \"Test Member\" | \"Test Player\", maxRetries:number = 3,):Promise<void>:clearSession,waitForAuthentication:",
@@ -57,7 +56,7 @@
         "clearSession:222:async (page:Page):Promise<void>::"
       ]
     ],
-    "e2e/issue-confirmation.spec.ts": [
+    ".archived-tests-2025-08-23/e2e/issue-confirmation.spec.ts": [
       "t",
       {
         "IssueConfirmationPage": [
@@ -77,7 +76,7 @@
         ]
       }
     ],
-    "e2e/roles-permissions.spec.ts": [
+    ".archived-tests-2025-08-23/e2e/roles-permissions.spec.ts": [
       "t",
       {
         "RolePermissionPage": [
@@ -96,6 +95,784 @@
         ]
       }
     ],
+    ".archived-tests-2025-08-23/sr/app/api/dev/__tests__/users-simple.test.ts": [
+      "t",
+      ["setNodeEnv:7:(value:string)::"]
+    ],
+    ".archived-tests-2025-08-23/sr/app/dashboard/_components/__tests__/PrimaryAppBar.test.tsx": [
+      "t",
+      ["MockAuthProvider:48:({ children, user = createMockSupabaseUser()::"]
+    ],
+    ".archived-tests-2025-08-23/sr/app/machines/components/MachineCard.test.tsx": [
+      "t",
+      [
+        "createMockMachine:36:(overrides:Partial<MachineWithRelations> = {},):MachineWithRelations::",
+        "createMachineWithoutCustomName:120:():MachineWithRelations:createMockMachine:"
+      ],
+      { "const": ["383", []] }
+    ],
+    ".archived-tests-2025-08-23/sr/components/issues/__tests__/MachineSelector.test.tsx": [
+      "t",
+      [
+        "createMockMachine:25:(overrides:Partial<MachineForIssues> = {},):MachineForIssues::",
+        "createMockMachines:38:(count = 3):MachineForIssues[]:createMockMachine:"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/components/locations/__tests__/LocationDetailView.test.tsx": [
+      "t",
+      ["createMockLocation:57:(overrides:any = {})::"]
+    ],
+    ".archived-tests-2025-08-23/sr/components/locations/__tests__/MachineGrid.test.tsx": [
+      "t",
+      [
+        "createMockMachine:16:(overrides:any = {})::",
+        "findMachineCard:261:(name:string)::"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/components/permissions/__tests__/PermissionGate.test.tsx": [
+      "t",
+      [
+        "expectProtectedContentVisible:40:()::",
+        "expectProtectedContentHidden:46:()::",
+        "expectEditButtonVisible:52:()::",
+        "expectAdminPanelHidden:58:()::",
+        "expectCreateMachineVisible:64:()::",
+        "expectFallbackVisible:70:()::",
+        "expectFallbackHidden:76:()::",
+        "expectPermissionCalled:82:(mock:ReturnType<typeof vi.fn>, permission:string, times = 1,)::",
+        "expectEmptyBody:91:()::",
+        "hasPermission:525:(permission:string)::"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/components/react-environment.test.tsx": [
+      "t",
+      ["SimpleComponent:13:()::"]
+    ],
+    ".archived-tests-2025-08-23/sr/hooks/__tests__/usePermissions.test.tsx": [
+      "t",
+      [
+        "createWrapper:28:(options:{ userPermissions?:string[]; userRole?:string; session?:any; injectPermissionDeps?:boolean; queryOptions?:{ isLoading?:boolean; isError?:boolean; error?:any }; } = {},)::",
+        "DynamicWrapper:233:({ children, permissions, }:{ children:ReactNode; permissions:string[]; })::"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/integration-t/comment.integration.test.ts": [
+      "t",
+      ["withCommentBusinessLogicSetup:83:async (workerDb, testFn)::"]
+    ],
+    ".archived-tests-2025-08-23/sr/integration-t/cross-org-isolation.test.ts": [
+      "t",
+      [
+        "integration:15:(PGlite limitation)::",
+        "createMinimalTestData:47:async (db:typeof schema, primaryOrgId:string, competitorOrgId:string,)::"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/integration-t/machine.location.integration.test.ts": [
+      "t",
+      ["setupTestData:55:async (db:TestDatabase)::"]
+    ],
+    ".archived-tests-2025-08-23/sr/integration-t/machine.owner.integration.test.ts": [
+      "t",
+      [
+        "withMachineOwnerBusinessLogicSetup:81:async (workerDb, testFn):setupTestData:",
+        "setupTestData:95:async (db:TestDatabase)::"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/integration-t/model.core.integration.test.ts": [
+      "t",
+      ["createTestContext:80:async (db:TestDatabase, organizationId:string)::"]
+    ],
+    ".archived-tests-2025-08-23/sr/integration-t/pinballMap.integration.test.ts": [
+      "t",
+      [
+        "getSimpleSeededData:38:async (db:any)::",
+        "createPinballMapTestContext:65:(db:TestDatabase, organizationId:string, userId:string, permissions:string[] = [\"organization:manage\", \"location:edit\"],):TRPCContext:setMockPermissions:",
+        "setMockPermissions:171:(permissions:string[])::"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/integration-t/schema-migration-validation.integration.test.ts": [
+      "t",
+      ["createTestContext:30:async (_db:TestDatabase)::"]
+    ],
+    ".archived-tests-2025-08-23/sr/lib/common/__tests__/organizationValidation.test.ts": [
+      "t",
+      [
+        "createMockMembership:47:(overrides:Partial<OrganizationMembership> = {},):OrganizationMembership::",
+        "createResourceOwnershipInput:68:(overrides:Partial<ResourceOwnershipInput> = {},):ResourceOwnershipInput::",
+        "createMembershipValidationInput:80:(overrides:Partial<MembershipValidationInput> = {},):MembershipValidationInput:createMockMembership:",
+        "createCrossOrganizationAccessInput:91:(overrides:Partial<CrossOrganizationAccessInput> = {},):CrossOrganizationAccessInput::"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/lib/issues/__tests__/assignmentValidation.test.ts": [
+      "t",
+      [
+        "createTestUser:46:(overrides:Partial<User> = {}):User::",
+        "createTestMembership:53:(overrides:Partial<Membership> = {},):Membership:createTestUser:",
+        "createTestMachine:64:(overrides:Partial<Machine> = {}):Machine::",
+        "createTestIssue:73:(overrides:Partial<Issue> = {}):Issue::",
+        "createTestIssueStatus:84:(overrides:Partial<IssueStatus> = {},):IssueStatus::",
+        "createTestPriority:94:(overrides:Partial<Priority> = {}):Priority::",
+        "createTestContext:102:(overrides:Partial<AssignmentValidationContext> = {},):AssignmentValidationContext::"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/lib/issues/__tests__/creationValidation.test.ts": [
+      "t",
+      [
+        "createMockMachine:27:(overrides:Partial<MachineOwnershipInput[\"machine\"]> = {},):MachineOwnershipInput[\"machine\"]::",
+        "createMockDefaults:39:(overrides:Partial<IssueCreationDefaults> = {},):IssueCreationDefaults::",
+        "createPublicIssueInput:55:(overrides:Partial<PublicIssueCreationInput> = {},):PublicIssueCreationInput::",
+        "createAuthenticatedIssueInput:65:(overrides:Partial<AuthenticatedIssueCreationInput> = {},):AuthenticatedIssueCreationInput::",
+        "createContext:75:(overrides:Partial<IssueCreationContext> = {},):IssueCreationContext::"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/lib/issues/__tests__/statusValidation.test.ts": [
+      "t",
+      [
+        "createMockStatus:23:(overrides:Partial<IssueStatus> = {}):IssueStatus::",
+        "createStatusSet:32:():::"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/lib/pinballmap/__tests__/apiMocker.ts": [
+      "t",
+      {
+        "PinballMapAPIMocker": [
+          "12",
+          [
+            "constructor:14:()::",
+            "start:22:():void::",
+            "stop:65:():void::",
+            "__init__:14:()::"
+          ]
+        ]
+      }
+    ],
+    ".archived-tests-2025-08-23/sr/lib/users/__tests__/roleManagementValidation.test.ts": [
+      "t",
+      [
+        "createTestUser:43:(overrides:Partial<User> = {}):User::",
+        "createTestRole:50:(overrides:Partial<Role> = {}):Role::",
+        "createAdminRole:59:(overrides:Partial<Role> = {}):Role::",
+        "createMembership:68:(overrides:Partial<Membership> = {}):Membership:createTestRole,createTestUser:",
+        "createAdminMembership:78:(overrides:Partial<Membership> = {},):Membership:createAdminRole,createTestUser:",
+        "createTestContext:94:(overrides:Partial<RoleManagementContext> = {},):RoleManagementContext::"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/server/api/__tests__/msw.trpc.test.ts": [
+      "t",
+      ["creation:43:(without executing them)::"]
+    ],
+    ".archived-tests-2025-08-23/sr/server/api/__tests__/trpc.permission.test.ts": [
+      "t",
+      [
+        "supabaseUserToSession:18:(user:any)::",
+        "createMockTRPCContext:51:(permissions:string[] = [], organizationId:string = SEED_TEST_IDS.ORGANIZATIONS.primary, userId:string = SEED_TEST_IDS.USERS.ADMIN,):VitestMockContext & {\n  membership:{ roleId:string | null };\n  userPermissions:string[];\n}::",
+        "createCompetitorOrgContext:123:(permissions:string[] = []):createMockTRPCContext:"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/server/api/routers/__tests__/collection.test.ts": [
+      "t",
+      ["setupTestData:174:async (db:TestDatabase)::"]
+    ],
+    ".archived-tests-2025-08-23/sr/server/api/routers/__tests__/issue.confirmation.test.ts": [
+      "t",
+      [
+        "createMockTRPCContext:316:(permissions:string[] = [], context?:TestMockContext,):OrganizationTRPCContext::"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/server/api/routers/__tests__/issue.integration.test.ts": [
+      "t",
+      [
+        "createTestContext:37:async (txDb:any, organizationId:string, userId:string,)::"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/server/api/routers/__tests__/issue.notification.test.ts": [
+      "t",
+      [
+        "getMockUser:58:(context:TestMockContext)::",
+        "getMockMachine:64:(context:TestMockContext)::",
+        "getMockIssue:71:(context:TestMockContext)::"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/server/api/routers/__tests__/issue.test.ts": [
+      "t",
+      [
+        "createTestIssue:84:async (db:TestDatabase, overrides:Partial<typeof schema.issues.$inferInsert> = {},)::",
+        "createPublicContext:110:async (db:TestDatabase, organizationId:string,):Promise<TRPCContext>::"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/server/api/routers/__tests__/model.core.test.ts": [
+      "t",
+      ["setupTestData:74:async (db:TestDatabase)::"]
+    ],
+    ".archived-tests-2025-08-23/sr/server/api/routers/__tests__/notification.test.ts": [
+      "t",
+      ["setupTestData:66:async (db:TestDatabase)::"]
+    ],
+    ".archived-tests-2025-08-23/sr/server/api/routers/utils/__tests__/commentService.integration.test.ts": [
+      "t",
+      ["createTestContext:72:async (db:TestDatabase, organizationId:string)::"]
+    ],
+    ".archived-tests-2025-08-23/sr/server/api/routers/utils/__tests__/commentValidation.test.ts": [
+      "t",
+      [
+        "createValidCommentData:51:(overrides:Partial<CommentData> = {},):CommentData::",
+        "createValidContext:64:(overrides:Partial<ValidationContext> = {},):ValidationContext::"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/server/auth/__tests__/permissions.constants.test.ts": [
+      "t",
+      ["hasCycle:125:(permission:string):boolean:hasCycle:"]
+    ],
+    ".archived-tests-2025-08-23/sr/server/auth/__tests__/uploadAuth.test.ts": [
+      "t",
+      [
+        "createMockSupabaseUser:58:(overrides:Partial<PinPointSupabaseUser> = {}, organizationId:string = SEED_TEST_IDS.ORGANIZATIONS.primary,):PinPointSupabaseUser::",
+        "createCompetitorOrgUser:88:(overrides:Partial<PinPointSupabaseUser> = {},):PinPointSupabaseUser:createMockSupabaseUser:",
+        "createMockRequest:100:(headers:Record<string, string> = {}):NextRequest::",
+        "createMockDrizzleClient:108:():DrizzleClient::",
+        "createMockOrganization:121:(organizationId:string = SEED_TEST_IDS.ORGANIZATIONS.primary,)::",
+        "createCompetitorOrganization:138:():createMockOrganization:",
+        "createMockMembership:142:(userId:string = SEED_TEST_IDS.USERS.ADMIN, organizationId:string = SEED_TEST_IDS.ORGANIZATIONS.primary, permissions:string[] = [\"upload:create\", \"file:manage\"],)::",
+        "createCompetitorMembership:163:(permissions:string[] = [\"upload:create\"]):createMockMembership:"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/server/db/__tests__/drizzle-singleton.test.ts": [
+      "t",
+      [
+        "importDrizzleModule:94:async ()::",
+        "resetSingleton:99:()::",
+        "createMockDrizzleInstance:28:()::"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/server/db/__tests__/drizzle-test-helpers.ts": [
+      "t",
+      [
+        "configureDevelopmentMocks:54:():void:createLocalhost5432URL:",
+        "configureProductionMocks:81:():void:createRemoteURL:",
+        "configureCIMocks:111:():void:createRemoteURL:",
+        "configureCustomEnvironment:144:(config:EnvironmentConfig):void::",
+        "createLocalhost5432URL:182:(database = \"postgres\"):string::",
+        "createRemoteURL:202:(host:string, database = \"postgres\"):string::",
+        "create127001URL:221:(database = \"postgres\"):string::",
+        "expectSSLConfiguration:243:(sslSetting:SSLSetting):void::",
+        "expectPoolConfiguration:266:(maxConnections:number):void::",
+        "expectTimeoutConfiguration:291:(idle:number, connect:number,):void::",
+        "expectLoggingConfiguration:318:(enabled:boolean):void::",
+        "importDrizzleModule:348:async ():Promise<::",
+        "setupDrizzleTestEnvironment:449:(customEnvSetup?:()::",
+        "validateDrizzleConfiguration:489:(expectedConfig:{ ssl:SSLSetting; maxConnections:number; idleTimeout:number; connectTimeout:number; logging:boolean; }):void:expectLoggingConfiguration,expectPoolConfiguration,expectSSLConfiguration,expectTimeoutConfiguration:",
+        "testSingletonBehavior:521:async (moduleImporter:()::",
+        "createMockPostgresInstance:363:()::",
+        "createMockDrizzleInstance:370:()::"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/server/services/__tests__/roleService.test.ts": [
+      "t",
+      ["createMockDrizzleClient:64:()::"],
+      { "covering": ["4", []] }
+    ],
+    ".archived-tests-2025-08-23/sr/test/VitestTestWrapper.tsx": [
+      "t",
+      [
+        "MockSessionProvider:47:({ children, }:{ children:ReactNode; session:Session | null; }):React.JSX.Element::",
+        "createMockUser:58:(overrides:Partial<User> = {}):User::",
+        "createMockMembership:76:(overrides:Partial<{ id:string; userId:string; organizationId:string; role:string; permissions:string[]; createdAt:Date; updatedAt:Date; }> = {},):::",
+        "createMockSessionHook:111:(session:Session | null, sessionLoading = false,)::",
+        "createMockMembershipQuery:132:(permissions:string[] = [], role = \"Member\", options:{ isLoading?:boolean; isError?:boolean; error?:Error | null; } = {},)::",
+        "createMockSupabaseUser:162:(overrides:Partial<PinPointSupabaseUser> = {},):PinPointSupabaseUser::",
+        "createServerMockContext:218:(overrides:Partial<ServerMockContext> = {},):ServerMockContext:createMockSupabaseUser:",
+        "VitestTestWrapper:317:({ children, session = { user:createMockUser()::"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/test/constants/seed-test-ids.ts": [
+      "t",
+      [
+        "createMockAdminContext:316:():TestMockContext::",
+        "createMockMemberContext:323:(memberNumber:1 | 2 = 1,):TestMockContext::"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/test/context.ts": [
+      "t",
+      ["createTestContext:7:():::"]
+    ],
+    ".archived-tests-2025-08-23/sr/test/database-test-helpers.ts": [
+      "t",
+      [
+        "cleanupTestData:82:async (db:DrizzleClient, testIds:TestDataIds,):Promise<void>::",
+        "createTestOrganization:256:async (db:DrizzleClient, orgType:\"primary\" | \"competitor\" = \"primary\",):Promise<Organization>::",
+        "createTestUser:293:async (db:DrizzleClient, overrides:Partial<User> = {},):Promise<User>::",
+        "createTestUserWithMembership:343:async (db:DrizzleClient, organizationId:string, roleType:\"admin\" | \"manager\" | \"member\" = \"member\", overrides:Partial<User> = {},):Promise<::",
+        "createTestMachine:407:async (db:DrizzleClient, organizationId:string, overrides:Partial<Machine> = {},):Promise<::",
+        "createTestIssue:502:async (db:DrizzleClient, machineId:string, organizationId:string, overrides:Partial<Issue> = {},):Promise<::",
+        "createMultiTenantTestEnvironment:624:async (db:DrizzleClient,):Promise<::"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/test/examples/dual-track-testing-examples.test.ts": [
+      "t",
+      [
+        "calculateIssuePriority:370:(params:{ downtime:number; machineImportance:string; businessImpact:string; }):string::",
+        "escalateIssueIfNeeded:385:async (db:any, issueId:string, metrics:{ downtime:number; customerComplaints:number; revenueImpact:number; },)::",
+        "getIssuesForMachine:427:async (db:any, machineId:string)::",
+        "calculateMaintenanceSchedule:438:(params:{ machineAge:number; usageHours:number; lastMaintenance:Date; })::",
+        "generateOrganizationalReport:463:async (db:any):calculateAvgResolutionTime,getTopMachinesByIssues:",
+        "calculateAvgResolutionTime:477:(issues:any[])::",
+        "getTopMachinesByIssues:490:(issues:any[])::"
+      ],
+      {
+        "ReportingService": [
+          "505",
+          [
+            "constructor:506:(private db:any):groupByPriority:",
+            "generateReport:507:async ()::",
+            "__init__:506:(private db:any):groupByPriority:"
+          ]
+        ]
+      }
+    ],
+    ".archived-tests-2025-08-23/sr/test/factories/roleFactory.ts": [
+      "t",
+      [
+        "create:346:(overrides:Partial<TestOrganization> = {},):TestOrganization::",
+        "createIssuePermissions:93:():TestPermission[]:create:",
+        "createMachinePermissions:104:():TestPermission[]:create:",
+        "createLocationPermissions:113:():TestPermission[]:create:",
+        "createAttachmentPermissions:122:():TestPermission[]:create:",
+        "createAdminPermissions:130:():TestPermission[]:create:",
+        "createAllPermissions:141:():TestPermission[]:createAdminPermissions,createAttachmentPermissions,createIssuePermissions,createLocationPermissions,createMachinePermissions:",
+        "createUnauthenticatedRole:172:(organizationId = \"org-1\",):TestRole:create:",
+        "createMemberRole:184:(organizationId = \"org-1\"):TestRole:create:",
+        "createTechnicianRole:199:(organizationId = \"org-1\"):TestRole:create:",
+        "createAdminRole:220:(organizationId = \"org-1\"):TestRole:create,createAllPermissions:",
+        "createCustomRole:230:(name:string, permissions:TestPermission[], organizationId = \"org-1\",):TestRole:create:",
+        "createSystemRoleSet:244:(organizationId = \"org-1\"):TestRole[]:createAdminRole,createMemberRole,createTechnicianRole,createUnauthenticatedRole:",
+        "createWithMemberCount:253:(memberCount:number, overrides:Partial<TestRole> = {},):TestRole:create:",
+        "createWithRole:526:(roleName:\"Unauthenticated\" | \"User\" | \"Technician\" | \"Admin\", organizationId = \"org-1\",):createWithPermissions,getRolePermissions:",
+        "createWithUser:297:(userId:string, userName:string, userEmail:string, role:TestRole,):TestMembership:create:",
+        "createMultipleForOrganization:316:(organizationId:string, userCount = 3,):TestMembership[]:createSystemRoleSet,createWithUser:",
+        "createWithRoles:360:(name = \"Test Organization\", subdomain = \"test\",):TestOrganization:create,createSystemRoleSet:",
+        "createWithMemberships:375:(name = \"Test Organization\", subdomain = \"test\", memberCount = 3,):TestOrganization:create,createMultipleForOrganization,createSystemRoleSet:",
+        "createMultipleForTesting:396:(count = 2):TestOrganization[]:createWithMemberships:",
+        "createMatrix:419:():Record<string, string[]>::",
+        "getRolePermissions:466:(roleName:string):string[]:createMatrix:",
+        "hasPermission:471:(roleName:string, permission:string):boolean:getRolePermissions:",
+        "getPermissionDependencies:476:():Record<string, string[]>::",
+        "createWithPermissions:497:(permissions:string[], organizationId = \"org-1\",):create,createCustomRole,createWithRole:",
+        "createAdmin:534:(organizationId = \"org-1\"):createWithRole:",
+        "createTechnician:538:(organizationId = \"org-1\"):createWithRole:",
+        "createUser:542:(organizationId = \"org-1\"):createWithRole:",
+        "createUnauthenticated:546:(organizationId = \"org-1\"):createWithRole:"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/test/helpers/archetype-validator.ts": [
+      "t",
+      [
+        "validateTestArchetype:259:(filePath:string, fileContent?:string,):ValidationResult:detectArchetype,validateArchetypeCompliance,validateErrorHandling,validateImportStructure,validateMemorySafety,validatePerformancePatterns,validateRLSContext:",
+        "detectArchetype:307:(content:string, _fileName:string,):number | null::",
+        "validateMemorySafety:345:(content:string, filePath:string, result:ValidationResult,):void:getLineNumber:",
+        "validateRLSContext:413:(content:string, filePath:string, result:ValidationResult,):void::",
+        "validateArchetypeCompliance:459:(content:string, filePath:string, result:ValidationResult,):void::",
+        "validateImportStructure:504:(content:string, filePath:string, result:ValidationResult,):void:getLineNumber:",
+        "validateErrorHandling:554:(content:string, filePath:string, result:ValidationResult,):void::",
+        "validatePerformancePatterns:593:(content:string, filePath:string, result:ValidationResult,):void::",
+        "getLineNumber:644:(content:string, index:number):number::",
+        "validateTestFiles:651:(filePaths:string[],):Map<string, ValidationResult>:validateTestArchetype:",
+        "generateValidationReport:691:(results:Map<string, ValidationResult>,):string::",
+        "validateSingleFile:796:(filePath:string):void:generateValidationReport,validateTestArchetype:"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/test/helpers/createSeededAdminTestContext.ts": [
+      "t",
+      [
+        "createSeededAdminTestContext:72:async (txDb:TestDatabase, organizationId:string, userId:string, options:AdminContextOptions = {},):Promise<SeededAdminTestContext>::"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/test/helpers/createSeededCollectionTestContext.ts": [
+      "t",
+      [
+        "createPublicTestContext:76:async (txDb:TestDatabase, organizationId:string,):Promise<SeededCollectionTestContext>::",
+        "createSeededCollectionTestContext:178:async (txDb:TestDatabase, organizationId:string, userId:string, options:SeededCollectionTestOptions = {},):Promise<SeededCollectionTestContext>::"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/test/helpers/createSeededIssueTestContext.ts": [
+      "t",
+      [
+        "createSeededIssueTestContext:61:async (txDb:TestDatabase, organizationId:string, userId:string,):Promise<SeededIssueTestContext>::"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/test/helpers/createSeededLocationTestContext.ts": [
+      "t",
+      [
+        "createSeededLocationTestContext:55:async (db:TestDatabase, organizationId:string, userId:string, options:CreateSeededLocationTestContextOptions = {},):Promise<TRPCContext>::",
+        "createPrimaryAdminContext:187:async (db:TestDatabase, options?:CreateSeededLocationTestContextOptions,):Promise<TRPCContext>:createSeededLocationTestContext:",
+        "createCompetitorAdminContext:202:async (db:TestDatabase, options?:CreateSeededLocationTestContextOptions,):Promise<TRPCContext>:createSeededLocationTestContext:",
+        "createPrimaryMemberContext:217:async (db:TestDatabase, memberNumber:1 | 2 = 1, options?:CreateSeededLocationTestContextOptions,):Promise<TRPCContext>:createSeededLocationTestContext:"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/test/helpers/createSeededMachineTestContext.ts": [
+      "t",
+      [
+        "createSeededMachineTestContext:55:async (db:TestDatabase, organizationId:string, userId:string, options:CreateSeededMachineTestContextOptions = {},):Promise<TRPCContext>::",
+        "createPrimaryAdminContext:182:async (db:TestDatabase, options?:CreateSeededMachineTestContextOptions,):Promise<TRPCContext>:createSeededMachineTestContext:",
+        "createCompetitorAdminContext:197:async (db:TestDatabase, options?:CreateSeededMachineTestContextOptions,):Promise<TRPCContext>:createSeededMachineTestContext:",
+        "createPrimaryMemberContext:212:async (db:TestDatabase, memberNumber:1 | 2 = 1, options?:CreateSeededMachineTestContextOptions,):Promise<TRPCContext>:createSeededMachineTestContext:"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/test/helpers/createSeededNotificationTestContext.ts": [
+      "t",
+      [
+        "createSeededNotificationTestContext:13:async (txDb:TestDatabase, organizationId:string, userId:string, options?:CreateSeededNotificationTestContextOptions,):Promise<TRPCContext>::"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/test/helpers/integration-test-seeds.ts": [
+      "t",
+      [
+        "seedProductionInfrastructure:44:async (db:TestDatabase,):Promise<::",
+        "seedProductionSampleData:60:async (db:TestDatabase, organizationId:string,):Promise<void>::",
+        "seedTestInfrastructure:81:async (db:TestDatabase,):Promise<TestOrganization>:seedProductionInfrastructure:",
+        "seedTestSampleData:92:async (db:TestDatabase, organizationId:string,):Promise<void>:seedProductionSampleData:",
+        "seedCompleteTestData:104:async (db:TestDatabase,):Promise<TestOrganization>:seedTestInfrastructure,seedTestSampleData:"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/test/helpers/multi-tenant-test-helpers.ts": [
+      "t",
+      [
+        "auditMultiTenantSecurity:101:async (db:TestDatabase, options:{ orgCount?:number; testDataSize?:\"small\" | \"medium\" | \"large\"; includePerformance?:boolean; } = {},):Promise<SecurityAuditResult>:auditTableIsolation,createAuditTestData,getDataSizeConfig,measureRLSPerformance:",
+        "testPermissionBoundaries:185:async (db:TestDatabase, userId:string, orgId:string, permissionSet:string[],):Promise<PermissionTestResult[]>::",
+        "testCrossOrgAccess:327:async (db:TestDatabase, sourceOrg:OrgTestContext, targetOrg:OrgTestContext,):Promise<CrossOrgAccessResult[]>::",
+        "measureRLSPerformance:411:async (db:TestDatabase, table:{ name:string; schema:any }, org:OrgTestContext,):Promise<::",
+        "validateRLSPolicies:498:async (db:TestDatabase):Promise<::",
+        "getDataSizeConfig:568:(size:\"small\" | \"medium\" | \"large\")::",
+        "createAuditTestData:582:async (db:TestDatabase, org:OrgTestContext, dataSize:{ locations:number; machines:number; issues:number },)::",
+        "auditTableIsolation:637:async (db:TestDatabase, table:{ name:string; schema:any }, testOrgs:OrgTestContext[],):Promise<SecurityViolation[]>::"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/test/helpers/organization-context.ts": [
+      "t",
+      [
+        "createOrgContext:83:async (db:TestDatabase, orgSuffix:string = Math.random()::",
+        "setupMultiOrgContext:400:async (db:TestDatabase, count = 2,):Promise<Record<string, OrgTestContext>>:createOrgContext:",
+        "createOrgTestData:422:async (db:TestDatabase, orgContext:OrgTestContext, options:{ locationCount?:number; machineCount?:number; issueCount?:number; } = {},):Promise<::",
+        "verifyOrgIsolation:547:async (db:TestDatabase, org1Id:string, org2Id:string,):Promise<::",
+        "getUserMembership:632:async (db:TestDatabase, userId:string, organizationId:string,)::"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/test/helpers/pglite-test-setup.ts": [
+      "t",
+      [
+        "applyDrizzleSchema:47:async (db:TestDatabase):Promise<void>::",
+        "verifyMigrationComplete:68:async (db:TestDatabase):Promise<void>::",
+        "createTestDatabase:120:async ():Promise<TestDatabase>:applyDrizzleSchema,configureForBusinessLogicTesting,verifyMigrationComplete:",
+        "configureForBusinessLogicTesting:150:async (db:TestDatabase,):Promise<void>::",
+        "createCleanTestDatabase:221:async ():Promise<::",
+        "createInfrastructureOnlyTestDatabase:254:async ():Promise<::",
+        "createSeededTestDatabase:279:async ():Promise<::",
+        "withTransaction:329:async (db:TestDatabase, testFn:(db:TestDatabase)::",
+        "cleanupTestDatabase:358:async (db:TestDatabase):Promise<void>::",
+        "isRLSBypassed:388:async (db:TestDatabase):Promise<boolean>::",
+        "getCurrentTestRole:406:async (db:TestDatabase,):Promise<string | null>::",
+        "getCurrentTestMode:425:async (db:TestDatabase,):Promise<string | null>::",
+        "verifyIntegrationTesterMode:447:async (db:TestDatabase):Promise<::",
+        "getIntegrationTesterDatabaseUrl:501:():string::",
+        "verifyIntegrationTesterSetup:524:async ():Promise<boolean>:getIntegrationTesterDatabaseUrl:"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/test/helpers/rls-security-context.ts": [
+      "t",
+      [
+        "withRLSSecurityContext:27:async (db:TestDatabase, context:RLSContext, fn:(db:TestDatabase):esc:",
+        "clearRLSSecurityContext:53:async (db:TestDatabase):Promise<void>::",
+        "esc:33:(v:string):esc:"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/test/helpers/rls-test-context.ts": [
+      "t",
+      [
+        "createTestUser:149:(userId:string, organizationId:string, options:{ email?:string; name?:string; role?:string; } = {},):RLSTestUser::",
+        "withTestUser:203:async (userId:string, organizationId:string, operation:()::",
+        "withRLSContext:266:async (db:TestDatabase, userId:string, organizationId:string, operation:(db:TestDatabase)::",
+        "verifyRLSContext:308:async (db:TestDatabase, expected:{ organizationId?:string; userId?:string; role?:string; email?:string; },):Promise<void>::",
+        "withAdminContext:372:async (db:TestDatabase, operation:(db:TestDatabase)::",
+        "withMemberContext:392:async (db:TestDatabase, operation:(db:TestDatabase)::",
+        "withFullRLSContext:427:async (db:TestDatabase, userId:string, organizationId:string, operation:(db:TestDatabase)::",
+        "verifyOrganizationalIsolation:505:async (db:TestDatabase, testFunction:(db:TestDatabase)::",
+        "mockNextHeaders:558:():void::"
+      ],
+      {
+        "RLSContextManager": [
+          "84",
+          [
+            "setUser:87:(user:RLSTestUser):void::",
+            "clearUser:91:():void::",
+            "getCurrentUser:95:():RLSTestUser | null::",
+            "getMockSupabaseResponse:99:():MockSupabaseAuthResponse::",
+            "getMockSupabaseClient:113:():MockSupabaseClient::",
+            "setOriginalCreateClient:128:(original:unknown):void::",
+            "getOriginalCreateClient:132:():unknown::"
+          ]
+        ]
+      }
+    ],
+    ".archived-tests-2025-08-23/sr/test/helpers/roleTestHelpers.ts": [
+      "t",
+      [
+        "getPermissionTestScenarios:18:(requiredPermission:string):::",
+        "getRoleTestScenarios:51:(requiredPermission:string):::",
+        "getMultiTenantTestScenarios:71:():::",
+        "createPermissionTestContexts:102:(permission:string):::",
+        "createMultiTenantTestContexts:127:():::",
+        "validatePermissionInheritance:156:(role:TestRole, expectedPermissions:string[],):boolean::",
+        "validatePermissionDependencies:169:(permissions:string[]):::",
+        "generatePermissionCombinations:194:():::",
+        "getPermissionEscalationScenarios:270:():::",
+        "validateRoleSystemIntegrity:317:(roles:TestRole[]):::",
+        "createTestSuiteData:366:():::"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/test/helpers/session-context.ts": [
+      "t",
+      [
+        "setTestSession:26:async (db:TestDatabase, orgId:string, userId?:string, role?:string, additionalContext?:Record<string, string>,):Promise<void>::",
+        "getCurrentSession:63:async (db:TestDatabase):Promise<::",
+        "clearTestSession:107:async (db:TestDatabase):Promise<void>::",
+        "escalate:531:async (to:\"member\" | \"admin\")::"
+      ],
+      {
+        "MultiContextManager": [
+          "284",
+          [
+            "constructor:292:(private db:TestDatabase)::",
+            "switchTo:319:async (contextId:string):Promise<void>::",
+            "getContextIds:341:():string[]::",
+            "clearContexts:348:():void::",
+            "__init__:292:(private db:TestDatabase)::"
+          ]
+        ]
+      }
+    ],
+    ".archived-tests-2025-08-23/sr/test/helpers/supabase-test-setup.ts": [
+      "t",
+      [
+        "ensureTestBucket:32:async ():Promise<void>::",
+        "clearTestStorage:56:async ():Promise<void>:getAllFilePaths:",
+        "getAllFilePaths:98:async (bucketName:string, folder:string,):Promise<string[]>:getAllFilePaths:",
+        "createTestBucket:132:async (bucketName:string, options:{ public?:boolean; fileSizeLimit?:number; allowedMimeTypes?:string[]; } = {},):Promise<void>::",
+        "deleteTestBucket:160:async (bucketName:string):Promise<void>:clearStorageBucket:",
+        "clearStorageBucket:175:async (bucketName:string):Promise<void>:getAllFilePaths:",
+        "uploadTestFile:192:async (bucketName:string, filePath:string, file:File | Blob,):Promise<string>::",
+        "verifyFileExists:218:async (bucketName:string, filePath:string,):Promise<boolean>::",
+        "getTestFileUrl:235:(bucketName:string, filePath:string):string::"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/test/helpers/test-id-generator.ts": [
+      "t",
+      [
+        "generateTestId:38:(prefix = \"test\"):never::",
+        "generateTestEmail:45:(prefix = \"test\"):never::",
+        "generateTestSubdomain:52:(prefix = \"test\"):never::",
+        "generateTestIds:59:(count:number, prefix = \"test\"):never::"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/test/helpers/worker-scoped-db.ts": [
+      "t",
+      [
+        "withIsolatedTest:84:async (db:TestDatabase, testFn:(tx:TestDatabase)::",
+        "withExplicitRollback:161:async (db:TestDatabase, testFn:(tx:TestDatabase)::",
+        "_cleanupAllTestData:207:async (_db:TestDatabase):Promise<void>::",
+        "setTestSession:264:async (db:TestDatabase, orgId:string, userId?:string, role?:string,):Promise<void>::",
+        "withRLSTest:329:async (db:TestDatabase, orgId:string, testFn:(tx:TestDatabase):withIsolatedTest:",
+        "withMultiOrgTest:348:async (db:TestDatabase, contexts:{ orgId:string; role?:string; userId?:string }[], testFn:( setContext:(contextIndex:number):setContext,setTestSession,withIsolatedTest:",
+        "withBusinessLogicTest:401:async (db:TestDatabase, testFn:(tx:TestDatabase):withIsolatedTest:",
+        "withRLSAwareTest:430:async (db:TestDatabase, orgId:string, testFn:(tx:TestDatabase):withRLSTest:",
+        "withCrossOrgTest:454:async (db:TestDatabase, contexts:{ orgId:string; role?:string; userId?:string }[], testFn:( setContext:(contextIndex:number):withMultiOrgTest:",
+        "withRLSEnabledTest:475:async (db:TestDatabase, testFn:(tx:TestDatabase):withIsolatedTest:",
+        "setContext:357:async (contextIndex:number):Promise<void>:setTestSession:"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/test/mockContext.ts": [
+      "t",
+      [
+        "createMockContext:94:():MockContext:createMockServiceFactory:",
+        "resetMockContext:153:(ctx:MockContext):void::",
+        "createMockServiceFactory:47:():DeepMockProxy<ServiceFactory>::"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/test/mockUtils.ts": [
+      "t",
+      [
+        "createMockUser:147:(overrides:Partial<MockUser> = {}):MockUser::",
+        "createMockStatus:160:(overrides:Partial<MockIssueStatus> = {},):MockIssueStatus::",
+        "createMockPriority:176:(overrides:Partial<MockPriority> = {},):MockPriority::",
+        "createMockModel:192:(overrides:Partial<MockModel> = {}):MockModel::",
+        "createMockLocation:205:(overrides:Partial<MockLocation> = {},):MockLocation::",
+        "createMockMachine:219:(overrides:Partial<MockMachine> = {},):MockMachine:createMockLocation,createMockModel:",
+        "createMockIssue:244:(overrides:Partial<MockIssue> = {}):MockIssue:createMockMachine,createMockPriority,createMockStatus,createMockUser:",
+        "createMockIssuesList:282:(options:MockFactoryOptions<MockIssue> = {},):MockIssue[]:createMockIssue:",
+        "createMockLocations:380:(options:MockFactoryOptions<MockLocation> = {},):MockLocation[]:createMockLocation:",
+        "createMockStatuses:403:(options:MockFactoryOptions<MockIssueStatus> = {},):MockIssueStatus[]:createMockStatus:",
+        "createMockMachines:428:(options:MockFactoryOptions<MockMachine> = {},):MockMachine[]:createMockMachine,createMockModel:",
+        "createMockUsers:451:(options:MockFactoryOptions<MockUser> = {},):MockUser[]:createMockUser:",
+        "createMockTRPCQueryResult:476:(data:T, options:Partial< Pick<MockTRPCQueryResult<T>, \"isLoading\" | \"isError\" | \"error\"> > = {},):MockTRPCQueryResult<T>::",
+        "createMockTRPCLoadingResult:495:():MockTRPCQueryResult<\n  T | undefined\n>::",
+        "createMockTRPCErrorResult:510:(error:Error = new Error(\"Mock error\")::",
+        "createIssueListTRPCMocks:526:():::",
+        "createPermissionScenario:624:(permissions:string[], role = \"Custom\",):::",
+        "createRealisticIssueDataSet:649:():::"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/test/msw/handlers.ts": [
+      "t",
+      [
+        "createMockUser:31:(overrides:Partial<User> = {}):User::",
+        "createMockOrganization:47:(overrides:Partial<Organization> = {},):Organization::",
+        "createMockMembership:59:(overrides:{ userId?:string; role?:string; organizationId?:string; permissions?:string[]; } = {},)::",
+        "mockUserProfile:77:(user:Partial<User> = {})::",
+        "mockCurrentMembership:104:(membership:Parameters<typeof createMockMembership>[0] = {},):createMockMembership:",
+        "mockCurrentOrganization:115:(org:Partial<Organization> = {})::",
+        "mockUserWithPermissions:121:(permissions:string[])::",
+        "mockAdminUser:125:()::",
+        "mockUserWithoutPermissions:148:()::",
+        "mockUnauthorizedError:155:()::",
+        "mockForbiddenError:161:(permission:string)::",
+        "mockNotFoundError:167:(resource:string)::"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/test/msw/setup.ts": [
+      "t",
+      [
+        "getTestBaseUrl:8:():string::",
+        "ensureListening:41:()::",
+        "ensureClosed:51:()::"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/test/permissionTestHelpers.ts": [
+      "t",
+      [
+        "createAuthenticatedContext:101:(permissions:readonly string[] = PERMISSION_SCENARIOS.MEMBER.permissions,):VitestMockContext &::",
+        "createPublicContext:189:():VitestMockContext &::",
+        "createCrossOrgContext:209:(organizationId = \"other-org\", permissions:readonly string[] = PERMISSION_SCENARIOS.MEMBER.permissions,):VitestMockContext &::",
+        "createPermissionTestCases:243:(requiredPermission:string, additionalCases:PermissionTestCase[] = [],):PermissionTestCase[]::",
+        "expectAuthenticationRequired:281:async (routerCall:(caller:TRouter):createPublicContext:",
+        "expectOrganizationRequired:295:async (routerCall:(caller:TRouter):createAuthenticatedContext:",
+        "expectPermissionRequired:312:async (routerCall:(caller:TRouter):createAuthenticatedContext:",
+        "expectOrganizationIsolation:333:async (routerCall:(caller:TRouter)::",
+        "createPermissionTestSuite:358:(name:string, options:PermissionTestSuiteOptions<TRouter>,):createAuthenticatedContext,createPermissionTestCases,expectAuthenticationRequired,expectOrganizationIsolation,expectOrganizationRequired,expectPermissionRequired:",
+        "setupPermissionMocks:485:(context:VitestMockContext, mockData:{ issue?:any; machine?:any; location?:any; membership?:any; [key:string]:any; },)::"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/test/routerTestPatterns.ts": [
+      "t",
+      [
+        "createRouterTestContext:41:(router:AppRouter):RouterTestContext::",
+        "testAuthenticatedProcedure:66:(testName:string, procedureCall:(context:RouterTestContext)::",
+        "testPublicProcedure:106:(testName:string, procedureCall:(context:RouterTestContext)::",
+        "testAdminOnlyProcedure:135:(testName:string, procedureCall:(context:RouterTestContext)::",
+        "testServiceIntegration:174:(serviceName:keyof VitestMockContext[\"services\"], methodName:string, options:{ mockReturnValue?:any; expectedCallArgs?:any[]; mockSetup?:(mockService:any)::",
+        "testInputValidation:220:(procedureCall:(input:any, context:RouterTestContext):createRouterTestContext:",
+        "testOrganizationScoping:250:(procedureCall:(context:RouterTestContext)::",
+        "createRouterTestSuite:397:(options:RouterTestSuiteOptions<TInput, TOutput>,):testAdminOnlyProcedure,testAuthenticatedProcedure,testInputValidation,testOrganizationScoping,testPublicProcedure:"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/test/seed-data-helpers.ts": [
+      "t",
+      [
+        "getCachedSeedData:55:async (cacheKey:string, fetchFn:()::",
+        "clearSeedDataCache:71:():void::",
+        "getUserWithRoles:82:async (email:string):Promise<SeededUser>::",
+        "getSeededAdmin:152:async ():Promise<SeededUser>:getCachedSeedData,getUserWithRoles:",
+        "getSeededMember:162:async ():Promise<SeededUser>:getCachedSeedData,getUserWithRoles:",
+        "getSeededPlayer:172:async ():Promise<SeededUser>:getCachedSeedData,getUserWithRoles:",
+        "getSeededUserByEmail:181:async (email:string):Promise<SeededUser>:getCachedSeedData,getUserWithRoles:",
+        "getSeededOrganization:208:async ():Promise<SeededOrganization>:getCachedSeedData:",
+        "getSeededIssue:260:async (titleContains:string,):Promise<SeededIssue>:getCachedSeedData:",
+        "getSeededIssues:329:async (limit = 10):Promise<SeededIssue[]>:getCachedSeedData:",
+        "getSeededOrganizationId:392:async ():Promise<string>:getSeededOrganization:",
+        "getSeededIssueStatuses:400:async ():Promise<IssueStatus[]>:getCachedSeedData,getSeededOrganizationId:",
+        "getSeededPriorities:413:async ():Promise<Priority[]>:getCachedSeedData,getSeededOrganizationId:",
+        "createSupabaseUserFromSeeded:456:(user:SeededUser):SupabaseUser::",
+        "getSeededAdminSupabaseUser:500:async ():Promise<SupabaseUser>:createSupabaseUserFromSeeded,getSeededAdmin:",
+        "getSeededMemberSupabaseUser:508:async ():Promise<SupabaseUser>:createSupabaseUserFromSeeded,getSeededMember:",
+        "getSeededPlayerSupabaseUser:516:async ():Promise<SupabaseUser>:createSupabaseUserFromSeeded,getSeededPlayer:",
+        "setupAuthTestData:529:async ():createSupabaseUserFromSeeded,getSeededAdmin,getSeededMember,getSeededOrganization,getSeededPlayer:",
+        "cleanupSeedDataHelpers:560:():void:clearSeedDataCache:"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/test/setup/issueListTestSetup.ts": [
+      "t",
+      [
+        "createIssueListMocks:49:():IssueListMocks::",
+        "setupIssueListTest:191:(scenario:IssueListTestScenario, mocks:ReturnType<typeof createIssueListMocks>,):::",
+        "createWorkflowIssues:308:():ReturnType<\n  typeof createMockIssuesList\n>::",
+        "createDefaultMachineData:110:():{\n  id:string;\n  name:string;\n  organizationId:string;\n  modelId:string;\n  locationId:string;\n  ownerId:null;\n  model:{\n    id:string;\n    name:string;\n    manufacturer:string;\n    year:number;\n  };\n  location:{\n    id:string;\n    name:string;\n    organizationId:string;\n  };\n}[]::",
+        "setupDefaultResponses:230:():void::",
+        "resetMocks:271:():void:setupDefaultResponses:"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/test/setup/viTestMocks.ts": [
+      "t",
+      [
+        "setupNavigationMocks:24:(mocks:IssueListMocks):void::",
+        "setupTRPCMocks:37:(mocks:IssueListMocks):void::",
+        "setupPermissionMocks:105:(mocks:IssueListMocks):void::",
+        "setupAllIssueListMocks:115:(mocks:IssueListMocks):void:setupNavigationMocks,setupPermissionMocks,setupTRPCMocks:"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/test/templates/02-service-business-logic-test.template.ts": [
+      "t",
+      ["createTestData:316:async (db:any):Promise<void>::"],
+      { "name": ["348", []] }
+    ],
+    ".archived-tests-2025-08-23/sr/test/templates/03-pglite-integration-test.template.ts": [
+      "t",
+      [
+        "createBasicTestData:393:async (db:any):Promise<void>::",
+        "createComplexTestDataset:418:async (db:any):Promise<void>:createBasicTestData:"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/test/templates/04-react-component-unit-test.template.tsx": [
+      "t",
+      ["ThrowingComponent:391:():JSX.Element::"]
+    ],
+    ".archived-tests-2025-08-23/sr/test/testDataFactories.ts": [
+      "t",
+      [
+        "createIssueFactory:18:(options:FactoryOptions = {}):createMachineFactory,createPriorityFactory,createSingleIssue,createStatusFactory,createUserFactory:",
+        "createSingleIssue:21:(customOverrides:Record<string, any> = {}):createMachineFactory,createPriorityFactory,createStatusFactory,createUserFactory:",
+        "createCommentFactory:117:(options:FactoryOptions = {}):createSingleComment,createUserFactory:",
+        "createSingleComment:120:(customOverrides:Record<string, any> = {}):createUserFactory:",
+        "createUserFactory:179:(options:FactoryOptions = {})::",
+        "createMachineFactory:262:(options:FactoryOptions = {}):createLocationFactory,createModelFactory:",
+        "createModelFactory:305:(options:FactoryOptions = {})::",
+        "createLocationFactory:331:(options:FactoryOptions = {})::",
+        "createStatusFactory:363:(options:FactoryOptions = {})::",
+        "createPriorityFactory:386:(options:FactoryOptions = {})::",
+        "createRoleFactory:404:(options:FactoryOptions = {})::",
+        "createOrganizationFactory:427:(options:FactoryOptions = {})::",
+        "createSessionFactory:443:(options:FactoryOptions = {}):createUserFactory:",
+        "createAttachmentFactory:455:(options:FactoryOptions = {}):createSingleAttachment,createUserFactory:",
+        "createSingleAttachment:458:(customOverrides:Record<string, any> = {},):createUserFactory:",
+        "createActivityFactory:486:(options:FactoryOptions = {}):createSingleActivity,createUserFactory:",
+        "createSingleActivity:489:(customOverrides:Record<string, any> = {}):createUserFactory:",
+        "getSingleIssue:519:(overrides:Record<string, any> = {}):createIssueFactory:",
+        "createComplexIssueFactory:526:(options:FactoryOptions = {}):createActivityFactory,createAttachmentFactory,createCommentFactory,getSingleIssue:",
+        "createIssueWithMixedComments:542:(options:FactoryOptions = {}):getSingleIssue:",
+        "createIssueRouterContext:605:(options:{ userId?:string; organizationId?:string; permissions?:string[]; role?:string; } = {},):createUserFactory:",
+        "createMockServices:779:():any::",
+        "createTRPCCallerForIssues:807:(options:{ permissions?:string[]; userId?:string; organizationId?:string; role?:string; mockContext?:any; } = {},):createIssueRouterContext,createMockServices:",
+        "createIssueDbMocks:856:(context:any)::"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/test/utils/mock-ids.ts": [
+      "t",
+      [
+        "createNumberedId:13:(pattern:string, number:number):string::",
+        "createAdminId:70:(base:string, suffix:string):string::",
+        "createNumberedVariation:77:(pattern:string, number:number,):string:createNumberedId:"
+      ]
+    ],
+    ".archived-tests-2025-08-23/sr/test/vitestMockContext.ts": [
+      "t",
+      ["createVitestMockContext:112:():VitestMockContext::"]
+    ],
+    "analyze-type-warnings.js": ["j", ["analyzeTypeWarnings:9:async ()::"]],
     "middleware.ts": [
       "t",
       [
@@ -264,10 +1041,6 @@
         "PublicDashboard:95:():React.ReactNode::"
       ]
     ],
-    "sr/app/api/dev/__tests__/users-simple.test.ts": [
-      "t",
-      ["setNodeEnv:7:(value:string)::"]
-    ],
     "sr/app/api/dev/users/route.ts": [
       "t",
       ["GET:10:async ():Promise<NextResponse>::"]
@@ -318,10 +1091,6 @@
     "sr/app/dashboard/_components/SecondaryHeader.tsx": [
       "t",
       ["SecondaryHeader:11:():JSX.Element::"]
-    ],
-    "sr/app/dashboard/_components/__tests__/PrimaryAppBar.test.tsx": [
-      "t",
-      ["MockAuthProvider:48:({ children, user = createMockSupabaseUser()::"]
     ],
     "sr/app/dashboard/layout.tsx": [
       "t",
@@ -388,14 +1157,6 @@
     "sr/app/machines/components/MachineList.tsx": [
       "t",
       ["MachineList:9:():React.ReactElement::"]
-    ],
-    "sr/app/machines/components/__tests__/MachineCard.test.tsx": [
-      "t",
-      [
-        "createMockMachine:36:(overrides:Partial<MachineWithRelations> = {},):MachineWithRelations::",
-        "createMachineWithoutCustomName:120:():MachineWithRelations:createMockMachine:"
-      ],
-      { "const": ["383", []] }
     ],
     "sr/app/machines/page.tsx": [
       "t",
@@ -596,13 +1357,6 @@
         "isCategoryFullySelected:144:(category:\"NEW\" | \"IN_PROGRESS\" | \"RESOLVED\",):boolean::"
       ]
     ],
-    "sr/components/issues/__tests__/MachineSelector.test.tsx": [
-      "t",
-      [
-        "createMockMachine:25:(overrides:Partial<MachineForIssues> = {},):MachineForIssues::",
-        "createMockMachines:38:(count = 3):MachineForIssues[]:createMockMachine:"
-      ]
-    ],
     "sr/components/locations/LocationDetailView.tsx": [
       "t",
       [
@@ -621,17 +1375,6 @@
       [
         "MachineGrid:30:({ machines, }:MachineGridProps):React.ReactElement::",
         "handleMachineClick:54:(machineId:string):void::"
-      ]
-    ],
-    "sr/components/locations/__tests__/LocationDetailView.test.tsx": [
-      "t",
-      ["createMockLocation:57:(overrides:any = {})::"]
-    ],
-    "sr/components/locations/__tests__/MachineGrid.test.tsx": [
-      "t",
-      [
-        "createMockMachine:16:(overrides:any = {})::",
-        "findMachineCard:261:(name:string)::"
       ]
     ],
     "sr/components/machines/MachineDetailView.tsx": [
@@ -653,21 +1396,6 @@
         "PermissionGate:52:({ permission, hasPermission, fallback, children, showFallback = false, }:PermissionGateProps):ReactNode::"
       ]
     ],
-    "sr/components/permissions/__tests__/PermissionGate.test.tsx": [
-      "t",
-      [
-        "expectProtectedContentVisible:40:()::",
-        "expectProtectedContentHidden:46:()::",
-        "expectEditButtonVisible:52:()::",
-        "expectAdminPanelHidden:58:()::",
-        "expectCreateMachineVisible:64:()::",
-        "expectFallbackVisible:70:()::",
-        "expectFallbackHidden:76:()::",
-        "expectPermissionCalled:82:(mock:ReturnType<typeof vi.fn>, permission:string, times = 1,)::",
-        "expectEmptyBody:91:()::",
-        "hasPermission:525:(permission:string)::"
-      ]
-    ],
     "sr/components/profile/ProfilePictureUpload.tsx": [
       "t",
       [
@@ -679,10 +1407,6 @@
         "handleFileInputChange:100:(e:React.ChangeEvent<HTMLInputElement>,):void:handleFileSelect:",
         "openFileDialog:109:():void::"
       ]
-    ],
-    "sr/components/react-environment.test.tsx": [
-      "t",
-      ["SimpleComponent:13:()::"]
     ],
     "sr/components/ui/Breadcrumbs.tsx": [
       "t",
@@ -704,13 +1428,6 @@
       ]
     ],
     "sr/env.js": ["j", ["getEnvironmentType:9:()::"]],
-    "sr/hooks/__tests__/usePermissions.test.tsx": [
-      "t",
-      [
-        "createWrapper:28:(options:{ userPermissions?:string[]; userRole?:string; session?:any; injectPermissionDeps?:boolean; queryOptions?:{ isLoading?:boolean; isError?:boolean; error?:any }; } = {},)::",
-        "DynamicWrapper:233:({ children, permissions, }:{ children:ReactNode; permissions:string[]; })::"
-      ]
-    ],
     "sr/hooks/usePermissions.ts": [
       "t",
       [
@@ -722,44 +1439,6 @@
         "ActionButton:199:():usePermissionTooltip,usePermissions:",
         "usePermissionTooltip:213:(permission:string):string::"
       ]
-    ],
-    "sr/integration-t/comment.integration.test.ts": [
-      "t",
-      ["withCommentBusinessLogicSetup:83:async (workerDb, testFn)::"]
-    ],
-    "sr/integration-t/cross-org-isolation.test.ts": [
-      "t",
-      [
-        "integration:15:(PGlite limitation)::",
-        "createMinimalTestData:47:async (db:typeof schema, primaryOrgId:string, competitorOrgId:string,)::"
-      ]
-    ],
-    "sr/integration-t/machine.location.integration.test.ts": [
-      "t",
-      ["setupTestData:55:async (db:TestDatabase)::"]
-    ],
-    "sr/integration-t/machine.owner.integration.test.ts": [
-      "t",
-      [
-        "withMachineOwnerBusinessLogicSetup:81:async (workerDb, testFn):setupTestData:",
-        "setupTestData:95:async (db:TestDatabase)::"
-      ]
-    ],
-    "sr/integration-t/model.core.integration.test.ts": [
-      "t",
-      ["createTestContext:80:async (db:TestDatabase, organizationId:string)::"]
-    ],
-    "sr/integration-t/pinballMap.integration.test.ts": [
-      "t",
-      [
-        "getSimpleSeededData:38:async (db:any)::",
-        "createPinballMapTestContext:65:(db:TestDatabase, organizationId:string, userId:string, permissions:string[] = [\"organization:manage\", \"location:edit\"],):TRPCContext:setMockPermissions:",
-        "setMockPermissions:171:(permissions:string[])::"
-      ]
-    ],
-    "sr/integration-t/schema-migration-validation.integration.test.ts": [
-      "t",
-      ["createTestContext:30:async (_db:TestDatabase)::"]
     ],
     "sr/lib/auth/dev-auth-server.ts": [
       "t",
@@ -804,15 +1483,6 @@
       [
         "expectZodError:75:(result:any, expectedMessage?:string):void::",
         "expectZodSuccess:82:(result:any, expectedData?:unknown):void::"
-      ]
-    ],
-    "sr/lib/common/__tests__/organizationValidation.test.ts": [
-      "t",
-      [
-        "createMockMembership:47:(overrides:Partial<OrganizationMembership> = {},):OrganizationMembership::",
-        "createResourceOwnershipInput:68:(overrides:Partial<ResourceOwnershipInput> = {},):ResourceOwnershipInput::",
-        "createMembershipValidationInput:80:(overrides:Partial<MembershipValidationInput> = {},):MembershipValidationInput:createMockMembership:",
-        "createCrossOrganizationAccessInput:91:(overrides:Partial<CrossOrganizationAccessInput> = {},):CrossOrganizationAccessInput::"
       ]
     ],
     "sr/lib/common/inputValidation.ts": [
@@ -926,35 +1596,6 @@
           ]
         ]
       }
-    ],
-    "sr/lib/issues/__tests__/assignmentValidation.test.ts": [
-      "t",
-      [
-        "createTestUser:46:(overrides:Partial<User> = {}):User::",
-        "createTestMembership:53:(overrides:Partial<Membership> = {},):Membership:createTestUser:",
-        "createTestMachine:64:(overrides:Partial<Machine> = {}):Machine::",
-        "createTestIssue:73:(overrides:Partial<Issue> = {}):Issue::",
-        "createTestIssueStatus:84:(overrides:Partial<IssueStatus> = {},):IssueStatus::",
-        "createTestPriority:94:(overrides:Partial<Priority> = {}):Priority::",
-        "createTestContext:102:(overrides:Partial<AssignmentValidationContext> = {},):AssignmentValidationContext::"
-      ]
-    ],
-    "sr/lib/issues/__tests__/creationValidation.test.ts": [
-      "t",
-      [
-        "createMockMachine:27:(overrides:Partial<MachineOwnershipInput[\"machine\"]> = {},):MachineOwnershipInput[\"machine\"]::",
-        "createMockDefaults:39:(overrides:Partial<IssueCreationDefaults> = {},):IssueCreationDefaults::",
-        "createPublicIssueInput:55:(overrides:Partial<PublicIssueCreationInput> = {},):PublicIssueCreationInput::",
-        "createAuthenticatedIssueInput:65:(overrides:Partial<AuthenticatedIssueCreationInput> = {},):AuthenticatedIssueCreationInput::",
-        "createContext:75:(overrides:Partial<IssueCreationContext> = {},):IssueCreationContext::"
-      ]
-    ],
-    "sr/lib/issues/__tests__/statusValidation.test.ts": [
-      "t",
-      [
-        "createMockStatus:23:(overrides:Partial<IssueStatus> = {}):IssueStatus::",
-        "createStatusSet:32:():::"
-      ]
     ],
     "sr/lib/issues/assignmentValidation.ts": [
       "t",
@@ -1090,20 +1731,6 @@
     "sr/lib/permissions/descriptions.ts": [
       "t",
       ["getPermissionDescription:45:(permission:string):string::"]
-    ],
-    "sr/lib/pinballmap/__tests__/apiMocker.ts": [
-      "t",
-      {
-        "PinballMapAPIMocker": [
-          "12",
-          [
-            "constructor:14:()::",
-            "start:22:():void::",
-            "stop:65:():void::",
-            "__init__:14:()::"
-          ]
-        ]
-      }
     ],
     "sr/lib/pinballmap/client.ts": [
       "t",
@@ -1288,17 +1915,6 @@
         "createTraceContext:26:():TraceContext:generateRequestId,generateTraceId:"
       ]
     ],
-    "sr/lib/users/__tests__/roleManagementValidation.test.ts": [
-      "t",
-      [
-        "createTestUser:43:(overrides:Partial<User> = {}):User::",
-        "createTestRole:50:(overrides:Partial<Role> = {}):Role::",
-        "createAdminRole:59:(overrides:Partial<Role> = {}):Role::",
-        "createMembership:68:(overrides:Partial<Membership> = {}):Membership:createTestRole,createTestUser:",
-        "createAdminMembership:78:(overrides:Partial<Membership> = {},):Membership:createAdminRole,createTestUser:",
-        "createTestContext:94:(overrides:Partial<RoleManagementContext> = {},):RoleManagementContext::"
-      ]
-    ],
     "sr/lib/users/roleManagementValidation.ts": [
       "t",
       [
@@ -1344,57 +1960,6 @@
         "transformRoleForValidation:47:(role:{ id:string; name:string; organizationId:string; isSystem:boolean; isDefault:boolean; }):Role::"
       ]
     ],
-    "sr/server/api/__tests__/msw.trpc.test.ts": [
-      "t",
-      ["creation:43:(without executing them)::"]
-    ],
-    "sr/server/api/__tests__/trpc.permission.test.ts": [
-      "t",
-      [
-        "supabaseUserToSession:18:(user:any)::",
-        "createMockTRPCContext:51:(permissions:string[] = [], organizationId:string = SEED_TEST_IDS.ORGANIZATIONS.primary, userId:string = SEED_TEST_IDS.USERS.ADMIN,):VitestMockContext & {\n  membership:{ roleId:string | null };\n  userPermissions:string[];\n}::",
-        "createCompetitorOrgContext:123:(permissions:string[] = []):createMockTRPCContext:"
-      ]
-    ],
-    "sr/server/api/routers/__tests__/collection.test.ts": [
-      "t",
-      ["setupTestData:174:async (db:TestDatabase)::"]
-    ],
-    "sr/server/api/routers/__tests__/issue.confirmation.test.ts": [
-      "t",
-      [
-        "createMockTRPCContext:316:(permissions:string[] = [], context?:TestMockContext,):OrganizationTRPCContext::"
-      ]
-    ],
-    "sr/server/api/routers/__tests__/issue.integration.test.ts": [
-      "t",
-      [
-        "createTestContext:37:async (txDb:any, organizationId:string, userId:string,)::"
-      ]
-    ],
-    "sr/server/api/routers/__tests__/issue.notification.test.ts": [
-      "t",
-      [
-        "getMockUser:58:(context:TestMockContext)::",
-        "getMockMachine:64:(context:TestMockContext)::",
-        "getMockIssue:71:(context:TestMockContext)::"
-      ]
-    ],
-    "sr/server/api/routers/__tests__/issue.test.ts": [
-      "t",
-      [
-        "createTestIssue:84:async (db:TestDatabase, overrides:Partial<typeof schema.issues.$inferInsert> = {},)::",
-        "createPublicContext:110:async (db:TestDatabase, organizationId:string,):Promise<TRPCContext>::"
-      ]
-    ],
-    "sr/server/api/routers/__tests__/model.core.test.ts": [
-      "t",
-      ["setupTestData:74:async (db:TestDatabase)::"]
-    ],
-    "sr/server/api/routers/__tests__/notification.test.ts": [
-      "t",
-      ["setupTestData:66:async (db:TestDatabase)::"]
-    ],
     "sr/server/api/routers/issue.comment.ts": [
       "t",
       [
@@ -1411,17 +1976,6 @@
     "sr/server/api/routers/role.ts": [
       "t",
       ["createRoleService:26:(ctx:RLSOrganizationTRPCContext):RoleService::"]
-    ],
-    "sr/server/api/routers/utils/__tests__/commentService.integration.test.ts": [
-      "t",
-      ["createTestContext:72:async (db:TestDatabase, organizationId:string)::"]
-    ],
-    "sr/server/api/routers/utils/__tests__/commentValidation.test.ts": [
-      "t",
-      [
-        "createValidCommentData:51:(overrides:Partial<CommentData> = {},):CommentData::",
-        "createValidContext:64:(overrides:Partial<ValidationContext> = {},):ValidationContext::"
-      ]
     ],
     "sr/server/api/routers/utils/commentService.ts": [
       "t",
@@ -1461,23 +2015,6 @@
       "t",
       [
         "supabaseUserToSession:26:(user:PinPointSupabaseUser, organizationId?:string,):Session::"
-      ]
-    ],
-    "sr/server/auth/__tests__/permissions.constants.test.ts": [
-      "t",
-      ["hasCycle:125:(permission:string):boolean:hasCycle:"]
-    ],
-    "sr/server/auth/__tests__/uploadAuth.test.ts": [
-      "t",
-      [
-        "createMockSupabaseUser:58:(overrides:Partial<PinPointSupabaseUser> = {}, organizationId:string = SEED_TEST_IDS.ORGANIZATIONS.primary,):PinPointSupabaseUser::",
-        "createCompetitorOrgUser:88:(overrides:Partial<PinPointSupabaseUser> = {},):PinPointSupabaseUser:createMockSupabaseUser:",
-        "createMockRequest:100:(headers:Record<string, string> = {}):NextRequest::",
-        "createMockDrizzleClient:108:():DrizzleClient::",
-        "createMockOrganization:121:(organizationId:string = SEED_TEST_IDS.ORGANIZATIONS.primary,)::",
-        "createCompetitorOrganization:138:():createMockOrganization:",
-        "createMockMembership:142:(userId:string = SEED_TEST_IDS.USERS.ADMIN, organizationId:string = SEED_TEST_IDS.ORGANIZATIONS.primary, permissions:string[] = [\"upload:create\", \"file:manage\"],)::",
-        "createCompetitorMembership:163:(permissions:string[] = [\"upload:create\"]):createMockMembership:"
       ]
     ],
     "sr/server/auth/permissions.ts": [
@@ -1521,40 +2058,10 @@
         "assertOAuthConfigValid:149:():void:validateAndLogOAuthConfig:"
       ]
     ],
-    "sr/server/db/__tests__/drizzle-singleton.test.ts": [
-      "t",
-      [
-        "importDrizzleModule:94:async ()::",
-        "resetSingleton:99:()::",
-        "createMockDrizzleInstance:28:()::"
-      ]
-    ],
-    "sr/server/db/__tests__/drizzle-test-helpers.ts": [
-      "t",
-      [
-        "configureDevelopmentMocks:54:():void:createLocalhost5432URL:",
-        "configureProductionMocks:81:():void:createRemoteURL:",
-        "configureCIMocks:111:():void:createRemoteURL:",
-        "configureCustomEnvironment:144:(config:EnvironmentConfig):void::",
-        "createLocalhost5432URL:182:(database = \"postgres\"):string::",
-        "createRemoteURL:202:(host:string, database = \"postgres\"):string::",
-        "create127001URL:221:(database = \"postgres\"):string::",
-        "expectSSLConfiguration:243:(sslSetting:SSLSetting):void::",
-        "expectPoolConfiguration:266:(maxConnections:number):void::",
-        "expectTimeoutConfiguration:291:(idle:number, connect:number,):void::",
-        "expectLoggingConfiguration:318:(enabled:boolean):void::",
-        "importDrizzleModule:348:async ():Promise<::",
-        "setupDrizzleTestEnvironment:449:(customEnvSetup?:()::",
-        "validateDrizzleConfiguration:489:(expectedConfig:{ ssl:SSLSetting; maxConnections:number; idleTimeout:number; connectTimeout:number; logging:boolean; }):void:expectLoggingConfiguration,expectPoolConfiguration,expectSSLConfiguration,expectTimeoutConfiguration:",
-        "testSingletonBehavior:521:async (moduleImporter:()::",
-        "createMockPostgresInstance:363:()::",
-        "createMockDrizzleInstance:370:()::"
-      ]
-    ],
     "sr/server/db/client-factory.ts": [
       "t",
       [
-        "createDrizzle:14:(adapter:Sql | PGlite, loggerEnabled?:boolean):PostgresJsDatabase<typeof schema> | PgliteDatabase<typeof schema>::"
+        "createDrizzle:14:(adapter:Sql | PGlite, loggerEnabled?:boolean,):PostgresJsDatabase<typeof schema> | PgliteDatabase<typeof schema>::"
       ]
     ],
     "sr/server/db/drizzle.ts": [
@@ -1605,11 +2112,6 @@
       [
         "ensureAtLeastOneAdmin:13:async (drizzle:DrizzleClient, organizationId:string,):Promise<void>::"
       ]
-    ],
-    "sr/server/services/__tests__/roleService.test.ts": [
-      "t",
-      ["createMockDrizzleClient:64:()::"],
-      { "covering": ["4", []] }
     ],
     "sr/server/services/collectionService.ts": [
       "t",
@@ -1765,505 +2267,6 @@
         "constructReportUrl:1:(machine:{ id:string; organization:{ subdomain:string }; }):string::"
       ]
     ],
-    "sr/test/VitestTestWrapper.tsx": [
-      "t",
-      [
-        "MockSessionProvider:47:({ children, }:{ children:ReactNode; session:Session | null; }):React.JSX.Element::",
-        "createMockUser:58:(overrides:Partial<User> = {}):User::",
-        "createMockMembership:76:(overrides:Partial<{ id:string; userId:string; organizationId:string; role:string; permissions:string[]; createdAt:Date; updatedAt:Date; }> = {},):::",
-        "createMockSessionHook:111:(session:Session | null, sessionLoading = false,)::",
-        "createMockMembershipQuery:132:(permissions:string[] = [], role = \"Member\", options:{ isLoading?:boolean; isError?:boolean; error?:Error | null; } = {},)::",
-        "createMockSupabaseUser:162:(overrides:Partial<PinPointSupabaseUser> = {},):PinPointSupabaseUser::",
-        "createServerMockContext:218:(overrides:Partial<ServerMockContext> = {},):ServerMockContext:createMockSupabaseUser:",
-        "VitestTestWrapper:317:({ children, session = { user:createMockUser()::"
-      ]
-    ],
-    "sr/test/constants/seed-test-ids.ts": [
-      "t",
-      [
-        "createMockAdminContext:316:():TestMockContext::",
-        "createMockMemberContext:323:(memberNumber:1 | 2 = 1,):TestMockContext::"
-      ]
-    ],
-    "sr/test/context.ts": ["t", ["createTestContext:7:():::"]],
-    "sr/test/database-test-helpers.ts": [
-      "t",
-      [
-        "cleanupTestData:82:async (db:DrizzleClient, testIds:TestDataIds,):Promise<void>::",
-        "createTestOrganization:256:async (db:DrizzleClient, orgType:\"primary\" | \"competitor\" = \"primary\",):Promise<Organization>::",
-        "createTestUser:293:async (db:DrizzleClient, overrides:Partial<User> = {},):Promise<User>::",
-        "createTestUserWithMembership:343:async (db:DrizzleClient, organizationId:string, roleType:\"admin\" | \"manager\" | \"member\" = \"member\", overrides:Partial<User> = {},):Promise<::",
-        "createTestMachine:407:async (db:DrizzleClient, organizationId:string, overrides:Partial<Machine> = {},):Promise<::",
-        "createTestIssue:502:async (db:DrizzleClient, machineId:string, organizationId:string, overrides:Partial<Issue> = {},):Promise<::",
-        "createMultiTenantTestEnvironment:624:async (db:DrizzleClient,):Promise<::"
-      ]
-    ],
-    "sr/test/examples/dual-track-testing-examples.test.ts": [
-      "t",
-      [
-        "calculateIssuePriority:370:(params:{ downtime:number; machineImportance:string; businessImpact:string; }):string::",
-        "escalateIssueIfNeeded:385:async (db:any, issueId:string, metrics:{ downtime:number; customerComplaints:number; revenueImpact:number; },)::",
-        "getIssuesForMachine:427:async (db:any, machineId:string)::",
-        "calculateMaintenanceSchedule:438:(params:{ machineAge:number; usageHours:number; lastMaintenance:Date; })::",
-        "generateOrganizationalReport:463:async (db:any):calculateAvgResolutionTime,getTopMachinesByIssues:",
-        "calculateAvgResolutionTime:477:(issues:any[])::",
-        "getTopMachinesByIssues:490:(issues:any[])::"
-      ],
-      {
-        "ReportingService": [
-          "505",
-          [
-            "constructor:506:(private db:any):groupByPriority:",
-            "generateReport:507:async ()::",
-            "__init__:506:(private db:any):groupByPriority:"
-          ]
-        ]
-      }
-    ],
-    "sr/test/factories/roleFactory.ts": [
-      "t",
-      [
-        "create:346:(overrides:Partial<TestOrganization> = {},):TestOrganization::",
-        "createIssuePermissions:93:():TestPermission[]:create:",
-        "createMachinePermissions:104:():TestPermission[]:create:",
-        "createLocationPermissions:113:():TestPermission[]:create:",
-        "createAttachmentPermissions:122:():TestPermission[]:create:",
-        "createAdminPermissions:130:():TestPermission[]:create:",
-        "createAllPermissions:141:():TestPermission[]:createAdminPermissions,createAttachmentPermissions,createIssuePermissions,createLocationPermissions,createMachinePermissions:",
-        "createUnauthenticatedRole:172:(organizationId = \"org-1\",):TestRole:create:",
-        "createMemberRole:184:(organizationId = \"org-1\"):TestRole:create:",
-        "createTechnicianRole:199:(organizationId = \"org-1\"):TestRole:create:",
-        "createAdminRole:220:(organizationId = \"org-1\"):TestRole:create,createAllPermissions:",
-        "createCustomRole:230:(name:string, permissions:TestPermission[], organizationId = \"org-1\",):TestRole:create:",
-        "createSystemRoleSet:244:(organizationId = \"org-1\"):TestRole[]:createAdminRole,createMemberRole,createTechnicianRole,createUnauthenticatedRole:",
-        "createWithMemberCount:253:(memberCount:number, overrides:Partial<TestRole> = {},):TestRole:create:",
-        "createWithRole:526:(roleName:\"Unauthenticated\" | \"User\" | \"Technician\" | \"Admin\", organizationId = \"org-1\",):createWithPermissions,getRolePermissions:",
-        "createWithUser:297:(userId:string, userName:string, userEmail:string, role:TestRole,):TestMembership:create:",
-        "createMultipleForOrganization:316:(organizationId:string, userCount = 3,):TestMembership[]:createSystemRoleSet,createWithUser:",
-        "createWithRoles:360:(name = \"Test Organization\", subdomain = \"test\",):TestOrganization:create,createSystemRoleSet:",
-        "createWithMemberships:375:(name = \"Test Organization\", subdomain = \"test\", memberCount = 3,):TestOrganization:create,createMultipleForOrganization,createSystemRoleSet:",
-        "createMultipleForTesting:396:(count = 2):TestOrganization[]:createWithMemberships:",
-        "createMatrix:419:():Record<string, string[]>::",
-        "getRolePermissions:466:(roleName:string):string[]:createMatrix:",
-        "hasPermission:471:(roleName:string, permission:string):boolean:getRolePermissions:",
-        "getPermissionDependencies:476:():Record<string, string[]>::",
-        "createWithPermissions:497:(permissions:string[], organizationId = \"org-1\",):create,createCustomRole,createWithRole:",
-        "createAdmin:534:(organizationId = \"org-1\"):createWithRole:",
-        "createTechnician:538:(organizationId = \"org-1\"):createWithRole:",
-        "createUser:542:(organizationId = \"org-1\"):createWithRole:",
-        "createUnauthenticated:546:(organizationId = \"org-1\"):createWithRole:"
-      ]
-    ],
-    "sr/test/helpers/archetype-validator.ts": [
-      "t",
-      [
-        "validateTestArchetype:259:(filePath:string, fileContent?:string,):ValidationResult:detectArchetype,validateArchetypeCompliance,validateErrorHandling,validateImportStructure,validateMemorySafety,validatePerformancePatterns,validateRLSContext:",
-        "detectArchetype:307:(content:string, _fileName:string,):number | null::",
-        "validateMemorySafety:345:(content:string, filePath:string, result:ValidationResult,):void:getLineNumber:",
-        "validateRLSContext:413:(content:string, filePath:string, result:ValidationResult,):void::",
-        "validateArchetypeCompliance:459:(content:string, filePath:string, result:ValidationResult,):void::",
-        "validateImportStructure:504:(content:string, filePath:string, result:ValidationResult,):void:getLineNumber:",
-        "validateErrorHandling:554:(content:string, filePath:string, result:ValidationResult,):void::",
-        "validatePerformancePatterns:593:(content:string, filePath:string, result:ValidationResult,):void::",
-        "getLineNumber:644:(content:string, index:number):number::",
-        "validateTestFiles:651:(filePaths:string[],):Map<string, ValidationResult>:validateTestArchetype:",
-        "generateValidationReport:691:(results:Map<string, ValidationResult>,):string::",
-        "validateSingleFile:796:(filePath:string):void:generateValidationReport,validateTestArchetype:"
-      ]
-    ],
-    "sr/test/helpers/createSeededAdminTestContext.ts": [
-      "t",
-      [
-        "createSeededAdminTestContext:72:async (txDb:TestDatabase, organizationId:string, userId:string, options:AdminContextOptions = {},):Promise<SeededAdminTestContext>::"
-      ]
-    ],
-    "sr/test/helpers/createSeededCollectionTestContext.ts": [
-      "t",
-      [
-        "createPublicTestContext:76:async (txDb:TestDatabase, organizationId:string,):Promise<SeededCollectionTestContext>::",
-        "createSeededCollectionTestContext:178:async (txDb:TestDatabase, organizationId:string, userId:string, options:SeededCollectionTestOptions = {},):Promise<SeededCollectionTestContext>::"
-      ]
-    ],
-    "sr/test/helpers/createSeededIssueTestContext.ts": [
-      "t",
-      [
-        "createSeededIssueTestContext:61:async (txDb:TestDatabase, organizationId:string, userId:string,):Promise<SeededIssueTestContext>::"
-      ]
-    ],
-    "sr/test/helpers/createSeededLocationTestContext.ts": [
-      "t",
-      [
-        "createSeededLocationTestContext:55:async (db:TestDatabase, organizationId:string, userId:string, options:CreateSeededLocationTestContextOptions = {},):Promise<TRPCContext>::",
-        "createPrimaryAdminContext:187:async (db:TestDatabase, options?:CreateSeededLocationTestContextOptions,):Promise<TRPCContext>:createSeededLocationTestContext:",
-        "createCompetitorAdminContext:202:async (db:TestDatabase, options?:CreateSeededLocationTestContextOptions,):Promise<TRPCContext>:createSeededLocationTestContext:",
-        "createPrimaryMemberContext:217:async (db:TestDatabase, memberNumber:1 | 2 = 1, options?:CreateSeededLocationTestContextOptions,):Promise<TRPCContext>:createSeededLocationTestContext:"
-      ]
-    ],
-    "sr/test/helpers/createSeededMachineTestContext.ts": [
-      "t",
-      [
-        "createSeededMachineTestContext:55:async (db:TestDatabase, organizationId:string, userId:string, options:CreateSeededMachineTestContextOptions = {},):Promise<TRPCContext>::",
-        "createPrimaryAdminContext:182:async (db:TestDatabase, options?:CreateSeededMachineTestContextOptions,):Promise<TRPCContext>:createSeededMachineTestContext:",
-        "createCompetitorAdminContext:197:async (db:TestDatabase, options?:CreateSeededMachineTestContextOptions,):Promise<TRPCContext>:createSeededMachineTestContext:",
-        "createPrimaryMemberContext:212:async (db:TestDatabase, memberNumber:1 | 2 = 1, options?:CreateSeededMachineTestContextOptions,):Promise<TRPCContext>:createSeededMachineTestContext:"
-      ]
-    ],
-    "sr/test/helpers/createSeededNotificationTestContext.ts": [
-      "t",
-      [
-        "createSeededNotificationTestContext:13:async (txDb:TestDatabase, organizationId:string, userId:string, options?:CreateSeededNotificationTestContextOptions,):Promise<TRPCContext>::"
-      ]
-    ],
-    "sr/test/helpers/integration-test-seeds.ts": [
-      "t",
-      [
-        "seedProductionInfrastructure:44:async (db:TestDatabase,):Promise<::",
-        "seedProductionSampleData:60:async (db:TestDatabase, organizationId:string,):Promise<void>::",
-        "seedTestInfrastructure:81:async (db:TestDatabase,):Promise<TestOrganization>:seedProductionInfrastructure:",
-        "seedTestSampleData:92:async (db:TestDatabase, organizationId:string,):Promise<void>:seedProductionSampleData:",
-        "seedCompleteTestData:104:async (db:TestDatabase,):Promise<TestOrganization>:seedTestInfrastructure,seedTestSampleData:"
-      ]
-    ],
-    "sr/test/helpers/multi-tenant-test-helpers.ts": [
-      "t",
-      [
-        "auditMultiTenantSecurity:101:async (db:TestDatabase, options:{ orgCount?:number; testDataSize?:\"small\" | \"medium\" | \"large\"; includePerformance?:boolean; } = {},):Promise<SecurityAuditResult>:auditTableIsolation,createAuditTestData,getDataSizeConfig,measureRLSPerformance:",
-        "testPermissionBoundaries:185:async (db:TestDatabase, userId:string, orgId:string, permissionSet:string[],):Promise<PermissionTestResult[]>::",
-        "testCrossOrgAccess:327:async (db:TestDatabase, sourceOrg:OrgTestContext, targetOrg:OrgTestContext,):Promise<CrossOrgAccessResult[]>::",
-        "measureRLSPerformance:411:async (db:TestDatabase, table:{ name:string; schema:any }, org:OrgTestContext,):Promise<::",
-        "validateRLSPolicies:498:async (db:TestDatabase):Promise<::",
-        "getDataSizeConfig:568:(size:\"small\" | \"medium\" | \"large\")::",
-        "createAuditTestData:582:async (db:TestDatabase, org:OrgTestContext, dataSize:{ locations:number; machines:number; issues:number },)::",
-        "auditTableIsolation:637:async (db:TestDatabase, table:{ name:string; schema:any }, testOrgs:OrgTestContext[],):Promise<SecurityViolation[]>::"
-      ]
-    ],
-    "sr/test/helpers/organization-context.ts": [
-      "t",
-      [
-        "createOrgContext:83:async (db:TestDatabase, orgSuffix:string = Math.random()::",
-        "setupMultiOrgContext:400:async (db:TestDatabase, count = 2,):Promise<Record<string, OrgTestContext>>:createOrgContext:",
-        "createOrgTestData:422:async (db:TestDatabase, orgContext:OrgTestContext, options:{ locationCount?:number; machineCount?:number; issueCount?:number; } = {},):Promise<::",
-        "verifyOrgIsolation:547:async (db:TestDatabase, org1Id:string, org2Id:string,):Promise<::",
-        "getUserMembership:632:async (db:TestDatabase, userId:string, organizationId:string,)::"
-      ]
-    ],
-    "sr/test/helpers/pglite-test-setup.ts": [
-      "t",
-      [
-        "applyDrizzleSchema:47:async (db:TestDatabase):Promise<void>::",
-        "verifyMigrationComplete:68:async (db:TestDatabase):Promise<void>::",
-        "createTestDatabase:120:async ():Promise<TestDatabase>:applyDrizzleSchema,configureForBusinessLogicTesting,verifyMigrationComplete:",
-        "configureForBusinessLogicTesting:150:async (db:TestDatabase,):Promise<void>::",
-        "createCleanTestDatabase:221:async ():Promise<::",
-        "createInfrastructureOnlyTestDatabase:254:async ():Promise<::",
-        "createSeededTestDatabase:279:async ():Promise<::",
-        "withTransaction:329:async (db:TestDatabase, testFn:(db:TestDatabase)::",
-        "cleanupTestDatabase:358:async (db:TestDatabase):Promise<void>::",
-        "isRLSBypassed:388:async (db:TestDatabase):Promise<boolean>::",
-        "getCurrentTestRole:406:async (db:TestDatabase,):Promise<string | null>::",
-        "getCurrentTestMode:425:async (db:TestDatabase,):Promise<string | null>::",
-        "verifyIntegrationTesterMode:447:async (db:TestDatabase):Promise<::",
-        "getIntegrationTesterDatabaseUrl:501:():string::",
-        "verifyIntegrationTesterSetup:524:async ():Promise<boolean>:getIntegrationTesterDatabaseUrl:"
-      ]
-    ],
-    "sr/test/helpers/rls-security-context.ts": [
-      "t",
-      [
-        "withRLSSecurityContext:27:async (db:TestDatabase, context:RLSContext, fn:(db:TestDatabase):esc:",
-        "clearRLSSecurityContext:53:async (db:TestDatabase):Promise<void>::",
-        "esc:33:(v:string):esc:"
-      ]
-    ],
-    "sr/test/helpers/rls-test-context.ts": [
-      "t",
-      [
-        "createTestUser:149:(userId:string, organizationId:string, options:{ email?:string; name?:string; role?:string; } = {},):RLSTestUser::",
-        "withTestUser:203:async (userId:string, organizationId:string, operation:()::",
-        "withRLSContext:266:async (db:TestDatabase, userId:string, organizationId:string, operation:(db:TestDatabase)::",
-        "verifyRLSContext:308:async (db:TestDatabase, expected:{ organizationId?:string; userId?:string; role?:string; email?:string; },):Promise<void>::",
-        "withAdminContext:372:async (db:TestDatabase, operation:(db:TestDatabase)::",
-        "withMemberContext:392:async (db:TestDatabase, operation:(db:TestDatabase)::",
-        "withFullRLSContext:427:async (db:TestDatabase, userId:string, organizationId:string, operation:(db:TestDatabase)::",
-        "verifyOrganizationalIsolation:505:async (db:TestDatabase, testFunction:(db:TestDatabase)::",
-        "mockNextHeaders:558:():void::"
-      ],
-      {
-        "RLSContextManager": [
-          "84",
-          [
-            "setUser:87:(user:RLSTestUser):void::",
-            "clearUser:91:():void::",
-            "getCurrentUser:95:():RLSTestUser | null::",
-            "getMockSupabaseResponse:99:():MockSupabaseAuthResponse::",
-            "getMockSupabaseClient:113:():MockSupabaseClient::",
-            "setOriginalCreateClient:128:(original:unknown):void::",
-            "getOriginalCreateClient:132:():unknown::"
-          ]
-        ]
-      }
-    ],
-    "sr/test/helpers/roleTestHelpers.ts": [
-      "t",
-      [
-        "getPermissionTestScenarios:18:(requiredPermission:string):::",
-        "getRoleTestScenarios:51:(requiredPermission:string):::",
-        "getMultiTenantTestScenarios:71:():::",
-        "createPermissionTestContexts:102:(permission:string):::",
-        "createMultiTenantTestContexts:127:():::",
-        "validatePermissionInheritance:156:(role:TestRole, expectedPermissions:string[],):boolean::",
-        "validatePermissionDependencies:169:(permissions:string[]):::",
-        "generatePermissionCombinations:194:():::",
-        "getPermissionEscalationScenarios:270:():::",
-        "validateRoleSystemIntegrity:317:(roles:TestRole[]):::",
-        "createTestSuiteData:366:():::"
-      ]
-    ],
-    "sr/test/helpers/session-context.ts": [
-      "t",
-      [
-        "setTestSession:26:async (db:TestDatabase, orgId:string, userId?:string, role?:string, additionalContext?:Record<string, string>,):Promise<void>::",
-        "getCurrentSession:63:async (db:TestDatabase):Promise<::",
-        "clearTestSession:107:async (db:TestDatabase):Promise<void>::",
-        "escalate:531:async (to:\"member\" | \"admin\")::"
-      ],
-      {
-        "MultiContextManager": [
-          "284",
-          [
-            "constructor:292:(private db:TestDatabase)::",
-            "switchTo:319:async (contextId:string):Promise<void>::",
-            "getContextIds:341:():string[]::",
-            "clearContexts:348:():void::",
-            "__init__:292:(private db:TestDatabase)::"
-          ]
-        ]
-      }
-    ],
-    "sr/test/helpers/supabase-test-setup.ts": [
-      "t",
-      [
-        "ensureTestBucket:32:async ():Promise<void>::",
-        "clearTestStorage:56:async ():Promise<void>:getAllFilePaths:",
-        "getAllFilePaths:98:async (bucketName:string, folder:string,):Promise<string[]>:getAllFilePaths:",
-        "createTestBucket:132:async (bucketName:string, options:{ public?:boolean; fileSizeLimit?:number; allowedMimeTypes?:string[]; } = {},):Promise<void>::",
-        "deleteTestBucket:160:async (bucketName:string):Promise<void>:clearStorageBucket:",
-        "clearStorageBucket:175:async (bucketName:string):Promise<void>:getAllFilePaths:",
-        "uploadTestFile:192:async (bucketName:string, filePath:string, file:File | Blob,):Promise<string>::",
-        "verifyFileExists:218:async (bucketName:string, filePath:string,):Promise<boolean>::",
-        "getTestFileUrl:235:(bucketName:string, filePath:string):string::"
-      ]
-    ],
-    "sr/test/helpers/test-id-generator.ts": [
-      "t",
-      [
-        "generateTestId:38:(prefix = \"test\"):never::",
-        "generateTestEmail:45:(prefix = \"test\"):never::",
-        "generateTestSubdomain:52:(prefix = \"test\"):never::",
-        "generateTestIds:59:(count:number, prefix = \"test\"):never::"
-      ]
-    ],
-    "sr/test/helpers/worker-scoped-db.ts": [
-      "t",
-      [
-        "withIsolatedTest:84:async (db:TestDatabase, testFn:(tx:TestDatabase)::",
-        "withExplicitRollback:161:async (db:TestDatabase, testFn:(tx:TestDatabase)::",
-        "_cleanupAllTestData:207:async (_db:TestDatabase):Promise<void>::",
-        "setTestSession:264:async (db:TestDatabase, orgId:string, userId?:string, role?:string,):Promise<void>::",
-        "withRLSTest:329:async (db:TestDatabase, orgId:string, testFn:(tx:TestDatabase):withIsolatedTest:",
-        "withMultiOrgTest:348:async (db:TestDatabase, contexts:{ orgId:string; role?:string; userId?:string }[], testFn:( setContext:(contextIndex:number):setContext,setTestSession,withIsolatedTest:",
-        "withBusinessLogicTest:401:async (db:TestDatabase, testFn:(tx:TestDatabase):withIsolatedTest:",
-        "withRLSAwareTest:430:async (db:TestDatabase, orgId:string, testFn:(tx:TestDatabase):withRLSTest:",
-        "withCrossOrgTest:454:async (db:TestDatabase, contexts:{ orgId:string; role?:string; userId?:string }[], testFn:( setContext:(contextIndex:number):withMultiOrgTest:",
-        "withRLSEnabledTest:475:async (db:TestDatabase, testFn:(tx:TestDatabase):withIsolatedTest:",
-        "setContext:357:async (contextIndex:number):Promise<void>:setTestSession:"
-      ]
-    ],
-    "sr/test/mockContext.ts": [
-      "t",
-      [
-        "createMockContext:94:():MockContext:createMockServiceFactory:",
-        "resetMockContext:153:(ctx:MockContext):void::",
-        "createMockServiceFactory:47:():DeepMockProxy<ServiceFactory>::"
-      ]
-    ],
-    "sr/test/mockUtils.ts": [
-      "t",
-      [
-        "createMockUser:147:(overrides:Partial<MockUser> = {}):MockUser::",
-        "createMockStatus:160:(overrides:Partial<MockIssueStatus> = {},):MockIssueStatus::",
-        "createMockPriority:176:(overrides:Partial<MockPriority> = {},):MockPriority::",
-        "createMockModel:192:(overrides:Partial<MockModel> = {}):MockModel::",
-        "createMockLocation:205:(overrides:Partial<MockLocation> = {},):MockLocation::",
-        "createMockMachine:219:(overrides:Partial<MockMachine> = {},):MockMachine:createMockLocation,createMockModel:",
-        "createMockIssue:244:(overrides:Partial<MockIssue> = {}):MockIssue:createMockMachine,createMockPriority,createMockStatus,createMockUser:",
-        "createMockIssuesList:282:(options:MockFactoryOptions<MockIssue> = {},):MockIssue[]:createMockIssue:",
-        "createMockLocations:380:(options:MockFactoryOptions<MockLocation> = {},):MockLocation[]:createMockLocation:",
-        "createMockStatuses:403:(options:MockFactoryOptions<MockIssueStatus> = {},):MockIssueStatus[]:createMockStatus:",
-        "createMockMachines:428:(options:MockFactoryOptions<MockMachine> = {},):MockMachine[]:createMockMachine,createMockModel:",
-        "createMockUsers:451:(options:MockFactoryOptions<MockUser> = {},):MockUser[]:createMockUser:",
-        "createMockTRPCQueryResult:476:(data:T, options:Partial< Pick<MockTRPCQueryResult<T>, \"isLoading\" | \"isError\" | \"error\"> > = {},):MockTRPCQueryResult<T>::",
-        "createMockTRPCLoadingResult:495:():MockTRPCQueryResult<\n  T | undefined\n>::",
-        "createMockTRPCErrorResult:510:(error:Error = new Error(\"Mock error\")::",
-        "createIssueListTRPCMocks:526:():::",
-        "createPermissionScenario:624:(permissions:string[], role = \"Custom\",):::",
-        "createRealisticIssueDataSet:649:():::"
-      ]
-    ],
-    "sr/test/msw/handlers.ts": [
-      "t",
-      [
-        "createMockUser:31:(overrides:Partial<User> = {}):User::",
-        "createMockOrganization:47:(overrides:Partial<Organization> = {},):Organization::",
-        "createMockMembership:59:(overrides:{ userId?:string; role?:string; organizationId?:string; permissions?:string[]; } = {},)::",
-        "mockUserProfile:77:(user:Partial<User> = {})::",
-        "mockCurrentMembership:104:(membership:Parameters<typeof createMockMembership>[0] = {},):createMockMembership:",
-        "mockCurrentOrganization:115:(org:Partial<Organization> = {})::",
-        "mockUserWithPermissions:121:(permissions:string[])::",
-        "mockAdminUser:125:()::",
-        "mockUserWithoutPermissions:148:()::",
-        "mockUnauthorizedError:155:()::",
-        "mockForbiddenError:161:(permission:string)::",
-        "mockNotFoundError:167:(resource:string)::"
-      ]
-    ],
-    "sr/test/msw/setup.ts": [
-      "t",
-      [
-        "getTestBaseUrl:8:():string::",
-        "ensureListening:41:()::",
-        "ensureClosed:51:()::"
-      ]
-    ],
-    "sr/test/permissionTestHelpers.ts": [
-      "t",
-      [
-        "createAuthenticatedContext:101:(permissions:readonly string[] = PERMISSION_SCENARIOS.MEMBER.permissions,):VitestMockContext &::",
-        "createPublicContext:189:():VitestMockContext &::",
-        "createCrossOrgContext:209:(organizationId = \"other-org\", permissions:readonly string[] = PERMISSION_SCENARIOS.MEMBER.permissions,):VitestMockContext &::",
-        "createPermissionTestCases:243:(requiredPermission:string, additionalCases:PermissionTestCase[] = [],):PermissionTestCase[]::",
-        "expectAuthenticationRequired:281:async (routerCall:(caller:TRouter):createPublicContext:",
-        "expectOrganizationRequired:295:async (routerCall:(caller:TRouter):createAuthenticatedContext:",
-        "expectPermissionRequired:312:async (routerCall:(caller:TRouter):createAuthenticatedContext:",
-        "expectOrganizationIsolation:333:async (routerCall:(caller:TRouter)::",
-        "createPermissionTestSuite:358:(name:string, options:PermissionTestSuiteOptions<TRouter>,):createAuthenticatedContext,createPermissionTestCases,expectAuthenticationRequired,expectOrganizationIsolation,expectOrganizationRequired,expectPermissionRequired:",
-        "setupPermissionMocks:485:(context:VitestMockContext, mockData:{ issue?:any; machine?:any; location?:any; membership?:any; [key:string]:any; },)::"
-      ]
-    ],
-    "sr/test/routerTestPatterns.ts": [
-      "t",
-      [
-        "createRouterTestContext:41:(router:AppRouter):RouterTestContext::",
-        "testAuthenticatedProcedure:66:(testName:string, procedureCall:(context:RouterTestContext)::",
-        "testPublicProcedure:106:(testName:string, procedureCall:(context:RouterTestContext)::",
-        "testAdminOnlyProcedure:135:(testName:string, procedureCall:(context:RouterTestContext)::",
-        "testServiceIntegration:174:(serviceName:keyof VitestMockContext[\"services\"], methodName:string, options:{ mockReturnValue?:any; expectedCallArgs?:any[]; mockSetup?:(mockService:any)::",
-        "testInputValidation:220:(procedureCall:(input:any, context:RouterTestContext):createRouterTestContext:",
-        "testOrganizationScoping:250:(procedureCall:(context:RouterTestContext)::",
-        "createRouterTestSuite:397:(options:RouterTestSuiteOptions<TInput, TOutput>,):testAdminOnlyProcedure,testAuthenticatedProcedure,testInputValidation,testOrganizationScoping,testPublicProcedure:"
-      ]
-    ],
-    "sr/test/seed-data-helpers.ts": [
-      "t",
-      [
-        "getCachedSeedData:55:async (cacheKey:string, fetchFn:()::",
-        "clearSeedDataCache:71:():void::",
-        "getUserWithRoles:82:async (email:string):Promise<SeededUser>::",
-        "getSeededAdmin:152:async ():Promise<SeededUser>:getCachedSeedData,getUserWithRoles:",
-        "getSeededMember:162:async ():Promise<SeededUser>:getCachedSeedData,getUserWithRoles:",
-        "getSeededPlayer:172:async ():Promise<SeededUser>:getCachedSeedData,getUserWithRoles:",
-        "getSeededUserByEmail:181:async (email:string):Promise<SeededUser>:getCachedSeedData,getUserWithRoles:",
-        "getSeededOrganization:208:async ():Promise<SeededOrganization>:getCachedSeedData:",
-        "getSeededIssue:260:async (titleContains:string,):Promise<SeededIssue>:getCachedSeedData:",
-        "getSeededIssues:329:async (limit = 10):Promise<SeededIssue[]>:getCachedSeedData:",
-        "getSeededOrganizationId:392:async ():Promise<string>:getSeededOrganization:",
-        "getSeededIssueStatuses:400:async ():Promise<IssueStatus[]>:getCachedSeedData,getSeededOrganizationId:",
-        "getSeededPriorities:413:async ():Promise<Priority[]>:getCachedSeedData,getSeededOrganizationId:",
-        "createSupabaseUserFromSeeded:456:(user:SeededUser):SupabaseUser::",
-        "getSeededAdminSupabaseUser:500:async ():Promise<SupabaseUser>:createSupabaseUserFromSeeded,getSeededAdmin:",
-        "getSeededMemberSupabaseUser:508:async ():Promise<SupabaseUser>:createSupabaseUserFromSeeded,getSeededMember:",
-        "getSeededPlayerSupabaseUser:516:async ():Promise<SupabaseUser>:createSupabaseUserFromSeeded,getSeededPlayer:",
-        "setupAuthTestData:529:async ():createSupabaseUserFromSeeded,getSeededAdmin,getSeededMember,getSeededOrganization,getSeededPlayer:",
-        "cleanupSeedDataHelpers:560:():void:clearSeedDataCache:"
-      ]
-    ],
-    "sr/test/setup/issueListTestSetup.ts": [
-      "t",
-      [
-        "createIssueListMocks:49:():IssueListMocks::",
-        "setupIssueListTest:191:(scenario:IssueListTestScenario, mocks:ReturnType<typeof createIssueListMocks>,):::",
-        "createWorkflowIssues:308:():ReturnType<\n  typeof createMockIssuesList\n>::",
-        "createDefaultMachineData:110:():{\n  id:string;\n  name:string;\n  organizationId:string;\n  modelId:string;\n  locationId:string;\n  ownerId:null;\n  model:{\n    id:string;\n    name:string;\n    manufacturer:string;\n    year:number;\n  };\n  location:{\n    id:string;\n    name:string;\n    organizationId:string;\n  };\n}[]::",
-        "setupDefaultResponses:230:():void::",
-        "resetMocks:271:():void:setupDefaultResponses:"
-      ]
-    ],
-    "sr/test/setup/viTestMocks.ts": [
-      "t",
-      [
-        "setupNavigationMocks:24:(mocks:IssueListMocks):void::",
-        "setupTRPCMocks:37:(mocks:IssueListMocks):void::",
-        "setupPermissionMocks:105:(mocks:IssueListMocks):void::",
-        "setupAllIssueListMocks:115:(mocks:IssueListMocks):void:setupNavigationMocks,setupPermissionMocks,setupTRPCMocks:"
-      ]
-    ],
-    "sr/test/templates/02-service-business-logic-test.template.ts": [
-      "t",
-      ["createTestData:316:async (db:any):Promise<void>::"],
-      { "name": ["348", []] }
-    ],
-    "sr/test/templates/03-pglite-integration-test.template.ts": [
-      "t",
-      [
-        "createBasicTestData:393:async (db:any):Promise<void>::",
-        "createComplexTestDataset:418:async (db:any):Promise<void>:createBasicTestData:"
-      ]
-    ],
-    "sr/test/templates/04-react-component-unit-test.template.tsx": [
-      "t",
-      ["ThrowingComponent:391:():JSX.Element::"]
-    ],
-    "sr/test/testDataFactories.ts": [
-      "t",
-      [
-        "createIssueFactory:18:(options:FactoryOptions = {}):createMachineFactory,createPriorityFactory,createSingleIssue,createStatusFactory,createUserFactory:",
-        "createSingleIssue:21:(customOverrides:Record<string, any> = {}):createMachineFactory,createPriorityFactory,createStatusFactory,createUserFactory:",
-        "createCommentFactory:117:(options:FactoryOptions = {}):createSingleComment,createUserFactory:",
-        "createSingleComment:120:(customOverrides:Record<string, any> = {}):createUserFactory:",
-        "createUserFactory:179:(options:FactoryOptions = {})::",
-        "createMachineFactory:262:(options:FactoryOptions = {}):createLocationFactory,createModelFactory:",
-        "createModelFactory:305:(options:FactoryOptions = {})::",
-        "createLocationFactory:331:(options:FactoryOptions = {})::",
-        "createStatusFactory:363:(options:FactoryOptions = {})::",
-        "createPriorityFactory:386:(options:FactoryOptions = {})::",
-        "createRoleFactory:404:(options:FactoryOptions = {})::",
-        "createOrganizationFactory:427:(options:FactoryOptions = {})::",
-        "createSessionFactory:443:(options:FactoryOptions = {}):createUserFactory:",
-        "createAttachmentFactory:455:(options:FactoryOptions = {}):createSingleAttachment,createUserFactory:",
-        "createSingleAttachment:458:(customOverrides:Record<string, any> = {},):createUserFactory:",
-        "createActivityFactory:486:(options:FactoryOptions = {}):createSingleActivity,createUserFactory:",
-        "createSingleActivity:489:(customOverrides:Record<string, any> = {}):createUserFactory:",
-        "getSingleIssue:519:(overrides:Record<string, any> = {}):createIssueFactory:",
-        "createComplexIssueFactory:526:(options:FactoryOptions = {}):createActivityFactory,createAttachmentFactory,createCommentFactory,getSingleIssue:",
-        "createIssueWithMixedComments:542:(options:FactoryOptions = {}):getSingleIssue:",
-        "createIssueRouterContext:605:(options:{ userId?:string; organizationId?:string; permissions?:string[]; role?:string; } = {},):createUserFactory:",
-        "createMockServices:779:():any::",
-        "createTRPCCallerForIssues:807:(options:{ permissions?:string[]; userId?:string; organizationId?:string; role?:string; mockContext?:any; } = {},):createIssueRouterContext,createMockServices:",
-        "createIssueDbMocks:856:(context:any)::"
-      ]
-    ],
-    "sr/test/utils/mock-ids.ts": [
-      "t",
-      [
-        "createNumberedId:13:(pattern:string, number:number):string::",
-        "createAdminId:70:(base:string, suffix:string):string::",
-        "createNumberedVariation:77:(pattern:string, number:number,):string:createNumberedId:"
-      ]
-    ],
-    "sr/test/vitestMockContext.ts": [
-      "t",
-      ["createVitestMockContext:112:():VitestMockContext::"]
-    ],
     "sr/trpc/query-client.ts": ["t", ["createQueryClient:7:():QueryClient::"]],
     "sr/trpc/react.tsx": [
       "t",
@@ -2295,441 +2298,517 @@
     ]
   },
   "g": [
-    ["createTemplateRoleWithDb", "log"],
-    ["validateDrizzleConfiguration", "expectPoolConfiguration"],
-    ["getClient", "createClient"],
-    ["createSystemRoleSet", "createMemberRole"],
-    ["validateCommentDeletion", "validateOrganizationMembership"],
-    ["getSeededPriorities", "getSeededOrganizationId"],
-    ["logout", "waitForLogout"],
-    ["validateSingleFile", "generateValidationReport"],
-    ["createSampleIssuesWithDb", "log"],
-    ["createAdminMembership", "createAdminRole"],
-    ["createDefaultCollectionTypesWithDb", "getCollectionTypeId"],
-    ["getSeededOrganizationId", "getSeededOrganization"],
-    ["validateSingleFile", "validateTestArchetype"],
-    ["createMockIssue", "createMockMachine"],
-    ["createAdmin", "createWithRole"],
-    ["validateCommentCreationInput", "validateCommentContent"],
-    ["createMockContext", "createMockServiceFactory"],
-    ["createUnauthenticatedRole", "create"],
-    ["createDrizzleClient", "createDrizzleClientInternal"],
-    ["seedAuthUsers", "processBatchUsers"],
-    ["getSeededAdminSupabaseUser", "createSupabaseUserFromSeeded"],
+    ["createMultipleForTesting", "createWithMemberships"],
+    ["seedTestSampleData", "seedProductionSampleData"],
+    ["isProduction", "getClientEnvironment"],
+    ["getValidStatusTransitions", "validateStatusTransition"],
+    ["createSingleActivity", "createUserFactory"],
+    ["createServerMockContext", "createMockSupabaseUser"],
+    ["createModelsWithDb", "log"],
+    ["createGlobalPermissionsWithDb", "log"],
+    ["createCompetitorOrgUser", "createMockSupabaseUser"],
+    ["urlParamsToFilters", "isValidSortOrder"],
+    ["processIssueImageFile", "calculateDimensions"],
     ["createCompetitorMachine", "log"],
-    ["createMachineWithoutCustomName", "createMockMachine"],
+    ["validateFilters", "isValidSortField"],
+    ["IssueActions", "usePermissions"],
+    ["createClient", "setAll"],
+    ["isDevelopmentOrTest", "isDevelopment"],
+    ["getGroupIdFromOPDBId", "parseOPDBId"],
+    ["createUnauthenticatedRole", "create"],
+    ["validateStatusTransition", "validateTransitionRules"],
+    ["seedSampleDataWithDb", "createCompetitorMachine"],
+    ["batchToggleSelection", "toggleSelection"],
+    ["configureCIMocks", "createRemoteURL"],
     ["createCustomRole", "create"],
+    ["createWithRoles", "createSystemRoleSet"],
+    ["createComplexTestDataset", "createBasicTestData"],
+    ["seedAuthUsers", "deleteExistingDevUsers"],
+    ["createWithPermissions", "create"],
+    ["auditMultiTenantSecurity", "auditTableIsolation"],
+    ["createWithRole", "createWithPermissions"],
+    ["PermissionButton", "getDefaultTooltipText"],
+    ["isDevAuthAvailable", "shouldEnableDevFeatures"],
+    ["getSeededAdmin", "getUserWithRoles"],
+    ["StatusCategoryMultiSelect", "getGroupLabel"],
+    ["verifyPublicOnlyContent", "verifyPublicContent"],
+    ["toggleSelectAll", "isAllSelected"],
+    ["seedTestInfrastructure", "seedProductionInfrastructure"],
+    ["createComplexIssueFactory", "createCommentFactory"],
+    ["ActiveFilters", "getMachineName"],
+    ["createCompetitorAdminContext", "createSeededLocationTestContext"],
+    ["createRouterTestSuite", "testAuthenticatedProcedure"],
+    ["getUserPermissionsForSupabaseUser", "getUserPermissionsForSupabaseUser"],
+    ["validateEntityExistsAndOwned", "validateRouterEntityOwnership"],
+    ["StatusTogglePills", "handleCategoryToggle"],
+    ["ReportingService.constructor", "groupByPriority"],
+    ["IssueStatusControl", "handleStatusChange"],
+    ["createWithMemberCount", "create"],
+    ["validateCommentDeletion", "validateCommentDeletionPermissions"],
+    ["createMockMachines", "createMockModel"],
+    ["validateCommentEditInput", "validateCommentContent"],
+    ["getSeededMember", "getCachedSeedData"],
+    ["createTestDatabase", "configureForBusinessLogicTesting"],
+    ["validateCommentCreationInput", "validateCommentContent"],
+    ["expectPermissionRequired", "createAuthenticatedContext"],
+    ["getSeededPriorities", "getCachedSeedData"],
+    ["createWithRole", "getRolePermissions"],
+    ["validateIssueAssignment", "validateAssignmentRules"],
+    ["createAllPermissions", "createLocationPermissions"],
+    ["createMockUsers", "createMockUser"],
+    ["createCommentFactory", "createSingleComment"],
+    ["validateTestArchetype", "validateRLSContext"],
+    ["validateCommentEditWithTimeLimit", "canEditCommentByTime"],
+    ["toggleSelectAll", "selectAll"],
+    ["setupRLS", "createDatabaseConnection"],
+    ["createLogger", "isErrorObject"],
+    ["createOrganizationWithRolesWithDb", "createSystemRolesWithDb"],
+    ["createMockIssue", "createMockMachine"],
     ["cleanupSeedDataHelpers", "clearSeedDataCache"],
-    ["createTestMembership", "createTestUser"],
-    ["createAllPermissions", "createAdminPermissions"],
-    ["AdminPanel", "useRequiredPermission"],
+    ["validateTestArchetype", "detectArchetype"],
+    ["createWithUser", "create"],
+    ["createAdminClient", "createServerClient"],
+    ["createComplexIssueFactory", "createActivityFactory"],
+    ["SignOutButton", "handleSignOut"],
+    ["getEnvironmentName", "getClientEnvironment"],
+    ["middleware", "getBaseDomain"],
+    ["createIssueFactory", "createStatusFactory"],
+    ["createAdminPermissions", "create"],
+    ["isDevelopment", "getClientEnvironment"],
     [
       "validatePublicOrganizationContextRequired",
       "validatePublicOrganizationContext"
     ],
-    ["shouldEnableCredentialsProvider", "isPreview"],
-    ["getSeededIssues", "getCachedSeedData"],
-    ["createSingleActivity", "createUserFactory"],
-    ["createDualChildLogger", "createDualChildLogger"],
-    ["formatMachineName", "getYearValue"],
-    ["createPermissionTestSuite", "expectAuthenticationRequired"],
-    ["createMockLocations", "createMockLocation"],
-    ["getSeededIssueStatuses", "getCachedSeedData"],
-    ["createDefaultCollectionTypesWithDb", "log"],
-    ["createSystemRoleSet", "createTechnicianRole"],
-    ["AuthProvider", "getInitialSession"],
-    ["createMockIssue", "createMockUser"],
-    ["createTechnicianRole", "create"],
-    ["validateIssueAssignment", "validateAssignmentRules"],
-    ["handler", "createContext"],
-    ["deleteTestBucket", "clearStorageBucket"],
-    ["seedInfrastructureWithDb", "createDefaultLocationWithDb"],
-    ["createCompetitorOrganization", "createMockOrganization"],
-    ["createAdminClient", "setAll"],
-    ["validateBatchAssignments", "validateIssueOrganizationBoundary"],
-    ["withCrossOrgTest", "withMultiOrgTest"],
-    ["shouldEnablePreviewAuthInProduction", "shouldForcePreviewBehavior"],
-    [
-      "validateCommentOrganizationBoundary",
-      "validateResourceOrganizationBoundary"
-    ],
-    ["withOrgScopeAndNotDeleted", "excludeSoftDeleted"],
-    ["formatMachineName", "getManufacturerName"],
-    ["seedSampleData", "seedSampleDataWithDb"],
-    ["createIssueFactory", "createUserFactory"],
-    ["createCommentFactory", "createUserFactory"],
-    ["esc", "esc"],
-    ["clearStorageBucket", "getAllFilePaths"],
-    ["requirePermission", "hasPermission"],
-    ["mockCurrentMembership", "createMockMembership"],
-    ["getCurrentUser", "createClient"],
-    ["shouldEnableTestLogin", "isDevelopment"],
-    ["createPermissionTestSuite", "expectPermissionRequired"],
-    ["validateUserRemoval", "validateUserRemovalRules"],
-    ["createAdminPermissions", "create"],
-    ["validateCommentEdit", "validateCommentExists"],
-    ["createDefaultStatusesWithDb", "log"],
-    ["getGroupIdFromOPDBId", "parseOPDBId"],
-    ["auditMultiTenantSecurity", "getDataSizeConfig"],
-    ["getSeededOrganization", "getCachedSeedData"],
-    ["ActionButton", "usePermissionTooltip"],
-    ["TRPCReactProvider", "getBaseUrl"],
-    ["deleteExistingDevUsers", "createServiceRoleClient"],
-    ["createMembershipValidationInput", "createMockMembership"],
-    ["middleware", "getBaseDomain"],
-    ["seedSampleDataWithDb", "createModelsWithDb"],
-    ["createLogger", "createFallbackLogger"],
-    ["signOut", "signOut"],
-    ["validateOrganizationContext", "getUserWithOrganization"],
-    ["createPrimaryAdminContext", "createSeededLocationTestContext"],
-    ["validateFilters", "isValidSortOrder"],
-    ["LocationList", "handleLocationClick"],
-    ["createLogger", "isErrorObject"],
-    ["createPermissionTestSuite", "createAuthenticatedContext"],
-    ["createPermissionTestSuite", "expectOrganizationRequired"],
-    ["seedSampleDataWithDb", "createCompetitorMachine"],
-    ["main", "generateSQLConstants"],
-    ["getUserPermissionsForSession", "getUserPermissions"],
-    ["createMockIssue", "createMockStatus"],
-    ["shouldRequireGoogleOAuth", "isProduction"],
-    ["validateTestArchetype", "validateMemorySafety"],
-    ["StatusCategoryMultiSelect", "getGroupLabel"],
-    ["createPermissionTestSuite", "createPermissionTestCases"],
-    ["validateRoleAssignment", "validateRoleAssignmentRules"],
-    ["createAllPermissions", "createLocationPermissions"],
-    ["createSystemRolesWithDb", "getRoleId"],
-    ["createComplexIssueFactory", "createCommentFactory"],
-    ["getUserPermissionsForSession", "PermissionService.getUserPermissions"],
-    ["urlParamsToFilters", "isValidSortBy"],
-    ["createDefaultLocationWithDb", "log"],
-    ["ActiveFilters", "getMachineName"],
-    ["createTechnician", "createWithRole"],
-    ["validateUserRemoval", "validateAdminCountForRemoval"],
-    ["isDevelopmentOrPreview", "isDevelopment"],
-    ["isValidOPDBId", "parseOPDBId"],
-    ["validateAdminCountForRemoval", "countAdmins"],
-    ["createActivityFactory", "createUserFactory"],
-    ["authenticateDevUser", "signInDevUser"],
-    ["createAdminRole", "create"],
-    ["validateStatusTransition", "validateOrganizationBoundary"],
-    ["createWithRole", "createWithPermissions"],
-    ["isPreview", "getClientEnvironment"],
-    ["validateTestArchetype", "validateErrorHandling"],
-    ["createWithRoles", "create"],
-    ["createAttachmentFactory", "createSingleAttachment"],
-    ["createNumberedVariation", "createNumberedId"],
-    ["createMultipleForOrganization", "createSystemRoleSet"],
-    ["expectPermissionRequired", "createAuthenticatedContext"],
-    ["createTRPCCallerForIssues", "createIssueRouterContext"],
-    ["validateTestArchetype", "validatePerformancePatterns"],
-    ["requirePermissionForSession", "requirePermission"],
-    ["validateIssueCreation", "validateDefaultPriority"],
-    ["validateUserRemoval", "validateUserMembership"],
-    ["getSeededPlayerSupabaseUser", "createSupabaseUserFromSeeded"],
-    ["withOrgScopeAndNotDeleted", "withOrganizationScope"],
-    ["middleware", "setAll"],
-    ["AuthProvider", "signOut"],
-    ["createComplexIssueFactory", "getSingleIssue"],
-    ["setupRLS", "createDatabaseConnection"],
-    ["validateAllOAuthProviders", "validateGoogleOAuth"],
-    ["ActiveFilters", "getLocationName"],
-    ["validateRoleReassignment", "validateReassignmentRole"],
-    ["validateCommentRestoration", "validateAdminPermissions"],
-    ["generateOrganizationalReport", "getTopMachinesByIssues"],
-    ["createSingleAttachment", "createUserFactory"],
-    ["getEnvironmentName", "getClientEnvironment"],
-    ["validateFilters", "isValidSortField"],
-    ["withRLSAwareTest", "withRLSTest"],
-    ["getEnvironmentName", "isPreview"],
-    ["setupAuthTestData", "createSupabaseUserFromSeeded"],
-    ["getSingleIssue", "createIssueFactory"],
-    [
-      "validateLocationOrganizationBoundary",
-      "validateResourceOrganizationBoundary"
-    ],
-    ["createAdminMembership", "createTestUser"],
-    ["getSeededAdmin", "getUserWithRoles"],
-    ["createTestDatabase", "applyDrizzleSchema"],
-    ["IssueActions", "usePermissions"],
-    ["createWithPermissions", "createWithRole"],
-    ["seedTestInfrastructure", "seedProductionInfrastructure"],
-    ["createUnauthenticated", "createWithRole"],
-    ["withRLSSecurityContext", "esc"],
-    ["logout", "clearSession"],
-    ["seedInfrastructureWithDb", "createTestDatabaseRolesWithDb"],
-    ["getSeededMember", "getCachedSeedData"],
-    ["getSeededAdminSupabaseUser", "getSeededAdmin"],
-    ["createOrganizationWithRolesWithDb", "log"],
-    ["withOrganizationClient", "createOrganizationAwareClient"],
-    ["generatePrefixedId", "generateId"],
-    ["createTraceContext", "generateRequestId"],
-    ["handleDrop", "handleFileSelect"],
-    ["getSeededPlayer", "getCachedSeedData"],
-    ["validateRoleAssignment", "validateAdminCountPreservation"],
-    ["createRouterTestSuite", "testOrganizationScoping"],
-    ["createMembership", "createTestRole"],
-    ["hasPermissionForSession", "hasPermission"],
-    ["createAllPermissions", "createAttachmentPermissions"],
-    ["getUserPermissionsForSupabaseUser", "getUserPermissionsForSupabaseUser"],
-    ["createFallbackLogger", "createFallbackLogger"],
-    ["createCompetitorAdminContext", "createSeededLocationTestContext"],
-    ["main", "setupRLS"],
-    ["canEditCommentByTime", "getCommentAgeInMinutes"],
-    ["getSeededPriorities", "getCachedSeedData"],
-    ["createIssueFactory", "createSingleIssue"],
-    ["createSystemRolesWithDb", "log"],
-    ["createTestDatabase", "verifyMigrationComplete"],
-    ["validateRoleReassignment", "validateRoleDeletion"],
-    ["middleware", "getSubdomain"],
-    ["MyComponent", "usePermissions"],
-    ["createWithRoles", "createSystemRoleSet"],
-    ["seedInfrastructureWithDb", "createDefaultStatusesWithDb"],
-    ["createPinballMapTestContext", "setMockPermissions"],
-    ["loginAsUser", "waitForAuthentication"],
-    ["createMockUsers", "createMockUser"],
-    ["createIssueFactory", "createStatusFactory"],
-    ["auditMultiTenantSecurity", "createAuditTestData"],
-    ["createIssueWithMixedComments", "getSingleIssue"],
-    ["TRPCReactProvider", "getQueryClient"],
-    ["setupMultiOrgContext", "createOrgContext"],
-    ["createActivityFactory", "createSingleActivity"],
-    ["createWithMemberships", "createSystemRoleSet"],
-    ["getSeededIssue", "getCachedSeedData"],
-    ["shouldEnableDemoLogin", "isPreview"],
-    ["createSessionFactory", "createUserFactory"],
-    ["createOrganizationWithRolesWithDb", "createSystemRolesWithDb"],
-    ["createComplexTestDataset", "createBasicTestData"],
-    ["validateTestArchetype", "detectArchetype"],
-    ["PermissionButton", "getDefaultTooltipText"],
-    ["ActionButton", "usePermissions"],
-    ["validateBatchRoleOperations", "countAdmins"],
-    ["createTraceContext", "generateTraceId"],
-    ["ReportingService.__init__", "groupByPriority"],
-    ["validateTestArchetype", "validateArchetypeCompliance"],
-    ["generateOrganizationalReport", "calculateAvgResolutionTime"],
-    ["auditMultiTenantSecurity", "measureRLSPerformance"],
-    ["validateRoleAssignment", "validateOrganizationBoundary"],
-    ["handleFileInputChange", "handleFileSelect"],
-    ["validateImportStructure", "getLineNumber"],
-    ["createSingleComment", "createUserFactory"],
-    ["seedSampleDataWithDb", "extractUniqueGames"],
-    ["createPrimaryMemberContext", "createSeededLocationTestContext"],
-    ["seedSampleDataWithDb", "createSampleIssuesWithDb"],
-    ["createLogger", "hasCodeAndMessage"],
-    ["ActiveFilters", "getUserName"],
-    ["toggleSelectAll", "selectAll"],
-    ["createWithMemberships", "createMultipleForOrganization"],
-    ["hasCycle", "hasCycle"],
-    ["createMachinePermissions", "create"],
-    ["IssueTimeline", "getActivityIcon"],
-    ["createPermissionTestSuite", "expectOrganizationIsolation"],
-    ["createComplexIssueFactory", "createActivityFactory"],
-    ["createCompetitorAdminContext", "createSeededMachineTestContext"],
-    ["validateMultipleEntityOwnership", "validateRouterEntityOwnership"],
-    ["createOrganizationWithRolesWithDb", "createTemplateRoleWithDb"],
-    ["createCompetitorMembership", "createMockMembership"],
-    ["setupAuthTestData", "getSeededPlayer"],
-    ["createAdminClient", "createServerClient"],
-    ["validateTestFiles", "validateTestArchetype"],
-    ["createWithPermissions", "create"],
-    ["validateTestArchetype", "validateRLSContext"],
-    ["DetailedIssueCard", "getStatusColor"],
-    ["createMembership", "createTestUser"],
-    ["createDrizzleClientInternal", "getDatabaseConfig"],
-    ["createWithUser", "create"],
-    ["createSystemRoleSet", "createUnauthenticatedRole"],
-    ["hasPermission", "getRolePermissions"],
-    ["seedCompleteTestData", "seedTestSampleData"],
-    ["withBusinessLogicTest", "withIsolatedTest"],
-    ["validateAndLogOAuthConfig", "validateAllOAuthProviders"],
-    ["seedSampleDataWithDb", "log"],
-    ["createSingleIssue", "createStatusFactory"],
-    ["createWithRole", "getRolePermissions"],
-    ["getRolePermissions", "createMatrix"],
-    ["createSingleIssue", "createMachineFactory"],
-    ["shouldRequireGoogleOAuth", "isPreview"],
-    ["setupAuthTestData", "getSeededAdmin"],
-    ["seedCompleteTestData", "seedTestInfrastructure"],
-    ["auditMultiTenantSecurity", "auditTableIsolation"],
-    ["validateCommentDeletion", "validateCommentDeletionState"],
-    ["validateIssueAssignment", "validateIssueOrganizationBoundary"],
-    ["validateCommentEditWithTimeLimit", "validateCommentEditPermissions"],
-    ["withRLSTest", "withIsolatedTest"],
-    ["createIssueRouterContext", "createUserFactory"],
-    ["verifyPublicOnlyContent", "verifyPublicContent"],
-    ["validateStatusTransition", "validateTransitionRules"],
-    ["validateCommentEditWithTimeLimit", "canEditCommentByTime"],
-    ["createRouterTestSuite", "testInputValidation"],
-    ["setupAuthTestData", "getSeededMember"],
-    ["createIssuePermissions", "create"],
-    ["createMockIssuesList", "createMockIssue"],
-    ["withMachineOwnerBusinessLogicSetup", "setupTestData"],
-    ["withRLSEnabledTest", "withIsolatedTest"],
-    ["validateBatchAssignments", "validateAssigneeMembership"],
-    ["seedInfrastructureWithDb", "createOrganizationWithRolesWithDb"],
-    ["clearAllFilters", "getDefaultFilters"],
-    ["log", "log"],
-    ["createMockMachine", "createMockLocation"],
-    ["validateCommentRestoration", "validateCommentDeletionState"],
-    ["createPrimaryMemberContext", "createSeededMachineTestContext"],
-    ["createMockIssue", "createMockPriority"],
-    ["validateIssueCreation", "validateDefaultStatus"],
-    ["loginAsUser", "clearSession"],
-    ["validateTransitionRules", "getTransitionType"],
-    ["batchToggleSelection", "toggleSelection"],
-    ["createWithPermissions", "createCustomRole"],
-    ["createTestDatabase", "configureForBusinessLogicTesting"],
-    ["createSystemRoleSet", "createAdminRole"],
-    ["validateCommentDeletion", "validateCommentDeletionPermissions"],
-    ["validateDrizzleConfiguration", "expectSSLConfiguration"],
-    ["validateStatusTransition", "validateUserPermissions"],
-    ["setupAllIssueListMocks", "setupTRPCMocks"],
-    ["setupAllIssueListMocks", "setupNavigationMocks"],
-    ["validateTestArchetype", "validateImportStructure"],
     ["TRPCReactProvider", "isClientDevelopment"],
-    ["StatusTogglePills", "getStatusColor"],
-    ["validateEntityExistsAndOwned", "validateRouterEntityOwnership"],
+    ["createPrimaryAdminContext", "createSeededMachineTestContext"],
+    ["validateRoleAssignment", "validateRoleAssignmentRules"],
+    ["withCrossOrgTest", "withMultiOrgTest"],
+    ["validateCommentDeletion", "validateCommentDeletionState"],
+    ["requirePermissionForSession", "requirePermission"],
+    ["createCompetitorOrgContext", "createMockTRPCContext"],
+    ["createSystemRoleSet", "createUnauthenticatedRole"],
+    ["validateDrizzleConfiguration", "expectSSLConfiguration"],
+    ["createPermissionTestSuite", "createPermissionTestCases"],
+    ["createWithRoles", "create"],
+    ["withOrgScopeAndNotDeleted", "withOrganizationScope"],
+    ["withMultiOrgTest", "setTestSession"],
+    ["getSeededIssues", "getCachedSeedData"],
+    ["auditMultiTenantSecurity", "getDataSizeConfig"],
+    ["withRLSTest", "withIsolatedTest"],
+    ["createSystemRolesWithDb", "log"],
+    ["createDefaultStatusesWithDb", "getStatusId"],
     ["createMockStatuses", "createMockStatus"],
-    ["setupAllIssueListMocks", "setupPermissionMocks"],
-    ["getSeededUserByEmail", "getCachedSeedData"],
-    ["middleware", "createServerClient"],
-    ["IssueStatusControl", "handleStatusChange"],
-    ["validateUserPermissions", "getTransitionType"],
-    ["getAllFilePaths", "getAllFilePaths"],
-    ["StatusTogglePills", "handleCategoryToggle"],
-    ["createWithMemberCount", "create"],
-    ["createTRPCCallerForIssues", "createMockServices"],
-    ["validateIssueCreation", "validateMachineOrganizationBoundary"],
-    ["validateReassignmentRole", "validateOrganizationBoundary"],
-    ["getSeededMemberSupabaseUser", "createSupabaseUserFromSeeded"],
-    ["getSelectionSummary", "getSelectedCount"],
-    ["clearTestStorage", "getAllFilePaths"],
+    ["loginAsUser", "clearSession"],
     ["createComplexIssueFactory", "createAttachmentFactory"],
-    ["withMultiOrgTest", "setContext"],
-    ["urlParamsToFilters", "isValidSortOrder"],
-    ["createAdminRole", "createAllPermissions"],
-    ["validateIssueAssignment", "validateAssigneeMembership"],
-    ["verifyIntegrationTesterSetup", "getIntegrationTesterDatabaseUrl"],
-    ["createDevUserAction", "isValidDevEmail"],
-    ["createMemberRole", "create"],
-    ["getCurrentUserOrganizationId", "RLSContextManager.getCurrentUser"],
-    ["createIssueFactory", "createMachineFactory"],
-    ["expectAuthenticationRequired", "createPublicContext"],
-    ["createSingleIssue", "createPriorityFactory"],
-    ["StatusTogglePills", "isCategoryActive"],
-    ["seedAuthUsers", "createUsersDirectly"],
-    ["testInputValidation", "createRouterTestContext"],
-    ["getSeededIssueStatuses", "getSeededOrganizationId"],
-    ["seedInfrastructureWithDb", "createGlobalPermissionsWithDb"],
-    ["authenticateDevUser", "isValidDevEmail"],
-    ["getCurrentUserOrganizationId", "getCurrentUser"],
-    ["loginAsTechnician", "loginAsUserWithPermissions"],
-    ["createAllPermissions", "createMachinePermissions"],
-    ["validateCommentEdit", "validateCommentDeletionState"],
-    ["isDevelopmentOrTest", "isTest"],
-    ["validateCommentEdit", "validateCommentEditPermissions"],
-    ["isDevelopment", "getClientEnvironment"],
-    ["getValidStatusTransitions", "validateStatusTransition"],
-    ["createCommentFactory", "createSingleComment"],
-    ["expectOrganizationRequired", "createAuthenticatedContext"],
-    ["validateDrizzleConfiguration", "expectLoggingConfiguration"],
-    ["shouldEnableCredentialsProvider", "isDevelopment"],
-    ["ReportingService.constructor", "groupByPriority"],
-    ["isDevAuthAvailable", "shouldEnableDevFeatures"],
-    ["getSeededPlayerSupabaseUser", "getSeededPlayer"],
+    ["createTRPCCallerForIssues", "createMockServices"],
+    ["createAdmin", "createWithRole"],
+    ["validateRoleAssignment", "validateOrganizationBoundary"],
+    ["validateMemorySafety", "getLineNumber"],
+    ["createSessionFactory", "createUserFactory"],
+    ["resetMocks", "setupDefaultResponses"],
+    ["getSeededAdmin", "getCachedSeedData"],
+    ["createMockIssuesList", "createMockIssue"],
+    ["isDevelopmentOrPreview", "isDevelopment"],
+    ["validateCommentRestoration", "validateCommentDeletionState"],
+    ["createMachinePermissions", "create"],
+    ["getSeededPlayer", "getUserWithRoles"],
     ["createMultipleForOrganization", "createWithUser"],
-    ["createMockMachines", "createMockMachine"],
-    ["createCompetitorOrgUser", "createMockSupabaseUser"],
-    ["validateCommentEditInput", "validateCommentContent"],
-    ["seedSampleDataWithDb", "createMachinesWithDb"],
-    ["createDefaultLocationWithDb", "getDefaultLocationId"],
-    ["createFallbackLogger", "mergeContext"],
+    ["validateTestFiles", "validateTestArchetype"],
+    ["shouldEnableCredentialsProvider", "isPreview"],
+    ["generateOrganizationalReport", "getTopMachinesByIssues"],
+    ["logout", "waitForLogout"],
+    ["createMachineFactory", "createLocationFactory"],
+    ["createSampleIssuesWithDb", "log"],
+    ["hasPermissionForSession", "hasPermission"],
+    ["handleDrop", "handleFileSelect"],
+    ["createTRPCCallerForIssues", "createIssueRouterContext"],
+    ["setupAllIssueListMocks", "setupTRPCMocks"],
+    ["createCompetitorOrganization", "createMockOrganization"],
+    ["seedInfrastructure", "seedInfrastructureWithDb"],
+    ["validateDrizzleConfiguration", "expectPoolConfiguration"],
+    ["createIssueFactory", "createPriorityFactory"],
+    ["createAdminMembership", "createAdminRole"],
+    ["IssueTimeline", "getActivityColor"],
+    ["loginAsTechnician", "loginAsUserWithPermissions"],
+    ["validateIssueAssignment", "validateAssigneeMembership"],
+    ["validateCommentEdit", "validateCommentDeletionState"],
+    ["StatusTogglePills", "isCategoryActive"],
+    ["createSingleIssue", "createUserFactory"],
+    ["configureProductionMocks", "createRemoteURL"],
+    ["deleteExistingDevUsers", "createServiceRoleClient"],
+    ["createIssueFactory", "createSingleIssue"],
+    ["createTestMembership", "createTestUser"],
+    ["withMultiOrgTest", "withIsolatedTest"],
+    ["validateDrizzleConfiguration", "expectTimeoutConfiguration"],
+    ["getSingleIssue", "createIssueFactory"],
+    ["signOut", "signOut"],
+    ["urlParamsToFilters", "isValidSortBy"],
+    ["createPermissionTestSuite", "expectOrganizationRequired"],
+    ["MyComponent", "usePermissions"],
     ["validateRoleAssignment", "validateUserMembership"],
-    ["createUser", "createWithRole"],
-    ["assertOAuthConfigValid", "validateAndLogOAuthConfig"],
-    ["createGlobalPermissionsWithDb", "log"],
-    ["ActiveFilters", "getStatusNames"],
+    ["seedInfrastructureWithDb", "createDefaultCollectionTypesWithDb"],
+    ["createPrimaryMemberContext", "createSeededLocationTestContext"],
+    ["getSeededMemberSupabaseUser", "createSupabaseUserFromSeeded"],
+    ["getCurrentUser", "createClient"],
+    ["createTraceContext", "generateRequestId"],
+    ["getSeededAdminSupabaseUser", "getSeededAdmin"],
+    ["validateRoleReassignment", "validateReassignmentRole"],
+    ["createAllPermissions", "createIssuePermissions"],
+    ["validateStatusTransition", "validateOrganizationBoundary"],
+    ["validateReassignmentRole", "validateOrganizationBoundary"],
+    ["ReportingService.__init__", "groupByPriority"],
+    ["formatMachineName", "getManufacturerName"],
+    ["setupAuthTestData", "createSupabaseUserFromSeeded"],
+    ["seedSampleDataWithDb", "extractUniqueGames"],
+    ["withBusinessLogicTest", "withIsolatedTest"],
     [
       "validateMachineOrganizationBoundary",
       "validateResourceOrganizationBoundary"
     ],
-    ["isDevelopmentOrPreview", "isPreview"],
-    ["createLocationPermissions", "create"],
-    ["createTemplateRoleWithDb", "getRoleId"],
-    ["configureProductionMocks", "createRemoteURL"],
-    ["resetMocks", "setupDefaultResponses"],
-    ["seedInfrastructureWithDb", "log"],
-    ["createUsersDirectly", "getMembershipId"],
-    ["SignOutButton", "handleSignOut"],
-    ["validateIssueCreation", "validateIssueCreationRules"],
-    ["processImageFile", "calculateDimensions"],
-    ["configureDevelopmentMocks", "createLocalhost5432URL"],
-    ["DetailedIssueCard", "getPriorityBorderColor"],
-    ["seedInfrastructureWithDb", "createDefaultPrioritiesWithDb"],
-    ["toggleSelectAll", "isAllSelected"],
-    ["StatusTogglePills", "getCategoryLabel"],
-    ["withMultiOrgTest", "setTestSession"],
-    ["setup_test_database", "print_error"],
+    ["createTemplateRoleWithDb", "log"],
+    ["createTechnician", "createWithRole"],
+    ["createAttachmentFactory", "createSingleAttachment"],
+    ["assertOAuthConfigValid", "validateAndLogOAuthConfig"],
+    ["createWithPermissions", "createWithRole"],
+    ["generatePrefixedId", "generateId"],
+    ["createTechnicianRole", "create"],
+    ["getSeededIssueStatuses", "getCachedSeedData"],
+    ["createPermissionTestSuite", "expectAuthenticationRequired"],
+    ["validateCommentEditWithTimeLimit", "validateCommentEditPermissions"],
+    ["validateBatchAssignments", "validateAssigneeMembership"],
+    ["createCompetitorMembership", "createMockMembership"],
+    ["createCompetitorAdminContext", "createSeededMachineTestContext"],
+    ["validateUserRemoval", "validateAdminCountForRemoval"],
+    ["setupAuthTestData", "getSeededOrganization"],
+    ["seedInfrastructureWithDb", "createDefaultStatusesWithDb"],
+    ["shouldRequireGoogleOAuth", "isProduction"],
+    ["seedSampleData", "seedSampleDataWithDb"],
+    ["createAttachmentPermissions", "create"],
+    ["getSeededUserByEmail", "getCachedSeedData"],
+    ["createIssueWithMixedComments", "getSingleIssue"],
+    ["createMultipleForOrganization", "createSystemRoleSet"],
+    ["createRouterTestSuite", "testInputValidation"],
+    ["TRPCReactProvider", "getBaseUrl"],
+    ["createIssueFactory", "createMachineFactory"],
     ["extractUniqueGames", "log"],
+    ["createMachineFactory", "createModelFactory"],
+    ["seedSampleDataWithDb", "createModelsWithDb"],
+    ["validateUserPermissions", "getTransitionType"],
+    ["getSeededPlayerSupabaseUser", "createSupabaseUserFromSeeded"],
+    ["AdminPanel", "useRequiredPermission"],
+    ["auditMultiTenantSecurity", "measureRLSPerformance"],
+    ["getSeededAdminSupabaseUser", "createSupabaseUserFromSeeded"],
+    ["StatusTogglePills", "getCategoryLabel"],
+    ["validateTestArchetype", "validateImportStructure"],
+    ["validateCommentRestoration", "validateAdminPermissions"],
+    ["IssueTimeline", "getActivityIcon"],
+    ["logout", "clearSession"],
+    ["validateCommentDeletion", "validateOrganizationMembership"],
+    ["setupMultiOrgContext", "createOrgContext"],
+    ["createMachineWithoutCustomName", "createMockMachine"],
+    ["createRouterTestSuite", "testAdminOnlyProcedure"],
+    [
+      "validateCommentOrganizationBoundary",
+      "validateResourceOrganizationBoundary"
+    ],
+    ["log", "log"],
+    ["shouldEnableTestLogin", "isDevelopment"],
+    ["createComplexIssueFactory", "getSingleIssue"],
+    ["isDevelopmentOrTest", "isTest"],
+    ["seedCompleteTestData", "seedTestSampleData"],
+    ["seedInfrastructureWithDb", "createGlobalPermissionsWithDb"],
+    ["seedInfrastructureWithDb", "createOrganizationWithRolesWithDb"],
+    ["withMultiOrgTest", "setContext"],
+    ["validateIssueCreation", "validateDefaultPriority"],
+    ["validateTestArchetype", "validateMemorySafety"],
+    ["validateOrganizationContext", "getUserWithOrganization"],
+    ["validateRoleReassignment", "validateRoleDeletion"],
+    ["createTraceContext", "generateTraceId"],
+    ["validateIssueAssignment", "validateIssueOrganizationBoundary"],
+    ["createFallbackLogger", "createFallbackLogger"],
+    ["getSeededOrganizationId", "getSeededOrganization"],
+    ["seedAuthUsers", "createUsersDirectly"],
+    ["getClient", "createClient"],
+    ["validateAdminCountForRemoval", "countAdmins"],
+    ["validateSingleFile", "generateValidationReport"],
+    ["validateDrizzleConfiguration", "expectLoggingConfiguration"],
+    ["createRouterTestSuite", "testPublicProcedure"],
+    ["createMemberRole", "create"],
+    ["getSeededOrganization", "getCachedSeedData"],
+    ["validateFilters", "isValidSortOrder"],
+    ["seedSampleDataWithDb", "log"],
+    ["getCurrentUserOrganizationId", "RLSContextManager.getCurrentUser"],
+    ["createAdminRole", "create"],
+    ["setContext", "setTestSession"],
+    ["createPermissionTestSuite", "createAuthenticatedContext"],
+    ["createDefaultCollectionTypesWithDb", "log"],
+    ["withOrgScopeAndNotDeleted", "excludeSoftDeleted"],
+    ["createMembership", "createTestUser"],
+    ["withRLSSecurityContext", "esc"],
+    ["createPrimaryAdminContext", "createSeededLocationTestContext"],
+    ["middleware", "createServerClient"],
+    ["mockCurrentMembership", "createMockMembership"],
+    ["getEnvironmentName", "isProduction"],
+    ["getEnvironmentName", "isDevelopment"],
+    ["validateAdminCountPreservation", "countAdmins"],
+    ["expectOrganizationRequired", "createAuthenticatedContext"],
+    [
+      "validateLocationOrganizationBoundary",
+      "validateResourceOrganizationBoundary"
+    ],
+    ["createFallbackLogger", "mergeContext"],
+    ["getCurrentUserOrganizationId", "getCurrentUser"],
+    ["toggleSelectAll", "selectNone"],
+    ["createDrizzleClientInternal", "getDatabaseConfig"],
+    ["createUnauthenticated", "createWithRole"],
+    ["validateTestArchetype", "validateErrorHandling"],
+    ["createMockMachine", "createMockModel"],
+    ["hasCycle", "hasCycle"],
+    ["canEditCommentByTime", "getCommentAgeInMinutes"],
+    ["createAdminClient", "setAll"],
+    ["seedSampleDataWithDb", "createSampleIssuesWithDb"],
+    ["createActivityFactory", "createUserFactory"],
+    ["isDevelopmentOrPreview", "isPreview"],
+    ["isValidOPDBId", "parseOPDBId"],
+    ["validateStatusTransition", "validateUserPermissions"],
+    ["validateIssueCreation", "validateIssueCreationRules"],
+    ["ActionButton", "usePermissionTooltip"],
+    ["withRLSEnabledTest", "withIsolatedTest"],
+    ["createDefaultPrioritiesWithDb", "log"],
+    ["createRouterTestSuite", "testOrganizationScoping"],
+    ["createPermissionTestSuite", "expectPermissionRequired"],
+    ["createTemplateRoleWithDb", "getRoleId"],
+    ["authenticateDevUser", "isValidDevEmail"],
+    ["createSingleIssue", "createStatusFactory"],
+    ["createPinballMapTestContext", "setMockPermissions"],
+    ["createAttachmentFactory", "createUserFactory"],
+    ["validateCommentEdit", "validateCommentEditPermissions"],
+    ["main", "generateSQLConstants"],
+    ["validateRoleAssignment", "validateAdminCountPreservation"],
+    ["validateCommentDeletion", "validateCommentExists"],
+    ["createSystemRoleSet", "createMemberRole"],
+    ["createDefaultCollectionTypesWithDb", "getCollectionTypeId"],
+    ["setupAuthTestData", "getSeededPlayer"],
+    ["createNumberedVariation", "createNumberedId"],
+    ["createTestDatabase", "applyDrizzleSchema"],
+    ["createDevUserAction", "isValidDevEmail"],
+    ["createAllPermissions", "createMachinePermissions"],
+    ["getSeededMemberSupabaseUser", "getSeededMember"],
+    ["handler", "createContext"],
+    ["deleteTestBucket", "clearStorageBucket"],
+    ["createUser", "createWithRole"],
+    ["createLogger", "createFallbackLogger"],
+    ["middleware", "setAll"],
+    ["createMockMachine", "createMockLocation"],
+    ["createDefaultPrioritiesWithDb", "getPriorityId"],
+    ["auditMultiTenantSecurity", "createAuditTestData"],
+    ["LocationList", "handleLocationClick"],
+    ["createMockContext", "createMockServiceFactory"],
+    ["createUsersDirectly", "getMembershipId"],
+    ["createWithMemberships", "createSystemRoleSet"],
+    ["createMockMachines", "createMockMachine"],
+    ["seedInfrastructureWithDb", "createDefaultPrioritiesWithDb"],
+    ["setupAuthTestData", "getSeededMember"],
+    ["createTestDatabaseRolesWithDb", "log"],
+    ["seedInfrastructureWithDb", "log"],
+    ["testInputValidation", "createRouterTestContext"],
+    ["validateSingleFile", "validateTestArchetype"],
+    ["validateIssueCreation", "validateMachineOrganizationBoundary"],
+    ["validateCommentRestoration", "validateCommentExists"],
+    ["configureDevelopmentMocks", "createLocalhost5432URL"],
+    ["validateImportStructure", "getLineNumber"],
+    ["DetailedIssueCard", "getPriorityBorderColor"],
+    ["isPreview", "getClientEnvironment"],
+    ["seedInfrastructureWithDb", "createTestDatabaseRolesWithDb"],
+    ["createTestDatabase", "verifyMigrationComplete"],
+    ["expectAuthenticationRequired", "createPublicContext"],
+    ["seedSampleDataWithDb", "createMachinesWithDb"],
+    ["ActionButton", "usePermissions"],
+    ["createSystemRoleSet", "createTechnicianRole"],
+    ["validateIssueCreation", "validateDefaultStatus"],
+    ["isPinPointSupabaseSession", "isPinPointSupabaseUser"],
+    ["validateTestArchetype", "validateArchetypeCompliance"],
+    ["getSeededPlayerSupabaseUser", "getSeededPlayer"],
+    ["getSeededIssueStatuses", "getSeededOrganizationId"],
+    ["createMockLocations", "createMockLocation"],
+    ["authenticateDevUser", "signInDevUser"],
+    ["createSingleIssue", "createPriorityFactory"],
+    ["getSeededPlayer", "getCachedSeedData"],
+    ["validateTransitionRules", "getTransitionType"],
+    ["validateCommentEdit", "validateCommentExists"],
+    ["getSelectionSummary", "getSelectedCount"],
+    ["createDefaultLocationWithDb", "getDefaultLocationId"],
+    ["createDualChildLogger", "createDualChildLogger"],
+    ["validateBatchRoleOperations", "countAdmins"],
+    ["shouldRequireGoogleOAuth", "isPreview"],
+    ["createSingleComment", "createUserFactory"],
+    ["createSingleAttachment", "createUserFactory"],
+    ["getSeededPriorities", "getSeededOrganizationId"],
+    ["createSystemRolesWithDb", "getRoleId"],
+    ["validateMultipleEntityOwnership", "validateRouterEntityOwnership"],
+    ["StatusTogglePills", "getStatusColor"],
+    ["shouldEnablePreviewAuthInProduction", "shouldForcePreviewBehavior"],
+    ["createIssuePermissions", "create"],
+    ["clearTestStorage", "getAllFilePaths"],
+    ["createDefaultStatusesWithDb", "log"],
+    ["validateFilters", "getDefaultFilters"],
+    ["createWithPermissions", "createCustomRole"],
     ["getExistingAuthUsers", "createServiceRoleClient"],
-    ["validateDrizzleConfiguration", "expectTimeoutConfiguration"],
+    ["seedCompleteTestData", "seedTestInfrastructure"],
+    ["handleFileInputChange", "handleFileSelect"],
+    ["generateOrganizationalReport", "calculateAvgResolutionTime"],
+    ["createCommentFactory", "createUserFactory"],
+    ["createAdminMembership", "createTestUser"],
+    ["validateAllOAuthProviders", "validateGoogleOAuth"],
+    ["withMachineOwnerBusinessLogicSetup", "setupTestData"],
+    ["createMockIssue", "createMockPriority"],
+    ["loginAsUser", "waitForAuthentication"],
+    ["validateUserRemoval", "validateUserMembership"],
+    ["createIssueRouterContext", "createUserFactory"],
+    ["setupAllIssueListMocks", "setupPermissionMocks"],
+    ["createAllPermissions", "createAttachmentPermissions"],
+    ["createLogger", "hasCodeAndMessage"],
+    ["createLocationPermissions", "create"],
+    ["createWithMemberships", "create"],
+    ["verifyIntegrationTesterSetup", "getIntegrationTesterDatabaseUrl"],
+    ["getRolePermissions", "createMatrix"],
+    ["createAdminRole", "createAllPermissions"],
+    ["hasPermission", "getRolePermissions"],
     [
       "validateIssueOrganizationBoundary",
       "validateResourceOrganizationBoundary"
     ],
-    ["createMachineFactory", "createModelFactory"],
-    ["toggleSelectAll", "selectNone"],
-    ["createRouterTestSuite", "testAuthenticatedProcedure"],
-    ["isDevelopmentOrTest", "isDevelopment"],
-    ["createAllPermissions", "createIssuePermissions"],
-    ["validateFilters", "getDefaultFilters"],
-    ["seedAuthUsers", "deleteExistingDevUsers"],
-    ["createAttachmentFactory", "createUserFactory"],
-    ["createDefaultPrioritiesWithDb", "getPriorityId"],
-    ["createDefaultPrioritiesWithDb", "log"],
-    ["getSeededMember", "getUserWithRoles"],
-    ["createClient", "setAll"],
-    ["createIssueFactory", "createPriorityFactory"],
-    ["createTestDatabaseRolesWithDb", "log"],
-    ["createSingleIssue", "createUserFactory"],
-    ["createMockMachines", "createMockModel"],
-    ["getSeededUserByEmail", "getUserWithRoles"],
-    ["getEnvironmentName", "isProduction"],
-    ["createWithMemberships", "create"],
-    ["validateCommentDeletion", "validateCommentExists"],
-    ["createMultipleForTesting", "createWithMemberships"],
-    ["getSeededPlayer", "getUserWithRoles"],
-    ["createMockMachine", "createMockModel"],
-    ["createRouterTestSuite", "testAdminOnlyProcedure"],
-    ["createDefaultStatusesWithDb", "getStatusId"],
-    ["createCompetitorOrgContext", "createMockTRPCContext"],
-    ["createMachineFactory", "createLocationFactory"],
-    ["getSeededMemberSupabaseUser", "getSeededMember"],
-    ["setContext", "setTestSession"],
-    ["withMultiOrgTest", "withIsolatedTest"],
-    ["createAttachmentPermissions", "create"],
-    ["createRouterTestSuite", "testPublicProcedure"],
-    ["configureCIMocks", "createRemoteURL"],
-    ["isProduction", "getClientEnvironment"],
-    ["createModelsWithDb", "log"],
-    ["isPinPointSupabaseSession", "isPinPointSupabaseUser"],
-    ["processIssueImageFile", "calculateDimensions"],
-    ["validateMemorySafety", "getLineNumber"],
-    ["createServerMockContext", "createMockSupabaseUser"],
-    ["StatusTogglePills", "isCategoryFullySelected"],
-    ["IssueTimeline", "getActivityColor"],
-    ["validateCommentRestoration", "validateCommentExists"],
-    ["getEnvironmentName", "isDevelopment"],
-    ["setupAuthTestData", "getSeededOrganization"],
+    ["createOrganizationWithRolesWithDb", "createTemplateRoleWithDb"],
+    ["createWithMemberships", "createMultipleForOrganization"],
+    ["createMockIssue", "createMockStatus"],
+    ["createIssueFactory", "createUserFactory"],
+    ["AuthProvider", "signOut"],
+    ["createDefaultLocationWithDb", "log"],
+    ["seedAuthUsers", "processBatchUsers"],
+    ["shouldEnableDemoLogin", "isPreview"],
+    ["TRPCReactProvider", "getQueryClient"],
+    ["createDrizzleClient", "createDrizzleClientInternal"],
+    ["validateAndLogOAuthConfig", "validateAllOAuthProviders"],
+    ["createSingleIssue", "createMachineFactory"],
+    ["withRLSAwareTest", "withRLSTest"],
+    ["validateTestArchetype", "validatePerformancePatterns"],
     ["createClient", "createServerClient"],
-    ["seedInfrastructureWithDb", "createDefaultCollectionTypesWithDb"],
-    ["seedInfrastructure", "seedInfrastructureWithDb"],
-    ["seedTestSampleData", "seedProductionSampleData"],
-    ["validateAdminCountPreservation", "countAdmins"],
-    ["getSeededAdmin", "getCachedSeedData"],
-    ["createPrimaryAdminContext", "createSeededMachineTestContext"]
+    ["clearAllFilters", "getDefaultFilters"],
+    ["createSystemRoleSet", "createAdminRole"],
+    ["getEnvironmentName", "isPreview"],
+    ["createMembership", "createTestRole"],
+    ["withOrganizationClient", "createOrganizationAwareClient"],
+    ["createMockIssue", "createMockUser"],
+    ["requirePermission", "hasPermission"],
+    ["main", "setupRLS"],
+    ["createActivityFactory", "createSingleActivity"],
+    ["createMembershipValidationInput", "createMockMembership"],
+    ["validateBatchAssignments", "validateIssueOrganizationBoundary"],
+    ["shouldEnableCredentialsProvider", "isDevelopment"],
+    ["esc", "esc"],
+    ["middleware", "getSubdomain"],
+    ["getSeededUserByEmail", "getUserWithRoles"],
+    ["ActiveFilters", "getUserName"],
+    ["clearStorageBucket", "getAllFilePaths"],
+    ["getSeededMember", "getUserWithRoles"],
+    ["validateUserRemoval", "validateUserRemovalRules"],
+    ["ActiveFilters", "getLocationName"],
+    ["getSeededIssue", "getCachedSeedData"],
+    ["createPermissionTestSuite", "expectOrganizationIsolation"],
+    ["AuthProvider", "getInitialSession"],
+    ["processImageFile", "calculateDimensions"],
+    ["setupAuthTestData", "getSeededAdmin"],
+    ["ActiveFilters", "getStatusNames"],
+    ["StatusTogglePills", "isCategoryFullySelected"],
+    ["createAllPermissions", "createAdminPermissions"],
+    ["getUserPermissionsForSession", "PermissionService.getUserPermissions"],
+    ["DetailedIssueCard", "getStatusColor"],
+    ["setupAllIssueListMocks", "setupNavigationMocks"],
+    ["getAllFilePaths", "getAllFilePaths"],
+    ["setup_test_database", "print_error"],
+    ["formatMachineName", "getYearValue"],
+    ["seedInfrastructureWithDb", "createDefaultLocationWithDb"],
+    ["createOrganizationWithRolesWithDb", "log"],
+    ["getUserPermissionsForSession", "getUserPermissions"],
+    ["createPrimaryMemberContext", "createSeededMachineTestContext"]
   ],
   "d": {
+    ".archived-tests-2025-08-23/ARCHIVE_MANIFEST.md": [
+      "Test Archive Manifest - 2025-08-23",
+      "Archive Purpose",
+      "Archive Timestamp",
+      "\ud83c\udfaf Final Result",
+      "What Was Preserved (NOT archived)",
+      "\ud83d\udfe2 Functional Tests (4 files remain)",
+      "\ud83d\udfe2 Essential Infrastructure ",
+      "\ud83d\udfe2 CI/CD Maintained",
+      "What Was Archived (Complete)",
+      "\u2705 Test Files Archived (~73 files)"
+    ],
+    ".archived-tests-2025-08-23/src/test/MIGRATION_GUIDE.md": [
+      "Permission Testing Migration Guide",
+      "Migration Strategy",
+      "Phase 1: Identify Duplication Patterns",
+      "Phase 2: Replace with Utilities",
+      "File-by-File Migration",
+      "1. notification.test.ts",
+      "2. issue.test.ts",
+      "3. collection.router.test.ts",
+      "4. Other Router Tests"
+    ],
+    ".archived-tests-2025-08-23/src/test/README.md": [
+      "Permission Testing Utilities",
+      "Quick Start",
+      "Core Concepts",
+      "1. Permission Scenarios",
+      "2. Context Factories",
+      "3. Permission Test Helpers",
+      "Router Test Patterns",
+      "Basic Patterns",
+      "Input Validation Testing",
+      "Service Integration Testing"
+    ],
+    ".github/chatmodes/researcher.chatmode.md": [
+      "Researcher Chat Mode",
+      "Core Operating Principles",
+      "Allowed Tool Usage Patterns",
+      "Strictly Prohibited in This Mode",
+      "Standard Research Workflow",
+      "Response Formatting Guidelines",
+      "Spec"
+    ],
+    "docs/NON_NEGOTIABLES.md": [
+      "PinPoint Non-Negotiables",
+      "\ud83d\udea8 ABSOLUTELY FORBIDDEN PATTERNS",
+      "\u26a1 HIGH PRIORITY VIOLATIONS",
+      "\ud83d\udd10 SECURITY REQUIREMENTS",
+      "\ud83e\uddea TESTING REQUIREMENTS",
+      "\ud83d\udccb DRIZZLE NAMING"
+    ],
+    "docs/NON_NEGOTIABLES_EXAMPLES.md": [
+      "PinPoint Non-Negotiables Examples",
+      "Memory Safety Violations",
+      "Migration Files",
+      "\u274c NEVER CREATE THESE FILES",
+      "Schema Modifications",
+      "Deprecated Imports",
+      "TypeScript Safety Defeats",
+      "Deep Relative Imports",
+      "Seed Data Modifications",
+      "Missing Return Types"
+    ],
+    "docs/testing/RISK_ANALYSIS.md": [
+      "Test System Reboot: Risk Analysis & Failure Modes",
+      "\ud83d\udea8 High-Risk Problem Areas",
+      "~~1. **Archetype Decision Paralysis & Boundary Confusion**~~ \u2705 RESOLVED",
+      "~~2. **Seed Data Explosion & Extended Seed Anti-Patterns**~~ \u2705 RESOLVED",
+      "3. **Coverage Gaming & Quality Degradation**",
+      "4. **Template Rigidity vs. Flexibility Tension**",
+      "5. **Memory Safety Assumptions Breaking Down**",
+      "6. **Slash Command Brittleness**",
+      "~~7. **Organizational Complexity Underestimated**~~ \u2705 NOT A CONCERN",
+      "\ud83c\udfaf Missing System Components (Trouble Spots)"
+    ],
     ".github/ISSUE_TEMPLATE.md": [
       "Issue Template",
       "Summary",
@@ -2890,26 +2969,6 @@
       "**Phase 2: Machine Location Router Consolidation**",
       "**Phase 3: Verification**",
       "\ud83d\udccb **Detailed Execution Steps**"
-    ],
-    "NON_NEGOTIABLES.md": [
-      "PinPoint Non-Negotiables",
-      "\ud83d\udea8 ABSOLUTELY FORBIDDEN PATTERNS",
-      "\u26a1 HIGH PRIORITY VIOLATIONS",
-      "\ud83d\udd10 SECURITY REQUIREMENTS",
-      "\ud83e\uddea TESTING REQUIREMENTS",
-      "\ud83d\udccb DRIZZLE NAMING"
-    ],
-    "NON_NEGOTIABLES_EXAMPLES.md": [
-      "PinPoint Non-Negotiables Examples",
-      "Memory Safety Violations",
-      "Migration Files",
-      "\u274c NEVER CREATE THESE FILES",
-      "Schema Modifications",
-      "Deprecated Imports",
-      "TypeScript Safety Defeats",
-      "Deep Relative Imports",
-      "Seed Data Modifications",
-      "Missing Return Types"
     ],
     "PHASE_1_PRODUCTION_CODE.md": [
       "Phase 1: Production Code TypeScript & ESLint Fixes",
@@ -4889,29 +4948,6 @@
       "**Two-Tier System**",
       "**Predictable IDs**"
     ],
-    "src/test/MIGRATION_GUIDE.md": [
-      "Permission Testing Migration Guide",
-      "Migration Strategy",
-      "Phase 1: Identify Duplication Patterns",
-      "Phase 2: Replace with Utilities",
-      "File-by-File Migration",
-      "1. notification.test.ts",
-      "2. issue.test.ts",
-      "3. collection.router.test.ts",
-      "4. Other Router Tests"
-    ],
-    "src/test/README.md": [
-      "Permission Testing Utilities",
-      "Quick Start",
-      "Core Concepts",
-      "1. Permission Scenarios",
-      "2. Context Factories",
-      "3. Permission Test Helpers",
-      "Router Test Patterns",
-      "Basic Patterns",
-      "Input Validation Testing",
-      "Service Integration Testing"
-    ],
     "supabase/tests/rls/README.md": [
       "pgTAP RLS Testing Guide",
       "Quick Start",
@@ -4926,22 +4962,446 @@
     ]
   },
   "deps": {
+    ".archived-tests-2025-08-23/e2e/helpers/auth.ts": ["@playwright/test"],
+    ".archived-tests-2025-08-23/e2e/helpers/unified-dashboard.ts": [
+      "@playwright/test"
+    ],
+    ".archived-tests-2025-08-23/e2e/issue-confirmation.spec.ts": [
+      "@playwright/test"
+    ],
+    ".archived-tests-2025-08-23/e2e/roles-permissions.spec.ts": [
+      "@playwright/test"
+    ],
+    ".archived-tests-2025-08-23/src/app/api/dev/__tests__/users-simple.test.ts": [
+      "vitest",
+      "~/test/constants/seed-test-ids"
+    ],
+    ".archived-tests-2025-08-23/src/app/dashboard/_components/__tests__/PrimaryAppBar.test.tsx": [
+      "@testing-library/react",
+      "react",
+      "vitest",
+      "~/test/msw/setup",
+      "~/test/VitestTestWrapper"
+    ],
+    ".archived-tests-2025-08-23/src/app/machines/components/MachineCard.test.tsx": [
+      "@testing-library/react",
+      "@testing-library/user-event",
+      "vitest",
+      "~/test/msw/setup",
+      "~/test/VitestTestWrapper"
+    ],
+    ".archived-tests-2025-08-23/src/components/issues/__tests__/MachineSelector.test.tsx": [
+      "@testing-library/react",
+      "@testing-library/user-event",
+      "vitest",
+      "~/test/mockUtils",
+      "~/test/VitestTestWrapper"
+    ],
+    ".archived-tests-2025-08-23/src/components/locations/__tests__/LocationDetailView.test.tsx": [
+      "@testing-library/react",
+      "vitest",
+      "~/test/msw/setup",
+      "~/test/VitestTestWrapper"
+    ],
+    ".archived-tests-2025-08-23/src/components/locations/__tests__/MachineGrid.test.tsx": [
+      "@testing-library/react",
+      "vitest"
+    ],
+    ".archived-tests-2025-08-23/src/components/permissions/__tests__/PermissionGate.test.tsx": [
+      "@testing-library/react",
+      "vitest",
+      "~/server/auth/permissions.constants"
+    ],
+    ".archived-tests-2025-08-23/src/components/react-environment.test.tsx": [
+      "@testing-library/react",
+      "vitest"
+    ],
+    ".archived-tests-2025-08-23/src/hooks/__tests__/usePermissions.test.tsx": [
+      "@testing-library/react",
+      "react",
+      "react",
+      "vitest",
+      "~/server/auth/permissions.constants",
+      "~/test/VitestTestWrapper"
+    ],
+    ".archived-tests-2025-08-23/src/integration-tests/comment.integration.test.ts": [
+      "vitest",
+      "drizzle-orm",
+      "~/server/api/root",
+      "~/server/db/schema",
+      "~/test/helpers/worker-scoped-db",
+      "~/test/helpers/createSeededIssueTestContext",
+      "~/test/constants/seed-test-ids"
+    ],
+    ".archived-tests-2025-08-23/src/integration-tests/cross-org-isolation.test.ts": [
+      "vitest",
+      "drizzle-orm",
+      "~/test/helpers/worker-scoped-db",
+      "~/test/constants/seed-test-ids",
+      "~/server/db/schema"
+    ],
+    ".archived-tests-2025-08-23/src/integration-tests/machine.location.integration.test.ts": [
+      "@trpc/server",
+      "drizzle-orm",
+      "vitest",
+      "~/server/api/routers/machine.location",
+      "~/server/db/schema",
+      "~/test/helpers/pglite-test-setup",
+      "~/test/helpers/worker-scoped-db",
+      "~/test/constants/seed-test-ids",
+      "~/test/helpers/createSeededMachineTestContext"
+    ],
+    ".archived-tests-2025-08-23/src/integration-tests/machine.owner.integration.test.ts": [
+      "drizzle-orm",
+      "vitest",
+      "~/server/api/routers/machine.owner",
+      "~/server/db/schema",
+      "~/test/helpers/worker-scoped-db",
+      "~/test/constants/seed-test-ids",
+      "~/test/helpers/createSeededMachineTestContext"
+    ],
+    ".archived-tests-2025-08-23/src/integration-tests/model.core.integration.test.ts": [
+      "@trpc/server",
+      "drizzle-orm",
+      "vitest",
+      "~/server/api/root",
+      "~/server/db/schema",
+      "~/test/constants/seed-test-ids",
+      "~/test/helpers/worker-scoped-db"
+    ],
+    ".archived-tests-2025-08-23/src/integration-tests/pinballMap.integration.test.ts": [
+      "drizzle-orm",
+      "vitest",
+      "msw",
+      "~/server/api/root",
+      "~/server/db/schema",
+      "~/test/msw/setup",
+      "~/test/helpers/worker-scoped-db",
+      "~/server/services/factory"
+    ],
+    ".archived-tests-2025-08-23/src/integration-tests/schema-migration-validation.integration.test.ts": [
+      "drizzle-orm",
+      "vitest",
+      "~/server/db/schema",
+      "~/test/helpers/test-id-generator",
+      "~/test/helpers/worker-scoped-db"
+    ],
+    ".archived-tests-2025-08-23/src/lib/common/__tests__/organizationValidation.test.ts": [
+      "vitest",
+      "~/test/constants/seed-test-ids"
+    ],
+    ".archived-tests-2025-08-23/src/lib/issues/__tests__/assignmentValidation.test.ts": [
+      "vitest",
+      "~/test/constants/seed-test-ids"
+    ],
+    ".archived-tests-2025-08-23/src/lib/issues/__tests__/creationValidation.test.ts": [
+      "vitest",
+      "~/test/constants/seed-test-ids"
+    ],
+    ".archived-tests-2025-08-23/src/lib/issues/__tests__/statusValidation.test.ts": [
+      "vitest",
+      "~/test/constants/seed-test-ids"
+    ],
+    ".archived-tests-2025-08-23/src/lib/pinballmap/__tests__/apiMocker.ts": [
+      "vitest",
+      ".archived-tests-2025-08-23/src/lib/pinballmap/__tests__/fixtures/api_responses/locations/location_26454_machine_details.json"
+    ],
+    ".archived-tests-2025-08-23/src/lib/users/__tests__/roleManagementValidation.test.ts": [
+      "vitest",
+      "~/test/constants/seed-test-ids"
+    ],
+    ".archived-tests-2025-08-23/src/server/api/__tests__/msw.trpc.test.ts": [
+      "@trpc/server",
+      "vitest",
+      "~/test/msw/handlers",
+      "~/test/msw/setup",
+      "~/test/msw/setup"
+    ],
+    ".archived-tests-2025-08-23/src/server/api/__tests__/trpc.permission.test.ts": [
+      "@trpc/server",
+      "vitest",
+      "~/server/auth/permissions",
+      "~/test/vitestMockContext",
+      "~/test/constants/seed-test-ids"
+    ],
+    ".archived-tests-2025-08-23/src/server/api/routers/__tests__/collection.test.ts": [
+      "drizzle-orm",
+      "vitest",
+      "~/server/api/root",
+      "~/server/db/schema",
+      "~/test/constants/seed-test-ids",
+      "~/test/helpers/worker-scoped-db"
+    ],
+    ".archived-tests-2025-08-23/src/server/api/routers/__tests__/issue.confirmation.test.ts": [
+      "vitest",
+      "@trpc/server",
+      "drizzle-orm",
+      "zod",
+      "~/test/vitestMockContext",
+      "~/test/constants/seed-test-ids",
+      "~/server/api/trpc",
+      "~/server/api/trpc.permission",
+      "~/server/auth/permissions",
+      "~/server/db/schema"
+    ],
+    ".archived-tests-2025-08-23/src/server/api/routers/__tests__/issue.integration.test.ts": [
+      "drizzle-orm",
+      "vitest",
+      "~/lib/utils/id-generation",
+      "~/server/api/root",
+      "~/server/db/schema",
+      "~/test/helpers/pglite-test-setup",
+      "~/test/helpers/worker-scoped-db",
+      "~/test/testDataFactories",
+      "~/test/constants/seed-test-ids"
+    ],
+    ".archived-tests-2025-08-23/src/server/api/routers/__tests__/issue.notification.test.ts": [
+      "vitest",
+      "~/server/services/notificationService",
+      "~/test/vitestMockContext",
+      "~/test/constants/seed-test-ids"
+    ],
+    ".archived-tests-2025-08-23/src/server/api/routers/__tests__/issue.test.ts": [
+      "drizzle-orm",
+      "vitest",
+      "~/server/api/root",
+      "~/server/db/schema",
+      "~/test/constants/seed-test-ids",
+      "~/test/helpers/worker-scoped-db",
+      "~/test/helpers/createSeededIssueTestContext",
+      "~/server/services/factory"
+    ],
+    ".archived-tests-2025-08-23/src/server/api/routers/__tests__/model.core.test.ts": [
+      "@trpc/server",
+      "drizzle-orm",
+      "vitest",
+      "~/server/api/root",
+      "~/server/db/schema",
+      "~/test/constants/seed-test-ids",
+      "~/test/helpers/test-id-generator",
+      "~/test/helpers/worker-scoped-db",
+      "~/test/helpers/pglite-test-setup"
+    ],
+    ".archived-tests-2025-08-23/src/server/api/routers/__tests__/notification.test.ts": [
+      "drizzle-orm",
+      "vitest",
+      "~/server/api/root",
+      "~/server/db/schema",
+      "~/test/helpers/test-id-generator",
+      "~/test/helpers/worker-scoped-db",
+      "~/server/services/factory",
+      "~/test/constants/seed-test-ids"
+    ],
+    ".archived-tests-2025-08-23/src/server/api/routers/utils/__tests__/commentService.integration.test.ts": [
+      "drizzle-orm",
+      "vitest",
+      "~/server/api/routers/comment",
+      "~/server/db/schema",
+      "~/test/helpers/pglite-test-setup",
+      "~/test/helpers/createSeededIssueTestContext",
+      "~/test/constants/seed-test-ids",
+      "~/test/helpers/worker-scoped-db"
+    ],
+    ".archived-tests-2025-08-23/src/server/api/routers/utils/__tests__/commentValidation.test.ts": [
+      "vitest",
+      ".archived-tests-2025-08-23/src/test/constants/seed-test-ids.ts"
+    ],
+    ".archived-tests-2025-08-23/src/server/auth/__tests__/permissions.constants.test.ts": [
+      "vitest"
+    ],
+    ".archived-tests-2025-08-23/src/server/auth/__tests__/uploadAuth.test.ts": [
+      "@trpc/server",
+      "vitest",
+      "~/test/constants/seed-test-ids"
+    ],
+    ".archived-tests-2025-08-23/src/server/db/__tests__/drizzle-singleton.test.ts": [
+      "vitest",
+      ".archived-tests-2025-08-23/src/test/helpers/worker-scoped-db.ts"
+    ],
+    ".archived-tests-2025-08-23/src/server/db/__tests__/drizzle-test-helpers.ts": [
+      "vitest"
+    ],
+    ".archived-tests-2025-08-23/src/server/services/__tests__/roleService.test.ts": [
+      "vitest",
+      "~/server/auth/permissions.constants",
+      "~/server/services/roleService",
+      "~/test/constants/seed-test-ids"
+    ],
+    ".archived-tests-2025-08-23/src/test/VitestTestWrapper.tsx": [
+      "@tanstack/react-query",
+      "react",
+      "~/contexts/PermissionDepsContext"
+    ],
+    ".archived-tests-2025-08-23/src/test/context.ts": [
+      "drizzle-orm/node-postgres",
+      "pg",
+      "~/server/db/schema",
+      "~/server/db/client-factory"
+    ],
+    ".archived-tests-2025-08-23/src/test/database-test-helpers.ts": [
+      "drizzle-orm",
+      "~/server/db/schema",
+      "~/test/constants/seed-test-ids"
+    ],
+    ".archived-tests-2025-08-23/src/test/examples/dual-track-testing-examples.test.ts": [
+      "vitest",
+      "drizzle-orm",
+      "~/test/constants/seed-test-ids",
+      "~/test/helpers/worker-scoped-db",
+      "~/test/helpers/pglite-test-setup",
+      "~/server/db/schema"
+    ],
+    ".archived-tests-2025-08-23/src/test/helpers/archetype-validator.ts": [
+      "node:fs",
+      "node:path"
+    ],
+    ".archived-tests-2025-08-23/src/test/helpers/createSeededAdminTestContext.ts": [
+      "drizzle-orm",
+      "vitest",
+      "~/test/helpers/pglite-test-setup",
+      "~/server/db/schema"
+    ],
+    ".archived-tests-2025-08-23/src/test/helpers/createSeededCollectionTestContext.ts": [
+      "drizzle-orm",
+      "vitest",
+      "~/test/helpers/pglite-test-setup",
+      "~/server/db/schema"
+    ],
+    ".archived-tests-2025-08-23/src/test/helpers/createSeededIssueTestContext.ts": [
+      "drizzle-orm",
+      "~/test/helpers/pglite-test-setup",
+      "~/server/db/schema",
+      "~/server/services/factory"
+    ],
+    ".archived-tests-2025-08-23/src/test/helpers/createSeededLocationTestContext.ts": [
+      "vitest",
+      "drizzle-orm",
+      "~/test/constants/seed-test-ids",
+      "~/server/db/schema"
+    ],
+    ".archived-tests-2025-08-23/src/test/helpers/createSeededMachineTestContext.ts": [
+      "vitest",
+      "drizzle-orm",
+      "~/test/constants/seed-test-ids",
+      "~/server/db/schema"
+    ],
+    ".archived-tests-2025-08-23/src/test/helpers/createSeededNotificationTestContext.ts": [
+      "vitest",
+      ".archived-tests-2025-08-23/src/test/helpers/pglite-test-setup.ts"
+    ],
+    ".archived-tests-2025-08-23/src/test/helpers/multi-tenant-test-helpers.ts": [
+      "drizzle-orm",
+      ".archived-tests-2025-08-23/src/test/helpers/rls-test-context.ts",
+      ".archived-tests-2025-08-23/src/test/helpers/organization-context.ts",
+      "~/server/db/schema"
+    ],
+    ".archived-tests-2025-08-23/src/test/helpers/organization-context.ts": [
+      "drizzle-orm",
+      "~/server/db/schema"
+    ],
+    ".archived-tests-2025-08-23/src/test/helpers/pglite-test-setup.ts": [
+      "@electric-sql/pglite",
+      "drizzle-orm",
+      "drizzle-orm/pglite",
+      "drizzle-kit/api",
+      "~/server/db/client-factory",
+      "~/server/db/schema"
+    ],
+    ".archived-tests-2025-08-23/src/test/helpers/rls-test-context.ts": [
+      "vitest",
+      "drizzle-orm",
+      ".archived-tests-2025-08-23/src/test/constants/seed-test-ids.ts"
+    ],
+    ".archived-tests-2025-08-23/src/test/helpers/session-context.ts": [
+      "drizzle-orm"
+    ],
+    ".archived-tests-2025-08-23/src/test/helpers/supabase-test-setup.ts": [
+      "@supabase/supabase-js",
+      "~/env"
+    ],
+    ".archived-tests-2025-08-23/src/test/helpers/test-id-generator.ts": [
+      "~/test/constants/seed-test-ids"
+    ],
+    ".archived-tests-2025-08-23/src/test/helpers/worker-scoped-db.ts": [
+      "vitest",
+      ".archived-tests-2025-08-23/src/test/helpers/pglite-test-setup.ts",
+      "drizzle-orm"
+    ],
+    ".archived-tests-2025-08-23/src/test/mockContext.ts": [
+      "vitest",
+      "vitest-mock-extended"
+    ],
+    ".archived-tests-2025-08-23/src/test/mockUtils.ts": ["vitest"],
+    ".archived-tests-2025-08-23/src/test/msw/handlers.ts": [
+      ".archived-tests-2025-08-23/src/test/msw/setup.ts"
+    ],
+    ".archived-tests-2025-08-23/src/test/msw/setup.ts": [
+      "msw/node",
+      "msw-trpc",
+      "superjson"
+    ],
+    ".archived-tests-2025-08-23/src/test/permissionTestHelpers.ts": [
+      "@trpc/server",
+      "vitest",
+      ".archived-tests-2025-08-23/src/test/vitestMockContext.ts",
+      "~/server/auth/permissions"
+    ],
+    ".archived-tests-2025-08-23/src/test/routerTestPatterns.ts": [
+      "vitest",
+      ".archived-tests-2025-08-23/src/test/permissionTestHelpers.ts"
+    ],
+    ".archived-tests-2025-08-23/src/test/seed-data-helpers.ts": [
+      "drizzle-orm",
+      "~/server/db/drizzle",
+      "~/server/db/schema"
+    ],
+    ".archived-tests-2025-08-23/src/test/setup/issueListTestSetup.ts": [
+      "vitest",
+      "~/test/mockUtils"
+    ],
+    ".archived-tests-2025-08-23/src/test/setup/viTestMocks.ts": ["vitest"],
+    ".archived-tests-2025-08-23/src/test/templates/02-service-business-logic-test.template.ts": [
+      "vitest",
+      "drizzle-orm",
+      "~/test/helpers/worker-scoped-db",
+      "~/test/constants/seed-test-ids",
+      "~/server/db/schema"
+    ],
+    ".archived-tests-2025-08-23/src/test/templates/03-pglite-integration-test.template.ts": [
+      "vitest",
+      "drizzle-orm",
+      "~/test/helpers/worker-scoped-db",
+      "~/test/helpers/pglite-test-setup",
+      "~/test/constants/seed-test-ids",
+      "~/server/db/schema"
+    ],
+    ".archived-tests-2025-08-23/src/test/templates/04-react-component-unit-test.template.tsx": [
+      "vitest",
+      "@testing-library/react",
+      "@testing-library/user-event",
+      "~/test/VitestTestWrapper"
+    ],
+    ".archived-tests-2025-08-23/src/test/testDataFactories.ts": [
+      "@faker-js/faker",
+      "vitest",
+      "~/test/constants/seed-test-ids",
+      "~/test/testDataFactories",
+      "~/test/testDataFactories",
+      "~/test/testDataFactories",
+      "~/test/testDataFactories"
+    ],
+    ".archived-tests-2025-08-23/src/test/utils/mock-ids.ts": [
+      ".archived-tests-2025-08-23/src/test/constants/seed-test-ids.ts"
+    ],
+    ".archived-tests-2025-08-23/src/test/vitestMockContext.ts": ["vitest"],
     "analyze-type-warnings.js": ["eslint", "path", "url"],
-    "e2e/helpers/auth.ts": ["@playwright/test"],
-    "e2e/helpers/unified-dashboard.ts": ["@playwright/test"],
-    "e2e/issue-confirmation.spec.ts": ["@playwright/test"],
-    "e2e/roles-permissions.spec.ts": ["@playwright/test"],
     "middleware.ts": [
       "@supabase/ssr",
       "next/server",
       "~/env",
       "~/lib/environment"
     ],
-    "scripts/generate-sql-constants.ts": [
-      "fs",
-      "path",
-      "src/test/constants/seed-test-ids.ts"
-    ],
+    "scripts/generate-sql-constants.ts": ["fs", "path"],
     "scripts/seed/index.ts": [
       "src/lib/environment.ts",
       "scripts/seed/shared/infrastructure.ts",
@@ -5002,10 +5462,6 @@
       "@mui/material",
       "~/trpc/react"
     ],
-    "src/app/api/dev/__tests__/users-simple.test.ts": [
-      "vitest",
-      "~/test/constants/seed-test-ids"
-    ],
     "src/app/api/dev/users/route.ts": [
       "drizzle-orm",
       "next/server",
@@ -5054,14 +5510,6 @@
       "@mui/material",
       "~/components/permissions/PermissionButton",
       "~/hooks/usePermissions"
-    ],
-    "src/app/dashboard/_components/__tests__/PrimaryAppBar.test.tsx": [
-      "@testing-library/react",
-      "react",
-      "vitest",
-      "src/app/dashboard/_components/PrimaryAppBar.tsx",
-      "~/test/msw/setup",
-      "~/test/VitestTestWrapper"
     ],
     "src/app/dashboard/layout.tsx": [
       "@mui/material",
@@ -5135,14 +5583,6 @@
       "@mui/material",
       "src/app/machines/components/MachineCard.tsx",
       "~/trpc/react"
-    ],
-    "src/app/machines/components/__tests__/MachineCard.test.tsx": [
-      "@testing-library/react",
-      "@testing-library/user-event",
-      "vitest",
-      "src/app/machines/components/MachineCard.tsx",
-      "~/test/msw/setup",
-      "~/test/VitestTestWrapper"
     ],
     "src/app/machines/page.tsx": [
       "@mui/icons-material",
@@ -5370,14 +5810,6 @@
       "react",
       "~/trpc/react"
     ],
-    "src/components/issues/__tests__/MachineSelector.test.tsx": [
-      "@testing-library/react",
-      "@testing-library/user-event",
-      "vitest",
-      "src/components/issues/MachineSelector.tsx",
-      "~/test/mockUtils",
-      "~/test/VitestTestWrapper"
-    ],
     "src/components/locations/LocationDetailView.tsx": [
       "@mui/icons-material",
       "@mui/material",
@@ -5396,18 +5828,6 @@
       "next/navigation",
       "react"
     ],
-    "src/components/locations/__tests__/LocationDetailView.test.tsx": [
-      "@testing-library/react",
-      "vitest",
-      "src/components/locations/LocationDetailView.tsx",
-      "~/test/msw/setup",
-      "~/test/VitestTestWrapper"
-    ],
-    "src/components/locations/__tests__/MachineGrid.test.tsx": [
-      "@testing-library/react",
-      "vitest",
-      "src/components/locations/MachineGrid.tsx"
-    ],
     "src/components/machines/MachineDetailView.tsx": [
       "@mui/icons-material",
       "@mui/material",
@@ -5421,22 +5841,12 @@
       "~/server/auth/permissions.constants"
     ],
     "src/components/permissions/PermissionGate.tsx": ["react"],
-    "src/components/permissions/__tests__/PermissionGate.test.tsx": [
-      "@testing-library/react",
-      "vitest",
-      "src/components/permissions/PermissionGate.tsx",
-      "~/server/auth/permissions.constants"
-    ],
     "src/components/profile/ProfilePictureUpload.tsx": [
       "@mui/icons-material",
       "@mui/material",
       "~/components/ui/UserAvatar",
       "~/lib/utils/image-processing",
       "~/trpc/react"
-    ],
-    "src/components/react-environment.test.tsx": [
-      "@testing-library/react",
-      "vitest"
     ],
     "src/components/ui/Breadcrumbs.tsx": [
       "@mui/material",
@@ -5451,82 +5861,11 @@
       "~/trpc/react"
     ],
     "src/env.js": ["@t3-oss/env-nextjs", "zod"],
-    "src/hooks/__tests__/usePermissions.test.tsx": [
-      "@testing-library/react",
-      "react",
-      "react",
-      "vitest",
-      "src/hooks/usePermissions.ts",
-      "~/server/auth/permissions.constants",
-      "~/test/VitestTestWrapper"
-    ],
     "src/hooks/usePermissions.ts": [
       "next/navigation",
       "react",
       "~/contexts/PermissionDepsContext",
       "~/lib/permissions/descriptions"
-    ],
-    "src/integration-tests/comment.integration.test.ts": [
-      "vitest",
-      "drizzle-orm",
-      "~/server/api/root",
-      "~/server/db/schema",
-      "~/test/helpers/worker-scoped-db",
-      "~/test/helpers/createSeededIssueTestContext",
-      "~/test/constants/seed-test-ids"
-    ],
-    "src/integration-tests/cross-org-isolation.test.ts": [
-      "vitest",
-      "drizzle-orm",
-      "~/test/helpers/worker-scoped-db",
-      "~/test/constants/seed-test-ids",
-      "~/server/db/schema"
-    ],
-    "src/integration-tests/machine.location.integration.test.ts": [
-      "@trpc/server",
-      "drizzle-orm",
-      "vitest",
-      "~/server/api/routers/machine.location",
-      "~/server/db/schema",
-      "~/test/helpers/pglite-test-setup",
-      "~/test/helpers/worker-scoped-db",
-      "~/test/constants/seed-test-ids",
-      "~/test/helpers/createSeededMachineTestContext"
-    ],
-    "src/integration-tests/machine.owner.integration.test.ts": [
-      "drizzle-orm",
-      "vitest",
-      "~/server/api/routers/machine.owner",
-      "~/server/db/schema",
-      "~/test/helpers/worker-scoped-db",
-      "~/test/constants/seed-test-ids",
-      "~/test/helpers/createSeededMachineTestContext"
-    ],
-    "src/integration-tests/model.core.integration.test.ts": [
-      "@trpc/server",
-      "drizzle-orm",
-      "vitest",
-      "~/server/api/root",
-      "~/server/db/schema",
-      "~/test/constants/seed-test-ids",
-      "~/test/helpers/worker-scoped-db"
-    ],
-    "src/integration-tests/pinballMap.integration.test.ts": [
-      "drizzle-orm",
-      "vitest",
-      "msw",
-      "~/server/api/root",
-      "~/server/db/schema",
-      "~/test/msw/setup",
-      "~/test/helpers/worker-scoped-db",
-      "~/server/services/factory"
-    ],
-    "src/integration-tests/schema-migration-validation.integration.test.ts": [
-      "drizzle-orm",
-      "vitest",
-      "~/server/db/schema",
-      "~/test/helpers/test-id-generator",
-      "~/test/helpers/worker-scoped-db"
     ],
     "src/lib/auth/dev-auth-server.ts": [
       "~/lib/environment",
@@ -5540,11 +5879,6 @@
       "vitest",
       "zod",
       "src/lib/common/inputValidation.ts"
-    ],
-    "src/lib/common/__tests__/organizationValidation.test.ts": [
-      "vitest",
-      "src/lib/common/organizationValidation.ts",
-      "~/test/constants/seed-test-ids"
     ],
     "src/lib/common/inputValidation.ts": ["zod"],
     "src/lib/env-loaders/development.ts": ["path", "url", "dotenv"],
@@ -5561,21 +5895,6 @@
       "path",
       "src/lib/image-storage/index.ts"
     ],
-    "src/lib/issues/__tests__/assignmentValidation.test.ts": [
-      "vitest",
-      "~/test/constants/seed-test-ids",
-      "src/lib/issues/assignmentValidation.ts"
-    ],
-    "src/lib/issues/__tests__/creationValidation.test.ts": [
-      "vitest",
-      "src/lib/issues/creationValidation.ts",
-      "~/test/constants/seed-test-ids"
-    ],
-    "src/lib/issues/__tests__/statusValidation.test.ts": [
-      "vitest",
-      "~/test/constants/seed-test-ids",
-      "src/lib/issues/statusValidation.ts"
-    ],
     "src/lib/logger.ts": [
       "pino",
       "~/env.js",
@@ -5583,10 +5902,6 @@
       "~/lib/logger-constants"
     ],
     "src/lib/opdb/client.ts": ["src/lib/opdb/utils.ts", "~/env"],
-    "src/lib/pinballmap/__tests__/apiMocker.ts": [
-      "vitest",
-      "src/lib/pinballmap/__tests__/fixtures/api_responses/locations/location_26454_machine_details.json"
-    ],
     "src/lib/supabase/client.ts": ["@supabase/ssr", "~/env"],
     "src/lib/supabase/multi-tenant-client.ts": [
       "src/lib/supabase/server.ts",
@@ -5596,95 +5911,7 @@
     "src/lib/supabase/server.ts": ["@supabase/ssr", "next/headers", "~/env"],
     "src/lib/temp-production-overrides.ts": ["~/env"],
     "src/lib/tracing.ts": ["async_hooks", "uuid", "~/lib/logger-constants"],
-    "src/lib/users/__tests__/roleManagementValidation.test.ts": [
-      "vitest",
-      "src/lib/users/roleManagementValidation.ts",
-      "~/test/constants/seed-test-ids"
-    ],
     "src/lib/utils/id-generation.ts": ["uuid"],
-    "src/server/api/__tests__/msw.trpc.test.ts": [
-      "@trpc/server",
-      "vitest",
-      "~/test/msw/handlers",
-      "~/test/msw/setup",
-      "~/test/msw/setup"
-    ],
-    "src/server/api/__tests__/trpc.permission.test.ts": [
-      "@trpc/server",
-      "vitest",
-      "src/server/api/trpc.ts",
-      "~/server/auth/permissions",
-      "~/test/vitestMockContext",
-      "~/test/constants/seed-test-ids"
-    ],
-    "src/server/api/routers/__tests__/collection.test.ts": [
-      "drizzle-orm",
-      "vitest",
-      "~/server/api/root",
-      "~/server/db/schema",
-      "~/test/constants/seed-test-ids",
-      "~/test/helpers/worker-scoped-db"
-    ],
-    "src/server/api/routers/__tests__/issue.confirmation.test.ts": [
-      "vitest",
-      "@trpc/server",
-      "drizzle-orm",
-      "zod",
-      "~/test/vitestMockContext",
-      "~/test/constants/seed-test-ids",
-      "~/server/api/trpc",
-      "~/server/api/trpc.permission",
-      "~/server/auth/permissions",
-      "~/server/db/schema"
-    ],
-    "src/server/api/routers/__tests__/issue.integration.test.ts": [
-      "drizzle-orm",
-      "vitest",
-      "~/lib/utils/id-generation",
-      "~/server/api/root",
-      "~/server/db/schema",
-      "~/test/helpers/pglite-test-setup",
-      "~/test/helpers/worker-scoped-db",
-      "~/test/testDataFactories",
-      "~/test/constants/seed-test-ids"
-    ],
-    "src/server/api/routers/__tests__/issue.notification.test.ts": [
-      "vitest",
-      "~/server/services/notificationService",
-      "~/test/vitestMockContext",
-      "~/test/constants/seed-test-ids"
-    ],
-    "src/server/api/routers/__tests__/issue.test.ts": [
-      "drizzle-orm",
-      "vitest",
-      "~/server/api/root",
-      "~/server/db/schema",
-      "~/test/constants/seed-test-ids",
-      "~/test/helpers/worker-scoped-db",
-      "~/test/helpers/createSeededIssueTestContext",
-      "~/server/services/factory"
-    ],
-    "src/server/api/routers/__tests__/model.core.test.ts": [
-      "@trpc/server",
-      "drizzle-orm",
-      "vitest",
-      "~/server/api/root",
-      "~/server/db/schema",
-      "~/test/constants/seed-test-ids",
-      "~/test/helpers/test-id-generator",
-      "~/test/helpers/worker-scoped-db",
-      "~/test/helpers/pglite-test-setup"
-    ],
-    "src/server/api/routers/__tests__/notification.test.ts": [
-      "drizzle-orm",
-      "vitest",
-      "~/server/api/root",
-      "~/server/db/schema",
-      "~/test/helpers/test-id-generator",
-      "~/test/helpers/worker-scoped-db",
-      "~/server/services/factory",
-      "~/test/constants/seed-test-ids"
-    ],
     "src/server/api/routers/issue.comment.ts": [
       "@trpc/server",
       "drizzle-orm",
@@ -5714,21 +5941,6 @@
       "~/server/db/schema",
       "~/server/services/roleService"
     ],
-    "src/server/api/routers/utils/__tests__/commentService.integration.test.ts": [
-      "drizzle-orm",
-      "vitest",
-      "~/server/api/routers/comment",
-      "~/server/db/schema",
-      "~/test/helpers/pglite-test-setup",
-      "~/test/helpers/createSeededIssueTestContext",
-      "~/test/constants/seed-test-ids",
-      "~/test/helpers/worker-scoped-db"
-    ],
-    "src/server/api/routers/utils/__tests__/commentValidation.test.ts": [
-      "vitest",
-      "src/test/constants/seed-test-ids.ts",
-      "src/server/api/routers/utils/commentValidation.ts"
-    ],
     "src/server/api/routers/utils/commentService.ts": [
       "drizzle-orm",
       "~/server/db/schema"
@@ -5754,18 +5966,6 @@
       "src/server/api/trpc.base.ts",
       "~/server/auth/permissions"
     ],
-    "src/server/auth/__tests__/permissions.constants.test.ts": [
-      "vitest",
-      "src/server/auth/permissions.constants.ts"
-    ],
-    "src/server/auth/__tests__/uploadAuth.test.ts": [
-      "@trpc/server",
-      "vitest",
-      "src/server/auth/supabase.ts",
-      "src/server/auth/types.ts",
-      "src/server/auth/uploadAuth.ts",
-      "~/test/constants/seed-test-ids"
-    ],
     "src/server/auth/permissions.ts": [
       "@trpc/server",
       "drizzle-orm",
@@ -5789,11 +5989,6 @@
       "~/lib/environment",
       "~/lib/logger"
     ],
-    "src/server/db/__tests__/drizzle-singleton.test.ts": [
-      "vitest",
-      "src/test/helpers/worker-scoped-db.ts"
-    ],
-    "src/server/db/__tests__/drizzle-test-helpers.ts": ["vitest"],
     "src/server/db/client-factory.ts": [
       "drizzle-orm/postgres-js",
       "drizzle-orm/pglite"
@@ -5811,12 +6006,6 @@
       "drizzle-orm",
       "~/server/auth/permissions.constants",
       "~/server/db/schema"
-    ],
-    "src/server/services/__tests__/roleService.test.ts": [
-      "vitest",
-      "~/server/auth/permissions.constants",
-      "~/server/services/roleService",
-      "~/test/constants/seed-test-ids"
     ],
     "src/server/services/collectionService.ts": [
       "drizzle-orm",
@@ -5878,153 +6067,6 @@
       "~/server/db/drizzle",
       "~/server/db/schema"
     ],
-    "src/test/VitestTestWrapper.tsx": [
-      "@tanstack/react-query",
-      "react",
-      "~/contexts/PermissionDepsContext"
-    ],
-    "src/test/context.ts": [
-      "drizzle-orm/node-postgres",
-      "pg",
-      "~/server/db/schema",
-      "~/server/db/client-factory"
-    ],
-    "src/test/database-test-helpers.ts": [
-      "drizzle-orm",
-      "~/server/db/schema",
-      "~/test/constants/seed-test-ids"
-    ],
-    "src/test/examples/dual-track-testing-examples.test.ts": [
-      "vitest",
-      "drizzle-orm",
-      "~/test/constants/seed-test-ids",
-      "~/test/helpers/worker-scoped-db",
-      "~/test/helpers/pglite-test-setup",
-      "~/server/db/schema"
-    ],
-    "src/test/helpers/archetype-validator.ts": ["node:fs", "node:path"],
-    "src/test/helpers/createSeededAdminTestContext.ts": [
-      "drizzle-orm",
-      "vitest",
-      "~/test/helpers/pglite-test-setup",
-      "~/server/db/schema"
-    ],
-    "src/test/helpers/createSeededCollectionTestContext.ts": [
-      "drizzle-orm",
-      "vitest",
-      "~/test/helpers/pglite-test-setup",
-      "~/server/db/schema"
-    ],
-    "src/test/helpers/createSeededIssueTestContext.ts": [
-      "drizzle-orm",
-      "~/test/helpers/pglite-test-setup",
-      "~/server/db/schema",
-      "~/server/services/factory"
-    ],
-    "src/test/helpers/createSeededLocationTestContext.ts": [
-      "vitest",
-      "drizzle-orm",
-      "~/test/constants/seed-test-ids",
-      "~/server/db/schema"
-    ],
-    "src/test/helpers/createSeededMachineTestContext.ts": [
-      "vitest",
-      "drizzle-orm",
-      "~/test/constants/seed-test-ids",
-      "~/server/db/schema"
-    ],
-    "src/test/helpers/createSeededNotificationTestContext.ts": [
-      "vitest",
-      "src/test/helpers/pglite-test-setup.ts",
-      "src/server/services/factory.ts"
-    ],
-    "src/test/helpers/multi-tenant-test-helpers.ts": [
-      "drizzle-orm",
-      "src/test/helpers/rls-test-context.ts",
-      "src/test/helpers/organization-context.ts",
-      "~/server/db/schema"
-    ],
-    "src/test/helpers/organization-context.ts": [
-      "drizzle-orm",
-      "~/server/db/schema"
-    ],
-    "src/test/helpers/pglite-test-setup.ts": [
-      "@electric-sql/pglite",
-      "drizzle-orm",
-      "drizzle-orm/pglite",
-      "drizzle-kit/api",
-      "~/server/db/client-factory",
-      "~/server/db/schema"
-    ],
-    "src/test/helpers/rls-test-context.ts": [
-      "vitest",
-      "drizzle-orm",
-      "src/test/constants/seed-test-ids.ts"
-    ],
-    "src/test/helpers/session-context.ts": ["drizzle-orm"],
-    "src/test/helpers/supabase-test-setup.ts": [
-      "@supabase/supabase-js",
-      "~/env"
-    ],
-    "src/test/helpers/test-id-generator.ts": ["~/test/constants/seed-test-ids"],
-    "src/test/helpers/worker-scoped-db.ts": [
-      "vitest",
-      "src/test/helpers/pglite-test-setup.ts",
-      "drizzle-orm"
-    ],
-    "src/test/mockContext.ts": ["vitest", "vitest-mock-extended"],
-    "src/test/mockUtils.ts": ["vitest"],
-    "src/test/msw/handlers.ts": ["src/test/msw/setup.ts"],
-    "src/test/msw/setup.ts": ["msw/node", "msw-trpc", "superjson"],
-    "src/test/permissionTestHelpers.ts": [
-      "@trpc/server",
-      "vitest",
-      "src/test/vitestMockContext.ts",
-      "~/server/auth/permissions"
-    ],
-    "src/test/routerTestPatterns.ts": [
-      "vitest",
-      "src/test/permissionTestHelpers.ts"
-    ],
-    "src/test/seed-data-helpers.ts": [
-      "drizzle-orm",
-      "~/server/db/drizzle",
-      "~/server/db/schema"
-    ],
-    "src/test/setup/issueListTestSetup.ts": ["vitest", "~/test/mockUtils"],
-    "src/test/setup/viTestMocks.ts": ["vitest"],
-    "src/test/templates/02-service-business-logic-test.template.ts": [
-      "vitest",
-      "drizzle-orm",
-      "~/test/helpers/worker-scoped-db",
-      "~/test/constants/seed-test-ids",
-      "~/server/db/schema"
-    ],
-    "src/test/templates/03-pglite-integration-test.template.ts": [
-      "vitest",
-      "drizzle-orm",
-      "~/test/helpers/worker-scoped-db",
-      "~/test/helpers/pglite-test-setup",
-      "~/test/constants/seed-test-ids",
-      "~/server/db/schema"
-    ],
-    "src/test/templates/04-react-component-unit-test.template.tsx": [
-      "vitest",
-      "@testing-library/react",
-      "@testing-library/user-event",
-      "~/test/VitestTestWrapper"
-    ],
-    "src/test/testDataFactories.ts": [
-      "@faker-js/faker",
-      "vitest",
-      "~/test/constants/seed-test-ids",
-      "~/test/testDataFactories",
-      "~/test/testDataFactories",
-      "~/test/testDataFactories",
-      "~/test/testDataFactories"
-    ],
-    "src/test/utils/mock-ids.ts": ["src/test/constants/seed-test-ids.ts"],
-    "src/test/vitestMockContext.ts": ["vitest"],
     "src/trpc/query-client.ts": ["@tanstack/react-query", "superjson"],
     "src/trpc/react.tsx": [
       "@tanstack/react-query",
@@ -6040,7 +6082,51 @@
     ]
   },
   "dir_purposes": {
+    ".archived-tests-2025-08-23": "Test files and test utilities",
+    ".archived-tests-2025-08-23/config": "Configuration files and settings",
+    ".archived-tests-2025-08-23/e2e": "Test files and test utilities",
+    ".archived-tests-2025-08-23/e2e/helpers": "Helper functions and utilities",
+    ".archived-tests-2025-08-23/src/app/api/dev/__tests__": "Test files and test utilities",
+    ".archived-tests-2025-08-23/src/app/dashboard/_components/__tests__": "Test files and test utilities",
+    ".archived-tests-2025-08-23/src/app/games/[id]/__tests__": "Test files and test utilities",
+    ".archived-tests-2025-08-23/src/app/games/__tests__": "Test files and test utilities",
+    ".archived-tests-2025-08-23/src/app/issues/__tests__": "Test files and test utilities",
+    ".archived-tests-2025-08-23/src/app/machines/[id]": "Test files and test utilities",
+    ".archived-tests-2025-08-23/src/app/machines/components": "Reusable UI components",
+    ".archived-tests-2025-08-23/src/components/issues/__tests__": "Test files and test utilities",
+    ".archived-tests-2025-08-23/src/components": "Reusable UI components",
+    ".archived-tests-2025-08-23/src/components/locations/__tests__": "Test files and test utilities",
+    ".archived-tests-2025-08-23/src/components/machines/__tests__": "Test files and test utilities",
+    ".archived-tests-2025-08-23/src/components/permissions/__tests__": "Test files and test utilities",
+    ".archived-tests-2025-08-23/src/hooks/__tests__": "Test files and test utilities",
+    ".archived-tests-2025-08-23/src/integration-tests": "Test files and test utilities",
+    ".archived-tests-2025-08-23/src/lib/common/__tests__": "Test files and test utilities",
+    ".archived-tests-2025-08-23/src/lib/environment-client/__tests__": "Test files and test utilities",
+    ".archived-tests-2025-08-23/src/lib/external/__tests__": "Test files and test utilities",
+    ".archived-tests-2025-08-23/src/lib/issues/__tests__": "Test files and test utilities",
+    ".archived-tests-2025-08-23/src/lib/opdb/__tests__": "Test files and test utilities",
+    ".archived-tests-2025-08-23/src/lib/permissions/__tests__": "Test files and test utilities",
+    ".archived-tests-2025-08-23/src/lib/pinballmap/__tests__": "Test files and test utilities",
+    ".archived-tests-2025-08-23/src/lib/supabase/__tests__": "Test files and test utilities",
+    ".archived-tests-2025-08-23/src/lib/users/__tests__": "Test files and test utilities",
+    ".archived-tests-2025-08-23/src/server/api/__tests__": "Test files and test utilities",
+    ".archived-tests-2025-08-23/src/server/api/routers/__tests__": "Test files and test utilities",
+    ".archived-tests-2025-08-23/src/server/api/routers/utils/__tests__": "Test files and test utilities",
+    ".archived-tests-2025-08-23/src/server/auth/__tests__": "Test files and test utilities",
+    ".archived-tests-2025-08-23/src/server/db/__tests__": "Test files and test utilities",
+    ".archived-tests-2025-08-23/src/server/services/__tests__": "Test files and test utilities",
+    ".archived-tests-2025-08-23/src/test": "Test files and test utilities",
+    ".archived-tests-2025-08-23/src/test/__examples__": "Test files and test utilities",
+    ".archived-tests-2025-08-23/src/test/__tests__": "Test files and test utilities",
+    ".archived-tests-2025-08-23/src/test/constants": "Test files and test utilities",
+    ".archived-tests-2025-08-23/src/test/examples": "Test files and test utilities",
+    ".archived-tests-2025-08-23/src/test/helpers/__tests__": "Test files and test utilities",
+    ".archived-tests-2025-08-23/src/test/helpers": "Helper functions and utilities",
+    ".archived-tests-2025-08-23/src/test/setup": "Test files and test utilities",
+    ".archived-tests-2025-08-23/src/test/templates": "Test files and test utilities",
+    ".archived-tests-2025-08-23/src/test/utils": "Shared utility functions and helpers",
     "docs": "Project documentation",
+    "docs/testing": "Test files and test utilities",
     "docs/architecture": "API routes and endpoints",
     "docs/configuration": "Configuration files and settings",
     "docs/deprecated": "Test files and test utilities",
@@ -6052,9 +6138,7 @@
     "docs/planning/archive": "Test files and test utilities",
     "docs/quick-reference": "Test files and test utilities",
     "docs/security": "Test files and test utilities",
-    "docs/testing": "Test files and test utilities",
     "e2e": "Test files and test utilities",
-    "e2e/helpers": "Helper functions and utilities",
     "migration-plan-v2": "Test files and test utilities",
     "phase3-task-breakdown/02-high-impact-patterns": "API routes and endpoints",
     "phase3-task-breakdown/03-medium-priority": "UI components",
@@ -6062,67 +6146,29 @@
     "scripts": "Build and utility scripts",
     "src": "Source code root directory",
     "src/app/_components": "Reusable UI components",
-    "src/app/api/dev/__tests__": "Test files and test utilities",
     "src/app/api/dev/users": "API routes and endpoints",
     "src/app/api/health": "API routes and endpoints",
     "src/app/api/qr/[qrCodeId]": "API routes and endpoints",
     "src/app/api/trpc/[trpc]": "API routes and endpoints",
     "src/app/dashboard/_components": "Reusable UI components",
-    "src/app/dashboard/_components/__tests__": "Test files and test utilities",
-    "src/app/games/[id]/__tests__": "Test files and test utilities",
-    "src/app/games/__tests__": "Test files and test utilities",
-    "src/app/issues/__tests__": "Test files and test utilities",
-    "src/app/machines/[id]/__tests__": "Test files and test utilities",
     "src/app/machines/components": "Reusable UI components",
-    "src/app/machines/components/__tests__": "Test files and test utilities",
     "src/app/settings/roles/_components": "Reusable UI components",
     "src/app/settings/users/_components": "Reusable UI components",
-    "src/components": "Reusable UI components",
-    "src/components/issues/__tests__": "Test files and test utilities",
-    "src/components/locations/__tests__": "Test files and test utilities",
-    "src/components/machines/__tests__": "Test files and test utilities",
-    "src/components/permissions/__tests__": "Test files and test utilities",
-    "src/hooks/__tests__": "Test files and test utilities",
-    "src/integration-tests": "Test files and test utilities",
     "src/lib/auth": "Authentication and authorization logic",
     "src/lib": "Library code and shared modules",
     "src/lib/common/__tests__": "Test files and test utilities",
-    "src/lib/environment-client/__tests__": "Test files and test utilities",
-    "src/lib/external/__tests__": "Test files and test utilities",
-    "src/lib/issues/__tests__": "Test files and test utilities",
-    "src/lib/opdb/__tests__": "Test files and test utilities",
-    "src/lib/permissions/__tests__": "Test files and test utilities",
-    "src/lib/pinballmap/__tests__": "Test files and test utilities",
-    "src/lib/supabase/__tests__": "Test files and test utilities",
-    "src/lib/users/__tests__": "Test files and test utilities",
     "src/lib/utils": "Shared utility functions and helpers",
-    "src/server/api/__tests__": "Test files and test utilities",
     "src/server/api": "API endpoints and route handlers",
-    "src/server/api/routers/__tests__": "Test files and test utilities",
     "src/server/api/routers": "Data models and schemas",
-    "src/server/api/routers/utils/__tests__": "Test files and test utilities",
     "src/server/api/routers/utils": "Shared utility functions and helpers",
-    "src/server/auth/__tests__": "Test files and test utilities",
     "src/server/auth": "Authentication and authorization logic",
-    "src/server/db/__tests__": "Test files and test utilities",
     "src/server/db/utils": "Shared utility functions and helpers",
-    "src/server/services/__tests__": "Test files and test utilities",
     "src/server/services": "Business logic and external service integrations",
     "src/server/utils": "Shared utility functions and helpers",
-    "src/test": "Test files and test utilities",
-    "src/test/__examples__": "Test files and test utilities",
-    "src/test/__tests__": "Test files and test utilities",
-    "src/test/constants": "Test files and test utilities",
-    "src/test/examples": "Test files and test utilities",
-    "src/test/helpers/__tests__": "Test files and test utilities",
-    "src/test/helpers": "Helper functions and utilities",
-    "src/test/setup": "Test files and test utilities",
-    "src/test/templates": "Test files and test utilities",
-    "src/test/utils": "Shared utility functions and helpers",
     "src/utils": "Shared utility functions and helpers",
     "supabase/tests": "Test files and test utilities",
     "supabase/tests/rls": "Test files and test utilities",
     "supabase/tests/setup": "Test files and test utilities"
   },
-  "staleness": 1755385788.898572
+  "staleness": 1755390284.248824
 }
