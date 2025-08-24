@@ -31,19 +31,19 @@ export class CommentService {
     const [deletedComment] = await this.drizzle
       .update(comments)
       .set({
-        deletedAt: new Date(),
-        deletedBy: deletedById,
+        deleted_at: new Date(),
+        deleted_by: deletedById,
       })
       .where(eq(comments.id, commentId))
       .returning({
         id: comments.id,
         content: comments.content,
-        createdAt: comments.createdAt,
-        updatedAt: comments.updatedAt,
-        deletedAt: comments.deletedAt,
-        deletedBy: comments.deletedBy,
-        issueId: comments.issueId,
-        authorId: comments.authorId,
+        createdAt: comments.created_at,
+        updatedAt: comments.updated_at,
+        deletedAt: comments.deleted_at,
+        deletedBy: comments.deleted_by,
+        issueId: comments.issue_id,
+        authorId: comments.author_id,
       });
 
     if (!deletedComment) {
@@ -69,19 +69,19 @@ export class CommentService {
     const [restoredComment] = await this.drizzle
       .update(comments)
       .set({
-        deletedAt: null,
-        deletedBy: null,
+        deleted_at: null,
+        deleted_by: null,
       })
       .where(eq(comments.id, commentId))
       .returning({
         id: comments.id,
         content: comments.content,
-        createdAt: comments.createdAt,
-        updatedAt: comments.updatedAt,
-        deletedAt: comments.deletedAt,
-        deletedBy: comments.deletedBy,
-        issueId: comments.issueId,
-        authorId: comments.authorId,
+        createdAt: comments.created_at,
+        updatedAt: comments.updated_at,
+        deletedAt: comments.deleted_at,
+        deletedBy: comments.deleted_by,
+        issueId: comments.issue_id,
+        authorId: comments.author_id,
       });
 
     if (!restoredComment) {
@@ -127,12 +127,12 @@ export class CommentService {
       .select({
         id: comments.id,
         content: comments.content,
-        createdAt: comments.createdAt,
-        updatedAt: comments.updatedAt,
-        deletedAt: comments.deletedAt,
-        deletedBy: comments.deletedBy,
-        issueId: comments.issueId,
-        authorId: comments.authorId,
+        createdAt: comments.created_at,
+        updatedAt: comments.updated_at,
+        deletedAt: comments.deleted_at,
+        deletedBy: comments.deleted_by,
+        issueId: comments.issue_id,
+        authorId: comments.author_id,
         author: {
           id: users.id,
           name: users.name,
@@ -145,10 +145,10 @@ export class CommentService {
         },
       })
       .from(comments)
-      .innerJoin(users, eq(comments.authorId, users.id))
-      .innerJoin(issues, eq(comments.issueId, issues.id))
-      .where(eq(issues.organizationId, organizationId))
-      .orderBy(desc(comments.deletedAt));
+      .innerJoin(users, eq(comments.author_id, users.id))
+      .innerJoin(issues, eq(comments.issue_id, issues.id))
+      .where(eq(issues.organization_id, organizationId))
+      .orderBy(desc(comments.deleted_at));
 
     // For each comment, if it has a deleter, fetch deleter info
     const commentsWithDeleters = await Promise.all(

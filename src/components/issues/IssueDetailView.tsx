@@ -190,7 +190,7 @@ export function IssueDetailView({
                   Created
                 </Typography>
                 <Typography variant="body1" data-testid="issue-created-date">
-                  {new Date(currentIssue.createdAt).toLocaleDateString()}
+                  {new Date(currentIssue.created_at).toLocaleDateString()}
                 </Typography>
               </Box>
 
@@ -199,7 +199,7 @@ export function IssueDetailView({
                   Last Updated
                 </Typography>
                 <Typography variant="body1" data-testid="issue-last-updated">
-                  {new Date(currentIssue.updatedAt).toLocaleDateString()}
+                  {new Date(currentIssue.updated_at).toLocaleDateString()}
                 </Typography>
               </Box>
 
@@ -220,7 +220,7 @@ export function IssueDetailView({
                 </Typography>
                 <Typography variant="body1" data-testid="issue-created-by">
                   {currentIssue.createdBy?.name ??
-                    currentIssue.submitterName ??
+                    currentIssue.submitter_name ??
                     "Anonymous User"}
                 </Typography>
               </Box>

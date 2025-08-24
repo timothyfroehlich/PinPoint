@@ -44,18 +44,18 @@ export class PinballMapService {
       .insert(pinballMapConfigs)
       .values({
         id: configId,
-        organizationId: organizationId,
-        apiEnabled: true,
-        autoSyncEnabled: false, // Start with manual sync
-        createMissingModels: true, // Allow creating models for unknown games
-        updateExistingData: true, // Allow updating existing data
+        organization_id: organizationId,
+        api_enabled: true,
+        auto_sync_enabled: false, // Start with manual sync
+        create_missing_models: true, // Allow creating models for unknown games
+        update_existing_data: true, // Allow updating existing data
       })
       .onConflictDoUpdate({
-        target: pinballMapConfigs.organizationId,
+        target: pinballMapConfigs.organization_id,
         set: {
-          apiEnabled: true,
-          createMissingModels: true,
-          updateExistingData: true,
+          api_enabled: true,
+          create_missing_models: true,
+          update_existing_data: true,
         },
       });
   }
@@ -70,10 +70,10 @@ export class PinballMapService {
   ): Promise<void> {
     // Verify organization has PinballMap enabled
     const config = await this.db.query.pinballMapConfigs.findFirst({
-      where: eq(pinballMapConfigs.organizationId, organizationId),
+      where: eq(pinballMapConfigs.organization_id, organizationId),
     });
 
-    if (!config?.apiEnabled) {
+    if (!config?.api_enabled) {
       throw new Error("PinballMap integration not enabled for organization");
     }
 
@@ -81,8 +81,8 @@ export class PinballMapService {
     await this.db
       .update(locations)
       .set({
-        pinballMapId,
-        syncEnabled: true,
+        pinball_map_id: pinballMapId,
+        sync_enabled: true,
       })
       .where(eq(locations.id, locationId));
   }
@@ -98,9 +98,9 @@ export class PinballMapService {
           with: {
             pinballMapConfig: {
               columns: {
-                apiEnabled: true,
-                createMissingModels: true,
-                updateExistingData: true,
+                api_enabled: true,
+                create_missing_models: true,
+                update_existing_data: true,
               },
             },
           },
@@ -118,7 +118,7 @@ export class PinballMapService {
       };
     }
 
-    if (!location.pinballMapId) {
+    if (!location.pinball_map_id) {
       return {
         success: false,
         added: 0,
@@ -130,7 +130,7 @@ export class PinballMapService {
 
     // Get the PinballMap config - array access since schema defines it as many relationship
     const pinballMapConfig = location.organization.pinballMapConfig[0];
-    if (!pinballMapConfig?.apiEnabled) {
+    if (!pinballMapConfig?.api_enabled) {
       return {
         success: false,
         added: 0,
@@ -143,7 +143,7 @@ export class PinballMapService {
     try {
       // Fetch machine data from PinballMap
       const machineData = await this.fetchLocationMachines(
-        location.pinballMapId,
+        location.pinball_map_id,
       );
 
       if (!machineData?.machines) {
@@ -166,7 +166,7 @@ export class PinballMapService {
       // Update last sync time
       await this.db
         .update(locations)
-        .set({ lastSyncAt: new Date() })
+        .set({ last_sync_at: new Date() })
         .where(eq(locations.id, locationId));
 
       return result;
@@ -187,7 +187,7 @@ export class PinballMapService {
   private async reconcileMachines(
     locationId: string,
     pinballMapMachines: PinballMapMachine[],
-    config: { createMissingModels: boolean; updateExistingData: boolean },
+    config: { create_missing_models: boolean; update_existing_data: boolean },
   ): Promise<SyncResult> {
     let added = 0;
     let updated = 0;
@@ -210,7 +210,7 @@ export class PinballMapService {
 
     // Get current machines at this location
     const currentMachines = await this.db.query.machines.findMany({
-      where: eq(machines.locationId, locationId),
+      where: eq(machines.location_id, locationId),
       with: {
         model: {
           columns: {
@@ -229,7 +229,7 @@ export class PinballMapService {
         // Find or create the Model record
         const model = await this.findOrCreateModel(
           pmMachine,
-          config.createMissingModels,
+          config.create_missing_models,
         );
 
         if (!model) {
@@ -238,13 +238,13 @@ export class PinballMapService {
 
         // Find existing machine by model and location
         const existingMachine = currentMachines.find(
-          (m) => m.modelId === model.id,
+          (m) => m.model_id === model.id,
         );
 
         if (existingMachine) {
           foundMachineIds.add(existingMachine.id);
 
-          if (config.updateExistingData) {
+          if (config.update_existing_data) {
             // Update existing machine if needed
             // For now, machines don't have updatable fields from PinballMap
             // This could be expanded for condition, notes, etc.
@@ -255,10 +255,10 @@ export class PinballMapService {
           await this.db.insert(machines).values({
             id: `machine_${Date.now().toString()}_${Math.random().toString(36).substring(2, 11)}`,
             name: model.name, // Use model name as default instance name
-            organizationId: location.organizationId,
-            locationId,
-            modelId: model.id,
-            qrCodeId: `qr_${Date.now().toString()}_${Math.random().toString(36).substring(2, 11)}`,
+            organization_id: location.organization_id,
+            location_id: locationId,
+            model_id: model.id,
+            qr_code_id: `qr_${Date.now().toString()}_${Math.random().toString(36).substring(2, 11)}`,
             // ownerId will be null initially
           });
           added++;
@@ -290,7 +290,7 @@ export class PinballMapService {
       const [issueCountResult] = await this.db
         .select({ count: count() })
         .from(issues)
-        .where(eq(issues.machineId, machine.id));
+        .where(eq(issues.machine_id, machine.id));
 
       if (issueCountResult?.count === 0) {
         // Only remove machines with no issues
@@ -312,12 +312,12 @@ export class PinballMapService {
    */
   async findOrCreateModel(
     pmMachine: PinballMapMachine,
-    createMissingModels: boolean,
+    create_missing_models: boolean,
   ): Promise<{ id: string; name: string } | null> {
     // Look for existing model by OPDB ID
     let model = pmMachine.opdb_id
       ? await this.db.query.models.findFirst({
-          where: eq(models.opdbId, pmMachine.opdb_id),
+          where: eq(models.opdb_id, pmMachine.opdb_id),
         })
       : null;
 
@@ -328,7 +328,7 @@ export class PinballMapService {
     // Look for existing model by IPDB ID if available
     if (pmMachine.ipdb_id) {
       model = await this.db.query.models.findFirst({
-        where: eq(models.ipdbId, pmMachine.ipdb_id.toString()),
+        where: eq(models.ipdb_id, pmMachine.ipdb_id.toString()),
       });
 
       if (model) {
@@ -336,7 +336,7 @@ export class PinballMapService {
       }
     }
 
-    if (!createMissingModels) {
+    if (!create_missing_models) {
       return null;
     }
 
@@ -361,7 +361,7 @@ export class PinballMapService {
         // Another sync might have created this model
         const fallbackModel = pmMachine.opdb_id
           ? await this.db.query.models.findFirst({
-              where: eq(models.opdbId, pmMachine.opdb_id),
+              where: eq(models.opdb_id, pmMachine.opdb_id),
             })
           : null;
         return fallbackModel ?? null;
@@ -411,20 +411,20 @@ export class PinballMapService {
     locations: {
       id: string;
       name: string;
-      pinballMapId: number | null;
-      syncEnabled: boolean;
-      lastSyncAt: Date | null;
+      pinball_map_id: number | null;
+      sync_enabled: boolean;
+      last_sync_at: Date | null;
       machineCount: number;
     }[];
     lastSync: Date | null;
   }> {
     // Get config for specific organization
     const config = await this.db.query.pinballMapConfigs.findFirst({
-      where: eq(pinballMapConfigs.organizationId, organizationId),
+      where: eq(pinballMapConfigs.organization_id, organizationId),
     });
 
     const locationsData = await this.db.query.locations.findMany({
-      where: eq(locations.organizationId, organizationId),
+      where: eq(locations.organization_id, organizationId),
       with: {
         machines: {
           columns: { id: true },
@@ -433,16 +433,16 @@ export class PinballMapService {
     });
 
     return {
-      configEnabled: config?.apiEnabled ?? false,
+      configEnabled: config?.api_enabled ?? false,
       locations: locationsData.map((location) => ({
         id: location.id,
         name: location.name,
-        pinballMapId: location.pinballMapId,
-        syncEnabled: location.syncEnabled,
-        lastSyncAt: location.lastSyncAt,
+        pinball_map_id: location.pinball_map_id,
+        sync_enabled: location.sync_enabled,
+        last_sync_at: location.last_sync_at,
         machineCount: location.machines.length,
       })),
-      lastSync: config?.lastGlobalSync ?? null,
+      lastSync: config?.last_global_sync ?? null,
     };
   }
 }
@@ -483,10 +483,10 @@ export async function processFixtureData(
         await db.insert(machines).values({
           id: `machine_${Date.now().toString()}_${Math.random().toString(36).substring(2, 11)}`,
           name: model.name, // Use model name as default instance name
-          organizationId: location.organizationId,
-          modelId: model.id,
-          locationId,
-          qrCodeId: `qr_${Date.now().toString()}_${Math.random().toString(36).substring(2, 11)}`,
+          organization_id: location.organization_id,
+          model_id: model.id,
+          location_id: locationId,
+          qr_code_id: `qr_${Date.now().toString()}_${Math.random().toString(36).substring(2, 11)}`,
         });
         created++;
       }

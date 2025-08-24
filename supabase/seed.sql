@@ -33,9 +33,9 @@ BEGIN
     id,
     name,
     email,
-    "emailVerified",
-    "createdAt",
-    "updatedAt"
+    email_verified,
+    created_at,
+    updated_at
   ) VALUES (
     NEW.id,
     COALESCE(NEW.raw_user_meta_data->>'name', NEW.email),
@@ -65,3 +65,20 @@ CREATE TRIGGER on_auth_user_created
 -- ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 -- ALTER TABLE public."Organization" ENABLE ROW LEVEL SECURITY;
 -- ALTER TABLE public."Issue" ENABLE ROW LEVEL SECURITY;
+
+-- Add missing RLS policy for unauthenticated/default role access
+-- This policy blocks all access for users who are not authenticated or anon
+DO $$
+BEGIN
+  -- Only create policy if it doesn't exist
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies 
+    WHERE schemaname = 'public' 
+    AND tablename = 'users' 
+    AND policyname = 'default_no_access_users'
+  ) THEN
+    EXECUTE 'CREATE POLICY default_no_access_users ON public.users 
+             FOR ALL TO public 
+             USING (false)';
+  END IF;
+END $$;

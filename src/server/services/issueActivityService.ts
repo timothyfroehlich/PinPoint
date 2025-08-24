@@ -60,7 +60,7 @@ export class IssueActivityService {
     // Get the issue to obtain organizationId (RLS ensures we only get issues from our org)
     const issue = await this.db.query.issues.findFirst({
       where: eq(issues.id, issueId),
-      columns: { organizationId: true },
+      columns: { organization_id: true },
     });
 
     if (!issue) {
@@ -70,30 +70,30 @@ export class IssueActivityService {
     // Build data object with conditional assignment for exactOptionalPropertyTypes compatibility
     const data: {
       id: string;
-      issueId: string;
-      organizationId: string;
+      issue_id: string;
+      organization_id: string;
       type: ActivityType;
       field: string;
-      actorId?: string;
-      oldValue?: string;
-      newValue?: string;
+      actor_id?: string;
+      old_value?: string;
+      new_value?: string;
     } = {
       id: generatePrefixedId("history"),
-      issueId,
-      organizationId: issue.organizationId,
+      issue_id: issueId,
+      organization_id: issue.organization_id,
       type: activityData.type,
       field: activityData.fieldName ?? "",
     };
 
     // Use conditional assignment for optional properties to avoid undefined assignments
     if (activityData.actorId) {
-      data.actorId = activityData.actorId;
+      data.actor_id = activityData.actorId;
     }
     if (activityData.oldValue) {
-      data.oldValue = activityData.oldValue;
+      data.old_value = activityData.oldValue;
     }
     if (activityData.newValue) {
-      data.newValue = activityData.newValue;
+      data.new_value = activityData.newValue;
     }
 
     await this.db.insert(issueHistory).values(data);
@@ -267,11 +267,11 @@ export class IssueActivityService {
     interface CommentResult {
       id: string;
       content: string;
-      createdAt: Date;
+      created_at: Date;
       author: {
         id: string;
         name: string | null;
-        profilePicture: string | null;
+        profile_picture: string | null;
       };
     }
 
@@ -279,13 +279,13 @@ export class IssueActivityService {
       id: string;
       type: ActivityType;
       field: string;
-      oldValue: string | null;
-      newValue: string | null;
-      changedAt: Date;
+      old_value: string | null;
+      new_value: string | null;
+      changed_at: Date;
       actor: {
         id: string;
         name: string | null;
-        profilePicture: string | null;
+        profile_picture: string | null;
       } | null;
     }
 
@@ -293,44 +293,44 @@ export class IssueActivityService {
     const [commentsData, activitiesData] = await Promise.all([
       // Fetch comments with author relations (exclude soft-deleted)
       this.db.query.comments.findMany({
-        where: and(eq(comments.issueId, issueId), isNull(comments.deletedAt)),
+        where: and(eq(comments.issue_id, issueId), isNull(comments.deleted_at)),
         columns: {
           id: true,
           content: true,
-          createdAt: true,
+          created_at: true,
         },
         with: {
           author: {
             columns: {
               id: true,
               name: true,
-              profilePicture: true,
+              profile_picture: true,
             },
           },
         },
-        orderBy: [comments.createdAt],
+        orderBy: [comments.created_at],
       }),
       // Fetch issue history with actor relations (RLS scoped)
       this.db.query.issueHistory.findMany({
-        where: eq(issueHistory.issueId, issueId),
+        where: eq(issueHistory.issue_id, issueId),
         columns: {
           id: true,
           type: true,
           field: true,
-          oldValue: true,
-          newValue: true,
-          changedAt: true,
+          old_value: true,
+          new_value: true,
+          changed_at: true,
         },
         with: {
           actor: {
             columns: {
               id: true,
               name: true,
-              profilePicture: true,
+              profile_picture: true,
             },
           },
         },
-        orderBy: [issueHistory.changedAt],
+        orderBy: [issueHistory.changed_at],
       }),
     ]);
 
@@ -343,12 +343,12 @@ export class IssueActivityService {
       ...commentsResults.map((comment) => ({
         ...comment,
         itemType: "comment" as const,
-        timestamp: comment.createdAt,
+        timestamp: comment.created_at,
       })),
       ...activitiesResults.map((activity) => ({
         ...activity,
         itemType: "activity" as const,
-        timestamp: activity.changedAt,
+        timestamp: activity.changed_at,
       })),
     ].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
 

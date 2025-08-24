@@ -111,13 +111,13 @@ export function IssueDetail({
               </Typography>
             </Box>
 
-            {issue.machine.serialNumber && (
+            {issue.machine.serial_number && (
               <Box>
                 <Typography variant="body2" color="text.secondary">
                   Serial Number
                 </Typography>
                 <Typography variant="body1" data-testid="machine-serial">
-                  {issue.machine.serialNumber}
+                  {issue.machine.serial_number}
                 </Typography>
               </Box>
             )}

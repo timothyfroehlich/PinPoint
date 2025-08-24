@@ -127,7 +127,7 @@ export default function ProfilePage(): JSX.Element {
     void refetch();
   };
 
-  const joinDate = new Date(userProfile.createdAt);
+  const joinDate = new Date(userProfile.created_at);
   const formattedJoinDate = joinDate.toLocaleDateString("en-US", {
     year: "numeric",
     month: "long",

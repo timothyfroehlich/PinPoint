@@ -90,40 +90,16 @@ drizzle-kit generate                    # Don't run migration generation
 
 **Why**: Schema and seed represent the completed data architecture. Code quality comes from proper alignment, not schema workarounds.
 
-## 🚧 MIGRATION STATUS: SYSTEMATIC CLEANUP PHASE 🚧
+## 🚧 MIGRATION STATUS: TEST SYSTEM REBOOT PHASE 🚧
 
-**CURRENT PHASE**: Migration infrastructure complete - now making everything work again
+**CURRENT PHASE**: Test infrastructure archived - Clean foundation for archetype-based reboot
 
-**MIGRATION PROGRESS (Following @migration-plan-v2/):**
+**ARCHIVE STATUS**: ✅ **Test Archive COMPLETE** (~130 files archived to `.archived-tests-2025-08-23/`)
+**REMAINING**: pgTAP RLS tests + smoke tests + 1 baseline unit test (205/205 passing)
+**FOUNDATION**: Simplified vitest config, clean package.json, isolated archived files
+**NEXT**: Archetype-based test system implementation
 
-- ✅ **Phase 0**: Configuration audit - COMPLETE
-- ✅ **Phase 1**: Prisma removal - COMPLETE
-- ✅ **Phase 2**: RLS implementation - COMPLETE
-- ✅ **Phase 2.5**: Testing architecture (pgTAP + PGlite) - COMPLETE
-- 🔄 **Phase 3**: **TypeScript Error Elimination + Test Recovery** - CURRENT PHASE
-- ⏳ **Phase 4**: Final cleanup & consolidation
-
-## 🎯 CURRENT PRIORITIES (SYSTEMATIC RECOVERY)
-
-**PHASE 3A: TypeScript Error Elimination** (ACTIVE NOW)
-
-- ✅ Eliminate ALL TypeScript errors with proper fixes (no suppressions)
-- ✅ Code conforms to locked schema and seed data
-- ✅ Maintain type safety while respecting existing architecture
-
-**PHASE 3B: Test Recovery** (NEXT)
-
-- 🔄 Convert 313 failing tests to new RLS + PGlite architecture
-- 🔄 All tests use SEED_TEST_IDS and dual-track testing patterns
-- 🔄 Achieve 100% test pass rate with new testing infrastructure
-
-**PHASE 3C: Validation** (FINAL)
-
-- ⏳ Full system validation: builds, lints, tests all green
-- ⏳ Performance verification with new architecture
-- ⏳ Ready for Phase 4 cleanup
-
-**APPROACH**: We're past the "breaking things" phase. Now it's systematic, methodical fixes respecting the locked foundation.
+**APPROACH**: We've completed the "destructive preparation" phase. Now ready for systematic archetype implementation.
 
 ## Claude Memories
 
@@ -135,45 +111,15 @@ drizzle-kit generate                    # Don't run migration generation
 
 ## 🚨🚨🚨 CRITICAL SYSTEM RESTRICTIONS 🚨🚨🚨
 
-### ⛔ ABSOLUTELY FORBIDDEN: Integration Test Memory Patterns
+### ⛔ ARCHIVED RESTRICTIONS (No Longer Applicable)
 
-**🔥 NEVER EVER USE THESE PATTERNS 🔥**
+**INTEGRATION TEST PATTERNS** - _Archived with test infrastructure_
 
-```typescript
-// ❌ CAUSES SYSTEM LOCKUPS - PGlite memory blowouts
-beforeEach(async () => {
-  const { db } = await createSeededTestDatabase(); // 50-100MB per test
-});
+- ~~PGlite per-test instances~~
+- ~~Complex test utility patterns~~
+- ~~Multi-project vitest configs~~
 
-// ❌ CAUSES 1-2GB+ MEMORY USAGE
-beforeAll(async () => {
-  const client = new PGlite(); // Multiple instances per test file
-});
-
-// ❌ ANY PER-TEST DATABASE CREATION
-test("...", async () => {
-  const testDb = await createTestDatabase(); // Multiplies memory usage
-});
-```
-
-**💥 WHY THIS BREAKS EVERYTHING:**
-
-- **12+ integration tests** using per-test PGlite = **20+ database instances**
-- **50-100MB per instance** = **1-2GB+ total memory usage**
-- **Causes system lockups** and computer freezing
-- **vitest workers multiply the problem** (4 workers × many instances)
-
-**✅ ONLY ACCEPTABLE PATTERN:**
-
-```typescript
-import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db";
-
-test("integration test", async ({ workerDb }) => {
-  await withIsolatedTest(workerDb, async (db) => {
-    // Test logic - shared PGlite instance, automatic cleanup
-  });
-});
-```
+**CURRENT STATE**: Complex testing infrastructure archived to `.archived-tests-2025-08-23/`
 
 ### ⛔ ABSOLUTELY FORBIDDEN: npm test with Redirection
 
@@ -197,9 +143,8 @@ vitest 2>&1            # ❌ BREAKS VITEST
 **✅ USE THESE INSTEAD:**
 
 ```bash
-npm run test:brief     # ✅ Fast, minimal output
-npm run test:verbose   # ✅ Detailed output
-npm run test:coverage  # ✅ With coverage report
+npm test              # ✅ Simplified unit test suite (205 tests)
+npm run test:watch    # ✅ Watch mode for unit tests
 ```
 
 ### ⛔ Other Command Restrictions
@@ -230,18 +175,19 @@ await db.execute(sql.raw(`SET session.user_id = '${escapeString(userId)}'`));
 - Prefer rg (ripgrep) to find or grep
 - Install missing tools with `brew` (preferred) or `apt`
 
-## ⚡ Single-File Validation Commands (Fast Development Workflow)
+## ⚡ Available Commands (Post-Archive)
 
-**CRITICAL FOR AGENTS:** Use these commands for fast feedback during development:
+**SIMPLIFIED COMMAND SET** (most commands archived):
 
 ```bash
-# Fast single-file validation (2-3s vs 30s+ full validation)
-npm run validate-file src/server/api/routers/user.ts
-npm run check-file src/components/Header.tsx
-npm run test-file src/server/api/routers/__tests__/user.test.ts
+# Basic testing (simplified)
+npm test                    # Single unit test suite (205 tests)
+npm run test:watch         # Watch mode for unit tests
+npm run test:rls           # pgTAP RLS policy tests
+npm run smoke             # Playwright smoke tests
 
-# Advanced options: --skip-typecheck, --skip-lint, --verbose
-node scripts/validate-single-file.cjs FILE --verbose
+# Single-file validation (status unknown - may need updates)
+npm run validate-file src/lib/file.ts  # May need verification
 ```
 
 ## 🎯 Seed Data Architecture (FOUNDATION PATTERN)
@@ -260,9 +206,20 @@ SEED_TEST_IDS.MOCK_PATTERNS.MACHINE; // "mock-machine-1"
 
 **Why**: Predictable debugging vs random UUIDs
 
-## 📐 Testing Archetypes (MANDATORY)
+## 🧪 Testing Architecture (POST-REBOOT)
 
-**Every test must follow one archetype pattern**:
+**CURRENT STATE**: Clean foundation with minimal infrastructure
+
+- **pgTAP RLS Testing**: `npm run test:rls` - Native PostgreSQL RLS validation
+- **Unit Testing**: Simplified vitest with 1 baseline test suite (inputValidation.test.ts)
+- **Smoke Testing**: Essential Playwright smoke tests only
+- **Archived**: ~130 test files, complex PGlite infrastructure, coverage configs, E2E suite
+
+**ARCHETYPE IMPLEMENTATION**: Ready for systematic archetype-based test suite rebuild
+
+## 📐 Testing Archetypes (PLANNED - FOR REBOOT IMPLEMENTATION)
+
+**Future test patterns** (currently archived):
 
 1. Pure Function Unit Test
 2. Service Business Logic Test
@@ -273,51 +230,13 @@ SEED_TEST_IDS.MOCK_PATTERNS.MACHINE; // "mock-machine-1"
 7. RLS Policy Test (pgTAP)
 8. Schema/Database Constraint Test
 
-**Quality Gate**: No ad-hoc test patterns allowed
+**CURRENT STATE**: Only archetype patterns 1 and 7 are functional
 
-## 🤖 Phase 3 Consultant Workflow (NO AD-HOC FIXES)
+## 📚 Test System Documentation
 
-**Specialized Agents**:
-
-- `unit-test-architect`: Foundation patterns (Archetypes 1 & 4)
-- `integration-test-architect`: Router conversions (Archetypes 2, 3 & 5)
-- `security-test-architect`: Security boundaries (Archetypes 6, 7 & 8)
-
-**Rule**: Analysis → Roadmap → Implementation (no shortcuts)
-
-## 🏢 Dual-Organization Testing
-
-**Infrastructure**:
-
-- Primary: "test-org-pinpoint" (Austin Pinball)
-- Competitor: "test-org-competitor" (Competitor Arcade)
-- Global OPDB catalog visible to both
-- Cross-org boundary validation ready
-
-**Usage**: Test organizational isolation with both orgs
-
-## 🧪 Testing Infrastructure
-
-**pgTAP RLS Testing**: `npm run test:rls` - Native PostgreSQL RLS validation
-**Business Logic**: Worker-scoped PGlite with BYPASSRLS role
-**Complete Testing**: `npm run test:all` - Both tracks together
-
-**Architecture**: pgTAP for security + PGlite for business logic
-
-### Testing Architecture
-
-**⚠️ PGlite Cannot Test Real RLS Policies**
-
-- PGlite lacks Supabase's `auth.jwt()` functions that power RLS policies
-- Use **pgTAP** (`supabase/tests/rls/`) for actual RLS validation
-- Use **PGlite** (`src/test/helpers/worker-scoped-db.ts`) for business logic only (RLS bypassed)
-
-## 📚 Documentation Synchronization
-
-**WHEN TO UPDATE**: Any seed data or testing pattern changes
-
-**Critical Rule**: All examples must use SEED_TEST_IDS (no random IDs)
-**Files**: `docs/testing/`, `docs/quick-reference/`, `docs/developer-guides/`
+**ARCHIVE STATUS**: See `.archived-tests-2025-08-23/ARCHIVE_MANIFEST.md` for complete operation details
+**CURRENT DOCS**: Most testing documentation in `docs/testing/` refers to archived infrastructure
+**REBOOT PLAN**: See `docs/testing/TEST_SYSTEM_REBOOT_PLAN.md` for archetype implementation plan
 
 ### 🚨 MANDATORY: Pattern Discovery Synchronization
 
@@ -350,12 +269,13 @@ docs/quick-reference/testing-patterns.md
 @docs/quick-reference/api-security-patterns.md
 @docs/quick-reference/typescript-strictest-patterns.md
 
-**Active migration execution:**
-migration-plan-v2/ - Current migration plan being executed (temporary mess expected)
-docs/quick-reference/ - Patterns for implementing current phase work
+**Test system status:**
+`.archived-tests-2025-08-23/` - Archived test infrastructure (130+ files)
+`docs/testing/TEST_SYSTEM_REBOOT_PLAN.md` - Archetype implementation plan
+`docs/quick-reference/` - Patterns for current simplified setup
 
 **Priority approach:**
-Execute the migration plan phases systematically - tests will be fixed in Phase 3 as planned
+Test infrastructure archived - ready for systematic archetype-based rebuild
 
 - Don't commit or push with --no-verify unless explicitly told to
 

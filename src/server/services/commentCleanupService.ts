@@ -37,8 +37,8 @@ export class CommentCleanupService {
       .delete(comments)
       .where(
         and(
-          isNotNull(comments.deletedAt),
-          lte(comments.deletedAt, retentionCutoff),
+          isNotNull(comments.deleted_at),
+          lte(comments.deleted_at, retentionCutoff),
         ),
       )
       .returning({ id: comments.id });
@@ -60,8 +60,8 @@ export class CommentCleanupService {
       .from(comments)
       .where(
         and(
-          isNotNull(comments.deletedAt),
-          lte(comments.deletedAt, retentionCutoff),
+          isNotNull(comments.deleted_at),
+          lte(comments.deleted_at, retentionCutoff),
         ),
       );
 
@@ -78,9 +78,9 @@ export class CommentCleanupService {
     await this.db
       .update(comments)
       .set({
-        deletedAt: new Date(),
-        deletedBy: deletedById,
-        updatedAt: new Date(),
+        deleted_at: new Date(),
+        deleted_by: deletedById,
+        updated_at: new Date(),
       })
       .where(eq(comments.id, commentId));
   }
@@ -92,9 +92,9 @@ export class CommentCleanupService {
     await this.db
       .update(comments)
       .set({
-        deletedAt: null,
-        deletedBy: null,
-        updatedAt: new Date(),
+        deleted_at: null,
+        deleted_by: null,
+        updated_at: new Date(),
       })
       .where(eq(comments.id, commentId));
   }
@@ -105,7 +105,7 @@ export class CommentCleanupService {
    */
   async getDeletedComments(): Promise<Comment[]> {
     const deletedComments = await this.db.query.comments.findMany({
-      where: isNotNull(comments.deletedAt),
+      where: isNotNull(comments.deleted_at),
       with: {
         author: {
           columns: {
@@ -126,7 +126,7 @@ export class CommentCleanupService {
           },
         },
       },
-      orderBy: (comments, { desc }) => [desc(comments.deletedAt)],
+      orderBy: (comments, { desc }) => [desc(comments.deleted_at)],
     });
 
     return deletedComments as Comment[];

@@ -5,7 +5,7 @@ import { collections, collectionTypes, machines, models } from "../db/schema";
 import type { DrizzleClient } from "../db/drizzle";
 import type { InferSelectModel } from "drizzle-orm";
 
-import { generateId } from "~/lib/utils/id-generation";
+import { generateId } from "../../lib/utils/id-generation";
 
 export interface CreateManualCollectionData {
   name: string;
@@ -91,10 +91,10 @@ export class CollectionService {
     // Get collections with type information using Drizzle relational queries
     const collectionsWithTypes = await this.db.query.collections.findMany({
       where: or(
-        eq(collections.locationId, locationId), // Location-specific collections
+        eq(collections.location_id, locationId), // Location-specific collections
         and(
-          isNull(collections.locationId), // Organization-wide auto-collections
-          eq(collections.isManual, false),
+          isNull(collections.location_id), // Organization-wide auto-collections
+          eq(collections.is_manual, false),
         ),
       ),
       with: {
@@ -102,14 +102,14 @@ export class CollectionService {
           columns: {
             id: true,
             name: true,
-            displayName: true,
-            organizationId: true,
-            isEnabled: true,
-            sortOrder: true,
+            display_name: true,
+            organization_id: true,
+            is_enabled: true,
+            sort_order: true,
           },
         },
       },
-      orderBy: [asc(collections.sortOrder)],
+      orderBy: [asc(collections.sort_order)],
     });
 
     // Filter for enabled types in the organization and calculate machine counts
@@ -117,7 +117,7 @@ export class CollectionService {
 
     for (const collection of collectionsWithTypes) {
       // Skip if type is not enabled (RLS handles organization filtering)
-      if (!collection.type.isEnabled) {
+      if (!collection.type.is_enabled) {
         continue;
       }
 
@@ -128,17 +128,26 @@ export class CollectionService {
         FROM collection_machines cm
         INNER JOIN machines m ON cm.machine_id = m.id
         WHERE cm.collection_id = ${collection.id}
-          AND m.location_id = ${locationId}
+      AND m.location_id = ${locationId}
       `)) as unknown as SqlExecuteResult<CountResult>;
 
       const machineCount = Number(machineCountResult[0]?.count) || 0;
 
+      // Adapt DB row (snake_case) to domain shape (camelCase)
       collectionsData.push({
-        ...collection,
+        id: collection.id,
+        name: collection.name,
+        typeId: collection.type_id,
+        locationId: collection.location_id,
+        isManual: collection.is_manual,
+        isSmart: collection.is_smart,
+        description: collection.description,
+        sortOrder: collection.sort_order,
+        filterCriteria: collection.filter_criteria,
         type: {
           id: collection.type.id,
           name: collection.type.name,
-          displayName: collection.type.displayName,
+          displayName: collection.type.display_name,
         },
         machineCount,
       });
@@ -149,10 +158,9 @@ export class CollectionService {
       const typeA = collectionsWithTypes.find((c) => c.id === a.id)?.type;
       const typeB = collectionsWithTypes.find((c) => c.id === b.id)?.type;
 
-      if (typeA?.sortOrder !== typeB?.sortOrder) {
-        return (typeA?.sortOrder ?? 0) - (typeB?.sortOrder ?? 0);
+      if (typeA?.sort_order !== typeB?.sort_order) {
+        return (typeA?.sort_order ?? 0) - (typeB?.sort_order ?? 0);
       }
-
       return a.sortOrder - b.sortOrder;
     });
 
@@ -205,7 +213,7 @@ export class CollectionService {
   > {
     // Get machines in the collection at the specific location using junction table
     const machinesInCollection = (await this.db.execute(sql`
-      SELECT 
+      SELECT
         m.id,
         mo.name as model_name,
         mo.manufacturer,
@@ -247,14 +255,14 @@ export class CollectionService {
     const createData = {
       id: generateId(),
       name: data.name,
-      typeId: data.typeId,
-      organizationId: collectionType.organizationId,
-      locationId: data.locationId ?? null,
+      type_id: collectionType.id,
+      organization_id: collectionType.organization_id,
+      location_id: data.locationId ?? null,
       description: data.description ?? null,
-      isManual: true,
-      isSmart: false,
-      sortOrder: 0,
-      filterCriteria: null,
+      is_manual: true,
+      is_smart: false,
+      sort_order: 0,
+      filter_criteria: null,
     };
 
     const result = await this.db
@@ -292,7 +300,7 @@ export class CollectionService {
       );
       await this.db.execute(sql`
         INSERT INTO collection_machines (collection_id, machine_id)
-        SELECT ${collectionId}, unnest(ARRAY[${machineIdArray}])
+  SELECT ${collectionId}, unnest(ARRAY[${machineIdArray}])
         ON CONFLICT (collection_id, machine_id) DO NOTHING
       `);
     }
@@ -308,8 +316,8 @@ export class CollectionService {
   }> {
     const autoTypes = await this.db.query.collectionTypes.findMany({
       where: and(
-        eq(collectionTypes.isAutoGenerated, true),
-        eq(collectionTypes.isEnabled, true),
+        eq(collectionTypes.is_auto_generated, true),
+        eq(collectionTypes.is_enabled, true),
       ),
     });
 
@@ -317,11 +325,11 @@ export class CollectionService {
     let updated = 0;
 
     for (const type of autoTypes) {
-      if (type.sourceField === "manufacturer") {
+      if (type.source_field === "manufacturer") {
         const result = await this.generateManufacturerCollections(type);
         generated += result.generated;
         updated += result.updated;
-      } else if (type.sourceField === "year") {
+      } else if (type.source_field === "year") {
         const result = await this.generateYearCollections(type);
         generated += result.generated;
         updated += result.updated;
@@ -344,7 +352,7 @@ export class CollectionService {
         manufacturer: models.manufacturer,
       })
       .from(machines)
-      .innerJoin(models, eq(machines.modelId, models.id))
+      .innerJoin(models, eq(machines.model_id, models.id))
       .where(
         // RLS automatically scopes machines to user's organization
         sql`${models.manufacturer} IS NOT NULL`,
@@ -362,8 +370,8 @@ export class CollectionService {
       const existing = await this.db.query.collections.findFirst({
         where: and(
           eq(collections.name, manufacturer),
-          eq(collections.typeId, collectionType["id"]),
-          isNull(collections.locationId), // Organization-wide
+          eq(collections.type_id, collectionType["id"]),
+          isNull(collections.location_id), // Organization-wide
         ),
       });
 
@@ -374,13 +382,13 @@ export class CollectionService {
           .values({
             id: generateId(),
             name: manufacturer,
-            typeId: collectionType["id"],
-            organizationId: collectionType["organizationId"],
-            locationId: null,
-            isManual: false,
-            isSmart: false,
-            sortOrder: 0,
-            filterCriteria: { manufacturer },
+            type_id: collectionType["id"],
+            organization_id: collectionType["organization_id"],
+            location_id: null,
+            is_manual: false,
+            is_smart: false,
+            sort_order: 0,
+            filter_criteria: { manufacturer },
             description: null,
           })
           .returning();
@@ -394,7 +402,7 @@ export class CollectionService {
         const manufacturerMachines = await this.db
           .select({ id: machines.id })
           .from(machines)
-          .innerJoin(models, eq(machines.modelId, models.id))
+          .innerJoin(models, eq(machines.model_id, models.id))
           .where(
             // RLS automatically scopes machines to user's organization
             eq(models.manufacturer, manufacturer),
@@ -417,7 +425,7 @@ export class CollectionService {
         const manufacturerMachines = await this.db
           .select({ id: machines.id })
           .from(machines)
-          .innerJoin(models, eq(machines.modelId, models.id))
+          .innerJoin(models, eq(machines.model_id, models.id))
           .where(
             // RLS automatically scopes machines to user's organization
             eq(models.manufacturer, manufacturer),
@@ -425,7 +433,7 @@ export class CollectionService {
 
         // First remove all existing associations
         await this.db.execute(sql`
-          DELETE FROM collection_machines 
+          DELETE FROM collection_machines
           WHERE collection_id = ${existing.id}
         `);
 
@@ -473,15 +481,15 @@ export class CollectionService {
       const existing = await this.db.query.collections.findFirst({
         where: and(
           eq(collections.name, era.name),
-          eq(collections.typeId, collectionType["id"]),
-          isNull(collections.locationId),
+          eq(collections.type_id, collectionType["id"]),
+          isNull(collections.location_id),
         ),
       });
 
       const eraMachines = await this.db
         .select({ id: machines.id })
         .from(machines)
-        .innerJoin(models, eq(machines.modelId, models.id))
+        .innerJoin(models, eq(machines.model_id, models.id))
         .where(
           // RLS automatically scopes machines to user's organization
           and(gte(models.year, era.start), lte(models.year, era.end)),
@@ -495,13 +503,13 @@ export class CollectionService {
           .values({
             id: generateId(),
             name: era.name,
-            typeId: collectionType["id"],
-            organizationId: collectionType["organizationId"],
-            locationId: null,
-            isManual: false,
-            isSmart: false,
-            sortOrder: 0,
-            filterCriteria: {
+            type_id: collectionType["id"],
+            organization_id: collectionType["organization_id"],
+            location_id: null,
+            is_manual: false,
+            is_smart: false,
+            sort_order: 0,
+            filter_criteria: {
               yearStart: era.start,
               yearEnd: era.end,
             },
@@ -522,7 +530,7 @@ export class CollectionService {
       } else {
         // Update existing era collection (replace all machines)
         await this.db.execute(sql`
-          DELETE FROM collection_machines 
+          DELETE FROM collection_machines
           WHERE collection_id = ${existing.id}
         `);
 
@@ -547,7 +555,7 @@ export class CollectionService {
   ): Promise<void> {
     await this.db
       .update(collectionTypes)
-      .set({ isEnabled: enabled })
+      .set({ is_enabled: enabled })
       .where(eq(collectionTypes.id, collectionTypeId));
   }
 
@@ -557,7 +565,7 @@ export class CollectionService {
    */
   async getOrganizationCollectionTypes(): Promise<CollectionTypeWithCount[]> {
     const types = await this.db.query.collectionTypes.findMany({
-      orderBy: [asc(collectionTypes.sortOrder)],
+      orderBy: [asc(collectionTypes.sort_order)],
     });
 
     // Get collection counts for each type
@@ -567,7 +575,7 @@ export class CollectionService {
       const countResult = await this.db
         .select({ count: sql<number>`count(*)` })
         .from(collections)
-        .where(eq(collections.typeId, type.id));
+        .where(eq(collections.type_id, type.id));
 
       typesWithCounts.push({
         ...type,

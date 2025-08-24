@@ -174,6 +174,63 @@ START: What are you testing?
   - minimal_plus_test_data
   - full (includes minimal but not minimal_plus_test_data)
 
+### Auto-Generated Mock System
+
+**Seed Data → Auto-Generated Mocks → Unit Tests**
+
+Generate TypeScript mocks directly from actual seed data, creating a seamless bridge between unit and integration testing with guaranteed consistency.
+
+**Benefits**:
+
+- Mocks always match real seed data structure
+- Schema changes automatically propagate to mocks
+- Same predictable IDs in unit and integration tests
+- Single source of truth for test scenarios
+- No drift between mock and real data
+
+**Generated Mock Structure**:
+
+```typescript
+// src/test/generated/mocks.ts (auto-generated)
+export const SEED_TEST_IDS = { /* extracted from seed */ };
+export const GENERATED_MOCKS = {
+  USERS: {
+    ADMIN: { id: "test-user-tim", name: "Tim", ... },
+    MEMBER: { id: "test-user-sarah", ... }
+  },
+  ORGANIZATIONS: { /* ... */ },
+  COLLECTIONS: {
+    ISSUES: {
+      all: Issue[],
+      forOrg: (orgId: string) => Issue[],
+      byStatus: (status: string) => Issue[]
+    }
+  }
+};
+```
+
+**Usage Across Archetypes**:
+
+```typescript
+// Pure function tests
+const mockUser = GENERATED_MOCKS.USERS.ADMIN;
+expect(validateUser(mockUser)).toBe(true);
+
+// Component tests
+const mockIssues = GENERATED_MOCKS.COLLECTIONS.ISSUES.forOrg("test-org-pinpoint");
+<IssuesList issues={mockIssues} />
+
+// tRPC mocks
+const mockDb = createMockDb(GENERATED_MOCKS.DATABASE_STATE);
+```
+
+**Implementation**:
+
+- `scripts/generate-test-mocks.ts` - Parses seed files into TypeScript objects
+- Auto-generates on seed changes via pre-commit hooks
+- Exports both individual entities and collection helpers
+- Integration with all archetype templates
+
 ### External API Fixture Strategy
 
 **Preserve Existing Pinballmap Fixtures**: Current fixture system for OPDB/pinballmap API responses will be maintained during reboot.
@@ -187,8 +244,8 @@ START: What are you testing?
 **Implementation**:
 
 - Keep existing fixture files and loading utilities
-- Fixtures remain separate from seed data system
-- Tests requiring external data use fixture system, not extended seed
+- Fixtures remain separate from seed data and auto-generated mock systems
+- Tests requiring external data use fixture system, not extended seed or generated mocks
 
 ## Test Non-Negotiables
 
@@ -207,10 +264,24 @@ START: What are you testing?
 ```typescript
 // test-helpers/core/
 ├── worker-db.ts          # Worker-scoped PGlite management
-├── mock-factory.ts       # Consistent mock generation
+├── mock-factory.ts       # Consistent mock generation (replaced by auto-generated system)
 ├── test-context.ts       # tRPC context creation
 ├── assertions.ts         # Custom test assertions
-└── seed-loader.ts        # Seed data management
+├── seed-loader.ts        # Seed data management
+└── generated/
+    ├── mocks.ts          # Auto-generated from seed data
+    └── seed-test-ids.ts   # Auto-generated test ID constants
+```
+
+### Mock Generation System
+
+```typescript
+// scripts/generate-test-mocks.ts
+├── parseSeeds()          # Extract entities from SQL seed files
+├── generateMocks()       # Create TypeScript mock objects
+├── generateCollections() # Create helper functions (forOrg, byStatus, etc.)
+├── generateTestIds()     # Extract and export SEED_TEST_IDS
+└── writeFiles()          # Output to src/test/generated/
 ```
 
 ### Archetype Templates
@@ -560,7 +631,8 @@ Create `docs/testing/coverage-progress.md` with:
 - [ ] Update vitest.config.ts with reboot-friendly thresholds (5%)
 - [ ] Consolidate codecov configuration with archetype flags
 - [ ] Update GitHub Actions for flag-based coverage uploads
-- [ ] Create archetype templates (Unit, Component, Service)
+- [ ] **Build auto-generated mock system** (`scripts/generate-test-mocks.ts`)
+- [ ] Create archetype templates (Unit, Component, Service) with auto-generated mock integration
 - [ ] Build `/create-test` slash command with archetype analysis
 - [ ] Set up worker-scoped DB utility
 
@@ -575,9 +647,9 @@ Create `docs/testing/coverage-progress.md` with:
 
 **Template Expansion**:
 
-- [ ] Service test templates (Archetype 3) with mocked dependencies
-- [ ] Component test templates (Archetype 2) with RTL
-- [ ] Mock factory utilities
+- [ ] Service test templates (Archetype 3) with auto-generated mocks
+- [ ] Component test templates (Archetype 2) with RTL and generated mock props
+- [ ] Enhanced mock generation for complex scenarios
 
 **Test Implementation**:
 
@@ -606,8 +678,8 @@ Create `docs/testing/coverage-progress.md` with:
 **Full Stack Testing**:
 
 - [ ] API Integration test templates (Archetype 6)
-- [ ] End-to-end API workflow tests
-- [ ] Enhanced mock contexts for complex scenarios
+- [ ] End-to-end API workflow tests with generated seed data state
+- [ ] Enhanced mock contexts bridging auto-generated mocks and real PGlite data
 
 **Coverage Hardening**:
 

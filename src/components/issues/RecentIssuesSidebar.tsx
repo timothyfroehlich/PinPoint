@@ -23,8 +23,8 @@ import { api } from "~/trpc/react";
 interface PublicIssueData {
   id: string;
   title: string;
-  createdAt: string | Date;
-  submitterName?: string | null;
+  created_at: string | Date;
+  submitter_name?: string | null;
   status: {
     id: string;
     name: string;
@@ -172,7 +172,9 @@ export function RecentIssuesSidebar({
                                 variant="caption"
                                 color="text.secondary"
                               >
-                                {new Date(issue.createdAt).toLocaleDateString()}{" "}
+                                {new Date(
+                                  issue.created_at,
+                                ).toLocaleDateString()}{" "}
                                 by{" "}
                                 {issue.createdBy?.name ??
                                   issue.submitterName ??

@@ -334,8 +334,8 @@ export const organizationProcedure = protectedProcedure.use(
     // RLS automatically scopes this query to user's organization
     const membership = await ctx.db.query.memberships.findFirst({
       where: and(
-        eq(memberships.organizationId, ctx.organizationId),
-        eq(memberships.userId, ctx.user.id),
+        eq(memberships.organization_id, ctx.organizationId),
+        eq(memberships.user_id, ctx.user.id),
       ),
       with: {
         role: {
@@ -370,8 +370,8 @@ export const organizationProcedure = protectedProcedure.use(
         organization: ctx.organization, // Guaranteed non-null
         membership: {
           id: membership.id,
-          organizationId: membership.organizationId,
-          userId: membership.userId,
+          organizationId: membership.organization_id,
+          userId: membership.user_id,
           role: {
             id: membership.role.id,
             name: membership.role.name,

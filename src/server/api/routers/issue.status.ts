@@ -42,7 +42,7 @@ export const issueStatusRouter = createTRPCRouter({
           id: generateId(),
           name: input.name,
           category: input.category,
-          organizationId: ctx.organizationId,
+          organization_id: ctx.organizationId,
         })
         .returning();
       return result;

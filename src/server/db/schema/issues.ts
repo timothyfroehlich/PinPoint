@@ -48,32 +48,32 @@ export const issues = pgTable(
     // For V1.0 checklists
     checklist: json(), // Store checklist items as JSON: [{ text: "...", completed: false }]
 
-    createdAt: timestamp().defaultNow().notNull(),
-    updatedAt: timestamp().defaultNow().notNull(),
-    resolvedAt: timestamp(),
+    created_at: timestamp().defaultNow().notNull(),
+    updated_at: timestamp().defaultNow().notNull(),
+    resolved_at: timestamp(),
     // Anonymous reporting support
-    reporterEmail: text(), // For anonymous issue reporting
-    submitterName: text(), // Optional name for anonymous issue reporting
+    reporter_email: text(), // For anonymous issue reporting
+    submitter_name: text(), // Optional name for anonymous issue reporting
 
     // Relations
-    organizationId: text().notNull(),
-    machineId: text().notNull(),
-    statusId: text().notNull(),
-    priorityId: text().notNull(),
-    createdById: text(),
-    assignedToId: text(),
+    organization_id: text().notNull(),
+    machine_id: text().notNull(),
+    status_id: text().notNull(),
+    priority_id: text().notNull(),
+    created_by_id: text(),
+    assigned_to_id: text(),
   },
   (table) => [
-    // Multi-tenancy: organizationId filtering (most critical)
-    index("issues_organization_id_idx").on(table.organizationId),
+    // Multi-tenancy: organization_id filtering (most critical)
+    index("issues_organization_id_idx").on(table.organization_id),
     // Issue workflow: machine-specific issue lookups
-    index("issues_machine_id_idx").on(table.machineId),
+    index("issues_machine_id_idx").on(table.machine_id),
     // Issue workflow: status and priority filtering
-    index("issues_status_id_idx").on(table.statusId),
-    index("issues_priority_id_idx").on(table.priorityId),
+    index("issues_status_id_idx").on(table.status_id),
+    index("issues_priority_id_idx").on(table.priority_id),
     // Issue workflow: assignment tracking (nullable fields)
-    index("issues_assigned_to_id_idx").on(table.assignedToId),
-    index("issues_created_by_id_idx").on(table.createdById),
+    index("issues_assigned_to_id_idx").on(table.assigned_to_id),
+    index("issues_created_by_id_idx").on(table.created_by_id),
   ],
 );
 
@@ -83,10 +83,12 @@ export const priorities = pgTable(
     id: text().primaryKey(),
     name: text().notNull(), // e.g., "Low", "Medium", "High"
     order: integer().notNull(), // For sorting purposes
-    organizationId: text().notNull(),
-    isDefault: boolean().default(false).notNull(),
+    organization_id: text().notNull(),
+    is_default: boolean().default(false).notNull(),
   },
-  (table) => [index("priorities_organization_id_idx").on(table.organizationId)],
+  (table) => [
+    index("priorities_organization_id_idx").on(table.organization_id),
+  ],
 );
 
 export const issueStatuses = pgTable(
@@ -95,11 +97,11 @@ export const issueStatuses = pgTable(
     id: text().primaryKey(),
     name: text().notNull(), // e.g., "Reported", "Diagnosing", "Awaiting Parts", "Fixed"
     category: statusCategoryEnum().notNull(), // "NEW", "IN_PROGRESS", "RESOLVED"
-    organizationId: text().notNull(),
-    isDefault: boolean().default(false).notNull(),
+    organization_id: text().notNull(),
+    is_default: boolean().default(false).notNull(),
   },
   (table) => [
-    index("issue_statuses_organization_id_idx").on(table.organizationId),
+    index("issue_statuses_organization_id_idx").on(table.organization_id),
   ],
 );
 
@@ -108,23 +110,23 @@ export const comments = pgTable(
   {
     id: text().primaryKey(),
     content: text().notNull(),
-    createdAt: timestamp().defaultNow().notNull(),
-    updatedAt: timestamp().defaultNow().notNull(),
+    created_at: timestamp().defaultNow().notNull(),
+    updated_at: timestamp().defaultNow().notNull(),
 
     // Soft delete fields
-    deletedAt: timestamp(), // Null = not deleted, Date = soft deleted
-    deletedBy: text(), // Who deleted the comment (for audit trail)
+    deleted_at: timestamp(), // Null = not deleted, Date = soft deleted
+    deleted_by: text(), // Who deleted the comment (for audit trail)
 
     // Relations
-    organizationId: text().notNull(),
-    issueId: text().notNull(),
-    authorId: text().notNull(),
+    organization_id: text().notNull(),
+    issue_id: text().notNull(),
+    author_id: text().notNull(),
   },
   (table) => [
     // Comments: multi-tenancy and lookups
-    index("comments_organizationId_idx").on(table.organizationId),
-    index("comments_issueId_idx").on(table.issueId),
-    index("comments_authorId_idx").on(table.authorId),
+    index("comments_organization_id_idx").on(table.organization_id),
+    index("comments_issue_id_idx").on(table.issue_id),
+    index("comments_author_id_idx").on(table.author_id),
   ],
 );
 
@@ -133,19 +135,19 @@ export const attachments = pgTable(
   {
     id: text().primaryKey(),
     url: text().notNull(),
-    fileName: text().notNull(),
-    fileType: text().notNull(),
-    createdAt: timestamp().defaultNow().notNull(),
+    file_name: text().notNull(),
+    file_type: text().notNull(),
+    created_at: timestamp().defaultNow().notNull(),
 
     // Add multi-tenancy
-    organizationId: text().notNull(),
+    organization_id: text().notNull(),
 
     // Relations
-    issueId: text().notNull(),
+    issue_id: text().notNull(),
   },
   (table) => [
-    index("attachments_organization_id_idx").on(table.organizationId),
-    index("attachments_issue_id_idx").on(table.issueId),
+    index("attachments_organization_id_idx").on(table.organization_id),
+    index("attachments_issue_id_idx").on(table.issue_id),
   ],
 );
 
@@ -154,21 +156,21 @@ export const issueHistory = pgTable(
   {
     id: text().primaryKey(),
     field: text().notNull(), // e.g., "status", "assignee", "priority"
-    oldValue: text(),
-    newValue: text(),
-    changedAt: timestamp().defaultNow().notNull(),
+    old_value: text(),
+    new_value: text(),
+    changed_at: timestamp().defaultNow().notNull(),
 
     // Add missing fields
-    organizationId: text().notNull(), // For multi-tenancy
-    actorId: text(), // Who performed the action (null for system actions)
+    organization_id: text().notNull(), // For multi-tenancy
+    actor_id: text(), // Who performed the action (null for system actions)
     type: activityTypeEnum().notNull(), // Replace string with proper enum
 
     // Relations
-    issueId: text().notNull(),
+    issue_id: text().notNull(),
   },
   (table) => [
-    index("issue_history_organization_id_idx").on(table.organizationId),
-    index("issue_history_issue_id_idx").on(table.issueId),
+    index("issue_history_organization_id_idx").on(table.organization_id),
+    index("issue_history_issue_id_idx").on(table.issue_id),
     index("issue_history_type_idx").on(table.type),
   ],
 );
@@ -177,12 +179,12 @@ export const upvotes = pgTable(
   "upvotes",
   {
     id: text().primaryKey(),
-    createdAt: timestamp().defaultNow().notNull(),
-    issueId: text().notNull(),
-    userId: text().notNull(),
+    created_at: timestamp().defaultNow().notNull(),
+    issue_id: text().notNull(),
+    user_id: text().notNull(),
   },
   (table) => [
-    index("upvotes_issue_id_idx").on(table.issueId),
-    index("upvotes_user_id_issue_id_idx").on(table.userId, table.issueId),
+    index("upvotes_issue_id_idx").on(table.issue_id),
+    index("upvotes_user_id_issue_id_idx").on(table.user_id, table.issue_id),
   ],
 );

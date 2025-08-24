@@ -1,5 +1,5 @@
 -- DO NOT EDIT: Generated from src/test/constants/seed-test-ids.ts
--- Generated at: 2025-08-19T12:22:48.015Z
+-- Generated at: 2025-08-24T13:53:15.644Z
 --
 -- This file provides SQL functions that return the same constants used in TypeScript tests.
 -- This ensures consistency between TypeScript integration tests and pgTAP RLS tests.
@@ -14,40 +14,40 @@
 
 -- Organization functions
 CREATE OR REPLACE FUNCTION test_org_primary() 
-RETURNS TEXT AS $$ SELECT '1okKbdf6Ss0XS5RjFeTuo'::TEXT $$ LANGUAGE SQL IMMUTABLE;
+RETURNS TEXT AS $$ SELECT 'test-org-pinpoint'::TEXT $$ LANGUAGE SQL IMMUTABLE;
 
 CREATE OR REPLACE FUNCTION test_org_competitor() 
 RETURNS TEXT AS $$ SELECT 'test-org-competitor'::TEXT $$ LANGUAGE SQL IMMUTABLE;
 
 -- User functions  
 CREATE OR REPLACE FUNCTION test_user_admin() 
-RETURNS TEXT AS $$ SELECT 'test-user-tim'::TEXT $$ LANGUAGE SQL IMMUTABLE;
+RETURNS TEXT AS $$ SELECT '10000000-0000-4000-8000-000000000001'::TEXT $$ LANGUAGE SQL IMMUTABLE;
 
 CREATE OR REPLACE FUNCTION test_user_member1() 
-RETURNS TEXT AS $$ SELECT 'test-user-harry'::TEXT $$ LANGUAGE SQL IMMUTABLE;
+RETURNS TEXT AS $$ SELECT '10000000-0000-4000-8000-000000000002'::TEXT $$ LANGUAGE SQL IMMUTABLE;
 
 CREATE OR REPLACE FUNCTION test_user_member2() 
-RETURNS TEXT AS $$ SELECT 'test-user-escher'::TEXT $$ LANGUAGE SQL IMMUTABLE;
+RETURNS TEXT AS $$ SELECT '10000000-0000-4000-8000-000000000003'::TEXT $$ LANGUAGE SQL IMMUTABLE;
 
 -- Email functions for user creation
 CREATE OR REPLACE FUNCTION test_email_admin() 
-RETURNS TEXT AS $$ SELECT 'tim@example.com'::TEXT $$ LANGUAGE SQL IMMUTABLE;
+RETURNS TEXT AS $$ SELECT 'tim.froehlich@example.com'::TEXT $$ LANGUAGE SQL IMMUTABLE;
 
 CREATE OR REPLACE FUNCTION test_email_member1() 
-RETURNS TEXT AS $$ SELECT 'harry@example.com'::TEXT $$ LANGUAGE SQL IMMUTABLE;
+RETURNS TEXT AS $$ SELECT 'harry.williams@example.com'::TEXT $$ LANGUAGE SQL IMMUTABLE;
 
 CREATE OR REPLACE FUNCTION test_email_member2() 
-RETURNS TEXT AS $$ SELECT 'escher@example.com'::TEXT $$ LANGUAGE SQL IMMUTABLE;
+RETURNS TEXT AS $$ SELECT 'escher.lefkoff@example.com'::TEXT $$ LANGUAGE SQL IMMUTABLE;
 
 -- Name functions for user creation
 CREATE OR REPLACE FUNCTION test_name_admin() 
 RETURNS TEXT AS $$ SELECT 'Tim Froehlich'::TEXT $$ LANGUAGE SQL IMMUTABLE;
 
 CREATE OR REPLACE FUNCTION test_name_member1() 
-RETURNS TEXT AS $$ SELECT 'Harry Potter'::TEXT $$ LANGUAGE SQL IMMUTABLE;
+RETURNS TEXT AS $$ SELECT 'Harry Williams'::TEXT $$ LANGUAGE SQL IMMUTABLE;
 
 CREATE OR REPLACE FUNCTION test_name_member2() 
-RETURNS TEXT AS $$ SELECT 'M.C. Escher'::TEXT $$ LANGUAGE SQL IMMUTABLE;
+RETURNS TEXT AS $$ SELECT 'Escher Lefkoff'::TEXT $$ LANGUAGE SQL IMMUTABLE;
 
 -- Helper functions for pgTAP testing
 CREATE OR REPLACE FUNCTION set_jwt_claims_for_test(

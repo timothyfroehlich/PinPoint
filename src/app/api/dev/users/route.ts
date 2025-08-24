@@ -1,4 +1,4 @@
-import { eq, or, like } from "drizzle-orm";
+import { eq, like } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { env } from "~/env";
@@ -53,28 +53,23 @@ export async function GET(): Promise<NextResponse> {
         id: users.id,
         name: users.name,
         email: users.email,
-        emailVerified: users.emailVerified,
+        emailVerified: users.email_verified,
         image: users.image,
         bio: users.bio,
-        notificationFrequency: users.notificationFrequency,
-        emailNotificationsEnabled: users.emailNotificationsEnabled,
-        pushNotificationsEnabled: users.pushNotificationsEnabled,
-        createdAt: users.createdAt,
-        updatedAt: users.updatedAt,
+        notificationFrequency: users.notification_frequency,
+        emailNotificationsEnabled: users.email_notifications_enabled,
+        pushNotificationsEnabled: users.push_notifications_enabled,
+        createdAt: users.created_at,
+        updatedAt: users.updated_at,
         // Join membership and role data
         membershipId: memberships.id,
         roleId: roles.id,
         roleName: roles.name,
       })
       .from(users)
-      .leftJoin(memberships, eq(memberships.userId, users.id))
-      .leftJoin(roles, eq(roles.id, memberships.roleId))
-      .where(
-        or(
-          like(users.email, "%@dev.local"),
-          like(users.email, "%@pinpoint.dev"),
-        ),
-      );
+      .leftJoin(memberships, eq(memberships.user_id, users.id))
+      .leftJoin(roles, eq(roles.id, memberships.role_id))
+      .where(like(users.email, "%@example.com"));
 
     console.log("[DEV-API] Found", devUsers.length, "dev user records");
     console.log(

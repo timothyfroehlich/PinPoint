@@ -4,6 +4,7 @@ export default defineConfig({
   dialect: "postgresql",
   schema: "./src/server/db/schema/index.ts",
   out: "./supabase/migrations", // Consistent with Supabase ecosystem
+  casing: "snake_case", // Convert camelCase TypeScript fields to snake_case PostgreSQL columns
 
   dbCredentials: {
     url:

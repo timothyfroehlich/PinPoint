@@ -71,15 +71,15 @@ interface IssueData {
     id: string;
     name: string;
     category: "NEW" | "IN_PROGRESS" | "RESOLVED";
-    organizationId: string;
-    isDefault: boolean;
+    organization_id: string;
+    is_default: boolean;
   };
   priority: {
     id: string;
     name: string;
     order: number;
-    organizationId: string;
-    isDefault: boolean;
+    organization_id: string;
+    is_default: boolean;
   } | null;
   machine: {
     id: string;
@@ -93,7 +93,7 @@ interface IssueData {
     location: {
       id: string;
       name: string;
-      organizationId: string;
+      organization_id: string;
     };
   };
   assignedTo: {
@@ -102,7 +102,7 @@ interface IssueData {
     email: string | null;
     image: string | null;
   } | null;
-  createdAt: string | Date;
+  created_at: string | Date;
   _count: {
     comments: number;
     attachments: number;
@@ -537,7 +537,7 @@ export function IssueList({
                           color="text.secondary"
                           sx={{ flexShrink: 0 }}
                         >
-                          {new Date(issue.createdAt).toLocaleDateString()}
+                          {new Date(issue.created_at).toLocaleDateString()}
                         </Typography>
                       </Box>
                     </Box>

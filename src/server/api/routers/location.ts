@@ -32,7 +32,7 @@ export const locationRouter = createTRPCRouter({
         .values({
           id: generateId(),
           name: input.name,
-          organizationId: ctx.organizationId,
+          organization_id: ctx.organizationId,
         })
         .returning();
 
@@ -148,8 +148,8 @@ export const locationRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const updates: { name?: string; updatedAt: Date } = {
-        updatedAt: new Date(),
+      const updates: { name?: string; updated_at: Date } = {
+        updated_at: new Date(),
       };
       if (input.name) {
         updates.name = input.name;
@@ -234,7 +234,7 @@ export const locationRouter = createTRPCRouter({
       const [updatedLocation] = await ctx.db
         .update(locations)
         .set({
-          pinballMapId: input.pinballMapId,
+          pinball_map_id: input.pinballMapId,
         })
         .where(eq(locations.id, input.locationId))
         .returning();

@@ -19,13 +19,13 @@ export const INCLUDE_PATTERNS = {
   // Production source code - strictest standards
   production: ["./src/**/*.{ts,tsx}"],
   // Test utility files - moderate standards (reusable test code)
-  testUtils: ["./src/test/**/*.{ts,tsx}"],
+  // NOTE: Currently unused - test infrastructure archived to .archived-tests-2025-08-23/
+  testUtils: [],
   // Test files - relaxed standards (pragmatic testing patterns)
   tests: [
     "./src/**/*.test.{ts,tsx}",
     "./src/**/*.spec.{ts,tsx}",
     "./src/**/__tests__/**/*.{ts,tsx}",
-    "./src/integration-tests/**/*.{ts,tsx}",
     "./e2e/**/*.{ts,tsx}",
   ],
   // Build and configuration files (including test setup)
@@ -41,11 +41,9 @@ export const INCLUDE_PATTERNS = {
  */
 export const EXCLUDE_PATTERNS = {
   production: [
-    "./src/test/**/*",
     "./src/**/*.test.*",
     "./src/**/*.spec.*",
     "./src/**/__tests__/**/*",
-    "./src/integration-tests/**/*",
   ],
 };
 /**

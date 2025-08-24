@@ -19,7 +19,7 @@ test.describe("Smoke Test: Complete Issue Workflow", () => {
     const timestamp = Date.now();
     const branch = "main"; // Could be dynamic if needed
     const issueTitle = `SMOKE-TEST-${branch}-${timestamp}`;
-    const testEmail = "smoketest@test.local";
+    const testEmail = "smoketest@example.com";
 
     // Enhanced debugging version - monitoring CI behavior
     console.log(`🧪 SMOKE TEST - Starting workflow with issue: ${issueTitle}`);

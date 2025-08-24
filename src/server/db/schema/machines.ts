@@ -17,11 +17,11 @@ export const locations = pgTable(
   {
     id: text().primaryKey(),
     name: text().notNull(),
-    organizationId: text().notNull(),
+    organization_id: text().notNull(),
 
     // Timestamps
-    createdAt: timestamp().defaultNow().notNull(),
-    updatedAt: timestamp().defaultNow().notNull(),
+    created_at: timestamp().defaultNow().notNull(),
+    updated_at: timestamp().defaultNow().notNull(),
 
     // Geographic and Contact Information (from PinballMap API analysis)
     street: text(),
@@ -35,14 +35,14 @@ export const locations = pgTable(
     description: text(),
 
     // PinballMap Integration (optional)
-    pinballMapId: integer(), // PinballMap location ID
-    regionId: text(), // PinballMap region ("austin", "portland", etc.)
-    lastSyncAt: timestamp(), // When was last sync performed
-    syncEnabled: boolean().default(false).notNull(), // Enable/disable sync for this location
+    pinball_map_id: integer(), // PinballMap location ID
+    region_id: text(), // PinballMap region ("austin", "portland", etc.)
+    last_sync_at: timestamp(), // When was last sync performed
+    sync_enabled: boolean().default(false).notNull(), // Enable/disable sync for this location
   },
   (table) => [
-    // Multi-tenancy: organizationId filtering
-    index("locations_organization_id_idx").on(table.organizationId),
+    // Multi-tenancy: organization_id filtering
+    index("locations_organization_id_idx").on(table.organization_id),
   ],
 );
 
@@ -52,30 +52,30 @@ export const locations = pgTable(
 export const models = pgTable("models", {
   id: text().primaryKey(),
   name: text().notNull(),
-  organizationId: text(), // NULL for OPDB (global), set for custom (org-scoped)
+  organization_id: text(), // NULL for OPDB (global), set for custom (org-scoped)
   manufacturer: text(),
   year: integer(),
 
   // Model Type Classification
-  isCustom: boolean().default(false).notNull(), // false = OPDB, true = custom
+  is_custom: boolean().default(false).notNull(), // false = OPDB, true = custom
 
   // Cross-Database References (IPDB and OPDB from PinballMap)
-  ipdbId: text().unique(), // Internet Pinball Database ID
-  opdbId: text().unique(), // Open Pinball Database ID
+  ipdb_id: text().unique(), // Internet Pinball Database ID
+  opdb_id: text().unique(), // Open Pinball Database ID
 
   // Machine Technical Details (from PinballMap API)
-  machineType: text(), // "em", "ss", "digital"
-  machineDisplay: text(), // "reels", "dmd", "lcd", "alphanumeric"
-  isActive: boolean().default(true).notNull(),
+  machine_type: text(), // "em", "ss", "digital"
+  machine_display: text(), // "reels", "dmd", "lcd", "alphanumeric"
+  is_active: boolean().default(true).notNull(),
 
   // Metadata and Links
-  ipdbLink: text(), // Direct link to IPDB entry
-  opdbImgUrl: text(), // Image from OPDB
-  kineticistUrl: text(), // Link to additional machine information
+  ipdb_link: text(), // Direct link to IPDB entry
+  opdb_img_url: text(), // Image from OPDB
+  kineticist_url: text(), // Link to additional machine information
 
   // Timestamps
-  createdAt: timestamp().defaultNow().notNull(),
-  updatedAt: timestamp().defaultNow().notNull(),
+  created_at: timestamp().defaultNow().notNull(),
+  updated_at: timestamp().defaultNow().notNull(),
 });
 
 // Replaces GameInstance
@@ -84,37 +84,37 @@ export const machines = pgTable(
   {
     id: text().primaryKey(),
     name: text().notNull(), // Instance-specific name (e.g., "Medieval Madness #1")
-    organizationId: text().notNull(),
-    locationId: text().notNull(),
+    organization_id: text().notNull(),
+    location_id: text().notNull(),
     // Model reference
-    modelId: text().notNull(), // References models.id
-    ownerId: text(),
+    model_id: text().notNull(), // References models.id
+    owner_id: text(),
 
     // Add notification preferences for owner
-    ownerNotificationsEnabled: boolean().default(true).notNull(), // Toggle for all notifications
-    notifyOnNewIssues: boolean().default(true).notNull(), // Notify when new issues created
-    notifyOnStatusChanges: boolean().default(true).notNull(), // Notify when issue status changes
-    notifyOnComments: boolean().default(false).notNull(), // Notify on new comments
+    owner_notifications_enabled: boolean().default(true).notNull(), // Toggle for all notifications
+    notify_on_new_issues: boolean().default(true).notNull(), // Notify when new issues created
+    notify_on_status_changes: boolean().default(true).notNull(), // Notify when issue status changes
+    notify_on_comments: boolean().default(false).notNull(), // Notify on new comments
 
     // QR Code system
-    qrCodeId: text().unique(),
-    qrCodeUrl: text(),
-    qrCodeGeneratedAt: timestamp(),
+    qr_code_id: text().unique(),
+    qr_code_url: text(),
+    qr_code_generated_at: timestamp(),
 
     // Timestamps
-    createdAt: timestamp().defaultNow().notNull(),
-    updatedAt: timestamp().defaultNow().notNull(),
+    created_at: timestamp().defaultNow().notNull(),
+    updated_at: timestamp().defaultNow().notNull(),
   },
   (table) => [
     // QR code lookups (critical for scanning performance)
-    index("machines_qr_code_id_idx").on(table.qrCodeId),
-    // Multi-tenancy: organizationId filtering
-    index("machines_organization_id_idx").on(table.organizationId),
+    index("machines_qr_code_id_idx").on(table.qr_code_id),
+    // Multi-tenancy: organization_id filtering
+    index("machines_organization_id_idx").on(table.organization_id),
     // Location-specific machine queries
-    index("machines_location_id_idx").on(table.locationId),
+    index("machines_location_id_idx").on(table.location_id),
     // Model-specific machine queries
-    index("machines_model_id_idx").on(table.modelId),
+    index("machines_model_id_idx").on(table.model_id),
     // Owner-specific machine queries (nullable field - this was the problem!)
-    index("machines_owner_id_idx").on(table.ownerId),
+    index("machines_owner_id_idx").on(table.owner_id),
   ],
 );

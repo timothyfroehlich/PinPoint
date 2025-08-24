@@ -63,8 +63,8 @@ export async function getUploadAuthContext(
   // 3. Get user's membership and permissions
   const membershipResult = await drizzle.query.memberships.findFirst({
     where: and(
-      eq(memberships.organizationId, organizationResult.id),
-      eq(memberships.userId, user.id),
+      eq(memberships.organization_id, organizationResult.id),
+      eq(memberships.user_id, user.id),
     ),
     with: {
       role: {

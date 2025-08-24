@@ -1,4 +1,4 @@
-import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
+import { SEED_TEST_IDS } from "./constants";
 import minimalIssues, { type MinimalIssue } from "./minimal-issues";
 
 // Helper mappers and assumptions
@@ -39,7 +39,8 @@ const mapReporterToUserId = (email?: string) => {
     e.includes("timfroehlich") ||
     e.includes("tim@") ||
     e.includes("tim.example") ||
-    e.includes("tim@example.com")
+    e.includes("tim@example.com") ||
+    e.includes("tim.froehlich@example.com")
   )
     return SEED_TEST_IDS.USERS.ADMIN;
   // Fallback to MEMBER1
@@ -84,27 +85,27 @@ const knownMachineByTitle = (title?: string, opdb?: string) => {
 };
 
 // Source data converted from scripts/seed/shared/sample-issues.json
-const sampleData: Record<string, any>[] = [
+const sample_data: Record<string, any>[] = [
   {
     title: "Kaiju figures on left ramp are not responding",
     description: "Kaiju figures on left ramp are not responding",
     severity: "Cosmetic",
     status: "New",
     gameTitle: "Ultraman: Kaiju Rumble (Blood Sucker Edition)",
-    reporterEmail: "roger.sharpe@pinpoint.dev",
-    createdAt: "2025-06-21T13:40:02.000Z",
-    updatedAt: "2025-07-01T19:09:30.000Z",
+    reporterEmail: "roger.sharpe@example.com",
+    created_at: "2025-06-21T13:40:02.000Z",
+    updated_at: "2025-07-01T19:09:30.000Z",
     gameOpdbId: "GBLLd-MdEON-A94po",
   },
   {
     title: "Loud buzzing noise then crashes",
     description: "Loud buzzing noise then crashes",
     severity: "Severe",
-    status: "Needs expert help",
+    status: "Needs Expert",
     gameTitle: "Xenon",
-    reporterEmail: "gary.stern@pinpoint.dev",
-    createdAt: "2025-06-27T19:05:40.000Z",
-    updatedAt: "2025-07-06T10:27:36.000Z",
+    reporterEmail: "gary.stern@example.com",
+    created_at: "2025-06-27T19:05:40.000Z",
+    updated_at: "2025-07-06T10:27:36.000Z",
     gameOpdbId: "G42Pk-MZe2e",
   },
   {
@@ -113,9 +114,9 @@ const sampleData: Record<string, any>[] = [
     severity: "Minor",
     status: "New",
     gameTitle: "Cleopatra",
-    reporterEmail: "harry.williams@pinpoint.dev",
-    createdAt: "2025-06-27T20:12:44.000Z",
-    updatedAt: "2025-07-01T19:10:53.000Z",
+    reporterEmail: "harry.williams@example.com",
+    created_at: "2025-06-27T20:12:44.000Z",
+    updated_at: "2025-07-01T19:10:53.000Z",
     gameOpdbId: "GrknN-MQrdv",
   },
   {
@@ -124,9 +125,9 @@ const sampleData: Record<string, any>[] = [
     severity: "Minor",
     status: "New",
     gameTitle: "Cleopatra",
-    reporterEmail: "escher.lefkoff@pinpoint.dev",
-    createdAt: "2025-06-27T20:13:27.000Z",
-    updatedAt: "2025-07-01T19:10:58.000Z",
+    reporterEmail: "escher.lefkoff@example.com",
+    created_at: "2025-06-27T20:13:27.000Z",
+    updated_at: "2025-07-01T19:10:58.000Z",
     gameOpdbId: "GrknN-MQrdv",
   },
   {
@@ -134,11 +135,11 @@ const sampleData: Record<string, any>[] = [
     description:
       "Sensitive Tilt Warning - needs adjustment/testing. A designer suggests it may be a loose connector or cracked solder joint.",
     severity: "Minor",
-    status: "Needs expert help",
+    status: "Needs Expert",
     gameTitle: "Ultraman: Kaiju Rumble (Blood Sucker Edition)",
-    reporterEmail: "roger.sharpe@pinpoint.dev",
-    createdAt: "2025-06-28T12:55:37.000Z",
-    updatedAt: "2025-07-02T15:30:02.000Z",
+    reporterEmail: "roger.sharpe@example.com",
+    created_at: "2025-06-28T12:55:37.000Z",
+    updated_at: "2025-07-02T15:30:02.000Z",
     gameOpdbId: "GBLLd-MdEON-A94po",
   },
   {
@@ -148,9 +149,9 @@ const sampleData: Record<string, any>[] = [
     severity: "Minor",
     status: "Not to be Fixed",
     gameTitle: "Revenge from Mars",
-    reporterEmail: "gary.stern@pinpoint.dev",
-    createdAt: "2025-06-28T12:59:21.000Z",
-    updatedAt: "2025-07-04T23:34:55.000Z",
+    reporterEmail: "gary.stern@example.com",
+    created_at: "2025-06-28T12:59:21.000Z",
+    updated_at: "2025-07-04T23:34:55.000Z",
     gameOpdbId: "G50Wr-MLeZP",
   },
   {
@@ -160,9 +161,9 @@ const sampleData: Record<string, any>[] = [
     severity: "Major",
     status: "New",
     gameTitle: "Star Trek: The Next Generation",
-    reporterEmail: "timfroehlich@pinpoint.dev",
-    createdAt: "2025-06-28T13:01:33.000Z",
-    updatedAt: "2025-07-01T19:11:54.000Z",
+    reporterEmail: "timfroehlich@example.com",
+    created_at: "2025-06-28T13:01:33.000Z",
+    updated_at: "2025-07-01T19:11:54.000Z",
     gameOpdbId: "GR6d8-M1rZd",
   },
   {
@@ -171,9 +172,9 @@ const sampleData: Record<string, any>[] = [
     severity: "Minor",
     status: "New",
     gameTitle: "Star Trek: The Next Generation",
-    reporterEmail: "harry.williams@pinpoint.dev",
-    createdAt: "2025-06-28T13:02:22.000Z",
-    updatedAt: "2025-06-29T14:35:23.000Z",
+    reporterEmail: "harry.williams@example.com",
+    created_at: "2025-06-28T13:02:22.000Z",
+    updated_at: "2025-06-29T14:35:23.000Z",
     gameOpdbId: "GR6d8-M1rZd",
   },
   {
@@ -182,9 +183,9 @@ const sampleData: Record<string, any>[] = [
     severity: "Cosmetic",
     status: "New",
     gameTitle: "Lord of the Rings",
-    reporterEmail: "escher.lefkoff@pinpoint.dev",
-    createdAt: "2025-06-28T13:03:48.000Z",
-    updatedAt: "2025-07-01T19:12:49.000Z",
+    reporterEmail: "escher.lefkoff@example.com",
+    created_at: "2025-06-28T13:03:48.000Z",
+    updated_at: "2025-07-01T19:12:49.000Z",
     gameOpdbId: "GrqZX-MD15w",
   },
   {
@@ -193,20 +194,20 @@ const sampleData: Record<string, any>[] = [
     severity: "Severe",
     status: "Needs Parts",
     gameTitle: "Transporter the Rescue",
-    reporterEmail: "roger.sharpe@pinpoint.dev",
-    createdAt: "2025-06-28T13:06:09.000Z",
-    updatedAt: "2025-07-01T13:13:11.000Z",
+    reporterEmail: "roger.sharpe@example.com",
+    created_at: "2025-06-28T13:06:09.000Z",
+    updated_at: "2025-07-01T13:13:11.000Z",
     gameOpdbId: "G5n2D-MLn85",
   },
   {
     title: "will not turn on",
     description: "will not turn on",
     severity: "Severe",
-    status: "Needs expert help",
+    status: "Needs Expert",
     gameTitle: "Sea Ray",
-    reporterEmail: "gary.stern@pinpoint.dev",
-    createdAt: "2025-06-28T13:08:51.000Z",
-    updatedAt: "2025-07-01T19:21:25.000Z",
+    reporterEmail: "gary.stern@example.com",
+    created_at: "2025-06-28T13:08:51.000Z",
+    updated_at: "2025-07-01T19:21:25.000Z",
     gameOpdbId: "G4jBk-MLB1w",
   },
   {
@@ -215,9 +216,9 @@ const sampleData: Record<string, any>[] = [
     severity: "Minor",
     status: "New",
     gameTitle: "Super Soccer",
-    reporterEmail: "timfroehlich@pinpoint.dev",
-    createdAt: "2025-06-28T13:10:20.000Z",
-    updatedAt: "2025-07-06T10:24:09.000Z",
+    reporterEmail: "timfroehlich@example.com",
+    created_at: "2025-06-28T13:10:20.000Z",
+    updated_at: "2025-07-06T10:24:09.000Z",
     gameOpdbId: "GRn8D-MQd21",
   },
   {
@@ -226,9 +227,9 @@ const sampleData: Record<string, any>[] = [
     severity: "Minor",
     status: "New",
     gameTitle: "Super Soccer",
-    reporterEmail: "harry.williams@pinpoint.dev",
-    createdAt: "2025-06-28T13:11:14.000Z",
-    updatedAt: "2025-07-01T19:13:48.000Z",
+    reporterEmail: "harry.williams@example.com",
+    created_at: "2025-06-28T13:11:14.000Z",
+    updated_at: "2025-07-01T19:13:48.000Z",
     gameOpdbId: "GRn8D-MQd21",
   },
   {
@@ -237,9 +238,9 @@ const sampleData: Record<string, any>[] = [
     severity: "Minor",
     status: "New",
     gameTitle: "Domino",
-    reporterEmail: "escher.lefkoff@pinpoint.dev",
-    createdAt: "2025-06-28T13:11:58.000Z",
-    updatedAt: "2025-07-01T19:15:04.000Z",
+    reporterEmail: "escher.lefkoff@example.com",
+    created_at: "2025-06-28T13:11:58.000Z",
+    updated_at: "2025-07-01T19:15:04.000Z",
     gameOpdbId: "G4j8k-MJK5K",
   },
   {
@@ -249,9 +250,9 @@ const sampleData: Record<string, any>[] = [
     severity: "Major",
     status: "Needs Parts",
     gameTitle: "Domino",
-    reporterEmail: "roger.sharpe@pinpoint.dev",
-    createdAt: "2025-06-28T13:12:48.000Z",
-    updatedAt: "2025-07-01T19:15:05.000Z",
+    reporterEmail: "roger.sharpe@example.com",
+    created_at: "2025-06-28T13:12:48.000Z",
+    updated_at: "2025-07-01T19:15:05.000Z",
     gameOpdbId: "G4j8k-MJK5K",
   },
   {
@@ -260,9 +261,9 @@ const sampleData: Record<string, any>[] = [
     severity: "Minor",
     status: "New",
     gameTitle: "Cleopatra",
-    reporterEmail: "gary.stern@pinpoint.dev",
-    createdAt: "2025-06-28T13:13:53.000Z",
-    updatedAt: "2025-07-06T10:35:04.000Z",
+    reporterEmail: "gary.stern@example.com",
+    created_at: "2025-06-28T13:13:53.000Z",
+    updated_at: "2025-07-06T10:35:04.000Z",
     gameOpdbId: "GrknN-MQrdv",
   },
   {
@@ -272,9 +273,9 @@ const sampleData: Record<string, any>[] = [
     severity: "Cosmetic",
     status: "In Progress",
     gameTitle: "Xenon",
-    reporterEmail: "roger.sharpe@pinpoint.dev",
-    createdAt: "2025-06-08T00:00:00.000Z",
-    updatedAt: "2025-07-01T19:18:58.000Z",
+    reporterEmail: "roger.sharpe@example.com",
+    created_at: "2025-06-08T00:00:00.000Z",
+    updated_at: "2025-07-01T19:18:58.000Z",
     gameOpdbId: "G42Pk-MZe2e",
   },
   {
@@ -284,9 +285,9 @@ const sampleData: Record<string, any>[] = [
     severity: "Major",
     status: "In Progress",
     gameTitle: "Hokus Pokus",
-    reporterEmail: "gary.stern@pinpoint.dev",
-    createdAt: "2025-06-08T00:00:00.000Z",
-    updatedAt: "2025-07-01T19:19:13.000Z",
+    reporterEmail: "gary.stern@example.com",
+    created_at: "2025-06-08T00:00:00.000Z",
+    updated_at: "2025-07-01T19:19:13.000Z",
     gameOpdbId: "GRwBN-MJ5ln",
   },
   {
@@ -296,9 +297,9 @@ const sampleData: Record<string, any>[] = [
     severity: "Severe",
     status: "In Progress",
     gameTitle: "Top Score",
-    reporterEmail: "timfroehlich@pinpoint.dev",
-    createdAt: "2025-06-08T00:00:00.000Z",
-    updatedAt: "2025-07-01T19:21:32.000Z",
+    reporterEmail: "timfroehlich@example.com",
+    created_at: "2025-06-08T00:00:00.000Z",
+    updated_at: "2025-07-01T19:21:32.000Z",
     gameOpdbId: "G5W1w-MQVkq",
   },
   {
@@ -308,9 +309,9 @@ const sampleData: Record<string, any>[] = [
     severity: "Major",
     status: "In Progress",
     gameTitle: "Halloween (CE)",
-    reporterEmail: "harry.williams@pinpoint.dev",
-    createdAt: "2025-06-16T00:00:00.000Z",
-    updatedAt: "2025-07-01T19:22:09.000Z",
+    reporterEmail: "harry.williams@example.com",
+    created_at: "2025-06-16T00:00:00.000Z",
+    updated_at: "2025-07-01T19:22:09.000Z",
     gameOpdbId: "Gj66Z-Mp4BN-A9Y6n",
   },
   {
@@ -320,9 +321,9 @@ const sampleData: Record<string, any>[] = [
     severity: "Major",
     status: "Occasionally",
     gameTitle: "Game of Thrones (Pro)",
-    reporterEmail: "escher.lefkoff@pinpoint.dev",
-    createdAt: "2025-06-30T00:00:00.000Z",
-    updatedAt: "2025-07-01T19:22:32.000Z",
+    reporterEmail: "escher.lefkoff@example.com",
+    created_at: "2025-06-30T00:00:00.000Z",
+    updated_at: "2025-07-01T19:22:32.000Z",
     gameOpdbId: "G41d5-MKNwX",
   },
 ];
@@ -334,33 +335,35 @@ const isMinimalIssue = (obj: any): obj is MinimalIssue => {
     typeof obj.id === "string" &&
     typeof obj.title === "string" &&
     typeof obj.description === "string" &&
-    typeof obj.organizationId === "string" &&
-    typeof obj.machineId === "string" &&
-    typeof obj.priorityId === "string" &&
-    typeof obj.statusId === "string" &&
-    typeof obj.createdById === "string" &&
-    obj.createdAt instanceof Date &&
-    obj.updatedAt instanceof Date
+    typeof obj.organization_id === "string" &&
+    typeof obj.machine_id === "string" &&
+    typeof obj.priority_id === "string" &&
+    typeof obj.status_id === "string" &&
+    typeof obj.created_by_id === "string" &&
+    obj.created_at instanceof Date &&
+    obj.updated_at instanceof Date
   );
 };
 
-// Convert sampleData into MinimalIssue objects using SEED_TEST_IDS where possible
-const otherIssues: MinimalIssue[] = sampleData.map((s, idx) => {
+// Convert sample_data into MinimalIssue objects using SEED_TEST_IDS where possible
+const otherIssues: MinimalIssue[] = sample_data.map((s, idx) => {
   const knownMachine = knownMachineByTitle(s.gameTitle, s.gameOpdbId);
-  const machineId =
+  const machine_id =
     knownMachine ?? `${SEED_TEST_IDS.MOCK_PATTERNS.MACHINE}-${idx + 1}`;
 
   const issue: MinimalIssue = {
     id: `${SEED_TEST_IDS.MOCK_PATTERNS.ISSUE}-${idx + 1}`,
     title: s.title ?? "Untitled",
     description: s.description ?? "",
-    organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
-    machineId,
-    priorityId: mapSeverityToPriority(s.severity),
-    statusId: mapStatusToStatusId(s.status),
-    createdById: mapReporterToUserId(s.reporterEmail),
-    createdAt: new Date(s.createdAt ?? new Date().toISOString()),
-    updatedAt: new Date(s.updatedAt ?? s.createdAt ?? new Date().toISOString()),
+    organization_id: SEED_TEST_IDS.ORGANIZATIONS.primary,
+    machine_id,
+    priority_id: mapSeverityToPriority(s.severity),
+    status_id: mapStatusToStatusId(s.status),
+    created_by_id: mapReporterToUserId(s.reporterEmail),
+    created_at: new Date(s.created_at ?? new Date().toISOString()),
+    updated_at: new Date(
+      s.updated_at ?? s.created_at ?? new Date().toISOString(),
+    ),
   };
 
   return issue;

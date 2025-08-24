@@ -13,9 +13,9 @@ export interface UserData {
 
 export interface SeedingConfig {
   users: UserData[];
-  sampleData: "none" | "minimal" | "full";
-  resetDatabase: boolean;
-  authUsersEnabled: boolean;
+  sample_data: "none" | "minimal" | "full";
+  reset_database: boolean;
+  auth_users_enabled: boolean;
 }
 
 export interface ValidationResult {
@@ -27,9 +27,9 @@ export interface ValidationResult {
 
 export interface SeedingResult {
   success: boolean;
-  organizationId?: string;
-  usersCreated: number;
-  sampleDataCreated: boolean;
+  organization_id?: string;
+  users_created: number;
+  sample_dataCreated: boolean;
   duration: number;
   errors?: string[];
 }

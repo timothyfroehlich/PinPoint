@@ -128,13 +128,13 @@ export const modelRouter = createTRPCRouter({
         .values({
           id: generateId(),
           name: machineData.name,
-          organizationId: null, // NULL for OPDB models (global access)
-          isCustom: false, // OPDB models are not custom
-          opdbId: input.opdbId,
+          organization_id: null, // NULL for OPDB models (global access)
+          is_custom: false, // OPDB models are not custom
+          opdb_id: input.opdbId,
           manufacturer: machineData.manufacturer ?? null,
           year: machineData.year ?? null,
-          opdbImgUrl: machineData.playfield_image ?? null,
-          machineType: machineData.type ?? null,
+          opdb_img_url: machineData.playfield_image ?? null,
+          machine_type: machineData.type ?? null,
         })
         .returning();
 
@@ -191,8 +191,8 @@ export const modelRouter = createTRPCRouter({
               name: machineData.name,
               manufacturer: machineData.manufacturer ?? null,
               year: machineData.year ?? null,
-              opdbImgUrl: machineData.playfield_image ?? null,
-              machineType: machineData.type ?? null,
+              opdb_img_url: machineData.playfield_image ?? null,
+              machine_type: machineData.type ?? null,
             })
             .where(eq(models.id, title.id));
           syncedCount++;

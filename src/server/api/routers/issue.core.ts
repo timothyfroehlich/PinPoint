@@ -65,21 +65,21 @@ export const issueCoreRouter = createTRPCRouter({
       const defaultStatus = await ctx.db.query.issueStatuses.findFirst({
         where: and(
           eq(issueStatuses.isDefault, true),
-          eq(issueStatuses.organizationId, organization.id),
+          eq(issueStatuses.organization_id, organization.id),
         ),
       });
 
       const defaultPriority = await ctx.db.query.priorities.findFirst({
         where: and(
           eq(priorities.isDefault, true),
-          eq(priorities.organizationId, organization.id),
+          eq(priorities.organization_id, organization.id),
         ),
       });
 
       // Create validation input (handle exactOptionalPropertyTypes)
       const baseValidationInput = {
         title: input.title,
-        machineId: input.machineId,
+        machine_id: input.machineId,
         organizationId: organization.id,
       };
 
@@ -132,11 +132,11 @@ export const issueCoreRouter = createTRPCRouter({
       } = {
         id: generatePrefixedId("issue"),
         title: input.title,
-        createdById: null, // Anonymous issue
+        created_by_id: null, // Anonymous issue
         organizationId: organization.id,
-        machineId: input.machineId,
-        statusId: defaultStatus.id,
-        priorityId: defaultPriority.id,
+        machine_id: input.machineId,
+        status_id: defaultStatus.id,
+        priority_id: defaultPriority.id,
       };
 
       if (input.description) {
@@ -216,23 +216,23 @@ export const issueCoreRouter = createTRPCRouter({
       const defaultStatus = await ctx.db.query.issueStatuses.findFirst({
         where: and(
           eq(issueStatuses.isDefault, true),
-          eq(issueStatuses.organizationId, organization.id),
+          eq(issueStatuses.organization_id, organization.id),
         ),
       });
 
       const defaultPriority = await ctx.db.query.priorities.findFirst({
         where: and(
           eq(priorities.isDefault, true),
-          eq(priorities.organizationId, organization.id),
+          eq(priorities.organization_id, organization.id),
         ),
       });
 
       // Create validation input (handle exactOptionalPropertyTypes)
       const baseValidationInput = {
         title: input.title,
-        machineId: input.machineId,
+        machine_id: input.machineId,
         organizationId: organization.id,
-        createdById: ctx.user.id,
+        created_by_id: ctx.user.id,
       };
 
       const validationInput: IssueCreationInput = {
@@ -285,9 +285,9 @@ export const issueCoreRouter = createTRPCRouter({
         title: input.title,
         createdById,
         organizationId: organization.id,
-        machineId: input.machineId,
-        statusId: defaultStatus.id,
-        priorityId: defaultPriority.id,
+        machine_id: input.machineId,
+        status_id: defaultStatus.id,
+        priority_id: defaultPriority.id,
       };
 
       if (input.description) {
@@ -349,12 +349,12 @@ export const issueCoreRouter = createTRPCRouter({
       const issue = await ctx.db.query.issues.findFirst({
         where: and(
           eq(issues.id, input.issueId),
-          eq(issues.organizationId, ctx.organizationId),
+          eq(issues.organization_id, ctx.organizationId),
         ),
       });
 
       const membership = await ctx.db.query.memberships.findFirst({
-        where: eq(memberships.userId, input.userId),
+        where: eq(memberships.user_id, input.userId),
         with: { user: true },
       });
 
@@ -376,7 +376,7 @@ export const issueCoreRouter = createTRPCRouter({
         ? {
             id: membership.id,
             userId: membership.userId,
-            organizationId: membership.organizationId,
+            organizationId: membership.organization_id,
             roleId: membership.roleId,
             user: {
               id: membership.user.id,
@@ -403,7 +403,7 @@ export const issueCoreRouter = createTRPCRouter({
       // Update the issue assignment
       await ctx.db
         .update(issues)
-        .set({ assignedToId: input.userId })
+        .set({ assigned_to_id: input.userId })
         .where(eq(issues.id, input.issueId));
 
       // Get updated issue with relations
@@ -480,28 +480,28 @@ export const issueCoreRouter = createTRPCRouter({
 
       // Machine ID filter
       if (input?.machineId) {
-        conditions.push(eq(issues.machineId, input.machineId));
+        conditions.push(eq(issues.machine_id, input.machineId));
       }
 
       // Status filtering - support both single statusId and statusIds array
       if (input?.statusIds && input.statusIds.length > 0) {
-        conditions.push(inArray(issues.statusId, input.statusIds));
+        conditions.push(inArray(issues.status_id, input.statusIds));
       } else if (input?.statusId) {
-        conditions.push(eq(issues.statusId, input.statusId));
+        conditions.push(eq(issues.status_id, input.statusId));
       }
 
       // Assignee filter
       if (input?.assigneeId) {
         if (input.assigneeId === "unassigned") {
-          conditions.push(isNull(issues.assignedToId));
+          conditions.push(isNull(issues.assigned_to_id));
         } else {
-          conditions.push(eq(issues.assignedToId, input.assigneeId));
+          conditions.push(eq(issues.assigned_to_id, input.assigneeId));
         }
       }
 
       // Reporter filter
       if (input?.reporterId) {
-        conditions.push(eq(issues.createdById, input.reporterId));
+        conditions.push(eq(issues.created_by_id, input.reporterId));
       }
 
       // For complex filters involving relations, we'll need to use the subquery or joins
@@ -672,7 +672,7 @@ export const issueCoreRouter = createTRPCRouter({
       const issue = await ctx.db.query.issues.findFirst({
         where: and(
           eq(issues.id, input.id),
-          eq(issues.organizationId, ctx.organizationId),
+          eq(issues.organization_id, ctx.organizationId),
         ),
         with: {
           status: true,
@@ -752,7 +752,7 @@ export const issueCoreRouter = createTRPCRouter({
       const existingIssue = await ctx.db.query.issues.findFirst({
         where: and(
           eq(issues.id, input.id),
-          eq(issues.organizationId, ctx.organizationId),
+          eq(issues.organization_id, ctx.organizationId),
         ),
         with: {
           status: true,
@@ -793,7 +793,7 @@ export const issueCoreRouter = createTRPCRouter({
       if (input.assignedToId !== undefined) {
         if (input.assignedToId) {
           const membership = await ctx.db.query.memberships.findFirst({
-            where: eq(memberships.userId, input.assignedToId),
+            where: eq(memberships.user_id, input.assignedToId),
             with: {
               user: true,
             },
@@ -815,9 +815,9 @@ export const issueCoreRouter = createTRPCRouter({
       if (input.title) updateData.title = input.title;
       if (input.description !== undefined)
         updateData.description = input.description;
-      if (input.statusId) updateData.statusId = input.statusId;
+      if (input.statusId) updateData.status_id = input.statusId;
       if (input.assignedToId !== undefined)
-        updateData.assignedToId = input.assignedToId ?? null;
+        updateData.assigned_to_id = input.assignedToId ?? null;
 
       await ctx.db
         .update(issues)
@@ -825,7 +825,7 @@ export const issueCoreRouter = createTRPCRouter({
         .where(
           and(
             eq(issues.id, input.id),
-            eq(issues.organizationId, ctx.organizationId),
+            eq(issues.organization_id, ctx.organizationId),
           ),
         );
 
@@ -833,7 +833,7 @@ export const issueCoreRouter = createTRPCRouter({
       const updatedIssue = await ctx.db.query.issues.findFirst({
         where: and(
           eq(issues.id, input.id),
-          eq(issues.organizationId, ctx.organizationId),
+          eq(issues.organization_id, ctx.organizationId),
         ),
         with: {
           status: true,
@@ -888,7 +888,7 @@ export const issueCoreRouter = createTRPCRouter({
 
       if (
         input.assignedToId !== undefined &&
-        existingIssue.assignedToId !== input.assignedToId
+        existingIssue.assigned_to_id !== input.assignedToId
       ) {
         await activityService.recordAssignmentChange(
           input.id,
@@ -952,13 +952,13 @@ export const issueCoreRouter = createTRPCRouter({
       await ctx.db
         .update(issues)
         .set({
-          statusId: resolvedStatus.id,
+          status_id: resolvedStatus.id,
           resolvedAt: new Date(),
         })
         .where(
           and(
             eq(issues.id, input.id),
-            eq(issues.organizationId, ctx.organizationId),
+            eq(issues.organization_id, ctx.organizationId),
           ),
         );
 
@@ -1020,7 +1020,7 @@ export const issueCoreRouter = createTRPCRouter({
       const existingIssue = await ctx.db.query.issues.findFirst({
         where: and(
           eq(issues.id, input.id),
-          eq(issues.organizationId, ctx.organizationId),
+          eq(issues.organization_id, ctx.organizationId),
         ),
         with: {
           status: true,
@@ -1071,7 +1071,7 @@ export const issueCoreRouter = createTRPCRouter({
 
       // Update the issue
       const updateData: Partial<typeof issues.$inferInsert> = {
-        statusId: input.statusId,
+        status_id: input.statusId,
       };
       if (effects.shouldSetResolvedAt) updateData.resolvedAt = new Date();
       if (effects.shouldClearResolvedAt) updateData.resolvedAt = null;
@@ -1082,7 +1082,7 @@ export const issueCoreRouter = createTRPCRouter({
         .where(
           and(
             eq(issues.id, input.id),
-            eq(issues.organizationId, ctx.organizationId),
+            eq(issues.organization_id, ctx.organizationId),
           ),
         );
 
@@ -1090,7 +1090,7 @@ export const issueCoreRouter = createTRPCRouter({
       const updatedIssue = await ctx.db.query.issues.findFirst({
         where: and(
           eq(issues.id, input.id),
-          eq(issues.organizationId, ctx.organizationId),
+          eq(issues.organization_id, ctx.organizationId),
         ),
         with: {
           status: true,
@@ -1178,12 +1178,12 @@ export const issueCoreRouter = createTRPCRouter({
 
       // Machine ID filter
       if (input?.machineId) {
-        conditions.push(eq(issues.machineId, input.machineId));
+        conditions.push(eq(issues.machine_id, input.machineId));
       }
 
       // Status filter
       if (input?.statusId) {
-        conditions.push(eq(issues.statusId, input.statusId));
+        conditions.push(eq(issues.status_id, input.statusId));
       }
 
       const baseQuery = ctx.db.query.issues.findMany({

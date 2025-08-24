@@ -10,9 +10,9 @@ export const organizations = pgTable(
     id: text().primaryKey(),
     name: text().notNull(),
     subdomain: text().unique().notNull(), // For V1.0 subdomain feature
-    logoUrl: text(),
-    createdAt: timestamp().defaultNow().notNull(),
-    updatedAt: timestamp().defaultNow().notNull(),
+    logo_url: text(),
+    created_at: timestamp().defaultNow().notNull(),
+    updated_at: timestamp().defaultNow().notNull(),
   },
   (table) => [
     // Organization subdomain lookup (critical for tenant resolution)
@@ -24,17 +24,17 @@ export const memberships = pgTable(
   "memberships",
   {
     id: text().primaryKey(),
-    userId: text().notNull(),
-    organizationId: text().notNull(),
-    roleId: text().notNull(),
+    user_id: text().notNull(),
+    organization_id: text().notNull(),
+    role_id: text().notNull(),
   },
   (table) => [
-    // Multi-tenancy: organizationId filtering (most critical for performance)
+    // Multi-tenancy: organization_id filtering (most critical for performance)
     index("memberships_user_id_organization_id_idx").on(
-      table.userId,
-      table.organizationId,
+      table.user_id,
+      table.organization_id,
     ),
-    index("memberships_organization_id_idx").on(table.organizationId),
+    index("memberships_organization_id_idx").on(table.organization_id),
   ],
 );
 
@@ -44,13 +44,13 @@ export const roles = pgTable(
   {
     id: text().primaryKey(),
     name: text().notNull(), // e.g., "Admin", "Technician", "Manager"
-    organizationId: text().notNull(),
-    isDefault: boolean().default(false).notNull(), // To identify system-default roles
-    isSystem: boolean().default(false).notNull(), // To identify system roles (Admin, Unauthenticated)
-    createdAt: timestamp().defaultNow().notNull(),
-    updatedAt: timestamp().defaultNow().notNull(),
+    organization_id: text().notNull(),
+    is_default: boolean().default(false).notNull(), // To identify system-default roles
+    is_system: boolean().default(false).notNull(), // To identify system roles (Admin, Unauthenticated)
+    created_at: timestamp().defaultNow().notNull(),
+    updated_at: timestamp().defaultNow().notNull(),
   },
-  (table) => [index("roles_organization_id_idx").on(table.organizationId)],
+  (table) => [index("roles_organization_id_idx").on(table.organization_id)],
 );
 
 export const permissions = pgTable("permissions", {
@@ -63,16 +63,16 @@ export const permissions = pgTable("permissions", {
 export const rolePermissions = pgTable(
   "role_permissions",
   {
-    roleId: text()
+    role_id: text()
       .notNull()
       .references(() => roles.id, { onDelete: "cascade" }),
-    permissionId: text()
+    permission_id: text()
       .notNull()
       .references(() => permissions.id, { onDelete: "cascade" }),
   },
   (table) => [
     // Permission system: role-permission lookups
-    index("role_permissions_role_id_idx").on(table.roleId),
-    index("role_permissions_permission_id_idx").on(table.permissionId),
+    index("role_permissions_role_id_idx").on(table.role_id),
+    index("role_permissions_permission_id_idx").on(table.permission_id),
   ],
 );

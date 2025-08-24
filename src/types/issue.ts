@@ -17,7 +17,7 @@ export interface Priority {
 export interface User {
   id: string;
   name: string | null;
-  email?: string | null; // Optional to match Prisma schema
+  email?: string | null; // Optional to match Drizzle schema
   image: string | null;
 }
 
@@ -41,8 +41,8 @@ export interface Location {
 export interface Machine {
   id: string;
   name: string;
-  serialNumber?: string | null;
-  qrCodeId: string | null;
+  serial_number?: string | null;
+  qr_code_id: string | null;
   model: Model;
   location: Location;
 }
@@ -50,19 +50,19 @@ export interface Machine {
 export interface Comment {
   id: string;
   content: string;
-  createdAt: Date;
-  updatedAt: Date;
-  deletedAt?: Date | null;
+  created_at: Date;
+  updated_at: Date;
+  deleted_at?: Date | null;
   author: User;
   createdBy: User; // Alias for compatibility - maps to author
 }
 
 export interface Attachment {
   id: string;
-  fileName: string; // Match Prisma field name
+  file_name: string; // Match Drizzle field name
   url: string;
-  fileType: string; // Match Prisma field name
-  createdAt: Date;
+  file_type: string; // Match Drizzle field name
+  created_at: Date;
 }
 
 export interface IssueActivity {
@@ -80,9 +80,9 @@ export interface IssueActivity {
     | "REOPENED"
     | "SYSTEM";
   field: string;
-  oldValue?: string | null;
-  newValue?: string | null;
-  changedAt: Date;
+  old_value?: string | null;
+  new_value?: string | null;
+  changed_at: Date;
   actor?: User | null;
 }
 
@@ -91,17 +91,17 @@ export interface IssueWithDetails {
   title: string;
   description: string | null;
   consistency?: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-  resolvedAt?: Date | null;
-  reporterEmail?: string | null; // For anonymous issue reporting
-  submitterName?: string | null; // Optional name for anonymous issue reporting
-  organizationId: string;
-  machineId: string;
-  statusId: string;
-  priorityId: string;
-  createdById: string | null;
-  assignedToId?: string | null;
+  created_at: Date;
+  updated_at: Date;
+  resolved_at?: Date | null;
+  reporter_email?: string | null; // For anonymous issue reporting
+  submitter_name?: string | null; // Optional name for anonymous issue reporting
+  organization_id: string;
+  machine_id: string;
+  status_id: string;
+  priority_id: string;
+  created_by_id: string | null;
+  assigned_to_id?: string | null;
   machine: Machine;
   priority: Priority;
   status: IssueStatus;

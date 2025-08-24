@@ -6,23 +6,24 @@ import { memberships, users, roles } from "~/server/db/schema";
  */
 export const membershipWithUserAndRoleSelect = {
   id: memberships.id,
-  userId: memberships.userId,
-  organizationId: memberships.organizationId,
-  roleId: memberships.roleId,
+  // Map camelCase result keys to underlying snake_case DB columns
+  userId: memberships.user_id,
+  organizationId: memberships.organization_id,
+  roleId: memberships.role_id,
   user: {
     id: users.id,
     name: users.name,
     email: users.email,
-    profilePicture: users.profilePicture,
-    emailVerified: users.emailVerified,
-    createdAt: users.createdAt,
+    profilePicture: users.profile_picture,
+    emailVerified: users.email_verified,
+    createdAt: users.created_at,
   },
   role: {
     id: roles.id,
     name: roles.name,
-    organizationId: roles.organizationId,
-    isSystem: roles.isSystem,
-    isDefault: roles.isDefault,
+    organizationId: roles.organization_id,
+    isSystem: roles.is_system,
+    isDefault: roles.is_default,
   },
 } as const;
 

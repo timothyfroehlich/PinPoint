@@ -107,7 +107,7 @@ export function IssueComments({
                         {comment.author.name}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        {new Date(comment.createdAt).toLocaleDateString()}
+                        {new Date(comment.created_at).toLocaleDateString()}
                       </Typography>
                       {/* Comment visibility badges removed until isInternal is implemented */}
                     </Stack>

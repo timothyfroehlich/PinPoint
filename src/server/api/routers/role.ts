@@ -35,29 +35,22 @@ export const roleRouter = createTRPCRouter({
     const roleService = createRoleService(ctx);
     const roles = await roleService.getRoles();
 
-    return roles.map(
-      (role: {
-        id: string;
-        name: string;
-        organizationId: string;
-        isSystem: boolean;
-        isDefault: boolean;
-        createdAt: Date;
-        updatedAt: Date;
-        permissions: { id: string; name: string }[];
-        _count: { memberships: number };
-      }) => ({
-        ...role,
-        memberCount: role._count.memberships,
-        permissions: role.permissions.map(
-          (p: { id: string; name: string }) => ({
-            id: p.id,
-            name: p.name,
-            description: null,
-          }),
-        ),
-      }),
-    );
+    // Map snake_case fields from service to camelCase API response
+    return roles.map((role) => ({
+      id: role.id,
+      name: role.name,
+      organizationId: role.organization_id,
+      isSystem: role.is_system,
+      isDefault: role.is_default,
+      createdAt: role.created_at,
+      updatedAt: role.updated_at,
+      memberCount: role._count.memberships,
+      permissions: role.permissions.map((p) => ({
+        id: p.id,
+        name: p.name,
+        description: null,
+      })),
+    }));
   }),
 
   /**
@@ -69,7 +62,7 @@ export const roleRouter = createTRPCRouter({
         name: z.string().min(1).max(50),
         permissionIds: z.array(z.string()).optional(),
         template: z
-          .enum(Object.keys(ROLE_TEMPLATES) as [keyof typeof ROLE_TEMPLATES])
+          .enum(Object.keys(ROLE_TEMPLATES) as [string, ...string[]])
           .optional(),
         isDefault: z.boolean().default(false),
       }),
@@ -91,9 +84,9 @@ export const roleRouter = createTRPCRouter({
         .values({
           id: generatePrefixedId("role"),
           name: input.name,
-          organizationId: ctx.organization.id,
-          isSystem: false,
-          isDefault: input.isDefault,
+          organization_id: ctx.organization.id,
+          is_system: false,
+          is_default: input.isDefault,
         })
         .returning();
 
@@ -205,12 +198,18 @@ export const roleRouter = createTRPCRouter({
       const memberCountResult = await ctx.db
         .select({ count: count() })
         .from(memberships)
-        .where(eq(memberships.roleId, input.roleId));
+        .where(eq(memberships.role_id, input.roleId));
 
       const memberCount = memberCountResult[0]?.count ?? 0;
 
       return {
-        ...role,
+        id: role.id,
+        name: role.name,
+        organizationId: role.organization_id,
+        isSystem: role.is_system,
+        isDefault: role.is_default,
+        createdAt: role.created_at,
+        updatedAt: role.updated_at,
         memberCount,
         permissions: role.rolePermissions.map((rp) => ({
           id: rp.permission.id,
@@ -235,10 +234,19 @@ export const roleRouter = createTRPCRouter({
    * Get role templates available for creation
    */
   getTemplates: organizationManageProcedure.query(() => {
-    return Object.entries(ROLE_TEMPLATES).map(([key, template]) => ({
-      key,
-      ...template,
-    }));
+    return Object.entries(ROLE_TEMPLATES).map(([key, template]) => {
+      const t = template as {
+        name: string;
+        description: string | null;
+        permissions: string[];
+      };
+      return {
+        key,
+        name: t.name,
+        description: t.description,
+        permissions: t.permissions,
+      };
+    });
   }),
 
   /**
@@ -266,7 +274,7 @@ export const roleRouter = createTRPCRouter({
 
       // Get the current user membership with user and role details
       const currentMembership = await ctx.db.query.memberships.findFirst({
-        where: eq(memberships.userId, input.userId),
+        where: eq(memberships.user_id, input.userId),
         with: {
           user: true,
           role: true,
@@ -304,9 +312,9 @@ export const roleRouter = createTRPCRouter({
       // Convert Drizzle result to validation interface
       const validationMembership = {
         id: currentMembership.id,
-        userId: currentMembership.userId,
-        organizationId: currentMembership.organizationId,
-        roleId: currentMembership.roleId,
+        userId: currentMembership.user_id,
+        organizationId: currentMembership.organization_id,
+        roleId: currentMembership.role_id,
         user: {
           id: currentMembership.user.id,
           name: currentMembership.user.name,
@@ -315,17 +323,17 @@ export const roleRouter = createTRPCRouter({
         role: {
           id: currentMembership.role.id,
           name: currentMembership.role.name,
-          organizationId: currentMembership.role.organizationId,
-          isSystem: currentMembership.role.isSystem,
-          isDefault: currentMembership.role.isDefault,
+          organizationId: currentMembership.role.organization_id,
+          isSystem: currentMembership.role.is_system,
+          isDefault: currentMembership.role.is_default,
         },
       };
 
       const validationAllMemberships = allMemberships.map((m) => ({
         id: m.id,
-        userId: m.userId,
-        organizationId: m.organizationId,
-        roleId: m.roleId,
+        userId: m.user_id,
+        organizationId: m.organization_id,
+        roleId: m.role_id,
         user: {
           id: m.user.id,
           name: m.user.name,
@@ -334,18 +342,18 @@ export const roleRouter = createTRPCRouter({
         role: {
           id: m.role.id,
           name: m.role.name,
-          organizationId: m.role.organizationId,
-          isSystem: m.role.isSystem,
-          isDefault: m.role.isDefault,
+          organizationId: m.role.organization_id,
+          isSystem: m.role.is_system,
+          isDefault: m.role.is_default,
         },
       }));
 
       const validationRole = {
         id: role.id,
         name: role.name,
-        organizationId: role.organizationId,
-        isSystem: role.isSystem,
-        isDefault: role.isDefault,
+        organizationId: role.organization_id,
+        isSystem: role.is_system,
+        isDefault: role.is_default,
       };
 
       // Validate the role assignment using pure functions
@@ -367,8 +375,8 @@ export const roleRouter = createTRPCRouter({
       // Update the user's membership
       const updatedMemberships = await ctx.db
         .update(memberships)
-        .set({ roleId: input.roleId })
-        .where(eq(memberships.userId, input.userId))
+        .set({ role_id: input.roleId })
+        .where(eq(memberships.user_id, input.userId))
         .returning();
 
       if (updatedMemberships.length === 0) {

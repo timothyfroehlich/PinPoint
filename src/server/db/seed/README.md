@@ -32,12 +32,13 @@ scripts/seed/
 ├── index.ts                     # Main seed orchestration
 └── shared/
     ├── auth-users.ts            # User accounts and authentication setup
-    ├── infrastructure.ts        # Core data (roles, statuses, priorities)  
+    ├── infrastructure.ts        # Core data (roles, statuses, priorities)
     ├── sample-data.ts           # Organizations, locations, machines, issues
     └── types.ts                 # Type definitions for seed operations
 ```
 
 **Generated Files** (DO NOT EDIT):
+
 ```
 supabase/tests/constants.sql     # SQL constants from SEED_TEST_IDS
 ```
@@ -49,6 +50,7 @@ supabase/tests/constants.sql     # SQL constants from SEED_TEST_IDS
 ### **Two-Tier System**
 
 **Minimal Seed** (Foundation - Always Loaded):
+
 - 2 organizations for security boundary testing
 - ~8 users across roles (admin, members, guests)
 - ~10 machines (different games, statuses, locations)
@@ -56,6 +58,7 @@ supabase/tests/constants.sql     # SQL constants from SEED_TEST_IDS
 - Complete infrastructure (roles, statuses, priorities)
 
 **Full Seed** (Additive Enhancement):
+
 - Minimal seed (100% preserved)
 - +50 additional machines for variety
 - +180 additional issues for rich scenarios
@@ -67,22 +70,23 @@ All seed data uses hardcoded, human-readable IDs from [`SEED_TEST_IDS`](../../sr
 
 ```typescript
 // Organizations
-"test-org-pinpoint"      // Primary organization (Austin Pinball) 
-"test-org-competitor"    // Competitor organization
+"test-org-pinpoint"; // Primary organization (Austin Pinball)
+"test-org-competitor"; // Competitor organization
 
-// Users  
-"test-user-tim"          // Admin user
-"test-user-harry"        // Member user
-"test-user-sarah"        // Member user
-"test-user-guest"        // Guest user
+// Users
+"test-user-tim"; // Admin user
+"test-user-harry"; // Member user
+"test-user-sarah"; // Member user
+"test-user-guest"; // Guest user
 
 // Machines
-"machine-mm-001"         // Medieval Madness
-"machine-af-002"         // Attack from Mars
-"machine-cc-003"         // Cactus Canyon
+"machine-mm-001"; // Medieval Madness
+"machine-af-002"; // Attack from Mars
+"machine-cc-003"; // Cactus Canyon
 ```
 
 **Benefits**:
+
 - 🎯 Easy debugging: "machine-mm-001 failing" vs random UUID
 - 🔗 Stable relationships: Foreign keys never break
 - ⚡ Fast execution: No runtime ID generation
@@ -100,7 +104,7 @@ npm run seed:minimal
 # Equivalent: tsx scripts/seed/index.ts --minimal
 
 # Load full seed data (for demos, manual testing)
-npm run seed:full  
+npm run seed:full
 # Equivalent: tsx scripts/seed/index.ts --full
 
 # Reset database and reload minimal
@@ -130,7 +134,7 @@ npm run seed:minimal          # Start with foundation
 npm run test                  # Run unit tests (use MOCK_PATTERNS)
 npm run test:integration      # Run integration tests (use seeded data)
 
-# Demo preparation  
+# Demo preparation
 npm run seed:full            # Load rich data for demos
 npm run dev                  # Start development server
 
@@ -149,12 +153,13 @@ Primary entry point that coordinates all seed operations:
 ```typescript
 // Usage patterns
 tsx scripts/seed/index.ts --minimal    # Load minimal seed
-tsx scripts/seed/index.ts --full       # Load full seed  
+tsx scripts/seed/index.ts --full       # Load full seed
 tsx scripts/seed/index.ts --reset      # Reset + minimal
 tsx scripts/seed/index.ts --validate   # Validate consistency
 ```
 
 **Key Functions**:
+
 - Database connection management
 - Transaction handling for atomic operations
 - Progress reporting and error handling
@@ -177,7 +182,7 @@ export const ISSUE_STATUSES = [
 export const PRIORITY_LEVELS = [
   { id: "priority-low", name: "Low", level: 1 },
   { id: "priority-medium", name: "Medium", level: 2 },
-  { id: "priority-high", name: "High", level: 3 }, 
+  { id: "priority-high", name: "High", level: 3 },
   { id: "priority-critical", name: "Critical", level: 4 },
 ];
 
@@ -203,13 +208,13 @@ export const SEED_USERS = [
     organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
     metadata: {
       firstName: "Tim",
-      lastName: "Froehlich", 
+      lastName: "Froehlich",
       permissions: ["*"], // Full access
-    }
+    },
   },
   {
     id: SEED_TEST_IDS.USERS.MEMBER1,
-    email: "harry@austinpinball.org", 
+    email: "harry@austinpinball.org",
     password: "member123",
     role: "member",
     organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
@@ -219,6 +224,7 @@ export const SEED_USERS = [
 ```
 
 **Features**:
+
 - Supabase auth.users entries with proper metadata
 - Organization assignments via app_metadata
 - Role-based permission sets
@@ -237,7 +243,7 @@ export const SAMPLE_ORGANIZATIONS = [
     settings: { theme: "pinball", timezone: "America/Chicago" },
   },
   {
-    id: SEED_TEST_IDS.ORGANIZATIONS.competitor,  
+    id: SEED_TEST_IDS.ORGANIZATIONS.competitor,
     name: "Competitor Arcade",
     description: "Local arcade competitor for testing",
     settings: { theme: "arcade", timezone: "America/Chicago" },
@@ -259,7 +265,7 @@ export const SAMPLE_MACHINES = [
 
 export const SAMPLE_ISSUES = [
   {
-    id: "issue-mm-flipper-001", 
+    id: "issue-mm-flipper-001",
     title: "Right flipper sticking intermittently",
     description: "Right flipper occasionally sticks in up position",
     priority: "medium",
@@ -308,15 +314,15 @@ Seed scripts **ONLY** run in development/test environments:
 
 ```typescript
 // Automatic environment validation
-const ALLOWED_ENVIRONMENTS = ['development', 'test', 'local'];
+const ALLOWED_ENVIRONMENTS = ["development", "test", "local"];
 
 if (!ALLOWED_ENVIRONMENTS.includes(process.env.NODE_ENV)) {
-  throw new Error('Seed scripts only allowed in development/test environments');
+  throw new Error("Seed scripts only allowed in development/test environments");
 }
 
 // URL validation prevents production accidents
-if (databaseUrl.includes('production') || databaseUrl.includes('prod')) {
-  throw new Error('Cannot run seed scripts against production database');
+if (databaseUrl.includes("production") || databaseUrl.includes("prod")) {
+  throw new Error("Cannot run seed scripts against production database");
 }
 ```
 
@@ -337,16 +343,22 @@ Scripts coordinate with testing infrastructure for memory safety:
 
 ```typescript
 // Integration with worker-scoped PGlite
-export async function seedTestDatabase(db: PGliteDatabase, level: 'minimal' | 'full') {
+export async function seedTestDatabase(
+  db: PGliteDatabase,
+  level: "minimal" | "full",
+) {
   // Uses same SEED_TEST_IDS constants
   // Memory-efficient seeding for test databases
   const results = await seedInfrastructure(db);
   const users = await seedUsers(db);
   const sampleData = await seedSampleData(db, level);
-  
+
   return {
-    organizations: [SEED_TEST_IDS.ORGANIZATIONS.primary, SEED_TEST_IDS.ORGANIZATIONS.competitor],
-    users: users.map(u => u.id),
+    organizations: [
+      SEED_TEST_IDS.ORGANIZATIONS.primary,
+      SEED_TEST_IDS.ORGANIZATIONS.competitor,
+    ],
+    users: users.map((u) => u.id),
     machines: sampleData.machines,
     issues: sampleData.issues,
   };
@@ -360,14 +372,15 @@ TypeScript SEED_TEST_IDS → SQL constants for pgTAP tests:
 ```typescript
 // scripts/generate-sql-constants.ts
 export function generateSQLConstants() {
-  const sqlFunctions = Object.entries(SEED_TEST_IDS.ORGANIZATIONS)
-    .map(([key, value]) => `
+  const sqlFunctions = Object.entries(SEED_TEST_IDS.ORGANIZATIONS).map(
+    ([key, value]) => `
 CREATE OR REPLACE FUNCTION test_org_${key}() 
-RETURNS TEXT AS $$ SELECT '${value}'::TEXT $$ LANGUAGE SQL IMMUTABLE;`);
-    
+RETURNS TEXT AS $$ SELECT '${value}'::TEXT $$ LANGUAGE SQL IMMUTABLE;`,
+  );
+
   return {
-    filename: 'supabase/tests/constants.sql',
-    content: sqlFunctions.join('\n'),
+    filename: "supabase/tests/constants.sql",
+    content: sqlFunctions.join("\n"),
   };
 }
 ```
@@ -396,23 +409,23 @@ npm run validate:test-constants
 export async function validateSeedHealth(db: Database) {
   const checks = [
     {
-      name: 'Organizations exist',
-      query: 'SELECT COUNT(*) FROM organizations',
+      name: "Organizations exist",
+      query: "SELECT COUNT(*) FROM organizations",
       expected: 2, // primary + competitor
     },
     {
-      name: 'Users have proper organization assignments', 
+      name: "Users have proper organization assignments",
       query: `SELECT COUNT(*) FROM auth.users 
               WHERE (raw_app_meta_data->>'organizationId') IS NOT NULL`,
       expected: 8,
     },
     {
-      name: 'Machines belong to organizations',
-      query: 'SELECT COUNT(*) FROM machines WHERE organization_id IS NOT NULL',
+      name: "Machines belong to organizations",
+      query: "SELECT COUNT(*) FROM machines WHERE organization_id IS NOT NULL",
       expected: 10, // minimal seed machines
     },
   ];
-  
+
   return await runHealthChecks(checks);
 }
 ```
@@ -448,12 +461,14 @@ npm run seed:minimal --step
 ### **Common Issues & Solutions**
 
 **Issue**: "Organization already exists" error
+
 ```bash
 # Solution: Reset database first
 npm run seed:reset
 ```
 
-**Issue**: Foreign key constraint violations  
+**Issue**: Foreign key constraint violations
+
 ```bash
 # Solution: Check SEED_TEST_IDS consistency
 npm run validate:test-constants
@@ -461,6 +476,7 @@ npm run generate:sql-constants  # Regenerate if needed
 ```
 
 **Issue**: Memory issues during testing
+
 ```bash
 # Solution: Verify worker-scoped patterns
 rg "createSeededTestDatabase" src/test/  # Should be zero results
@@ -468,6 +484,7 @@ rg "withIsolatedTest" src/test/          # Should be used everywhere
 ```
 
 **Issue**: Inconsistent test data across environments
+
 ```bash
 # Solution: Verify SEED_TEST_IDS usage
 npm run validate:seed-data
@@ -487,7 +504,7 @@ For specialized scenarios, extend the base seed:
 export async function seedSecurityScenario(db: Database) {
   // Build on minimal seed foundation
   await runMinimalSeed(db);
-  
+
   // Add specific security test data
   await db.insert(issues).values({
     id: "issue-security-test-001",
@@ -496,7 +513,7 @@ export async function seedSecurityScenario(db: Database) {
     organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
     machineId: "machine-mm-001", // Reference existing machine
   });
-  
+
   return { securityIssue: "issue-security-test-001" };
 }
 
@@ -510,14 +527,14 @@ npm run tsx scripts/seed/custom/security-testing.ts
 // Different seed levels per environment
 export function getSeedConfig(): SeedConfig {
   switch (process.env.NODE_ENV) {
-    case 'test':
-      return { minimal: true, full: false };  // Fast testing
-    case 'development':
-      return { minimal: false, full: true };  // Rich dev data
-    case 'staging':
-      return { minimal: true, full: false };  // Consistent staging
+    case "test":
+      return { minimal: true, full: false }; // Fast testing
+    case "development":
+      return { minimal: false, full: true }; // Rich dev data
+    case "staging":
+      return { minimal: true, full: false }; // Consistent staging
     default:
-      throw new Error('Seed not allowed in this environment');
+      throw new Error("Seed not allowed in this environment");
   }
 }
 ```
@@ -529,14 +546,14 @@ export function getSeedConfig(): SeedConfig {
 export async function seedLargeDataset(db: Database) {
   const BATCH_SIZE = 100;
   const totalMachines = 1000;
-  
+
   for (let i = 0; i < totalMachines; i += BATCH_SIZE) {
     const batch = Array.from({ length: BATCH_SIZE }, (_, idx) => ({
       id: `machine-perf-${i + idx + 1}`,
       name: `Performance Test Machine ${i + idx + 1}`,
       organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
     }));
-    
+
     await db.insert(machines).values(batch);
     console.log(`Seeded batch ${i + 1}-${i + BATCH_SIZE}`);
   }
@@ -548,16 +565,19 @@ export async function seedLargeDataset(db: Database) {
 ## 📚 Related Documentation
 
 **Core Architecture**:
+
 - [Seed Data Architecture](../../docs/testing/seed-data-architecture.md) - Complete system overview
 - [SEED_TEST_IDS Constants](./../../src/test/constants/seed-test-ids.ts) - Central ID definitions
 - [Testing Patterns](../../docs/quick-reference/testing-patterns.md) - Usage examples
 
 **Testing Integration**:
+
 - [Test Database Guide](../../docs/testing/test-database.md) - Memory-safe PGlite patterns
 - [Integration Testing](../../docs/testing/archetype-integration-testing.md) - Full-stack with seed data
 - [Security Testing](../../docs/testing/archetype-security-testing.md) - Cross-org validation
 
 **Technical Implementation**:
+
 - [Database Setup Scripts](../setup-rls.ts) - RLS configuration
 - [pgTAP Testing](../../docs/testing/pgtap-rls-testing.md) - SQL constants usage
 
@@ -566,24 +586,28 @@ export async function seedLargeDataset(db: Database) {
 ## ✅ Success Checklist
 
 **Proper Setup**:
+
 - [ ] `npm run seed:minimal` completes without errors
 - [ ] All SEED_TEST_IDS constants are used consistently
 - [ ] Database contains expected record counts
 - [ ] Generated SQL constants are up-to-date
 
 **Testing Integration**:
+
 - [ ] Integration tests use `getSeededTestData()` function
 - [ ] Security tests validate both organizations
 - [ ] pgTAP tests use generated SQL constants
 - [ ] Memory-safe patterns enforced throughout
 
 **Development Workflow**:
+
 - [ ] Seed operations are fast and reliable
 - [ ] Debugging is straightforward with readable IDs
 - [ ] Demo environments have rich, realistic data
 - [ ] Health checks validate data consistency
 
 **Quality Assurance**:
+
 - [ ] No hardcoded test IDs outside SEED_TEST_IDS
 - [ ] All environments use consistent seed data
 - [ ] Foreign key relationships are stable

@@ -49,10 +49,10 @@ export const machineCoreRouter = createTRPCRouter({
         .values({
           id: machineId,
           name: input.name ?? model.name,
-          modelId: input.modelId,
-          locationId: input.locationId,
-          qrCodeId: qrCodeId,
-          organizationId: ctx.organizationId,
+          model_id: input.modelId,
+          location_id: input.locationId,
+          qr_code_id: qrCodeId,
+          organization_id: ctx.organizationId,
         })
         .returning();
 
@@ -65,10 +65,10 @@ export const machineCoreRouter = createTRPCRouter({
         .select({
           id: machines.id,
           name: machines.name,
-          modelId: machines.modelId,
-          locationId: machines.locationId,
-          organizationId: machines.organizationId,
-          ownerId: machines.ownerId,
+          modelId: machines.model_id,
+          locationId: machines.location_id,
+          organizationId: machines.organization_id,
+          ownerId: machines.owner_id,
           qrCodeId: machines.qrCodeId,
           qrCodeUrl: machines.qrCodeUrl,
           qrCodeGeneratedAt: machines.qrCodeGeneratedAt,
@@ -92,7 +92,7 @@ export const machineCoreRouter = createTRPCRouter({
             isCustom: models.isCustom,
             machinesCount: sql<number>`(
               SELECT COUNT(*) FROM ${machines} 
-              WHERE ${machines.modelId} = ${models.id}
+              WHERE ${machines.model_id} = ${models.id}
             )`,
           },
           location: locations,
@@ -103,9 +103,9 @@ export const machineCoreRouter = createTRPCRouter({
           },
         })
         .from(machines)
-        .innerJoin(models, eq(machines.modelId, models.id))
-        .innerJoin(locations, eq(machines.locationId, locations.id))
-        .leftJoin(users, eq(machines.ownerId, users.id))
+        .innerJoin(models, eq(machines.model_id, models.id))
+        .innerJoin(locations, eq(machines.location_id, locations.id))
+        .leftJoin(users, eq(machines.owner_id, users.id))
         .where(eq(machines.id, machine.id))
         .limit(1);
 
@@ -141,10 +141,10 @@ export const machineCoreRouter = createTRPCRouter({
       .select({
         id: machines.id,
         name: machines.name,
-        modelId: machines.modelId,
-        locationId: machines.locationId,
-        organizationId: machines.organizationId,
-        ownerId: machines.ownerId,
+        modelId: machines.model_id,
+        locationId: machines.location_id,
+        organizationId: machines.organization_id,
+        ownerId: machines.owner_id,
         qrCodeId: machines.qrCodeId,
         qrCodeUrl: machines.qrCodeUrl,
         qrCodeGeneratedAt: machines.qrCodeGeneratedAt,
@@ -161,9 +161,9 @@ export const machineCoreRouter = createTRPCRouter({
         },
       })
       .from(machines)
-      .innerJoin(models, eq(machines.modelId, models.id))
-      .innerJoin(locations, eq(machines.locationId, locations.id))
-      .leftJoin(users, eq(machines.ownerId, users.id))
+      .innerJoin(models, eq(machines.model_id, models.id))
+      .innerJoin(locations, eq(machines.location_id, locations.id))
+      .leftJoin(users, eq(machines.owner_id, users.id))
       .orderBy(asc(models.name));
 
     return machinesWithRelations;
@@ -190,7 +190,7 @@ export const machineCoreRouter = createTRPCRouter({
         },
       })
       .from(machines)
-      .innerJoin(models, eq(machines.modelId, models.id))
+      .innerJoin(models, eq(machines.model_id, models.id))
       .orderBy(asc(models.name));
 
     return machinesForIssues;
@@ -203,10 +203,10 @@ export const machineCoreRouter = createTRPCRouter({
         .select({
           id: machines.id,
           name: machines.name,
-          modelId: machines.modelId,
-          locationId: machines.locationId,
-          organizationId: machines.organizationId,
-          ownerId: machines.ownerId,
+          modelId: machines.model_id,
+          locationId: machines.location_id,
+          organizationId: machines.organization_id,
+          ownerId: machines.owner_id,
           qrCodeId: machines.qrCodeId,
           qrCodeUrl: machines.qrCodeUrl,
           qrCodeGeneratedAt: machines.qrCodeGeneratedAt,
@@ -230,7 +230,7 @@ export const machineCoreRouter = createTRPCRouter({
             isCustom: models.isCustom,
             machinesCount: sql<number>`(
               SELECT COUNT(*) FROM ${machines} 
-              WHERE ${machines.modelId} = ${models.id}
+              WHERE ${machines.model_id} = ${models.id}
             )`,
           },
           location: locations,
@@ -241,9 +241,9 @@ export const machineCoreRouter = createTRPCRouter({
           },
         })
         .from(machines)
-        .innerJoin(models, eq(machines.modelId, models.id))
-        .innerJoin(locations, eq(machines.locationId, locations.id))
-        .leftJoin(users, eq(machines.ownerId, users.id))
+        .innerJoin(models, eq(machines.model_id, models.id))
+        .innerJoin(locations, eq(machines.location_id, locations.id))
+        .leftJoin(users, eq(machines.owner_id, users.id))
         .where(eq(machines.id, input.id))
         .limit(1);
 
@@ -312,12 +312,12 @@ export const machineCoreRouter = createTRPCRouter({
       // Prepare update data
       const updateData: {
         name?: string;
-        modelId?: string;
-        locationId?: string;
+        model_id?: string;
+        location_id?: string;
       } = {};
       if (input.name) updateData.name = input.name;
-      if (input.modelId) updateData.modelId = input.modelId;
-      if (input.locationId) updateData.locationId = input.locationId;
+      if (input.modelId) updateData.model_id = input.modelId;
+      if (input.locationId) updateData.location_id = input.locationId;
 
       // Update machine (RLS handles org scoping)
       const [updatedMachine] = await ctx.db
@@ -338,10 +338,10 @@ export const machineCoreRouter = createTRPCRouter({
         .select({
           id: machines.id,
           name: machines.name,
-          modelId: machines.modelId,
-          locationId: machines.locationId,
-          organizationId: machines.organizationId,
-          ownerId: machines.ownerId,
+          modelId: machines.model_id,
+          locationId: machines.location_id,
+          organizationId: machines.organization_id,
+          ownerId: machines.owner_id,
           qrCodeId: machines.qrCodeId,
           qrCodeUrl: machines.qrCodeUrl,
           qrCodeGeneratedAt: machines.qrCodeGeneratedAt,
@@ -365,7 +365,7 @@ export const machineCoreRouter = createTRPCRouter({
             isCustom: models.isCustom,
             machinesCount: sql<number>`(
               SELECT COUNT(*) FROM ${machines} 
-              WHERE ${machines.modelId} = ${models.id}
+              WHERE ${machines.model_id} = ${models.id}
             )`,
           },
           location: locations,
@@ -376,9 +376,9 @@ export const machineCoreRouter = createTRPCRouter({
           },
         })
         .from(machines)
-        .innerJoin(models, eq(machines.modelId, models.id))
-        .innerJoin(locations, eq(machines.locationId, locations.id))
-        .leftJoin(users, eq(machines.ownerId, users.id))
+        .innerJoin(models, eq(machines.model_id, models.id))
+        .innerJoin(locations, eq(machines.location_id, locations.id))
+        .leftJoin(users, eq(machines.owner_id, users.id))
         .where(eq(machines.id, input.id))
         .limit(1);
 

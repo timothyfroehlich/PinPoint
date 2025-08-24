@@ -59,10 +59,10 @@ export const issueAttachmentRouter = createTRPCRouter({
         .values({
           id: generatePrefixedId("attachment"),
           url: input.url,
-          fileName: input.fileName,
-          fileType: input.fileType,
-          issueId: input.issueId,
-          organizationId: ctx.organization.id,
+          file_name: input.fileName,
+          file_type: input.fileType,
+          issue_id: input.issueId,
+          organization_id: ctx.organization.id,
         })
         .returning();
 

@@ -2,26 +2,26 @@
 
 /**
  * SQL Constants Generator
- * 
+ *
  * Generates SQL constants from TypeScript SEED_TEST_IDS for pgTAP test consistency.
- * 
+ *
  * Usage: tsx scripts/generate-sql-constants.ts
- * 
+ *
  * Generates: supabase/tests/constants.sql
- * 
+ *
  * Purpose:
  * - Ensures pgTAP tests use same IDs as TypeScript tests
  * - Single source of truth for test data constants
  * - Cross-language consistency (TypeScript ↔ SQL)
  */
 
-import { writeFileSync } from 'fs';
-import { join } from 'path';
-import { SEED_TEST_IDS } from '../src/test/constants/seed-test-ids';
+import { writeFileSync } from "fs";
+import { join } from "path";
+import { SEED_TEST_IDS } from "../src/server/db/seed/constants";
 
 const generateSQLConstants = () => {
   const timestamp = new Date().toISOString();
-  
+
   const header = `-- DO NOT EDIT: Generated from src/test/constants/seed-test-ids.ts
 -- Generated at: ${timestamp}
 --
@@ -175,39 +175,40 @@ RETURNS TEXT AS $$ SELECT test_id('status', suffix) $$ LANGUAGE SQL;
 -- ID Generators: test_id(), test_issue_id(), test_machine_id(), etc.
 `;
 
-  const content = header + 
-                  organizationFunctions + 
-                  userFunctions + 
-                  emailFunctions + 
-                  nameFunctions + 
-                  helperFunctions + 
-                  testIdFunctions + 
-                  footer;
+  const content =
+    header +
+    organizationFunctions +
+    userFunctions +
+    emailFunctions +
+    nameFunctions +
+    helperFunctions +
+    testIdFunctions +
+    footer;
 
   return content;
 };
 
 const main = () => {
-  console.log('🔧 Generating SQL constants from TypeScript SEED_TEST_IDS...');
-  
+  console.log("🔧 Generating SQL constants from TypeScript SEED_TEST_IDS...");
+
   const sqlContent = generateSQLConstants();
-  const outputPath = join(process.cwd(), 'supabase', 'tests', 'constants.sql');
-  
+  const outputPath = join(process.cwd(), "supabase", "tests", "constants.sql");
+
   try {
-    writeFileSync(outputPath, sqlContent, 'utf8');
-    console.log('✅ Generated SQL constants successfully!');
+    writeFileSync(outputPath, sqlContent, "utf8");
+    console.log("✅ Generated SQL constants successfully!");
     console.log(`📄 File: ${outputPath}`);
-    console.log('');
-    console.log('Usage in pgTAP tests:');
-    console.log('  \\i constants.sql');
-    console.log('  SELECT set_primary_org_context();');
-    console.log('  SELECT results_eq(');
-    console.log('    \'SELECT organization_id FROM issues LIMIT 1\',');
-    console.log('    $$VALUES (test_org_primary())$$,');
-    console.log('    \'Issue belongs to primary org\'');
-    console.log('  );');
+    console.log("");
+    console.log("Usage in pgTAP tests:");
+    console.log("  \\i constants.sql");
+    console.log("  SELECT set_primary_org_context();");
+    console.log("  SELECT results_eq(");
+    console.log("    'SELECT organization_id FROM issues LIMIT 1',");
+    console.log("    $$VALUES (test_org_primary())$$,");
+    console.log("    'Issue belongs to primary org'");
+    console.log("  );");
   } catch (error) {
-    console.error('❌ Failed to generate SQL constants:', error);
+    console.error("❌ Failed to generate SQL constants:", error);
     process.exit(1);
   }
 };

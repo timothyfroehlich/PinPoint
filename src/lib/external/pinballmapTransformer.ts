@@ -260,7 +260,7 @@ function isValidUrl(urlString: string): boolean {
 
 /**
  * Extract machine creation data for database insertion
- * Pure function that prepares data for Prisma create operations
+ * Pure function that prepares data for Drizzle create operations
  */
 export function prepareMachineCreateData(
   modelId: string,

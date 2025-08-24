@@ -1,66 +1,73 @@
-# Final Migration Patterns: Complete Prisma Removal
+# Drizzle-Only Architecture Patterns
 
-Service layer conversion and infrastructure cleanup workflows for complete Prisma removal.
+Current patterns for PinPoint's 100% Drizzle-only architecture after completed Prisma removal.
 
-## 🎯 Final Migration Phase Context
+## 🎯 Architecture Status
 
-**Phase:** Complete Prisma removal - service layer conversion and infrastructure cleanup  
-**Status:** Router layer 85%+ complete, service layer conversion in progress  
-**Approach:** Direct Drizzle-only implementations, no dual-ORM patterns, complete removal  
-**Context:** Solo development, pre-beta - see [CLAUDE.md → Migration Status](../../CLAUDE.md#🚨-migration-status-final-prisma-removal-phase-🚨)
+**Migration Status**: ✅ **COMPLETE** - Prisma fully removed  
+**Current State**: 100% Drizzle-only architecture achieved  
+**Infrastructure**: Single Drizzle client throughout system  
+**Context**: Modern TypeScript + Drizzle + Supabase SSR stack
 
 ---
 
-## 🔧 Service Layer Conversion Patterns
+## 🔧 Service Layer Architecture
 
-### Service Constructor Updates
+### Standard Service Pattern
 
-**Pattern**: Convert Prisma-based services to Drizzle-only dependency injection
+**Pattern**: All services use Drizzle-only dependency injection
 
-**Before (Dual-ORM):**
-```typescript
-export class CollectionService {
-  constructor(private prisma: PrismaClient, private drizzle: DrizzleClient) {}
-}
-```
-
-**After (Drizzle-only):**
 ```typescript
 export class CollectionService {
   constructor(private db: DrizzleClient) {}
+
+  async getLocationCollections(locationId: string) {
+    return await this.db.query.collections.findMany({
+      where: or(
+        eq(collections.location_id, locationId),
+        and(isNull(collections.location_id), eq(collections.is_manual, false)),
+      ),
+    });
+  }
 }
 ```
 
-### Business Logic Preservation
+### Service Architecture
 
-**Pattern**: Maintain identical functionality while converting data access patterns
+**Current Services** (All Drizzle-only):
 
-**Conversion Priority:**
-- **High**: `roleService.ts`, `permissionService.ts` (security-critical)
-- **Medium**: `collectionService.ts`, `issueActivityService.ts` (business logic)
-- **Low**: `pinballmapService.ts`, `commentCleanupService.ts` (utilities)
+- **Security**: `roleService.ts`, `permissionService.ts`
+- **Core Business**: `collectionService.ts`, `issueActivityService.ts`, `notificationService.ts`
+- **Integration**: `pinballmapService.ts`, `commentCleanupService.ts`, `qrCodeService.ts`
 
 ---
 
-## 🏗️ Infrastructure Cleanup Patterns
+## 🏗️ Infrastructure Architecture
 
-### tRPC Context Simplification
+### tRPC Context Pattern
 
-**Pattern**: Remove dual-ORM from tRPC context, single Drizzle client
+**Pattern**: Single Drizzle client in tRPC context
 
-**Before (Dual-ORM):**
 ```typescript
 export interface TRPCContext {
-  db: PrismaClient;
-  drizzle: DrizzleClient;
+  db: DrizzleClient;
+  session: Session | null;
+  supabase: SupabaseClient;
 }
-```
 
-**After (Drizzle-only):**
-```typescript
-export interface TRPCContext {
-  db: DrizzleClient; // Renamed from drizzle to db
-}
+// Usage in procedures
+export const protectedProcedure = publicProcedure.use(({ ctx, next }) => {
+  if (!ctx.session?.user) {
+    throw new TRPCError({ code: "UNAUTHORIZED" });
+  }
+  return next({
+    ctx: {
+      ...ctx,
+      userId: ctx.session.user.id,
+      organizationId: ctx.session.user.user_metadata?.organizationId,
+    },
+  });
+});
 ```
 
 ---
@@ -81,97 +88,109 @@ export interface TRPCContext {
 
 ---
 
-## 🧪 Test Infrastructure Updates
+## 🧪 Test Infrastructure (Simplified)
 
-### Mock Pattern Conversion
+### Current Test Architecture
 
-**Pattern**: Update test mocks from dual-ORM to Drizzle-only patterns
+**Status**: Minimal baseline system after test infrastructure archive
 
-**Before (Dual-ORM Mocks):**
 ```typescript
-const mockContext = {
-  db: mockPrisma,
-  drizzle: mockDrizzle,
-}
+// Current test pattern (Pure functions only)
+import { describe, it, expect } from "vitest";
+import { validateEmail } from "../inputValidation";
+
+describe("Input Validation", () => {
+  it("should validate email formats correctly", () => {
+    expect(validateEmail("user@domain.com")).toBe(true);
+    expect(validateEmail("invalid")).toBe(false);
+  });
+});
 ```
 
-**After (Drizzle-only Mocks):**
-```typescript
-const mockContext = {
-  db: mockDrizzle, // Single client, renamed
-}
+### Test Commands
+
+```bash
+npm test                    # Unit tests (1 file, 205 tests)
+npm run test:rls           # pgTAP RLS policy tests
+npm run smoke              # Playwright smoke tests
 ```
 
-### Integration Test Memory Safety
-
-**Pattern**: Continue using worker-scoped PGlite to prevent memory blowouts → @docs/quick-reference/testing-patterns.md#pglite
+**Note**: Complex integration testing infrastructure archived to `.archived-tests-2025-08-23/` during system simplification. Focus on velocity and rapid prototyping.
 
 ---
 
-## 🚦 Final Migration Decision Tree
+## 🚦 Current Architecture Decision Tree
 
 ```
-Final Migration Task:
-├── Service conversion? → Use drizzle-migration agent + @docs/migration/supabase-drizzle/quick-reference/prisma-to-drizzle.md
-├── Infrastructure cleanup? → @prisma-removal-tasks/phase-2-infrastructure.md
-├── Test updates? → Use test-architect agent + @docs/quick-reference/testing-patterns.md
-├── Dependency removal? → @prisma-removal-tasks/phase-7-cleanup.md
-└── Complete task plan? → @prisma-removal-tasks/README.md
+Development Task:
+├── New service class? → Use Drizzle-only pattern + @docs/developer-guides/drizzle/current-patterns.md
+├── Database operations? → Use Drizzle queries + @docs/quick-reference/api-security-patterns.md
+├── Auth integration? → Use Supabase SSR + @docs/developer-guides/supabase/auth-patterns.md
+├── Testing needed? → Use minimal patterns + @docs/quick-reference/testing-patterns.md
+└── API endpoint? → Use tRPC with organizationId scoping + @docs/quick-reference/typescript-strictest-patterns.md
 ```
 
 ---
 
-## ⚠️ Final Migration Pitfalls
+## ⚠️ Common Architecture Pitfalls
 
-**Service Conversion Issues:**
+**Service Implementation:**
 
-- ❌ Leaving Prisma client in service constructors
-- ✅ Convert to Drizzle-only dependency injection
-- ❌ Attempting to maintain dual-ORM patterns
-- ✅ Complete removal of all Prisma references
-- ❌ Breaking business logic during conversion
-- ✅ Preserve functionality while modernizing data access
+- ❌ Using multiple database clients in one service
+- ✅ Single Drizzle client dependency injection pattern
+- ❌ Missing organizationId scoping in queries
+- ✅ Always include organization-level Row Level Security scoping
+- ❌ Complex service hierarchies with circular dependencies
+- ✅ Simple service classes with clear single responsibility
 
-**Infrastructure Cleanup:**
+**Database Operations:**
 
-- ❌ Leaving dual clients in tRPC context
-- ✅ Single Drizzle client throughout system
-- ❌ Keeping parallel validation code
-- ✅ Clean removal of comparison/logging infrastructure
+- ❌ Raw SQL without parameterization
+- ✅ Use Drizzle query builder with proper type safety
+- ❌ Missing transaction boundaries for multi-table operations
+- ✅ Use Drizzle transactions for atomic operations
+- ❌ Inconsistent snake_case/camelCase field naming
+- ✅ Follow snake_case database schema, camelCase TypeScript variables
 
-**Test Updates:**
+**Testing Approach:**
 
-- ❌ Keeping Prisma mock patterns in tests
-- ✅ Update all test mocks to Drizzle-only patterns
-- ❌ Breaking integration test memory safety
-- ✅ Maintain worker-scoped PGlite for memory efficiency
-
----
-
-## 📋 Service Conversion Process
-
-**Quick Checklist:** Read service → Convert to Drizzle → Update tests → Validate functionality  
-**Detailed workflow:** @prisma-removal-tasks/phase-1-services.md
+- ❌ Over-engineering test infrastructure during rapid prototyping
+- ✅ Focus on critical paths: security policies, data validation, core business logic
+- ❌ Testing implementation details of rapidly changing UI
+- ✅ Test stable contracts and user-facing behavior
 
 ---
 
-## 🎯 Final Migration Success Indicators
+## 📋 Development Process
 
-**Technical Metrics:**
-
-- TypeScript build passes with zero Prisma references
-- All services use Drizzle-only dependency injection
-- Infrastructure uses single database client
-- All tests pass with updated mocks
-- Manual user flows work correctly
-
-**Completion Metrics:**
-
-- Service layer: 100% converted from Prisma to Drizzle
-- Infrastructure: Single Drizzle client in tRPC context
-- Dependencies: Zero Prisma packages remaining
-- Tests: All mocks updated to Drizzle-only patterns
+**Standard Workflow:** Plan feature → Implement service → Add API route → Update UI → Test critical paths  
+**Security First:** Always include organizationId scoping for multi-tenant data isolation  
+**Type Safety:** Use TypeScript strict mode and Drizzle's type inference
 
 ---
 
-**Complete removal plan**: @prisma-removal-tasks/README.md
+## 🎯 Architecture Quality Indicators
+
+**Technical Health:**
+
+- ✅ TypeScript builds with zero errors
+- ✅ All services use consistent Drizzle-only patterns
+- ✅ Database operations properly scoped by organization
+- ✅ Authentication flows use Supabase SSR patterns
+- ✅ Critical business logic has test coverage
+
+**Architecture Maturity:**
+
+- ✅ Service layer: 100% Drizzle-only with consistent patterns
+- ✅ Infrastructure: Single database client throughout
+- ✅ Dependencies: Modern stack (Next.js, Drizzle, Supabase, Material-UI)
+- ✅ Security: Row Level Security policies enforced
+- ✅ Testing: Strategic coverage for stable, critical functionality
+
+---
+
+**Related Patterns:**
+
+- API Security: `@docs/quick-reference/api-security-patterns.md`
+- TypeScript Patterns: `@docs/quick-reference/typescript-strictest-patterns.md`
+- Testing Strategy: `@docs/quick-reference/testing-patterns.md`

@@ -1,82 +1,67 @@
 /**
- * Temporary type definitions for auth-related Prisma models
- * These provide type safety when Prisma client generation is not available
+ * Type definitions for auth-related Drizzle ORM models
+ * These provide type safety using inferred types from Drizzle schema
  */
 
-export interface PrismaUser {
-  id: string;
-  name: string | null;
-  email: string | null;
-  profilePicture: string | null;
-  createdAt: Date;
-  updatedAt: Date;
+import type { InferSelectModel } from "drizzle-orm";
+import {
+  users,
+  organizations,
+  roles,
+  permissions,
+  memberships,
+} from "~/server/db/schema";
+
+// Base types inferred from Drizzle schema
+export type User = InferSelectModel<typeof users>;
+export type Organization = InferSelectModel<typeof organizations>;
+export type Role = InferSelectModel<typeof roles>;
+export type Permission = InferSelectModel<typeof permissions>;
+export type Membership = InferSelectModel<typeof memberships>;
+
+// Extended types for relationships
+export interface MembershipWithRole extends Membership {
+  role: Role;
 }
 
-export interface PrismaOrganization {
-  id: string;
-  name: string;
-  subdomain: string; // Non-null to match database schema
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface PrismaRole {
-  id: string;
-  name: string;
-  organizationId: string;
-  createdAt: Date;
-  updatedAt: Date;
-  permissions?: PrismaPermission[];
-}
-
-export interface PrismaPermission {
-  id: string;
-  name: string;
-  description: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface PrismaMembership {
-  id: string;
-  userId: string;
-  organizationId: string;
-  roleId: string;
-  createdAt: Date;
-  updatedAt: Date;
-  role: PrismaRole;
-}
-
-export interface PrismaMembershipWithPermissions extends PrismaMembership {
-  role: PrismaRole & {
-    permissions: PrismaPermission[];
+export interface MembershipWithPermissions extends Membership {
+  role: Role & {
+    permissions: Permission[];
   };
 }
 
+// Compatibility aliases for existing code (temporary)
+export type PrismaUser = User;
+export type PrismaOrganization = Organization;
+export type PrismaRole = Role;
+export type PrismaPermission = Permission;
+export type PrismaMembership = Membership;
+export type PrismaMembershipWithPermissions = MembershipWithPermissions;
+
 // Type guard functions to help with type safety
-export function isValidUser(user: unknown): user is PrismaUser {
+export function isValidUser(user: unknown): user is User {
   return (
     typeof user === "object" &&
     user !== null &&
-    typeof (user as PrismaUser).id === "string"
+    typeof (user as User).id === "string"
   );
 }
 
-export function isValidOrganization(org: unknown): org is PrismaOrganization {
+export function isValidOrganization(org: unknown): org is Organization {
   return (
     typeof org === "object" &&
     org !== null &&
-    typeof (org as PrismaOrganization).id === "string"
+    typeof (org as Organization).id === "string"
   );
 }
 
 export function isValidMembership(
   membership: unknown,
-): membership is PrismaMembershipWithPermissions {
+): membership is MembershipWithPermissions {
   return (
     typeof membership === "object" &&
     membership !== null &&
-    typeof (membership as PrismaMembershipWithPermissions).id === "string" &&
-    typeof (membership as PrismaMembershipWithPermissions).role === "object"
+    typeof (membership as MembershipWithPermissions).id === "string" &&
+    typeof (membership as MembershipWithPermissions).role === "object"
   );
 }

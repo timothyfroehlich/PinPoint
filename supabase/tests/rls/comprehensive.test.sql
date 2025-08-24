@@ -15,13 +15,13 @@ SET LOCAL role = 'authenticated';
 SELECT set_primary_org_context();
 SELECT set_jwt_claims_for_test(test_org_primary(), test_user_admin(), 'admin', ARRAY['location:create', 'machine:create', 'issue:create']);
 
-INSERT INTO locations (id, name, address, "organizationId", "createdBy")
+INSERT INTO locations (id, name, address, "organization_id", "created_by")
 VALUES ('test-location-primary', 'Primary Org Location', '123 Primary St', test_org_primary(), test_user_admin());
 
-INSERT INTO machines (id, name, model, "locationId", "organizationId", "createdBy")
+INSERT INTO machines (id, name, model, "location_id", "organization_id", "created_by")
 VALUES ('test-machine-primary', 'Primary Org Machine', 'Test Model', 'test-location-primary', test_org_primary(), test_user_admin());
 
-INSERT INTO issues (id, title, description, "machineId", "organizationId", "createdBy", status, priority)
+INSERT INTO issues (id, title, description, "machine_id", "organization_id", "created_by", status, priority)
 VALUES 
   ('test-issue-primary-rel-1', 'Primary Issue 1', 'Complex relational test', 'test-machine-primary', test_org_primary(), test_user_admin(), 'OPEN', 'HIGH'),
   ('test-issue-primary-rel-2', 'Primary Issue 2', 'Another relational test', 'test-machine-primary', test_org_primary(), test_user_admin(), 'CLOSED', 'MEDIUM');
@@ -30,13 +30,13 @@ VALUES
 SELECT set_competitor_org_context();
 SELECT set_jwt_claims_for_test(test_org_competitor(), 'test-competitor-admin', 'admin', ARRAY['location:create', 'machine:create', 'issue:create']);
 
-INSERT INTO locations (id, name, address, "organizationId", "createdBy")
+INSERT INTO locations (id, name, address, "organization_id", "created_by")
 VALUES ('test-location-competitor', 'Competitor Org Location', '456 Competitor Ave', test_org_competitor(), 'test-competitor-admin');
 
-INSERT INTO machines (id, name, model, "locationId", "organizationId", "createdBy")
+INSERT INTO machines (id, name, model, "location_id", "organization_id", "created_by")
 VALUES ('test-machine-competitor', 'Competitor Org Machine', 'Secret Model', 'test-location-competitor', test_org_competitor(), 'test-competitor-admin');
 
-INSERT INTO issues (id, title, description, "machineId", "organizationId", "createdBy", status, priority)
+INSERT INTO issues (id, title, description, "machine_id", "organization_id", "created_by", status, priority)
 VALUES ('test-issue-competitor-rel', 'Competitor Issue', 'Confidential competitor data', 'test-machine-competitor', test_org_competitor(), 'test-competitor-admin', 'IN_PROGRESS', 'HIGH');
 
 -- === CRITICAL COMPLEX RELATIONAL QUERY TESTS ===
@@ -46,9 +46,9 @@ SET LOCAL role = 'authenticated';
 SELECT set_primary_org_context();
 SELECT results_eq(
   'SELECT COUNT(*)::integer FROM issues i 
-   JOIN machines m ON i."machineId" = m.id 
-   JOIN locations l ON m."locationId" = l.id
-   WHERE l."organizationId" = ' || quote_literal(test_org_competitor()),
+   JOIN machines m ON i."machine_id" = m.id 
+   JOIN locations l ON m."location_id" = l.id
+   WHERE l."organization_id" = ' || quote_literal(test_org_competitor()),
   'VALUES (0)',
   'CRITICAL: Complex JOINs cannot access competitor organization data'
 );
@@ -60,9 +60,9 @@ SELECT results_eq(
   'SELECT COUNT(*)::integer FROM (
      SELECT l.name, COUNT(i.id) as issue_count
      FROM locations l 
-     LEFT JOIN machines m ON l.id = m."locationId"
-     LEFT JOIN issues i ON m.id = i."machineId"
-     WHERE l."organizationId" = ' || quote_literal(test_org_primary()) || '
+     LEFT JOIN machines m ON l.id = m."location_id"
+     LEFT JOIN issues i ON m.id = i."machine_id"
+     WHERE l."organization_id" = ' || quote_literal(test_org_primary()) || '
      GROUP BY l.id, l.name
    ) aggregated',
   'VALUES (0)',
@@ -74,8 +74,8 @@ SET LOCAL role = 'authenticated';
 SELECT set_primary_org_context();
 SELECT results_eq(
   'SELECT COUNT(*)::integer FROM machines 
-   WHERE "locationId" IN (
-     SELECT id FROM locations WHERE "organizationId" = ' || quote_literal(test_org_competitor()) || '
+   WHERE "location_id" IN (
+     SELECT id FROM locations WHERE "organization_id" = ' || quote_literal(test_org_competitor()) || '
    )',
   'VALUES (0)',
   'CRITICAL: Subqueries cannot bypass organizational isolation'
@@ -87,9 +87,9 @@ SELECT set_competitor_org_context();
 SELECT results_eq(
   'SELECT COUNT(*)::integer FROM (
      SELECT i.id, 
-            ROW_NUMBER() OVER (PARTITION BY i."organizationId" ORDER BY i."createdAt") as rn
+            ROW_NUMBER() OVER (PARTITION BY i."organization_id" ORDER BY i."created_at") as rn
      FROM issues i
-     WHERE i."organizationId" = ' || quote_literal(test_org_primary()) || '
+     WHERE i."organization_id" = ' || quote_literal(test_org_primary()) || '
    ) windowed',
   'VALUES (0)',
   'CRITICAL: Window functions cannot access cross-organizational data'
@@ -100,7 +100,7 @@ SET LOCAL role = 'authenticated';
 SELECT set_primary_org_context();
 SELECT results_eq(
   'WITH competitor_issues AS (
-     SELECT * FROM issues WHERE "organizationId" = ' || quote_literal(test_org_competitor()) || '
+     SELECT * FROM issues WHERE "organization_id" = ' || quote_literal(test_org_competitor()) || '
    )
    SELECT COUNT(*)::integer FROM competitor_issues',
   'VALUES (0)',
@@ -112,11 +112,11 @@ SET LOCAL role = 'authenticated';
 SELECT set_primary_org_context();
 SELECT results_eq(
   'SELECT COUNT(*)::integer FROM issues i
-   JOIN machines m ON i."machineId" = m.id
-   JOIN locations l ON m."locationId" = l.id
-   WHERE i."organizationId" = ' || quote_literal(test_org_primary()) || '
-   AND m."organizationId" = ' || quote_literal(test_org_primary()) || '
-   AND l."organizationId" = ' || quote_literal(test_org_primary()),
+   JOIN machines m ON i."machine_id" = m.id
+   JOIN locations l ON m."location_id" = l.id
+   WHERE i."organization_id" = ' || quote_literal(test_org_primary()) || '
+   AND m."organization_id" = ' || quote_literal(test_org_primary()) || '
+   AND l."organization_id" = ' || quote_literal(test_org_primary()),
   'VALUES (2)',
   'Primary org sees own data through complex JOINs'
 );
@@ -127,8 +127,8 @@ SELECT set_competitor_org_context();
 SELECT results_eq(
   'SELECT COUNT(DISTINCT l.id)::integer as location_count
    FROM locations l
-   JOIN machines m ON l.id = m."locationId"
-   WHERE l."organizationId" = ' || quote_literal(test_org_competitor()),
+   JOIN machines m ON l.id = m."location_id"
+   WHERE l."organization_id" = ' || quote_literal(test_org_competitor()),
   'VALUES (1)',
   'Competitor org sees only own locations in aggregations'
 );
@@ -140,8 +140,8 @@ SELECT results_eq(
   'SELECT COUNT(*)::integer FROM issues i
    WHERE EXISTS (
      SELECT 1 FROM machines m 
-     WHERE m.id = i."machineId" 
-     AND m."organizationId" = ' || quote_literal(test_org_competitor()) || '
+     WHERE m.id = i."machine_id" 
+     AND m."organization_id" = ' || quote_literal(test_org_competitor()) || '
    )',
   'VALUES (0)',
   'EXISTS subqueries cannot find cross-organizational relationships'
@@ -153,8 +153,8 @@ SELECT set_competitor_org_context();
 SELECT results_eq(
   'SELECT COUNT(*)::integer FROM machines
    WHERE id NOT IN (
-     SELECT COALESCE("machineId", ''none'') FROM issues 
-     WHERE "organizationId" = ' || quote_literal(test_org_primary()) || '
+     SELECT COALESCE("machine_id", ''none'') FROM issues 
+     WHERE "organization_id" = ' || quote_literal(test_org_primary()) || '
    )',
   'VALUES (1)',
   'NOT IN subqueries maintain organizational isolation'
@@ -165,9 +165,9 @@ SET LOCAL role = 'authenticated';
 SELECT set_primary_org_context();
 SELECT results_eq(
   'SELECT COUNT(*)::integer FROM (
-     SELECT id FROM issues WHERE "organizationId" = ' || quote_literal(test_org_primary()) || '
+     SELECT id FROM issues WHERE "organization_id" = ' || quote_literal(test_org_primary()) || '
      UNION ALL
-     SELECT id FROM issues WHERE "organizationId" = ' || quote_literal(test_org_competitor()) || '
+     SELECT id FROM issues WHERE "organization_id" = ' || quote_literal(test_org_competitor()) || '
    ) combined',
   'VALUES (2)', -- Only sees primary org issues, competitor part returns 0
   'UNION queries cannot access cross-organizational data'
@@ -179,8 +179,8 @@ SELECT results_eq(
 SET LOCAL role = 'anon';
 SELECT results_eq(
   'SELECT COUNT(*)::integer FROM issues i 
-   JOIN machines m ON i."machineId" = m.id 
-   JOIN locations l ON m."locationId" = l.id',
+   JOIN machines m ON i."machine_id" = m.id 
+   JOIN locations l ON m."location_id" = l.id',
   'VALUES (0)',
   'Anonymous users blocked from complex relational queries'
 );
@@ -190,7 +190,7 @@ SET LOCAL role = 'authenticated';
 SELECT set_jwt_claims_for_test('invalid-org-id', 'test-user', 'member', ARRAY['issue:view']);
 SELECT results_eq(
   'SELECT COUNT(*)::integer FROM issues i
-   JOIN machines m ON i."machineId" = m.id',
+   JOIN machines m ON i."machine_id" = m.id',
   'VALUES (0)',
   'Invalid organization context blocks complex queries'
 );
@@ -200,8 +200,8 @@ SET LOCAL role = 'authenticated';
 SELECT set_primary_org_context();
 SELECT results_eq(
   'SELECT COUNT(*)::integer FROM locations l
-   LEFT JOIN machines m ON l.id = m."locationId"
-   WHERE l."organizationId" = ' || quote_literal(test_org_competitor()),
+   LEFT JOIN machines m ON l.id = m."location_id"
+   WHERE l."organization_id" = ' || quote_literal(test_org_competitor()),
   'VALUES (0)',
   'LEFT JOINs cannot access cross-organizational data'
 );
@@ -211,9 +211,9 @@ SET LOCAL role = 'authenticated';
 SELECT set_competitor_org_context();
 SELECT results_eq(
   'SELECT COUNT(*)::integer FROM issues i
-   JOIN machines m ON i."machineId" = m.id
-   WHERE (i."organizationId" = ' || quote_literal(test_org_primary()) || ' 
-          OR m."organizationId" = ' || quote_literal(test_org_primary()) || ')',
+   JOIN machines m ON i."machine_id" = m.id
+   WHERE (i."organization_id" = ' || quote_literal(test_org_primary()) || ' 
+          OR m."organization_id" = ' || quote_literal(test_org_primary()) || ')',
   'VALUES (0)',
   'Complex OR conditions cannot bypass RLS in JOINs'
 );
@@ -225,7 +225,7 @@ SELECT results_eq(
   'SELECT COUNT(*)::integer FROM (
      SELECT i.id,
             CASE 
-              WHEN i."organizationId" = ' || quote_literal(test_org_competitor()) || ' THEN ''competitor''
+              WHEN i."organization_id" = ' || quote_literal(test_org_competitor()) || ' THEN ''competitor''
               ELSE ''primary''
             END as org_type
      FROM issues i
@@ -242,8 +242,8 @@ SET LOCAL role = 'authenticated';
 SELECT set_competitor_org_context();
 SELECT ok(
   (SELECT COUNT(*) FROM issues i
-   JOIN machines m ON i."machineId" = m.id
-   JOIN locations l ON m."locationId" = l.id
+   JOIN machines m ON i."machine_id" = m.id
+   JOIN locations l ON m."location_id" = l.id
    WHERE i.status IN ('OPEN', 'IN_PROGRESS', 'CLOSED')
    AND i.priority IN ('LOW', 'MEDIUM', 'HIGH')) >= 0,
   'Complex multi-condition queries maintain security boundaries'
@@ -254,11 +254,11 @@ SET LOCAL role = 'authenticated';
 SELECT set_primary_org_context();
 SELECT results_eq(
   'SELECT COUNT(*)::integer FROM machines
-   WHERE "locationId" IN (
+   WHERE "location_id" IN (
      SELECT l.id FROM locations l
      WHERE l.id IN (
-       SELECT "locationId" FROM machines
-       WHERE "organizationId" = ' || quote_literal(test_org_competitor()) || '
+       SELECT "location_id" FROM machines
+       WHERE "organization_id" = ' || quote_literal(test_org_competitor()) || '
      )
    )',
   'VALUES (0)',
@@ -270,10 +270,10 @@ SET LOCAL role = 'authenticated';
 SELECT set_competitor_org_context();
 SELECT results_eq(
   'SELECT COUNT(*)::integer FROM issues i
-   WHERE i."machineId" IN (
+   WHERE i."machine_id" IN (
      SELECT m.id FROM machines m
-     JOIN locations l ON m."locationId" = l.id
-     WHERE l."organizationId" = ' || quote_literal(test_org_primary()) || '
+     JOIN locations l ON m."location_id" = l.id
+     WHERE l."organization_id" = ' || quote_literal(test_org_primary()) || '
    )',
   'VALUES (0)',
   'Foreign key relationship queries maintain organizational boundaries'
@@ -284,11 +284,11 @@ SET LOCAL role = 'authenticated';
 SELECT set_primary_org_context();
 SELECT results_eq(
   'SELECT COUNT(*)::integer FROM (
-     SELECT l."organizationId", COUNT(m.id) as machine_count
+     SELECT l."organization_id", COUNT(m.id) as machine_count
      FROM locations l
-     LEFT JOIN machines m ON l.id = m."locationId"
-     WHERE l."organizationId" = ' || quote_literal(test_org_competitor()) || '
-     GROUP BY l."organizationId"
+     LEFT JOIN machines m ON l.id = m."location_id"
+     WHERE l."organization_id" = ' || quote_literal(test_org_competitor()) || '
+     GROUP BY l."organization_id"
      HAVING COUNT(m.id) > 0
    ) grouped',
   'VALUES (0)',
@@ -300,11 +300,11 @@ SET LOCAL role = 'authenticated';
 SELECT set_competitor_org_context();
 SELECT results_eq(
   'SELECT COUNT(*)::integer FROM issues i, machines m, locations l
-   WHERE i."machineId" = m.id
-   AND m."locationId" = l.id
-   AND (i."organizationId" = ' || quote_literal(test_org_primary()) || '
-        OR m."organizationId" = ' || quote_literal(test_org_primary()) || '
-        OR l."organizationId" = ' || quote_literal(test_org_primary()) || ')',
+   WHERE i."machine_id" = m.id
+   AND m."location_id" = l.id
+   AND (i."organization_id" = ' || quote_literal(test_org_primary()) || '
+        OR m."organization_id" = ' || quote_literal(test_org_primary()) || '
+        OR l."organization_id" = ' || quote_literal(test_org_primary()) || ')',
   'VALUES (0)',
   'Multi-table references with OR conditions maintain isolation'
 );

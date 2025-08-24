@@ -1,0 +1,565 @@
+/**
+ * Auth Users Seeding - Unified with Shared Utilities
+ *
+ * Supabase auth user creation with proper metadata.
+ * Uses SeedMapper to eliminate switch statements and standardize patterns.
+ */
+
+// Node modules
+import { createClient, type User } from "@supabase/supabase-js";
+import { nanoid } from "nanoid";
+
+// Internal utilities
+import { createDrizzleClient } from "~/server/db/drizzle";
+import { SEED_TEST_IDS } from "./constants";
+import {
+  SeedLogger,
+  SeedMapper,
+  withErrorContext,
+  createSeedResult,
+  createFailedSeedResult,
+  type SeedTarget,
+  type SeedResult,
+} from "./seed-utilities";
+
+// Schema imports
+import { users, roles, memberships } from "~/server/db/schema";
+import { eq, and } from "drizzle-orm";
+
+const db = createDrizzleClient();
+
+// ============================================================================
+// Types & Interfaces
+// ============================================================================
+
+export interface UserData {
+  name: string;
+  email: string;
+  role: string;
+  bio: string;
+}
+
+interface CreateUserParams {
+  email: string;
+  organization_id: string;
+  role: string;
+  profile: {
+    name: string;
+    bio: string;
+  };
+}
+
+interface BatchProcessResult {
+  successCount: number;
+  createdCount: number;
+  existedCount: number;
+  errorCount: number;
+  errors: string[];
+}
+
+// ============================================================================
+// Standard User Data
+// ============================================================================
+
+/**
+ * Primary organization users - for multi-tenant isolation testing
+ */
+const PRIMARY_ORG_USERS: UserData[] = [
+  {
+    name: "Tim Froehlich",
+    email: "tim.froehlich@example.com",
+    role: "Admin",
+    bio: "Admin user for primary org testing.",
+  },
+  {
+    name: "Harry Williams",
+    email: "harry.williams@example.com",
+    role: "Member",
+    bio: "Member user for primary org testing.",
+  },
+];
+
+/**
+ * Competitor organization users - separate set for isolation testing
+ */
+const COMPETITOR_ORG_USERS: UserData[] = [
+  {
+    name: "Escher Lefkoff",
+    email: "escher.lefkoff@example.com",
+    role: "Member",
+    bio: "Member user for competitor org testing.",
+  },
+];
+
+/**
+ * Combined user set for backwards compatibility
+ * All users from both organizations
+ */
+const STANDARD_USERS: UserData[] = [
+  ...PRIMARY_ORG_USERS,
+  ...COMPETITOR_ORG_USERS,
+];
+
+// ============================================================================
+// User ID Mapping Utilities
+// ============================================================================
+
+/**
+ * Get organization-specific user list for multi-tenant isolation
+ */
+function getUsersForOrganization(organizationId: string): UserData[] {
+  if (organizationId === SEED_TEST_IDS.ORGANIZATIONS.primary) {
+    return PRIMARY_ORG_USERS;
+  } else if (organizationId === SEED_TEST_IDS.ORGANIZATIONS.competitor) {
+    return COMPETITOR_ORG_USERS;
+  } else {
+    // For non-test orgs, use all users for backwards compatibility
+    return STANDARD_USERS;
+  }
+}
+
+/**
+ * Get user ID for email using mapping object instead of switch statement
+ */
+function getUserIdForEmail(email: string): string {
+  const mapping: Record<string, string> = {
+    "tim.froehlich@example.com": SEED_TEST_IDS.USERS.ADMIN,
+    "harry.williams@example.com": SEED_TEST_IDS.USERS.MEMBER1,
+    "escher.lefkoff@example.com": SEED_TEST_IDS.USERS.MEMBER2,
+  };
+
+  return mapping[email] ?? nanoid();
+}
+
+// ============================================================================
+// Supabase Auth Utilities
+// ============================================================================
+
+/**
+ * Create Supabase service role client for admin operations
+ */
+function createServiceRoleClient() {
+  const supabaseUrl = process.env["SUPABASE_URL"];
+  const serviceRoleKey = process.env["SUPABASE_SECRET_KEY"];
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error(
+      "Missing required Supabase environment variables: SUPABASE_URL and SUPABASE_SECRET_KEY",
+    );
+  }
+
+  return createClient(supabaseUrl, serviceRoleKey);
+}
+
+/**
+ * Get existing Supabase auth users by email
+ */
+async function getExistingAuthUsers(): Promise<Map<string, User>> {
+  const supabase = createServiceRoleClient();
+  const { data: userList, error } = await supabase.auth.admin.listUsers();
+
+  if (error) {
+    throw new Error(`Failed to list existing users: ${error.message}`);
+  }
+
+  const userMap = new Map();
+  for (const user of userList.users) {
+    if (user.email) {
+      userMap.set(user.email, user);
+    }
+  }
+
+  return userMap;
+}
+
+/**
+ * Create Supabase auth user using idempotent approach
+ */
+async function upsertSupabaseAuthUser(
+  params: CreateUserParams,
+  existingUsers: Map<string, User>,
+): Promise<{ success: boolean; user_id: string; wasCreated: boolean }> {
+  const supabase = createServiceRoleClient();
+
+  // Get the predetermined static ID for this user
+  const staticUserId = getUserIdForEmail(params.email);
+
+  // Check if user already exists
+  const existingUser = existingUsers.get(params.email);
+  if (existingUser) {
+    return {
+      success: true,
+      user_id: existingUser.id,
+      wasCreated: false,
+    };
+  }
+
+  // Create new user with predetermined static ID
+  const { data, error } = await supabase.auth.admin.createUser({
+    id: staticUserId, // Specify the static ID we want
+    email: params.email,
+    password: "dev-login-123",
+    email_confirm: true,
+    user_metadata: {
+      name: params.profile.name,
+      bio: params.profile.bio,
+      dev_user: true,
+      environment: "development",
+    },
+    app_metadata: {
+      organization_id: params.organization_id,
+      role: params.role,
+      dev_created: true,
+      created_via: "seeding",
+    },
+  });
+
+  if (error || !data.user) {
+    throw new Error(
+      `Failed to create user ${params.email} with ID ${staticUserId}: ${error?.message || "No user data returned"}`,
+    );
+  }
+
+  return {
+    success: true,
+    user_id: data.user.id, // Should now be the static ID we specified
+    wasCreated: true,
+  };
+}
+
+// ============================================================================
+// User Record Validation
+// ============================================================================
+
+/**
+ * Wait for database User record to exist (created by auth trigger)
+ */
+async function waitForUserRecord(
+  user_id: string,
+  email: string,
+): Promise<boolean> {
+  const MAX_ATTEMPTS = 100; // 5 seconds @ 50ms intervals
+  const POLL_INTERVAL = 50;
+
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    try {
+      const existingUser = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.id, user_id))
+        .limit(1);
+
+      if (existingUser.length > 0) {
+        return true;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL));
+    } catch (error) {
+      // Continue trying despite query errors
+    }
+  }
+
+  SeedLogger.error(
+    "AUTH",
+    `Auth trigger failed for ${email} - User record not created`,
+  );
+  return false;
+}
+
+// ============================================================================
+// Batch Processing
+// ============================================================================
+
+/**
+ * Process batch of users with unified error handling
+ */
+async function processBatchUsers(
+  userList: UserData[],
+  organization_id: string,
+): Promise<BatchProcessResult> {
+  let successCount = 0;
+  let createdCount = 0;
+  let existedCount = 0;
+  let errorCount = 0;
+  const errors: string[] = [];
+
+  // Get existing auth users
+  const existingUsers = await getExistingAuthUsers();
+
+  // Get existing database users and memberships
+  const existingDbUsers = await db
+    .select({ id: users.id, email: users.email })
+    .from(users);
+  const dbUsersMap = new Map(existingDbUsers.map((u) => [u.email ?? "", u.id]));
+
+  const existingMemberships = await db
+    .select({ user_id: memberships.user_id })
+    .from(memberships)
+    .where(eq(memberships.organization_id, organization_id));
+  const membershipSet = new Set(existingMemberships.map((m) => m.user_id));
+
+  const membershipsToCreate: {
+    id: string;
+    user_id: string;
+    role_id: string;
+    organization_id: string;
+  }[] = [];
+
+  for (const userData of userList) {
+    try {
+      // Upsert Supabase auth user
+      const authResult = await upsertSupabaseAuthUser(
+        {
+          email: userData.email,
+          organization_id,
+          role: userData.role,
+          profile: {
+            name: userData.name,
+            bio: userData.bio,
+          },
+        },
+        existingUsers,
+      );
+
+      // Track creation vs existing
+      if (authResult.wasCreated) {
+        createdCount++;
+        const userRecordExists = await waitForUserRecord(
+          authResult.user_id,
+          userData.email,
+        );
+
+        if (!userRecordExists) {
+          const error = `Auth trigger failed for ${userData.email}`;
+          errorCount++;
+          errors.push(error);
+          continue;
+        }
+
+        dbUsersMap.set(userData.email, authResult.user_id);
+      } else {
+        existedCount++;
+        if (!dbUsersMap.has(userData.email)) {
+          const userRecordExists = await waitForUserRecord(
+            authResult.user_id,
+            userData.email,
+          );
+          if (!userRecordExists) {
+            const error = `Existing auth user ${userData.email} missing User record`;
+            errorCount++;
+            errors.push(error);
+            continue;
+          }
+          dbUsersMap.set(userData.email, authResult.user_id);
+        }
+      }
+
+      // Check if membership needs to be created
+      if (!membershipSet.has(authResult.user_id)) {
+        const roleResults = await db
+          .select({ id: roles.id })
+          .from(roles)
+          .where(
+            and(
+              eq(roles.name, userData.role),
+              eq(roles.organization_id, organization_id),
+            ),
+          )
+          .limit(1);
+
+        if (roleResults.length > 0 && roleResults[0]) {
+          membershipsToCreate.push({
+            id: SeedMapper.getMembershipId(userData.email, organization_id),
+            user_id: authResult.user_id,
+            organization_id,
+            role_id: roleResults[0].id,
+          });
+          membershipSet.add(authResult.user_id);
+        }
+      }
+
+      successCount++;
+    } catch (error) {
+      errorCount++;
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      errors.push(`Error processing ${userData.email}: ${errorMessage}`);
+    }
+  }
+
+  // Batch create memberships
+  if (membershipsToCreate.length > 0) {
+    try {
+      await db
+        .insert(memberships)
+        .values(membershipsToCreate)
+        .onConflictDoNothing();
+    } catch (error) {
+      errorCount += membershipsToCreate.length;
+      errors.push(
+        `Batch membership creation failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  return { successCount, createdCount, existedCount, errorCount, errors };
+}
+
+// ============================================================================
+// User Management
+// ============================================================================
+
+/**
+ * Delete existing dev users for clean preview environment resets
+ */
+async function deleteExistingDevUsers(userList: UserData[]): Promise<void> {
+  const supabase = createServiceRoleClient();
+
+  for (const userData of userList) {
+    try {
+      const { data: userList, error: listError } =
+        await supabase.auth.admin.listUsers();
+
+      if (listError) continue;
+
+      const existingUser = userList.users.find(
+        (u) => u.email === userData.email,
+      );
+
+      if (existingUser) {
+        // Delete from database first (cascades to memberships)
+        try {
+          await db.delete(users).where(eq(users.id, existingUser.id));
+        } catch (dbError) {
+          // Continue even if database deletion fails
+        }
+
+        // Delete from Supabase auth
+        await supabase.auth.admin.deleteUser(existingUser.id);
+      }
+    } catch (error) {
+      // Continue with other users even if one fails
+    }
+  }
+}
+
+/**
+ * Create users directly in database for PostgreSQL-only mode
+ */
+async function createUsersDirectly(
+  userList: UserData[],
+  organization_id: string,
+): Promise<void> {
+  // Create users directly in the users table
+  const usersToCreate = userList.map((userData) => ({
+    id: getUserIdForEmail(userData.email),
+    email: userData.email,
+    name: userData.name,
+    bio: userData.bio,
+    created_at: new Date(),
+    updated_at: new Date(),
+  }));
+
+  await db.insert(users).values(usersToCreate).onConflictDoNothing();
+
+  // Create memberships
+  const membershipsToCreate: {
+    id: string;
+    user_id: string;
+    organization_id: string;
+    role_id: string;
+  }[] = [];
+
+  for (const userData of userList) {
+    const roleResults = await db
+      .select({ id: roles.id })
+      .from(roles)
+      .where(
+        and(
+          eq(roles.name, userData.role),
+          eq(roles.organization_id, organization_id),
+        ),
+      )
+      .limit(1);
+
+    if (roleResults.length > 0 && roleResults[0]) {
+      membershipsToCreate.push({
+        id: SeedMapper.getMembershipId(userData.email, organization_id),
+        user_id: getUserIdForEmail(userData.email),
+        organization_id,
+        role_id: roleResults[0].id,
+      });
+    }
+  }
+
+  if (membershipsToCreate.length > 0) {
+    await db
+      .insert(memberships)
+      .values(membershipsToCreate)
+      .onConflictDoNothing();
+  }
+}
+
+// ============================================================================
+// Main Export Function
+// ============================================================================
+
+/**
+ * Main auth users seeding function with unified patterns
+ */
+export async function seedAuthUsers(
+  organization_id: string,
+  target: SeedTarget,
+): Promise<SeedResult<UserData[]>> {
+  const startTime = Date.now();
+  const users = getUsersForOrganization(organization_id);
+
+  try {
+    if (target === "local:pg") {
+      // PostgreSQL-only mode
+      await withErrorContext(
+        "AUTH_USERS",
+        "create users directly in database",
+        () => createUsersDirectly(users, organization_id),
+      );
+
+      SeedLogger.success(`Created ${users.length} users directly in database`);
+      return createSeedResult(users, users.length, startTime);
+    }
+
+    // Supabase modes
+    if (target === "preview") {
+      await withErrorContext(
+        "AUTH_USERS",
+        "delete existing dev users for preview reset",
+        () => deleteExistingDevUsers(users),
+      );
+    }
+
+    // Process users in batch
+    const results = await withErrorContext(
+      "AUTH_USERS",
+      "process batch users with Supabase auth",
+      () => processBatchUsers(users, organization_id),
+    );
+
+    if (results.errorCount > 0) {
+      SeedLogger.error(
+        "AUTH",
+        `${results.errorCount} users failed: ${results.errors.join(", ")}`,
+      );
+      return createFailedSeedResult(
+        new Error(`${results.errorCount} auth failures`),
+        startTime,
+      );
+    }
+
+    SeedLogger.success(
+      `Processed ${results.successCount} users (${results.createdCount} created, ${results.existedCount} existed)`,
+    );
+    return createSeedResult(users, results.createdCount, startTime);
+  } catch (error) {
+    SeedLogger.error("AUTH_USERS", error);
+    return createFailedSeedResult(error, startTime);
+  }
+}

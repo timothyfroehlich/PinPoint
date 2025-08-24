@@ -28,7 +28,6 @@ export default tseslint.config(
         // Multiple tsconfig files for different contexts
         project: [
           "./tsconfig.json",
-          "./tsconfig.test-utils.json",
           "./tsconfig.tests.json",
           "./tsconfig.config.json",
         ],
@@ -199,18 +198,16 @@ export default tseslint.config(
       "@typescript-eslint/explicit-function-return-type": "off",
     },
   },
-  {
-    // Override: Test utilities - moderate standards
-    files: convertPatterns.forESLint(INCLUDE_PATTERNS.testUtils),
-    rules: {
-      // Use shared rules configuration
-      ...ESLINT_RULES.testUtils,
-      // Allow process.env for test utilities
-      "no-restricted-properties": "off",
-      // Allow dynamic imports in test utilities (can't use import type)
-      "@typescript-eslint/consistent-type-imports": "off",
-    },
-  },
+  // Override: Test utilities - moderate standards
+  // NOTE: Disabled - test infrastructure archived to .archived-tests-2025-08-23/
+  // {
+  //   files: convertPatterns.forESLint(INCLUDE_PATTERNS.testUtils),
+  //   rules: {
+  //     ...ESLINT_RULES.testUtils,
+  //     "no-restricted-properties": "off",
+  //     "@typescript-eslint/consistent-type-imports": "off",
+  //   },
+  // },
   {
     // Override: Test files - relaxed standards for pragmatic testing
     files: convertPatterns.forESLint(INCLUDE_PATTERNS.tests),

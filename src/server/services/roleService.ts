@@ -60,9 +60,9 @@ export class RoleService {
         .values({
           id: generatePrefixedId("role"),
           name: SYSTEM_ROLES.ADMIN,
-          organizationId: this.organizationId, // Explicit for local dev, redundant in production (triggers override)
-          isSystem: true,
-          isDefault: false,
+          organization_id: this.organizationId, // Explicit for local dev, redundant in production (triggers override)
+          is_system: true,
+          is_default: false,
         })
         .returning();
 
@@ -72,9 +72,9 @@ export class RoleService {
       const [updatedAdminRole] = await this.drizzle
         .update(roles)
         .set({
-          isSystem: true,
-          isDefault: false,
-          updatedAt: new Date(),
+          is_system: true,
+          is_default: false,
+          updated_at: new Date(),
         })
         .where(eq(roles.id, adminRole.id))
         .returning();
@@ -95,14 +95,14 @@ export class RoleService {
     // Clear existing permissions
     await this.drizzle
       .delete(rolePermissions)
-      .where(eq(rolePermissions.roleId, adminRole.id));
+      .where(eq(rolePermissions.role_id, adminRole.id));
 
     // Insert all permissions
     if (allPermissions.length > 0) {
       await this.drizzle.insert(rolePermissions).values(
         allPermissions.map((p) => ({
-          roleId: adminRole.id,
-          permissionId: p.id,
+          role_id: adminRole.id,
+          permission_id: p.id,
         })),
       );
     }
@@ -119,9 +119,9 @@ export class RoleService {
         .values({
           id: generatePrefixedId("role"),
           name: SYSTEM_ROLES.UNAUTHENTICATED,
-          organizationId: this.organizationId, // Explicit for local dev, redundant in production (triggers override)
-          isSystem: true,
-          isDefault: false,
+          organization_id: this.organizationId, // Explicit for local dev, redundant in production (triggers override)
+          is_system: true,
+          is_default: false,
         })
         .returning();
 
@@ -131,9 +131,9 @@ export class RoleService {
       const [updatedUnauthRole] = await this.drizzle
         .update(roles)
         .set({
-          isSystem: true,
-          isDefault: false,
-          updatedAt: new Date(),
+          is_system: true,
+          is_default: false,
+          updated_at: new Date(),
         })
         .where(eq(roles.id, unauthRole.id))
         .returning();
@@ -157,14 +157,14 @@ export class RoleService {
     // Clear existing permissions
     await this.drizzle
       .delete(rolePermissions)
-      .where(eq(rolePermissions.roleId, unauthRole.id));
+      .where(eq(rolePermissions.role_id, unauthRole.id));
 
     // Insert unauthenticated permissions
     if (unauthPermissions.length > 0) {
       await this.drizzle.insert(rolePermissions).values(
         unauthPermissions.map((p) => ({
-          roleId: unauthRole.id,
-          permissionId: p.id,
+          role_id: unauthRole.id,
+          permission_id: p.id,
         })),
       );
     }
@@ -179,7 +179,7 @@ export class RoleService {
    */
   async createTemplateRole(
     templateName: keyof typeof ROLE_TEMPLATES,
-    overrides: Partial<{ name: string; isDefault: boolean }> = {},
+    overrides: Partial<{ name: string; is_default: boolean }> = {},
   ): Promise<Role> {
     const template = ROLE_TEMPLATES[templateName];
     const roleName = overrides.name ?? template.name;
@@ -196,9 +196,9 @@ export class RoleService {
         .values({
           id: generatePrefixedId("role"),
           name: roleName,
-          organizationId: this.organizationId, // Explicit for local dev, redundant in production (triggers override)
-          isSystem: false,
-          isDefault: overrides.isDefault ?? true,
+          organization_id: this.organizationId, // Explicit for local dev, redundant in production (triggers override)
+          is_system: false,
+          is_default: overrides.is_default ?? true,
         })
         .returning();
 
@@ -208,9 +208,9 @@ export class RoleService {
       const [updatedRole] = await this.drizzle
         .update(roles)
         .set({
-          isSystem: false,
-          isDefault: overrides.isDefault ?? true,
-          updatedAt: new Date(),
+          is_system: false,
+          is_default: overrides.is_default ?? true,
+          updated_at: new Date(),
         })
         .where(eq(roles.id, role.id))
         .returning();
@@ -240,14 +240,14 @@ export class RoleService {
     // Clear existing permissions
     await this.drizzle
       .delete(rolePermissions)
-      .where(eq(rolePermissions.roleId, role.id));
+      .where(eq(rolePermissions.role_id, role.id));
 
     // Assign permissions to role
     if (permissionRecords.length > 0) {
       await this.drizzle.insert(rolePermissions).values(
         permissionRecords.map((p) => ({
-          roleId: role.id,
-          permissionId: p.id,
+          role_id: role.id,
+          permission_id: p.id,
         })),
       );
     }
@@ -267,7 +267,7 @@ export class RoleService {
     updates: {
       name?: string;
       permissionIds?: string[];
-      isDefault?: boolean;
+      is_default?: boolean;
     },
   ): Promise<Role> {
     // Get the current role
@@ -290,7 +290,7 @@ export class RoleService {
     }
 
     // Validate system role constraints
-    if (role.isSystem) {
+    if (role.is_system) {
       if (role.name === SYSTEM_ROLES.ADMIN) {
         throw new TRPCError({
           code: "FORBIDDEN",
@@ -299,7 +299,7 @@ export class RoleService {
       }
 
       // Only allow permission updates for Unauthenticated role
-      if (updates.name || updates.isDefault !== undefined) {
+      if (updates.name || updates.is_default !== undefined) {
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "System role properties cannot be changed",
@@ -310,18 +310,18 @@ export class RoleService {
     // Prepare update data
     const updateData: {
       name?: string;
-      isDefault?: boolean;
-      updatedAt: Date;
+      is_default?: boolean;
+      updated_at: Date;
     } = {
-      updatedAt: new Date(),
+      updated_at: new Date(),
     };
 
     if (updates.name) {
       updateData.name = updates.name;
     }
 
-    if (updates.isDefault !== undefined) {
-      updateData.isDefault = updates.isDefault;
+    if (updates.is_default !== undefined) {
+      updateData.is_default = updates.is_default;
     }
 
     // Update the role
@@ -343,14 +343,14 @@ export class RoleService {
       // Clear existing permissions
       await this.drizzle
         .delete(rolePermissions)
-        .where(eq(rolePermissions.roleId, roleId));
+        .where(eq(rolePermissions.role_id, roleId));
 
       // Insert new permissions
       if (updates.permissionIds.length > 0) {
         await this.drizzle.insert(rolePermissions).values(
           updates.permissionIds.map((permissionId) => ({
-            roleId,
-            permissionId,
+            role_id: roleId,
+            permission_id: permissionId,
           })),
         );
       }
@@ -380,7 +380,7 @@ export class RoleService {
     }
 
     // Cannot delete system roles
-    if (role.isSystem) {
+    if (role.is_system) {
       throw new TRPCError({
         code: "FORBIDDEN",
         message: "System roles cannot be deleted",
@@ -389,7 +389,7 @@ export class RoleService {
 
     // Find default role for reassignment (RLS scoped)
     const defaultRole = await this.drizzle.query.roles.findFirst({
-      where: and(eq(roles.isDefault, true), ne(roles.id, roleId)),
+      where: and(eq(roles.is_default, true), ne(roles.id, roleId)),
     });
 
     if (!defaultRole) {
@@ -402,13 +402,13 @@ export class RoleService {
     // Reassign all members to default role
     await this.drizzle
       .update(memberships)
-      .set({ roleId: defaultRole.id })
-      .where(eq(memberships.roleId, roleId));
+      .set({ role_id: defaultRole.id })
+      .where(eq(memberships.role_id, roleId));
 
     // Delete role permissions
     await this.drizzle
       .delete(rolePermissions)
-      .where(eq(rolePermissions.roleId, roleId));
+      .where(eq(rolePermissions.role_id, roleId));
 
     // Delete the role
     await this.drizzle.delete(roles).where(eq(roles.id, roleId));
@@ -430,14 +430,14 @@ export class RoleService {
       .select({
         id: roles.id,
         name: roles.name,
-        organizationId: roles.organizationId,
-        isSystem: roles.isSystem,
-        isDefault: roles.isDefault,
-        createdAt: roles.createdAt,
-        updatedAt: roles.updatedAt,
+        organization_id: roles.organization_id,
+        is_system: roles.is_system,
+        is_default: roles.is_default,
+        created_at: roles.created_at,
+        updated_at: roles.updated_at,
       })
       .from(roles)
-      .orderBy(asc(roles.isSystem), asc(roles.name));
+      .orderBy(asc(roles.is_system), asc(roles.name));
 
     // Get permissions and membership counts for each role
     const rolesWithDetails = await Promise.all(
@@ -452,13 +452,13 @@ export class RoleService {
             .from(rolePermissions)
             .innerJoin(
               permissions,
-              eq(rolePermissions.permissionId, permissions.id),
+              eq(rolePermissions.permission_id, permissions.id),
             )
-            .where(eq(rolePermissions.roleId, role.id)),
+            .where(eq(rolePermissions.role_id, role.id)),
           this.drizzle
             .select()
             .from(memberships)
-            .where(eq(memberships.roleId, role.id)),
+            .where(eq(memberships.role_id, role.id)),
         ]);
 
         return {
@@ -505,7 +505,7 @@ export class RoleService {
   async getDefaultRole(): Promise<Role | null> {
     // RLS automatically scopes to user's organization
     const result = await this.drizzle.query.roles.findFirst({
-      where: and(eq(roles.isDefault, true), eq(roles.isSystem, false)),
+      where: and(eq(roles.is_default, true), eq(roles.is_system, false)),
     });
 
     return result ?? null;

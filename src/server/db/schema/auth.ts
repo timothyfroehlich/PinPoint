@@ -19,29 +19,29 @@ export const users = pgTable("users", {
   id: text().primaryKey(),
   name: text(),
   email: text().unique(),
-  emailVerified: timestamp(),
+  email_verified: timestamp(),
   image: text(),
-  createdAt: timestamp().defaultNow().notNull(),
-  updatedAt: timestamp().defaultNow().notNull(),
+  created_at: timestamp().defaultNow().notNull(),
+  updated_at: timestamp().defaultNow().notNull(),
 
   // PinPoint Specific Profile
   bio: text(),
-  profilePicture: text(),
+  profile_picture: text(),
 
   // Global notification preferences
-  emailNotificationsEnabled: boolean().default(true).notNull(),
-  pushNotificationsEnabled: boolean().default(false).notNull(),
-  notificationFrequency: notificationFrequencyEnum()
+  email_notifications_enabled: boolean().default(true).notNull(),
+  push_notifications_enabled: boolean().default(false).notNull(),
+  notification_frequency: notificationFrequencyEnum()
     .default("IMMEDIATE")
     .notNull(),
 });
 
 export const accounts = pgTable("accounts", {
   id: text().primaryKey(),
-  userId: text().notNull(),
+  user_id: text().notNull(),
   type: text().notNull(),
   provider: text().notNull(),
-  providerAccountId: text().notNull(),
+  provider_account_id: text().notNull(),
   refresh_token: text(),
   access_token: text(),
   expires_at: timestamp(),
@@ -53,8 +53,8 @@ export const accounts = pgTable("accounts", {
 
 export const sessions = pgTable("sessions", {
   id: text().primaryKey(),
-  sessionToken: text().unique().notNull(),
-  userId: text().notNull(),
+  session_token: text().unique().notNull(),
+  user_id: text().notNull(),
   expires: timestamp().notNull(),
 });
 

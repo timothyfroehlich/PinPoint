@@ -29,7 +29,7 @@ export function IssueTimeline({
       type: "created",
       title: "Issue Created",
       description: `Issue "${issue.title}" was created`,
-      timestamp: issue.createdAt,
+      timestamp: issue.created_at,
       user: issue.createdBy,
     },
   ];
@@ -41,7 +41,7 @@ export function IssueTimeline({
       type: "assigned",
       title: "Issue Assigned",
       description: `Issue assigned to ${issue.assignedTo.name ?? "Unknown"}`,
-      timestamp: issue.updatedAt,
+      timestamp: issue.updated_at,
       user: issue.assignedTo,
     });
   }

@@ -50,15 +50,15 @@ export const userRouter = createTRPCRouter({
         ctx.db
           .select({ count: count() })
           .from(machines)
-          .where(eq(machines.ownerId, ctx.user.id)),
+          .where(eq(machines.owner_id, ctx.user.id)),
         ctx.db
           .select({ count: count() })
           .from(issues)
-          .where(eq(issues.createdById, ctx.user.id)),
+          .where(eq(issues.created_by_id, ctx.user.id)),
         ctx.db
           .select({ count: count() })
           .from(comments)
-          .where(eq(comments.authorId, ctx.user.id)),
+          .where(eq(comments.author_id, ctx.user.id)),
       ]);
 
     return {
@@ -75,7 +75,7 @@ export const userRouter = createTRPCRouter({
   getCurrentMembership: orgScopedProcedure.query(async ({ ctx }) => {
     // RLS handles organizational scoping automatically
     const membership = await ctx.db.query.memberships.findFirst({
-      where: eq(memberships.userId, ctx.user.id),
+      where: eq(memberships.user_id, ctx.user.id),
       with: {
         role: true,
       },
@@ -92,9 +92,9 @@ export const userRouter = createTRPCRouter({
     );
 
     return {
-      userId: membership.userId,
+      userId: membership.user_id,
       role: membership.role.name,
-      organizationId: membership.organizationId,
+      organizationId: membership.organization_id,
       permissions: userPermissions,
     };
   }),
@@ -153,7 +153,7 @@ export const userRouter = createTRPCRouter({
 
         // Delete old profile picture if it exists
         const [currentUser] = await ctx.db
-          .select({ profilePicture: users.profilePicture })
+          .select({ profilePicture: users.profile_picture })
           .from(users)
           .where(eq(users.id, ctx.user.id))
           .limit(1);
@@ -184,9 +184,9 @@ export const userRouter = createTRPCRouter({
         // Update user's profile picture
         const [updatedUser] = await ctx.db
           .update(users)
-          .set({ profilePicture: imagePath })
+          .set({ profile_picture: imagePath })
           .where(eq(users.id, ctx.user.id))
-          .returning();
+          .returning({ profilePicture: users.profile_picture });
 
         if (!updatedUser) {
           throw new Error("Profile picture update failed");
@@ -224,13 +224,13 @@ export const userRouter = createTRPCRouter({
             id: users.id,
             name: users.name,
             bio: users.bio,
-            profilePicture: users.profilePicture,
-            createdAt: users.createdAt,
+            profilePicture: users.profile_picture,
+            createdAt: users.created_at,
           },
         })
         .from(memberships)
-        .innerJoin(users, eq(memberships.userId, users.id))
-        .where(eq(memberships.userId, input.userId))
+        .innerJoin(users, eq(memberships.user_id, users.id))
+        .where(eq(memberships.user_id, input.userId))
         .limit(1);
 
       if (!membership) {
@@ -243,15 +243,15 @@ export const userRouter = createTRPCRouter({
           ctx.db
             .select({ count: count() })
             .from(machines)
-            .where(eq(machines.ownerId, input.userId)),
+            .where(eq(machines.owner_id, input.userId)),
           ctx.db
             .select({ count: count() })
             .from(issues)
-            .where(eq(issues.createdById, input.userId)),
+            .where(eq(issues.created_by_id, input.userId)),
           ctx.db
             .select({ count: count() })
             .from(comments)
-            .where(eq(comments.authorId, input.userId)),
+            .where(eq(comments.author_id, input.userId)),
         ]);
 
       return {
@@ -273,16 +273,16 @@ export const userRouter = createTRPCRouter({
           id: users.id,
           name: users.name,
           bio: users.bio,
-          profilePicture: users.profilePicture,
-          createdAt: users.createdAt,
+          profilePicture: users.profile_picture,
+          createdAt: users.created_at,
         },
         role: {
           name: roles.name,
         },
       })
       .from(memberships)
-      .innerJoin(users, eq(memberships.userId, users.id))
-      .innerJoin(roles, eq(memberships.roleId, roles.id))
+      .innerJoin(users, eq(memberships.user_id, users.id))
+      .innerJoin(roles, eq(memberships.role_id, roles.id))
       .orderBy(asc(users.name));
 
     // Get counts for each user (batched approach for performance)
@@ -298,28 +298,28 @@ export const userRouter = createTRPCRouter({
         await Promise.all([
           ctx.db
             .select({
-              userId: machines.ownerId,
+              userId: machines.owner_id,
               count: count(),
             })
             .from(machines)
-            .where(inArray(machines.ownerId, userIds))
-            .groupBy(machines.ownerId),
+            .where(inArray(machines.owner_id, userIds))
+            .groupBy(machines.owner_id),
           ctx.db
             .select({
-              userId: issues.createdById,
+              userId: issues.created_by_id,
               count: count(),
             })
             .from(issues)
-            .where(inArray(issues.createdById, userIds))
-            .groupBy(issues.createdById),
+            .where(inArray(issues.created_by_id, userIds))
+            .groupBy(issues.created_by_id),
           ctx.db
             .select({
-              userId: comments.authorId,
+              userId: comments.author_id,
               count: count(),
             })
             .from(comments)
-            .where(inArray(comments.authorId, userIds))
-            .groupBy(comments.authorId),
+            .where(inArray(comments.author_id, userIds))
+            .groupBy(comments.author_id),
         ]);
 
       // Initialize counts for all users
@@ -369,7 +369,7 @@ export const userRouter = createTRPCRouter({
   // Assign default avatar to user (used during account creation)
   assignDefaultAvatar: protectedProcedure.mutation(async ({ ctx }) => {
     const [user] = await ctx.db
-      .select({ profilePicture: users.profilePicture })
+      .select({ profilePicture: users.profile_picture })
       .from(users)
       .where(eq(users.id, ctx.user.id))
       .limit(1);
@@ -380,9 +380,9 @@ export const userRouter = createTRPCRouter({
 
       const [updatedUser] = await ctx.db
         .update(users)
-        .set({ profilePicture: defaultAvatarUrl })
+        .set({ profile_picture: defaultAvatarUrl })
         .where(eq(users.id, ctx.user.id))
-        .returning({ profilePicture: users.profilePicture });
+        .returning({ profilePicture: users.profile_picture });
 
       if (!updatedUser) {
         throw new Error("Default avatar assignment failed");
@@ -416,9 +416,9 @@ export const userRouter = createTRPCRouter({
 
       // Verify the user is a member
       const [membership] = await ctx.db
-        .select({ userId: memberships.userId })
+        .select({ userId: memberships.user_id })
         .from(memberships)
-        .where(eq(memberships.userId, input.userId))
+        .where(eq(memberships.user_id, input.userId))
         .limit(1);
 
       if (!membership) {
@@ -428,8 +428,8 @@ export const userRouter = createTRPCRouter({
       // Update the membership
       const [updatedMembership] = await ctx.db
         .update(memberships)
-        .set({ roleId: input.roleId })
-        .where(eq(memberships.userId, input.userId))
+        .set({ role_id: input.roleId })
+        .where(eq(memberships.user_id, input.userId))
         .returning();
 
       if (!updatedMembership) {
@@ -439,8 +439,8 @@ export const userRouter = createTRPCRouter({
       // Get the updated role and user details for response
       const [membershipDetails] = await ctx.db
         .select({
-          userId: memberships.userId,
-          roleId: memberships.roleId,
+          userId: memberships.user_id,
+          roleId: memberships.role_id,
           roleName: roles.name,
           user: {
             id: users.id,
@@ -449,9 +449,9 @@ export const userRouter = createTRPCRouter({
           },
         })
         .from(memberships)
-        .innerJoin(roles, eq(memberships.roleId, roles.id))
-        .innerJoin(users, eq(memberships.userId, users.id))
-        .where(eq(memberships.userId, input.userId))
+        .innerJoin(roles, eq(memberships.role_id, roles.id))
+        .innerJoin(users, eq(memberships.user_id, users.id))
+        .where(eq(memberships.user_id, input.userId))
         .limit(1);
 
       if (!membershipDetails) {

@@ -217,7 +217,7 @@ export class PermissionService {
   } | null> {
     // RLS automatically scopes to user's organization
     const membership = await this.db.query.memberships.findFirst({
-      where: (memberships) => eq(memberships.userId, userId),
+      where: (memberships) => eq(memberships.user_id, userId),
       with: {
         role: {
           with: {

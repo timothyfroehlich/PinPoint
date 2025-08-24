@@ -32,7 +32,7 @@ export function IssueStatusControl({
   hasPermission,
   onError,
 }: IssueStatusControlProps): React.JSX.Element {
-  const [selectedStatusId, setSelectedStatusId] = useState(issue.statusId);
+  const [selectedStatusId, setSelectedStatusId] = useState(issue.status_id);
   const [isUpdating, setIsUpdating] = useState(false);
 
   const utils = api.useUtils();
@@ -48,7 +48,7 @@ export function IssueStatusControl({
     },
     onError: (error) => {
       onError(error.message);
-      setSelectedStatusId(issue.statusId); // Reset to original
+      setSelectedStatusId(issue.status_id); // Reset to original
       setIsUpdating(false);
     },
   });
