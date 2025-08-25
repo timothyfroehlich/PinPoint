@@ -177,11 +177,12 @@ export const modelRouter = createTRPCRouter({
         },
       });
 
+      // Extract and filter OPDB models from machines
       const opdbModelsToSync = machinesInOrg
         .map((machine) => machine.model)
         .filter(
-          (model): model is NonNullable<typeof model> =>
-            model?.opdb_id != null &&
+          (model) =>
+            model.opdb_id != null &&
             model.organization_id === null && // Only OPDB models
             !model.is_custom,
         )

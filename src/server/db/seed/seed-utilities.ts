@@ -221,119 +221,93 @@ export const SeedValidator = {
 // ============================================================================
 
 /**
- * Get membership ID for user email and organization
- * Replaces switch statements with mapping object lookups
+ * Get membership ID for user email and organization with type-safe validation
  */
 function seedMapperGetMembershipId(
   email: string,
   organization_id: string,
 ): string {
-  const mapping =
-    STATIC_MAPPINGS.EMAIL_TO_MEMBERSHIP[
-      email as keyof typeof STATIC_MAPPINGS.EMAIL_TO_MEMBERSHIP
-    ];
+  const { getMembershipIdOrThrow } = require("./mapping-validator");
 
-  if (!mapping) {
-    throw new SeedError(
-      "MAPPER",
-      `get membership ID for unknown email: ${email}`,
-    );
+  try {
+    return getMembershipIdOrThrow(email, organization_id);
+  } catch (error) {
+    // Convert mapping validation error to SeedError for consistency
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new SeedError("MAPPER", `get membership ID: ${errorMessage}`);
   }
-
-  const isPrimary = organization_id === SEED_TEST_IDS.ORGANIZATIONS.primary;
-  return isPrimary ? mapping.primary : mapping.competitor;
 }
 
 /**
- * Get priority ID for priority name and organization
- * Replaces switch statements with mapping object lookups
+ * Get priority ID for priority name and organization with type-safe validation
  */
 function seedMapperGetPriorityId(
   priorityName: string,
   organization_id: string,
 ): string {
-  const mapping =
-    STATIC_MAPPINGS.PRIORITY_NAMES[
-      priorityName as keyof typeof STATIC_MAPPINGS.PRIORITY_NAMES
-    ];
+  const { getPriorityIdOrThrow } = require("./mapping-validator");
 
-  if (!mapping) {
-    throw new SeedError(
-      "MAPPER",
-      `get priority ID for unknown priority: ${priorityName}`,
-    );
+  try {
+    return getPriorityIdOrThrow(priorityName, organization_id);
+  } catch (error) {
+    // Convert mapping validation error to SeedError for consistency
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new SeedError("MAPPER", `get priority ID: ${errorMessage}`);
   }
-
-  const isPrimary = organization_id === SEED_TEST_IDS.ORGANIZATIONS.primary;
-  return isPrimary ? mapping.primary : mapping.competitor;
 }
 
 /**
- * Get status ID for status name and organization
- * Replaces switch statements with mapping object lookups
+ * Get status ID for status name and organization with type-safe validation
  */
 function seedMapperGetStatusId(
   statusName: string,
   organization_id: string,
 ): string {
-  const mapping =
-    STATIC_MAPPINGS.STATUS_NAMES[
-      statusName as keyof typeof STATIC_MAPPINGS.STATUS_NAMES
-    ];
+  const { getStatusIdOrThrow } = require("./mapping-validator");
 
-  if (!mapping) {
-    throw new SeedError(
-      "MAPPER",
-      `get status ID for unknown status: ${statusName}`,
-    );
+  try {
+    return getStatusIdOrThrow(statusName, organization_id);
+  } catch (error) {
+    // Convert mapping validation error to SeedError for consistency
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new SeedError("MAPPER", `get status ID: ${errorMessage}`);
   }
-
-  const isPrimary = organization_id === SEED_TEST_IDS.ORGANIZATIONS.primary;
-  return isPrimary ? mapping.primary : mapping.competitor;
 }
 
 /**
- * Get role ID for role name and organization
+ * Get role ID for role name and organization with type-safe validation
  */
 function seedMapperGetRoleId(
   roleName: string,
   organization_id: string,
 ): string {
-  const mapping =
-    STATIC_MAPPINGS.ROLE_NAMES[
-      roleName as keyof typeof STATIC_MAPPINGS.ROLE_NAMES
-    ];
+  const { getRoleIdOrThrow } = require("./mapping-validator");
 
-  if (!mapping) {
-    throw new SeedError("MAPPER", `get role ID for unknown role: ${roleName}`);
+  try {
+    return getRoleIdOrThrow(roleName, organization_id);
+  } catch (error) {
+    // Convert mapping validation error to SeedError for consistency
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new SeedError("MAPPER", `get role ID: ${errorMessage}`);
   }
-
-  const isPrimary = organization_id === SEED_TEST_IDS.ORGANIZATIONS.primary;
-  return isPrimary ? mapping.primary : mapping.competitor;
 }
 
 /**
- * Get collection type ID for collection type name and organization
- * Replaces switch statements with mapping object lookups
+ * Get collection type ID for collection type name and organization with type-safe validation
  */
 function seedMapperGetCollectionTypeId(
   typeName: string,
   organization_id: string,
 ): string {
-  const mapping =
-    STATIC_MAPPINGS.COLLECTION_TYPE_NAMES[
-      typeName as keyof typeof STATIC_MAPPINGS.COLLECTION_TYPE_NAMES
-    ];
+  const { getCollectionTypeIdOrThrow } = require("./mapping-validator");
 
-  if (!mapping) {
-    throw new SeedError(
-      "MAPPER",
-      `get collection type ID for unknown type: ${typeName}`,
-    );
+  try {
+    return getCollectionTypeIdOrThrow(typeName, organization_id);
+  } catch (error) {
+    // Convert mapping validation error to SeedError for consistency
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new SeedError("MAPPER", `get collection type ID: ${errorMessage}`);
   }
-
-  const isPrimary = organization_id === SEED_TEST_IDS.ORGANIZATIONS.primary;
-  return isPrimary ? mapping.primary : mapping.competitor;
 }
 
 export const SeedMapper = {

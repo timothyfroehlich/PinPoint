@@ -86,105 +86,105 @@ export function RecentIssuesSidebar({
           {recentIssues && recentIssues.length > 0 ? (
             <>
               <List disablePadding>
-                {recentIssues
-                  .slice(0, 5)
-                  .map(
-                    (
-                      issue: Record<string, unknown> & {
-                        id: string;
-                        title: string;
-                      },
-                      index: number,
-                    ) => (
-                      <React.Fragment key={issue.id}>
-                        {index > 0 && <Divider />}
-                        <ListItem disablePadding sx={{ py: 1 }}>
-                          <ListItemText
-                            primary={
-                              <Typography variant="body2" fontWeight="medium">
-                                {issue.title}
-                              </Typography>
-                            }
-                            secondary={
-                              <Box>
-                                <Box
-                                  sx={{
-                                    display: "flex",
-                                    gap: 1,
-                                    mt: 0.5,
-                                    mb: 0.5,
-                                  }}
-                                >
-                                  <Chip
-                                    label={
-                                      (
-                                        issue["status"] as {
-                                          name?: string;
-                                        } | null
-                                      )?.name ?? "Unknown Status"
-                                    }
-                                    size="small"
-                                    variant="outlined"
-                                  />
-                                  <Chip
-                                    label={
-                                      (
-                                        issue["priority"] as {
-                                          name?: string;
-                                        } | null
-                                      )?.name ?? "Unknown Priority"
-                                    }
-                                    size="small"
-                                    variant="outlined"
-                                  />
-                                </Box>
-                                <Typography
-                                  variant="caption"
-                                  color="text.secondary"
-                                >
-                                  {new Date(
-                                    (issue["created_at"] ??
-                                      issue["createdAt"]) as
-                                      | string
-                                      | number
-                                      | Date,
-                                  ).toLocaleDateString()}{" "}
-                                  by{" "}
-                                  {(
+                {recentIssues.slice(0, 5).map(
+                  (
+                    issue: Record<string, unknown> & {
+                      id: string;
+                      title: string;
+                    },
+                    index: number,
+                  ) => (
+                    <React.Fragment key={issue.id}>
+                      {index > 0 && <Divider />}
+                      <ListItem disablePadding sx={{ py: 1 }}>
+                        <ListItemText
+                          primary={
+                            <Typography variant="body2" fontWeight="medium">
+                              {issue.title}
+                            </Typography>
+                          }
+                          secondary={
+                            <Box>
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  gap: 1,
+                                  mt: 0.5,
+                                  mb: 0.5,
+                                }}
+                              >
+                                <Chip
+                                  label={
+                                    (
+                                      issue["status"] as {
+                                        name?: string;
+                                      } | null
+                                    )?.name ?? "Unknown Status"
+                                  }
+                                  size="small"
+                                  variant="outlined"
+                                />
+                                <Chip
+                                  label={
+                                    (
+                                      issue["priority"] as {
+                                        name?: string;
+                                      } | null
+                                    )?.name ?? "Unknown Priority"
+                                  }
+                                  size="small"
+                                  variant="outlined"
+                                />
+                              </Box>
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                              >
+                                {new Date(
+                                  (issue["created_at"] ??
+                                    issue["createdAt"]) as
+                                    | string
+                                    | number
+                                    | Date,
+                                ).toLocaleDateString()}{" "}
+                                by{" "}
+                                {String(
+                                  (
                                     issue["createdBy"] as {
                                       name?: string;
                                     } | null
                                   )?.name ??
                                     issue["submitter_name"] ??
                                     issue["submitterName"] ??
-                                    "Anonymous User"}
-                                </Typography>
-                                <Typography
-                                  variant="caption"
-                                  color="text.secondary"
-                                  sx={{ display: "block", mt: 0.5 }}
-                                >
-                                  {(
+                                    "Anonymous User",
+                                )}
+                              </Typography>
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                                sx={{ display: "block", mt: 0.5 }}
+                              >
+                                {(
+                                  issue["machine"] as {
+                                    name?: string;
+                                    model?: { name?: string };
+                                  } | null
+                                )?.name ??
+                                  (
                                     issue["machine"] as {
                                       name?: string;
                                       model?: { name?: string };
                                     } | null
-                                  )?.name ??
-                                    (
-                                      issue["machine"] as {
-                                        name?: string;
-                                        model?: { name?: string };
-                                      } | null
-                                    )?.model?.name ??
-                                    "Unknown Machine"}
-                                </Typography>
-                              </Box>
-                            }
-                          />
-                        </ListItem>
-                      </React.Fragment>
-                    ),
-                  )}
+                                  )?.model?.name ??
+                                  "Unknown Machine"}
+                              </Typography>
+                            </Box>
+                          }
+                        />
+                      </ListItem>
+                    </React.Fragment>
+                  ),
+                )}
               </List>
 
               {recentIssues.length > 5 && (

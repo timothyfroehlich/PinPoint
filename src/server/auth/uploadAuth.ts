@@ -39,7 +39,7 @@ export interface UploadAuthContext {
  * @returns Transformed context with camelCase fields for API consumption
  */
 function transformUploadAuthContext(ctx: unknown): unknown {
-  return transformKeysToCamelCase<UploadAuthContext>(ctx);
+  return transformKeysToCamelCase(ctx) as UploadAuthContext;
 }
 
 /**
@@ -102,12 +102,12 @@ export async function getUploadAuthContext(
   }
 
   // Transform database results to camelCase for API compatibility
-  const transformedOrganization =
-    transformKeysToCamelCase<UploadAuthContext["organization"]>(
-      organizationResult,
-    );
-  const transformedMembership =
-    transformKeysToCamelCase<UploadAuthContext["membership"]>(membershipResult);
+  const transformedOrganization = transformKeysToCamelCase(
+    organizationResult,
+  ) as UploadAuthContext["organization"];
+  const transformedMembership = transformKeysToCamelCase(
+    membershipResult,
+  ) as UploadAuthContext["membership"];
 
   return transformUploadAuthContext({
     user,

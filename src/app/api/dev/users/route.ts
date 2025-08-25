@@ -101,7 +101,7 @@ export async function GET(): Promise<NextResponse> {
     }
 
     // Transform to camelCase for API response
-    const usersWithRoles = transformKeysToCamelCase<unknown[]>(
+    const usersWithRoles = transformKeysToCamelCase(
       Array.from(userMap.values()),
     );
     const transformedUser = transformKeysToCamelCase(user);

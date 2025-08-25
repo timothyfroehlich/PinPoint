@@ -428,7 +428,7 @@ export async function seedSampleData(
     };
 
     SeedLogger.success(
-      `Sample data seeded: ${String(result.gamesCreated)} games, ${String(result.machinesCreated)} machines, ${String(result.issuesCreated)} issues`,
+      `Sample data seeded: ${result.gamesCreated} games, ${result.machinesCreated} machines, ${result.issuesCreated} issues`,
     );
 
     return createSeedResult(

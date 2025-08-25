@@ -6,7 +6,11 @@
  */
 
 // Node modules
-import { createClient, type User } from "@supabase/supabase-js";
+import {
+  createClient,
+  type User,
+  type SupabaseClient,
+} from "@supabase/supabase-js";
 import { nanoid } from "nanoid";
 
 // Internal utilities
@@ -22,6 +26,14 @@ import {
   type SeedTarget,
   type SeedResult,
 } from "./seed-utilities";
+
+// Supabase error handling
+import {
+  safeSupabaseOperation,
+  SupabaseErrorHandler,
+  logSupabaseError,
+  type SupabaseOperationContext,
+} from "~/lib/supabase/error-handler";
 
 // Schema imports
 import { users, roles, memberships } from "~/server/db/schema";
@@ -154,18 +166,33 @@ function createServiceRoleClient(): SupabaseClient {
 }
 
 /**
- * Get existing Supabase auth users by email
+ * Get existing Supabase auth users by email with proper error handling
  */
 async function getExistingAuthUsers(): Promise<Map<string, User>> {
   const supabase = createServiceRoleClient();
-  const { data: userList, error } = await supabase.auth.admin.listUsers();
 
-  if (error) {
-    throw new Error(`Failed to list existing users: ${error.message}`);
+  const context: SupabaseOperationContext = {
+    operation: "listUsers",
+    metadata: { purpose: "seed_data_validation" },
+  };
+
+  const result = await safeSupabaseOperation(
+    () => supabase.auth.admin.listUsers(),
+    context,
+    (data): data is { users: User[] } =>
+      typeof data === "object" &&
+      data !== null &&
+      "users" in data &&
+      Array.isArray((data as any).users),
+  );
+
+  if (!result.success) {
+    logSupabaseError(result.error, SeedLogger);
+    SupabaseErrorHandler.throwStructuredError(result);
   }
 
-  const userMap = new Map();
-  for (const user of userList.users) {
+  const userMap = new Map<string, User>();
+  for (const user of result.data.users) {
     if (user.email) {
       userMap.set(user.email, user);
     }
@@ -197,34 +224,54 @@ async function upsertSupabaseAuthUser(
   }
 
   // Create new user with predetermined static ID
-  const { data, error } = await supabase.auth.admin.createUser({
-    id: staticUserId, // Specify the static ID we want
+  const context: SupabaseOperationContext = {
+    operation: "createUser",
     email: params.email,
-    password: "dev-login-123",
-    email_confirm: true,
-    user_metadata: {
-      name: params.profile.name,
-      bio: params.profile.bio,
-      dev_user: true,
-      environment: "development",
-    },
-    app_metadata: {
-      organization_id: params.organization_id,
+    organizationId: params.organization_id,
+    metadata: {
+      staticUserId,
       role: params.role,
-      dev_created: true,
-      created_via: "seeding",
+      purpose: "seed_user_creation",
     },
-  });
+  };
 
-  if (error || !data.user) {
-    throw new Error(
-      `Failed to create user ${params.email} with ID ${staticUserId}: ${error?.message ?? "No user data returned"}`,
-    );
+  const result = await safeSupabaseOperation(
+    () =>
+      supabase.auth.admin.createUser({
+        id: staticUserId, // Specify the static ID we want
+        email: params.email,
+        password: "dev-login-123",
+        email_confirm: true,
+        user_metadata: {
+          name: params.profile.name,
+          bio: params.profile.bio,
+          dev_user: true,
+          environment: "development",
+        },
+        app_metadata: {
+          organization_id: params.organization_id,
+          role: params.role,
+          dev_created: true,
+          created_via: "seeding",
+        },
+      }),
+    context,
+    (data): data is { user: User } =>
+      typeof data === "object" &&
+      data !== null &&
+      "user" in data &&
+      typeof (data as { user: unknown }).user === "object" &&
+      (data as { user: unknown }).user !== null,
+  );
+
+  if (!result.success) {
+    logSupabaseError(result.error, SeedLogger);
+    SupabaseErrorHandler.throwStructuredError(result);
   }
 
   return {
     success: true,
-    user_id: data.user.id, // Should now be the static ID we specified
+    user_id: result.data.user.id, // Should now be the static ID we specified
     wasCreated: true,
   };
 }
@@ -256,8 +303,12 @@ async function waitForUserRecord(
       }
 
       await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL));
-    } catch {
-      // Continue trying despite query errors
+    } catch (error) {
+      // Log query errors but continue trying
+      SeedLogger.warn(
+        "AUTH",
+        `Query error while waiting for user record ${user_id}: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -383,9 +434,23 @@ async function processBatchUsers(
       successCount++;
     } catch (error) {
       errorCount++;
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      errors.push(`Error processing ${userData.email}: ${errorMessage}`);
+
+      // Use structured error handling instead of generic string conversion
+      const context: SupabaseOperationContext = {
+        operation: "processBatchUser",
+        email: userData.email,
+        organizationId: organization_id,
+        metadata: { role: userData.role },
+      };
+
+      const structuredError = SupabaseErrorHandler.createStructuredError(
+        error,
+        context,
+      );
+      logSupabaseError(structuredError, SeedLogger);
+      errors.push(
+        `${userData.email}: ${structuredError.type} - ${structuredError.message}`,
+      );
     }
   }
 
@@ -398,8 +463,26 @@ async function processBatchUsers(
         .onConflictDoNothing();
     } catch (error) {
       errorCount += membershipsToCreate.length;
+
+      // Use structured error handling for membership creation
+      const context: SupabaseOperationContext = {
+        operation: "batchCreateMemberships",
+        organizationId: organization_id,
+        metadata: {
+          membershipCount: membershipsToCreate.length,
+          emails: membershipsToCreate
+            .map((m, i) => userList[i]?.email)
+            .filter(Boolean),
+        },
+      };
+
+      const structuredError = SupabaseErrorHandler.createStructuredError(
+        error,
+        context,
+      );
+      logSupabaseError(structuredError, SeedLogger);
       errors.push(
-        `Batch membership creation failed: ${error instanceof Error ? error.message : String(error)}`,
+        `Batch membership creation: ${structuredError.type} - ${structuredError.message}`,
       );
     }
   }
@@ -418,29 +501,58 @@ async function deleteExistingDevUsers(userList: UserData[]): Promise<void> {
   const supabase = createServiceRoleClient();
 
   for (const userData of userList) {
+    const userContext: SupabaseOperationContext = {
+      operation: "deleteDevUser",
+      email: userData.email,
+      metadata: { purpose: "preview_environment_cleanup" },
+    };
+
     try {
-      const { data: userList, error: listError } =
-        await supabase.auth.admin.listUsers();
+      // List users with proper error handling
+      const listResult = await safeSupabaseOperation(
+        () => supabase.auth.admin.listUsers(),
+        userContext,
+      );
 
-      if (listError) continue;
+      if (!listResult.success) {
+        logSupabaseError(listResult.error, SeedLogger);
+        continue; // Continue with next user
+      }
 
-      const existingUser = userList.users.find(
-        (u) => u.email === userData.email,
+      const listData = listResult.data as { users?: User[] };
+      const existingUser = listData.users?.find(
+        (u: User) => u.email === userData.email,
       );
 
       if (existingUser) {
         // Delete from database first (cascades to memberships)
         try {
           await db.delete(users).where(eq(users.id, existingUser.id));
-        } catch {
-          // Continue even if database deletion fails
+        } catch (error) {
+          // Log database deletion error but continue
+          SeedLogger.warn(
+            "AUTH",
+            `Database deletion failed for user ${userData.email}: ${error instanceof Error ? error.message : String(error)}`,
+          );
         }
 
-        // Delete from Supabase auth
-        await supabase.auth.admin.deleteUser(existingUser.id);
+        // Delete from Supabase auth with proper error handling
+        const deleteResult = await safeSupabaseOperation(
+          () => supabase.auth.admin.deleteUser(existingUser.id),
+          { ...userContext, userId: existingUser.id },
+        );
+
+        if (!deleteResult.success) {
+          logSupabaseError(deleteResult.error, SeedLogger);
+        }
       }
-    } catch {
-      // Continue with other users even if one fails
+    } catch (error) {
+      // Log unexpected errors but continue with other users
+      const structuredError = SupabaseErrorHandler.createStructuredError(
+        error,
+        userContext,
+      );
+      logSupabaseError(structuredError, SeedLogger);
     }
   }
 }

@@ -433,11 +433,13 @@ async function createTemplateRole(
   organization_id: string,
   templateName: keyof typeof ROLE_TEMPLATES,
 ): Promise<void> {
-  // eslint-disable-next-line security/detect-object-injection
-  const template = ROLE_TEMPLATES[templateName];
-  if (!template) {
+  // Type-safe template lookup with validation
+  if (!(templateName in ROLE_TEMPLATES)) {
     throw new Error(`Unknown role template: ${templateName}`);
   }
+
+  // Safe access after validation
+  const template = ROLE_TEMPLATES[templateName];
 
   // Get permissions for this template
   const allPermissions = await db.select().from(permissions);

@@ -114,6 +114,14 @@ export function PublicDashboard(): React.ReactNode {
     );
   }
 
+  if (!locations) {
+    return (
+      <Box sx={{ p: 3, textAlign: "center" }}>
+        <Typography color="error">Location data not available</Typography>
+      </Box>
+    );
+  }
+
   const totalMachines = locations.reduce(
     (sum: number, loc) => sum + loc._count.machines,
     0,

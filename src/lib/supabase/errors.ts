@@ -253,3 +253,11 @@ export function isConfigurationError(
 ): error is ConfigurationError {
   return error instanceof ConfigurationError;
 }
+
+// ============================================================================
+// Re-exports for convenience
+// ============================================================================
+
+// Re-export type guards and error handling utilities
+export * from "./type-guards";
+export * from "./error-handler";

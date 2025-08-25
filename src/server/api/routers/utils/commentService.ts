@@ -72,7 +72,7 @@ export class CommentService {
       throw new Error(`Comment with id ${commentId} not found`);
     }
 
-    return transformKeysToCamelCase<CommentResponse>(deletedComment);
+    return transformKeysToCamelCase(deletedComment) as CommentResponse;
   }
 
   /**
@@ -110,7 +110,7 @@ export class CommentService {
       throw new Error(`Comment with id ${commentId} not found`);
     }
 
-    return transformKeysToCamelCase<CommentResponse>(restoredComment);
+    return transformKeysToCamelCase(restoredComment) as CommentResponse;
   }
 
   /**
@@ -201,7 +201,7 @@ export class CommentService {
       (comment) => comment.deleted_at !== null,
     );
     return deletedComments.map((comment) =>
-      transformKeysToCamelCase<CommentWithRelationsResponse>(comment),
-    );
+      transformKeysToCamelCase(comment),
+    ) as CommentWithRelationsResponse[];
   }
 }

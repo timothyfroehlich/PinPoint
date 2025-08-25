@@ -84,9 +84,6 @@ export function DevLoginCompact({
       if (user?.name) userData.name = user.name;
       if (user?.role) userData.role = user.role;
 
-      // Get the current organization from URL subdomain or default
-      const _hostname =
-        typeof window !== "undefined" ? window.location.hostname : "";
       // Organization detection could be implemented here based on subdomain
 
       // For now, use default organization ID - in the future this could be dynamic
