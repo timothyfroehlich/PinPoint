@@ -204,7 +204,11 @@ export const issueCoreRouter = createTRPCRouter({
         issueData.reporterEmail = input.reporterEmail;
       }
 
-      await ctx.db.insert(issues).values(transformKeysToSnakeCase(issueData));
+      await ctx.db
+        .insert(issues)
+        .values(
+          transformKeysToSnakeCase(issueData) as typeof issues.$inferInsert,
+        );
 
       // Get issue with relations for return
       const issueWithRelations = await ctx.db.query.issues.findFirst({
@@ -252,7 +256,9 @@ export const issueCoreRouter = createTRPCRouter({
         attachments: [], // Issues without attachment relations loaded
       };
 
-      return transformKeysToCamelCase<IssueWithRelationsResponse>(mappedIssue);
+      return transformKeysToCamelCase(
+        mappedIssue,
+      ) as IssueWithRelationsResponse;
     }),
   // Create issue - requires issue:create permission
   create: issueCreateProcedure
@@ -390,7 +396,11 @@ export const issueCoreRouter = createTRPCRouter({
         issueData.description = input.description;
       }
 
-      await ctx.db.insert(issues).values(transformKeysToSnakeCase(issueData));
+      await ctx.db
+        .insert(issues)
+        .values(
+          transformKeysToSnakeCase(issueData) as typeof issues.$inferInsert,
+        );
 
       // Get issue with relations for return
       const issueWithRelations = await ctx.db.query.issues.findFirst({
@@ -439,7 +449,9 @@ export const issueCoreRouter = createTRPCRouter({
         attachments: [], // Issues without attachment relations loaded
       };
 
-      return transformKeysToCamelCase<IssueWithRelationsResponse>(mappedIssue);
+      return transformKeysToCamelCase(
+        mappedIssue,
+      ) as IssueWithRelationsResponse;
     }),
 
   // Assign issue to a user - requires issue:assign permission
@@ -568,7 +580,7 @@ export const issueCoreRouter = createTRPCRouter({
 
         return {
           success: true,
-          issue: transformKeysToCamelCase<IssueResponse>(updatedIssue),
+          issue: transformKeysToCamelCase(updatedIssue) as IssueResponse,
         };
       },
     ),
@@ -764,9 +776,9 @@ export const issueCoreRouter = createTRPCRouter({
         }
       });
 
-      return transformKeysToCamelCase<IssueWithRelationsResponse[]>(
+      return transformKeysToCamelCase(
         resultsWithCounts,
-      );
+      ) as IssueWithRelationsResponse[];
     }),
 
   // Get a single issue by ID
@@ -837,7 +849,9 @@ export const issueCoreRouter = createTRPCRouter({
         })),
       };
 
-      return transformKeysToCamelCase<IssueWithRelationsResponse>(mappedIssue);
+      return transformKeysToCamelCase(
+        mappedIssue,
+      ) as IssueWithRelationsResponse;
     }),
 
   // Update issue (for members/admins)
@@ -1025,7 +1039,9 @@ export const issueCoreRouter = createTRPCRouter({
         );
       }
 
-      return transformKeysToCamelCase<IssueWithRelationsResponse>(updatedIssue);
+      return transformKeysToCamelCase(
+        updatedIssue,
+      ) as IssueWithRelationsResponse;
     }),
 
   // Close an issue (set status to resolved)
@@ -1100,7 +1116,9 @@ export const issueCoreRouter = createTRPCRouter({
       const activityService = ctx.services.createIssueActivityService();
       await activityService.recordIssueResolved(input.id, ctx.user.id);
 
-      return transformKeysToCamelCase<IssueWithRelationsResponse>(updatedIssue);
+      return transformKeysToCamelCase(
+        updatedIssue,
+      ) as IssueWithRelationsResponse;
     }),
 
   // Update issue status
@@ -1142,11 +1160,11 @@ export const issueCoreRouter = createTRPCRouter({
       const userPermissions = ["issue:edit"] as const;
       const validationResult = validateStatusTransition(
         {
-          currentStatus: transformKeysToCamelCase(existingIssue.status),
+          currentStatus: transformKeysToCamelCase(existingIssue.status) as any, // IssueStatus type conversion
           newStatusId: input.statusId,
           organizationId: ctx.organizationId,
         },
-        transformKeysToCamelCase(newStatus),
+        transformKeysToCamelCase(newStatus) as any, // IssueStatus type conversion
         {
           userPermissions,
           organizationId: ctx.organizationId,
@@ -1162,8 +1180,8 @@ export const issueCoreRouter = createTRPCRouter({
 
       // Get status change effects using extracted function
       const effects = getStatusChangeEffects(
-        transformKeysToCamelCase(existingIssue.status),
-        transformKeysToCamelCase(newStatus),
+        transformKeysToCamelCase(existingIssue.status) as any, // IssueStatus type conversion
+        transformKeysToCamelCase(newStatus) as any, // IssueStatus type conversion
       );
 
       // Update the issue
@@ -1241,7 +1259,9 @@ export const issueCoreRouter = createTRPCRouter({
         newStatus.name,
       );
 
-      return transformKeysToCamelCase<IssueWithRelationsResponse>(updatedIssue);
+      return transformKeysToCamelCase(
+        updatedIssue,
+      ) as IssueWithRelationsResponse;
     }),
 
   // Public procedure for getting issues (for anonymous users to see recent issues)
@@ -1363,6 +1383,8 @@ export const issueCoreRouter = createTRPCRouter({
 
       // Apply limit
       const limit = input?.limit ?? 20;
-      return transformKeysToCamelCase<IssueResponse[]>(results.slice(0, limit));
+      return transformKeysToCamelCase(
+        results.slice(0, limit),
+      ) as IssueResponse[];
     }),
 });

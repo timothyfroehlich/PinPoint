@@ -39,7 +39,7 @@ export const issueStatusRouter = createTRPCRouter({
         .select()
         .from(issueStatuses)
         .orderBy(asc(issueStatuses.name));
-      return transformKeysToCamelCase<IssueStatusResponse[]>(statuses);
+      return transformKeysToCamelCase(statuses) as IssueStatusResponse[];
     },
   ),
 
@@ -60,7 +60,7 @@ export const issueStatusRouter = createTRPCRouter({
           organization_id: ctx.organizationId,
         })
         .returning();
-      return transformKeysToCamelCase<IssueStatusResponse>(result);
+      return transformKeysToCamelCase(result) as IssueStatusResponse;
     }),
 
   update: orgScopedProcedure
@@ -87,7 +87,7 @@ export const issueStatusRouter = createTRPCRouter({
         .where(eq(issueStatuses.id, input.id))
         .returning();
 
-      return transformKeysToCamelCase<IssueStatusResponse>(result);
+      return transformKeysToCamelCase(result) as IssueStatusResponse;
     }),
 
   delete: orgScopedProcedure
@@ -110,7 +110,7 @@ export const issueStatusRouter = createTRPCRouter({
         .where(eq(issueStatuses.id, input.id))
         .returning();
 
-      return transformKeysToCamelCase<IssueStatusResponse>(result);
+      return transformKeysToCamelCase(result) as IssueStatusResponse;
     }),
 
   // Status Counts / Analytics

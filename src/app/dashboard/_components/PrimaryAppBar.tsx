@@ -28,12 +28,14 @@ import type { JSX } from "react";
 import { useAuth } from "~/app/auth-provider";
 import { PermissionButton } from "~/components/permissions/PermissionButton";
 import { usePermissions } from "~/hooks/usePermissions";
+import { useClientMounted } from "~/hooks/useClientMounted";
 
 const PrimaryAppBar = (): JSX.Element => {
   const router = useRouter();
   const { user, loading } = useAuth();
   const { hasPermission } = usePermissions();
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const isMounted = useClientMounted();
 
   // Responsive design: show mobile drawer for navigation on small screens
   const theme = useTheme();
@@ -56,7 +58,7 @@ const PrimaryAppBar = (): JSX.Element => {
         sx={{ justifyContent: "space-between", minHeight: { xs: 56, sm: 64 } }}
       >
         {/* Mobile Menu Button */}
-        {isMobile && user && (
+        {isMounted && isMobile && user && (
           <IconButton
             color="inherit"
             aria-label="open navigation menu"
@@ -86,7 +88,7 @@ const PrimaryAppBar = (): JSX.Element => {
         </Box>
 
         {/* Primary Navigation - Hidden on mobile to make room for user menu */}
-        {!isMobile && (
+        {isMounted && !isMobile && (
           <Box sx={{ display: "flex", gap: 1 }}>
             <Button
               color="inherit"
@@ -204,7 +206,7 @@ const PrimaryAppBar = (): JSX.Element => {
 
         {/* Authentication Controls */}
         <Box>
-          {loading ? (
+          {!isMounted || loading ? (
             <IconButton color="inherit" disabled>
               <AccountCircle />
             </IconButton>

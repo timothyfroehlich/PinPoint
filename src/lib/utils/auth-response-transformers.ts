@@ -69,7 +69,7 @@ export interface AuthUserProfile {
  * // Result: { emailVerified: Date, notificationFrequency: 'daily' }
  */
 export function transformUserResponse(user: unknown): UserResponse {
-  return transformKeysToCamelCase<UserResponse>(user);
+  return transformKeysToCamelCase(user) as UserResponse;
 }
 
 /**
@@ -87,7 +87,7 @@ export function transformUserResponse(user: unknown): UserResponse {
 export function transformOrganizationResponse(
   org: unknown,
 ): OrganizationResponse {
-  return transformKeysToCamelCase<OrganizationResponse>(org);
+  return transformKeysToCamelCase(org) as OrganizationResponse;
 }
 
 /**
@@ -110,7 +110,9 @@ export function transformOrganizationResponse(
 export function transformMembershipResponse(
   membership: unknown,
 ): MembershipResponse {
-  const transformed = transformKeysToCamelCase<MembershipResponse>(membership);
+  const transformed = transformKeysToCamelCase(
+    membership,
+  ) as MembershipResponse;
 
   // Handle nested user transformation if present
   if (transformed.user && typeof transformed.user === "object") {
@@ -119,12 +121,14 @@ export function transformMembershipResponse(
 
   // Handle nested role transformation if present
   if (transformed.role && typeof transformed.role === "object") {
-    transformed.role = transformKeysToCamelCase<Record<string, unknown>>(
-      transformed.role,
-    );
+    transformed.role = transformKeysToCamelCase(transformed.role) as {
+      id: string;
+      name: string;
+      permissions: { name: string }[];
+    };
 
     // Handle role permissions array if present
-    const role = transformed.role as Record<string, unknown>;
+    const role = transformed.role as any; // Temporary any for permission processing
     if (Array.isArray(role["rolePermissions"])) {
       role["permissions"] = role["rolePermissions"].map(
         (rp: Record<string, unknown>) => {
@@ -138,7 +142,7 @@ export function transformMembershipResponse(
       role["permissions"] = role["permissions"].map(
         (p: Record<string, unknown>) => {
           if (typeof p === "object") {
-            return transformKeysToCamelCase<Record<string, unknown>>(p);
+            return transformKeysToCamelCase(p) as Record<string, unknown>;
           }
           return p;
         },
@@ -168,7 +172,9 @@ export function transformMembershipResponse(
 export function transformUploadAuthContextResponse(
   ctx: unknown,
 ): UploadAuthContextResponse {
-  const transformed = transformKeysToCamelCase<UploadAuthContextResponse>(ctx);
+  const transformed = transformKeysToCamelCase(
+    ctx,
+  ) as UploadAuthContextResponse;
 
   // Transform nested organization if present
   if (typeof transformed.organization === "object") {
@@ -206,7 +212,7 @@ export function transformUploadAuthContextResponse(
  * // Result: { profilePicture: 'url', emailVerified: true }
  */
 export function transformAuthUserProfile(profile: unknown): AuthUserProfile {
-  const transformed = transformKeysToCamelCase<AuthUserProfile>(profile);
+  const transformed = transformKeysToCamelCase(profile) as AuthUserProfile;
 
   // Field transformation is handled by transformKeysToCamelCase
 

@@ -106,7 +106,7 @@ export const commentRouter = createTRPCRouter({
       const cleanupService = ctx.services.createCommentCleanupService();
       const deletedComments = await cleanupService.getDeletedComments();
       // Transform to camelCase as service returns snake_case from database
-      return transformKeysToCamelCase<CommentResponse[]>(deletedComments);
+      return transformKeysToCamelCase(deletedComments) as CommentResponse[];
     },
   ),
 

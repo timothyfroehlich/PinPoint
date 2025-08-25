@@ -390,7 +390,7 @@ export async function seedSampleData(
     const uniqueGames = await withErrorContext(
       "SAMPLE_DATA",
       "extract unique games from sample issues",
-      () => extractUniqueGames(dataAmount),
+      async () => extractUniqueGames(dataAmount),
     );
 
     // Create OPDB models

@@ -306,8 +306,7 @@ async function waitForUserRecord(
     } catch (error) {
       // Log query errors but continue trying
       SeedLogger.warn(
-        "AUTH",
-        `Query error while waiting for user record ${user_id}: ${error instanceof Error ? error.message : String(error)}`,
+        `AUTH: Query error while waiting for user record ${user_id}: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }
@@ -471,7 +470,7 @@ async function processBatchUsers(
         metadata: {
           membershipCount: membershipsToCreate.length,
           emails: membershipsToCreate
-            .map((m, i) => userList[i]?.email)
+            .map((_, i) => userList[i]?.email)
             .filter(Boolean),
         },
       };
@@ -531,8 +530,7 @@ async function deleteExistingDevUsers(userList: UserData[]): Promise<void> {
         } catch (error) {
           // Log database deletion error but continue
           SeedLogger.warn(
-            "AUTH",
-            `Database deletion failed for user ${userData.email}: ${error instanceof Error ? error.message : String(error)}`,
+            `AUTH: Database deletion failed for user ${userData.email}: ${error instanceof Error ? error.message : String(error)}`,
           );
         }
 

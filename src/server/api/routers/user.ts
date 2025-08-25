@@ -87,12 +87,12 @@ export const userRouter = createTRPCRouter({
         bio: user.bio,
         profilePicture: user.profile_picture,
         createdAt: user.created_at,
-        ownedMachines: transformKeysToCamelCase<
-          UserProfileResponse["ownedMachines"]
-        >(user.ownedMachines),
-        memberships: transformKeysToCamelCase<
-          UserProfileResponse["memberships"]
-        >(user.memberships),
+        ownedMachines: transformKeysToCamelCase(
+          user.ownedMachines,
+        ) as UserProfileResponse["ownedMachines"],
+        memberships: transformKeysToCamelCase(
+          user.memberships,
+        ) as UserProfileResponse["memberships"],
         _count: {
           ownedMachines: ownedMachinesCount[0]?.count ?? 0,
           issuesCreated: issuesCreatedCount[0]?.count ?? 0,

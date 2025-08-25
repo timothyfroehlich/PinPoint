@@ -49,7 +49,7 @@ export const locationRouter = createTRPCRouter({
         })
         .returning();
 
-      return transformKeysToCamelCase(location);
+      return transformKeysToCamelCase(location) as LocationResponse;
     }),
 
   getAll: orgScopedProcedure.query(
@@ -61,7 +61,9 @@ export const locationRouter = createTRPCRouter({
         orderBy: asc(locations.name),
       });
 
-      return allLocations.map((location) => transformKeysToCamelCase(location));
+      return allLocations.map(
+        (location) => transformKeysToCamelCase(location) as LocationResponse,
+      );
     },
   ),
 
@@ -165,7 +167,7 @@ export const locationRouter = createTRPCRouter({
         });
       }
 
-      return transformKeysToCamelCase(updatedLocation);
+      return transformKeysToCamelCase(updatedLocation) as LocationResponse;
     }),
 
   // Get a single location with detailed info
@@ -199,7 +201,7 @@ export const locationRouter = createTRPCRouter({
         });
       }
 
-      return transformKeysToCamelCase(location);
+      return transformKeysToCamelCase(location) as LocationResponse;
     }),
 
   delete: locationDeleteProcedure
@@ -217,7 +219,7 @@ export const locationRouter = createTRPCRouter({
         });
       }
 
-      return transformKeysToCamelCase(deletedLocation);
+      return transformKeysToCamelCase(deletedLocation) as LocationResponse;
     }),
 
   // Admin-only PinballMap sync operations
@@ -244,7 +246,7 @@ export const locationRouter = createTRPCRouter({
         });
       }
 
-      return transformKeysToCamelCase(updatedLocation);
+      return transformKeysToCamelCase(updatedLocation) as LocationResponse;
     }),
 
   syncWithPinballMap: organizationManageProcedure
@@ -273,6 +275,6 @@ export const locationRouter = createTRPCRouter({
         });
       }
 
-      return transformKeysToCamelCase(refreshed);
+      return transformKeysToCamelCase(refreshed) as LocationResponse;
     }),
 });

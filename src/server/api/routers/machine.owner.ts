@@ -108,8 +108,8 @@ export const machineOwnerRouter = createTRPCRouter({
         });
       }
 
-      return transformKeysToCamelCase<MachineWithRelationsResponse>(
+      return transformKeysToCamelCase(
         machineWithRelations,
-      );
+      ) as MachineWithRelationsResponse;
     }),
 });

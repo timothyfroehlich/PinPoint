@@ -10,6 +10,7 @@
 
 import type {
   User,
+  Session,
   AuthResponse,
   AuthError,
   UserResponse,
@@ -77,7 +78,7 @@ export function isSuccessfulUserResponse(
  */
 export function isSuccessfulAuthResponse(
   response: AuthResponse,
-): response is { data: { user: User; session: unknown }; error: null } {
+): response is { data: { user: User; session: Session | null }; error: null } {
   return (
     response.error === null &&
     response.data.user !== undefined &&
@@ -244,7 +245,7 @@ export function hasValidPinPointMetadata(
   return (
     typeof user.app_metadata === "object" &&
     user.app_metadata !== null &&
-    typeof user.app_metadata.organization_id === "string"
+    typeof user.app_metadata["organization_id"] === "string"
   );
 }
 
@@ -253,7 +254,7 @@ export function hasValidPinPointMetadata(
  */
 export function extractOrganizationId(user: User): string | null {
   if (!hasValidPinPointMetadata(user)) return null;
-  return user.app_metadata.organization_id || null;
+  return user.app_metadata["organization_id"] || null;
 }
 
 /**
@@ -261,7 +262,7 @@ export function extractOrganizationId(user: User): string | null {
  */
 export function extractUserRole(user: User): string | null {
   if (!hasValidPinPointMetadata(user)) return null;
-  return user.app_metadata.role || null;
+  return user.app_metadata["role"] || null;
 }
 
 // ============================================================================

@@ -152,6 +152,7 @@ npm run test:watch    # ✅ Watch mode for unit tests
 
 - **NEVER use the `find` command** - it's dangerous due to the `-exec` flag which can execute arbitrary commands
 - **NEVER use the `psql` command directly** - use `./scripts/safe-psql.sh` instead for database safety
+- **NEVER use `curl` for external URLs** - use `./scripts/safe-curl.sh` instead for localhost-only HTTP requests
 
 ### ⛔ PostgreSQL Query Limitations
 
@@ -173,6 +174,7 @@ await db.execute(sql.raw(`SET session.user_id = '${escapeString(userId)}'`));
 - **fd/fdfind** - for file discovery: `fd "*.js"`, `fd --type f --changed-within 1day`
 - **git ls-files** - for repo files: `git ls-files | grep "\.js$"`
 - **safe-psql** - for database access: `./scripts/safe-psql.sh` (localhost-only with safety guardrails)
+- **safe-curl** - for HTTP requests: `./scripts/safe-curl.sh` (localhost-only with safety guardrails)
 - Prefer rg (ripgrep) to find or grep
 - Install missing tools with `brew` (preferred) or `apt`
 

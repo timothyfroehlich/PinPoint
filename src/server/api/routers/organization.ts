@@ -26,7 +26,7 @@ export const organizationRouter = createTRPCRouter({
     if (!ctx.organization) {
       return null;
     }
-    return transformKeysToCamelCase(ctx.organization);
+    return transformKeysToCamelCase(ctx.organization) as OrganizationResponse;
   }),
 
   update: organizationManageProcedure

@@ -399,7 +399,7 @@ export class MappingValidationError extends Error {
   public readonly organization?: string;
 
   constructor(
-    result: MappingValidationResult<never>,
+    result: MappingValidationResult<any>,
     context?: { operation?: string },
   ) {
     if (!result.error) {
@@ -415,8 +415,9 @@ export class MappingValidationError extends Error {
 
     this.name = "MappingValidationError";
     this.type = result.error.type;
-    this.key = result.error.key;
-    this.organization = result.error.organization;
+    if (result.error.key) this.key = result.error.key;
+    if (result.error.organization)
+      this.organization = result.error.organization;
   }
 }
 

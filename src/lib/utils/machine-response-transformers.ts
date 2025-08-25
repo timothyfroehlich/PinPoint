@@ -91,9 +91,9 @@ export function transformMachineResponse(machine: unknown): MachineResponse {
     throw new Error("Machine data must be an object");
   }
 
-  return transformKeysToCamelCase<MachineResponse>(
+  return transformKeysToCamelCase(
     machine as Record<string, unknown>,
-  );
+  ) as MachineResponse;
 }
 
 /**
@@ -146,9 +146,9 @@ export function transformLocationResponse(location: unknown): LocationResponse {
     throw new Error("Location data must be an object");
   }
 
-  const transformed = transformKeysToCamelCase<LocationResponse>(
+  const transformed = transformKeysToCamelCase(
     location as Record<string, unknown>,
-  );
+  ) as LocationResponse;
 
   // Handle nested machines array if present
   if ("machines" in transformed) {
@@ -209,7 +209,7 @@ export function transformLocationsResponse(
 export function transformMachineForIssuesResponse(
   machine: Record<string, unknown>,
 ): MachineForIssues {
-  return transformKeysToCamelCase<MachineForIssues>(machine);
+  return transformKeysToCamelCase(machine) as MachineForIssues;
 }
 
 /**
@@ -257,7 +257,7 @@ export function transformMachinesForIssuesResponse(
 export function transformApiRequestToDb(
   data: Record<string, unknown>,
 ): Record<string, unknown> {
-  return transformKeysToSnakeCase(data);
+  return transformKeysToSnakeCase(data) as Record<string, unknown>;
 }
 
 // Removed redundant type-safe transformers - use the base functions instead

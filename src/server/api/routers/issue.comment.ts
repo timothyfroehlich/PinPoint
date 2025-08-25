@@ -205,12 +205,12 @@ export const issueCommentRouter = createTRPCRouter({
       const validation = validateCommentEdit(commentData, validationContext);
       if (!validation.valid) {
         throw new TRPCError({
-          code: validation.error.includes("not found")
+          code: validation.error?.includes("not found")
             ? "NOT_FOUND"
-            : validation.error.includes("deleted")
+            : validation.error?.includes("deleted")
               ? "BAD_REQUEST"
               : "FORBIDDEN",
-          message: validation.error,
+          message: validation.error ?? "Validation failed",
         });
       }
 
@@ -265,9 +265,9 @@ export const issueCommentRouter = createTRPCRouter({
         });
       }
 
-      return transformKeysToCamelCase<CommentWithAuthorResponse>(
+      return transformKeysToCamelCase(
         commentWithAuthor,
-      );
+      ) as CommentWithAuthorResponse;
     }),
 
   // Delete comment (users can delete their own, admins can delete any)
@@ -354,12 +354,12 @@ export const issueCommentRouter = createTRPCRouter({
       );
       if (!validation.valid) {
         throw new TRPCError({
-          code: validation.error.includes("not found")
+          code: validation.error?.includes("not found")
             ? "NOT_FOUND"
-            : validation.error.includes("already deleted")
+            : validation.error?.includes("already deleted")
               ? "BAD_REQUEST"
               : "FORBIDDEN",
-          message: validation.error,
+          message: validation.error ?? "Validation failed",
         });
       }
 
@@ -446,12 +446,12 @@ export const issueCommentRouter = createTRPCRouter({
       );
       if (!validation.valid) {
         throw new TRPCError({
-          code: validation.error.includes("not found")
+          code: validation.error?.includes("not found")
             ? "NOT_FOUND"
-            : validation.error.includes("not deleted")
+            : validation.error?.includes("not deleted")
               ? "BAD_REQUEST"
               : "FORBIDDEN",
-          message: validation.error,
+          message: validation.error ?? "Validation failed",
         });
       }
 
@@ -490,9 +490,9 @@ export const issueCommentRouter = createTRPCRouter({
       const deletedComments = await commentService.getDeletedComments(
         ctx.organization.id,
       );
-      return transformKeysToCamelCase<CommentWithAuthorResponse[]>(
+      return transformKeysToCamelCase(
         deletedComments,
-      );
+      ) as CommentWithAuthorResponse[];
     },
   ),
 });

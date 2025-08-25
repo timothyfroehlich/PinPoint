@@ -43,7 +43,7 @@ export type CommentResponse = CommentWithAuthorResponse;
 export function transformIssueResponse(
   issue: Record<string, unknown>,
 ): IssueResponse {
-  const transformed = transformKeysToCamelCase<IssueResponse>(issue);
+  const transformed = transformKeysToCamelCase(issue) as IssueResponse;
 
   // Preserve Date objects during transformation (access snake_case properties safely)
   if (issue["created_at"] instanceof Date) {
@@ -68,7 +68,7 @@ export function transformIssueResponse(
 export function transformCommentResponse(
   comment: Record<string, unknown>,
 ): CommentWithAuthorResponse {
-  return transformKeysToCamelCase<CommentWithAuthorResponse>(comment);
+  return transformKeysToCamelCase(comment) as CommentWithAuthorResponse;
 }
 
 /**
@@ -80,7 +80,9 @@ export function transformCommentResponse(
 export function transformAttachmentResponse(
   attachment: Record<string, unknown>,
 ): AttachmentResponse {
-  const transformed = transformKeysToCamelCase<AttachmentResponse>(attachment);
+  const transformed = transformKeysToCamelCase(
+    attachment,
+  ) as AttachmentResponse;
 
   if (attachment["created_at"] instanceof Date) {
     transformed.createdAt = attachment["created_at"];
@@ -141,9 +143,9 @@ export function transformIssueWithRelationsResponse(
   issueWithRelations: Record<string, unknown>,
 ): IssueWithRelationsResponse {
   // Use the simple generic transformer - DrizzleToCamelCase handles all the nested relations correctly
-  return transformKeysToCamelCase<IssueWithRelationsResponse>(
+  return transformKeysToCamelCase(
     issueWithRelations,
-  );
+  ) as IssueWithRelationsResponse;
 }
 
 /**
@@ -156,7 +158,9 @@ export function transformCommentWithAuthorResponse(
   commentWithAuthor: Record<string, unknown>,
 ): CommentWithAuthorResponse {
   // Use the simple generic transformer - DrizzleToCamelCase handles the author relation correctly
-  return transformKeysToCamelCase<CommentWithAuthorResponse>(commentWithAuthor);
+  return transformKeysToCamelCase(
+    commentWithAuthor,
+  ) as CommentWithAuthorResponse;
 }
 
 /**

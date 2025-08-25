@@ -130,6 +130,7 @@ export const createTRPCContext = async (
   const user = await getSupabaseUser();
 
   // Get organization ID from user's app_metadata (used by RLS policies)
+  // NOTE: must be 'let' (was 'const') because we may assign a fallback value later with `organizationId ??= org.id;`
   let organizationId = await getUserOrganizationId(supabase);
 
   let organization: Organization | null = null;

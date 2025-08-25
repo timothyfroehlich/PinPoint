@@ -47,7 +47,7 @@ export const notificationRouter = createTRPCRouter({
         ctx.user.id,
         options,
       );
-      return transformKeysToCamelCase<NotificationResponse[]>(notifications);
+      return transformKeysToCamelCase(notifications) as NotificationResponse[];
     }),
 
   // Get unread count

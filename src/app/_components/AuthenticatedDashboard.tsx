@@ -39,6 +39,7 @@ interface IssueFromList {
 export function AuthenticatedDashboard(): React.ReactNode {
   const { data: issues, isLoading, error } = api.issue.core.getAll.useQuery({});
 
+  // Early return for loading state
   if (isLoading) {
     return (
       <Box sx={{ mb: 4 }}>
@@ -50,6 +51,7 @@ export function AuthenticatedDashboard(): React.ReactNode {
     );
   }
 
+  // Early return for error state
   if (error) {
     return (
       <Box sx={{ mb: 4 }}>
@@ -63,23 +65,52 @@ export function AuthenticatedDashboard(): React.ReactNode {
     );
   }
 
-  // Transform issues with proper typing
-  const openIssues = (issues as unknown as IssueFromList[])
+  // Early return if issues is not properly loaded
+  if (!issues || !Array.isArray(issues)) {
+    return (
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h4" component="h2" sx={{ mb: 3 }}>
+          My Dashboard
+        </Typography>
+        <Typography color="text.secondary">Loading your issues...</Typography>
+      </Box>
+    );
+  }
+
+  // Defensive function to safely check issue structure
+  const isValidIssue = (issue: unknown): issue is IssueFromList => {
+    return (
+      typeof issue === "object" &&
+      issue !== null &&
+      "id" in issue &&
+      "title" in issue &&
+      "status" in issue &&
+      issue.status !== null &&
+      typeof issue.status === "object" &&
+      "category" in issue.status &&
+      typeof issue.status.category === "string"
+    );
+  };
+
+  // Transform issues with comprehensive null safety
+  const validIssues = issues.filter(isValidIssue);
+
+  const openIssues = validIssues
     .filter((issue) => issue.status.category !== "RESOLVED")
     .map((issue) => ({
       id: issue.id,
       title: issue.title,
-      machineName: issue.machine.model.name,
+      machineName: issue.machine?.model?.name || "Unknown Machine",
       status: issue.status,
       priority: issue.priority,
     }));
 
-  const resolvedIssues = (issues as unknown as IssueFromList[])
+  const resolvedIssues = validIssues
     .filter((issue) => issue.status.category === "RESOLVED")
     .map((issue) => ({
       id: issue.id,
       title: issue.title,
-      machineName: issue.machine.model.name,
+      machineName: issue.machine?.model?.name || "Unknown Machine",
       status: issue.status,
       priority: issue.priority,
     }));
