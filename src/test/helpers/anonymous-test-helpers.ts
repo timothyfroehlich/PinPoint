@@ -8,8 +8,6 @@
  * - Session variable setup for database-level scoping
  */
 
-/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/unbound-method */
-
 import { vi } from "vitest";
 import type { MockProxy } from "vitest-mock-extended";
 import { mockDeep } from "vitest-mock-extended";

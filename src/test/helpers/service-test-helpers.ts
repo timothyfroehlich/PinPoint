@@ -8,8 +8,6 @@
  * - Organization scoping verification
  */
 
-/* eslint-disable @typescript-eslint/no-unnecessary-boolean-literal-compare, @typescript-eslint/no-unnecessary-condition, @typescript-eslint/prefer-nullish-coalescing */
-
 import { vi } from "vitest";
 import { mockDeep, type MockProxy } from "vitest-mock-extended";
 import type { DrizzleClient } from "~/server/db/drizzle";

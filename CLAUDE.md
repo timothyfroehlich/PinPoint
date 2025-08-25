@@ -98,6 +98,7 @@ drizzle-kit generate                    # Don't run migration generation
 **REMAINING**: pgTAP RLS tests + smoke tests + 1 baseline unit test (205/205 passing)
 **FOUNDATION**: Simplified vitest config, clean package.json, isolated archived files
 **NEXT**: Archetype-based test system implementation
+**QUALITY EXPECTATIONS**: **All tests and lints should pass** - Report any failures for immediate fixing
 
 **APPROACH**: We've completed the "destructive preparation" phase. Now ready for systematic archetype implementation.
 
@@ -210,11 +211,12 @@ SEED_TEST_IDS.MOCK_PATTERNS.MACHINE; // "mock-machine-1"
 
 **CURRENT STATE**: Clean foundation with minimal infrastructure
 
-- **pgTAP RLS Testing**: `npm run test:rls` - Native PostgreSQL RLS validation
-- **Unit Testing**: Simplified vitest with 1 baseline test suite (inputValidation.test.ts)
-- **Smoke Testing**: Essential Playwright smoke tests only
+- **pgTAP RLS Testing**: `npm run test:rls` - Native PostgreSQL RLS validation (should pass)
+- **Unit Testing**: Simplified vitest with 1 baseline test suite (inputValidation.test.ts) (should pass)
+- **Smoke Testing**: Essential Playwright smoke tests only (should pass)
 - **Archived**: ~130 test files, complex PGlite infrastructure, coverage configs, E2E suite
 
+**QUALITY EXPECTATIONS**: All tests should pass. Any failures indicate issues that need immediate attention.
 **ARCHETYPE IMPLEMENTATION**: Ready for systematic archetype-based test suite rebuild
 
 ## 📐 Testing Archetypes (PLANNED - FOR REBOOT IMPLEMENTATION)

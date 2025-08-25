@@ -181,9 +181,7 @@ export const modelRouter = createTRPCRouter({
         .map((machine) => machine.model)
         .filter(
           (model): model is NonNullable<typeof model> =>
-            model !== null &&
-            model.opdb_id !== null &&
-            model.opdb_id !== undefined &&
+            model?.opdb_id != null &&
             model.organization_id === null && // Only OPDB models
             !model.is_custom,
         )

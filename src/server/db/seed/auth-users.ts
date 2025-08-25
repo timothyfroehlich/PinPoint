@@ -129,6 +129,7 @@ function getUserIdForEmail(email: string): string {
     "escher.lefkoff@example.com": SEED_TEST_IDS.USERS.MEMBER2,
   };
 
+  // eslint-disable-next-line security/detect-object-injection
   return mapping[email] ?? nanoid();
 }
 
@@ -139,7 +140,7 @@ function getUserIdForEmail(email: string): string {
 /**
  * Create Supabase service role client for admin operations
  */
-function createServiceRoleClient() {
+function createServiceRoleClient(): SupabaseClient {
   const supabaseUrl = env.SUPABASE_URL;
   const serviceRoleKey = env.SUPABASE_SECRET_KEY;
 
@@ -217,7 +218,7 @@ async function upsertSupabaseAuthUser(
 
   if (error || !data.user) {
     throw new Error(
-      `Failed to create user ${params.email} with ID ${staticUserId}: ${error?.message || "No user data returned"}`,
+      `Failed to create user ${params.email} with ID ${staticUserId}: ${error?.message ?? "No user data returned"}`,
     );
   }
 
@@ -255,7 +256,7 @@ async function waitForUserRecord(
       }
 
       await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL));
-    } catch (error) {
+    } catch {
       // Continue trying despite query errors
     }
   }
@@ -431,14 +432,14 @@ async function deleteExistingDevUsers(userList: UserData[]): Promise<void> {
         // Delete from database first (cascades to memberships)
         try {
           await db.delete(users).where(eq(users.id, existingUser.id));
-        } catch (dbError) {
+        } catch {
           // Continue even if database deletion fails
         }
 
         // Delete from Supabase auth
         await supabase.auth.admin.deleteUser(existingUser.id);
       }
-    } catch (error) {
+    } catch {
       // Continue with other users even if one fails
     }
   }

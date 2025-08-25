@@ -4,27 +4,36 @@ Purpose: Fast, safe, and correct day-to-day development guidance for this repo. 
 
 ## Context you must assume
 
-- Project phase: Pre‑beta, solo dev, high velocity, Phase 3A TypeScript error elimination (systematic recovery)
+- Project phase: Pre‑beta, solo dev, high velocity, **migration 95% complete**
 - Schema & seed data: LOCKED/IMMUTABLE - code conforms to schema, not vice versa
-- Active migration: Phase 3 test conversion; many tests failing by design until finished
+- Quality expectations: **All tests and lints should pass** - report failures for immediate fixing
 - Tech: Next.js 15, React 19, Drizzle ORM, PGlite for tests, Supabase RLS, Vitest
 - Path alias: `~/*` -> `src/*` (see tsconfig.base.json). Tests use tsconfig.tests.json
 - Use Context7 for docs when unsure: Drizzle, Vitest, Next.js, Supabase evolve quickly
+- TypeScript: @tsconfig/strictest mode - embrace strict errors, they prevent runtime bugs
 
-## Do / Don’t (critical)
+## Do / Don't (critical)
 
-- Do use the worker‑scoped DB pattern in integration tests:
-  - `import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db"`
-  - No per‑test PGlite instances; no `new PGlite()` in tests.
-- For RLS testing use pgTAP (`supabase/tests/rls/`) - PGlite cannot test real RLS policies
-- For business logic use PGlite with RLS bypassed for speed
-- Do use single‑file validation for fast loops:
-  - `npm run validate-file <file>` (all checks) or `npm run test-file <test-file>` (tests only).
+**🚨 ABSOLUTELY FORBIDDEN (Non-Negotiable Patterns):**
 
-- Don’t generate or commit DB migrations pre‑beta.
-- Don’t create per‑test databases or global PGlite instances (memory blowouts).
-- Don’t use shell redirection with Vitest (e.g., `2>&1`, `>`); it breaks CLI parsing.
-- Don’t use `find` with `-exec` or raw `psql`; use rg/safe scripts.
+- **Memory safety**: Never create per-test PGlite instances (causes system lockups)
+- **Migration files**: Never create files in `supabase/migrations/` (pre-beta violation)
+- **Schema modifications**: Schema is locked - code adapts to schema, not vice versa
+- **TypeScript safety defeats**: No `any`, `!.`, unsafe `as` - use proper type guards
+- **Missing org scoping**: Always scope queries by organizationId (security requirement)
+- **Deep relative imports**: No `../../../lib/` - always use `~/lib/` TypeScript aliases
+- **Vitest redirection**: No `2>&1`, `>`, `>>` with npm test commands (breaks CLI)
+- **Dangerous commands**: No `find -exec` or raw `psql` - use rg/safe scripts
+
+**✅ REQUIRED PATTERNS:**
+
+- Use worker‑scoped DB pattern: `import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db"`
+- RLS testing: Use pgTAP (`supabase/tests/rls/`) for real RLS policies
+- Business logic: Use PGlite with RLS bypassed for speed
+- Single‑file validation: `npm run validate-file <file>` for fast loops
+- Organization scoping: Always use `orgScopedProcedure` in tRPC routers
+- TypeScript strictest: Explicit return types, null safety, proper error handling
+- Hardcoded test IDs: Use `SEED_TEST_IDS` for predictable debugging
 
 ## Commands you’ll actually use
 
@@ -61,10 +70,12 @@ Direct Vitest (optional):
 
 ## Hardcoded test data (SEED_TEST_IDS)
 
-- All tests use hardcoded IDs for predictable debugging
+All tests use hardcoded IDs from `~/test/constants/seed-test-ids` for predictable debugging:
+
 - Primary org: `SEED_TEST_IDS.ORGANIZATIONS.primary` ("test-org-pinpoint")
-- Competitor org: `SEED_TEST_IDS.ORGANIZATIONS.competitor` ("test-org-competitor") 
+- Competitor org: `SEED_TEST_IDS.ORGANIZATIONS.competitor` ("test-org-competitor")
 - Admin user: `SEED_TEST_IDS.USERS.ADMIN` ("test-user-tim")
+- Machines: `SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1` ("machine-mm-001")
 - Cross-org isolation testing with dual organizations
 
 ## RLS Testing
@@ -93,10 +104,79 @@ Direct Vitest (optional):
 - Tests live in `src/integration-tests/**` and elsewhere; tsconfig.tests.json includes them.
 - Path alias `~` resolves during Vitest/Vite via vite-tsconfig-paths.
 - Lint budget is permissive during migration: `eslint . --max-warnings 220`.
-- Validate script prints a compact summary; failures are expected during Phase 3.
+- **Quality expectations**: All tests and lints should pass - report any failures for immediate fixing
+
+## API Security Patterns (Multi-tenant)
+
+**tRPC Procedures**:
+
+```typescript
+// ✅ Always scope by organization
+export const issueRouter = createTRPCRouter({
+  list: orgScopedProcedure.query(async ({ ctx }) => {
+    return await db.query.issues.findMany({
+      where: eq(issues.organizationId, ctx.organizationId),
+    });
+  }),
+});
+```
+
+**Server Actions**:
+
+```typescript
+export const withAuth =
+  <T extends any[], R>(action: (userId: string, ...args: T) => Promise<R>) =>
+  async (...args: T): Promise<R> => {
+    const supabase = await createClient();
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser();
+    if (error || !user) redirect("/login");
+    return action(user.id, ...args);
+  };
+```
+
+**Error Handling**:
+
+```typescript
+// ✅ Generic messages (don't leak info)
+throw new TRPCError({ code: "NOT_FOUND", message: "Access denied" });
+// ❌ Never: throw new Error("User not found in org xyz")
+```
+
+## TypeScript Strictest Patterns
+
+**Null Safety**:
+
+```typescript
+// ✅ Safe authentication check
+if (!ctx.session?.user?.id) {
+  throw new TRPCError({ code: "UNAUTHORIZED" });
+}
+const userId = ctx.session.user.id; // Now safe
+
+// ✅ Optional property assignment
+const data = {
+  id: uuid(),
+  ...(name && { name }),
+  ...(description && { description }),
+};
+```
+
+**Type Guards**:
+
+```typescript
+function isValidUser(user: unknown): user is { id: string; email: string } {
+  return (
+    typeof user === "object" && user !== null && "id" in user && "email" in user
+  );
+}
+```
 
 ## When in doubt – Context7
 
-- Always resolve library docs first if an API feels unfamiliar or new since 2024:
-  - Drizzle ORM, Vitest 3.x, Next.js 15, Supabase Auth/RLS, PGlite/ElectricSQL.
-  - Use: resolve-library-id → get-library-docs (topic focus: hooks, routing, transactions, vitest cli).
+Always resolve library docs first if an API feels unfamiliar or new since 2024:
+
+- Drizzle ORM, Vitest 3.x, Next.js 15, Supabase Auth/RLS, PGlite/ElectricSQL
+- Use: resolve-library-id → get-library-docs (topic focus: hooks, routing, transactions, vitest cli)

@@ -165,16 +165,14 @@ export const createTRPCContext = async (
       } satisfies Organization;
 
       // Set organizationId for downstream procedures if not already set
-      if (!organizationId) {
-        organizationId = org.id;
-      }
+      organizationId ??= org.id;
 
       // Set session variable for RLS policies (simple, no verification)
       try {
         await db.execute(
           sql`SET LOCAL app.current_organization_id = ${org.id}`,
         );
-      } catch (error) {
+      } catch {
         // Log but continue - application-layer filtering will work as fallback
         logger.warn({
           msg: "Could not set RLS session variable, using application-layer filtering",

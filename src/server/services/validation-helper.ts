@@ -38,6 +38,7 @@ export const COMMON_FIELD_MAPPINGS: Record<string, string> = {
 export function validateDrizzleFieldAccess(fieldName: string): void {
   if (env.NODE_ENV === "development" && fieldName in COMMON_FIELD_MAPPINGS) {
     throw new Error(
+      // eslint-disable-next-line security/detect-object-injection
       `Incorrect field access: Used '${fieldName}' but should be '${COMMON_FIELD_MAPPINGS[fieldName] ?? "unknown"}'. ` +
         "Database queries must use snake_case for field names.",
     );

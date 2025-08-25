@@ -122,10 +122,12 @@ async function createGlobalPermissions(): Promise<void> {
     ALL_PERMISSIONS.filter((permName) => !existingSet.has(permName)).map(
       (permName) => ({
         id:
-          PERMISSION_ID_MAP[permName] ||
+          // eslint-disable-next-line security/detect-object-injection
+          PERMISSION_ID_MAP[permName] ??
           `perm-fallback-${permName.replace(/[^a-z0-9]/gi, "-")}`,
         name: permName,
         description:
+          // eslint-disable-next-line security/detect-object-injection
           PERMISSION_DESCRIPTIONS[permName] ?? `Permission: ${permName}`,
       }),
     );
@@ -431,6 +433,7 @@ async function createTemplateRole(
   organization_id: string,
   templateName: keyof typeof ROLE_TEMPLATES,
 ): Promise<void> {
+  // eslint-disable-next-line security/detect-object-injection
   const template = ROLE_TEMPLATES[templateName];
   if (!template) {
     throw new Error(`Unknown role template: ${templateName}`);

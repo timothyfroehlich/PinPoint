@@ -144,7 +144,7 @@ async function main(): Promise<void> {
 }
 
 // Run if called directly (ESM equivalent of require.main === module)
-if (import.meta.url === `file://${String(process.argv[1] ?? "")}`) {
+if (import.meta.url === `file://${process.argv[1] ?? ""}`) {
   main().catch((error: unknown) => {
     SeedLogger.error("UNHANDLED", error);
     process.exit(1);

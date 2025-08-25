@@ -47,277 +47,302 @@ export interface SeedConfig {
 // Seed Logger - Unified Logging System
 // ============================================================================
 
-export class SeedLogger {
-  private static isTestMode = env.NODE_ENV === "test" || Boolean(env.VITEST);
+const isTestMode = env.NODE_ENV === "test" || Boolean(env.VITEST);
 
-  /**
-   * Log minimal progress message
-   */
-  static info(message: string): void {
-    if (!this.isTestMode) {
-      console.log(`[SEED] ${message}`);
-    }
-  }
-
-  /**
-   * Log completion with checkmark
-   */
-  static success(message: string): void {
-    if (!this.isTestMode) {
-      console.log(`[SEED] ✅ ${message}`);
-    }
-  }
-
-  /**
-   * Log error with context
-   */
-  static error(context: string, error: unknown): void {
-    console.error(`[SEED] ❌ ${context}:`, error);
-  }
-
-  /**
-   * Log warning with context (only for important safety messages)
-   */
-  static warn(message: string): void {
-    if (!this.isTestMode) {
-      console.log(`[SEED] ⚠️  ${message}`);
-    }
+/**
+ * Log minimal progress message
+ */
+function seedLoggerInfo(message: string): void {
+  if (!isTestMode) {
+    console.log(`[SEED] ${message}`);
   }
 }
+
+/**
+ * Log completion with checkmark
+ */
+function seedLoggerSuccess(message: string): void {
+  if (!isTestMode) {
+    console.log(`[SEED] ✅ ${message}`);
+  }
+}
+
+/**
+ * Log error with context
+ */
+function seedLoggerError(context: string, error: unknown): void {
+  console.error(`[SEED] ❌ ${context}:`, error);
+}
+
+/**
+ * Log warning with context (only for important safety messages)
+ */
+function seedLoggerWarn(message: string): void {
+  if (!isTestMode) {
+    console.log(`[SEED] ⚠️  ${message}`);
+  }
+}
+
+export const SeedLogger = {
+  info: seedLoggerInfo,
+  success: seedLoggerSuccess,
+  error: seedLoggerError,
+  warn: seedLoggerWarn,
+};
 
 // ============================================================================
 // Seed Validator - Reusable Validation Logic
 // ============================================================================
 
-export class SeedValidator {
-  private static readonly VALID_TARGETS: SeedTarget[] = [
-    "local:pg",
-    "local:sb",
-    "preview",
-  ];
-  private static readonly VALID_DATA_AMOUNTS: DataAmount[] = [
-    "minimal",
-    "full",
-  ];
+const VALID_TARGETS: SeedTarget[] = ["local:pg", "local:sb", "preview"];
 
-  /**
-   * Validate seed target parameter
-   */
-  static validateTarget(target: string): target is SeedTarget {
-    return this.VALID_TARGETS.includes(target as SeedTarget);
-  }
+const VALID_DATA_AMOUNTS: DataAmount[] = ["minimal", "full"];
 
-  /**
-   * Validate data amount parameter
-   */
-  static validateDataAmount(dataAmount: string): dataAmount is DataAmount {
-    return this.VALID_DATA_AMOUNTS.includes(dataAmount as DataAmount);
-  }
-
-  /**
-   * Validate environment-specific requirements
-   */
-  static validateEnvironment(
-    target: SeedTarget,
-    supabaseUrl?: string,
-  ): ValidationResult {
-    const errors: string[] = [];
-
-    // Preview environment validation
-    if (target === "preview") {
-      if (!supabaseUrl?.includes("supabase.co")) {
-        errors.push(
-          "Preview environment requires remote Supabase URL (must contain 'supabase.co')",
-        );
-      }
-    }
-
-    return {
-      success: errors.length === 0,
-      errors,
-    };
-  }
-
-  /**
-   * Comprehensive validation of all seed parameters
-   */
-  static validateAll(params: {
-    target: string;
-    dataAmount: string;
-    environment: string;
-    supabaseUrl?: string;
-  }): ValidationResult {
-    const errors: string[] = [];
-
-    // Parameter validation
-    if (!this.validateTarget(params.target)) {
-      errors.push(
-        `Invalid target: ${String(params.target)}. Valid targets: ${this.VALID_TARGETS.join(", ")}`,
-      );
-    }
-
-    if (!this.validateDataAmount(params.dataAmount)) {
-      errors.push(
-        `Invalid data amount: ${String(params.dataAmount)}. Valid amounts: ${this.VALID_DATA_AMOUNTS.join(", ")}`,
-      );
-    }
-
-    // Environment validation
-    if (this.validateTarget(params.target)) {
-      const envValidation = this.validateEnvironment(
-        params.target,
-        params.supabaseUrl,
-      );
-      errors.push(...envValidation.errors);
-    }
-
-    // Safety check for preview mode in development
-    if (params.target === "preview" && params.environment === "development") {
-      errors.push(
-        "Preview target is not allowed in development environment. Use 'local:sb' instead.",
-      );
-    }
-
-    return {
-      success: errors.length === 0,
-      errors,
-    };
-  }
-
-  /**
-   * Show usage help for invalid parameters
-   */
-  static showUsage(): void {
-    console.error(
-      "Usage: tsx src/server/db/seed/index.ts <target> <dataAmount>",
-    );
-    console.error("");
-    console.error("Targets:");
-    console.error("  local:pg  - PostgreSQL-only seeding for CI tests");
-    console.error("  local:sb  - Local Supabase seeding for development");
-    console.error("  preview   - Remote preview environment seeding");
-    console.error("");
-    console.error("Data Amounts:");
-    console.error(
-      "  minimal   - Basic test data (3 users, 6 machines, 10 issues)",
-    );
-    console.error(
-      "  full      - Complete sample data (3 users, 60+ machines, 200+ issues)",
-    );
-    console.error("");
-    console.error("Examples:");
-    console.error("  tsx src/server/db/seed/index.ts local:sb minimal");
-    console.error("  tsx src/server/db/seed/index.ts preview full");
-  }
+/**
+ * Validate seed target parameter
+ */
+function seedValidatorValidateTarget(target: string): target is SeedTarget {
+  return VALID_TARGETS.includes(target as SeedTarget);
 }
+
+/**
+ * Validate data amount parameter
+ */
+function seedValidatorValidateDataAmount(
+  dataAmount: string,
+): dataAmount is DataAmount {
+  return VALID_DATA_AMOUNTS.includes(dataAmount as DataAmount);
+}
+
+/**
+ * Validate environment-specific requirements
+ */
+function seedValidatorValidateEnvironment(
+  target: SeedTarget,
+  supabaseUrl?: string,
+): ValidationResult {
+  const errors: string[] = [];
+
+  // Preview environment validation
+  if (target === "preview") {
+    if (!supabaseUrl?.includes("supabase.co")) {
+      errors.push(
+        "Preview environment requires remote Supabase URL (must contain 'supabase.co')",
+      );
+    }
+  }
+
+  return {
+    success: errors.length === 0,
+    errors,
+  };
+}
+
+/**
+ * Comprehensive validation of all seed parameters
+ */
+function seedValidatorValidateAll(params: {
+  target: string;
+  dataAmount: string;
+  environment: string;
+  supabaseUrl?: string;
+}): ValidationResult {
+  const errors: string[] = [];
+
+  // Parameter validation
+  if (!seedValidatorValidateTarget(params.target)) {
+    errors.push(
+      `Invalid target: ${params.target}. Valid targets: ${VALID_TARGETS.join(", ")}`,
+    );
+  }
+
+  if (!seedValidatorValidateDataAmount(params.dataAmount)) {
+    errors.push(
+      `Invalid data amount: ${params.dataAmount}. Valid amounts: ${VALID_DATA_AMOUNTS.join(", ")}`,
+    );
+  }
+
+  // Environment validation
+  if (seedValidatorValidateTarget(params.target)) {
+    const envValidation = seedValidatorValidateEnvironment(
+      params.target,
+      params.supabaseUrl,
+    );
+    errors.push(...envValidation.errors);
+  }
+
+  // Safety check for preview mode in development
+  if (params.target === "preview" && params.environment === "development") {
+    errors.push(
+      "Preview target is not allowed in development environment. Use 'local:sb' instead.",
+    );
+  }
+
+  return {
+    success: errors.length === 0,
+    errors,
+  };
+}
+
+/**
+ * Show usage help for invalid parameters
+ */
+function seedValidatorShowUsage(): void {
+  console.error("Usage: tsx src/server/db/seed/index.ts <target> <dataAmount>");
+  console.error("");
+  console.error("Targets:");
+  console.error("  local:pg  - PostgreSQL-only seeding for CI tests");
+  console.error("  local:sb  - Local Supabase seeding for development");
+  console.error("  preview   - Remote preview environment seeding");
+  console.error("");
+  console.error("Data Amounts:");
+  console.error(
+    "  minimal   - Basic test data (3 users, 6 machines, 10 issues)",
+  );
+  console.error(
+    "  full      - Complete sample data (3 users, 60+ machines, 200+ issues)",
+  );
+  console.error("");
+  console.error("Examples:");
+  console.error("  tsx src/server/db/seed/index.ts local:sb minimal");
+  console.error("  tsx src/server/db/seed/index.ts preview full");
+}
+
+export const SeedValidator = {
+  validateTarget: seedValidatorValidateTarget,
+  validateDataAmount: seedValidatorValidateDataAmount,
+  validateEnvironment: seedValidatorValidateEnvironment,
+  validateAll: seedValidatorValidateAll,
+  showUsage: seedValidatorShowUsage,
+};
 
 // ============================================================================
 // Seed Mapper - ID Resolution Without Switch Statements
 // ============================================================================
 
-export class SeedMapper {
-  /**
-   * Get membership ID for user email and organization
-   * Replaces switch statements with mapping object lookups
-   */
-  static getMembershipId(email: string, organization_id: string): string {
-    const mapping =
-      STATIC_MAPPINGS.EMAIL_TO_MEMBERSHIP[
-        email as keyof typeof STATIC_MAPPINGS.EMAIL_TO_MEMBERSHIP
-      ];
-    if (!mapping) {
-      throw new SeedError(
-        "MAPPER",
-        `get membership ID for unknown email: ${email}`,
-      );
-    }
+/**
+ * Get membership ID for user email and organization
+ * Replaces switch statements with mapping object lookups
+ */
+function seedMapperGetMembershipId(
+  email: string,
+  organization_id: string,
+): string {
+  const mapping =
+    STATIC_MAPPINGS.EMAIL_TO_MEMBERSHIP[
+      email as keyof typeof STATIC_MAPPINGS.EMAIL_TO_MEMBERSHIP
+    ];
 
-    const isPrimary = organization_id === SEED_TEST_IDS.ORGANIZATIONS.primary;
-    return isPrimary ? mapping.primary : mapping.competitor;
+  if (!mapping) {
+    throw new SeedError(
+      "MAPPER",
+      `get membership ID for unknown email: ${email}`,
+    );
   }
 
-  /**
-   * Get priority ID for priority name and organization
-   * Replaces switch statements with mapping object lookups
-   */
-  static getPriorityId(priorityName: string, organization_id: string): string {
-    const mapping =
-      STATIC_MAPPINGS.PRIORITY_NAMES[
-        priorityName as keyof typeof STATIC_MAPPINGS.PRIORITY_NAMES
-      ];
-    if (!mapping) {
-      throw new SeedError(
-        "MAPPER",
-        `get priority ID for unknown priority: ${priorityName}`,
-      );
-    }
-
-    const isPrimary = organization_id === SEED_TEST_IDS.ORGANIZATIONS.primary;
-    return isPrimary ? mapping.primary : mapping.competitor;
-  }
-
-  /**
-   * Get status ID for status name and organization
-   * Replaces switch statements with mapping object lookups
-   */
-  static getStatusId(statusName: string, organization_id: string): string {
-    const mapping =
-      STATIC_MAPPINGS.STATUS_NAMES[
-        statusName as keyof typeof STATIC_MAPPINGS.STATUS_NAMES
-      ];
-    if (!mapping) {
-      throw new SeedError(
-        "MAPPER",
-        `get status ID for unknown status: ${statusName}`,
-      );
-    }
-
-    const isPrimary = organization_id === SEED_TEST_IDS.ORGANIZATIONS.primary;
-    return isPrimary ? mapping.primary : mapping.competitor;
-  }
-
-  /**
-   * Get role ID for role name and organization
-   */
-  static getRoleId(roleName: string, organization_id: string): string {
-    const mapping =
-      STATIC_MAPPINGS.ROLE_NAMES[
-        roleName as keyof typeof STATIC_MAPPINGS.ROLE_NAMES
-      ];
-    if (!mapping) {
-      throw new SeedError(
-        "MAPPER",
-        `get role ID for unknown role: ${roleName}`,
-      );
-    }
-
-    const isPrimary = organization_id === SEED_TEST_IDS.ORGANIZATIONS.primary;
-    return isPrimary ? mapping.primary : mapping.competitor;
-  }
-
-  /**
-   * Get collection type ID for collection type name and organization
-   * Replaces switch statements with mapping object lookups
-   */
-  static getCollectionTypeId(
-    typeName: string,
-    organization_id: string,
-  ): string {
-    const mapping =
-      STATIC_MAPPINGS.COLLECTION_TYPE_NAMES[
-        typeName as keyof typeof STATIC_MAPPINGS.COLLECTION_TYPE_NAMES
-      ];
-    if (!mapping) {
-      throw new SeedError(
-        "MAPPER",
-        `get collection type ID for unknown type: ${typeName}`,
-      );
-    }
-
-    const isPrimary = organization_id === SEED_TEST_IDS.ORGANIZATIONS.primary;
-    return isPrimary ? mapping.primary : mapping.competitor;
-  }
+  const isPrimary = organization_id === SEED_TEST_IDS.ORGANIZATIONS.primary;
+  return isPrimary ? mapping.primary : mapping.competitor;
 }
+
+/**
+ * Get priority ID for priority name and organization
+ * Replaces switch statements with mapping object lookups
+ */
+function seedMapperGetPriorityId(
+  priorityName: string,
+  organization_id: string,
+): string {
+  const mapping =
+    STATIC_MAPPINGS.PRIORITY_NAMES[
+      priorityName as keyof typeof STATIC_MAPPINGS.PRIORITY_NAMES
+    ];
+
+  if (!mapping) {
+    throw new SeedError(
+      "MAPPER",
+      `get priority ID for unknown priority: ${priorityName}`,
+    );
+  }
+
+  const isPrimary = organization_id === SEED_TEST_IDS.ORGANIZATIONS.primary;
+  return isPrimary ? mapping.primary : mapping.competitor;
+}
+
+/**
+ * Get status ID for status name and organization
+ * Replaces switch statements with mapping object lookups
+ */
+function seedMapperGetStatusId(
+  statusName: string,
+  organization_id: string,
+): string {
+  const mapping =
+    STATIC_MAPPINGS.STATUS_NAMES[
+      statusName as keyof typeof STATIC_MAPPINGS.STATUS_NAMES
+    ];
+
+  if (!mapping) {
+    throw new SeedError(
+      "MAPPER",
+      `get status ID for unknown status: ${statusName}`,
+    );
+  }
+
+  const isPrimary = organization_id === SEED_TEST_IDS.ORGANIZATIONS.primary;
+  return isPrimary ? mapping.primary : mapping.competitor;
+}
+
+/**
+ * Get role ID for role name and organization
+ */
+function seedMapperGetRoleId(
+  roleName: string,
+  organization_id: string,
+): string {
+  const mapping =
+    STATIC_MAPPINGS.ROLE_NAMES[
+      roleName as keyof typeof STATIC_MAPPINGS.ROLE_NAMES
+    ];
+
+  if (!mapping) {
+    throw new SeedError("MAPPER", `get role ID for unknown role: ${roleName}`);
+  }
+
+  const isPrimary = organization_id === SEED_TEST_IDS.ORGANIZATIONS.primary;
+  return isPrimary ? mapping.primary : mapping.competitor;
+}
+
+/**
+ * Get collection type ID for collection type name and organization
+ * Replaces switch statements with mapping object lookups
+ */
+function seedMapperGetCollectionTypeId(
+  typeName: string,
+  organization_id: string,
+): string {
+  const mapping =
+    STATIC_MAPPINGS.COLLECTION_TYPE_NAMES[
+      typeName as keyof typeof STATIC_MAPPINGS.COLLECTION_TYPE_NAMES
+    ];
+
+  if (!mapping) {
+    throw new SeedError(
+      "MAPPER",
+      `get collection type ID for unknown type: ${typeName}`,
+    );
+  }
+
+  const isPrimary = organization_id === SEED_TEST_IDS.ORGANIZATIONS.primary;
+  return isPrimary ? mapping.primary : mapping.competitor;
+}
+
+export const SeedMapper = {
+  getMembershipId: seedMapperGetMembershipId,
+  getPriorityId: seedMapperGetPriorityId,
+  getStatusId: seedMapperGetStatusId,
+  getRoleId: seedMapperGetRoleId,
+  getCollectionTypeId: seedMapperGetCollectionTypeId,
+};
 
 // ============================================================================
 // Error Handling Utilities

@@ -181,6 +181,7 @@ export class RoleService {
     templateName: keyof typeof ROLE_TEMPLATES,
     overrides: Partial<{ name: string; is_default: boolean }> = {},
   ): Promise<Role> {
+    // eslint-disable-next-line security/detect-object-injection
     const template = ROLE_TEMPLATES[templateName];
     const roleName = overrides.name ?? template.name;
 
@@ -545,6 +546,7 @@ export class RoleService {
           await this.drizzle.insert(permissions).values({
             id: generatePrefixedId("perm"),
             name,
+            // eslint-disable-next-line security/detect-object-injection
             description: PERMISSION_DESCRIPTIONS[name] ?? `Permission: ${name}`,
           });
         } catch (error) {

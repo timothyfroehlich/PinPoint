@@ -241,7 +241,10 @@ export default tseslint.config(
   // },
   {
     // Override: Test files - relaxed standards for pragmatic testing
-    files: convertPatterns.forESLint(INCLUDE_PATTERNS.tests),
+    files: [
+      ...convertPatterns.forESLint(INCLUDE_PATTERNS.tests),
+      "src/test/**/*.ts",
+    ],
     plugins: {
       vitest: vitestPlugin,
     },

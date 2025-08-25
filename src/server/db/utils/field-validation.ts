@@ -121,6 +121,7 @@ export const FIELD_MAPPINGS: Record<string, string> = {
  * @returns The corresponding snake_case field name, or the original if no mapping exists
  */
 export function getFieldMapping(camelCaseField: string): string {
+  // eslint-disable-next-line security/detect-object-injection
   return FIELD_MAPPINGS[camelCaseField] ?? camelCaseField;
 }
 
@@ -244,5 +245,6 @@ export function validateCommonPattern(
   tableName: TableName,
   pattern: keyof typeof COMMON_FIELDS,
 ): ReturnType<typeof validateFieldAccess> {
+  // eslint-disable-next-line security/detect-object-injection
   return validateFieldAccess(tableName, [...COMMON_FIELDS[pattern]]);
 }

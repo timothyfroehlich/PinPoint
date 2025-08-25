@@ -171,6 +171,7 @@ export class PermissionService {
 
     // Add all dependencies
     permissions.forEach((permission) => {
+      // eslint-disable-next-line security/detect-object-injection
       const dependencies = PERMISSION_DEPENDENCIES[permission];
       if (dependencies) {
         dependencies.forEach((dep) => expandedPermissions.add(dep));

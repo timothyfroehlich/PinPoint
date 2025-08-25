@@ -132,10 +132,13 @@ async function createModels(games: UniqueGame[]): Promise<void> {
   const existingOpdbIdSet = new Set(
     existingModelOpdbIds
       .map((m) => m.opdb_id)
-      .filter((id): id is string => id !== null && id !== undefined),
+      .filter((id): id is string => id != null),
   );
   const actualNewModels = modelsToCreate.filter(
-    (m) => m.opdb_id && !existingOpdbIdSet.has(m.opdb_id),
+    (m) =>
+      m.opdb_id !== null &&
+      m.opdb_id !== undefined &&
+      !existingOpdbIdSet.has(m.opdb_id),
   );
 
   await db
@@ -176,7 +179,12 @@ async function createMachines(
     );
   }
 
-  const location_id = location[0]!.id;
+  if (!location[0]) {
+    throw new Error(
+      `Location query returned empty result for organization ${organization_id}`,
+    );
+  }
+  const location_id = location[0].id;
 
   // Get admin user for machine ownership
   const devUsers = await db
@@ -255,7 +263,10 @@ async function createCompetitorMachine(): Promise<void> {
     throw new Error("Revenge from Mars model not found for competitor machine");
   }
 
-  const model_id = revengeModel[0]!.id;
+  if (!revengeModel[0]) {
+    throw new Error("Revenge from Mars model query returned empty result");
+  }
+  const model_id = revengeModel[0].id;
 
   // Find competitor organization location (no is_default field in schema)
   const competitorLocation = await db
@@ -270,7 +281,10 @@ async function createCompetitorMachine(): Promise<void> {
     throw new Error("Competitor organization location not found");
   }
 
-  const location_id = competitorLocation[0]!.id;
+  if (!competitorLocation[0]) {
+    throw new Error("Competitor location query returned empty result");
+  }
+  const location_id = competitorLocation[0].id;
 
   // Create competitor machine
   await db
@@ -342,7 +356,11 @@ async function createSampleIssues(
     .filter((issue) => machine_idMap.has(issue.machine_id))
     .map((issue) => ({
       ...issue,
-      machine_id: machine_idMap.get(issue.machine_id)!,
+      machine_id:
+        machine_idMap.get(issue.machine_id) ??
+        (() => {
+          throw new Error(`Machine ID not found in map: ${issue.machine_id}`);
+        })(),
       organization_id,
     }));
 
@@ -372,7 +390,7 @@ export async function seedSampleData(
     const uniqueGames = await withErrorContext(
       "SAMPLE_DATA",
       "extract unique games from sample issues",
-      async () => extractUniqueGames(dataAmount),
+      () => extractUniqueGames(dataAmount),
     );
 
     // Create OPDB models
