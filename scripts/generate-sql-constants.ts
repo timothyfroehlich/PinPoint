@@ -115,8 +115,8 @@ $$ LANGUAGE plpgsql;
 
 -- Convenience function to set competitor org context  
 CREATE OR REPLACE FUNCTION set_competitor_org_context(
-  user_id TEXT DEFAULT test_user_admin(),
-  role_name TEXT DEFAULT 'admin'
+  user_id TEXT DEFAULT test_user_member2(),
+  role_name TEXT DEFAULT 'member'
 ) RETURNS VOID AS $$
 BEGIN
   PERFORM set_jwt_claims_for_test(test_org_competitor(), user_id, role_name, ARRAY['*']);

@@ -14,7 +14,7 @@ export const modelCoreRouter = createTRPCRouter({
       with: {
         machines: {
           columns: { id: true },
-          where: eq(machines.organizationId, ctx.organizationId),
+          where: eq(machines.organization_id, ctx.organizationId),
         },
       },
     });
@@ -46,7 +46,7 @@ export const modelCoreRouter = createTRPCRouter({
         with: {
           machines: {
             columns: { id: true },
-            where: eq(machines.organizationId, ctx.organizationId),
+            where: eq(machines.organization_id, ctx.organizationId),
           },
         },
       });
@@ -78,7 +78,7 @@ export const modelCoreRouter = createTRPCRouter({
         where: eq(models.id, input.id),
         with: {
           machines: {
-            columns: { id: true, organizationId: true },
+            columns: { id: true, organization_id: true },
           },
         },
       });
@@ -92,7 +92,7 @@ export const modelCoreRouter = createTRPCRouter({
 
       // Check if this organization has any machines of this model
       const orgMachines = model.machines.filter(
-        (m) => m.organizationId === ctx.organizationId,
+        (m) => m.organization_id === ctx.organizationId,
       );
 
       if (orgMachines.length === 0) {
@@ -102,7 +102,7 @@ export const modelCoreRouter = createTRPCRouter({
         });
       }
 
-      if (model.isCustom) {
+      if (model.is_custom) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "Cannot delete custom games. Remove game instances instead.",

@@ -24,6 +24,7 @@ import {
   Tooltip,
 } from "@mui/material";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useState } from "react";
 
 import { ActiveFilters } from "./ActiveFilters";
@@ -44,6 +45,7 @@ import {
   selectAll,
   selectNone,
 } from "~/lib/issues/selectionUtils";
+// Types imported but managed via tRPC inferrence
 
 // Helper function to get status color based on category
 const getStatusColor = (
@@ -63,51 +65,7 @@ const getStatusColor = (
 
 // IssueFilters interface imported from ~/lib/issues/filterUtils
 
-// Type for issue data from tRPC (matches actual API response)
-interface IssueData {
-  id: string;
-  title: string;
-  status: {
-    id: string;
-    name: string;
-    category: "NEW" | "IN_PROGRESS" | "RESOLVED";
-    organization_id: string;
-    is_default: boolean;
-  };
-  priority: {
-    id: string;
-    name: string;
-    order: number;
-    organization_id: string;
-    is_default: boolean;
-  } | null;
-  machine: {
-    id: string;
-    name: string;
-    model: {
-      id: string;
-      name: string;
-      manufacturer: string | null;
-      year: number | null;
-    };
-    location: {
-      id: string;
-      name: string;
-      organization_id: string;
-    };
-  };
-  assignedTo: {
-    id: string;
-    name: string | null;
-    email: string | null;
-    image: string | null;
-  } | null;
-  created_at: string | Date;
-  _count: {
-    comments: number;
-    attachments: number;
-  };
-}
+// Using centralized API types
 
 interface IssueListProps {
   initialFilters: IssueFilters;
@@ -339,7 +297,7 @@ export function IssueList({
           </Grid>
 
           {/* Issue Cards */}
-          {issues.map((issue: IssueData) => (
+          {issues.map((issue) => (
             <Grid
               key={issue.id}
               size={{
@@ -399,11 +357,20 @@ export function IssueList({
                         mb={viewMode === "list" ? 0.5 : 1}
                         gap={2}
                       >
+                        {/* Accessible navigation: use real link for issue title */}
                         <Typography
                           variant={viewMode === "list" ? "subtitle1" : "h6"}
-                          component="h3"
+                          component={Link}
+                          href={`/issues/${issue.id}`}
+                          data-testid={`issue-title-${issue.id}`}
+                          data-issue-id={issue.id}
+                          onClick={(e) => {
+                            // Prevent selection checkbox / card handlers from conflicting
+                            e.stopPropagation();
+                          }}
                           sx={{
                             cursor: "pointer",
+                            textDecoration: "none",
                             "&:hover": {
                               textDecoration: "underline",
                               color: "primary.main",
@@ -412,11 +379,7 @@ export function IssueList({
                             textOverflow: "ellipsis",
                             whiteSpace: "nowrap",
                             minWidth: 0,
-                          }}
-                          onClick={(e) => {
-                            // Prevent event propagation to parent elements
-                            e.stopPropagation();
-                            router.push(`/issues/${issue.id}`);
+                            color: "text.primary",
                           }}
                         >
                           {issue.title}
@@ -444,8 +407,7 @@ export function IssueList({
                           whiteSpace: "nowrap",
                         }}
                       >
-                        {issue.machine.model.name} at{" "}
-                        {issue.machine.location.name}
+                        {`${issue.machine.model.name} at ${issue.machine.location.name}`}
                       </Typography>
                       {/* Priority and Comments/Attachments - Show in grid view or as inline in list */}
                       {viewMode === "grid" ? (
@@ -457,7 +419,7 @@ export function IssueList({
                           gap={1}
                         >
                           <Chip
-                            label={issue.priority?.name ?? "Normal"}
+                            label={issue.priority.name}
                             size="small"
                             variant="outlined"
                             sx={{ flexShrink: 0 }}
@@ -467,8 +429,8 @@ export function IssueList({
                             color="text.secondary"
                             sx={{ textAlign: "right" }}
                           >
-                            {issue._count.comments} comments •{" "}
-                            {issue._count.attachments} attachments
+                            {issue.comments.length} comments •{" "}
+                            {issue.attachments.length} attachments
                           </Typography>
                         </Box>
                       ) : (
@@ -479,13 +441,13 @@ export function IssueList({
                           mb={0.5}
                         >
                           <Chip
-                            label={issue.priority?.name ?? "Normal"}
+                            label={issue.priority.name}
                             size="small"
                             variant="outlined"
                           />
                           <Typography variant="caption" color="text.secondary">
-                            {issue._count.comments} comments •{" "}
-                            {issue._count.attachments} attachments
+                            {issue.comments.length} comments •{" "}
+                            {issue.attachments.length} attachments
                           </Typography>
                         </Box>
                       )}
@@ -537,7 +499,7 @@ export function IssueList({
                           color="text.secondary"
                           sx={{ flexShrink: 0 }}
                         >
-                          {new Date(issue.created_at).toLocaleDateString()}
+                          {new Date(issue.createdAt).toLocaleDateString()}
                         </Typography>
                       </Box>
                     </Box>

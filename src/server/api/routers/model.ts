@@ -1,65 +1,81 @@
+// External libraries (alphabetical)
 import { TRPCError } from "@trpc/server";
-import { eq, and, isNull, or } from "drizzle-orm";
+import { and, eq, isNull, or } from "drizzle-orm";
 import { z } from "zod";
 
+// Internal types (alphabetical)
+import type { ModelResponse } from "~/lib/types/api";
+import type { OPDBSearchResult } from "~/lib/opdb/types";
+
+// Internal utilities (alphabetical)
 import { env } from "~/env";
-import { OPDBClient } from "~/lib/opdb/client";
 import { generateId } from "~/lib/utils/id-generation";
+import { transformKeysToCamelCase } from "~/lib/utils/case-transformers";
+import { OPDBClient } from "~/lib/opdb/client";
+
+// Server modules (alphabetical)
 import {
   createTRPCRouter,
-  orgScopedProcedure,
   organizationManageProcedure,
+  orgScopedProcedure,
 } from "~/server/api/trpc";
-import { models, machines } from "~/server/db/schema";
+
+// Database schema (alphabetical)
+import { machines, models } from "~/server/db/schema";
+import { type Model } from "~/server/db/types";
 
 export const modelRouter = createTRPCRouter({
   // Get all models accessible to this organization
   // Includes: OPDB models (global) + org's custom models (future v1.x feature)
-  getAll: orgScopedProcedure.query(async ({ ctx }) => {
-    const allModels = await ctx.db.query.models.findMany({
-      where:
-        // Global OPDB models (organizationId = NULL) OR org's custom models
-        or(
-          isNull(models.organizationId), // OPDB models
-          eq(models.organizationId, ctx.organizationId), // Custom models
-        ),
-      with: {
-        machines: {
-          where: eq(machines.organizationId, ctx.organizationId),
-          columns: { id: true },
+  getAll: orgScopedProcedure.query(
+    async ({ ctx }): Promise<ModelResponse[]> => {
+      const allModels = await ctx.db.query.models.findMany({
+        where:
+          // Global OPDB models (organizationId = NULL) OR org's custom models
+          or(
+            isNull(models.organization_id), // OPDB models
+            eq(models.organization_id, ctx.organizationId), // Custom models
+          ),
+        with: {
+          machines: {
+            where: eq(machines.organization_id, ctx.organizationId),
+            columns: { id: true },
+          },
         },
-      },
-    });
+      });
 
-    // Add machine count and sort by name
-    return allModels
-      .map((model) => ({
-        ...model,
-        machineCount: model.machines.length,
-        _count: {
-          machines: model.machines.length,
-        },
-        machines: undefined, // Remove machines array from response
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }),
+      // Add machine count and sort by name
+      return allModels
+        .map((m) => {
+          const { machines, ...base } = m;
+          const count = machines.length;
+          const transformed = transformKeysToCamelCase({
+            ...base,
+            machineCount: count,
+            _count: { machines: count },
+          });
+          return transformed as ModelResponse;
+        })
+        .sort((a, b) => a.name.localeCompare(b.name));
+    },
+  ),
 
   // Get single model by ID (must be accessible to organization)
   getById: orgScopedProcedure
     .input(z.object({ id: z.string() }))
-    .query(async ({ ctx, input }) => {
+    .query(async ({ ctx, input }): Promise<ModelResponse> => {
       const model = await ctx.db.query.models.findFirst({
         where: and(
           eq(models.id, input.id),
           // Must be OPDB model OR org's custom model
           or(
-            isNull(models.organizationId), // OPDB models
-            eq(models.organizationId, ctx.organizationId), // Custom models
+            isNull(models.organization_id), // OPDB models
+            eq(models.organization_id, ctx.organizationId), // Custom models
           ),
         ),
         with: {
           machines: {
-            where: eq(machines.organizationId, ctx.organizationId),
+            where: (m, { eq }) => eq(m.organization_id, ctx.organizationId),
             columns: { id: true },
           },
         },
@@ -73,20 +89,20 @@ export const modelRouter = createTRPCRouter({
       }
 
       // Return model with machine count
-      return {
-        ...model,
-        machineCount: model.machines.length,
-        _count: {
-          machines: model.machines.length,
-        },
-        machines: undefined, // Remove machines array from response
-      };
+      const { machines, ...base } = model;
+      const count = machines.length;
+      const transformed = transformKeysToCamelCase({
+        ...base,
+        machineCount: count,
+        _count: { machines: count },
+      });
+      return transformed as ModelResponse;
     }),
 
   // Search OPDB games for typeahead
   searchOPDB: orgScopedProcedure
     .input(z.object({ query: z.string().min(1) }))
-    .query(async ({ input }) => {
+    .query(async ({ input }): Promise<OPDBSearchResult[]> => {
       const opdbClient = new OPDBClient(env.OPDB_API_KEY, env.OPDB_API_URL);
       return await opdbClient.searchMachines(input.query);
     }),
@@ -94,12 +110,12 @@ export const modelRouter = createTRPCRouter({
   // Create Model from OPDB data
   createFromOPDB: organizationManageProcedure
     .input(z.object({ opdbId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }): Promise<Model> => {
       // Check if this OPDB game already exists globally
       const existingGame = await ctx.db.query.models.findFirst({
         where: and(
-          eq(models.opdbId, input.opdbId),
-          isNull(models.organizationId), // OPDB models have NULL organizationId
+          eq(models.opdb_id, input.opdbId),
+          isNull(models.organization_id), // OPDB models have NULL organizationId
         ),
       });
 
@@ -138,88 +154,98 @@ export const modelRouter = createTRPCRouter({
         })
         .returning();
 
+      if (!newModel) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to create model",
+        });
+      }
+
       return newModel;
     }),
 
   // Sync existing OPDB models with latest OPDB data
-  syncWithOPDB: organizationManageProcedure.mutation(async ({ ctx }) => {
-    // Find all OPDB models that have machines in this organization
-    const machinesInOrg = await ctx.db.query.machines.findMany({
-      where: eq(machines.organizationId, ctx.organizationId),
-      with: {
-        model: true,
-      },
-    });
+  syncWithOPDB: organizationManageProcedure.mutation(
+    async ({
+      ctx,
+    }): Promise<{ synced: number; total?: number; message: string }> => {
+      // Find all OPDB models that have machines in this organization
+      const machinesInOrg = await ctx.db.query.machines.findMany({
+        where: eq(machines.organization_id, ctx.organizationId),
+        with: {
+          model: true,
+        },
+      });
 
-    const opdbModelsToSync = machinesInOrg
-      .map((machine) => machine.model)
-      .filter(
-        (model): model is NonNullable<typeof model> =>
-          model !== null &&
-          model !== undefined &&
-          model.opdbId !== null &&
-          model.opdbId !== undefined &&
-          model.organizationId === null && // Only OPDB models
-          !model.isCustom,
-      )
-      // Remove duplicates by creating a Map
-      .reduce((uniqueModels, model) => {
-        uniqueModels.set(model.id, model);
-        return uniqueModels;
-      }, new Map<string, NonNullable<(typeof machinesInOrg)[0]["model"]>>());
+      const opdbModelsToSync = machinesInOrg
+        .map((machine) => machine.model)
+        .filter(
+          (model): model is NonNullable<typeof model> =>
+            model !== null &&
+            model.opdb_id !== null &&
+            model.opdb_id !== undefined &&
+            model.organization_id === null && // Only OPDB models
+            !model.is_custom,
+        )
+        // Remove duplicates by creating a Map
+        .reduce((uniqueModels, model) => {
+          uniqueModels.set(model.id, model);
+          return uniqueModels;
+        }, new Map<string, NonNullable<(typeof machinesInOrg)[0]["model"]>>());
 
-    const uniqueModels = Array.from(opdbModelsToSync.values());
+      const uniqueModels = Array.from(opdbModelsToSync.values());
 
-    if (uniqueModels.length === 0) {
-      return { synced: 0, message: "No OPDB-linked games found to sync" };
-    }
-
-    const opdbClient = new OPDBClient(env.OPDB_API_KEY, env.OPDB_API_URL);
-    let syncedCount = 0;
-
-    // Sync each title with OPDB data
-    for (const title of uniqueModels) {
-      try {
-        if (!title.opdbId) continue; // Type guard
-
-        const machineData = await opdbClient.getMachineById(title.opdbId);
-
-        if (machineData) {
-          await ctx.db
-            .update(models)
-            .set({
-              name: machineData.name,
-              manufacturer: machineData.manufacturer ?? null,
-              year: machineData.year ?? null,
-              opdb_img_url: machineData.playfield_image ?? null,
-              machine_type: machineData.type ?? null,
-            })
-            .where(eq(models.id, title.id));
-          syncedCount++;
-        }
-      } catch (error) {
-        ctx.logger.error({
-          msg: "Failed to sync OPDB game",
-          component: "modelRouter.syncOPDBGames",
-          context: {
-            gameTitle: title.name,
-            gameId: title.id,
-            opdbId: title.opdbId,
-            operation: "opdb_sync",
-          },
-          error: {
-            message: error instanceof Error ? error.message : String(error),
-          },
-        });
+      if (uniqueModels.length === 0) {
+        return { synced: 0, message: "No OPDB-linked games found to sync" };
       }
-    }
 
-    return {
-      synced: syncedCount,
-      total: uniqueModels.length,
-      message: `Synced ${syncedCount.toString()} of ${uniqueModels.length.toString()} games`,
-    };
-  }),
+      const opdbClient = new OPDBClient(env.OPDB_API_KEY, env.OPDB_API_URL);
+      let syncedCount = 0;
+
+      // Sync each title with OPDB data
+      for (const title of uniqueModels) {
+        try {
+          if (!title.opdb_id) continue; // Type guard
+
+          const machineData = await opdbClient.getMachineById(title.opdb_id);
+
+          if (machineData) {
+            await ctx.db
+              .update(models)
+              .set({
+                name: machineData.name,
+                manufacturer: machineData.manufacturer ?? null,
+                year: machineData.year ?? null,
+                opdb_img_url: machineData.playfield_image ?? null,
+                machine_type: machineData.type ?? null,
+              })
+              .where(eq(models.id, title.id));
+            syncedCount++;
+          }
+        } catch (error) {
+          ctx.logger.error({
+            msg: "Failed to sync OPDB game",
+            component: "modelRouter.syncOPDBGames",
+            context: {
+              gameTitle: title.name,
+              gameId: title.id,
+              opdbId: title.opdb_id,
+              operation: "opdb_sync",
+            },
+            error: {
+              message: error instanceof Error ? error.message : String(error),
+            },
+          });
+        }
+      }
+
+      return {
+        synced: syncedCount,
+        total: uniqueModels.length,
+        message: `Synced ${String(syncedCount)} of ${String(uniqueModels.length)} games`,
+      };
+    },
+  ),
 
   // Note: Custom model CRUD operations will be added in v1.x
   // For now, OPDB models are read-only after creation and cannot be deleted

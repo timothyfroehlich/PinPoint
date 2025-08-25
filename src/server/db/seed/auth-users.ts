@@ -11,6 +11,7 @@ import { nanoid } from "nanoid";
 
 // Internal utilities
 import { createDrizzleClient } from "~/server/db/drizzle";
+import { env } from "~/env.js";
 import { SEED_TEST_IDS } from "./constants";
 import {
   SeedLogger,
@@ -139,8 +140,8 @@ function getUserIdForEmail(email: string): string {
  * Create Supabase service role client for admin operations
  */
 function createServiceRoleClient() {
-  const supabaseUrl = process.env["SUPABASE_URL"];
-  const serviceRoleKey = process.env["SUPABASE_SECRET_KEY"];
+  const supabaseUrl = env.SUPABASE_URL;
+  const serviceRoleKey = env.SUPABASE_SECRET_KEY;
 
   if (!supabaseUrl || !serviceRoleKey) {
     throw new Error(
@@ -523,7 +524,9 @@ export async function seedAuthUsers(
         () => createUsersDirectly(users, organization_id),
       );
 
-      SeedLogger.success(`Created ${users.length} users directly in database`);
+      SeedLogger.success(
+        `Created ${String(users.length)} users directly in database`,
+      );
       return createSeedResult(users, users.length, startTime);
     }
 
@@ -546,16 +549,16 @@ export async function seedAuthUsers(
     if (results.errorCount > 0) {
       SeedLogger.error(
         "AUTH",
-        `${results.errorCount} users failed: ${results.errors.join(", ")}`,
+        `${String(results.errorCount)} users failed: ${results.errors.join(", ")},`,
       );
       return createFailedSeedResult(
-        new Error(`${results.errorCount} auth failures`),
+        new Error(`${String(results.errorCount)} auth failures`),
         startTime,
       );
     }
 
     SeedLogger.success(
-      `Processed ${results.successCount} users (${results.createdCount} created, ${results.existedCount} existed)`,
+      `Processed ${String(results.successCount)} users (${String(results.createdCount)} created, ${String(results.existedCount)} existed)`,
     );
     return createSeedResult(users, results.createdCount, startTime);
   } catch (error) {

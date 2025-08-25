@@ -1,57 +1,85 @@
+// External libraries (alphabetical)
 import { TRPCError } from "@trpc/server";
-import { eq, count } from "drizzle-orm";
+import { count, eq } from "drizzle-orm";
 import { z } from "zod";
 
-import { createTRPCRouter } from "../trpc";
-import {
-  roleManageProcedure,
-  organizationManageProcedure,
-} from "../trpc.permission";
-
-import type { RLSOrganizationTRPCContext } from "../trpc.base";
-
-import {
-  validateRoleAssignment,
-  type RoleAssignmentInput,
-  type RoleManagementContext,
+// Internal types (alphabetical)
+import type { RLSOrganizationTRPCContext } from "~/server/api/trpc.base";
+import type {
+  RoleAssignmentInput,
+  RoleManagementContext,
 } from "~/lib/users/roleManagementValidation";
+
+// Internal utilities (alphabetical)
 import { generatePrefixedId } from "~/lib/utils/id-generation";
+import { validateRoleAssignment } from "~/lib/users/roleManagementValidation";
+
+// Server modules (alphabetical)
 import { ROLE_TEMPLATES } from "~/server/auth/permissions.constants";
-import { roles, memberships } from "~/server/db/schema";
-import { RoleService } from "~/server/services/roleService";
+import { createTRPCRouter } from "~/server/api/trpc";
+import {
+  organizationManageProcedure,
+  roleManageProcedure,
+} from "~/server/api/trpc.permission";
+import type { RoleService } from "~/server/services/roleService";
+
+// Database schema (alphabetical)
+import { memberships, roles } from "~/server/db/schema";
+import { type Membership, type Role } from "~/server/db/types";
+
+// Interface definitions for role-related responses
+export interface RoleResponse {
+  id: string;
+  name: string;
+  organizationId: string;
+  isSystem: boolean;
+  isDefault: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  memberCount: number;
+  permissions: PermissionResponse[];
+}
+
+export interface PermissionResponse {
+  id: string;
+  name: string;
+  description: string | null;
+}
 
 /**
- * Create role service (Three-environment compatibility: local dev + production)
+ * Create role service using factory pattern
  */
 function createRoleService(ctx: RLSOrganizationTRPCContext): RoleService {
-  return new RoleService(ctx.db, ctx.organizationId);
+  return ctx.services.createRoleService();
 }
 
 export const roleRouter = createTRPCRouter({
   /**
    * List all roles in the organization
    */
-  list: organizationManageProcedure.query(async ({ ctx }) => {
-    const roleService = createRoleService(ctx);
-    const roles = await roleService.getRoles();
+  list: organizationManageProcedure.query(
+    async ({ ctx }): Promise<RoleResponse[]> => {
+      const roleService = createRoleService(ctx);
+      const roles = await roleService.getRoles();
 
-    // Map snake_case fields from service to camelCase API response
-    return roles.map((role) => ({
-      id: role.id,
-      name: role.name,
-      organizationId: role.organization_id,
-      isSystem: role.is_system,
-      isDefault: role.is_default,
-      createdAt: role.created_at,
-      updatedAt: role.updated_at,
-      memberCount: role._count.memberships,
-      permissions: role.permissions.map((p) => ({
-        id: p.id,
-        name: p.name,
-        description: null,
-      })),
-    }));
-  }),
+      // Map snake_case fields from service to camelCase API response
+      return roles.map((role) => ({
+        id: role.id,
+        name: role.name,
+        organizationId: role.organization_id,
+        isSystem: role.is_system,
+        isDefault: role.is_default,
+        createdAt: role.created_at,
+        updatedAt: role.updated_at,
+        memberCount: role._count.memberships,
+        permissions: role.permissions.map((p) => ({
+          id: p.id,
+          name: p.name,
+          description: null,
+        })),
+      }));
+    },
+  ),
 
   /**
    * Create a new role
@@ -67,14 +95,14 @@ export const roleRouter = createTRPCRouter({
         isDefault: z.boolean().default(false),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }): Promise<Role> => {
       const roleService = createRoleService(ctx);
 
       // If template is specified, create from template
       if (input.template) {
-        return roleService.createTemplateRole(input.template, {
+        return roleService.createTemplateRole(input.template as "MEMBER", {
           name: input.name,
-          isDefault: input.isDefault,
+          is_default: input.isDefault,
         });
       }
 
@@ -128,7 +156,7 @@ export const roleRouter = createTRPCRouter({
         isDefault: z.boolean().optional(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }): Promise<Role> => {
       const roleService = createRoleService(ctx);
 
       const updateData: {
@@ -154,7 +182,7 @@ export const roleRouter = createTRPCRouter({
         roleId: z.string(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }): Promise<{ success: boolean }> => {
       const roleService = createRoleService(ctx);
 
       // Ensure we maintain at least one admin before deletion
@@ -174,7 +202,7 @@ export const roleRouter = createTRPCRouter({
         roleId: z.string(),
       }),
     )
-    .query(async ({ ctx, input }) => {
+    .query(async ({ ctx, input }): Promise<RoleResponse> => {
       // Get role details
       const role = await ctx.db.query.roles.findFirst({
         where: eq(roles.id, input.roleId),
@@ -222,32 +250,45 @@ export const roleRouter = createTRPCRouter({
   /**
    * Get all available permissions
    */
-  getPermissions: organizationManageProcedure.query(async ({ ctx }) => {
-    const allPermissions = await ctx.db.query.permissions.findMany({
-      orderBy: (permissions, { asc }) => [asc(permissions.name)],
-    });
-
-    return allPermissions;
-  }),
+  getPermissions: organizationManageProcedure.query(
+    async ({ ctx }): Promise<PermissionResponse[]> => {
+      const rows = await ctx.db.query.permissions.findMany({
+        columns: { id: true, name: true, description: true },
+        orderBy: (p, { asc }) => [asc(p.name)],
+      });
+      return rows.map((p) => ({
+        id: p.id,
+        name: p.name,
+        description: p.description,
+      }));
+    },
+  ),
 
   /**
    * Get role templates available for creation
    */
-  getTemplates: organizationManageProcedure.query(() => {
-    return Object.entries(ROLE_TEMPLATES).map(([key, template]) => {
-      const t = template as {
-        name: string;
-        description: string | null;
-        permissions: string[];
-      };
-      return {
-        key,
-        name: t.name,
-        description: t.description,
-        permissions: t.permissions,
-      };
-    });
-  }),
+  getTemplates: organizationManageProcedure.query(
+    (): {
+      key: string;
+      name: string;
+      description: string | null;
+      permissions: string[];
+    }[] => {
+      return Object.entries(ROLE_TEMPLATES).map(([key, template]) => {
+        const t = template as {
+          name: string;
+          description: string | null;
+          permissions: readonly string[];
+        };
+        return {
+          key,
+          name: t.name,
+          description: t.description,
+          permissions: [...t.permissions], // Spread to convert readonly to mutable array
+        };
+      });
+    },
+  ),
 
   /**
    * Assign a role to a user (change user's role)
@@ -259,7 +300,7 @@ export const roleRouter = createTRPCRouter({
         roleId: z.string(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }): Promise<Membership> => {
       // Get the target role and verify it exists in this organization
       const role = await ctx.db.query.roles.findFirst({
         where: eq(roles.id, input.roleId),

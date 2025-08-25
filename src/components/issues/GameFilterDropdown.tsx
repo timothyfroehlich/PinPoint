@@ -35,20 +35,22 @@ export function GameFilterDropdown({
   // Transform machines into display options
   useEffect(() => {
     if (machines) {
-      const transformedOptions: MachineOption[] = machines.map((machine) => {
-        // Use machine name if different from model name, otherwise just model name
-        const displayName =
-          machine.name !== machine.model.name
-            ? `${machine.name} (${machine.model.name})`
-            : machine.model.name;
+      const transformedOptions: MachineOption[] = machines.map(
+        (machine: { id: string; name: string; model: { name: string } }) => {
+          // Use machine name if different from model name, otherwise just model name
+          const displayName =
+            machine.name !== machine.model.name
+              ? `${machine.name} (${machine.model.name})`
+              : machine.model.name;
 
-        return {
-          id: machine.id,
-          name: machine.name,
-          modelName: machine.model.name,
-          displayName,
-        };
-      });
+          return {
+            id: machine.id,
+            name: machine.name,
+            modelName: machine.model.name,
+            displayName,
+          };
+        },
+      );
 
       // Sort by display name for better UX
       transformedOptions.sort((a, b) =>

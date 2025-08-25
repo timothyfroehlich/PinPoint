@@ -5,7 +5,7 @@ import { collections, collectionTypes, machines, models } from "../db/schema";
 import type { DrizzleClient } from "../db/drizzle";
 import type { InferSelectModel } from "drizzle-orm";
 
-import { generateId } from "../../lib/utils/id-generation";
+import { generateId } from "~/lib/utils/id-generation";
 
 export interface CreateManualCollectionData {
   name: string;
@@ -370,7 +370,7 @@ export class CollectionService {
       const existing = await this.db.query.collections.findFirst({
         where: and(
           eq(collections.name, manufacturer),
-          eq(collections.type_id, collectionType["id"]),
+          eq(collections.type_id, collectionType.id),
           isNull(collections.location_id), // Organization-wide
         ),
       });
@@ -382,8 +382,8 @@ export class CollectionService {
           .values({
             id: generateId(),
             name: manufacturer,
-            type_id: collectionType["id"],
-            organization_id: collectionType["organization_id"],
+            type_id: collectionType.id,
+            organization_id: collectionType.organization_id,
             location_id: null,
             is_manual: false,
             is_smart: false,
@@ -415,7 +415,7 @@ export class CollectionService {
           );
           await this.db.execute(sql`
             INSERT INTO collection_machines (collection_id, machine_id)
-            SELECT ${collection["id"]}, unnest(ARRAY[${machineIdArray}])
+            SELECT ${collection.id}, unnest(ARRAY[${machineIdArray}])
           `);
         }
 
@@ -481,7 +481,7 @@ export class CollectionService {
       const existing = await this.db.query.collections.findFirst({
         where: and(
           eq(collections.name, era.name),
-          eq(collections.type_id, collectionType["id"]),
+          eq(collections.type_id, collectionType.id),
           isNull(collections.location_id),
         ),
       });
@@ -503,8 +503,8 @@ export class CollectionService {
           .values({
             id: generateId(),
             name: era.name,
-            type_id: collectionType["id"],
-            organization_id: collectionType["organization_id"],
+            type_id: collectionType.id,
+            organization_id: collectionType.organization_id,
             location_id: null,
             is_manual: false,
             is_smart: false,
@@ -523,7 +523,7 @@ export class CollectionService {
         }
 
         await this.addMachinesToCollection(
-          collection["id"],
+          collection.id,
           eraMachines.map((m) => m.id),
         );
         generated++;

@@ -1,5 +1,5 @@
 -- DO NOT EDIT: Generated from src/test/constants/seed-test-ids.ts
--- Generated at: 2025-08-24T13:53:15.644Z
+-- Generated at: 2025-08-24T14:29:28.842Z
 --
 -- This file provides SQL functions that return the same constants used in TypeScript tests.
 -- This ensures consistency between TypeScript integration tests and pgTAP RLS tests.
@@ -81,8 +81,8 @@ $$ LANGUAGE plpgsql;
 
 -- Convenience function to set competitor org context  
 CREATE OR REPLACE FUNCTION set_competitor_org_context(
-  user_id TEXT DEFAULT test_user_admin(),
-  role_name TEXT DEFAULT 'admin'
+  user_id TEXT DEFAULT test_user_member2(),
+  role_name TEXT DEFAULT 'member'
 ) RETURNS VOID AS $$
 BEGIN
   PERFORM set_jwt_claims_for_test(test_org_competitor(), user_id, role_name, ARRAY['*']);

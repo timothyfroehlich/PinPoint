@@ -1,21 +1,34 @@
+// External libraries (alphabetical)
 import { TRPCError } from "@trpc/server";
-import { eq, asc, sql } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
+// Internal types (alphabetical)
+import type {
+  LocationResponse,
+  LocationWithMachineDetails,
+} from "~/lib/types/api";
+
+// Internal utilities (alphabetical)
 import { generateId } from "~/lib/utils/id-generation";
+import { transformKeysToCamelCase } from "~/lib/utils/case-transformers";
+
+// Server modules (alphabetical)
 import {
   createTRPCRouter,
-  publicProcedure,
-  orgScopedProcedure,
-  locationEditProcedure,
   locationDeleteProcedure,
+  locationEditProcedure,
   organizationManageProcedure,
+  orgScopedProcedure,
+  anonOrgScopedProcedure,
 } from "~/server/api/trpc";
+
+// Database schema (alphabetical)
 import {
-  locations,
-  machines,
   issues,
   issueStatuses,
+  locations,
+  machines,
   models,
 } from "~/server/db/schema";
 
@@ -26,7 +39,7 @@ export const locationRouter = createTRPCRouter({
         name: z.string().min(1),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }): Promise<LocationResponse> => {
       const [location] = await ctx.db
         .insert(locations)
         .values({
@@ -36,109 +49,93 @@ export const locationRouter = createTRPCRouter({
         })
         .returning();
 
-      return location;
+      return transformKeysToCamelCase(location);
     }),
 
-  getAll: orgScopedProcedure.query(async ({ ctx }) => {
-    return await ctx.db.query.locations.findMany({
-      with: {
-        machines: true,
-      },
-      orderBy: asc(locations.name),
-    });
-  }),
+  getAll: orgScopedProcedure.query(
+    async ({ ctx }): Promise<LocationResponse[]> => {
+      const allLocations = await ctx.db.query.locations.findMany({
+        with: {
+          machines: true,
+        },
+        orderBy: asc(locations.name),
+      });
+
+      return allLocations.map((location) => transformKeysToCamelCase(location));
+    },
+  ),
 
   // Public endpoint for unified dashboard - no authentication required
-  getPublic: publicProcedure.query(async ({ ctx }) => {
-    if (!ctx.organization) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Organization not found",
-      });
-    }
+  getPublic: anonOrgScopedProcedure.query(
+    async ({ ctx }): Promise<LocationWithMachineDetails[]> => {
+      // Use single optimized query with JOINs instead of separate queries
+      const result = await ctx.db
+        .select({
+          locationId: locations.id,
+          locationName: locations.name,
+          machineId: machines.id,
+          machineName: machines.name,
+          modelName: models.name,
+          modelManufacturer: models.manufacturer,
+          unresolvedIssueCount: sql<number>`count(case when ${issueStatuses.category} <> 'RESOLVED' then 1 end)`,
+        })
+        .from(locations)
+        .leftJoin(machines, eq(machines.location_id, locations.id))
+        .leftJoin(models, eq(models.id, machines.model_id))
+        .leftJoin(issues, eq(issues.machine_id, machines.id))
+        .leftJoin(issueStatuses, eq(issueStatuses.id, issues.status_id))
+        .where(eq(locations.organization_id, ctx.organization.id))
+        .groupBy(
+          locations.id,
+          locations.name,
+          machines.id,
+          machines.name,
+          models.id,
+          models.name,
+          models.manufacturer,
+        )
+        .orderBy(asc(locations.name), asc(machines.id));
 
-    // Use single optimized query with JOINs instead of separate queries
-    const result = await ctx.db
-      .select({
-        locationId: locations.id,
-        locationName: locations.name,
-        machineId: machines.id,
-        machineName: machines.name,
-        modelName: models.name,
-        modelManufacturer: models.manufacturer,
-        unresolvedIssueCount: sql<number>`count(case when ${issueStatuses.category} <> 'RESOLVED' then 1 end)`,
-      })
-      .from(locations)
-      .leftJoin(machines, eq(machines.locationId, locations.id))
-      .innerJoin(models, eq(models.id, machines.modelId))
-      .leftJoin(issues, eq(issues.machineId, machines.id))
-      .leftJoin(issueStatuses, eq(issueStatuses.id, issues.statusId))
-      .where(sql`1=1`)
-      .groupBy(
-        locations.id,
-        locations.name,
-        machines.id,
-        machines.name,
-        models.id,
-        models.name,
-        models.manufacturer,
-      )
-      .orderBy(asc(locations.name), asc(machines.id));
+      // Transform flat result into nested structure
+      const locationMap = new Map<string, LocationWithMachineDetails>();
 
-    // Transform flat result into nested structure
-    interface LocationWithMachines {
-      id: string;
-      name: string;
-      _count: { machines: number };
-      machines: {
-        id: string;
-        name: string;
-        model: {
-          name: string;
-          manufacturer: string | null;
-        };
-        _count: { issues: number };
-      }[];
-    }
-
-    const locationMap = new Map<string, LocationWithMachines>();
-
-    for (const row of result) {
-      if (!locationMap.has(row.locationId)) {
-        locationMap.set(row.locationId, {
-          id: row.locationId,
-          name: row.locationName,
-          _count: { machines: 0 },
-          machines: [],
-        });
-      }
-
-      const location = locationMap.get(row.locationId);
-      if (!location) continue;
-
-      if (row.machineId) {
-        const existingMachine = location.machines.find(
-          (m) => m.id === row.machineId,
-        );
-        if (!existingMachine) {
-          location.machines.push({
-            id: row.machineId,
-            name: row.machineName ?? "Unknown Machine",
-            model: {
-              name: row.modelName,
-              manufacturer: row.modelManufacturer,
-            },
-            _count: {
-              issues: row.unresolvedIssueCount || 0,
-            },
+      for (const row of result) {
+        if (!locationMap.has(row.locationId)) {
+          locationMap.set(row.locationId, {
+            id: row.locationId,
+            name: row.locationName,
+            _count: { machines: 0 },
+            machines: [],
           });
-          location._count.machines++;
+        }
+
+        const location = locationMap.get(row.locationId);
+        if (!location) continue;
+
+        if (row.machineId) {
+          const existingMachine = location.machines.find(
+            (m) => m.id === row.machineId,
+          );
+          if (!existingMachine) {
+            location.machines.push({
+              id: row.machineId,
+              name: row.machineName ?? "Unknown Machine",
+              model: {
+                name: row.modelName ?? "Unknown Model",
+                manufacturer: row.modelManufacturer,
+              },
+              _count: {
+                issues: row.unresolvedIssueCount || 0,
+              },
+            });
+            location._count.machines++;
+          }
         }
       }
-    }
 
-    return Array.from(locationMap.values());
-  }),
+      return Array.from(locationMap.values());
+    },
+  ),
 
   update: locationEditProcedure
     .input(
@@ -147,7 +144,7 @@ export const locationRouter = createTRPCRouter({
         name: z.string().min(1).optional(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }): Promise<LocationResponse> => {
       const updates: { name?: string; updated_at: Date } = {
         updated_at: new Date(),
       };
@@ -168,13 +165,13 @@ export const locationRouter = createTRPCRouter({
         });
       }
 
-      return updatedLocation;
+      return transformKeysToCamelCase(updatedLocation);
     }),
 
   // Get a single location with detailed info
   getById: orgScopedProcedure
     .input(z.object({ id: z.string() }))
-    .query(async ({ ctx, input }) => {
+    .query(async ({ ctx, input }): Promise<LocationResponse> => {
       const location = await ctx.db.query.locations.findFirst({
         where: eq(locations.id, input.id),
         with: {
@@ -186,7 +183,8 @@ export const locationRouter = createTRPCRouter({
                 columns: {
                   id: true,
                   name: true,
-                  profilePicture: true,
+                  image: true,
+                  profile_picture: true,
                 },
               },
             },
@@ -201,12 +199,12 @@ export const locationRouter = createTRPCRouter({
         });
       }
 
-      return location;
+      return transformKeysToCamelCase(location);
     }),
 
   delete: locationDeleteProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }): Promise<LocationResponse> => {
       const [deletedLocation] = await ctx.db
         .delete(locations)
         .where(eq(locations.id, input.id))
@@ -219,7 +217,7 @@ export const locationRouter = createTRPCRouter({
         });
       }
 
-      return deletedLocation;
+      return transformKeysToCamelCase(deletedLocation);
     }),
 
   // Admin-only PinballMap sync operations
@@ -230,7 +228,7 @@ export const locationRouter = createTRPCRouter({
         pinballMapId: z.number().int().positive(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }): Promise<LocationResponse> => {
       const [updatedLocation] = await ctx.db
         .update(locations)
         .set({
@@ -246,22 +244,35 @@ export const locationRouter = createTRPCRouter({
         });
       }
 
-      return updatedLocation;
+      return transformKeysToCamelCase(updatedLocation);
     }),
 
   syncWithPinballMap: organizationManageProcedure
     .input(z.object({ locationId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }): Promise<LocationResponse> => {
+      const { locationId } = input;
       const pinballMapService = ctx.services.createPinballMapService();
-      const result = await pinballMapService.syncLocation(input.locationId);
+      const sync = await pinballMapService.syncLocation(locationId);
 
-      if (!result.success) {
+      if (!sync.success) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: result.error ?? "Sync failed",
+          message: sync.error ?? "Sync failed",
         });
       }
 
-      return result;
+      const refreshed = await ctx.db.query.locations.findFirst({
+        where: eq(locations.id, locationId),
+        with: { machines: true },
+      });
+
+      if (!refreshed) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Location not found after sync",
+        });
+      }
+
+      return transformKeysToCamelCase(refreshed);
     }),
 });

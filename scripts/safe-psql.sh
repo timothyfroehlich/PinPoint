@@ -11,6 +11,8 @@ ALLOWED_DATABASES=("postgres" "pinpoint_test" "pinpoint_dev" "test")
 DEFAULT_HOST="localhost"
 DEFAULT_PORT="54322"  # Supabase local port
 DEFAULT_DATABASE="postgres"
+DEFAULT_USERNAME="postgres"
+DEFAULT_PASSWORD="postgres"
 
 # Colors for output
 RED='\033[0;31m'
@@ -68,7 +70,7 @@ is_database_allowed() {
 HOST="$DEFAULT_HOST"
 PORT="$DEFAULT_PORT"
 DATABASE="$DEFAULT_DATABASE"
-USERNAME=""
+USERNAME="$DEFAULT_USERNAME"
 COMMAND=""
 FILE=""
 PSQL_ARGS=()
@@ -146,12 +148,11 @@ if [[ -n "$USERNAME" ]]; then
     PSQL_CMD+=" --username=$USERNAME"
 fi
 
-if [[ -n "$COMMAND" ]]; then
-    PSQL_CMD+=" --command=$COMMAND"
-fi
-
 if [[ -n "$FILE" ]]; then
     PSQL_CMD+=" --file=$FILE"
+elif [[ -z "$COMMAND" ]]; then
+    # Interactive mode - no additional flags needed
+    :
 fi
 
 # Add any additional arguments
@@ -169,7 +170,7 @@ if [[ -n "$USERNAME" ]]; then
     echo -e "   Username: ${GREEN}$USERNAME${NC}"
 fi
 if [[ -n "$COMMAND" ]]; then
-    echo -e "   Command: ${GREEN}$COMMAND${NC}"
+    echo -e "   Command: ${GREEN}[Multi-line command via stdin]${NC}"
 fi
 if [[ -n "$FILE" ]]; then
     echo -e "   File: ${GREEN}$FILE${NC}"
@@ -179,5 +180,14 @@ echo ""
 echo -e "${YELLOW}🚀 Executing:${NC} $PSQL_CMD"
 echo ""
 
+# Set password environment variable
+export PGPASSWORD="$DEFAULT_PASSWORD"
+
 # Execute psql command
-exec $PSQL_CMD
+if [[ -n "$COMMAND" ]]; then
+    # For commands, use stdin to avoid shell argument parsing issues
+    echo "$COMMAND" | eval "$PSQL_CMD"
+else
+    # For files or interactive mode, use normal execution
+    eval "$PSQL_CMD"
+fi

@@ -1,8 +1,8 @@
 import { eq, isNull, count } from "drizzle-orm";
 import * as QRCode from "qrcode";
 
-import { imageStorage } from "../../lib/image-storage/local-storage";
-import { logger } from "../../lib/logger";
+import { imageStorage } from "~/lib/image-storage/local-storage";
+import { logger } from "~/lib/logger";
 import { type DrizzleClient } from "../db/drizzle";
 import { machines } from "../db/schema";
 import { constructReportUrl } from "../utils/qrCodeUtils";
@@ -120,6 +120,7 @@ export class QRCodeService {
       throw new Error("Machine not found");
     }
 
+    // Use || to check for falsy values - QR code validation requires non-empty strings and valid dates
     if (
       !machine.qr_code_url ||
       !machine.qr_code_generated_at ||
@@ -215,8 +216,8 @@ export class QRCodeService {
     return {
       id: machine.id,
       name: machine.name,
-      organizationId: machine.organization_id as string,
-      locationId: machine.location_id as string,
+      organizationId: machine.organization_id,
+      locationId: machine.location_id,
       model: machine.model,
       location: machine.location,
       organization: machine.organization,

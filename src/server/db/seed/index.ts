@@ -5,6 +5,9 @@
  * Unified seeding orchestrator using shared utilities for consistent patterns.
  * Eliminates duplicate validation/logging/error handling across seed files.
  *
+ * Note: This file handles database seeding using snake_case field names
+ * to match the actual database schema. Field validation ensures consistency.
+ *
  * Usage:
  *   tsx src/server/db/seed/index.ts local:pg minimal    # PostgreSQL-only (CI tests)
  *   tsx src/server/db/seed/index.ts local:sb minimal    # Local Supabase (development)
@@ -17,11 +20,12 @@ import "~/lib/env-loaders/development";
 
 // Internal utilities
 import { getEnvironmentName } from "~/lib/environment";
+import { env } from "~/env.js";
 import {
   SeedLogger,
   SeedValidator,
   SeedConfigBuilder,
-  SeedSafety,
+  confirmDestructiveOperation,
   withErrorContext,
   type SeedTarget,
   type DataAmount,
@@ -44,12 +48,24 @@ async function main(): Promise<void> {
     const target = process.argv[2];
     const dataAmount = process.argv[3];
 
-    const validation = SeedValidator.validateAll({
+    // Handle optional supabaseUrl for exactOptionalPropertyTypes compliance
+    const supabaseUrl = env.SUPABASE_URL;
+    const validationParams: {
+      target: string;
+      dataAmount: string;
+      environment: string;
+      supabaseUrl?: string;
+    } = {
       target: target ?? "",
       dataAmount: dataAmount ?? "",
       environment: getEnvironmentName(),
-      supabaseUrl: process.env["SUPABASE_URL"],
-    });
+    };
+
+    if (supabaseUrl) {
+      validationParams.supabaseUrl = supabaseUrl;
+    }
+
+    const validation = SeedValidator.validateAll(validationParams);
 
     if (!validation.success) {
       SeedLogger.error("VALIDATION", validation.errors.join(", "));
@@ -61,11 +77,11 @@ async function main(): Promise<void> {
     const config = SeedConfigBuilder.forTarget(target as SeedTarget)
       .withDataAmount(dataAmount as DataAmount)
       .withEnvironment(getEnvironmentName())
-      .withSupabaseUrl(process.env["SUPABASE_URL"] ?? "")
+      .withSupabaseUrl(env.SUPABASE_URL ?? "")
       .build();
 
     // 3. Safety confirmation for destructive operations
-    await SeedSafety.confirmDestructiveOperation(config.target);
+    await confirmDestructiveOperation(config.target);
 
     SeedLogger.info(
       `Target: ${config.target.toUpperCase()}, Data: ${config.dataAmount.toUpperCase()}`,
@@ -92,12 +108,12 @@ async function main(): Promise<void> {
     );
 
     await withErrorContext("SAMPLE_DATA", "seed sample data", () =>
-      seedSampleData(organizations.primary.id, config.dataAmount, false),
+      seedSampleData(organizations.primary.id, config.dataAmount),
     );
 
     // 5. Success summary
     const duration = Date.now() - startTime;
-    SeedLogger.success(`Completed in ${duration}ms`);
+    SeedLogger.success(`Completed in ${String(duration)}ms`);
 
     console.log("");
     console.log("🔑 Environment Summary:");
@@ -119,13 +135,16 @@ async function main(): Promise<void> {
     }
   } catch (error) {
     const duration = Date.now() - startTime;
-    SeedLogger.error("SEEDING", `Failed after ${duration}ms: ${error}`);
+    SeedLogger.error(
+      "SEEDING",
+      `Failed after ${String(duration)}ms: ${String(error)}`,
+    );
     process.exit(1);
   }
 }
 
 // Run if called directly (ESM equivalent of require.main === module)
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === `file://${String(process.argv[1] ?? "")}`) {
   main().catch((error: unknown) => {
     SeedLogger.error("UNHANDLED", error);
     process.exit(1);

@@ -16,6 +16,7 @@ export {
   protectedProcedure,
   organizationProcedure,
   orgScopedProcedure,
+  anonOrgScopedProcedure,
 } from "./trpc.base";
 
 // Re-export types for convenience

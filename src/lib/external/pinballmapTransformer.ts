@@ -150,6 +150,7 @@ export function validatePinballMapMachine(pmMachine: unknown): {
   // URL validation for links
   const urlFields = ["ipdb_link", "opdb_img", "kineticist_url"] as const;
   for (const field of urlFields) {
+    // eslint-disable-next-line security/detect-object-injection -- field is from const array of known property names
     const value = machine[field];
     if (value !== undefined && value !== null) {
       if (typeof value !== "string") {

@@ -1,9 +1,18 @@
 import { count, eq, asc } from "drizzle-orm";
+import type { InferSelectModel } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
 
+import {
+  transformKeysToCamelCase,
+  type DrizzleToCamelCase,
+} from "~/lib/utils/case-transformers";
 import { createTRPCRouter, orgScopedProcedure } from "~/server/api/trpc";
 import { issues, issueStatuses } from "~/server/db/schema/issues";
+
+// Type definitions for API responses
+type IssueStatusDbModel = InferSelectModel<typeof issueStatuses>;
+type IssueStatusResponse = DrizzleToCamelCase<IssueStatusDbModel>;
 
 /**
  * Generate UUID with environment fallback support.
@@ -24,9 +33,15 @@ function generateId(): string {
 
 export const issueStatusRouter = createTRPCRouter({
   // CRUD Operations
-  getAll: orgScopedProcedure.query(async ({ ctx }) => {
-    return ctx.db.select().from(issueStatuses).orderBy(asc(issueStatuses.name));
-  }),
+  getAll: orgScopedProcedure.query(
+    async ({ ctx }): Promise<IssueStatusResponse[]> => {
+      const statuses = await ctx.db
+        .select()
+        .from(issueStatuses)
+        .orderBy(asc(issueStatuses.name));
+      return transformKeysToCamelCase<IssueStatusResponse[]>(statuses);
+    },
+  ),
 
   create: orgScopedProcedure
     .input(
@@ -35,7 +50,7 @@ export const issueStatusRouter = createTRPCRouter({
         category: z.enum(["NEW", "IN_PROGRESS", "RESOLVED"]),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }): Promise<IssueStatusResponse> => {
       const [result] = await ctx.db
         .insert(issueStatuses)
         .values({
@@ -45,7 +60,7 @@ export const issueStatusRouter = createTRPCRouter({
           organization_id: ctx.organizationId,
         })
         .returning();
-      return result;
+      return transformKeysToCamelCase<IssueStatusResponse>(result);
     }),
 
   update: orgScopedProcedure
@@ -56,7 +71,7 @@ export const issueStatusRouter = createTRPCRouter({
         category: z.enum(["NEW", "IN_PROGRESS", "RESOLVED"]).optional(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }): Promise<IssueStatusResponse> => {
       // Build the update object dynamically
       const updateData: Partial<{
         name: string;
@@ -72,17 +87,17 @@ export const issueStatusRouter = createTRPCRouter({
         .where(eq(issueStatuses.id, input.id))
         .returning();
 
-      return result;
+      return transformKeysToCamelCase<IssueStatusResponse>(result);
     }),
 
   delete: orgScopedProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }): Promise<IssueStatusResponse> => {
       // Check if any issues are using this status (RLS handles org scoping)
       const [issueCountResult] = await ctx.db
         .select({ count: count() })
         .from(issues)
-        .where(eq(issues.statusId, input.id));
+        .where(eq(issues.status_id, input.id));
 
       if (issueCountResult?.count && issueCountResult.count > 0) {
         throw new Error(
@@ -95,7 +110,7 @@ export const issueStatusRouter = createTRPCRouter({
         .where(eq(issueStatuses.id, input.id))
         .returning();
 
-      return result;
+      return transformKeysToCamelCase<IssueStatusResponse>(result);
     }),
 
   // Status Counts / Analytics
@@ -103,11 +118,11 @@ export const issueStatusRouter = createTRPCRouter({
     // Get issue counts grouped by statusId using Drizzle aggregation (RLS handles org scoping)
     const counts = await ctx.db
       .select({
-        statusId: issues.statusId,
+        status_id: issues.status_id,
         count: count(),
       })
       .from(issues)
-      .groupBy(issues.statusId);
+      .groupBy(issues.status_id);
 
     // Get all statuses (RLS handles org scoping)
     const statuses = await ctx.db
@@ -137,11 +152,13 @@ export const issueStatusRouter = createTRPCRouter({
     // Aggregate counts by category
     for (const group of counts) {
       // Type assertion needed due to Drizzle query result typing
-      const statusId = group.statusId;
+      const statusId = group.status_id;
       const category = statusMap.get(statusId);
       if (category !== undefined && isValidCategory(category)) {
         // Use type-safe property access instead of bracket notation
+        // eslint-disable-next-line security/detect-object-injection -- category is validated by isValidCategory and type-constrained
         const currentCount = categoryCounts[category];
+        // eslint-disable-next-line security/detect-object-injection -- category is validated by isValidCategory and type-constrained
         categoryCounts[category] = currentCount + group.count;
       }
     }

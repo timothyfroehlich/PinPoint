@@ -43,6 +43,7 @@ export const PERMISSION_DESCRIPTIONS: Record<string, string> = {
  * Get a human-readable description for a permission
  */
 export function getPermissionDescription(permission: string): string {
+  // eslint-disable-next-line security/detect-object-injection -- permission string is validated by type system and used for predefined lookup
   const description = PERMISSION_DESCRIPTIONS[permission];
   if (description) {
     return `This action requires: ${description}`;

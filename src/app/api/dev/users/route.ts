@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { env } from "~/env";
 import { shouldEnableDevFeatures } from "~/lib/environment";
+import { transformKeysToCamelCase } from "~/lib/utils/case-transformers";
 import { getSupabaseUser } from "~/server/auth/supabase";
 import { getGlobalDatabaseProvider } from "~/server/db/provider";
 import { users, memberships, roles, organizations } from "~/server/db/schema";
@@ -46,25 +47,25 @@ export async function GET(): Promise<NextResponse> {
       );
     }
 
-    // Query dev users using Drizzle
+    // Query dev users using Drizzle with snake_case field access
     console.log("[DEV-API] Querying for dev users...");
     const devUsers = await db
       .select({
         id: users.id,
         name: users.name,
         email: users.email,
-        emailVerified: users.email_verified,
+        email_verified: users.email_verified,
         image: users.image,
         bio: users.bio,
-        notificationFrequency: users.notification_frequency,
-        emailNotificationsEnabled: users.email_notifications_enabled,
-        pushNotificationsEnabled: users.push_notifications_enabled,
-        createdAt: users.created_at,
-        updatedAt: users.updated_at,
+        notification_frequency: users.notification_frequency,
+        email_notifications_enabled: users.email_notifications_enabled,
+        push_notifications_enabled: users.push_notifications_enabled,
+        created_at: users.created_at,
+        updated_at: users.updated_at,
         // Join membership and role data
-        membershipId: memberships.id,
-        roleId: roles.id,
-        roleName: roles.name,
+        membership_id: memberships.id,
+        role_id: roles.id,
+        role_name: roles.name,
       })
       .from(users)
       .leftJoin(memberships, eq(memberships.user_id, users.id))
@@ -77,7 +78,7 @@ export async function GET(): Promise<NextResponse> {
       devUsers.map((u) => u.email),
     );
 
-    // Transform results to group by user and include role information
+    // Transform results to group by user and include role information with snake_case field access
     const userMap = new Map();
     for (const row of devUsers) {
       const userId = row.id;
@@ -86,29 +87,34 @@ export async function GET(): Promise<NextResponse> {
           id: row.id,
           name: row.name,
           email: row.email,
-          emailVerified: row.emailVerified,
+          email_verified: row.email_verified,
           image: row.image,
           bio: row.bio,
-          notificationFrequency: row.notificationFrequency,
-          emailNotificationsEnabled: row.emailNotificationsEnabled,
-          pushNotificationsEnabled: row.pushNotificationsEnabled,
-          createdAt: row.createdAt,
-          updatedAt: row.updatedAt,
-          role: row.roleName,
+          notification_frequency: row.notification_frequency,
+          email_notifications_enabled: row.email_notifications_enabled,
+          push_notifications_enabled: row.push_notifications_enabled,
+          created_at: row.created_at,
+          updated_at: row.updated_at,
+          role: row.role_name,
         });
       }
     }
 
-    const usersWithRoles = Array.from(userMap.values());
+    // Transform to camelCase for API response
+    const usersWithRoles = transformKeysToCamelCase<unknown[]>(
+      Array.from(userMap.values()),
+    );
+    const transformedUser = transformKeysToCamelCase(user);
+
     console.log(
       "[DEV-API] Returning",
-      usersWithRoles.length,
+      Array.isArray(usersWithRoles) ? usersWithRoles.length : 0,
       "users with roles",
     );
 
     return NextResponse.json({
       users: usersWithRoles,
-      currentUser: user,
+      currentUser: transformedUser,
     });
   } catch (error) {
     console.error("Error fetching dev users:", error);

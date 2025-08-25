@@ -1,25 +1,51 @@
 /**
  * Type definitions for auth-related Drizzle ORM models
  * These provide type safety using inferred types from Drizzle schema
+ *
+ * This file provides both database types (snake_case) and application types (camelCase).
+ * Database types (DbUser, DbOrganization, etc.) use snake_case field names from the database.
+ * Application types (User, Organization, etc.) use camelCase field names for the TypeScript application layer.
+ * Use database types for database operations and application types for business logic and UI.
  */
 
 import type { InferSelectModel } from "drizzle-orm";
-import {
+import type { DrizzleToCamelCase } from "~/lib/utils/case-transformers";
+import type {
   users,
   organizations,
   roles,
   permissions,
   memberships,
-} from "~/server/db/schema";
+} from "../db/schema";
 
-// Base types inferred from Drizzle schema
-export type User = InferSelectModel<typeof users>;
-export type Organization = InferSelectModel<typeof organizations>;
-export type Role = InferSelectModel<typeof roles>;
-export type Permission = InferSelectModel<typeof permissions>;
-export type Membership = InferSelectModel<typeof memberships>;
+// Database types (snake_case) - use for database operations
+export type DbUser = InferSelectModel<typeof users>;
+export type DbOrganization = InferSelectModel<typeof organizations>;
+export type DbRole = InferSelectModel<typeof roles>;
+export type DbPermission = InferSelectModel<typeof permissions>;
+export type DbMembership = InferSelectModel<typeof memberships>;
 
-// Extended types for relationships
+// Application types (camelCase) - use for business logic and UI
+export type User = DrizzleToCamelCase<DbUser>;
+export type Organization = DrizzleToCamelCase<DbOrganization>;
+export type Role = DrizzleToCamelCase<DbRole>;
+export type Permission = DrizzleToCamelCase<DbPermission>;
+export type Membership = DrizzleToCamelCase<DbMembership>;
+
+// Extended database types for relationships (snake_case)
+export interface DbMembershipWithRole extends DbMembership {
+  role: DbRole;
+}
+
+export interface DbMembershipWithPermissions extends DbMembership {
+  role: DbRole & {
+    rolePermissions: {
+      permission: DbPermission;
+    }[];
+  };
+}
+
+// Extended application types for relationships (camelCase)
 export interface MembershipWithRole extends Membership {
   role: Role;
 }
@@ -30,15 +56,7 @@ export interface MembershipWithPermissions extends Membership {
   };
 }
 
-// Compatibility aliases for existing code (temporary)
-export type PrismaUser = User;
-export type PrismaOrganization = Organization;
-export type PrismaRole = Role;
-export type PrismaPermission = Permission;
-export type PrismaMembership = Membership;
-export type PrismaMembershipWithPermissions = MembershipWithPermissions;
-
-// Type guard functions to help with type safety
+// Type guard functions to help with type safety (updated for camelCase)
 export function isValidUser(user: unknown): user is User {
   return (
     typeof user === "object" &&

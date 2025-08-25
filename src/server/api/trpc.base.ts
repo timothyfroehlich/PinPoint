@@ -7,7 +7,7 @@
  */
 
 import { initTRPC, TRPCError } from "@trpc/server";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import superjson from "superjson";
 import { ZodError } from "zod";
 
@@ -148,22 +148,47 @@ export const createTRPCContext = async (
     }
   }
 
-  // Fallback for unauthenticated users: use subdomain
-  if (!organization && !user) {
+  // Fallback: derive organization from subdomain for users without app_metadata organizationId
+  if (!organization) {
     const subdomain =
       opts.headers.get("x-subdomain") ?? env.DEFAULT_ORG_SUBDOMAIN;
 
     const org = await db.query.organizations.findFirst({
       where: eq(organizations.subdomain, subdomain),
     });
+
     if (org) {
       organization = {
         id: org.id,
         subdomain: org.subdomain,
         name: org.name,
       } satisfies Organization;
+
+      // Set organizationId for downstream procedures if not already set
+      if (!organizationId) {
+        organizationId = org.id;
+      }
+
+      // Set session variable for RLS policies (simple, no verification)
+      try {
+        await db.execute(
+          sql`SET LOCAL app.current_organization_id = ${org.id}`,
+        );
+      } catch (error) {
+        // Log but continue - application-layer filtering will work as fallback
+        logger.warn({
+          msg: "Could not set RLS session variable, using application-layer filtering",
+          component: "createTRPCContext",
+          context: { organizationId: org.id, subdomain },
+        });
+      }
     }
   }
+
+  // Create organization-scoped service factory if we have organization context
+  const contextServices = organizationId
+    ? services.withOrganization(organizationId)
+    : services;
 
   return {
     db,
@@ -171,7 +196,7 @@ export const createTRPCContext = async (
     supabase,
     organizationId,
     organization,
-    services,
+    services: contextServices,
     headers: opts.headers,
     logger,
   };
@@ -305,26 +330,91 @@ export const protectedProcedure = t.procedure
   });
 
 /**
- * RLS-aware organization procedure with automatic organizational scoping
+ * RLS-aware organization procedure with automatic organizational scoping and context repair
  *
  * This procedure ensures:
  * 1. User is authenticated
- * 2. User has organization context (organizationId in app_metadata)
+ * 2. User has organization context (organizationId in app_metadata or can be repaired)
  * 3. RLS policies will automatically scope all database queries
+ *
+ * Enhanced with authentication context repair:
+ * - Attempts to find user's organization through membership if app_metadata is missing
+ * - Provides fallback mechanisms for broken authentication contexts
  *
  * CRITICAL: organizationId is now handled by RLS policies automatically!
  * No manual filtering needed in router queries.
  */
 export const organizationProcedure = protectedProcedure.use(
   async ({ ctx, next }) => {
-    if (!ctx.organizationId) {
+    let organizationId = ctx.organizationId;
+    let organization = ctx.organization;
+
+    // Phase 2.2: Authentication context repair
+    // If user is missing organizationId in app_metadata, attempt to repair via membership lookup
+    if (!organizationId) {
+      ctx.logger.warn({
+        msg: "Attempting authentication context repair - user missing organizationId",
+        component: "organizationProcedure",
+        context: {
+          userId: ctx.user.id,
+          hasAppMetadata: !!ctx.user.app_metadata,
+          operation: "context_repair",
+        },
+      });
+
+      // Try to find user's organization through their membership
+      try {
+        const userMembership = await ctx.db.query.memberships.findFirst({
+          where: eq(memberships.user_id, ctx.user.id),
+          with: {
+            organization: true,
+          },
+          orderBy: [sql`updated_at DESC`], // Get most recent membership
+        });
+
+        if (userMembership?.organization) {
+          organizationId = userMembership.organization_id;
+          organization = {
+            id: userMembership.organization.id,
+            subdomain: userMembership.organization.subdomain,
+            name: userMembership.organization.name,
+          };
+
+          ctx.logger.info({
+            msg: "Authentication context repair successful",
+            component: "organizationProcedure",
+            context: {
+              userId: ctx.user.id,
+              repairedOrganizationId: organizationId,
+              repairMethod: "membership_lookup",
+            },
+          });
+        }
+      } catch (error) {
+        ctx.logger.error({
+          msg: "Authentication context repair failed",
+          component: "organizationProcedure",
+          context: {
+            userId: ctx.user.id,
+            operation: "membership_lookup_failed",
+          },
+          error: {
+            message: error instanceof Error ? error.message : String(error),
+          },
+        });
+      }
+    }
+
+    // Final validation after repair attempts
+    if (!organizationId) {
       throw new TRPCError({
         code: "FORBIDDEN",
-        message: "User does not have organization context",
+        message:
+          "User does not have organization context. Please contact support if this persists.",
       });
     }
 
-    if (!ctx.organization) {
+    if (!organization) {
       throw new TRPCError({
         code: "NOT_FOUND",
         message: "Organization not found",
@@ -334,7 +424,7 @@ export const organizationProcedure = protectedProcedure.use(
     // RLS automatically scopes this query to user's organization
     const membership = await ctx.db.query.memberships.findFirst({
       where: and(
-        eq(memberships.organization_id, ctx.organizationId),
+        eq(memberships.organization_id, organizationId),
         eq(memberships.user_id, ctx.user.id),
       ),
       with: {
@@ -366,8 +456,8 @@ export const organizationProcedure = protectedProcedure.use(
     return next({
       ctx: {
         ...ctx,
-        organizationId: ctx.organizationId, // Guaranteed non-null
-        organization: ctx.organization, // Guaranteed non-null
+        organizationId, // Guaranteed non-null (original or repaired)
+        organization, // Guaranteed non-null (original or repaired)
         membership: {
           id: membership.id,
           organizationId: membership.organization_id,
@@ -406,6 +496,36 @@ export const orgScopedProcedure = protectedProcedure.use(({ ctx, next }) => {
     ctx: {
       ...ctx,
       organizationId: ctx.organizationId, // Guaranteed non-null for RLS
+    },
+  });
+});
+
+/**
+ * Anonymous organization-scoped procedure
+ *
+ * This procedure ensures anonymous users have organization context from subdomain
+ * resolution. Use this instead of publicProcedure for multi-tenant operations
+ * that require organization context.
+ *
+ * Features:
+ * - Validates organization context exists (from subdomain resolution)
+ * - Provides guaranteed non-null organizationId for consistent usage
+ * - Standardizes error handling for missing organization context
+ * - Compatible with application-layer organization filtering patterns
+ */
+export const anonOrgScopedProcedure = publicProcedure.use(({ ctx, next }) => {
+  if (!ctx.organization) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Organization not found. Please check the URL or subdomain.",
+    });
+  }
+
+  return next({
+    ctx: {
+      ...ctx,
+      organizationId: ctx.organization.id, // Guaranteed non-null for consistency
+      organization: ctx.organization, // Guaranteed non-null
     },
   });
 });

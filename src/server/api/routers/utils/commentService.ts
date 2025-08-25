@@ -1,8 +1,30 @@
 import { eq, desc } from "drizzle-orm";
+import type { InferSelectModel } from "drizzle-orm";
 
 import type { DrizzleClient } from "~/server/db/drizzle";
 
 import { comments, issues, users } from "~/server/db/schema";
+import {
+  transformKeysToCamelCase,
+  type DrizzleToCamelCase,
+} from "~/lib/utils/case-transformers";
+
+// Type definitions for service responses
+type CommentDbModel = InferSelectModel<typeof comments>;
+type CommentResponse = DrizzleToCamelCase<CommentDbModel>;
+
+type CommentWithRelations = InferSelectModel<typeof comments> & {
+  author: Pick<
+    InferSelectModel<typeof users>,
+    "id" | "name" | "email" | "image"
+  >;
+  deleter: Pick<
+    InferSelectModel<typeof users>,
+    "id" | "name" | "email" | "image"
+  > | null;
+  issue: Pick<InferSelectModel<typeof issues>, "id" | "title">;
+};
+type CommentWithRelationsResponse = DrizzleToCamelCase<CommentWithRelations>;
 
 /**
  * Comment service utilities.
@@ -38,19 +60,19 @@ export class CommentService {
       .returning({
         id: comments.id,
         content: comments.content,
-        createdAt: comments.created_at,
-        updatedAt: comments.updated_at,
-        deletedAt: comments.deleted_at,
-        deletedBy: comments.deleted_by,
-        issueId: comments.issue_id,
-        authorId: comments.author_id,
+        created_at: comments.created_at,
+        updated_at: comments.updated_at,
+        deleted_at: comments.deleted_at,
+        deleted_by: comments.deleted_by,
+        issue_id: comments.issue_id,
+        author_id: comments.author_id,
       });
 
     if (!deletedComment) {
       throw new Error(`Comment with id ${commentId} not found`);
     }
 
-    return deletedComment;
+    return transformKeysToCamelCase<CommentResponse>(deletedComment);
   }
 
   /**
@@ -76,19 +98,19 @@ export class CommentService {
       .returning({
         id: comments.id,
         content: comments.content,
-        createdAt: comments.created_at,
-        updatedAt: comments.updated_at,
-        deletedAt: comments.deleted_at,
-        deletedBy: comments.deleted_by,
-        issueId: comments.issue_id,
-        authorId: comments.author_id,
+        created_at: comments.created_at,
+        updated_at: comments.updated_at,
+        deleted_at: comments.deleted_at,
+        deleted_by: comments.deleted_by,
+        issue_id: comments.issue_id,
+        author_id: comments.author_id,
       });
 
     if (!restoredComment) {
       throw new Error(`Comment with id ${commentId} not found`);
     }
 
-    return restoredComment;
+    return transformKeysToCamelCase<CommentResponse>(restoredComment);
   }
 
   /**
@@ -127,12 +149,12 @@ export class CommentService {
       .select({
         id: comments.id,
         content: comments.content,
-        createdAt: comments.created_at,
-        updatedAt: comments.updated_at,
-        deletedAt: comments.deleted_at,
-        deletedBy: comments.deleted_by,
-        issueId: comments.issue_id,
-        authorId: comments.author_id,
+        created_at: comments.created_at,
+        updated_at: comments.updated_at,
+        deleted_at: comments.deleted_at,
+        deleted_by: comments.deleted_by,
+        issue_id: comments.issue_id,
+        author_id: comments.author_id,
         author: {
           id: users.id,
           name: users.name,
@@ -154,7 +176,7 @@ export class CommentService {
     const commentsWithDeleters = await Promise.all(
       result.map(async (comment) => {
         let deleter = null;
-        if (comment.deletedBy) {
+        if (comment.deleted_by) {
           const [deleterUser] = await this.drizzle
             .select({
               id: users.id,
@@ -163,7 +185,7 @@ export class CommentService {
               image: users.image,
             })
             .from(users)
-            .where(eq(users.id, comment.deletedBy))
+            .where(eq(users.id, comment.deleted_by))
             .limit(1);
           deleter = deleterUser ?? null;
         }
@@ -174,7 +196,12 @@ export class CommentService {
       }),
     );
 
-    // Filter to only deleted comments
-    return commentsWithDeleters.filter((comment) => comment.deletedAt !== null);
+    // Filter to only deleted comments and transform to camelCase
+    const deletedComments = commentsWithDeleters.filter(
+      (comment) => comment.deleted_at !== null,
+    );
+    return deletedComments.map((comment) =>
+      transformKeysToCamelCase<CommentWithRelationsResponse>(comment),
+    );
   }
 }

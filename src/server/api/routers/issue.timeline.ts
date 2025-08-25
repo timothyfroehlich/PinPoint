@@ -17,7 +17,7 @@ export const issueTimelineRouter = createTRPCRouter({
         .where(eq(issues.id, input.issueId))
         .limit(1);
 
-      if (!issue || issue.length === 0) {
+      if (issue.length === 0) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Issue not found or access denied",

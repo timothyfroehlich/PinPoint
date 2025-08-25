@@ -80,7 +80,8 @@ export function validateFilters(filters: Partial<IssueFilters>): IssueFilters {
     statusIds: Array.isArray(filters.statusIds) ? filters.statusIds : undefined,
     search:
       typeof filters.search === "string"
-        ? filters.search.trim() || undefined
+        ? // Convert empty strings to undefined for API consistency
+          filters.search.trim() || undefined
         : undefined,
     assigneeId: filters.assigneeId ?? undefined,
     reporterId: filters.reporterId ?? undefined,

@@ -22,7 +22,7 @@ export function createDrizzle(
 
   // Check if adapter is PGlite instance (has .exec method)
   if ("exec" in adapter && typeof adapter.exec === "function") {
-    return pgliteDrizzle(adapter as PGlite, options);
+    return pgliteDrizzle(adapter, options);
   }
 
   // Otherwise, use postgres-js

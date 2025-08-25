@@ -2,7 +2,7 @@ import { SEED_TEST_IDS } from "./constants";
 import minimalIssues, { type MinimalIssue } from "./minimal-issues";
 
 // Helper mappers and assumptions
-const mapSeverityToPriority = (severity?: string) => {
+const mapSeverityToPriority = (severity?: string): string => {
   if (!severity) return SEED_TEST_IDS.PRIORITIES.LOW;
   const s = severity.toLowerCase();
   if (s.includes("severe")) return SEED_TEST_IDS.PRIORITIES.CRITICAL;
@@ -12,7 +12,7 @@ const mapSeverityToPriority = (severity?: string) => {
   return SEED_TEST_IDS.PRIORITIES.MEDIUM;
 };
 
-const mapStatusToStatusId = (status?: string) => {
+const mapStatusToStatusId = (status?: string): string => {
   if (!status) return SEED_TEST_IDS.STATUSES.NEW;
   const s = status.toLowerCase();
   if (s.includes("new")) return SEED_TEST_IDS.STATUSES.NEW;
@@ -28,7 +28,7 @@ const mapStatusToStatusId = (status?: string) => {
   return SEED_TEST_IDS.STATUSES.IN_PROGRESS;
 };
 
-const mapReporterToUserId = (email?: string) => {
+const mapReporterToUserId = (email?: string): string => {
   if (!email) return SEED_TEST_IDS.USERS.MEMBER1;
   const e = email.toLowerCase();
   if (e.includes("roger.sharpe")) return SEED_TEST_IDS.USERS.MEMBER1;
@@ -48,7 +48,10 @@ const mapReporterToUserId = (email?: string) => {
 };
 
 // Map common game titles/opdb ids to known machines; for unknown games we use MOCK_PATTERNS.MACHINE
-const knownMachineByTitle = (title?: string, opdb?: string) => {
+const knownMachineByTitle = (
+  title?: string,
+  opdb?: string,
+): string | undefined => {
   // Primary deterministic lookup by OPDB id when available
   if (opdb) {
     const o = opdb.trim();
@@ -70,7 +73,7 @@ const knownMachineByTitle = (title?: string, opdb?: string) => {
   }
 
   // Fallback to title-based heuristic when OPDB lookup not available
-  const t = (title || "").toLowerCase();
+  const t = (title ?? "").toLowerCase();
   if (t.includes("medieval")) return SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1;
   if (t.includes("ultraman") || t.includes("kaiju"))
     return SEED_TEST_IDS.MACHINES.ULTRAMAN_KAIJU;
@@ -85,7 +88,19 @@ const knownMachineByTitle = (title?: string, opdb?: string) => {
 };
 
 // Source data converted from scripts/seed/shared/sample-issues.json
-const sample_data: Record<string, any>[] = [
+interface SampleIssueData {
+  title?: string;
+  description?: string;
+  severity?: string;
+  status?: string;
+  gameTitle?: string;
+  reporterEmail?: string;
+  created_at?: string;
+  updated_at?: string;
+  gameOpdbId?: string;
+}
+
+const sample_data: SampleIssueData[] = [
   {
     title: "Kaiju figures on left ramp are not responding",
     description: "Kaiju figures on left ramp are not responding",
@@ -329,19 +344,32 @@ const sample_data: Record<string, any>[] = [
 ];
 
 // Runtime validator for MinimalIssue
-const isMinimalIssue = (obj: any): obj is MinimalIssue => {
+const isMinimalIssue = (obj: unknown): obj is MinimalIssue => {
+  if (!obj || typeof obj !== "object") return false;
+
+  const record = obj as Record<string, unknown>;
+
   return (
-    obj &&
-    typeof obj.id === "string" &&
-    typeof obj.title === "string" &&
-    typeof obj.description === "string" &&
-    typeof obj.organization_id === "string" &&
-    typeof obj.machine_id === "string" &&
-    typeof obj.priority_id === "string" &&
-    typeof obj.status_id === "string" &&
-    typeof obj.created_by_id === "string" &&
-    obj.created_at instanceof Date &&
-    obj.updated_at instanceof Date
+    "id" in record &&
+    typeof record["id"] === "string" &&
+    "title" in record &&
+    typeof record["title"] === "string" &&
+    "description" in record &&
+    typeof record["description"] === "string" &&
+    "organization_id" in record &&
+    typeof record["organization_id"] === "string" &&
+    "machine_id" in record &&
+    typeof record["machine_id"] === "string" &&
+    "priority_id" in record &&
+    typeof record["priority_id"] === "string" &&
+    "status_id" in record &&
+    typeof record["status_id"] === "string" &&
+    "created_by_id" in record &&
+    typeof record["created_by_id"] === "string" &&
+    "created_at" in record &&
+    record["created_at"] instanceof Date &&
+    "updated_at" in record &&
+    record["updated_at"] instanceof Date
   );
 };
 
@@ -349,10 +377,10 @@ const isMinimalIssue = (obj: any): obj is MinimalIssue => {
 const otherIssues: MinimalIssue[] = sample_data.map((s, idx) => {
   const knownMachine = knownMachineByTitle(s.gameTitle, s.gameOpdbId);
   const machine_id =
-    knownMachine ?? `${SEED_TEST_IDS.MOCK_PATTERNS.MACHINE}-${idx + 1}`;
+    knownMachine ?? `${SEED_TEST_IDS.MOCK_PATTERNS.MACHINE}-${String(idx + 1)}`;
 
   const issue: MinimalIssue = {
-    id: `${SEED_TEST_IDS.MOCK_PATTERNS.ISSUE}-${idx + 1}`,
+    id: `${SEED_TEST_IDS.MOCK_PATTERNS.ISSUE}-${String(idx + 1)}`,
     title: s.title ?? "Untitled",
     description: s.description ?? "",
     organization_id: SEED_TEST_IDS.ORGANIZATIONS.primary,

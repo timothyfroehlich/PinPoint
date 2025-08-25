@@ -17,10 +17,13 @@ import { useState } from "react";
 import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 
 import { api } from "~/trpc/react";
-import { type IssueWithDetails, type IssueStatus } from "~/types/issue";
+import {
+  type IssueWithRelationsResponse,
+  type IssueStatus,
+} from "~/lib/types/api";
 
 interface IssueStatusControlProps {
-  issue: IssueWithDetails;
+  issue: NonNullable<IssueWithRelationsResponse>;
   user: PinPointSupabaseUser | null;
   hasPermission: (permission: string) => boolean;
   onError: (error: string) => void;
@@ -32,14 +35,15 @@ export function IssueStatusControl({
   hasPermission,
   onError,
 }: IssueStatusControlProps): React.JSX.Element {
-  const [selectedStatusId, setSelectedStatusId] = useState(issue.status_id);
+  const [selectedStatusId, setSelectedStatusId] = useState(issue.statusId);
   const [isUpdating, setIsUpdating] = useState(false);
 
   const utils = api.useUtils();
 
   // Fetch available statuses for the organization
-  const { data: statuses, isLoading: statusesLoading } =
-    api.issueStatus.getAll.useQuery();
+  const statusQuery = api.issueStatus.getAll.useQuery();
+  const statuses = statusQuery.data as IssueStatus[] | undefined;
+  const statusesLoading = statusQuery.isLoading;
 
   const updateStatus = api.issue.core.update.useMutation({
     onSuccess: () => {
@@ -48,7 +52,7 @@ export function IssueStatusControl({
     },
     onError: (error) => {
       onError(error.message);
-      setSelectedStatusId(issue.status_id); // Reset to original
+      setSelectedStatusId(issue.statusId); // Reset to original
       setIsUpdating(false);
     },
   });
@@ -93,63 +97,66 @@ export function IssueStatusControl({
             color="primary"
             variant="filled"
             sx={{
-              backgroundColor: issue.status.color,
+              backgroundColor: issue.status.color ?? "#666",
               color: "white",
             }}
           />
         </Box>
 
         {/* Status Change Control */}
-        {canEditStatus && statuses && statuses.length > 0 && (
-          <Box>
-            <FormControl fullWidth>
-              <InputLabel id="status-select-label">Change Status</InputLabel>
-              <Select
-                labelId="status-select-label"
-                value={selectedStatusId}
-                label="Change Status"
-                onChange={(e) => {
-                  handleStatusChange(e.target.value);
-                }}
-                disabled={isUpdating}
-                data-testid="status-dropdown"
-              >
-                {statuses.map((status: IssueStatus) => (
-                  <MenuItem
-                    key={status.id}
-                    value={status.id}
-                    data-testid={`status-option-${status.name.toLowerCase().replace(" ", "-")}`}
-                  >
-                    <Stack direction="row" alignItems="center" spacing={1}>
-                      <Box
-                        sx={{
-                          width: 16,
-                          height: 16,
-                          borderRadius: "50%",
-                          backgroundColor: status.color,
-                        }}
-                      />
-                      <Typography>{status.name}</Typography>
-                    </Stack>
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+        {canEditStatus &&
+          statuses &&
+          Array.isArray(statuses) &&
+          statuses.length > 0 && (
+            <Box>
+              <FormControl fullWidth>
+                <InputLabel id="status-select-label">Change Status</InputLabel>
+                <Select
+                  labelId="status-select-label"
+                  value={selectedStatusId}
+                  label="Change Status"
+                  onChange={(e) => {
+                    handleStatusChange(e.target.value);
+                  }}
+                  disabled={isUpdating}
+                  data-testid="status-dropdown"
+                >
+                  {statuses.map((status) => (
+                    <MenuItem
+                      key={status.id}
+                      value={status.id}
+                      data-testid={`status-option-${status.name.toLowerCase().replace(" ", "-")}`}
+                    >
+                      <Stack direction="row" alignItems="center" spacing={1}>
+                        <Box
+                          sx={{
+                            width: 16,
+                            height: 16,
+                            borderRadius: "50%",
+                            backgroundColor: status.color,
+                          }}
+                        />
+                        <Typography>{status.name}</Typography>
+                      </Stack>
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
 
-            {isUpdating && (
-              <Box sx={{ display: "flex", alignItems: "center", mt: 1 }}>
-                <CircularProgress
-                  size={16}
-                  sx={{ mr: 1 }}
-                  data-testid="status-loading"
-                />
-                <Typography variant="body2" color="text.secondary">
-                  Updating status...
-                </Typography>
-              </Box>
-            )}
-          </Box>
-        )}
+              {isUpdating && (
+                <Box sx={{ display: "flex", alignItems: "center", mt: 1 }}>
+                  <CircularProgress
+                    size={16}
+                    sx={{ mr: 1 }}
+                    data-testid="status-loading"
+                  />
+                  <Typography variant="body2" color="text.secondary">
+                    Updating status...
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+          )}
 
         {/* Status History/Activity */}
         {/* TODO: Add status change history */}

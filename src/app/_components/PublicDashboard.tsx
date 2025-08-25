@@ -114,8 +114,10 @@ export function PublicDashboard(): React.ReactNode {
     );
   }
 
-  const totalMachines =
-    locations?.reduce((sum, loc) => sum + loc._count.machines, 0) ?? 0;
+  const totalMachines = locations.reduce(
+    (sum: number, loc) => sum + loc._count.machines,
+    0,
+  );
 
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", p: 3 }}>

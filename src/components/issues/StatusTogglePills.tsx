@@ -80,7 +80,7 @@ export function StatusTogglePills({
       RESOLVED: [],
     };
 
-    statuses.forEach((status) => {
+    statuses.forEach((status: StatusInfo) => {
       // Only process statuses with valid categories
       if (status.category in statusesByCategory) {
         statusesByCategory[status.category].push(status);
@@ -94,14 +94,16 @@ export function StatusTogglePills({
       RESOLVED: 0,
     };
 
-    allIssues.forEach((issue) => {
-      const category = issue.status.category;
-      // Only count issues with valid status categories
-      if (category in counts) {
-        // eslint-disable-next-line security/detect-object-injection
-        counts[category]++;
-      }
-    });
+    allIssues.forEach(
+      (issue: { status: { category: "NEW" | "IN_PROGRESS" | "RESOLVED" } }) => {
+        const category = issue.status.category;
+        // Only count issues with valid status categories
+        if (category in counts) {
+          // eslint-disable-next-line security/detect-object-injection -- category is type-constrained to specific string literals
+          counts[category]++;
+        }
+      },
+    );
 
     return { statusesByCategory, counts };
   }, [statuses, allIssues]);
@@ -112,6 +114,7 @@ export function StatusTogglePills({
   ): void => {
     if (!statusData) return;
 
+    // eslint-disable-next-line security/detect-object-injection -- category is type-constrained to union type
     const categoryStatusIds = statusData.statusesByCategory[category].map(
       (s) => s.id,
     );
@@ -134,6 +137,7 @@ export function StatusTogglePills({
     category: "NEW" | "IN_PROGRESS" | "RESOLVED",
   ): boolean => {
     if (!statusData) return false;
+    // eslint-disable-next-line security/detect-object-injection -- category is type-constrained to union type
     const categoryStatusIds = statusData.statusesByCategory[category].map(
       (s) => s.id,
     );
@@ -145,6 +149,7 @@ export function StatusTogglePills({
     category: "NEW" | "IN_PROGRESS" | "RESOLVED",
   ): boolean => {
     if (!statusData) return false;
+    // eslint-disable-next-line security/detect-object-injection -- category is type-constrained to union type
     const categoryStatusIds = statusData.statusesByCategory[category].map(
       (s) => s.id,
     );
@@ -173,6 +178,7 @@ export function StatusTogglePills({
       {categories.map((category) => {
         const isActive = isCategoryActive(category);
         const isFullySelected = isCategoryFullySelected(category);
+        // eslint-disable-next-line security/detect-object-injection -- category is type-constrained to union type
         const count = statusData.counts[category];
         const colors = getStatusColor(category);
         const label = getCategoryLabel(category);

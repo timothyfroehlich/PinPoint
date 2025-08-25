@@ -59,44 +59,97 @@ Analyze `$ARGUMENTS` and determine the appropriate archetype:
    - Show decision tree path taken
    - Allow user to confirm or select different archetype
 
-3. **Apply Template**
-   - Use appropriate template for selected archetype:
-     - **Archetype 1**: Pure functions (no dependencies)
-     - **Archetype 2**: React components with RTL
-     - **Archetype 3**: Business logic with mocked dependencies (@src/test/templates/service.test.template.ts)
-     - **Archetype 4**: Database operations with PGlite
-     - **Archetype 5**: tRPC router with mock contexts
-     - **Archetype 6**: Full API integration tests
-     - **Archetype 7**: Playwright E2E tests
-     - **Archetype 8**: pgTAP RLS policy tests
-     - **Archetype 9**: pgTAP schema constraint tests
+3. **Load Archetype-Specific Files**
+   - Based on confirmed archetype, read only the relevant files from Dynamic File Recommendations
+   - Check if template exists for selected archetype
+   - If template missing: Show "Archetype X not ready yet - see Issue #YYY"
+   - Load required helpers and examples for the specific archetype
 
-4. **Customize Template**
+4. **Apply Template**
+   - Use appropriate template for selected archetype:
+     - **Archetype 1**: `unit.template.ts` - Pure functions (no dependencies)
+     - **Archetype 2**: `component.template.tsx` - React components with RTL
+     - **Archetype 3**: `service.template.ts` - Business logic with mocked dependencies (ready)
+     - **Archetype 4**: `repository.template.ts` - Database operations with PGlite
+     - **Archetype 5**: `router.template.ts` - tRPC router with mock contexts
+     - **Archetype 6**: `api.template.ts` - Full API integration tests
+     - **Archetype 7**: `e2e.template.ts` - Playwright E2E tests
+     - **Archetype 8**: `rls.template.sql` - pgTAP RLS policy tests
+     - **Archetype 9**: `schema.template.sql` - pgTAP schema constraint tests
+
+5. **Customize Template**
    - Replace template placeholders with actual file imports
    - Identify and test actual methods/functions
    - Apply proper TypeScript types
-   - Use SEED_TEST_IDS and service-test-helpers
+   - Use auto-generated mocks and seed constants
 
-5. **Validation Pipeline**
+6. **Validation Pipeline**
    - Run generated tests to ensure they pass
    - Run prettier formatting
    - Run ESLint validation
    - Run TypeScript type checking
 
-6. **Save with Correct Naming**
+7. **Save with Correct Naming**
    - Use archetype naming convention: `{filename}.{archetype}.test.{ext}`
    - Place in correct location (co-located with source)
 
-## Available Infrastructure
+## Dynamic File Recommendations
 
-Reference these established patterns:
+Based on the selected archetype, I will recommend specific files to read:
 
-- **Templates**: @src/test/templates/service.test.template.ts (more coming)
-- **Test Helpers**: @src/test/helpers/service-test-helpers.ts
-- **Test Constants**: @src/test/constants/seed-test-ids.ts
-- **Working Example**: @src/server/services/roleService.simple.service.test.ts
-- **Archetype Guide**: @docs/testing/SERVICE_TESTS_ARCHETYPE.md
+**Archetype 1 (Unit Test)**:
+
+- Template: `src/test/templates/unit.template.ts` (Issue #349)
+- Helpers: `src/test/generated/mocks.ts` (for consistent mock data)
+
+**Archetype 2 (Component Test)**:
+
+- Template: `src/test/templates/component.template.tsx` (Issue #350)
+- Helpers: `src/test/generated/mocks.ts` (for mock props)
+
+**Archetype 3 (Service Test)**:
+
+- Template: `src/test/templates/service.template.ts` (ready)
+- Helpers: `src/test/helpers/service-test-helpers.ts`
+- Example: `src/server/services/roleService.simple.service.test.ts`
+
+**Archetype 4 (Repository Test)**:
+
+- Template: `src/test/templates/repository.template.ts` (Issue #352)
+- Helpers: `src/test/helpers/worker-db.ts` (Issue #345)
+- Constants: `src/test/generated/seed-test-ids.ts` (Issue #346)
+
+**Archetype 5 (Router Test)**:
+
+- Template: `src/test/templates/router.template.ts` (Issue #353)
+- Helpers: `src/test/helpers/test-context.ts` (Issue #345)
+- Mocks: `src/test/generated/mocks.ts` (Issue #346)
+
+**Archetype 6 (API Integration Test)**:
+
+- Template: `src/test/templates/api.template.ts` (Issue #354)
+- Helpers: `src/test/helpers/worker-db.ts`, `src/test/helpers/test-context.ts` (Issue #345)
+- Constants: `src/test/generated/seed-test-ids.ts` (Issue #346)
+
+**Archetype 7 (E2E Test)**:
+
+- Template: `src/test/templates/e2e.template.ts` (Issue #355)
+- Constants: `src/test/generated/seed-test-ids.ts` (for predictable data)
+
+**Archetype 8 (RLS Test)**:
+
+- Template: `src/test/templates/rls.template.sql` (Issue #356)
+- Examples: Files in `supabase/tests/rls/`
+
+**Archetype 9 (Schema Test)**:
+
+- Template: `src/test/templates/schema.template.sql` (Issue #357)
+- Examples: Files in `supabase/tests/`
+
+**Always Available**:
+
 - **Master Plan**: @docs/testing/TEST_SYSTEM_REBOOT_PLAN.md
+- **Non-Negotiables**: @docs/NON_NEGOTIABLES.md
 
 ## Test Non-Negotiables
 

@@ -3,10 +3,14 @@
  *
  * Shared seeding for organizations, permissions, roles, priorities, statuses.
  * Uses SeedMapper to eliminate switch statements and standardize patterns.
+ *
+ * Note: This file uses snake_case field names for database operations
+ * to match the actual database schema. Any transformation between camelCase
+ * and snake_case should be handled at the application boundary.
  */
 
 // Node modules
-import { eq, and, inArray, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 // Internal utilities
 import { createDrizzleClient } from "~/server/db/drizzle";
@@ -114,20 +118,22 @@ async function createGlobalPermissions(): Promise<void> {
 
   const existingSet = new Set(existingPermissions.map((p) => p.name));
 
-  const permissionsToCreate = ALL_PERMISSIONS.filter(
-    (permName) => !existingSet.has(permName),
-  ).map((permName) => ({
-    id:
-      PERMISSION_ID_MAP[permName] ||
-      `perm-fallback-${permName.replace(/[^a-z0-9]/gi, "-")}`,
-    name: permName,
-    description: PERMISSION_DESCRIPTIONS[permName] ?? `Permission: ${permName}`,
-  }));
+  const permissionsToCreate: (typeof permissions.$inferInsert)[] =
+    ALL_PERMISSIONS.filter((permName) => !existingSet.has(permName)).map(
+      (permName) => ({
+        id:
+          PERMISSION_ID_MAP[permName] ||
+          `perm-fallback-${permName.replace(/[^a-z0-9]/gi, "-")}`,
+        name: permName,
+        description:
+          PERMISSION_DESCRIPTIONS[permName] ?? `Permission: ${permName}`,
+      }),
+    );
 
   if (permissionsToCreate.length > 0) {
     await db.insert(permissions).values(permissionsToCreate);
     SeedLogger.success(
-      `Created ${permissionsToCreate.length} global permissions`,
+      `Created ${String(permissionsToCreate.length)} global permissions`,
     );
   }
 }
@@ -151,7 +157,7 @@ async function createOrganizationWithRoles(orgData: {
       id: orgData.id ?? `org-fallback-${orgData.subdomain}`,
       name: orgData.name,
       subdomain: orgData.subdomain,
-      logoUrl: orgData.logoUrl,
+      logo_url: orgData.logoUrl,
       created_at: new Date(),
       updated_at: new Date(),
     })
@@ -159,7 +165,7 @@ async function createOrganizationWithRoles(orgData: {
       target: organizations.subdomain,
       set: {
         name: orgData.name,
-        logoUrl: orgData.logoUrl,
+        logo_url: orgData.logoUrl,
         updated_at: new Date(),
       },
     })
@@ -212,7 +218,7 @@ async function createDefaultPriorities(organization_id: string): Promise<void> {
 
   const existingSet = new Set(existingPriorities.map((p) => p.name));
 
-  const prioritiesToCreate = priorityData
+  const prioritiesToCreate: (typeof priorities.$inferInsert)[] = priorityData
     .filter((priority) => !existingSet.has(priority.name))
     .map((priority) => ({
       id: SeedMapper.getPriorityId(priority.name, organization_id),
@@ -250,7 +256,7 @@ async function createDefaultCollectionTypes(
 
   const existingSet = new Set(existingTypes.map((t) => t.name));
 
-  const typesToCreate = typeData
+  const typesToCreate: (typeof collectionTypes.$inferInsert)[] = typeData
     .filter((type) => !existingSet.has(type.name))
     .map((typeData) => ({
       id: SeedMapper.getCollectionTypeId(typeData.name, organization_id),
@@ -334,10 +340,18 @@ async function createDefaultIssueStatuses(
       name: statusData.name,
       color: statusData.color,
       description: statusData.description,
-      category: statusData.category,
+      category: statusData.category as "NEW" | "IN_PROGRESS" | "RESOLVED",
       organization_id: organization_id,
       is_default: true,
-    }));
+    })) as {
+    id: string;
+    name: string;
+    color: string;
+    description: string;
+    category: "NEW" | "IN_PROGRESS" | "RESOLVED";
+    organization_id: string;
+    is_default: boolean;
+  }[];
 
   if (statusesToCreate.length > 0) {
     await db.insert(issueStatuses).values(statusesToCreate);
@@ -469,7 +483,6 @@ async function createDefaultLocation(organization_id: string): Promise<void> {
       name: "Main Floor",
       description: "Primary location for machines",
       organization_id: organization_id,
-      is_default: true,
     })
     .onConflictDoNothing();
 }

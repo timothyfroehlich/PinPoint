@@ -8,7 +8,7 @@ import {
   machineEditProcedure,
   organizationManageProcedure,
 } from "~/server/api/trpc";
-import { machines } from "~/server/db/schema";
+import { machines, organizations } from "~/server/db/schema";
 import {
   getSingleRecordWithLimit,
   COMMON_ERRORS,
@@ -87,6 +87,9 @@ export const qrCodeRouter = createTRPCRouter({
   /**
    * Public endpoint to resolve machine information from QR code
    * This is used when someone scans a QR code
+   *
+   * Security: Cross-organization access is intentional - QR codes should redirect
+   * users to the correct organization. However, we add validation and logging.
    */
   resolve: publicProcedure
     .input(z.object({ qrCodeId: z.string() }))
@@ -96,6 +99,29 @@ export const qrCodeRouter = createTRPCRouter({
 
       if (!machine) {
         throw new Error("Invalid QR code");
+      }
+
+      // Security: Log QR code access for monitoring
+      ctx.logger.info({
+        msg: "QR code resolved",
+        component: "qrCodeRouter.resolve",
+        context: {
+          qrCodeId: input.qrCodeId,
+          machineId: machine.id,
+          targetOrganization: machine.organization.subdomain,
+          requestingOrganization: ctx.organization?.subdomain ?? "unknown",
+          crossOrgAccess: ctx.organization?.id !== machine.organizationId,
+        },
+      });
+
+      // Security: Validate that the target organization exists
+      const targetOrg = await ctx.db.query.organizations.findFirst({
+        where: eq(organizations.id, machine.organizationId),
+        columns: { id: true },
+      });
+
+      if (!targetOrg) {
+        throw new Error("QR code organization not found");
       }
 
       return machine;

@@ -14,9 +14,14 @@
     "noUncheckedIndexedAccess": false,
     /* Allow any types in tests for mocking flexibility */
     "noImplicitAny": false,
+    /* Allow JavaScript files and improve performance */
+    "allowJs": true,
+    "skipLibCheck": true,
     /* Keep some basic safety */
     "noImplicitReturns": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    /* Test framework type definitions */
+    "types": ["vitest/globals", "node"]
   },
   "include": [
     "src/**/*.test.ts",
@@ -31,6 +36,12 @@
     "e2e/**/*.tsx",
     "src/test/setup/**/*.ts",
     "src/test/examples/**/*.ts",
-    "src/test/helpers/**/*.ts"
+    "src/test/helpers/**/*.ts",
+    "src/test/**/*.ts"
+  ],
+  "exclude": [
+    "src/test/archived-templates/**/*",
+    "src/test/templates/**/*",
+    "src/**/*.template.ts"
   ]
 }

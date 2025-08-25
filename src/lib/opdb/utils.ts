@@ -154,6 +154,7 @@ export function generateCacheKey(
 ): string {
   const paramString = Object.keys(params)
     .sort()
+    // eslint-disable-next-line security/detect-object-injection -- key is from Object.keys() iteration of known params object
     .map((key) => `${key}=${String(params[key])}`)
     .join("&");
 

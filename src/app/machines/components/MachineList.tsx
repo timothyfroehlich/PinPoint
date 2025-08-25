@@ -5,6 +5,7 @@ import { Grid, Typography, Box, CircularProgress } from "@mui/material";
 import { MachineCard } from "./MachineCard";
 
 import { api } from "~/trpc/react";
+import type { MachineResponse } from "~/lib/types/api";
 
 export function MachineList(): React.ReactElement {
   const {
@@ -43,11 +44,13 @@ export function MachineList(): React.ReactElement {
 
   return (
     <Grid container spacing={3}>
-      {machines.map((machine) => (
-        <Grid size={{ xs: 12, md: 6, lg: 4 }} key={machine.id}>
-          <MachineCard machine={machine} />
-        </Grid>
-      ))}
+      {machines.map((machine: MachineResponse) => {
+        return (
+          <Grid size={{ xs: 12, md: 6, lg: 4 }} key={machine.id}>
+            <MachineCard machine={machine} />
+          </Grid>
+        );
+      })}
     </Grid>
   );
 }

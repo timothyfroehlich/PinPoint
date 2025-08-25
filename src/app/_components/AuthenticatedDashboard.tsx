@@ -7,8 +7,34 @@ import DetailedIssueCard from "../dashboard/_components/DetailedIssueCard";
 
 import { api } from "~/trpc/react";
 
-type IssueStatus = "new" | "in progress" | "acknowledged" | "resolved";
-type IssuePriority = "high" | "medium" | "low";
+// Type for the actual structure returned by getAll with relations
+interface IssueFromList {
+  id: string;
+  title: string;
+  status: {
+    id: string;
+    category: "NEW" | "IN_PROGRESS" | "RESOLVED";
+    name: string;
+    color: string;
+    description: string;
+    isDefault: boolean;
+    organizationId: string;
+  };
+  priority: {
+    id: string;
+    name: string;
+    color: string;
+    description: string;
+    order: number;
+    isDefault: boolean;
+    organizationId: string;
+  };
+  machine: {
+    model: {
+      name: string;
+    };
+  };
+}
 
 export function AuthenticatedDashboard(): React.ReactNode {
   const { data: issues, isLoading, error } = api.issue.core.getAll.useQuery({});
@@ -37,27 +63,26 @@ export function AuthenticatedDashboard(): React.ReactNode {
     );
   }
 
-  const openIssues =
-    issues
-      ?.filter((issue) => issue.status.category !== "RESOLVED")
-      .map((issue) => ({
-        id: issue.id,
-        title: issue.title,
-        machineName: issue.machine.model.name,
-        status: issue.status.name.toLowerCase() as IssueStatus,
-        priority: issue.priority.name.toLowerCase() as IssuePriority,
-      })) ?? [];
+  // Transform issues with proper typing
+  const openIssues = (issues as unknown as IssueFromList[])
+    .filter((issue) => issue.status.category !== "RESOLVED")
+    .map((issue) => ({
+      id: issue.id,
+      title: issue.title,
+      machineName: issue.machine.model.name,
+      status: issue.status,
+      priority: issue.priority,
+    }));
 
-  const resolvedIssues =
-    issues
-      ?.filter((issue) => issue.status.category === "RESOLVED")
-      .map((issue) => ({
-        id: issue.id,
-        title: issue.title,
-        machineName: issue.machine.model.name,
-        status: issue.status.name.toLowerCase() as IssueStatus,
-        priority: issue.priority.name.toLowerCase() as IssuePriority,
-      })) ?? [];
+  const resolvedIssues = (issues as unknown as IssueFromList[])
+    .filter((issue) => issue.status.category === "RESOLVED")
+    .map((issue) => ({
+      id: issue.id,
+      title: issue.title,
+      machineName: issue.machine.model.name,
+      status: issue.status,
+      priority: issue.priority,
+    }));
 
   // Mock newly reported data (replace with real data later)
   const newlyReported = [{ location: "Pinballz Arcade", count: 2 }];

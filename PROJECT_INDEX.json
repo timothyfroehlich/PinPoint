@@ -1,5 +1,5 @@
 {
-  "at": "2025-08-24T09:10:10.153678",
+  "at": "2025-08-25T05:10:15.384059",
   "root": ".",
   "tree": [
     ".",
@@ -17,137 +17,20 @@
     "\u2502   \u2502   \u2514\u2500\u2500 trpc/",
     "\u2502   \u251c\u2500\u2500 latest-updates/",
     "\u2502   \u251c\u2500\u2500 lessons-learned/",
-    "\u2502   \u251c\u2500\u2500 orchestrator-system/",
     "\u2502   \u251c\u2500\u2500 planning/",
     "\u2502   \u2502   \u251c\u2500\u2500 archive/",
     "\u2502   \u2502   \u251c\u2500\u2500 future-features/",
-    "\u2502   \u2502   \u2514\u2500\u2500 rejected-ideas/"
+    "\u2502   \u2502   \u2514\u2500\u2500 rejected-ideas/",
+    "\u2502   \u251c\u2500\u2500 quick-reference/"
   ],
   "stats": {
-    "total_files": 389,
+    "total_files": 415,
     "total_directories": 320,
-    "fully_parsed": { "typescript": 351, "javascript": 5, "shell": 3 },
-    "listed_only": { "sql": 16, "json": 11, "shell": 3 },
-    "markdown_files": 184
+    "fully_parsed": { "typescript": 379, "javascript": 4, "shell": 3 },
+    "listed_only": { "json": 11, "sql": 15, "shell": 3 },
+    "markdown_files": 155
   },
   "f": {
-    "s/convert-snake-case.ts": [
-      "t",
-      [
-        "parseArgs:47:():Options::",
-        "log:70:(...m:any[]):log:",
-        "collectSchemaColumns:75:async ():Promise<Set<string>>::",
-        "snakeToCamel:97:(s:string):string::",
-        "buildMapping:108:async ():Promise<MappingEntry[]>:collectSchemaColumns,snakeToCamel:",
-        "listSourceFiles:130:():string[]::",
-        "includeFilter:146:(path:string):boolean::",
-        "applyMappingAll:155:(content:string, mapping:MappingEntry[]):::",
-        "applyMappingProperties:177:(content:string, mapping:MappingEntry[]):::",
-        "applyMappingToContent:218:(content:string, mapping:MappingEntry[], mode:Mode):::",
-        "processFiles:222:async ():applyMappingToContent,buildMapping,listSourceFiles,log:"
-      ]
-    ],
-    "sr/server/db/seed/auth-users.ts": [
-      "t",
-      [
-        "getUsersForOrganization:110:(organizationId:string):UserData[]::",
-        "getUserIdForEmail:124:(email:string):string::",
-        "createServiceRoleClient:141:()::",
-        "getExistingAuthUsers:157:async ():Promise<Map<string, User>>:createServiceRoleClient:",
-        "upsertSupabaseAuthUser:178:async (params:CreateUserParams, existingUsers:Map<string, User>,):Promise<::",
-        "waitForUserRecord:237:async (user_id:string, email:string):Promise<boolean>::",
-        "processBatchUsers:270:async (userList:UserData[], organization_id:string,):Promise<BatchProcessResult>:getExistingAuthUsers,upsertSupabaseAuthUser,waitForUserRecord:",
-        "deleteExistingDevUsers:402:async (userList:UserData[]):Promise<void>:createServiceRoleClient:",
-        "createUsersDirectly:433:async (userList:UserData[], organization_id:string,):Promise<void>:getUserIdForEmail:",
-        "seedAuthUsers:491:async (organization_id:string, target:SeedTarget,):Promise<SeedResult<UserData[]>>:createUsersDirectly,deleteExistingDevUsers,getUsersForOrganization,processBatchUsers:"
-      ]
-    ],
-    "sr/server/db/seed/constants.ts": [
-      "t",
-      [
-        "createMockAdminContext:316:():TestMockContext::",
-        "createMockMemberContext:323:(memberNumber:1 | 2 = 1,):TestMockContext::"
-      ],
-      { "for": ["357", []] }
-    ],
-    "sr/server/db/seed/full-issues.ts": [
-      "t",
-      [
-        "mapSeverityToPriority:5:(severity?:string)::",
-        "mapStatusToStatusId:15:(status?:string)::",
-        "mapReporterToUserId:31:(email?:string)::",
-        "knownMachineByTitle:51:(title?:string, opdb?:string)::",
-        "isMinimalIssue:332:(obj:any):obj is MinimalIssue::"
-      ]
-    ],
-    "sr/server/db/seed/index.ts": ["t", ["main:38:async ():Promise<void>::"]],
-    "sr/server/db/seed/infrastructure.ts": [
-      "t",
-      [
-        "getDefaultLocationId:96:(orgId:string):string::",
-        "createGlobalPermissions:110:async ():Promise<void>::",
-        "createOrganizationWithRoles:140:async (orgData:{ id?:string; name:string; subdomain:string; logoUrl?:string; }):Promise<Organization>:createSystemRoles,createTemplateRole:",
-        "createDefaultPriorities:198:async (organization_id:string):Promise<void>::",
-        "createDefaultCollectionTypes:235:async (organization_id:string):Promise<void>::",
-        "createDefaultIssueStatuses:271:async (organization_id:string):Promise<void>::",
-        "createSystemRoles:313:async (organization_id:string):Promise<void>::",
-        "createTemplateRole:366:async (organization_id:string, templateName:keyof typeof ROLE_TEMPLATES):Promise<void>::",
-        "createDefaultLocation:408:async (organization_id:string):Promise<void>:getDefaultLocationId:",
-        "seedInfrastructure:428:async ():Promise<SeedResult<DualOrganizationSetup>>:createDefaultCollectionTypes,createDefaultIssueStatuses,createDefaultLocation,createDefaultPriorities,createGlobalPermissions,createOrganizationWithRoles:"
-      ]
-    ],
-    "sr/server/db/seed/sample-data.ts": [
-      "t",
-      [
-        "extractUniqueGames:57:async (dataAmount:DataAmount):Promise<UniqueGame[]>::",
-        "parseGameTitle:97:(title:string):::",
-        "createModels:129:async (games:UniqueGame[]):Promise<void>::",
-        "createMachines:164:async (organization_id:string, games:UniqueGame[], dataAmount:DataAmount,):Promise<void>::",
-        "createCompetitorMachine:254:async ():Promise<void>::",
-        "createSampleIssues:310:async (organization_id:string, dataAmount:DataAmount, skipAuthUsers = false,):Promise<void>::",
-        "seedSampleData:376:async (organization_id:string, dataAmount:DataAmount, skipAuthUsers = false,):Promise<SeedResult<SampleDataResult>>:createCompetitorMachine,createMachines,createModels,createSampleIssues,extractUniqueGames:",
-        "seedSampleDataWithDb:445:async (dbInstance:typeof db, organization_id:string, dataAmount:DataAmount, skipAuthUsers = false,):Promise<void>:seedSampleData:"
-      ]
-    ],
-    "sr/server/db/seed/seed-utilities.ts": [
-      "t",
-      [
-        "withErrorContext:276:async (context:string, operation:string, fn:()::",
-        "createSeedResult:291:(data:T, recordsCreated:number, startTime:number,):SeedResult<T>::",
-        "createFailedSeedResult:307:(error:unknown, startTime:number,):SeedResult<T>::"
-      ],
-      {
-        "SeedLogger": ["49", []],
-        "SeedValidator": ["91", []],
-        "SeedMapper": ["190", []],
-        "SeedError": [
-          "265",
-          [
-            "constructor:266:(context:string, operation:string, cause?:unknown)::",
-            "__init__:266:(context:string, operation:string, cause?:unknown)::"
-          ]
-        ],
-        "SeedConfigBuilder": [
-          "324",
-          [
-            "withDataAmount:332:(dataAmount:DataAmount):SeedConfigBuilder::",
-            "withEnvironment:337:(environment:string):SeedConfigBuilder::",
-            "withSupabaseUrl:342:(supabaseUrl:string):SeedConfigBuilder::",
-            "build:347:():SeedConfig::"
-          ]
-        ],
-        "SeedSafety": ["370", []]
-      }
-    ],
-    "sr/server/db/setup-rls.ts": [
-      "t",
-      [
-        "createDatabaseConnection:41:()::",
-        "setupRLS:62:async ():Promise<void>:createDatabaseConnection:",
-        "main:185:async ():Promise<void>:setupRLS:"
-      ],
-      { "c": ["92", []] }
-    ],
     ".archived-tests-2025-08-23/e2e/helpers/auth.ts": [
       "t",
       [
@@ -989,7 +872,7 @@
       "t",
       ["createVitestMockContext:112:():VitestMockContext::"]
     ],
-    "analyze-type-warnings.js": ["j", ["analyzeTypeWarnings:9:async ()::"]],
+    "e2e/helpers/unified-dashboard.ts": ["t", ["logout:6:async (page:Page)::"]],
     "middleware.ts": [
       "t",
       [
@@ -998,9 +881,25 @@
         "getBaseDomain:97:(host:string):string::"
       ]
     ],
+    "s/convert-snake-case.ts": [
+      "t",
+      [
+        "parseArgs:47:():Options::",
+        "log:72:(...m:any[]):log:",
+        "collectSchemaColumns:77:async ():Promise<Set<string>>::",
+        "snakeToCamel:99:(s:string):string::",
+        "buildMapping:114:async ():Promise<MappingEntry[]>:collectSchemaColumns,snakeToCamel:",
+        "listSourceFiles:138:():string[]::",
+        "includeFilter:159:(path:string):boolean::",
+        "applyMappingAll:173:(content:string, mapping:MappingEntry[],):::",
+        "applyMappingProperties:201:(content:string, mapping:MappingEntry[],):::",
+        "applyMappingToContent:248:(content:string, mapping:MappingEntry[], mode:Mode,):::",
+        "processFiles:258:async ():applyMappingToContent,buildMapping,listSourceFiles,log:"
+      ]
+    ],
     "s/generate-sql-constants.ts": [
       "t",
-      ["generateSQLConstants:22:()::", "main:190:():generateSQLConstants:"]
+      ["generateSQLConstants:22:()::", "main:191:():generateSQLConstants:"]
     ],
     "s/safe-psql.sh": [
       "s",
@@ -1051,7 +950,7 @@
     ],
     "sr/app/_components/AuthenticatedDashboard.tsx": [
       "t",
-      ["AuthenticatedDashboard:13:():React.ReactNode::"]
+      ["AuthenticatedDashboard:39:():React.ReactNode::"]
     ],
     "sr/app/_components/AuthenticatedLayout.tsx": [
       "t",
@@ -1064,7 +963,7 @@
       [
         "DevLoginCompact:33:({ onLogin:_onLogin, }:DevLoginCompactProps):React.ReactNode::",
         "handleLogin:67:async (email:string):Promise<void>::",
-        "getRoleColor:112:(role:string | null,):\"error\" | \"primary\" | \"success\" | \"default\"::",
+        "getRoleColor:120:(role:string | null,):\"error\" | \"primary\" | \"success\" | \"default\"::",
         "fetchUsers:43:async ():Promise<void>::"
       ]
     ],
@@ -1081,7 +980,7 @@
     ],
     "sr/app/api/dev/users/route.ts": [
       "t",
-      ["GET:10:async ():Promise<NextResponse>::"]
+      ["GET:11:async ():Promise<NextResponse>::"]
     ],
     "sr/app/api/health/route.ts": [
       "t",
@@ -1113,9 +1012,9 @@
     "sr/app/dashboard/_components/DetailedIssueCard.tsx": [
       "t",
       [
-        "getStatusColor:18:(status:IssueStatus):string::",
-        "getPriorityBorderColor:33:(priority:IssuePriority):string::",
-        "DetailedIssueCard:46:({ id, title, machineName, status, priority, hasPermission = ():getPriorityBorderColor,getStatusColor:"
+        "getStatusColor:16:(status:IssueStatus):string::",
+        "getPriorityBorderColor:44:(priority:IssuePriority):string::",
+        "DetailedIssueCard:68:({ id, title, machineName, status, priority, hasPermission = ():getPriorityBorderColor,getStatusColor:"
       ]
     ],
     "sr/app/dashboard/_components/PrimaryAppBar.tsx": [
@@ -1136,7 +1035,7 @@
         "DashboardLayout:9:({ children, }:{ children:React.ReactNode; }):JSX.Element::"
       ]
     ],
-    "sr/app/dashboard/page.tsx": ["t", ["DashboardPage:24:():JSX.Element::"]],
+    "sr/app/dashboard/page.tsx": ["t", ["DashboardPage:22:():JSX.Element::"]],
     "sr/app/games/[id]/page.tsx": [
       "t",
       ["GamePage:9:async ({ params, }:GamePageProps):Promise<never>::"]
@@ -1188,13 +1087,13 @@
     "sr/app/machines/components/MachineCard.tsx": [
       "t",
       [
-        "MachineCard:22:({ machine }:MachineCardProps):React.ReactElement::",
-        "handleClick:26:():void::"
+        "MachineCard:20:({ machine }:MachineCardProps):React.ReactElement::",
+        "handleClick:24:():void::"
       ]
     ],
     "sr/app/machines/components/MachineList.tsx": [
       "t",
-      ["MachineList:9:():React.ReactElement::"]
+      ["MachineList:10:():React.ReactElement::"]
     ],
     "sr/app/machines/page.tsx": [
       "t",
@@ -1325,7 +1224,7 @@
     ],
     "sr/components/issues/IssueDetail.tsx": [
       "t",
-      ["IssueDetail:16:({ issue, user, }:IssueDetailProps):React.JSX.Element::"]
+      ["IssueDetail:15:({ issue, user, }:IssueDetailProps):React.JSX.Element::"]
     ],
     "sr/components/issues/IssueDetailView.tsx": [
       "t",
@@ -1336,27 +1235,27 @@
     "sr/components/issues/IssueList.tsx": [
       "t",
       [
-        "IssueList:116:({ initialFilters, }:IssueListProps):React.JSX.Element::",
-        "getStatusColor:49:(category:\"NEW\" | \"IN_PROGRESS\" | \"RESOLVED\",):string::",
-        "updateFilters:138:(newFilters:Partial<IssueFilters>):void::",
-        "handleSelectIssue:148:(issueId:string, selected:boolean):void::",
-        "handleSelectAll:152:(selected:boolean):void::",
-        "handleClearAllFilters:179:():void::"
+        "IssueList:74:({ initialFilters, }:IssueListProps):React.JSX.Element::",
+        "getStatusColor:51:(category:\"NEW\" | \"IN_PROGRESS\" | \"RESOLVED\",):string::",
+        "updateFilters:96:(newFilters:Partial<IssueFilters>):void::",
+        "handleSelectIssue:106:(issueId:string, selected:boolean):void::",
+        "handleSelectAll:110:(selected:boolean):void::",
+        "handleClearAllFilters:137:():void::"
       ]
     ],
     "sr/components/issues/IssueStatusControl.tsx": [
       "t",
       [
         "IssueStatusControl:29:({ issue, user:_user, hasPermission, onError, }:IssueStatusControlProps):React.JSX.Element:handleStatusChange:",
-        "handleStatusChange:56:(newStatusId:string):void::"
+        "handleStatusChange:57:(newStatusId:string):void::"
       ]
     ],
     "sr/components/issues/IssueTimeline.tsx": [
       "t",
       [
         "IssueTimeline:21:({ issue, user:_user, }:IssueTimelineProps):React.JSX.Element:getActivityColor,getActivityIcon:",
-        "getActivityIcon:78:(type:string):React.JSX.Element::",
-        "getActivityColor:95:(type:string,):\"primary\" | \"secondary\" | \"default\"::"
+        "getActivityIcon:69:(type:string):React.JSX.Element::",
+        "getActivityColor:86:(type:string,):\"primary\" | \"secondary\" | \"default\"::"
       ]
     ],
     "sr/components/issues/MachineSelector.tsx": [
@@ -1368,7 +1267,7 @@
     "sr/components/issues/RecentIssuesSidebar.tsx": [
       "t",
       [
-        "RecentIssuesSidebar:76:({ selectedMachineId, user:_user, }:RecentIssuesSidebarProps):React.JSX.Element::"
+        "RecentIssuesSidebar:28:({ selectedMachineId, user:_user, }:RecentIssuesSidebarProps):React.JSX.Element::"
       ]
     ],
     "sr/components/issues/SearchTextField.tsx": [
@@ -1387,45 +1286,45 @@
     "sr/components/issues/StatusTogglePills.tsx": [
       "t",
       [
-        "StatusTogglePills:58:({ value, onChange, showCounts = true, parentLoading = false, }:StatusTogglePillsProps):React.JSX.Element:getCategoryLabel,getStatusColor,handleCategoryToggle,isCategoryActive,isCategoryFullySelected:",
+        "StatusTogglePills:58:({ value, onChange, showCounts = true, parentLoading = false, }:StatusTogglePillsProps):React.JSX.Element::",
         "getStatusColor:28:(category:\"NEW\" | \"IN_PROGRESS\" | \"RESOLVED\",):{\n  backgroundColor:string;\n  color:string;\n}::",
         "getCategoryLabel:45:(category:\"NEW\" | \"IN_PROGRESS\" | \"RESOLVED\",):string::",
         "handleCategoryToggle:110:(category:\"NEW\" | \"IN_PROGRESS\" | \"RESOLVED\",):void::",
-        "isCategoryActive:133:(category:\"NEW\" | \"IN_PROGRESS\" | \"RESOLVED\",):boolean::",
-        "isCategoryFullySelected:144:(category:\"NEW\" | \"IN_PROGRESS\" | \"RESOLVED\",):boolean::"
+        "isCategoryActive:134:(category:\"NEW\" | \"IN_PROGRESS\" | \"RESOLVED\",):boolean::",
+        "isCategoryFullySelected:146:(category:\"NEW\" | \"IN_PROGRESS\" | \"RESOLVED\",):boolean::"
       ]
     ],
     "sr/components/locations/LocationDetailView.tsx": [
       "t",
       [
-        "LocationDetailView:33:({ location, user:_user, locationId, }:LocationDetailViewProps):React.ReactElement::"
+        "LocationDetailView:31:({ location, user:_user, locationId, }:LocationDetailViewProps):React.ReactElement::"
       ]
     ],
     "sr/components/locations/LocationList.tsx": [
       "t",
       [
-        "LocationList:28:({ locations, user:_user, }:LocationListProps):React.ReactElement:handleLocationClick:",
-        "handleLocationClick:34:(locationId:string):void::"
+        "LocationList:26:({ locations, user:_user, }:LocationListProps):React.ReactElement:handleLocationClick:",
+        "handleLocationClick:32:(locationId:string):void::"
       ]
     ],
     "sr/components/locations/MachineGrid.tsx": [
       "t",
       [
-        "MachineGrid:30:({ machines, }:MachineGridProps):React.ReactElement::",
-        "handleMachineClick:54:(machineId:string):void::"
+        "MachineGrid:27:({ machines, }:MachineGridProps):React.ReactElement::",
+        "handleMachineClick:51:(machineId:string):void::"
       ]
     ],
     "sr/components/machines/MachineDetailView.tsx": [
       "t",
       [
-        "MachineDetailView:39:({ machine, user:_user, machineId, }:MachineDetailViewProps):React.ReactElement::"
+        "MachineDetailView:37:({ machine, user:_user, machineId, }:MachineDetailViewProps):React.ReactElement::"
       ]
     ],
     "sr/components/permissions/PermissionButton.tsx": [
       "t",
       [
         "getDefaultTooltipText:36:(permission:string):string::",
-        "PermissionButton:91:({ permission, hasPermission, tooltipText, showWhenDenied = true, disabled:customDisabled = false, children, ...buttonProps }, ref,):getDefaultTooltipText:"
+        "PermissionButton:92:({ permission, hasPermission, tooltipText, showWhenDenied = true, disabled:customDisabled = false, children, ...buttonProps }, ref,):getDefaultTooltipText:"
       ]
     ],
     "sr/components/permissions/PermissionGate.tsx": [
@@ -1531,7 +1430,7 @@
         "createNamedEntityUpdateSchema:403:():z.ZodObject<::",
         "validateNonEmptyStringArray:417:(array:unknown, fieldName:string,):string[]::",
         "validateAndNormalizeSearchQuery:444:(query:unknown,):string | undefined::",
-        "validateOptionalString:471:(value:unknown, fieldName:string, maxLength = 255,):string | undefined::"
+        "validateOptionalString:472:(value:unknown, fieldName:string, maxLength = 255,):string | undefined::"
       ]
     ],
     "sr/lib/common/organizationValidation.ts": [
@@ -1606,14 +1505,14 @@
         "transformPinballMapMachineToModel:48:(pmMachine:PinballMapMachine,):ModelCreateData::",
         "getModelLookupStrategy:83:(pmMachine:PinballMapMachine,):::",
         "validatePinballMapMachine:105:(pmMachine:unknown):::",
-        "findMatchingMachine:170:(modelId:string, currentMachines:{ id:string; modelId:string }[],):MachineMatchResult::",
-        "calculateSyncOperations:187:(pinballMapMachines:PinballMapMachine[], currentMachines:{ id:string; modelId:string }[], foundModels:Map<string, { id:string; name:string }>, // pmMachine.opdb_id>model):::",
-        "generateMachineName:238:(modelName:string, instanceNumber?:number,):string::",
-        "isValidUrl:252:(urlString:string):boolean::",
-        "prepareMachineCreateData:265:(modelId:string, organizationId:string, locationId:string, modelName:string,):::"
+        "findMatchingMachine:171:(modelId:string, currentMachines:{ id:string; modelId:string }[],):MachineMatchResult::",
+        "calculateSyncOperations:188:(pinballMapMachines:PinballMapMachine[], currentMachines:{ id:string; modelId:string }[], foundModels:Map<string, { id:string; name:string }>, // pmMachine.opdb_id>model):::",
+        "generateMachineName:239:(modelName:string, instanceNumber?:number,):string::",
+        "isValidUrl:253:(urlString:string):boolean::",
+        "prepareMachineCreateData:266:(modelId:string, organizationId:string, locationId:string, modelName:string,):::"
       ]
     ],
-    "sr/lib/hooks/use-current-user.ts": ["t", ["useCurrentUser:9:():::"]],
+    "sr/lib/hooks/use-current-user.ts": ["t", ["useCurrentUser:11:():::"]],
     "sr/lib/image-storage/local-storage.ts": [
       "t",
       {
@@ -1669,11 +1568,11 @@
         "getDefaultFilters:21:():IssueFilters::",
         "mergeFilters:32:(currentFilters:IssueFilters, updates:Partial<IssueFilters>,):IssueFilters::",
         "validateFilters:74:(filters:Partial<IssueFilters>):IssueFilters:getDefaultFilters,isValidSortField,isValidSortOrder:",
-        "hasActiveFilters:98:(filters:IssueFilters):boolean::",
-        "clearAllFilters:113:():IssueFilters:getDefaultFilters:",
-        "isValidSortField:120:(value:unknown):value is IssueFilters[\"sortBy\"]::",
-        "isValidSortOrder:127:(value:unknown):value is IssueFilters[\"sortOrder\"]::",
-        "getFilterSummary:134:(filters:IssueFilters):string[]::"
+        "hasActiveFilters:99:(filters:IssueFilters):boolean::",
+        "clearAllFilters:114:():IssueFilters:getDefaultFilters:",
+        "isValidSortField:121:(value:unknown):value is IssueFilters[\"sortBy\"]::",
+        "isValidSortOrder:128:(value:unknown):value is IssueFilters[\"sortOrder\"]::",
+        "getFilterSummary:135:(filters:IssueFilters):string[]::"
       ]
     ],
     "sr/lib/issues/selectionUtils.ts": [
@@ -1761,7 +1660,7 @@
         "formatMachineName:93:(machine:OPDBMachine):string:getManufacturerName,getYearValue:",
         "normalizeDescription:141:(description?:string):string | null::",
         "generateCacheKey:151:(endpoint:string, params:Record<string, unknown> = {},):string::",
-        "isDataStale:166:(lastSynced:Date | null, maxAgeHours = 24,):boolean::",
+        "isDataStale:167:(lastSynced:Date | null, maxAgeHours = 24,):boolean::",
         "getManufacturerName:97:(manufacturer:unknown):string | null::",
         "getYearValue:107:(machine:OPDBMachine):string | null::"
       ]
@@ -1923,10 +1822,10 @@
       "t",
       [
         "createClient:23:async ():Promise<SupabaseClient>:createServerClient,setAll:",
-        "createAdminClient:80:async ():Promise<SupabaseClient>:createServerClient,setAll:",
-        "getCurrentUser:137:async ():Promise<\n  Awaited<ReturnType<SupabaseClient[\"auth\"][\"getUser\"]>>[\"data\"][\"user\"]\n>:createClient:",
-        "getCurrentUserOrganizationId:168:async ():Promise<string | null>:getCurrentUser:",
-        "requireOrganizationContext:187:async ():Promise<::"
+        "createAdminClient:83:async ():Promise<SupabaseClient>:createServerClient,setAll:",
+        "getCurrentUser:143:async ():Promise<\n  Awaited<ReturnType<SupabaseClient[\"auth\"][\"getUser\"]>>[\"data\"][\"user\"]\n>:createClient:",
+        "getCurrentUserOrganizationId:174:async ():Promise<string | null>:getCurrentUser:",
+        "requireOrganizationContext:193:async ():Promise<::"
       ]
     ],
     "sr/lib/supabase/types.ts": [
@@ -1974,6 +1873,45 @@
         "validateBatchRoleOperations:525:(operations:readonly { readonly type:\"assign\" | \"remove\"; readonly membership:Membership; readonly newRole?:Role; }[], allMemberships:readonly Membership[], _context:RoleManagementContext,):RoleValidationResult:countAdmins:"
       ]
     ],
+    "sr/lib/utils/api-response-transformers.ts": [
+      "t",
+      [
+        "transformIssueResponse:41:(issue:Record<string, unknown>):IssueResponse::",
+        "transformCommentResponse:64:(comment:Record<string, unknown>):CommentWithAuthorResponse::",
+        "transformAttachmentResponse:74:(attachment:Record<string, unknown>):AttachmentResponse::",
+        "transformIssuesResponse:90:(issues:Record<string, unknown>[]):IssueResponse[]:transformIssueResponse:",
+        "transformCommentsResponse:101:(comments:Record<string, unknown>[]):CommentWithAuthorResponse[]:transformCommentResponse:",
+        "transformAttachmentsResponse:112:(attachments:Record<string, unknown>[]):AttachmentResponse[]:transformAttachmentResponse:",
+        "transformIssueWithRelationsResponse:124:(issueWithRelations:Record<string, unknown>):IssueWithRelationsResponse::",
+        "transformCommentWithAuthorResponse:135:(commentWithAuthor:Record<string, unknown>):CommentWithAuthorResponse::",
+        "transformForDatabaseInsert:146:(data:Record<string, unknown>):Record<string, unknown>::",
+        "safeTransformRelation:158:(relation:Record<string, unknown> | null | undefined, transformer:(obj:Record<string, unknown>)::"
+      ]
+    ],
+    "sr/lib/utils/auth-response-transformers.ts": [
+      "t",
+      [
+        "transformUserResponse:71:(user:unknown):UserResponse::",
+        "transformOrganizationResponse:87:(org:unknown):OrganizationResponse::",
+        "transformMembershipResponse:108:(membership:unknown):MembershipResponse:transformUserResponse:",
+        "transformUploadAuthContextResponse:158:(ctx:unknown):UploadAuthContextResponse:transformMembershipResponse,transformOrganizationResponse:",
+        "transformAuthUserProfile:192:(profile:unknown):AuthUserProfile::",
+        "transformAuthArray:208:(items:unknown[], transformer:(item:unknown)::",
+        "transformUserArray:222:(users:unknown[]):UserResponse[]:transformAuthArray:",
+        "transformMembershipArray:229:(memberships:unknown[]):MembershipResponse[]:transformAuthArray:",
+        "transformOrganizationArray:236:(organizations:unknown[]):OrganizationResponse[]:transformAuthArray:"
+      ]
+    ],
+    "sr/lib/utils/case-transformers.ts": [
+      "t",
+      [
+        "toCamelCase:50:(str:string):string::",
+        "toSnakeCase:82:(str:string):string::",
+        "isPlainObject:108:(obj:unknown):obj is Record<string, unknown>::",
+        "transformKeysToCamelCase:169:(obj:unknown):unknown:isPlainObject,toCamelCase,transformKeysToCamelCase:",
+        "transformKeysToSnakeCase:221:(obj:unknown):unknown:isPlainObject,toSnakeCase,transformKeysToSnakeCase:"
+      ]
+    ],
     "sr/lib/utils/id-generation.ts": [
       "t",
       [
@@ -1990,41 +1928,56 @@
         "getDefaultAvatarUrl:222:():string::"
       ]
     ],
+    "sr/lib/utils/machine-response-transformers.ts": [
+      "t",
+      [
+        "transformMachineResponse:86:(machine:unknown):MachineResponse::",
+        "transformMachinesResponse:110:(machines:unknown):MachineResponse[]:map,transformMachineResponse:",
+        "transformLocationResponse:137:(location:unknown):LocationResponse:transformMachinesResponse:",
+        "transformLocationsResponse:171:(locations:unknown):LocationResponse[]:map,transformLocationResponse:",
+        "transformMachineForIssuesResponse:196:(machine:Record<string, unknown>):MachineForIssues::",
+        "transformMachinesForIssuesResponse:207:(machines:unknown):MachineForIssues[]:map,transformMachineForIssuesResponse:",
+        "transformApiRequestToDb:238:(data:Record<string, unknown>):Record<string, unknown>::",
+        "transformDbResultToApiResponse:252:(data:unknown):unknown::"
+      ]
+    ],
     "sr/lib/utils/membership-transformers.ts": [
       "t",
       [
-        "transformMembershipForValidation:11:(membership:MembershipWithUserAndRole,):Membership::",
-        "transformMembershipsForValidation:38:(memberships:MembershipWithUserAndRole[],):Membership[]::",
-        "transformRoleForValidation:47:(role:{ id:string; name:string; organizationId:string; isSystem:boolean; isDefault:boolean; }):Role::"
+        "transformMembershipForValidation:20:(membership:unknown,):Membership::",
+        "transformMembershipsForValidation:56:(memberships:unknown[],):Membership[]::",
+        "transformRoleForValidation:70:(role:unknown):Role::"
       ]
     ],
     "sr/server/api/routers/issue.comment.ts": [
       "t",
       [
-        "createCommentWithAuthor:26:async (ctx:RLSOrganizationTRPCContext, input:{ issueId:string; content:string },):Promise<::"
+        "createCommentWithAuthor:31:async (ctx:RLSOrganizationTRPCContext, input:{ issueId:string; content:string },):Promise<CommentWithAuthorResponse>::"
       ]
     ],
     "sr/server/api/routers/issue.status.ts": [
       "t",
       [
-        "generateId:12:():string::",
-        "isValidCategory:131:(category:string,):category is keyof typeof categoryCounts::"
+        "generateId:18:():string::",
+        "isValidCategory:138:(category:string,):category is keyof typeof categoryCounts::"
       ]
     ],
     "sr/server/api/routers/role.ts": [
       "t",
-      ["createRoleService:26:(ctx:RLSOrganizationTRPCContext):RoleService::"]
+      [
+        "createRoleService:52:(ctx:RLSOrganizationTRPCContext):RoleService:createRoleService:"
+      ]
     ],
     "sr/server/api/routers/utils/commentService.ts": [
       "t",
       {
         "CommentService": [
-          "12",
+          "25",
           [
-            "constructor:13:(private drizzle:DrizzleClient)::",
-            "restoreComment:59:async (commentId:string):Promise<::",
-            "getDeletedComments:97:async (organizationId:string):Promise<::",
-            "__init__:13:(private drizzle:DrizzleClient)::"
+            "constructor:26:(private drizzle:DrizzleClient)::",
+            "restoreComment:72:async (commentId:string):Promise<::",
+            "getDeletedComments:110:async (organizationId:string):Promise<::",
+            "__init__:26:(private drizzle:DrizzleClient)::"
           ]
         ]
       }
@@ -2074,17 +2027,18 @@
     "sr/server/auth/types.ts": [
       "t",
       [
-        "isValidUser:36:(user:unknown):user is User::",
-        "isValidOrganization:44:(org:unknown):org is Organization::",
-        "isValidMembership:52:(membership:unknown,):membership is MembershipWithPermissions::"
+        "isValidUser:62:(user:unknown):user is User::",
+        "isValidOrganization:70:(org:unknown):org is Organization::",
+        "isValidMembership:78:(membership:unknown,):membership is MembershipWithPermissions::"
       ]
     ],
     "sr/server/auth/uploadAuth.ts": [
       "t",
       [
-        "getUploadAuthContext:35:async (req:NextRequest, drizzle:DrizzleClient,):Promise<UploadAuthContext>::",
-        "requireUploadPermission:99:(ctx:UploadAuthContext, permission:string,):void::",
-        "validateUploadAuth:111:(_drizzle:DrizzleClient, _sessionId?:string, _organizationId?:string,):void::"
+        "transformUploadAuthContext:41:(ctx:unknown):unknown::",
+        "getUploadAuthContext:50:async (req:NextRequest, drizzle:DrizzleClient,):Promise<UploadAuthContext>:transformUploadAuthContext:",
+        "requireUploadPermission:118:(ctx:UploadAuthContext, permission:string,):void::",
+        "validateUploadAuth:130:(_drizzle:DrizzleClient, _sessionId?:string, _organizationId?:string,):void::"
       ]
     ],
     "sr/server/auth/validation.ts": [
@@ -2135,14 +2089,136 @@
         ]
       }
     ],
+    "sr/server/db/queries/audit-queries.ts": [
+      "t",
+      [
+        "getMembershipsWithUserAndRole:29:async (organizationId:string):Promise<::",
+        "getMachineByQrCode:63:async (qrCodeId:string):Promise<::",
+        "getIssuesByStatus:92:async (organizationId:string, statusName:string,):Promise<::",
+        "getIssuesByStatus_INCORRECT:132:async (organizationId:string)::"
+      ]
+    ],
+    "sr/server/db/seed/auth-users.ts": [
+      "t",
+      [
+        "getUsersForOrganization:111:(organizationId:string):UserData[]::",
+        "getUserIdForEmail:125:(email:string):string::",
+        "createServiceRoleClient:142:()::",
+        "getExistingAuthUsers:158:async ():Promise<Map<string, User>>:createServiceRoleClient:",
+        "upsertSupabaseAuthUser:179:async (params:CreateUserParams, existingUsers:Map<string, User>,):Promise<::",
+        "waitForUserRecord:238:async (user_id:string, email:string,):Promise<boolean>::",
+        "processBatchUsers:277:async (userList:UserData[], organization_id:string,):Promise<BatchProcessResult>:getExistingAuthUsers,upsertSupabaseAuthUser,waitForUserRecord:",
+        "deleteExistingDevUsers:416:async (userList:UserData[]):Promise<void>:createServiceRoleClient:",
+        "createUsersDirectly:450:async (userList:UserData[], organization_id:string,):Promise<void>:getUserIdForEmail:",
+        "seedAuthUsers:511:async (organization_id:string, target:SeedTarget,):Promise<SeedResult<UserData[]>>:createUsersDirectly,deleteExistingDevUsers,getUsersForOrganization,processBatchUsers:"
+      ]
+    ],
+    "sr/server/db/seed/constants.ts": [
+      "t",
+      [
+        "createMockAdminContext:316:():TestMockContext::",
+        "createMockMemberContext:323:(memberNumber:1 | 2 = 1,):TestMockContext::"
+      ],
+      { "for": ["357", []] }
+    ],
+    "sr/server/db/seed/full-issues.ts": [
+      "t",
+      [
+        "mapSeverityToPriority:5:(severity?:string):string::",
+        "mapStatusToStatusId:15:(status?:string):string::",
+        "mapReporterToUserId:31:(email?:string):string::",
+        "knownMachineByTitle:51:(title?:string, opdb?:string):string | undefined::",
+        "isMinimalIssue:344:(obj:unknown):obj is MinimalIssue::"
+      ]
+    ],
+    "sr/server/db/seed/index.ts": ["t", ["main:42:async ():Promise<void>::"]],
+    "sr/server/db/seed/infrastructure.ts": [
+      "t",
+      [
+        "getDefaultLocationId:100:(orgId:string):string::",
+        "createGlobalPermissions:114:async ():Promise<void>::",
+        "createOrganizationWithRoles:146:async (orgData:{ id?:string; name:string; subdomain:string; logoUrl?:string; }):Promise<Organization>:createSystemRoles,createTemplateRole:",
+        "createDefaultPriorities:204:async (organization_id:string):Promise<void>::",
+        "createDefaultCollectionTypes:241:async (organization_id:string,):Promise<void>::",
+        "createDefaultIssueStatuses:279:async (organization_id:string,):Promise<void>::",
+        "createSystemRoles:366:async (organization_id:string):Promise<void>::",
+        "createTemplateRole:428:async (organization_id:string, templateName:keyof typeof ROLE_TEMPLATES,):Promise<void>::",
+        "createDefaultLocation:476:async (organization_id:string):Promise<void>:getDefaultLocationId:",
+        "seedInfrastructure:495:async ():Promise<\n  SeedResult<DualOrganizationSetup>\n>:createDefaultCollectionTypes,createDefaultIssueStatuses,createDefaultLocation,createDefaultPriorities,createGlobalPermissions,createOrganizationWithRoles:"
+      ]
+    ],
+    "sr/server/db/seed/sample-data.ts": [
+      "t",
+      [
+        "extractUniqueGames:61:(dataAmount:DataAmount,):UniqueGame[]::",
+        "createModels:107:async (games:UniqueGame[]):Promise<void>::",
+        "createMachines:155:async (organization_id:string, games:UniqueGame[],):Promise<void>::",
+        "createCompetitorMachine:241:async ():Promise<void>::",
+        "createSampleIssues:290:async (organization_id:string, dataAmount:DataAmount,):Promise<void>::",
+        "seedSampleData:355:async (organization_id:string, dataAmount:DataAmount,):Promise<SeedResult<SampleDataResult>>:createCompetitorMachine,createMachines,createModels,createSampleIssues,extractUniqueGames:",
+        "seedSampleDataWithDb:422:async (organization_id:string, dataAmount:DataAmount,):Promise<void>:seedSampleData:"
+      ]
+    ],
+    "sr/server/db/seed/seed-utilities.ts": [
+      "t",
+      [
+        "withErrorContext:323:async (context:string, operation:string, fn:()::",
+        "createSeedResult:338:(data:T, recordsCreated:number, startTime:number,):SeedResult<T>::",
+        "createFailedSeedResult:354:(error:unknown, startTime:number,):SeedResult<T>::",
+        "confirmDestructiveOperation:428:async (target:SeedTarget):Promise<void>::"
+      ],
+      {
+        "SeedLogger": ["50", []],
+        "SeedValidator": ["93", []],
+        "SeedMapper": ["219", []],
+        "SeedError": [
+          "312",
+          [
+            "constructor:313:(context:string, operation:string, cause?:unknown)::",
+            "__init__:313:(context:string, operation:string, cause?:unknown)::"
+          ]
+        ],
+        "SeedConfigBuilder": [
+          "371",
+          [
+            "withDataAmount:379:(dataAmount:DataAmount):this::",
+            "withEnvironment:384:(environment:string):this::",
+            "withSupabaseUrl:389:(supabaseUrl:string):this::",
+            "build:394:():SeedConfig::"
+          ]
+        ]
+      }
+    ],
+    "sr/server/db/setup-rls.ts": [
+      "t",
+      [
+        "createDatabaseConnection:42:():postgres.Sql::",
+        "setupRLS:63:async ():Promise<void>:createDatabaseConnection:",
+        "main:202:async ():Promise<void>:setupRLS:"
+      ],
+      { "c": ["105", []] }
+    ],
     "sr/server/db/utils/common-queries.ts": [
       "t",
       [
-        "withOrganizationScope:15:(column:PgColumn, organizationId:string,):SQL::",
-        "excludeSoftDeleted:26:(deletedAtColumn:PgColumn):SQL::",
-        "withOrgScopeAndNotDeleted:36:(orgColumn:PgColumn, organizationId:string, deletedAtColumn:PgColumn,):SQL:excludeSoftDeleted,withOrganizationScope:",
-        "getSingleRecord:58:async (query:Promise<T[]>,):Promise<T | null>::",
-        "getSingleRecordWithLimit:70:async (baseQuery:T,):Promise<Awaited<ReturnType<T[\"execute\"]>>[0] | null>::"
+        "withOrganizationScope:19:(column:PgColumn, organizationId:string,):SQL::",
+        "excludeSoftDeleted:30:(deletedAtColumn:PgColumn):SQL::",
+        "withOrgScopeAndNotDeleted:40:(orgColumn:PgColumn, organizationId:string, deletedAtColumn:PgColumn,):SQL:excludeSoftDeleted,withOrganizationScope:",
+        "getSingleRecord:62:async (query:Promise<T[]>,):Promise<T | null>::",
+        "getSingleRecordWithLimit:74:async (baseQuery:T,):Promise<Awaited<ReturnType<T[\"execute\"]>>[0] | null>::",
+        "validateQueryFields:103:(tableName:Parameters<typeof devValidateFields>[0], fields:string[]):void::"
+      ]
+    ],
+    "sr/server/db/utils/field-validation.ts": [
+      "t",
+      [
+        "getFieldMapping:123:(camelCaseField:string):string::",
+        "isCamelCase:132:(fieldName:string):boolean::",
+        "validateFieldExists:144:(_tableName:TableName, fieldName:string):::",
+        "convertToSnakeCase:172:(camelCase:string):string::",
+        "validateFieldAccess:183:(tableName:TableName, fields:string[]):::",
+        "devValidateFields:200:(tableName:TableName, fields:string[]):void:validateFieldAccess:",
+        "validateCommonPattern:238:(tableName:TableName, pattern:keyof typeof COMMON_FIELDS):ReturnType<typeof validateFieldAccess>:validateFieldAccess:"
       ]
     ],
     "sr/server/db/utils/role-validation.ts": [
@@ -2150,6 +2226,10 @@
       [
         "ensureAtLeastOneAdmin:13:async (drizzle:DrizzleClient, organizationId:string,):Promise<void>::"
       ]
+    ],
+    "sr/server/services/collectionService.service.test.ts": [
+      "t",
+      { "name": ["335", []] }
     ],
     "sr/server/services/collectionService.ts": [
       "t",
@@ -2185,17 +2265,32 @@
     "sr/server/services/factory.ts": [
       "t",
       {
-        "ServiceFactory": [
-          "10",
+        "ensures": [
+          "13",
           [
-            "constructor:11:(private db:DrizzleClient)::",
-            "createNotificationService:12:():NotificationService::",
-            "createCollectionService:16:():CollectionService::",
-            "createPinballMapService:20:():PinballMapService::",
-            "createIssueActivityService:24:():IssueActivityService::",
-            "createCommentCleanupService:28:():CommentCleanupService::",
-            "createQRCodeService:32:():QRCodeService::",
-            "__init__:11:(private db:DrizzleClient)::"
+            "createNotificationService:26:():NotificationService::",
+            "createCollectionService:46:():CollectionService::",
+            "createPinballMapService:50:():PinballMapService::",
+            "createIssueActivityService:54:():IssueActivityService::",
+            "createCommentCleanupService:58:():CommentCleanupService::",
+            "createQRCodeService:62:():QRCodeService::",
+            "createRoleService:68:(organizationId?:string):RoleService::",
+            "withOrganization:77:(organizationId:string):ServiceFactory::",
+            "__init__:22:(private db:DrizzleClient, private organizationId?:string,)::"
+          ]
+        ],
+        "ServiceFactory": [
+          "21",
+          [
+            "createNotificationService:26:():NotificationService::",
+            "createCollectionService:46:():CollectionService::",
+            "createPinballMapService:50:():PinballMapService::",
+            "createIssueActivityService:54:():IssueActivityService::",
+            "createCommentCleanupService:58:():CommentCleanupService::",
+            "createQRCodeService:62:():QRCodeService::",
+            "createRoleService:68:(organizationId?:string):RoleService::",
+            "withOrganization:77:(organizationId:string):ServiceFactory::",
+            "__init__:22:(private db:DrizzleClient, private organizationId?:string,)::"
           ]
         ]
       }
@@ -2209,7 +2304,7 @@
             "constructor:49:(private db:DrizzleClient)::",
             "recordIssueCreated:106:async (issueId:string, actorId:string):Promise<void>::",
             "recordIssueResolved:185:async (issueId:string, actorId:string):Promise<void>::",
-            "getIssueTimeline:236:async (issueId:string):Promise<\n    (\n      |::",
+            "getIssueTimeline:254:async (issueId:string):Promise<\n    (\n      |::",
             "__init__:49:(private db:DrizzleClient)::"
           ]
         ]
@@ -2273,10 +2368,10 @@
             "constructor:41:(private db:DrizzleClient)::",
             "generateQRCode:46:async (machineId:string):Promise<QRCodeInfo>::",
             "getQRCodeInfo:109:async (machineId:string):Promise<QRCodeInfo | null>::",
-            "regenerateQRCode:137:async (machineId:string):Promise<QRCodeInfo>::",
-            "generateQRCodesForOrganization:225:async ():Promise<BulkGenerationResult>::",
-            "regenerateQRCodesForOrganization:262:async ():Promise<BulkGenerationResult>::",
-            "getOrganizationQRCodeStats:308:async ():Promise<::",
+            "regenerateQRCode:142:async (machineId:string):Promise<QRCodeInfo>::",
+            "generateQRCodesForOrganization:230:async ():Promise<BulkGenerationResult>::",
+            "regenerateQRCodesForOrganization:267:async ():Promise<BulkGenerationResult>::",
+            "getOrganizationQRCodeStats:313:async ():Promise<::",
             "__init__:41:(private db:DrizzleClient)::"
           ]
         ]
@@ -2299,11 +2394,50 @@
         ]
       }
     ],
+    "sr/server/services/types.ts": [
+      "t",
+      ["isDatabaseResult:61:(obj:unknown):obj is DatabaseResult<object>::"]
+    ],
+    "sr/server/services/validation-helper.ts": [
+      "t",
+      [
+        "validateDrizzleFieldAccess:38:(fieldName:string):void::",
+        "validateQueryFields:55:(query:object, expectedFields?:string[],):void:validateDrizzleFieldAccess:",
+        "isSnakeCaseResult:82:(result:object):boolean::",
+        "auditDatabaseQuery:94:(queryObject:object):void:validateQueryFields:"
+      ]
+    ],
     "sr/server/utils/qrCodeUtils.ts": [
       "t",
       [
         "constructReportUrl:1:(machine:{ id:string; organization:{ subdomain:string }; }):string::"
       ]
+    ],
+    "sr/test/archived-templates/service.test.template.ts": [
+      "t",
+      { "name": ["12", []] }
+    ],
+    "sr/test/helpers/anonymous-test-helpers.ts": [
+      "t",
+      [
+        "createAnonymousTestContext:48:(options:{ /** Organization to use for testing (defaults to primary)::",
+        "createCrossOrgTestContext:119:():::",
+        "mockSessionVariableSetup:142:(mockDb:MockProxy<DrizzleClient>, _organizationId:string,):void::",
+        "expectSessionVariableSet:166:(mockDb:MockProxy<DrizzleClient>, expectedOrgId:string,):void::",
+        "createCrossOrgAccessScenario:181:():::"
+      ]
+    ],
+    "sr/test/helpers/service-test-helpers.ts": [
+      "t",
+      [
+        "createMockDatabase:23:():MockProxy<DrizzleClient>::",
+        "createServiceTestContext:105:():ServiceTestContext:createMockDatabase:",
+        "expectOrganizationScoping:119:(mockCall:unknown, expectedOrgId:string,):void::"
+      ]
+    ],
+    "sr/test/templates/service.test.template.ts": [
+      "t",
+      { "name": ["335", []] }
     ],
     "sr/trpc/query-client.ts": ["t", ["createQueryClient:7:():QueryClient::"]],
     "sr/trpc/react.tsx": [
@@ -2336,454 +2470,456 @@
     ]
   },
   "g": [
-    ["createRouterTestSuite", "testOrganizationScoping"],
-    ["ActionButton", "usePermissionTooltip"],
-    ["createWithRoles", "createSystemRoleSet"],
-    ["createMachineFactory", "createLocationFactory"],
-    ["validateIssueCreation", "validateDefaultPriority"],
-    ["validateIssueCreation", "validateDefaultStatus"],
-    ["processFiles", "applyMappingToContent"],
-    ["mockCurrentMembership", "createMockMembership"],
-    ["createMockMachine", "createMockLocation"],
-    ["isDevelopmentOrTest", "isTest"],
-    ["withOrganizationClient", "createOrganizationAwareClient"],
-    ["createDrizzleClient", "createDrizzleClientInternal"],
-    ["createWithRoles", "create"],
-    ["toggleSelectAll", "selectNone"],
-    ["createSystemRoleSet", "createUnauthenticatedRole"],
-    ["createAllPermissions", "createMachinePermissions"],
-    ["createTRPCCallerForIssues", "createIssueRouterContext"],
-    ["isDevelopmentOrTest", "isDevelopment"],
-    ["loginAsTechnician", "loginAsUserWithPermissions"],
-    [
-      "validateLocationOrganizationBoundary",
-      "validateResourceOrganizationBoundary"
-    ],
-    ["getSeededIssueStatuses", "getCachedSeedData"],
-    ["validateOrganizationContext", "getUserWithOrganization"],
-    ["batchToggleSelection", "toggleSelection"],
-    ["getEnvironmentName", "isDevelopment"],
-    ["StatusTogglePills", "getCategoryLabel"],
-    ["seedSampleData", "createSampleIssues"],
-    ["logout", "clearSession"],
-    ["createMockIssue", "createMockMachine"],
-    ["verifyIntegrationTesterSetup", "getIntegrationTesterDatabaseUrl"],
-    ["validateMemorySafety", "getLineNumber"],
-    ["getSeededAdmin", "getCachedSeedData"],
-    ["validateFilters", "getDefaultFilters"],
-    ["expectAuthenticationRequired", "createPublicContext"],
-    ["createCustomRole", "create"],
-    ["auditMultiTenantSecurity", "createAuditTestData"],
-    ["seedAuthUsers", "processBatchUsers"],
-    ["validateTestArchetype", "validatePerformancePatterns"],
-    ["getSeededPriorities", "getCachedSeedData"],
-    ["createPermissionTestSuite", "expectAuthenticationRequired"],
-    ["createSingleComment", "createUserFactory"],
-    ["createCommentFactory", "createUserFactory"],
-    ["StatusTogglePills", "getStatusColor"],
-    ["createMockLocations", "createMockLocation"],
-    ["processFiles", "buildMapping"],
-    ["isDevAuthAvailable", "shouldEnableDevFeatures"],
-    ["createOrganizationWithRoles", "createTemplateRole"],
-    ["setup_test_database", "print_error"],
-    ["getSeededAdminSupabaseUser", "getSeededAdmin"],
-    ["createMockContext", "createMockServiceFactory"],
-    ["deleteTestBucket", "clearStorageBucket"],
-    ["createUnauthenticated", "createWithRole"],
-    ["getSeededPriorities", "getSeededOrganizationId"],
-    ["createTestDatabase", "applyDrizzleSchema"],
-    ["setContext", "setTestSession"],
-    ["getSeededPlayerSupabaseUser", "getSeededPlayer"],
-    ["TRPCReactProvider", "isClientDevelopment"],
-    ["isValidOPDBId", "parseOPDBId"],
-    ["handleFileInputChange", "handleFileSelect"],
-    ["validateRoleAssignment", "validateRoleAssignmentRules"],
-    ["createMembership", "createTestRole"],
-    [
-      "validateCommentOrganizationBoundary",
-      "validateResourceOrganizationBoundary"
-    ],
-    ["seedAuthUsers", "getUsersForOrganization"],
-    ["shouldRequireGoogleOAuth", "isPreview"],
-    ["ActionButton", "usePermissions"],
-    ["loginAsUser", "clearSession"],
-    ["configureDevelopmentMocks", "createLocalhost5432URL"],
-    ["createPrimaryMemberContext", "createSeededMachineTestContext"],
-    ["createComplexIssueFactory", "createAttachmentFactory"],
-    ["IssueTimeline", "getActivityIcon"],
-    ["authenticateDevUser", "signInDevUser"],
-    ["createRouterTestSuite", "testAdminOnlyProcedure"],
-    ["urlParamsToFilters", "isValidSortBy"],
-    ["validateDrizzleConfiguration", "expectSSLConfiguration"],
-    ["createPermissionTestSuite", "createPermissionTestCases"],
-    ["hasCycle", "hasCycle"],
-    ["TRPCReactProvider", "getBaseUrl"],
-    ["validateCommentEdit", "validateCommentDeletionState"],
-    ["createDrizzleClientInternal", "getDatabaseConfig"],
-    ["getCurrentUser", "createClient"],
-    ["log", "log"],
-    ["createMemberRole", "create"],
-    ["validateCommentRestoration", "validateAdminPermissions"],
-    ["createOrganizationWithRoles", "createSystemRoles"],
-    ["validateBatchRoleOperations", "countAdmins"],
-    ["formatMachineName", "getYearValue"],
-    ["createAttachmentFactory", "createUserFactory"],
-    ["ReportingService.constructor", "groupByPriority"],
-    ["IssueActions", "usePermissions"],
-    ["createTraceContext", "generateRequestId"],
-    ["isPinPointSupabaseSession", "isPinPointSupabaseUser"],
-    ["getGroupIdFromOPDBId", "parseOPDBId"],
-    ["validateCommentRestoration", "validateCommentExists"],
-    ["validateDrizzleConfiguration", "expectTimeoutConfiguration"],
-    ["createSingleIssue", "createPriorityFactory"],
-    ["seedCompleteTestData", "seedTestSampleData"],
-    ["validateStatusTransition", "validateTransitionRules"],
-    ["isPreview", "getClientEnvironment"],
-    ["verifyPublicOnlyContent", "verifyPublicContent"],
-    ["getSeededMemberSupabaseUser", "getSeededMember"],
-    ["setupAllIssueListMocks", "setupTRPCMocks"],
-    ["validateTestArchetype", "detectArchetype"],
-    ["isDevelopmentOrPreview", "isPreview"],
     ["getSeededIssue", "getCachedSeedData"],
-    ["seedAuthUsers", "createUsersDirectly"],
-    ["createUnauthenticatedRole", "create"],
-    ["createWithMemberships", "createMultipleForOrganization"],
-    ["canEditCommentByTime", "getCommentAgeInMinutes"],
-    ["createMachineWithoutCustomName", "createMockMachine"],
-    ["createAdminPermissions", "create"],
-    ["clearAllFilters", "getDefaultFilters"],
-    ["createDevUserAction", "isValidDevEmail"],
-    ["createWithRole", "createWithPermissions"],
+    ["transformLocationsResponse", "transformLocationResponse"],
+    ["setup_test_database", "print_error"],
+    ["createAdmin", "createWithRole"],
+    ["withCrossOrgTest", "withMultiOrgTest"],
+    ["createOrganizationWithRoles", "RoleService.createSystemRoles"],
     ["createIssueRouterContext", "createUserFactory"],
-    ["createActivityFactory", "createUserFactory"],
-    ["withMultiOrgTest", "withIsolatedTest"],
-    ["withRLSSecurityContext", "esc"],
-    ["validateTestArchetype", "validateArchetypeCompliance"],
-    ["esc", "esc"],
-    ["validateCommentDeletion", "validateCommentDeletionState"],
-    ["validateRoleReassignment", "validateRoleDeletion"],
-    ["getSeededMemberSupabaseUser", "createSupabaseUserFromSeeded"],
-    ["shouldEnablePreviewAuthInProduction", "shouldForcePreviewBehavior"],
-    ["createLocationPermissions", "create"],
-    ["expectPermissionRequired", "createAuthenticatedContext"],
-    ["validateSingleFile", "validateTestArchetype"],
-    ["createCompetitorMembership", "createMockMembership"],
-    ["AdminPanel", "useRequiredPermission"],
-    ["validateCommentDeletion", "validateCommentDeletionPermissions"],
-    ["createSystemRoleSet", "createAdminRole"],
-    ["createAllPermissions", "createIssuePermissions"],
-    ["seedInfrastructure", "createGlobalPermissions"],
-    ["handler", "createContext"],
-    ["validateBatchAssignments", "validateIssueOrganizationBoundary"],
-    ["withMultiOrgTest", "setContext"],
-    ["createMockMachine", "createMockModel"],
-    ["getCurrentUserOrganizationId", "RLSContextManager.getCurrentUser"],
-    ["validateAndLogOAuthConfig", "validateAllOAuthProviders"],
-    ["seedSampleData", "createModels"],
-    ["toggleSelectAll", "selectAll"],
-    ["setupMultiOrgContext", "createOrgContext"],
-    ["createIssueWithMixedComments", "getSingleIssue"],
-    ["createRouterTestSuite", "testAuthenticatedProcedure"],
-    ["setupAuthTestData", "getSeededMember"],
-    ["setupAuthTestData", "getSeededOrganization"],
-    ["createAdminMembership", "createAdminRole"],
-    ["isDevelopmentOrPreview", "isDevelopment"],
-    ["LocationList", "handleLocationClick"],
-    ["createSystemRoleSet", "createMemberRole"],
-    ["getSeededUserByEmail", "getUserWithRoles"],
-    ["validateCommentEditInput", "validateCommentContent"],
-    ["createCompetitorAdminContext", "createSeededLocationTestContext"],
-    ["seedSampleData", "extractUniqueGames"],
-    ["createWithPermissions", "createCustomRole"],
-    ["ActiveFilters", "getUserName"],
-    ["seedInfrastructure", "createDefaultCollectionTypes"],
-    ["generateOrganizationalReport", "getTopMachinesByIssues"],
-    ["shouldEnableDemoLogin", "isPreview"],
-    ["seedInfrastructure", "createDefaultPriorities"],
-    ["getExistingAuthUsers", "createServiceRoleClient"],
-    ["createWithMemberships", "create"],
-    ["getSeededPlayer", "getCachedSeedData"],
-    ["auditMultiTenantSecurity", "measureRLSPerformance"],
-    ["shouldRequireGoogleOAuth", "isProduction"],
-    ["createTestMembership", "createTestUser"],
-    ["setupAuthTestData", "createSupabaseUserFromSeeded"],
-    ["createTestDatabase", "configureForBusinessLogicTesting"],
-    ["isProduction", "getClientEnvironment"],
-    ["shouldEnableCredentialsProvider", "isPreview"],
-    ["createDualChildLogger", "createDualChildLogger"],
-    ["getUserPermissionsForSession", "getUserPermissions"],
-    ["buildMapping", "collectSchemaColumns"],
-    ["loginAsUser", "waitForAuthentication"],
-    ["getCurrentUserOrganizationId", "getCurrentUser"],
-    ["createAdminClient", "setAll"],
-    ["createMockMachines", "createMockMachine"],
-    ["validateBatchAssignments", "validateAssigneeMembership"],
-    ["auditMultiTenantSecurity", "getDataSizeConfig"],
-    ["createAdminClient", "createServerClient"],
-    ["createMockIssuesList", "createMockIssue"],
+    ["createWithMemberships", "createMultipleForOrganization"],
+    ["withOrgScopeAndNotDeleted", "excludeSoftDeleted"],
     ["middleware", "getBaseDomain"],
-    ["validateEntityExistsAndOwned", "validateRouterEntityOwnership"],
-    ["createDefaultLocation", "getDefaultLocationId"],
-    ["getSeededUserByEmail", "getCachedSeedData"],
+    ["getCurrentUserOrganizationId", "getCurrentUser"],
+    ["validateReassignmentRole", "validateOrganizationBoundary"],
+    ["setupAuthTestData", "getSeededPlayer"],
+    ["createPrimaryMemberContext", "createSeededMachineTestContext"],
+    ["getSeededMemberSupabaseUser", "createSupabaseUserFromSeeded"],
+    ["getSeededMember", "getUserWithRoles"],
+    ["validateTestArchetype", "validatePerformancePatterns"],
     ["validateCommentEdit", "validateCommentEditPermissions"],
-    ["PermissionButton", "getDefaultTooltipText"],
-    ["createAdminRole", "create"],
-    ["createWithPermissions", "create"],
-    ["seedSampleData", "createCompetitorMachine"],
-    ["createServerMockContext", "createMockSupabaseUser"],
-    ["validateIssueCreation", "validateMachineOrganizationBoundary"],
-    ["validateCommentDeletion", "validateOrganizationMembership"],
-    [
-      "validateIssueOrganizationBoundary",
-      "validateResourceOrganizationBoundary"
-    ],
-    ["configureCIMocks", "createRemoteURL"],
-    ["validateStatusTransition", "validateOrganizationBoundary"],
-    ["createPrimaryAdminContext", "createSeededLocationTestContext"],
-    ["createFallbackLogger", "createFallbackLogger"],
+    ["seedAuthUsers", "getUsersForOrganization"],
+    ["seedSampleData", "createModels"],
+    ["seedInfrastructure", "createOrganizationWithRoles"],
+    ["auditMultiTenantSecurity", "createAuditTestData"],
+    ["getSingleIssue", "createIssueFactory"],
     ["createSystemRoleSet", "createTechnicianRole"],
-    ["setupAllIssueListMocks", "setupNavigationMocks"],
-    ["urlParamsToFilters", "isValidSortOrder"],
-    ["validateTestArchetype", "validateRLSContext"],
-    ["createAdminMembership", "createTestUser"],
-    ["createAttachmentPermissions", "create"],
-    ["getSeededOrganization", "getCachedSeedData"],
-    ["requirePermissionForSession", "requirePermission"],
-    ["seedInfrastructure", "createDefaultLocation"],
-    ["withMachineOwnerBusinessLogicSetup", "setupTestData"],
-    ["getClient", "createClient"],
-    ["createMembership", "createTestUser"],
-    ["createMachinePermissions", "create"],
-    ["createRouterTestSuite", "testInputValidation"],
-    ["clearTestStorage", "getAllFilePaths"],
-    ["generateOrganizationalReport", "calculateAvgResolutionTime"],
-    ["createWithUser", "create"],
-    ["SignOutButton", "handleSignOut"],
-    ["hasPermission", "getRolePermissions"],
-    ["createIssueFactory", "createStatusFactory"],
-    ["validateIssueAssignment", "validateIssueOrganizationBoundary"],
-    ["validateRoleAssignment", "validateUserMembership"],
-    ["createLogger", "createFallbackLogger"],
-    ["testInputValidation", "createRouterTestContext"],
-    ["validateRoleAssignment", "validateAdminCountPreservation"],
-    ["createTestDatabase", "verifyMigrationComplete"],
-    ["createUsersDirectly", "getUserIdForEmail"],
-    ["createPermissionTestSuite", "expectOrganizationRequired"],
-    ["createAttachmentFactory", "createSingleAttachment"],
-    ["validateTestArchetype", "validateMemorySafety"],
-    ["validateTestFiles", "validateTestArchetype"],
-    ["getSeededIssues", "getCachedSeedData"],
-    ["validateCommentEdit", "validateCommentExists"],
-    ["createTraceContext", "generateTraceId"],
-    ["validateCommentEditWithTimeLimit", "validateCommentEditPermissions"],
-    ["createActivityFactory", "createSingleActivity"],
-    ["seedSampleDataWithDb", "seedSampleData"],
-    ["validateFilters", "isValidSortField"],
-    ["validateCommentRestoration", "validateCommentDeletionState"],
-    ["seedTestInfrastructure", "seedProductionInfrastructure"],
-    ["StatusTogglePills", "isCategoryFullySelected"],
-    ["TRPCReactProvider", "getQueryClient"],
-    ["main", "setupRLS"],
-    ["getRolePermissions", "createMatrix"],
+    ["authenticateDevUser", "signInDevUser"],
     ["createCompetitorAdminContext", "createSeededMachineTestContext"],
+    ["validateCommonPattern", "validateFieldAccess"],
+    ["createMachinePermissions", "create"],
+    ["seedAuthUsers", "processBatchUsers"],
+    ["createSingleIssue", "createMachineFactory"],
+    ["createAllPermissions", "createIssuePermissions"],
+    ["getSeededUserByEmail", "getCachedSeedData"],
+    ["processIssueImageFile", "calculateDimensions"],
+    ["createPermissionTestSuite", "expectAuthenticationRequired"],
+    ["ActionButton", "usePermissions"],
+    ["setupAllIssueListMocks", "setupNavigationMocks"],
+    ["getEnvironmentName", "getClientEnvironment"],
+    ["middleware", "getSubdomain"],
+    ["createDrizzleClientInternal", "getDatabaseConfig"],
+    ["withRLSEnabledTest", "withIsolatedTest"],
+    ["processFiles", "buildMapping"],
+    ["SignOutButton", "handleSignOut"],
+    ["transformKeysToCamelCase", "transformKeysToCamelCase"],
+    ["toggleSelectAll", "isAllSelected"],
+    ["validateRoleAssignment", "validateAdminCountPreservation"],
+    ["setupAuthTestData", "getSeededAdmin"],
+    ["createRoleService", "ensures.createRoleService"],
+    ["verifyIntegrationTesterSetup", "getIntegrationTesterDatabaseUrl"],
+    ["validateTestArchetype", "detectArchetype"],
+    ["createActivityFactory", "createSingleActivity"],
+    ["getCurrentUser", "createClient"],
+    ["ActiveFilters", "getUserName"],
+    ["validateRoleReassignment", "validateReassignmentRole"],
+    ["seedInfrastructure", "createDefaultPriorities"],
+    ["handleDrop", "handleFileSelect"],
+    ["createTechnician", "createWithRole"],
+    ["withMultiOrgTest", "setTestSession"],
+    ["createLogger", "hasCodeAndMessage"],
+    ["transformCommentsResponse", "transformCommentResponse"],
+    ["withMultiOrgTest", "withIsolatedTest"],
+    ["ReportingService.constructor", "groupByPriority"],
+    ["getSeededPlayer", "getCachedSeedData"],
+    ["validateRoleAssignment", "validateOrganizationBoundary"],
+    ["createTestDatabase", "configureForBusinessLogicTesting"],
+    ["getEnvironmentName", "isDevelopment"],
+    ["validateUserPermissions", "getTransitionType"],
+    ["getUserPermissionsForSession", "PermissionService.getUserPermissions"],
+    ["createMockContext", "createMockServiceFactory"],
+    ["shouldRequireGoogleOAuth", "isProduction"],
+    ["createAllPermissions", "createAttachmentPermissions"],
+    ["hasPermissionForSession", "hasPermission"],
+    ["seedSampleData", "createMachines"],
+    ["validateCommentDeletion", "validateCommentDeletionState"],
+    ["validateIssueAssignment", "validateIssueOrganizationBoundary"],
+    ["loginAsUser", "waitForAuthentication"],
+    ["ActiveFilters", "getStatusNames"],
+    ["createPrimaryAdminContext", "createSeededLocationTestContext"],
+    ["urlParamsToFilters", "isValidSortBy"],
+    ["withOrgScopeAndNotDeleted", "withOrganizationScope"],
+    ["isProduction", "getClientEnvironment"],
+    ["createWithRoles", "create"],
+    ["seedSampleDataWithDb", "seedSampleData"],
+    ["validateCommentEditWithTimeLimit", "canEditCommentByTime"],
+    ["getSeededMemberSupabaseUser", "getSeededMember"],
+    ["createNumberedVariation", "createNumberedId"],
+    ["getCurrentUserOrganizationId", "RLSContextManager.getCurrentUser"],
+    ["transformMachinesForIssuesResponse", "map"],
+    ["shouldEnablePreviewAuthInProduction", "shouldForcePreviewBehavior"],
+    ["processFiles", "log"],
+    ["createTRPCCallerForIssues", "createIssueRouterContext"],
+    ["createMachineFactory", "createModelFactory"],
+    ["isDevelopmentOrTest", "isTest"],
+    ["getUserPermissionsForSession", "getUserPermissions"],
+    ["toggleSelectAll", "selectNone"],
+    ["processBatchUsers", "getExistingAuthUsers"],
+    ["getSeededMember", "getCachedSeedData"],
+    ["createSingleIssue", "createUserFactory"],
+    ["seedCompleteTestData", "seedTestSampleData"],
+    ["validateImportStructure", "getLineNumber"],
+    ["createMultipleForTesting", "createWithMemberships"],
+    ["isDevelopmentOrPreview", "isDevelopment"],
+    ["setupRLS", "createDatabaseConnection"],
+    ["createLogger", "createFallbackLogger"],
+    ["createTechnicianRole", "create"],
+    ["requirePermissionForSession", "requirePermission"],
+    ["setupAllIssueListMocks", "setupTRPCMocks"],
+    ["createActivityFactory", "createUserFactory"],
+    ["createMockMachine", "createMockModel"],
+    ["transformMachinesForIssuesResponse", "transformMachineForIssuesResponse"],
+    ["setupAuthTestData", "getSeededMember"],
+    ["middleware", "createServerClient"],
+    ["createUser", "createWithRole"],
+    ["transformUploadAuthContextResponse", "transformOrganizationResponse"],
+    ["seedInfrastructure", "createGlobalPermissions"],
+    ["createWithPermissions", "createWithRole"],
+    ["createClient", "createServerClient"],
+    ["transformKeysToSnakeCase", "transformKeysToSnakeCase"],
+    ["createDrizzleClient", "createDrizzleClientInternal"],
+    ["AdminPanel", "useRequiredPermission"],
+    ["transformLocationResponse", "transformMachinesResponse"],
+    ["validateBatchAssignments", "validateAssigneeMembership"],
+    ["loginAsUser", "clearSession"],
+    ["createCompetitorMembership", "createMockMembership"],
+    ["createMockIssue", "createMockStatus"],
+    ["createSystemRoleSet", "createAdminRole"],
+    ["createWithMemberships", "createSystemRoleSet"],
+    ["clearTestStorage", "getAllFilePaths"],
+    ["handleFileInputChange", "handleFileSelect"],
+    ["createIssueFactory", "createMachineFactory"],
+    ["getUserPermissionsForSupabaseUser", "getUserPermissionsForSupabaseUser"],
+    ["getSeededPlayer", "getUserWithRoles"],
+    ["middleware", "setAll"],
+    ["createMembershipValidationInput", "createMockMembership"],
+    ["createTRPCCallerForIssues", "createMockServices"],
+    ["processFiles", "applyMappingToContent"],
+    ["createMachineFactory", "createLocationFactory"],
+    ["transformAttachmentsResponse", "transformAttachmentResponse"],
+    ["verifyPublicOnlyContent", "verifyPublicContent"],
+    ["createFallbackLogger", "createFallbackLogger"],
+    ["getSeededPlayerSupabaseUser", "getSeededPlayer"],
+    ["getValidStatusTransitions", "validateStatusTransition"],
+    ["MyComponent", "usePermissions"],
+    ["seedInfrastructure", "createDefaultLocation"],
+    ["setupAllIssueListMocks", "setupPermissionMocks"],
+    ["getSeededPriorities", "getSeededOrganizationId"],
+    ["devValidateFields", "validateFieldAccess"],
+    ["validateQueryFields", "validateDrizzleFieldAccess"],
+    ["ActiveFilters", "getLocationName"],
+    ["createAttachmentFactory", "createUserFactory"],
+    ["getExistingAuthUsers", "createServiceRoleClient"],
+    ["createRouterTestSuite", "testPublicProcedure"],
+    ["getSeededAdminSupabaseUser", "createSupabaseUserFromSeeded"],
+    ["IssueActions", "usePermissions"],
+    ["IssueTimeline", "getActivityIcon"],
+    ["getSeededAdminSupabaseUser", "getSeededAdmin"],
+    ["TRPCReactProvider", "getQueryClient"],
+    ["createSystemRoleSet", "createUnauthenticatedRole"],
+    ["validateTestArchetype", "validateRLSContext"],
+    ["withMachineOwnerBusinessLogicSetup", "setupTestData"],
+    ["createMockLocations", "createMockLocation"],
+    ["createSingleIssue", "createStatusFactory"],
+    ["validateAdminCountForRemoval", "countAdmins"],
+    ["setupAuthTestData", "getSeededOrganization"],
+    ["transformMembershipResponse", "transformUserResponse"],
+    ["createAttachmentFactory", "createSingleAttachment"],
+    ["transformMembershipArray", "transformAuthArray"],
+    ["expectPermissionRequired", "createAuthenticatedContext"],
+    ["createMockIssuesList", "createMockIssue"],
+    ["createMemberRole", "create"],
+    ["isDevelopmentOrTest", "isDevelopment"],
+    ["createAdminRole", "create"],
+    ["createMockUsers", "createMockUser"],
+    ["createComplexIssueFactory", "getSingleIssue"],
+    ["createDualChildLogger", "createDualChildLogger"],
+    ["setupAuthTestData", "createSupabaseUserFromSeeded"],
+    ["createUnauthenticated", "createWithRole"],
+    ["validateTestArchetype", "validateMemorySafety"],
+    ["createWithMemberships", "create"],
+    ["createWithPermissions", "create"],
+    ["setupMultiOrgContext", "createOrgContext"],
+    ["transformUserArray", "transformAuthArray"],
+    ["batchToggleSelection", "toggleSelection"],
+    ["validateFilters", "getDefaultFilters"],
+    ["TRPCReactProvider", "getBaseUrl"],
+    ["seedAuthUsers", "createUsersDirectly"],
+    ["createMembership", "createTestUser"],
+    ["withRLSAwareTest", "withRLSTest"],
+    ["createComplexIssueFactory", "createActivityFactory"],
+    ["shouldEnableTestLogin", "isDevelopment"],
+    ["seedAuthUsers", "deleteExistingDevUsers"],
+    ["createIssueFactory", "createUserFactory"],
+    ["cleanupSeedDataHelpers", "clearSeedDataCache"],
+    ["processBatchUsers", "waitForUserRecord"],
+    ["seedInfrastructure", "createDefaultCollectionTypes"],
+    ["transformUploadAuthContextResponse", "transformMembershipResponse"],
+    ["ReportingService.__init__", "groupByPriority"],
+    ["validateBatchRoleOperations", "countAdmins"],
     [
       "validatePublicOrganizationContextRequired",
       "validatePublicOrganizationContext"
     ],
-    ["createIssueFactory", "createUserFactory"],
-    ["setupRLS", "createDatabaseConnection"],
-    ["createSingleAttachment", "createUserFactory"],
-    ["DetailedIssueCard", "getPriorityBorderColor"],
-    ["IssueTimeline", "getActivityColor"],
-    ["ActiveFilters", "getMachineName"],
-    ["seedInfrastructure", "createDefaultIssueStatuses"],
-    ["createSingleIssue", "createMachineFactory"],
-    ["AuthProvider", "getInitialSession"],
-    ["createClient", "setAll"],
-    ["IssueStatusControl", "handleStatusChange"],
-    ["setupAuthTestData", "getSeededAdmin"],
-    ["validateTransitionRules", "getTransitionType"],
-    ["createClient", "createServerClient"],
-    ["createRouterTestSuite", "testPublicProcedure"],
-    ["getSingleIssue", "createIssueFactory"],
-    ["createWithMemberCount", "create"],
-    ["DetailedIssueCard", "getStatusColor"],
-    ["createMockIssue", "createMockStatus"],
-    ["validateIssueAssignment", "validateAssigneeMembership"],
-    ["getUserPermissionsForSupabaseUser", "getUserPermissionsForSupabaseUser"],
-    ["validateUserRemoval", "validateUserRemovalRules"],
-    ["clearStorageBucket", "getAllFilePaths"],
-    ["createComplexIssueFactory", "createCommentFactory"],
-    ["withBusinessLogicTest", "withIsolatedTest"],
-    ["seedCompleteTestData", "seedTestInfrastructure"],
-    ["requirePermission", "hasPermission"],
-    ["setupAllIssueListMocks", "setupPermissionMocks"],
-    ["cleanupSeedDataHelpers", "clearSeedDataCache"],
-    ["generatePrefixedId", "generateId"],
-    ["getSeededPlayerSupabaseUser", "createSupabaseUserFromSeeded"],
-    ["withMultiOrgTest", "setTestSession"],
-    ["validateCommentDeletion", "validateCommentExists"],
-    ["createLogger", "isErrorObject"],
-    ["expectOrganizationRequired", "createAuthenticatedContext"],
-    ["auditMultiTenantSecurity", "auditTableIsolation"],
-    ["getSelectionSummary", "getSelectedCount"],
-    ["validateIssueAssignment", "validateAssignmentRules"],
-    ["processImageFile", "calculateDimensions"],
-    ["createPrimaryAdminContext", "createSeededMachineTestContext"],
-    ["createUser", "createWithRole"],
     ["createMockMachines", "createMockModel"],
-    ["validateImportStructure", "getLineNumber"],
-    ["hasPermissionForSession", "hasPermission"],
-    ["createAllPermissions", "createLocationPermissions"],
-    ["createOrganizationWithRoles", "RoleService.createSystemRoles"],
-    ["createWithMemberships", "createSystemRoleSet"],
-    ["processBatchUsers", "waitForUserRecord"],
-    ["AuthProvider", "signOut"],
-    ["createAdminRole", "createAllPermissions"],
-    ["processFiles", "log"],
-    ["seedAuthUsers", "deleteExistingDevUsers"],
-    ["validateTestArchetype", "validateImportStructure"],
-    ["getSeededAdmin", "getUserWithRoles"],
-    ["validateFilters", "isValidSortOrder"],
-    ["createMockUsers", "createMockUser"],
-    ["middleware", "getSubdomain"],
-    ["createNumberedVariation", "createNumberedId"],
+    ["createSingleAttachment", "createUserFactory"],
     ["signOut", "signOut"],
-    ["validateCommentEditWithTimeLimit", "canEditCommentByTime"],
-    ["validateDrizzleConfiguration", "expectPoolConfiguration"],
-    ["createSessionFactory", "createUserFactory"],
-    ["createPermissionTestSuite", "createAuthenticatedContext"],
-    ["getEnvironmentName", "getClientEnvironment"],
-    ["createCommentFactory", "createSingleComment"],
-    ["formatMachineName", "getManufacturerName"],
-    ["createCompetitorOrgUser", "createMockSupabaseUser"],
-    ["createLogger", "hasCodeAndMessage"],
-    ["middleware", "setAll"],
-    ["createTechnicianRole", "create"],
-    ["isDevelopment", "getClientEnvironment"],
-    ["createWithRole", "getRolePermissions"],
-    ["middleware", "createServerClient"],
-    ["shouldEnableTestLogin", "isDevelopment"],
-    ["validateIssueCreation", "validateIssueCreationRules"],
-    ["validateUserRemoval", "validateAdminCountForRemoval"],
-    ["validateRoleReassignment", "validateReassignmentRole"],
-    ["validateAllOAuthProviders", "validateGoogleOAuth"],
-    ["StatusCategoryMultiSelect", "getGroupLabel"],
-    ["createMultipleForOrganization", "createSystemRoleSet"],
-    ["deleteExistingDevUsers", "createServiceRoleClient"],
-    ["getSeededIssueStatuses", "getSeededOrganizationId"],
-    ["processBatchUsers", "getExistingAuthUsers"],
-    ["createMockIssue", "createMockUser"],
-    ["createMultipleForOrganization", "createWithUser"],
-    ["validateReassignmentRole", "validateOrganizationBoundary"],
-    ["createIssueFactory", "createPriorityFactory"],
-    ["createAllPermissions", "createAttachmentPermissions"],
-    ["StatusTogglePills", "handleCategoryToggle"],
-    ["toggleSelectAll", "isAllSelected"],
-    ["assertOAuthConfigValid", "validateAndLogOAuthConfig"],
-    ["getSeededMember", "getUserWithRoles"],
-    ["validateCommentCreationInput", "validateCommentContent"],
-    ["createTRPCCallerForIssues", "createMockServices"],
-    ["withRLSEnabledTest", "withIsolatedTest"],
-    ["createFallbackLogger", "mergeContext"],
-    ["validateDrizzleConfiguration", "expectLoggingConfiguration"],
-    ["withOrgScopeAndNotDeleted", "excludeSoftDeleted"],
-    ["processFiles", "listSourceFiles"],
-    ["createIssuePermissions", "create"],
-    ["getAllFilePaths", "getAllFilePaths"],
-    ["createMachineFactory", "createModelFactory"],
-    ["shouldEnableCredentialsProvider", "isDevelopment"],
-    ["processIssueImageFile", "calculateDimensions"],
-    ["createComplexTestDataset", "createBasicTestData"],
-    ["createTechnician", "createWithRole"],
-    ["createComplexIssueFactory", "getSingleIssue"],
-    ["createIssueFactory", "createSingleIssue"],
-    ["createIssueFactory", "createMachineFactory"],
-    ["seedSampleData", "createMachines"],
-    ["validateSingleFile", "generateValidationReport"],
-    ["createAllPermissions", "createAdminPermissions"],
-    ["validateAdminCountPreservation", "countAdmins"],
-    ["getSeededOrganizationId", "getSeededOrganization"],
-    ["createComplexIssueFactory", "createActivityFactory"],
-    ["validateStatusTransition", "validateUserPermissions"],
-    ["main", "generateSQLConstants"],
-    ["withOrgScopeAndNotDeleted", "withOrganizationScope"],
-    ["getSeededMember", "getCachedSeedData"],
-    ["createAdmin", "createWithRole"],
-    ["getEnvironmentName", "isProduction"],
-    ["validateAdminCountForRemoval", "countAdmins"],
+    ["validateFilters", "isValidSortOrder"],
+    ["validateFilters", "isValidSortField"],
+    ["isDevAuthAvailable", "shouldEnableDevFeatures"],
+    ["formatMachineName", "getYearValue"],
+    ["createRouterTestSuite", "testAuthenticatedProcedure"],
+    ["createPermissionTestSuite", "expectOrganizationRequired"],
+    ["ActionButton", "usePermissionTooltip"],
     ["validateTestArchetype", "validateErrorHandling"],
-    ["createCompetitorOrganization", "createMockOrganization"],
-    ["setupAuthTestData", "getSeededPlayer"],
-    ["withRLSTest", "withIsolatedTest"],
-    ["createMockIssue", "createMockPriority"],
-    ["withRLSAwareTest", "withRLSTest"],
-    ["ActiveFilters", "getLocationName"],
-    ["getSeededAdminSupabaseUser", "createSupabaseUserFromSeeded"],
-    ["ActiveFilters", "getStatusNames"],
-    ["logout", "waitForLogout"],
-    ["StatusTogglePills", "isCategoryActive"],
-    ["resetMocks", "setupDefaultResponses"],
-    ["MyComponent", "usePermissions"],
-    ["createMembershipValidationInput", "createMockMembership"],
-    ["createSingleActivity", "createUserFactory"],
-    ["validateUserRemoval", "validateUserMembership"],
-    ["getValidStatusTransitions", "validateStatusTransition"],
-    ["withCrossOrgTest", "withMultiOrgTest"],
-    ["validateRoleAssignment", "validateOrganizationBoundary"],
-    ["seedTestSampleData", "seedProductionSampleData"],
-    ["createPrimaryMemberContext", "createSeededLocationTestContext"],
-    ["createSingleIssue", "createStatusFactory"],
-    ["getEnvironmentName", "isPreview"],
-    ["validateMultipleEntityOwnership", "validateRouterEntityOwnership"],
-    ["getUserPermissionsForSession", "PermissionService.getUserPermissions"],
-    ["createMockStatuses", "createMockStatus"],
-    ["seedInfrastructure", "createOrganizationWithRoles"],
+    ["createAdminClient", "createServerClient"],
+    ["createAllPermissions", "createMachinePermissions"],
+    ["validateStatusTransition", "validateOrganizationBoundary"],
+    ["createTestDatabase", "applyDrizzleSchema"],
+    ["createComplexIssueFactory", "createCommentFactory"],
+    ["createTestDatabase", "verifyMigrationComplete"],
+    ["createOrganizationWithRoles", "createTemplateRole"],
+    ["deleteExistingDevUsers", "createServiceRoleClient"],
+    ["seedSampleData", "createCompetitorMachine"],
+    ["auditMultiTenantSecurity", "auditTableIsolation"],
+    ["buildMapping", "snakeToCamel"],
+    ["processBatchUsers", "upsertSupabaseAuthUser"],
     ["configureProductionMocks", "createRemoteURL"],
-    ["createPermissionTestSuite", "expectPermissionRequired"],
-    ["handleDrop", "handleFileSelect"],
-    ["ReportingService.__init__", "groupByPriority"],
+    ["createMachineWithoutCustomName", "createMockMachine"],
+    ["createPrimaryMemberContext", "createSeededLocationTestContext"],
+    ["createRouterTestSuite", "testAdminOnlyProcedure"],
+    ["createDefaultLocation", "getDefaultLocationId"],
+    ["createWithMemberCount", "create"],
+    ["shouldRequireGoogleOAuth", "isPreview"],
+    ["validateTestArchetype", "validateArchetypeCompliance"],
+    ["AuthProvider", "getInitialSession"],
+    ["shouldEnableCredentialsProvider", "isPreview"],
+    ["getSeededIssueStatuses", "getCachedSeedData"],
+    ["validateCommentEditInput", "validateCommentContent"],
+    ["validateAdminCountPreservation", "countAdmins"],
+    ["esc", "esc"],
+    ["transformMachinesResponse", "transformMachineResponse"],
     ["authenticateDevUser", "isValidDevEmail"],
+    ["createAdminClient", "setAll"],
+    ["createCompetitorAdminContext", "createSeededLocationTestContext"],
+    ["createSingleActivity", "createUserFactory"],
+    ["DetailedIssueCard", "getStatusColor"],
+    ["canEditCommentByTime", "getCommentAgeInMinutes"],
+    ["createFallbackLogger", "mergeContext"],
+    ["main", "setupRLS"],
+    ["seedInfrastructure", "createDefaultIssueStatuses"],
+    ["IssueStatusControl", "handleStatusChange"],
+    ["validateAllOAuthProviders", "validateGoogleOAuth"],
+    ["validateIssueAssignment", "validateAssignmentRules"],
+    ["PermissionButton", "getDefaultTooltipText"],
+    ["getEnvironmentName", "isProduction"],
+    ["createTraceContext", "generateRequestId"],
+    ["validateDrizzleConfiguration", "expectSSLConfiguration"],
+    ["withRLSSecurityContext", "esc"],
+    ["validateUserRemoval", "validateUserRemovalRules"],
+    ["validateBatchAssignments", "validateIssueOrganizationBoundary"],
+    ["createSingleIssue", "createPriorityFactory"],
+    ["auditMultiTenantSecurity", "getDataSizeConfig"],
+    ["createMockMachines", "createMockMachine"],
+    ["generateOrganizationalReport", "calculateAvgResolutionTime"],
+    ["seedTestInfrastructure", "seedProductionInfrastructure"],
+    ["validateSingleFile", "generateValidationReport"],
+    ["withOrganizationClient", "createOrganizationAwareClient"],
+    ["transformIssuesResponse", "transformIssueResponse"],
+    ["createCustomRole", "create"],
+    ["getRolePermissions", "createMatrix"],
+    ["createAdminMembership", "createTestUser"],
+    ["getSelectionSummary", "getSelectedCount"],
+    ["createIssueFactory", "createStatusFactory"],
+    ["createRoleService", "createRoleService"],
+    ["createPermissionTestSuite", "createAuthenticatedContext"],
+    ["createTraceContext", "generateTraceId"],
+    ["transformKeysToSnakeCase", "isPlainObject"],
+    ["isValidOPDBId", "parseOPDBId"],
+    ["validateUserRemoval", "validateAdminCountForRemoval"],
+    ["validateIssueCreation", "validateDefaultPriority"],
+    ["seedSampleData", "createSampleIssues"],
+    ["createCompetitorOrganization", "createMockOrganization"],
+    ["auditMultiTenantSecurity", "measureRLSPerformance"],
+    ["validateDrizzleConfiguration", "expectPoolConfiguration"],
+    ["isDevelopment", "getClientEnvironment"],
+    [
+      "validateLocationOrganizationBoundary",
+      "validateResourceOrganizationBoundary"
+    ],
+    ["validateUserRemoval", "validateUserMembership"],
+    ["createPermissionTestSuite", "expectOrganizationIsolation"],
+    ["main", "generateSQLConstants"],
+    ["validateSingleFile", "validateTestArchetype"],
+    ["validateCommentRestoration", "validateAdminPermissions"],
+    ["getUploadAuthContext", "transformUploadAuthContext"],
+    ["seedTestSampleData", "seedProductionSampleData"],
+    ["createIssuePermissions", "create"],
+    ["expectOrganizationRequired", "createAuthenticatedContext"],
+    ["processImageFile", "calculateDimensions"],
+    ["validateCommentDeletion", "validateCommentDeletionPermissions"],
+    ["assertOAuthConfigValid", "validateAndLogOAuthConfig"],
+    ["createSingleComment", "createUserFactory"],
+    ["createAdminMembership", "createAdminRole"],
+    ["getSeededAdmin", "getCachedSeedData"],
+    ["validateIssueCreation", "validateMachineOrganizationBoundary"],
     [
       "validateMachineOrganizationBoundary",
       "validateResourceOrganizationBoundary"
     ],
-    ["getSeededPlayer", "getUserWithRoles"],
-    ["processBatchUsers", "upsertSupabaseAuthUser"],
+    ["withRLSTest", "withIsolatedTest"],
+    ["validateDrizzleConfiguration", "expectLoggingConfiguration"],
+    ["setContext", "setTestSession"],
+    ["generatePrefixedId", "generateId"],
+    ["configureCIMocks", "createRemoteURL"],
+    ["createMockIssue", "createMockMachine"],
+    ["transformKeysToCamelCase", "isPlainObject"],
+    ["validateTestFiles", "validateTestArchetype"],
+    ["createAllPermissions", "createAdminPermissions"],
+    ["validateStatusTransition", "validateUserPermissions"],
+    ["createPrimaryAdminContext", "createSeededMachineTestContext"],
+    ["validateTestArchetype", "validateImportStructure"],
+    ["getSeededOrganizationId", "getSeededOrganization"],
+    ["getSeededPlayerSupabaseUser", "createSupabaseUserFromSeeded"],
+    ["validateEntityExistsAndOwned", "validateRouterEntityOwnership"],
+    ["createWithRole", "createWithPermissions"],
+    ["validateRoleAssignment", "validateUserMembership"],
+    ["toggleSelectAll", "selectAll"],
+    ["createPermissionTestSuite", "createPermissionTestCases"],
+    ["transformLocationsResponse", "map"],
+    ["buildMapping", "collectSchemaColumns"],
+    ["createMockIssue", "createMockUser"],
+    ["transformOrganizationArray", "transformAuthArray"],
+    ["createLocationPermissions", "create"],
+    ["createServerMockContext", "createMockSupabaseUser"],
+    ["createSessionFactory", "createUserFactory"],
+    ["validateTransitionRules", "getTransitionType"],
+    ["createWithRoles", "createSystemRoleSet"],
+    ["expectAuthenticationRequired", "createPublicContext"],
+    ["createCommentFactory", "createUserFactory"],
+    ["createAttachmentPermissions", "create"],
+    ["formatMachineName", "getManufacturerName"],
+    ["createMockStatuses", "createMockStatus"],
+    ["createWithRole", "getRolePermissions"],
+    ["isPreview", "getClientEnvironment"],
+    ["validateDrizzleConfiguration", "expectTimeoutConfiguration"],
+    ["seedSampleData", "extractUniqueGames"],
+    ["shouldEnableCredentialsProvider", "isDevelopment"],
+    ["transformMachinesResponse", "map"],
+    ["createUsersDirectly", "getUserIdForEmail"],
+    ["IssueTimeline", "getActivityColor"],
+    ["createMultipleForOrganization", "createSystemRoleSet"],
+    ["transformKeysToSnakeCase", "toSnakeCase"],
+    ["DetailedIssueCard", "getPriorityBorderColor"],
+    ["hasPermission", "getRolePermissions"],
+    ["AuthProvider", "signOut"],
+    [
+      "validateIssueOrganizationBoundary",
+      "validateResourceOrganizationBoundary"
+    ],
     ["createPinballMapTestContext", "setMockPermissions"],
-    ["buildMapping", "snakeToCamel"],
-    ["validateUserPermissions", "getTransitionType"],
-    ["createPermissionTestSuite", "expectOrganizationIsolation"],
-    ["createWithPermissions", "createWithRole"],
-    ["createSingleIssue", "createUserFactory"],
+    ["createWithPermissions", "createCustomRole"],
+    ["validateCommentEditWithTimeLimit", "validateCommentEditPermissions"],
+    ["validateCommentDeletion", "validateOrganizationMembership"],
+    ["hasCycle", "hasCycle"],
+    ["createServiceTestContext", "createMockDatabase"],
+    ["urlParamsToFilters", "isValidSortOrder"],
+    ["testInputValidation", "createRouterTestContext"],
+    ["mockCurrentMembership", "createMockMembership"],
+    ["createDevUserAction", "isValidDevEmail"],
+    ["createIssueFactory", "createPriorityFactory"],
+    ["generateOrganizationalReport", "getTopMachinesByIssues"],
+    ["withBusinessLogicTest", "withIsolatedTest"],
+    ["validateOrganizationContext", "getUserWithOrganization"],
+    ["validateCommentDeletion", "validateCommentExists"],
+    ["clearStorageBucket", "getAllFilePaths"],
+    ["getSeededAdmin", "getUserWithRoles"],
+    ["getClient", "createClient"],
+    ["createOrganizationWithRoles", "createSystemRoles"],
+    ["createRouterTestSuite", "testInputValidation"],
+    ["getGroupIdFromOPDBId", "parseOPDBId"],
+    ["withMultiOrgTest", "setContext"],
+    ["createCompetitorOrgUser", "createMockSupabaseUser"],
+    ["getSeededIssues", "getCachedSeedData"],
+    ["createMockMachine", "createMockLocation"],
+    ["validateRoleReassignment", "validateRoleDeletion"],
+    ["processFiles", "listSourceFiles"],
+    ["validateIssueCreation", "validateDefaultStatus"],
+    ["LocationList", "handleLocationClick"],
+    ["createIssueWithMixedComments", "getSingleIssue"],
+    ["createAllPermissions", "createLocationPermissions"],
+    ["createIssueFactory", "createSingleIssue"],
+    ["createCommentFactory", "createSingleComment"],
+    ["validateIssueCreation", "validateIssueCreationRules"],
+    ["validateAndLogOAuthConfig", "validateAllOAuthProviders"],
+    ["createComplexTestDataset", "createBasicTestData"],
+    ["logout", "waitForLogout"],
+    ["getAllFilePaths", "getAllFilePaths"],
+    ["validateIssueAssignment", "validateAssigneeMembership"],
+    ["seedCompleteTestData", "seedTestInfrastructure"],
+    ["logout", "clearSession"],
+    ["createAdminPermissions", "create"],
+    ["configureDevelopmentMocks", "createLocalhost5432URL"],
+    ["validateRoleAssignment", "validateRoleAssignmentRules"],
+    ["deleteTestBucket", "clearStorageBucket"],
+    ["createAdminRole", "createAllPermissions"],
+    ["createWithUser", "create"],
+    ["auditDatabaseQuery", "validateQueryFields"],
+    ["createMembership", "createTestRole"],
+    ["createComplexIssueFactory", "createAttachmentFactory"],
+    ["getSeededPriorities", "getCachedSeedData"],
+    ["createPermissionTestSuite", "expectPermissionRequired"],
+    ["getSeededUserByEmail", "getUserWithRoles"],
+    ["createLogger", "isErrorObject"],
+    ["TRPCReactProvider", "isClientDevelopment"],
+    ["createRouterTestSuite", "testOrganizationScoping"],
+    ["log", "log"],
+    ["createTestMembership", "createTestUser"],
+    ["getSeededOrganization", "getCachedSeedData"],
+    ["shouldEnableDemoLogin", "isPreview"],
+    ["getEnvironmentName", "isPreview"],
     ["createCompetitorOrgContext", "createMockTRPCContext"],
-    ["createMultipleForTesting", "createWithMemberships"]
+    ["validateCommentRestoration", "validateCommentExists"],
+    ["StatusCategoryMultiSelect", "getGroupLabel"],
+    ["clearAllFilters", "getDefaultFilters"],
+    ["resetMocks", "setupDefaultResponses"],
+    ["validateCommentEdit", "validateCommentExists"],
+    ["createSystemRoleSet", "createMemberRole"],
+    ["validateMultipleEntityOwnership", "validateRouterEntityOwnership"],
+    ["createUnauthenticatedRole", "create"],
+    [
+      "validateCommentOrganizationBoundary",
+      "validateResourceOrganizationBoundary"
+    ],
+    ["validateCommentCreationInput", "validateCommentContent"],
+    ["loginAsTechnician", "loginAsUserWithPermissions"],
+    ["getSeededIssueStatuses", "getSeededOrganizationId"],
+    ["validateCommentRestoration", "validateCommentDeletionState"],
+    ["createRoleService", "ServiceFactory.createRoleService"],
+    ["createMockIssue", "createMockPriority"],
+    ["transformKeysToCamelCase", "toCamelCase"],
+    ["validateCommentEdit", "validateCommentDeletionState"],
+    ["handler", "createContext"],
+    ["createMultipleForOrganization", "createWithUser"],
+    ["isPinPointSupabaseSession", "isPinPointSupabaseUser"],
+    ["requirePermission", "hasPermission"],
+    ["ActiveFilters", "getMachineName"],
+    ["validateStatusTransition", "validateTransitionRules"],
+    ["isDevelopmentOrPreview", "isPreview"],
+    ["validateMemorySafety", "getLineNumber"],
+    ["createClient", "setAll"]
   ],
   "d": {
-    "docs/quick-reference/testing-patterns.md": [
-      "Testing Patterns Quick Reference",
-      "Current Test System (Post-Archive)",
-      "Available Commands",
-      "Active Test Infrastructure",
-      "Current Testing Patterns",
-      "Pure Function Unit Tests",
-      "RLS Policy Testing (pgTAP)",
-      "Run database policy tests",
-      "Individual test files",
-      "Smoke Testing (Playwright)"
-    ],
-    "src/server/db/seed/README.md": [
-      "Seed Data Management Scripts",
-      "\ud83d\ude80 Quick Start",
-      "Load minimal seed data (foundation for all testing)",
-      "Load full seed data (minimal + extended demo data)",
-      "Reset database and reload minimal seed",
-      "Generate SQL constants from TypeScript",
-      "\ud83d\udcc1 File Structure",
-      "\ud83c\udfd7\ufe0f Seed Data Architecture",
-      "**Two-Tier System**",
-      "**Predictable IDs**"
-    ],
     ".archived-tests-2025-08-23/ARCHIVE_MANIFEST.md": [
       "Test Archive Manifest - 2025-08-23",
       "Archive Purpose",
@@ -2867,6 +3003,18 @@
       "**Development Approach**",
       "\ud83d\udea7 MIGRATION STATUS: TEST SYSTEM REBOOT PHASE \ud83d\udea7"
     ],
+    "ESLINT_REMAINING_WORK_BREAKDOWN.md": [
+      "ESLint Remaining Work: Detailed Breakdown",
+      "Executive Summary",
+      "Error Distribution by Rule Type",
+      "HIGH VOLUME: Type Safety Issues (135 errors - 73%)",
+      "MEDIUM VOLUME: Code Quality Issues (50 errors - 27%)",
+      "Error Concentration by Architecture Layer",
+      "Frontend Components (~60 errors)",
+      "Backend Services (~75 errors)  ",
+      "Test Infrastructure (~50 errors)",
+      "Strategic Categories for Resolution"
+    ],
     "README.md": [
       "PinPoint: Modern Issue Tracking for Arcades & Collectives",
       "About The Project",
@@ -2896,7 +3044,7 @@
       "\u2705 Migration Status: Prisma Removal Complete",
       "Quick Start",
       "For New Developers",
-      "For Phase 2: RLS Implementation",
+      "For Current Development",
       "Documentation Structure",
       "Core Documentation",
       "Planning & Process",
@@ -4062,98 +4210,6 @@
       "3. Verification Steps",
       "Test OAuth Configuration"
     ],
-    "docs/orchestrator-system/07-execution-framework.md": [
-      "Task-Based Execution Framework",
-      "Philosophy: Natural Flow Development",
-      "Work Session Management",
-      "Session Startup Procedures",
-      "Validate development environment",
-      "Sync with latest changes",
-      "Quick health check",
-      "Task Initiation Workflow",
-      "Create focused branch for task",
-      "Verify clean state"
-    ],
-    "docs/orchestrator-system/INDEX.md": [
-      "Orchestrator System",
-      "Status",
-      "Migration Context",
-      "Contents"
-    ],
-    "docs/orchestrator-system/ORCHESTRATOR_SYSTEM_PROMPT.md": [
-      "PinPoint Orchestrator System Prompt",
-      "PinPoint-Specific Orchestrator Mission",
-      "PinPoint Architecture Knowledge",
-      "Library Version Management & Documentation",
-      "Critical Responsibility: Keep Sub-agents Updated",
-      "Documentation Update Protocol",
-      "Context7 MCP Tool Usage",
-      "Orchestrator Operating Procedures",
-      "ALWAYS Start With These Steps",
-      "Test-Driven Development Dispatch Protocol"
-    ],
-    "docs/orchestrator-system/agent-workspace.md": [
-      "GitHub Issues for Agent Task Management",
-      "Overview",
-      "GitHub Issues Approach",
-      "Issue Creation",
-      "Issue Structure",
-      "Issue Content",
-      "Standard Template",
-      "Task: <Task Name>",
-      "Mission Statement",
-      "Context"
-    ],
-    "docs/orchestrator-system/implementation-agent-project.md": [
-      "PinPoint Implementation Agent - Project Context",
-      "Project Essentials",
-      "Key Patterns",
-      "Commands",
-      "TDD Process",
-      "PR Creation",
-      "Key Documentation"
-    ],
-    "docs/orchestrator-system/multi-agent-development-workflow.md": [
-      "Multi-Agent Development Workflow Patterns",
-      "Overview",
-      "Key Architectural Patterns",
-      "1. Git Worktree Isolation Strategy",
-      "2. Task Dependency Matrix Management",
-      "3. Daily Synchronization Protocol",
-      "Daily sync before work",
-      "4. Quality Gate Enforcement",
-      "5. Self-Sufficiency Guidelines",
-      "Multi-Agent Communication Patterns"
-    ],
-    "docs/orchestrator-system/orchestrator-project.md": [
-      "PinPoint Orchestrator Agent - Project Context",
-      "Project Essentials",
-      "Environment",
-      "Orchestrator Command Variations",
-      "Available Commands",
-      "Key Procedures",
-      "Task Dependencies",
-      "Schema Conflicts",
-      "Critical User Journeys (CUJs)",
-      "Key Commands"
-    ],
-    "docs/orchestrator-system/review-agent-project.md": [
-      "PinPoint Review Agent - Project Context",
-      "Project Essentials",
-      "Key Review Areas",
-      "Review Process",
-      "GitHub Actions Integration",
-      "Key Documentation"
-    ],
-    "docs/orchestrator-system/test-agent-project.md": [
-      "PinPoint Test Agent - Project Context",
-      "Project Essentials",
-      "Test Organization",
-      "Key Patterns",
-      "Commands",
-      "TDD Process",
-      "Key Documentation"
-    ],
     "docs/planning/INDEX.md": [
       "Planning Documentation",
       "Active Planning",
@@ -4332,6 +4388,18 @@
       "Server Client Creation",
       "Next.js Middleware Integration"
     ],
+    "docs/quick-reference/testing-patterns.md": [
+      "Testing Patterns Quick Reference",
+      "Current Test System (Post-Archive)",
+      "Available Commands",
+      "Active Test Infrastructure",
+      "Current Testing Patterns",
+      "Pure Function Unit Tests",
+      "RLS Policy Testing (pgTAP)",
+      "Run database policy tests",
+      "Individual test files",
+      "Smoke Testing (Playwright)"
+    ],
     "docs/quick-reference/typescript-strictest-patterns.md": [
       "TypeScript Strictest Patterns",
       "Core Safety Patterns",
@@ -4440,6 +4508,18 @@
       "~~7. **Organizational Complexity Underestimated**~~ \u2705 NOT A CONCERN",
       "\ud83c\udfaf Missing System Components (Trouble Spots)"
     ],
+    "docs/testing/SERVICE_TESTS_ARCHETYPE.md": [
+      "Service Tests Archetype (Archetype 3)",
+      "Overview",
+      "Why Service Tests First?",
+      "**Highest Value Archetype**",
+      "Implementation Status",
+      "\u2705 **Infrastructure Complete**",
+      "\u2705 **Working Examples**",
+      "Usage Patterns",
+      "**File Naming Convention**",
+      "**Test Structure Pattern**"
+    ],
     "docs/testing/TEST_SYSTEM_REBOOT_PLAN.md": [
       "PinPoint Test System Reboot Plan",
       "Executive Summary",
@@ -4464,276 +4544,6 @@
       "Problem: Drizzle schema out of sync",
       "Problem: Database has old/inconsistent data"
     ],
-    "migration-plan-v2/00-phase0-configuration-audit.md": [
-      "Phase 0: Complete Configuration Audit & Cleanup",
-      "\ud83c\udfaf Phase Objectives",
-      "Primary Goals",
-      "Why This Phase Is Critical",
-      "\ud83d\udd0d Current State Analysis",
-      "Prisma References Found (117 files total)",
-      "\ud83d\udee0\ufe0f Modern Linting Tools to Add",
-      "Recommended Additions (2024-2025) - Research Validated",
-      "\u274c Tools Excluded After Research",
-      "\ud83d\udccb Configuration Files Audit"
-    ],
-    "migration-plan-v2/01-phase1-prisma-removal.md": [
-      "Phase 1: Complete Prisma Removal - Execution Plan",
-      "Phase Objective & Dependencies",
-      "**Why This Phase Must Complete First**",
-      "Current State Assessment",
-      "**\u2705 COMPLETE: All Drizzle-Only**",
-      "Service Layer Conversion",
-      "**Service Constructor Modernization**",
-      "**Service Files to Audit**",
-      "**Conversion Process for Each Service**",
-      "Examine service for Prisma patterns"
-    ],
-    "migration-plan-v2/02-phase2-rls-implementation-unified.md": [
-      "Phase 2: Row-Level Security Implementation (Supabase-Native)",
-      "\ud83c\udfaf **Executive Summary**",
-      "\ud83c\udfd7\ufe0f **Technical Architecture**",
-      "Supabase RLS Foundation",
-      "Multi-Tenant Tables (Schema Analysis)",
-      "\ud83d\udcca **Parallel Work Streams**",
-      "\ud83d\udd27 **Stream 1: RLS Setup Script** (Independent)"
-    ],
-    "migration-plan-v2/02.1-phase2.1-fix-pascalcase-tables.md": [
-      "Phase 2.1: Fix PascalCase Database Table Names",
-      "Overview",
-      "Prerequisites",
-      "Step-by-Step Instructions",
-      "STEP 1: Fix Schema Table Names",
-      "STEP 2: Fix All Index Names",
-      "STEP 3: Fix Service Files"
-    ],
-    "migration-plan-v2/03-phase2.5-testing-architecture.md": [
-      "Testing Architecture for RLS-Enhanced System",
-      "Strategic Importance",
-      "Why This Phase Is Critical",
-      "The RLS Testing Transformation",
-      "Benefits Realization with pgTAP + PGlite Testing Strategy",
-      "Agent Workload Distribution (95 Files Analyzed)",
-      "**`unit-test-architect`**: **38 files (40%)**",
-      "**`integration-test-architect`**: **40 files (42%)**",
-      "**`security-test-architect`**: **22 files (23%)**",
-      "**Archetype Distribution Across 95 Files**"
-    ],
-    "migration-plan-v2/04-phase3-test-implementation.md": [
-      "Phase 3: Systematic Test Implementation - Consultant-Guided RLS Enhancement",
-      "Executive Summary",
-      "Seed Data Architecture Foundation",
-      "Hardcoded SEED_TEST_IDS System",
-      "Dual-Organization Testing Infrastructure",
-      "Global OPDB Catalog Architecture"
-    ],
-    "migration-plan-v2/05-phase4-cleanup-docs.md": [
-      "Phase 4: Final Optimization & Architecture Documentation",
-      "Executive Summary",
-      "\ud83c\udfaf Phase 4 Objectives",
-      "**Primary Objectives**",
-      "**Secondary Objectives**",
-      "\ud83d\udcbb Legacy Code Removal",
-      "**Phase 4A: Organizational Management Code Elimination**"
-    ],
-    "migration-plan-v2/06-risk-management.md": [
-      "Risk Management Plan: Migration Risk Mitigation",
-      "1. Risk Categories Overview",
-      "Technical Risks (HIGHEST PRIORITY)",
-      "External Risks (MODERATE PRIORITY)",
-      "2. Critical Dependency Chain Enforcement",
-      "Iron Law of Migration Phases",
-      "Dependency Gate Checklist",
-      "Enforcement Mechanisms",
-      "Automated dependency validation",
-      "Validation questions:"
-    ],
-    "migration-plan-v2/07-execution-framework.md": [
-      "Execution Framework: Tactical Migration Operations",
-      "1. Phase Execution Framework",
-      "Validation Commands and Quality Gates",
-      "scripts/validate-migration-phase.sh",
-      "scripts/collect-metrics.sh",
-      "Technical metrics",
-      "Architecture metrics",
-      "Create metrics JSON",
-      "3. Phase Coordination",
-      "Dependency Gate Enforcement"
-    ],
-    "migration-plan-v2/08-specialized-testing-agents.md": [
-      "Specialized Testing Agents: RLS-Enhanced Test Architecture",
-      "Agent Architecture Overview",
-      "**Agent Specialization Benefits**",
-      "1. Integration Test Architect",
-      "**Agent Profile**",
-      "**Core Expertise**",
-      "**Specialized Patterns**",
-      "**Target Files & Scope**",
-      "**Critical Responsibilities**"
-    ],
-    "migration-plan-v2/VERY_MASSIVE_CLAUDE.md": [
-      "Migration Execution Guide: Prisma Removal + RLS Implementation",
-      "Migration Context",
-      "Phase Dependencies (IMMUTABLE)",
-      "Operational Commands",
-      "Phase Validation",
-      "Continuous validation during migration work",
-      "Phase-specific validation",
-      "Progress Monitoring",
-      "Check Prisma removal progress",
-      "Check RLS implementation progress"
-    ],
-    "migration-plan-v2/archive/02-phase2-rls-implementation-original.md": [
-      "Row Level Security Implementation (Hybrid Approach)",
-      "1. Hybrid Security Architecture",
-      "3-Layer Security Model",
-      "Current vs Target State",
-      "Benefits of Hybrid Approach",
-      "2. JWT Claims Structure",
-      "Enhanced Supabase Auth Metadata",
-      "3. RLS Foundation Setup",
-      "Hybrid RLS Functions",
-      "Multi-Tenant Table Policies"
-    ],
-    "migration-plan-v2/archive/PHASE2-DETAILED-WORKFLOW-original.md": [
-      "Phase 2: RLS Implementation - Detailed Workflow Plan",
-      "\ud83c\udfaf **Phase 2 Overview: Database-Level Multi-Tenancy**",
-      "\ud83d\udcca **Parallel Work Streams (Supabase-Native)**",
-      "\ud83d\udd27 **Stream 1: RLS Setup Script** (Independent)",
-      "\ud83c\udfd7\ufe0f **Stream 2: Supabase Client Integration** (Independent)  ",
-      "\ud83d\udce1 **Stream 3: tRPC Context Integration** (Depends on Stream 2)"
-    ],
-    "phase3-task-breakdown/01-critical-security/TASK_001_fix_cross_org_data_leakage.md": [
-      "TASK 001: Fix Cross-Organizational Testing Architecture",
-      "\u2705 STATUS UPDATE: CONVERSION COMPLETE, BLOCKED BY TASK_002",
-      "Objective",
-      "Scope",
-      "Error Patterns",
-      "Pattern 1: Data Leakage Across Organizations",
-      "Pattern 2: Isolation Verification Failures",
-      "Pattern 3: Access Control Breakdown",
-      "Pattern 4: Database Constraint Issues",
-      "Root Cause Analysis"
-    ],
-    "phase3-task-breakdown/01-critical-security/TASK_002_restore_permission_system.md": [
-      "TASK 002: Restore Permission System Functionality",
-      "\ud83d\udea8 PRIORITY: CRITICAL - AUTHORIZATION SYSTEM BREAKDOWN",
-      "Objective",
-      "Scope",
-      "Primary Files (36 failing tests total):",
-      "Related Schema Files:",
-      "Error Patterns",
-      "Pattern 1: Schema Export Missing (Most Critical)",
-      "Pattern 2: Drizzle Relational Configuration Broken",
-      "Pattern 3: Permission Middleware Not Working"
-    ],
-    "phase3-task-breakdown/02-high-impact-patterns/TASK_003_database_initialization_fixes.md": [
-      "TASK 003: Database Initialization and Schema Fixes",
-      "\u26a1 PRIORITY: HIGH - BLOCKS INTEGRATION TESTING",
-      "Objective",
-      "Scope",
-      "Primary Issues Identified:",
-      "Affected Test Files:",
-      "Error Patterns Analysis",
-      "Pattern 1: Missing Tables (Database Creation Failure)",
-      "Pattern 2: Column Name Case Sensitivity Issues",
-      "Pattern 3: Seeding Operation Failures"
-    ],
-    "phase3-task-breakdown/02-high-impact-patterns/TASK_003_rls_context_establishment.md": [
-      "TASK 003: RLS Context Establishment Pattern",
-      "\u26a1 PRIORITY: HIGH - BLOCKS ALL DATABASE OPERATIONS",
-      "Objective",
-      "Scope",
-      "Primary Affected Files:",
-      "Pattern Recognition Files:",
-      "Error Patterns",
-      "Pattern 1: Permission Denied (Most Common - 90%+ of failures)",
-      "Pattern 2: Empty Result Arrays (Data Access Blocked)",
-      "Pattern 3: Missing Seeded Users"
-    ],
-    "phase3-task-breakdown/02-high-impact-patterns/TASK_004_trpc_router_mock_setup.md": [
-      "TASK 004: tRPC Router Mock Setup Pattern",
-      "\u26a1 PRIORITY: HIGH - BLOCKS API DEVELOPMENT & TESTING",
-      "Objective",
-      "Scope",
-      "Primary Affected Files:",
-      "Related Files:",
-      "Error Patterns",
-      "Pattern 1: Mock Database Undefined (Most Critical - 80%+ of failures)",
-      "Pattern 2: Router Integration vs Unit Test Confusion",
-      "Pattern 3: Mock Setup and Spy Issues"
-    ],
-    "phase3-task-breakdown/02-high-impact-patterns/TASK_005_schema_export_fixes.md": [
-      "TASK 005: Schema Export Fixes for Mock Database Alignment",
-      "\u26a1 PRIORITY: HIGH - BLOCKS PERMISSION AND SERVICE LAYER TESTING",
-      "Objective",
-      "Scope",
-      "Primary Affected Files (71 failing tests total):",
-      "Schema Files to Align:",
-      "Error Patterns",
-      "Pattern 1: Missing Schema Table Exports (Most Common - 80%+ failures)",
-      "Pattern 2: Partial Mock Setup Issues",
-      "Pattern 3: Schema Relations Missing"
-    ],
-    "phase3-task-breakdown/03-medium-priority/TASK_006_service_layer_mocks.md": [
-      "TASK 006: Service Layer Mock Database Setup",
-      "\ud83d\udcdd PRIORITY: MEDIUM - SERVICE LAYER TESTING FOUNDATION",
-      "Objective",
-      "Scope",
-      "Primary Affected Files (47 failing tests total):",
-      "Service Files Being Tested:",
-      "Error Patterns",
-      "Pattern 1: Database Mock Undefined (Most Common - 85%+ failures)",
-      "Pattern 2: Organizational Context Missing",
-      "Pattern 3: Missing Service Dependencies"
-    ],
-    "phase3-task-breakdown/03-medium-priority/TASK_007_react_component_permissions.md": [
-      "TASK 007: React Component Permission Integration",
-      "\ud83d\udcdd PRIORITY: MEDIUM - UI PERMISSION SYSTEM ALIGNMENT",
-      "Objective",
-      "Scope",
-      "Primary Affected Files (2 failing tests total):",
-      "Related Component Files:",
-      "Error Patterns",
-      "Pattern 1: Permission Context Not Available (Primary Issue)",
-      "Pattern 2: Mock Permission Provider Mismatch",
-      "Root Cause Analysis"
-    ],
-    "phase3-task-breakdown/03-medium-priority/TASK_008_schema_constraint_fixes.md": [
-      "TASK 008: Schema Constraint and Database Setup Fixes",
-      "\ud83d\udcdd PRIORITY: MEDIUM - DATABASE CONSTRAINT VALIDATION",
-      "Objective",
-      "Scope",
-      "Primary Affected Files (18 failing tests total):",
-      "Related Schema Files:",
-      "Error Patterns",
-      "Pattern 1: Foreign Key Constraint Violations (Most Common - 60%)",
-      "Pattern 2: Missing SEED_TEST_IDS Imports (30%)",
-      "Pattern 3: Database Trigger and Validation Failures (10%)"
-    ],
-    "phase3-task-breakdown/04-standardization/TASK_009_seed_test_ids_standardization.md": [
-      "TASK 009: SEED_TEST_IDS Standardization Across Test Suite",
-      "\ud83d\udee0\ufe0f PRIORITY: LOW - STANDARDIZATION AND MAINTENANCE",
-      "Objective",
-      "Scope",
-      "Primary Pattern: Hardcoded Test Values (111 failing tests across multiple files)",
-      "Error Patterns",
-      "Pattern 1: Hardcoded Organization IDs (Most Common - 40%)",
-      "Pattern 2: Hardcoded User IDs (30%)",
-      "Pattern 3: Hardcoded Machine/Issue IDs (20%)",
-      "Pattern 4: Inconsistent Mock Values (10%)"
-    ],
-    "phase3-task-breakdown/04-standardization/TASK_010_pure_function_cleanup.md": [
-      "TASK 010: Pure Function Unit Test Cleanup",
-      "\ud83d\udee0\ufe0f PRIORITY: LOW - FOUNDATIONAL TESTING STANDARDS",
-      "Objective",
-      "Scope",
-      "Primary Affected Files (14 failing tests total):",
-      "Related Utility Files Being Tested:",
-      "Error Patterns",
-      "Pattern 1: Missing SEED_TEST_IDS Usage (Most Common - 60%)",
-      "Pattern 2: Outdated Test Patterns (25%)",
-      "Pattern 3: Missing Test Utilities (10%)"
-    ],
     "scripts/README.md": [
       "Development Scripts",
       "Core Development Scripts",
@@ -4745,6 +4555,42 @@
       "Agent Workflow",
       "Database Management",
       "Usage Patterns"
+    ],
+    "src/lib/utils/README.md": [
+      "Utility Functions",
+      "Boundary Convention",
+      "When to Use Transformers",
+      "Examples",
+      "Type Safety",
+      "Important Notes",
+      "Available Utilities",
+      "Case Transformers (`case-transformers.ts`)",
+      "Membership Transformers (`membership-transformers.ts`)",
+      "Other Utilities"
+    ],
+    "src/server/db/seed/README.md": [
+      "Seed Data Management Scripts",
+      "\ud83d\ude80 Quick Start",
+      "Load minimal seed data (foundation for all testing)",
+      "Load full seed data (minimal + extended demo data)",
+      "Reset database and reload minimal seed",
+      "Generate SQL constants from TypeScript",
+      "\ud83d\udcc1 File Structure",
+      "\ud83c\udfd7\ufe0f Seed Data Architecture",
+      "**Two-Tier System**",
+      "**Predictable IDs**"
+    ],
+    "src/test/README.md": [
+      "Test Infrastructure Documentation",
+      "Structure",
+      "Testing Archetypes",
+      "1. Service Layer Testing",
+      "2. Anonymous User RLS Testing",
+      "Key Testing Patterns",
+      "Organization Scoping Validation",
+      "Cross-Organization Security Testing",
+      "RLS Policy Testing",
+      "Test Data Constants"
     ],
     "supabase/tests/rls/README.md": [
       "pgTAP RLS Testing Guide",
@@ -4760,48 +4606,6 @@
     ]
   },
   "deps": {
-    "scripts/convert-snake-case.ts": [
-      "node:fs",
-      "node:fs/promises",
-      "node:path",
-      "node:child_process"
-    ],
-    "src/server/db/seed/auth-users.ts": [
-      "@supabase/supabase-js",
-      "nanoid",
-      "~/server/db/drizzle",
-      "src/server/db/seed/constants.ts",
-      "src/server/db/seed/seed-utilities.ts",
-      "~/server/db/schema",
-      "drizzle-orm"
-    ],
-    "src/server/db/seed/full-issues.ts": ["src/server/db/seed/constants.ts"],
-    "src/server/db/seed/index.ts": [
-      "~/lib/environment",
-      "src/server/db/seed/seed-utilities.ts",
-      "src/server/db/seed/infrastructure.ts",
-      "src/server/db/seed/auth-users.ts",
-      "src/server/db/seed/sample-data.ts"
-    ],
-    "src/server/db/seed/infrastructure.ts": [
-      "drizzle-orm",
-      "~/server/db/drizzle",
-      "src/server/db/seed/constants.ts",
-      "src/server/db/seed/seed-utilities.ts",
-      "~/server/db/schema",
-      "~/server/auth/permissions.constants"
-    ],
-    "src/server/db/seed/sample-data.ts": [
-      "drizzle-orm",
-      "~/server/db/drizzle",
-      "src/server/db/seed/constants.ts",
-      "src/server/db/seed/seed-utilities.ts",
-      "~/server/db/schema",
-      "src/server/db/seed/minimal-issues.ts",
-      "src/server/db/seed/full-issues.ts"
-    ],
-    "src/server/db/seed/seed-utilities.ts": ["src/server/db/seed/constants.ts"],
-    "src/server/db/setup-rls.ts": ["dotenv", "fs", "url", "path", "postgres"],
     ".archived-tests-2025-08-23/e2e/helpers/auth.ts": ["@playwright/test"],
     ".archived-tests-2025-08-23/e2e/helpers/unified-dashboard.ts": [
       "@playwright/test"
@@ -5234,12 +5038,18 @@
       ".archived-tests-2025-08-23/src/test/constants/seed-test-ids.ts"
     ],
     ".archived-tests-2025-08-23/src/test/vitestMockContext.ts": ["vitest"],
-    "analyze-type-warnings.js": ["eslint", "path", "url"],
+    "e2e/helpers/unified-dashboard.ts": ["@playwright/test"],
     "middleware.ts": [
       "@supabase/ssr",
       "next/server",
       "~/env",
       "~/lib/environment"
+    ],
+    "scripts/convert-snake-case.ts": [
+      "node:fs",
+      "node:fs/promises",
+      "node:path",
+      "node:child_process"
     ],
     "scripts/generate-sql-constants.ts": [
       "fs",
@@ -5280,6 +5090,7 @@
       "next/server",
       "~/env",
       "~/lib/environment",
+      "~/lib/utils/case-transformers",
       "~/server/auth/supabase",
       "~/server/db/provider",
       "~/server/db/schema"
@@ -5528,14 +5339,14 @@
       "react",
       "~/components/permissions",
       "~/trpc/react",
-      "~/types/issue"
+      "~/lib/types/api"
     ],
     "src/components/issues/IssueComments.tsx": [
       "@mui/material",
       "react",
       "~/components/permissions",
       "~/trpc/react",
-      "~/types/issue"
+      "~/lib/types/api"
     ],
     "src/components/issues/IssueCreateForm.tsx": [
       "@mui/material",
@@ -5552,11 +5363,7 @@
       "src/components/issues/IssueCreateForm.tsx",
       "src/components/issues/RecentIssuesSidebar.tsx"
     ],
-    "src/components/issues/IssueDetail.tsx": [
-      "@mui/material",
-      "react",
-      "~/types/issue"
-    ],
+    "src/components/issues/IssueDetail.tsx": ["@mui/material", "react"],
     "src/components/issues/IssueDetailView.tsx": [
       "@mui/material",
       "@mui/material/Grid",
@@ -5569,13 +5376,13 @@
       "src/components/issues/IssueTimeline.tsx",
       "~/components/permissions",
       "~/hooks/usePermissions",
-      "~/trpc/react",
-      "~/types/issue"
+      "~/trpc/react"
     ],
     "src/components/issues/IssueList.tsx": [
       "@mui/icons-material",
       "@mui/material",
       "next/navigation",
+      "next/link",
       "react",
       "src/components/issues/ActiveFilters.tsx",
       "src/components/issues/FilterToolbar.tsx",
@@ -5591,12 +5398,12 @@
       "react",
       "react",
       "~/trpc/react",
-      "~/types/issue"
+      "~/lib/types/api"
     ],
     "src/components/issues/IssueTimeline.tsx": [
       "@mui/icons-material",
       "@mui/material",
-      "~/types/issue"
+      "~/lib/types/api"
     ],
     "src/components/issues/MachineSelector.tsx": [
       "@mui/material",
@@ -5724,7 +5531,20 @@
     "src/lib/supabase/server.ts": ["@supabase/ssr", "next/headers", "~/env"],
     "src/lib/temp-production-overrides.ts": ["~/env"],
     "src/lib/tracing.ts": ["async_hooks", "uuid", "~/lib/logger-constants"],
+    "src/lib/utils/api-response-transformers.ts": [
+      "src/lib/utils/case-transformers.ts"
+    ],
+    "src/lib/utils/auth-response-transformers.ts": [
+      "src/lib/utils/case-transformers.ts"
+    ],
+    "src/lib/utils/case-transformers.ts": ["drizzle-orm"],
     "src/lib/utils/id-generation.ts": ["uuid"],
+    "src/lib/utils/machine-response-transformers.ts": [
+      "src/lib/utils/case-transformers.ts"
+    ],
+    "src/lib/utils/membership-transformers.ts": [
+      "src/lib/utils/case-transformers.ts"
+    ],
     "src/server/api/routers/issue.comment.ts": [
       "@trpc/server",
       "drizzle-orm",
@@ -5732,6 +5552,8 @@
       "src/server/api/routers/utils/commentService.ts",
       "src/server/api/routers/utils/commentValidation.ts",
       "~/lib/utils/id-generation",
+      "~/lib/utils/case-transformers",
+      "~/lib/utils/api-response-transformers",
       "~/server/api/trpc",
       "~/server/db/schema"
     ],
@@ -5739,6 +5561,7 @@
       "drizzle-orm",
       "uuid",
       "zod",
+      "~/lib/utils/case-transformers",
       "~/server/api/trpc",
       "~/server/db/schema/issues"
     ],
@@ -5746,17 +5569,18 @@
       "@trpc/server",
       "drizzle-orm",
       "zod",
-      "src/server/api/trpc.ts",
-      "src/server/api/trpc.permission.ts",
-      "~/lib/users/roleManagementValidation",
       "~/lib/utils/id-generation",
+      "~/lib/users/roleManagementValidation",
       "~/server/auth/permissions.constants",
+      "~/server/api/trpc",
+      "~/server/api/trpc.permission",
       "~/server/db/schema",
-      "~/server/services/roleService"
+      "~/server/db/types"
     ],
     "src/server/api/routers/utils/commentService.ts": [
       "drizzle-orm",
-      "~/server/db/schema"
+      "~/server/db/schema",
+      "~/lib/utils/case-transformers"
     ],
     "src/server/api/trpc.base.ts": [
       "@trpc/server",
@@ -5788,13 +5612,13 @@
       "~/server/db/schema"
     ],
     "src/server/auth/supabase.ts": ["~/lib/logger", "~/lib/supabase/server"],
-    "src/server/auth/types.ts": ["~/server/db/schema"],
     "src/server/auth/uploadAuth.ts": [
       "@trpc/server",
       "drizzle-orm",
       "next/server",
       "src/server/auth/supabase.ts",
       "src/server/auth/types.ts",
+      "~/lib/utils/case-transformers",
       "~/env",
       "~/server/db/schema"
     ],
@@ -5814,16 +5638,79 @@
       "~/lib/environment"
     ],
     "src/server/db/provider.ts": ["~/server/db/drizzle"],
-    "src/server/db/utils/common-queries.ts": ["drizzle-orm"],
+    "src/server/db/queries/audit-queries.ts": [
+      "~/server/db/provider",
+      "~/server/db/schema",
+      "drizzle-orm"
+    ],
+    "src/server/db/seed/auth-users.ts": [
+      "@supabase/supabase-js",
+      "nanoid",
+      "~/server/db/drizzle",
+      "~/env.js",
+      "src/server/db/seed/constants.ts",
+      "src/server/db/seed/seed-utilities.ts",
+      "~/server/db/schema",
+      "drizzle-orm"
+    ],
+    "src/server/db/seed/full-issues.ts": ["src/server/db/seed/constants.ts"],
+    "src/server/db/seed/index.ts": [
+      "~/lib/environment",
+      "~/env.js",
+      "src/server/db/seed/seed-utilities.ts",
+      "src/server/db/seed/infrastructure.ts",
+      "src/server/db/seed/auth-users.ts",
+      "src/server/db/seed/sample-data.ts"
+    ],
+    "src/server/db/seed/infrastructure.ts": [
+      "drizzle-orm",
+      "~/server/db/drizzle",
+      "src/server/db/seed/constants.ts",
+      "src/server/db/seed/seed-utilities.ts",
+      "~/server/db/schema",
+      "~/server/auth/permissions.constants"
+    ],
+    "src/server/db/seed/sample-data.ts": [
+      "drizzle-orm",
+      "~/server/db/drizzle",
+      "src/server/db/seed/constants.ts",
+      "src/server/db/seed/seed-utilities.ts",
+      "~/server/db/schema",
+      "src/server/db/seed/minimal-issues.ts",
+      "src/server/db/seed/full-issues.ts"
+    ],
+    "src/server/db/seed/seed-utilities.ts": [
+      "src/server/db/seed/constants.ts",
+      "~/env.js"
+    ],
+    "src/server/db/setup-rls.ts": [
+      "dotenv",
+      "~/env.js",
+      "fs",
+      "url",
+      "path",
+      "postgres"
+    ],
+    "src/server/db/utils/common-queries.ts": [
+      "drizzle-orm",
+      "src/server/db/utils/field-validation.ts",
+      "~/env.js"
+    ],
+    "src/server/db/utils/field-validation.ts": ["~/env.js"],
     "src/server/db/utils/role-validation.ts": [
       "@trpc/server",
       "drizzle-orm",
       "~/server/auth/permissions.constants",
       "~/server/db/schema"
     ],
+    "src/server/services/collectionService.service.test.ts": [
+      "vitest",
+      "src/server/services/collectionService.ts",
+      "~/test/helpers/service-test-helpers"
+    ],
     "src/server/services/collectionService.ts": [
       "drizzle-orm",
-      "src/lib/utils/id-generation.ts"
+      "~/lib/utils/id-generation"
     ],
     "src/server/services/commentCleanupService.ts": [
       "drizzle-orm",
@@ -5838,7 +5725,8 @@
       "src/server/services/issueActivityService.ts",
       "src/server/services/notificationService.ts",
       "src/server/services/pinballmapService.ts",
-      "src/server/services/qrCodeService.ts"
+      "src/server/services/qrCodeService.ts",
+      "src/server/services/roleService.ts"
     ],
     "src/server/services/issueActivityService.ts": [
       "drizzle-orm",
@@ -5866,8 +5754,8 @@
     "src/server/services/qrCodeService.ts": [
       "drizzle-orm",
       "qrcode",
-      "src/lib/image-storage/local-storage.ts",
-      "src/lib/logger.ts",
+      "~/lib/image-storage/local-storage",
+      "~/lib/logger",
       "src/server/db/drizzle.ts",
       "src/server/utils/qrCodeUtils.ts"
     ],
@@ -5879,6 +5767,32 @@
       "~/lib/utils/id-generation",
       "~/server/db/drizzle",
       "~/server/db/schema"
+    ],
+    "src/server/services/types.ts": [
+      "~/server/db/schema/collections",
+      "~/server/db/schema/issues"
+    ],
+    "src/server/services/validation-helper.ts": ["~/env.js"],
+    "src/test/archived-templates/service.test.template.ts": [
+      "vitest",
+      "@trpc/server",
+      "src/test/helpers/service-test-helpers.ts"
+    ],
+    "src/test/helpers/anonymous-test-helpers.ts": [
+      "vitest",
+      "vitest-mock-extended",
+      "src/test/constants/seed-test-ids.ts",
+      "src/test/helpers/service-test-helpers.ts"
+    ],
+    "src/test/helpers/service-test-helpers.ts": [
+      "vitest",
+      "vitest-mock-extended",
+      "src/test/constants/seed-test-ids.ts"
+    ],
+    "src/test/templates/service.test.template.ts": [
+      "vitest",
+      "@trpc/server",
+      "~/test/helpers/service-test-helpers"
     ],
     "src/trpc/query-client.ts": ["@tanstack/react-query", "superjson"],
     "src/trpc/react.tsx": [
@@ -5895,10 +5809,6 @@
     ]
   },
   "dir_purposes": {
-    "docs/quick-reference": "Test files and test utilities",
-    "docs": "Project documentation",
-    "scripts": "Build and utility scripts",
-    "src": "Source code root directory",
     ".archived-tests-2025-08-23": "Test files and test utilities",
     ".archived-tests-2025-08-23/config": "Configuration files and settings",
     ".archived-tests-2025-08-23/e2e": "Test files and test utilities",
@@ -5942,6 +5852,7 @@
     ".archived-tests-2025-08-23/src/test/setup": "Test files and test utilities",
     ".archived-tests-2025-08-23/src/test/templates": "Test files and test utilities",
     ".archived-tests-2025-08-23/src/test/utils": "Shared utility functions and helpers",
+    "docs": "Project documentation",
     "docs/architecture": "API routes and endpoints",
     "docs/configuration": "Configuration files and settings",
     "docs/deprecated": "Test files and test utilities",
@@ -5949,15 +5860,14 @@
     "docs/design-docs": "Project documentation",
     "docs/latest-updates": "Test files and test utilities",
     "docs/lessons-learned": "API routes and endpoints",
-    "docs/orchestrator-system": "Test files and test utilities",
     "docs/planning/archive": "Test files and test utilities",
+    "docs/quick-reference": "Test files and test utilities",
     "docs/security": "Test files and test utilities",
     "docs/testing": "Test files and test utilities",
+    "e2e/helpers": "Helper functions and utilities",
     "e2e": "Test files and test utilities",
-    "migration-plan-v2": "Test files and test utilities",
-    "phase3-task-breakdown/02-high-impact-patterns": "API routes and endpoints",
-    "phase3-task-breakdown/03-medium-priority": "UI components",
-    "phase3-task-breakdown/04-standardization": "Test files and test utilities",
+    "scripts": "Build and utility scripts",
+    "src": "Source code root directory",
     "src/app/_components": "Reusable UI components",
     "src/app/api/dev/users": "API routes and endpoints",
     "src/app/api/health": "API routes and endpoints",
@@ -5971,17 +5881,24 @@
     "src/lib": "Library code and shared modules",
     "src/lib/common/__tests__": "Test files and test utilities",
     "src/lib/utils": "Shared utility functions and helpers",
+    "src/lib/utils/__tests__": "Test files and test utilities",
     "src/server/api": "API endpoints and route handlers",
     "src/server/api/routers": "Data models and schemas",
     "src/server/api/routers/utils": "Shared utility functions and helpers",
     "src/server/auth": "Authentication and authorization logic",
+    "src/server/db/utils/__tests__": "Test files and test utilities",
     "src/server/db/utils": "Shared utility functions and helpers",
     "src/server/services": "Business logic and external service integrations",
     "src/server/utils": "Shared utility functions and helpers",
+    "src/test": "Test files and test utilities",
+    "src/test/archived-templates": "Test files and test utilities",
+    "src/test/constants": "Test files and test utilities",
+    "src/test/helpers": "Helper functions and utilities",
+    "src/test/templates": "Test files and test utilities",
     "src/utils": "Shared utility functions and helpers",
     "supabase/tests": "Test files and test utilities",
     "supabase/tests/rls": "Test files and test utilities",
     "supabase/tests/setup": "Test files and test utilities"
   },
-  "staleness": 1755439811.21671
+  "staleness": 1755511816.440679
 }

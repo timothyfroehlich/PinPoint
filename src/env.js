@@ -74,6 +74,10 @@ export const env = createEnv({
       getEnvironmentType() === "test"
         ? z.string().optional()
         : z.string().min(1, "Supabase JWT secret is required"),
+    SUPABASE_DB_URL:
+      getEnvironmentType() === "test"
+        ? z.string().url().optional()
+        : z.string().url().optional(), // Direct database connection URL
     // Future API keys mentioned in the issue (optional for now)
     PINBALL_MAP_API_KEY: z.string().optional(),
     OPDB_API_KEY: z.string().optional(),
@@ -89,6 +93,9 @@ export const env = createEnv({
     LOG_LEVEL: z
       .enum(["trace", "debug", "info", "warn", "error", "fatal"])
       .optional(),
+    // Test environment variables
+    VITEST: z.string().optional(), // Set by Vitest test runner
+    CI: z.string().optional(), // Set by CI environments
   },
 
   /**
@@ -145,6 +152,7 @@ export const env = createEnv({
     SUPABASE_URL: process.env["SUPABASE_URL"],
     SUPABASE_SECRET_KEY: process.env["SUPABASE_SECRET_KEY"],
     SUPABASE_JWT_SECRET: process.env["SUPABASE_JWT_SECRET"],
+    SUPABASE_DB_URL: process.env["SUPABASE_DB_URL"],
     // Client-side environment variables
     NEXT_PUBLIC_VERCEL_ENV: process.env["NEXT_PUBLIC_VERCEL_ENV"],
     NEXT_PUBLIC_SUPABASE_URL: process.env["NEXT_PUBLIC_SUPABASE_URL"],
@@ -152,6 +160,9 @@ export const env = createEnv({
       process.env["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"],
     // Logging configuration
     LOG_LEVEL: process.env["LOG_LEVEL"],
+    // Test environment variables
+    VITEST: process.env["VITEST"],
+    CI: process.env["CI"],
     NEXT_PUBLIC_ENABLE_DEV_FEATURES:
       process.env["NEXT_PUBLIC_ENABLE_DEV_FEATURES"],
     // Next.js automatically exposes NODE_ENV to the client

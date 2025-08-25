@@ -3,6 +3,8 @@ import { count, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { generatePrefixedId } from "~/lib/utils/id-generation";
+import { transformAttachmentResponse } from "~/lib/utils/api-response-transformers";
+import { type AttachmentResponse } from "~/lib/types/api";
 import { createTRPCRouter } from "~/server/api/trpc";
 import {
   attachmentCreateProcedure,
@@ -21,7 +23,7 @@ export const issueAttachmentRouter = createTRPCRouter({
         fileType: z.string(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }): Promise<AttachmentResponse> => {
       // Verify the issue exists (RLS handles org scoping)
       const [existingIssue] = await ctx.db
         .select({
@@ -42,7 +44,7 @@ export const issueAttachmentRouter = createTRPCRouter({
       const [attachmentCountResult] = await ctx.db
         .select({ count: count() })
         .from(attachments)
-        .where(eq(attachments.issueId, input.issueId));
+        .where(eq(attachments.issue_id, input.issueId));
 
       const existingAttachments = attachmentCountResult?.count ?? 0;
 
@@ -66,7 +68,14 @@ export const issueAttachmentRouter = createTRPCRouter({
         })
         .returning();
 
-      return newAttachment;
+      if (!newAttachment) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to create attachment",
+        });
+      }
+
+      return transformAttachmentResponse(newAttachment);
     }),
 
   // Delete attachment from an issue
@@ -76,16 +85,16 @@ export const issueAttachmentRouter = createTRPCRouter({
         attachmentId: z.string(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }): Promise<AttachmentResponse> => {
       // Find the attachment (RLS handles org scoping)
       const [attachment] = await ctx.db
         .select({
           id: attachments.id,
           url: attachments.url,
-          fileName: attachments.fileName,
-          fileType: attachments.fileType,
-          issueId: attachments.issueId,
-          createdAt: attachments.createdAt,
+          file_name: attachments.file_name,
+          file_type: attachments.file_type,
+          issue_id: attachments.issue_id,
+          created_at: attachments.created_at,
         })
         .from(attachments)
         .where(eq(attachments.id, input.attachmentId))
@@ -112,6 +121,13 @@ export const issueAttachmentRouter = createTRPCRouter({
         .where(eq(attachments.id, input.attachmentId))
         .returning();
 
-      return deletedAttachment;
+      if (!deletedAttachment) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to delete attachment",
+        });
+      }
+
+      return transformAttachmentResponse(deletedAttachment);
     }),
 });

@@ -55,7 +55,7 @@ SELECT results_eq(
 
 -- Test 6: Test with invalid organization context
 SET LOCAL role = 'authenticated';
-SELECT set_jwt_claims_for_test('invalid-org-id', 'test-user', 'member', ARRAY['issue:view']);
+SELECT set_jwt_claims_for_test('invalid-org-id', '99999999-9999-9999-9999-999999999999', 'member', ARRAY['issue:view']);
 SELECT results_eq(
   'SELECT COUNT(*)::integer FROM organizations',
   'VALUES (0)',

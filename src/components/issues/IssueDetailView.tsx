@@ -21,11 +21,11 @@ import { IssueStatusControl } from "./IssueStatusControl";
 import { IssueTimeline } from "./IssueTimeline";
 
 import type { PinPointSupabaseUser } from "~/lib/supabase/types";
+import type { IssueWithDetails } from "~/lib/types/api";
 
 import { PermissionGate } from "~/components/permissions";
 import { usePermissions } from "~/hooks/usePermissions";
 import { api } from "~/trpc/react";
-import { type IssueWithDetails } from "~/types/issue";
 
 interface IssueDetailViewProps {
   issue: IssueWithDetails;
@@ -190,7 +190,7 @@ export function IssueDetailView({
                   Created
                 </Typography>
                 <Typography variant="body1" data-testid="issue-created-date">
-                  {new Date(currentIssue.created_at).toLocaleDateString()}
+                  {new Date(currentIssue.createdAt).toLocaleDateString()}
                 </Typography>
               </Box>
 
@@ -199,7 +199,7 @@ export function IssueDetailView({
                   Last Updated
                 </Typography>
                 <Typography variant="body1" data-testid="issue-last-updated">
-                  {new Date(currentIssue.updated_at).toLocaleDateString()}
+                  {new Date(currentIssue.updatedAt).toLocaleDateString()}
                 </Typography>
               </Box>
 
@@ -219,8 +219,8 @@ export function IssueDetailView({
                   Created By
                 </Typography>
                 <Typography variant="body1" data-testid="issue-created-by">
-                  {currentIssue.createdBy?.name ??
-                    currentIssue.submitter_name ??
+                  {currentIssue.createdBy.name ??
+                    currentIssue.submitterName ??
                     "Anonymous User"}
                 </Typography>
               </Box>

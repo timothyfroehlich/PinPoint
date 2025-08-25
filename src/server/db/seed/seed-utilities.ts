@@ -12,6 +12,7 @@
  */
 
 import { SEED_TEST_IDS, STATIC_MAPPINGS } from "./constants";
+import { env } from "~/env.js";
 
 // ============================================================================
 // Types & Interfaces
@@ -47,8 +48,7 @@ export interface SeedConfig {
 // ============================================================================
 
 export class SeedLogger {
-  private static isTestMode =
-    process.env.NODE_ENV === "test" || process.env.VITEST;
+  private static isTestMode = env.NODE_ENV === "test" || Boolean(env.VITEST);
 
   /**
    * Log minimal progress message
@@ -152,20 +152,20 @@ export class SeedValidator {
     // Parameter validation
     if (!this.validateTarget(params.target)) {
       errors.push(
-        `Invalid target: ${params.target}. Valid targets: ${this.VALID_TARGETS.join(", ")}`,
+        `Invalid target: ${String(params.target)}. Valid targets: ${this.VALID_TARGETS.join(", ")}`,
       );
     }
 
     if (!this.validateDataAmount(params.dataAmount)) {
       errors.push(
-        `Invalid data amount: ${params.dataAmount}. Valid amounts: ${this.VALID_DATA_AMOUNTS.join(", ")}`,
+        `Invalid data amount: ${String(params.dataAmount)}. Valid amounts: ${this.VALID_DATA_AMOUNTS.join(", ")}`,
       );
     }
 
     // Environment validation
     if (this.validateTarget(params.target)) {
       const envValidation = this.validateEnvironment(
-        params.target as SeedTarget,
+        params.target,
         params.supabaseUrl,
       );
       errors.push(...envValidation.errors);
@@ -221,7 +221,10 @@ export class SeedMapper {
    * Replaces switch statements with mapping object lookups
    */
   static getMembershipId(email: string, organization_id: string): string {
-    const mapping = STATIC_MAPPINGS.EMAIL_TO_MEMBERSHIP[email];
+    const mapping =
+      STATIC_MAPPINGS.EMAIL_TO_MEMBERSHIP[
+        email as keyof typeof STATIC_MAPPINGS.EMAIL_TO_MEMBERSHIP
+      ];
     if (!mapping) {
       throw new SeedError(
         "MAPPER",
@@ -238,7 +241,10 @@ export class SeedMapper {
    * Replaces switch statements with mapping object lookups
    */
   static getPriorityId(priorityName: string, organization_id: string): string {
-    const mapping = STATIC_MAPPINGS.PRIORITY_NAMES[priorityName];
+    const mapping =
+      STATIC_MAPPINGS.PRIORITY_NAMES[
+        priorityName as keyof typeof STATIC_MAPPINGS.PRIORITY_NAMES
+      ];
     if (!mapping) {
       throw new SeedError(
         "MAPPER",
@@ -255,7 +261,10 @@ export class SeedMapper {
    * Replaces switch statements with mapping object lookups
    */
   static getStatusId(statusName: string, organization_id: string): string {
-    const mapping = STATIC_MAPPINGS.STATUS_NAMES[statusName];
+    const mapping =
+      STATIC_MAPPINGS.STATUS_NAMES[
+        statusName as keyof typeof STATIC_MAPPINGS.STATUS_NAMES
+      ];
     if (!mapping) {
       throw new SeedError(
         "MAPPER",
@@ -271,7 +280,10 @@ export class SeedMapper {
    * Get role ID for role name and organization
    */
   static getRoleId(roleName: string, organization_id: string): string {
-    const mapping = STATIC_MAPPINGS.ROLE_NAMES[roleName];
+    const mapping =
+      STATIC_MAPPINGS.ROLE_NAMES[
+        roleName as keyof typeof STATIC_MAPPINGS.ROLE_NAMES
+      ];
     if (!mapping) {
       throw new SeedError(
         "MAPPER",
@@ -291,7 +303,10 @@ export class SeedMapper {
     typeName: string,
     organization_id: string,
   ): string {
-    const mapping = STATIC_MAPPINGS.COLLECTION_TYPE_NAMES[typeName];
+    const mapping =
+      STATIC_MAPPINGS.COLLECTION_TYPE_NAMES[
+        typeName as keyof typeof STATIC_MAPPINGS.COLLECTION_TYPE_NAMES
+      ];
     if (!mapping) {
       throw new SeedError(
         "MAPPER",
@@ -376,17 +391,17 @@ export class SeedConfigBuilder {
     return builder;
   }
 
-  withDataAmount(dataAmount: DataAmount): SeedConfigBuilder {
+  withDataAmount(dataAmount: DataAmount): this {
     this.config.dataAmount = dataAmount;
     return this;
   }
 
-  withEnvironment(environment: string): SeedConfigBuilder {
+  withEnvironment(environment: string): this {
     this.config.environment = environment;
     return this;
   }
 
-  withSupabaseUrl(supabaseUrl: string): SeedConfigBuilder {
+  withSupabaseUrl(supabaseUrl: string): this {
     this.config.supabaseUrl = supabaseUrl;
     return this;
   }
@@ -401,14 +416,19 @@ export class SeedConfigBuilder {
       );
     }
 
-    return {
+    const config: SeedConfig = {
       target,
       dataAmount,
       environment,
-      supabaseUrl,
       requiresAuth: target !== "local:pg",
       requiresConfirmation: target === "preview",
     };
+
+    if (supabaseUrl) {
+      config.supabaseUrl = supabaseUrl;
+    }
+
+    return config;
   }
 }
 
@@ -416,18 +436,18 @@ export class SeedConfigBuilder {
 // Safety & Confirmation Utilities
 // ============================================================================
 
-export class SeedSafety {
-  /**
-   * Show safety warning and require confirmation for destructive operations
-   */
-  static async confirmDestructiveOperation(target: SeedTarget): Promise<void> {
-    if (target !== "preview") return;
+/**
+ * Show safety warning and require confirmation for destructive operations
+ */
+export async function confirmDestructiveOperation(
+  target: SeedTarget,
+): Promise<void> {
+  if (target !== "preview") return;
 
-    SeedLogger.warn(
-      "PREVIEW MODE - Will delete existing dev users! (3s to abort...)",
-    );
+  SeedLogger.warn(
+    "PREVIEW MODE - Will delete existing dev users! (3s to abort...)",
+  );
 
-    // Add brief delay for manual cancellation
-    await new Promise((resolve) => setTimeout(resolve, 3000));
-  }
+  // Add brief delay for manual cancellation
+  await new Promise((resolve) => setTimeout(resolve, 3000));
 }

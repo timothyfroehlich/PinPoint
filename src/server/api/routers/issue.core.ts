@@ -1,22 +1,47 @@
+// External libraries (alphabetical)
 import { TRPCError } from "@trpc/server";
 import { eq, inArray, sql, isNull, and } from "drizzle-orm";
 import { z } from "zod";
 
+// Internal types (alphabetical)
+import type {
+  IssueAssignmentInput,
+  IssueCreationInput,
+  AssignmentValidationContext,
+} from "~/lib/issues/assignmentValidation";
+import type {
+  IssueWithRelationsResponse,
+  IssueResponse,
+} from "~/lib/types/api";
+
+// Internal utilities (alphabetical)
 import {
   validateIssueAssignment,
   validateIssueCreation,
-  type IssueAssignmentInput,
-  type IssueCreationInput,
-  type AssignmentValidationContext,
 } from "~/lib/issues/assignmentValidation";
 import {
   validateStatusTransition,
   getStatusChangeEffects,
 } from "~/lib/issues/statusValidation";
+import {
+  transformKeysToCamelCase,
+  transformKeysToSnakeCase,
+} from "~/lib/utils/case-transformers";
 import { generatePrefixedId } from "~/lib/utils/id-generation";
+
+// Server modules (alphabetical)
+import {
+  issueCreateSchema,
+  issueUpdateSchema,
+  issueFilterSchema,
+  issueAssignSchema,
+  issueStatusUpdateSchema,
+  publicIssueCreateSchema,
+} from "~/server/api/schemas/issue.schema";
 import {
   createTRPCRouter,
-  publicProcedure,
+  anonOrgScopedProcedure,
+  orgScopedProcedure,
   issueEditProcedure,
 } from "~/server/api/trpc";
 import {
@@ -24,36 +49,23 @@ import {
   issueAssignProcedure,
   issueViewProcedure,
 } from "~/server/api/trpc.permission";
+
+// Database schema (alphabetical)
 import {
-  issues,
-  machines,
-  issueStatuses,
-  priorities,
-  memberships,
-  comments,
   attachments,
+  comments,
+  issues,
+  issueStatuses,
+  machines,
+  memberships,
+  priorities,
 } from "~/server/db/schema";
 
 export const issueCoreRouter = createTRPCRouter({
   // Public issue creation for anonymous users (via QR codes)
-  publicCreate: publicProcedure
-    .input(
-      z.object({
-        title: z.string().min(1).max(255),
-        description: z.string().optional(),
-        machineId: z.string(),
-        reporterEmail: z.email().optional(),
-        submitterName: z.string().optional(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      // Organization is guaranteed by publicProcedure middleware via subdomain
-      const organization = ctx.organization;
-
-      if (!organization) {
-        throw new Error("Organization not found");
-      }
-
+  publicCreate: anonOrgScopedProcedure
+    .input(publicIssueCreateSchema)
+    .mutation(async ({ ctx, input }): Promise<IssueWithRelationsResponse> => {
       // Get machine, status, and priority for validation (RLS handles org scoping)
       const machine = await ctx.db.query.machines.findFirst({
         where: eq(machines.id, input.machineId),
@@ -64,23 +76,23 @@ export const issueCoreRouter = createTRPCRouter({
 
       const defaultStatus = await ctx.db.query.issueStatuses.findFirst({
         where: and(
-          eq(issueStatuses.isDefault, true),
-          eq(issueStatuses.organization_id, organization.id),
+          eq(issueStatuses.is_default, true),
+          eq(issueStatuses.organization_id, ctx.organizationId),
         ),
       });
 
       const defaultPriority = await ctx.db.query.priorities.findFirst({
         where: and(
-          eq(priorities.isDefault, true),
-          eq(priorities.organization_id, organization.id),
+          eq(priorities.is_default, true),
+          eq(priorities.organization_id, ctx.organizationId),
         ),
       });
 
       // Create validation input (handle exactOptionalPropertyTypes)
       const baseValidationInput = {
         title: input.title,
-        machine_id: input.machineId,
-        organizationId: organization.id,
+        machineId: input.machineId,
+        organizationId: ctx.organizationId,
       };
 
       const validationInput: IssueCreationInput = {
@@ -91,30 +103,71 @@ export const issueCoreRouter = createTRPCRouter({
       };
 
       const context: AssignmentValidationContext = {
-        organizationId: organization.id,
+        organizationId: ctx.organizationId,
         actorUserId: "anonymous", // Anonymous user
         userPermissions: ["issue:create"], // Anonymous creation allowed
       };
 
+      // Transform machine data to camelCase for validation
+      const transformedMachine = machine
+        ? {
+            id: machine.id,
+            name: machine.name,
+            location: {
+              organizationId: machine.location.organization_id,
+            },
+          }
+        : null;
+
+      // Transform defaultStatus to camelCase for validation
+      const transformedDefaultStatus = defaultStatus
+        ? {
+            id: defaultStatus.id,
+            name: defaultStatus.name,
+            organizationId: defaultStatus.organization_id,
+            isDefault: defaultStatus.is_default,
+            category: defaultStatus.category,
+          }
+        : null;
+
+      // Transform defaultPriority to camelCase for validation
+      const transformedDefaultPriority = defaultPriority
+        ? {
+            id: defaultPriority.id,
+            name: defaultPriority.name,
+            organizationId: defaultPriority.organization_id,
+            isDefault: defaultPriority.is_default,
+          }
+        : null;
+
       // Validate issue creation using pure functions
       const validation = validateIssueCreation(
         validationInput,
-        machine ?? null,
-        defaultStatus ?? null,
-        defaultPriority ?? null,
+        transformedMachine,
+        transformedDefaultStatus,
+        transformedDefaultPriority,
         context,
       );
 
       if (!validation.valid) {
-        throw new Error(validation.error ?? "Issue creation validation failed");
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: validation.error ?? "Issue creation validation failed",
+        });
       }
 
       // Validation passed, so defaultStatus and defaultPriority are guaranteed to be non-null
       if (!defaultStatus) {
-        throw new Error("Default status validation failed");
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Default status validation failed",
+        });
       }
       if (!defaultPriority) {
-        throw new Error("Default priority validation failed");
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Default priority validation failed",
+        });
       }
 
       // Create the issue without a user (anonymous)
@@ -132,11 +185,11 @@ export const issueCoreRouter = createTRPCRouter({
       } = {
         id: generatePrefixedId("issue"),
         title: input.title,
-        created_by_id: null, // Anonymous issue
-        organizationId: organization.id,
-        machine_id: input.machineId,
-        status_id: defaultStatus.id,
-        priority_id: defaultPriority.id,
+        createdById: null, // Anonymous issue
+        organizationId: ctx.organizationId,
+        machineId: input.machineId,
+        statusId: defaultStatus.id,
+        priorityId: defaultPriority.id,
       };
 
       if (input.description) {
@@ -151,7 +204,7 @@ export const issueCoreRouter = createTRPCRouter({
         issueData.reporterEmail = input.reporterEmail;
       }
 
-      await ctx.db.insert(issues).values(issueData);
+      await ctx.db.insert(issues).values(transformKeysToSnakeCase(issueData));
 
       // Get issue with relations for return
       const issueWithRelations = await ctx.db.query.issues.findFirst({
@@ -176,7 +229,10 @@ export const issueCoreRouter = createTRPCRouter({
       });
 
       if (!issueWithRelations) {
-        throw new Error("Failed to create issue");
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to create issue",
+        });
       }
 
       // Note: Skip activity recording for anonymous issues
@@ -189,21 +245,20 @@ export const issueCoreRouter = createTRPCRouter({
         input.machineId,
       );
 
-      return issueWithRelations;
+      // Create properly mapped issue with comments having createdBy alias
+      const mappedIssue = {
+        ...issueWithRelations,
+        comments: [], // Issues without comment relations loaded
+        attachments: [], // Issues without attachment relations loaded
+      };
+
+      return transformKeysToCamelCase<IssueWithRelationsResponse>(mappedIssue);
     }),
   // Create issue - requires issue:create permission
   create: issueCreateProcedure
-    .input(
-      z.object({
-        title: z.string().min(1).max(255),
-        description: z.string().optional(),
-        severity: z.enum(["Low", "Medium", "High", "Critical"]).optional(),
-        machineId: z.string(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
+    .input(issueCreateSchema)
+    .mutation(async ({ ctx, input }): Promise<IssueWithRelationsResponse> => {
       // Organization is guaranteed by organizationProcedure middleware
-      const organization = ctx.organization;
 
       // Get machine, status, and priority for validation (RLS handles org scoping)
       const machine = await ctx.db.query.machines.findFirst({
@@ -215,24 +270,24 @@ export const issueCoreRouter = createTRPCRouter({
 
       const defaultStatus = await ctx.db.query.issueStatuses.findFirst({
         where: and(
-          eq(issueStatuses.isDefault, true),
-          eq(issueStatuses.organization_id, organization.id),
+          eq(issueStatuses.is_default, true),
+          eq(issueStatuses.organization_id, ctx.organizationId),
         ),
       });
 
       const defaultPriority = await ctx.db.query.priorities.findFirst({
         where: and(
-          eq(priorities.isDefault, true),
-          eq(priorities.organization_id, organization.id),
+          eq(priorities.is_default, true),
+          eq(priorities.organization_id, ctx.organizationId),
         ),
       });
 
       // Create validation input (handle exactOptionalPropertyTypes)
       const baseValidationInput = {
         title: input.title,
-        machine_id: input.machineId,
-        organizationId: organization.id,
-        created_by_id: ctx.user.id,
+        machineId: input.machineId,
+        organizationId: ctx.organizationId,
+        createdById: ctx.user.id,
       };
 
       const validationInput: IssueCreationInput = {
@@ -241,30 +296,71 @@ export const issueCoreRouter = createTRPCRouter({
       };
 
       const context: AssignmentValidationContext = {
-        organizationId: organization.id,
+        organizationId: ctx.organizationId,
         actorUserId: ctx.user.id,
         userPermissions: ctx.userPermissions,
       };
 
+      // Transform machine data to camelCase for validation
+      const transformedMachine = machine
+        ? {
+            id: machine.id,
+            name: machine.name,
+            location: {
+              organizationId: machine.location.organization_id,
+            },
+          }
+        : null;
+
+      // Transform defaultStatus to camelCase for validation
+      const transformedDefaultStatus = defaultStatus
+        ? {
+            id: defaultStatus.id,
+            name: defaultStatus.name,
+            organizationId: defaultStatus.organization_id,
+            isDefault: defaultStatus.is_default,
+            category: defaultStatus.category,
+          }
+        : null;
+
+      // Transform defaultPriority to camelCase for validation
+      const transformedDefaultPriority = defaultPriority
+        ? {
+            id: defaultPriority.id,
+            name: defaultPriority.name,
+            organizationId: defaultPriority.organization_id,
+            isDefault: defaultPriority.is_default,
+          }
+        : null;
+
       // Validate issue creation using pure functions
       const validation = validateIssueCreation(
         validationInput,
-        machine ?? null,
-        defaultStatus ?? null,
-        defaultPriority ?? null,
+        transformedMachine,
+        transformedDefaultStatus,
+        transformedDefaultPriority,
         context,
       );
 
       if (!validation.valid) {
-        throw new Error(validation.error ?? "Issue creation validation failed");
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: validation.error ?? "Issue creation validation failed",
+        });
       }
 
       // Validation passed, so defaultStatus and defaultPriority are guaranteed to be non-null
       if (!defaultStatus) {
-        throw new Error("Default status validation failed");
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Default status validation failed",
+        });
       }
       if (!defaultPriority) {
-        throw new Error("Default priority validation failed");
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Default priority validation failed",
+        });
       }
 
       // User is guaranteed to exist in protected procedure
@@ -284,17 +380,17 @@ export const issueCoreRouter = createTRPCRouter({
         id: generatePrefixedId("issue"),
         title: input.title,
         createdById,
-        organizationId: organization.id,
-        machine_id: input.machineId,
-        status_id: defaultStatus.id,
-        priority_id: defaultPriority.id,
+        organizationId: ctx.organizationId,
+        machineId: input.machineId,
+        statusId: defaultStatus.id,
+        priorityId: defaultPriority.id,
       };
 
       if (input.description) {
         issueData.description = input.description;
       }
 
-      await ctx.db.insert(issues).values(issueData);
+      await ctx.db.insert(issues).values(transformKeysToSnakeCase(issueData));
 
       // Get issue with relations for return
       const issueWithRelations = await ctx.db.query.issues.findFirst({
@@ -319,7 +415,10 @@ export const issueCoreRouter = createTRPCRouter({
       });
 
       if (!issueWithRelations) {
-        throw new Error("Failed to create issue");
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to create issue",
+        });
       }
 
       // Record the issue creation activity
@@ -333,148 +432,151 @@ export const issueCoreRouter = createTRPCRouter({
         input.machineId,
       );
 
-      return issueWithRelations;
+      // Create properly mapped issue with comments having createdBy alias
+      const mappedIssue = {
+        ...issueWithRelations,
+        comments: [], // Issues without comment relations loaded
+        attachments: [], // Issues without attachment relations loaded
+      };
+
+      return transformKeysToCamelCase<IssueWithRelationsResponse>(mappedIssue);
     }),
 
   // Assign issue to a user - requires issue:assign permission
   assign: issueAssignProcedure
-    .input(
-      z.object({
-        issueId: z.string(),
-        userId: z.string(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      // Get issue and membership for validation (organization scoped)
-      const issue = await ctx.db.query.issues.findFirst({
-        where: and(
-          eq(issues.id, input.issueId),
-          eq(issues.organization_id, ctx.organizationId),
-        ),
-      });
+    .input(issueAssignSchema)
+    .mutation(
+      async ({
+        ctx,
+        input,
+      }): Promise<{ success: boolean; issue: IssueResponse }> => {
+        // Get issue and membership for validation (organization scoped)
+        const issue = await ctx.db.query.issues.findFirst({
+          where: and(
+            eq(issues.id, input.issueId),
+            eq(issues.organization_id, ctx.organizationId),
+          ),
+        });
 
-      const membership = await ctx.db.query.memberships.findFirst({
-        where: eq(memberships.user_id, input.userId),
-        with: { user: true },
-      });
+        const membership = await ctx.db.query.memberships.findFirst({
+          where: eq(memberships.user_id, input.userId),
+          with: { user: true },
+        });
 
-      // Create validation input
-      const validationInput: IssueAssignmentInput = {
-        issueId: input.issueId,
-        userId: input.userId,
-        organizationId: ctx.organization.id,
-      };
+        // Create validation input
+        const validationInput: IssueAssignmentInput = {
+          issueId: input.issueId,
+          userId: input.userId,
+          organizationId: ctx.organizationId,
+        };
 
-      const context: AssignmentValidationContext = {
-        organizationId: ctx.organization.id,
-        actorUserId: ctx.user.id,
-        userPermissions: ctx.userPermissions,
-      };
+        const context: AssignmentValidationContext = {
+          organizationId: ctx.organizationId,
+          actorUserId: ctx.user.id,
+          userPermissions: ctx.userPermissions,
+        };
 
-      // Convert membership to validation format
-      const validationMembership = membership
-        ? {
-            id: membership.id,
-            userId: membership.userId,
-            organizationId: membership.organization_id,
-            roleId: membership.roleId,
-            user: {
-              id: membership.user.id,
-              name: membership.user.name,
-              email: membership.user.email ?? "",
-            },
-          }
-        : null;
+        // Convert membership to validation format
+        const validationMembership = membership
+          ? {
+              id: membership.id,
+              userId: membership.user_id,
+              organizationId: membership.organization_id,
+              roleId: membership.role_id,
+              user: {
+                id: membership.user.id,
+                name: membership.user.name,
+                email: membership.user.email ?? "",
+              },
+            }
+          : null;
 
-      // Validate issue assignment using pure functions
-      const validation = validateIssueAssignment(
-        validationInput,
-        issue ?? null,
-        validationMembership,
-        context,
-      );
+        // Transform issue data to camelCase for validation
+        const transformedIssue = issue
+          ? {
+              id: issue.id,
+              title: issue.title,
+              organizationId: issue.organization_id,
+              machineId: issue.machine_id,
+              assignedToId: issue.assigned_to_id,
+              statusId: issue.status_id,
+              createdById: issue.created_by_id,
+            }
+          : null;
 
-      if (!validation.valid) {
-        throw new Error(
-          validation.error ?? "Issue assignment validation failed",
+        // Validate issue assignment using pure functions
+        const validation = validateIssueAssignment(
+          validationInput,
+          transformedIssue,
+          validationMembership,
+          context,
         );
-      }
 
-      // Update the issue assignment
-      await ctx.db
-        .update(issues)
-        .set({ assigned_to_id: input.userId })
-        .where(eq(issues.id, input.issueId));
+        if (!validation.valid) {
+          throw new Error(
+            validation.error ?? "Issue assignment validation failed",
+          );
+        }
 
-      // Get updated issue with relations
-      const updatedIssue = await ctx.db.query.issues.findFirst({
-        where: eq(issues.id, input.issueId),
-        with: {
-          assignedTo: {
-            columns: {
-              id: true,
-              name: true,
-              email: true,
+        // Update the issue assignment
+        await ctx.db
+          .update(issues)
+          .set({ assigned_to_id: input.userId })
+          .where(eq(issues.id, input.issueId));
+
+        // Get updated issue with relations
+        const updatedIssue = await ctx.db.query.issues.findFirst({
+          where: eq(issues.id, input.issueId),
+          with: {
+            assignedTo: {
+              columns: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+            status: true,
+            createdBy: {
+              columns: {
+                id: true,
+                name: true,
+              },
+            },
+            machine: {
+              with: {
+                model: true,
+                location: true,
+              },
             },
           },
-          status: true,
-          createdBy: {
-            columns: {
-              id: true,
-              name: true,
-            },
-          },
-          machine: {
-            with: {
-              model: true,
-              location: true,
-            },
-          },
-        },
-      });
+        });
 
-      if (!updatedIssue) {
-        throw new Error("Failed to update issue");
-      }
+        if (!updatedIssue) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to update issue",
+          });
+        }
 
-      // Record the assignment activity
-      const activityService = ctx.services.createIssueActivityService();
-      await activityService.recordIssueAssigned(
-        input.issueId,
-        ctx.user.id,
-        input.userId,
-      );
+        // Record the assignment activity
+        const activityService = ctx.services.createIssueActivityService();
+        await activityService.recordIssueAssigned(
+          input.issueId,
+          ctx.user.id,
+          input.userId,
+        );
 
-      return {
-        success: true,
-        issue: updatedIssue,
-      };
-    }),
+        return {
+          success: true,
+          issue: transformKeysToCamelCase<IssueResponse>(updatedIssue),
+        };
+      },
+    ),
 
   // Get all issues for an organization
-  getAll: issueViewProcedure
-    .input(
-      z
-        .object({
-          locationId: z.string().optional(),
-          machineId: z.string().optional(),
-          statusIds: z.array(z.string()).optional(),
-          search: z.string().optional(),
-          assigneeId: z.string().optional(),
-          reporterId: z.string().optional(),
-          ownerId: z.string().optional(),
-          modelId: z.string().optional(),
-          // Legacy support
-          statusId: z.string().optional(),
-          statusCategory: z.enum(["NEW", "IN_PROGRESS", "RESOLVED"]).optional(),
-          sortBy: z
-            .enum(["created", "updated", "status", "severity", "game"])
-            .optional(),
-          sortOrder: z.enum(["asc", "desc"]).optional(),
-        })
-        .optional(),
-    )
-    .query(async ({ ctx, input }) => {
+  getAll: orgScopedProcedure
+    .input(issueFilterSchema.optional())
+    .query(async ({ ctx, input }): Promise<IssueWithRelationsResponse[]> => {
       // Build where conditions dynamically (RLS handles org scoping)
       const conditions = [];
 
@@ -585,24 +687,24 @@ export const issueCoreRouter = createTRPCRouter({
         issueIds.length > 0
           ? await ctx.db
               .select({
-                issueId: comments.issueId,
+                issueId: comments.issue_id,
                 count: sql<number>`count(*)`.as("count"),
               })
               .from(comments)
-              .where(inArray(comments.issueId, issueIds))
-              .groupBy(comments.issueId)
+              .where(inArray(comments.issue_id, issueIds))
+              .groupBy(comments.issue_id)
           : [];
 
       const attachmentCounts =
         issueIds.length > 0
           ? await ctx.db
               .select({
-                issueId: attachments.issueId,
+                issueId: attachments.issue_id,
                 count: sql<number>`count(*)`.as("count"),
               })
               .from(attachments)
-              .where(inArray(attachments.issueId, issueIds))
-              .groupBy(attachments.issueId)
+              .where(inArray(attachments.issue_id, issueIds))
+              .groupBy(attachments.issue_id)
           : [];
 
       // Map counts to issues
@@ -631,12 +733,12 @@ export const issueCoreRouter = createTRPCRouter({
 
         switch (sortBy) {
           case "created":
-            aValue = a.createdAt;
-            bValue = b.createdAt;
+            aValue = a.created_at;
+            bValue = b.created_at;
             break;
           case "updated":
-            aValue = a.updatedAt;
-            bValue = b.updatedAt;
+            aValue = a.updated_at;
+            bValue = b.updated_at;
             break;
           case "status":
             aValue = a.status.name;
@@ -651,8 +753,8 @@ export const issueCoreRouter = createTRPCRouter({
             bValue = b.machine.model.name;
             break;
           default:
-            aValue = a.createdAt;
-            bValue = b.createdAt;
+            aValue = a.created_at;
+            bValue = b.created_at;
         }
 
         if (sortOrder === "desc") {
@@ -662,13 +764,15 @@ export const issueCoreRouter = createTRPCRouter({
         }
       });
 
-      return resultsWithCounts;
+      return transformKeysToCamelCase<IssueWithRelationsResponse[]>(
+        resultsWithCounts,
+      );
     }),
 
   // Get a single issue by ID
   getById: issueViewProcedure
     .input(z.object({ id: z.string() }))
-    .query(async ({ ctx, input }) => {
+    .query(async ({ ctx, input }): Promise<IssueWithRelationsResponse> => {
       const issue = await ctx.db.query.issues.findFirst({
         where: and(
           eq(issues.id, input.id),
@@ -709,7 +813,7 @@ export const issueCoreRouter = createTRPCRouter({
                 },
               },
             },
-            orderBy: (comments, { asc }) => [asc(comments.createdAt)],
+            orderBy: (comments, { asc }) => [asc(comments.created_at)],
           },
           attachments: {
             orderBy: (attachments, { asc }) => [asc(attachments.id)],
@@ -733,21 +837,13 @@ export const issueCoreRouter = createTRPCRouter({
         })),
       };
 
-      return mappedIssue;
+      return transformKeysToCamelCase<IssueWithRelationsResponse>(mappedIssue);
     }),
 
   // Update issue (for members/admins)
   update: issueEditProcedure
-    .input(
-      z.object({
-        id: z.string(),
-        title: z.string().min(1).max(255).optional(),
-        description: z.string().optional(),
-        statusId: z.string().optional(),
-        assignedToId: z.string().optional(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
+    .input(issueUpdateSchema)
+    .mutation(async ({ ctx, input }): Promise<IssueWithRelationsResponse> => {
       // Verify the issue exists (organization scoped)
       const existingIssue = await ctx.db.query.issues.findFirst({
         where: and(
@@ -929,13 +1025,13 @@ export const issueCoreRouter = createTRPCRouter({
         );
       }
 
-      return updatedIssue;
+      return transformKeysToCamelCase<IssueWithRelationsResponse>(updatedIssue);
     }),
 
   // Close an issue (set status to resolved)
   close: issueEditProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }): Promise<IssueWithRelationsResponse> => {
       // Find the resolved status (RLS handles org scoping)
       const resolvedStatus = await ctx.db.query.issueStatuses.findFirst({
         where: eq(issueStatuses.category, "RESOLVED"),
@@ -953,7 +1049,7 @@ export const issueCoreRouter = createTRPCRouter({
         .update(issues)
         .set({
           status_id: resolvedStatus.id,
-          resolvedAt: new Date(),
+          resolved_at: new Date(),
         })
         .where(
           and(
@@ -1004,18 +1100,13 @@ export const issueCoreRouter = createTRPCRouter({
       const activityService = ctx.services.createIssueActivityService();
       await activityService.recordIssueResolved(input.id, ctx.user.id);
 
-      return updatedIssue;
+      return transformKeysToCamelCase<IssueWithRelationsResponse>(updatedIssue);
     }),
 
   // Update issue status
   updateStatus: issueEditProcedure
-    .input(
-      z.object({
-        id: z.string(),
-        statusId: z.string(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
+    .input(issueStatusUpdateSchema)
+    .mutation(async ({ ctx, input }): Promise<IssueWithRelationsResponse> => {
       // Verify the issue exists (organization scoped)
       const existingIssue = await ctx.db.query.issues.findFirst({
         where: and(
@@ -1051,30 +1142,36 @@ export const issueCoreRouter = createTRPCRouter({
       const userPermissions = ["issue:edit"] as const;
       const validationResult = validateStatusTransition(
         {
-          currentStatus: existingIssue.status,
+          currentStatus: transformKeysToCamelCase(existingIssue.status),
           newStatusId: input.statusId,
-          organizationId: ctx.organization.id,
+          organizationId: ctx.organizationId,
         },
-        newStatus,
+        transformKeysToCamelCase(newStatus),
         {
           userPermissions,
-          organizationId: ctx.organization.id,
+          organizationId: ctx.organizationId,
         },
       );
 
       if (!validationResult.valid) {
-        throw new Error(validationResult.error ?? "Invalid status transition");
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: validationResult.error ?? "Invalid status transition",
+        });
       }
 
       // Get status change effects using extracted function
-      const effects = getStatusChangeEffects(existingIssue.status, newStatus);
+      const effects = getStatusChangeEffects(
+        transformKeysToCamelCase(existingIssue.status),
+        transformKeysToCamelCase(newStatus),
+      );
 
       // Update the issue
       const updateData: Partial<typeof issues.$inferInsert> = {
         status_id: input.statusId,
       };
-      if (effects.shouldSetResolvedAt) updateData.resolvedAt = new Date();
-      if (effects.shouldClearResolvedAt) updateData.resolvedAt = null;
+      if (effects.shouldSetResolvedAt) updateData.resolved_at = new Date();
+      if (effects.shouldClearResolvedAt) updateData.resolved_at = null;
 
       await ctx.db
         .update(issues)
@@ -1144,35 +1241,13 @@ export const issueCoreRouter = createTRPCRouter({
         newStatus.name,
       );
 
-      return updatedIssue;
+      return transformKeysToCamelCase<IssueWithRelationsResponse>(updatedIssue);
     }),
 
   // Public procedure for getting issues (for anonymous users to see recent issues)
-  publicGetAll: publicProcedure
-    .input(
-      z
-        .object({
-          locationId: z.string().optional(),
-          machineId: z.string().optional(),
-          statusId: z.string().optional(),
-          modelId: z.string().optional(),
-          statusCategory: z.enum(["NEW", "IN_PROGRESS", "RESOLVED"]).optional(),
-          sortBy: z
-            .enum(["created", "updated", "status", "severity", "game"])
-            .optional(),
-          sortOrder: z.enum(["asc", "desc"]).optional(),
-          limit: z.number().min(1).max(100).optional(), // Limit for public access
-        })
-        .optional(),
-    )
-    .query(async ({ ctx, input }) => {
-      // Organization is guaranteed by publicProcedure middleware via subdomain
-      const organization = ctx.organization;
-
-      if (!organization) {
-        throw new Error("Organization not found");
-      }
-
+  publicGetAll: anonOrgScopedProcedure
+    .input(issueFilterSchema.optional())
+    .query(async ({ ctx, input }): Promise<IssueResponse[]> => {
       // Build where conditions dynamically (RLS handles org scoping)
       const conditions = [];
 
@@ -1192,9 +1267,9 @@ export const issueCoreRouter = createTRPCRouter({
           id: true,
           title: true,
           description: true,
-          createdAt: true,
-          updatedAt: true,
-          submitterName: true,
+          created_at: true,
+          updated_at: true,
+          submitter_name: true,
         },
         with: {
           status: true,
@@ -1255,12 +1330,12 @@ export const issueCoreRouter = createTRPCRouter({
 
         switch (sortBy) {
           case "created":
-            aValue = a.createdAt;
-            bValue = b.createdAt;
+            aValue = a.created_at;
+            bValue = b.created_at;
             break;
           case "updated":
-            aValue = a.updatedAt;
-            bValue = b.updatedAt;
+            aValue = a.updated_at;
+            bValue = b.updated_at;
             break;
           case "status":
             aValue = a.status.name;
@@ -1275,8 +1350,8 @@ export const issueCoreRouter = createTRPCRouter({
             bValue = b.machine.model.name;
             break;
           default:
-            aValue = a.createdAt;
-            bValue = b.createdAt;
+            aValue = a.created_at;
+            bValue = b.created_at;
         }
 
         if (sortOrder === "desc") {
@@ -1288,6 +1363,6 @@ export const issueCoreRouter = createTRPCRouter({
 
       // Apply limit
       const limit = input?.limit ?? 20;
-      return results.slice(0, limit);
+      return transformKeysToCamelCase<IssueResponse[]>(results.slice(0, limit));
     }),
 });

@@ -1,74 +1,130 @@
+// External libraries (alphabetical)
 import { TRPCError } from "@trpc/server";
-import { eq, asc, desc, isNull, and } from "drizzle-orm";
+import { and, asc, desc, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 
-import { createTRPCRouter, organizationProcedure } from "../trpc";
-
-import {
-  validateRoleAssignment,
-  validateUserRemoval,
-  validateRoleReassignment,
-  type RoleAssignmentInput,
-  type RoleReassignmentInput,
-  type RoleManagementContext,
+// Internal types (alphabetical)
+import type {
+  RoleAssignmentInput,
+  RoleManagementContext,
+  RoleReassignmentInput,
 } from "~/lib/users/roleManagementValidation";
+
+// Internal utilities (alphabetical)
 import { generatePrefixedId } from "~/lib/utils/id-generation";
 import {
   transformMembershipForValidation,
   transformMembershipsForValidation,
   transformRoleForValidation,
 } from "~/lib/utils/membership-transformers";
-import { users, memberships, roles } from "~/server/db/schema";
-import { ensureAtLeastOneAdmin } from "~/server/db/utils/role-validation";
+import {
+  validateRoleAssignment,
+  validateRoleReassignment,
+  validateUserRemoval,
+} from "~/lib/users/roleManagementValidation";
+
+// Server modules (alphabetical)
+import { createTRPCRouter, organizationProcedure } from "~/server/api/trpc";
+
+// Database schema (alphabetical)
+import { memberships, roles, users } from "~/server/db/schema";
+import { ensureAtLeastOneAdmin } from "~/server/db/utils";
+
+// Admin-specific interfaces
+interface AdminUserResponse {
+  userId: string;
+  email: string;
+  name: string;
+  profilePicture: string | null;
+  emailVerified: Date | null;
+  createdAt: Date;
+  membershipId: string;
+  role: {
+    id: string;
+    name: string;
+    isSystem: boolean;
+  };
+}
+
+interface AdminInvitationResponse {
+  userId: string;
+  email: string;
+  name: string;
+  createdAt: Date;
+  role: {
+    id: string;
+    name: string;
+  };
+  isInvitation?: boolean;
+}
+
+interface AdminMembershipResponse {
+  id: string;
+  userId: string;
+  organizationId: string;
+  roleId: string;
+  role: {
+    id: string;
+    name: string;
+    isSystem: boolean;
+  };
+  user: {
+    id: string;
+    name: string | null;
+    email: string;
+  };
+}
 
 export const adminRouter = createTRPCRouter({
   /**
    * Get all organization members with their roles
    */
-  getUsers: organizationProcedure.query(async ({ ctx }) => {
-    const members = await ctx.db
-      .select({
-        id: memberships.id,
-        userId: memberships.user_id, // alias db user_id -> userId
-        organizationId: memberships.organization_id, // alias db organization_id -> organizationId
-        roleId: memberships.role_id, // alias db role_id -> roleId
-        user: {
-          id: users.id,
-          name: users.name,
-          email: users.email,
-          profilePicture: users.profile_picture, // db profile_picture
-          emailVerified: users.email_verified, // db email_verified
-          createdAt: users.created_at, // db created_at
-        },
-        role: {
-          id: roles.id,
-          name: roles.name,
-          organizationId: roles.organization_id, // db organization_id
-          isSystem: roles.is_system, // db is_system
-          isDefault: roles.is_default, // db is_default
-        },
-      })
-      .from(memberships)
-      .innerJoin(users, eq(memberships.user_id, users.id))
-      .innerJoin(roles, eq(memberships.role_id, roles.id))
-      .where(eq(memberships.organization_id, ctx.organizationId))
-      .orderBy(asc(roles.name), asc(users.name));
+  getUsers: organizationProcedure.query(
+    async ({ ctx }): Promise<AdminUserResponse[]> => {
+      const members = await ctx.db
+        .select({
+          id: memberships.id,
+          userId: memberships.user_id, // alias db user_id -> userId
+          organizationId: memberships.organization_id, // alias db organization_id -> organizationId
+          roleId: memberships.role_id, // alias db role_id -> roleId
+          user: {
+            id: users.id,
+            name: users.name,
+            email: users.email,
+            profilePicture: users.profile_picture, // db profile_picture
+            emailVerified: users.email_verified, // db email_verified
+            createdAt: users.created_at, // db created_at
+          },
+          role: {
+            id: roles.id,
+            name: roles.name,
+            organizationId: roles.organization_id, // db organization_id
+            isSystem: roles.is_system, // db is_system
+            isDefault: roles.is_default, // db is_default
+          },
+        })
+        .from(memberships)
+        .innerJoin(users, eq(memberships.user_id, users.id))
+        .innerJoin(roles, eq(memberships.role_id, roles.id))
+        .where(eq(memberships.organization_id, ctx.organizationId))
+        .orderBy(asc(roles.name), asc(users.name));
 
-    return members.map((member) => ({
-      userId: member.user.id,
-      email: member.user.email,
-      name: member.user.name ?? "",
-      profilePicture: member.user.profilePicture,
-      emailVerified: member.user.emailVerified,
-      createdAt: member.user.createdAt,
-      membershipId: member.id,
-      role: {
-        id: member.role.id,
-        name: member.role.name,
-        isSystem: member.role.isSystem,
-      },
-    }));
-  }),
+      return members.map((member) => ({
+        userId: member.user.id,
+        email: member.user.email ?? "",
+        name: member.user.name ?? "",
+        profilePicture: member.user.profilePicture,
+        emailVerified: member.user.emailVerified,
+        createdAt: member.user.createdAt,
+        membershipId: member.id,
+        role: {
+          id: member.role.id,
+          name: member.role.name,
+          isSystem: member.role.isSystem,
+        },
+      }));
+    },
+  ),
 
   /**
    * Update a user's role assignment
@@ -80,7 +136,7 @@ export const adminRouter = createTRPCRouter({
         roleId: z.string(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }): Promise<AdminMembershipResponse> => {
       // Get the target role and verify it exists in this organization
       const [role] = await ctx.db
         .select()
@@ -189,7 +245,13 @@ export const adminRouter = createTRPCRouter({
       const validationAllMemberships =
         transformMembershipsForValidation(allMemberships);
 
-      const validationRole = transformRoleForValidation(role);
+      const validationRole = transformRoleForValidation({
+        id: role.id,
+        name: role.name,
+        organizationId: role.organization_id,
+        isSystem: role.is_system,
+        isDefault: role.is_default,
+      });
 
       // Validate the role assignment using pure functions
       const validation = validateRoleAssignment(
@@ -237,7 +299,20 @@ export const adminRouter = createTRPCRouter({
         .where(eq(memberships.user_id, input.userId))
         .limit(1);
 
-      return membership;
+      if (!membership) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Membership not found",
+        });
+      }
+
+      return {
+        ...membership,
+        user: {
+          ...membership.user,
+          email: membership.user.email ?? "",
+        },
+      };
     }),
 
   /**
@@ -251,7 +326,7 @@ export const adminRouter = createTRPCRouter({
         name: z.string().optional(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }): Promise<AdminInvitationResponse> => {
       // Verify the role exists in this organization
       const [role] = await ctx.db
         .select()
@@ -345,6 +420,7 @@ export const adminRouter = createTRPCRouter({
             email: users.email,
             name: users.name,
             emailVerified: users.email_verified,
+            createdAt: users.created_at,
           },
           role: {
             id: roles.id,
@@ -370,55 +446,56 @@ export const adminRouter = createTRPCRouter({
 
       return {
         userId: membership.user.id,
-        email: membership.user.email,
-        name: membership.user.name,
-        emailVerified: membership.user.emailVerified, // alias preserves camelCase
+        email: membership.user.email ?? "",
+        name: membership.user.name ?? "",
+        createdAt: membership.user.createdAt,
         role: membership.role,
-        isInvitation: membership.user.emailVerified === null,
       };
     }),
 
   /**
    * Get pending invitations
    */
-  getInvitations: organizationProcedure.query(async ({ ctx }) => {
-    const invitations = await ctx.db
-      .select({
-        id: memberships.id,
-        userId: memberships.user_id,
-        organizationId: memberships.organization_id,
-        roleId: memberships.role_id,
-        createdAt: users.created_at,
-        user: {
-          id: users.id,
-          email: users.email,
-          name: users.name,
+  getInvitations: organizationProcedure.query(
+    async ({ ctx }): Promise<AdminInvitationResponse[]> => {
+      const invitations = await ctx.db
+        .select({
+          id: memberships.id,
+          userId: memberships.user_id,
+          organizationId: memberships.organization_id,
+          roleId: memberships.role_id,
           createdAt: users.created_at,
-        },
-        role: {
-          id: roles.id,
-          name: roles.name,
-        },
-      })
-      .from(memberships)
-      .innerJoin(users, eq(memberships.user_id, users.id))
-      .innerJoin(roles, eq(memberships.role_id, roles.id))
-      .where(
-        and(
-          isNull(users.email_verified),
-          eq(memberships.organization_id, ctx.organizationId),
-        ),
-      )
-      .orderBy(desc(users.created_at));
+          user: {
+            id: users.id,
+            email: users.email,
+            name: users.name,
+            createdAt: users.created_at,
+          },
+          role: {
+            id: roles.id,
+            name: roles.name,
+          },
+        })
+        .from(memberships)
+        .innerJoin(users, eq(memberships.user_id, users.id))
+        .innerJoin(roles, eq(memberships.role_id, roles.id))
+        .where(
+          and(
+            isNull(users.email_verified),
+            eq(memberships.organization_id, ctx.organizationId),
+          ),
+        )
+        .orderBy(desc(users.created_at));
 
-    return invitations.map((invitation) => ({
-      userId: invitation.user.id,
-      email: invitation.user.email,
-      name: invitation.user.name,
-      createdAt: invitation.user.createdAt,
-      role: invitation.role,
-    }));
-  }),
+      return invitations.map((invitation) => ({
+        userId: invitation.user.id,
+        email: invitation.user.email ?? "",
+        name: invitation.user.name ?? "",
+        createdAt: invitation.user.createdAt,
+        role: invitation.role,
+      }));
+    },
+  ),
 
   /**
    * Remove a user from the organization
@@ -429,7 +506,7 @@ export const adminRouter = createTRPCRouter({
         userId: z.string(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }): Promise<{ success: boolean }> => {
       // Get the user membership to remove
       const [membership] = await ctx.db
         .select({
@@ -550,7 +627,7 @@ export const adminRouter = createTRPCRouter({
         reassignRoleId: z.string().optional(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }): Promise<{ success: boolean }> => {
       // Get the role to delete
       const [role] = await ctx.db
         .select()
@@ -712,7 +789,7 @@ export const adminRouter = createTRPCRouter({
         userId: z.string(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }): Promise<{ success: boolean }> => {
       // Find the invitation (user with null emailVerified in this organization)
       const [invitation] = await ctx.db
         .select()

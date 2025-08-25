@@ -91,13 +91,13 @@ SELECT results_eq(
   'Anonymous users cannot access any user data'
 );
 
--- Test 10: Unauthenticated access returns no results  
-RESET role;
-SELECT clear_jwt_context();
+-- Test 10: Authenticated role with empty JWT claims returns no results  
+SET LOCAL role = 'authenticated';
+SELECT set_jwt_claims_for_test('', '', 'member', ARRAY[]::TEXT[]);
 SELECT results_eq(
   'SELECT COUNT(*)::integer FROM users',
   'VALUES (0)',
-  'Unauthenticated access returns no user data'
+  'Authenticated role with empty JWT context returns no user data'
 );
 
 -- Test 11: Invalid organization context returns no results

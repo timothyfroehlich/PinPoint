@@ -27,8 +27,12 @@ export async function createClient(): Promise<SupabaseClient> {
   const supabasePublishableKey = env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
   if (!supabaseUrl || !supabasePublishableKey) {
+    const missingVars = [];
+    if (!supabaseUrl) missingVars.push("NEXT_PUBLIC_SUPABASE_URL");
+    if (!supabasePublishableKey)
+      missingVars.push("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY");
     throw new Error(
-      "Supabase environment variables are required for server client creation",
+      `Missing required Supabase environment variables: ${missingVars.join(", ")}`,
     );
   }
 
@@ -84,8 +88,11 @@ export async function createAdminClient(): Promise<SupabaseClient> {
   const supabaseSecretKey = env.SUPABASE_SECRET_KEY;
 
   if (!supabaseUrl || !supabaseSecretKey) {
+    const missingVars = [];
+    if (!supabaseUrl) missingVars.push("SUPABASE_URL");
+    if (!supabaseSecretKey) missingVars.push("SUPABASE_SECRET_KEY");
     throw new Error(
-      "Supabase admin environment variables are required for admin client creation",
+      `Missing required Supabase admin environment variables: ${missingVars.join(", ")}`,
     );
   }
 

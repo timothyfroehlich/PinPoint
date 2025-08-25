@@ -227,6 +227,24 @@ export class IssueActivityService {
   }
 
   /**
+   * Records a comment restoration activity.
+   * RLS automatically handles organizational scoping.
+   */
+  async recordCommentRestored(
+    issueId: string,
+    actorId: string,
+    commentId: string,
+  ): Promise<void> {
+    await this.recordActivity(issueId, {
+      type: ActivityType.SYSTEM,
+      actorId,
+      fieldName: "comment",
+      newValue: commentId,
+      description: "Comment restored",
+    });
+  }
+
+  /**
    * Gets the complete timeline (activities + comments) for an issue.
    * RLS automatically scopes results to the user's organization.
    *
@@ -341,14 +359,33 @@ export class IssueActivityService {
     // Merge comments and activities into a single timeline
     const timeline = [
       ...commentsResults.map((comment) => ({
-        ...comment,
         itemType: "comment" as const,
         timestamp: comment.created_at,
+        id: comment.id,
+        content: comment.content,
+        createdAt: comment.created_at,
+        author: {
+          id: comment.author.id,
+          name: comment.author.name,
+          profilePicture: comment.author.profile_picture,
+        },
       })),
       ...activitiesResults.map((activity) => ({
-        ...activity,
         itemType: "activity" as const,
         timestamp: activity.changed_at,
+        id: activity.id,
+        type: activity.type,
+        field: activity.field,
+        oldValue: activity.old_value,
+        newValue: activity.new_value,
+        changedAt: activity.changed_at,
+        actor: activity.actor
+          ? {
+              id: activity.actor.id,
+              name: activity.actor.name,
+              profilePicture: activity.actor.profile_picture,
+            }
+          : null,
       })),
     ].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
 

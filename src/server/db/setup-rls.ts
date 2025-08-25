@@ -19,12 +19,13 @@
  */
 
 import dotenv from "dotenv";
+import { env } from "~/env.js";
 
 // Load environment variables in correct precedence order
 try {
   dotenv.config(); // Load default .env
   dotenv.config({ path: ".env.local" }); // Override with local development vars
-} catch (error) {
+} catch {
   // If dotenv loading fails, continue - might be in production
 }
 import { readFileSync } from "fs";
@@ -38,8 +39,8 @@ const __dirname = dirname(__filename);
 /**
  * Database connection configuration
  */
-function createDatabaseConnection() {
-  const databaseUrl = process.env.DATABASE_URL || process.env.SUPABASE_DB_URL;
+function createDatabaseConnection(): postgres.Sql {
+  const databaseUrl = env.DATABASE_URL ?? env.SUPABASE_DB_URL;
 
   if (!databaseUrl) {
     throw new Error(
@@ -71,12 +72,24 @@ async function setupRLS(): Promise<void> {
     // Local: Supabase container (full RLS with local-compatible auth)
     // Production: Hosted Supabase (full RLS with auth.jwt())
     const sqlFile =
-      process.env.CI === "true"
+      env.CI === "true"
         ? "setup-rls-local.sql" // CI: Plain PostgreSQL
-        : process.env.NODE_ENV === "production"
+        : env.NODE_ENV === "production"
           ? "setup-rls.sql" // Production: Hosted Supabase
           : "setup-rls-local-supabase.sql"; // Local dev: Supabase container
-    const rlsSQL = readFileSync(join(__dirname, sqlFile), "utf-8");
+
+    let rlsSQL: string;
+    try {
+      const resolvedPath = join(__dirname, sqlFile);
+      rlsSQL = readFileSync(resolvedPath, "utf-8");
+    } catch (error) {
+      const resolvedPath = join(__dirname, sqlFile);
+      throw new Error(
+        `Failed to read SQL file '${sqlFile}' at path '${resolvedPath}'. ` +
+          `Expected environment: ${env.CI === "true" ? "CI" : env.NODE_ENV === "production" ? "production" : "local development"}. ` +
+          `Error: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
 
     console.log("📊 Executing RLS setup (this may take 30-60 seconds)...");
 
@@ -86,31 +99,37 @@ async function setupRLS(): Promise<void> {
     // Verify setup completion
     console.log("🔍 Verifying RLS setup...");
 
-    const [{ count: tablesWithRLS }] = await sql`
+    const result1 = await sql`
       SELECT COUNT(*) as count
       FROM pg_tables t
       JOIN pg_class c ON c.relname = t.tablename
       WHERE t.schemaname = 'public'
       AND c.relrowsecurity = true
     `;
+    const tablesWithRLS =
+      (result1[0] as { count: number } | undefined)?.count ?? 0;
 
-    const [{ count: totalPolicies }] = await sql`
+    const result2 = await sql`
       SELECT COUNT(*) as count
       FROM pg_policies
       WHERE schemaname = 'public'
     `;
+    const totalPolicies =
+      (result2[0] as { count: number } | undefined)?.count ?? 0;
 
-    const [{ count: orgTriggers }] = await sql`
+    const result3 = await sql`
       SELECT COUNT(*) as count
       FROM pg_trigger
       WHERE tgname LIKE 'set_%_organization_id'
     `;
+    const orgTriggers =
+      (result3[0] as { count: number } | undefined)?.count ?? 0;
 
     console.log("✅ RLS setup completed successfully!");
     console.log(`📋 Summary:`);
-    console.log(`   - Tables with RLS enabled: ${tablesWithRLS}`);
-    console.log(`   - RLS policies created: ${totalPolicies}`);
-    console.log(`   - Organization injection triggers: ${orgTriggers}`);
+    console.log(`   - Tables with RLS enabled: ${String(tablesWithRLS)}`);
+    console.log(`   - RLS policies created: ${String(totalPolicies)}`);
+    console.log(`   - Organization injection triggers: ${String(orgTriggers)}`);
     console.log("");
     console.log("🎯 Next steps:");
     console.log("   - Run database migration: npx drizzle-kit pull");
@@ -124,7 +143,11 @@ async function setupRLS(): Promise<void> {
     if (error instanceof Error) {
       // PostgreSQL errors often have detailed position information
       if ("position" in error && error.position) {
-        console.error(`   SQL Error at position ${error.position}:`);
+        const position =
+          typeof error.position === "number"
+            ? error.position.toString()
+            : "[object Object]";
+        console.error(`   SQL Error at position ${position}:`);
       }
 
       console.error(`   Error: ${error.message}`);
@@ -192,8 +215,8 @@ async function main(): Promise<void> {
 }
 
 // Execute if this file is run directly
-if (import.meta.url === `file://${process.argv[1]}`) {
-  main();
+if (import.meta.url === `file://${process.argv[1] ?? ""}`) {
+  void main();
 }
 
 export { setupRLS };

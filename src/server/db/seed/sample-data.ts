@@ -3,10 +3,14 @@
  *
  * Creates machines and sample issues using pure Drizzle queries.
  * Uses standardized error handling, logging, and patterns.
+ *
+ * Note: This file uses snake_case field names for database operations
+ * to match the actual database schema. Any transformation between camelCase
+ * and snake_case should be handled at the application boundary.
  */
 
 // Node modules
-import { eq, and, inArray, sql } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 
 // Internal utilities
 import { createDrizzleClient } from "~/server/db/drizzle";
@@ -54,9 +58,7 @@ interface SampleDataResult {
 /**
  * Extract unique games from TypeScript issue data
  */
-async function extractUniqueGames(
-  dataAmount: DataAmount,
-): Promise<UniqueGame[]> {
+function extractUniqueGames(dataAmount: DataAmount): UniqueGame[] {
   const issueData = dataAmount === "minimal" ? minimalIssues : fullIssues;
 
   if (issueData.length === 0) {
@@ -93,44 +95,6 @@ async function extractUniqueGames(
   return knownGames;
 }
 
-/**
- * Parse basic manufacturer/year from game titles
- */
-function parseGameTitle(title: string): {
-  manufacturer?: string | undefined;
-  year?: number | undefined;
-} {
-  // Common manufacturer patterns
-  const sternGames = [
-    "AC/DC",
-    "Ultraman",
-    "Lord of the Rings",
-    "Star Trek",
-    "Game of Thrones",
-  ];
-  const ballyGames = ["Xenon", "Eight Ball Deluxe", "Black Knight"];
-  const gottliebGames = ["Cleopatra"];
-  const williamsGames = [
-    "Medieval Madness",
-    "Revenge from Mars",
-    "World Cup Soccer",
-  ];
-
-  let manufacturer: string | undefined;
-
-  if (sternGames.some((game) => title.includes(game))) {
-    manufacturer = "Stern";
-  } else if (ballyGames.some((game) => title.includes(game))) {
-    manufacturer = "Bally";
-  } else if (gottliebGames.some((game) => title.includes(game))) {
-    manufacturer = "Gottlieb";
-  } else if (williamsGames.some((game) => title.includes(game))) {
-    manufacturer = "Williams";
-  }
-
-  return { manufacturer, year: undefined };
-}
-
 // ============================================================================
 // Model Management
 // ============================================================================
@@ -143,38 +107,44 @@ async function createModels(games: UniqueGame[]): Promise<void> {
     return;
   }
 
-  const modelsToCreate = games.map((game) => ({
+  const modelsToCreate: (typeof models.$inferInsert)[] = games.map((game) => ({
     id: `model_${game.opdbId}`,
     name: game.name,
     manufacturer: game.manufacturer,
     year: game.year,
-    opdbId: game.opdbId,
+    opdb_id: game.opdbId,
     is_active: true,
   }));
 
   // Check existing models
-  const existingModelOpdbIds = await db
-    .select({ opdbId: models.opdbId })
-    .from(models)
-    .where(
-      inArray(
-        models.opdbId,
-        modelsToCreate.map((m) => m.opdbId),
-      ),
-    );
+  const opdbIds = modelsToCreate
+    .map((m) => m.opdb_id)
+    .filter((id): id is string => id !== null && id !== undefined);
 
-  const existingOpdbIdSet = new Set(existingModelOpdbIds.map((m) => m.opdbId));
+  const existingModelOpdbIds =
+    opdbIds.length > 0
+      ? await db
+          .select({ opdb_id: models.opdb_id })
+          .from(models)
+          .where(inArray(models.opdb_id, opdbIds))
+      : [];
+
+  const existingOpdbIdSet = new Set(
+    existingModelOpdbIds
+      .map((m) => m.opdb_id)
+      .filter((id): id is string => id !== null && id !== undefined),
+  );
   const actualNewModels = modelsToCreate.filter(
-    (m) => !existingOpdbIdSet.has(m.opdbId),
+    (m) => m.opdb_id && !existingOpdbIdSet.has(m.opdb_id),
   );
 
   await db
     .insert(models)
-    .values(modelsToCreate)
-    .onConflictDoNothing({ target: models.opdbId });
+    .values(actualNewModels)
+    .onConflictDoNothing({ target: models.opdb_id });
 
   SeedLogger.success(
-    `Created ${actualNewModels.length} new models (${modelsToCreate.length - actualNewModels.length} already existed)`,
+    `Created ${String(actualNewModels.length)} new models (${String(modelsToCreate.length - actualNewModels.length)} already existed)`,
   );
 }
 
@@ -188,22 +158,16 @@ async function createModels(games: UniqueGame[]): Promise<void> {
 async function createMachines(
   organization_id: string,
   games: UniqueGame[],
-  dataAmount: DataAmount,
 ): Promise<void> {
   if (games.length === 0) {
     return;
   }
 
-  // Find the default location for this organization
+  // Find a location for this organization (no is_default field in schema)
   const location = await db
     .select({ id: locations.id, name: locations.name })
     .from(locations)
-    .where(
-      and(
-        eq(locations.organization_id, organization_id),
-        eq(locations.is_default, true),
-      ),
-    )
+    .where(eq(locations.organization_id, organization_id))
     .limit(1);
 
   if (location.length === 0) {
@@ -225,10 +189,10 @@ async function createMachines(
 
   // Get all models by OPDB ID
   const modelsData = await db
-    .select({ id: models.id, opdbId: models.opdbId, name: models.name })
+    .select({ id: models.id, opdb_id: models.opdb_id, name: models.name })
     .from(models);
 
-  const modelsMap = new Map(modelsData.map((m) => [m.opdbId, m]));
+  const modelsMap = new Map(modelsData.map((m) => [m.opdb_id, m]));
 
   // Get existing machines for this organization and location
   const existingMachines = await db
@@ -250,7 +214,9 @@ async function createMachines(
   let machineCount = 0;
 
   for (const game of games) {
-    const model = modelsMap.get(game.opdbId);
+    const model = modelsMap.get(game.opdbId) as
+      | { id: string; name: string; opdb_id: string }
+      | undefined;
     if (!model || existingMachineModelIds.has(model.id)) {
       continue;
     }
@@ -262,9 +228,7 @@ async function createMachines(
       organization_id,
       location_id,
       owner_id,
-      status: "active",
-      condition: machineCount <= 3 ? "excellent" : "good",
-      is_public: true,
+      name: `${model.name} #${String(machineCount)}`, // Add instance-specific name
       created_at: new Date(),
       updated_at: new Date(),
     });
@@ -272,7 +236,7 @@ async function createMachines(
 
   if (machinesToCreate.length > 0) {
     await db.insert(machines).values(machinesToCreate).onConflictDoNothing();
-    SeedLogger.success(`Created ${machinesToCreate.length} machines`);
+    SeedLogger.success(`Created ${String(machinesToCreate.length)} machines`);
   }
 }
 
@@ -284,7 +248,7 @@ async function createCompetitorMachine(): Promise<void> {
   const revengeModel = await db
     .select({ id: models.id })
     .from(models)
-    .where(eq(models.opdbId, "G50Wr-MLeZP"))
+    .where(eq(models.opdb_id, "G50Wr-MLeZP"))
     .limit(1);
 
   if (revengeModel.length === 0) {
@@ -293,20 +257,17 @@ async function createCompetitorMachine(): Promise<void> {
 
   const model_id = revengeModel[0]!.id;
 
-  // Find competitor organization default location
+  // Find competitor organization location (no is_default field in schema)
   const competitorLocation = await db
     .select({ id: locations.id })
     .from(locations)
     .where(
-      and(
-        eq(locations.organization_id, SEED_TEST_IDS.ORGANIZATIONS.competitor),
-        eq(locations.is_default, true),
-      ),
+      eq(locations.organization_id, SEED_TEST_IDS.ORGANIZATIONS.competitor),
     )
     .limit(1);
 
   if (competitorLocation.length === 0) {
-    throw new Error("Competitor organization default location not found");
+    throw new Error("Competitor organization location not found");
   }
 
   const location_id = competitorLocation[0]!.id;
@@ -316,12 +277,10 @@ async function createCompetitorMachine(): Promise<void> {
     .insert(machines)
     .values({
       id: "machine-competitor-001",
+      name: "Revenge from Mars - Competitor",
       model_id,
       organization_id: SEED_TEST_IDS.ORGANIZATIONS.competitor,
       location_id,
-      status: "active",
-      condition: "good",
-      is_public: false,
       created_at: new Date(),
       updated_at: new Date(),
     })
@@ -338,7 +297,6 @@ async function createCompetitorMachine(): Promise<void> {
 async function createSampleIssues(
   organization_id: string,
   dataAmount: DataAmount,
-  skipAuthUsers = false,
 ): Promise<void> {
   const issueData = dataAmount === "minimal" ? minimalIssues : fullIssues;
 
@@ -351,7 +309,7 @@ async function createSampleIssues(
     .select({
       id: machines.id,
       model_id: machines.model_id,
-      opdbId: models.opdbId,
+      opdb_id: models.opdb_id,
     })
     .from(machines)
     .innerJoin(models, eq(machines.model_id, models.id))
@@ -367,20 +325,20 @@ async function createSampleIssues(
   // Map known SEED_TEST_IDS.MACHINES to actual machine IDs
   for (const machine of organizationMachines) {
     // Simple mapping based on OPDB ID patterns
-    if (machine.opdbId === "GBLLd-MdEON-A94po") {
+    if (machine.opdb_id === "GBLLd-MdEON-A94po") {
       machine_idMap.set(SEED_TEST_IDS.MACHINES.ULTRAMAN_KAIJU, machine.id);
-    } else if (machine.opdbId === "G42Pk-MZe2e") {
+    } else if (machine.opdb_id === "G42Pk-MZe2e") {
       machine_idMap.set(SEED_TEST_IDS.MACHINES.XENON_1, machine.id);
-    } else if (machine.opdbId === "GrknN-MQrdv") {
+    } else if (machine.opdb_id === "GrknN-MQrdv") {
       machine_idMap.set(SEED_TEST_IDS.MACHINES.CLEOPATRA_1, machine.id);
-    } else if (machine.opdbId === "G50Wr-MLeZP") {
+    } else if (machine.opdb_id === "G50Wr-MLeZP") {
       machine_idMap.set(SEED_TEST_IDS.MACHINES.REVENGE_FROM_MARS_1, machine.id);
     }
     // Add more mappings as needed
   }
 
   // Filter and map issues to actual machine IDs
-  const issuesToCreate = issueData
+  const issuesToCreate: (typeof issues.$inferInsert)[] = issueData
     .filter((issue) => machine_idMap.has(issue.machine_id))
     .map((issue) => ({
       ...issue,
@@ -390,7 +348,9 @@ async function createSampleIssues(
 
   if (issuesToCreate.length > 0) {
     await db.insert(issues).values(issuesToCreate).onConflictDoNothing();
-    SeedLogger.success(`Created ${issuesToCreate.length} sample issues`);
+    SeedLogger.success(
+      `Created ${String(issuesToCreate.length)} sample issues`,
+    );
   }
 }
 
@@ -404,7 +364,6 @@ async function createSampleIssues(
 export async function seedSampleData(
   organization_id: string,
   dataAmount: DataAmount,
-  skipAuthUsers = false,
 ): Promise<SeedResult<SampleDataResult>> {
   const startTime = Date.now();
 
@@ -413,7 +372,7 @@ export async function seedSampleData(
     const uniqueGames = await withErrorContext(
       "SAMPLE_DATA",
       "extract unique games from sample issues",
-      () => extractUniqueGames(dataAmount),
+      async () => extractUniqueGames(dataAmount),
     );
 
     // Create OPDB models
@@ -425,7 +384,7 @@ export async function seedSampleData(
     await withErrorContext(
       "SAMPLE_DATA",
       "create machines for organization",
-      () => createMachines(organization_id, uniqueGames, dataAmount),
+      () => createMachines(organization_id, uniqueGames),
     );
 
     // Create competitor machine for cross-org testing
@@ -438,7 +397,7 @@ export async function seedSampleData(
       "SAMPLE_DATA",
       "create sample issues",
       async () => {
-        await createSampleIssues(organization_id, dataAmount, skipAuthUsers);
+        await createSampleIssues(organization_id, dataAmount);
         const issueData = dataAmount === "minimal" ? minimalIssues : fullIssues;
         return issueData.length;
       },
@@ -451,7 +410,7 @@ export async function seedSampleData(
     };
 
     SeedLogger.success(
-      `Sample data seeded: ${result.gamesCreated} games, ${result.machinesCreated} machines, ${result.issuesCreated} issues`,
+      `Sample data seeded: ${String(result.gamesCreated)} games, ${String(result.machinesCreated)} machines, ${String(result.issuesCreated)} issues`,
     );
 
     return createSeedResult(
@@ -470,17 +429,11 @@ export async function seedSampleData(
  * @deprecated Use seedSampleData instead
  */
 export async function seedSampleDataWithDb(
-  dbInstance: typeof db,
   organization_id: string,
   dataAmount: DataAmount,
-  skipAuthUsers = false,
 ): Promise<void> {
   // For now, just call the main function since we're not using dbInstance injection pattern anymore
-  const result = await seedSampleData(
-    organization_id,
-    dataAmount,
-    skipAuthUsers,
-  );
+  const result = await seedSampleData(organization_id, dataAmount);
   if (!result.success) {
     throw new Error(
       `Sample data seeding failed: ${result.errors?.join(", ") ?? "Unknown error"}`,

@@ -155,12 +155,15 @@ START: What are you testing?
 
 ### Minimal Seed (SEED_TEST_IDS)
 
-- Primary organization: "test-org-pinpoint"
-- Competitor organization: "test-org-competitor"
-- 3 users per org (admin, member1, member2)
-- 2 machines per org
-- 2 issues per machine
-- Complete role/permission structure
+- **Primary organization**: "test-org-pinpoint" (Austin Pinball Collective)
+- **Competitor organization**: "test-org-competitor" (Competitor Arcade)
+- **3 users per org**:
+  - Tim Froehlich (tim.froehlich@example.com) - Admin
+  - Harry Williams (harry.williams@example.com) - Member
+  - Escher Lefkoff (escher.lefkoff@example.com) - Member
+- **6 machines total**: Medieval Madness, Cactus Canyon, Revenge from Mars, Cleopatra, Xenon, Ultraman Kaiju
+- **10 canonical issues**: Kaiju Figures, Loud Buzzing, Left Rollover, Right Gun Opto, etc.
+- **Complete role/permission structure**: Admin/Member/Unauthenticated roles with 21 granular permissions
 
 ### Extended Seed (seed-extended.ts)
 
@@ -195,10 +198,31 @@ Generate TypeScript mocks directly from actual seed data, creating a seamless br
 export const SEED_TEST_IDS = { /* extracted from seed */ };
 export const GENERATED_MOCKS = {
   USERS: {
-    ADMIN: { id: "test-user-tim", name: "Tim", ... },
-    MEMBER: { id: "test-user-sarah", ... }
+    ADMIN: {
+      id: "10000000-0000-4000-8000-000000000001",
+      name: "Tim Froehlich",
+      email: "tim.froehlich@example.com"
+    },
+    MEMBER1: {
+      id: "10000000-0000-4000-8000-000000000002",
+      name: "Harry Williams",
+      email: "harry.williams@example.com"
+    },
+    MEMBER2: {
+      id: "10000000-0000-4000-8000-000000000003",
+      name: "Escher Lefkoff",
+      email: "escher.lefkoff@example.com"
+    }
   },
-  ORGANIZATIONS: { /* ... */ },
+  ORGANIZATIONS: {
+    PRIMARY: { id: "test-org-pinpoint", name: "Austin Pinball Collective" },
+    COMPETITOR: { id: "test-org-competitor", name: "Competitor Arcade" }
+  },
+  MACHINES: {
+    MEDIEVAL_MADNESS: { id: "machine-mm-001", name: "Medieval Madness" },
+    CACTUS_CANYON: { id: "machine-cc-001", name: "Cactus Canyon" },
+    ULTRAMAN_KAIJU: { id: "machine-ultraman-001", name: "Ultraman Kaiju" }
+  },
   COLLECTIONS: {
     ISSUES: {
       all: Issue[],
@@ -213,15 +237,19 @@ export const GENERATED_MOCKS = {
 
 ```typescript
 // Pure function tests
-const mockUser = GENERATED_MOCKS.USERS.ADMIN;
+const mockUser = GENERATED_MOCKS.USERS.ADMIN; // Tim Froehlich
 expect(validateUser(mockUser)).toBe(true);
 
 // Component tests
 const mockIssues = GENERATED_MOCKS.COLLECTIONS.ISSUES.forOrg("test-org-pinpoint");
 <IssuesList issues={mockIssues} />
 
-// tRPC mocks
-const mockDb = createMockDb(GENERATED_MOCKS.DATABASE_STATE);
+// tRPC mocks with real seed data
+const mockContext = {
+  organizationId: "test-org-pinpoint", // Austin Pinball Collective
+  userId: "10000000-0000-4000-8000-000000000001", // Tim Froehlich
+  userEmail: "tim.froehlich@example.com"
+};
 ```
 
 **Implementation**:
