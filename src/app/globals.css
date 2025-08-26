@@ -56,66 +56,68 @@
   }
 }
 
-/* === CSS VARIABLES (shadcn/ui design tokens) === */
+/* === CSS VARIABLES (shadcn/ui design tokens with PinPoint dark theme) === */
 :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    /* PinPoint Dark Theme - matches the original dark blue/purple scheme */
+    --background: 236 37% 9%;   /* #1a1a2e - Dark navy background */
+    --foreground: 0 0% 98%;     /* #ffffff - White text */
+    --card: 215 25% 19%;        /* #2d3748 - Darker blue-grey for cards */
+    --card-foreground: 0 0% 98%; /* #ffffff - White card text */
+    --popover: 215 25% 19%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 247 53% 70%;     /* #667eea - Purple-blue primary */
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 50% 75%;   /* #a8b4f0 - Lighter purple secondary */
+    --secondary-foreground: 236 37% 9%;
+    --muted: 215 20% 22%;       /* Muted background */
+    --muted-foreground: 215 16% 65%; /* #a0aec0 - Light grey muted text */
+    --accent: 215 20% 22%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 65% 70%;   /* #f87171 - Red for errors */
+    --destructive-foreground: 0 0% 98%;
+    --border: 215 20% 30%;      /* Border color */
+    --input: 215 20% 30%;       /* Input border */
+    --ring: 247 53% 70%;        /* Focus ring */
     --radius: 0.5rem;
-    --sidebar: hsl(0 0% 98%);
-    --sidebar-foreground: hsl(240 5.3% 26.1%);
-    --sidebar-primary: hsl(240 5.9% 10%);
-    --sidebar-primary-foreground: hsl(0 0% 98%);
-    --sidebar-accent: hsl(240 4.8% 95.9%);
-    --sidebar-accent-foreground: hsl(240 5.9% 10%);
-    --sidebar-border: hsl(220 13% 91%);
-    --sidebar-ring: hsl(217.2 91.2% 59.8%);
+    --sidebar: 215 25% 19%;     /* Sidebar background */
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 247 53% 70%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 215 20% 25%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 215 20% 30%;
+    --sidebar-ring: 247 53% 70%;
   }
 
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar: hsl(240 5.9% 10%);
-    --sidebar-foreground: hsl(240 4.8% 95.9%);
-    --sidebar-primary: hsl(224.3 76.3% 48%);
-    --sidebar-primary-foreground: hsl(0 0% 100%);
-    --sidebar-accent: hsl(240 3.7% 15.9%);
-    --sidebar-accent-foreground: hsl(240 4.8% 95.9%);
-    --sidebar-border: hsl(240 3.7% 15.9%);
-    --sidebar-ring: hsl(217.2 91.2% 59.8%);
+.dark {
+    /* Use the same PinPoint dark theme for .dark class */
+    --background: 236 37% 9%;   /* #1a1a2e - Dark navy background */
+    --foreground: 0 0% 98%;     /* #ffffff - White text */
+    --card: 215 25% 19%;        /* #2d3748 - Darker blue-grey for cards */
+    --card-foreground: 0 0% 98%;
+    --popover: 215 25% 19%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 247 53% 70%;     /* #667eea - Purple-blue primary */
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 50% 75%;   /* #a8b4f0 - Lighter purple secondary */
+    --secondary-foreground: 236 37% 9%;
+    --muted: 215 20% 22%;
+    --muted-foreground: 215 16% 65%;
+    --accent: 215 20% 22%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 65% 70%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 215 20% 30%;
+    --input: 215 20% 30%;
+    --ring: 247 53% 70%;
+    --sidebar: 215 25% 19%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 247 53% 70%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 215 20% 25%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 215 20% 30%;
+    --sidebar-ring: 247 53% 70%;
 }
 
 /* === LAYER ISOLATION === */

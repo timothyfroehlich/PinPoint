@@ -119,15 +119,31 @@ async function AuthenticatedContent(): Promise<JSX.Element> {
 // Simple public content (Server Component)
 function PublicContent(): JSX.Element {
   return (
-    <div className="max-w-6xl mx-auto p-6">
-      <div className="text-center py-12">
-        <h1 className="text-4xl font-bold mb-4">PinPoint</h1>
-        <p className="text-xl text-muted-foreground mb-8">
-          Pinball Machine Issue Tracking System
-        </p>
-        <p className="text-muted-foreground">
-          Track and manage issues with your pinball machines efficiently.
-        </p>
+    <div className="container mx-auto py-8 px-4">
+      <div className="max-w-4xl mx-auto">
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold mb-4">PinPoint</h1>
+          <p className="text-xl text-muted-foreground mb-2">
+            Pinball Machine Issue Tracking System
+          </p>
+          <p className="text-muted-foreground">
+            Track and manage issues with your pinball machines efficiently.
+          </p>
+        </div>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-center">Welcome to PinPoint</CardTitle>
+          </CardHeader>
+          <CardContent className="text-center">
+            <p className="text-muted-foreground mb-6">
+              Sign in to access your dashboard and manage your pinball machines, track issues, and optimize operations.
+            </p>
+            <Button asChild>
+              <a href="/auth/sign-in">Get Started</a>
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
