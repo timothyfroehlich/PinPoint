@@ -18,7 +18,181 @@
 
 ## 🎯 Implementation Plan
 
-### Step 1: Server-Side Auth Context
+### Step 1: Supabase Client Utilities (2025 SSR Patterns)
+
+**Create `src/utils/supabase/server.ts`** (CRITICAL - Server-side client):
+```typescript
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
+
+export async function createClient() {
+  const cookieStore = await cookies()
+
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll()
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            )
+          } catch {
+            // The `setAll` method was called from a Server Component.
+            // This can be ignored if you have middleware refreshing
+            // user sessions.
+          }
+        },
+      },
+    }
+  )
+}
+```
+
+**Create `src/utils/supabase/client.ts`** (CRITICAL - Client-side client):
+```typescript
+import { createBrowserClient } from '@supabase/ssr'
+
+export function createClient() {
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+}
+```
+
+**Create `src/utils/supabase/middleware.ts`** (CRITICAL - Session refresh):
+```typescript
+import { createServerClient } from '@supabase/ssr'
+import { NextResponse, type NextRequest } from 'next/server'
+
+export async function updateSession(request: NextRequest) {
+  let supabaseResponse = NextResponse.next({
+    request,
+  })
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll()
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
+          supabaseResponse = NextResponse.next({
+            request,
+          })
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, options)
+          )
+        },
+      },
+    }
+  )
+
+  // IMPORTANT: DO NOT run code between createServerClient and supabase.auth.getUser()
+  // A simple mistake could make it very hard to debug issues with users being randomly logged out.
+
+  // IMPORTANT: DO NOT REMOVE auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (
+    !user &&
+    !request.nextUrl.pathname.startsWith('/login') &&
+    !request.nextUrl.pathname.startsWith('/auth')
+  ) {
+    // no user, potentially respond by redirecting the user to the login page
+    const url = request.nextUrl.clone()
+    url.pathname = '/login'
+    return NextResponse.redirect(url)
+  }
+
+  // IMPORTANT: You *must* return the supabaseResponse object as it is.
+  // If you're creating a new response object with NextResponse.next() make sure to:
+  // 1. Pass the request in it, like so:
+  //    const myNewResponse = NextResponse.next({ request })
+  // 2. Copy over the cookies, like so:
+  //    myNewResponse.cookies.setAll(supabaseResponse.cookies.getAll())
+  // 3. Change the myNewResponse object to fit your needs, but avoid changing
+  //    the cookies!
+  // 4. Finally:
+  //    return myNewResponse
+  // If this is not done, you may be causing the browser and server to go out
+  // of sync and terminate the user's session prematurely!
+
+  return supabaseResponse
+}
+```
+
+**Create `middleware.ts`** (REQUIRED - Root level):
+```typescript
+import { type NextRequest } from 'next/server'
+import { updateSession } from '@/utils/supabase/middleware'
+
+export async function middleware(request: NextRequest) {
+  return await updateSession(request)
+}
+
+export const config = {
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * Feel free to modify this pattern to include more paths.
+     */
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+  ],
+}
+```
+
+**Create `src/app/auth/callback/route.ts`** (REQUIRED - OAuth flow completion):
+```typescript
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/utils/supabase/server'
+
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url)
+  const code = searchParams.get('code')
+  const next = searchParams.get('next') ?? '/'
+
+  if (code) {
+    const supabase = await createClient()
+    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    if (!error) {
+      const forwardedHost = request.headers.get('x-forwarded-host')
+      const isLocalEnv = process.env.NODE_ENV === 'development'
+      if (isLocalEnv) {
+        return NextResponse.redirect(`http://localhost:3000${next}`)
+      } else if (forwardedHost) {
+        return NextResponse.redirect(`https://${forwardedHost}${next}`)
+      } else {
+        return NextResponse.redirect(`${request.nextUrl.origin}${next}`)
+      }
+    }
+  }
+
+  // return the user to an error page with instructions
+  return NextResponse.redirect(`${request.nextUrl.origin}/auth/auth-code-error`)
+}
+```
+
+**Create `.env.local`** (REQUIRED - Environment setup):
+```bash
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+### Step 2: Server-Side Auth Context
 
 **Create `src/lib/auth/server-context.ts`**:
 ```typescript
@@ -184,12 +358,12 @@ export function ServerNavigation() {
 
 ### Step 3: Client Island Components
 
-**Create `src/components/layout/client/UserMenuClient.tsx`**:
+**Create `src/components/layout/client/UserMenuClient.tsx`** (Updated for 2025):
 ```typescript
 "use client";
 
 import { useState } from "react";
-import { createClient } from "~/utils/supabase/client";
+import { createClient } from "~/utils/supabase/client"; // Uses createBrowserClient internally
 import { Button } from "~/components/ui/button";
 import {
   DropdownMenu,
@@ -653,22 +827,33 @@ export const getMachinesForOrg = cache(async (organizationId: string) => {
 });
 ```
 
-### Step 9: Enhanced Server Actions
+### Step 9: Enhanced Server Actions (2025 Patterns)
 
-**Create `src/lib/actions/issue-actions.ts`**:
+**Create `src/lib/actions/issue-actions.ts`** (Updated for Supabase SSR):
 ```typescript
 "use server";
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createClient } from "~/utils/supabase/server";
+import { createClient } from "~/utils/supabase/server"; // Uses createServerClient internally
 import { db } from "~/server/db";
 import { issues } from "~/server/db/schema";
 import { requireServerOrgContext } from "~/lib/auth/server-context";
 
-// React 19 enhanced Server Action with better error handling
+// React 19 enhanced Server Action with 2025 Supabase SSR patterns
 export async function createIssueAction(formData: FormData) {
-  const auth = await requireServerOrgContext();
+  // Server Actions use the same createClient utility as Server Components
+  const supabase = await createClient();
+  const { data: { user }, error } = await supabase.auth.getUser();
+  
+  if (error || !user) {
+    redirect("/auth/sign-in");
+  }
+
+  const organizationId = user.user_metadata?.organizationId;
+  if (!organizationId) {
+    throw new Error("No organization selected");
+  }
 
   const title = formData.get("title") as string;
   const description = formData.get("description") as string;
@@ -829,20 +1014,25 @@ export function CreateIssueForm() {
 ## 🚨 Risk Mitigation
 
 **High-Risk Areas** (Updated for 2025 stack):
-- **Hydration Mismatches**: Server and client rendering differences
-- **Auth Context**: Supabase SSR cookie handling and session management
+- **Supabase SSR Implementation**: Critical cookie sync patterns - any deviation breaks auth entirely
+- **Middleware Configuration**: Missing middleware or incorrect supabaseResponse handling causes session loss
+- **Client/Server Boundaries**: Using wrong createClient (server vs browser) breaks auth flows  
+- **OAuth Callback**: Missing callback route prevents OAuth sign-in completion
+- **Code Placement**: Any code between createServerClient() and getUser() causes random logouts
 - **Next.js 15 Caching**: Uncached `fetch()` calls causing performance issues
 - **React 19 cache() API**: Potential memory leaks with improper cache boundaries
 - **Drizzle + RLS**: Ensuring organizational scoping works correctly
 
-**Mitigation Strategies**:
-- Careful separation of server and client components with clear "use client" boundaries
-- Supabase SSR with `getAll()`/`setAll()` cookie patterns
-- Explicit `cache: "force-cache"` for frequently accessed data
-- React 19 cache() used only at request level, not across requests
-- Double security: RLS + explicit organizationId filtering in queries
-- Progressive enhancement for all interactive elements via shadcn/ui
-- Comprehensive error boundaries with shadcn/ui Alert components
+**Mitigation Strategies** (Updated for 2025):
+- **Follow Supabase SSR patterns exactly**: Any deviation from documented cookie handling breaks auth
+- **Mandatory middleware setup**: Without proper middleware, sessions won't refresh properly  
+- **Client utilities separation**: Use correct createClient utility for each context (server/client)
+- **Never modify supabaseResponse**: Return middleware response object exactly as received
+- **OAuth callback implementation**: Required for any OAuth-based authentication flows
+- **Careful server/client boundaries**: Clear "use client" boundaries and proper component separation
+- **React 19 cache() used only at request level**: Never across requests to prevent memory leaks
+- **Double security**: RLS + explicit organizationId filtering in queries
+- **Progressive enhancement**: All interactive elements work without JavaScript via shadcn/ui
 
 **Testing Strategy** (Updated patterns):
 - Server Component integration tests with React 19 cache() API
@@ -860,11 +1050,14 @@ export function CreateIssueForm() {
 - Implement React 19 `cache()` API for request-level memoization
 - Enable React Compiler for automatic performance optimizations
 
-**Supabase SSR Requirements**:
-- Use `@supabase/ssr` package (NOT deprecated auth-helpers)
-- Implement `getAll()`/`setAll()` cookie handling pattern
-- Always call `getUser()` in middleware for token refresh
-- Use Server Actions for all authentication flows
+**Supabase SSR Requirements** (2025 Critical Patterns):
+- ⚠️ **MANDATORY**: Use `@supabase/ssr` package (NOT deprecated auth-helpers)
+- ⚠️ **CRITICAL**: Implement `getAll()`/`setAll()` cookie handling pattern exactly as documented
+- ⚠️ **NEVER MODIFY**: supabaseResponse object in middleware - return exactly as-is
+- ⚠️ **DO NOT REMOVE**: `supabase.auth.getUser()` call in middleware
+- ⚠️ **NO CODE**: Between `createServerClient()` and `getUser()` - causes random logouts
+- ⚠️ **REQUIRED**: OAuth callback route at `app/auth/callback/route.ts`
+- Use Server Actions for all authentication flows with proper SSR client creation
 
 **shadcn/ui Best Practices**:
 - Use 2025 Blocks system for complex UI patterns

@@ -19,9 +19,9 @@ export function createClient() {
   // These environment variables are required in non-test environments
   // In test environment, Supabase client creation is mocked at the module level
   const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabasePublishableKey = env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  const supabaseAnonKey = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  if (!supabaseUrl || !supabasePublishableKey) {
+  if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error(
       "Supabase environment variables are required for client creation",
     );
@@ -29,7 +29,7 @@ export function createClient() {
 
   // Use the modern @supabase/ssr createBrowserClient which handles
   // cookie management automatically and is SSR-safe
-  return createBrowserClient(supabaseUrl, supabasePublishableKey);
+  return createBrowserClient(supabaseUrl, supabaseAnonKey);
 }
 
 // Export a default client instance for convenience

@@ -11,25 +11,26 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
 
   console.log(`[MIDDLEWARE] Request to: ${host}${url.pathname}`);
 
-  // Create Supabase response for session management
+  // Create Supabase response for session management (2025 SSR pattern)
   let supabaseResponse = NextResponse.next({
     request,
   });
 
-  // Handle Supabase session refresh
+  // Handle Supabase session refresh (Updated 2025 patterns)
   try {
     const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabasePublishableKey = env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+    const supabaseAnonKey = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-    if (supabaseUrl && supabasePublishableKey) {
-      const supabase = createServerClient(supabaseUrl, supabasePublishableKey, {
+    if (supabaseUrl && supabaseAnonKey) {
+      const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
         cookies: {
           getAll() {
             return request.cookies.getAll();
           },
           setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value }) =>
-              request.cookies.set(name, value),
+            // 2025 pattern: Proper cookie sync with options
+            cookiesToSet.forEach(({ name, value, options }) => 
+              request.cookies.set(name, value)
             );
             supabaseResponse = NextResponse.next({ request });
             cookiesToSet.forEach(({ name, value, options }) =>
@@ -39,8 +40,22 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
         },
       });
 
-      // CRITICAL: Always call getUser() to refresh session
-      await supabase.auth.getUser();
+      // IMPORTANT: DO NOT run code between createServerClient and supabase.auth.getUser()
+      // IMPORTANT: DO NOT REMOVE auth.getUser() - critical for session refresh
+      const { data: { user } } = await supabase.auth.getUser();
+
+      // Optional: Redirect unauthenticated users (can be customized per app needs)
+      if (
+        !user &&
+        !request.nextUrl.pathname.startsWith('/login') &&
+        !request.nextUrl.pathname.startsWith('/auth') &&
+        !request.nextUrl.pathname.startsWith('/demo-server-actions') // Allow demo access
+      ) {
+        // Preserve subdomain in redirect for multi-tenant setup
+        const loginUrl = url.clone();
+        loginUrl.pathname = '/auth/sign-in';
+        return NextResponse.redirect(loginUrl);
+      }
     }
   } catch (error) {
     console.warn("[MIDDLEWARE] Supabase session refresh failed:", error);

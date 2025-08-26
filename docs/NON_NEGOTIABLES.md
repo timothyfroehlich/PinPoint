@@ -12,6 +12,18 @@ _Critical file content patterns that MUST be enforced during static analysis_
 
 **Deprecated Imports**: `@supabase/auth-helpers-nextjs` is deprecated. Use modern SSR patterns.
 
+**Supabase SSR Client Creation Violations**: Must use `createServerClient` from `@supabase/ssr` with proper cookie handling. No direct `createClient` imports.
+
+**Missing Supabase Middleware**: Next.js middleware REQUIRED for Supabase SSR. Auth tokens won't refresh without it.
+
+**Supabase Response Object Modification**: Never modify `supabaseResponse` object in middleware. Must return exactly as-is or auth breaks.
+
+**Code Between Supabase Client and getUser()**: FORBIDDEN to run any logic between `createServerClient()` and `supabase.auth.getUser()`. Causes random logouts.
+
+**Missing Auth Callback Route**: `app/auth/callback/route.ts` required for OAuth flows. Without it, users can't complete sign-in.
+
+**Supabase Cookie Sync Violations**: Must implement `getAll()`/`setAll()` cookie pattern exactly as documented. Partial implementation breaks sessions.
+
 **TypeScript Safety Defeats**: No `any`, `!.`, unsafe `as`. Use proper type guards.
 
 **Deep Relative Imports**: No `../../../lib/`. Always use TypeScript aliases like `~/lib/`.
