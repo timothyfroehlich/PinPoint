@@ -6,8 +6,8 @@ _Essential security patterns for tRPC, Server Actions, and multi-tenant access c
 
 ### tRPC Procedure Patterns
 
-**Protected procedures**: Session auth with Supabase → @docs/developer-guides/trpc/procedures.md#protected  
-**Org scoping**: Multi-tenant boundary enforcement → @docs/developer-guides/row-level-security/multi-tenant.md#trpc  
+**Protected procedures**: Session auth with Supabase (archived - use Context7 for current tRPC patterns)  
+**Org scoping**: Multi-tenant boundary enforcement (archived - use Context7 for current RLS patterns)  
 **Permission checks**: Role-based access control → @docs/security/rbac-patterns.md
 
 ## Drizzle Query Security Patterns

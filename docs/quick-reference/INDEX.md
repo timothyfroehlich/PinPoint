@@ -10,11 +10,11 @@ Specialized tactical guides for immediate action. Auto-loaded by Claude Code for
 
 ## 🔧 Core Pattern Guides
 
-### **Migration & Architecture**
+### **Architecture & Security**
 
-- **[Migration Patterns](migration-patterns.md)** - Current Supabase SSR + Drizzle direct conversion workflows
-- **[API Security Patterns](api-security-patterns.md)** - RLS, multi-tenant scoping, tRPC protection
-- **[Testing Patterns](testing-patterns.md)** - Modern Vitest, PGlite, integration strategies
+- **[Migration Patterns](migration-patterns.md)** - Supabase SSR + Drizzle patterns
+- **[API Security Patterns](api-security-patterns.md)** - Multi-tenant scoping, tRPC protection
+- **[Testing Patterns](testing-patterns.md)** - Current test archetype patterns
 
 ### **Language & Framework**
 
@@ -22,19 +22,13 @@ Specialized tactical guides for immediate action. Auto-loaded by Claude Code for
 
 ---
 
-## 📋 Migration-Specific Guides
+## 📋 Current Implementation Guides
 
-### **Database Conversion**
+### **Stack References**
 
-- **[Prisma → Drizzle](../migration/supabase-drizzle/quick-reference/prisma-to-drizzle.md)** - Direct conversion patterns, generated columns, relational queries
-
-### **Authentication Migration**
-
-- **[NextAuth → Supabase](../migration/supabase-drizzle/quick-reference/nextauth-to-supabase.md)** - SSR package patterns, Server Actions auth
-
-### **Overall Strategy**
-
-- **[Direct Conversion Plan](../migration/supabase-drizzle/direct-conversion-plan.md)** - Complete migration strategy and timeline
+- **[Developer Guides](../developer-guides/)** - Current Drizzle + Supabase patterns
+- **[Latest Updates](../latest-updates/)** - Post-training tech updates (August 2025)
+- **[Architecture](../architecture/)** - System design and current state
 
 ---
 
@@ -47,11 +41,11 @@ Specialized tactical guides for immediate action. Auto-loaded by Claude Code for
 3. Test immediately
 4. Fix issues as they arise
 
-**For Migration Work:**
+**For Current Development:**
 
-1. Reference Direct Conversion Plan for strategy
-2. Use specific migration guides for tactics
-3. Follow incremental approach (one router at a time)
+1. Use current patterns from developer guides
+2. Follow server-first architecture (RSC migration)  
+3. Apply security patterns for multi-tenant scoping
 
 **For New Features:**
 
