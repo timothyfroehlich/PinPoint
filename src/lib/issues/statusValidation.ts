@@ -3,7 +3,7 @@
  * Extracted from tRPC procedures for better testability and performance
  */
 
-import type { IssueStatus } from "~/types/issue";
+import type { IssueStatus, StatusCategory } from "~/lib/types/api";
 
 // =============================================================================
 // TYPE DEFINITIONS
@@ -96,7 +96,7 @@ export function validateOrganizationBoundary(
   _expectedOrganizationId: string,
 ): StatusValidationResult {
   // Validate current status has valid category
-  const validCategories = ["NEW", "IN_PROGRESS", "RESOLVED"] as const;
+  const validCategories: StatusCategory[] = ["NEW", "IN_PROGRESS", "RESOLVED"];
   if (!validCategories.includes(currentStatus.category)) {
     return {
       valid: false,

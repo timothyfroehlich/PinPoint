@@ -36,6 +36,7 @@ export function UserAvatar({
     return (
       <Avatar
         sx={{
+          // eslint-disable-next-line security/detect-object-injection -- size is type-constrained to specific size keys
           ...SIZE_MAP[size],
           cursor: clickable ? "pointer" : "default",
         }}
@@ -61,6 +62,7 @@ export function UserAvatar({
       {...(avatarSrc && { src: avatarSrc })}
       alt={`${displayName}'s profile picture`}
       sx={{
+        // eslint-disable-next-line security/detect-object-injection -- size is type-constrained to specific size keys
         ...SIZE_MAP[size],
         cursor: clickable ? "pointer" : "default",
         "&:hover": clickable ? { opacity: 0.8 } : {},

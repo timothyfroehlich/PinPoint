@@ -16,10 +16,10 @@ import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 
 import { PermissionButton, PermissionGate } from "~/components/permissions";
 import { api } from "~/trpc/react";
-import { type IssueWithDetails, type Comment } from "~/types/issue";
+import { type IssueWithRelationsResponse } from "~/lib/types/api";
 
 interface IssueCommentsProps {
-  issue: IssueWithDetails;
+  issue: NonNullable<IssueWithRelationsResponse>;
   user: PinPointSupabaseUser | null;
   hasPermission: (permission: string) => boolean;
   onError: (error: string) => void;
@@ -65,7 +65,7 @@ export function IssueComments({
   // const canCreateInternal = hasPermission("issues:comment_internal");
 
   // For now, all comments are visible (isInternal functionality not implemented in DB)
-  const visibleComments = issue.comments;
+  const visibleComments = Array.isArray(issue.comments) ? issue.comments : [];
 
   return (
     <Box>
@@ -81,7 +81,7 @@ export function IssueComments({
           </Typography>
         ) : (
           <Stack spacing={2}>
-            {visibleComments.map((comment: Comment, index: number) => (
+            {visibleComments.map((comment, index: number) => (
               <Paper
                 key={comment.id}
                 variant="outlined"

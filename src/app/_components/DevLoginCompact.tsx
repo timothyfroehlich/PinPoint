@@ -73,11 +73,22 @@ export function DevLoginCompact({
       const user = testUsers.find((u) => u.email === email);
       const supabase = createClient();
 
-      const userData: { email: string; name?: string; role?: string } = {
+      const userData: {
+        email: string;
+        name?: string;
+        role?: string;
+        organizationId?: string;
+      } = {
         email,
       };
       if (user?.name) userData.name = user.name;
       if (user?.role) userData.role = user.role;
+
+      // Organization detection could be implemented here based on subdomain
+
+      // For now, use default organization ID - in the future this could be dynamic
+      // This should match the organization that the current page belongs to
+      userData.organizationId = "test-org-pinpoint"; // This should match the seed organization
 
       const result = await authenticateDevUser(supabase, userData);
 

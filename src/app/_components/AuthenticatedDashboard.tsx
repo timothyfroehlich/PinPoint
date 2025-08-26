@@ -7,12 +7,39 @@ import DetailedIssueCard from "../dashboard/_components/DetailedIssueCard";
 
 import { api } from "~/trpc/react";
 
-type IssueStatus = "new" | "in progress" | "acknowledged" | "resolved";
-type IssuePriority = "high" | "medium" | "low";
+// Type for the actual structure returned by getAll with relations
+interface IssueFromList {
+  id: string;
+  title: string;
+  status: {
+    id: string;
+    category: "NEW" | "IN_PROGRESS" | "RESOLVED";
+    name: string;
+    color: string;
+    description: string;
+    isDefault: boolean;
+    organizationId: string;
+  };
+  priority: {
+    id: string;
+    name: string;
+    color: string;
+    description: string;
+    order: number;
+    isDefault: boolean;
+    organizationId: string;
+  };
+  machine: {
+    model: {
+      name: string;
+    };
+  };
+}
 
 export function AuthenticatedDashboard(): React.ReactNode {
   const { data: issues, isLoading, error } = api.issue.core.getAll.useQuery({});
 
+  // Early return for loading state
   if (isLoading) {
     return (
       <Box sx={{ mb: 4 }}>
@@ -24,6 +51,7 @@ export function AuthenticatedDashboard(): React.ReactNode {
     );
   }
 
+  // Early return for error state
   if (error) {
     return (
       <Box sx={{ mb: 4 }}>
@@ -37,27 +65,55 @@ export function AuthenticatedDashboard(): React.ReactNode {
     );
   }
 
-  const openIssues =
-    issues
-      ?.filter((issue) => issue.status.category !== "RESOLVED")
-      .map((issue) => ({
-        id: issue.id,
-        title: issue.title,
-        machineName: issue.machine.model.name,
-        status: issue.status.name.toLowerCase() as IssueStatus,
-        priority: issue.priority.name.toLowerCase() as IssuePriority,
-      })) ?? [];
+  // Early return if issues is not properly loaded
+  if (!issues || !Array.isArray(issues)) {
+    return (
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h4" component="h2" sx={{ mb: 3 }}>
+          My Dashboard
+        </Typography>
+        <Typography color="text.secondary">Loading your issues...</Typography>
+      </Box>
+    );
+  }
 
-  const resolvedIssues =
-    issues
-      ?.filter((issue) => issue.status.category === "RESOLVED")
-      .map((issue) => ({
-        id: issue.id,
-        title: issue.title,
-        machineName: issue.machine.model.name,
-        status: issue.status.name.toLowerCase() as IssueStatus,
-        priority: issue.priority.name.toLowerCase() as IssuePriority,
-      })) ?? [];
+  // Defensive function to safely check issue structure
+  const isValidIssue = (issue: unknown): issue is IssueFromList => {
+    return (
+      typeof issue === "object" &&
+      issue !== null &&
+      "id" in issue &&
+      "title" in issue &&
+      "status" in issue &&
+      issue.status !== null &&
+      typeof issue.status === "object" &&
+      "category" in issue.status &&
+      typeof issue.status.category === "string"
+    );
+  };
+
+  // Transform issues with comprehensive null safety
+  const validIssues = issues.filter(isValidIssue);
+
+  const openIssues = validIssues
+    .filter((issue) => issue.status.category !== "RESOLVED")
+    .map((issue) => ({
+      id: issue.id,
+      title: issue.title,
+      machineName: issue.machine?.model?.name || "Unknown Machine",
+      status: issue.status,
+      priority: issue.priority,
+    }));
+
+  const resolvedIssues = validIssues
+    .filter((issue) => issue.status.category === "RESOLVED")
+    .map((issue) => ({
+      id: issue.id,
+      title: issue.title,
+      machineName: issue.machine?.model?.name || "Unknown Machine",
+      status: issue.status,
+      priority: issue.priority,
+    }));
 
   // Mock newly reported data (replace with real data later)
   const newlyReported = [{ location: "Pinballz Arcade", count: 2 }];

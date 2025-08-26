@@ -157,13 +157,7 @@ export default function ProfilePage(): JSX.Element {
                   <Typography variant="h4" component="h1" gutterBottom>
                     {userProfile.name ?? "Unnamed User"}
                   </Typography>
-                  <Typography
-                    variant="body1"
-                    color="text.secondary"
-                    gutterBottom
-                  >
-                    {userProfile.email}
-                  </Typography>
+                  {/* Note: Email is handled by Supabase Auth, not stored in user profile */}
                   {userProfile.bio && (
                     <Typography variant="body2" sx={{ mt: 1 }}>
                       {userProfile.bio}
@@ -223,19 +217,19 @@ export default function ProfilePage(): JSX.Element {
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <Games color="primary" />
                   <Typography variant="body2">
-                    {_count.ownedMachines} games owned
+                    {String(_count.ownedMachines)} games owned
                   </Typography>
                 </Box>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <BugReport color="secondary" />
                   <Typography variant="body2">
-                    {_count.issuesCreated} issues reported
+                    {String(_count.issuesCreated)} issues reported
                   </Typography>
                 </Box>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <Comment color="action" />
                   <Typography variant="body2">
-                    {_count.comments} comments posted
+                    {String(_count.comments)} comments posted
                   </Typography>
                 </Box>
               </Box>
@@ -261,16 +255,26 @@ export default function ProfilePage(): JSX.Element {
                 </Typography>
               ) : (
                 <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-                  {memberships.map((membership) => (
-                    <Chip
-                      key={membership.id}
-                      label={`${membership.organization.name} (${membership.role.name})`}
-                      color={
-                        membership.role.name === "admin" ? "primary" : "default"
-                      }
-                      variant="outlined"
-                    />
-                  ))}
+                  {memberships.map((membership: unknown) => {
+                    const membershipData = membership as Record<
+                      string,
+                      unknown
+                    >;
+                    const organization = membershipData["organization"] as
+                      | { name?: string }
+                      | undefined;
+                    const role = membershipData["role"] as
+                      | { name?: string }
+                      | undefined;
+                    return (
+                      <Chip
+                        key={membershipData["id"] as string}
+                        label={`${organization?.name ?? "Unknown"} (${role?.name ?? "Unknown"})`}
+                        color={role?.name === "admin" ? "primary" : "default"}
+                        variant="outlined"
+                      />
+                    );
+                  })}
                 </Box>
               )}
             </CardContent>
@@ -290,7 +294,7 @@ export default function ProfilePage(): JSX.Element {
                 }}
               >
                 <Typography variant="h6">
-                  Owned Games ({ownedMachines.length})
+                  Owned Games ({String(ownedMachines.length)})
                 </Typography>
                 {ownedMachines.length > 0 && (
                   <ToggleButtonGroup
@@ -347,7 +351,7 @@ export default function ProfilePage(): JSX.Element {
                             >
                               {machine.model.manufacturer}
                               {machine.model.year &&
-                                ` • ${machine.model.year.toString()}`}
+                                ` • ${String(machine.model.year)}`}
                             </Typography>
                           )}
                           <Typography
@@ -379,7 +383,9 @@ export default function ProfilePage(): JSX.Element {
                             {machine.model.manufacturer && (
                               <> • {machine.model.manufacturer}</>
                             )}
-                            {machine.model.year && <> • {machine.model.year}</>}
+                            {machine.model.year && (
+                              <> • {String(machine.model.year)}</>
+                            )}
                             <br />
                             <Typography
                               component="span"
@@ -431,7 +437,7 @@ export default function ProfilePage(): JSX.Element {
               rows={3}
               placeholder="Tell us about yourself..."
               slotProps={{ htmlInput: { maxLength: 500 } }}
-              helperText={`${editForm.bio.length.toString()}/500 characters`}
+              helperText={`${String(editForm.bio.length)}/500 characters`}
             />
           </Box>
         </DialogContent>

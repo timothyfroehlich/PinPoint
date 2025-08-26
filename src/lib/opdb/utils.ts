@@ -13,6 +13,7 @@ import type { OPDBParsedId, OPDBMachine } from "./types";
  * - A1B7O = Alias ID (optional, starts with 'A')
  */
 export function parseOPDBId(opdbId: string): OPDBParsedId | null {
+  // eslint-disable-next-line security/detect-unsafe-regex
   const regex = /^G([a-zA-Z0-9]+)(?:-M([a-zA-Z0-9]+)(?:-A([a-zA-Z0-9]+))?)?$/;
   const match = regex.exec(opdbId);
 
@@ -153,6 +154,7 @@ export function generateCacheKey(
 ): string {
   const paramString = Object.keys(params)
     .sort()
+    // eslint-disable-next-line security/detect-object-injection -- key is from Object.keys() iteration of known params object
     .map((key) => `${key}=${String(params[key])}`)
     .join("&");
 

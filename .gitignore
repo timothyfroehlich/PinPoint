@@ -9,9 +9,7 @@
 /coverage
 
 # database
-/prisma/db.sqlite
-/prisma/db.sqlite-journal
-db.sqlite
+# (using Drizzle + Supabase)
 
 # next.js
 /.next/
@@ -104,3 +102,4 @@ cleanup_analysis/
 .worktree-ports
 .env*.local
 .eslintcache
+.claude/recycle_bin/

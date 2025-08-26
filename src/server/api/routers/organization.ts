@@ -1,18 +1,32 @@
+// External libraries (alphabetical)
 import { TRPCError } from "@trpc/server";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
+// Internal types (alphabetical)
+import type { OrganizationResponse } from "~/lib/types/api";
+
+// Internal utilities (alphabetical)
+import { transformKeysToCamelCase } from "~/lib/utils/case-transformers";
+
+// Server modules (alphabetical)
 import {
   createTRPCRouter,
-  publicProcedure,
   organizationManageProcedure,
+  publicProcedure,
 } from "~/server/api/trpc";
+
+// Database schema (alphabetical)
 import { organizations } from "~/server/db/schema";
+import { type Organization } from "~/server/db/types";
 
 export const organizationRouter = createTRPCRouter({
-  getCurrent: publicProcedure.query(({ ctx }) => {
+  getCurrent: publicProcedure.query(({ ctx }): OrganizationResponse | null => {
     // Return the organization from context (resolved based on subdomain)
-    return ctx.organization;
+    if (!ctx.organization) {
+      return null;
+    }
+    return transformKeysToCamelCase(ctx.organization) as OrganizationResponse;
   }),
 
   update: organizationManageProcedure
@@ -22,17 +36,14 @@ export const organizationRouter = createTRPCRouter({
         logoUrl: z.url().optional(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
-      // Prepare update data
-      const updateData: { name: string; logoUrl?: string } = {
+    .mutation(async ({ ctx, input }): Promise<Organization> => {
+      const updateData = {
         name: input.name,
+        ...(input.logoUrl ? { logo_url: input.logoUrl } : {}),
       };
-      if (input.logoUrl) {
-        updateData.logoUrl = input.logoUrl;
-      }
 
       // Execute Drizzle update
-      const [organization] = await ctx.drizzle
+      const [organization] = await ctx.db
         .update(organizations)
         .set(updateData)
         .where(eq(organizations.id, ctx.organization.id))

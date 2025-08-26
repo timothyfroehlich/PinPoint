@@ -54,14 +54,14 @@ export const usersRelations = relations(users, ({ many }) => ({
 
 export const accountsRelations = relations(accounts, ({ one }) => ({
   user: one(users, {
-    fields: [accounts.userId],
+    fields: [accounts.user_id],
     references: [users.id],
   }),
 }));
 
 export const sessionsRelations = relations(sessions, ({ one }) => ({
   user: one(users, {
-    fields: [sessions.userId],
+    fields: [sessions.user_id],
     references: [users.id],
   }),
 }));
@@ -72,6 +72,7 @@ export const organizationsRelations = relations(organizations, ({ many }) => ({
   locations: many(locations),
   roles: many(roles),
   machines: many(machines),
+  models: many(models), // Organization-owned custom models (where organizationId IS NOT NULL)
   issues: many(issues),
   priorities: many(priorities),
   issueStatuses: many(issueStatuses),
@@ -83,22 +84,22 @@ export const organizationsRelations = relations(organizations, ({ many }) => ({
 
 export const membershipsRelations = relations(memberships, ({ one }) => ({
   user: one(users, {
-    fields: [memberships.userId],
+    fields: [memberships.user_id],
     references: [users.id],
   }),
   organization: one(organizations, {
-    fields: [memberships.organizationId],
+    fields: [memberships.organization_id],
     references: [organizations.id],
   }),
   role: one(roles, {
-    fields: [memberships.roleId],
+    fields: [memberships.role_id],
     references: [roles.id],
   }),
 }));
 
 export const rolesRelations = relations(roles, ({ one, many }) => ({
   organization: one(organizations, {
-    fields: [roles.organizationId],
+    fields: [roles.organization_id],
     references: [organizations.id],
   }),
   memberships: many(memberships),
@@ -113,11 +114,11 @@ export const rolePermissionsRelations = relations(
   rolePermissions,
   ({ one }) => ({
     role: one(roles, {
-      fields: [rolePermissions.roleId],
+      fields: [rolePermissions.role_id],
       references: [roles.id],
     }),
     permission: one(permissions, {
-      fields: [rolePermissions.permissionId],
+      fields: [rolePermissions.permission_id],
       references: [permissions.id],
     }),
   }),
@@ -126,32 +127,38 @@ export const rolePermissionsRelations = relations(
 // Machine Relations
 export const locationsRelations = relations(locations, ({ one, many }) => ({
   organization: one(organizations, {
-    fields: [locations.organizationId],
+    fields: [locations.organization_id],
     references: [organizations.id],
   }),
   machines: many(machines),
   collections: many(collections),
 }));
 
-export const modelsRelations = relations(models, ({ many }) => ({
+// Models Relations (OPDB + Future Custom Models)
+export const modelsRelations = relations(models, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [models.organization_id],
+    references: [organizations.id],
+  }),
   machines: many(machines),
 }));
 
 export const machinesRelations = relations(machines, ({ one, many }) => ({
   organization: one(organizations, {
-    fields: [machines.organizationId],
+    fields: [machines.organization_id],
     references: [organizations.id],
   }),
   location: one(locations, {
-    fields: [machines.locationId],
+    fields: [machines.location_id],
     references: [locations.id],
   }),
+  // Model relation
   model: one(models, {
-    fields: [machines.modelId],
+    fields: [machines.model_id],
     references: [models.id],
   }),
   owner: one(users, {
-    fields: [machines.ownerId],
+    fields: [machines.owner_id],
     references: [users.id],
   }),
   issues: many(issues),
@@ -161,28 +168,28 @@ export const machinesRelations = relations(machines, ({ one, many }) => ({
 // Issue Relations
 export const issuesRelations = relations(issues, ({ one, many }) => ({
   organization: one(organizations, {
-    fields: [issues.organizationId],
+    fields: [issues.organization_id],
     references: [organizations.id],
   }),
   machine: one(machines, {
-    fields: [issues.machineId],
+    fields: [issues.machine_id],
     references: [machines.id],
   }),
   priority: one(priorities, {
-    fields: [issues.priorityId],
+    fields: [issues.priority_id],
     references: [priorities.id],
   }),
   status: one(issueStatuses, {
-    fields: [issues.statusId],
+    fields: [issues.status_id],
     references: [issueStatuses.id],
   }),
   createdBy: one(users, {
-    fields: [issues.createdById],
+    fields: [issues.created_by_id],
     references: [users.id],
     relationName: "CreatedBy",
   }),
   assignedTo: one(users, {
-    fields: [issues.assignedToId],
+    fields: [issues.assigned_to_id],
     references: [users.id],
     relationName: "AssignedTo",
   }),
@@ -194,7 +201,7 @@ export const issuesRelations = relations(issues, ({ one, many }) => ({
 
 export const prioritiesRelations = relations(priorities, ({ one, many }) => ({
   organization: one(organizations, {
-    fields: [priorities.organizationId],
+    fields: [priorities.organization_id],
     references: [organizations.id],
   }),
   issues: many(issues),
@@ -204,7 +211,7 @@ export const issueStatusesRelations = relations(
   issueStatuses,
   ({ one, many }) => ({
     organization: one(organizations, {
-      fields: [issueStatuses.organizationId],
+      fields: [issueStatuses.organization_id],
       references: [organizations.id],
     }),
     issues: many(issues),
@@ -213,15 +220,15 @@ export const issueStatusesRelations = relations(
 
 export const commentsRelations = relations(comments, ({ one }) => ({
   issue: one(issues, {
-    fields: [comments.issueId],
+    fields: [comments.issue_id],
     references: [issues.id],
   }),
   author: one(users, {
-    fields: [comments.authorId],
+    fields: [comments.author_id],
     references: [users.id],
   }),
   deleter: one(users, {
-    fields: [comments.deletedBy],
+    fields: [comments.deleted_by],
     references: [users.id],
     relationName: "CommentDeleter",
   }),
@@ -229,37 +236,37 @@ export const commentsRelations = relations(comments, ({ one }) => ({
 
 export const attachmentsRelations = relations(attachments, ({ one }) => ({
   issue: one(issues, {
-    fields: [attachments.issueId],
+    fields: [attachments.issue_id],
     references: [issues.id],
   }),
   organization: one(organizations, {
-    fields: [attachments.organizationId],
+    fields: [attachments.organization_id],
     references: [organizations.id],
   }),
 }));
 
 export const issueHistoryRelations = relations(issueHistory, ({ one }) => ({
   issue: one(issues, {
-    fields: [issueHistory.issueId],
+    fields: [issueHistory.issue_id],
     references: [issues.id],
   }),
   organization: one(organizations, {
-    fields: [issueHistory.organizationId],
+    fields: [issueHistory.organization_id],
     references: [organizations.id],
   }),
   actor: one(users, {
-    fields: [issueHistory.actorId],
+    fields: [issueHistory.actor_id],
     references: [users.id],
   }),
 }));
 
 export const upvotesRelations = relations(upvotes, ({ one }) => ({
   issue: one(issues, {
-    fields: [upvotes.issueId],
+    fields: [upvotes.issue_id],
     references: [issues.id],
   }),
   user: one(users, {
-    fields: [upvotes.userId],
+    fields: [upvotes.user_id],
     references: [users.id],
   }),
 }));
@@ -267,11 +274,11 @@ export const upvotesRelations = relations(upvotes, ({ one }) => ({
 // Collection Relations
 export const collectionsRelations = relations(collections, ({ one, many }) => ({
   type: one(collectionTypes, {
-    fields: [collections.typeId],
+    fields: [collections.type_id],
     references: [collectionTypes.id],
   }),
   location: one(locations, {
-    fields: [collections.locationId],
+    fields: [collections.location_id],
     references: [locations.id],
   }),
   collectionMachines: many(collectionMachines),
@@ -281,11 +288,11 @@ export const collectionMachinesRelations = relations(
   collectionMachines,
   ({ one }) => ({
     collection: one(collections, {
-      fields: [collectionMachines.collectionId],
+      fields: [collectionMachines.collection_id],
       references: [collections.id],
     }),
     machine: one(machines, {
-      fields: [collectionMachines.machineId],
+      fields: [collectionMachines.machine_id],
       references: [machines.id],
     }),
   }),
@@ -295,7 +302,7 @@ export const collectionTypesRelations = relations(
   collectionTypes,
   ({ one, many }) => ({
     organization: one(organizations, {
-      fields: [collectionTypes.organizationId],
+      fields: [collectionTypes.organization_id],
       references: [organizations.id],
     }),
     collections: many(collections),
@@ -304,7 +311,7 @@ export const collectionTypesRelations = relations(
 
 export const notificationsRelations = relations(notifications, ({ one }) => ({
   user: one(users, {
-    fields: [notifications.userId],
+    fields: [notifications.user_id],
     references: [users.id],
   }),
 }));
@@ -313,7 +320,7 @@ export const pinballMapConfigsRelations = relations(
   pinballMapConfigs,
   ({ one }) => ({
     organization: one(organizations, {
-      fields: [pinballMapConfigs.organizationId],
+      fields: [pinballMapConfigs.organization_id],
       references: [organizations.id],
     }),
   }),

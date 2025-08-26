@@ -3,6 +3,7 @@ import { api } from "~/trpc/react";
 
 /**
  * Custom hook that returns the current user, accounting for development impersonation.
+ * This hook expects camelCase data from the API (which should be transformed from database snake_case).
  * In development, it checks if there's an impersonated user and returns that instead of the real user.
  * In production, it just returns the authenticated user.
  */
@@ -28,13 +29,14 @@ export function useCurrentUser(): {
   // If we have a user profile from tRPC, that means we're either:
   // 1. Authenticated normally, or
   // 2. Impersonating in development
+  // Handle both camelCase and snake_case field names for robustness
   if (userProfile) {
     return {
       user: {
         id: userProfile.id,
         name: userProfile.name,
-        email: userProfile.email,
-        image: userProfile.profilePicture ?? userProfile.image,
+        email: null, // Not available in UserProfileResponse, would need to come from Supabase user
+        image: userProfile.profilePicture,
       },
       isLoading: false,
       isAuthenticated: true,

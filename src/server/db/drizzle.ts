@@ -1,7 +1,8 @@
-import { drizzle } from "drizzle-orm/postgres-js";
+import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
+import { createDrizzle } from "./client-factory";
 import postgres from "postgres";
 
-import * as schema from "./schema";
+import type * as schema from "./schema";
 
 import { env } from "~/env";
 import { isDevelopment } from "~/lib/environment";
@@ -48,12 +49,11 @@ function getDatabaseConfig(): DatabaseConfig {
   };
 }
 
-// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
-function createDrizzleClientInternal() {
-  const connectionString = env.POSTGRES_PRISMA_URL;
+function createDrizzleClientInternal(): DrizzleClient {
+  const connectionString = env.DATABASE_URL;
 
   if (!connectionString) {
-    throw new Error("POSTGRES_PRISMA_URL is required for Drizzle client");
+    throw new Error("DATABASE_URL is required for Drizzle client");
   }
 
   // Determine SSL configuration based on environment
@@ -79,20 +79,19 @@ function createDrizzleClientInternal() {
     },
   });
 
-  return drizzle(sql, {
-    schema,
-    logger: isDevelopment() && !isTest, // Disable logging in CI for performance
-  });
+  return createDrizzle(sql, isDevelopment() && !isTest) as PostgresJsDatabase<
+    typeof schema
+  >;
 }
 
-export type DrizzleClient = ReturnType<typeof createDrizzleClientInternal>;
+export type DrizzleClient = PostgresJsDatabase<typeof schema>;
 
 /**
  * Controlled singleton pattern for development hot-reload optimization.
  * Avoids global namespace pollution while maintaining connection reuse benefits.
  */
-class DrizzleSingleton {
-  private static instance: DrizzleSingleton | undefined;
+class DatabaseSingleton {
+  private static instance: DatabaseSingleton | undefined;
   private _client: DrizzleClient | null = null;
   private _sql: ReturnType<typeof postgres> | null = null;
 
@@ -100,9 +99,9 @@ class DrizzleSingleton {
     // Private constructor ensures singleton pattern
   }
 
-  static getInstance(): DrizzleSingleton {
-    DrizzleSingleton.instance ??= new DrizzleSingleton();
-    return DrizzleSingleton.instance;
+  static getInstance(): DatabaseSingleton {
+    DatabaseSingleton.instance ??= new DatabaseSingleton();
+    return DatabaseSingleton.instance;
   }
 
   getClient(): DrizzleClient {
@@ -111,10 +110,10 @@ class DrizzleSingleton {
   }
 
   private createClient(): DrizzleClient {
-    const connectionString = env.POSTGRES_PRISMA_URL;
+    const connectionString = env.DATABASE_URL;
 
     if (!connectionString) {
-      throw new Error("POSTGRES_PRISMA_URL is required for Drizzle client");
+      throw new Error("DATABASE_URL is required for Drizzle client");
     }
 
     // Determine SSL configuration based on environment
@@ -140,10 +139,9 @@ class DrizzleSingleton {
     });
 
     this._sql = sql;
-    return drizzle(sql, {
-      schema,
-      logger: isDevelopment() && !isTest,
-    });
+    return createDrizzle(sql, isDevelopment() && !isTest) as PostgresJsDatabase<
+      typeof schema
+    >;
   }
 
   async cleanup(): Promise<void> {
@@ -177,7 +175,7 @@ export const createDrizzleClient = (): DrizzleClient => {
   }
 
   // Development: reuse connection across hot reloads to prevent connection exhaustion
-  return DrizzleSingleton.getInstance().getClient();
+  return DatabaseSingleton.getInstance().getClient();
 };
 
 /**
@@ -185,5 +183,5 @@ export const createDrizzleClient = (): DrizzleClient => {
  * Call this when the application is shutting down
  */
 export const closeDrizzleConnection = async (): Promise<void> => {
-  await DrizzleSingleton.getInstance().cleanup();
+  await DatabaseSingleton.getInstance().cleanup();
 };

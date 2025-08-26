@@ -27,8 +27,12 @@ export async function createClient(): Promise<SupabaseClient> {
   const supabasePublishableKey = env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
   if (!supabaseUrl || !supabasePublishableKey) {
+    const missingVars = [];
+    if (!supabaseUrl) missingVars.push("NEXT_PUBLIC_SUPABASE_URL");
+    if (!supabasePublishableKey)
+      missingVars.push("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY");
     throw new Error(
-      "Supabase environment variables are required for server client creation",
+      `Missing required Supabase environment variables: ${missingVars.join(", ")}`,
     );
   }
 
@@ -84,8 +88,11 @@ export async function createAdminClient(): Promise<SupabaseClient> {
   const supabaseSecretKey = env.SUPABASE_SECRET_KEY;
 
   if (!supabaseUrl || !supabaseSecretKey) {
+    const missingVars = [];
+    if (!supabaseUrl) missingVars.push("SUPABASE_URL");
+    if (!supabaseSecretKey) missingVars.push("SUPABASE_SECRET_KEY");
     throw new Error(
-      "Supabase admin environment variables are required for admin client creation",
+      `Missing required Supabase admin environment variables: ${missingVars.join(", ")}`,
     );
   }
 
@@ -118,6 +125,88 @@ export async function createAdminClient(): Promise<SupabaseClient> {
       persistSession: false,
     },
   });
+}
+
+/**
+ * Gets the current authenticated user from server context.
+ * Useful for Server Components and Server Actions.
+ *
+ * @returns Promise resolving to user data or null if not authenticated
+ *
+ * @example
+ * ```typescript
+ * const user = await getCurrentUser();
+ * if (!user) {
+ *   redirect('/login');
+ * }
+ * ```
+ */
+export async function getCurrentUser(): Promise<
+  Awaited<ReturnType<SupabaseClient["auth"]["getUser"]>>["data"]["user"]
+> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error) {
+    console.warn("Auth error in getCurrentUser:", error.message);
+    return null;
+  }
+
+  return user;
+}
+
+/**
+ * Gets the current user's organization ID from app_metadata.
+ * Returns null if user is not authenticated or has no organization context.
+ *
+ * @returns Promise resolving to organization ID or null
+ *
+ * @example
+ * ```typescript
+ * const orgId = await getCurrentUserOrganizationId();
+ * if (!orgId) {
+ *   redirect('/organization/select');
+ * }
+ * ```
+ */
+export async function getCurrentUserOrganizationId(): Promise<string | null> {
+  const user = await getCurrentUser();
+  const orgId = user?.app_metadata["organizationId"] as unknown;
+  return typeof orgId === "string" ? orgId : null;
+}
+
+/**
+ * Validates that the current user has organization context.
+ * Throws an error if user is not authenticated or lacks organization context.
+ *
+ * @returns Promise resolving to validated user and organization ID
+ * @throws Error if validation fails
+ *
+ * @example
+ * ```typescript
+ * const { user, organizationId } = await requireOrganizationContext();
+ * // Safe to proceed with organization-scoped operations
+ * ```
+ */
+export async function requireOrganizationContext(): Promise<{
+  user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>;
+  organizationId: string;
+}> {
+  const user = await getCurrentUser();
+
+  if (!user) {
+    throw new Error("Authentication required");
+  }
+
+  const orgId = user.app_metadata["organizationId"] as unknown;
+  if (typeof orgId !== "string" || !orgId) {
+    throw new Error("Organization context required");
+  }
+
+  return { user, organizationId: orgId };
 }
 
 // Export types for TypeScript IntelliSense

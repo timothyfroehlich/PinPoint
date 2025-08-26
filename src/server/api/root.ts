@@ -9,6 +9,7 @@ import { locationRouter } from "~/server/api/routers/location";
 import { machineRouter } from "~/server/api/routers/machine";
 import { modelRouter } from "~/server/api/routers/model";
 import { notificationRouter } from "~/server/api/routers/notification";
+import { pinballMapRouter } from "~/server/api/routers/pinballMap";
 import { qrCodeRouter } from "~/server/api/routers/qrCode";
 import { roleRouter } from "~/server/api/routers/role";
 import { userRouter } from "~/server/api/routers/user";
@@ -31,6 +32,7 @@ export const appRouter = createTRPCRouter({
   issueStatus: issueStatusRouter,
   organization: organizationRouter,
   notification: notificationRouter,
+  pinballMap: pinballMapRouter,
   qrCode: qrCodeRouter,
   role: roleRouter,
 });

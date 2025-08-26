@@ -19,55 +19,6 @@ import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 
 import { api } from "~/trpc/react";
 
-// Interface for the public issue data returned by publicGetAll
-interface PublicIssueData {
-  id: string;
-  title: string;
-  createdAt: string | Date;
-  submitterName?: string | null;
-  status: {
-    id: string;
-    name: string;
-    category: "NEW" | "IN_PROGRESS" | "RESOLVED";
-    organizationId: string;
-    isDefault: boolean;
-  };
-  priority: {
-    id: string;
-    name: string;
-    order: number;
-    organizationId: string;
-    isDefault: boolean;
-  };
-  assignedTo: {
-    id: string;
-    name: string | null;
-    email: string | null;
-    image: string | null;
-  } | null;
-  createdBy: {
-    id: string;
-    name: string | null;
-    email: string | null;
-    image: string | null;
-  } | null;
-  machine: {
-    id: string;
-    name: string;
-    model: {
-      id: string;
-      name: string;
-      manufacturer: string | null;
-      year: number | null;
-    };
-    location: {
-      id: string;
-      name: string;
-      organizationId: string;
-    };
-  };
-}
-
 interface RecentIssuesSidebarProps {
   selectedMachineId: string | null;
   user: PinPointSupabaseUser | null;
@@ -98,10 +49,10 @@ export function RecentIssuesSidebar({
     },
   );
 
-  // Get machine data either from issues or from the machines list
-  const machineData =
-    recentIssues?.[0]?.machine ??
-    allMachines?.find((machine) => machine.id === selectedMachineId);
+  // Get machine data from the machines list since issues don't include full machine relations
+  const machineData = allMachines?.find(
+    (machine: { id: string }) => machine.id === selectedMachineId,
+  );
 
   if (!selectedMachineId) {
     return (
@@ -135,9 +86,14 @@ export function RecentIssuesSidebar({
           {recentIssues && recentIssues.length > 0 ? (
             <>
               <List disablePadding>
-                {recentIssues
-                  .slice(0, 5)
-                  .map((issue: PublicIssueData, index: number) => (
+                {recentIssues.slice(0, 5).map(
+                  (
+                    issue: Record<string, unknown> & {
+                      id: string;
+                      title: string;
+                    },
+                    index: number,
+                  ) => (
                     <React.Fragment key={issue.id}>
                       {index > 0 && <Divider />}
                       <ListItem disablePadding sx={{ py: 1 }}>
@@ -158,12 +114,24 @@ export function RecentIssuesSidebar({
                                 }}
                               >
                                 <Chip
-                                  label={issue.status.name}
+                                  label={
+                                    (
+                                      issue["status"] as {
+                                        name?: string;
+                                      } | null
+                                    )?.name ?? "Unknown Status"
+                                  }
                                   size="small"
                                   variant="outlined"
                                 />
                                 <Chip
-                                  label={issue.priority.name}
+                                  label={
+                                    (
+                                      issue["priority"] as {
+                                        name?: string;
+                                      } | null
+                                    )?.name ?? "Unknown Priority"
+                                  }
                                   size="small"
                                   variant="outlined"
                                 />
@@ -172,25 +140,51 @@ export function RecentIssuesSidebar({
                                 variant="caption"
                                 color="text.secondary"
                               >
-                                {new Date(issue.createdAt).toLocaleDateString()}{" "}
+                                {new Date(
+                                  (issue["created_at"] ??
+                                    issue["createdAt"]) as
+                                    | string
+                                    | number
+                                    | Date,
+                                ).toLocaleDateString()}{" "}
                                 by{" "}
-                                {issue.createdBy?.name ??
-                                  issue.submitterName ??
-                                  "Anonymous User"}
+                                {String(
+                                  (
+                                    issue["createdBy"] as {
+                                      name?: string;
+                                    } | null
+                                  )?.name ??
+                                    issue["submitter_name"] ??
+                                    issue["submitterName"] ??
+                                    "Anonymous User",
+                                )}
                               </Typography>
                               <Typography
                                 variant="caption"
                                 color="text.secondary"
                                 sx={{ display: "block", mt: 0.5 }}
                               >
-                                {issue.machine.name || issue.machine.model.name}
+                                {(
+                                  issue["machine"] as {
+                                    name?: string;
+                                    model?: { name?: string };
+                                  } | null
+                                )?.name ??
+                                  (
+                                    issue["machine"] as {
+                                      name?: string;
+                                      model?: { name?: string };
+                                    } | null
+                                  )?.model?.name ??
+                                  "Unknown Machine"}
                               </Typography>
                             </Box>
                           }
                         />
                       </ListItem>
                     </React.Fragment>
-                  ))}
+                  ),
+                )}
               </List>
 
               {recentIssues.length > 5 && (

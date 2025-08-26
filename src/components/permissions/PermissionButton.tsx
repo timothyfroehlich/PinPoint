@@ -34,6 +34,7 @@ interface PermissionButtonProps extends Omit<ButtonProps, "disabled"> {
  * Get default tooltip text for a permission
  */
 function getDefaultTooltipText(permission: string): string {
+  // eslint-disable-next-line security/detect-object-injection -- permission string is validated by type system and used for predefined lookup
   const description = PERMISSION_DESCRIPTIONS[permission];
   if (description) {
     return `You don't have permission to: ${description}`;

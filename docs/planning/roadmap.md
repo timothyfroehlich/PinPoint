@@ -9,7 +9,7 @@ _The goal of the Beta is to prove the core value proposition with a single, trus
 ### **Core Capabilities**
 
 - **Machine & Issue Lifecycle:**
-  - **Fleet Management:** Integration with OPDB for Model data, support for custom/homebrew Machines, the machine-centric history view.
+  - **Fleet Management:** Integration with OPDB for Model data, support for custom/homebrew Machine instances (using OPDB models), the machine-centric history view.
   - **QR Codes & Status Pages:** Generation of QR codes that link to public, read-only status pages for issue reporting.
   - **Issue Tracking:** All core functionality including public submission, all issue fields (Title, Status, Priority, etc.), rich content with image attachments, and the Consistency field.
   - **Workflow:** Categorized statuses (New, In Progress, Resolved), re-opening issues, immutable history, and re-assigning issues between machines.
@@ -54,6 +54,7 @@ _This phase includes incremental features and quality-of-life improvements that 
 ### **Core Capabilities**
 
 - **Asset & Data Organization:**
+  - **Custom Model Definitions:** Organizations can define their own custom models for homebrew/prototype machines not in OPDB, with full CRUD capabilities and organizational scoping.
   - **Smart Collections:** Automatically generate collections based on machine attributes.
   - **Kanban View:** Add a Kanban board as an alternative view for the issue list.
   - **Drag-and-Drop UI:** A polished drag-and-drop interface for managing collections.
