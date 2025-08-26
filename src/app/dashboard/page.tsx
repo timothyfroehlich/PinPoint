@@ -15,9 +15,7 @@ import DetailedIssueCard from "./_components/DetailedIssueCard";
 import type { JSX } from "react";
 
 import { api } from "~/trpc/react";
-
-type IssueStatus = "new" | "in progress" | "acknowledged" | "resolved";
-type IssuePriority = "high" | "medium" | "low";
+import type { IssueStatus, IssuePriority } from "~/lib/types/api";
 
 const newlyReported = [{ location: "Pinballz Arcade", count: 2 }];
 
@@ -34,25 +32,47 @@ export default function DashboardPage(): JSX.Element {
 
   const openIssues =
     issues
-      ?.filter((issue) => issue.status.category !== "RESOLVED")
-      .map((issue) => ({
-        id: issue.id,
-        title: issue.title,
-        machineName: issue.machine.model.name,
-        status: issue.status.name.toLowerCase() as IssueStatus,
-        priority: issue.priority.name.toLowerCase() as IssuePriority,
-      })) ?? [];
+      ?.filter(
+        (issue: { status: { category: string } }) =>
+          issue.status.category !== "RESOLVED",
+      )
+      .map(
+        (issue: {
+          id: string;
+          title: string;
+          machine: { model: { name: string } };
+          status: IssueStatus;
+          priority: IssuePriority;
+        }) => ({
+          id: issue.id,
+          title: issue.title,
+          machineName: issue.machine.model.name,
+          status: issue.status,
+          priority: issue.priority,
+        }),
+      ) ?? [];
 
   const resolvedIssues =
     issues
-      ?.filter((issue) => issue.status.category === "RESOLVED")
-      .map((issue) => ({
-        id: issue.id,
-        title: issue.title,
-        machineName: issue.machine.model.name,
-        status: issue.status.name.toLowerCase() as IssueStatus,
-        priority: issue.priority.name.toLowerCase() as IssuePriority,
-      })) ?? [];
+      ?.filter(
+        (issue: { status: { category: string } }) =>
+          issue.status.category === "RESOLVED",
+      )
+      .map(
+        (issue: {
+          id: string;
+          title: string;
+          machine: { model: { name: string } };
+          status: IssueStatus;
+          priority: IssuePriority;
+        }) => ({
+          id: issue.id,
+          title: issue.title,
+          machineName: issue.machine.model.name,
+          status: issue.status,
+          priority: issue.priority,
+        }),
+      ) ?? [];
 
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto" }}>
@@ -67,9 +87,15 @@ export default function DashboardPage(): JSX.Element {
               My Open Issues
             </Typography>
             {openIssues.length > 0 ? (
-              openIssues.map((issue) => (
-                <DetailedIssueCard key={issue.id} {...issue} />
-              ))
+              openIssues.map(
+                (issue: {
+                  id: string;
+                  title: string;
+                  machineName: string;
+                  status: IssueStatus;
+                  priority: IssuePriority;
+                }) => <DetailedIssueCard key={issue.id} {...issue} />,
+              )
             ) : (
               <Typography color="text.secondary">
                 No open issues assigned to you.
@@ -82,9 +108,15 @@ export default function DashboardPage(): JSX.Element {
               Recently Resolved
             </Typography>
             {resolvedIssues.length > 0 ? (
-              resolvedIssues.map((issue) => (
-                <DetailedIssueCard key={issue.id} {...issue} />
-              ))
+              resolvedIssues.map(
+                (issue: {
+                  id: string;
+                  title: string;
+                  machineName: string;
+                  status: IssueStatus;
+                  priority: IssuePriority;
+                }) => <DetailedIssueCard key={issue.id} {...issue} />,
+              )
             ) : (
               <Typography color="text.secondary">
                 No recently resolved issues.

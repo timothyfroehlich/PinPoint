@@ -1,5 +1,16 @@
+// External libraries (alphabetical)
 import { z } from "zod";
 
+// Internal types (alphabetical)
+import type {
+  NotificationResponse,
+  UnreadCountResponse,
+} from "~/lib/types/api";
+
+// Internal utilities (alphabetical)
+import { transformKeysToCamelCase } from "~/lib/utils/case-transformers";
+
+// Server modules (alphabetical)
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
 export const notificationRouter = createTRPCRouter({
@@ -12,7 +23,7 @@ export const notificationRouter = createTRPCRouter({
         offset: z.number().min(0).optional(),
       }),
     )
-    .query(async ({ ctx, input }) => {
+    .query(async ({ ctx, input }): Promise<NotificationResponse[]> => {
       const service = ctx.services.createNotificationService();
 
       // Build options object to avoid exactOptionalPropertyTypes issues
@@ -32,28 +43,37 @@ export const notificationRouter = createTRPCRouter({
         options.offset = input.offset;
       }
 
-      return service.getUserNotifications(ctx.user.id, options);
+      const notifications = await service.getUserNotifications(
+        ctx.user.id,
+        options,
+      );
+      return transformKeysToCamelCase(notifications) as NotificationResponse[];
     }),
 
   // Get unread count
-  getUnreadCount: protectedProcedure.query(async ({ ctx }) => {
-    const service = ctx.services.createNotificationService();
-    return service.getUnreadCount(ctx.user.id);
-  }),
+  getUnreadCount: protectedProcedure.query(
+    async ({ ctx }): Promise<UnreadCountResponse> => {
+      const service = ctx.services.createNotificationService();
+      const count = await service.getUnreadCount(ctx.user.id);
+      return { count };
+    },
+  ),
 
   // Mark notification as read
   markAsRead: protectedProcedure
     .input(z.object({ notificationId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }): Promise<{ success: boolean }> => {
       const service = ctx.services.createNotificationService();
       await service.markAsRead(input.notificationId, ctx.user.id);
       return { success: true };
     }),
 
   // Mark all as read
-  markAllAsRead: protectedProcedure.mutation(async ({ ctx }) => {
-    const service = ctx.services.createNotificationService();
-    await service.markAllAsRead(ctx.user.id);
-    return { success: true };
-  }),
+  markAllAsRead: protectedProcedure.mutation(
+    async ({ ctx }): Promise<{ success: boolean }> => {
+      const service = ctx.services.createNotificationService();
+      await service.markAllAsRead(ctx.user.id);
+      return { success: true };
+    },
+  ),
 });

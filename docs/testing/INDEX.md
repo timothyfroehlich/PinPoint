@@ -1,39 +1,36 @@
 # Testing Documentation
 
-Comprehensive testing patterns and strategies for PinPoint.
+## Current Test System Status
 
-## Current Stack (Being Replaced)
+**Status**: ✅ **Archive Complete** - Simplified baseline system operational
 
-- Heavy Prisma mocking with complex test doubles
-- Unit test focused approach
-- Mock-based isolation
+**Current State** (Post-Archive):
 
-## Migration Target
+- **Test Files**: 1 active (`src/lib/common/__tests__/inputValidation.test.ts`)
+- **Test Count**: 205 pure function unit tests
+- **Infrastructure**: Simplified vitest configuration
+- **Command**: `npm test` (fast execution: ~214ms)
 
-- Transaction-based testing with real database
-- Integration test focused approach
-- Minimal mocking (external services only)
+**Additional Testing**:
 
-## Contents
+- **RLS Tests**: `npm run test:rls` - pgTAP database policy validation
+- **Smoke Tests**: `npm run smoke` - Essential Playwright automation
 
-### Core Testing Strategies
+## Archive Status
 
-- **[GUIDE.md](./GUIDE.md)** - Testing philosophy and quick start guide
-- **[unit-patterns.md](./unit-patterns.md)** - Pure function and business logic testing
-- **[integration-patterns.md](./integration-patterns.md)** - Database and API testing with transactions
-- **[resilient-ui-patterns.md](./resilient-ui-patterns.md)** - UI testing patterns that resist minor changes (unit & E2E with MUI components)
+**Completed**: ✅ ~130 test files archived to `.archived-tests-2025-08-23/`
 
-### Advanced Testing Patterns (NEW)
+- Complex PGlite infrastructure removed
+- Multi-project test configurations cleaned up
+- E2E test suite archived (UI/UX in flux)
 
-- **[supabase-auth-patterns.md](./supabase-auth-patterns.md)** - Supabase authentication testing with user/org structure
-- **[advanced-mock-patterns.md](./advanced-mock-patterns.md)** - Sophisticated mocking with type preservation
-- **[hook-testing-patterns.md](./hook-testing-patterns.md)** - React hook testing with dependency injection
-- **[validation-factory-patterns.md](./validation-factory-patterns.md)** - Type-safe test data factories for validation
-- **[multi-tenant-testing.md](./multi-tenant-testing.md)** - Organization boundary and security testing
+## Future Plans
 
-### Infrastructure & Setup
+- [**TEST_SYSTEM_REBOOT_PLAN.md**](./TEST_SYSTEM_REBOOT_PLAN.md) - **PLANNED**: 9 archetype system for future implementation
+- [**RISK_ANALYSIS.md**](./RISK_ANALYSIS.md) - Risk assessment for minimal test coverage
 
-- **[test-database.md](./test-database.md)** - Supabase local setup for testing
-- **[configuration.md](./configuration.md)** - Vitest configuration and setup
-- **[performance.md](./performance.md)** - Test execution optimization
-- **[troubleshooting.md](./troubleshooting.md)** - Common issues and debugging
+**Legacy Documentation**: All previous testing patterns moved to `docs/deprecated/testing/`
+
+---
+
+**Current Approach**: Focus on velocity and rapid prototyping with minimal but reliable test foundation. Comprehensive testing system will be implemented when core features stabilize.

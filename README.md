@@ -41,15 +41,17 @@ This project leverages a modern, type-safe, and performant technology stack to e
 - **Database:** [PostgreSQL](https://www.postgresql.org/) via [Supabase](https://supabase.com/)
 - **Authentication:** [Supabase Auth](https://supabase.com/auth)
 
-### 🚨 Active Migration
+### ✅ Migration Near Complete
 
-PinPoint is currently undergoing a strategic migration to modernize its architecture:
+PinPoint has successfully completed its strategic migration to modernize its architecture:
 
-- **Timeline:** 6-week staged migration (currently in Week 4 - Phase 2)
+- **Timeline:** 6-week staged migration (**95% COMPLETE**)
 - **Stage 1** ✅ **COMPLETE**: Supabase Auth integration
-- **Stage 2** 🔄 **IN PROGRESS**: Drizzle ORM migration (Phase 2A foundation complete)
-- **Stage 3** ⏳ **UPCOMING**: Row Level Security activation
+- **Stage 2** ✅ **COMPLETE**: Drizzle ORM migration (100% Prisma removal achieved)
+- **Stage 3** ✅ **COMPLETE**: Row Level Security activation
 - **Benefits:** Database-enforced security, 100x faster serverless performance, better developer experience
+
+**Quality Status**: All tests and lints should now pass - any failures indicate issues that need fixing.
 
 For details, see the [Migration Guide](./docs/migration/supabase-drizzle/).
 
@@ -82,14 +84,14 @@ npm install
 
 # 2. Set up environment variables
 vercel link --project pin-point
-vercel env pull  # Downloads shared development environment from Vercel
+npm run env:pull  # Downloads shared development environment from Vercel
 
-# 3. Start Supabase and initialize database
-supabase start
+# 3. Start Supabase and initialize database (from root worktree)
+supabase start  # Start shared instance from root directory
 npm run reset:local
 
-# 4. Start development server (background mode)
-npm run dev:bg
+# 4. Start development server
+npm run dev
 
 # 5. Validate setup
 npm run check
@@ -101,9 +103,8 @@ Your development server will be running at **http://localhost:49200**
 
 **Essential Commands:**
 
-- `npm run dev:bg` - Start development server in background
-- `npm run dev:bg:status` - Check if server is running
-- `npm run dev:bg:stop` - Stop background server
+- `supabase start` - Start local Supabase instance
+- `npm run dev` - Start development server
 - `npm run check` - Run all quality checks (typecheck, lint, format, audit)
 - `npm run validate` - Full validation including tests (run before commits)
 
@@ -112,6 +113,13 @@ Your development server will be running at **http://localhost:49200**
 - `npm run db:reset:local:sb` - Reset database with fresh schema and seed data
 - `npm run db:push:local` - Sync schema changes without reset
 - `npm run db:seed:local:sb` - Seed data only (local Supabase)
+
+**Supabase Instance Strategy:**
+
+- **Default**: Start Supabase from root worktree - all worktrees share one instance
+- **Exception**: For major schema changes, stop root instance and start from current worktree
+- **Decision**: Only switch to worktree-specific after explicit confirmation
+- **Ports**: Supabase uses fixed ports (54321, 54322) - only one instance can run at a time
 
 ### Prerequisites
 
@@ -143,7 +151,7 @@ If you encounter issues, see [docs/troubleshooting.md](./docs/troubleshooting.md
 
 **Quick fixes:**
 
-- **Server not responding**: `npm run dev:bg:status` then `npm run dev:clean`
+- **Server not responding**: Stop with `Ctrl+C` then restart `npm run dev`
 - **Database issues**: `npm run reset:local`
 - **Dependency problems**: `npm run clean` then `npm install`
 

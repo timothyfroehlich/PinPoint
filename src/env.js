@@ -36,11 +36,11 @@ export const env = createEnv({
       getEnvironmentType() === "production"
         ? z.string()
         : z.string().optional(),
-    POSTGRES_PRISMA_URL:
+    DATABASE_URL:
       getEnvironmentType() === "test"
         ? z.string().url().optional()
         : z.string().url(),
-    POSTGRES_URL_NON_POOLING:
+    DIRECT_URL:
       getEnvironmentType() === "test"
         ? z.string().url().optional()
         : z.string().url(),
@@ -74,6 +74,10 @@ export const env = createEnv({
       getEnvironmentType() === "test"
         ? z.string().optional()
         : z.string().min(1, "Supabase JWT secret is required"),
+    SUPABASE_DB_URL:
+      getEnvironmentType() === "test"
+        ? z.string().url().optional()
+        : z.string().url().optional(), // Direct database connection URL
     // Future API keys mentioned in the issue (optional for now)
     PINBALL_MAP_API_KEY: z.string().optional(),
     OPDB_API_KEY: z.string().optional(),
@@ -89,6 +93,9 @@ export const env = createEnv({
     LOG_LEVEL: z
       .enum(["trace", "debug", "info", "warn", "error", "fatal"])
       .optional(),
+    // Test environment variables
+    VITEST: z.string().optional(), // Set by Vitest test runner
+    CI: z.string().optional(), // Set by CI environments
   },
 
   /**
@@ -124,8 +131,8 @@ export const env = createEnv({
    */
   runtimeEnv: {
     AUTH_SECRET: process.env["AUTH_SECRET"],
-    POSTGRES_PRISMA_URL: process.env["POSTGRES_PRISMA_URL"],
-    POSTGRES_URL_NON_POOLING: process.env["POSTGRES_URL_NON_POOLING"],
+    DATABASE_URL: process.env["DATABASE_URL"],
+    DIRECT_URL: process.env["DIRECT_URL"],
     NODE_ENV: process.env["NODE_ENV"],
     GOOGLE_CLIENT_ID: process.env["GOOGLE_CLIENT_ID"],
     GOOGLE_CLIENT_SECRET: process.env["GOOGLE_CLIENT_SECRET"],
@@ -145,6 +152,7 @@ export const env = createEnv({
     SUPABASE_URL: process.env["SUPABASE_URL"],
     SUPABASE_SECRET_KEY: process.env["SUPABASE_SECRET_KEY"],
     SUPABASE_JWT_SECRET: process.env["SUPABASE_JWT_SECRET"],
+    SUPABASE_DB_URL: process.env["SUPABASE_DB_URL"],
     // Client-side environment variables
     NEXT_PUBLIC_VERCEL_ENV: process.env["NEXT_PUBLIC_VERCEL_ENV"],
     NEXT_PUBLIC_SUPABASE_URL: process.env["NEXT_PUBLIC_SUPABASE_URL"],
@@ -152,6 +160,9 @@ export const env = createEnv({
       process.env["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"],
     // Logging configuration
     LOG_LEVEL: process.env["LOG_LEVEL"],
+    // Test environment variables
+    VITEST: process.env["VITEST"],
+    CI: process.env["CI"],
     NEXT_PUBLIC_ENABLE_DEV_FEATURES:
       process.env["NEXT_PUBLIC_ENABLE_DEV_FEATURES"],
     // Next.js automatically exposes NODE_ENV to the client

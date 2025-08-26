@@ -1,7 +1,8 @@
 import { TRPCError } from "@trpc/server";
-import { and, eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { z } from "zod";
 
+import { transformMachineResponse } from "~/lib/utils/machine-response-transformers";
 import { createTRPCRouter, machineEditProcedure } from "~/server/api/trpc";
 import { machines, locations, models, users } from "~/server/db/schema";
 
@@ -15,11 +16,11 @@ export const machineLocationRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Verify the game instance belongs to this organization
-      const existingInstance = await ctx.drizzle.query.machines.findFirst({
+      // Verify the game instance exists and belongs to user's organization
+      const existingInstance = await ctx.db.query.machines.findFirst({
         where: and(
           eq(machines.id, input.machineId),
-          eq(machines.organizationId, ctx.organization.id),
+          eq(machines.organization_id, ctx.organizationId),
         ),
       });
 
@@ -30,11 +31,11 @@ export const machineLocationRouter = createTRPCRouter({
         });
       }
 
-      // Verify the target location belongs to this organization
-      const location = await ctx.drizzle.query.locations.findFirst({
+      // Verify the target location exists and belongs to user's organization
+      const location = await ctx.db.query.locations.findFirst({
         where: and(
           eq(locations.id, input.locationId),
-          eq(locations.organizationId, ctx.organization.id),
+          eq(locations.organization_id, ctx.organizationId),
         ),
       });
 
@@ -46,34 +47,29 @@ export const machineLocationRouter = createTRPCRouter({
       }
 
       // Update machine location and return with all relationships in a single query
-      const updatedMachines = await ctx.drizzle
+      const updatedMachines = await ctx.db
         .update(machines)
         .set({
-          locationId: input.locationId,
-          updatedAt: new Date(),
+          location_id: input.locationId,
+          updated_at: new Date(),
         })
-        .where(
-          and(
-            eq(machines.id, input.machineId),
-            eq(machines.organizationId, ctx.organization.id),
-          ),
-        )
+        .where(eq(machines.id, input.machineId))
         .returning({
           id: machines.id,
           name: machines.name,
-          modelId: machines.modelId,
-          locationId: machines.locationId,
-          organizationId: machines.organizationId,
-          ownerId: machines.ownerId,
-          qrCodeId: machines.qrCodeId,
-          qrCodeUrl: machines.qrCodeUrl,
-          qrCodeGeneratedAt: machines.qrCodeGeneratedAt,
-          ownerNotificationsEnabled: machines.ownerNotificationsEnabled,
-          notifyOnNewIssues: machines.notifyOnNewIssues,
-          notifyOnStatusChanges: machines.notifyOnStatusChanges,
-          notifyOnComments: machines.notifyOnComments,
-          createdAt: machines.createdAt,
-          updatedAt: machines.updatedAt,
+          model_id: machines.model_id,
+          location_id: machines.location_id,
+          organization_id: machines.organization_id,
+          owner_id: machines.owner_id,
+          qr_code_id: machines.qr_code_id,
+          qr_code_url: machines.qr_code_url,
+          qr_code_generated_at: machines.qr_code_generated_at,
+          owner_notifications_enabled: machines.owner_notifications_enabled,
+          notify_on_new_issues: machines.notify_on_new_issues,
+          notify_on_status_changes: machines.notify_on_status_changes,
+          notify_on_comments: machines.notify_on_comments,
+          created_at: machines.created_at,
+          updated_at: machines.updated_at,
         });
 
       // If no rows were updated, the machine didn't exist or doesn't belong to the organization
@@ -94,49 +90,50 @@ export const machineLocationRouter = createTRPCRouter({
       }
 
       // Fetch the related data separately (model, location, owner)
-      const [machineWithRelations] = await ctx.drizzle
+      const [machineWithRelations] = await ctx.db
         .select({
           id: machines.id,
           name: machines.name,
-          modelId: machines.modelId,
-          locationId: machines.locationId,
-          organizationId: machines.organizationId,
-          ownerId: machines.ownerId,
-          qrCodeId: machines.qrCodeId,
-          qrCodeUrl: machines.qrCodeUrl,
-          qrCodeGeneratedAt: machines.qrCodeGeneratedAt,
-          ownerNotificationsEnabled: machines.ownerNotificationsEnabled,
-          notifyOnNewIssues: machines.notifyOnNewIssues,
-          notifyOnStatusChanges: machines.notifyOnStatusChanges,
-          notifyOnComments: machines.notifyOnComments,
-          createdAt: machines.createdAt,
-          updatedAt: machines.updatedAt,
+          model_id: machines.model_id,
+          location_id: machines.location_id,
+          organization_id: machines.organization_id,
+          owner_id: machines.owner_id,
+          qr_code_id: machines.qr_code_id,
+          qr_code_url: machines.qr_code_url,
+          qr_code_generated_at: machines.qr_code_generated_at,
+          owner_notifications_enabled: machines.owner_notifications_enabled,
+          notify_on_new_issues: machines.notify_on_new_issues,
+          notify_on_status_changes: machines.notify_on_status_changes,
+          notify_on_comments: machines.notify_on_comments,
+          created_at: machines.created_at,
+          updated_at: machines.updated_at,
           model: {
             id: models.id,
             name: models.name,
             manufacturer: models.manufacturer,
             year: models.year,
-            ipdbId: models.ipdbId,
-            opdbId: models.opdbId,
-            machineType: models.machineType,
-            machineDisplay: models.machineDisplay,
-            isActive: models.isActive,
-            ipdbLink: models.ipdbLink,
-            opdbImgUrl: models.opdbImgUrl,
-            kineticistUrl: models.kineticistUrl,
-            isCustom: models.isCustom,
+            ipdb_id: models.ipdb_id,
+            opdb_id: models.opdb_id,
+            machine_type: models.machine_type,
+            machine_display: models.machine_display,
+            is_active: models.is_active,
+            ipdb_link: models.ipdb_link,
+            opdb_img_url: models.opdb_img_url,
+            kineticist_url: models.kineticist_url,
+            is_custom: models.is_custom,
           },
           location: locations,
           owner: {
             id: users.id,
             name: users.name,
             image: users.image,
+            profile_picture: users.profile_picture,
           },
         })
         .from(machines)
-        .leftJoin(models, eq(machines.modelId, models.id))
-        .leftJoin(locations, eq(machines.locationId, locations.id))
-        .leftJoin(users, eq(machines.ownerId, users.id))
+        .leftJoin(models, eq(machines.model_id, models.id))
+        .leftJoin(locations, eq(machines.location_id, locations.id))
+        .leftJoin(users, eq(machines.owner_id, users.id))
         .where(eq(machines.id, updatedMachine.id))
         .limit(1);
 
@@ -148,6 +145,6 @@ export const machineLocationRouter = createTRPCRouter({
         });
       }
 
-      return machineWithRelations;
+      return transformMachineResponse(machineWithRelations);
     }),
 });

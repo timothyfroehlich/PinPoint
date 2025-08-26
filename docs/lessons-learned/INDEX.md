@@ -17,8 +17,6 @@ Core lessons integrated into main documentation for agent accessibility.
 
 - **[completed-task-consolidation.md](./completed-task-consolidation.md)** - Security-first architecture insights
 - **[public-api-endpoints.md](./public-api-endpoints.md)** - Multi-tenant scoping discoveries
-- **[migration-reports/](./migration-reports/)** - Technical migration reports and patterns
-  - **[phase-2a-drizzle-foundation.md](./migration-reports/phase-2a-drizzle-foundation.md)** - Drizzle index syntax, pgbouncer issues, dual-ORM patterns
 - **Integrated Lessons** - See CLAUDE.md for core insights
 
 ## Recent Critical Discoveries (Phase 2A)

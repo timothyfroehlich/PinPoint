@@ -1,0 +1,119 @@
+name: pgTAP RLS Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths: 
+      - 'supabase/tests/rls/**'
+      - 'scripts/migrations/**'
+      - 'src/server/db/schema/**'
+      - 'drizzle.config.*'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'supabase/tests/rls/**'
+      - 'scripts/migrations/**'
+      - 'src/server/db/schema/**'
+      - 'drizzle.config.*'
+
+permissions:
+  contents: read
+
+jobs:
+  pgtap-rls-tests:
+    name: pgTAP RLS Policy Validation
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+          POSTGRES_USER: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+      NODE_ENV: test
+      CI: true
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Install pgTAP
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-15-pgtap libtap-parser-sourcehandler-pgtap-perl
+      
+      - name: Setup database schema
+        run: |
+          # Push Drizzle schema to PostgreSQL
+          npm run db:push:local
+          
+          # Install pgTAP extension
+          psql $DATABASE_URL -c "CREATE EXTENSION IF NOT EXISTS pgtap;"
+          
+          # Setup test roles
+          psql $DATABASE_URL -f supabase/tests/setup/01-test-roles.sql
+      
+      - name: Run RLS migrations if they exist
+        run: |
+          if [ -d "scripts/migrations" ]; then
+            for migration in scripts/migrations/*.sql; do
+              if [ -f "$migration" ]; then
+                echo "Running migration: $migration"
+                psql $DATABASE_URL -f "$migration"
+              fi
+            done
+          else
+            echo "No migrations directory found, skipping"
+          fi
+      
+      - name: Run pgTAP RLS tests
+        run: |
+          cd supabase/tests
+          
+          # Check if we have RLS tests
+          if [ ! -d "rls" ] || [ -z "$(find rls -name "*.test.sql" 2>/dev/null)" ]; then
+            echo "⚠️ No pgTAP RLS tests found - skipping"
+            exit 0
+          fi
+          
+          # Make test runner executable
+          chmod +x ./run-tests.sh
+          
+          # Run pgTAP tests with pg_prove for better output
+          if command -v pg_prove >/dev/null 2>&1; then
+            echo "🧪 Running pgTAP RLS tests with pg_prove..."
+            pg_prove --ext .sql --recursive rls/
+          else
+            echo "🧪 Running pgTAP RLS tests with basic runner..."
+            ./run-tests.sh
+          fi
+      
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pgtap-rls-test-results
+          path: |
+            supabase/tests/*.log
+            supabase/tests/rls/*.log
+          retention-days: 7

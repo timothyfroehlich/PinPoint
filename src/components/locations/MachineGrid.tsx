@@ -18,10 +18,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useState, useMemo } from "react";
 
-import type { RouterOutputs } from "~/trpc/react";
-
-type MachineWithDetails =
-  RouterOutputs["location"]["getById"]["machines"][number];
+import type { MachineWithDetails } from "~/lib/types/api";
 
 interface MachineGridProps {
   machines: MachineWithDetails[];
@@ -183,9 +180,10 @@ export function MachineGrid({
                           sx={{ fontSize: 16, color: "text.secondary" }}
                         />
                         <Avatar
-                          {...(machine.owner.profilePicture && {
-                            src: machine.owner.profilePicture,
-                          })}
+                          {...(typeof machine.owner.profile_picture ===
+                            "string" && machine.owner.profile_picture
+                            ? { src: machine.owner.profile_picture }
+                            : {})}
                           sx={{ width: 20, height: 20 }}
                           alt={machine.owner.name ?? "Owner"}
                         />

@@ -11,14 +11,13 @@ This document describes the current implementation state of the PinPoint archite
 
 PinPoint is a multi-tenant issue tracking system for pinball arcade operators, built with modern TypeScript technologies and deployed on Vercel. The system provides comprehensive machine management, issue tracking, and team collaboration features with strict data isolation between organizations.
 
-> ⚠️ **MIGRATION IN PROGRESS**: PinPoint is actively migrating from Prisma + NextAuth to Supabase + Drizzle with database-level Row Level Security.
+> ✅ **MIGRATION COMPLETE**: PinPoint has completed the migration from Prisma + NextAuth to Supabase + Drizzle with database-level Row Level Security.
 >
-> - **Current Stack**: Dual-ORM (Prisma + Drizzle) + Supabase Auth + Application-level security
-> - **Target Stack**: Drizzle ORM + Supabase (Auth, Storage, RLS) + Database-level security
-> - **Progress**: Phase 1 (Supabase Auth) ✅ Complete | Phase 2A (Drizzle Foundation) ✅ Complete | Phase 2B-E 🔄 In Progress
-> - **Timeline**: 2-3 week direct conversion migration (Week 1 of 3)
+> - **Current Stack**: Drizzle ORM + Supabase (Auth, Storage, RLS) + Database-level security
+> - **Migration Status**: ✅ **Prisma Removal COMPLETE** - 100% Drizzle-only architecture achieved
+> - **Next Phase**: Ready for Phase 2 - RLS Implementation and snake_case database schema alignment
 >
-> For migration details, see [Migration Guide](/docs/migration/supabase-drizzle/)
+> For current patterns, see [Developer Guides](/docs/developer-guides/)
 
 ## Technology Stack (As Implemented)
 
@@ -28,7 +27,7 @@ PinPoint is a multi-tenant issue tracking system for pinball arcade operators, b
 | **Framework**      | Next.js 14 (App Router)                   | ✅ Implemented |
 | **UI Library**     | Material UI (MUI) v7 (yes, it's released) | ✅ Implemented |
 | **Database**       | PostgreSQL                                | ✅ Implemented |
-| **ORM**            | Prisma + Drizzle (dual-ORM migration)     | 🔄 Migrating   |
+| **ORM**            | Drizzle (100% Drizzle-only)               | ✅ Implemented |
 | **Authentication** | Supabase Auth                             | ✅ Implemented |
 | **API Layer**      | tRPC (exclusive)                          | ✅ Implemented |
 | **File Storage**   | Local (dev) / Vercel Blob (prod)          | ✅ Implemented |
@@ -159,12 +158,13 @@ export interface TRPCContext {
 - **Rollback Safety**: Can revert individual procedures if needed
 - **Type Safety**: Full TypeScript support for both ORMs
 
-#### Current Status (Phase 2A Complete)
+#### Current Status (Migration Complete)
 
-- ✅ Complete Drizzle schema with 1:1 Prisma parity
-- ✅ Both clients available in all tRPC procedures
-- ✅ 39 tests validate dual-ORM functionality
-- 🔄 Router migrations in progress (Phase 2B-E)
+- ✅ 100% Drizzle-only architecture achieved
+- ✅ Single Drizzle client in all tRPC procedures
+- ✅ 205 tests validate core functionality (simplified test system)
+- ✅ All routers converted to Drizzle-only patterns
+- 🔄 Snake_case database schema alignment in progress
 
 ### Unified Dashboard Progressive Enhancement
 
@@ -290,14 +290,17 @@ npm run db:reset:local:sb   # Reset and reseed
 npm run db:push:local       # Push schema changes
 npm run db:seed:local:sb          # Seed data only
 
-# Testing
-npm run test:coverage # Run tests with coverage report
+# Testing (Simplified System)
+npm test                    # Unit tests (1 file, 205 tests, ~214ms)
+npm run test:rls           # pgTAP RLS policy tests
+npm run smoke              # Playwright smoke tests
 ```
 
 ### Multi-Agent Development
 
 - Git worktrees for parallel development
-- Test-Driven Development workflow with specialized agents
+- Simplified testing strategy focused on critical paths (security, data validation, core business logic)
+- Complex test infrastructure archived during pre-beta focus on velocity
 - See: [Orchestrator System](../orchestrator-system/) for agent coordination
 
 ## Quality Standards
@@ -335,7 +338,7 @@ See `CLAUDE.md` for complete quality standards and development guidelines.
 
 1. **ESM Modules**: Project uses `"type": "module"` for modern JavaScript
 2. **No Migrations**: Pre-production uses `db:reset` for schema changes
-3. **Typed Mocks**: Tests use `jest.fn<T>()` for type safety
+3. **Minimal Testing**: Simplified test system focused on pure functions and critical security policies
 4. **Global Models**: OPDB data shared across organizations
 5. **Soft Deletes**: Comments use soft delete with audit trail
 
@@ -346,5 +349,4 @@ See `CLAUDE.md` for complete quality standards and development guidelines.
 - [Technical Design Document](../design-docs/technical-design-document.md) - Detailed specifications
 - [Orchestrator System](../orchestrator-system/) - Multi-agent coordination system
 - [Source Map](source-map.md) - File organization by feature
-- [Test Map](test-map.md) - Test file relationships
 - [Roadmap](../planning/roadmap.md) - Release planning

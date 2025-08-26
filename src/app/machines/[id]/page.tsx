@@ -22,14 +22,14 @@ export async function generateMetadata({
     const resolvedParams = await params;
     const machine = await api.machine.core.getById({ id: resolvedParams.id });
 
-    const machineName = machine.name || machine.model.name;
+    const machineName = machine.name || machine.model.name || "Unknown Machine";
 
     return {
       title: `${machineName} - PinPoint`,
-      description: `${machine.model.name} at ${machine.location.name}`,
+      description: `${machine.model.name || "Unknown Model"} at ${machine.location.name || "Unknown Location"}`,
       openGraph: {
         title: machineName,
-        description: `${machine.model.name} at ${machine.location.name}`,
+        description: `${machine.model.name || "Unknown Model"} at ${machine.location.name || "Unknown Location"}`,
         type: "article",
       },
     };
