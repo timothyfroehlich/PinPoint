@@ -2,7 +2,13 @@
 
 _Migration-focused updates for Prisma → Drizzle direct conversion_
 
-## Key Changes Since November 2025
+## Key Changes (2024-2025)
+
+### **🚀 2025 Integration Improvements**
+
+**Enhanced PGlite Integration**: Better memory management and query optimization  
+**Generated Columns Performance**: Improved database-level computation patterns  
+**Real-world Examples**: Production patterns for complex schema migrations
 
 ### 🎯 **Critical for Direct Conversion**
 

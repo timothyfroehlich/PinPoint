@@ -1,8 +1,100 @@
-# Next.js: App Router & Server-Centric Revolution
+# Next.js: App Router & Caching Revolution
 
-_Server Components, Server Actions, and modern caching for full-stack architecture_
+_Server Components, Server Actions, and critical caching changes for full-stack architecture_
 
-## Key Changes Since November 2025
+## 🚨 CRITICAL BREAKING CHANGES (Next.js 15.x - 2025)
+
+### **Caching Defaults Completely Changed**
+
+**BREAKING:** Next.js 15 fundamentally changed caching behavior - **defaults are now UNCACHED**:
+
+- **fetch requests** now default to `cache: "no-store"` (uncached)
+- **GET Route Handlers** now default to uncached behavior
+- **Client Router Cache** now defaults to uncached for page segments
+
+**Migration Impact:** Previous aggressive caching is GONE. Explicit cache configuration now required for performance.
+
+```typescript
+// BEFORE Next.js 15: fetch was cached by default
+const data = await fetch("https://api.example.com/posts") // ✅ Cached automatically
+
+// AFTER Next.js 15: fetch is uncached by default  
+const data = await fetch("https://api.example.com/posts") // ❌ Not cached!
+
+// REQUIRED: Explicit caching for performance
+const data = await fetch("https://api.example.com/posts", {
+  cache: "force-cache" // ✅ Must specify to cache
+})
+```
+
+### **PinPoint Migration Impact**
+
+**FOR PINPOINT:** Review all `fetch()` calls and data fetching patterns immediately:
+
+```typescript
+// Update all DAL functions for performance
+export async function getIssuesForOrg(organizationId: string) {
+  // Add explicit caching for frequently accessed data
+  const response = await fetch(`/api/issues?org=${organizationId}`, {
+    cache: "force-cache",
+    next: { revalidate: 60 } // Cache for 60 seconds
+  })
+  return response.json()
+}
+
+// Or use React 19 cache() for request-level memoization
+import { cache } from "react"
+export const getIssuesForOrg = cache(async (organizationId: string) => {
+  return await db.query.issues.findMany({
+    where: eq(issues.organizationId, organizationId)
+  })
+})
+```
+
+### **New APIs in Next.js 15.5+**
+
+**Form Component & unstable_after API**
+
+```typescript
+import { Form } from "next/form"
+
+// NEW: Built-in Form component with better defaults
+export function IssueForm() {
+  return (
+    <Form action={createIssueAction}>
+      <input name="title" required />
+      <input name="description" />
+      <button type="submit">Create Issue</button>
+    </Form>
+  )
+}
+
+// NEW: unstable_after for background tasks
+"use server"
+import { unstable_after } from "next/server"
+
+export async function createIssueAction(formData: FormData) {
+  const issue = await createIssue(formData)
+  
+  // Run after response is sent to user
+  unstable_after(async () => {
+    await sendNotificationEmail(issue)
+    await updateAnalytics(issue)
+  })
+  
+  redirect(`/issues/${issue.id}`)
+}
+```
+
+**TypeScript Improvements**
+
+- **Typed Routes**: Better type safety for `href` props
+- **Turbopack Beta**: Faster development builds
+- **Enhanced DevTools**: Better debugging for Server Components
+
+---
+
+## Key Architecture Changes (2024-2025)
 
 ### 🚨 **Paradigm Shift: Server-Centric Architecture**
 
@@ -34,10 +126,10 @@ async function createPost(formData: FormData) {
 }
 ```
 
-**Native Caching with `'use cache'`**
+**Request-Level Caching with React 19 cache()**
 
-- **DO:** Use `'use cache'` directive for memoization within requests
-- **DON'T:** Rely on client-side caching libraries for server data
+- **DO:** Use React 19's `cache()` API for request-level memoization
+- **DON'T:** Rely on client-side caching libraries for server data  
 - **Migration Benefit:** Request-level memoization prevents duplicate DB queries
 
 **Streaming & Suspense Integration**
@@ -145,21 +237,24 @@ async function SlowDataComponent() {
 
 ### Advanced Caching Strategies
 
-**Request Memoization with `'use cache'`**
+**Request Memoization with React 19 cache()**
 
 ```typescript
-async function getUser(id: string) {
-  'use cache'  // Memoize within single request
+import { cache } from "react"
+
+const getUser = cache(async (id: string) => {
+  // Memoized within single request - no duplicate queries
   const user = await db.query.users.findFirst({
     where: eq(users.id, id)
   })
   return user
-}
+})
 
 // Called multiple times in same request = only 1 DB query
 export default async function UserProfile({ userId }: { userId: string }) {
-  const user = await getUser(userId)
-  const posts = await getUserPosts(userId) // May also call getUser
+  const user = await getUser(userId)        // DB query executed
+  const posts = await getUserPosts(userId)  // May also call getUser()
+  const profile = await getUser(userId)     // Cache hit, no additional query!
 
   return <ProfileView user={user} posts={posts} />
 }
@@ -313,6 +408,13 @@ global.fetch = vi.fn().mockResolvedValue({
 
 ## Migration Checklist
 
+### 🚨 Phase 0: CRITICAL Caching Review (IMMEDIATE)
+
+- [ ] **Audit all fetch() calls**: Review every data fetching pattern in the application
+- [ ] **Add explicit caching**: Set `cache: "force-cache"` for frequently accessed data
+- [ ] **Performance testing**: Measure impact of uncached defaults
+- [ ] **React 19 cache() migration**: Replace repeated queries with request-level memoization
+
 ### Phase 1: App Router Setup
 
 - [ ] Create `app/` directory structure
@@ -322,8 +424,9 @@ global.fetch = vi.fn().mockResolvedValue({
 ### Phase 2: Data Fetching Migration
 
 - [ ] Replace `getServerSideProps` with async Server Components
-- [ ] Replace `getStaticProps` with cached `fetch()` calls
+- [ ] Replace `getStaticProps` with cached `fetch()` calls **with explicit caching**
 - [ ] Convert API routes to Server Actions where appropriate
+- [ ] Implement React 19 `cache()` for request-level memoization
 
 ### Phase 3: Component Updates
 
@@ -331,11 +434,12 @@ global.fetch = vi.fn().mockResolvedValue({
 - [ ] Wrap slow components with `<Suspense>` boundaries
 - [ ] Implement loading and error states
 
-### Phase 4: Caching Optimization
+### Phase 4: Modern API Integration
 
-- [ ] Add `'use cache'` directive for request memoization
-- [ ] Implement tag-based revalidation with `revalidateTag`
-- [ ] Set appropriate cache strategies for different data types
+- [ ] Use Next.js Form component for better form handling
+- [ ] Implement `unstable_after` for background tasks
+- [ ] Set up tag-based revalidation with `revalidateTag`
+- [ ] Optimize with TypeScript route typing
 
 ## Common Gotchas
 

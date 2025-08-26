@@ -1,8 +1,8 @@
 import InitColorSchemeScript from "@mui/material/InitColorSchemeScript";
 import { AppRouterCacheProvider } from "@mui/material-nextjs/v15-appRouter";
 
-import { AuthenticatedLayout } from "./_components/AuthenticatedLayout";
 import Providers from "./providers";
+import "./globals.css";
 
 import type { JSX } from "react";
 
@@ -27,7 +27,7 @@ export default function RootLayout({
           }}
         >
           <Providers>
-            <AuthenticatedLayout>{children}</AuthenticatedLayout>
+            {children}
           </Providers>
         </AppRouterCacheProvider>
       </body>
