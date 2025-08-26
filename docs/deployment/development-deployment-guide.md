@@ -45,7 +45,8 @@ cd PinPoint
 npm install
 
 # 3. Setup environment variables
-cp .env.example .env.local
+vercel link --project pin-point
+npm run env:pull  # Downloads shared development environment from Vercel
 ```
 
 ### Environment Variables (.env.local)

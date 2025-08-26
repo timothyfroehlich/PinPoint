@@ -20,7 +20,7 @@ export async function ensureAtLeastOneAdmin(
     .from(roles)
     .where(
       and(
-        eq(roles.organizationId, organizationId),
+        eq(roles.organization_id, organizationId),
         eq(roles.name, SYSTEM_ROLES.ADMIN),
       ),
     )
@@ -37,7 +37,7 @@ export async function ensureAtLeastOneAdmin(
   const [adminMemberCount] = await drizzle
     .select({ count: count() })
     .from(memberships)
-    .where(eq(memberships.roleId, adminRole.id));
+    .where(eq(memberships.role_id, adminRole.id));
 
   if (!adminMemberCount || adminMemberCount.count === 0) {
     throw new TRPCError({

@@ -23,7 +23,8 @@ import {
   IconButton,
   Tooltip,
 } from "@mui/material";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useState } from "react";
 
 import { ActiveFilters } from "./ActiveFilters";
@@ -32,6 +33,19 @@ import { FilterToolbar } from "./FilterToolbar";
 import { PermissionGate } from "~/components/permissions/PermissionGate";
 import { usePermissions } from "~/hooks/usePermissions";
 import { api } from "~/trpc/react";
+import {
+  type IssueFilters,
+  mergeFilters,
+  validateFilters,
+  clearAllFilters,
+} from "~/lib/issues/filterUtils";
+import { createFilteredUrl } from "~/lib/issues/urlUtils";
+import {
+  toggleSelection,
+  selectAll,
+  selectNone,
+} from "~/lib/issues/selectionUtils";
+// Types imported but managed via tRPC inferrence
 
 // Helper function to get status color based on category
 const getStatusColor = (
@@ -49,63 +63,9 @@ const getStatusColor = (
   }
 };
 
-interface IssueFilters {
-  locationId?: string | undefined;
-  machineId?: string | undefined;
-  statusIds?: string[] | undefined;
-  search?: string | undefined;
-  assigneeId?: string | undefined;
-  reporterId?: string | undefined;
-  ownerId?: string | undefined;
-  sortBy: "created" | "updated" | "status" | "severity" | "game";
-  sortOrder: "asc" | "desc";
-}
+// IssueFilters interface imported from ~/lib/issues/filterUtils
 
-// Type for issue data from tRPC (matches actual API response)
-interface IssueData {
-  id: string;
-  title: string;
-  status: {
-    id: string;
-    name: string;
-    category: "NEW" | "IN_PROGRESS" | "RESOLVED";
-    organizationId: string;
-    isDefault: boolean;
-  };
-  priority: {
-    id: string;
-    name: string;
-    order: number;
-    organizationId: string;
-    isDefault: boolean;
-  } | null;
-  machine: {
-    id: string;
-    name: string;
-    model: {
-      id: string;
-      name: string;
-      manufacturer: string | null;
-      year: number | null;
-    };
-    location: {
-      id: string;
-      name: string;
-      organizationId: string;
-    };
-  };
-  assignedTo: {
-    id: string;
-    name: string | null;
-    email: string | null;
-    image: string | null;
-  } | null;
-  createdAt: string | Date;
-  _count: {
-    comments: number;
-    attachments: number;
-  };
-}
+// Using centralized API types
 
 interface IssueListProps {
   initialFilters: IssueFilters;
@@ -115,10 +75,11 @@ export function IssueList({
   initialFilters,
 }: IssueListProps): React.JSX.Element {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { hasPermission, isLoading: permissionsLoading } = usePermissions();
 
-  const [filters, setFilters] = useState<IssueFilters>(initialFilters);
+  const [filters, setFilters] = useState<IssueFilters>(
+    validateFilters(initialFilters),
+  );
   const [selectedIssues, setSelectedIssues] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
@@ -133,72 +94,22 @@ export function IssueList({
 
   // Update URL when filters change
   const updateFilters = (newFilters: Partial<IssueFilters>): void => {
-    const updated: IssueFilters = { ...filters };
-
-    // Handle each filter property explicitly for TypeScript strictest
-    if ("locationId" in newFilters) {
-      updated.locationId = newFilters.locationId;
-    }
-    if ("machineId" in newFilters) {
-      updated.machineId = newFilters.machineId;
-    }
-    if ("statusIds" in newFilters) {
-      updated.statusIds = newFilters.statusIds;
-    }
-    if ("search" in newFilters) {
-      updated.search = newFilters.search;
-    }
-    if ("assigneeId" in newFilters) {
-      updated.assigneeId = newFilters.assigneeId;
-    }
-    if ("reporterId" in newFilters) {
-      updated.reporterId = newFilters.reporterId;
-    }
-    if ("ownerId" in newFilters) {
-      updated.ownerId = newFilters.ownerId;
-    }
-    if ("sortBy" in newFilters) {
-      updated.sortBy = newFilters.sortBy;
-    }
-    if ("sortOrder" in newFilters) {
-      updated.sortOrder = newFilters.sortOrder;
-    }
-
-    setFilters(updated);
+    const merged = mergeFilters(filters, newFilters);
+    setFilters(merged);
 
     // Update URL for shareable links
-    const params = new URLSearchParams(searchParams);
-
-    Object.entries(updated).forEach(([key, value]) => {
-      if (value != null && value !== "") {
-        if (Array.isArray(value)) {
-          // Handle array parameters (like statusIds)
-          params.delete(key); // Clear existing values
-          if (value.length > 0) {
-            value.forEach((item) => {
-              params.append(key, String(item));
-            });
-          }
-        } else {
-          params.set(key, String(value));
-        }
-      } else {
-        params.delete(key);
-      }
-    });
-
-    router.push(`/issues?${params.toString()}`);
+    const url = createFilteredUrl("/issues", merged);
+    router.push(url);
   };
 
   // Handle issue selection
   const handleSelectIssue = (issueId: string, selected: boolean): void => {
-    setSelectedIssues((prev) =>
-      selected ? [...prev, issueId] : prev.filter((id) => id !== issueId),
-    );
+    setSelectedIssues((prev) => toggleSelection(prev, issueId, selected));
   };
 
   const handleSelectAll = (selected: boolean): void => {
-    setSelectedIssues(selected ? (issues?.map((issue) => issue.id) ?? []) : []);
+    const issueIds = issues?.map((issue) => issue.id) ?? [];
+    setSelectedIssues(selected ? selectAll(issueIds) : selectNone());
   };
 
   // Note: Bulk actions to be implemented later
@@ -224,10 +135,8 @@ export function IssueList({
 
   // Handle clear all filters
   const handleClearAllFilters = (): void => {
-    setFilters({
-      sortBy: "created",
-      sortOrder: "desc",
-    });
+    const clearedFilters = clearAllFilters();
+    setFilters(clearedFilters);
     router.push("/issues");
   };
 
@@ -388,7 +297,7 @@ export function IssueList({
           </Grid>
 
           {/* Issue Cards */}
-          {issues.map((issue: IssueData) => (
+          {issues.map((issue) => (
             <Grid
               key={issue.id}
               size={{
@@ -448,11 +357,20 @@ export function IssueList({
                         mb={viewMode === "list" ? 0.5 : 1}
                         gap={2}
                       >
+                        {/* Accessible navigation: use real link for issue title */}
                         <Typography
                           variant={viewMode === "list" ? "subtitle1" : "h6"}
-                          component="h3"
+                          component={Link}
+                          href={`/issues/${issue.id}`}
+                          data-testid={`issue-title-${issue.id}`}
+                          data-issue-id={issue.id}
+                          onClick={(e) => {
+                            // Prevent selection checkbox / card handlers from conflicting
+                            e.stopPropagation();
+                          }}
                           sx={{
                             cursor: "pointer",
+                            textDecoration: "none",
                             "&:hover": {
                               textDecoration: "underline",
                               color: "primary.main",
@@ -461,11 +379,7 @@ export function IssueList({
                             textOverflow: "ellipsis",
                             whiteSpace: "nowrap",
                             minWidth: 0,
-                          }}
-                          onClick={(e) => {
-                            // Prevent event propagation to parent elements
-                            e.stopPropagation();
-                            router.push(`/issues/${issue.id}`);
+                            color: "text.primary",
                           }}
                         >
                           {issue.title}
@@ -493,8 +407,7 @@ export function IssueList({
                           whiteSpace: "nowrap",
                         }}
                       >
-                        {issue.machine.model.name} at{" "}
-                        {issue.machine.location.name}
+                        {`${issue.machine.model.name} at ${issue.machine.location.name}`}
                       </Typography>
                       {/* Priority and Comments/Attachments - Show in grid view or as inline in list */}
                       {viewMode === "grid" ? (
@@ -506,7 +419,7 @@ export function IssueList({
                           gap={1}
                         >
                           <Chip
-                            label={issue.priority?.name ?? "Normal"}
+                            label={issue.priority.name}
                             size="small"
                             variant="outlined"
                             sx={{ flexShrink: 0 }}
@@ -516,8 +429,8 @@ export function IssueList({
                             color="text.secondary"
                             sx={{ textAlign: "right" }}
                           >
-                            {issue._count.comments} comments •{" "}
-                            {issue._count.attachments} attachments
+                            {issue.comments.length} comments •{" "}
+                            {issue.attachments.length} attachments
                           </Typography>
                         </Box>
                       ) : (
@@ -528,13 +441,13 @@ export function IssueList({
                           mb={0.5}
                         >
                           <Chip
-                            label={issue.priority?.name ?? "Normal"}
+                            label={issue.priority.name}
                             size="small"
                             variant="outlined"
                           />
                           <Typography variant="caption" color="text.secondary">
-                            {issue._count.comments} comments •{" "}
-                            {issue._count.attachments} attachments
+                            {issue.comments.length} comments •{" "}
+                            {issue.attachments.length} attachments
                           </Typography>
                         </Box>
                       )}

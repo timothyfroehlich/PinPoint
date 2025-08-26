@@ -19,13 +19,13 @@ export const INCLUDE_PATTERNS = {
   // Production source code - strictest standards
   production: ["./src/**/*.{ts,tsx}"],
   // Test utility files - moderate standards (reusable test code)
-  testUtils: ["./src/test/**/*.{ts,tsx}"],
+  // NOTE: Currently unused - test infrastructure archived to .archived-tests-2025-08-23/
+  testUtils: [],
   // Test files - relaxed standards (pragmatic testing patterns)
   tests: [
     "./src/**/*.test.{ts,tsx}",
     "./src/**/*.spec.{ts,tsx}",
     "./src/**/__tests__/**/*.{ts,tsx}",
-    "./src/integration-tests/**/*.{ts,tsx}",
     "./e2e/**/*.{ts,tsx}",
   ],
   // Build and configuration files (including test setup)
@@ -33,7 +33,6 @@ export const INCLUDE_PATTERNS = {
     "./*.config.{js,ts}",
     "./vitest.setup.*.ts",
     "./scripts/**/*.{js,ts}",
-    "./prisma/**/*.ts",
   ],
 };
 /**
@@ -42,11 +41,9 @@ export const INCLUDE_PATTERNS = {
  */
 export const EXCLUDE_PATTERNS = {
   production: [
-    "./src/test/**/*",
     "./src/**/*.test.*",
     "./src/**/*.spec.*",
     "./src/**/__tests__/**/*",
-    "./src/integration-tests/**/*",
   ],
 };
 /**
@@ -97,15 +94,17 @@ export const ESLINT_RULES = {
     "@typescript-eslint/no-unsafe-return": "error",
     "@typescript-eslint/no-unsafe-enum-comparison": "error",
   },
-  // Test utilities - moderate warnings
+  // Test utilities - temporarily permissive during Phase 3 migration
+  // TODO: Create GitHub issue to restore moderate warnings post-Phase 3
   testUtils: {
-    "@typescript-eslint/no-explicit-any": "warn",
-    "@typescript-eslint/no-unsafe-assignment": "warn",
-    "@typescript-eslint/no-unsafe-argument": "warn",
-    "@typescript-eslint/no-unsafe-call": "warn",
-    "@typescript-eslint/no-unsafe-member-access": "warn",
-    "@typescript-eslint/no-unsafe-return": "warn",
-    "@typescript-eslint/no-unsafe-enum-comparison": "warn",
+    "@typescript-eslint/no-explicit-any": "off",
+    "@typescript-eslint/no-unsafe-assignment": "off",
+    "@typescript-eslint/no-unsafe-argument": "off",
+    "@typescript-eslint/no-unsafe-call": "off",
+    "@typescript-eslint/no-unsafe-member-access": "off",
+    "@typescript-eslint/no-unsafe-return": "off",
+    "@typescript-eslint/no-unsafe-enum-comparison": "off",
+    "@typescript-eslint/restrict-template-expressions": "off",
   },
   // Test files - allow pragmatic patterns
   tests: {

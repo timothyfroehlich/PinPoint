@@ -23,15 +23,13 @@ import {
 import NextLink from "next/link";
 
 import type { PinPointSupabaseUser } from "~/lib/supabase/types";
-import type { RouterOutputs } from "~/trpc/react";
+import type { MachineResponse } from "~/lib/types/api";
 
 import { PermissionGate } from "~/components/permissions";
 import { usePermissions } from "~/hooks/usePermissions";
 
-type MachineWithDetails = RouterOutputs["machine"]["core"]["getById"];
-
 interface MachineDetailViewProps {
-  machine: MachineWithDetails;
+  machine: MachineResponse;
   user: PinPointSupabaseUser | null;
   machineId: string;
 }
@@ -42,7 +40,7 @@ export function MachineDetailView({
   machineId,
 }: MachineDetailViewProps): React.ReactElement {
   const { hasPermission } = usePermissions();
-  const machineName = machine.name || machine.model.name;
+  const machineName = machine.name || machine.model.name || "Unknown Machine";
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>

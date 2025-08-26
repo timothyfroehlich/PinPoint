@@ -52,7 +52,9 @@ export function MachineSelector({
         }
         renderValue={(selectedValue) => {
           if (!selectedValue) return "";
-          const machine = machines?.find((m) => m.id === selectedValue);
+          const machine = machines?.find(
+            (m: MachineOption) => m.id === selectedValue,
+          );
           return machine ? machine.name || machine.model.name : selectedValue;
         }}
       >

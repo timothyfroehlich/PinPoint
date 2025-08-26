@@ -10,7 +10,7 @@
  */
 
 // =============================================================================
-// TYPE DEFINITIONS - Based on actual Prisma types from admin.ts
+// TYPE DEFINITIONS - Based on actual Drizzle types from admin.ts
 // =============================================================================
 
 export interface User {
