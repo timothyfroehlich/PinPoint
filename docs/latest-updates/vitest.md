@@ -2,7 +2,13 @@
 
 _Advanced mocking patterns for type-safe testing in modern JavaScript applications_
 
-## Key Changes Since November 2025
+## Key Changes (2024-2025)
+
+### **🚀 Vitest 3.0 Updates (2025)**
+
+**Enhanced Browser Mode**: Better ES module support for browser-based testing  
+**Performance Improvements**: Faster test execution and module resolution  
+**Improved TypeScript Integration**: Better type inference for mock functions
 
 ### 🎯 **Modern ES Module Mocking Standard**
 

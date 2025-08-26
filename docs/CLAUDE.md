@@ -1,4 +1,9 @@
 @INDEX.md
 
-After editing or adding to anything in this directory, update INDEX.md to reflect those changes. It should always be up to date.
-Any doc file that is more than 500 lines after it has been edited should be flagged to the user for possible splitting up
+Documentation has been cleaned up and consolidated for context efficiency:
+- Removed outdated migration references (Prisma removal complete)
+- Simplified INDEX files for better navigation
+- Archived obsolete files to .claude/recycle_bin/
+- Focused on actionable patterns over explanations
+
+Any doc file that is more than 500 lines after editing should be flagged for splitting.

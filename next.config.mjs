@@ -26,6 +26,12 @@ const config = {
     'pino-abstract-transport',
     'on-exit-leak-free'
   ],
+
+  // React Compiler for automatic optimization (2025)
+  experimental: {
+    reactCompiler: true, // Enable React Compiler optimization
+    // optimizeCss: true, // Temporarily disabled while Tailwind v4 is stabilizing
+  },
 };
 
 export default config;

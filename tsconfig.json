@@ -15,7 +15,8 @@
     /* Ensure path aliases work for middleware */
     "baseUrl": ".",
     "paths": {
-      "~/*": ["./src/*"]
+      "~/*": ["./src/*"],
+      "@/*": ["./src/*"]
     }
   },
   "include": [
@@ -24,6 +25,7 @@
     "lib/**/*.ts",
     "lib/**/*.tsx",
     ".next/types/**/*.ts",
+    "types/**/*.d.ts",
     "middleware.ts"
   ],
   "exclude": [
