@@ -1,11 +1,74 @@
-# Migration Patterns: Direct Conversion
+# Drizzle-Only Architecture Patterns
 
-Migration workflows optimized for velocity and clean implementations.
+Current patterns for PinPoint's 100% Drizzle-only architecture after completed Prisma removal.
 
-## 🎯 Core Migration Philosophy
+## 🎯 Architecture Status
 
-**Context:** Direct conversion approach - see [CLAUDE.md → Project Context](../../CLAUDE.md#project-context--development-phase)  
-**Principles:** One router at a time, clean Drizzle implementations, TypeScript safety net
+**Migration Status**: ✅ **COMPLETE** - Prisma fully removed  
+**Current State**: 100% Drizzle-only architecture achieved  
+**Infrastructure**: Single Drizzle client throughout system  
+**Context**: Modern TypeScript + Drizzle + Supabase SSR stack
+
+---
+
+## 🔧 Service Layer Architecture
+
+### Standard Service Pattern
+
+**Pattern**: All services use Drizzle-only dependency injection
+
+```typescript
+export class CollectionService {
+  constructor(private db: DrizzleClient) {}
+
+  async getLocationCollections(locationId: string) {
+    return await this.db.query.collections.findMany({
+      where: or(
+        eq(collections.location_id, locationId),
+        and(isNull(collections.location_id), eq(collections.is_manual, false)),
+      ),
+    });
+  }
+}
+```
+
+### Service Architecture
+
+**Current Services** (All Drizzle-only):
+
+- **Security**: `roleService.ts`, `permissionService.ts`
+- **Core Business**: `collectionService.ts`, `issueActivityService.ts`, `notificationService.ts`
+- **Integration**: `pinballmapService.ts`, `commentCleanupService.ts`, `qrCodeService.ts`
+
+---
+
+## 🏗️ Infrastructure Architecture
+
+### tRPC Context Pattern
+
+**Pattern**: Single Drizzle client in tRPC context
+
+```typescript
+export interface TRPCContext {
+  db: DrizzleClient;
+  session: Session | null;
+  supabase: SupabaseClient;
+}
+
+// Usage in procedures
+export const protectedProcedure = publicProcedure.use(({ ctx, next }) => {
+  if (!ctx.session?.user) {
+    throw new TRPCError({ code: "UNAUTHORIZED" });
+  }
+  return next({
+    ctx: {
+      ...ctx,
+      userId: ctx.session.user.id,
+      organizationId: ctx.session.user.user_metadata?.organizationId,
+    },
+  });
+});
+```
 
 ---
 
@@ -25,100 +88,109 @@ Migration workflows optimized for velocity and clean implementations.
 
 ---
 
-## 🗄️ Prisma → Drizzle Direct Conversion
+## 🧪 Test Infrastructure (Simplified)
 
-### Router Conversion Workflow
+### Current Test Architecture
 
-**Router Patterns:**
+**Status**: Minimal baseline system after test infrastructure archive
 
-- **Setup**: Context change from Prisma → Drizzle clients
-- **Query conversion**: `include` → `with` for relational queries → @docs/migration/supabase-drizzle/quick-reference/prisma-to-drizzle.md#query-patterns
-- **Organizational scoping**: Maintain multi-tenant boundaries
+```typescript
+// Current test pattern (Pure functions only)
+import { describe, it, expect } from "vitest";
+import { validateEmail } from "../inputValidation";
 
-### Generated Columns Pattern
+describe("Input Validation", () => {
+  it("should validate email formats correctly", () => {
+    expect(validateEmail("user@domain.com")).toBe(true);
+    expect(validateEmail("invalid")).toBe(false);
+  });
+});
+```
 
-**Pattern**: `.generatedAlwaysAs()` moves computed fields to DB → @docs/migration/supabase-drizzle/quick-reference/prisma-to-drizzle.md#generated-columns
+### Test Commands
 
----
+```bash
+npm test                    # Unit tests (1 file, 205 tests)
+npm run test:rls           # pgTAP RLS policy tests
+npm run smoke              # Playwright smoke tests
+```
 
-## 🧪 Testing Migration Patterns
-
-### Database Testing Setup
-
-**PGlite setup**: In-memory PostgreSQL for tests → @docs/quick-reference/testing-patterns.md#pglite  
-**Mock updates**: Update router test mocks for Drizzle patterns → @docs/quick-reference/testing-patterns.md#router-test-updates
-
----
-
-## ⚡ Next.js App Router Integration
-
-### App Router Integration
-
-**Server Components**: `async function` with direct DB queries → @docs/latest-updates/nextjs.md#server-components  
-**Server Actions**: `'use server'` mutations with `revalidatePath()` → @docs/latest-updates/nextjs.md#server-actions
+**Note**: Complex integration testing infrastructure archived to `.archived-tests-2025-08-23/` during system simplification. Focus on velocity and rapid prototyping.
 
 ---
 
-## 🚦 Migration Decision Tree
+## 🚦 Current Architecture Decision Tree
 
 ```
-Migration Task:
-├── Auth issues? → @docs/migration/supabase-drizzle/quick-reference/nextauth-to-supabase.md
-├── Router conversion? → @docs/migration/supabase-drizzle/quick-reference/prisma-to-drizzle.md
-├── Testing setup? → @docs/quick-reference/testing-patterns.md
-└── Complete strategy? → @docs/migration/supabase-drizzle/direct-conversion-plan.md
+Development Task:
+├── New service class? → Use Drizzle-only pattern + @docs/developer-guides/drizzle/current-patterns.md
+├── Database operations? → Use Drizzle queries + @docs/quick-reference/api-security-patterns.md
+├── Auth integration? → Use Supabase SSR + @docs/developer-guides/supabase/auth-patterns.md
+├── Testing needed? → Use minimal patterns + @docs/quick-reference/testing-patterns.md
+└── API endpoint? → Use tRPC with organizationId scoping + @docs/quick-reference/typescript-strictest-patterns.md
 ```
 
 ---
 
-## ⚠️ Common Migration Pitfalls
+## ⚠️ Common Architecture Pitfalls
 
-**Authentication Issues:**
+**Service Implementation:**
 
-- ❌ Using individual cookie methods (`get()`, `set()`)
-- ✅ Always use `getAll()` and `setAll()`
-- ❌ Skipping `getUser()` in middleware
-- ✅ Token refresh on every protected request
+- ❌ Using multiple database clients in one service
+- ✅ Single Drizzle client dependency injection pattern
+- ❌ Missing organizationId scoping in queries
+- ✅ Always include organization-level Row Level Security scoping
+- ❌ Complex service hierarchies with circular dependencies
+- ✅ Simple service classes with clear single responsibility
 
-**Database Conversion:**
+**Database Operations:**
 
-- ❌ Keeping Prisma patterns in Drizzle
-- ✅ Use relational queries for joins
-- ❌ Manual transaction management
-- ✅ Leverage database-generated columns
+- ❌ Raw SQL without parameterization
+- ✅ Use Drizzle query builder with proper type safety
+- ❌ Missing transaction boundaries for multi-table operations
+- ✅ Use Drizzle transactions for atomic operations
+- ❌ Inconsistent snake_case/camelCase field naming
+- ✅ Follow snake_case database schema, camelCase TypeScript variables
 
-**Testing Strategy:**
+**Testing Approach:**
 
-- ❌ External Docker databases for tests
-- ✅ PGlite in-memory for fast feedback
-- ❌ Mocking individual query methods
-- ✅ Mock entire database module
-
----
-
-## 📋 Router Conversion Process
-
-**Quick Checklist:** Read router → Convert procedures → Test → Commit  
-**Detailed workflow:** @docs/migration/supabase-drizzle/direct-conversion-plan.md#file-by-file-process
+- ❌ Over-engineering test infrastructure during rapid prototyping
+- ✅ Focus on critical paths: security policies, data validation, core business logic
+- ❌ Testing implementation details of rapidly changing UI
+- ✅ Test stable contracts and user-facing behavior
 
 ---
 
-## 🎯 Success Indicators
+## 📋 Development Process
 
-**Technical Metrics:**
-
-- TypeScript build passes
-- No Prisma imports remaining
-- All tests pass with new mocks
-- Manual user flows work correctly
-
-**Velocity Metrics:**
-
-- Converting 1-2 routers per day
-- Immediate issue resolution
-- Clean, readable Drizzle code
-- No parallel validation overhead
+**Standard Workflow:** Plan feature → Implement service → Add API route → Update UI → Test critical paths  
+**Security First:** Always include organizationId scoping for multi-tenant data isolation  
+**Type Safety:** Use TypeScript strict mode and Drizzle's type inference
 
 ---
 
-**Complete strategy**: @docs/migration/supabase-drizzle/direct-conversion-plan.md
+## 🎯 Architecture Quality Indicators
+
+**Technical Health:**
+
+- ✅ TypeScript builds with zero errors
+- ✅ All services use consistent Drizzle-only patterns
+- ✅ Database operations properly scoped by organization
+- ✅ Authentication flows use Supabase SSR patterns
+- ✅ Critical business logic has test coverage
+
+**Architecture Maturity:**
+
+- ✅ Service layer: 100% Drizzle-only with consistent patterns
+- ✅ Infrastructure: Single database client throughout
+- ✅ Dependencies: Modern stack (Next.js, Drizzle, Supabase, Material-UI)
+- ✅ Security: Row Level Security policies enforced
+- ✅ Testing: Strategic coverage for stable, critical functionality
+
+---
+
+**Related Patterns:**
+
+- API Security: `@docs/quick-reference/api-security-patterns.md`
+- TypeScript Patterns: `@docs/quick-reference/typescript-strictest-patterns.md`
+- Testing Strategy: `@docs/quick-reference/testing-patterns.md`

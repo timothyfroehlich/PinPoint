@@ -25,10 +25,10 @@ import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 
 import { PermissionButton, PermissionGate } from "~/components/permissions";
 import { api } from "~/trpc/react";
-import { type IssueWithDetails } from "~/types/issue";
+import { type IssueWithRelationsResponse } from "~/lib/types/api";
 
 interface IssueActionsProps {
-  issue: IssueWithDetails;
+  issue: NonNullable<IssueWithRelationsResponse>;
   user: PinPointSupabaseUser | null;
   hasPermission: (permission: string) => boolean;
   onError: (error: string) => void;

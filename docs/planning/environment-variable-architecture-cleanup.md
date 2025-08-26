@@ -34,7 +34,7 @@ This strategy provides clear separation of concerns while respecting project con
 
 | Environment     | Database                         | Dev Features | Source of Env Vars     | Use Case                       |
 | :-------------- | :------------------------------- | :----------- | :--------------------- | :----------------------------- |
-| **Development** | **Single Shared** Local Supabase | ✅ Enabled   | .env.development       | Local coding with npm run dev  |
+| **Development** | **Single Shared** Local Supabase | ✅ Enabled   | .env.local (Vercel)    | Local coding with npm run dev  |
 | **CI / Test**   | Ephemeral PostgreSQL Container   | ❌ Disabled  | GitHub Actions Secrets | Automated tests in CI          |
 | **Preview**     | Cloud Supabase (Shared)          | ✅ Enabled   | Vercel Preview Vars    | Staging, PR reviews, manual QA |
 | **Production**  | Cloud Supabase (Shared)          | ❌ Disabled  | Vercel Production Vars | Live user-facing application   |
@@ -66,7 +66,7 @@ This strategy provides clear separation of concerns while respecting project con
    IMAGE_STORAGE_PROVIDER="local"  
    OPDB_API_URL="https://opdb.org/api"
 
-3. **Create .env.development (Committed)**: This file contains overrides for local development, pointing to the now-standard local Supabase ports.  
+3. **Pull .env.local from Vercel**: Use `npm run env:pull` to download development environment variables from Vercel, pointing to the now-standard local Supabase ports.  
    \# Overrides for local development using the single shared Supabase instance.  
    DATABASE_URL="postgresql://postgres:postgres@localhost:54322/postgres"  
    NEXT_PUBLIC_SUPABASE_URL="http://localhost:54321"  

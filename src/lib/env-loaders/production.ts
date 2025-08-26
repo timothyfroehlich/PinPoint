@@ -31,10 +31,10 @@ export function loadProductionEnvironment(): void {
   config({ path: resolve(projectRoot, ".env.local") });
 
   // Ensure production environment has NODE_ENV set
-  // eslint-disable-next-line @typescript-eslint/dot-notation, no-restricted-properties, @typescript-eslint/no-unnecessary-condition
-  if (!process.env["NODE_ENV"]) {
-    // eslint-disable-next-line no-restricted-properties, @typescript-eslint/dot-notation
-    (process.env as { NODE_ENV?: string })["NODE_ENV"] = "production";
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition, no-restricted-properties
+  if (!process.env.NODE_ENV) {
+    // eslint-disable-next-line no-restricted-properties
+    (process.env as Record<string, string>)["NODE_ENV"] = "production";
   }
 }
 

@@ -1,9 +1,27 @@
 import { TRPCError } from "@trpc/server";
 import { eq, and } from "drizzle-orm";
+import type { InferSelectModel } from "drizzle-orm";
 import { z } from "zod";
 
+import {
+  transformKeysToCamelCase,
+  type DrizzleToCamelCase,
+} from "~/lib/utils/case-transformers";
 import { createTRPCRouter, machineEditProcedure } from "~/server/api/trpc";
 import { machines, memberships } from "~/server/db/schema";
+import type { models, locations, users } from "~/server/db/schema";
+
+// Type for the machine with its relationships
+type MachineWithRelations = InferSelectModel<typeof machines> & {
+  model: InferSelectModel<typeof models>;
+  location: InferSelectModel<typeof locations>;
+  owner: Pick<
+    InferSelectModel<typeof users>,
+    "id" | "name" | "profile_picture"
+  > | null;
+};
+
+type MachineWithRelationsResponse = DrizzleToCamelCase<MachineWithRelations>;
 
 export const machineOwnerRouter = createTRPCRouter({
   // Assign or remove owner from a game instance
@@ -14,12 +32,12 @@ export const machineOwnerRouter = createTRPCRouter({
         ownerId: z.string().optional(), // null/undefined to remove owner
       }),
     )
-    .mutation(async ({ ctx, input }) => {
-      // Verify the game instance belongs to this organization
-      const existingInstance = await ctx.drizzle.query.machines.findFirst({
+    .mutation(async ({ ctx, input }): Promise<MachineWithRelationsResponse> => {
+      // Verify the game instance exists and belongs to the user's organization
+      const existingInstance = await ctx.db.query.machines.findFirst({
         where: and(
           eq(machines.id, input.machineId),
-          eq(machines.organizationId, ctx.organization.id),
+          eq(machines.organization_id, ctx.organizationId),
         ),
       });
 
@@ -31,11 +49,11 @@ export const machineOwnerRouter = createTRPCRouter({
       }
 
       // If setting an owner, verify the user is a member of this organization
-      if (input.ownerId) {
-        const membership = await ctx.drizzle.query.memberships.findFirst({
+      if (input.ownerId && input.ownerId.trim() !== "") {
+        const membership = await ctx.db.query.memberships.findFirst({
           where: and(
-            eq(memberships.userId, input.ownerId),
-            eq(memberships.organizationId, ctx.organization.id),
+            eq(memberships.user_id, input.ownerId),
+            eq(memberships.organization_id, ctx.organizationId),
           ),
         });
 
@@ -47,10 +65,13 @@ export const machineOwnerRouter = createTRPCRouter({
         }
       }
 
-      // Update the machine owner
-      const [updatedMachine] = await ctx.drizzle
+      // Update the machine owner (treat empty string as null)
+      const [updatedMachine] = await ctx.db
         .update(machines)
-        .set({ ownerId: input.ownerId ?? null })
+        .set({
+          owner_id:
+            input.ownerId && input.ownerId.trim() !== "" ? input.ownerId : null,
+        })
         .where(eq(machines.id, input.machineId))
         .returning();
 
@@ -61,9 +82,12 @@ export const machineOwnerRouter = createTRPCRouter({
         });
       }
 
-      // Fetch the updated machine with its relationships
-      const machineWithRelations = await ctx.drizzle.query.machines.findFirst({
-        where: eq(machines.id, input.machineId),
+      // Fetch the updated machine with its relationships (ensure org scoping)
+      const machineWithRelations = await ctx.db.query.machines.findFirst({
+        where: and(
+          eq(machines.id, input.machineId),
+          eq(machines.organization_id, ctx.organizationId),
+        ),
         with: {
           model: true,
           location: true,
@@ -71,7 +95,7 @@ export const machineOwnerRouter = createTRPCRouter({
             columns: {
               id: true,
               name: true,
-              image: true,
+              profile_picture: true,
             },
           },
         },
@@ -84,6 +108,8 @@ export const machineOwnerRouter = createTRPCRouter({
         });
       }
 
-      return machineWithRelations;
+      return transformKeysToCamelCase(
+        machineWithRelations,
+      ) as MachineWithRelationsResponse;
     }),
 });

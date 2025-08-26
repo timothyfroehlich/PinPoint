@@ -1,16 +1,14 @@
 import { defineConfig } from "drizzle-kit";
 
-// Load development environment variables
-import "./src/lib/env-loaders/development";
-
 export default defineConfig({
   dialect: "postgresql",
   schema: "./src/server/db/schema/index.ts",
   out: "./supabase/migrations", // Output to Supabase migrations for proper integration
+  casing: "snake_case", // Convert camelCase TypeScript fields to snake_case PostgreSQL columns
 
   dbCredentials: {
     url:
-      process.env.POSTGRES_PRISMA_URL ??
+      process.env.DATABASE_URL ??
       "postgresql://postgres:postgres@localhost:54322/postgres",
   },
 
@@ -18,6 +16,6 @@ export default defineConfig({
   verbose: true,
   strict: false, // Allow force operations in development
   introspect: {
-    casing: "camel",
+    casing: "camel", // Keep camelCase when introspecting existing schemas
   },
 });

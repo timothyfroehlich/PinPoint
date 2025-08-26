@@ -41,7 +41,12 @@ const DEV_PASSWORD = "dev-login-123";
  * Allowed email domains for dev users
  * Restricts dev user creation to development-specific domains
  */
-const ALLOWED_DEV_DOMAINS = ["dev.local", "localhost", "pinpoint.dev"];
+const ALLOWED_DEV_DOMAINS = [
+  "dev.local",
+  "localhost",
+  "pinpoint.dev",
+  "example.com",
+];
 
 /**
  * Validates that an email is allowed for dev user creation

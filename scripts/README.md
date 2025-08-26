@@ -6,13 +6,7 @@ This directory contains utility scripts for PinPoint development workflows.
 
 ### Development Server Management
 
-- **`dev-background.sh`** - Manage development server in background
-  ```bash
-  npm run dev:bg        # Start server in background
-  npm run dev:bg:stop   # Stop background server
-  npm run dev:bg:status # Check server status
-  npm run dev:bg:logs   # View server logs
-  ```
+- Use `npm run dev` directly - background scripts have been removed for simplicity
 
 ### Worktree Management
 
@@ -52,8 +46,8 @@ This directory contains utility scripts for PinPoint development workflows.
 ### Starting Development
 
 ```bash
-npm run dev:bg        # Start development server
-npm run dev:bg:status # Verify it's running
+supabase start       # Start database
+npm run dev          # Start development server
 ```
 
 ### Database Validation
@@ -65,17 +59,38 @@ npm run db:push:local # Push schema changes
 
 ### Worktree Workflow
 
+**Standard Workflow (Shared Supabase):**
 ```bash
+# From root directory - start shared Supabase instance
+supabase start
+
+# Create and use worktree
 ./scripts/create-and-setup-worktree.sh feature-branch
 cd ../worktrees/feature-branch
-npm run dev:bg
+npm run dev  # Uses shared Supabase from root
 ```
+
+**Worktree-Specific Supabase (Only when explicitly needed):**
+```bash
+# Stop shared instance first
+supabase stop
+
+# In worktree directory
+cd ../worktrees/feature-branch
+supabase start  # Start instance specific to this worktree
+npm run dev
+```
+
+**When to use worktree-specific Supabase:**
+- Major schema migrations that conflict with root
+- Significant database structure changes
+- **Decision**: Only after explicit confirmation - ask first!
 
 ## Related Commands
 
 Most scripts are wrapped in package.json commands. Use `npm run` commands when available:
 
-- `npm run dev:bg*` - Background development server
+- `npm run dev` - Development server
 - `npm run db:*` - Database operations
 - `npm run setup:worktree` - Worktree initialization
 

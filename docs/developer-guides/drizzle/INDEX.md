@@ -49,7 +49,6 @@ src/server/db/schema/
 - [Schema Patterns](./schema-patterns.md) - Table definitions, relations, migrations, PinPoint-specific patterns
 - [Query Patterns](./query-patterns.md) - Common queries, joins, transactions, Drizzle patterns
 - [Testing Patterns](./testing-patterns.md) - Mock strategies, CRUD validation, integration testing
-- [Direct Conversion Migration](./dual-orm-migration.md) - Direct conversion strategies from Prisma to Drizzle
 - [Drizzle + Zod Validation](./drizzle-zod-validation.md) - Input validation with generated schemas
 
 ## Key Implementation Decisions

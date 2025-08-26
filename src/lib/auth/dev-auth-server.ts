@@ -27,7 +27,12 @@ export interface DevUserCreationResult {
 const DEV_PASSWORD = "dev-login-123";
 
 // Allowed email domains for dev users
-const ALLOWED_DEV_DOMAINS = ["dev.local", "pinpoint.dev"];
+const ALLOWED_DEV_DOMAINS = [
+  "dev.local",
+  "localhost",
+  "pinpoint.dev",
+  "example.com",
+];
 
 /**
  * Validates if an email is allowed for dev user creation
@@ -74,7 +79,7 @@ export async function createDevUserAction(
       },
       app_metadata: {
         role: userData.role ?? "member",
-        organization_id: userData.organizationId,
+        organizationId: userData.organizationId,
         dev_created: true,
         created_at: new Date().toISOString(),
       },

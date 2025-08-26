@@ -1,19 +1,11 @@
-import { eq, and, or, sql, count, type InferSelectModel } from "drizzle-orm";
+import { and, eq, or, gte, lte, sql, asc, isNull } from "drizzle-orm";
 
-import { type DrizzleClient } from "../db/drizzle";
-import {
-  collections,
-  collectionTypes,
-  collectionMachines,
-  machines,
-  models,
-} from "../db/schema";
+import { collections, collectionTypes, machines, models } from "../db/schema";
+
+import type { DrizzleClient } from "../db/drizzle";
+import type { InferSelectModel } from "drizzle-orm";
 
 import { generateId } from "~/lib/utils/id-generation";
-
-// Type definitions using Drizzle schema inference
-type Collection = InferSelectModel<typeof collections>;
-type CollectionType = InferSelectModel<typeof collectionTypes>;
 
 export interface CreateManualCollectionData {
   name: string;
@@ -21,6 +13,25 @@ export interface CreateManualCollectionData {
   locationId?: string;
   description?: string;
 }
+
+// Type definitions for raw SQL query results
+interface MachineIdResult {
+  id: string;
+}
+
+interface CountResult {
+  count: string | number;
+}
+
+interface MachineWithModelResult {
+  id: string;
+  model_name: string;
+  manufacturer: string | null;
+  year: number | null;
+}
+
+// Drizzle's execute() returns the results directly, not wrapped in a rows object
+type SqlExecuteResult<T = unknown> = T[];
 
 export interface CollectionWithMachines {
   id: string;
@@ -40,6 +51,28 @@ export interface CollectionWithMachines {
   }[];
 }
 
+// Type definitions using Drizzle schema inference
+type Collection = InferSelectModel<typeof collections>;
+type CollectionType = InferSelectModel<typeof collectionTypes>;
+
+interface CollectionWithTypeAndCount {
+  id: string;
+  name: string;
+  typeId: string;
+  locationId: string | null;
+  isManual: boolean;
+  isSmart: boolean;
+  description: string | null;
+  sortOrder: number;
+  filterCriteria: unknown;
+  type: {
+    id: string;
+    name: string;
+    displayName: string | null;
+  };
+  machineCount: number;
+}
+
 type CollectionTypeWithCount = CollectionType & {
   collectionCount: number;
 };
@@ -49,79 +82,102 @@ export class CollectionService {
 
   /**
    * Get collections for a location (for public filtering)
+   * RLS automatically scopes to user's organization through collection types and locations
    */
-  async getLocationCollections(
-    locationId: string,
-    organizationId: string,
-  ): Promise<{
+  async getLocationCollections(locationId: string): Promise<{
     manual: CollectionWithMachines[];
     auto: CollectionWithMachines[];
   }> {
-    // Use a join query instead of nested relational queries for better control
-    const collectionsData = await this.db
-      .select({
-        collectionId: collections.id,
-        collectionName: collections.name,
-        collectionIsManual: collections.isManual,
-        collectionSortOrder: collections.sortOrder,
-        typeId: collectionTypes.id,
-        typeName: collectionTypes.name,
-        typeDisplayName: collectionTypes.displayName,
-        typeSortOrder: collectionTypes.sortOrder,
-        machineCount: count(machines.id).as("machine_count"),
-      })
-      .from(collections)
-      .innerJoin(collectionTypes, eq(collections.typeId, collectionTypes.id))
-      .leftJoin(
-        machines,
+    // Get collections with type information using Drizzle relational queries
+    const collectionsWithTypes = await this.db.query.collections.findMany({
+      where: or(
+        eq(collections.location_id, locationId), // Location-specific collections
         and(
-          sql`EXISTS (
-            SELECT 1 FROM ${collectionMachines} cm 
-            WHERE cm.collection_id = ${collections.id} 
-            AND cm.machine_id = ${machines.id}
-          )`,
-          eq(machines.locationId, locationId),
+          isNull(collections.location_id), // Organization-wide auto-collections
+          eq(collections.is_manual, false),
         ),
-      )
-      .where(
-        and(
-          or(
-            eq(collections.locationId, locationId), // Location-specific collections
-            and(
-              sql`${collections.locationId} IS NULL`, // Organization-wide auto-collections
-              eq(collections.isManual, false),
-            ),
-          ),
-          eq(collectionTypes.organizationId, organizationId),
-          eq(collectionTypes.isEnabled, true),
-        ),
-      )
-      .groupBy(
-        collections.id,
-        collections.name,
-        collections.isManual,
-        collections.sortOrder,
-        collectionTypes.id,
-        collectionTypes.name,
-        collectionTypes.displayName,
-        collectionTypes.sortOrder,
-      )
-      .orderBy(collectionTypes.sortOrder, collections.sortOrder);
+      ),
+      with: {
+        type: {
+          columns: {
+            id: true,
+            name: true,
+            display_name: true,
+            organization_id: true,
+            is_enabled: true,
+            sort_order: true,
+          },
+        },
+      },
+      orderBy: [asc(collections.sort_order)],
+    });
+
+    // Filter for enabled types in the organization and calculate machine counts
+    const collectionsData: CollectionWithTypeAndCount[] = [];
+
+    for (const collection of collectionsWithTypes) {
+      // Skip if type is not enabled (RLS handles organization filtering)
+      if (!collection.type.is_enabled) {
+        continue;
+      }
+
+      // Count machines in this collection at the specific location
+      // Note: This assumes a collection_machines junction table exists
+      const machineCountResult = (await this.db.execute(sql`
+        SELECT COUNT(*) as count
+        FROM collection_machines cm
+        INNER JOIN machines m ON cm.machine_id = m.id
+        WHERE cm.collection_id = ${collection.id}
+      AND m.location_id = ${locationId}
+      `)) as unknown as SqlExecuteResult<CountResult>;
+
+      const machineCount = Number(machineCountResult[0]?.count) || 0;
+
+      // Adapt DB row (snake_case) to domain shape (camelCase)
+      collectionsData.push({
+        id: collection.id,
+        name: collection.name,
+        typeId: collection.type_id,
+        locationId: collection.location_id,
+        isManual: collection.is_manual,
+        isSmart: collection.is_smart,
+        description: collection.description,
+        sortOrder: collection.sort_order,
+        filterCriteria: collection.filter_criteria,
+        type: {
+          id: collection.type.id,
+          name: collection.type.name,
+          displayName: collection.type.display_name,
+        },
+        machineCount,
+      });
+    }
+
+    // Sort by type sort order, then collection sort order
+    collectionsData.sort((a, b) => {
+      const typeA = collectionsWithTypes.find((c) => c.id === a.id)?.type;
+      const typeB = collectionsWithTypes.find((c) => c.id === b.id)?.type;
+
+      if (typeA?.sort_order !== typeB?.sort_order) {
+        return (typeA?.sort_order ?? 0) - (typeB?.sort_order ?? 0);
+      }
+      return a.sortOrder - b.sortOrder;
+    });
 
     const { manual, auto } = collectionsData.reduce(
       (acc, collection) => {
         const collectionData: CollectionWithMachines = {
-          id: collection.collectionId,
-          name: collection.collectionName,
+          id: collection.id,
+          name: collection.name,
           type: {
-            id: collection.typeId,
-            name: collection.typeName,
-            displayName: collection.typeDisplayName,
+            id: collection.type.id,
+            name: collection.type.name,
+            displayName: collection.type.displayName,
           },
           machineCount: collection.machineCount,
         };
 
-        if (collection.collectionIsManual) {
+        if (collection.isManual) {
           acc.manual.push(collectionData);
         } else {
           acc.auto.push(collectionData);
@@ -140,6 +196,7 @@ export class CollectionService {
 
   /**
    * Get machines in a collection at a specific location
+   * RLS automatically scopes machines and collections to user's organization
    */
   async getCollectionMachines(
     collectionId: string,
@@ -154,89 +211,77 @@ export class CollectionService {
       };
     }[]
   > {
-    // Use a join query to get machines in the collection at the location
-    const machinesData = await this.db
-      .select({
-        id: machines.id,
-        modelName: models.name,
-        modelManufacturer: models.manufacturer,
-        modelYear: models.year,
-      })
-      .from(machines)
-      .innerJoin(models, eq(machines.modelId, models.id))
-      .innerJoin(
-        collectionMachines,
-        eq(collectionMachines.machineId, machines.id),
-      )
-      .where(
-        and(
-          eq(machines.locationId, locationId),
-          eq(collectionMachines.collectionId, collectionId),
-        ),
-      )
-      .orderBy(models.name);
+    // Get machines in the collection at the specific location using junction table
+    const machinesInCollection = (await this.db.execute(sql`
+      SELECT
+        m.id,
+        mo.name as model_name,
+        mo.manufacturer,
+        mo.year
+      FROM machines m
+      INNER JOIN collection_machines cm ON m.id = cm.machine_id
+      INNER JOIN models mo ON m.model_id = mo.id
+      WHERE cm.collection_id = ${collectionId}
+        AND m.location_id = ${locationId}
+      ORDER BY mo.name ASC
+    `)) as unknown as SqlExecuteResult<MachineWithModelResult>;
 
-    return machinesData.map((machine) => ({
-      id: machine.id,
+    return machinesInCollection.map((row) => ({
+      id: row.id,
       model: {
-        name: machine.modelName,
-        manufacturer: machine.modelManufacturer,
-        year: machine.modelYear,
+        name: row.model_name,
+        manufacturer: row.manufacturer,
+        year: row.year,
       },
     }));
   }
 
   /**
    * Create a manual collection
+   * RLS automatically sets organizationId via trigger or policy
    */
   async createManualCollection(
-    organizationId: string,
     data: CreateManualCollectionData,
   ): Promise<Collection> {
-    // Validate that the collection type belongs to the specified organization
-    const [type] = await this.db
-      .select()
-      .from(collectionTypes)
-      .where(
-        and(
-          eq(collectionTypes.id, data.typeId),
-          eq(collectionTypes.organizationId, organizationId),
-        ),
-      )
-      .limit(1);
+    // Get organizationId from collection type
+    const collectionType = await this.db.query.collectionTypes.findFirst({
+      where: eq(collectionTypes.id, data.typeId),
+    });
 
-    if (!type) {
-      throw new Error(
-        "Collection type does not belong to the specified organization",
-      );
+    if (!collectionType) {
+      throw new Error("Collection type not found");
     }
+
     const createData = {
-      id: generateId(), // Generate UUID using centralized utility
+      id: generateId(),
       name: data.name,
-      typeId: data.typeId,
-      locationId: data.locationId ?? null,
+      type_id: collectionType.id,
+      organization_id: collectionType.organization_id,
+      location_id: data.locationId ?? null,
       description: data.description ?? null,
-      isManual: true,
-      isSmart: false,
-      sortOrder: 0,
-      filterCriteria: null,
+      is_manual: true,
+      is_smart: false,
+      sort_order: 0,
+      filter_criteria: null,
     };
 
-    const [newCollection] = await this.db
+    const result = await this.db
       .insert(collections)
       .values(createData)
       .returning();
 
-    if (!newCollection) {
+    const collection = result[0];
+    if (!collection) {
       throw new Error("Failed to create collection");
     }
 
-    return newCollection;
+    return collection;
   }
 
   /**
    * Add machines to a manual collection
    * Uses PostgreSQL-specific unnest function for efficient bulk insert
+   * RLS automatically validates that collection and machines belong to user's organization
    *
    * NOTE: Uses raw SQL for PostgreSQL-specific bulk operations. The machineIds parameter
    * is properly parameterized to prevent SQL injection. Drizzle supports many-to-many
@@ -247,29 +292,32 @@ export class CollectionService {
     collectionId: string,
     machineIds: string[],
   ): Promise<void> {
-    if (machineIds.length === 0) return;
-
-    // Use PostgreSQL-specific unnest function for bulk insert with proper conflict handling
-    // Note: machineIds array is properly parameterized to prevent SQL injection
-    await this.db.execute(sql`
-      INSERT INTO ${collectionMachines} (collection_id, machine_id)
-      SELECT ${collectionId}, unnest(${machineIds})
-      ON CONFLICT (collection_id, machine_id) DO NOTHING
-    `);
+    // Insert into junction table, ignoring duplicates
+    if (machineIds.length > 0) {
+      const machineIdArray = sql.join(
+        machineIds.map((id) => sql`${id}`),
+        sql`, `,
+      );
+      await this.db.execute(sql`
+        INSERT INTO collection_machines (collection_id, machine_id)
+  SELECT ${collectionId}, unnest(ARRAY[${machineIdArray}])
+        ON CONFLICT (collection_id, machine_id) DO NOTHING
+      `);
+    }
   }
 
   /**
-   * Generate auto-collections for an organization
+   * Generate auto-collections for the current user's organization
+   * RLS automatically scopes collection types and machines to user's organization
    */
-  async generateAutoCollections(organizationId: string): Promise<{
+  async generateAutoCollections(): Promise<{
     generated: number;
     updated: number;
   }> {
     const autoTypes = await this.db.query.collectionTypes.findMany({
       where: and(
-        eq(collectionTypes.organizationId, organizationId),
-        eq(collectionTypes.isAutoGenerated, true),
-        eq(collectionTypes.isEnabled, true),
+        eq(collectionTypes.is_auto_generated, true),
+        eq(collectionTypes.is_enabled, true),
       ),
     });
 
@@ -277,11 +325,11 @@ export class CollectionService {
     let updated = 0;
 
     for (const type of autoTypes) {
-      if (type.sourceField === "manufacturer") {
+      if (type.source_field === "manufacturer") {
         const result = await this.generateManufacturerCollections(type);
         generated += result.generated;
         updated += result.updated;
-      } else if (type.sourceField === "year") {
+      } else if (type.source_field === "year") {
         const result = await this.generateYearCollections(type);
         generated += result.generated;
         updated += result.updated;
@@ -293,27 +341,26 @@ export class CollectionService {
 
   /**
    * Generate manufacturer-based collections
+   * RLS automatically scopes all queries to user's organization
    */
   private async generateManufacturerCollections(
     collectionType: CollectionType,
   ): Promise<{ generated: number; updated: number }> {
-    // Get all unique manufacturers for machines in this organization using Drizzle
-    const manufacturerData = await this.db
+    // Get all unique manufacturers for machines in this organization
+    const machineModels = await this.db
       .selectDistinct({
         manufacturer: models.manufacturer,
       })
       .from(machines)
-      .innerJoin(models, eq(machines.modelId, models.id))
+      .innerJoin(models, eq(machines.model_id, models.id))
       .where(
-        and(
-          eq(machines.organizationId, collectionType.organizationId),
-          sql`${models.manufacturer} IS NOT NULL`,
-        ),
+        // RLS automatically scopes machines to user's organization
+        sql`${models.manufacturer} IS NOT NULL`,
       );
 
-    const uniqueManufacturers = manufacturerData
+    const uniqueManufacturers = machineModels
       .map((m) => m.manufacturer)
-      .filter((m): m is string => m !== null);
+      .filter((m: string | null): m is string => m !== null);
 
     let generated = 0;
     let updated = 0;
@@ -323,62 +370,83 @@ export class CollectionService {
       const existing = await this.db.query.collections.findFirst({
         where: and(
           eq(collections.name, manufacturer),
-          eq(collections.typeId, collectionType.id),
-          sql`${collections.locationId} IS NULL`, // Organization-wide
+          eq(collections.type_id, collectionType.id),
+          isNull(collections.location_id), // Organization-wide
         ),
       });
 
-      // Get all machines with this manufacturer
-      const machinesWithManufacturer = await this.db
-        .select({ id: machines.id })
-        .from(machines)
-        .innerJoin(models, eq(machines.modelId, models.id))
-        .where(
-          and(
-            eq(machines.organizationId, collectionType.organizationId),
-            eq(models.manufacturer, manufacturer),
-          ),
-        );
-
-      const machineIds = machinesWithManufacturer.map((m) => m.id);
-
       if (!existing) {
         // Create new collection
-        const [collection] = await this.db
+        const result = await this.db
           .insert(collections)
           .values({
             id: generateId(),
             name: manufacturer,
-            typeId: collectionType.id,
-            locationId: null,
-            isManual: false,
-            isSmart: false,
-            sortOrder: 0,
-            filterCriteria: { manufacturer },
+            type_id: collectionType.id,
+            organization_id: collectionType.organization_id,
+            location_id: null,
+            is_manual: false,
+            is_smart: false,
+            sort_order: 0,
+            filter_criteria: { manufacturer },
             description: null,
           })
           .returning();
 
+        const collection = result[0];
         if (!collection) {
           throw new Error("Failed to create manufacturer collection");
         }
 
-        // Add machines to collection (using placeholder SQL)
-        if (machineIds.length > 0) {
-          await this.addMachinesToCollection(collection.id, machineIds);
+        // Add all machines with this manufacturer (RLS scoped)
+        const manufacturerMachines = await this.db
+          .select({ id: machines.id })
+          .from(machines)
+          .innerJoin(models, eq(machines.model_id, models.id))
+          .where(
+            // RLS automatically scopes machines to user's organization
+            eq(models.manufacturer, manufacturer),
+          );
+
+        if (manufacturerMachines.length > 0) {
+          const machineIdArray = sql.join(
+            manufacturerMachines.map((m: MachineIdResult) => sql`${m.id}`),
+            sql`, `,
+          );
+          await this.db.execute(sql`
+            INSERT INTO collection_machines (collection_id, machine_id)
+            SELECT ${collection.id}, unnest(ARRAY[${machineIdArray}])
+          `);
         }
 
         generated++;
       } else {
-        // Update existing collection with new machines (replace all)
-        // First remove existing associations, then add new ones
+        // Update existing collection with new machines (replace all, RLS scoped)
+        const manufacturerMachines = await this.db
+          .select({ id: machines.id })
+          .from(machines)
+          .innerJoin(models, eq(machines.model_id, models.id))
+          .where(
+            // RLS automatically scopes machines to user's organization
+            eq(models.manufacturer, manufacturer),
+          );
+
+        // First remove all existing associations
         await this.db.execute(sql`
-          DELETE FROM ${collectionMachines} 
+          DELETE FROM collection_machines
           WHERE collection_id = ${existing.id}
         `);
 
-        if (machineIds.length > 0) {
-          await this.addMachinesToCollection(existing.id, machineIds);
+        // Then add current machines
+        if (manufacturerMachines.length > 0) {
+          const machineIdArray = sql.join(
+            manufacturerMachines.map((m: MachineIdResult) => sql`${m.id}`),
+            sql`, `,
+          );
+          await this.db.execute(sql`
+            INSERT INTO collection_machines (collection_id, machine_id)
+            SELECT ${existing.id}, unnest(ARRAY[${machineIdArray}])
+          `);
         }
 
         updated++;
@@ -390,6 +458,7 @@ export class CollectionService {
 
   /**
    * Generate year/era-based collections
+   * RLS automatically scopes all queries to user's organization
    */
   private async generateYearCollections(
     collectionType: CollectionType,
@@ -412,41 +481,35 @@ export class CollectionService {
       const existing = await this.db.query.collections.findFirst({
         where: and(
           eq(collections.name, era.name),
-          eq(collections.typeId, collectionType.id),
-          sql`${collections.locationId} IS NULL`,
+          eq(collections.type_id, collectionType.id),
+          isNull(collections.location_id),
         ),
       });
 
-      // Find machines in this era
-      const machinesInEra = await this.db
+      const eraMachines = await this.db
         .select({ id: machines.id })
         .from(machines)
-        .innerJoin(models, eq(machines.modelId, models.id))
+        .innerJoin(models, eq(machines.model_id, models.id))
         .where(
-          and(
-            eq(machines.organizationId, collectionType.organizationId),
-            sql`${models.year} >= ${era.start}`,
-            sql`${models.year} <= ${era.end}`,
-          ),
+          // RLS automatically scopes machines to user's organization
+          and(gte(models.year, era.start), lte(models.year, era.end)),
         );
 
-      if (machinesInEra.length === 0) continue; // Skip empty eras
-
-      const machineIds = machinesInEra.map((m) => m.id);
+      if (eraMachines.length === 0) continue; // Skip empty eras
 
       if (!existing) {
-        // Create new collection
-        const [collection] = await this.db
+        const result = await this.db
           .insert(collections)
           .values({
             id: generateId(),
             name: era.name,
-            typeId: collectionType.id,
-            locationId: null,
-            isManual: false,
-            isSmart: false,
-            sortOrder: 0,
-            filterCriteria: {
+            type_id: collectionType.id,
+            organization_id: collectionType.organization_id,
+            location_id: null,
+            is_manual: false,
+            is_smart: false,
+            sort_order: 0,
+            filter_criteria: {
               yearStart: era.start,
               yearEnd: era.end,
             },
@@ -454,20 +517,27 @@ export class CollectionService {
           })
           .returning();
 
+        const collection = result[0];
         if (!collection) {
-          throw new Error("Failed to create year-based collection");
+          throw new Error("Failed to create era collection");
         }
 
-        await this.addMachinesToCollection(collection.id, machineIds);
+        await this.addMachinesToCollection(
+          collection.id,
+          eraMachines.map((m) => m.id),
+        );
         generated++;
       } else {
-        // Update existing collection with new machines (replace all)
+        // Update existing era collection (replace all machines)
         await this.db.execute(sql`
-          DELETE FROM ${collectionMachines} 
+          DELETE FROM collection_machines
           WHERE collection_id = ${existing.id}
         `);
 
-        await this.addMachinesToCollection(existing.id, machineIds);
+        await this.addMachinesToCollection(
+          existing.id,
+          eraMachines.map((m) => m.id),
+        );
         updated++;
       }
     }
@@ -476,7 +546,8 @@ export class CollectionService {
   }
 
   /**
-   * Enable/disable a collection type for an organization
+   * Enable/disable a collection type
+   * RLS automatically ensures only user's organization collection types can be modified
    */
   async toggleCollectionType(
     collectionTypeId: string,
@@ -484,46 +555,33 @@ export class CollectionService {
   ): Promise<void> {
     await this.db
       .update(collectionTypes)
-      .set({ isEnabled: enabled })
+      .set({ is_enabled: enabled })
       .where(eq(collectionTypes.id, collectionTypeId));
   }
 
   /**
-   * Get organization's collection types for admin management
+   * Get current user's organization collection types for admin management
+   * RLS automatically scopes to user's organization
    */
-  async getOrganizationCollectionTypes(
-    organizationId: string,
-  ): Promise<CollectionTypeWithCount[]> {
-    const typesWithCounts = await this.db
-      .select({
-        id: collectionTypes.id,
-        name: collectionTypes.name,
-        organizationId: collectionTypes.organizationId,
-        isAutoGenerated: collectionTypes.isAutoGenerated,
-        isEnabled: collectionTypes.isEnabled,
-        sourceField: collectionTypes.sourceField,
-        generationRules: collectionTypes.generationRules,
-        displayName: collectionTypes.displayName,
-        description: collectionTypes.description,
-        sortOrder: collectionTypes.sortOrder,
-        collectionCount: count(collections.id).as("collection_count"),
-      })
-      .from(collectionTypes)
-      .leftJoin(collections, eq(collectionTypes.id, collections.typeId))
-      .where(eq(collectionTypes.organizationId, organizationId))
-      .groupBy(
-        collectionTypes.id,
-        collectionTypes.name,
-        collectionTypes.organizationId,
-        collectionTypes.isAutoGenerated,
-        collectionTypes.isEnabled,
-        collectionTypes.sourceField,
-        collectionTypes.generationRules,
-        collectionTypes.displayName,
-        collectionTypes.description,
-        collectionTypes.sortOrder,
-      )
-      .orderBy(collectionTypes.sortOrder);
+  async getOrganizationCollectionTypes(): Promise<CollectionTypeWithCount[]> {
+    const types = await this.db.query.collectionTypes.findMany({
+      orderBy: [asc(collectionTypes.sort_order)],
+    });
+
+    // Get collection counts for each type
+    const typesWithCounts: CollectionTypeWithCount[] = [];
+
+    for (const type of types) {
+      const countResult = await this.db
+        .select({ count: sql<number>`count(*)` })
+        .from(collections)
+        .where(eq(collections.type_id, type.id));
+
+      typesWithCounts.push({
+        ...type,
+        collectionCount: countResult[0]?.count ?? 0,
+      });
+    }
 
     return typesWithCounts;
   }
