@@ -516,7 +516,7 @@ export async function seedInfrastructure(): Promise<
         createOrganizationWithRoles({
           id: SEED_TEST_IDS.ORGANIZATIONS.primary,
           name: "Austin Pinball Collective",
-          subdomain: "austin-pinball",
+          subdomain: "apc",
         }),
       ),
       withErrorContext("INFRASTRUCTURE", "create secondary organization", () =>
