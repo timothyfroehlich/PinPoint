@@ -123,9 +123,9 @@ npm run smoke              # Playwright smoke tests
 
 ```
 Development Task:
-├── New service class? → Use Drizzle-only pattern + @docs/developer-guides/drizzle/current-patterns.md
+├── New service class? → Use Drizzle-only pattern + @docs/developer-guides/drizzle-current-patterns.md
 ├── Database operations? → Use Drizzle queries + @docs/quick-reference/api-security-patterns.md
-├── Auth integration? → Use Supabase SSR + @docs/developer-guides/supabase/auth-patterns.md
+├── Auth integration? → Use Supabase SSR + @docs/developer-guides/supabase-current-auth-patterns.md
 ├── Testing needed? → Use minimal patterns + @docs/quick-reference/testing-patterns.md
 └── API endpoint? → Use tRPC with organizationId scoping + @docs/quick-reference/typescript-strictest-patterns.md
 ```

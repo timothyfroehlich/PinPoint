@@ -31,29 +31,33 @@ The system is architected as a multi-tenant SaaS platform, allowing multiple org
 
 ### Built With
 
-This project leverages a modern, type-safe, and performant technology stack to ensure a great developer and user experience. [1]
+Technology stack:
 
-- **Framework:** [Next.js](https://nextjs.org/)
-- **Language:**([https://www.typescriptlang.org/](https://www.typescriptlang.org/))
-- **UI Library:**([https://react.dev/](https://react.dev/))
-- **Styling:**([https://tailwindcss.com/](https://tailwindcss.com/)) & [Material UI (MUI)](https://mui.com/)
-- **Database ORM:** [Drizzle ORM](https://orm.drizzle.team/)
+- **Framework:** [Next.js 15](https://nextjs.org/) with React Server Components
+- **Language:** [TypeScript](https://www.typescriptlang.org/) (strictest configuration)  
+- **Runtime:** [React 19](https://react.dev/)
+- **Components:** [shadcn/ui](https://ui.shadcn.com/) (primary), [Material UI](https://mui.com/) (transition)
+- **Styling:** [Tailwind CSS v4](https://tailwindcss.com/)
 - **Database:** [PostgreSQL](https://www.postgresql.org/) via [Supabase](https://supabase.com/)
-- **Authentication:** [Supabase Auth](https://supabase.com/auth)
+- **ORM:** [Drizzle ORM](https://orm.drizzle.team/)
+- **Authentication:** [Supabase SSR](https://supabase.com/docs/guides/auth/server-side)
+- **Testing:** [Vitest](https://vitest.dev/), [Playwright](https://playwright.dev/), [PGlite](https://pglite.dev/)
 
-### ✅ Migration Near Complete
+### Current Development Phase
 
-PinPoint has successfully completed its strategic migration to modernize its architecture:
+**React Server Components Migration:**
+- Status: Phase 1A Foundation nearly complete
+- Next: Data Access Layer (DAL) implementation
+- Approach: Complete rewrite from client-heavy MUI to server-first RSC
 
-- **Timeline:** 6-week staged migration (**95% COMPLETE**)
-- **Stage 1** ✅ **COMPLETE**: Supabase Auth integration
-- **Stage 2** ✅ **COMPLETE**: Drizzle ORM migration (100% Prisma removal achieved)
-- **Stage 3** ✅ **COMPLETE**: Row Level Security activation
-- **Benefits:** Database-enforced security, 100x faster serverless performance, better developer experience
+**Test System Reboot:**
+- Status: Archive complete, ready for implementation
+- Next: 9 archetype-based test system with auto-generated mocks
+- Approach: Complete testing infrastructure rebuild
 
-**Quality Status**: All tests and lints should now pass - any failures indicate issues that need fixing.
+**Project Context:** Pre-beta phase, solo development, high risk tolerance for breaking changes
 
-For details, see the [Migration Guide](./docs/migration/supabase-drizzle/).
+For detailed evolution plans, see [`RSC_MIGRATION/`](./RSC_MIGRATION/) and [`docs/testing/TEST_SYSTEM_REBOOT_PLAN.md`](./docs/testing/TEST_SYSTEM_REBOOT_PLAN.md).
 
 ### 🚨 Development User Reset Warning
 
@@ -69,6 +73,16 @@ For details, see the [Migration Guide](./docs/migration/supabase-drizzle/).
 **🔔 BETA-ONLY BEHAVIOR**: This aggressive user reset is **TEMPORARY** for rapid development iteration. In production, user accounts will be preserved.
 
 **🚨 BEFORE PRODUCTION**: We MUST update the seeding system to preserve existing users and only create missing ones.
+
+## Architecture Changes
+
+**Current:** Client-heavy MUI components with tRPC + Prisma
+**Target:** Server Components with shadcn/ui + Drizzle
+
+**Migration Strategy:**
+- Server Components by default, Client Components for interactivity only
+- MUI and shadcn/ui coexist during transition
+- Complete rewrite approach rather than incremental migration
 
 ## Getting Started
 
@@ -101,18 +115,31 @@ Your development server will be running at **http://localhost:49200**
 
 ### Development Workflow
 
-**Essential Commands:**
+**🚀 Modern Development Commands:**
 
-- `supabase start` - Start local Supabase instance
-- `npm run dev` - Start development server
-- `npm run check` - Run all quality checks (typecheck, lint, format, audit)
-- `npm run validate` - Full validation including tests (run before commits)
+- `npm run dev` - Next.js development server with React Server Components
+- `npm run build` - Production build with Server Components validation
+- `npm run check` - Complete quality validation (typecheck, lint, format, audit)
+- `npm run validate` - Full validation including all tests (pre-commit ready)
 
-**Database Commands:**
+**🎨 UI Development (shadcn/ui + Tailwind):**
 
+- `npx shadcn@latest add [component]` - Install shadcn/ui components
+- `npx shadcn@latest add block [block-name]` - Install pre-built component blocks
+- CSS lives in `src/app/globals.css` with layer separation (MUI coexistence)
+
+**🛢️ Database Commands:**
+
+- `supabase start` - Start local Supabase instance (shared across worktrees)
 - `npm run db:reset:local:sb` - Reset database with fresh schema and seed data
 - `npm run db:push:local` - Sync schema changes without reset
 - `npm run db:seed:local:sb` - Seed data only (local Supabase)
+
+**🧪 Testing Commands (Post-Reboot):**
+
+- `npm test` - Unit tests (single baseline test currently active)
+- `npm run test:rls` - pgTAP Row-Level Security policy tests
+- `npm run smoke` - Playwright smoke tests
 
 **Supabase Instance Strategy:**
 
@@ -164,15 +191,3 @@ PinPoint is designed to evolve. Key features planned for future releases include
 
 This roadmap ensures that PinPoint will grow from a powerful issue tracker into a complete operational management tool for any arcade or collective.
 
-## Multi-Agent Development Workflow
-
-PinPoint uses a coordinated multi-agent development approach for backend implementation tasks. Multiple Claude agents work in parallel using git worktrees to maximize development velocity while maintaining code quality.
-
-**For developers working on backend tasks**: See `docs/backend_impl_tasks/MULTI_AGENT_WORKFLOW.md` for complete coordination guidelines, worktree setup, and synchronization procedures.
-
-Key features:
-
-- **Parallel Development**: Multiple agents work simultaneously on independent tasks
-- **Git Worktrees**: Isolated environments prevent conflicts between agents
-- **Dependency Management**: Clear coordination for sequential task dependencies
-- **Quality Standards**: All agents maintain strict TypeScript and testing requirements

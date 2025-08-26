@@ -18,9 +18,23 @@ _Critical file content patterns that MUST be enforced during static analysis_
 
 **Seed Data Modifications**: SEED_TEST_IDS locked for predictable debugging. Don't change IDs.
 
+**Next.js 15 Performance Risk**: Uncached fetch() calls without explicit caching. Add `cache: "force-cache"` for performance.
+
+**Tailwind v3 Config**: No `tailwind.config.js` files with Tailwind v4. Use CSS-based configuration only.
+
+**Client Component Overuse**: Don't use "use client" for data display components. Server Components by default.
+
+**Material UI in New Code**: No new Material UI components. Use shadcn/ui for all new development.
+
 ## ⚡ HIGH PRIORITY VIOLATIONS
 
 **Missing Return Types**: Complex functions need explicit return types. Prevents inference errors.
+
+**Duplicate Database Queries**: Use React 19 cache() API for request-level memoization. Prevents query duplication.
+
+**Missing Organization Context**: Server Components should receive organizationId for multi-tenant scoping.
+
+**Uncached Data Access**: Data fetching functions should be wrapped with cache() for performance optimization.
 
 ## 🔐 SECURITY REQUIREMENTS
 
@@ -33,6 +47,12 @@ _Critical file content patterns that MUST be enforced during static analysis_
 ## 🧪 TESTING REQUIREMENTS
 
 **Wrong Test Archetypes**: Pure functions don't use DB. Integration uses workerDb. tRPC uses mocks.
+
+**Server Component Testing**: No direct unit testing of async Server Components. Use E2E tests for full flows.
+
+**Manual Test Creation**: All tests created via `/create-test` slash command. No manual test files.
+
+**Missing Archetype Declaration**: Test files must declare archetype in filename (e.g., `*.unit.test.ts`).
 
 ## 📋 DRIZZLE NAMING
 

@@ -2,7 +2,13 @@
 
 _Server-first authentication and realtime patterns for Next.js App Router_
 
-## Key Changes Since November 2025
+## Key Changes (2024-2025)
+
+### **🚀 2025 Platform Updates**
+
+**Geo-Routing Improvements** (April 2025): Enhanced global edge network performance  
+**Node.js 20 Requirement**: October 31, 2025 deadline for Node.js 20 migration  
+**Enhanced RLS AI Assistant**: Improved policy debugging and optimization tools
 
 ### 🚨 **Critical Migration Required**
 

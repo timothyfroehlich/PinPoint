@@ -1,32 +1,149 @@
-"use client";
+import type { JSX } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { Button } from "~/components/ui/button";
+import { getServerAuthContext } from "~/lib/dal/shared";
+import { getIssuesForOrg, getRecentIssues } from "~/lib/dal/issues";
+import { getMachinesForOrg } from "~/lib/dal/machines";
 
-import { Box } from "@mui/material";
+// Simple authenticated dashboard component (Server Component)
+async function AuthenticatedContent(): Promise<JSX.Element> {
+  try {
+    // Get organization data using DAL
+    const [issues, recentIssues, machines] = await Promise.all([
+      getIssuesForOrg(),
+      getRecentIssues(5),
+      getMachinesForOrg(),
+    ]);
 
-import { AuthenticatedDashboard } from "./_components/AuthenticatedDashboard";
-import { DevLoginCompact } from "./_components/DevLoginCompact";
-import { PublicDashboard } from "./_components/PublicDashboard";
+    const totalIssues = issues.length;
+    const totalMachines = machines.length;
+    
+    // Calculate open vs resolved (simplified)
+    const openIssues = issues.filter(issue => 
+      issue.status_id && !issue.status_id.includes('resolved')
+    ).length;
 
-import { useAuth } from "~/app/auth-provider";
+    return (
+      <div className="max-w-6xl mx-auto p-6">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold mb-2">My Dashboard</h1>
+          <p className="text-muted-foreground">
+            Here's what's happening with your issues and machines.
+          </p>
+        </div>
 
-export default function HomePage(): React.ReactNode {
-  const { user } = useAuth();
+        {/* Simple stats grid */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm font-medium">Total Issues</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{totalIssues}</div>
+            </CardContent>
+          </Card>
 
-  // Always show public content
-  const publicContent = <PublicDashboard />;
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm font-medium">Open Issues</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{openIssues}</div>
+            </CardContent>
+          </Card>
 
-  // Show additional authenticated content if logged in
-  const authenticatedContent = user ? <AuthenticatedDashboard /> : null;
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm font-medium">Total Machines</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{totalMachines}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm font-medium">Recent Activity</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{recentIssues.length}</div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Recent Issues */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Issues</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {recentIssues.length > 0 ? (
+              recentIssues.map((issue) => (
+                <div key={issue.id} className="flex items-center justify-between border-b pb-2">
+                  <div className="flex-1">
+                    <h3 className="font-medium">{issue.title}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {issue.machine ? issue.machine.name : 'Unknown Machine'}
+                    </p>
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    {new Date(issue.created_at).toLocaleDateString()}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <p className="text-muted-foreground">No recent issues found.</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  } catch {
+    // Not authenticated or no organization
+    return (
+      <div className="max-w-6xl mx-auto p-6 text-center">
+        <Card>
+          <CardContent className="p-8">
+            <h2 className="text-xl font-semibold mb-4">Welcome to PinPoint</h2>
+            <p className="text-muted-foreground mb-4">
+              Sign in to access your dashboard and manage your pinball machines.
+            </p>
+            <Button>Sign In</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+}
+
+// Simple public content (Server Component)
+function PublicContent(): JSX.Element {
+  return (
+    <div className="max-w-6xl mx-auto p-6">
+      <div className="text-center py-12">
+        <h1 className="text-4xl font-bold mb-4">PinPoint</h1>
+        <p className="text-xl text-muted-foreground mb-8">
+          Pinball Machine Issue Tracking System
+        </p>
+        <p className="text-muted-foreground">
+          Track and manage issues with your pinball machines efficiently.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+export default async function HomePage(): Promise<JSX.Element> {
+  // Check authentication status server-side
+  const { user, organizationId } = await getServerAuthContext();
 
   return (
-    <Box>
-      {/* Public content - visible to everyone */}
-      {publicContent}
-
-      {/* Authenticated content - only visible when logged in */}
-      {authenticatedContent}
-
-      {/* Dev login helper - only in development */}
-      <DevLoginCompact />
-    </Box>
+    <div>
+      {/* Public content - always visible */}
+      <PublicContent />
+      
+      {/* Authenticated content - only if user has organization */}
+      {user && organizationId && <AuthenticatedContent />}
+    </div>
   );
 }
