@@ -11,17 +11,15 @@ import {
 } from "@mui/material";
 import { useRouter } from "next/navigation";
 
-import type { RouterOutputs } from "~/trpc/react";
-
-type MachineWithRelations = RouterOutputs["machine"]["core"]["getAll"][number];
+import type { MachineResponse } from "~/lib/types/api";
 
 interface MachineCardProps {
-  machine: MachineWithRelations;
+  machine: MachineResponse;
 }
 
 export function MachineCard({ machine }: MachineCardProps): React.ReactElement {
   const router = useRouter();
-  const machineName = machine.name || machine.model.name;
+  const machineName = machine.name || machine.model.name || "Unknown Machine";
 
   const handleClick = (): void => {
     router.push(`/machines/${machine.id}`);

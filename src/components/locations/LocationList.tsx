@@ -16,12 +16,10 @@ import {
 import { useRouter } from "next/navigation";
 
 import type { PinPointSupabaseUser } from "~/lib/supabase/types";
-import type { RouterOutputs } from "~/trpc/react";
-
-type LocationWithMachineCount = RouterOutputs["location"]["getPublic"][number];
+import type { LocationWithMachineDetails } from "~/lib/types/api";
 
 interface LocationListProps {
-  locations: LocationWithMachineCount[];
+  locations: LocationWithMachineDetails[];
   user: PinPointSupabaseUser | null;
 }
 
@@ -122,15 +120,23 @@ export function LocationList({
                       Machines:
                     </Typography>
                     <Box display="flex" flexWrap="wrap" gap={0.5}>
-                      {location.machines.slice(0, 3).map((machine) => (
-                        <Chip
-                          key={machine.id}
-                          label={machine.name || machine.model.name}
-                          size="small"
-                          variant="outlined"
-                          sx={{ fontSize: "0.75rem" }}
-                        />
-                      ))}
+                      {location.machines
+                        .slice(0, 3)
+                        .map(
+                          (machine: {
+                            id: string;
+                            name?: string | null;
+                            model: { name: string };
+                          }) => (
+                            <Chip
+                              key={machine.id}
+                              label={machine.name ?? machine.model.name}
+                              size="small"
+                              variant="outlined"
+                              sx={{ fontSize: "0.75rem" }}
+                            />
+                          ),
+                        )}
                       {location.machines.length > 3 && (
                         <Chip
                           label={`+${String(location.machines.length - 3)} more`}

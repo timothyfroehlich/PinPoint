@@ -11,7 +11,7 @@ import {
   Stack,
   Divider,
 } from "@mui/material";
-import { type User, type Role } from "@prisma/client";
+import { type InferSelectModel } from "drizzle-orm";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 
@@ -19,7 +19,10 @@ import { useAuth } from "~/app/auth-provider";
 import { authenticateDevUser, getAuthResultMessage } from "~/lib/auth/dev-auth";
 import { isDevAuthAvailable } from "~/lib/environment-client";
 import { createClient } from "~/lib/supabase/client";
+import type { users, roles } from "~/server/db/schema";
 
+type User = InferSelectModel<typeof users>;
+type Role = InferSelectModel<typeof roles>;
 type UserWithRole = User & { role: Role | null };
 
 // Check if dev features are available

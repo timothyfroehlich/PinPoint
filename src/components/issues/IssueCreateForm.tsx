@@ -139,19 +139,17 @@ export function IssueCreateForm({
           title: string;
           description?: string;
           machineId: string;
-          reporterEmail?: string;
+          reporterEmail: string;
           submitterName?: string;
         } = {
           title: formData.title.trim(),
           machineId: formData.machineId,
+          reporterEmail:
+            formData.reporterEmail.trim() || "anonymous@pinpoint.local",
         };
 
         if (formData.description.trim()) {
           payload.description = formData.description.trim();
-        }
-
-        if (formData.reporterEmail.trim()) {
-          payload.reporterEmail = formData.reporterEmail.trim();
         }
 
         if (formData.submitterName.trim()) {

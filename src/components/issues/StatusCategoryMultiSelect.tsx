@@ -44,7 +44,11 @@ export function StatusCategoryMultiSelect({
   useEffect(() => {
     if (statuses) {
       const transformedOptions: StatusCategoryOption[] = statuses.map(
-        (status) => ({
+        (status: {
+          id: string;
+          name: string;
+          category: "NEW" | "IN_PROGRESS" | "RESOLVED";
+        }) => ({
           id: status.id,
           name: status.name,
           category: status.category,

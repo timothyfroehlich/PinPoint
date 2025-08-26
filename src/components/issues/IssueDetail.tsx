@@ -4,11 +4,10 @@ import { Box, Typography, Chip, Stack, Card, CardContent } from "@mui/material";
 import * as React from "react";
 
 import type { PinPointSupabaseUser } from "~/lib/supabase/types";
-
-import { type IssueWithDetails } from "~/types/issue";
+import type { IssueWithRelationsResponse } from "~/lib/types/api";
 
 interface IssueDetailProps {
-  issue: IssueWithDetails;
+  issue: IssueWithRelationsResponse;
   user: PinPointSupabaseUser | null;
   hasPermission: (permission: string) => boolean;
 }
@@ -106,21 +105,21 @@ export function IssueDetail({
               <Typography variant="body1" data-testid="machine-location">
                 {issue.machine.location.name}
               </Typography>
-              <Typography variant="body2" color="text.secondary">
-                {issue.machine.location.address}
-              </Typography>
+              {issue.machine.location.street && (
+                <Typography variant="body2" color="text.secondary">
+                  {[
+                    issue.machine.location.street,
+                    issue.machine.location.city,
+                    issue.machine.location.state,
+                    issue.machine.location.zip,
+                  ]
+                    .filter(Boolean)
+                    .join(", ")}
+                </Typography>
+              )}
             </Box>
 
-            {issue.machine.serialNumber && (
-              <Box>
-                <Typography variant="body2" color="text.secondary">
-                  Serial Number
-                </Typography>
-                <Typography variant="body1" data-testid="machine-serial">
-                  {issue.machine.serialNumber}
-                </Typography>
-              </Box>
-            )}
+            {/* Serial number not implemented in schema */}
           </Box>
         </CardContent>
       </Card>

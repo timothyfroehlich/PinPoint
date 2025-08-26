@@ -54,7 +54,7 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   // If no subdomain, redirect to apc subdomain (default organization)
   if (!subdomain) {
     const redirectHost = isDevelopment()
-      ? `apc.localhost:3000`
+      ? `apc.localhost:${url.port || "3000"}`
       : `apc.${getBaseDomain(host)}`;
 
     console.log(`[MIDDLEWARE] Redirecting to: ${redirectHost}`);
@@ -97,11 +97,13 @@ function getSubdomain(host: string): string | null {
 function getBaseDomain(host: string): string {
   const hostParts = host.split(":");
   const hostWithoutPort = hostParts[0];
+  const port = hostParts[1];
 
   if (!hostWithoutPort) return host;
 
   if (isDevelopment()) {
-    return "localhost:3000";
+    // Preserve the original port instead of hardcoding 3000
+    return port ? `localhost:${port}` : "localhost:3000";
   } else {
     // Extract base domain (e.g., "example.com" from "sub.example.com")
     const parts = hostWithoutPort.split(".");

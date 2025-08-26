@@ -36,12 +36,16 @@ export function ActiveFilters({
 
   // Helper to get display names
   const getLocationName = (id: string): string => {
-    const location = locations?.find((l) => l.id === id);
+    const location = locations?.find(
+      (l: { id: string; name?: string }) => l.id === id,
+    );
     return location?.name ?? "Unknown Location";
   };
 
   const getMachineName = (id: string): string => {
-    const machine = machines?.find((m) => m.id === id);
+    const machine = machines?.find(
+      (m: { id: string; name: string; model: { name: string } }) => m.id === id,
+    );
     if (!machine) return "Unknown Machine";
     return machine.name !== machine.model.name
       ? `${machine.name} (${machine.model.name})`
@@ -51,7 +55,11 @@ export function ActiveFilters({
   const getStatusNames = (ids: string[]): string => {
     if (!statuses) return "Unknown Statuses";
     const statusNames = ids
-      .map((id) => statuses.find((s) => s.id === id)?.name)
+      .map(
+        (id) =>
+          statuses.find((s: { id: string; name?: string }) => s.id === id)
+            ?.name,
+      )
       .filter(Boolean);
     return statusNames.join(", ");
   };

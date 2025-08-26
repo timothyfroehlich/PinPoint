@@ -444,7 +444,8 @@ export function validateNonEmptyStringArray(
 export function validateAndNormalizeSearchQuery(
   query: unknown,
 ): string | undefined {
-  if (query === null || query === undefined || query === "") {
+  // Use || to check for falsy values (null, undefined, empty string)
+  if (!query || query === "") {
     return undefined;
   }
 
@@ -473,7 +474,8 @@ export function validateOptionalString(
   fieldName: string,
   maxLength = 255,
 ): string | undefined {
-  if (value === null || value === undefined || value === "") {
+  // Use || to check for falsy values (null, undefined, empty string)
+  if (!value || value === "") {
     return undefined;
   }
 

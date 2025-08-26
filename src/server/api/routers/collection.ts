@@ -3,34 +3,31 @@ import { z } from "zod";
 import {
   createTRPCRouter,
   publicProcedure,
-  organizationProcedure,
+  orgScopedProcedure,
   organizationManageProcedure,
   locationEditProcedure,
 } from "~/server/api/trpc";
 
 export const collectionRouter = createTRPCRouter({
-  // Public: Get collections for location filtering
+  // Public: Get collections for location filtering (RLS scoped)
   getForLocation: publicProcedure
     .input(
       z.object({
-        locationId: z.string(),
-        organizationId: z.string(),
+        locationId: z.string().min(1, "Location ID cannot be empty"),
+        organizationId: z.string().min(1, "Organization ID cannot be empty"), // Still needed for public API compatibility
       }),
     )
     .query(async ({ ctx, input }) => {
       const service = ctx.services.createCollectionService();
-      return service.getLocationCollections(
-        input.locationId,
-        input.organizationId,
-      );
+      return service.getLocationCollections(input.locationId);
     }),
 
   // Get machines in a collection
   getMachines: publicProcedure
     .input(
       z.object({
-        collectionId: z.string(),
-        locationId: z.string(),
+        collectionId: z.string().min(1, "Collection ID cannot be empty"),
+        locationId: z.string().min(1, "Location ID cannot be empty"),
       }),
     )
     .query(async ({ ctx, input }) => {
@@ -72,7 +69,7 @@ export const collectionRouter = createTRPCRouter({
         data.description = input.description;
       }
 
-      return service.createManualCollection(ctx.organization.id, data);
+      return service.createManualCollection(data);
     }),
 
   // Add machines to collection
@@ -92,16 +89,16 @@ export const collectionRouter = createTRPCRouter({
       return { success: true };
     }),
 
-  // Generate auto-collections
+  // Generate auto-collections (RLS scoped)
   generateAuto: organizationManageProcedure.mutation(async ({ ctx }) => {
     const service = ctx.services.createCollectionService();
-    return service.generateAutoCollections(ctx.organization.id);
+    return service.generateAutoCollections();
   }),
 
-  // Get organization collection types for admin
-  getTypes: organizationProcedure.query(async ({ ctx }) => {
+  // Get organization collection types for admin (RLS scoped)
+  getTypes: orgScopedProcedure.query(async ({ ctx }) => {
     const service = ctx.services.createCollectionService();
-    return service.getOrganizationCollectionTypes(ctx.organization.id);
+    return service.getOrganizationCollectionTypes();
   }),
 
   // Toggle collection type

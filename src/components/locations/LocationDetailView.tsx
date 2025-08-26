@@ -17,15 +17,13 @@ import {
 import { MachineGrid } from "./MachineGrid";
 
 import type { PinPointSupabaseUser } from "~/lib/supabase/types";
-import type { RouterOutputs } from "~/trpc/react";
+import type { LocationResponse } from "~/lib/types/api";
 
 import { PermissionGate } from "~/components/permissions";
 import { usePermissions } from "~/hooks/usePermissions";
 
-type LocationWithDetails = RouterOutputs["location"]["getById"];
-
 interface LocationDetailViewProps {
-  location: LocationWithDetails;
+  location: LocationResponse;
   user: PinPointSupabaseUser | null;
   locationId: string;
 }
@@ -54,8 +52,7 @@ export function LocationDetailView({
             </Typography>
           </Box>
           <Typography variant="h6" color="text.secondary">
-            {location.machines.length} machine
-            {location.machines.length !== 1 ? "s" : ""}
+            Location Details
           </Typography>
         </Box>
 
@@ -114,10 +111,10 @@ export function LocationDetailView({
 
               <Box sx={{ mb: 3 }}>
                 <Typography variant="body2" color="text.secondary" gutterBottom>
-                  Total Machines
+                  Location ID
                 </Typography>
                 <Typography variant="body1" fontWeight="medium">
-                  {location.machines.length}
+                  {location.id}
                 </Typography>
               </Box>
 
@@ -140,7 +137,7 @@ export function LocationDetailView({
                 <Typography variant="h6">Machines</Typography>
               </Box>
 
-              <MachineGrid machines={location.machines} />
+              <MachineGrid machines={[]} />
             </CardContent>
           </Card>
         </Grid>
