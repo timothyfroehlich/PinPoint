@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { getServerAuth } from "~/lib/auth/server-context";
+import type { ServerAuthContext } from "~/lib/auth/server-auth";
 import { UserMenuClient } from "./client/UserMenuClient";
 import { MobileNavToggle } from "./client/MobileNavToggle";
 import { NavigationSkeleton } from "./NavigationSkeleton";
@@ -24,8 +24,12 @@ const navigationItems: NavItem[] = [
   { label: "Settings", href: "/settings", icon: "Settings" },
 ];
 
-async function NavigationContent() {
-  const auth = await getServerAuth();
+interface NavigationContentProps {
+  authContext: ServerAuthContext | null;
+}
+
+function NavigationContent({ authContext }: NavigationContentProps) {
+  const auth = authContext;
   
   if (!auth) {
     return (
@@ -50,7 +54,7 @@ async function NavigationContent() {
         <div className="flex items-center justify-between">
           <div className="flex-1 min-w-0">
             <h2 className="text-lg font-semibold truncate">
-              {auth.organization?.name || 'PinPoint'}
+              PinPoint
             </h2>
             <p className="text-sm text-muted-foreground truncate">
               {auth.user.name}
@@ -94,11 +98,15 @@ function NavigationLink({ item }: { item: NavItem }) {
   );
 }
 
-export function ServerNavigation() {
+interface ServerNavigationProps {
+  authContext?: ServerAuthContext | null;
+}
+
+export function ServerNavigation({ authContext = null }: ServerNavigationProps) {
   return (
     <aside className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 bg-white border-r">
       <Suspense fallback={<NavigationSkeleton />}>
-        <NavigationContent />
+        <NavigationContent authContext={authContext} />
       </Suspense>
     </aside>
   );
