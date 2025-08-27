@@ -5,6 +5,7 @@ import { Inter } from "next/font/google";
 import Providers from "./providers";
 import { ClientProviders } from "./client-providers";
 import { ServerNavigation } from "~/components/layout/ServerNavigation";
+import { getServerAuth } from "~/lib/auth/server-auth";
 import "./globals.css";
 
 import type { JSX } from "react";
@@ -16,11 +17,13 @@ export const metadata: Metadata = {
   description: "Manage your pinball machines, track issues, and optimize operations",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
-}): JSX.Element {
+}): Promise<JSX.Element> {
+  // Get authentication context (optional - doesn't redirect) - Phase 2C pattern
+  const authContext = await getServerAuth();
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -36,8 +39,8 @@ export default function RootLayout({
           }}
         >
           <div className="min-h-screen bg-background">
-            {/* Server-rendered navigation (Phase 1D) */}
-            <ServerNavigation />
+            {/* Server-rendered navigation with auth context (Phase 2C) */}
+            <ServerNavigation authContext={authContext} />
             
             {/* Main content area */}
             <div className="md:ml-64">
