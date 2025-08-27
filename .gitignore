@@ -103,3 +103,4 @@ cleanup_analysis/
 .env*.local
 .eslintcache
 .claude/recycle_bin/
+.playwright-mcp/

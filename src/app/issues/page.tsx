@@ -1,22 +1,27 @@
-import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
 import { IssueList } from "~/components/issues/IssueList";
-import { getSupabaseUser } from "~/server/auth/supabase";
+import { requireServerAuth } from "~/lib/auth/server-auth";
 
 // Force dynamic rendering for auth-dependent content
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata() {
+  const { user, organizationId } = await requireServerAuth();
+  
+  return {
+    title: `Issues - PinPoint`,
+    description: `Track and manage all issues across your organization's pinball machines`,
+  };
+}
 
 export default async function IssuesPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }): Promise<React.JSX.Element> {
-  const user = await getSupabaseUser();
-
-  if (!user?.id) {
-    redirect("/");
-  }
+  // Authentication validation with automatic redirect - Phase 2C pattern
+  const { user, organizationId } = await requireServerAuth();
 
   // Await searchParams since it's a Promise in Next.js 15
   const params = await searchParams;
