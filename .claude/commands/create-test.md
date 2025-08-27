@@ -6,7 +6,7 @@ description: Create comprehensive tests using 9-archetype system with decision t
 
 # Test Creation Command - 9 Archetype System
 
-Create tests following the TEST_SYSTEM_REBOOT_PLAN.md with archetype-based decision tree analysis.
+Create tests following the COMPREHENSIVE_RSC_TEST_SYSTEM_PLAN.md with RSC-adapted archetype decision tree analysis.
 
 ## Target File: $ARGUMENTS
 
@@ -16,28 +16,28 @@ You will analyze the target file and suggest the appropriate test archetype(s) u
 
 Analyze `$ARGUMENTS` and determine the appropriate archetype:
 
-**START: What are you testing?**
+**START: What are you testing? (RSC-Adapted Decision Tree)**
 
 ```
-├─> Pure computation/logic?
+├─> Pure computation/logic (utilities, validation)?
 │   └─> Archetype 1: Unit Test (*.unit.test.ts)
 │
-├─> React component?
-│   └─> Archetype 2: Component Test (*.component.test.tsx)
+├─> Server Component (async, direct DB access)?
+│   └─> Archetype 2: Server Component Test (*.server-component.test.ts)
 │
-├─> Business logic with dependencies?
-│   └─> Archetype 3: Service Test (*.service.test.ts)
+├─> Client Island (minimal interactivity)?
+│   └─> Archetype 3: Client Island Test (*.client-island.test.tsx)
 │
-├─> Database queries/mutations?
-│   ├─> Direct Drizzle operations?
-│   │   └─> Archetype 4: Repository Test (*.repository.test.ts)
-│   └─> Through tRPC router?
-│       ├─> Just router logic?
-│       │   └─> Archetype 5: Router Test (*.router.test.ts)
-│       └─> Full API flow?
-│           └─> Archetype 6: API Integration Test (*.api.test.ts)
+├─> Server Action (FormData processing)?
+│   └─> Archetype 4: Server Action Test (*.server-action.test.ts)
 │
-├─> User workflow in browser?
+├─> Hybrid Component (server shell + client islands)?
+│   └─> Archetype 5: Hybrid Component Test (*.hybrid-component.test.tsx)
+│
+├─> DAL functions (direct database queries for Server Components)?
+│   └─> Archetype 6: DAL Integration Test (*.dal.test.ts)
+│
+├─> User workflow in browser (RSC + client islands)?
 │   └─> Archetype 7: E2E Test (*.e2e.test.ts)
 │
 └─> Database security/constraints?
@@ -66,14 +66,14 @@ Analyze `$ARGUMENTS` and determine the appropriate archetype:
    - Load required helpers and examples for the specific archetype
 
 4. **Apply Template**
-   - Use appropriate template for selected archetype:
-     - **Archetype 1**: `unit.template.ts` - Pure functions (no dependencies)
-     - **Archetype 2**: `component.template.tsx` - React components with RTL
-     - **Archetype 3**: `service.template.ts` - Business logic with mocked dependencies (ready)
-     - **Archetype 4**: `repository.template.ts` - Database operations with PGlite
-     - **Archetype 5**: `router.template.ts` - tRPC router with mock contexts
-     - **Archetype 6**: `api.template.ts` - Full API integration tests
-     - **Archetype 7**: `e2e.template.ts` - Playwright E2E tests
+   - Use appropriate RSC-adapted template for selected archetype:
+     - **Archetype 1**: `unit.template.ts` - Pure functions (Server Action utilities, validation) ✅ READY
+     - **Archetype 2**: `server-component.template.ts` - Server Components with database integration
+     - **Archetype 3**: `client-island.template.tsx` - Minimal interactive components with RTL
+     - **Archetype 4**: `server-action.template.ts` - FormData processing, validation, mutations ✅ READY
+     - **Archetype 5**: `hybrid-component.template.tsx` - Server/client boundary testing
+     - **Archetype 6**: `dal.template.ts` - Direct database functions for Server Components ✅ READY
+     - **Archetype 7**: `e2e.template.ts` - Playwright RSC workflow tests
      - **Archetype 8**: `rls.template.sql` - pgTAP RLS policy tests
      - **Archetype 9**: `schema.template.sql` - pgTAP schema constraint tests
 
@@ -99,37 +99,39 @@ Based on the selected archetype, I will recommend specific files to read:
 
 **Archetype 1 (Unit Test)**:
 
-- Template: `src/test/templates/unit.template.ts` (Issue #349)
+- Template: `src/test/templates/unit.template.ts` ✅ READY
 - Helpers: `src/test/generated/mocks.ts` (for consistent mock data)
+- Focus: Server Action utilities, validation functions, formatters
 
-**Archetype 2 (Component Test)**:
+**Archetype 2 (Server Component Test)**:
 
-- Template: `src/test/templates/component.template.tsx` (Issue #350)
-- Helpers: `src/test/generated/mocks.ts` (for mock props)
+- Template: `src/test/templates/server-component.template.ts`
+- Helpers: `src/test/rsc-helpers/server-component-renderer.ts`
+- Focus: Async Server Components with database integration, organization scoping
 
-**Archetype 3 (Service Test)**:
+**Archetype 3 (Client Island Test)**:
 
-- Template: `src/test/templates/service.template.ts` (ready)
-- Helpers: `src/test/helpers/service-test-helpers.ts`
-- Example: `src/server/services/roleService.simple.service.test.ts`
+- Template: `src/test/templates/client-island.template.tsx`
+- Helpers: Standard React Testing Library patterns
+- Focus: Minimal interactive components with server-passed props
 
-**Archetype 4 (Repository Test)**:
+**Archetype 4 (Server Action Test)**:
 
-- Template: `src/test/templates/repository.template.ts` (Issue #352)
-- Helpers: `src/test/helpers/worker-db.ts` (Issue #345)
-- Constants: `src/test/generated/seed-test-ids.ts` (Issue #346)
+- Template: `src/test/templates/server-action.template.ts` ✅ READY
+- Helpers: `src/test/server-action-helpers/form-data.ts`
+- Focus: FormData processing, validation, authentication boundaries
 
-**Archetype 5 (Router Test)**:
+**Archetype 5 (Hybrid Component Test)**:
 
-- Template: `src/test/templates/router.template.ts` (Issue #353)
-- Helpers: `src/test/helpers/test-context.ts` (Issue #345)
-- Mocks: `src/test/generated/mocks.ts` (Issue #346)
+- Template: `src/test/templates/hybrid-component.template.tsx`
+- Helpers: `src/test/hybrid-helpers/hybrid-renderer.ts`
+- Focus: Server shell + client island integration, boundary data flow
 
-**Archetype 6 (API Integration Test)**:
+**Archetype 6 (DAL Integration Test)**:
 
-- Template: `src/test/templates/api.template.ts` (Issue #354)
-- Helpers: `src/test/helpers/worker-db.ts`, `src/test/helpers/test-context.ts` (Issue #345)
-- Constants: `src/test/generated/seed-test-ids.ts` (Issue #346)
+- Template: `src/test/templates/dal.template.ts` ✅ READY
+- Helpers: `src/test/worker-db.ts` for worker-scoped PGlite
+- Focus: Direct database functions called by Server Components
 
 **Archetype 7 (E2E Test)**:
 
@@ -148,8 +150,10 @@ Based on the selected archetype, I will recommend specific files to read:
 
 **Always Available**:
 
-- **Master Plan**: @docs/testing/TEST_SYSTEM_REBOOT_PLAN.md
+- **Master Plan**: @RSC_MIGRATION/COMPREHENSIVE_RSC_TEST_SYSTEM_PLAN.md
+- **RSC Integration**: @RSC_MIGRATION/RSC_TEST_SYSTEM_INTEGRATION.md
 - **Non-Negotiables**: @docs/NON_NEGOTIABLES.md
+- **Seed Constants**: @src/test/constants/seed-test-ids.ts
 
 ## Test Non-Negotiables
 
@@ -162,6 +166,12 @@ Enforce these patterns from @docs/NON_NEGOTIABLES.md:
 - **ALWAYS declare archetype** - In filename and test description
 - **ALWAYS use minimal seed first** - Extended only when justified
 - **NEVER mix archetype patterns** - One archetype per file
+- **RSC-SPECIFIC PATTERNS**:
+  - **NO direct unit testing of async Server Components** - Use integration or E2E
+  - **ALWAYS test organization scoping** - Multi-tenant security critical
+  - **ALWAYS verify cache() optimization** - Performance requirement
+  - **ALWAYS test FormData validation** - Server Action input safety
+  - **ALWAYS test progressive enhancement** - Forms must work without JS
 
 ## Expected Output
 
