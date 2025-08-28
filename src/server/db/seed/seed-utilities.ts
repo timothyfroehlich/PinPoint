@@ -223,11 +223,11 @@ export const SeedValidator = {
 /**
  * Get membership ID for user email and organization with type-safe validation
  */
-function seedMapperGetMembershipId(
+async function seedMapperGetMembershipId(
   email: string,
   organization_id: string,
-): string {
-  const { getMembershipIdOrThrow } = require("./mapping-validator");
+): Promise<string> {
+  const { getMembershipIdOrThrow } = await import("./mapping-validator");
 
   try {
     return getMembershipIdOrThrow(email, organization_id);
@@ -241,11 +241,11 @@ function seedMapperGetMembershipId(
 /**
  * Get priority ID for priority name and organization with type-safe validation
  */
-function seedMapperGetPriorityId(
+async function seedMapperGetPriorityId(
   priorityName: string,
   organization_id: string,
-): string {
-  const { getPriorityIdOrThrow } = require("./mapping-validator");
+): Promise<string> {
+  const { getPriorityIdOrThrow } = await import("./mapping-validator");
 
   try {
     return getPriorityIdOrThrow(priorityName, organization_id);
@@ -259,11 +259,11 @@ function seedMapperGetPriorityId(
 /**
  * Get status ID for status name and organization with type-safe validation
  */
-function seedMapperGetStatusId(
+async function seedMapperGetStatusId(
   statusName: string,
   organization_id: string,
-): string {
-  const { getStatusIdOrThrow } = require("./mapping-validator");
+): Promise<string> {
+  const { getStatusIdOrThrow } = await import("./mapping-validator");
 
   try {
     return getStatusIdOrThrow(statusName, organization_id);
@@ -277,11 +277,11 @@ function seedMapperGetStatusId(
 /**
  * Get role ID for role name and organization with type-safe validation
  */
-function seedMapperGetRoleId(
+async function seedMapperGetRoleId(
   roleName: string,
   organization_id: string,
-): string {
-  const { getRoleIdOrThrow } = require("./mapping-validator");
+): Promise<string> {
+  const { getRoleIdOrThrow } = await import("./mapping-validator");
 
   try {
     return getRoleIdOrThrow(roleName, organization_id);
@@ -295,11 +295,11 @@ function seedMapperGetRoleId(
 /**
  * Get collection type ID for collection type name and organization with type-safe validation
  */
-function seedMapperGetCollectionTypeId(
+async function seedMapperGetCollectionTypeId(
   typeName: string,
   organization_id: string,
-): string {
-  const { getCollectionTypeIdOrThrow } = require("./mapping-validator");
+): Promise<string> {
+  const { getCollectionTypeIdOrThrow } = await import("./mapping-validator");
 
   try {
     return getCollectionTypeIdOrThrow(typeName, organization_id);

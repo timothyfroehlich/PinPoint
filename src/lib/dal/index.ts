@@ -83,14 +83,14 @@ export async function getDashboardData() {
   const { getCurrentOrganization } = await import("./organizations");
   const { getCurrentUserProfile } = await import("./users");
   const { getIssueDashboardStats, getRecentIssues } = await import("./issues");
-  
+
   const [orgData, userProfile, issueStats, recentIssues] = await Promise.all([
     getCurrentOrganization(),
     getCurrentUserProfile(),
     getIssueDashboardStats(),
     getRecentIssues(5),
   ]);
-  
+
   return {
     organization: orgData,
     user: userProfile,
@@ -107,12 +107,12 @@ export async function getDashboardData() {
 export async function getUserContextData() {
   const { getServerAuthContextWithRole } = await import("./shared");
   const { getCurrentUserProfile } = await import("./users");
-  
+
   const [authContext, userProfile] = await Promise.all([
     getServerAuthContextWithRole(),
     getCurrentUserProfile().catch(() => null), // Handle unauthenticated case
   ]);
-  
+
   return {
     ...authContext,
     profile: userProfile,
@@ -125,16 +125,20 @@ export async function getUserContextData() {
  * Useful for admin pages and organization management
  */
 export async function getOrganizationOverviewData() {
-  const { getCurrentOrganization, getOrganizationStats, getOrganizationMemberCount } = await import("./organizations");
+  const {
+    getCurrentOrganization,
+    getOrganizationStats,
+    getOrganizationMemberCount,
+  } = await import("./organizations");
   const { getRecentIssues } = await import("./issues");
-  
+
   const [organization, stats, memberCount, recentIssues] = await Promise.all([
     getCurrentOrganization(),
     getOrganizationStats(),
     getOrganizationMemberCount(),
     getRecentIssues(10),
   ]);
-  
+
   return {
     organization,
     stats,
@@ -144,4 +148,8 @@ export async function getOrganizationOverviewData() {
 }
 
 // Utility type for DAL function return types
-export type DALFunction<T extends (...args: any[]) => any> = T extends (...args: any[]) => Promise<infer R> ? R : never;
+export type DALFunction<T extends (...args: any[]) => any> = T extends (
+  ...args: any[]
+) => Promise<infer R>
+  ? R
+  : never;

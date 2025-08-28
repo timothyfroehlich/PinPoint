@@ -1,8 +1,8 @@
-import { type ClassValue, clsx } from "clsx"
-import { twMerge } from "tailwind-merge"
+import { type ClassValue, clsx } from "clsx";
+import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
+  return twMerge(clsx(inputs));
 }
 
 // Utility for conditional styling with MUI coexistence
@@ -15,7 +15,7 @@ export function muiToTailwind(_muiStyles: Record<string, any>) {
 // Design system bridge utilities
 export const spacing = {
   xs: "0.5rem",
-  sm: "0.75rem", 
+  sm: "0.75rem",
   md: "1rem",
   lg: "1.5rem",
   xl: "2rem",

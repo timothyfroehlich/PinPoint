@@ -64,7 +64,9 @@ describe("Issue Server Actions (Server Action Tests - Archetype 5)", () => {
 
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.fieldErrors?.machineId).toContain("Invalid machine selected");
+        expect(result.fieldErrors?.machineId).toContain(
+          "Invalid machine selected",
+        );
       }
     });
 
@@ -161,7 +163,9 @@ describe("Issue Server Actions (Server Action Tests - Archetype 5)", () => {
 
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.fieldErrors?.statusId).toContain("Invalid status selected");
+        expect(result.fieldErrors?.statusId).toContain(
+          "Invalid status selected",
+        );
       }
     });
 
@@ -185,7 +189,9 @@ describe("Issue Server Actions (Server Action Tests - Archetype 5)", () => {
 
   describe("Authentication boundary testing", () => {
     it("requires authentication for createIssueAction", async () => {
-      mockGetActionAuthContext.mockRejectedValue(new Error("Authentication required"));
+      mockGetActionAuthContext.mockRejectedValue(
+        new Error("Authentication required"),
+      );
 
       const formData = new FormData();
       formData.append("title", "Test Issue");
@@ -206,7 +212,11 @@ describe("Issue Server Actions (Server Action Tests - Archetype 5)", () => {
       const formData = new FormData();
       formData.append("statusId", "550e8400-e29b-41d4-a716-446655440000");
 
-      const result = await updateIssueStatusAction("issue-test", null, formData);
+      const result = await updateIssueStatusAction(
+        "issue-test",
+        null,
+        formData,
+      );
 
       expect(result.success).toBe(false);
       if (!result.success) {
@@ -221,7 +231,7 @@ describe("Issue Server Actions (Server Action Tests - Archetype 5)", () => {
       // Verify React 19 useActionState compatibility
       expect(typeof createIssueAction).toBe("function");
       expect(createIssueAction.length).toBe(2); // _prevState, formData
-      
+
       expect(typeof updateIssueStatusAction).toBe("function");
       expect(updateIssueStatusAction.length).toBe(3); // issueId, _prevState, formData
     });
@@ -235,13 +245,13 @@ describe("Issue Server Actions (Server Action Tests - Archetype 5)", () => {
     it("Server Actions return ActionResult type structure", async () => {
       const formData = new FormData();
       // Invalid data to ensure we get an error result
-      
+
       const result = await createIssueAction(null, formData);
-      
+
       // Should have ActionResult structure
       expect(result).toHaveProperty("success");
       expect(typeof result.success).toBe("boolean");
-      
+
       if (result.success) {
         expect(result).toHaveProperty("data");
       } else {

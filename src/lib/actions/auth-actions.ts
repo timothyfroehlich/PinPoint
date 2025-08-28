@@ -1,0 +1,265 @@
+/**
+ * Authentication Server Actions - Modern Supabase OAuth & Magic Link
+ * Implements Google OAuth and Magic Link authentication with Server Actions
+ */
+
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { z } from "zod";
+import { createClient } from "~/lib/supabase/server";
+import { validateOrganizationExists, getOrganizationSubdomainById } from "~/lib/dal/public-organizations";
+import { isDevelopment } from "~/lib/environment";
+
+// Validation schemas
+const magicLinkSchema = z.object({
+  email: z.string().email("Please enter a valid email address"),
+  organizationId: z.string().min(1, "Organization is required"),
+});
+
+const oauthProviderSchema = z.object({
+  provider: z.enum(["google"]),
+  organizationId: z.string().min(1, "Organization is required"),
+  redirectTo: z.string().url().optional(),
+});
+
+// Action result types for useActionState compatibility
+export type ActionResult<T> =
+  | {
+      success: true;
+      data: T;
+    }
+  | {
+      success: false;
+      error: string;
+      fieldErrors?: Record<string, string>;
+    };
+
+/**
+ * Send Magic Link for passwordless authentication
+ */
+export async function sendMagicLink(
+  _prevState: ActionResult<{ message: string }> | null,
+  formData: FormData,
+): Promise<ActionResult<{ message: string }>> {
+  try {
+    // Validate form data
+    const rawEmail = formData.get("email");
+    const rawOrganizationId = formData.get("organizationId");
+    const validation = magicLinkSchema.safeParse({ 
+      email: rawEmail, 
+      organizationId: rawOrganizationId 
+    });
+
+    if (!validation.success) {
+      const fieldErrors: Record<string, string> = {};
+      validation.error.issues.forEach((issue) => {
+        if (issue.path[0]) {
+          fieldErrors[issue.path[0] as string] = issue.message;
+        }
+      });
+      
+      return {
+        success: false,
+        error: "Please check your input",
+        fieldErrors,
+      };
+    }
+
+    const { email, organizationId } = validation.data;
+    
+    // Validate organization exists
+    const organizationValid = await validateOrganizationExists(organizationId);
+    if (!organizationValid) {
+      return {
+        success: false,
+        error: "Invalid organization selected",
+        fieldErrors: {
+          organizationId: "Selected organization is not valid",
+        },
+      };
+    }
+    const supabase = await createClient();
+    
+    // Get organization subdomain for redirect URL
+    const subdomain = await getOrganizationSubdomainById(organizationId);
+    if (!subdomain) {
+      return {
+        success: false,
+        error: "Organization configuration error",
+      };
+    }
+
+    // Build callback URL with organization subdomain
+    const baseUrl = process.env["NEXT_PUBLIC_SITE_URL"] ?? "http://localhost:3000";
+    const callbackUrl = isDevelopment() 
+      ? `http://${subdomain}.localhost:3000/auth/callback`
+      : `https://${subdomain}.${baseUrl.replace(/^https?:\/\//, '')}/auth/callback`;
+
+    // Send magic link with organization metadata
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        shouldCreateUser: true,
+        emailRedirectTo: `${callbackUrl}?organizationId=${organizationId}`,
+        data: {
+          organizationId,
+        },
+      },
+    });
+
+    if (error) {
+      console.error("Magic link error:", error);
+      return {
+        success: false,
+        error: "Failed to send magic link. Please try again.",
+      };
+    }
+
+    return {
+      success: true,
+      data: {
+        message: `Magic link sent to ${email}! Check your inbox and click the link to sign in.`,
+      },
+    };
+  } catch (error) {
+    console.error("Magic link action error:", error);
+    return {
+      success: false,
+      error: "An unexpected error occurred. Please try again.",
+    };
+  }
+}
+
+/**
+ * Initiate OAuth authentication flow
+ */
+export async function signInWithOAuth(
+  provider: "google",
+  organizationId: string,
+  redirectTo?: string,
+): Promise<never> {
+  try {
+    // Validate inputs
+    const validation = oauthProviderSchema.safeParse({ provider, organizationId, redirectTo });
+    if (!validation.success) {
+      redirect("/auth/auth-code-error?error=invalid_input");
+    }
+    
+    // Validate organization exists
+    const organizationValid = await validateOrganizationExists(organizationId);
+    if (!organizationValid) {
+      redirect("/auth/auth-code-error?error=invalid_organization");
+    }
+
+    const supabase = await createClient();
+    
+    // Get organization subdomain for redirect URL
+    const subdomain = await getOrganizationSubdomainById(organizationId);
+    if (!subdomain) {
+      redirect("/auth/auth-code-error?error=organization_config");
+    }
+
+    // Build callback URL with organization subdomain
+    const baseUrl = process.env["NEXT_PUBLIC_SITE_URL"] ?? "http://localhost:3000";
+    const callbackUrl = isDevelopment() 
+      ? `http://${subdomain}.localhost:3000/auth/callback`
+      : `https://${subdomain}.${baseUrl.replace(/^https?:\/\//, '')}/auth/callback`;
+
+    // Build query params for callback
+    const queryParams = new URLSearchParams({ organizationId });
+    if (redirectTo) {
+      queryParams.set('next', redirectTo);
+    }
+
+    // Initiate OAuth flow
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: `${callbackUrl}?${queryParams.toString()}`,
+        data: {
+          organizationId,
+        },
+      },
+    });
+
+    if (error) {
+      console.error("OAuth initiation error:", error);
+      redirect("/auth/auth-code-error?error=oauth_failed");
+    }
+
+    if (data.url) {
+      redirect(data.url);
+    }
+
+    redirect("/auth/auth-code-error?error=no_redirect_url");
+  } catch (error) {
+    console.error("OAuth action error:", error);
+    redirect("/auth/auth-code-error?error=unexpected");
+  }
+}
+
+/**
+ * Dev authentication for testing (development only)
+ */
+export async function devSignIn(
+  email: string,
+  _userData?: { name?: string; role?: string },
+): Promise<ActionResult<{ message: string }>> {
+  if (process.env.NODE_ENV !== "development") {
+    return {
+      success: false,
+      error: "Dev authentication only available in development",
+    };
+  }
+
+  try {
+    const supabase = await createClient();
+
+    // Use Supabase's development-friendly authentication
+    // This would typically integrate with your existing dev auth system
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        shouldCreateUser: true,
+      },
+    });
+
+    if (error) {
+      return {
+        success: false,
+        error: "Dev authentication failed",
+      };
+    }
+
+    revalidatePath("/", "layout");
+
+    return {
+      success: true,
+      data: {
+        message: `Development authentication successful for ${email}`,
+      },
+    };
+  } catch (error) {
+    console.error("Dev auth error:", error);
+    return {
+      success: false,
+      error: "Development authentication failed",
+    };
+  }
+}
+
+/**
+ * Sign out action
+ */
+export async function signOut(): Promise<void> {
+  try {
+    const supabase = await createClient();
+    await supabase.auth.signOut();
+    revalidatePath("/", "layout");
+  } catch (error) {
+    console.error("Sign out error:", error);
+  }
+  redirect("/auth/sign-in");
+}

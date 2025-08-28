@@ -1,5 +1,5 @@
 import type { JSX } from "react";
-import { CreateIssueForm } from "~/components/forms/CreateIssueForm";
+import { CreateIssueFormServer } from "~/components/forms/CreateIssueFormServer";
 import { getMachinesForOrg } from "~/lib/dal/machines";
 import { getServerAuthContext } from "~/lib/dal/shared";
 
@@ -16,7 +16,11 @@ export default async function DemoServerActionsPage(): Promise<JSX.Element> {
     // If not authenticated, show demo data
     error = "Demo mode - using sample data";
     machines = [
-      { id: "demo-machine-1", name: "Medieval Madness", model: "Williams 1997" },
+      {
+        id: "demo-machine-1",
+        name: "Medieval Madness",
+        model: "Williams 1997",
+      },
       { id: "demo-machine-2", name: "Attack from Mars", model: "Bally 1995" },
       { id: "demo-machine-3", name: "Twilight Zone", model: "Bally 1993" },
     ];
@@ -40,6 +44,8 @@ export default async function DemoServerActionsPage(): Promise<JSX.Element> {
         <div className="space-y-4">
           <h2 className="text-xl font-semibold">Features Demonstrated</h2>
           <ul className="space-y-2 text-sm text-muted-foreground">
+            <li>✅ Server-first form architecture (works without JavaScript)</li>
+            <li>✅ Progressive enhancement with client islands</li>
             <li>✅ React 19 useActionState hook</li>
             <li>✅ Enhanced form validation with Zod</li>
             <li>✅ shadcn/ui components</li>
@@ -51,10 +57,7 @@ export default async function DemoServerActionsPage(): Promise<JSX.Element> {
           </ul>
         </div>
 
-        <CreateIssueForm 
-          machines={machines} 
-          className="max-w-lg"
-        />
+        <CreateIssueFormServer machines={machines} className="max-w-lg" />
       </div>
     </div>
   );

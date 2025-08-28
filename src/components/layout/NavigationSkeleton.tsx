@@ -9,7 +9,7 @@ export function NavigationSkeleton() {
         <Skeleton className="h-6 mb-2" />
         <Skeleton className="h-4 w-3/4" />
       </div>
-      
+
       <Separator />
 
       {/* Navigation skeleton */}
@@ -20,7 +20,7 @@ export function NavigationSkeleton() {
       </div>
 
       <Separator />
-      
+
       {/* User menu skeleton */}
       <div className="p-4">
         <div className="flex items-center space-x-3">

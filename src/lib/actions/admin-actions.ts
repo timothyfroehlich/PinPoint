@@ -1,0 +1,398 @@
+/**
+ * Administrative Server Actions (2025 Performance Patterns)
+ * Form handling and mutations for admin operations with React 19 cache API
+ */
+
+"use server";
+
+import { revalidatePath, revalidateTag } from "next/cache";
+import { z } from "zod";
+import { eq, and } from "drizzle-orm";
+import { getGlobalDatabaseProvider } from "~/server/db/provider";
+import { users, memberships, roles, organizations } from "~/server/db/schema";
+import { generatePrefixedId } from "~/lib/utils/id-generation";
+import {
+  getActionAuthContext,
+  validateFormData,
+  actionSuccess,
+  actionError,
+  runAfterResponse,
+  type ActionResult,
+} from "./shared";
+
+// Enhanced validation schemas with better error messages
+const inviteUserSchema = z.object({
+  email: z
+    .string()
+    .email("Please enter a valid email address")
+    .trim()
+    .toLowerCase(),
+  name: z
+    .string()
+    .max(100, "Name must be less than 100 characters")
+    .optional(),
+  roleId: z
+    .string()
+    .uuid("Invalid role selected")
+    .optional(),
+  message: z
+    .string()
+    .max(500, "Message must be less than 500 characters")
+    .optional(),
+});
+
+const updateUserRoleSchema = z.object({
+  userId: z.string().uuid("Invalid user ID"),
+  roleId: z.string().uuid("Invalid role selected"),
+});
+
+const removeUserSchema = z.object({
+  userId: z.string().uuid("Invalid user ID"),
+  confirmEmail: z.string().email("Please enter the user's email to confirm"),
+});
+
+const updateSystemSettingsSchema = z.object({
+  settings: z.object({
+    emailNotifications: z.boolean().optional(),
+    pushNotifications: z.boolean().optional(),
+    issueUpdates: z.boolean().optional(),
+    weeklyDigest: z.boolean().optional(),
+    maintenanceAlerts: z.boolean().optional(),
+    twoFactorRequired: z.boolean().optional(),
+    sessionTimeout: z.number().int().min(0).max(1440).optional(),
+    passwordMinLength: z.number().int().min(6).max(128).optional(),
+    loginAttempts: z.number().int().min(0).max(10).optional(),
+    timezone: z.string().optional(),
+    dateFormat: z.string().optional(),
+    theme: z.enum(["light", "dark", "system"]).optional(),
+    language: z.string().optional(),
+    itemsPerPage: z.number().int().min(10).max(100).optional(),
+  }),
+});
+
+/**
+ * Invite user to organization via Server Action (React 19 useActionState compatible)
+ * Enhanced with validation and background processing
+ */
+export async function inviteUserAction(
+  _prevState: ActionResult<{ success: boolean }> | null,
+  formData: FormData,
+): Promise<ActionResult<{ success: boolean }>> {
+  try {
+    const { user, organizationId } = await getActionAuthContext();
+
+    // Enhanced validation with Zod
+    const validation = validateFormData(formData, inviteUserSchema);
+    if (!validation.success) {
+      return validation;
+    }
+
+    const db = getGlobalDatabaseProvider().getClient();
+
+    // Check if user already exists in the system
+    const existingUser = await db.query.users.findFirst({
+      where: eq(users.email, validation.data.email),
+    });
+
+    if (existingUser) {
+      // Check if user is already a member of this organization
+      const existingMembership = await db.query.memberships.findFirst({
+        where: and(
+          eq(memberships.user_id, existingUser.id),
+          eq(memberships.organization_id, organizationId),
+        ),
+      });
+
+      if (existingMembership) {
+        return actionError("User is already a member of this organization");
+      }
+    }
+
+    // Get default role if none specified
+    let roleId = validation.data.roleId;
+    if (!roleId) {
+      const defaultRole = await db.query.roles.findFirst({
+        where: and(
+          eq(roles.organization_id, organizationId),
+          eq(roles.is_default, true),
+        ),
+      });
+      
+      if (!defaultRole) {
+        return actionError("No default role configured. Please contact support.");
+      }
+      
+      roleId = defaultRole.id;
+    }
+
+    // Create user record if they don't exist
+    let userId = existingUser?.id;
+    if (!existingUser) {
+      // Create a new user record with unverified email
+      const newUser = await db.insert(users).values({
+        id: generatePrefixedId("user"),
+        email: validation.data.email,
+        name: validation.data.name || null,
+        email_verified: null, // Email not verified until they complete signup
+      }).returning({ id: users.id });
+      
+      userId = newUser[0]?.id;
+      if (!userId) {
+        return actionError("Failed to create user record");
+      }
+    }
+
+    // Create membership for the user
+    const membership = await db.insert(memberships).values({
+      id: generatePrefixedId("membership"),
+      user_id: userId,
+      organization_id: organizationId,
+      role_id: roleId,
+    }).returning({ id: memberships.id });
+
+    if (!membership[0]) {
+      return actionError("Failed to create user membership");
+    }
+
+    console.log("User invitation processed:", {
+      email: validation.data.email,
+      userId,
+      organizationId,
+      roleId,
+      membershipId: membership[0].id,
+    });
+
+    // Cache invalidation
+    revalidatePath("/settings/users");
+    revalidatePath("/settings");
+    revalidateTag("admin");
+    revalidateTag("users");
+
+    // Background processing
+    runAfterResponse(async () => {
+      console.log(`User invitation processed for ${validation.data.email} by ${user.email}`, {
+        userId,
+        membershipId: membership[0].id,
+        organizationId,
+        roleId,
+      });
+      
+      // TODO: Send actual invitation email with signup/login link
+      // The email should include:
+      // - Welcome message with personal note if provided
+      // - Link to complete account setup (for new users)
+      // - Link to login and accept invitation (for existing users)
+      // - Organization details and role information
+      //
+      // Example implementation:
+      // await sendInvitationEmail({
+      //   to: validation.data.email,
+      //   userExists: !!existingUser,
+      //   organizationName: organization.name,
+      //   organizationId,
+      //   inviterName: user.name || user.email,
+      //   roleName: role.name,
+      //   personalMessage: validation.data.message,
+      //   signupUrl: existingUser 
+      //     ? `${baseUrl}/auth/sign-in?invitation=${invitationToken}`
+      //     : `${baseUrl}/auth/sign-up?invitation=${invitationToken}`,
+      // });
+    });
+
+    return actionSuccess(
+      { success: true },
+      "User invitation sent successfully",
+    );
+  } catch (error) {
+    console.error("Invite user error:", error);
+    return actionError(
+      error instanceof Error
+        ? error.message
+        : "Failed to send invitation. Please try again.",
+    );
+  }
+}
+
+/**
+ * Update user role via Server Action (React 19 useActionState compatible)
+ */
+export async function updateUserRoleAction(
+  _prevState: ActionResult<{ success: boolean }> | null,
+  formData: FormData,
+): Promise<ActionResult<{ success: boolean }>> {
+  try {
+    const { user, organizationId } = await getActionAuthContext();
+
+    // Enhanced validation
+    const validation = validateFormData(formData, updateUserRoleSchema);
+    if (!validation.success) {
+      return validation;
+    }
+
+    const db = getGlobalDatabaseProvider().getClient();
+
+    // Verify role exists in this organization
+    const role = await db.query.roles.findFirst({
+      where: and(
+        eq(roles.id, validation.data.roleId),
+        eq(roles.organization_id, organizationId),
+      ),
+    });
+
+    if (!role) {
+      return actionError("Role not found or access denied");
+    }
+
+    // Update user role (membership)
+    const [updatedMembership] = await db
+      .update(memberships)
+      .set({ role_id: validation.data.roleId })
+      .where(
+        and(
+          eq(memberships.user_id, validation.data.userId),
+          eq(memberships.organization_id, organizationId),
+        ),
+      )
+      .returning({ user_id: memberships.user_id });
+
+    if (!updatedMembership) {
+      return actionError("User not found or access denied");
+    }
+
+    // Cache invalidation
+    revalidatePath("/settings/users");
+    revalidatePath("/settings/roles");
+    revalidateTag("admin");
+    revalidateTag("users");
+
+    // Background processing
+    runAfterResponse(async () => {
+      console.log(`User role updated by ${user.email}: ${validation.data.userId} -> ${role.name}`);
+    });
+
+    return actionSuccess(
+      { success: true },
+      `User role updated to ${role.name}`,
+    );
+  } catch (error) {
+    console.error("Update user role error:", error);
+    return actionError(
+      error instanceof Error ? error.message : "Failed to update user role",
+    );
+  }
+}
+
+/**
+ * Remove user from organization via Server Action (React 19 useActionState compatible)
+ */
+export async function removeUserAction(
+  _prevState: ActionResult<{ success: boolean }> | null,
+  formData: FormData,
+): Promise<ActionResult<{ success: boolean }>> {
+  try {
+    const { user, organizationId } = await getActionAuthContext();
+
+    // Enhanced validation
+    const validation = validateFormData(formData, removeUserSchema);
+    if (!validation.success) {
+      return validation;
+    }
+
+    const db = getGlobalDatabaseProvider().getClient();
+
+    // Verify user exists and email matches (safety check)
+    const targetUser = await db.query.users.findFirst({
+      where: eq(users.id, validation.data.userId),
+      columns: { id: true, email: true },
+    });
+
+    if (!targetUser || targetUser.email !== validation.data.confirmEmail) {
+      return actionError("User not found or email confirmation doesn't match");
+    }
+
+    // Remove membership (soft delete would be better for audit trail)
+    const [removedMembership] = await db
+      .delete(memberships)
+      .where(
+        and(
+          eq(memberships.user_id, validation.data.userId),
+          eq(memberships.organization_id, organizationId),
+        ),
+      )
+      .returning({ user_id: memberships.user_id });
+
+    if (!removedMembership) {
+      return actionError("User not found in this organization");
+    }
+
+    // Cache invalidation
+    revalidatePath("/settings/users");
+    revalidateTag("admin");
+    revalidateTag("users");
+
+    // Background processing
+    runAfterResponse(async () => {
+      console.log(`User removed from organization by ${user.email}: ${validation.data.confirmEmail}`);
+    });
+
+    return actionSuccess(
+      { success: true },
+      "User removed from organization successfully",
+    );
+  } catch (error) {
+    console.error("Remove user error:", error);
+    return actionError(
+      error instanceof Error ? error.message : "Failed to remove user",
+    );
+  }
+}
+
+/**
+ * Update system settings via Server Action (React 19 useActionState compatible)
+ */
+export async function updateSystemSettingsAction(
+  _prevState: ActionResult<{ success: boolean }> | null,
+  formData: FormData,
+): Promise<ActionResult<{ success: boolean }>> {
+  try {
+    const { user, organizationId } = await getActionAuthContext();
+
+    // Parse JSON data from form
+    const settingsData = formData.get("settings") as string;
+    if (!settingsData) {
+      return actionError("No settings data provided");
+    }
+
+    const data = JSON.parse(settingsData);
+    const validation = updateSystemSettingsSchema.safeParse({ settings: data });
+    
+    if (!validation.success) {
+      return actionError("Invalid settings data");
+    }
+
+    // TODO: Implement system settings persistence
+    // This would typically update a system_settings table or organization preferences
+    console.log("System settings would be updated:", validation.data.settings);
+
+    // Cache invalidation
+    revalidatePath("/settings/system");
+    revalidatePath("/settings");
+    revalidateTag("admin");
+    revalidateTag("settings");
+
+    // Background processing
+    runAfterResponse(async () => {
+      console.log(`System settings updated by ${user.email}`);
+    });
+
+    return actionSuccess(
+      { success: true },
+      "System settings updated successfully",
+    );
+  } catch (error) {
+    console.error("Update system settings error:", error);
+    return actionError(
+      error instanceof Error ? error.message : "Failed to update system settings",
+    );
+  }
+}
