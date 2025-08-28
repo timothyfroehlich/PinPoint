@@ -4,19 +4,20 @@
  */
 
 import { createMockAuthContext } from "./dal-test-helpers";
-import { SEED_TEST_IDS } from "../constants/seed-test-ids";
 
 /**
  * Create test FormData for Server Action testing
  * Simplifies form data creation with proper typing
  */
-export function createTestFormData(fields: Record<string, string | File>): FormData {
+export function createTestFormData(
+  fields: Record<string, string | File>,
+): FormData {
   const formData = new FormData();
-  
+
   Object.entries(fields).forEach(([key, value]) => {
     formData.append(key, value);
   });
-  
+
   return formData;
 }
 
@@ -31,21 +32,21 @@ export function mockServerActionAuth(mockContext = createMockAuthContext()) {
       auth: {
         getUser: vi.fn().mockResolvedValue({
           data: { user: mockContext.user },
-          error: null
-        })
-      }
-    }))
+          error: null,
+        }),
+      },
+    })),
   }));
-  
+
   // Mock Next.js cache and navigation functions
   vi.mock("next/cache", () => ({
-    revalidatePath: vi.fn()
+    revalidatePath: vi.fn(),
   }));
-  
+
   vi.mock("next/navigation", () => ({
-    redirect: vi.fn()
+    redirect: vi.fn(),
   }));
-  
+
   return mockContext;
 }
 
@@ -56,11 +57,11 @@ export function mockServerActionAuth(mockContext = createMockAuthContext()) {
 export async function testServerAction<T>(
   serverAction: (formData: FormData) => Promise<T>,
   formFields: Record<string, string>,
-  mockContext = createMockAuthContext()
+  mockContext = createMockAuthContext(),
 ): Promise<T> {
   mockServerActionAuth(mockContext);
   const formData = createTestFormData(formFields);
-  
+
   return await serverAction(formData);
 }
 

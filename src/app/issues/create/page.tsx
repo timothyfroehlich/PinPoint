@@ -1,10 +1,28 @@
-import { Home as HomeIcon, Build as BuildIcon } from "@mui/icons-material";
-import { Container, Box, Typography, Breadcrumbs, Link } from "@mui/material";
 import { type Metadata } from "next";
-import * as React from "react";
+import Link from "next/link";
+import { Home, Wrench } from "lucide-react";
 
-import { IssueCreateView } from "~/components/issues/IssueCreateView";
-import { getSupabaseUser } from "~/server/auth/supabase";
+import { CreateIssueFormServer } from "~/components/forms/CreateIssueFormServer";
+import { requireServerAuth } from "~/lib/auth/server-auth";
+import { createIssueAction } from "~/lib/actions/issue-actions";
+
+// Temporary function - will be replaced with proper DAL function
+async function getMachinesForCreateForm(organizationId: string) {
+  // For now, return mock data to test the form structure
+  return [
+    { id: "mock-machine-1", name: "Medieval Madness", model: "Williams 1997" },
+    { id: "mock-machine-2", name: "Attack from Mars", model: "Bally 1995" },
+  ];
+}
+
+// Temporary function - will be replaced with proper DAL function  
+async function getUsersForAssignment(organizationId: string) {
+  // For now, return mock data to test the form structure
+  return [
+    { id: "test-user-tim", name: "Tim Froehlich", email: "tim@austinpinball.com" },
+    { id: "test-user-tech1", name: "Tech User", email: "tech@austinpinball.com" },
+  ];
+}
 
 // Force dynamic rendering for auth-dependent content
 export const dynamic = "force-dynamic";
@@ -28,48 +46,47 @@ export const metadata: Metadata = {
 export default async function CreateIssuePage({
   searchParams,
 }: CreateIssuePageProps): Promise<React.JSX.Element> {
-  const user = await getSupabaseUser();
+  const { organizationId } = await requireServerAuth();
   const resolvedSearchParams = await searchParams;
 
+  // Parallel data fetching for form options
+  const [machines, users] = await Promise.all([
+    getMachinesForCreateForm(organizationId),
+    getUsersForAssignment(organizationId),
+  ]);
+
   return (
-    <Container maxWidth="xl" sx={{ py: 4 }}>
+    <div className="max-w-4xl mx-auto px-4 py-8">
       {/* Breadcrumbs */}
-      <Breadcrumbs aria-label="breadcrumb" sx={{ mb: 3 }}>
-        <Link
-          color="inherit"
-          href="/"
-          sx={{ display: "flex", alignItems: "center" }}
-        >
-          <HomeIcon sx={{ mr: 0.5 }} fontSize="inherit" />
+      <nav className="flex items-center space-x-2 text-sm text-muted-foreground mb-6">
+        <Link href="/" className="flex items-center hover:text-foreground">
+          <Home className="w-4 h-4 mr-1" />
           Home
         </Link>
-        <Link
-          color="inherit"
-          href="/issues"
-          sx={{ display: "flex", alignItems: "center" }}
-        >
-          <BuildIcon sx={{ mr: 0.5 }} fontSize="inherit" />
+        <span>/</span>
+        <Link href="/issues" className="flex items-center hover:text-foreground">
+          <Wrench className="w-4 h-4 mr-1" />
           Issues
         </Link>
-        <Typography color="text.primary">Create</Typography>
-      </Breadcrumbs>
+        <span>/</span>
+        <span className="text-foreground">Create</span>
+      </nav>
 
       {/* Page Header */}
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          Create New Issue
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          Report a problem with a pinball machine to help keep the games running
-          smoothly.
-        </Typography>
-      </Box>
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold mb-2">Create New Issue</h1>
+        <p className="text-muted-foreground">
+          Report a problem with a pinball machine to help keep the games running smoothly.
+        </p>
+      </div>
 
-      {/* Main Issue Creation View */}
-      <IssueCreateView
-        user={user}
-        initialMachineId={resolvedSearchParams.machineId}
+      {/* Server Component Form with Server Actions */}
+      <CreateIssueFormServer 
+        machines={machines}
+        users={users}
+        action={createIssueAction}
+        {...(resolvedSearchParams.machineId && { initialMachineId: resolvedSearchParams.machineId })}
       />
-    </Container>
+    </div>
   );
 }

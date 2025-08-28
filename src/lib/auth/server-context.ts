@@ -5,26 +5,31 @@ import { cache } from "react";
 // Cached server-side auth check (React 19 cache API)
 export const getServerAuth = cache(async () => {
   const supabase = await createClient();
-  const { data: { user }, error } = await supabase.auth.getUser();
-  
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
   if (error || !user) {
     return null;
   }
 
-  const organizationId = user.user_metadata?.organizationId;
-  const organizationName = user.user_metadata?.organizationName;
+  const organizationId = user.user_metadata?.["organizationId"];
+  const organizationName = user.user_metadata?.["organizationName"];
 
   return {
     user: {
       id: user.id,
       email: user.email!,
-      name: user.user_metadata?.name || user.email!,
-      avatarUrl: user.user_metadata?.avatarUrl,
+      name: user.user_metadata?.["name"] || user.email!,
+      avatarUrl: user.user_metadata?.["avatarUrl"],
     },
-    organization: organizationId ? {
-      id: organizationId,
-      name: organizationName || 'Unknown Organization',
-    } : null,
+    organization: organizationId
+      ? {
+          id: organizationId,
+          name: organizationName || "Unknown Organization",
+        }
+      : null,
   };
 });
 

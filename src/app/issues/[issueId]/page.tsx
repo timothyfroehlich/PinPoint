@@ -2,9 +2,9 @@ import { type Metadata } from "next";
 import { notFound } from "next/navigation";
 import * as React from "react";
 
-import { IssueDetailView } from "~/components/issues/IssueDetailView";
-import { getSupabaseUser } from "~/server/auth/supabase";
-import { api } from "~/trpc/server";
+import { IssueDetailServer } from "~/components/issues/issue-detail-server";
+import { requireServerAuth } from "~/lib/auth/server-auth";
+import { getIssueById } from "~/lib/dal/issues";
 
 interface IssuePageProps {
   params: Promise<{
@@ -17,7 +17,9 @@ export async function generateMetadata({
 }: IssuePageProps): Promise<Metadata> {
   try {
     const resolvedParams = await params;
-    const issue = await api.issue.core.getById({ id: resolvedParams.issueId });
+    // Ensure authentication before generating metadata
+    await requireServerAuth();
+    const issue = await getIssueById(resolvedParams.issueId);
 
     return {
       title: `${issue.title} - PinPoint`,
@@ -39,23 +41,16 @@ export async function generateMetadata({
 export default async function IssuePage({
   params,
 }: IssuePageProps): Promise<React.JSX.Element> {
-  const user = await getSupabaseUser();
-
   try {
-    // Fetch issue data on the server
-    const resolvedParams = await params;
-    const issue = await api.issue.core.getById({ id: resolvedParams.issueId });
+    // Authentication validation with automatic redirect - Phase 2C pattern
+    await requireServerAuth();
 
-    // Check if user has permission to view this issue
-    // For now, we'll allow public access and let the component handle permissions
+    // Resolve params for issue ID
+    const resolvedParams = await params;
 
     return (
-      <main aria-label="Issue details">
-        <IssueDetailView
-          issue={issue}
-          user={user}
-          issueId={resolvedParams.issueId}
-        />
+      <main aria-label="Issue details" className="container mx-auto px-4 py-6">
+        <IssueDetailServer issueId={resolvedParams.issueId} />
       </main>
     );
   } catch {

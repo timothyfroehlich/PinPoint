@@ -6,7 +6,14 @@
 
 import { cache } from "react";
 import { eq, sql, count } from "drizzle-orm";
-import { organizations, issues, machines, memberships, roles, issueStatuses } from "~/server/db/schema";
+import {
+  organizations,
+  issues,
+  machines,
+  memberships,
+  roles,
+  issueStatuses,
+} from "~/server/db/schema";
 import { db, requireAuthContext } from "./shared";
 
 /**
@@ -26,11 +33,11 @@ export const getOrganizationById = cache(async (organizationId: string) => {
       updated_at: true,
     },
   });
-  
+
   if (!organization) {
     throw new Error("Organization not found");
   }
-  
+
   return organization;
 });
 
@@ -51,7 +58,7 @@ export const getCurrentOrganization = cache(async () => {
  */
 export const getOrganizationStats = cache(async () => {
   const { organizationId } = await requireAuthContext();
-  
+
   // Execute all statistics queries in parallel for performance
   const [issueStats, machineCount, memberCount] = await Promise.all([
     // Issue statistics with status category breakdown using JOINs for type safety
@@ -65,20 +72,20 @@ export const getOrganizationStats = cache(async () => {
       .from(issues)
       .innerJoin(issueStatuses, eq(issues.status_id, issueStatuses.id))
       .where(eq(issues.organization_id, organizationId)),
-      
+
     // Machine count
     db
       .select({ count: count() })
       .from(machines)
       .where(eq(machines.organization_id, organizationId)),
-      
+
     // Active member count
     db
       .select({ count: count() })
       .from(memberships)
       .where(eq(memberships.organization_id, organizationId)),
   ]);
-  
+
   return {
     issues: {
       total: issueStats[0]?.total ?? 0,
@@ -103,7 +110,7 @@ export const getOrganizationStats = cache(async () => {
 export const getOrganizationMembers = cache(async (page = 1, limit = 20) => {
   const { organizationId } = await requireAuthContext();
   const offset = (page - 1) * limit;
-  
+
   const members = await db.query.memberships.findMany({
     where: eq(memberships.organization_id, organizationId),
     with: {
@@ -128,7 +135,7 @@ export const getOrganizationMembers = cache(async (page = 1, limit = 20) => {
     limit,
     offset,
   });
-  
+
   return members;
 });
 
@@ -138,12 +145,12 @@ export const getOrganizationMembers = cache(async (page = 1, limit = 20) => {
  */
 export const getOrganizationMemberCount = cache(async () => {
   const { organizationId } = await requireAuthContext();
-  
+
   const result = await db
     .select({ count: count() })
     .from(memberships)
     .where(eq(memberships.organization_id, organizationId));
-    
+
   return result[0]?.count ?? 0;
 });
 
@@ -154,7 +161,7 @@ export const getOrganizationMemberCount = cache(async () => {
  */
 export const getOrganizationRoles = cache(async () => {
   const { organizationId } = await requireAuthContext();
-  
+
   return await db.query.roles.findMany({
     where: eq(roles.organization_id, organizationId),
     columns: {
@@ -174,9 +181,11 @@ export const getOrganizationRoles = cache(async () => {
  */
 export const validateUserMembership = cache(async (userId: string) => {
   const { organizationId } = await requireAuthContext();
-  
+
   const membership = await db.query.memberships.findFirst({
-    where: eq(memberships.user_id, userId) && eq(memberships.organization_id, organizationId),
+    where:
+      eq(memberships.user_id, userId) &&
+      eq(memberships.organization_id, organizationId),
     with: {
       role: {
         columns: {
@@ -187,7 +196,7 @@ export const validateUserMembership = cache(async (userId: string) => {
       },
     },
   });
-  
+
   return membership;
 });
 
@@ -198,13 +207,13 @@ export const validateUserMembership = cache(async (userId: string) => {
  */
 export const getOrganizationDashboardData = cache(async () => {
   const { organizationId } = await requireAuthContext();
-  
+
   // Get organization info and stats in parallel
   const [organization, stats] = await Promise.all([
     getOrganizationById(organizationId),
     getOrganizationStats(),
   ]);
-  
+
   return {
     organization,
     stats,

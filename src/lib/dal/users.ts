@@ -16,7 +16,7 @@ import { db, requireAuthContext } from "./shared";
  */
 export const getCurrentUserProfile = cache(async () => {
   const { user } = await requireAuthContext();
-  
+
   const userProfile = await db.query.users.findFirst({
     where: eq(users.id, user.id),
     columns: {
@@ -32,11 +32,11 @@ export const getCurrentUserProfile = cache(async () => {
       updated_at: true,
     },
   });
-  
+
   if (!userProfile) {
     throw new Error("User profile not found");
   }
-  
+
   return userProfile;
 });
 
@@ -47,19 +47,19 @@ export const getCurrentUserProfile = cache(async () => {
  */
 export const getUserById = cache(async (userId: string) => {
   const { organizationId } = await requireAuthContext();
-  
+
   // First verify the user is a member of the current organization
   const membership = await db.query.memberships.findFirst({
     where: and(
       eq(memberships.user_id, userId),
-      eq(memberships.organization_id, organizationId)
+      eq(memberships.organization_id, organizationId),
     ),
   });
-  
+
   if (!membership) {
     throw new Error("User not found or access denied");
   }
-  
+
   const user = await db.query.users.findFirst({
     where: eq(users.id, userId),
     columns: {
@@ -71,11 +71,11 @@ export const getUserById = cache(async (userId: string) => {
       created_at: true,
     },
   });
-  
+
   if (!user) {
     throw new Error("User not found");
   }
-  
+
   return user;
 });
 
@@ -86,11 +86,11 @@ export const getUserById = cache(async (userId: string) => {
  */
 export const getCurrentUserMembership = cache(async () => {
   const { user, organizationId } = await requireAuthContext();
-  
+
   const membership = await db.query.memberships.findFirst({
     where: and(
       eq(memberships.user_id, user.id),
-      eq(memberships.organization_id, organizationId)
+      eq(memberships.organization_id, organizationId),
     ),
     with: {
       role: {
@@ -123,11 +123,11 @@ export const getCurrentUserMembership = cache(async () => {
       },
     },
   });
-  
+
   if (!membership) {
     throw new Error("User membership not found");
   }
-  
+
   return membership;
 });
 
@@ -138,9 +138,11 @@ export const getCurrentUserMembership = cache(async () => {
  */
 export const getCurrentUserPermissions = cache(async () => {
   const membership = await getCurrentUserMembership();
-  
-  const permissions = membership.role.rolePermissions.map(rp => rp.permission.name);
-  
+
+  const permissions = membership.role.rolePermissions.map(
+    (rp) => rp.permission.name,
+  );
+
   return permissions;
 });
 
@@ -151,40 +153,40 @@ export const getCurrentUserPermissions = cache(async () => {
  */
 export const getUserActivityStats = cache(async (userId?: string) => {
   const { organizationId } = await requireAuthContext();
-  
+
   // Use current user if no userId provided
   const targetUserId = userId || (await requireAuthContext()).user.id;
-  
+
   // Verify user access through membership
   const membership = await db.query.memberships.findFirst({
     where: and(
       eq(memberships.user_id, targetUserId),
-      eq(memberships.organization_id, organizationId)
+      eq(memberships.organization_id, organizationId),
     ),
   });
-  
+
   if (!membership) {
     throw new Error("User not found or access denied");
   }
-  
+
   // Get issue statistics for the user
   const [issuesCreated, issuesAssigned] = await Promise.all([
     db.query.issues.findMany({
       where: and(
         eq(issues.created_by_id, targetUserId),
-        eq(issues.organization_id, organizationId)
+        eq(issues.organization_id, organizationId),
       ),
       columns: { id: true },
     }),
     db.query.issues.findMany({
       where: and(
         eq(issues.assigned_to_id, targetUserId),
-        eq(issues.organization_id, organizationId)
+        eq(issues.organization_id, organizationId),
       ),
       columns: { id: true },
     }),
   ]);
-  
+
   return {
     issuesCreated: issuesCreated.length,
     issuesAssigned: issuesAssigned.length,
@@ -198,7 +200,7 @@ export const getUserActivityStats = cache(async (userId?: string) => {
  */
 export const getAssignableUsers = cache(async () => {
   const { organizationId } = await requireAuthContext();
-  
+
   const assignableUsers = await db.query.memberships.findMany({
     where: eq(memberships.organization_id, organizationId),
     with: {
@@ -218,8 +220,8 @@ export const getAssignableUsers = cache(async () => {
       },
     },
   });
-  
-  return assignableUsers.map(membership => ({
+
+  return assignableUsers.map((membership) => ({
     ...membership.user,
     role: membership.role,
   }));
@@ -230,56 +232,58 @@ export const getAssignableUsers = cache(async () => {
  * Includes recently created and assigned issues
  * Uses React 19 cache() for request-level memoization per limit
  */
-export const getUserRecentActivity = cache(async (limit = 10, userId?: string) => {
-  const { organizationId } = await requireAuthContext();
-  
-  // Use current user if no userId provided
-  const targetUserId = userId || (await requireAuthContext()).user.id;
-  
-  // Verify user access through membership
-  const membership = await db.query.memberships.findFirst({
-    where: and(
-      eq(memberships.user_id, targetUserId),
-      eq(memberships.organization_id, organizationId)
-    ),
-  });
-  
-  if (!membership) {
-    throw new Error("User not found or access denied");
-  }
-  
-  // Get recent issues (created or assigned)
-  const recentIssues = await db.query.issues.findMany({
-    where: and(
-      eq(issues.organization_id, organizationId),
-      // Include issues created by user or assigned to user
-      or(
-        eq(issues.created_by_id, targetUserId),
-        eq(issues.assigned_to_id, targetUserId)
-      )
-    ),
-    with: {
-      machine: {
-        columns: { id: true, name: true },
-        with: {
-          model: {
-            columns: { name: true },
+export const getUserRecentActivity = cache(
+  async (limit = 10, userId?: string) => {
+    const { organizationId } = await requireAuthContext();
+
+    // Use current user if no userId provided
+    const targetUserId = userId || (await requireAuthContext()).user.id;
+
+    // Verify user access through membership
+    const membership = await db.query.memberships.findFirst({
+      where: and(
+        eq(memberships.user_id, targetUserId),
+        eq(memberships.organization_id, organizationId),
+      ),
+    });
+
+    if (!membership) {
+      throw new Error("User not found or access denied");
+    }
+
+    // Get recent issues (created or assigned)
+    const recentIssues = await db.query.issues.findMany({
+      where: and(
+        eq(issues.organization_id, organizationId),
+        // Include issues created by user or assigned to user
+        or(
+          eq(issues.created_by_id, targetUserId),
+          eq(issues.assigned_to_id, targetUserId),
+        ),
+      ),
+      with: {
+        machine: {
+          columns: { id: true, name: true },
+          with: {
+            model: {
+              columns: { name: true },
+            },
           },
         },
+        status: {
+          columns: { name: true },
+        },
+        priority: {
+          columns: { name: true },
+        },
       },
-      status: {
-        columns: { name: true },
-      },
-      priority: {
-        columns: { name: true },
-      },
-    },
-    orderBy: [desc(issues.updated_at)],
-    limit,
-  });
-  
-  return recentIssues;
-});
+      orderBy: [desc(issues.updated_at)],
+      limit,
+    });
+
+    return recentIssues;
+  },
+);
 
 /**
  * Check if current user has specific permission
@@ -302,12 +306,12 @@ export const userHasPermission = cache(async (permission: string) => {
  */
 export const getUserPublicProfile = cache(async (userId: string) => {
   const { organizationId } = await requireAuthContext();
-  
+
   // Verify user is in the same organization
   const membership = await db.query.memberships.findFirst({
     where: and(
       eq(memberships.user_id, userId),
-      eq(memberships.organization_id, organizationId)
+      eq(memberships.organization_id, organizationId),
     ),
     with: {
       user: {
@@ -326,14 +330,14 @@ export const getUserPublicProfile = cache(async (userId: string) => {
       },
     },
   });
-  
+
   if (!membership) {
     throw new Error("User not found or access denied");
   }
-  
+
   // Get user activity stats
   const activityStats = await getUserActivityStats(userId);
-  
+
   return {
     ...membership.user,
     role: membership.role,

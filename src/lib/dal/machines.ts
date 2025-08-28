@@ -1,25 +1,204 @@
 /**
  * Machines Data Access Layer
  * Direct database queries for Server Components
+ * Phase 3B: Enhanced with filtering, search, and pagination capabilities
  */
 
 import { cache } from "react";
-import { and, desc, eq } from "drizzle-orm";
-import { machines } from "~/server/db/schema";
+import {
+  and,
+  desc,
+  eq,
+  ilike,
+  or,
+  count,
+  sql,
+  asc,
+  inArray,
+} from "drizzle-orm";
+import { machines, locations, models } from "~/server/db/schema";
 import { db, requireAuthContext } from "./shared";
 
+// ================================
+// TYPE DEFINITIONS
+// ================================
+
+export interface MachineFilters {
+  locationIds?: string[] | undefined;
+  modelIds?: string[] | undefined;
+  ownerIds?: string[] | undefined;
+  search?: string | undefined;
+  hasQR?: boolean | undefined;
+}
+
+export interface MachinePagination {
+  page: number;
+  limit: number;
+}
+
+export interface MachineSorting {
+  field: "name" | "created_at" | "updated_at" | "location" | "model";
+  order: "asc" | "desc";
+}
+
+export interface MachineStats {
+  total: number;
+  withQR: number;
+  byLocation: {
+    locationId: string;
+    locationName: string;
+    count: number;
+  }[];
+  byModel: {
+    modelId: string;
+    modelName: string;
+    count: number;
+  }[];
+}
+
+// ================================
+// CORE MACHINE QUERIES
+// ================================
+
 /**
- * Get all machines for the current organization
+ * Get machines with comprehensive filtering, pagination, and search
+ * Primary function for machine inventory with Server Component optimization
+ * Uses React 19 cache() for request-level memoization
+ */
+export const getMachinesWithFilters = cache(
+  async (
+    filters: MachineFilters = {},
+    pagination: MachinePagination = { page: 1, limit: 20 },
+    sorting: MachineSorting = { field: "created_at", order: "desc" },
+  ) => {
+    const { organizationId } = await requireAuthContext();
+    const offset = (pagination.page - 1) * pagination.limit;
+
+    // Build where conditions
+    const whereConditions = [eq(machines.organization_id, organizationId)];
+
+    // Location filtering
+    if (filters.locationIds?.length) {
+      whereConditions.push(inArray(machines.location_id, filters.locationIds));
+    }
+
+    // Model filtering
+    if (filters.modelIds?.length) {
+      whereConditions.push(inArray(machines.model_id, filters.modelIds));
+    }
+
+    // Owner filtering
+    if (filters.ownerIds?.length) {
+      whereConditions.push(inArray(machines.owner_id, filters.ownerIds));
+    }
+
+    // QR code filtering
+    if (filters.hasQR === true) {
+      whereConditions.push(sql`${machines.qr_code_url} IS NOT NULL`);
+    } else if (filters.hasQR === false) {
+      whereConditions.push(sql`${machines.qr_code_url} IS NULL`);
+    }
+
+    // Search across machine name, location name, and model name
+    if (filters.search) {
+      const searchTerm = `%${filters.search}%`;
+      whereConditions.push(
+        or(
+          ilike(machines.name, searchTerm),
+          sql`EXISTS (
+          SELECT 1 FROM ${locations} 
+          WHERE ${locations.id} = ${machines.location_id} 
+          AND ${locations.name} ILIKE ${searchTerm}
+        )`,
+          sql`EXISTS (
+          SELECT 1 FROM ${models} 
+          WHERE ${models.id} = ${machines.model_id} 
+          AND ${models.name} ILIKE ${searchTerm}
+        )`,
+        ),
+      );
+    }
+
+    // Build order by
+    let orderBy;
+    switch (sorting.field) {
+      case "name":
+        orderBy =
+          sorting.order === "desc" ? desc(machines.name) : asc(machines.name);
+        break;
+      case "updated_at":
+        orderBy =
+          sorting.order === "desc"
+            ? desc(machines.updated_at)
+            : asc(machines.updated_at);
+        break;
+      case "location":
+        // Complex sorting by location name - we'll use a subquery
+        orderBy =
+          sorting.order === "desc"
+            ? sql`(SELECT ${locations.name} FROM ${locations} WHERE ${locations.id} = ${machines.location_id}) DESC`
+            : sql`(SELECT ${locations.name} FROM ${locations} WHERE ${locations.id} = ${machines.location_id}) ASC`;
+        break;
+      case "model":
+        // Complex sorting by model name - we'll use a subquery
+        orderBy =
+          sorting.order === "desc"
+            ? sql`(SELECT ${models.name} FROM ${models} WHERE ${models.id} = ${machines.model_id}) DESC`
+            : sql`(SELECT ${models.name} FROM ${models} WHERE ${models.id} = ${machines.model_id}) ASC`;
+        break;
+      default:
+        orderBy =
+          sorting.order === "desc"
+            ? desc(machines.created_at)
+            : asc(machines.created_at);
+    }
+
+    // Execute queries in parallel
+    const [machineResults, totalCountResult] = await Promise.all([
+      // Get machines with relations
+      db.query.machines.findMany({
+        where: and(...whereConditions),
+        with: {
+          location: {
+            columns: { id: true, name: true, city: true, state: true },
+          },
+          model: {
+            columns: { id: true, name: true, manufacturer: true, year: true },
+          },
+        },
+        limit: pagination.limit + 1, // +1 to check if there's a next page
+        offset,
+        ...(orderBy ? { orderBy: [orderBy] } : {}),
+      }),
+
+      // Get total count
+      db
+        .select({ count: count() })
+        .from(machines)
+        .where(and(...whereConditions))
+        .then((result) => result[0]?.count ?? 0),
+    ]);
+
+    const hasNextPage = machineResults.length > pagination.limit;
+    const items = hasNextPage ? machineResults.slice(0, -1) : machineResults;
+
+    return {
+      items,
+      totalCount: totalCountResult,
+      hasNextPage,
+      currentPage: pagination.page,
+      totalPages: Math.ceil(totalCountResult / pagination.limit),
+    };
+  },
+);
+
+/**
+ * Get all machines for the current organization (simple version)
  * Includes location and model information
  * Uses React 19 cache() for request-level memoization
  */
 export const getMachinesForOrg = cache(async () => {
-  const { organizationId } = await requireAuthContext();
-  
-  return await db.query.machines.findMany({
-    where: eq(machines.organization_id, organizationId),
-    orderBy: [desc(machines.created_at)]
-  });
+  return await getMachinesWithFilters();
 });
 
 /**
@@ -29,19 +208,149 @@ export const getMachinesForOrg = cache(async () => {
  */
 export const getMachineById = cache(async (machineId: string) => {
   const { organizationId } = await requireAuthContext();
-  
+
   const machine = await db.query.machines.findFirst({
     where: and(
       eq(machines.id, machineId),
-      eq(machines.organization_id, organizationId)
-    )
+      eq(machines.organization_id, organizationId),
+    ),
+    with: {
+      location: {
+        columns: {
+          id: true,
+          name: true,
+          city: true,
+          state: true,
+          street: true,
+        },
+      },
+      model: {
+        columns: {
+          id: true,
+          name: true,
+          manufacturer: true,
+          year: true,
+          machine_type: true,
+          machine_display: true,
+        },
+      },
+    },
   });
-  
+
   if (!machine) {
     throw new Error("Machine not found or access denied");
   }
-  
+
   return machine;
+});
+
+/**
+ * Get machine statistics for organization dashboard
+ * Includes counts by location, model, and QR code status
+ * Uses React 19 cache() for request-level memoization
+ */
+export const getMachineStats = cache(async (): Promise<MachineStats> => {
+  const { organizationId } = await requireAuthContext();
+
+  // Get basic counts
+  const [totalMachines, machinesWithQR, byLocation, byModel] =
+    await Promise.all([
+      // Total machine count
+      db
+        .select({ count: count() })
+        .from(machines)
+        .where(eq(machines.organization_id, organizationId))
+        .then((result) => result[0]?.count ?? 0),
+
+      // Machines with QR codes
+      db
+        .select({ count: count() })
+        .from(machines)
+        .where(
+          and(
+            eq(machines.organization_id, organizationId),
+            sql`${machines.qr_code_url} IS NOT NULL`,
+          ),
+        )
+        .then((result) => result[0]?.count ?? 0),
+
+      // Machines by location
+      db
+        .select({
+          locationId: machines.location_id,
+          locationName: locations.name,
+          count: count(),
+        })
+        .from(machines)
+        .leftJoin(locations, eq(machines.location_id, locations.id))
+        .where(eq(machines.organization_id, organizationId))
+        .groupBy(machines.location_id, locations.name),
+
+      // Machines by model
+      db
+        .select({
+          modelId: machines.model_id,
+          modelName: models.name,
+          count: count(),
+        })
+        .from(machines)
+        .leftJoin(models, eq(machines.model_id, models.id))
+        .where(eq(machines.organization_id, organizationId))
+        .groupBy(machines.model_id, models.name),
+    ]);
+
+  return {
+    total: totalMachines,
+    withQR: machinesWithQR,
+    byLocation: byLocation.map((item) => ({
+      locationId: item.locationId,
+      locationName: item.locationName || "Unknown Location",
+      count: item.count,
+    })),
+    byModel: byModel.map((item) => ({
+      modelId: item.modelId,
+      modelName: item.modelName || "Unknown Model",
+      count: item.count,
+    })),
+  };
+});
+
+/**
+ * Get locations for the current organization (for filters)
+ * Uses React 19 cache() for request-level memoization
+ */
+export const getLocationsForOrg = cache(async () => {
+  const { organizationId } = await requireAuthContext();
+
+  return await db.query.locations.findMany({
+    where: eq(locations.organization_id, organizationId),
+    columns: { id: true, name: true, city: true, state: true },
+    orderBy: [asc(locations.name)],
+  });
+});
+
+/**
+ * Get models available for the current organization (for filters)
+ * Includes both global OPDB models and org-specific custom models
+ * Uses React 19 cache() for request-level memoization
+ */
+export const getModelsForOrg = cache(async () => {
+  const { organizationId } = await requireAuthContext();
+
+  return await db.query.models.findMany({
+    where: or(
+      sql`${models.organization_id} IS NULL`, // Global OPDB models
+      eq(models.organization_id, organizationId), // Org-specific custom models
+    ),
+    columns: {
+      id: true,
+      name: true,
+      manufacturer: true,
+      year: true,
+      is_custom: true,
+    },
+    orderBy: [asc(models.manufacturer), asc(models.name)],
+  });
 });
 
 /**

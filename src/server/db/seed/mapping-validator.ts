@@ -15,10 +15,10 @@ import { STATIC_MAPPINGS, SEED_TEST_IDS } from "./constants";
 /**
  * Standard dual-organization mapping structure
  */
-type DualOrgMapping = {
+interface DualOrgMapping {
   primary: string;
   competitor: string;
-};
+}
 
 /**
  * Valid organization types for mapping resolution
