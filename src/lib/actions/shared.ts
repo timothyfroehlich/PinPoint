@@ -8,13 +8,13 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { cache } from "react"; // React 19 cache API
 // TODO: Enable when Next.js supports unstable_after in current version
 // import { unstable_after } from "next/server"; // Background tasks
-import { z } from "zod";
+import type { z } from "zod";
 import { createClient } from "~/lib/supabase/server";
 
 /**
  * Server Action result types (React 19 useActionState compatible)
  */
-export type ActionResult<T = any> = 
+export type ActionResult<T = any> =
   | { success: true; data: T; message?: string }
   | { success: false; error: string; fieldErrors?: Record<string, string[]> };
 
@@ -33,7 +33,9 @@ export const getActionAuthContext = cache(async () => {
     redirect("/sign-in");
   }
 
-  const organizationId = user.user_metadata?.["organizationId"] as string | undefined;
+  const organizationId = user.user_metadata?.["organizationId"] as
+    | string
+    | undefined;
   if (!organizationId) {
     throw new Error("Organization selection required");
   }
@@ -49,13 +51,20 @@ export const getServerAuthContext = getActionAuthContext;
 /**
  * Safe FormData extraction with validation
  */
-export function getFormField(formData: FormData, field: string, required = false): string | null {
+export function getFormField(
+  formData: FormData,
+  field: string,
+  required = false,
+): string | null {
   const value = formData.get(field);
-  
-  if (required && (!value || typeof value !== "string" || value.trim() === "")) {
+
+  if (
+    required &&
+    (!value || typeof value !== "string" || value.trim() === "")
+  ) {
     throw new Error(`${field} is required`);
   }
-  
+
   return typeof value === "string" ? value.trim() : null;
 }
 
@@ -63,18 +72,18 @@ export function getFormField(formData: FormData, field: string, required = false
  * Validate required fields from FormData
  */
 export function validateRequiredFields(
-  formData: FormData, 
-  requiredFields: string[]
+  formData: FormData,
+  requiredFields: string[],
 ): Record<string, string> {
   const result: Record<string, string> = {};
-  
+
   for (const field of requiredFields) {
     const value = getFormField(formData, field, true);
     if (value) {
       result[field] = value;
     }
   }
-  
+
   return result;
 }
 
@@ -89,7 +98,10 @@ export function actionSuccess<T>(data: T, message?: string): ActionResult<T> {
   return result;
 }
 
-export function actionError(error: string, fieldErrors?: Record<string, string[]>): ActionResult<never> {
+export function actionError(
+  error: string,
+  fieldErrors?: Record<string, string[]>,
+): ActionResult<never> {
   const result: ActionResult<never> = { success: false, error };
   if (fieldErrors) {
     result.fieldErrors = fieldErrors;
@@ -102,29 +114,35 @@ export function actionError(error: string, fieldErrors?: Record<string, string[]
  */
 export function validateFormData<T>(
   formData: FormData,
-  schema: z.ZodSchema<T>
+  schema: z.ZodSchema<T>,
 ): ActionResult<T> {
   const rawData = Object.fromEntries(formData.entries());
-  
+
   // Convert empty strings to undefined for optional fields
-  const processedData = Object.entries(rawData).reduce((acc, [key, value]) => {
-    acc[key] = value === '' ? undefined : value;
-    return acc;
-  }, {} as Record<string, any>);
+  const processedData = Object.entries(rawData).reduce<Record<string, any>>(
+    (acc, [key, value]) => {
+      acc[key] = value === "" ? undefined : value;
+      return acc;
+    },
+    {},
+  );
 
   const result = schema.safeParse(processedData);
-  
+
   if (result.success) {
     return actionSuccess(result.data);
   }
 
   // Format Zod errors for form display
-  const fieldErrors = result.error.issues.reduce((acc: Record<string, string[]>, issue) => {
-    const path = issue.path.join('.');
-    if (!acc[path]) acc[path] = [];
-    acc[path].push(issue.message);
-    return acc;
-  }, {} as Record<string, string[]>);
+  const fieldErrors = result.error.issues.reduce<Record<string, string[]>>(
+    (acc: Record<string, string[]>, issue) => {
+      const path = issue.path.join(".");
+      if (!acc[path]) acc[path] = [];
+      acc[path].push(issue.message);
+      return acc;
+    },
+    {},
+  );
 
   return actionError("Validation failed", fieldErrors);
 }
@@ -135,7 +153,7 @@ export function validateFormData<T>(
  */
 export function runAfterResponse(task: () => Promise<void>): void {
   // For now, run immediately (in production, would use unstable_after)
-  task().catch(error => {
+  task().catch((error) => {
     console.error("Background task failed:", error);
   });
 }
@@ -162,7 +180,7 @@ export function revalidateDashboard(): void {
  * Wrapper for Server Actions with comprehensive error handling
  */
 export async function withActionErrorHandling<T>(
-  action: () => Promise<T>
+  action: () => Promise<T>,
 ): Promise<ActionResult<T>> {
   try {
     const data = await action();
@@ -170,7 +188,7 @@ export async function withActionErrorHandling<T>(
   } catch (error) {
     console.error("Server Action error:", error);
     return actionError(
-      error instanceof Error ? error.message : "An error occurred"
+      error instanceof Error ? error.message : "An error occurred",
     );
   }
 }

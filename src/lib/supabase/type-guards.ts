@@ -44,7 +44,7 @@ export function isPinPointSupabaseUser(
 ): value is PinPointSupabaseUser {
   if (!isSupabaseUser(value)) return false;
 
-  const user = value as User;
+  const user = value;
   return typeof user.app_metadata === "object" && user.app_metadata !== null;
 }
 

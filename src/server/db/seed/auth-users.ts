@@ -249,7 +249,7 @@ async function upsertSupabaseAuthUser(
           environment: "development",
         },
         app_metadata: {
-          organization_id: params.organization_id,
+          organizationId: params.organization_id,
           role: params.role,
           dev_created: true,
           created_via: "seeding",
@@ -420,8 +420,12 @@ async function processBatchUsers(
           .limit(1);
 
         if (roleResults.length > 0 && roleResults[0]) {
+          const membershipId = await SeedMapper.getMembershipId(
+            userData.email,
+            organization_id,
+          );
           membershipsToCreate.push({
-            id: SeedMapper.getMembershipId(userData.email, organization_id),
+            id: membershipId,
             user_id: authResult.user_id,
             organization_id,
             role_id: roleResults[0].id,
@@ -595,8 +599,12 @@ async function createUsersDirectly(
       .limit(1);
 
     if (roleResults.length > 0 && roleResults[0]) {
+      const membershipId = await SeedMapper.getMembershipId(
+        userData.email,
+        organization_id,
+      );
       membershipsToCreate.push({
-        id: SeedMapper.getMembershipId(userData.email, organization_id),
+        id: membershipId,
         user_id: getUserIdForEmail(userData.email),
         organization_id,
         role_id: roleResults[0].id,

@@ -9,7 +9,9 @@ export default async function Phase1DTestPage(): Promise<JSX.Element> {
   return (
     <div className="container mx-auto py-8 px-4">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-2">Phase 1D Implementation Test</h1>
+        <h1 className="text-3xl font-bold mb-2">
+          Phase 1D Implementation Test
+        </h1>
         <p className="text-muted-foreground">
           Testing server-first layout with 2025 Supabase SSR patterns
         </p>
@@ -30,13 +32,23 @@ export default async function Phase1DTestPage(): Promise<JSX.Element> {
                   </AlertDescription>
                 </Alert>
                 <div className="grid gap-2">
-                  <div><strong>User ID:</strong> {auth.user.id}</div>
-                  <div><strong>Name:</strong> {auth.user.name}</div>
-                  <div><strong>Email:</strong> {auth.user.email}</div>
+                  <div>
+                    <strong>User ID:</strong> {auth.user.id}
+                  </div>
+                  <div>
+                    <strong>Name:</strong> {auth.user.name}
+                  </div>
+                  <div>
+                    <strong>Email:</strong> {auth.user.email}
+                  </div>
                   {auth.organization && (
                     <>
-                      <div><strong>Organization:</strong> {auth.organization.name}</div>
-                      <div><strong>Org ID:</strong> {auth.organization.id}</div>
+                      <div>
+                        <strong>Organization:</strong> {auth.organization.name}
+                      </div>
+                      <div>
+                        <strong>Org ID:</strong> {auth.organization.id}
+                      </div>
                     </>
                   )}
                 </div>
@@ -78,9 +90,13 @@ export default async function Phase1DTestPage(): Promise<JSX.Element> {
             <div className="space-y-2 text-sm text-muted-foreground">
               <div>Phase 1D foundation is complete and ready for:</div>
               <div>• Individual page conversions to Server Components</div>
-              <div>• Data Access Layer implementation with direct DB queries</div>
+              <div>
+                • Data Access Layer implementation with direct DB queries
+              </div>
               <div>• Server Actions for form handling and mutations</div>
-              <div>• Progressive replacement of MUI components with shadcn/ui</div>
+              <div>
+                • Progressive replacement of MUI components with shadcn/ui
+              </div>
             </div>
           </CardContent>
         </Card>

@@ -15,15 +15,14 @@ import {
 } from "./shared";
 
 describe("Server Action Utilities (Unit Tests - Archetype 1)", () => {
-  
   describe("actionSuccess", () => {
     it("creates successful result with data", () => {
       const data = { id: "123", name: "Test" };
       const result = actionSuccess(data);
-      
+
       expect(result).toEqual({
         success: true,
-        data: { id: "123", name: "Test" }
+        data: { id: "123", name: "Test" },
       });
     });
 
@@ -31,11 +30,11 @@ describe("Server Action Utilities (Unit Tests - Archetype 1)", () => {
       const data = { id: "123" };
       const message = "Operation completed successfully";
       const result = actionSuccess(data, message);
-      
+
       expect(result).toEqual({
         success: true,
         data: { id: "123" },
-        message: "Operation completed successfully"
+        message: "Operation completed successfully",
       });
     });
   });
@@ -43,27 +42,27 @@ describe("Server Action Utilities (Unit Tests - Archetype 1)", () => {
   describe("actionError", () => {
     it("creates error result with message", () => {
       const result = actionError("Something went wrong");
-      
+
       expect(result).toEqual({
         success: false,
-        error: "Something went wrong"
+        error: "Something went wrong",
       });
     });
 
     it("creates error result with field errors", () => {
       const fieldErrors = {
         title: ["Title is required"],
-        email: ["Invalid email format"]
+        email: ["Invalid email format"],
       };
       const result = actionError("Validation failed", fieldErrors);
-      
+
       expect(result).toEqual({
         success: false,
         error: "Validation failed",
         fieldErrors: {
           title: ["Title is required"],
-          email: ["Invalid email format"]
-        }
+          email: ["Invalid email format"],
+        },
       });
     });
   });
@@ -72,7 +71,7 @@ describe("Server Action Utilities (Unit Tests - Archetype 1)", () => {
     const testSchema = z.object({
       title: z.string().min(1, "Title is required"),
       description: z.string().optional(),
-      priority: z.enum(["low", "medium", "high"]).default("medium")
+      priority: z.enum(["low", "medium", "high"]).default("medium"),
     });
 
     it("validates valid form data successfully", () => {
@@ -80,15 +79,15 @@ describe("Server Action Utilities (Unit Tests - Archetype 1)", () => {
       formData.append("title", "Test Issue");
       formData.append("description", "Test description");
       formData.append("priority", "high");
-      
+
       const result = validateFormData(formData, testSchema);
-      
+
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.data).toEqual({
           title: "Test Issue",
-          description: "Test description", 
-          priority: "high"
+          description: "Test description",
+          priority: "high",
         });
       }
     });
@@ -97,14 +96,14 @@ describe("Server Action Utilities (Unit Tests - Archetype 1)", () => {
       const formData = new FormData();
       formData.append("title", "Test Issue");
       // description omitted
-      
+
       const result = validateFormData(formData, testSchema);
-      
+
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.data).toEqual({
           title: "Test Issue",
-          priority: "medium" // default value
+          priority: "medium", // default value
         });
       }
     });
@@ -113,9 +112,9 @@ describe("Server Action Utilities (Unit Tests - Archetype 1)", () => {
       const formData = new FormData();
       formData.append("title", "Test Issue");
       formData.append("description", ""); // empty string
-      
+
       const result = validateFormData(formData, testSchema);
-      
+
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.data.description).toBeUndefined();
@@ -126,14 +125,16 @@ describe("Server Action Utilities (Unit Tests - Archetype 1)", () => {
       const formData = new FormData();
       // title missing (required field)
       formData.append("priority", "invalid"); // invalid enum value
-      
+
       const result = validateFormData(formData, testSchema);
-      
+
       expect(result.success).toBe(false);
       if (!result.success) {
         expect(result.error).toBe("Validation failed");
         expect(result.fieldErrors).toBeDefined();
-        expect(result.fieldErrors?.title).toContain("Invalid input: expected string, received undefined");
+        expect(result.fieldErrors?.title).toContain(
+          "Invalid input: expected string, received undefined",
+        );
         expect(result.fieldErrors?.priority).toBeDefined();
       }
     });
@@ -143,21 +144,21 @@ describe("Server Action Utilities (Unit Tests - Archetype 1)", () => {
     it("extracts string field from FormData", () => {
       const formData = new FormData();
       formData.append("title", "Test Title");
-      
+
       const result = getFormField(formData, "title");
       expect(result).toBe("Test Title");
     });
 
     it("returns null for missing optional field", () => {
       const formData = new FormData();
-      
+
       const result = getFormField(formData, "missing");
       expect(result).toBeNull();
     });
 
     it("throws error for missing required field", () => {
       const formData = new FormData();
-      
+
       expect(() => {
         getFormField(formData, "required", true);
       }).toThrow("required is required");
@@ -166,7 +167,7 @@ describe("Server Action Utilities (Unit Tests - Archetype 1)", () => {
     it("trims whitespace from field values", () => {
       const formData = new FormData();
       formData.append("title", "  Test Title  ");
-      
+
       const result = getFormField(formData, "title");
       expect(result).toBe("Test Title");
     });
@@ -174,7 +175,7 @@ describe("Server Action Utilities (Unit Tests - Archetype 1)", () => {
     it("treats empty string as missing for required fields", () => {
       const formData = new FormData();
       formData.append("title", "   "); // only whitespace
-      
+
       expect(() => {
         getFormField(formData, "title", true);
       }).toThrow("title is required");
@@ -186,12 +187,12 @@ describe("Server Action Utilities (Unit Tests - Archetype 1)", () => {
       const formData = new FormData();
       formData.append("title", "Test Title");
       formData.append("machineId", "machine-123");
-      
+
       const result = validateRequiredFields(formData, ["title", "machineId"]);
-      
+
       expect(result).toEqual({
         title: "Test Title",
-        machineId: "machine-123"
+        machineId: "machine-123",
       });
     });
 
@@ -199,7 +200,7 @@ describe("Server Action Utilities (Unit Tests - Archetype 1)", () => {
       const formData = new FormData();
       formData.append("title", "Test Title");
       // machineId missing
-      
+
       expect(() => {
         validateRequiredFields(formData, ["title", "machineId"]);
       }).toThrow("machineId is required");
@@ -211,12 +212,12 @@ describe("Server Action Utilities (Unit Tests - Archetype 1)", () => {
       const successAction = async () => {
         return { id: "123", name: "Test" };
       };
-      
+
       const result = await withActionErrorHandling(successAction);
-      
+
       expect(result).toEqual({
         success: true,
-        data: { id: "123", name: "Test" }
+        data: { id: "123", name: "Test" },
       });
     });
 
@@ -224,12 +225,12 @@ describe("Server Action Utilities (Unit Tests - Archetype 1)", () => {
       const failingAction = async () => {
         throw new Error("Something went wrong");
       };
-      
+
       const result = await withActionErrorHandling(failingAction);
-      
+
       expect(result).toEqual({
         success: false,
-        error: "Something went wrong"
+        error: "Something went wrong",
       });
     });
 
@@ -237,12 +238,12 @@ describe("Server Action Utilities (Unit Tests - Archetype 1)", () => {
       const failingAction = async () => {
         throw "String error";
       };
-      
+
       const result = await withActionErrorHandling(failingAction);
-      
+
       expect(result).toEqual({
         success: false,
-        error: "An error occurred"
+        error: "An error occurred",
       });
     });
   });

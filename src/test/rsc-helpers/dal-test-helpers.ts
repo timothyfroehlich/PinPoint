@@ -3,8 +3,6 @@
  * Enhanced Archetype 4: Repository/DAL Tests with real database
  */
 
-import { createClient } from "@supabase/supabase-js";
-import type { Database } from "~/lib/supabase/types";
 import { SEED_TEST_IDS } from "../constants/seed-test-ids";
 
 /**
@@ -14,17 +12,17 @@ import { SEED_TEST_IDS } from "../constants/seed-test-ids";
 export function createMockAuthContext(userId?: string, orgId?: string) {
   const testUserId = userId || SEED_TEST_IDS.USERS.ADMIN;
   const testOrgId = orgId || SEED_TEST_IDS.ORGANIZATIONS.primary;
-  
+
   return {
     user: {
       id: testUserId,
       email: "tim.froehlich@example.com",
       user_metadata: {
         organizationId: testOrgId,
-        name: "Tim Froehlich"
-      }
+        name: "Tim Froehlich",
+      },
     },
-    organizationId: testOrgId
+    organizationId: testOrgId,
   };
 }
 
@@ -39,12 +37,12 @@ export function mockSupabaseAuth(mockContext = createMockAuthContext()) {
       auth: {
         getUser: vi.fn().mockResolvedValue({
           data: { user: mockContext.user },
-          error: null
-        })
-      }
-    }))
+          error: null,
+        }),
+      },
+    })),
   }));
-  
+
   return mockContext;
 }
 
@@ -54,7 +52,7 @@ export function mockSupabaseAuth(mockContext = createMockAuthContext()) {
  */
 export async function testDALFunction<T>(
   dalFunction: () => Promise<T>,
-  mockContext = createMockAuthContext()
+  mockContext = createMockAuthContext(),
 ): Promise<T> {
   mockSupabaseAuth(mockContext);
   return await dalFunction();
@@ -64,16 +62,18 @@ export async function testDALFunction<T>(
  * Assert organization scoping works correctly
  * Critical security pattern for all DAL functions
  */
-export async function assertOrganizationScoping<T extends { organizationId?: string }>(
+export async function assertOrganizationScoping<
+  T extends { organizationId?: string },
+>(
   dalFunction: () => Promise<T[]>,
-  expectedOrgId: string = SEED_TEST_IDS.ORGANIZATIONS.primary
+  expectedOrgId: string = SEED_TEST_IDS.ORGANIZATIONS.primary,
 ) {
   const results = await testDALFunction(dalFunction);
-  
+
   // Verify all results belong to expected organization
-  results.forEach(result => {
+  results.forEach((result) => {
     expect(result.organizationId).toBe(expectedOrgId);
   });
-  
+
   return results;
 }

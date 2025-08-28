@@ -4,10 +4,14 @@
  */
 
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { eq, and } from "drizzle-orm";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 import * as dalShared from "./shared";
-import { getIssuesForOrg, getIssueById, getIssueStatusCounts, getRecentIssues } from "./issues";
+import {
+  getIssuesForOrg,
+  getIssueById,
+  getIssueStatusCounts,
+  getRecentIssues,
+} from "./issues";
 
 // Mock the database and auth context
 vi.mock("./shared", async () => {
@@ -20,16 +24,16 @@ vi.mock("./shared", async () => {
         issues: {
           findMany: vi.fn(),
           findFirst: vi.fn(),
-        }
+        },
       },
       select: vi.fn(() => ({
         from: vi.fn(() => ({
           where: vi.fn(() => ({
-            groupBy: vi.fn()
-          }))
-        }))
-      }))
-    }
+            groupBy: vi.fn(),
+          })),
+        })),
+      })),
+    },
   };
 });
 
@@ -39,11 +43,11 @@ const mockDb = vi.mocked(dalShared.db);
 describe("Issues DAL (Business Logic Tests - Archetype 2)", () => {
   // Test context setup with seed data
   const mockAuthContext = {
-    user: { 
+    user: {
       id: SEED_TEST_IDS.USERS.ADMIN,
-      email: "tim@pinpoint.dev"
+      email: "tim@pinpoint.dev",
     },
-    organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary
+    organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
   };
 
   beforeEach(() => {
@@ -66,14 +70,14 @@ describe("Issues DAL (Business Logic Tests - Archetype 2)", () => {
           machine: {
             id: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
             name: "Test Machine",
-            model: { id: "model-1", name: "Test Model" }
+            model: { id: "model-1", name: "Test Model" },
           },
           assignedTo: {
             id: SEED_TEST_IDS.USERS.ADMIN,
             name: "Tim",
-            email: "tim@pinpoint.dev"
-          }
-        }
+            email: "tim@pinpoint.dev",
+          },
+        },
       ];
 
       const mockFindMany = vi.fn().mockResolvedValue(mockIssues);
@@ -87,17 +91,21 @@ describe("Issues DAL (Business Logic Tests - Archetype 2)", () => {
       // Verify query was called with proper structure (simplified)
       expect(mockFindMany).toHaveBeenCalledOnce();
       const callArgs = mockFindMany.mock.calls[0][0];
-      expect(callArgs).toHaveProperty('where');
-      expect(callArgs).toHaveProperty('with');
-      expect(callArgs).toHaveProperty('orderBy');
+      expect(callArgs).toHaveProperty("where");
+      expect(callArgs).toHaveProperty("with");
+      expect(callArgs).toHaveProperty("orderBy");
 
       expect(result).toEqual(mockIssues);
     });
 
     it("throws when auth context fails", async () => {
-      mockRequireAuthContext.mockRejectedValue(new Error("Authentication required"));
+      mockRequireAuthContext.mockRejectedValue(
+        new Error("Authentication required"),
+      );
 
-      await expect(getIssuesForOrg()).rejects.toThrow("Authentication required");
+      await expect(getIssuesForOrg()).rejects.toThrow(
+        "Authentication required",
+      );
     });
 
     it("properly handles empty result set", async () => {
@@ -119,9 +127,20 @@ describe("Issues DAL (Business Logic Tests - Archetype 2)", () => {
         id: testIssueId,
         title: "Test Issue",
         organization_id: SEED_TEST_IDS.ORGANIZATIONS.primary,
-        machine: { id: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE, name: "Test Machine" },
-        assignedTo: { id: SEED_TEST_IDS.USERS.ADMIN, name: "Tim", email: "tim@pinpoint.dev" },
-        createdBy: { id: SEED_TEST_IDS.USERS.ADMIN, name: "Tim", email: "tim@pinpoint.dev" }
+        machine: {
+          id: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
+          name: "Test Machine",
+        },
+        assignedTo: {
+          id: SEED_TEST_IDS.USERS.ADMIN,
+          name: "Tim",
+          email: "tim@pinpoint.dev",
+        },
+        createdBy: {
+          id: SEED_TEST_IDS.USERS.ADMIN,
+          name: "Tim",
+          email: "tim@pinpoint.dev",
+        },
       };
 
       const mockFindFirst = vi.fn().mockResolvedValue(mockIssue);
@@ -135,8 +154,8 @@ describe("Issues DAL (Business Logic Tests - Archetype 2)", () => {
       // Verify query was called with proper structure (simplified)
       expect(mockFindFirst).toHaveBeenCalledOnce();
       const callArgs = mockFindFirst.mock.calls[0][0];
-      expect(callArgs).toHaveProperty('where');
-      expect(callArgs).toHaveProperty('with');
+      expect(callArgs).toHaveProperty("where");
+      expect(callArgs).toHaveProperty("with");
 
       expect(result).toEqual(mockIssue);
     });
@@ -145,7 +164,9 @@ describe("Issues DAL (Business Logic Tests - Archetype 2)", () => {
       const mockFindFirst = vi.fn().mockResolvedValue(null);
       mockDb.query.issues.findFirst = mockFindFirst;
 
-      await expect(getIssueById("non-existent")).rejects.toThrow("Issue not found or access denied");
+      await expect(getIssueById("non-existent")).rejects.toThrow(
+        "Issue not found or access denied",
+      );
       expect(mockRequireAuthContext).toHaveBeenCalledOnce();
     });
 
@@ -153,14 +174,16 @@ describe("Issues DAL (Business Logic Tests - Archetype 2)", () => {
       // Mock finding an issue from a different organization
       const crossOrgIssue = {
         id: testIssueId,
-        organization_id: SEED_TEST_IDS.ORGANIZATIONS.competitor  // Different org
+        organization_id: SEED_TEST_IDS.ORGANIZATIONS.competitor, // Different org
       };
 
       // Since the query includes org scoping, this should return null
       const mockFindFirst = vi.fn().mockResolvedValue(null);
       mockDb.query.issues.findFirst = mockFindFirst;
 
-      await expect(getIssueById(testIssueId)).rejects.toThrow("Issue not found or access denied");
+      await expect(getIssueById(testIssueId)).rejects.toThrow(
+        "Issue not found or access denied",
+      );
     });
   });
 
@@ -168,7 +191,7 @@ describe("Issues DAL (Business Logic Tests - Archetype 2)", () => {
     it("returns aggregated status counts with organization scoping", async () => {
       const mockStatusCounts = [
         { statusId: "status-open", count: 5 },
-        { statusId: "status-closed", count: 3 }
+        { statusId: "status-closed", count: 3 },
       ];
 
       // Mock the select chain
@@ -189,7 +212,7 @@ describe("Issues DAL (Business Logic Tests - Archetype 2)", () => {
       // Verify result transformation to object
       expect(result).toEqual({
         "status-open": 5,
-        "status-closed": 3
+        "status-closed": 3,
       });
     });
 
@@ -217,9 +240,9 @@ describe("Issues DAL (Business Logic Tests - Archetype 2)", () => {
           machine: {
             id: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
             name: "Test Machine",
-            model: { id: "model-1", name: "Test Model" }
-          }
-        }
+            model: { id: "model-1", name: "Test Model" },
+          },
+        },
       ];
 
       const mockFindMany = vi.fn().mockResolvedValue(mockIssues);
@@ -233,10 +256,10 @@ describe("Issues DAL (Business Logic Tests - Archetype 2)", () => {
       // Verify query was called with proper structure and limit (simplified)
       expect(mockFindMany).toHaveBeenCalledOnce();
       const callArgs = mockFindMany.mock.calls[0][0];
-      expect(callArgs).toHaveProperty('where');
-      expect(callArgs).toHaveProperty('with');
-      expect(callArgs).toHaveProperty('orderBy');
-      expect(callArgs).toHaveProperty('limit');
+      expect(callArgs).toHaveProperty("where");
+      expect(callArgs).toHaveProperty("with");
+      expect(callArgs).toHaveProperty("orderBy");
+      expect(callArgs).toHaveProperty("limit");
       expect(callArgs.limit).toBe(3);
 
       expect(result).toEqual(mockIssues);
@@ -248,9 +271,11 @@ describe("Issues DAL (Business Logic Tests - Archetype 2)", () => {
 
       await getRecentIssues();
 
-      expect(mockFindMany).toHaveBeenCalledWith(expect.objectContaining({
-        limit: 5  // Default limit
-      }));
+      expect(mockFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          limit: 5, // Default limit
+        }),
+      );
     });
   });
 
@@ -278,7 +303,7 @@ describe("Issues DAL (Business Logic Tests - Archetype 2)", () => {
       const mockWhere = vi.fn().mockReturnValue({ groupBy: mockGroupBy });
       const mockFrom = vi.fn().mockReturnValue({ where: mockWhere });
       const mockSelect = vi.fn().mockReturnValue({ from: mockFrom });
-      
+
       mockDb.query.issues.findMany = mockFindMany;
       mockDb.query.issues.findFirst = mockFindFirst;
       mockDb.select = mockSelect;
@@ -291,7 +316,7 @@ describe("Issues DAL (Business Logic Tests - Archetype 2)", () => {
 
       // Verify all functions called requireAuthContext
       expect(mockRequireAuthContext).toHaveBeenCalledTimes(4);
-      
+
       // This test ensures no DAL function can be called without auth context
     });
   });

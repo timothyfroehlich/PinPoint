@@ -220,15 +220,16 @@ async function createDefaultPriorities(organization_id: string): Promise<void> {
 
   const existingSet = new Set(existingPriorities.map((p) => p.name));
 
-  const prioritiesToCreate: (typeof priorities.$inferInsert)[] = priorityData
-    .filter((priority) => !existingSet.has(priority.name))
-    .map((priority) => ({
-      id: SeedMapper.getPriorityId(priority.name, organization_id),
+  const prioritiesToCreate: (typeof priorities.$inferInsert)[] = [];
+  for (const priority of priorityData.filter((p) => !existingSet.has(p.name))) {
+    prioritiesToCreate.push({
+      id: await SeedMapper.getPriorityId(priority.name, organization_id),
       name: priority.name,
       order: priority.order,
       organization_id: organization_id,
       is_default: true,
-    }));
+    });
+  }
 
   if (prioritiesToCreate.length > 0) {
     await db.insert(priorities).values(prioritiesToCreate);
@@ -258,15 +259,16 @@ async function createDefaultCollectionTypes(
 
   const existingSet = new Set(existingTypes.map((t) => t.name));
 
-  const typesToCreate: (typeof collectionTypes.$inferInsert)[] = typeData
-    .filter((type) => !existingSet.has(type.name))
-    .map((typeData) => ({
-      id: SeedMapper.getCollectionTypeId(typeData.name, organization_id),
-      name: typeData.name,
-      description: typeData.description,
+  const typesToCreate: (typeof collectionTypes.$inferInsert)[] = [];
+  for (const type of typeData.filter((type) => !existingSet.has(type.name))) {
+    typesToCreate.push({
+      id: await SeedMapper.getCollectionTypeId(type.name, organization_id),
+      name: type.name,
+      description: type.description,
       organization_id: organization_id,
       is_default: true,
-    }));
+    });
+  }
 
   if (typesToCreate.length > 0) {
     await db.insert(collectionTypes).values(typesToCreate);
@@ -335,25 +337,20 @@ async function createDefaultIssueStatuses(
 
   const existingSet = new Set(existingStatuses.map((s) => s.name));
 
-  const statusesToCreate = statusData
-    .filter((status) => !existingSet.has(status.name))
-    .map((statusData) => ({
-      id: SeedMapper.getStatusId(statusData.name, organization_id),
-      name: statusData.name,
-      color: statusData.color,
-      description: statusData.description,
-      category: statusData.category as "NEW" | "IN_PROGRESS" | "RESOLVED",
+  const statusesToCreate = [];
+  for (const status of statusData.filter(
+    (status) => !existingSet.has(status.name),
+  )) {
+    statusesToCreate.push({
+      id: await SeedMapper.getStatusId(status.name, organization_id),
+      name: status.name,
+      color: status.color,
+      description: status.description,
+      category: status.category as "NEW" | "IN_PROGRESS" | "RESOLVED",
       organization_id: organization_id,
       is_default: true,
-    })) as {
-    id: string;
-    name: string;
-    color: string;
-    description: string;
-    category: "NEW" | "IN_PROGRESS" | "RESOLVED";
-    organization_id: string;
-    is_default: boolean;
-  }[];
+    });
+  }
 
   if (statusesToCreate.length > 0) {
     await db.insert(issueStatuses).values(statusesToCreate);
@@ -373,10 +370,14 @@ async function createSystemRoles(organization_id: string): Promise<void> {
   const permissionMap = new Map(allPermissions.map((p) => [p.name, p.id]));
 
   // Create Admin role with all permissions
+  const adminRoleId = await SeedMapper.getRoleId(
+    SYSTEM_ROLES.ADMIN,
+    organization_id,
+  );
   await db
     .insert(roles)
     .values({
-      id: SeedMapper.getRoleId(SYSTEM_ROLES.ADMIN, organization_id),
+      id: adminRoleId,
       name: SYSTEM_ROLES.ADMIN,
       organization_id: organization_id,
       is_system: true,
@@ -385,7 +386,7 @@ async function createSystemRoles(organization_id: string): Promise<void> {
 
   // Create role-permission assignments for Admin
   const adminRolePermissions = allPermissions.map((permission) => ({
-    role_id: SeedMapper.getRoleId(SYSTEM_ROLES.ADMIN, organization_id),
+    role_id: adminRoleId,
     permission_id: permission.id,
   }));
 
@@ -399,10 +400,14 @@ async function createSystemRoles(organization_id: string): Promise<void> {
     permissionMap.get(permName),
   ).filter((id): id is string => id !== undefined);
 
+  const unauthRoleId = await SeedMapper.getRoleId(
+    SYSTEM_ROLES.UNAUTHENTICATED,
+    organization_id,
+  );
   await db
     .insert(roles)
     .values({
-      id: SeedMapper.getRoleId(SYSTEM_ROLES.UNAUTHENTICATED, organization_id),
+      id: unauthRoleId,
       name: SYSTEM_ROLES.UNAUTHENTICATED,
       organization_id: organization_id,
       is_system: true,
@@ -412,10 +417,7 @@ async function createSystemRoles(organization_id: string): Promise<void> {
   // Create role-permission assignments for Unauthenticated
   if (unauthPermissions.length > 0) {
     const unauthRolePermissions = unauthPermissions.map((permissionId) => ({
-      role_id: SeedMapper.getRoleId(
-        SYSTEM_ROLES.UNAUTHENTICATED,
-        organization_id,
-      ),
+      role_id: unauthRoleId,
       permission_id: permissionId,
     }));
 
@@ -449,10 +451,14 @@ async function createTemplateRole(
     .map((permName) => permissionMap.get(permName))
     .filter((id): id is string => id !== undefined);
 
+  const templateRoleId = await SeedMapper.getRoleId(
+    template.name,
+    organization_id,
+  );
   await db
     .insert(roles)
     .values({
-      id: SeedMapper.getRoleId(template.name, organization_id),
+      id: templateRoleId,
       name: template.name,
       organization_id: organization_id,
       is_system: false,
@@ -462,7 +468,7 @@ async function createTemplateRole(
   // Create role-permission assignments
   if (templatePermissions.length > 0) {
     const templateRolePermissions = templatePermissions.map((permissionId) => ({
-      role_id: SeedMapper.getRoleId(template.name, organization_id),
+      role_id: templateRoleId,
       permission_id: permissionId,
     }));
 
