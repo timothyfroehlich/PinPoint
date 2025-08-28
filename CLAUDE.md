@@ -21,6 +21,7 @@
 - `find` command (dangerous -exec flag)
 - Direct `psql` (use `./scripts/safe-psql.sh`)
 - Direct `curl` for external URLs (use `./scripts/safe-curl.sh`)
+- **`require()` statements**: Use ES module `import` syntax only (project is type: "module")
 
 ---
 
@@ -127,6 +128,15 @@
 - Organization scoping in all multi-tenant queries
 - SEED_TEST_IDS for predictable testing
 
+### Supabase Infrastructure Setup
+**CRITICAL**: The `db:reset` workflow has been updated to handle auth trigger creation properly:
+1. `supabase db reset --no-seed` (skip premature seed.sql execution)
+2. `npm run db:push:local` (apply Drizzle schema first)
+3. `npm run db:apply-infrastructure` (then run seed.sql with auth triggers)
+4. RLS setup and data seeding complete the process
+
+**Root Cause**: Supabase's seed.sql tries to create policies on tables that don't exist yet when migrations are disabled. The new workflow ensures tables exist before infrastructure setup.
+
 ### Pattern Synchronization
 **Mandatory**: Update `@docs/developer-guides/general-code-review-procedure.md` when discovering new forbidden/enforced patterns
 
@@ -135,11 +145,14 @@
 ## 📚 QUICK REFERENCE
 
 ### Essential Documentation
-- **@docs/TARGET_ARCHITECTURE.md** - Architectural authority for all decisions
 - **@docs/NON_NEGOTIABLES.md** - Static analysis patterns
 - **@RSC_MIGRATION/** - Current migration plans and status
 - **@docs/latest-updates/quick-reference.md** - Post-training tech updates
 - **@docs/quick-reference/typescript-strictest-patterns.md** - Type safety patterns
+- **@package.json** - Available scripts, dependencies, and project configuration
+
+### Esential but too big to autoload
+- **docs/TARGET_ARCHITECTURE.md** - Architectural authority for all decisions
 
 ### Current Priorities
 - **RSC Migration**: Phase 1A → Phase 1B (DAL implementation)

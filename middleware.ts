@@ -29,8 +29,8 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
           },
           setAll(cookiesToSet) {
             // 2025 pattern: Proper cookie sync with options
-            cookiesToSet.forEach(({ name, value, options }) => 
-              request.cookies.set(name, value)
+            cookiesToSet.forEach(({ name, value }) =>
+              request.cookies.set(name, value),
             );
             supabaseResponse = NextResponse.next({ request });
             cookiesToSet.forEach(({ name, value, options }) =>
@@ -42,18 +42,20 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
 
       // IMPORTANT: DO NOT run code between createServerClient and supabase.auth.getUser()
       // IMPORTANT: DO NOT REMOVE auth.getUser() - critical for session refresh
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
       // Optional: Redirect unauthenticated users (can be customized per app needs)
       if (
         !user &&
-        !request.nextUrl.pathname.startsWith('/login') &&
-        !request.nextUrl.pathname.startsWith('/auth') &&
-        !request.nextUrl.pathname.startsWith('/demo-server-actions') // Allow demo access
+        !request.nextUrl.pathname.startsWith("/login") &&
+        !request.nextUrl.pathname.startsWith("/auth") &&
+        !request.nextUrl.pathname.startsWith("/demo-server-actions") // Allow demo access
       ) {
         // Preserve subdomain in redirect for multi-tenant setup
         const loginUrl = url.clone();
-        loginUrl.pathname = '/auth/sign-in';
+        loginUrl.pathname = "/auth/sign-in";
         return NextResponse.redirect(loginUrl);
       }
     }
@@ -66,21 +68,14 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   const subdomain = getSubdomain(host);
   console.log(`[MIDDLEWARE] Detected subdomain: ${subdomain ?? "none"}`);
 
-  // If no subdomain, redirect to apc subdomain (default organization)
-  if (!subdomain) {
-    const redirectHost = isDevelopment()
-      ? `apc.localhost:${url.port || "3000"}`
-      : `apc.${getBaseDomain(host)}`;
-
-    console.log(`[MIDDLEWARE] Redirecting to: ${redirectHost}`);
-    url.host = redirectHost;
-    return NextResponse.redirect(url);
+  // Add subdomain to headers for organization resolution (only if subdomain exists)
+  if (subdomain) {
+    supabaseResponse.headers.set("x-subdomain", subdomain);
+    console.log(`[MIDDLEWARE] Setting x-subdomain header: ${subdomain}`);
+  } else {
+    console.log(`[MIDDLEWARE] No subdomain detected, allowing root domain access`);
   }
 
-  // Add subdomain to headers for organization resolution
-  supabaseResponse.headers.set("x-subdomain", subdomain);
-
-  console.log(`[MIDDLEWARE] Setting x-subdomain header: ${subdomain}`);
   return supabaseResponse;
 }
 

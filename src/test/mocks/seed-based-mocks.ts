@@ -79,7 +79,9 @@ export class SeedBasedMockFactory {
   /**
    * Generate mock organizations based on seed patterns
    */
-  static createMockOrganization(overrides: Partial<MockOrganization> = {}): MockOrganization {
+  static createMockOrganization(
+    overrides: Partial<MockOrganization> = {},
+  ): MockOrganization {
     const defaults = {
       id: SEED_TEST_IDS.ORGANIZATIONS.primary,
       name: "PinPoint Test Arcade",
@@ -91,7 +93,9 @@ export class SeedBasedMockFactory {
     return { ...defaults, ...overrides };
   }
 
-  static createMockCompetitorOrganization(overrides: Partial<MockOrganization> = {}): MockOrganization {
+  static createMockCompetitorOrganization(
+    overrides: Partial<MockOrganization> = {},
+  ): MockOrganization {
     const defaults = {
       id: SEED_TEST_IDS.ORGANIZATIONS.competitor,
       name: "Competitor Arcade",
@@ -153,7 +157,9 @@ export class SeedBasedMockFactory {
   /**
    * Generate mock issue statuses based on seed patterns
    */
-  static createMockIssueStatus(overrides: Partial<MockIssueStatus> = {}): MockIssueStatus {
+  static createMockIssueStatus(
+    overrides: Partial<MockIssueStatus> = {},
+  ): MockIssueStatus {
     const defaults = {
       id: "status-open",
       name: "Open",
@@ -172,29 +178,31 @@ export class SeedBasedMockFactory {
       this.createMockIssueStatus(),
       this.createMockIssueStatus({
         id: "status-in-progress",
-        name: "In Progress", 
+        name: "In Progress",
         is_default: false,
-        sort_order: 2
+        sort_order: 2,
       }),
       this.createMockIssueStatus({
         id: "status-resolved",
         name: "Resolved",
         is_default: false,
-        sort_order: 3
+        sort_order: 3,
       }),
       this.createMockIssueStatus({
         id: "status-closed",
         name: "Closed",
         is_default: false,
-        sort_order: 4
-      })
+        sort_order: 4,
+      }),
     ];
   }
 
   /**
    * Generate mock priorities based on seed patterns
    */
-  static createMockPriority(overrides: Partial<MockPriority> = {}): MockPriority {
+  static createMockPriority(
+    overrides: Partial<MockPriority> = {},
+  ): MockPriority {
     const defaults = {
       id: "priority-medium",
       name: "Medium",
@@ -214,21 +222,21 @@ export class SeedBasedMockFactory {
         id: "priority-low",
         name: "Low",
         is_default: false,
-        sort_order: 1
+        sort_order: 1,
       }),
       this.createMockPriority(), // Medium (default)
       this.createMockPriority({
         id: "priority-high",
         name: "High",
         is_default: false,
-        sort_order: 3
+        sort_order: 3,
       }),
       this.createMockPriority({
         id: "priority-urgent",
         name: "Urgent",
         is_default: false,
-        sort_order: 4
-      })
+        sort_order: 4,
+      }),
     ];
   }
 
@@ -239,7 +247,8 @@ export class SeedBasedMockFactory {
     const defaults = {
       id: "issue-test-123",
       title: "Test Issue: Machine Not Working",
-      description: "The pinball machine is experiencing technical difficulties.",
+      description:
+        "The pinball machine is experiencing technical difficulties.",
       machine_id: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
       organization_id: SEED_TEST_IDS.ORGANIZATIONS.primary,
       status_id: "status-open",
@@ -256,19 +265,21 @@ export class SeedBasedMockFactory {
   /**
    * Generate multiple mock issues for testing lists
    */
-  static createMockIssues(count: number = 3): MockIssue[] {
+  static createMockIssues(count = 3): MockIssue[] {
     const issues: MockIssue[] = [];
     const statuses = ["status-open", "status-in-progress", "status-resolved"];
     const priorities = ["priority-low", "priority-medium", "priority-high"];
 
     for (let i = 0; i < count; i++) {
-      issues.push(this.createMockIssue({
-        id: `issue-test-${i + 1}`,
-        title: `Test Issue ${i + 1}: ${this.getRandomIssueTitle()}`,
-        status_id: statuses[i % statuses.length],
-        priority_id: priorities[i % priorities.length],
-        assigned_to_id: i % 2 === 0 ? SEED_TEST_IDS.USERS.ADMIN : null,
-      }));
+      issues.push(
+        this.createMockIssue({
+          id: `issue-test-${i + 1}`,
+          title: `Test Issue ${i + 1}: ${this.getRandomIssueTitle()}`,
+          status_id: statuses[i % statuses.length],
+          priority_id: priorities[i % priorities.length],
+          assigned_to_id: i % 2 === 0 ? SEED_TEST_IDS.USERS.ADMIN : null,
+        }),
+      );
     }
 
     return issues;
@@ -340,9 +351,13 @@ export class MockDatabaseFactory {
           findMany: vi.fn().mockResolvedValue(mockPriorities),
         },
         machines: {
-          findMany: vi.fn().mockResolvedValue([SeedBasedMockFactory.createMockMachine()]),
-          findFirst: vi.fn().mockResolvedValue(SeedBasedMockFactory.createMockMachine()),
-        }
+          findMany: vi
+            .fn()
+            .mockResolvedValue([SeedBasedMockFactory.createMockMachine()]),
+          findFirst: vi
+            .fn()
+            .mockResolvedValue(SeedBasedMockFactory.createMockMachine()),
+        },
       },
       insert: vi.fn(() => ({
         values: vi.fn().mockResolvedValue(undefined),
@@ -351,9 +366,11 @@ export class MockDatabaseFactory {
       update: vi.fn(() => ({
         set: vi.fn(() => ({
           where: vi.fn(() => ({
-            returning: vi.fn().mockResolvedValue([{ status_id: "status-updated" }])
-          }))
-        }))
+            returning: vi
+              .fn()
+              .mockResolvedValue([{ status_id: "status-updated" }]),
+          })),
+        })),
       })),
       select: vi.fn(() => ({
         from: vi.fn(() => ({
@@ -361,10 +378,10 @@ export class MockDatabaseFactory {
             groupBy: vi.fn().mockResolvedValue([
               { statusId: "status-open", count: 3 },
               { statusId: "status-in-progress", count: 2 },
-            ])
-          }))
-        }))
-      }))
+            ]),
+          })),
+        })),
+      })),
     };
   }
 }
@@ -373,9 +390,11 @@ export class MockDatabaseFactory {
  * FormData helpers for Server Action testing
  */
 export class MockFormDataFactory {
-  static createValidIssueFormData(overrides: Record<string, string> = {}): FormData {
+  static createValidIssueFormData(
+    overrides: Record<string, string> = {},
+  ): FormData {
     const formData = new FormData();
-    
+
     const defaults = {
       title: "Test Issue from Mock",
       description: "This is a test issue created from mock data",
@@ -395,15 +414,19 @@ export class MockFormDataFactory {
     return formData;
   }
 
-  static createValidStatusUpdateFormData(statusId: string = "status-in-progress"): FormData {
+  static createValidStatusUpdateFormData(
+    statusId = "status-in-progress",
+  ): FormData {
     const formData = new FormData();
     formData.append("statusId", statusId);
     return formData;
   }
 
-  static createInvalidFormData(invalidFields: Record<string, string> = {}): FormData {
+  static createInvalidFormData(
+    invalidFields: Record<string, string> = {},
+  ): FormData {
     const formData = new FormData();
-    
+
     const invalidDefaults = {
       title: "", // Empty title (required)
       machineId: "not-a-uuid", // Invalid UUID
@@ -446,24 +469,28 @@ export class MockScenarioFactory {
    */
   static createCrossOrgSecurityScenario() {
     const primaryScenario = this.createPrimaryOrgScenario();
-    
+
     return {
       primaryOrg: primaryScenario,
       competitorOrg: {
         organization: SeedBasedMockFactory.createMockCompetitorOrganization(),
         users: [SeedBasedMockFactory.createMockCompetitorUser()],
-        machines: [SeedBasedMockFactory.createMockMachine({
-          id: "machine-competitor-1",
-          organization_id: SEED_TEST_IDS.ORGANIZATIONS.competitor
-        })],
-        issues: [SeedBasedMockFactory.createMockIssue({
-          id: "issue-competitor-1", 
-          organization_id: SEED_TEST_IDS.ORGANIZATIONS.competitor,
-          machine_id: "machine-competitor-1",
-          created_by_id: SEED_TEST_IDS.USERS.COMPETITOR_ADMIN
-        })],
+        machines: [
+          SeedBasedMockFactory.createMockMachine({
+            id: "machine-competitor-1",
+            organization_id: SEED_TEST_IDS.ORGANIZATIONS.competitor,
+          }),
+        ],
+        issues: [
+          SeedBasedMockFactory.createMockIssue({
+            id: "issue-competitor-1",
+            organization_id: SEED_TEST_IDS.ORGANIZATIONS.competitor,
+            machine_id: "machine-competitor-1",
+            created_by_id: SEED_TEST_IDS.USERS.COMPETITOR_ADMIN,
+          }),
+        ],
         authContext: MockAuthContextFactory.createCompetitorOrgContext(),
-      }
+      },
     };
   }
 
@@ -479,20 +506,18 @@ export class MockScenarioFactory {
       },
       unassignedIssues: {
         ...this.createPrimaryOrgScenario(),
-        issues: SeedBasedMockFactory.createMockIssues(3).map(issue => ({
+        issues: SeedBasedMockFactory.createMockIssues(3).map((issue) => ({
           ...issue,
-          assigned_to_id: null // All unassigned
-        }))
+          assigned_to_id: null, // All unassigned
+        })),
       },
       highVolumeScenario: {
         ...this.createPrimaryOrgScenario(),
         issues: SeedBasedMockFactory.createMockIssues(50), // Large dataset
-      }
+      },
     };
   }
 }
 
 // Re-export for convenience
-export {
-  SEED_TEST_IDS,
-};
+export { SEED_TEST_IDS };
