@@ -29,7 +29,9 @@ export const getServerAuthContext = cache(async () => {
     return { user: null, organizationId: null, membership: null, role: null };
   }
 
-  const organizationId = user.user_metadata?.["organizationId"] as string | undefined;
+  const organizationId = user.app_metadata?.["organizationId"] as
+    | string
+    | undefined;
 
   return {
     user,
@@ -46,15 +48,15 @@ export const getServerAuthContext = cache(async () => {
  */
 export const requireAuthContext = cache(async () => {
   const { user, organizationId } = await getServerAuthContext();
-  
+
   if (!user) {
     throw new Error("Authentication required");
   }
-  
+
   if (!organizationId) {
     throw new Error("Organization selection required");
   }
-  
+
   return { user, organizationId };
 });
 
@@ -65,16 +67,22 @@ export const requireAuthContext = cache(async () => {
  */
 export const getServerAuthContextWithRole = cache(async () => {
   const { user, organizationId } = await getServerAuthContext();
-  
+
   if (!user || !organizationId) {
-    return { user: null, organizationId: null, membership: null, role: null, permissions: [] };
+    return {
+      user: null,
+      organizationId: null,
+      membership: null,
+      role: null,
+      permissions: [],
+    };
   }
-  
+
   // Get user membership with role and permissions
   const membership = await db.query.memberships.findFirst({
     where: and(
       eq(memberships.user_id, user.id),
-      eq(memberships.organization_id, organizationId)
+      eq(memberships.organization_id, organizationId),
     ),
     with: {
       role: {
@@ -100,14 +108,22 @@ export const getServerAuthContextWithRole = cache(async () => {
       },
     },
   });
-  
+
   if (!membership) {
-    return { user, organizationId, membership: null, role: null, permissions: [] };
+    return {
+      user,
+      organizationId,
+      membership: null,
+      role: null,
+      permissions: [],
+    };
   }
-  
+
   // Extract permissions for easy access
-  const permissions = membership.role.rolePermissions.map(rp => rp.permission.name);
-  
+  const permissions = membership.role.rolePermissions.map(
+    (rp) => rp.permission.name,
+  );
+
   return {
     user,
     organizationId,
@@ -124,19 +140,19 @@ export const getServerAuthContextWithRole = cache(async () => {
  */
 export const requireAuthContextWithRole = cache(async () => {
   const context = await getServerAuthContextWithRole();
-  
+
   if (!context.user) {
     throw new Error("Authentication required");
   }
-  
+
   if (!context.organizationId) {
     throw new Error("Organization selection required");
   }
-  
+
   if (!context.membership || !context.role) {
     throw new Error("Role assignment required");
   }
-  
+
   return {
     user: context.user,
     organizationId: context.organizationId,
@@ -158,6 +174,6 @@ export function getPaginationParams(options: PaginationOptions = {}) {
   const page = Math.max(1, options.page || 1);
   const limit = Math.min(100, Math.max(1, options.limit || 20));
   const offset = (page - 1) * limit;
-  
+
   return { limit, offset, page };
 }
