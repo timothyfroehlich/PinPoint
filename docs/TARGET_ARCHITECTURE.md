@@ -59,6 +59,18 @@ _The definitive architectural blueprint for PinPoint's server-first, multi-tenan
 - Maintained for existing components during transition period
 - No new MUI components in future development
 
+**Material Design 3 Color System (Primary Color Strategy)**
+- Google's Material Color Utilities (`@material/material-color-utilities`) for scientific color generation
+- HCT (Hue, Chroma, Tone) color space providing perceptually accurate color relationships
+- Dynamic color palette generation from single purple source color (`#6750A4`)
+- Automatic generation of primary, secondary, tertiary, and surface color families
+- Built-in accessibility compliance with proper contrast ratios between all color pairs
+- Surface color variants (surface-container-low, surface-container, etc.) for navigation and component backgrounds
+- Light and dark theme variants generated from same source with consistent color relationships
+- CSS custom properties integration with Tailwind v4's CSS-based configuration
+- Color role system ensuring proper text/background contrast (on-primary, on-surface, etc.)
+- 2025 specification compliance with latest Material Design 3 algorithms
+
 ### Database and Authentication
 
 **Supabase with Server-Side Rendering**
