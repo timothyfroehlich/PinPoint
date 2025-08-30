@@ -10,6 +10,7 @@
 - **Organization scoping**: All queries must include organizationId for security
 - **Server-first**: Default to Server Components, minimal Client Components
 - **shadcn/ui only**: No new MUI components, use shadcn/ui for all new development
+- **Material Design 3 colors only**: All colors must come from the Material 3 color system in globals.css. No manual color overrides or custom purple tints. Work within Material 3's generated primary, secondary, tertiary, surface, and error color families.
 
 ### Mandatory Context7 Usage
 - **When**: Working with any library/framework (Drizzle, Supabase, Next.js, shadcn/ui, Server Components, Server Actions, Vitest)
