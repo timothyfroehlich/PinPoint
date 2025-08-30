@@ -38,10 +38,10 @@ const ENTITY_ICONS = {
 } as const;
 
 const ENTITY_COLORS = {
-  issues: "bg-blue-100 text-blue-800",
-  machines: "bg-green-100 text-green-800", 
-  users: "bg-purple-100 text-purple-800",
-  locations: "bg-orange-100 text-orange-800",
+  issues: "bg-primary-container text-on-primary-container",
+  machines: "bg-tertiary-container text-on-tertiary-container", 
+  users: "bg-primary-container text-on-primary-container",
+  locations: "bg-secondary-container text-on-secondary-container",
 } as const;
 
 const ENTITY_LABELS = {
@@ -131,7 +131,7 @@ export async function UniversalSearchResults({
             {Object.entries(searchResponse.entityCounts).map(([entity, count]) => {
               if (count === 0) return null;
               
-              const colorClass = ENTITY_COLORS[entity as keyof typeof ENTITY_COLORS] || "bg-gray-100 text-gray-800";
+              const colorClass = ENTITY_COLORS[entity as keyof typeof ENTITY_COLORS] || "bg-surface-variant text-on-surface-variant";
               const label = ENTITY_LABELS[entity as keyof typeof ENTITY_LABELS] || entity;
               
               return (
@@ -148,7 +148,7 @@ export async function UniversalSearchResults({
       <div className="space-y-3">
         {searchResponse.results.map((result) => {
           const IconComponent = ENTITY_ICONS[result.entity as keyof typeof ENTITY_ICONS] || FileTextIcon;
-          const colorClass = ENTITY_COLORS[result.entity as keyof typeof ENTITY_COLORS] || "bg-gray-100 text-gray-800";
+          const colorClass = ENTITY_COLORS[result.entity as keyof typeof ENTITY_COLORS] || "bg-surface-variant text-on-surface-variant";
           const label = ENTITY_LABELS[result.entity as keyof typeof ENTITY_LABELS] || result.entity;
 
           return (
@@ -230,7 +230,7 @@ export async function UniversalSearchResults({
                           </Badge>
                         )}
                         {typeof result.metadata["issueCount"] === "number" && result.metadata["issueCount"] > 0 && (
-                          <Badge variant="outline" className="text-xs text-red-600">
+                          <Badge variant="outline" className="text-xs text-error">
                             {result.metadata["issueCount"]} open issue{result.metadata["issueCount"] !== 1 ? 's' : ''}
                           </Badge>
                         )}
