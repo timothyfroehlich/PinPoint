@@ -49,10 +49,10 @@ const ENTITY_ICONS = {
 } as const;
 
 const ENTITY_COLORS = {
-  issues: "bg-blue-100 text-blue-800",
-  machines: "bg-green-100 text-green-800", 
-  users: "bg-purple-100 text-purple-800",
-  locations: "bg-orange-100 text-orange-800",
+  issues: "bg-primary-container text-on-primary-container",
+  machines: "bg-tertiary-container text-on-tertiary-container", 
+  users: "bg-primary-container text-on-primary-container",
+  locations: "bg-secondary-container text-on-secondary-container",
 } as const;
 
 export function UniversalSearchInput({
@@ -321,7 +321,7 @@ export function UniversalSearchInput({
                 )}
                 {suggestions.map((suggestion) => {
                   const IconComponent = ENTITY_ICONS[suggestion.entity as keyof typeof ENTITY_ICONS] || FileTextIcon;
-                  const colorClass = ENTITY_COLORS[suggestion.entity as keyof typeof ENTITY_COLORS] || "bg-gray-100 text-gray-800";
+                  const colorClass = ENTITY_COLORS[suggestion.entity as keyof typeof ENTITY_COLORS] || "bg-surface-variant text-on-surface-variant";
 
                   return (
                     <button
