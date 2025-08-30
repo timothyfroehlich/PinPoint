@@ -23,9 +23,7 @@ const Checkbox = dynamic(() => import("~/components/ui/checkbox").then(mod => ({
   loading: () => <div className="h-4 w-4 animate-pulse bg-muted rounded" />,
 });
 
-interface FormState {
-  [key: string]: any;
-}
+type FormState = Record<string, any>;
 
 // Memoized field renderer for performance
 const MemoizedFieldRenderer = memo(function FieldRenderer({ 
@@ -47,7 +45,7 @@ const MemoizedFieldRenderer = memo(function FieldRenderer({
   }, [field.id, updateFormField]);
   
   const handleCheckboxChange = useCallback((checked: boolean) => {
-    updateFormField(field.id, checked === true);
+    updateFormField(field.id, checked);
   }, [field.id, updateFormField]);
   
   const handleMultiSelectChange = useCallback((optionValue: string, checked: boolean) => {
@@ -113,7 +111,7 @@ const MemoizedFieldRenderer = memo(function FieldRenderer({
                 <Checkbox
                   id={`${field.id}-${option.value}`}
                   checked={selectedValues.includes(option.value)}
-                  onCheckedChange={(checked) => handleMultiSelectChange(option.value, checked as boolean)}
+                  onCheckedChange={(checked) => { handleMultiSelectChange(option.value, checked as boolean); }}
                 />
                 <Label
                   htmlFor={`${field.id}-${option.value}`}
@@ -142,7 +140,7 @@ const MemoizedFieldRenderer = memo(function FieldRenderer({
                 type="date"
                 placeholder="Start date"
                 value={formState[`${field.id}_start`] || ""}
-                onChange={(e) => updateFormField(`${field.id}_start`, e.target.value)}
+                onChange={(e) => { updateFormField(`${field.id}_start`, e.target.value); }}
               />
             </div>
             <div className="flex-1">
@@ -150,7 +148,7 @@ const MemoizedFieldRenderer = memo(function FieldRenderer({
                 type="date"
                 placeholder="End date"
                 value={formState[`${field.id}_end`] || ""}
-                onChange={(e) => updateFormField(`${field.id}_end`, e.target.value)}
+                onChange={(e) => { updateFormField(`${field.id}_end`, e.target.value); }}
               />
             </div>
           </div>
@@ -169,7 +167,7 @@ const MemoizedFieldRenderer = memo(function FieldRenderer({
                 min={field.min}
                 max={field.max}
                 value={formState[`${field.id}_min`] || ""}
-                onChange={(e) => updateFormField(`${field.id}_min`, e.target.value)}
+                onChange={(e) => { updateFormField(`${field.id}_min`, e.target.value); }}
               />
             </div>
             <div className="flex-1">
@@ -179,7 +177,7 @@ const MemoizedFieldRenderer = memo(function FieldRenderer({
                 min={field.min}
                 max={field.max}
                 value={formState[`${field.id}_max`] || ""}
-                onChange={(e) => updateFormField(`${field.id}_max`, e.target.value)}
+                onChange={(e) => { updateFormField(`${field.id}_max`, e.target.value); }}
               />
             </div>
           </div>
@@ -384,7 +382,7 @@ export const AdvancedSearchFormOptimized = memo(function AdvancedSearchFormOptim
               <Button 
                 variant="ghost" 
                 size="sm"
-                onClick={() => setIsExpanded(true)}
+                onClick={() => { setIsExpanded(true); }}
                 className="flex items-center gap-1"
               >
                 <ChevronDown className="h-4 w-4" />
@@ -416,7 +414,7 @@ export const AdvancedSearchFormOptimized = memo(function AdvancedSearchFormOptim
             <Button 
               variant="ghost" 
               size="sm"
-              onClick={() => setIsExpanded(false)}
+              onClick={() => { setIsExpanded(false); }}
               className="flex items-center gap-1"
             >
               <ChevronUp className="h-4 w-4" />

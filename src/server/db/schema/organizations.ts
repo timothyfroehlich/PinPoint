@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, boolean, index } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, index, jsonb, inet } from "drizzle-orm/pg-core";
 
 // =================================
 // ORGANIZATION & TENANCY TABLES
@@ -11,6 +11,19 @@ export const organizations = pgTable(
     name: text().notNull(),
     subdomain: text().unique().notNull(), // For V1.0 subdomain feature
     logo_url: text(),
+    
+    // Organization profile information (Phase 4B.1)
+    description: text(),
+    website: text(),
+    phone: text(),
+    address: text(),
+    
+    // Anonymous access settings
+    allow_anonymous_issues: boolean().default(true).notNull(),
+    allow_anonymous_comments: boolean().default(true).notNull(),
+    allow_anonymous_upvotes: boolean().default(true).notNull(),
+    require_moderation_anonymous: boolean().default(false).notNull(),
+    
     created_at: timestamp().defaultNow().notNull(),
     updated_at: timestamp().defaultNow().notNull(),
   },
@@ -74,5 +87,83 @@ export const rolePermissions = pgTable(
     // Permission system: role-permission lookups
     index("role_permissions_role_id_idx").on(table.role_id),
     index("role_permissions_permission_id_idx").on(table.permission_id),
+  ],
+);
+
+// =================================
+// SYSTEM ADMINISTRATION TABLES (Phase 4B)
+// =================================
+
+// System Settings - Organization-scoped configuration (Phase 4B.3)
+export const systemSettings = pgTable(
+  "system_settings",
+  {
+    id: text().primaryKey(),
+    organization_id: text()
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    setting_key: text().notNull(),
+    setting_value: jsonb().notNull(),
+    created_at: timestamp().defaultNow().notNull(),
+    updated_at: timestamp().defaultNow().notNull(),
+  },
+  (table) => [
+    // System settings lookup by organization and key
+    index("system_settings_org_key_idx").on(table.organization_id, table.setting_key),
+    index("system_settings_organization_id_idx").on(table.organization_id),
+  ],
+);
+
+// Activity Log - Comprehensive audit trail (Phase 4B.4)
+export const activityLog = pgTable(
+  "activity_log",
+  {
+    id: text().primaryKey(),
+    organization_id: text()
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    user_id: text(), // Nullable for system actions
+    action: text().notNull(), // e.g., "USER_LOGIN", "ISSUE_CREATED", "ROLE_CHANGED"
+    entity_type: text().notNull(), // e.g., "USER", "ISSUE", "ORGANIZATION"
+    entity_id: text(), // ID of the affected entity
+    details: jsonb(), // Additional context and metadata
+    ip_address: inet(), // Client IP address
+    user_agent: text(), // Client user agent
+    severity: text().default("info").notNull(), // "info", "warning", "error"
+    created_at: timestamp().defaultNow().notNull(),
+  },
+  (table) => [
+    // Activity log queries by organization and time
+    index("activity_log_org_time_idx").on(table.organization_id, table.created_at),
+    index("activity_log_user_id_idx").on(table.user_id),
+    index("activity_log_action_idx").on(table.action),
+    index("activity_log_entity_idx").on(table.entity_type, table.entity_id),
+  ],
+);
+
+// User Invitations - Pending user invitations (Phase 4B.2)
+export const invitations = pgTable(
+  "invitations",
+  {
+    id: text().primaryKey(),
+    organization_id: text()
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    email: text().notNull(),
+    role_id: text()
+      .notNull()
+      .references(() => roles.id, { onDelete: "cascade" }),
+    token: text().unique().notNull(), // Secure invitation token
+    invited_by: text().notNull(), // User ID who sent the invitation
+    status: text().default("pending").notNull(), // "pending", "accepted", "declined", "expired"
+    expires_at: timestamp().notNull(),
+    created_at: timestamp().defaultNow().notNull(),
+    updated_at: timestamp().defaultNow().notNull(),
+  },
+  (table) => [
+    // Invitation lookup by token and organization
+    index("invitations_token_idx").on(table.token),
+    index("invitations_org_email_idx").on(table.organization_id, table.email),
+    index("invitations_organization_id_idx").on(table.organization_id),
   ],
 );

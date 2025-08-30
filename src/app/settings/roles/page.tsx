@@ -14,19 +14,18 @@ import {
   UsersIcon,
   LockIcon,
   SettingsIcon,
-  CheckIcon,
-  XIcon
+  CheckIcon
 } from "lucide-react";
-import { requireAuthContext } from "~/lib/dal/shared";
-import { getServerTRPCClient } from "~/server/api/server-client";
+import { requireMemberAccess } from "~/lib/organization-context";
+import { api } from "~/trpc/server";
 
 export default async function RolesSettingsPage() {
-  const { organizationId } = await requireAuthContext();
-  const trpc = getServerTRPCClient();
+  const { organization } = await requireMemberAccess();
+  const organizationId = organization.id;
   
   // Fetch roles using the existing role router
-  const roles = await trpc.role.getAll();
-  const roleStats = await trpc.role.getStats();
+  const roles = await api.role.getAll();
+  const roleStats = await api.role.getStats();
 
   return (
     <div className="space-y-6">

@@ -29,6 +29,11 @@ export const getOrganizationById = cache(async (organizationId: string) => {
       name: true,
       subdomain: true,
       logo_url: true,
+      // Phase 4B.1: Organization profile fields
+      description: true,
+      website: true,
+      phone: true,
+      address: true,
       created_at: true,
       updated_at: true,
     },

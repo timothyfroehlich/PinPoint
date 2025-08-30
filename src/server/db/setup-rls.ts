@@ -19,7 +19,6 @@
  */
 
 import dotenv from "dotenv";
-import { env } from "~/env.js";
 
 // Load environment variables in correct precedence order
 try {
@@ -40,7 +39,13 @@ const __dirname = dirname(__filename);
  * Database connection configuration
  */
 function createDatabaseConnection(): postgres.Sql {
-  const databaseUrl = env.DATABASE_URL ?? env.SUPABASE_DB_URL;
+  // Infrastructure script: requires direct process.env access before app initialization
+  // eslint-disable-next-line no-restricted-properties
+  const databaseUrl = 
+    process.env["DATABASE_URL"] ?? 
+    // eslint-disable-next-line no-restricted-properties
+    process.env["SUPABASE_DB_URL"] ??
+    "postgresql://postgres:postgres@localhost:54322/postgres"; // Local Supabase default
 
   if (!databaseUrl) {
     throw new Error(
@@ -68,15 +73,8 @@ async function setupRLS(): Promise<void> {
     console.log("📍 Reading setup-rls.sql from scripts directory");
 
     // Read the SQL setup file based on environment
-    // CI: Plain PostgreSQL (minimal RLS)
-    // Local: Supabase container (full RLS with local-compatible auth)
-    // Production: Hosted Supabase (full RLS with auth.jwt())
-    const sqlFile =
-      env.CI === "true"
-        ? "setup-rls-local.sql" // CI: Plain PostgreSQL
-        : env.NODE_ENV === "production"
-          ? "setup-rls.sql" // Production: Hosted Supabase
-          : "setup-rls-local-supabase.sql"; // Local dev: Supabase container
+    // All environments now use the secure session-variable-based approach
+    const sqlFile = "setup-rls-secure.sql"; // Universal secure RLS setup
 
     let rlsSQL: string;
     try {
@@ -86,7 +84,8 @@ async function setupRLS(): Promise<void> {
       const resolvedPath = join(__dirname, sqlFile);
       throw new Error(
         `Failed to read SQL file '${sqlFile}' at path '${resolvedPath}'. ` +
-          `Expected environment: ${env.CI === "true" ? "CI" : env.NODE_ENV === "production" ? "production" : "local development"}. ` +
+          // eslint-disable-next-line no-restricted-properties
+        `Expected environment: ${process.env["CI"] === "true" ? "CI" : process.env["NODE_ENV"] === "production" ? "production" : "local development"}. ` +
           `Error: ${error instanceof Error ? error.message : String(error)}`,
       );
     }

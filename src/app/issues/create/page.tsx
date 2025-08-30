@@ -3,25 +3,29 @@ import Link from "next/link";
 import { Home, Wrench } from "lucide-react";
 
 import { CreateIssueFormServer } from "~/components/forms/CreateIssueFormServer";
-import { requireServerAuth } from "~/lib/auth/server-auth";
+import { requireMemberAccess } from "~/lib/organization-context";
 import { createIssueAction } from "~/lib/actions/issue-actions";
+import { getMachinesForOrg } from "~/lib/dal/machines";
+import { getAssignableUsers } from "~/lib/dal/users";
 
-// Temporary function - will be replaced with proper DAL function
-async function getMachinesForCreateForm(organizationId: string) {
-  // For now, return mock data to test the form structure
-  return [
-    { id: "mock-machine-1", name: "Medieval Madness", model: "Williams 1997" },
-    { id: "mock-machine-2", name: "Attack from Mars", model: "Bally 1995" },
-  ];
+// Transform DAL data for CreateIssueFormServer component
+function transformMachinesForForm(machinesResult: Awaited<ReturnType<typeof getMachinesForOrg>>) {
+  return machinesResult.items.map(machine => ({
+    id: machine.id,
+    name: machine.name,
+    ...(machine.model?.name && { model: machine.model.name }),
+  }));
 }
 
-// Temporary function - will be replaced with proper DAL function  
-async function getUsersForAssignment(organizationId: string) {
-  // For now, return mock data to test the form structure
-  return [
-    { id: "test-user-tim", name: "Tim Froehlich", email: "tim@austinpinball.com" },
-    { id: "test-user-tech1", name: "Tech User", email: "tech@austinpinball.com" },
-  ];
+// Transform DAL data for CreateIssueFormServer component
+function transformUsersForForm(assignableUsers: Awaited<ReturnType<typeof getAssignableUsers>>) {
+  return assignableUsers
+    .map(user => ({
+      id: user.id,
+      name: user.name || 'Unknown User',
+      email: user.email || '',
+    }))
+    .filter(user => user.email); // Filter out users without email
 }
 
 // Force dynamic rendering for auth-dependent content
@@ -46,14 +50,18 @@ export const metadata: Metadata = {
 export default async function CreateIssuePage({
   searchParams,
 }: CreateIssuePageProps): Promise<React.JSX.Element> {
-  const { organizationId } = await requireServerAuth();
+  await requireMemberAccess(); // Ensure authenticated user with organization membership
   const resolvedSearchParams = await searchParams;
 
-  // Parallel data fetching for form options
-  const [machines, users] = await Promise.all([
-    getMachinesForCreateForm(organizationId),
-    getUsersForAssignment(organizationId),
+  // Parallel data fetching using real DAL functions with React 19 cache()
+  const [machinesRaw, assignableUsersRaw] = await Promise.all([
+    getMachinesForOrg(),
+    getAssignableUsers(),
   ]);
+
+  // Transform data to match component expectations
+  const machines = transformMachinesForForm(machinesRaw);
+  const users = transformUsersForForm(assignableUsersRaw);
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">

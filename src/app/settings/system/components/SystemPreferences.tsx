@@ -47,8 +47,8 @@ export function SystemPreferences({ settings }: SystemPreferencesProps) {
     if (state?.success) {
       toast.success(state.message || "System preferences saved successfully!");
     } else if (state && !state.success) {
-      if (state.message) {
-        toast.error(state.message);
+      if (state.error) {
+        toast.error(state.error);
       }
     }
   }, [state]);
@@ -69,8 +69,8 @@ export function SystemPreferences({ settings }: SystemPreferencesProps) {
           </p>
           <Select
             value={formData.timezone}
-            onValueChange={(value) => handleSelectChange("timezone", value)}
-            disabled={isLoading}
+            onValueChange={(value) => { handleSelectChange("timezone", value); }}
+            disabled={isPending}
           >
             <SelectTrigger>
               <SelectValue />
@@ -98,8 +98,8 @@ export function SystemPreferences({ settings }: SystemPreferencesProps) {
           </p>
           <Select
             value={formData.dateFormat}
-            onValueChange={(value) => handleSelectChange("dateFormat", value)}
-            disabled={isLoading}
+            onValueChange={(value) => { handleSelectChange("dateFormat", value); }}
+            disabled={isPending}
           >
             <SelectTrigger>
               <SelectValue />
@@ -131,8 +131,8 @@ export function SystemPreferences({ settings }: SystemPreferencesProps) {
           </p>
           <Select
             value={formData.theme}
-            onValueChange={(value) => handleSelectChange("theme", value)}
-            disabled={isLoading}
+            onValueChange={(value) => { handleSelectChange("theme", value); }}
+            disabled={isPending}
           >
             <SelectTrigger>
               <SelectValue />
@@ -156,8 +156,8 @@ export function SystemPreferences({ settings }: SystemPreferencesProps) {
           </p>
           <Select
             value={formData.language}
-            onValueChange={(value) => handleSelectChange("language", value)}
-            disabled={isLoading}
+            onValueChange={(value) => { handleSelectChange("language", value); }}
+            disabled={isPending}
           >
             <SelectTrigger>
               <SelectValue />
@@ -192,8 +192,8 @@ export function SystemPreferences({ settings }: SystemPreferencesProps) {
           </p>
           <Select
             value={formData.itemsPerPage.toString()}
-            onValueChange={(value) => handleSelectChange("itemsPerPage", value)}
-            disabled={isLoading}
+            onValueChange={(value) => { handleSelectChange("itemsPerPage", value); }}
+            disabled={isPending}
           >
             <SelectTrigger className="w-full md:w-48">
               <SelectValue />
@@ -213,7 +213,7 @@ export function SystemPreferences({ settings }: SystemPreferencesProps) {
         <input 
           type="hidden" 
           name="settings" 
-          value={JSON.stringify(formData)}
+          value={JSON.stringify({ preferences: formData })}
         />
         <Button 
           type="submit"

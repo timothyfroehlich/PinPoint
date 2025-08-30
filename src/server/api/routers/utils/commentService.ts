@@ -48,7 +48,7 @@ export class CommentService {
     deletedAt: Date | null;
     deletedBy: string | null;
     issueId: string;
-    authorId: string;
+    authorId: string | null;
   }> {
     const [deletedComment] = await this.drizzle
       .update(comments)
@@ -86,7 +86,7 @@ export class CommentService {
     deletedAt: Date | null;
     deletedBy: string | null;
     issueId: string;
-    authorId: string;
+    authorId: string | null;
   }> {
     const [restoredComment] = await this.drizzle
       .update(comments)
@@ -125,13 +125,13 @@ export class CommentService {
       deletedAt: Date | null;
       deletedBy: string | null;
       issueId: string;
-      authorId: string;
+      authorId: string | null;
       author: {
         id: string;
         name: string | null;
         email: string | null;
         image: string | null;
-      };
+      } | null;
       deleter: {
         id: string;
         name: string | null;
@@ -167,7 +167,7 @@ export class CommentService {
         },
       })
       .from(comments)
-      .innerJoin(users, eq(comments.author_id, users.id))
+      .leftJoin(users, eq(comments.author_id, users.id))
       .innerJoin(issues, eq(comments.issue_id, issues.id))
       .where(eq(issues.organization_id, organizationId))
       .orderBy(desc(comments.deleted_at));

@@ -31,7 +31,7 @@ import { inviteUserAction } from "~/lib/actions/admin-actions";
 
 interface InviteUserDialogProps {
   children?: React.ReactNode;
-  availableRoles?: Array<{ id: string; name: string; description?: string }>;
+  availableRoles?: { id: string; name: string; description?: string }[];
 }
 
 export function InviteUserDialog({ children, availableRoles = [] }: InviteUserDialogProps) {
@@ -52,8 +52,8 @@ export function InviteUserDialog({ children, availableRoles = [] }: InviteUserDi
             errors.forEach(error => toast.error(`${field}: ${error}`));
           }
         });
-      } else if (state.message) {
-        toast.error(state.message);
+      } else if (state.error) {
+        toast.error(state.error);
       }
     }
   }, [state]);
@@ -89,8 +89,8 @@ export function InviteUserDialog({ children, availableRoles = [] }: InviteUserDi
               required
               disabled={isPending}
             />
-            {state?.fieldErrors?.email && (
-              <p className="text-xs text-destructive">{state.fieldErrors.email[0]}</p>
+            {state && !state.success && state.fieldErrors?.["email"] && (
+              <p className="text-xs text-destructive">{state.fieldErrors["email"][0]}</p>
             )}
           </div>
 
@@ -107,8 +107,8 @@ export function InviteUserDialog({ children, availableRoles = [] }: InviteUserDi
             <p className="text-xs text-muted-foreground">
               Optional. They can set this up later during onboarding.
             </p>
-            {state?.fieldErrors?.name && (
-              <p className="text-xs text-destructive">{state.fieldErrors.name[0]}</p>
+            {state && !state.success && state.fieldErrors?.["name"] && (
+              <p className="text-xs text-destructive">{state.fieldErrors["name"][0]}</p>
             )}
           </div>
 
@@ -135,8 +135,8 @@ export function InviteUserDialog({ children, availableRoles = [] }: InviteUserDi
             <p className="text-xs text-muted-foreground">
               Optional. If not selected, the default role will be assigned.
             </p>
-            {state?.fieldErrors?.roleId && (
-              <p className="text-xs text-destructive">{state.fieldErrors.roleId[0]}</p>
+            {state && !state.success && state.fieldErrors?.["roleId"] && (
+              <p className="text-xs text-destructive">{state.fieldErrors["roleId"][0]}</p>
             )}
           </div>
 
@@ -153,8 +153,8 @@ export function InviteUserDialog({ children, availableRoles = [] }: InviteUserDi
             <p className="text-xs text-muted-foreground">
               This message will be included in the invitation email.
             </p>
-            {state?.fieldErrors?.message && (
-              <p className="text-xs text-destructive">{state.fieldErrors.message[0]}</p>
+            {state && !state.success && state.fieldErrors?.["message"] && (
+              <p className="text-xs text-destructive">{state.fieldErrors["message"][0]}</p>
             )}
           </div>
 
@@ -163,7 +163,7 @@ export function InviteUserDialog({ children, availableRoles = [] }: InviteUserDi
             <Button
               type="button"
               variant="outline"
-              onClick={() => setIsOpen(false)}
+              onClick={() => { setIsOpen(false); }}
               disabled={isPending}
             >
               Cancel

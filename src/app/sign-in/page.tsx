@@ -1,24 +1,18 @@
 "use client";
 
-import { Google } from "@mui/icons-material";
-import {
-  Box,
-  Button,
-  Typography,
-  Paper,
-  Chip,
-  Container,
-  Stack,
-  Divider,
-} from "@mui/material";
 import { type InferSelectModel } from "drizzle-orm";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
+import { Button } from "~/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/components/ui/card";
+import { Badge } from "~/components/ui/badge";
+import { Separator } from "~/components/ui/separator";
+import { Chrome, Loader2 } from "lucide-react";
 
 import { useAuth } from "~/app/auth-provider";
 import { authenticateDevUser, getAuthResultMessage } from "~/lib/auth/dev-auth";
 import { isDevAuthAvailable } from "~/lib/environment-client";
-import { createClient } from "~/lib/supabase/client";
+import { createClient } from "~/utils/supabase/client";
 import type { users, roles } from "~/server/db/schema";
 
 type User = InferSelectModel<typeof users>;
@@ -129,26 +123,17 @@ export default function SignInPage(): React.ReactElement | null {
     }
   }
 
-  function getRoleColor(
-    role: Role | null,
-  ):
-    | "default"
-    | "primary"
-    | "secondary"
-    | "error"
-    | "info"
-    | "success"
-    | "warning" {
+  function getRoleBadgeVariant(role: Role | null): "default" | "secondary" | "destructive" | "outline" {
     if (!role) return "default";
     switch (role.name.toLowerCase()) {
       case "admin":
-        return "error";
+        return "destructive";
       case "member":
-        return "primary";
-      case "player":
-        return "success";
-      default:
         return "default";
+      case "player":
+        return "secondary";
+      default:
+        return "outline";
     }
   }
 
@@ -157,107 +142,85 @@ export default function SignInPage(): React.ReactElement | null {
   }
 
   return (
-    <Container maxWidth="sm" sx={{ mt: 8 }}>
-      <Paper elevation={3} sx={{ p: 4 }}>
-        <Typography variant="h4" component="h1" gutterBottom align="center">
-          Sign In to PinPoint
-        </Typography>
-
-        <Typography
-          variant="body1"
-          align="center"
-          color="text.secondary"
-          sx={{ mb: 4 }}
-        >
-          Welcome back! Please sign in to continue.
-        </Typography>
-
-        <Stack spacing={3}>
+    <div className="container mx-auto max-w-sm mt-32">
+      <Card>
+        <CardHeader className="text-center">
+          <CardTitle className="text-3xl">Sign In to PinPoint</CardTitle>
+          <CardDescription className="text-lg">
+            Welcome back! Please sign in to continue.
+          </CardDescription>
+        </CardHeader>
+        
+        <CardContent className="space-y-6">
           <Button
-            variant="contained"
-            size="large"
-            startIcon={<Google />}
+            className="w-full h-12"
             onClick={() => void handleGoogleSignIn()}
             disabled={isLoading}
-            fullWidth
-            sx={{ py: 1.5 }}
           >
+            {isLoading ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Chrome className="mr-2 h-4 w-4" />
+            )}
             Sign in with Google
           </Button>
 
           {shouldShowDevLogin && (
             <>
-              <Divider sx={{ my: 3 }}>
-                <Typography variant="body2" color="text.secondary">
-                  Development Mode
-                </Typography>
-              </Divider>
+              <div className="relative">
+                <Separator />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="bg-background px-2 text-sm text-muted-foreground">
+                    Development Mode
+                  </span>
+                </div>
+              </div>
 
-              <Box>
-                <Typography variant="body1" gutterBottom>
-                  Quick Login (Dev Only)
-                </Typography>
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ mb: 2 }}
-                >
-                  Skip authentication and login as a test user
-                </Typography>
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-base font-medium">Quick Login (Dev Only)</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Skip authentication and login as a test user
+                  </p>
+                </div>
 
-                <Stack spacing={1}>
+                <div className="space-y-2">
                   {isLoadingUsers ? (
-                    <Typography variant="body2" color="text.secondary">
+                    <p className="text-sm text-muted-foreground">
                       Loading test users...
-                    </Typography>
+                    </p>
                   ) : (
                     users.map((testUser) => (
-                      <Box
+                      <div
                         key={testUser.id}
-                        sx={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 1,
-                          p: 0.5,
-                          border: 1,
-                          borderColor: "divider",
-                          borderRadius: 1,
-                        }}
+                        className="flex items-center gap-2 p-2 border rounded-md"
                       >
                         <Button
-                          variant="outlined"
-                          size="small"
+                          variant="outline"
+                          size="sm"
                           disabled={isLoading}
-                          onClick={() =>
-                            void handleDevLogin(testUser.email ?? "")
-                          }
-                          sx={{
-                            justifyContent: "flex-start",
-                            textTransform: "none",
-                            flex: 1,
-                            fontSize: "0.75rem",
-                            py: 0.5,
-                          }}
+                          onClick={() => void handleDevLogin(testUser.email ?? "")}
+                          className="flex-1 justify-start text-xs h-8"
                         >
                           {testUser.name}
                         </Button>
                         {testUser.role && (
-                          <Chip
-                            label={testUser.role.name.toUpperCase()}
-                            size="small"
-                            color={getRoleColor(testUser.role)}
-                            sx={{ fontSize: "0.6rem", height: "18px" }}
-                          />
+                          <Badge 
+                            variant={getRoleBadgeVariant(testUser.role)}
+                            className="text-xs h-5"
+                          >
+                            {testUser.role.name.toUpperCase()}
+                          </Badge>
                         )}
-                      </Box>
+                      </div>
                     ))
                   )}
-                </Stack>
-              </Box>
+                </div>
+              </div>
             </>
           )}
-        </Stack>
-      </Paper>
-    </Container>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

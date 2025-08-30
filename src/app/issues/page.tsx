@@ -5,7 +5,7 @@ import { PlusIcon } from "lucide-react";
 import { IssuesListServer } from "~/components/issues/issues-list-server";
 import { IssueActiveFilters } from "~/components/issues/issue-active-filters";
 import { AdvancedSearchForm, ISSUES_FILTER_FIELDS } from "~/components/search";
-import { requireServerAuth } from "~/lib/auth/server-auth";
+import { requireMemberAccess } from "~/lib/organization-context";
 import {
   getIssuesWithFilters,
   type IssueFilters,
@@ -28,7 +28,7 @@ interface IssuesPageProps {
 }
 
 export async function generateMetadata({ searchParams }: IssuesPageProps) {
-  await requireServerAuth();
+  await requireMemberAccess();
 
   // Parse search params using centralized utility
   const rawParams = await searchParams;
@@ -187,8 +187,8 @@ async function IssuesWithData({
 export default async function IssuesPage({
   searchParams,
 }: IssuesPageProps): Promise<React.JSX.Element> {
-  // Authentication validation with automatic redirect - Phase 2C pattern
-  await requireServerAuth();
+  // Authentication and organization membership validation
+  await requireMemberAccess();
 
   return (
     <div className="space-y-6">

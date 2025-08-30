@@ -30,8 +30,8 @@ export function OrganizationLogoForm({ currentLogoUrl }: OrganizationLogoFormPro
   useEffect(() => {
     if (state?.success && state.message) {
       toast.success(state.message);
-    } else if (!state?.success && state?.message) {
-      toast.error(state.message);
+    } else if (!state?.success && state?.error) {
+      toast.error(state.error);
     }
   }, [state]);
 
@@ -95,12 +95,12 @@ export function OrganizationLogoForm({ currentLogoUrl }: OrganizationLogoFormPro
             name="logoUrl"
             type="url"
             value={previewUrl}
-            onChange={(e) => handleUrlChange(e.target.value)}
+            onChange={(e) => { handleUrlChange(e.target.value); }}
             placeholder="https://example.com/logo.png"
             disabled={isPending}
           />
-          {state?.fieldErrors?.logoUrl && (
-            <p className="text-sm text-destructive">{state.fieldErrors.logoUrl[0]}</p>
+          {state && !state.success && state.fieldErrors?.["logoUrl"] && (
+            <p className="text-sm text-destructive">{state.fieldErrors["logoUrl"][0]}</p>
           )}
           <p className="text-xs text-muted-foreground">
             Enter a URL to an image file (PNG, JPG, or SVG recommended)
@@ -123,9 +123,9 @@ export function OrganizationLogoForm({ currentLogoUrl }: OrganizationLogoFormPro
         </Button>
 
         {/* Error Display */}
-        {state?.message && !state.success && !state.fieldErrors && (
+        {state && !state.success && !state.fieldErrors && (
           <div className="rounded-md bg-destructive/15 p-3">
-            <p className="text-sm text-destructive">{state.message}</p>
+            <p className="text-sm text-destructive">{state.error}</p>
           </div>
         )}
       </form>

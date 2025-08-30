@@ -17,43 +17,18 @@ import {
   GlobeIcon,
   ZapIcon
 } from "lucide-react";
-import { requireAuthContext } from "~/lib/dal/shared";
+import { requireMemberAccess } from "~/lib/organization-context";
+import { getSystemSettings } from "~/lib/dal/system-settings";
 import { SystemNotificationSettings } from "./components/SystemNotificationSettings";
 import { SystemSecuritySettings } from "./components/SystemSecuritySettings";
 import { SystemPreferences } from "./components/SystemPreferences";
 
 export default async function SystemSettingsPage() {
-  const { organizationId } = await requireAuthContext();
+  const { organization } = await requireMemberAccess();
+  const organizationId = organization.id;
 
-  // TODO: Fetch system settings from database
-  const systemSettings = {
-    notifications: {
-      emailNotifications: true,
-      pushNotifications: false,
-      issueUpdates: true,
-      weeklyDigest: true,
-      maintenanceAlerts: true,
-    },
-    security: {
-      twoFactorRequired: false,
-      sessionTimeout: 30,
-      passwordMinLength: 8,
-      loginAttempts: 5,
-    },
-    preferences: {
-      timezone: "UTC",
-      dateFormat: "MM/DD/YYYY",
-      theme: "system",
-      language: "en",
-      itemsPerPage: 25,
-    },
-    features: {
-      realTimeUpdates: true,
-      analyticsTracking: false,
-      betaFeatures: false,
-      maintenanceMode: false,
-    }
-  };
+  // Fetch system settings from database
+  const systemSettings = await getSystemSettings(organizationId);
 
   return (
     <div className="space-y-6">

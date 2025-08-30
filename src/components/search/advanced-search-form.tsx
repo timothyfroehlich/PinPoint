@@ -53,9 +53,7 @@ export interface AdvancedSearchFormProps {
   onFormSubmit?: (params: Record<string, any>) => void;
 }
 
-interface FormState {
-  [key: string]: any;
-}
+type FormState = Record<string, any>;
 
 export function AdvancedSearchForm({
   entityType,
@@ -219,7 +217,7 @@ export function AdvancedSearchForm({
               type="text"
               placeholder={field.placeholder}
               value={formState[field.id] || ""}
-              onChange={(e) => updateFormField(field.id, e.target.value)}
+              onChange={(e) => { updateFormField(field.id, e.target.value); }}
             />
           </div>
         );
@@ -230,7 +228,7 @@ export function AdvancedSearchForm({
             <Label htmlFor={field.id}>{field.label}</Label>
             <Select
               value={formState[field.id] || ""}
-              onValueChange={(value) => updateFormField(field.id, value)}
+              onValueChange={(value) => { updateFormField(field.id, value); }}
             >
               <SelectTrigger>
                 <SelectValue placeholder={field.placeholder || `Select ${field.label.toLowerCase()}`} />
@@ -298,7 +296,7 @@ export function AdvancedSearchForm({
                   type="date"
                   placeholder="Start date"
                   value={formState[`${field.id}_start`] || ""}
-                  onChange={(e) => updateFormField(`${field.id}_start`, e.target.value)}
+                  onChange={(e) => { updateFormField(`${field.id}_start`, e.target.value); }}
                 />
               </div>
               <div className="flex-1">
@@ -306,7 +304,7 @@ export function AdvancedSearchForm({
                   type="date"
                   placeholder="End date"
                   value={formState[`${field.id}_end`] || ""}
-                  onChange={(e) => updateFormField(`${field.id}_end`, e.target.value)}
+                  onChange={(e) => { updateFormField(`${field.id}_end`, e.target.value); }}
                 />
               </div>
             </div>
@@ -325,7 +323,7 @@ export function AdvancedSearchForm({
                   min={field.min}
                   max={field.max}
                   value={formState[`${field.id}_min`] || ""}
-                  onChange={(e) => updateFormField(`${field.id}_min`, e.target.value)}
+                  onChange={(e) => { updateFormField(`${field.id}_min`, e.target.value); }}
                 />
               </div>
               <div className="flex-1">
@@ -335,7 +333,7 @@ export function AdvancedSearchForm({
                   min={field.min}
                   max={field.max}
                   value={formState[`${field.id}_max`] || ""}
-                  onChange={(e) => updateFormField(`${field.id}_max`, e.target.value)}
+                  onChange={(e) => { updateFormField(`${field.id}_max`, e.target.value); }}
                 />
               </div>
             </div>
@@ -348,7 +346,7 @@ export function AdvancedSearchForm({
             <Checkbox
               id={field.id}
               checked={formState[field.id] === true}
-              onCheckedChange={(checked) => updateFormField(field.id, checked === true)}
+              onCheckedChange={(checked) => { updateFormField(field.id, checked === true); }}
             />
             <Label htmlFor={field.id}>{field.label}</Label>
           </div>
@@ -384,7 +382,7 @@ export function AdvancedSearchForm({
               <Button 
                 variant="ghost" 
                 size="sm"
-                onClick={() => setIsExpanded(true)}
+                onClick={() => { setIsExpanded(true); }}
                 className="flex items-center gap-1"
               >
                 <ChevronDown className="h-4 w-4" />
@@ -416,7 +414,7 @@ export function AdvancedSearchForm({
             <Button 
               variant="ghost" 
               size="sm"
-              onClick={() => setIsExpanded(false)}
+              onClick={() => { setIsExpanded(false); }}
               className="flex items-center gap-1"
             >
               <ChevronUp className="h-4 w-4" />

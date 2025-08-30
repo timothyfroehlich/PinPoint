@@ -6,7 +6,7 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "~/components/ui/button";
-import { requireServerAuth } from "~/lib/auth/server-auth";
+import { requireMemberAccess } from "~/lib/organization-context";
 import { getLocationsForOrg, getModelsForOrg } from "~/lib/dal/machines";
 import { createMachineAction } from "~/lib/actions/machine-actions";
 import { CreateMachineFormClient } from "~/components/machines/client/create-machine-form-client";
@@ -17,7 +17,7 @@ export const metadata = {
 };
 
 export default async function NewMachinePage() {
-  await requireServerAuth();
+  await requireMemberAccess();
   
   // Fetch required data for form
   const [locations, models] = await Promise.all([

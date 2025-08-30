@@ -9,8 +9,10 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
 import { eq, and } from "drizzle-orm";
 import { getGlobalDatabaseProvider } from "~/server/db/provider";
-import { users, memberships, roles, organizations } from "~/server/db/schema";
+import { users, memberships, roles } from "~/server/db/schema";
 import { generatePrefixedId } from "~/lib/utils/id-generation";
+import { updateSystemSettings } from "~/lib/dal/system-settings";
+import { logActivity, ACTIVITY_ACTIONS, ACTIVITY_ENTITIES, exportActivityLog } from "~/lib/dal/activity-log";
 import {
   getActionAuthContext,
   validateFormData,
@@ -176,6 +178,17 @@ export async function inviteUserAction(
         organizationId,
         roleId,
       });
+
+      // Log the activity
+      await logActivity({
+        organizationId,
+        userId: user.id,
+        action: ACTIVITY_ACTIONS.INVITATION_SENT,
+        entity: ACTIVITY_ENTITIES.USER,
+        entityId: userId!,
+        details: `Invited ${validation.data.email} to join the organization`,
+        severity: "info",
+      });
       
       // TODO: Send actual invitation email with signup/login link
       // The email should include:
@@ -268,6 +281,17 @@ export async function updateUserRoleAction(
     // Background processing
     runAfterResponse(async () => {
       console.log(`User role updated by ${user.email}: ${validation.data.userId} -> ${role.name}`);
+      
+      // Log the activity
+      await logActivity({
+        organizationId,
+        userId: user.id,
+        action: ACTIVITY_ACTIONS.ROLE_CHANGED,
+        entity: ACTIVITY_ENTITIES.USER,
+        entityId: validation.data.userId,
+        details: `Changed user role to ${role.name}`,
+        severity: "warning",
+      });
     });
 
     return actionSuccess(
@@ -333,6 +357,17 @@ export async function removeUserAction(
     // Background processing
     runAfterResponse(async () => {
       console.log(`User removed from organization by ${user.email}: ${validation.data.confirmEmail}`);
+      
+      // Log the activity
+      await logActivity({
+        organizationId,
+        userId: user.id,
+        action: ACTIVITY_ACTIONS.USER_DELETED,
+        entity: ACTIVITY_ENTITIES.USER,
+        entityId: validation.data.userId,
+        details: `Removed user ${validation.data.confirmEmail} from organization`,
+        severity: "warning",
+      });
     });
 
     return actionSuccess(
@@ -370,9 +405,8 @@ export async function updateSystemSettingsAction(
       return actionError("Invalid settings data");
     }
 
-    // TODO: Implement system settings persistence
-    // This would typically update a system_settings table or organization preferences
-    console.log("System settings would be updated:", validation.data.settings);
+    // Update system settings in database
+    await updateSystemSettings(organizationId, validation.data.settings);
 
     // Cache invalidation
     revalidatePath("/settings/system");
@@ -383,6 +417,17 @@ export async function updateSystemSettingsAction(
     // Background processing
     runAfterResponse(async () => {
       console.log(`System settings updated by ${user.email}`);
+      
+      // Log the activity
+      await logActivity({
+        organizationId,
+        userId: user.id,
+        action: ACTIVITY_ACTIONS.SETTINGS_UPDATED,
+        entity: ACTIVITY_ENTITIES.SETTINGS,
+        entityId: "system-settings",
+        details: `Updated system settings: ${Object.keys(validation.data.settings).join(", ")}`,
+        severity: "info",
+      });
     });
 
     return actionSuccess(
@@ -394,5 +439,54 @@ export async function updateSystemSettingsAction(
     return actionError(
       error instanceof Error ? error.message : "Failed to update system settings",
     );
+  }
+}
+
+/**
+ * Export activity log to CSV via Server Action
+ */
+export async function exportActivityLogAction(): Promise<Response> {
+  try {
+    const { user, organizationId } = await getActionAuthContext();
+
+    // Export activity log to CSV
+    const csvData = await exportActivityLog(organizationId, {
+      // Export all data with reasonable limit
+      limit: 10000,
+    });
+
+    // Log the export activity
+    await logActivity({
+      organizationId,
+      userId: user.id,
+      action: ACTIVITY_ACTIONS.EXPORT_GENERATED,
+      entity: ACTIVITY_ENTITIES.EXPORT,
+      entityId: "activity-log-csv",
+      details: "Exported activity log to CSV file",
+      severity: "info",
+    });
+
+    // Generate filename with timestamp
+    const timestamp = new Date().toISOString().split('T')[0];
+    const filename = `activity-log-${timestamp}.csv`;
+
+    // Return CSV file response
+    return new Response(csvData, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/csv',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+      },
+    });
+  } catch (error) {
+    console.error("Export activity log error:", error);
+    
+    // Return error response
+    return new Response("Failed to export activity log", {
+      status: 500,
+      headers: {
+        'Content-Type': 'text/plain',
+      },
+    });
   }
 }

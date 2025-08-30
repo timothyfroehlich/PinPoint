@@ -12,7 +12,6 @@ import { and, eq, isNull } from "drizzle-orm";
 import { getGlobalDatabaseProvider } from "~/server/db/provider";
 import { comments, issues } from "~/server/db/schema";
 import { generatePrefixedId } from "~/lib/utils/id-generation";
-import { transformKeysToSnakeCase } from "~/lib/utils/case-transformers";
 import {
   getActionAuthContext,
   validateFormData,
@@ -264,7 +263,7 @@ export async function restoreCommentAction(
       ),
     });
 
-    if (!comment || !comment.deleted_at) {
+    if (!comment?.deleted_at) {
       return actionError("Comment not found or not deleted");
     }
 

@@ -15,12 +15,12 @@ import {
   ShieldIcon,
   ArrowRightIcon,
 } from "lucide-react";
-import { requireAuthContext } from "~/lib/dal/shared";
+import { requireMemberAccess } from "~/lib/organization-context";
 import { getCurrentOrganization } from "~/lib/dal/organizations";
 
 export default async function SettingsPage() {
-  const { user, organizationId } = await requireAuthContext();
-  const organization = await getCurrentOrganization();
+  const { user, organization } = await requireMemberAccess();
+  const orgDetails = await getCurrentOrganization();
 
   const settingsCards = [
     {
@@ -28,7 +28,7 @@ export default async function SettingsPage() {
       description: "Manage organization profile, logo, and basic settings",
       href: "/settings/organization",
       icon: BuildingIcon,
-      stats: `${organization.name}`,
+      stats: orgDetails.name,
     },
     {
       title: "Users & Roles", 
@@ -81,7 +81,7 @@ export default async function SettingsPage() {
         <CardContent>
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <div className="text-2xl font-bold">{organization.name}</div>
+              <div className="text-2xl font-bold">{orgDetails.name}</div>
               <p className="text-xs text-muted-foreground">Organization Name</p>
             </div>
             <div>

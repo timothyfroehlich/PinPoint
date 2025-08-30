@@ -1,0 +1,42 @@
+/**
+ * Placeholder LocationList Component
+ * TODO: Implement full location listing functionality
+ */
+
+import type { PinPointSupabaseUser } from "~/lib/supabase/types";
+
+interface Location {
+  id: string;
+  name: string;
+}
+
+interface LocationListProps {
+  locations: Location[];
+  user: PinPointSupabaseUser | null;
+}
+
+export function LocationList({ locations, user }: LocationListProps) {
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-bold">Locations</h1>
+        </div>
+        
+        <div className="text-center py-12">
+          <h2 className="text-xl font-semibold text-gray-700 mb-2">
+            Location Management Coming Soon
+          </h2>
+          <p className="text-gray-500 mb-4">
+            This feature is currently under development.
+          </p>
+          {locations.length > 0 && (
+            <p className="text-sm text-gray-400">
+              Found {locations.length} location{locations.length === 1 ? '' : 's'}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
