@@ -5,15 +5,20 @@
 
 import Link from "next/link";
 import { Button } from "~/components/ui/button";
-import { Card, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
-import { 
-  ZapIcon, 
-  UsersIcon, 
-  BarChart3Icon, 
+import {
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
+import {
+  ZapIcon,
+  UsersIcon,
+  BarChart3Icon,
   ShieldCheckIcon,
   ArrowRightIcon,
   WrenchIcon,
-  ClipboardListIcon
+  ClipboardListIcon,
 } from "lucide-react";
 
 export function PinPointHomepage() {
@@ -28,8 +33,8 @@ export function PinPointHomepage() {
               PinPoint
             </h1>
             <p className="text-xl text-on-surface-variant max-w-2xl mx-auto leading-relaxed">
-              Streamline your pinball machine maintenance with intelligent issue tracking, 
-              team collaboration, and actionable insights.
+              Streamline your pinball machine maintenance with intelligent issue
+              tracking, team collaboration, and actionable insights.
             </p>
           </div>
 
@@ -53,7 +58,8 @@ export function PinPointHomepage() {
               </div>
               <CardTitle className="text-lg">Issue Tracking</CardTitle>
               <CardDescription>
-                Log, track, and resolve machine issues with detailed reporting and status updates.
+                Log, track, and resolve machine issues with detailed reporting
+                and status updates.
               </CardDescription>
             </CardHeader>
           </Card>
@@ -65,7 +71,8 @@ export function PinPointHomepage() {
               </div>
               <CardTitle className="text-lg">Team Collaboration</CardTitle>
               <CardDescription>
-                Coordinate maintenance tasks across your team with role-based permissions and real-time updates.
+                Coordinate maintenance tasks across your team with role-based
+                permissions and real-time updates.
               </CardDescription>
             </CardHeader>
           </Card>
@@ -77,7 +84,8 @@ export function PinPointHomepage() {
               </div>
               <CardTitle className="text-lg">Machine Management</CardTitle>
               <CardDescription>
-                Maintain detailed records of your pinball machine inventory, locations, and maintenance history.
+                Maintain detailed records of your pinball machine inventory,
+                locations, and maintenance history.
               </CardDescription>
             </CardHeader>
           </Card>
@@ -89,7 +97,8 @@ export function PinPointHomepage() {
               </div>
               <CardTitle className="text-lg">Analytics & Insights</CardTitle>
               <CardDescription>
-                Track maintenance trends, identify recurring issues, and optimize your operations.
+                Track maintenance trends, identify recurring issues, and
+                optimize your operations.
               </CardDescription>
             </CardHeader>
           </Card>
@@ -101,7 +110,8 @@ export function PinPointHomepage() {
               </div>
               <CardTitle className="text-lg">Real-time Updates</CardTitle>
               <CardDescription>
-                Stay informed with instant notifications when issues are updated or resolved.
+                Stay informed with instant notifications when issues are updated
+                or resolved.
               </CardDescription>
             </CardHeader>
           </Card>
@@ -113,19 +123,28 @@ export function PinPointHomepage() {
               </div>
               <CardTitle className="text-lg">Secure & Reliable</CardTitle>
               <CardDescription>
-                Enterprise-grade security with organization-level data isolation and role-based access control.
+                Enterprise-grade security with organization-level data isolation
+                and role-based access control.
               </CardDescription>
             </CardHeader>
           </Card>
         </div>
 
         {/* Bottom CTA */}
-        <div className="mt-24 text-center bg-gray-900 rounded-xl px-8 py-12 text-white">
-          <h2 className="text-3xl font-bold mb-4">Ready to streamline your pinball maintenance?</h2>
-          <p className="text-gray-300 mb-8 text-lg">
-            Join organizations already using PinPoint to manage their pinball operations more effectively.
+        <div className="mt-24 text-center bg-surface-variant rounded-xl px-8 py-12 text-on-surface">
+          <h2 className="text-3xl font-bold mb-4">
+            Ready to streamline your pinball maintenance?
+          </h2>
+          <p className="text-on-surface-variant mb-8 text-lg">
+            Join organizations already using PinPoint to manage their pinball
+            operations more effectively.
           </p>
-          <Button asChild size="lg" variant="secondary" className="text-lg px-8 py-3">
+          <Button
+            asChild
+            size="lg"
+            variant="secondary"
+            className="text-lg px-8 py-3"
+          >
             <Link href="/auth/sign-in">
               Sign In to Your Organization
               <ArrowRightIcon className="ml-2 h-5 w-5" />
@@ -135,8 +154,8 @@ export function PinPointHomepage() {
       </div>
 
       {/* Footer */}
-      <footer className="border-t bg-gray-50 py-8">
-        <div className="container mx-auto px-4 text-center text-gray-600">
+      <footer className="border-t bg-surface py-8">
+        <div className="container mx-auto px-4 text-center text-on-surface-variant">
           <p>&copy; 2025 PinPoint. Streamlined pinball machine maintenance.</p>
         </div>
       </footer>
