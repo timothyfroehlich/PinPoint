@@ -55,10 +55,10 @@ export default async function SystemSettingsPage() {
           <div className="grid gap-4 md:grid-cols-4">
             <div className="space-y-2">
               <div className="flex items-center space-x-2">
-                <div className="h-2 w-2 bg-green-500 rounded-full"></div>
+                <div className="h-2 w-2 bg-tertiary rounded-full"></div>
                 <span className="text-sm font-medium">System Health</span>
               </div>
-              <Badge variant="secondary" className="text-green-600">
+              <Badge variant="secondary" className="text-tertiary">
                 Operational
               </Badge>
             </div>
@@ -67,7 +67,7 @@ export default async function SystemSettingsPage() {
                 <DatabaseIcon className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm font-medium">Database</span>
               </div>
-              <Badge variant="secondary" className="text-green-600">
+              <Badge variant="secondary" className="text-tertiary">
                 Connected
               </Badge>
             </div>
@@ -76,7 +76,7 @@ export default async function SystemSettingsPage() {
                 <GlobeIcon className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm font-medium">API Status</span>
               </div>
-              <Badge variant="secondary" className="text-green-600">
+              <Badge variant="secondary" className="text-tertiary">
                 Active
               </Badge>
             </div>
