@@ -164,7 +164,7 @@ function ActiveFilterBadge({ filter }: { filter: ActiveFilter }) {
         {filter.label}: {filter.value}
       </span>
       <Button asChild variant="ghost" size="sm" className="h-4 w-4 p-0">
-        <a href={filter.removeUrl} className="hover:text-red-500">
+        <a href={filter.removeUrl} className="hover:text-error">
           <X className="h-3 w-3" />
         </a>
       </Button>
@@ -307,7 +307,7 @@ export function CheckboxFilter({
               name={name}
               value={option.value}
               defaultChecked={selectedValues.includes(option.value)}
-              className="rounded border-gray-300"
+              className="rounded border-outline"
             />
             <span className="flex-1">{option.label}</span>
             {option.count !== undefined && (

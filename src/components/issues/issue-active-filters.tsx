@@ -139,7 +139,7 @@ export function IssueActiveFilters({
             size="sm"
             className="h-4 w-4 p-0 ml-1"
           >
-            <Link href={filter.removeUrl} className="hover:text-red-500">
+            <Link href={filter.removeUrl} className="hover:text-error">
               <X className="h-3 w-3" />
             </Link>
           </Button>
