@@ -210,7 +210,7 @@ export default function ProfilePage(): JSX.Element {
               </span>
             </div>
             <div className="flex items-center gap-3">
-              <Bug className="h-5 w-5 text-orange-600" />
+              <Bug className="h-5 w-5 text-secondary" />
               <span className="text-sm">
                 {String(_count.issuesCreated)} issues reported
               </span>
