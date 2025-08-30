@@ -162,7 +162,7 @@ export function NotificationClient({
 
     const cleanup = initializeNotificationStream();
     return () => {
-      cleanup.then(fn => fn && fn());
+      cleanup.then(fn => fn?.());
     };
   }, [userId, organizationId]);
 
@@ -251,7 +251,7 @@ export function NotificationClient({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => removeNotification(notification.id)}
+                onClick={() => { removeNotification(notification.id); }}
                 className="h-6 w-6 p-0 ml-2"
               >
                 <XIcon className="h-3 w-3" />

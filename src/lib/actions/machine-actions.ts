@@ -9,7 +9,7 @@
 import { revalidateTag, revalidatePath } from "next/cache";
 import { z } from "zod";
 import { eq, and, inArray } from "drizzle-orm";
-import { requireServerAuth } from "~/lib/auth/server-auth";
+import { requireMemberAccess } from "~/lib/organization-context";
 import { db } from "~/lib/dal/shared";
 import { machines } from "~/server/db/schema";
 import { generateMachineQRCode, validateQRCodeParams } from "~/lib/services/qr-code-service";
@@ -60,7 +60,8 @@ const BulkQRGenerateSchema = z.object({
 export async function createMachineAction(
   formData: FormData,
 ): Promise<ActionResult<{ machineId: string }>> {
-  const { organizationId } = await requireServerAuth();
+  const { organization } = await requireMemberAccess();
+  const organizationId = organization.id;
 
   const result = CreateMachineSchema.safeParse({
     name: formData.get("name"),
@@ -111,7 +112,8 @@ export async function createMachineAction(
 export async function updateMachineAction(
   formData: FormData,
 ): Promise<ActionResult<{ machineId: string }>> {
-  const { organizationId } = await requireServerAuth();
+  const { organization } = await requireMemberAccess();
+  const organizationId = organization.id;
 
   const result = UpdateMachineSchema.safeParse({
     id: formData.get("id"),
@@ -179,7 +181,8 @@ export async function updateMachineAction(
 export async function deleteMachineAction(
   machineId: string,
 ): Promise<ActionResult<{ deleted: boolean }>> {
-  const { organizationId } = await requireServerAuth();
+  const { organization } = await requireMemberAccess();
+  const organizationId = organization.id;
 
   if (!machineId) {
     return {
@@ -229,7 +232,8 @@ export async function deleteMachineAction(
 export async function bulkUpdateMachinesAction(
   formData: FormData,
 ): Promise<ActionResult<{ updatedCount: number }>> {
-  const { organizationId } = await requireServerAuth();
+  const { organization } = await requireMemberAccess();
+  const organizationId = organization.id;
 
   const machineIdsString = formData.get("machineIds") as string;
   const machineIds = machineIdsString ? machineIdsString.split(",") : [];
@@ -292,7 +296,8 @@ export async function bulkUpdateMachinesAction(
 export async function generateQRCodeAction(
   formData: FormData,
 ): Promise<ActionResult<{ qrCodeUrl: string }>> {
-  const { organizationId } = await requireServerAuth();
+  const { organization } = await requireMemberAccess();
+  const organizationId = organization.id;
 
   const result = GenerateQRCodeSchema.safeParse({
     machineId: formData.get("machineId"),
@@ -361,7 +366,8 @@ export async function generateQRCodeAction(
 export async function regenerateQRCodeAction(
   machineId: string,
 ): Promise<ActionResult<{ qrCodeUrl: string }>> {
-  const { organizationId } = await requireServerAuth();
+  const { organization } = await requireMemberAccess();
+  const organizationId = organization.id;
 
   if (!machineId) {
     return {
@@ -425,7 +431,8 @@ export async function regenerateQRCodeAction(
 export async function bulkGenerateQRCodesAction(
   formData: FormData,
 ): Promise<ActionResult<{ processedCount: number }>> {
-  const { organizationId } = await requireServerAuth();
+  const { organization } = await requireMemberAccess();
+  const organizationId = organization.id;
 
   const machineIdsString = formData.get("machineIds") as string;
   const machineIds = machineIdsString ? machineIdsString.split(",") : [];

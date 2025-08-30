@@ -143,7 +143,7 @@ export function UniversalSearchInput({
     };
 
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    return () => { document.removeEventListener("mousedown", handleClickOutside); };
   }, []);
 
   // Handle keyboard navigation
@@ -157,7 +157,7 @@ export function UniversalSearchInput({
 
     if (showDropdown) {
       document.addEventListener("keydown", handleKeyDown);
-      return () => document.removeEventListener("keydown", handleKeyDown);
+      return () => { document.removeEventListener("keydown", handleKeyDown); };
     }
     
     return undefined;
@@ -290,7 +290,7 @@ export function UniversalSearchInput({
                 {recentSearches.map((recentSearch, index) => (
                   <button
                     key={index}
-                    onClick={() => selectRecentSearch(recentSearch)}
+                    onClick={() => { selectRecentSearch(recentSearch); }}
                     className="w-full text-left px-3 py-2 hover:bg-muted rounded-md flex items-center gap-2 transition-colors"
                   >
                     <SearchIcon className="h-3 w-3 text-muted-foreground" />
@@ -326,7 +326,7 @@ export function UniversalSearchInput({
                   return (
                     <button
                       key={`${suggestion.entity}-${suggestion.id}`}
-                      onClick={() => selectSuggestion(suggestion)}
+                      onClick={() => { selectSuggestion(suggestion); }}
                       className="w-full text-left px-3 py-3 hover:bg-muted rounded-md transition-colors"
                     >
                       <div className="flex items-start justify-between gap-3">

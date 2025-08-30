@@ -5,7 +5,7 @@ import { PlusIcon } from "lucide-react";
 import { MachineInventoryServer } from "~/components/machines/machine-inventory-server";
 import { MachineStatsServer } from "~/components/machines/machine-stats-server";
 import { AdvancedSearchForm, MACHINES_FILTER_FIELDS } from "~/components/search";
-import { requireServerAuth } from "~/lib/auth/server-auth";
+import { requireMemberAccess } from "~/lib/organization-context";
 import {
   getMachinesWithFilters,
   getMachineStats,
@@ -30,7 +30,7 @@ interface MachinesPageProps {
 }
 
 export async function generateMetadata({ searchParams }: MachinesPageProps) {
-  await requireServerAuth();
+  await requireMemberAccess();
 
   // Parse search params using centralized utility
   const rawParams = await searchParams;
@@ -92,7 +92,7 @@ export async function generateMetadata({ searchParams }: MachinesPageProps) {
 export default async function MachinesPage({
   searchParams,
 }: MachinesPageProps) {
-  await requireServerAuth();
+  await requireMemberAccess();
 
   // Parse URL parameters using centralized utility
   const rawParams = await searchParams;

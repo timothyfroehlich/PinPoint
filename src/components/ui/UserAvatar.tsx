@@ -1,7 +1,14 @@
 "use client";
 
-import { Avatar, Tooltip } from "@mui/material";
+import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "~/components/ui/tooltip";
 import { useState } from "react";
+import { cn } from "~/lib/utils";
 
 import type { JSX } from "react";
 
@@ -17,10 +24,10 @@ interface UserAvatarProps {
   onClick?: () => void;
 }
 
-const SIZE_MAP = {
-  small: { width: 32, height: 32 },
-  medium: { width: 40, height: 40 },
-  large: { width: 64, height: 64 },
+const SIZE_CLASSES = {
+  small: "h-8 w-8 text-sm",
+  medium: "h-10 w-10 text-sm", 
+  large: "h-16 w-16 text-lg",
 } as const;
 
 export function UserAvatar({
@@ -33,17 +40,29 @@ export function UserAvatar({
   const [imageError, setImageError] = useState(false);
 
   if (!user) {
-    return (
+    const avatarElement = (
       <Avatar
-        sx={{
-          // eslint-disable-next-line security/detect-object-injection -- size is type-constrained to specific size keys
-          ...SIZE_MAP[size],
-          cursor: clickable ? "pointer" : "default",
-        }}
+        className={cn(
+          SIZE_CLASSES[size],
+          clickable && "cursor-pointer hover:opacity-80",
+        )}
         onClick={onClick}
       >
-        ?
+        <AvatarFallback>?</AvatarFallback>
       </Avatar>
+    );
+
+    return showTooltip ? (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>{avatarElement}</TooltipTrigger>
+          <TooltipContent>
+            <p>Unknown User</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    ) : (
+      avatarElement
     );
   }
 
@@ -59,28 +78,33 @@ export function UserAvatar({
 
   const avatarElement = (
     <Avatar
-      {...(avatarSrc && { src: avatarSrc })}
-      alt={`${displayName}'s profile picture`}
-      sx={{
-        // eslint-disable-next-line security/detect-object-injection -- size is type-constrained to specific size keys
-        ...SIZE_MAP[size],
-        cursor: clickable ? "pointer" : "default",
-        "&:hover": clickable ? { opacity: 0.8 } : {},
-      }}
+      className={cn(
+        SIZE_CLASSES[size],
+        clickable && "cursor-pointer hover:opacity-80",
+      )}
       onClick={onClick}
-      onError={() => {
-        setImageError(true);
-      }}
     >
-      {!avatarSrc && initials}
+      {avatarSrc && (
+        <AvatarImage
+          src={avatarSrc}
+          alt={`${displayName}'s profile picture`}
+          onError={() => setImageError(true)}
+        />
+      )}
+      <AvatarFallback>{initials}</AvatarFallback>
     </Avatar>
   );
 
   if (showTooltip && displayName) {
     return (
-      <Tooltip title={displayName} arrow>
-        {avatarElement}
-      </Tooltip>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>{avatarElement}</TooltipTrigger>
+          <TooltipContent>
+            <p>{displayName}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
     );
   }
 

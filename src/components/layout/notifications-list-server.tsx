@@ -5,8 +5,6 @@
 
 import { formatDistanceToNow } from "date-fns";
 import { Badge } from "~/components/ui/badge";
-import { Avatar, AvatarFallback } from "~/components/ui/avatar";
-import { Card, CardContent } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import {
   AlertTriangleIcon,
@@ -44,24 +42,24 @@ function getNotificationIcon(type: string) {
 }
 
 /**
- * Get appropriate color scheme based on notification type
+ * Get appropriate color scheme based on notification type using Material 3 colors
  */
 function getNotificationColor(type: string) {
   switch (type) {
     case "ISSUE_CREATED":
-      return "bg-red-50 border-red-200 text-red-800";
+      return "bg-error-container border-outline-variant text-on-error-container";
     case "ISSUE_UPDATED":
-      return "bg-blue-50 border-blue-200 text-blue-800";
+      return "bg-primary-container border-outline-variant text-on-primary-container";
     case "ISSUE_ASSIGNED":
-      return "bg-yellow-50 border-yellow-200 text-yellow-800";
+      return "bg-secondary-container border-outline-variant text-on-secondary-container";
     case "ISSUE_COMMENTED":
-      return "bg-green-50 border-green-200 text-green-800";
+      return "bg-tertiary-container border-outline-variant text-on-tertiary-container";
     case "MACHINE_ASSIGNED":
-      return "bg-purple-50 border-purple-200 text-purple-800";
+      return "bg-secondary-container border-outline-variant text-on-secondary-container";
     case "SYSTEM_ANNOUNCEMENT":
-      return "bg-indigo-50 border-indigo-200 text-indigo-800";
+      return "bg-primary-container border-outline-variant text-on-primary-container";
     default:
-      return "bg-gray-50 border-gray-200 text-gray-800";
+      return "bg-surface-variant border-outline-variant text-on-surface-variant";
   }
 }
 

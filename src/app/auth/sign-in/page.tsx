@@ -7,7 +7,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
 import { SignInForm } from "./components/SignInForm";
-import { getServerAuth } from "~/lib/auth/server-auth";
+import { getOrganizationContext } from "~/lib/organization-context";
 
 export const metadata = {
   title: "Sign In - PinPoint",
@@ -16,8 +16,8 @@ export const metadata = {
 
 export default async function SignInPage() {
   // Check if user is already authenticated
-  const authContext = await getServerAuth();
-  if (authContext) {
+  const orgContext = await getOrganizationContext();
+  if (orgContext?.user && orgContext?.accessLevel === "member") {
     redirect("/dashboard");
   }
 

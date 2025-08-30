@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import type { NextRequest} from "next/server";
+import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getSearchSuggestions } from "~/lib/services/search-service";
-import { requireServerAuth } from "~/lib/auth/server-auth";
+import { requireMemberAccess } from "~/lib/organization-context";
 
 const SuggestionsQuerySchema = z.object({
   q: z.string().min(2, "Query must be at least 2 characters"),
@@ -18,7 +19,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const { q: query, limit } = SuggestionsQuerySchema.parse(queryParams);
 
     // Require authentication and organization context
-    const { organizationId } = await requireServerAuth();
+    const { organization } = await requireMemberAccess();
+    const organizationId = organization.id;
 
     // Get search suggestions
     const suggestions = await getSearchSuggestions(query, organizationId, limit);
@@ -37,7 +39,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json(
         {
           error: "Invalid query parameters",
-          details: error.flatten(),
+          details: error.issues,
           timestamp: new Date().toISOString(),
         },
         { status: 400 }

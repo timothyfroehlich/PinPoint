@@ -4,10 +4,10 @@
  */
 
 import { db } from "~/lib/dal/shared";
-import { notifications, issues, users, machines } from "~/server/db/schema";
+import { notifications, issues } from "~/server/db/schema";
 import { generatePrefixedId } from "~/lib/utils/id-generation";
 import { createNotificationActionUrl } from "~/lib/dal/notifications";
-import { eq, and, ne } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 /**
  * Notification types that can be generated
@@ -101,7 +101,7 @@ async function getIssueStakeholders(issueId: string, organizationId: string) {
 
   if (!issue) return [];
 
-  const stakeholders: Array<{ id: string; name: string; email: string; role: string }> = [];
+  const stakeholders: { id: string; name: string; email: string; role: string }[] = [];
 
   // Add assignee
   if (issue.assignedTo) {
@@ -128,12 +128,12 @@ async function getIssueStakeholders(issueId: string, organizationId: string) {
   }
 
   // Remove duplicates by user ID
-  const uniqueStakeholders = stakeholders.reduce((acc, stakeholder) => {
+  const uniqueStakeholders = stakeholders.reduce<typeof stakeholders>((acc, stakeholder) => {
     if (!acc.find(s => s.id === stakeholder.id)) {
       acc.push(stakeholder);
     }
     return acc;
-  }, [] as typeof stakeholders);
+  }, []);
 
   return uniqueStakeholders;
 }
