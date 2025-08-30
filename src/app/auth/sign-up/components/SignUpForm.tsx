@@ -124,7 +124,7 @@ export function SignUpForm() {
             </Select>
           )}
           {organizations.length === 0 && !organizationsLoading && (
-            <p className="text-sm text-red-600">
+            <p className="text-sm text-error">
               No organizations available. Please contact support.
             </p>
           )}
@@ -192,7 +192,7 @@ export function SignUpForm() {
             />
             {magicLinkState?.success === false &&
               magicLinkState.fieldErrors?.["email"] && (
-                <p className="text-sm text-red-600">
+                <p className="text-sm text-error">
                   {magicLinkState.fieldErrors["email"]}
                 </p>
               )}
@@ -223,8 +223,8 @@ export function SignUpForm() {
 
         {/* Action Results */}
         {magicLinkState?.success === true && (
-          <Alert className="border-green-200 bg-green-50">
-            <div className="text-green-800">
+          <Alert className="border-tertiary bg-tertiary-container">
+            <div className="text-on-tertiary-container">
               <p className="font-medium">Account creation initiated!</p>
               <p className="text-sm mt-1">{magicLinkState.data.message}</p>
             </div>
@@ -232,8 +232,8 @@ export function SignUpForm() {
         )}
 
         {magicLinkState?.success === false && !magicLinkState.fieldErrors && (
-          <Alert className="border-red-200 bg-red-50">
-            <div className="text-red-800">
+          <Alert className="border-error bg-error-container">
+            <div className="text-on-error-container">
               <p className="font-medium">Account creation failed</p>
               <p className="text-sm mt-1">{magicLinkState.error}</p>
             </div>

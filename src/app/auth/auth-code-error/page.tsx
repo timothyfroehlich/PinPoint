@@ -33,20 +33,20 @@ export default async function AuthCodeErrorPage({
 }: AuthCodeErrorPageProps) {
   const resolvedSearchParams = await searchParams;
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-surface-container-lowest py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">
+          <h1 className="text-3xl font-bold text-on-surface">
             Authentication Error
           </h1>
-          <p className="mt-2 text-sm text-gray-600">
+          <p className="mt-2 text-sm text-on-surface-variant">
             Something went wrong during the sign-in process
           </p>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-red-600">Sign-In Failed</CardTitle>
+            <CardTitle className="text-error">Sign-In Failed</CardTitle>
             <CardDescription>
               We encountered an error while trying to sign you in.
             </CardDescription>
@@ -153,19 +153,19 @@ function ErrorDetails({
 
   return (
     <div className="space-y-4">
-      <Alert className="border-red-200 bg-red-50">
-        <div className="text-red-800">
+      <Alert className="border-error bg-error-container">
+        <div className="text-on-error-container">
           <p className="font-medium">{errorInfo.title}</p>
           <p className="text-sm mt-1">{errorInfo.message}</p>
         </div>
       </Alert>
 
       <div className="space-y-2">
-        <p className="text-sm font-medium text-gray-900">What you can try:</p>
-        <ul className="text-sm text-gray-600 space-y-1">
+        <p className="text-sm font-medium text-on-surface">What you can try:</p>
+        <ul className="text-sm text-on-surface-variant space-y-1">
           {errorInfo.suggestions.map((suggestion, index) => (
             <li key={index} className="flex items-start gap-2">
-              <span className="text-gray-400 mt-0.5">•</span>
+              <span className="text-outline mt-0.5">•</span>
               <span>{suggestion}</span>
             </li>
           ))}
@@ -173,7 +173,7 @@ function ErrorDetails({
       </div>
 
       {error && (
-        <details className="text-xs text-gray-500">
+        <details className="text-xs text-on-surface-variant">
           <summary className="cursor-pointer font-medium">
             Technical Details
           </summary>
@@ -196,13 +196,13 @@ function ErrorDetails({
 function ErrorDetailsSkeleton() {
   return (
     <div className="space-y-4">
-      <div className="h-20 bg-red-50 border border-red-200 rounded-md animate-pulse" />
+      <div className="h-20 bg-error-container border border-error rounded-md animate-pulse" />
       <div className="space-y-2">
-        <div className="h-4 bg-gray-200 rounded animate-pulse" />
+        <div className="h-4 bg-surface-container rounded animate-pulse" />
         <div className="space-y-1">
-          <div className="h-3 bg-gray-100 rounded animate-pulse" />
-          <div className="h-3 bg-gray-100 rounded animate-pulse" />
-          <div className="h-3 bg-gray-100 rounded animate-pulse" />
+          <div className="h-3 bg-surface-container-low rounded animate-pulse" />
+          <div className="h-3 bg-surface-container-low rounded animate-pulse" />
+          <div className="h-3 bg-surface-container-low rounded animate-pulse" />
         </div>
       </div>
     </div>
