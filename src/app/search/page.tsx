@@ -76,19 +76,19 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
             <h3 className="font-medium mb-3">Search tips:</h3>
             <ul className="text-sm text-muted-foreground space-y-2">
               <li className="flex items-start gap-2">
-                <span className="text-blue-600">•</span>
+                <span className="text-primary">•</span>
                 <span>Search for <strong>issue titles</strong>, <strong>machine names</strong>, <strong>locations</strong>, or <strong>team members</strong></span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="text-green-600">•</span>
+                <span className="text-tertiary">•</span>
                 <span>Use specific terms like machine models, issue priorities, or location names</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="text-purple-600">•</span>
+                <span className="text-primary">•</span>
                 <span>Results show the most relevant matches across all entity types</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="text-orange-600">•</span>
+                <span className="text-secondary">•</span>
                 <span>Recent searches are saved for quick access</span>
               </li>
             </ul>
