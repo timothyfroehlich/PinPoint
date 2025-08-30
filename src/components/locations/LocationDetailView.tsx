@@ -21,13 +21,13 @@ export function LocationDetailView({ location }: LocationDetailViewProps) {
         </div>
         
         <div className="text-center py-12">
-          <h2 className="text-xl font-semibold text-gray-700 mb-2">
+          <h2 className="text-xl font-semibold text-on-surface mb-2">
             Location Details Coming Soon
           </h2>
-          <p className="text-gray-500 mb-4">
+          <p className="text-on-surface-variant mb-4">
             This feature is currently under development.
           </p>
-          <p className="text-sm text-gray-400">
+          <p className="text-sm text-on-surface-variant">
             Location ID: {location.id}
           </p>
         </div>
