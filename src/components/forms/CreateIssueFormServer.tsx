@@ -37,7 +37,10 @@ interface CreateIssueFormServerProps {
   machines: Machine[];
   users?: User[];
   className?: string;
-  action: (prevState: ActionResult<{ id: string }> | null, formData: FormData) => Promise<ActionResult<{ id: string }>>;
+  action: (
+    prevState: ActionResult<{ id: string }> | null,
+    formData: FormData,
+  ) => Promise<ActionResult<{ id: string }>>;
   initialMachineId?: string;
 }
 
@@ -93,8 +96,8 @@ export function CreateIssueFormServer({
             <Label htmlFor="machineId">
               Machine <span className="text-destructive">*</span>
             </Label>
-            <Select 
-              name="machineId" 
+            <Select
+              name="machineId"
               required
               defaultValue={initialMachineId}
               disabled={isPending}
@@ -149,13 +152,13 @@ export function CreateIssueFormServer({
 
           {/* Error/Success display */}
           {state && !state.success && (
-            <div className="text-red-600 text-sm">
+            <div className="text-error text-sm">
               {state.error || "Failed to create issue. Please try again."}
             </div>
           )}
 
           {state && state.success && (
-            <div className="text-green-600 text-sm">
+            <div className="text-tertiary text-sm">
               ✅ Issue created successfully!
             </div>
           )}
