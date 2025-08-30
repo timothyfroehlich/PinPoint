@@ -5,7 +5,7 @@
 
 export interface CommentData {
   id: string;
-  authorId: string;
+  authorId: string | null;
   deletedAt: Date | null;
   issue: {
     id: string;
@@ -55,9 +55,9 @@ export function validateCommentDeletionPermissions(
   comment: CommentData,
   context: ValidationContext,
 ): ValidationResult {
-  // User can delete their own comment, or admins can delete any
+  // User can delete their own comment (not anonymous), or admins can delete any
   const canDelete =
-    comment.authorId === context.userId ||
+    (comment.authorId !== null && comment.authorId === context.userId) ||
     context.userPermissions.includes("issue:delete");
 
   if (!canDelete) {
@@ -77,8 +77,8 @@ export function validateCommentEditPermissions(
   comment: CommentData,
   context: ValidationContext,
 ): ValidationResult {
-  // Only the author can edit their own comment
-  if (comment.authorId !== context.userId) {
+  // Only authenticated authors can edit their own comments (anonymous comments cannot be edited)
+  if (comment.authorId === null || comment.authorId !== context.userId) {
     return {
       valid: false,
       error: "You can only edit your own comments",

@@ -4,6 +4,8 @@
  * Used for login flow organization selection and middleware subdomain mapping
  */
 
+import "server-only";
+
 import { cache } from "react";
 import { eq } from "drizzle-orm";
 import { organizations } from "~/server/db/schema";

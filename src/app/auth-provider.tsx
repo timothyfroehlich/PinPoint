@@ -11,7 +11,7 @@ import {
 
 import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 
-import { createClient } from "~/lib/supabase/client";
+import { createClient } from "~/utils/supabase/client";
 
 interface AuthContextType {
   user: PinPointSupabaseUser | null;

@@ -6,7 +6,7 @@
 import { type Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { requireServerAuth } from "~/lib/auth/server-auth";
+import { requireMemberAccess } from "~/lib/organization-context";
 import { getMachineById } from "~/lib/dal/machines";
 import { MachineDetailServer } from "~/components/machines/machine-detail-server";
 import { MachineHeader } from "~/components/machines/machine-header";
@@ -46,7 +46,7 @@ export async function generateMetadata({
 
 export default async function MachinePage({ params }: MachinePageProps) {
   // Ensure user is authenticated and get organization context
-  await requireServerAuth();
+  await requireMemberAccess();
   
   try {
     const resolvedParams = await params;

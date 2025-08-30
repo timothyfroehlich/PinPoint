@@ -35,7 +35,7 @@ export function GlobalSearchShortcut({ children }: GlobalSearchShortcutProps) {
     };
 
     document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
+    return () => { document.removeEventListener("keydown", handleKeyDown); };
   }, [isOpen]);
 
   // Focus input when dialog opens
@@ -43,13 +43,13 @@ export function GlobalSearchShortcut({ children }: GlobalSearchShortcutProps) {
     if (isOpen) {
       // Small delay to ensure dialog is fully rendered
       const timer = setTimeout(() => {
-        const input = document.querySelector('[data-search-input]') as HTMLInputElement;
+        const input = document.querySelector('[data-search-input]')!;
         if (input) {
           input.focus();
         }
       }, 100);
       
-      return () => clearTimeout(timer);
+      return () => { clearTimeout(timer); };
     }
     
     return undefined;
@@ -68,7 +68,7 @@ export function GlobalSearchShortcut({ children }: GlobalSearchShortcutProps) {
     <>
       {/* Trigger element (optional) */}
       {children && (
-        <div onClick={() => setIsOpen(true)} className="cursor-pointer">
+        <div onClick={() => { setIsOpen(true); }} className="cursor-pointer">
           {children}
         </div>
       )}
@@ -200,12 +200,12 @@ export function useGlobalSearchShortcut() {
     };
 
     document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
+    return () => { document.removeEventListener("keydown", handleKeyDown); };
   }, []);
 
   return {
     isSearchOpen,
-    openSearch: () => setIsSearchOpen(true),
-    closeSearch: () => setIsSearchOpen(false),
+    openSearch: () => { setIsSearchOpen(true); },
+    closeSearch: () => { setIsSearchOpen(false); },
   };
 }

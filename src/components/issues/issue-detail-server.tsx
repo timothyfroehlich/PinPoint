@@ -4,7 +4,7 @@ import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import { CalendarIcon, UserIcon, WrenchIcon, MapPinIcon } from "lucide-react";
 import { getIssueById } from "~/lib/dal/issues";
 import { getCommentsForIssue, getCommentCountForIssue } from "~/lib/dal/comments";
-import { requireServerAuth } from "~/lib/auth/server-auth";
+import { requireMemberAccess } from "~/lib/organization-context";
 import { formatDistanceToNow, format } from "date-fns";
 import { IssueStatusUpdateClient } from "./issue-status-update-client";
 import { IssueAssignmentClient } from "./issue-assignment-client";
@@ -17,7 +17,8 @@ interface IssueDetailServerProps {
 
 export async function IssueDetailServer({ issueId }: IssueDetailServerProps) {
   // Parallel data fetching for optimal performance
-  const { userId } = await requireServerAuth();
+  const { user } = await requireMemberAccess();
+  const userId = user.id;
   const [issue, comments, commentCount] = await Promise.all([
     getIssueById(issueId),
     getCommentsForIssue(issueId),

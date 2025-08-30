@@ -94,7 +94,7 @@ export async function sendMagicLink(
     // Build callback URL with organization subdomain
     const baseUrl = process.env["NEXT_PUBLIC_SITE_URL"] ?? "http://localhost:3000";
     const callbackUrl = isDevelopment() 
-      ? `http://${subdomain}.localhost:3000/auth/callback`
+      ? `https://${subdomain}.localhost:3000/auth/callback`
       : `https://${subdomain}.${baseUrl.replace(/^https?:\/\//, '')}/auth/callback`;
 
     // Send magic link with organization metadata
@@ -164,7 +164,7 @@ export async function signInWithOAuth(
     // Build callback URL with organization subdomain
     const baseUrl = process.env["NEXT_PUBLIC_SITE_URL"] ?? "http://localhost:3000";
     const callbackUrl = isDevelopment() 
-      ? `http://${subdomain}.localhost:3000/auth/callback`
+      ? `https://${subdomain}.localhost:3000/auth/callback`
       : `https://${subdomain}.${baseUrl.replace(/^https?:\/\//, '')}/auth/callback`;
 
     // Build query params for callback

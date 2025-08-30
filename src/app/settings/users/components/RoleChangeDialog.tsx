@@ -38,12 +38,12 @@ interface RoleChangeDialogProps {
       isSystem: boolean;
     };
   };
-  availableRoles: Array<{ 
+  availableRoles: { 
     id: string; 
     name: string; 
     description?: string;
     isSystem: boolean;
-  }>;
+  }[];
   children?: React.ReactNode;
 }
 

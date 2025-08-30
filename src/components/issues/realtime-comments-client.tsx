@@ -11,7 +11,7 @@ import { Alert, AlertDescription } from "~/components/ui/alert";
 import { Badge } from "~/components/ui/badge";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import { formatDistanceToNow } from "date-fns";
-import { MessageSquareIcon, UserIcon } from "lucide-react";
+import { MessageSquareIcon } from "lucide-react";
 
 interface Comment {
   id: string;
@@ -168,7 +168,7 @@ export function RealtimeCommentsClient({
 
     const cleanup = initializeRealtimeConnection();
     return () => {
-      cleanup.then(fn => fn && fn());
+      cleanup.then(fn => fn?.());
     };
   }, [issueId, currentUserId, existingCommentIds]);
 

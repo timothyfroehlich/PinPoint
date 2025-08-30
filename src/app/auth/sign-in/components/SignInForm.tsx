@@ -7,6 +7,7 @@
 
 import { useActionState } from "react";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 import { Button } from "~/components/ui/button";
 import {
@@ -36,11 +37,17 @@ import {
 // Development auth integration
 import { authenticateDevUser, getAuthResultMessage } from "~/lib/auth/dev-auth";
 import { isDevAuthAvailable } from "~/lib/environment-client";
-import { createClient } from "~/lib/supabase/client";
-import { SEED_TEST_IDS } from "~/server/db/seed/constants";
-import { getOrganizationSelectOptions, type OrganizationOption } from "~/lib/dal/public-organizations";
+import { createClient } from "~/utils/supabase/client";
+
+export interface OrganizationOption {
+  id: string;
+  name: string;
+  subdomain: string;
+}
 
 export function SignInForm() {
+  const router = useRouter();
+  
   const [magicLinkState, magicLinkAction, magicLinkPending] = useActionState<
     ActionResult<{ message: string }> | null,
     FormData
@@ -48,6 +55,7 @@ export function SignInForm() {
 
   const [isOAuthLoading, setIsOAuthLoading] = useState(false);
   const [devAuthLoading, setDevAuthLoading] = useState(false);
+  const [devAuthError, setDevAuthError] = useState<string | null>(null);
 
   // Organization selection state
   const [organizations, setOrganizations] = useState<OrganizationOption[]>([]);
@@ -61,7 +69,11 @@ export function SignInForm() {
   useEffect(() => {
     async function loadOrganizations() {
       try {
-        const { organizations: orgs, defaultOrganizationId } = await getOrganizationSelectOptions();
+        const response = await fetch("/api/organizations/public");
+        if (!response.ok) {
+          throw new Error("Failed to fetch organizations");
+        }
+        const { organizations: orgs, defaultOrganizationId } = await response.json();
         setOrganizations(orgs);
         setSelectedOrganizationId(defaultOrganizationId || orgs[0]?.id || "");
       } catch (error) {
@@ -110,15 +122,34 @@ export function SignInForm() {
 
       if (result.success) {
         console.log("Dev login successful:", result.method);
-        alert(message);
-        window.location.reload();
+        
+        // CRITICAL: Wait for session to sync between client and server
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Use the selected organization from the dropdown to redirect to proper subdomain
+        const selectedOrg = organizations.find(org => org.id === selectedOrganizationId);
+        if (selectedOrg?.subdomain) {
+          const isDev = process.env.NODE_ENV === 'development';
+          if (isDev) {
+            window.location.href = `http://${selectedOrg.subdomain}.localhost:3000/dashboard`;
+            return;
+          }
+          // In production, use proper domain
+          window.location.href = `https://${selectedOrg.subdomain}.yourdomain.com/dashboard`;
+          return;
+        }
+        
+        // Fallback: regular navigation if no organization selected
+        router.refresh();
+        await new Promise(resolve => setTimeout(resolve, 200));
+        router.push('/dashboard');
       } else {
         console.error("Login failed:", result.error);
-        alert(message);
+        setDevAuthError(getAuthResultMessage(result));
       }
     } catch (error) {
       console.error("Dev auth error:", error);
-      alert("Dev authentication failed");
+      setDevAuthError("Dev authentication failed");
     } finally {
       setDevAuthLoading(false);
     }
@@ -208,7 +239,7 @@ export function SignInForm() {
             <Separator className="w-full" />
           </div>
           <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-white px-2 text-muted-foreground">Or</span>
+            <span className="bg-surface px-2 text-muted-foreground">Or</span>
           </div>
         </div>
 
@@ -287,6 +318,12 @@ export function SignInForm() {
                   Quick login for testing
                 </p>
               </div>
+
+              {devAuthError && (
+                <Alert className="border-destructive">
+                  <p className="text-sm text-destructive">{devAuthError}</p>
+                </Alert>
+              )}
 
               <div className="space-y-2">
                 <Button

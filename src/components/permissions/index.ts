@@ -6,7 +6,3 @@
  */
 
 export { PermissionGate, type PermissionGateProps } from "./PermissionGate";
-export {
-  PermissionButton,
-  type PermissionButtonProps,
-} from "./PermissionButton";

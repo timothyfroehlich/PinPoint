@@ -15,7 +15,7 @@ import {
   ActivityIcon,
   ShieldIcon,
 } from "lucide-react";
-import { requireAuthContext } from "~/lib/dal/shared";
+import { requireMemberAccess } from "~/lib/organization-context";
 
 interface SettingsLayoutProps {
   children: React.ReactNode;
@@ -23,13 +23,10 @@ interface SettingsLayoutProps {
 
 export default async function SettingsLayout({ children }: SettingsLayoutProps) {
   // Ensure user is authenticated and has organization access
-  const { user, organizationId } = await requireAuthContext();
+  const { user, organization } = await requireMemberAccess();
   
-  // For now, allow all authenticated users to access settings
-  // In production, you might want to add role-based access control here
-  if (!user || !organizationId) {
-    redirect("/auth/sign-in");
-  }
+  // requireMemberAccess already ensures user is authenticated and has membership
+  // No additional checks needed
 
   const navigationItems = [
     {

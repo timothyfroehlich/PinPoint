@@ -32,7 +32,7 @@ function buildPaginationUrl(
   Object.entries(searchParams).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== "") {
       if (Array.isArray(value)) {
-        value.forEach(v => params.append(key, v));
+        value.forEach(v => { params.append(key, v); });
       } else {
         params.set(key, String(value));
       }
@@ -154,7 +154,7 @@ export function PaginationUniversal({
               );
             }
 
-            const pageNum = page as number;
+            const pageNum = page;
             const isCurrentPage = pageNum === currentPage;
 
             return (
