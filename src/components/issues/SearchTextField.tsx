@@ -1,8 +1,11 @@
 "use client";
 
-import { Search } from "@mui/icons-material";
-import { TextField, InputAdornment } from "@mui/material";
+import { Search, X } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
+import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
+import { Button } from "~/components/ui/button";
+import { cn } from "~/lib/utils";
 
 interface SearchTextFieldProps {
   value: string;
@@ -18,7 +21,7 @@ export function SearchTextField({
   placeholder = "Search issues...",
   label = "Search",
   debounceMs = 300,
-}: SearchTextFieldProps): React.JSX.Element {
+}: SearchTextFieldProps) {
   const [localValue, setLocalValue] = useState(value);
 
   // Sync with external value changes
@@ -52,49 +55,39 @@ export function SearchTextField({
   }, [onChange]);
 
   return (
-    <TextField
-      value={localValue}
-      onChange={handleChange}
-      label={label}
-      placeholder={placeholder}
-      size="small"
-      fullWidth
-      data-testid="issue-search-input"
-      slotProps={{
-        input: {
-          startAdornment: (
-            <InputAdornment position="start">
-              <Search color="action" />
-            </InputAdornment>
-          ),
-          endAdornment: localValue ? (
-            <InputAdornment position="end">
-              <button
-                type="button"
-                onClick={handleClear}
-                style={{
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  padding: "4px",
-                  color: "rgba(0, 0, 0, 0.54)",
-                  fontSize: "18px",
-                  lineHeight: 1,
-                }}
-                aria-label="Clear search"
-              >
-                ×
-              </button>
-            </InputAdornment>
-          ) : undefined,
-        },
-      }}
-      sx={{
-        minWidth: 200,
-        "& .MuiInputBase-root": {
-          paddingRight: localValue ? "8px" : "14px",
-        },
-      }}
-    />
+    <div className="space-y-1 w-full min-w-[200px]">
+      {label && (
+        <Label htmlFor="search-input" className="text-sm font-medium">
+          {label}
+        </Label>
+      )}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          id="search-input"
+          type="text"
+          value={localValue}
+          onChange={handleChange}
+          placeholder={placeholder}
+          data-testid="issue-search-input"
+          className={cn(
+            "pl-9",
+            localValue && "pr-9"
+          )}
+        />
+        {localValue && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={handleClear}
+            className="absolute right-1 top-1/2 h-6 w-6 -translate-y-1/2 p-0 hover:bg-transparent"
+            aria-label="Clear search"
+          >
+            <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+          </Button>
+        )}
+      </div>
+    </div>
   );
 }

@@ -4,7 +4,6 @@
  * Fixed: Removed server component children to prevent bundling issues
  */
 
-import { Suspense } from "react";
 import { NotificationBellClient } from "./notification-bell-client";
 import { getUnreadNotificationCount } from "~/lib/dal/notifications";
 import { Skeleton } from "~/components/ui/skeleton";

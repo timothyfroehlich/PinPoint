@@ -1,10 +1,9 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { Card, CardContent, CardHeader } from "~/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
-import { AlertTriangleIcon, PlusIcon, ArrowRightIcon } from "lucide-react";
-import { requireAuthContext } from "~/lib/dal/shared";
+import { AlertTriangleIcon, PlusIcon, ArrowRightIcon, WrenchIcon, BarChart3Icon } from "lucide-react";
+import { requireMemberAccess } from "~/lib/organization-context";
 import { getIssuesForOrg } from "~/lib/dal/issues";
 import {
   getOrganizationById,
@@ -12,54 +11,31 @@ import {
 } from "~/lib/dal/organizations";
 import { IssuesListServer } from "~/components/issues/issues-list-server";
 import { DashboardStats } from "~/components/dashboard/dashboard-stats";
-import { QuickActions } from "~/components/dashboard/quick-actions";
 
 export async function generateMetadata() {
-  const { organizationId } = await requireAuthContext();
-  const organization = await getOrganizationById(organizationId);
+  const { organization } = await requireMemberAccess();
+  const org = await getOrganizationById(organization.id);
 
   return {
-    title: `Dashboard - ${organization.name}`,
-    description: `Issue management dashboard for ${organization.name}`,
+    title: `Dashboard - ${org.name}`,
+    description: `Issue management dashboard for ${org.name}`,
   };
 }
 
 export default async function DashboardPage() {
   // Authentication validation with automatic redirect
-  const { user, organizationId } = await requireAuthContext();
+  const { user, organization } = await requireMemberAccess();
+  const organizationId = organization.id;
 
   return (
     <div className="space-y-8">
       {/* Welcome Section */}
-      <div className="flex justify-between items-start">
-        <div>
-          <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground mt-1">
-            Welcome back,{" "}
-            {user.user_metadata?.["name"] ??
-              user.email?.split("@")[0] ??
-              "User"}
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div className="text-right">
-            <Suspense fallback={<OrgNameSkeleton />}>
-              <OrganizationName organizationId={organizationId} />
-            </Suspense>
-          </div>
-          <Avatar className="h-10 w-10">
-            <AvatarImage src={user.user_metadata?.["profile_picture"]} />
-            <AvatarFallback>
-              {user.user_metadata?.["name"]
-                ?.split(" ")
-                .map((n: string) => n[0])
-                .join("") ||
-                user.email?.[0]?.toUpperCase() ||
-                "?"}
-            </AvatarFallback>
-          </Avatar>
-        </div>
+      <div>
+        <h1 className="text-3xl font-bold">Dashboard</h1>
+        <p className="text-muted-foreground mt-1">
+          Welcome back,{" "}
+          {user.name ?? user.email?.split("@")[0] ?? "User"}
+        </p>
       </div>
 
       {/* Organization Statistics */}
@@ -67,8 +43,8 @@ export default async function DashboardPage() {
         <DashboardStatsWithData organizationId={organizationId} />
       </Suspense>
 
-      {/* Quick Actions */}
-      <QuickActions />
+      {/* Dashboard Actions */}
+      <DashboardQuickActions />
 
       {/* Recent Issues */}
       <div>
@@ -90,21 +66,67 @@ export default async function DashboardPage() {
   );
 }
 
-// Server Component for organization name
-async function OrganizationName({
-  organizationId,
-}: {
-  organizationId: string;
-}) {
-  const organization = await getOrganizationById(organizationId);
+// Dashboard-specific Quick Actions (focused on task creation and management)
+function DashboardQuickActions() {
   return (
-    <div className="text-sm text-muted-foreground">{organization.name}</div>
+    <Card>
+      <CardHeader>
+        <CardTitle>Quick Actions</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Button
+            variant="default"
+            asChild
+            className="h-auto p-4 flex-col gap-2"
+          >
+            <Link href="/issues/create">
+              <PlusIcon className="h-5 w-5" />
+              <span className="text-xs">Report Issue</span>
+            </Link>
+          </Button>
+
+          <Button
+            variant="outline"
+            asChild
+            className="h-auto p-4 flex-col gap-2"
+          >
+            <Link href="/issues?status=open">
+              <AlertTriangleIcon className="h-5 w-5" />
+              <span className="text-xs">View Open Issues</span>
+            </Link>
+          </Button>
+
+          <Button
+            variant="outline"
+            asChild
+            className="h-auto p-4 flex-col gap-2"
+          >
+            <Link href="/machines?status=needs-attention">
+              <WrenchIcon className="h-5 w-5" />
+              <span className="text-xs">Maintenance Alerts</span>
+            </Link>
+          </Button>
+
+          <Button
+            variant="outline"
+            asChild
+            className="h-auto p-4 flex-col gap-2"
+          >
+            <Link href="/analytics">
+              <BarChart3Icon className="h-5 w-5" />
+              <span className="text-xs">View Analytics</span>
+            </Link>
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
 // Server Component for dashboard statistics
 async function DashboardStatsWithData({
-  organizationId,
+  organizationId: _organizationId,
 }: {
   organizationId: string;
 }) {
@@ -124,7 +146,7 @@ async function DashboardStatsWithData({
 
 // Server Component for recent issues
 async function RecentIssuesWithData({
-  organizationId,
+  organizationId: _organizationId,
 }: {
   organizationId: string;
 }) {
@@ -167,9 +189,6 @@ async function RecentIssuesWithData({
 }
 
 // Loading Skeletons
-function OrgNameSkeleton() {
-  return <div className="h-4 bg-muted rounded w-24 animate-pulse" />;
-}
 
 function StatsLoadingSkeleton() {
   return (

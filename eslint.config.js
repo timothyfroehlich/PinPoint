@@ -286,6 +286,9 @@ export default tseslint.config(
       "@typescript-eslint/await-thenable": "off",
       // Allow dynamic imports in E2E tests (can't use import type)
       "@typescript-eslint/consistent-type-imports": "off",
+      // Allow Playwright test patterns
+      "@typescript-eslint/no-confusing-void-expression": "off", // Common in Playwright expect() patterns
+      "@typescript-eslint/no-floating-promises": "off", // Playwright handles promises internally
     },
   },
   {

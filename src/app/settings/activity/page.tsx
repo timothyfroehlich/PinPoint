@@ -7,7 +7,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
-import { Input } from "~/components/ui/input";
 import { 
   ActivityIcon, 
   ClockIcon,
@@ -19,103 +18,44 @@ import {
   DownloadIcon,
   FilterIcon
 } from "lucide-react";
-import { requireAuthContext } from "~/lib/dal/shared";
+import { requireMemberAccess } from "~/lib/organization-context";
+import { getActivityLog, getActivityStats } from "~/lib/dal/activity-log";
 import { ActivityLogFilter } from "./components/ActivityLogFilter";
-import { format, subDays } from "date-fns";
-
-interface ActivityLogEntry {
-  id: string;
-  timestamp: Date;
-  action: string;
-  entity: string;
-  entityId: string;
-  userId: string;
-  userName: string;
-  userEmail: string;
-  details: string;
-  ipAddress: string;
-  userAgent: string;
-  severity: "info" | "warning" | "error";
-}
+import { format } from "date-fns";
 
 export default async function ActivityLogPage({
   searchParams,
 }: {
-  searchParams: { [key: string]: string | string[] | undefined };
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { organizationId } = await requireAuthContext();
+  const { organization } = await requireMemberAccess();
+  const organizationId = organization.id;
+  
+  // Await searchParams as required by Next.js 15
+  const resolvedSearchParams = await searchParams;
 
   // Parse search parameters for filtering
-  const page = parseInt((searchParams.page as string) || "1", 10);
-  const limit = parseInt((searchParams.limit as string) || "50", 10);
-  const userId = searchParams.userId as string;
-  const action = searchParams.action as string;
-  const dateFrom = searchParams.dateFrom as string;
-  const dateTo = searchParams.dateTo as string;
+  const page = parseInt((resolvedSearchParams["page"] as string) || "1", 10);
+  const limit = parseInt((resolvedSearchParams["limit"] as string) || "50", 10);
+  const userId = resolvedSearchParams["userId"] as string;
+  const action = resolvedSearchParams["action"] as string;
+  const dateFrom = resolvedSearchParams["dateFrom"] as string;
+  const dateTo = resolvedSearchParams["dateTo"] as string;
 
-  // TODO: Fetch activity log data from database
-  // This would normally come from a DAL function or tRPC query
-  const mockActivityLog: ActivityLogEntry[] = [
-    {
-      id: "activity-1",
-      timestamp: new Date(),
-      action: "USER_LOGIN",
-      entity: "USER", 
-      entityId: "user-123",
-      userId: "user-123",
-      userName: "John Doe",
-      userEmail: "john@example.com",
-      details: "User logged in successfully",
-      ipAddress: "192.168.1.100",
-      userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
-      severity: "info"
-    },
-    {
-      id: "activity-2",
-      timestamp: subDays(new Date(), 1),
-      action: "ISSUE_CREATED",
-      entity: "ISSUE",
-      entityId: "issue-456",
-      userId: "user-123",
-      userName: "John Doe",
-      userEmail: "john@example.com",
-      details: "Created issue 'Machine overheating in location A'",
-      ipAddress: "192.168.1.100",
-      userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
-      severity: "info"
-    },
-    {
-      id: "activity-3",
-      timestamp: subDays(new Date(), 2),
-      action: "ROLE_CHANGED",
-      entity: "USER",
-      entityId: "user-789",
-      userId: "user-admin",
-      userName: "Admin User",
-      userEmail: "admin@example.com",
-      details: "Changed user role from 'Member' to 'Manager'",
-      ipAddress: "10.0.0.50",
-      userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-      severity: "warning"
-    },
-    {
-      id: "activity-4",
-      timestamp: subDays(new Date(), 3),
-      action: "LOGIN_FAILED",
-      entity: "USER",
-      entityId: "user-456",
-      userId: "user-456",
-      userName: "Jane Smith",
-      userEmail: "jane@example.com",
-      details: "Failed login attempt - invalid password",
-      ipAddress: "203.0.113.1",
-      userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 15_0)",
-      severity: "error"
-    }
-  ];
+  // Fetch activity log data from database
+  const [activityResult, stats] = await Promise.all([
+    getActivityLog(organizationId, {
+      page,
+      limit,
+      userId,
+      action,
+      dateFrom,
+      dateTo,
+    }),
+    getActivityStats(organizationId),
+  ]);
 
-  const totalEntries = mockActivityLog.length;
-  const totalPages = Math.ceil(totalEntries / limit);
+  const { entries: mockActivityLog, totalCount: totalEntries, totalPages } = activityResult;
 
   const getActionIcon = (action: string) => {
     switch (action) {
@@ -156,9 +96,11 @@ export default async function ActivityLogPage({
           </p>
         </div>
         <div className="flex items-center space-x-2">
-          <Button variant="outline" size="sm">
-            <DownloadIcon className="mr-2 h-4 w-4" />
-            Export CSV
+          <Button variant="outline" size="sm" asChild>
+            <a href="/api/admin/export/activity-log" download>
+              <DownloadIcon className="mr-2 h-4 w-4" />
+              Export CSV
+            </a>
           </Button>
         </div>
       </div>
@@ -171,8 +113,8 @@ export default async function ActivityLogPage({
             <ActivityIcon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalEntries}</div>
-            <p className="text-xs text-muted-foreground">Last 30 days</p>
+            <div className="text-2xl font-bold">{stats.totalEvents}</div>
+            <p className="text-xs text-muted-foreground">All time</p>
           </CardContent>
         </Card>
 
@@ -182,11 +124,7 @@ export default async function ActivityLogPage({
             <UserIcon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {mockActivityLog.filter(entry => 
-                entry.action.includes("USER") || entry.action.includes("ISSUE")
-              ).length}
-            </div>
+            <div className="text-2xl font-bold">{stats.userActions}</div>
           </CardContent>
         </Card>
 
@@ -196,11 +134,7 @@ export default async function ActivityLogPage({
             <ShieldIcon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {mockActivityLog.filter(entry => 
-                entry.action.includes("LOGIN") || entry.action.includes("ROLE")
-              ).length}
-            </div>
+            <div className="text-2xl font-bold">{stats.securityEvents}</div>
           </CardContent>
         </Card>
 
@@ -210,9 +144,7 @@ export default async function ActivityLogPage({
             <AlertTriangleIcon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">
-              {mockActivityLog.filter(entry => entry.severity === "error").length}
-            </div>
+            <div className="text-2xl font-bold text-red-600">{stats.errorEvents}</div>
           </CardContent>
         </Card>
       </div>

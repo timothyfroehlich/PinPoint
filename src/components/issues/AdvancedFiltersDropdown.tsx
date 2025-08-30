@@ -1,19 +1,24 @@
 "use client";
 
-import { ExpandMore, FilterList } from "@mui/icons-material";
-import {
-  Button,
-  Menu,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  Select,
-  Box,
-  Typography,
-  Divider,
-  type SelectChangeEvent,
-} from "@mui/material";
+import { ChevronDown, Filter } from "lucide-react";
 import { useState } from "react";
+import { Button } from "~/components/ui/button";
+import { Label } from "~/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "~/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
+import { Separator } from "~/components/ui/separator";
+import { Badge } from "~/components/ui/badge";
+import { cn } from "~/lib/utils";
 
 import { api } from "~/trpc/react";
 
@@ -33,31 +38,10 @@ export function AdvancedFiltersDropdown({
   onAssigneeChange,
   onReporterChange,
   onOwnerChange,
-}: AdvancedFiltersDropdownProps): React.JSX.Element {
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const open = Boolean(anchorEl);
+}: AdvancedFiltersDropdownProps) {
+  const [open, setOpen] = useState(false);
 
   const { data: users, isLoading } = api.user.getAllInOrganization.useQuery();
-
-  const handleClick = (event: React.MouseEvent<HTMLButtonElement>): void => {
-    setAnchorEl(event.currentTarget);
-  };
-
-  const handleClose = (): void => {
-    setAnchorEl(null);
-  };
-
-  const handleAssigneeChange = (event: SelectChangeEvent): void => {
-    onAssigneeChange(event.target.value);
-  };
-
-  const handleReporterChange = (event: SelectChangeEvent): void => {
-    onReporterChange(event.target.value);
-  };
-
-  const handleOwnerChange = (event: SelectChangeEvent): void => {
-    onOwnerChange(event.target.value);
-  };
 
   // Show active filter count
   const activeFilters = [assigneeId, reporterId, ownerId].filter(
@@ -65,130 +49,125 @@ export function AdvancedFiltersDropdown({
   ).length;
 
   return (
-    <>
-      <Button
-        variant="outlined"
-        onClick={handleClick}
-        endIcon={<ExpandMore />}
-        startIcon={<FilterList />}
-        size="small"
-        sx={{
-          minWidth: 120,
-          color: activeFilters > 0 ? "primary.main" : "text.secondary",
-          borderColor: activeFilters > 0 ? "primary.main" : "grey.300",
-        }}
-      >
-        Filters
-        {activeFilters > 0 && (
-          <Typography
-            component="span"
-            variant="caption"
-            sx={{
-              ml: 0.5,
-              px: 0.5,
-              py: 0.25,
-              backgroundColor: "primary.main",
-              color: "primary.contrastText",
-              borderRadius: "50%",
-              minWidth: "16px",
-              fontSize: "0.625rem",
-              lineHeight: 1,
-            }}
-          >
-            {activeFilters}
-          </Typography>
-        )}
-      </Button>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          className={cn(
+            "min-w-[120px] justify-between",
+            activeFilters > 0 && "border-primary text-primary"
+          )}
+        >
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4" />
+            <span>Filters</span>
+            {activeFilters > 0 && (
+              <Badge variant="default" className="h-4 w-4 p-0 text-[10px] min-w-[16px]">
+                {activeFilters}
+              </Badge>
+            )}
+          </div>
+          <ChevronDown className="h-4 w-4" />
+        </Button>
+      </PopoverTrigger>
 
-      <Menu
-        anchorEl={anchorEl}
-        open={open}
-        onClose={handleClose}
-        slotProps={{
-          paper: {
-            sx: {
-              minWidth: 280,
-              p: 2,
-            },
-          },
-        }}
-      >
-        <Box>
-          <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: "bold" }}>
+      <PopoverContent className="w-80 p-4">
+        <div className="space-y-4">
+          <h4 className="text-sm font-semibold">
             Advanced Filters
-          </Typography>
+          </h4>
 
-          <FormControl fullWidth size="small" sx={{ mb: 2 }}>
-            <InputLabel id="assignee-filter-label">Assignee</InputLabel>
+          <div className="space-y-2">
+            <Label htmlFor="assignee-filter" className="text-xs font-medium">
+              Assignee
+            </Label>
             <Select
-              labelId="assignee-filter-label"
               value={assigneeId}
-              onChange={handleAssigneeChange}
-              label="Assignee"
+              onValueChange={onAssigneeChange}
               disabled={isLoading}
             >
-              <MenuItem value="">
-                <em>Any Assignee</em>
-              </MenuItem>
-              <MenuItem value="unassigned">
-                <em>Unassigned</em>
-              </MenuItem>
-              <Divider />
-              {users?.map((user) => (
-                <MenuItem key={user.id} value={user.id}>
-                  {user.name ?? "Unknown User"}
-                </MenuItem>
-              ))}
+              <SelectTrigger className="h-8">
+                <SelectValue placeholder="Any Assignee" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">
+                  <span className="italic text-muted-foreground">Any Assignee</span>
+                </SelectItem>
+                <SelectItem value="unassigned">
+                  <span className="italic text-muted-foreground">Unassigned</span>
+                </SelectItem>
+                {users && users.length > 0 && (
+                  <>
+                    <Separator className="my-1" />
+                    {users.map((user) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.name ?? "Unknown User"}
+                      </SelectItem>
+                    ))}
+                  </>
+                )}
+              </SelectContent>
             </Select>
-          </FormControl>
+          </div>
 
-          <FormControl fullWidth size="small" sx={{ mb: 2 }}>
-            <InputLabel id="reporter-filter-label">Reporter</InputLabel>
+          <div className="space-y-2">
+            <Label htmlFor="reporter-filter" className="text-xs font-medium">
+              Reporter
+            </Label>
             <Select
-              labelId="reporter-filter-label"
               value={reporterId}
-              onChange={handleReporterChange}
-              label="Reporter"
+              onValueChange={onReporterChange}
               disabled={isLoading}
             >
-              <MenuItem value="">
-                <em>Any Reporter</em>
-              </MenuItem>
-              {users?.map((user) => (
-                <MenuItem key={user.id} value={user.id}>
-                  {user.name ?? "Unknown User"}
-                </MenuItem>
-              ))}
+              <SelectTrigger className="h-8">
+                <SelectValue placeholder="Any Reporter" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">
+                  <span className="italic text-muted-foreground">Any Reporter</span>
+                </SelectItem>
+                {users?.map((user) => (
+                  <SelectItem key={user.id} value={user.id}>
+                    {user.name ?? "Unknown User"}
+                  </SelectItem>
+                ))}
+              </SelectContent>
             </Select>
-          </FormControl>
+          </div>
 
-          <FormControl fullWidth size="small">
-            <InputLabel id="owner-filter-label">Machine Owner</InputLabel>
+          <div className="space-y-2">
+            <Label htmlFor="owner-filter" className="text-xs font-medium">
+              Machine Owner
+            </Label>
             <Select
-              labelId="owner-filter-label"
               value={ownerId}
-              onChange={handleOwnerChange}
-              label="Machine Owner"
+              onValueChange={onOwnerChange}
               disabled={isLoading}
             >
-              <MenuItem value="">
-                <em>Any Owner</em>
-              </MenuItem>
-              {users?.map((user) => (
-                <MenuItem key={user.id} value={user.id}>
-                  {user.name ?? "Unknown User"}
-                </MenuItem>
-              ))}
+              <SelectTrigger className="h-8">
+                <SelectValue placeholder="Any Owner" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">
+                  <span className="italic text-muted-foreground">Any Owner</span>
+                </SelectItem>
+                {users?.map((user) => (
+                  <SelectItem key={user.id} value={user.id}>
+                    {user.name ?? "Unknown User"}
+                  </SelectItem>
+                ))}
+              </SelectContent>
             </Select>
-          </FormControl>
+          </div>
 
-          <Box sx={{ mt: 2, display: "flex", justifyContent: "flex-end" }}>
-            <Button size="small" onClick={handleClose}>
+          <div className="flex justify-end pt-2">
+            <Button size="sm" onClick={() => setOpen(false)}>
               Done
             </Button>
-          </Box>
-        </Box>
-      </Menu>
-    </>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }

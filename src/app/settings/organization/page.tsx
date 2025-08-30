@@ -7,18 +7,21 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Separator } from "~/components/ui/separator";
 import { Badge } from "~/components/ui/badge";
-import { CalendarIcon, GlobeIcon, PhoneIcon, MapPinIcon } from "lucide-react";
-import { requireAuthContext } from "~/lib/dal/shared";
-import { getCurrentOrganization } from "~/lib/dal/organizations";
+import { CalendarIcon, GlobeIcon } from "lucide-react";
+import { requireMemberAccess } from "~/lib/organization-context";
+import { getCurrentOrganization, getOrganizationStats } from "~/lib/dal/organizations";
 import { OrganizationProfileForm } from "./components/OrganizationProfileForm";
 import { OrganizationLogoForm } from "./components/OrganizationLogoForm";
 import { format } from "date-fns";
 
 export default async function OrganizationSettingsPage() {
-  const { organizationId } = await requireAuthContext();
+  const { organization: _organization } = await requireMemberAccess();
   
-  // Fetch organization details with full profile information
-  const organization = await getCurrentOrganization();
+  // Fetch organization details and statistics in parallel
+  const [organization, stats] = await Promise.all([
+    getCurrentOrganization(),
+    getOrganizationStats(),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -124,15 +127,15 @@ export default async function OrganizationSettingsPage() {
               <h4 className="text-sm font-medium mb-3">Organization Statistics</h4>
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="space-y-2">
-                  <div className="text-2xl font-bold">-</div>
+                  <div className="text-2xl font-bold">{stats.members.total}</div>
                   <p className="text-xs text-muted-foreground">Total Members</p>
                 </div>
                 <div className="space-y-2">
-                  <div className="text-2xl font-bold">-</div>
+                  <div className="text-2xl font-bold">{stats.issues.total}</div>
                   <p className="text-xs text-muted-foreground">Active Issues</p>
                 </div>
                 <div className="space-y-2">
-                  <div className="text-2xl font-bold">-</div>
+                  <div className="text-2xl font-bold">{stats.machines.total}</div>
                   <p className="text-xs text-muted-foreground">Total Machines</p>
                 </div>
               </div>

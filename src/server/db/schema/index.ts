@@ -16,6 +16,7 @@ import {
   attachments,
   issueHistory,
   upvotes,
+  anonymousRateLimits,
 } from "./issues";
 import { locations, models, machines } from "./machines";
 import {
@@ -24,6 +25,9 @@ import {
   roles,
   permissions,
   rolePermissions,
+  systemSettings,
+  activityLog,
+  invitations,
 } from "./organizations";
 
 // Import all tables
@@ -80,6 +84,11 @@ export const organizationsRelations = relations(organizations, ({ many }) => ({
   issueHistory: many(issueHistory),
   attachments: many(attachments),
   pinballMapConfig: many(pinballMapConfigs),
+  anonymousRateLimits: many(anonymousRateLimits),
+  // Phase 4B: Administrative relations
+  systemSettings: many(systemSettings),
+  activityLog: many(activityLog),
+  invitations: many(invitations),
 }));
 
 export const membershipsRelations = relations(memberships, ({ one }) => ({
@@ -325,3 +334,50 @@ export const pinballMapConfigsRelations = relations(
     }),
   }),
 );
+
+export const anonymousRateLimitsRelations = relations(
+  anonymousRateLimits,
+  ({ one }) => ({
+    organization: one(organizations, {
+      fields: [anonymousRateLimits.organization_id],
+      references: [organizations.id],
+    }),
+  }),
+);
+
+// =================================
+// PHASE 4B: ADMINISTRATIVE RELATIONS
+// =================================
+
+export const systemSettingsRelations = relations(systemSettings, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [systemSettings.organization_id],
+    references: [organizations.id],
+  }),
+}));
+
+export const activityLogRelations = relations(activityLog, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [activityLog.organization_id],
+    references: [organizations.id],
+  }),
+  user: one(users, {
+    fields: [activityLog.user_id],
+    references: [users.id],
+  }),
+}));
+
+export const invitationsRelations = relations(invitations, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [invitations.organization_id],
+    references: [organizations.id],
+  }),
+  role: one(roles, {
+    fields: [invitations.role_id],
+    references: [roles.id],
+  }),
+  invitedByUser: one(users, {
+    fields: [invitations.invited_by],
+    references: [users.id],
+  }),
+}));

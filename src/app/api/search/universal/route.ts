@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import type { NextRequest} from "next/server";
+import { NextResponse } from "next/server";
 import { z } from "zod";
 import { performUniversalSearch, type SearchEntity } from "~/lib/services/search-service";
-import { requireServerAuth } from "~/lib/auth/server-auth";
+import { requireMemberAccess } from "~/lib/organization-context";
 
 const UniversalSearchQuerySchema = z.object({
   q: z.string().min(2, "Query must be at least 2 characters"),
@@ -47,7 +48,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
 
     // Require authentication and organization context
-    const { organizationId } = await requireServerAuth();
+    const { organization } = await requireMemberAccess();
+    const organizationId = organization.id;
 
     // Perform universal search
     const searchResponse = await performUniversalSearch({
@@ -74,7 +76,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json(
         {
           error: "Invalid query parameters",
-          details: error.flatten(),
+          details: error.issues,
           timestamp: new Date().toISOString(),
         },
         { status: 400 }

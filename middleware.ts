@@ -28,14 +28,22 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
             return request.cookies.getAll();
           },
           setAll(cookiesToSet) {
-            // 2025 pattern: Proper cookie sync with options
+            // Standard Supabase SSR pattern - let Supabase handle cookies naturally
             cookiesToSet.forEach(({ name, value }) =>
               request.cookies.set(name, value),
             );
             supabaseResponse = NextResponse.next({ request });
-            cookiesToSet.forEach(({ name, value, options }) =>
-              supabaseResponse.cookies.set(name, value, options),
-            );
+            cookiesToSet.forEach(({ name, value, options }) => {
+              // Set cookie domain for subdomain sharing
+              const cookieOptions = {
+                ...options,
+                domain: isDevelopment() ? ".localhost" : ".yourdomain.com",
+                path: "/",
+                sameSite: "lax" as const,
+                maxAge: 100000000,
+              };
+              supabaseResponse.cookies.set(name, value, cookieOptions);
+            });
           },
         },
       });
@@ -44,7 +52,16 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
       // IMPORTANT: DO NOT REMOVE auth.getUser() - critical for session refresh
       const {
         data: { user },
+        error: authError,
       } = await supabase.auth.getUser();
+
+      console.log(`[MIDDLEWARE] Auth check for ${request.nextUrl.pathname}:`, {
+        hasUser: !!user,
+        userId: user?.id,
+        authError: authError?.message,
+        host: request.headers.get("host"),
+        cookies: request.cookies.getAll().map(c => ({ name: c.name, hasValue: !!c.value })),
+      });
 
       // Optional: Redirect unauthenticated users (can be customized per app needs)
       if (
@@ -104,25 +121,6 @@ function getSubdomain(host: string): string | null {
   }
 }
 
-function getBaseDomain(host: string): string {
-  const hostParts = host.split(":");
-  const hostWithoutPort = hostParts[0];
-  const port = hostParts[1];
-
-  if (!hostWithoutPort) return host;
-
-  if (isDevelopment()) {
-    // Preserve the original port instead of hardcoding 3000
-    return port ? `localhost:${port}` : "localhost:3000";
-  } else {
-    // Extract base domain (e.g., "example.com" from "sub.example.com")
-    const parts = hostWithoutPort.split(".");
-    if (parts.length >= 2) {
-      return parts.slice(-2).join(".");
-    }
-    return hostWithoutPort;
-  }
-}
 
 export const config = {
   matcher: [

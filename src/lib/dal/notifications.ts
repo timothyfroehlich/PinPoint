@@ -4,9 +4,9 @@
  */
 
 import { cache } from "react";
-import { and, desc, eq, sql, isNull, inArray } from "drizzle-orm";
-import { notifications, users, issues, machines } from "~/server/db/schema";
-import { db, requireAuthContext, getServerAuthContext } from "./shared";
+import { and, desc, eq, sql } from "drizzle-orm";
+import { notifications } from "~/server/db/schema";
+import { db, requireAuthContext } from "./shared";
 
 /**
  * Get notifications for the current user with pagination

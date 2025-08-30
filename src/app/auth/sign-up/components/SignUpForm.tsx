@@ -6,7 +6,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 import { Button } from "~/components/ui/button";
 import {
@@ -21,10 +21,23 @@ import { Label } from "~/components/ui/label";
 import { Separator } from "~/components/ui/separator";
 import { Alert } from "~/components/ui/alert";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
+import {
   signInWithOAuth,
   sendMagicLink,
   type ActionResult,
 } from "~/lib/actions/auth-actions";
+
+export interface OrganizationOption {
+  id: string;
+  name: string;
+  subdomain: string;
+}
 
 export function SignUpForm() {
   const [magicLinkState, magicLinkAction, magicLinkPending] = useActionState<
@@ -34,10 +47,41 @@ export function SignUpForm() {
 
   const [isOAuthLoading, setIsOAuthLoading] = useState(false);
 
+  // Organization selection state
+  const [organizations, setOrganizations] = useState<OrganizationOption[]>([]);
+  const [selectedOrganizationId, setSelectedOrganizationId] = useState<string>("");
+  const [organizationsLoading, setOrganizationsLoading] = useState(true);
+
+  // Load organizations on component mount
+  useEffect(() => {
+    async function loadOrganizations() {
+      try {
+        const response = await fetch("/api/organizations/public");
+        if (!response.ok) {
+          throw new Error("Failed to fetch organizations");
+        }
+        const { organizations: orgs, defaultOrganizationId } = await response.json();
+        setOrganizations(orgs);
+        setSelectedOrganizationId(defaultOrganizationId || orgs[0]?.id || "");
+      } catch (error) {
+        console.error("Failed to load organizations:", error);
+      } finally {
+        setOrganizationsLoading(false);
+      }
+    }
+    
+    loadOrganizations();
+  }, []);
+
   const handleOAuthSignUp = async (provider: "google") => {
+    if (!selectedOrganizationId) {
+      alert("Please select an organization");
+      return;
+    }
+    
     setIsOAuthLoading(true);
     try {
-      await signInWithOAuth(provider);
+      await signInWithOAuth(provider, selectedOrganizationId);
     } catch (error) {
       console.error("OAuth error:", error);
       setIsOAuthLoading(false);
@@ -53,6 +97,41 @@ export function SignUpForm() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Organization Selector */}
+        <div className="space-y-2">
+          <Label htmlFor="organization">Organization</Label>
+          {organizationsLoading ? (
+            <div className="flex items-center space-x-2">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current" />
+              <span className="text-sm text-muted-foreground">Loading organizations...</span>
+            </div>
+          ) : (
+            <Select
+              value={selectedOrganizationId}
+              onValueChange={setSelectedOrganizationId}
+              disabled={isOAuthLoading || magicLinkPending}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select your organization" />
+              </SelectTrigger>
+              <SelectContent>
+                {organizations.map((org) => (
+                  <SelectItem key={org.id} value={org.id}>
+                    {org.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {organizations.length === 0 && !organizationsLoading && (
+            <p className="text-sm text-red-600">
+              No organizations available. Please contact support.
+            </p>
+          )}
+        </div>
+
+        <Separator />
+
         {/* Google OAuth */}
         <Button
           onClick={() => handleOAuthSignUp("google")}
@@ -95,7 +174,7 @@ export function SignUpForm() {
             <Separator className="w-full" />
           </div>
           <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-white px-2 text-muted-foreground">Or</span>
+            <span className="bg-surface px-2 text-muted-foreground">Or</span>
           </div>
         </div>
 
@@ -118,6 +197,13 @@ export function SignUpForm() {
                 </p>
               )}
           </div>
+
+          {/* Hidden organization ID field */}
+          <input
+            type="hidden"
+            name="organizationId"
+            value={selectedOrganizationId}
+          />
 
           <Button
             type="submit"

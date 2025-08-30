@@ -57,8 +57,8 @@ export function SystemSecuritySettings({ settings }: SystemSecuritySettingsProps
     if (state?.success) {
       toast.success(state.message || "Security settings saved successfully!");
     } else if (state && !state.success) {
-      if (state.message) {
-        toast.error(state.message);
+      if (state.error) {
+        toast.error(state.error);
       }
     }
   }, [state]);
@@ -84,8 +84,8 @@ export function SystemSecuritySettings({ settings }: SystemSecuritySettingsProps
             )}
             <Switch
               checked={formData.twoFactorRequired}
-              onCheckedChange={(checked) => handleToggle("twoFactorRequired", checked)}
-              disabled={isLoading}
+              onCheckedChange={(checked) => { handleToggle("twoFactorRequired", checked); }}
+              disabled={isPending}
             />
           </div>
         </div>
@@ -100,8 +100,8 @@ export function SystemSecuritySettings({ settings }: SystemSecuritySettingsProps
           </p>
           <Select
             value={formData.sessionTimeout.toString()}
-            onValueChange={(value) => handleSelectChange("sessionTimeout", value)}
-            disabled={isLoading}
+            onValueChange={(value) => { handleSelectChange("sessionTimeout", value); }}
+            disabled={isPending}
           >
             <SelectTrigger>
               <SelectValue />
@@ -131,8 +131,8 @@ export function SystemSecuritySettings({ settings }: SystemSecuritySettingsProps
             min="6"
             max="128"
             value={formData.passwordMinLength}
-            onChange={(e) => handleInputChange("passwordMinLength", e.target.value)}
-            disabled={isLoading}
+            onChange={(e) => { handleInputChange("passwordMinLength", e.target.value); }}
+            disabled={isPending}
           />
           <p className="text-xs text-muted-foreground">
             Recommended: 8 or more characters
@@ -149,8 +149,8 @@ export function SystemSecuritySettings({ settings }: SystemSecuritySettingsProps
           </p>
           <Select
             value={formData.loginAttempts.toString()}
-            onValueChange={(value) => handleSelectChange("loginAttempts", value)}
-            disabled={isLoading}
+            onValueChange={(value) => { handleSelectChange("loginAttempts", value); }}
+            disabled={isPending}
           >
             <SelectTrigger>
               <SelectValue />
@@ -166,7 +166,7 @@ export function SystemSecuritySettings({ settings }: SystemSecuritySettingsProps
       </div>
 
       {/* Security Warning */}
-      {formData.sessionTimeout === 0 || formData.loginAttempts === 0 && (
+      {(formData.sessionTimeout === 0 || formData.loginAttempts === 0) && (
         <div className="flex items-start space-x-2 p-3 bg-yellow-50 rounded-md border border-yellow-200">
           <ShieldAlertIcon className="h-4 w-4 text-yellow-600 mt-0.5" />
           <div className="text-sm">
@@ -183,7 +183,7 @@ export function SystemSecuritySettings({ settings }: SystemSecuritySettingsProps
         <input 
           type="hidden" 
           name="settings" 
-          value={JSON.stringify(formData)}
+          value={JSON.stringify({ security: formData })}
         />
         <Button 
           type="submit"

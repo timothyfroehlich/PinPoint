@@ -5,7 +5,7 @@
 
 import Link from "next/link";
 import { Button } from "~/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import { Card, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { 
   ZapIcon, 
   UsersIcon, 
@@ -18,16 +18,16 @@ import {
 
 export function PinPointHomepage() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+    <div className="min-h-screen bg-gradient-to-b from-surface to-surface-variant">
       {/* Hero Section */}
       <div className="container mx-auto px-4 py-16">
         <div className="text-center space-y-8">
           {/* Logo/Brand */}
           <div className="space-y-4">
-            <h1 className="text-5xl font-bold text-gray-900 tracking-tight">
+            <h1 className="text-5xl font-bold text-on-surface tracking-tight">
               PinPoint
             </h1>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed">
+            <p className="text-xl text-on-surface-variant max-w-2xl mx-auto leading-relaxed">
               Streamline your pinball machine maintenance with intelligent issue tracking, 
               team collaboration, and actionable insights.
             </p>
@@ -46,10 +46,10 @@ export function PinPointHomepage() {
 
         {/* Features Grid */}
         <div className="mt-24 grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-          <Card className="border-gray-200 hover:shadow-lg transition-shadow">
+          <Card className="border-outline hover:shadow-lg transition-shadow">
             <CardHeader className="text-center">
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                <ClipboardListIcon className="h-6 w-6 text-blue-600" />
+              <div className="w-12 h-12 bg-primary-container rounded-lg flex items-center justify-center mx-auto mb-4">
+                <ClipboardListIcon className="h-6 w-6 text-on-primary-container" />
               </div>
               <CardTitle className="text-lg">Issue Tracking</CardTitle>
               <CardDescription>
@@ -58,10 +58,10 @@ export function PinPointHomepage() {
             </CardHeader>
           </Card>
 
-          <Card className="border-gray-200 hover:shadow-lg transition-shadow">
+          <Card className="border-outline hover:shadow-lg transition-shadow">
             <CardHeader className="text-center">
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                <UsersIcon className="h-6 w-6 text-green-600" />
+              <div className="w-12 h-12 bg-secondary-container rounded-lg flex items-center justify-center mx-auto mb-4">
+                <UsersIcon className="h-6 w-6 text-on-secondary-container" />
               </div>
               <CardTitle className="text-lg">Team Collaboration</CardTitle>
               <CardDescription>
@@ -70,10 +70,10 @@ export function PinPointHomepage() {
             </CardHeader>
           </Card>
 
-          <Card className="border-gray-200 hover:shadow-lg transition-shadow">
+          <Card className="border-outline hover:shadow-lg transition-shadow">
             <CardHeader className="text-center">
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                <WrenchIcon className="h-6 w-6 text-purple-600" />
+              <div className="w-12 h-12 bg-tertiary-container rounded-lg flex items-center justify-center mx-auto mb-4">
+                <WrenchIcon className="h-6 w-6 text-on-tertiary-container" />
               </div>
               <CardTitle className="text-lg">Machine Management</CardTitle>
               <CardDescription>
@@ -82,10 +82,10 @@ export function PinPointHomepage() {
             </CardHeader>
           </Card>
 
-          <Card className="border-gray-200 hover:shadow-lg transition-shadow">
+          <Card className="border-outline hover:shadow-lg transition-shadow">
             <CardHeader className="text-center">
-              <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                <BarChart3Icon className="h-6 w-6 text-yellow-600" />
+              <div className="w-12 h-12 bg-secondary-container rounded-lg flex items-center justify-center mx-auto mb-4">
+                <BarChart3Icon className="h-6 w-6 text-on-secondary-container" />
               </div>
               <CardTitle className="text-lg">Analytics & Insights</CardTitle>
               <CardDescription>
@@ -94,10 +94,10 @@ export function PinPointHomepage() {
             </CardHeader>
           </Card>
 
-          <Card className="border-gray-200 hover:shadow-lg transition-shadow">
+          <Card className="border-outline hover:shadow-lg transition-shadow">
             <CardHeader className="text-center">
-              <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                <ZapIcon className="h-6 w-6 text-red-600" />
+              <div className="w-12 h-12 bg-error-container rounded-lg flex items-center justify-center mx-auto mb-4">
+                <ZapIcon className="h-6 w-6 text-on-error-container" />
               </div>
               <CardTitle className="text-lg">Real-time Updates</CardTitle>
               <CardDescription>
@@ -106,10 +106,10 @@ export function PinPointHomepage() {
             </CardHeader>
           </Card>
 
-          <Card className="border-gray-200 hover:shadow-lg transition-shadow">
+          <Card className="border-outline hover:shadow-lg transition-shadow">
             <CardHeader className="text-center">
-              <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                <ShieldCheckIcon className="h-6 w-6 text-indigo-600" />
+              <div className="w-12 h-12 bg-primary-container rounded-lg flex items-center justify-center mx-auto mb-4">
+                <ShieldCheckIcon className="h-6 w-6 text-on-primary-container" />
               </div>
               <CardTitle className="text-lg">Secure & Reliable</CardTitle>
               <CardDescription>

@@ -82,3 +82,16 @@ BEGIN
              USING (false)';
   END IF;
 END $$;
+
+-- =============================================================================
+-- ANONYMOUS ACCESS: Cleanup function for rate limiting
+-- =============================================================================
+
+-- Add cleanup function for old anonymous rate limit entries
+CREATE OR REPLACE FUNCTION cleanup_anonymous_rate_limits()
+RETURNS void AS $$
+BEGIN
+  DELETE FROM anonymous_rate_limits 
+  WHERE created_at < NOW() - INTERVAL '24 hours';
+END;
+$$ LANGUAGE plpgsql;

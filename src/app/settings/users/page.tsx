@@ -10,26 +10,24 @@ import { Button } from "~/components/ui/button";
 import { Separator } from "~/components/ui/separator";
 import { 
   UsersIcon, 
-  UserPlusIcon, 
   MailIcon, 
   CalendarIcon,
-  ShieldIcon,
-  MoreHorizontalIcon 
+  ShieldIcon 
 } from "lucide-react";
-import { requireAuthContext } from "~/lib/dal/shared";
-import { getServerTRPCClient } from "~/server/api/server-client";
+import { requireMemberAccess } from "~/lib/organization-context";
+import { api } from "~/trpc/server";
 import { UserTableActions } from "./components/UserTableActions";
 import { InviteUserDialog } from "./components/InviteUserDialog";
 import { format } from "date-fns";
 
 export default async function UsersSettingsPage() {
-  const { organizationId } = await requireAuthContext();
-  const trpc = getServerTRPCClient();
+  const { organization } = await requireMemberAccess();
+  const organizationId = organization.id;
   
   // Fetch organization users and roles using the existing admin router
   const [users, roles] = await Promise.all([
-    trpc.admin.getUsers(),
-    trpc.role.getAll(),
+    api.admin.getUsers(),
+    api.role.getAll(),
   ]);
 
   // Group users by role for better organization

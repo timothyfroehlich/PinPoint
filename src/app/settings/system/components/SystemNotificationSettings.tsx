@@ -37,8 +37,8 @@ export function SystemNotificationSettings({ settings }: SystemNotificationSetti
     if (state?.success) {
       toast.success(state.message || "Notification settings saved successfully!");
     } else if (state && !state.success) {
-      if (state.message) {
-        toast.error(state.message);
+      if (state.error) {
+        toast.error(state.error);
       }
     }
   }, [state]);
@@ -58,7 +58,7 @@ export function SystemNotificationSettings({ settings }: SystemNotificationSetti
           </div>
           <Switch
             checked={formData.emailNotifications}
-            onCheckedChange={(checked) => handleToggle("emailNotifications", checked)}
+            onCheckedChange={(checked) => { handleToggle("emailNotifications", checked); }}
             disabled={isPending}
           />
         </div>
@@ -74,7 +74,7 @@ export function SystemNotificationSettings({ settings }: SystemNotificationSetti
           </div>
           <Switch
             checked={formData.pushNotifications}
-            onCheckedChange={(checked) => handleToggle("pushNotifications", checked)}
+            onCheckedChange={(checked) => { handleToggle("pushNotifications", checked); }}
             disabled={isPending}
           />
         </div>
@@ -95,8 +95,8 @@ export function SystemNotificationSettings({ settings }: SystemNotificationSetti
           </div>
           <Switch
             checked={formData.issueUpdates}
-            onCheckedChange={(checked) => handleToggle("issueUpdates", checked)}
-            disabled={isLoading || !formData.emailNotifications}
+            onCheckedChange={(checked) => { handleToggle("issueUpdates", checked); }}
+            disabled={isPending || !formData.emailNotifications}
           />
         </div>
 
@@ -109,8 +109,8 @@ export function SystemNotificationSettings({ settings }: SystemNotificationSetti
           </div>
           <Switch
             checked={formData.weeklyDigest}
-            onCheckedChange={(checked) => handleToggle("weeklyDigest", checked)}
-            disabled={isLoading || !formData.emailNotifications}
+            onCheckedChange={(checked) => { handleToggle("weeklyDigest", checked); }}
+            disabled={isPending || !formData.emailNotifications}
           />
         </div>
 
@@ -123,8 +123,8 @@ export function SystemNotificationSettings({ settings }: SystemNotificationSetti
           </div>
           <Switch
             checked={formData.maintenanceAlerts}
-            onCheckedChange={(checked) => handleToggle("maintenanceAlerts", checked)}
-            disabled={isLoading || !formData.emailNotifications}
+            onCheckedChange={(checked) => { handleToggle("maintenanceAlerts", checked); }}
+            disabled={isPending || !formData.emailNotifications}
           />
         </div>
       </div>
@@ -134,7 +134,7 @@ export function SystemNotificationSettings({ settings }: SystemNotificationSetti
         <input 
           type="hidden" 
           name="settings" 
-          value={JSON.stringify(formData)}
+          value={JSON.stringify({ notifications: formData })}
         />
         <Button 
           type="submit"

@@ -460,4 +460,40 @@ export const roleRouter = createTRPCRouter({
 
       return membership;
     }),
+
+  /**
+   * Get all roles for the organization
+   */
+  getAll: organizationManageProcedure.query(
+    async ({ ctx }): Promise<RoleResponse[]> => {
+      const rolesWithMemberCount = await ctx.db
+        .select({
+          id: roles.id,
+          name: roles.name,
+          organizationId: roles.organization_id,
+          isSystem: roles.is_system,
+          isDefault: roles.is_default,
+          createdAt: roles.created_at,
+          updatedAt: roles.updated_at,
+          memberCount: count(memberships.id),
+        })
+        .from(roles)
+        .leftJoin(memberships, eq(roles.id, memberships.role_id))
+        .where(eq(roles.organization_id, ctx.organizationId))
+        .groupBy(roles.id)
+        .orderBy(roles.name);
+
+      return rolesWithMemberCount.map((role) => ({
+        id: role.id,
+        name: role.name,
+        organizationId: role.organizationId,
+        isSystem: role.isSystem,
+        isDefault: role.isDefault,
+        createdAt: role.createdAt,
+        updatedAt: role.updatedAt,
+        memberCount: role.memberCount,
+        permissions: [], // TODO: Add permissions when permission system is implemented
+      }));
+    },
+  ),
 });
