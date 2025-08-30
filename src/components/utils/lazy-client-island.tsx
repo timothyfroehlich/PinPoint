@@ -21,7 +21,7 @@ interface LazyClientIslandProps<T = any> {
   /** Intersection observer threshold (default: 0.1) */
   threshold?: number;
   /** Loading strategy: 'intersection' | 'idle' | 'immediate' */
-  strategy?: 'intersection' | 'idle' | 'immediate';
+  strategy?: "intersection" | "idle" | "immediate";
   /** Component name for debugging */
   name?: string;
 }
@@ -36,8 +36,8 @@ export function LazyClientIsland<T = any>({
   fallback = <div className="h-16 bg-muted animate-pulse rounded" />,
   loadImmediately = false,
   threshold = 0.1,
-  strategy = 'intersection',
-  name = 'LazyComponent',
+  strategy = "intersection",
+  name = "LazyComponent",
 }: LazyClientIslandProps<T>) {
   const [Component, setComponent] = useState<ComponentType<T> | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -46,14 +46,14 @@ export function LazyClientIsland<T = any>({
 
   // Load component immediately if requested
   useEffect(() => {
-    if (loadImmediately || strategy === 'immediate') {
+    if (loadImmediately || strategy === "immediate") {
       loadComponent();
     }
   }, [loadImmediately, strategy]);
 
   // Intersection observer loading
   useEffect(() => {
-    if (Component || isLoading || strategy !== 'intersection') return;
+    if (Component || isLoading || strategy !== "intersection") return;
 
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -62,22 +62,24 @@ export function LazyClientIsland<T = any>({
           observer.disconnect();
         }
       },
-      { threshold }
+      { threshold },
     );
 
     if (containerRef.current) {
       observer.observe(containerRef.current);
     }
 
-    return () => { observer.disconnect(); };
+    return () => {
+      observer.disconnect();
+    };
   }, [Component, isLoading, strategy, threshold]);
 
   // Idle loading
   useEffect(() => {
-    if (Component || isLoading || strategy !== 'idle') return;
+    if (Component || isLoading || strategy !== "idle") return;
 
     const loadOnIdle = () => {
-      if ('requestIdleCallback' in window) {
+      if ("requestIdleCallback" in window) {
         requestIdleCallback(() => loadComponent(), { timeout: 2000 });
       } else {
         // Fallback for browsers without requestIdleCallback
@@ -97,13 +99,14 @@ export function LazyClientIsland<T = any>({
     try {
       const { default: ImportedComponent } = await importComponent();
       setComponent(() => ImportedComponent);
-      
+
       // Performance monitoring
-      if (process.env.NODE_ENV === 'development') {
+      if (process.env.NODE_ENV === "development") {
         console.log(`✅ Lazy loaded client island: ${name}`);
       }
     } catch (err) {
-      const error = err instanceof Error ? err : new Error('Failed to load component');
+      const error =
+        err instanceof Error ? err : new Error("Failed to load component");
       setError(error);
       console.error(`❌ Failed to lazy load client island ${name}:`, error);
     } finally {
@@ -114,8 +117,8 @@ export function LazyClientIsland<T = any>({
   // Error state
   if (error) {
     return (
-      <div className="rounded-md border border-red-200 bg-red-50 p-4">
-        <div className="text-sm text-red-800">
+      <div className="rounded-md border border-error bg-error-container p-4">
+        <div className="text-sm text-on-error-container">
           <strong>Failed to load component:</strong> {error.message}
         </div>
         <button
@@ -123,7 +126,7 @@ export function LazyClientIsland<T = any>({
             setError(null);
             loadComponent();
           }}
-          className="mt-2 text-xs text-red-600 hover:text-red-700 underline"
+          className="mt-2 text-xs text-error hover:text-error underline"
         >
           Retry
         </button>
@@ -155,18 +158,18 @@ export function LazyClientIsland<T = any>({
  * Useful for critical components that should be preloaded on route change
  */
 export function usePreloadComponent<T = any>(
-  importComponent: () => Promise<{ default: ComponentType<T> }>
+  importComponent: () => Promise<{ default: ComponentType<T> }>,
 ) {
   const [isPreloaded, setIsPreloaded] = useState(false);
 
   const preload = async () => {
     if (isPreloaded) return;
-    
+
     try {
       await importComponent();
       setIsPreloaded(true);
     } catch (error) {
-      console.error('Failed to preload component:', error);
+      console.error("Failed to preload component:", error);
     }
   };
 
@@ -178,16 +181,16 @@ export function usePreloadComponent<T = any>(
  */
 export function createLazyClientIsland<T = any>(
   importComponent: () => Promise<{ default: ComponentType<T> }>,
-  defaultProps?: Partial<LazyClientIslandProps<T>>
+  defaultProps?: Partial<LazyClientIslandProps<T>>,
 ) {
   return function LazyWrapper(props: T & Partial<LazyClientIslandProps<T>>) {
-    const { 
-      fallback, 
-      loadImmediately, 
-      threshold, 
-      strategy, 
+    const {
+      fallback,
+      loadImmediately,
+      threshold,
+      strategy,
       name,
-      ...componentProps 
+      ...componentProps
     } = props as any;
 
     return (
