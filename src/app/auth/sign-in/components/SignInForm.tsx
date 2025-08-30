@@ -189,7 +189,7 @@ export function SignInForm() {
             </Select>
           )}
           {organizations.length === 0 && !organizationsLoading && (
-            <p className="text-sm text-red-600">
+            <p className="text-sm text-error">
               No organizations available. Please contact support.
             </p>
           )}
@@ -257,7 +257,7 @@ export function SignInForm() {
             />
             {magicLinkState?.success === false &&
               magicLinkState.fieldErrors?.["email"] && (
-                <p className="text-sm text-red-600">
+                <p className="text-sm text-error">
                   {magicLinkState.fieldErrors["email"]}
                 </p>
               )}
@@ -288,8 +288,8 @@ export function SignInForm() {
 
         {/* Action Results */}
         {magicLinkState?.success === true && (
-          <Alert className="border-green-200 bg-green-50">
-            <div className="text-green-800">
+          <Alert className="border-tertiary bg-tertiary-container">
+            <div className="text-on-tertiary-container">
               <p className="font-medium">Magic link sent!</p>
               <p className="text-sm mt-1">{magicLinkState.data.message}</p>
             </div>
@@ -297,8 +297,8 @@ export function SignInForm() {
         )}
 
         {magicLinkState?.success === false && !magicLinkState.fieldErrors && (
-          <Alert className="border-red-200 bg-red-50">
-            <div className="text-red-800">
+          <Alert className="border-error bg-error-container">
+            <div className="text-on-error-container">
               <p className="font-medium">Sign-in failed</p>
               <p className="text-sm mt-1">{magicLinkState.error}</p>
             </div>

@@ -22,13 +22,13 @@ export default async function SignUpPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-surface-container-lowest py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900">
+          <h1 className="text-3xl font-bold text-on-surface">
             Create your account
           </h1>
-          <p className="mt-2 text-sm text-gray-600">
+          <p className="mt-2 text-sm text-on-surface-variant">
             Get started with PinPoint issue tracking
           </p>
         </div>
@@ -45,9 +45,9 @@ function SignUpFormSkeleton() {
   return (
     <div className="space-y-6">
       <div className="space-y-4">
-        <div className="h-12 bg-gray-200 rounded-md animate-pulse" />
-        <div className="h-12 bg-gray-200 rounded-md animate-pulse" />
-        <div className="h-12 bg-gray-200 rounded-md animate-pulse" />
+        <div className="h-12 bg-surface-container rounded-md animate-pulse" />
+        <div className="h-12 bg-surface-container rounded-md animate-pulse" />
+        <div className="h-12 bg-surface-container rounded-md animate-pulse" />
       </div>
     </div>
   );
