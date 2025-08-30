@@ -213,8 +213,8 @@ export function MachineQRCodeClient({
           <div
             className={`flex items-center gap-2 p-2 rounded-md text-sm ${
               message.type === "success"
-                ? "bg-green-50 text-green-800 border border-green-200"
-                : "bg-red-50 text-red-800 border border-red-200"
+                ? "bg-tertiary-container text-on-tertiary-container border border-tertiary"
+                : "bg-error-container text-on-error-container border border-error"
             }`}
           >
             {message.type === "success" ? (
@@ -230,7 +230,7 @@ export function MachineQRCodeClient({
           <>
             {/* QR Code Display */}
             <div className="flex justify-center">
-              <div className="p-4 border rounded-lg bg-white">
+              <div className="p-4 border rounded-lg bg-surface">
                 <img
                   src={currentQRCode}
                   alt={`QR Code for ${machineName}`}
