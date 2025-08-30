@@ -47,10 +47,10 @@ const NOTIFICATION_ICONS = {
 };
 
 const NOTIFICATION_STYLES = {
-  success: "border-green-200 bg-green-50 text-green-800",
-  error: "border-red-200 bg-red-50 text-red-800",
-  info: "border-blue-200 bg-blue-50 text-blue-800",
-  warning: "border-yellow-200 bg-yellow-50 text-yellow-800",
+  success: "border-tertiary bg-tertiary-container text-on-tertiary-container",
+  error: "border-error bg-error-container text-on-error-container",
+  info: "border-primary bg-primary-container text-on-primary-container",
+  warning: "border-secondary bg-secondary-container text-on-secondary-container",
 };
 
 /**
@@ -199,7 +199,7 @@ export function NotificationClient({
     <div className="fixed top-4 right-4 z-50 space-y-2 max-w-sm">
       {/* Connection status (only show if disconnected) */}
       {!isConnected && userId && (
-        <Alert className="border-yellow-200 bg-yellow-50">
+        <Alert className="border-secondary bg-secondary-container">
           <AlertCircleIcon className="h-4 w-4" />
           <AlertDescription className="text-sm">
             <div className="flex items-center justify-between">
