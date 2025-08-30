@@ -70,28 +70,28 @@ interface IssuesListServerProps {
 
 // Priority color mapping - based on common priority names
 const priorityColors = {
-  Low: "bg-blue-100 text-blue-800 border-blue-200",
-  Medium: "bg-yellow-100 text-yellow-800 border-yellow-200",
-  High: "bg-red-100 text-red-800 border-red-200",
-  Critical: "bg-purple-100 text-purple-800 border-purple-200",
+  Low: "bg-primary-container text-on-primary-container border-primary",
+  Medium: "bg-secondary-container text-on-secondary-container border-secondary",
+  High: "bg-error-container text-on-error-container border-error",
+  Critical: "bg-primary-container text-on-primary-container border-primary",
 } as const;
 
 // Status color mapping - based on status categories
 const statusColors = {
-  NEW: "bg-green-100 text-green-800 border-green-200",
-  IN_PROGRESS: "bg-orange-100 text-orange-800 border-orange-200",
-  RESOLVED: "bg-gray-100 text-gray-800 border-gray-200",
+  NEW: "bg-tertiary-container text-on-tertiary-container border-tertiary",
+  IN_PROGRESS: "bg-secondary-container text-on-secondary-container border-secondary",
+  RESOLVED: "bg-surface-container-low text-on-surface border-outline-variant",
 } as const;
 
 function IssueCard({ issue }: { issue: Issue }) {
   const priorityColor =
     issue.priority?.name && issue.priority.name in priorityColors
       ? priorityColors[issue.priority.name as keyof typeof priorityColors]
-      : "bg-gray-100 text-gray-800 border-gray-200";
+      : "bg-surface-container-low text-on-surface border-outline-variant";
 
   const statusColor = issue.status?.category
     ? statusColors[issue.status.category]
-    : "bg-gray-100 text-gray-800 border-gray-200";
+    : "bg-surface-container-low text-on-surface border-outline-variant";
 
   return (
     <Card className="hover:shadow-md transition-shadow">

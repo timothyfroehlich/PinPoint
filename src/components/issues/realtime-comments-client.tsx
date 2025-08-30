@@ -199,7 +199,7 @@ export function RealtimeCommentsClient({
 
       {/* Status update notification */}
       {statusUpdate && (
-        <Alert className="border-blue-200 bg-blue-50">
+        <Alert className="border-primary bg-primary-container">
           <AlertDescription>
             <div className="flex items-center gap-2">
               <Badge variant="secondary" className="text-xs">
@@ -218,7 +218,7 @@ export function RealtimeCommentsClient({
 
       {/* Real-time comment notifications */}
       {newComments.map((comment) => (
-        <Alert key={comment.id} className="border-green-200 bg-green-50">
+        <Alert key={comment.id} className="border-tertiary bg-tertiary-container">
           <AlertDescription>
             <div className="flex items-start gap-3">
               <Avatar className="h-8 w-8">
@@ -243,7 +243,7 @@ export function RealtimeCommentsClient({
                   </Badge>
                 </div>
                 
-                <div className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+                <div className="text-sm text-on-surface whitespace-pre-wrap leading-relaxed">
                   {comment.content}
                 </div>
               </div>

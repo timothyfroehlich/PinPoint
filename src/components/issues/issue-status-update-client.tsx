@@ -103,10 +103,10 @@ export function IssueStatusUpdateClient({
         </SelectContent>
       </Select>
 
-      {state?.error && <p className="text-red-600 text-sm">{state.error}</p>}
+      {state?.error && <p className="text-error text-sm">{state.error}</p>}
 
       {state?.success && (
-        <p className="text-green-600 text-sm">✅ {state.message}</p>
+        <p className="text-tertiary text-sm">✅ {state.message}</p>
       )}
 
       <Button type="submit" disabled={isPending} size="sm" className="w-full">

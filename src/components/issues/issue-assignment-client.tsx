@@ -79,13 +79,13 @@ export function IssueAssignmentClient({
       </Select>
 
       {state && !state.success && (
-        <p className="text-red-600 text-sm">
+        <p className="text-error text-sm">
           {state.error || "Failed to update assignment"}
         </p>
       )}
 
       {state && state.success && (
-        <p className="text-green-600 text-sm">✅ Assignment updated successfully</p>
+        <p className="text-tertiary text-sm">✅ Assignment updated successfully</p>
       )}
 
       <Button type="submit" disabled={isPending} size="sm" className="w-full">
