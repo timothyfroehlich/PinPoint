@@ -77,11 +77,11 @@ export default async function ActivityLogPage({
   const getSeverityColor = (severity: string) => {
     switch (severity) {
       case "error":
-        return "text-red-600 bg-red-50";
+        return "text-on-error-container bg-error-container";
       case "warning":
-        return "text-yellow-600 bg-yellow-50";
+        return "text-on-secondary-container bg-secondary-container";
       default:
-        return "text-blue-600 bg-blue-50";
+        return "text-on-primary-container bg-primary-container";
     }
   };
 
@@ -144,7 +144,7 @@ export default async function ActivityLogPage({
             <AlertTriangleIcon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">{stats.errorEvents}</div>
+            <div className="text-2xl font-bold text-error">{stats.errorEvents}</div>
           </CardContent>
         </Card>
       </div>

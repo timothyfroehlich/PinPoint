@@ -151,11 +151,11 @@ export function RoleChangeDialog({ user, availableRoles, children }: RoleChangeD
 
             {/* Role Change Warning */}
             {hasRoleChanged && selectedRole && (
-              <div className="p-3 border border-yellow-200 rounded-lg bg-yellow-50">
-                <p className="text-sm font-medium text-yellow-800">
+              <div className="p-3 border border-secondary rounded-lg bg-secondary-container">
+                <p className="text-sm font-medium text-on-secondary-container">
                   Role Change Confirmation
                 </p>
-                <p className="text-xs text-yellow-700 mt-1">
+                <p className="text-xs text-secondary mt-1">
                   {user.name || user.email} will be changed from "{user.role.name}" to "{selectedRole.name}". 
                   This change takes effect immediately.
                 </p>
