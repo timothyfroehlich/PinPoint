@@ -90,9 +90,9 @@ export async function NotificationsListServer({
     <div className="max-h-96 overflow-y-auto">
       {/* Notification Stats Header */}
       {stats.unread > 0 && (
-        <div className="p-3 bg-blue-50 border-b">
+        <div className="p-3 bg-primary-container border-b">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-blue-800 font-medium">
+            <span className="text-on-primary-container font-medium">
               {stats.unread} unread notification{stats.unread !== 1 ? 's' : ''}
             </span>
             <Badge variant="secondary" className="text-xs">
@@ -108,7 +108,7 @@ export async function NotificationsListServer({
           <div
             key={notification.id}
             className={`p-4 hover:bg-muted/50 transition-colors ${
-              !notification.read ? "bg-blue-50/30" : ""
+              !notification.read ? "bg-primary-container/30" : ""
             }`}
           >
             <div className="flex items-start gap-3">
@@ -126,7 +126,7 @@ export async function NotificationsListServer({
                     {notification.message}
                   </p>
                   {!notification.read && (
-                    <div className="h-2 w-2 bg-blue-500 rounded-full flex-shrink-0" />
+                    <div className="h-2 w-2 bg-primary rounded-full flex-shrink-0" />
                   )}
                 </div>
 
