@@ -22,11 +22,11 @@ function EnhancedSubmitButton({ isPending }: { isPending: boolean }) {
   const isLoading = isPending || pending;
 
   return (
-    <Button 
-      type="submit" 
-      disabled={isLoading} 
+    <Button
+      type="submit"
+      disabled={isLoading}
       className="w-full"
-      style={{ display: 'none' }} // Hidden by default, shown by JS
+      style={{ display: "none" }} // Hidden by default, shown by JS
     >
       {isLoading ? "Creating Issue..." : "Create Issue"}
     </Button>
@@ -39,25 +39,30 @@ function EnhancedSubmitButton({ isPending }: { isPending: boolean }) {
  * Falls back gracefully to server-rendered form
  */
 export function FormEnhancementClient() {
-  const [state, formAction, isPending] = useActionState(createIssueAction, null);
+  const [state, formAction, isPending] = useActionState(
+    createIssueAction,
+    null,
+  );
   const formRef = useRef<HTMLFormElement>(null);
 
   // Progressive enhancement: hide server button, show enhanced button
   useEffect(() => {
-    const form = document.querySelector('form');
-    const serverButton = form?.querySelector('button[type="submit"]:not([style*="display: none"])');
+    const form = document.querySelector("form");
+    const serverButton = form?.querySelector(
+      'button[type="submit"]:not([style*="display: none"])',
+    );
     const clientButton = form?.querySelector('button[style*="display: none"]');
-    
+
     if (serverButton && clientButton) {
-      (serverButton as HTMLElement).style.display = 'none';
-      (clientButton as HTMLElement).style.display = 'block';
+      (serverButton as HTMLElement).style.display = "none";
+      (clientButton as HTMLElement).style.display = "block";
     }
 
     // Set enhanced form action
     if (form) {
-      form.action = '';
-      (form).onsubmit = null;
-      form.setAttribute('data-enhanced', 'true');
+      form.action = "";
+      form.onsubmit = null;
+      form.setAttribute("data-enhanced", "true");
     }
   }, []);
 
@@ -70,10 +75,10 @@ export function FormEnhancementClient() {
 
   // Attach to nearest form
   useEffect(() => {
-    const form = document.querySelector('form');
-    if (form && !form.hasAttribute('data-enhanced')) {
-      form.setAttribute('action', '');
-      form.addEventListener('submit', (e) => {
+    const form = document.querySelector("form");
+    if (form && !form.hasAttribute("data-enhanced")) {
+      form.setAttribute("action", "");
+      form.addEventListener("submit", (e) => {
         e.preventDefault();
         const formData = new FormData(form);
         formAction(formData);
@@ -106,13 +111,14 @@ export function FormEnhancementClient() {
             // Add error styling to field (side effect in render, but for progressive enhancement)
             const fieldElement = document.querySelector(`[name="${field}"]`);
             if (fieldElement && Array.isArray(errors) && errors.length > 0) {
-              fieldElement.classList.add('border-red-500');
-              fieldElement.setAttribute('aria-invalid', 'true');
+              fieldElement.classList.add("border-error");
+              fieldElement.setAttribute("aria-invalid", "true");
             }
-            
+
             return (
               <div key={field} className="text-sm text-destructive">
-                <strong>{field}:</strong> {Array.isArray(errors) ? errors[0] : errors}
+                <strong>{field}:</strong>{" "}
+                {Array.isArray(errors) ? errors[0] : errors}
               </div>
             );
           })}
