@@ -26,7 +26,7 @@ export async function IssueDetailServer({ issueId }: IssueDetailServerProps) {
   ]);
 
   // TODO: Status colors will be implemented when issue schema includes these fields
-  const statusColor = "bg-gray-100 text-gray-800 border-gray-200";
+  const statusColor = "bg-surface-container-low text-on-surface border-outline-variant";
 
   return (
     <div className="space-y-6">
