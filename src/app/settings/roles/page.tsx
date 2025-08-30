@@ -106,7 +106,7 @@ export default async function RolesSettingsPage() {
               <div key={role.id}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-4">
-                    <div className="h-10 w-10 rounded-lg bg-gradient-to-r from-indigo-500 to-purple-600 flex items-center justify-center">
+                    <div className="h-10 w-10 rounded-lg bg-gradient-to-r from-primary to-primary-container flex items-center justify-center">
                       <ShieldIcon className="h-5 w-5 text-white" />
                     </div>
                     
@@ -154,7 +154,7 @@ export default async function RolesSettingsPage() {
                     <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
                       {role.permissions.slice(0, 6).map((permission) => (
                         <div key={permission.id} className="flex items-center space-x-2 text-sm">
-                          <CheckIcon className="h-3 w-3 text-green-500" />
+                          <CheckIcon className="h-3 w-3 text-tertiary" />
                           <span>{permission.name}</span>
                         </div>
                       ))}
@@ -205,19 +205,19 @@ export default async function RolesSettingsPage() {
                 name: "Administrator",
                 description: "Full access to all features",
                 permissions: ["All permissions"],
-                color: "from-red-500 to-pink-500"
+                color: "from-error to-error-container"
               },
               {
                 name: "Manager", 
                 description: "User management and reporting",
                 permissions: ["Manage Users", "View Reports", "Manage Issues"],
-                color: "from-blue-500 to-indigo-500"
+                color: "from-primary to-primary-container"
               },
               {
                 name: "Member",
                 description: "Standard user access",
                 permissions: ["Create Issues", "View Machines", "Comment"],
-                color: "from-green-500 to-emerald-500"
+                color: "from-tertiary to-tertiary-container"
               }
             ].map((template) => (
               <Card key={template.name} className="hover:shadow-md transition-shadow">
@@ -234,7 +234,7 @@ export default async function RolesSettingsPage() {
                   <div className="space-y-1 mb-4">
                     {template.permissions.map((permission, idx) => (
                       <div key={idx} className="flex items-center text-xs text-muted-foreground">
-                        <CheckIcon className="mr-1 h-3 w-3 text-green-500" />
+                        <CheckIcon className="mr-1 h-3 w-3 text-tertiary" />
                         {permission}
                       </div>
                     ))}
