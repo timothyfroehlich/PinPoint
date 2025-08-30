@@ -167,11 +167,11 @@ export function SystemSecuritySettings({ settings }: SystemSecuritySettingsProps
 
       {/* Security Warning */}
       {(formData.sessionTimeout === 0 || formData.loginAttempts === 0) && (
-        <div className="flex items-start space-x-2 p-3 bg-yellow-50 rounded-md border border-yellow-200">
-          <ShieldAlertIcon className="h-4 w-4 text-yellow-600 mt-0.5" />
+        <div className="flex items-start space-x-2 p-3 bg-secondary-container rounded-md border border-secondary">
+          <ShieldAlertIcon className="h-4 w-4 text-secondary mt-0.5" />
           <div className="text-sm">
-            <p className="font-medium text-yellow-800">Security Warning</p>
-            <p className="text-yellow-700">
+            <p className="font-medium text-on-secondary-container">Security Warning</p>
+            <p className="text-secondary">
               Your current settings may reduce security. Consider enabling session timeouts and login attempt limits.
             </p>
           </div>
