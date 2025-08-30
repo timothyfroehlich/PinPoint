@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { type SearchEntity } from "~/lib/services/search-service";
 import { UniversalSearchResults, UniversalSearchResultsSkeleton } from "~/components/search/universal-search-results";
 import { UniversalSearchInput } from "~/components/search/universal-search-input";
-import { requireServerAuth } from "~/lib/auth/server-auth";
+import { requireMemberAccess } from "~/lib/organization-context";
 
 // Force dynamic rendering for search pages
 export const dynamic = "force-dynamic";
@@ -35,7 +35,7 @@ export async function generateMetadata({ searchParams }: SearchPageProps) {
 
 export default async function SearchPage({ searchParams }: SearchPageProps) {
   // Authentication validation with automatic redirect
-  await requireServerAuth();
+  await requireMemberAccess();
 
   const params = await searchParams;
   const query = typeof params["q"] === "string" ? params["q"].trim() : "";

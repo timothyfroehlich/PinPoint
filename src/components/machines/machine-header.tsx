@@ -7,7 +7,7 @@ import Link from "next/link";
 import { ArrowLeft, MapPin, Wrench, Calendar } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { Card, CardHeader, CardTitle } from "~/components/ui/card";
 
 interface Machine {
   id: string;

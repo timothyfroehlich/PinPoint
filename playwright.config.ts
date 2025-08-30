@@ -18,8 +18,8 @@ export default defineConfig({
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
-    // Use subdomain host so middleware sets x-subdomain and organization context
-    baseURL: "http://apc.localhost:3000",
+    // Use root domain to test new no-forced-org architecture  
+    baseURL: "http://localhost:3000",
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: "on-first-retry",

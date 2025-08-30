@@ -96,28 +96,28 @@ export function ActivityLogFilter() {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => setQuickDateRange(1)}
+          onClick={() => { setQuickDateRange(1); }}
         >
           Last 24h
         </Button>
         <Button
           variant="outline"
           size="sm"
-          onClick={() => setQuickDateRange(7)}
+          onClick={() => { setQuickDateRange(7); }}
         >
           Last 7 days
         </Button>
         <Button
           variant="outline"
           size="sm"
-          onClick={() => setQuickDateRange(30)}
+          onClick={() => { setQuickDateRange(30); }}
         >
           Last 30 days
         </Button>
         <Button
           variant="outline"
           size="sm"
-          onClick={() => setQuickDateRange(90)}
+          onClick={() => { setQuickDateRange(90); }}
         >
           Last 90 days
         </Button>
@@ -226,7 +226,7 @@ export function ActivityLogFilter() {
           <Input
             placeholder="Search in activity details, IP addresses, or user agents..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => { setSearchTerm(e.target.value); }}
             className="pl-10"
           />
         </div>

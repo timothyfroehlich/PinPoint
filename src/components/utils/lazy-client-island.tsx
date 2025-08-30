@@ -69,7 +69,7 @@ export function LazyClientIsland<T = any>({
       observer.observe(containerRef.current);
     }
 
-    return () => observer.disconnect();
+    return () => { observer.disconnect(); };
   }, [Component, isLoading, strategy, threshold]);
 
   // Idle loading

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import * as React from "react";
 
 import { IssueDetailServer } from "~/components/issues/issue-detail-server";
-import { requireServerAuth } from "~/lib/auth/server-auth";
+import { requireMemberAccess } from "~/lib/organization-context";
 import { getIssueById } from "~/lib/dal/issues";
 
 interface IssuePageProps {
@@ -18,7 +18,7 @@ export async function generateMetadata({
   try {
     const resolvedParams = await params;
     // Ensure authentication before generating metadata
-    await requireServerAuth();
+    await requireMemberAccess();
     const issue = await getIssueById(resolvedParams.issueId);
 
     return {
@@ -42,8 +42,8 @@ export default async function IssuePage({
   params,
 }: IssuePageProps): Promise<React.JSX.Element> {
   try {
-    // Authentication validation with automatic redirect - Phase 2C pattern
-    await requireServerAuth();
+    // Authentication and organization membership validation
+    await requireMemberAccess();
 
     // Resolve params for issue ID
     const resolvedParams = await params;

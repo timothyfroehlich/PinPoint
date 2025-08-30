@@ -177,7 +177,7 @@ export function CreateMachineFormClient({
             <Button
               type="button"
               variant="outline"
-              onClick={() => router.push("/machines")}
+              onClick={() => { router.push("/machines"); }}
               disabled={isPending}
             >
               Cancel

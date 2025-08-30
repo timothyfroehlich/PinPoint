@@ -1,24 +1,30 @@
 "use client";
 
-import { ExpandMore, SwapVert } from "@mui/icons-material";
-import {
-  Box,
-  Paper,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  IconButton,
-  Tooltip,
-  Typography,
-  type SelectChangeEvent,
-} from "@mui/material";
+import { ChevronDown, ArrowUpDown } from "lucide-react";
 import { useState } from "react";
+import { Card } from "~/components/ui/card";
+import { Button } from "~/components/ui/button";
+import { Label } from "~/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "~/components/ui/tooltip";
+import { cn } from "~/lib/utils";
 
 import { AdvancedFiltersDropdown } from "./AdvancedFiltersDropdown";
 import { GameFilterDropdown } from "./GameFilterDropdown";
 import { SearchTextField } from "./SearchTextField";
 import { StatusTogglePills } from "./StatusTogglePills";
+import { FilterPresets } from "./FilterPresets";
 
 import { api } from "~/trpc/react";
 
@@ -44,11 +50,15 @@ export function FilterToolbar({
   filters,
   onFiltersChange,
   isLoading = false,
-}: FilterToolbarProps): React.JSX.Element {
+}: FilterToolbarProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [activePresetId, setActivePresetId] = useState<string>();
 
   // Fetch locations for filter dropdown
   const { data: locations } = api.location.getAll.useQuery();
+  
+  // Get current user for "My Issues" preset  
+  const { data: currentUser } = api.user.getProfile.useQuery();
 
   const handleSortOrderToggle = (): void => {
     onFiltersChange({
@@ -56,48 +66,49 @@ export function FilterToolbar({
     });
   };
 
+  const handlePresetClick = (presetFilters: any, presetId?: string) => {
+    // Apply preset filters and mark which preset is active
+    onFiltersChange({
+      ...filters,
+      ...presetFilters,
+      // Reset other filters when applying preset
+      ...(Object.keys(presetFilters).length === 0 && {
+        assigneeId: undefined,
+        search: undefined,
+        statusIds: undefined,
+      }),
+    });
+    setActivePresetId(presetId);
+  };
+
   return (
-    <Paper
-      elevation={1}
-      sx={{
-        p: 2,
-        mb: 3,
-        borderRadius: 2,
-        border: "1px solid",
-        borderColor: "divider",
-      }}
-    >
+    <Card className="p-4 mb-6 border">
+      {/* Filter Presets Row */}
+      <div className="mb-4">
+        <FilterPresets
+          currentUserId={currentUser?.id}
+          onPresetClick={(presetFilters) => handlePresetClick(presetFilters)}
+          activePresetId={activePresetId}
+        />
+      </div>
+      
       {/* Primary Filter Row */}
-      <Box
-        display="flex"
-        alignItems="center"
-        gap={2}
-        flexWrap="wrap"
-        sx={{
-          "& > *": {
-            minWidth: { xs: "100%", sm: "auto" },
-          },
-        }}
-      >
+      <div className="flex items-center gap-4 flex-wrap">
         {/* Search - Most prominent */}
-        <Box sx={{ flexGrow: 1, minWidth: 250 }}>
+        <div className="flex-grow min-w-[250px]">
           <SearchTextField
             value={filters.search ?? ""}
             onChange={(search) => {
               onFiltersChange({ search: search === "" ? undefined : search });
             }}
           />
-        </Box>
+        </div>
 
         {/* Status Pills - Primary filter */}
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ fontSize: "0.75rem", fontWeight: 500 }}
-          >
+        <div className="flex items-center gap-2">
+          <Label className="text-xs font-medium text-muted-foreground">
             Status:
-          </Typography>
+          </Label>
           <StatusTogglePills
             value={filters.statusIds ?? []}
             onChange={(statusIds: string[]) => {
@@ -105,7 +116,7 @@ export function FilterToolbar({
             }}
             parentLoading={isLoading}
           />
-        </Box>
+        </div>
 
         {/* Machine Filter - Primary */}
         <GameFilterDropdown
@@ -118,7 +129,7 @@ export function FilterToolbar({
         />
 
         {/* Advanced Filters Toggle */}
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+        <div className="flex items-center gap-2">
           <AdvancedFiltersDropdown
             assigneeId={filters.assigneeId ?? ""}
             reporterId={filters.reporterId ?? ""}
@@ -140,108 +151,109 @@ export function FilterToolbar({
             }}
           />
 
-          <IconButton
-            size="small"
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => {
               setShowAdvanced(!showAdvanced);
             }}
             aria-label={
               showAdvanced ? "Hide advanced filters" : "Show advanced filters"
             }
-            sx={{
-              color: showAdvanced ? "primary.main" : "text.secondary",
-              transform: showAdvanced ? "rotate(180deg)" : "rotate(0deg)",
-              transition: "all 0.2s ease-in-out",
-            }}
+            className={cn(
+              "h-8 w-8 p-0 transition-all duration-200",
+              showAdvanced && "text-primary"
+            )}
           >
-            <ExpandMore />
-          </IconButton>
-        </Box>
-      </Box>
+            <ChevronDown 
+              className={cn(
+                "h-4 w-4 transition-transform duration-200",
+                showAdvanced && "rotate-180"
+              )}
+            />
+          </Button>
+        </div>
+      </div>
 
       {/* Secondary Filters - Collapsible */}
       {showAdvanced && (
-        <Box
-          sx={{
-            mt: 2,
-            pt: 2,
-            borderTop: "1px solid",
-            borderColor: "divider",
-            display: "flex",
-            alignItems: "center",
-            gap: 2,
-            flexWrap: "wrap",
-          }}
-        >
+        <div className="mt-4 pt-4 border-t flex items-center gap-4 flex-wrap">
           {/* Location Filter */}
-          <FormControl size="small" sx={{ minWidth: 150 }}>
-            <InputLabel id="location-filter-label">Location</InputLabel>
+          <div className="min-w-[150px]">
             <Select
-              labelId="location-filter-label"
               value={filters.locationId ?? ""}
-              onChange={(e: SelectChangeEvent) => {
-                const value = e.target.value;
+              onValueChange={(value) => {
                 onFiltersChange({
                   locationId: value === "" ? undefined : value,
                 });
               }}
-              label="Location"
             >
-              <MenuItem value="">All Locations</MenuItem>
-              {locations?.map((location: { id: string; name: string }) => (
-                <MenuItem key={location.id} value={location.id}>
-                  {location.name}
-                </MenuItem>
-              ))}
+              <SelectTrigger className="h-9">
+                <SelectValue placeholder="All Locations" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">All Locations</SelectItem>
+                {locations?.map((location: { id: string; name: string }) => (
+                  <SelectItem key={location.id} value={location.id}>
+                    {location.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
             </Select>
-          </FormControl>
+          </div>
 
           {/* Sort Controls */}
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <FormControl size="small" sx={{ minWidth: 130 }}>
-              <InputLabel id="sort-by-filter-label">Sort By</InputLabel>
+          <div className="flex items-center gap-2">
+            <div className="min-w-[130px]">
               <Select
-                labelId="sort-by-filter-label"
                 value={filters.sortBy}
-                onChange={(e: SelectChangeEvent) => {
+                onValueChange={(value) => {
                   onFiltersChange({
-                    sortBy: e.target.value as IssueFilters["sortBy"],
+                    sortBy: value as IssueFilters["sortBy"],
                   });
                 }}
-                label="Sort By"
               >
-                <MenuItem value="created">Created Date</MenuItem>
-                <MenuItem value="updated">Updated Date</MenuItem>
-                <MenuItem value="status">Status</MenuItem>
-                <MenuItem value="severity">Priority</MenuItem>
-                <MenuItem value="game">Game</MenuItem>
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Sort By" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="created">Created Date</SelectItem>
+                  <SelectItem value="updated">Updated Date</SelectItem>
+                  <SelectItem value="status">Status</SelectItem>
+                  <SelectItem value="severity">Priority</SelectItem>
+                  <SelectItem value="game">Game</SelectItem>
+                </SelectContent>
               </Select>
-            </FormControl>
+            </div>
 
-            <Tooltip
-              title={`Sort ${
-                filters.sortOrder === "asc" ? "Ascending" : "Descending"
-              }`}
-            >
-              <IconButton
-                size="small"
-                onClick={handleSortOrderToggle}
-                sx={{
-                  color:
-                    filters.sortOrder === "desc" ? "primary.main" : "inherit",
-                  transform:
-                    filters.sortOrder === "desc"
-                      ? "rotate(180deg)"
-                      : "rotate(0deg)",
-                  transition: "all 0.2s ease-in-out",
-                }}
-              >
-                <SwapVert />
-              </IconButton>
-            </Tooltip>
-          </Box>
-        </Box>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleSortOrderToggle}
+                    className={cn(
+                      "h-8 w-8 p-0 transition-all duration-200",
+                      filters.sortOrder === "desc" && "text-primary"
+                    )}
+                  >
+                    <ArrowUpDown 
+                      className={cn(
+                        "h-4 w-4 transition-transform duration-200",
+                        filters.sortOrder === "desc" && "rotate-180"
+                      )}
+                    />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Sort {filters.sortOrder === "asc" ? "Ascending" : "Descending"}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        </div>
       )}
-    </Paper>
+    </Card>
   );
 }

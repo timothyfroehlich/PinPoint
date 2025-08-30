@@ -56,7 +56,7 @@ export function FormEnhancementClient() {
     // Set enhanced form action
     if (form) {
       form.action = '';
-      (form as HTMLFormElement).onsubmit = null;
+      (form).onsubmit = null;
       form.setAttribute('data-enhanced', 'true');
     }
   }, []);
@@ -75,7 +75,7 @@ export function FormEnhancementClient() {
       form.setAttribute('action', '');
       form.addEventListener('submit', (e) => {
         e.preventDefault();
-        const formData = new FormData(form as HTMLFormElement);
+        const formData = new FormData(form);
         formAction(formData);
       });
     }

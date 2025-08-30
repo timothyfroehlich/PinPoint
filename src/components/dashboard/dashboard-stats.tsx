@@ -79,15 +79,15 @@ interface StatCardProps {
 
 function StatCard({ title, value, icon, description, trend }: StatCardProps) {
   const trendColors = {
-    good: "text-green-600",
-    neutral: "text-blue-600",
-    "needs-attention": "text-red-600",
+    good: "text-tertiary",
+    neutral: "text-secondary",
+    "needs-attention": "text-error",
   };
 
   const bgColors = {
-    good: "bg-green-50",
-    neutral: "bg-blue-50",
-    "needs-attention": "bg-red-50",
+    good: "bg-tertiary-container",
+    neutral: "bg-secondary-container",
+    "needs-attention": "bg-error-container",
   };
 
   return (

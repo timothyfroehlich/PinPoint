@@ -2,37 +2,40 @@
 
 import {
   Edit,
-  CalendarToday,
-  Games,
-  BugReport,
-  Comment,
-  ViewModule,
-  ViewList,
-  Logout,
-} from "@mui/icons-material";
+  Calendar,
+  Gamepad2,
+  Bug,
+  MessageCircle,
+  Grid3X3,
+  List,
+  LogOut,
+} from "lucide-react";
 import {
-  Container,
-  Typography,
   Card,
   CardContent,
-  Box,
-  Grid,
-  Chip,
-  Alert,
-  CircularProgress,
-  Button,
+  CardHeader,
+} from "~/components/ui/card";
+import { Badge } from "~/components/ui/badge";
+import { Alert, AlertDescription } from "~/components/ui/alert";
+import { Button } from "~/components/ui/button";
+import {
   Dialog,
-  DialogTitle,
   DialogContent,
-  TextField,
-  DialogActions,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "~/components/ui/dialog";
+import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
+import { Textarea } from "~/components/ui/textarea";
+import {
   Tooltip,
-  List,
-  ListItem,
-  ListItemText,
-  ToggleButton,
-  ToggleButtonGroup,
-} from "@mui/material";
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "~/components/ui/tooltip";
+import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
+import { cn } from "~/lib/utils";
 import React, { useState } from "react";
 
 import type { JSX } from "react";
@@ -56,11 +59,11 @@ function SignOutButton(): JSX.Element {
 
   return (
     <Button
-      variant="outlined"
-      startIcon={<Logout />}
+      variant="outline"
       onClick={() => void handleSignOut()}
-      color="error"
+      className="w-full sm:w-auto border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
     >
+      <LogOut className="mr-2 h-4 w-4" />
       Sign Out
     </Button>
   );
@@ -88,22 +91,24 @@ export default function ProfilePage(): JSX.Element {
 
   if (isLoading) {
     return (
-      <Container maxWidth="lg" sx={{ py: 4, textAlign: "center" }}>
-        <CircularProgress />
-        <Typography variant="h6" sx={{ mt: 2 }}>
+      <div className="container mx-auto max-w-6xl py-8 text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
+        <h2 className="text-lg font-semibold mt-4">
           Loading profile...
-        </Typography>
-      </Container>
+        </h2>
+      </div>
     );
   }
 
   if (error || !userProfile) {
     return (
-      <Container maxWidth="lg" sx={{ py: 4 }}>
-        <Alert severity="error">
-          Error loading profile: {error?.message ?? "Profile not found"}
+      <div className="container mx-auto max-w-6xl py-8">
+        <Alert className="border-destructive/50 text-destructive dark:border-destructive [&>svg]:text-destructive">
+          <AlertDescription>
+            Error loading profile: {error?.message ?? "Profile not found"}
+          </AlertDescription>
         </Alert>
-      </Container>
+      </div>
     );
   }
 
@@ -139,352 +144,311 @@ export default function ProfilePage(): JSX.Element {
   const ownedMachines = userProfile.ownedMachines;
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Grid container spacing={3}>
-        {/* Profile Header */}
-        <Grid size={12}>
-          <Card elevation={2}>
-            <CardContent>
-              <Box
-                sx={{ display: "flex", alignItems: "center", gap: 3, mb: 2 }}
+    <div className="container mx-auto max-w-6xl py-8 space-y-6">
+      {/* Profile Header */}
+      <Card className="shadow-md">
+        <CardContent className="p-6">
+          <div className="flex flex-col sm:flex-row items-center gap-6">
+            <UserAvatar
+              user={userProfile}
+              size="large"
+              showTooltip={false}
+            />
+            <div className="flex-1 text-center sm:text-left">
+              <h1 className="text-3xl font-bold mb-2">
+                {userProfile.name ?? "Unnamed User"}
+              </h1>
+              {/* Note: Email is handled by Supabase Auth, not stored in user profile */}
+              {userProfile.bio && (
+                <p className="text-muted-foreground mb-4">
+                  {userProfile.bio}
+                </p>
+              )}
+              <div className="flex items-center justify-center sm:justify-start gap-2">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">
+                  Joined {formattedJoinDate}
+                </span>
+              </div>
+            </div>
+            <div className="flex flex-col gap-2 w-full sm:w-auto">
+              <Button
+                variant="outline"
+                onClick={handleEditProfile}
+                disabled={updateProfileMutation.isPending}
+                className="w-full sm:w-auto"
               >
-                <UserAvatar
-                  user={userProfile}
-                  size="large"
-                  showTooltip={false}
-                />
-                <Box sx={{ flex: 1 }}>
-                  <Typography variant="h4" component="h1" gutterBottom>
-                    {userProfile.name ?? "Unnamed User"}
-                  </Typography>
-                  {/* Note: Email is handled by Supabase Auth, not stored in user profile */}
-                  {userProfile.bio && (
-                    <Typography variant="body2" sx={{ mt: 1 }}>
-                      {userProfile.bio}
-                    </Typography>
-                  )}
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 1,
-                      mt: 2,
-                    }}
-                  >
-                    <CalendarToday fontSize="small" color="action" />
-                    <Typography variant="caption" color="text.secondary">
-                      Joined {formattedJoinDate}
-                    </Typography>
-                  </Box>
-                </Box>
-                <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                  <Button
-                    variant="outlined"
-                    startIcon={<Edit />}
-                    onClick={handleEditProfile}
-                    disabled={updateProfileMutation.isPending}
-                  >
-                    Edit Profile
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    onClick={() => {
-                      setUploadDialogOpen(true);
-                    }}
-                  >
-                    Change Picture
-                  </Button>
-                  <SignOutButton />
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
+                <Edit className="mr-2 h-4 w-4" />
+                Edit Profile
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setUploadDialogOpen(true);
+                }}
+                className="w-full sm:w-auto"
+              >
+                Change Picture
+              </Button>
+              <SignOutButton />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-        {/* Statistics */}
-        <Grid
-          size={{
-            xs: 12,
-            md: 4,
-          }}
-        >
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Statistics
-              </Typography>
-              <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <Games color="primary" />
-                  <Typography variant="body2">
-                    {String(_count.ownedMachines)} games owned
-                  </Typography>
-                </Box>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <BugReport color="secondary" />
-                  <Typography variant="body2">
-                    {String(_count.issuesCreated)} issues reported
-                  </Typography>
-                </Box>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <Comment color="action" />
-                  <Typography variant="body2">
-                    {String(_count.comments)} comments posted
-                  </Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
+      {/* Statistics */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card>
+          <CardHeader>
+            <h3 className="text-lg font-semibold">Statistics</h3>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-3">
+              <Gamepad2 className="h-5 w-5 text-primary" />
+              <span className="text-sm">
+                {String(_count.ownedMachines)} games owned
+              </span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Bug className="h-5 w-5 text-orange-600" />
+              <span className="text-sm">
+                {String(_count.issuesCreated)} issues reported
+              </span>
+            </div>
+            <div className="flex items-center gap-3">
+              <MessageCircle className="h-5 w-5 text-muted-foreground" />
+              <span className="text-sm">
+                {String(_count.comments)} comments posted
+              </span>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Organizations */}
-        <Grid
-          size={{
-            xs: 12,
-            md: 8,
-          }}
-        >
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Organizations
-              </Typography>
-              {memberships.length === 0 ? (
-                <Typography variant="body2" color="text.secondary">
-                  Not a member of any organizations
-                </Typography>
-              ) : (
-                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-                  {memberships.map((membership: unknown) => {
-                    const membershipData = membership as Record<
-                      string,
-                      unknown
-                    >;
-                    const organization = membershipData["organization"] as
-                      | { name?: string }
-                      | undefined;
-                    const role = membershipData["role"] as
-                      | { name?: string }
-                      | undefined;
-                    return (
-                      <Chip
-                        key={membershipData["id"] as string}
-                        label={`${organization?.name ?? "Unknown"} (${role?.name ?? "Unknown"})`}
-                        color={role?.name === "admin" ? "primary" : "default"}
-                        variant="outlined"
-                      />
-                    );
-                  })}
-                </Box>
-              )}
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* Owned Games */}
-        <Grid size={12}>
-          <Card>
-            <CardContent>
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  mb: 2,
-                }}
-              >
-                <Typography variant="h6">
-                  Owned Games ({String(ownedMachines.length)})
-                </Typography>
-                {ownedMachines.length > 0 && (
-                  <ToggleButtonGroup
-                    value={gamesViewMode}
-                    exclusive
-                    onChange={(_, newMode: string | null) => {
-                      if (newMode !== null)
-                        setGamesViewMode(newMode as "grid" | "list");
-                    }}
-                    size="small"
-                  >
-                    <ToggleButton value="grid">
-                      <Tooltip title="Grid View">
-                        <ViewModule fontSize="small" />
-                      </Tooltip>
-                    </ToggleButton>
-                    <ToggleButton value="list">
-                      <Tooltip title="List View">
-                        <ViewList fontSize="small" />
-                      </Tooltip>
-                    </ToggleButton>
-                  </ToggleButtonGroup>
-                )}
-              </Box>
-              {ownedMachines.length === 0 ? (
-                <Typography variant="body2" color="text.secondary">
-                  No games owned yet
-                </Typography>
-              ) : gamesViewMode === "grid" ? (
-                <Grid container spacing={2}>
-                  {ownedMachines.map((machine) => (
-                    <Grid key={machine.id} size={{ xs: 12, sm: 6, md: 4 }}>
-                      <Card variant="outlined" sx={{ height: "100%" }}>
-                        <CardContent sx={{ p: 2 }}>
-                          <Typography
-                            variant="subtitle2"
-                            fontWeight="bold"
-                            noWrap
-                          >
-                            {machine.name}
-                          </Typography>
-                          <Typography
-                            variant="body2"
-                            color="text.secondary"
-                            sx={{ mt: 0.5 }}
-                          >
-                            {machine.model.name}
-                          </Typography>
-                          {machine.model.manufacturer && (
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                              display="block"
-                            >
-                              {machine.model.manufacturer}
-                              {machine.model.year &&
-                                ` • ${String(machine.model.year)}`}
-                            </Typography>
-                          )}
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
-                            display="block"
-                            sx={{ mt: 1 }}
-                          >
-                            @ {machine.location.name}
-                          </Typography>
-                        </CardContent>
-                      </Card>
-                    </Grid>
-                  ))}
-                </Grid>
-              ) : (
-                <List sx={{ p: 0 }}>
-                  {ownedMachines.map((machine, index) => (
-                    <ListItem
-                      key={machine.id}
-                      divider={index < ownedMachines.length - 1}
-                      sx={{ px: 0 }}
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <h3 className="text-lg font-semibold">Organizations</h3>
+          </CardHeader>
+          <CardContent>
+            {memberships.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Not a member of any organizations
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {memberships.map((membership: unknown) => {
+                  const membershipData = membership as Record<
+                    string,
+                    unknown
+                  >;
+                  const organization = membershipData["organization"] as
+                    | { name?: string }
+                    | undefined;
+                  const role = membershipData["role"] as
+                    | { name?: string }
+                    | undefined;
+                  return (
+                    <Badge
+                      key={membershipData["id"] as string}
+                      variant={role?.name === "admin" ? "default" : "outline"}
+                      className={cn(
+                        role?.name === "admin" && "bg-primary text-primary-foreground"
+                      )}
                     >
-                      <ListItemText
-                        primary={machine.name}
-                        secondary={
-                          <>
-                            {machine.model.name}
-                            {machine.model.manufacturer && (
-                              <> • {machine.model.manufacturer}</>
-                            )}
-                            {machine.model.year && (
-                              <> • {String(machine.model.year)}</>
-                            )}
-                            <br />
-                            <Typography
-                              component="span"
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              @ {machine.location.name}
-                            </Typography>
-                          </>
-                        }
-                      />
-                    </ListItem>
-                  ))}
-                </List>
-              )}
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+                      {organization?.name ?? "Unknown"} ({role?.name ?? "Unknown"})
+                    </Badge>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Owned Games */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold">
+              Owned Games ({String(ownedMachines.length)})
+            </h3>
+            {ownedMachines.length > 0 && (
+              <TooltipProvider>
+                <ToggleGroup
+                  type="single"
+                  value={gamesViewMode}
+                  onValueChange={(value) => {
+                    if (value) setGamesViewMode(value as "grid" | "list");
+                  }}
+                  className="border"
+                >
+                  <ToggleGroupItem value="grid" size="sm">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Grid3X3 className="h-4 w-4" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Grid View</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="list" size="sm">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <List className="h-4 w-4" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>List View</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </ToggleGroupItem>
+                </ToggleGroup>
+              </TooltipProvider>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {ownedMachines.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No games owned yet
+            </p>
+          ) : gamesViewMode === "grid" ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {ownedMachines.map((machine) => (
+                <Card key={machine.id} className="border h-full">
+                  <CardContent className="p-4">
+                    <h4 className="font-semibold truncate mb-2">
+                      {machine.name}
+                    </h4>
+                    <p className="text-sm text-muted-foreground mb-1">
+                      {machine.model.name}
+                    </p>
+                    {machine.model.manufacturer && (
+                      <p className="text-xs text-muted-foreground">
+                        {machine.model.manufacturer}
+                        {machine.model.year &&
+                          ` • ${String(machine.model.year)}`}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground mt-2">
+                      @ {machine.location.name}
+                    </p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-0">
+              {ownedMachines.map((machine, index) => (
+                <div
+                  key={machine.id}
+                  className={cn(
+                    "py-4 px-0",
+                    index < ownedMachines.length - 1 && "border-b"
+                  )}
+                >
+                  <div>
+                    <h4 className="font-medium">{machine.name}</h4>
+                    <div className="text-sm text-muted-foreground">
+                      {machine.model.name}
+                      {machine.model.manufacturer && (
+                        <> • {machine.model.manufacturer}</>
+                      )}
+                      {machine.model.year && (
+                        <> • {String(machine.model.year)}</>
+                      )}
+                      <br />
+                      <span className="text-xs">
+                        @ {machine.location.name}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Edit Profile Dialog */}
-      <Dialog
-        open={editDialogOpen}
-        onClose={() => {
-          setEditDialogOpen(false);
-        }}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>Edit Profile</DialogTitle>
-        <DialogContent>
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
-            <TextField
-              label="Display Name"
-              value={editForm.name}
-              onChange={(e) => {
-                setEditForm({ ...editForm, name: e.target.value });
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Edit Profile</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Display Name</Label>
+              <Input
+                id="name"
+                value={editForm.name}
+                onChange={(e) => {
+                  setEditForm({ ...editForm, name: e.target.value });
+                }}
+                placeholder="Enter your display name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="bio">Bio</Label>
+              <Textarea
+                id="bio"
+                value={editForm.bio}
+                onChange={(e) => {
+                  setEditForm({ ...editForm, bio: e.target.value });
+                }}
+                placeholder="Tell us about yourself..."
+                maxLength={500}
+                rows={3}
+                className="resize-none"
+              />
+              <p className="text-xs text-muted-foreground text-right">
+                {String(editForm.bio.length)}/500 characters
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setEditDialogOpen(false);
               }}
-              fullWidth
-              placeholder="Enter your display name"
-            />
-            <TextField
-              label="Bio"
-              value={editForm.bio}
-              onChange={(e) => {
-                setEditForm({ ...editForm, bio: e.target.value });
-              }}
-              fullWidth
-              multiline
-              rows={3}
-              placeholder="Tell us about yourself..."
-              slotProps={{ htmlInput: { maxLength: 500 } }}
-              helperText={`${String(editForm.bio.length)}/500 characters`}
-            />
-          </Box>
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveProfile}
+              disabled={updateProfileMutation.isPending}
+            >
+              {updateProfileMutation.isPending ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() => {
-              setEditDialogOpen(false);
-            }}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSaveProfile}
-            variant="contained"
-            disabled={updateProfileMutation.isPending}
-          >
-            {updateProfileMutation.isPending ? "Saving..." : "Save Changes"}
-          </Button>
-        </DialogActions>
       </Dialog>
       {/* Upload Picture Dialog */}
-      <Dialog
-        open={uploadDialogOpen}
-        onClose={() => {
-          setUploadDialogOpen(false);
-        }}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>Change Profile Picture</DialogTitle>
-        <DialogContent>
-          <ProfilePictureUpload
-            currentUser={userProfile}
-            onUploadSuccess={handleUploadSuccess}
-            size="large"
-          />
+      <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Change Profile Picture</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <ProfilePictureUpload
+              currentUser={userProfile}
+              onUploadSuccess={handleUploadSuccess}
+              size="large"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setUploadDialogOpen(false);
+              }}
+            >
+              Close
+            </Button>
+          </DialogFooter>
         </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() => {
-              setUploadDialogOpen(false);
-            }}
-          >
-            Close
-          </Button>
-        </DialogActions>
       </Dialog>
-    </Container>
+    </div>
   );
 }

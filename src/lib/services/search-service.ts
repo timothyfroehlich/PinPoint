@@ -433,7 +433,7 @@ async function countLocations(query: string, organizationId: string): Promise<nu
  * Get search suggestions for autocomplete
  * Returns commonly searched terms and recent results
  */
-export const getSearchSuggestions = cache(async (query: string, organizationId: string, limit: number = 5): Promise<SearchResult[]> => {
+export const getSearchSuggestions = cache(async (query: string, organizationId: string, limit = 5): Promise<SearchResult[]> => {
   if (!query.trim() || query.length < 2) {
     return [];
   }

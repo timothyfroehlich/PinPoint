@@ -5,7 +5,7 @@
 
 import { cache } from "react";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
-import { comments, users, issues } from "~/server/db/schema";
+import { comments } from "~/server/db/schema";
 import { db, requireAuthContext, getServerAuthContext } from "./shared";
 
 /**

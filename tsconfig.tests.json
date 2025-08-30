@@ -20,6 +20,8 @@
     /* Keep some basic safety */
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
+    /* Relaxed import syntax for test frameworks */
+    "verbatimModuleSyntax": false,
     /* Test framework type definitions */
     "types": ["vitest/globals", "node"]
   },

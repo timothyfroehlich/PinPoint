@@ -39,12 +39,12 @@ interface UserTableActionsProps {
     emailVerified: Date | null;
   };
   currentUserCanManage: boolean;
-  availableRoles?: Array<{ 
+  availableRoles?: { 
     id: string; 
     name: string; 
     description?: string;
     isSystem: boolean;
-  }>;
+  }[];
 }
 
 export function UserTableActions({ user, currentUserCanManage, availableRoles = [] }: UserTableActionsProps) {
@@ -93,7 +93,7 @@ export function UserTableActions({ user, currentUserCanManage, availableRoles = 
         
         <RoleChangeDialog user={user} availableRoles={availableRoles}>
           <DropdownMenuItem 
-            onSelect={(e) => e.preventDefault()} // Prevent dropdown from closing
+            onSelect={(e) => { e.preventDefault(); }} // Prevent dropdown from closing
             className="cursor-pointer"
           >
             <ShieldIcon className="mr-2 h-4 w-4" />

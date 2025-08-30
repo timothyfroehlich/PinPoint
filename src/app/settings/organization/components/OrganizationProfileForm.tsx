@@ -35,8 +35,8 @@ export function OrganizationProfileForm({ organization }: OrganizationProfileFor
   useEffect(() => {
     if (state?.success && state.message) {
       toast.success(state.message);
-    } else if (!state?.success && state?.message) {
-      toast.error(state.message);
+    } else if (state && !state.success) {
+      toast.error(state.error);
     }
   }, [state]);
 
@@ -54,8 +54,8 @@ export function OrganizationProfileForm({ organization }: OrganizationProfileFor
           disabled={isPending}
           required
         />
-        {state?.fieldErrors?.name && (
-          <p className="text-sm text-destructive">{state.fieldErrors.name[0]}</p>
+        {state && !state.success && state.fieldErrors?.["name"] && (
+          <p className="text-sm text-destructive">{state.fieldErrors["name"][0]}</p>
         )}
       </div>
 
@@ -70,8 +70,8 @@ export function OrganizationProfileForm({ organization }: OrganizationProfileFor
           disabled={isPending}
           rows={3}
         />
-        {state?.fieldErrors?.description && (
-          <p className="text-sm text-destructive">{state.fieldErrors.description[0]}</p>
+        {state && !state.success && state.fieldErrors?.["description"] && (
+          <p className="text-sm text-destructive">{state.fieldErrors["description"][0]}</p>
         )}
       </div>
 
@@ -86,8 +86,8 @@ export function OrganizationProfileForm({ organization }: OrganizationProfileFor
           placeholder="https://example.com"
           disabled={isPending}
         />
-        {state?.fieldErrors?.website && (
-          <p className="text-sm text-destructive">{state.fieldErrors.website[0]}</p>
+        {state && !state.success && state.fieldErrors?.["website"] && (
+          <p className="text-sm text-destructive">{state.fieldErrors["website"][0]}</p>
         )}
       </div>
 
@@ -102,8 +102,8 @@ export function OrganizationProfileForm({ organization }: OrganizationProfileFor
           placeholder="(555) 123-4567"
           disabled={isPending}
         />
-        {state?.fieldErrors?.phone && (
-          <p className="text-sm text-destructive">{state.fieldErrors.phone[0]}</p>
+        {state && !state.success && state.fieldErrors?.["phone"] && (
+          <p className="text-sm text-destructive">{state.fieldErrors["phone"][0]}</p>
         )}
       </div>
 
@@ -118,8 +118,8 @@ export function OrganizationProfileForm({ organization }: OrganizationProfileFor
           disabled={isPending}
           rows={2}
         />
-        {state?.fieldErrors?.address && (
-          <p className="text-sm text-destructive">{state.fieldErrors.address[0]}</p>
+        {state && !state.success && state.fieldErrors?.["address"] && (
+          <p className="text-sm text-destructive">{state.fieldErrors["address"][0]}</p>
         )}
       </div>
 
@@ -139,9 +139,9 @@ export function OrganizationProfileForm({ organization }: OrganizationProfileFor
       </Button>
 
       {/* Error Display */}
-      {state?.message && !state.success && !state.fieldErrors && (
+      {state && !state.success && !state.fieldErrors && (
         <div className="rounded-md bg-destructive/15 p-3">
-          <p className="text-sm text-destructive">{state.message}</p>
+          <p className="text-sm text-destructive">{state.error}</p>
         </div>
       )}
     </form>
