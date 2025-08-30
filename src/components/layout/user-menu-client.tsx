@@ -64,7 +64,7 @@ export function UserMenuClient({ user }: UserMenuClientProps) {
         <DropdownMenuItem asChild>
           <Link
             href="/auth/sign-out"
-            className="flex items-center gap-2 text-red-600"
+            className="flex items-center gap-2 text-error"
           >
             <LogOutIcon className="h-4 w-4" />
             Sign Out

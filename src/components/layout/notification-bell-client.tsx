@@ -121,7 +121,7 @@ export function NotificationBellClient({
         >
           {hasNewNotifications || unreadCount > 0 ? (
             <BellRingIcon 
-              className={`h-5 w-5 ${hasNewNotifications ? 'animate-pulse text-blue-600' : ''}`} 
+              className={`h-5 w-5 ${hasNewNotifications ? 'animate-pulse text-primary' : ''}`} 
             />
           ) : (
             <BellIcon className="h-5 w-5" />
@@ -141,7 +141,7 @@ export function NotificationBellClient({
 
           {/* Connection Status Indicator (subtle) */}
           {!isConnected && unreadCount === 0 && (
-            <div className="absolute -top-0.5 -right-0.5 h-2 w-2 bg-yellow-400 rounded-full" />
+            <div className="absolute -top-0.5 -right-0.5 h-2 w-2 bg-secondary rounded-full" />
           )}
         </Button>
       </PopoverTrigger>
