@@ -19,7 +19,7 @@ import { requireMemberAccess } from "~/lib/organization-context";
 import { getCurrentOrganization } from "~/lib/dal/organizations";
 
 export default async function SettingsPage() {
-  const { user, organization } = await requireMemberAccess();
+  const { user } = await requireMemberAccess();
   const orgDetails = await getCurrentOrganization();
 
   const settingsCards = [

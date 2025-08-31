@@ -9,7 +9,6 @@ import {
   and,
   desc,
   eq,
-  ilike,
   or,
   count,
   sql,
@@ -103,19 +102,19 @@ export const getMachinesWithFilters = cache(
     if (filters.search) {
       const searchTerm = `%${filters.search}%`;
       whereConditions.push(
-        or(
-          ilike(machines.name, searchTerm),
-          sql`EXISTS (
-          SELECT 1 FROM ${locations} 
-          WHERE ${locations.id} = ${machines.location_id} 
-          AND ${locations.name} ILIKE ${searchTerm}
-        )`,
-          sql`EXISTS (
-          SELECT 1 FROM ${models} 
-          WHERE ${models.id} = ${machines.model_id} 
-          AND ${models.name} ILIKE ${searchTerm}
-        )`,
-        ),
+        sql`(
+          ${machines.name} ILIKE ${searchTerm}
+          OR EXISTS (
+            SELECT 1 FROM ${locations} 
+            WHERE ${locations.id} = ${machines.location_id} 
+            AND ${locations.name} ILIKE ${searchTerm}
+          )
+          OR EXISTS (
+            SELECT 1 FROM ${models} 
+            WHERE ${models.id} = ${machines.model_id} 
+            AND ${models.name} ILIKE ${searchTerm}
+          )
+        )`
       );
     }
 

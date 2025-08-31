@@ -91,13 +91,21 @@ export const getSystemSettings = cache(async (organizationId: string): Promise<S
     const settingsObject: Partial<SystemSettingsData> = {};
     
     for (const setting of settings) {
-      const [category, key] = setting.setting_key.split(".");
+      const parts = setting.setting_key.split(".");
+      const category = parts[0];
+      const key = parts[1];
       
-      if (!settingsObject[category as keyof SystemSettingsData]) {
-        settingsObject[category as keyof SystemSettingsData] = {} as any;
+      // Skip invalid setting keys
+      if (!category || !key) {
+        continue;
       }
       
-      (settingsObject[category as keyof SystemSettingsData] as any)[key] = setting.setting_value;
+      const categoryKey = category as keyof SystemSettingsData;
+      if (!settingsObject[categoryKey]) {
+        settingsObject[categoryKey] = {} as any;
+      }
+      
+      (settingsObject[categoryKey] as any)[key] = setting.setting_value;
     }
 
     // Merge with defaults to ensure all keys exist

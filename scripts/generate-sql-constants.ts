@@ -17,7 +17,7 @@
 
 import { writeFileSync } from "fs";
 import { join } from "path";
-import { SEED_TEST_IDS } from "../src/server/db/seed/constants";
+import { SEED_TEST_IDS } from "../src/test/constants/seed-test-ids";
 
 const generateSQLConstants = () => {
   const timestamp = new Date().toISOString();

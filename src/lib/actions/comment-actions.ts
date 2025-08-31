@@ -114,7 +114,7 @@ export async function addCommentAction(
         await generateCommentNotifications(issueId, commentData.id, {
           organizationId,
           actorId: user.id,
-          actorName: user.user_metadata?.name || user.email || 'Someone',
+          actorName: user.user_metadata?.['name'] as string || user.email || 'Someone',
         });
       } catch (error) {
         console.error('Failed to generate comment notifications:', error);
@@ -197,7 +197,7 @@ export async function editCommentAction(
 export async function deleteCommentAction(
   commentId: string,
   _prevState: ActionResult<{ success: boolean }> | null,
-  formData: FormData,
+  _formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
     const { user, organizationId } = await getActionAuthContext();
@@ -247,7 +247,7 @@ export async function deleteCommentAction(
 export async function restoreCommentAction(
   commentId: string,
   _prevState: ActionResult<{ success: boolean }> | null,
-  formData: FormData,
+  _formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
     const { user, organizationId } = await getActionAuthContext();

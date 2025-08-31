@@ -5,7 +5,6 @@
  */
 
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { Button } from "~/components/ui/button";
 import { Separator } from "~/components/ui/separator";
 import {
@@ -23,7 +22,7 @@ interface SettingsLayoutProps {
 
 export default async function SettingsLayout({ children }: SettingsLayoutProps) {
   // Ensure user is authenticated and has organization access
-  const { user, organization } = await requireMemberAccess();
+  await requireMemberAccess();
   
   // requireMemberAccess already ensures user is authenticated and has membership
   // No additional checks needed

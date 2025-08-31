@@ -150,7 +150,7 @@ export const getOrganizationContext = cache(async (): Promise<OrganizationContex
       user = {
         id: authUser.id,
         email: authUser.email!,
-        name: authUser.user_metadata?.name || authUser.email!,
+        name: authUser.user_metadata?.['name'] || authUser.email!,
       };
       
       accessLevel = "authenticated";
@@ -170,12 +170,17 @@ export const getOrganizationContext = cache(async (): Promise<OrganizationContex
     console.warn("Auth check failed in organization context:", error);
   }
   
-  return {
+  const context: OrganizationContext = {
     organization,
     user,
     accessLevel,
-    membership,
   };
+  
+  if (membership) {
+    context.membership = membership;
+  }
+  
+  return context;
 });
 
 /**

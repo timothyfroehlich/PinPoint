@@ -1,5 +1,5 @@
 import { createBrowserClient } from "@supabase/ssr";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { TypedSupabaseClient } from "~/types/supabase-client";
 import { env } from "~/env";
 
 /**
@@ -11,7 +11,7 @@ import { env } from "~/env";
  * - Next.js 15 App Router SSR compatibility
  * - Automatic cookie-based session sync across subdomains
  */
-export function createClient(): SupabaseClient {
+export function createClient(): TypedSupabaseClient {
   const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -21,20 +21,20 @@ export function createClient(): SupabaseClient {
     );
   }
 
-  return createBrowserClient(supabaseUrl, supabaseAnonKey);
+  return createBrowserClient(supabaseUrl, supabaseAnonKey) as unknown as TypedSupabaseClient;
 }
 
-// Singleton instance for performance optimization
-let clientInstance: SupabaseClient | null = null;
+// Singleton instance for performance optimization  
+let clientInstance: TypedSupabaseClient | null = null;
 
 /**
  * Gets a singleton instance of the Supabase browser client.
  * Prevents multiple client instances and improves performance.
  */
-export function getClient(): SupabaseClient {
+export function getClient(): TypedSupabaseClient {
   clientInstance ??= createClient();
   return clientInstance;
 }
 
 // Export types for TypeScript IntelliSense
-export type SupabaseBrowserClient = SupabaseClient;
+export type SupabaseBrowserClient = TypedSupabaseClient;
