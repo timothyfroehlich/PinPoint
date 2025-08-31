@@ -218,7 +218,16 @@ export const getIssueById = cache(async (issueId: string) => {
       eq(issues.organization_id, organizationId),
     ),
     with: {
-      machine: true,
+      machine: {
+        with: {
+          model: {
+            columns: { id: true, name: true },
+          },
+        },
+      },
+      status: {
+        columns: { id: true, name: true, category: true },
+      },
       assignedTo: {
         columns: { id: true, name: true, email: true },
       },

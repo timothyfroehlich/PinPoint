@@ -21,8 +21,7 @@ import { InviteUserDialog } from "./components/InviteUserDialog";
 import { format } from "date-fns";
 
 export default async function UsersSettingsPage() {
-  const { organization } = await requireMemberAccess();
-  const organizationId = organization.id;
+  await requireMemberAccess();
   
   // Fetch organization users and roles using the existing admin router
   const [users, roles] = await Promise.all([
@@ -46,7 +45,7 @@ export default async function UsersSettingsPage() {
   const availableRoles = roles.map(role => ({
     id: role.id,
     name: role.name,
-    description: role.description || undefined,
+    description: (role as any).description || undefined,
     isSystem: role.isSystem,
   }));
 

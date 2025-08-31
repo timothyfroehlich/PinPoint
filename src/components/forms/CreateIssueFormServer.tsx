@@ -99,7 +99,7 @@ export function CreateIssueFormServer({
             <Select
               name="machineId"
               required
-              defaultValue={initialMachineId}
+              defaultValue={initialMachineId || ""}
               disabled={isPending}
             >
               <SelectTrigger>

@@ -273,7 +273,7 @@ export function IssuesListServer({
   if (!issues) {
     return (
       <Suspense fallback={<IssuesListSkeleton />}>
-        <IssuesListWithData limit={limit} />
+        <IssuesListWithData limit={limit || 20} />
       </Suspense>
     );
   }

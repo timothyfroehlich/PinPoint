@@ -77,8 +77,8 @@ export function RealtimeCommentsClient({
             (payload) => {
               // Only show comments from other users and not already loaded
               if (
-                payload.new.author_id !== currentUserId &&
-                !existingCommentIds.includes(payload.new.id)
+                payload.new['author_id'] !== currentUserId &&
+                !existingCommentIds.includes(payload.new['id'])
               ) {
                 const newComment = payload.new as Comment;
                 
@@ -108,7 +108,7 @@ export function RealtimeCommentsClient({
             },
             (payload) => {
               // Update existing comment in real-time
-              if (payload.new.author_id !== currentUserId) {
+              if (payload.new['author_id'] !== currentUserId) {
                 const updatedComment = payload.new as Comment;
                 
                 setNewComments((prev) => {
@@ -134,7 +134,7 @@ export function RealtimeCommentsClient({
             },
             (payload) => {
               // Show status update notification
-              if (payload.new.updated_at !== payload.old.updated_at) {
+              if (payload.new['updated_at'] !== payload.old['updated_at']) {
                 setStatusUpdate({
                   status: "Status updated",
                   user: "Someone",
@@ -163,6 +163,7 @@ export function RealtimeCommentsClient({
       } catch (error) {
         console.error("Failed to initialize realtime connection:", error);
         setIsConnected(false);
+        return () => {}; // Return empty cleanup function on error
       }
     };
 

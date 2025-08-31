@@ -3,12 +3,23 @@
  * TODO: Implement full profile picture upload functionality
  */
 
+interface UserProfileResponse {
+  id: string;
+  name: string | null;
+  email?: string | null;
+  image?: string | null;
+  profile_picture?: string | null;
+}
+
 interface ProfilePictureUploadProps {
+  currentUser: UserProfileResponse;
+  onUploadSuccess: () => void;
+  size: string;
   currentImage?: string;
   onImageChange?: (imageUrl: string) => void;
 }
 
-export function ProfilePictureUpload({ currentImage, onImageChange }: ProfilePictureUploadProps) {
+export function ProfilePictureUpload({ currentUser: _currentUser, onUploadSuccess: _onUploadSuccess, size: _size, currentImage, onImageChange: _onImageChange }: ProfilePictureUploadProps) {
   return (
     <div className="space-y-4">
       <div className="flex items-center space-x-4">

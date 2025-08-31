@@ -26,12 +26,13 @@ show_usage() {
     echo "Safe curl client that only connects to localhost"
     echo ""
     echo "Security Restrictions:"
-    echo "  • Only localhost/127.0.0.1/::1 hosts allowed"
+    echo "  • Only localhost/127.0.0.1/::1 and *.localhost hosts allowed"
     echo "  • Only HTTP/HTTPS protocols allowed"
     echo "  • Port range: $ALLOWED_PORT_RANGE_MIN-$ALLOWED_PORT_RANGE_MAX"
     echo ""
     echo "Examples:"
     echo "  $0 http://localhost:3000                    # Basic GET request"
+    echo "  $0 http://apc.localhost:3000/issues         # Subdomain request"
     echo "  $0 http://localhost:3000/api/health -I      # HEAD request"
     echo "  $0 http://localhost:3000/api/users -X POST  # POST request"
     echo "  $0 localhost:3000                           # Auto-add http://"
@@ -120,11 +121,19 @@ extract_protocol() {
 # Function to check if host is allowed
 is_host_allowed() {
     local host="$1"
+    
+    # Check exact matches first
     for allowed_host in "${ALLOWED_HOSTS[@]}"; do
         if [[ "$host" == "$allowed_host" ]]; then
             return 0
         fi
     done
+    
+    # Check for localhost subdomains (*.localhost)
+    if [[ "$host" =~ \.localhost$ ]]; then
+        return 0
+    fi
+    
     return 1
 }
 

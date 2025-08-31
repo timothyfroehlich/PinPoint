@@ -400,8 +400,10 @@ export const userRouter = createTRPCRouter({
           }
         });
         commentsCountRows.forEach((row) => {
-          const existingCounts = userCounts.get(row.userId);
-          if (existingCounts) existingCounts.comments = row.count;
+          if (row.userId) {
+            const existingCounts = userCounts.get(row.userId);
+            if (existingCounts) existingCounts.comments = row.count;
+          }
         });
       }
 
