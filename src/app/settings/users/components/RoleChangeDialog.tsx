@@ -58,21 +58,21 @@ export function RoleChangeDialog({ user, availableRoles, children }: RoleChangeD
       toast.success(state.message || "User role updated successfully!");
       setIsOpen(false);
     } else if (state && !state.success) {
-      // Handle field errors or general error
-      if (state.fieldErrors) {
+      // Handle field errors or general error  
+      if ('fieldErrors' in state && state.fieldErrors) {
         Object.entries(state.fieldErrors).forEach(([field, errors]) => {
           if (Array.isArray(errors)) {
             errors.forEach(error => toast.error(`${field}: ${error}`));
           }
         });
-      } else if (state.message) {
-        toast.error(state.message);
+      } else if (state.error) {
+        toast.error(state.error);
       }
     }
   }, [state]);
 
   // Filter out roles that shouldn't be assignable
-  const assignableRoles = availableRoles.filter(role => 
+  const assignableRoles = availableRoles.filter(_role => 
     // Allow all roles for now, but you could add logic here
     // For example: !role.isSystem || role.id === user.role.id
     true
@@ -144,8 +144,8 @@ export function RoleChangeDialog({ user, availableRoles, children }: RoleChangeD
                   ))}
                 </SelectContent>
               </Select>
-              {state?.fieldErrors?.roleId && (
-                <p className="text-xs text-destructive">{state.fieldErrors.roleId[0]}</p>
+              {state && 'fieldErrors' in state && state.fieldErrors?.['roleId'] && (
+                <p className="text-xs text-destructive">{state.fieldErrors['roleId'][0]}</p>
               )}
             </div>
 

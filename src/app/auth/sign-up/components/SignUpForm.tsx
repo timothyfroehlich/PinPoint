@@ -7,6 +7,7 @@
 
 import { useActionState } from "react";
 import { useState, useEffect } from "react";
+import { z } from "zod";
 
 import { Button } from "~/components/ui/button";
 import {
@@ -32,11 +33,30 @@ import {
   sendMagicLink,
   type ActionResult,
 } from "~/lib/actions/auth-actions";
+import { type OrganizationOption } from "~/lib/dal/public-organizations";
 
-export interface OrganizationOption {
-  id: string;
-  name: string;
-  subdomain: string;
+// API Response validation schema for security
+const organizationSelectOptionsSchema = z.object({
+  organizations: z.array(z.object({
+    id: z.string().min(1),
+    name: z.string().min(1),
+    subdomain: z.string().min(1)
+  })),
+  defaultOrganizationId: z.string().nullable()
+});
+
+// Type guard for safe organization access
+function isValidOrganizationArray(data: unknown): data is OrganizationOption[] {
+  return Array.isArray(data) && data.every(item => 
+    typeof item === 'object' && 
+    item !== null && 
+    'id' in item && 
+    'name' in item && 
+    'subdomain' in item &&
+    typeof item.id === 'string' &&
+    typeof item.name === 'string' &&
+    typeof item.subdomain === 'string'
+  );
 }
 
 export function SignUpForm() {
@@ -60,11 +80,26 @@ export function SignUpForm() {
         if (!response.ok) {
           throw new Error("Failed to fetch organizations");
         }
-        const { organizations: orgs, defaultOrganizationId } = await response.json();
+        
+        // Security: Validate API response to prevent injection attacks
+        const rawData = await response.json();
+        const validatedData = organizationSelectOptionsSchema.parse(rawData);
+        
+        const { organizations: orgs, defaultOrganizationId } = validatedData;
+        
+        // Additional defensive validation
+        if (!isValidOrganizationArray(orgs)) {
+          throw new Error("Invalid organization data structure");
+        }
+        
         setOrganizations(orgs);
-        setSelectedOrganizationId(defaultOrganizationId || orgs[0]?.id || "");
+        setSelectedOrganizationId(defaultOrganizationId ?? orgs[0]?.id ?? "");
       } catch (error) {
         console.error("Failed to load organizations:", error);
+        // Handle validation errors gracefully
+        if (error instanceof z.ZodError) {
+          console.error("API response validation failed:", error.issues);
+        }
       } finally {
         setOrganizationsLoading(false);
       }

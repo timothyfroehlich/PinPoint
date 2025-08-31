@@ -29,7 +29,7 @@ const bulkMarkAsReadSchema = z.object({
 });
 
 const markAllAsReadSchema = z.object({
-  confirm: z.literal("true", { errorMap: () => ({ message: "Confirmation required" }) }),
+  confirm: z.literal("true", { message: "Confirmation required" }),
 });
 
 /**

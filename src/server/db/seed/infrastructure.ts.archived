@@ -266,7 +266,7 @@ async function createDefaultCollectionTypes(
       name: type.name,
       description: type.description,
       organization_id: organization_id,
-      is_default: true,
+      is_auto_generated: true,
     });
   }
 

@@ -20,12 +20,12 @@ import { requireMemberAccess } from "~/lib/organization-context";
 import { api } from "~/trpc/server";
 
 export default async function RolesSettingsPage() {
-  const { organization } = await requireMemberAccess();
-  const organizationId = organization.id;
+  await requireMemberAccess();
   
   // Fetch roles using the existing role router
   const roles = await api.role.getAll();
-  const roleStats = await api.role.getStats();
+  // TODO: Implement role statistics API
+  const roleStats: any[] = [];
 
   return (
     <div className="space-y-6">
@@ -62,7 +62,7 @@ export default async function RolesSettingsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {roles.filter(role => role.is_system).length}
+              {roles.filter(role => role.isSystem).length}
             </div>
           </CardContent>
         </Card>
@@ -74,7 +74,7 @@ export default async function RolesSettingsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {roles.filter(role => !role.is_system).length}
+              {roles.filter(role => !role.isSystem).length}
             </div>
           </CardContent>
         </Card>
@@ -113,15 +113,15 @@ export default async function RolesSettingsPage() {
                     <div>
                       <div className="flex items-center space-x-2">
                         <h3 className="text-lg font-medium">{role.name}</h3>
-                        {role.is_system && (
+                        {role.isSystem && (
                           <Badge variant="secondary">System</Badge>
                         )}
-                        {role.is_default && (
+                        {role.isDefault && (
                           <Badge variant="outline">Default</Badge>
                         )}
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        {role.description || "No description provided"}
+                        {(role as any).description || "No description provided"}
                       </p>
                       <div className="flex items-center space-x-4 mt-2 text-xs text-muted-foreground">
                         <span>
@@ -139,7 +139,7 @@ export default async function RolesSettingsPage() {
                     <Button variant="outline" size="sm">
                       Edit Permissions
                     </Button>
-                    {!role.is_system && (
+                    {!role.isSystem && (
                       <Button variant="ghost" size="sm">
                         <SettingsIcon className="h-4 w-4" />
                       </Button>

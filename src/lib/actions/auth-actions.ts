@@ -11,6 +11,11 @@ import { z } from "zod";
 import { createClient } from "~/lib/supabase/server";
 import { validateOrganizationExists, getOrganizationSubdomainById } from "~/lib/dal/public-organizations";
 import { isDevelopment } from "~/lib/environment";
+import { extractFormFields } from "~/lib/utils/form-data";
+import { actionError, type ActionResult } from "./shared";
+
+// Re-export ActionResult for compatibility with existing components
+export type { ActionResult };
 
 // Validation schemas
 const magicLinkSchema = z.object({
@@ -24,18 +29,6 @@ const oauthProviderSchema = z.object({
   redirectTo: z.string().url().optional(),
 });
 
-// Action result types for useActionState compatibility
-export type ActionResult<T> =
-  | {
-      success: true;
-      data: T;
-    }
-  | {
-      success: false;
-      error: string;
-      fieldErrors?: Record<string, string>;
-    };
-
 /**
  * Send Magic Link for passwordless authentication
  */
@@ -44,51 +37,29 @@ export async function sendMagicLink(
   formData: FormData,
 ): Promise<ActionResult<{ message: string }>> {
   try {
-    // Validate form data
-    const rawEmail = formData.get("email");
-    const rawOrganizationId = formData.get("organizationId");
-    const validation = magicLinkSchema.safeParse({ 
-      email: rawEmail, 
-      organizationId: rawOrganizationId 
-    });
-
-    if (!validation.success) {
-      const fieldErrors: Record<string, string> = {};
-      validation.error.issues.forEach((issue) => {
-        if (issue.path[0]) {
-          fieldErrors[issue.path[0] as string] = issue.message;
-        }
-      });
-      
-      return {
-        success: false,
-        error: "Please check your input",
-        fieldErrors,
-      };
+    // Validate form data with type safety
+    let data: { email: string; organizationId: string };
+    try {
+      data = extractFormFields(formData, magicLinkSchema);
+    } catch (error) {
+      return actionError(error instanceof Error ? error.message : "Form validation failed");
     }
 
-    const { email, organizationId } = validation.data;
+    const { email, organizationId } = data;
     
     // Validate organization exists
     const organizationValid = await validateOrganizationExists(organizationId);
     if (!organizationValid) {
-      return {
-        success: false,
-        error: "Invalid organization selected",
-        fieldErrors: {
-          organizationId: "Selected organization is not valid",
-        },
-      };
+      return actionError("Invalid organization selected", {
+        organizationId: ["Selected organization is not valid"],
+      });
     }
     const supabase = await createClient();
     
     // Get organization subdomain for redirect URL
     const subdomain = await getOrganizationSubdomainById(organizationId);
     if (!subdomain) {
-      return {
-        success: false,
-        error: "Organization configuration error",
-      };
+      return actionError("Organization configuration error");
     }
 
     // Build callback URL with organization subdomain
@@ -111,10 +82,7 @@ export async function sendMagicLink(
 
     if (error) {
       console.error("Magic link error:", error);
-      return {
-        success: false,
-        error: "Failed to send magic link. Please try again.",
-      };
+      return actionError("Failed to send magic link. Please try again.");
     }
 
     return {
@@ -125,10 +93,7 @@ export async function sendMagicLink(
     };
   } catch (error) {
     console.error("Magic link action error:", error);
-    return {
-      success: false,
-      error: "An unexpected error occurred. Please try again.",
-    };
+    return actionError("An unexpected error occurred. Please try again.");
   }
 }
 
@@ -178,9 +143,6 @@ export async function signInWithOAuth(
       provider,
       options: {
         redirectTo: `${callbackUrl}?${queryParams.toString()}`,
-        data: {
-          organizationId,
-        },
       },
     });
 
@@ -208,10 +170,7 @@ export async function devSignIn(
   _userData?: { name?: string; role?: string },
 ): Promise<ActionResult<{ message: string }>> {
   if (process.env.NODE_ENV !== "development") {
-    return {
-      success: false,
-      error: "Dev authentication only available in development",
-    };
+    return actionError("Dev authentication only available in development");
   }
 
   try {
@@ -227,10 +186,7 @@ export async function devSignIn(
     });
 
     if (error) {
-      return {
-        success: false,
-        error: "Dev authentication failed",
-      };
+      return actionError("Dev authentication failed");
     }
 
     revalidatePath("/", "layout");
@@ -243,10 +199,7 @@ export async function devSignIn(
     };
   } catch (error) {
     console.error("Dev auth error:", error);
-    return {
-      success: false,
-      error: "Development authentication failed",
-    };
+    return actionError("Development authentication failed");
   }
 }
 

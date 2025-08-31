@@ -68,7 +68,7 @@ export function NotificationClient({
 
   // Listen for custom events from other client islands
   useEffect(() => {
-    const handleIssueUpdate = (_event: CustomEvent) => {
+    const handleIssueUpdate: EventListener = (_event) => {
       addNotification({
         type: "success",
         title: "Issue Updated",
@@ -77,28 +77,30 @@ export function NotificationClient({
       });
     };
 
-    const handleMachineUpdate = (event: CustomEvent) => {
+    const handleMachineUpdate: EventListener = (event) => {
+      const customEvent = event as CustomEvent;
       addNotification({
         type: "info",
         title: "Machine Updated",
-        message: `Machine "${event.detail.machineName}" has been updated`,
+        message: `Machine "${customEvent.detail.machineName}" has been updated`,
         autoHide: true,
       });
     };
 
-    const handleFormSubmission = (event: CustomEvent) => {
-      if (event.detail.success) {
+    const handleFormSubmission: EventListener = (event) => {
+      const customEvent = event as CustomEvent;
+      if (customEvent.detail.success) {
         addNotification({
           type: "success",
-          title: event.detail.title || "Success",
-          message: event.detail.message || "Operation completed successfully",
+          title: customEvent.detail.title || "Success",
+          message: customEvent.detail.message || "Operation completed successfully",
           autoHide: true,
         });
       } else {
         addNotification({
           type: "error",
-          title: event.detail.title || "Error",
-          message: event.detail.message || "Operation failed",
+          title: customEvent.detail.title || "Error",
+          message: customEvent.detail.message || "Operation failed",
           autoHide: false,
         });
       }
@@ -139,11 +141,12 @@ export function NotificationClient({
             },
             (payload) => {
               if (payload.new) {
+                const notification = payload.new as any;
                 addNotification({
-                  type: payload.new.type || "info",
-                  title: payload.new.title || "Notification",
-                  message: payload.new.message || "",
-                  autoHide: payload.new.auto_hide !== false,
+                  type: notification.type || "info",
+                  title: notification.title || "Notification",
+                  message: notification.message || "",
+                  autoHide: notification.auto_hide !== false,
                 });
               }
             }
@@ -157,6 +160,7 @@ export function NotificationClient({
       } catch (error) {
         console.error("Failed to initialize notification stream:", error);
         setIsConnected(false);
+        return () => {}; // No-op cleanup function
       }
     };
 

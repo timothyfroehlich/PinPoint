@@ -151,7 +151,7 @@ export async function createIssueAction(
         await generateIssueCreationNotifications(issueData.id, {
           organizationId,
           actorId: user.id,
-          actorName: user.user_metadata?.name || user.email || 'Someone',
+          actorName: user.user_metadata?.['name'] as string || user.email || 'Someone',
         });
       } catch (error) {
         console.error('Failed to generate issue creation notifications:', error);
@@ -225,7 +225,7 @@ export async function updateIssueStatusAction(
           await generateStatusChangeNotifications(issueId, statusResult.name, {
             organizationId,
             actorId: user.id,
-            actorName: user.user_metadata?.name || user.email || 'Someone',
+            actorName: user.user_metadata?.['name'] as string || user.email || 'Someone',
           });
         }
       } catch (error) {
@@ -361,12 +361,12 @@ export async function updateIssueAssignmentAction(
       try {
         await generateAssignmentNotifications(
           issueId, 
-          validation.data.assigneeId, 
+          validation.data.assigneeId || null, 
           previousAssigneeId,
           {
             organizationId,
             actorId: user.id,
-            actorName: user.user_metadata?.name || user.email || 'Someone',
+            actorName: user.user_metadata?.['name'] as string || user.email || 'Someone',
           }
         );
       } catch (error) {
