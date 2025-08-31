@@ -3,6 +3,8 @@
  * TODO: Implement full location detail functionality
  */
 
+import type { PinPointSupabaseUser } from "~/lib/supabase/types";
+
 interface Location {
   id: string;
   name: string;
@@ -10,9 +12,11 @@ interface Location {
 
 interface LocationDetailViewProps {
   location: Location;
+  user: PinPointSupabaseUser | null;
+  locationId: string;
 }
 
-export function LocationDetailView({ location }: LocationDetailViewProps) {
+export function LocationDetailView({ location, user: _user, locationId: _locationId }: LocationDetailViewProps) {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="space-y-6">

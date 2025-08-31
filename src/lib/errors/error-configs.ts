@@ -39,7 +39,7 @@ function createErrorConfig(
     actions: actions.map(actionFactory => actionFactory(reset)),
     icon: options?.icon ?? AlertTriangle,
     severity: options?.severity ?? "error",
-    showErrorDetails: options?.showErrorDetails,
+    showErrorDetails: options?.showErrorDetails ?? false,
   });
 }
 
@@ -87,7 +87,7 @@ export const errorConfigs = {
     "Unable to load this specific issue. It may have been deleted or you may not have permission to view it.",
     [
       createCommonActions.retry,
-      (reset) => ({
+      (_reset) => ({
         label: "Back to Issues",
         action: () => window.location.href = "/issues",
         variant: "outline" as const,

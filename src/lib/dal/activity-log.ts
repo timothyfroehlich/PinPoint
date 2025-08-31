@@ -4,32 +4,34 @@
  */
 
 import { cache } from "react";
-import { desc, eq, and, like, between } from "drizzle-orm";
+import { desc, eq, and, between } from "drizzle-orm";
 import { db } from "./shared";
-import { activityLog, users } from "~/server/db/schema";
+import { activityLog } from "~/server/db/schema";
 import { generatePrefixedId } from "~/lib/utils/id-generation";
 
-// Type definitions for activity log
+// Type definitions for activity log (aligned with database schema)
 export interface ActivityLogEntry {
   id: string;
-  timestamp: Date;
+  created_at: Date;  // was timestamp
   action: string;
-  entity: string;
-  entityId: string;
-  userId: string;
+  entity_type: string;  // was entity
+  entity_id: string | null;  // was entityId
+  user_id: string | null;  // was userId
   userName: string;
   userEmail: string;
   details: string;
-  ipAddress: string;
-  userAgent: string;
+  ip_address: string | null;  // was ipAddress
+  user_agent: string | null;  // was userAgent
   severity: "info" | "warning" | "error";
-  organizationId: string;
+  organization_id: string;  // was organizationId
 }
 
 export interface ActivityLogFilters {
-  userId?: string;
+  user_id?: string;  // was userId
+  userId?: string;    // Keep old name for backwards compatibility
   action?: string;
-  entity?: string;
+  entity_type?: string;  // was entity
+  entity?: string;    // Keep old name for backwards compatibility
   severity?: "info" | "warning" | "error";
   dateFrom?: string;
   dateTo?: string;
@@ -104,8 +106,10 @@ export const getActivityLog = cache(async (
 
     const {
       userId,
+      user_id,
       action,
       entity,
+      entity_type,
       severity,
       dateFrom,
       dateTo,
@@ -113,21 +117,25 @@ export const getActivityLog = cache(async (
       limit = 50,
     } = filters;
 
+    // Support both old and new parameter names
+    const actualUserId = user_id || userId;
+    const actualEntity = entity_type || entity;
+
     // Build where conditions
     const whereConditions = [
       eq(activityLog.organization_id, organizationId)
     ];
 
-    if (userId) {
-      whereConditions.push(eq(activityLog.user_id, userId));
+    if (actualUserId) {
+      whereConditions.push(eq(activityLog.user_id, actualUserId));
     }
 
     if (action) {
       whereConditions.push(eq(activityLog.action, action));
     }
 
-    if (entity) {
-      whereConditions.push(eq(activityLog.entity, entity));
+    if (actualEntity) {
+      whereConditions.push(eq(activityLog.entity_type, actualEntity));
     }
 
     if (severity) {
@@ -137,7 +145,7 @@ export const getActivityLog = cache(async (
     if (dateFrom || dateTo) {
       const fromDate = dateFrom ? new Date(dateFrom) : new Date('1970-01-01');
       const toDate = dateTo ? new Date(dateTo) : new Date();
-      whereConditions.push(between(activityLog.timestamp, fromDate, toDate));
+      whereConditions.push(between(activityLog.created_at, fromDate, toDate));
     }
 
     const whereClause = whereConditions.length > 1 
@@ -165,7 +173,7 @@ export const getActivityLog = cache(async (
           },
         },
       },
-      orderBy: [desc(activityLog.timestamp)],
+      orderBy: [desc(activityLog.created_at)],
       limit,
       offset,
     });
@@ -173,18 +181,18 @@ export const getActivityLog = cache(async (
     // Map to expected format
     const mappedEntries: ActivityLogEntry[] = entries.map(entry => ({
       id: entry.id,
-      timestamp: entry.timestamp,
+      created_at: entry.created_at,
       action: entry.action,
-      entity: entry.entity,
-      entityId: entry.entity_id,
-      userId: entry.user_id,
-      userName: entry.user.name || 'Unknown User',
-      userEmail: entry.user.email || 'unknown@example.com',
-      details: entry.details,
-      ipAddress: entry.ip_address || '0.0.0.0',
-      userAgent: entry.user_agent || 'Unknown',
+      entity_type: entry.entity_type,
+      entity_id: entry.entity_id,
+      user_id: entry.user_id,
+      userName: entry.user?.name || 'Unknown User',
+      userEmail: entry.user?.email || 'unknown@example.com',
+      details: typeof entry.details === 'string' ? entry.details : JSON.stringify(entry.details || {}),
+      ip_address: entry.ip_address,
+      user_agent: entry.user_agent,
       severity: entry.severity as "info" | "warning" | "error",
-      organizationId: entry.organization_id,
+      organization_id: entry.organization_id,
     }));
 
     return {
@@ -238,13 +246,13 @@ export async function logActivity(params: {
       organization_id: organizationId,
       user_id: userId,
       action,
-      entity,
+      entity_type: entity,
       entity_id: entityId,
-      details,
+      details: JSON.stringify(details),
       severity,
       ip_address: ipAddress,
       user_agent: userAgent,
-      timestamp: new Date(),
+      created_at: new Date(),
     });
   } catch (error) {
     console.error("Error logging activity:", error);
@@ -339,7 +347,7 @@ export async function exportActivityLog(
     const csvHeader = "Timestamp,Action,Entity,Entity ID,User Name,User Email,Details,Severity,IP Address\n";
     
     const csvRows = result.entries.map(entry => 
-      `"${entry.timestamp.toISOString()}","${entry.action}","${entry.entity}","${entry.entityId}","${entry.userName}","${entry.userEmail}","${entry.details}","${entry.severity}","${entry.ipAddress}"`
+      `"${entry.created_at.toISOString()}","${entry.action}","${entry.entity_type}","${entry.entity_id || ''}","${entry.userName}","${entry.userEmail}","${entry.details}","${entry.severity}","${entry.ip_address || ''}"`
     ).join("\n");
 
     return csvHeader + csvRows;

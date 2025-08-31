@@ -38,7 +38,7 @@ interface ErrorBoundaryCardProps {
  * Reusable error boundary card that follows PinPoint's design patterns
  * Integrates with existing shadcn/ui components for consistency
  */
-export function ErrorBoundaryCard({ error, reset, config }: ErrorBoundaryCardProps) {
+export function ErrorBoundaryCard({ error, reset: _reset, config }: ErrorBoundaryCardProps) {
   const {
     title,
     description,

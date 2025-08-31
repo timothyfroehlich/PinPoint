@@ -15,8 +15,8 @@ import { memberships } from "~/server/db/schema";
 export const db = getGlobalDatabaseProvider().getClient();
 
 /**
- * Get current authenticated user (organization-agnostic)
- * Organization context is determined separately at request time
+ * Get current authenticated user with organization context
+ * Uses the new organization context system for request-time organization resolution
  * Uses React 19 cache() for request-level memoization to eliminate duplicate auth queries
  */
 export const getServerAuthContext = cache(async () => {
@@ -30,11 +30,29 @@ export const getServerAuthContext = cache(async () => {
     return { user: null, organizationId: null, membership: null, role: null };
   }
 
-  // Users are now organization-agnostic - no organizationId in user identity
-  // Organization context comes from request-time subdomain resolution
+  // Import here to avoid circular dependency
+  const { getOrganizationContext } = await import("~/lib/organization-context");
+  
+  try {
+    // Get organization context from the new system
+    const orgContext = await getOrganizationContext();
+    
+    if (orgContext?.user?.id === user.id && orgContext.accessLevel === "member" && orgContext.membership) {
+      return {
+        user,
+        organizationId: orgContext.organization.id,
+        membership: orgContext.membership,
+        role: orgContext.membership.role,
+      };
+    }
+  } catch (error) {
+    console.warn("Failed to get organization context:", error);
+  }
+
+  // Return user without organization context if not a member or context unavailable
   return {
     user,
-    organizationId: null, // Will be set by request-time organization context
+    organizationId: null,
     membership: null,
     role: null,
   };
@@ -103,13 +121,13 @@ export const requireAuthContextWithOrg = cache(async (organizationId: string) =>
 
 /**
  * Get authenticated user context with role and permissions
- * Includes membership and role information for authorization
+ * Uses the new organization context system with enhanced role information
  * Uses React 19 cache() for request-level memoization
  */
 export const getServerAuthContextWithRole = cache(async () => {
-  const { user, organizationId } = await getServerAuthContext();
+  const baseContext = await getServerAuthContext();
 
-  if (!user || !organizationId) {
+  if (!baseContext.user || !baseContext.organizationId || !baseContext.membership) {
     return {
       user: null,
       organizationId: null,
@@ -119,11 +137,11 @@ export const getServerAuthContextWithRole = cache(async () => {
     };
   }
 
-  // Get user membership with role and permissions
-  const membership = await db.query.memberships.findFirst({
+  // Get enhanced role information with permissions from database
+  const enhancedMembership = await db.query.memberships.findFirst({
     where: and(
-      eq(memberships.user_id, user.id),
-      eq(memberships.organization_id, organizationId),
+      eq(memberships.user_id, baseContext.user.id),
+      eq(memberships.organization_id, baseContext.organizationId),
     ),
     with: {
       role: {
@@ -150,10 +168,10 @@ export const getServerAuthContextWithRole = cache(async () => {
     },
   });
 
-  if (!membership) {
+  if (!enhancedMembership) {
     return {
-      user,
-      organizationId,
+      user: baseContext.user,
+      organizationId: baseContext.organizationId,
       membership: null,
       role: null,
       permissions: [],
@@ -161,25 +179,43 @@ export const getServerAuthContextWithRole = cache(async () => {
   }
 
   // Extract permissions for easy access
-  const permissions = membership.role.rolePermissions.map(
+  const permissions = enhancedMembership.role.rolePermissions.map(
     (rp) => rp.permission.name,
   );
 
   return {
-    user,
-    organizationId,
-    membership,
-    role: membership.role,
+    user: baseContext.user,
+    organizationId: baseContext.organizationId,
+    membership: enhancedMembership,
+    role: enhancedMembership.role,
     permissions,
   };
 });
+
+/**
+ * Type for complete auth context with all required properties
+ */
+type CompleteAuthContext = {
+  user: NonNullable<Awaited<ReturnType<typeof getServerAuthContextWithRole>>["user"]>;
+  organizationId: NonNullable<Awaited<ReturnType<typeof getServerAuthContextWithRole>>["organizationId"]>;
+  membership: NonNullable<Awaited<ReturnType<typeof getServerAuthContextWithRole>>["membership"]>;
+  role: NonNullable<Awaited<ReturnType<typeof getServerAuthContextWithRole>>["role"]>;
+  permissions: Awaited<ReturnType<typeof getServerAuthContextWithRole>>["permissions"];
+};
+
+/**
+ * Type guard to check if context has all required properties
+ */
+function hasCompleteAuthContext(context: Awaited<ReturnType<typeof getServerAuthContextWithRole>>): context is CompleteAuthContext {
+  return !!(context.user && context.organizationId && context.membership && context.role);
+}
 
 /**
  * Require authenticated user context with role validation
  * Throws if not authenticated, no organization, or no role assigned
  * Uses React 19 cache() for request-level memoization
  */
-export const requireAuthContextWithRole = cache(async () => {
+export const requireAuthContextWithRole = cache(async (): Promise<CompleteAuthContext> => {
   const context = await getServerAuthContextWithRole();
 
   if (!context.user) {
@@ -194,13 +230,11 @@ export const requireAuthContextWithRole = cache(async () => {
     throw new Error("Role assignment required");
   }
 
-  return {
-    user: context.user,
-    organizationId: context.organizationId,
-    membership: context.membership,
-    role: context.role,
-    permissions: context.permissions,
-  };
+  if (!hasCompleteAuthContext(context)) {
+    throw new Error("Incomplete authentication context");
+  }
+
+  return context;
 });
 
 /**

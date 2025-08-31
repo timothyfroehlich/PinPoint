@@ -15,7 +15,7 @@ interface LocationListProps {
   user: PinPointSupabaseUser | null;
 }
 
-export function LocationList({ locations, user }: LocationListProps) {
+export function LocationList({ locations }: LocationListProps) {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="space-y-6">
