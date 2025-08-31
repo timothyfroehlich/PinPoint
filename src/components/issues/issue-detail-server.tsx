@@ -181,14 +181,14 @@ export async function IssueDetailServer({ issueId }: IssueDetailServerProps) {
                 <div className="flex items-center gap-3">
                   <Avatar className="h-8 w-8">
                     <AvatarFallback>
-                      {issue.assignedTo.name
+                      {(issue.assignedTo.name || issue.assignedTo.email || "U")
                         .split(" ")
-                        .map((n) => n[0])
+                        .map((n: string) => n[0])
                         .join("")}
                     </AvatarFallback>
                   </Avatar>
                   <div>
-                    <p className="font-medium">{issue.assignedTo.name}</p>
+                    <p className="font-medium">{issue.assignedTo.name || issue.assignedTo.email}</p>
                     <p className="text-sm text-muted-foreground">
                       {issue.assignedTo.email}
                     </p>
@@ -202,8 +202,8 @@ export async function IssueDetailServer({ issueId }: IssueDetailServerProps) {
               <div className="mt-4">
                 <IssueAssignmentClient
                   issueId={issue.id}
-                  currentAssigneeId={issue.assignedTo?.id}
-                  currentAssigneeName={issue.assignedTo?.name}
+                  {...(issue.assignedTo?.id && { currentAssigneeId: issue.assignedTo.id })}
+                  {...(issue.assignedTo?.name && { currentAssigneeName: issue.assignedTo.name })}
                 />
               </div>
             </CardContent>

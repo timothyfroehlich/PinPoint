@@ -1,10 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { TypedSupabaseClient } from "~/types/supabase-client";
 import { cookies } from "next/headers";
 import { env } from "~/env";
 import { isDevelopment } from "~/lib/environment";
 
-export async function createClient(): Promise<SupabaseClient> {
+export async function createClient(): Promise<TypedSupabaseClient> {
   const cookieStore = await cookies();
 
   if (!env.NEXT_PUBLIC_SUPABASE_URL) {
@@ -44,5 +44,5 @@ export async function createClient(): Promise<SupabaseClient> {
         },
       },
     },
-  );
+  ) as unknown as TypedSupabaseClient;
 }

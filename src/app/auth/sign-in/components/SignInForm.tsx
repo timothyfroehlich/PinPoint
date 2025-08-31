@@ -8,6 +8,7 @@
 import { useActionState } from "react";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { z } from "zod";
 
 import { Button } from "~/components/ui/button";
 import {
@@ -33,16 +34,35 @@ import {
   signInWithOAuth,
   type ActionResult,
 } from "~/lib/actions/auth-actions";
+import { type OrganizationOption } from "~/lib/dal/public-organizations";
 
 // Development auth integration
 import { authenticateDevUser, getAuthResultMessage } from "~/lib/auth/dev-auth";
 import { isDevAuthAvailable } from "~/lib/environment-client";
 import { createClient } from "~/utils/supabase/client";
 
-export interface OrganizationOption {
-  id: string;
-  name: string;
-  subdomain: string;
+// API Response validation schema for security
+const organizationSelectOptionsSchema = z.object({
+  organizations: z.array(z.object({
+    id: z.string().min(1),
+    name: z.string().min(1),
+    subdomain: z.string().min(1)
+  })),
+  defaultOrganizationId: z.string().nullable()
+});
+
+// Type guard for safe organization access
+function isValidOrganizationArray(data: unknown): data is OrganizationOption[] {
+  return Array.isArray(data) && data.every(item => 
+    typeof item === 'object' && 
+    item !== null && 
+    'id' in item && 
+    'name' in item && 
+    'subdomain' in item &&
+    typeof item.id === 'string' &&
+    typeof item.name === 'string' &&
+    typeof item.subdomain === 'string'
+  );
 }
 
 export function SignInForm() {
@@ -73,11 +93,26 @@ export function SignInForm() {
         if (!response.ok) {
           throw new Error("Failed to fetch organizations");
         }
-        const { organizations: orgs, defaultOrganizationId } = await response.json();
+        
+        // Security: Validate API response to prevent injection attacks
+        const rawData = await response.json();
+        const validatedData = organizationSelectOptionsSchema.parse(rawData);
+        
+        const { organizations: orgs, defaultOrganizationId } = validatedData;
+        
+        // Additional defensive validation
+        if (!isValidOrganizationArray(orgs)) {
+          throw new Error("Invalid organization data structure");
+        }
+        
         setOrganizations(orgs);
-        setSelectedOrganizationId(defaultOrganizationId || orgs[0]?.id || "");
+        setSelectedOrganizationId(defaultOrganizationId ?? orgs[0]?.id ?? "");
       } catch (error) {
         console.error("Failed to load organizations:", error);
+        // Handle validation errors gracefully
+        if (error instanceof z.ZodError) {
+          console.error("API response validation failed:", error.issues);
+        }
       } finally {
         setOrganizationsLoading(false);
       }
@@ -112,13 +147,11 @@ export function SignInForm() {
       const supabase = createClient();
       const userData = {
         email,
-        name: email.split("@")[0] ?? "",
+        name: email.split("@").at(0) ?? "user",
         role,
         organizationId: selectedOrganizationId,
       };
-      const result = await authenticateDevUser(supabase, userData);
-
-      const message = getAuthResultMessage(result);
+      const result = await authenticateDevUser(supabase as any, userData);
 
       if (result.success) {
         console.log("Dev login successful:", result.method);
@@ -129,7 +162,7 @@ export function SignInForm() {
         // Use the selected organization from the dropdown to redirect to proper subdomain
         const selectedOrg = organizations.find(org => org.id === selectedOrganizationId);
         if (selectedOrg?.subdomain) {
-          const isDev = process.env.NODE_ENV === 'development';
+          const isDev = typeof window !== 'undefined' && window.location.hostname === 'localhost';
           if (isDev) {
             window.location.href = `http://${selectedOrg.subdomain}.localhost:3000/dashboard`;
             return;

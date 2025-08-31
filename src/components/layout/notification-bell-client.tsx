@@ -47,7 +47,7 @@ export function NotificationBellClient({
               table: "notifications",
               filter: `user_id=eq.${userId}`,
             },
-            (payload) => {
+            () => {
               // New notification received
               setUnreadCount((prev) => prev + 1);
               setHasNewNotifications(true);
@@ -68,11 +68,11 @@ export function NotificationBellClient({
             },
             (payload) => {
               // Notification was marked as read
-              if (payload.old.read === false && payload.new.read === true) {
+              if (payload.old['read'] === false && payload.new['read'] === true) {
                 setUnreadCount((prev) => Math.max(0, prev - 1));
               }
               // Notification was marked as unread
-              else if (payload.old.read === true && payload.new.read === false) {
+              else if (payload.old['read'] === true && payload.new['read'] === false) {
                 setUnreadCount((prev) => prev + 1);
               }
             }
@@ -92,6 +92,7 @@ export function NotificationBellClient({
       } catch (error) {
         console.error("Failed to initialize notification realtime connection:", error);
         setIsConnected(false);
+        return () => {}; // Return empty cleanup function on error
       }
     };
 

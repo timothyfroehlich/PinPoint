@@ -107,6 +107,8 @@ async function getIssueStakeholders(issueId: string, organizationId: string) {
   if (issue.assignedTo) {
     stakeholders.push({
       ...issue.assignedTo,
+      name: issue.assignedTo.name || issue.assignedTo.email || "Unknown User",
+      email: issue.assignedTo.email || "",
       role: "assignee",
     });
   }
@@ -115,6 +117,8 @@ async function getIssueStakeholders(issueId: string, organizationId: string) {
   if (issue.createdBy) {
     stakeholders.push({
       ...issue.createdBy,
+      name: issue.createdBy.name || issue.createdBy.email || "Unknown User",
+      email: issue.createdBy.email || "",
       role: "creator",
     });
   }
@@ -123,6 +127,8 @@ async function getIssueStakeholders(issueId: string, organizationId: string) {
   if (issue.machine?.owner) {
     stakeholders.push({
       ...issue.machine.owner,
+      name: issue.machine.owner.name || issue.machine.owner.email || "Unknown User",
+      email: issue.machine.owner.email || "",
       role: "machine_owner",
     });
   }
@@ -143,7 +149,7 @@ async function getIssueStakeholders(issueId: string, organizationId: string) {
  */
 export async function generateCommentNotifications(
   issueId: string,
-  commentId: string,
+  _commentId: string,
   context: NotificationContext,
 ) {
   try {
@@ -201,7 +207,7 @@ export async function generateCommentNotifications(
 export async function generateAssignmentNotifications(
   issueId: string,
   newAssigneeId: string | null,
-  previousAssigneeId: string | null,
+  _previousAssigneeId: string | null,
   context: NotificationContext,
 ) {
   try {

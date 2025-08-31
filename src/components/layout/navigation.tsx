@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { Button } from "~/components/ui/button";
-import { Suspense } from "react";
 import {
   AlertTriangleIcon,
   WrenchIcon,
@@ -107,7 +106,11 @@ export function Navigation({ organizationContext }: NavigationProps) {
             
             <UserContextDisplay user={organizationContext.user} organization={organizationContext.organization} />
 
-            <UserMenuClient user={organizationContext.user} />
+            <UserMenuClient user={{
+              id: organizationContext.user.id,
+              name: organizationContext.user.name || organizationContext.user.email,
+              email: organizationContext.user.email,
+            }} />
           </div>
         </div>
       </div>

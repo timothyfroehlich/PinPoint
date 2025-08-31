@@ -25,6 +25,7 @@ export function OrganizationLogoForm({ currentLogoUrl }: OrganizationLogoFormPro
     null,
   );
   const [previewUrl, setPreviewUrl] = useState(currentLogoUrl);
+  const [hasImageError, setHasImageError] = useState(false);
 
   // Show toast notifications based on action state
   useEffect(() => {
@@ -41,7 +42,15 @@ export function OrganizationLogoForm({ currentLogoUrl }: OrganizationLogoFormPro
 
   const clearLogo = () => {
     setPreviewUrl("");
+    setHasImageError(false);
   };
+
+  // Reset error state when previewUrl changes
+  useEffect(() => {
+    if (previewUrl) {
+      setHasImageError(false);
+    }
+  }, [previewUrl]);
 
   return (
     <div className="space-y-4">
@@ -51,15 +60,13 @@ export function OrganizationLogoForm({ currentLogoUrl }: OrganizationLogoFormPro
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className="h-12 w-12 rounded border flex items-center justify-center overflow-hidden bg-muted">
-                {previewUrl ? (
+                {previewUrl && !hasImageError ? (
                   <img
                     src={previewUrl}
                     alt="Organization logo"
                     className="h-full w-full object-contain"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.style.display = 'none';
-                      target.parentElement!.innerHTML = '<ImageIcon class="h-6 w-6 text-muted-foreground" />';
+                    onError={() => {
+                      setHasImageError(true);
                     }}
                   />
                 ) : (

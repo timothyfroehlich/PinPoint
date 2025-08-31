@@ -57,7 +57,7 @@ export function LazyClientIsland<T = any>({
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) {
+        if (entry?.isIntersecting) {
           loadComponent();
           observer.disconnect();
         }
@@ -147,7 +147,7 @@ export function LazyClientIsland<T = any>({
   return (
     <div ref={containerRef} data-lazy-loaded={name}>
       <Suspense fallback={fallback}>
-        <Component {...componentProps} />
+        <Component {...(componentProps as any)} />
       </Suspense>
     </div>
   );

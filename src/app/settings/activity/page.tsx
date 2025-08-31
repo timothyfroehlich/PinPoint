@@ -199,7 +199,7 @@ export default async function ActivityLogPage({
                       </div>
                       <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                         <ClockIcon className="h-3 w-3" />
-                        {format(entry.timestamp, "PPp")}
+                        {format(entry.created_at, "PPp")}
                       </div>
                     </div>
 
@@ -210,9 +210,9 @@ export default async function ActivityLogPage({
                         <span>({entry.userEmail})</span>
                       </div>
                       <span>•</span>
-                      <span>IP: {entry.ipAddress}</span>
+                      <span>IP: {entry.ip_address}</span>
                       <span>•</span>
-                      <span>Entity: {entry.entity}</span>
+                      <span>Entity: {entry.entity_type}</span>
                     </div>
                   </div>
                 </div>

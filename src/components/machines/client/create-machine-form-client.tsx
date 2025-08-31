@@ -50,7 +50,15 @@ export function CreateMachineFormClient({
 }: CreateMachineFormClientProps) {
   const router = useRouter();
   
-  const [state, formAction, isPending] = useActionState(action, null);
+  // Wrapper to adapt Server Action for useActionState
+  const actionWrapper = async (
+    _prevState: ActionResult<{ machineId: string }> | null,
+    formData: FormData
+  ) => {
+    return await action(formData);
+  };
+
+  const [state, formAction, isPending] = useActionState(actionWrapper, null);
 
   // Redirect on success
   if (state?.success && state.data?.machineId) {
@@ -87,8 +95,8 @@ export function CreateMachineFormClient({
                 disabled={isPending}
                 required
               />
-              {state?.fieldErrors?.name && (
-                <p className="text-sm text-destructive">{state.fieldErrors.name[0]}</p>
+              {!state?.success && state?.fieldErrors?.['name'] && (
+                <p className="text-sm text-destructive">{state.fieldErrors['name'][0]}</p>
               )}
             </div>
 
@@ -112,8 +120,8 @@ export function CreateMachineFormClient({
                   ))}
                 </SelectContent>
               </Select>
-              {state?.fieldErrors?.locationId && (
-                <p className="text-sm text-destructive">{state.fieldErrors.locationId[0]}</p>
+              {!state?.success && state?.fieldErrors?.['locationId'] && (
+                <p className="text-sm text-destructive">{state.fieldErrors['locationId'][0]}</p>
               )}
             </div>
 
@@ -143,8 +151,8 @@ export function CreateMachineFormClient({
                   ))}
                 </SelectContent>
               </Select>
-              {state?.fieldErrors?.modelId && (
-                <p className="text-sm text-destructive">{state.fieldErrors.modelId[0]}</p>
+              {!state?.success && state?.fieldErrors?.['modelId'] && (
+                <p className="text-sm text-destructive">{state.fieldErrors['modelId'][0]}</p>
               )}
             </div>
 
@@ -157,8 +165,8 @@ export function CreateMachineFormClient({
                 placeholder="Enter owner information"
                 disabled={isPending}
               />
-              {state?.fieldErrors?.ownerId && (
-                <p className="text-sm text-destructive">{state.fieldErrors.ownerId[0]}</p>
+              {!state?.success && state?.fieldErrors?.['ownerId'] && (
+                <p className="text-sm text-destructive">{state.fieldErrors['ownerId'][0]}</p>
               )}
             </div>
           </div>

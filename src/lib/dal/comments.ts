@@ -28,7 +28,7 @@ export const getCommentsForIssue = cache(async (issueId: string) => {
           id: true,
           name: true,
           email: true,
-          avatar_url: true,
+          profile_picture: true,
         },
       },
     },
@@ -55,7 +55,7 @@ export const getCommentById = cache(async (commentId: string) => {
           id: true,
           name: true,
           email: true,
-          avatar_url: true,
+          profile_picture: true,
         },
       },
       issue: {
@@ -87,7 +87,7 @@ export const getRecentCommentsForOrg = cache(async (limit = 10) => {
           id: true,
           name: true,
           email: true,
-          avatar_url: true,
+          profile_picture: true,
         },
       },
       issue: {
