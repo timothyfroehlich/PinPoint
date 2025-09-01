@@ -127,7 +127,7 @@ export function usePermissions(): UsePermissionsReturn {
     hasPermission,
     permissions,
     isAuthenticated,
-    isLoading: loading || isLoading,
+    isLoading: loading ?? isLoading,
     isError,
     isAdmin,
   };

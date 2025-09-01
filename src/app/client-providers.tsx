@@ -7,7 +7,7 @@ export function ClientProviders({
   children,
 }: {
   children: React.ReactNode;
-}): JSX.Element {
+}): React.JSX.Element {
   return (
     <TRPCReactProvider>
       <ThemeProvider

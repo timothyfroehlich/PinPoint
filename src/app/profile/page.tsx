@@ -34,14 +34,12 @@ import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
 import { cn } from "~/lib/utils";
 import React, { useState } from "react";
 
-import type { JSX } from "react";
-
 import { useAuth } from "~/app/auth-provider";
 import { ProfilePictureUpload } from "~/components/profile/ProfilePictureUpload";
 import { UserAvatar } from "~/components/ui/UserAvatar";
 import { api } from "~/trpc/react";
 
-function SignOutButton(): JSX.Element {
+function SignOutButton(): React.JSX.Element {
   const { signOut } = useAuth();
 
   const handleSignOut = async (): Promise<void> => {
@@ -65,7 +63,7 @@ function SignOutButton(): JSX.Element {
   );
 }
 
-export default function ProfilePage(): JSX.Element {
+export default function ProfilePage(): React.JSX.Element {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [editForm, setEditForm] = useState({ name: "", bio: "" });

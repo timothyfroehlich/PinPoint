@@ -53,7 +53,7 @@ export function mockServerActionAuth(mockContext = createMockAuthContext()) {
         id: "membership-test",
         user_id: mockContext.user.id,
         organization_id: mockContext.organizationId,
-        role_id: mockContext.membership?.role_id || "role-test",
+        role_id: mockContext.membership?.role_id ?? "role-test",
       },
     })),
   }));
@@ -68,17 +68,17 @@ export function mockServerActionAuth(mockContext = createMockAuthContext()) {
         user_id: mockContext.user.id,
         organization_id: mockContext.organizationId,
         role: {
-          id: mockContext.membership?.role_id || "role-test",
+          id: mockContext.membership?.role_id ?? "role-test",
           name: "Member",
         },
-        role_id: mockContext.membership?.role_id || "role-test",
+        role_id: mockContext.membership?.role_id ?? "role-test",
         rolePermissions: [],
       },
       role: {
-        id: mockContext.membership?.role_id || "role-test",
+        id: mockContext.membership?.role_id ?? "role-test",
         name: "Member",
       },
-      permissions: mockContext.permissions || [],
+      permissions: mockContext.permissions ?? [],
     })),
   }));
 

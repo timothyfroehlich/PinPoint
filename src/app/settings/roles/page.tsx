@@ -141,7 +141,7 @@ export default async function RolesSettingsPage() {
                           users
                         </span>
                         <span>•</span>
-                        <span>{role.permissions?.length || 0} permissions</span>
+                        <span>{role.permissions?.length ?? 0} permissions</span>
                       </div>
                     </div>
                   </div>

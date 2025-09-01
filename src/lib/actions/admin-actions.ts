@@ -34,9 +34,15 @@ import { PERMISSIONS } from "~/server/auth/permissions.constants";
 // Enhanced validation schemas with better error messages
 const inviteUserSchema = z.object({
   email: emailSchema.transform((s) => s.toLowerCase()),
-  name: z.string().max(100, "Name must be less than 100 characters").optional(),
+  name: z
+    .string()
+    .max(100, "Name must be less than 100 characters")
+    .optional(),
   roleId: uuidSchema.optional(),
-  message: z.string().max(500, "Message must be less than 500 characters").optional(),
+  message: z
+    .string()
+    .max(500, "Message must be less than 500 characters")
+    .optional(),
 });
 
 const updateUserRoleSchema = z.object({

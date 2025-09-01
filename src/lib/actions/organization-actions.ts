@@ -7,7 +7,7 @@
 
 import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
-import { nameSchema, LIMITS } from "../validation/schemas";
+import { nameSchema, LIMITS } from "~/lib/validation/schemas";
 import { eq } from "drizzle-orm";
 import { getGlobalDatabaseProvider } from "~/server/db/provider";
 import { organizations } from "~/server/db/schema";

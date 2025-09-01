@@ -93,16 +93,16 @@ export function NotificationClient({
       if (customEvent.detail.success) {
         addNotification({
           type: "success",
-          title: customEvent.detail.title || "Success",
+          title: customEvent.detail.title ?? "Success",
           message:
-            customEvent.detail.message || "Operation completed successfully",
+            customEvent.detail.message ?? "Operation completed successfully",
           autoHide: true,
         });
       } else {
         addNotification({
           type: "error",
-          title: customEvent.detail.title || "Error",
-          message: customEvent.detail.message || "Operation failed",
+          title: customEvent.detail.title ?? "Error",
+          message: customEvent.detail.message ?? "Operation failed",
           autoHide: false,
         });
       }
@@ -145,9 +145,9 @@ export function NotificationClient({
               if (payload.new) {
                 const notification = payload.new as any;
                 addNotification({
-                  type: notification.type || "info",
-                  title: notification.title || "Notification",
-                  message: notification.message || "",
+                  type: notification.type ?? "info",
+                  title: notification.title ?? "Notification",
+                  message: notification.message ?? "",
                   autoHide: notification.auto_hide !== false,
                 });
               }

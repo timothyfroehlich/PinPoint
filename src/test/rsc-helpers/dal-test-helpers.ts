@@ -14,8 +14,8 @@ import {
  * Uses SEED_TEST_IDS for predictable testing
  */
 export function createMockAuthContext(userId?: string, orgId?: string) {
-  const testUserId = userId || SEED_TEST_IDS.USERS.ADMIN;
-  const testOrgId = orgId || SEED_TEST_IDS.ORGANIZATIONS.primary;
+  const testUserId = userId ?? SEED_TEST_IDS.USERS.ADMIN;
+  const testOrgId = orgId ?? SEED_TEST_IDS.ORGANIZATIONS.primary;
 
   return {
     user: {

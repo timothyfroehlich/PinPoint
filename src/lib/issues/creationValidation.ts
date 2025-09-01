@@ -82,7 +82,7 @@ export function validateMachineOwnership(
   return { valid: true };
 }
 
-import { titleSchema, emailSchema, LIMITS } from "../validation/schemas";
+import { titleSchema, emailSchema, LIMITS } from "~/lib/validation/schemas";
 
 /**
  * Validate issue creation input parameters
@@ -95,7 +95,10 @@ export function validateIssueCreationInput(
   const titleStr = input.title;
   const titleResult = titleSchema.safeParse(titleStr);
   if (!titleResult.success) {
-  return { valid: false, error: titleResult.error.issues[0].message };
+    return {
+      valid: false,
+      error: titleResult.error.issues[0]?.message ?? "Invalid title",
+    };
   }
 
   // Validate optional description (use commentContentSchema for length constraints but allow empty)
@@ -115,7 +118,10 @@ export function validateIssueCreationInput(
   if ("reporterEmail" in input && input.reporterEmail) {
     const emailResult = emailSchema.safeParse(input.reporterEmail);
     if (!emailResult.success) {
-  return { valid: false, error: emailResult.error.issues[0].message };
+      return {
+        valid: false,
+        error: emailResult.error.issues[0]?.message ?? "Invalid email",
+      };
     }
   }
 
