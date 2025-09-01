@@ -37,6 +37,14 @@ export default tseslint.config(
     },
   },
   {
+    // Allow server-only imports and type exports in organization context module
+    files: ["src/lib/organization-context.ts"],
+    rules: {
+      "no-restricted-imports": "off",
+      "no-restricted-syntax": "off",
+    },
+  },
+  {
     // Main configuration for all TS/TSX files
     files: convertPatterns.forESLint(INCLUDE_PATTERNS.production),
     plugins: {
@@ -87,6 +95,13 @@ export default tseslint.config(
           selector:
             "CallExpression[callee.property.name='update']:not([arguments.0])",
           message: "UPDATE operations must include WHERE clause",
+        },
+        // Type-only imports for search params must go through ~/lib/types
+        {
+          selector:
+            "ImportDeclaration[importKind='type'][source.value=/^~\\/lib\\/search-params\\/(issue|machine)-search-params$/]",
+          message:
+            "Import search param types from '~/lib/types' (or '~/lib/types/search'), not directly from '~/lib/search-params/*'. Keep value imports (parsers/builders) from '~/lib/search-params/*'.",
         },
       ],
 
@@ -178,12 +193,18 @@ export default tseslint.config(
   },
   {
     // Guardrails for app code (exclude server code)
-    files: ["src/**/*.{ts,tsx}"],
-    excludedFiles: [
-      "src/server/**",
-      "supabase/**",
-      "RSC_MIGRATION/**",
-      "docs/**",
+    // Target app code files but explicitly exclude directories where exported
+    // types/interfaces are allowed (negated globs are used for exclusions).
+    files: [
+  "src/**/*.{ts,tsx}",
+  "!src/lib/types/**",
+  "!src/components/**",
+  "!src/**/__tests__/**",
+  "!e2e/**",
+  "!src/server/db/**",
+  "!supabase/**",
+  "!RSC_MIGRATION/**",
+  "!docs/**",
     ],
     rules: {
       // App code must not depend directly on DB schema/types or low-level server modules
@@ -200,6 +221,18 @@ export default tseslint.config(
               name: "~/server/db/types",
               message:
                 "Import DB model types via '~/lib/types' (Db.*) per CORE-TS-003. Do not import server DB types directly in app code.",
+            },
+            {
+              name: "~/lib/dal/issues",
+              importNames: ["IssueFilters"],
+              message:
+                "Import IssueFilters from '~/lib/types' (filters) per CORE-TS-002. DAL does not export this type.",
+            },
+            {
+              name: "~/lib/dal/machines",
+              importNames: ["MachineFilters"],
+              message:
+                "Import MachineFilters from '~/lib/types' (filters) per CORE-TS-002. DAL does not export this type.",
             },
             {
               name: "@supabase/supabase-js",
@@ -227,6 +260,32 @@ export default tseslint.config(
           ],
         },
       ],
+      // Disallow exported type/interface declarations in app code outside of the
+      // canonical `src/lib/types` and other allowed locations. This prevents
+      // ad-hoc domain types from being declared in random modules and enforces
+      // the types consolidation plan (WS-08).
+      "no-restricted-syntax": [
+        "error",
+        {
+          // export interface Foo { ... }
+          selector: "ExportNamedDeclaration[declaration.type='TSInterfaceDeclaration']",
+          message:
+            "Exported interfaces must be declared under 'src/lib/types' (or an allowed exception). Move this interface to '~/lib/types' or keep it internal to a component/test.",
+        },
+        {
+          // export type Foo = ...
+          selector: "ExportNamedDeclaration[declaration.type='TSTypeAliasDeclaration']",
+          message:
+            "Exported type aliases must be declared under 'src/lib/types' (or an allowed exception). Move this type to '~/lib/types' or keep it internal to a component/test.",
+        },
+      ],
+    },
+  },
+  {
+    // Allow type-only search param re-exports in the types barrel
+    files: ["src/lib/types/search.ts"],
+    rules: {
+      "no-restricted-syntax": "off",
     },
   },
   {

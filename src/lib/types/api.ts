@@ -216,15 +216,7 @@ export interface ModelResponse
   };
 }
 
-/** OPDB search result */
-export interface OPDBSearchResult {
-  id: string;
-  name: string;
-  manufacturer?: string;
-  year?: number;
-  type?: string;
-  playfield_image?: string;
-}
+
 
 /** Attachment response */
 export type AttachmentResponse = DrizzleToCamelCase<
@@ -350,34 +342,6 @@ export type MachineModel = NonNullable<MachineResponse>["model"];
 /** Owner from machine response */
 export type MachineOwner = NonNullable<MachineResponse>["owner"];
 
-// ============================================================================
-// Input Types - For Forms and Filters
-// ============================================================================
-
-/** Issue filtering parameters */
-export interface IssueFilters {
-  machineId?: string;
-  statusIds?: string[];
-  statusId?: string;
-  statusCategory?: string;
-  assigneeId?: string;
-  reporterId?: string;
-  locationId?: string;
-  modelId?: string;
-  ownerId?: string;
-  search?: string;
-  sortBy?: "created" | "updated" | "status" | "severity" | "game";
-  sortOrder?: "asc" | "desc";
-  limit?: number;
-}
-
-/** Machine filtering parameters */
-export interface MachineFilters {
-  locationId?: string;
-  modelId?: string;
-  ownerId?: string;
-  organizationId?: string;
-}
 
 // ============================================================================
 // Utility Types - Common Patterns
@@ -401,50 +365,6 @@ export type IssueSortBy = "created" | "updated" | "priority" | "status";
 /** Sort order options */
 export type SortOrder = "asc" | "desc";
 
-// ============================================================================
-// Component-Specific Types - For Props and State
-// ============================================================================
-
-/** Props for components displaying a single issue */
-export interface IssueComponentProps {
-  issue: IssueResponse;
-  onUpdate?: (issue: IssueResponse) => void;
-  onDelete?: (issueId: string) => void;
-}
-
-/** Props for components displaying issue lists */
-export interface IssueListComponentProps {
-  issues: IssueList;
-  onSelectIssue?: (issue: IssueResponse) => void;
-  onSelectAll?: (selected: boolean) => void;
-  selectedIssues?: string[];
-}
-
-/** Props for components displaying a single machine */
-export interface MachineComponentProps {
-  machine: MachineResponse;
-  onUpdate?: (machine: MachineResponse) => void;
-  onDelete?: (machineId: string) => void;
-}
-
-/** Props for components displaying machine lists */
-export interface MachineListComponentProps {
-  machines: MachineList;
-  onSelectMachine?: (machine: MachineResponse) => void;
-}
-
-/** Props for components displaying a single location */
-export interface LocationComponentProps {
-  location: LocationResponse;
-  onUpdate?: (location: LocationResponse) => void;
-  onDelete?: (locationId: string) => void;
-}
-
-/** Props for components displaying location lists */
-export interface LocationListComponentProps {
-  locations: LocationList;
-  onSelectLocation?: (location: LocationResponse) => void;
-}
 
 // ============================================================================
 // Re-exports for Convenience

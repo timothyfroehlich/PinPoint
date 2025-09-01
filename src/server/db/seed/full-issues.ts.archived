@@ -47,7 +47,7 @@ const mapReporterToUserId = (email?: string): string => {
   return SEED_TEST_IDS.USERS.MEMBER1;
 };
 
-// Map common game titles/opdb ids to known machines; for unknown games we use MOCK_PATTERNS.MACHINE
+// Map common models/opdb ids to known machines; for unknown games we use MOCK_PATTERNS.MACHINE
 const knownMachineByTitle = (
   title?: string,
   opdb?: string,

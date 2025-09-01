@@ -1,6 +1,6 @@
 /**
  * Machine Filter Dropdown Component
- * Filters issues by machine/game with real-time issue counts
+ * Filters issues by machine with real-time issue counts
  */
 
 import { useMemo } from "react";
@@ -16,19 +16,19 @@ import {
 import { Loader2 } from "lucide-react";
 import { api } from "~/trpc/react";
 
-interface GameFilterDropdownProps {
+interface MachineFilterDropdownProps {
   onChange: (machineId: string) => void;
   value: string;
   disabled?: boolean;
   showCounts?: boolean;
 }
 
-export function GameFilterDropdown({ 
+export function MachineFilterDropdown({ 
   onChange, 
   value, 
   disabled = false,
   showCounts = true 
-}: GameFilterDropdownProps) {
+}: MachineFilterDropdownProps) {
   // Fetch real machine data from API
   const { data: machines, isLoading: machinesLoading } = api.machine.core.getAllForIssues.useQuery();
   

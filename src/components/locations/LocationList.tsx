@@ -3,12 +3,10 @@
  * TODO: Implement full location listing functionality
  */
 
-import type { PinPointSupabaseUser } from "~/lib/supabase/types";
+import type { PinPointSupabaseUser, LocationResponse } from "~/lib/types";
 
-interface Location {
-  id: string;
-  name: string;
-}
+// Use canonical Location type to avoid drift
+type Location = Pick<LocationResponse, "id" | "name">;
 
 interface LocationListProps {
   locations: Location[];

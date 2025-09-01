@@ -7,9 +7,9 @@ import {
   ShieldIcon,
   PlusIcon,
 } from "lucide-react";
-import type { OrganizationContext } from "~/lib/organization-context";
-import { UserMenuClient } from "./client/UserMenuClient";
-import { UniversalSearchInput } from "~/components/search";
+import type { OrganizationContext } from "~/lib/types";
+import { UserMenuClient } from "./user-menu-client";
+import { UniversalSearch } from "~/components/search/universal-search";
 import { NotificationBellWrapper } from "./notification-bell-wrapper";
 
 interface NavigationProps {
@@ -91,7 +91,7 @@ export function Navigation({ organizationContext }: NavigationProps) {
 
           {/* Global Search */}
           <div className="flex-1 max-w-md mx-6">
-            <UniversalSearchInput
+            <UniversalSearch
               placeholder="Search anything..."
               showSuggestions={true}
               showRecentSearches={true}
@@ -106,11 +106,11 @@ export function Navigation({ organizationContext }: NavigationProps) {
             
             <UserContextDisplay user={organizationContext.user} organization={organizationContext.organization} />
 
-            <UserMenuClient user={{
-              id: organizationContext.user.id,
-              name: organizationContext.user.name || organizationContext.user.email,
-              email: organizationContext.user.email,
-            }} />
+  <UserMenuClient user={{
+      id: organizationContext.user.id,
+      name: organizationContext.user.name ?? organizationContext.user.email,
+      email: organizationContext.user.email,
+    }} />
           </div>
         </div>
       </div>
@@ -139,11 +139,10 @@ function UserContextDisplay({
 }) {
   return (
     <div className="text-right hidden lg:block">
-      <p className="text-sm font-medium text-on-primary-container">{user.name || user.email}</p>
+      <p className="text-sm font-medium text-on-primary-container">{user.name ?? user.email}</p>
       <p className="text-xs text-on-surface-variant">
         {organization.name}
       </p>
     </div>
   );
 }
-

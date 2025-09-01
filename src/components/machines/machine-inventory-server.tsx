@@ -17,11 +17,11 @@ import {
   TableRow,
 } from "~/components/ui/table";
 import { MapPinIcon, QrCodeIcon, PlusIcon } from "lucide-react";
-import { MachineSearchClient } from "./client/machine-search-client";
+import { GenericSearch } from "~/components/ui/generic-search";
 import { MachineFiltersClient } from "./client/machine-filters-client";
-import { PaginationUniversal } from "~/components/ui/pagination-universal";
+import { PaginationUniversal } from "~/components/ui/pagination-server";
+import type { MachineFilters } from "~/lib/types";
 import type {
-  MachineFilters,
   MachinePagination as MachinePaginationType,
   MachineSorting,
 } from "~/lib/dal/machines";
@@ -87,7 +87,11 @@ export async function MachineInventoryServer({
         {/* Search and Filters */}
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1">
-            <MachineSearchClient initialSearch={filters.search} />
+            <GenericSearch 
+              initialSearch={filters.search} 
+              basePath="/machines"
+              placeholder="Search machines, locations, or models..."
+            />
           </div>
           <MachineFiltersClient
             locations={locations}
@@ -129,7 +133,12 @@ export async function MachineInventoryServer({
       {/* Search and Filters */}
       <div className="flex flex-col md:flex-row gap-4">
         <div className="flex-1">
-          <MachineSearchClient initialSearch={filters.search} />
+          <GenericSearch 
+            initialSearch={filters.search} 
+            basePath="/machines"
+            placeholder="Search machines, locations, or models..."
+            size="sm"
+          />
         </div>
         <MachineFiltersClient
           locations={locations}

@@ -9,6 +9,11 @@ import type {
   RoleAssignmentInput,
   RoleManagementContext,
 } from "~/lib/users/roleManagementValidation";
+import type {
+  RoleResponse,
+  RoleResponseWithDetails,
+  PermissionResponse,
+} from "~/lib/types";
 
 // Internal utilities (alphabetical)
 import { generatePrefixedId } from "~/lib/utils/id-generation";
@@ -27,24 +32,7 @@ import type { RoleService } from "~/server/services/roleService";
 import { memberships, roles } from "~/server/db/schema";
 import { type Membership, type Role } from "~/server/db/types";
 
-// Interface definitions for role-related responses
-export interface RoleResponse {
-  id: string;
-  name: string;
-  organizationId: string;
-  isSystem: boolean;
-  isDefault: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-  memberCount: number;
-  permissions: PermissionResponse[];
-}
-
-export interface PermissionResponse {
-  id: string;
-  name: string;
-  description: string | null;
-}
+// Use canonical API types from ~/lib/types
 
 /**
  * Create role service using factory pattern
@@ -58,7 +46,7 @@ export const roleRouter = createTRPCRouter({
    * List all roles in the organization
    */
   list: organizationManageProcedure.query(
-    async ({ ctx }): Promise<RoleResponse[]> => {
+    async ({ ctx }): Promise<RoleResponseWithDetails[]> => {
       const roleService = createRoleService(ctx);
       const roles = await roleService.getRoles();
 
@@ -202,7 +190,7 @@ export const roleRouter = createTRPCRouter({
         roleId: z.string(),
       }),
     )
-    .query(async ({ ctx, input }): Promise<RoleResponse> => {
+    .query(async ({ ctx, input }): Promise<RoleResponseWithDetails> => {
       // Get role details
       const role = await ctx.db.query.roles.findFirst({
         where: eq(roles.id, input.roleId),

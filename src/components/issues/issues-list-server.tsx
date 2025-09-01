@@ -12,11 +12,8 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
 } from "lucide-react";
-import {
-  getIssuesForOrg,
-  type IssueFilters,
-  type IssueSorting,
-} from "~/lib/dal/issues";
+import { getIssuesForOrg, type IssueSorting } from "~/lib/dal/issues";
+import type { IssueFilters } from "~/lib/types";
 import { formatDistanceToNow } from "date-fns";
 
 // Type based on actual DAL structure

@@ -10,10 +10,8 @@ import Link from "next/link";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
 import { X } from "lucide-react";
-import {
-  buildIssueUrl,
-  type IssueSearchParams,
-} from "~/lib/search-params/issue-search-params";
+import { buildIssueUrl } from "~/lib/search-params/issue-search-params";
+import type { IssueSearchParams } from "~/lib/types";
 
 interface IssueActiveFiltersProps {
   filters: IssueSearchParams;

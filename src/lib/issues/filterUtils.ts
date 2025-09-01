@@ -3,17 +3,8 @@
  * Extracted from IssueList component for proper unit testing
  */
 
-export interface IssueFilters {
-  locationId?: string | undefined;
-  machineId?: string | undefined;
-  statusIds?: string[] | undefined;
-  search?: string | undefined;
-  assigneeId?: string | undefined;
-  reporterId?: string | undefined;
-  ownerId?: string | undefined;
-  sortBy: "created" | "updated" | "status" | "severity" | "game";
-  sortOrder: "asc" | "desc";
-}
+import type { IssueFilters } from "~/lib/types";
+import { ISSUE_SORT_OPTIONS } from "~/lib/types/filters";
 
 /**
  * Default filter values for new filter objects
@@ -121,7 +112,7 @@ export function clearAllFilters(): IssueFilters {
 function isValidSortField(value: unknown): value is IssueFilters["sortBy"] {
   return (
     typeof value === "string" &&
-    ["created", "updated", "status", "severity", "game"].includes(value)
+    ISSUE_SORT_OPTIONS.includes(value as typeof ISSUE_SORT_OPTIONS[number])
   );
 }
 

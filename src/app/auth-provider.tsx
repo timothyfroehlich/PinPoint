@@ -9,7 +9,7 @@ import {
   type JSX,
 } from "react";
 
-import type { PinPointSupabaseUser } from "~/lib/supabase/types";
+import type { PinPointSupabaseUser } from "~/lib/types";
 
 import { createClient } from "~/utils/supabase/client";
 

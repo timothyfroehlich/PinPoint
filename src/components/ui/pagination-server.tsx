@@ -20,6 +20,16 @@ interface PaginationServerProps {
   showSummary?: boolean;
 }
 
+// Legacy compatibility interface for PaginationUniversal migration
+interface PaginationUniversalProps {
+  currentPage: number;
+  totalPages: number;
+  totalCount: number;
+  baseUrl: string;
+  searchParams?: Record<string, string | string[] | undefined>;
+  itemName?: string;
+}
+
 export function PaginationServer({
   currentPage,
   totalPages,
@@ -246,5 +256,33 @@ export function PaginationServerCompact({
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * Legacy compatibility component for PaginationUniversal migration
+ * Maps PaginationUniversal API to PaginationServer implementation
+ */
+export function PaginationUniversal({
+  currentPage,
+  totalPages,
+  totalCount,
+  baseUrl,
+  searchParams = {},
+  itemName = "items",
+}: PaginationUniversalProps) {
+  // Calculate items per page (estimate from totalCount and totalPages)
+  const itemsPerPage = totalPages > 1 ? Math.ceil(totalCount / totalPages) : totalCount;
+  
+  return (
+    <PaginationServer
+      currentPage={currentPage}
+      totalPages={totalPages}
+      totalItems={totalCount}
+      basePath={baseUrl}
+      searchParams={searchParams}
+      itemsPerPage={itemsPerPage}
+      showSummary={true}
+    />
   );
 }

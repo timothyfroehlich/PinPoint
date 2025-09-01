@@ -16,7 +16,7 @@ import {
   ALL_PERMISSIONS,
 } from "../auth/permissions.constants";
 
-import type { PinPointSupabaseUser } from "~/lib/supabase/types";
+import type { PinPointSupabaseUser } from "~/lib/types";
 
 import { type DrizzleClient } from "~/server/db/drizzle";
 

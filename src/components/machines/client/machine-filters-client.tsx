@@ -27,7 +27,7 @@ import {
   ListIcon,
   XIcon,
 } from "lucide-react";
-import type { MachineFilters } from "~/lib/dal/machines";
+import type { MachineFilters } from "~/lib/types";
 
 interface MachineFiltersClientProps {
   locations: {

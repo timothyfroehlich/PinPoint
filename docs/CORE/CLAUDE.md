@@ -17,6 +17,7 @@ When working on PinPoint, reference CORE documentation in this priority order:
 
 ### 3. Implementation Patterns
 - **TYPESCRIPT_STRICTEST_PATTERNS.md** - Type safety patterns for @tsconfig/strictest
+- **TYPE_INVENTORY.md** - Type Ownership Matrix and import reference for ~/lib/types
 - **MULTI_CONFIG_STRATEGY.md** - Multi-tier TypeScript/ESLint configuration system
 
 ### 4. User Requirements
