@@ -122,7 +122,11 @@ export const requireAuthContextWithOrg = cache(async (organizationId: string) =>
 export const getServerAuthContextWithRole = cache(async () => {
   const baseContext = await getServerAuthContext();
 
-  if (!baseContext.user || !baseContext.organizationId || !baseContext.membership) {
+  if (
+    baseContext.user == null ||
+    baseContext.organizationId == null ||
+    baseContext.membership == null
+  ) {
     return {
       user: null,
       organizationId: null,
@@ -190,13 +194,13 @@ export const getServerAuthContextWithRole = cache(async () => {
 /**
  * Type for complete auth context with all required properties
  */
-type CompleteAuthContext = {
+interface CompleteAuthContext {
   user: NonNullable<Awaited<ReturnType<typeof getServerAuthContextWithRole>>["user"]>;
   organizationId: NonNullable<Awaited<ReturnType<typeof getServerAuthContextWithRole>>["organizationId"]>;
   membership: NonNullable<Awaited<ReturnType<typeof getServerAuthContextWithRole>>["membership"]>;
   role: NonNullable<Awaited<ReturnType<typeof getServerAuthContextWithRole>>["role"]>;
   permissions: Awaited<ReturnType<typeof getServerAuthContextWithRole>>["permissions"];
-};
+}
 
 /**
  * Type guard to check if context has all required properties
@@ -221,7 +225,7 @@ export const requireAuthContextWithRole = cache(async (): Promise<CompleteAuthCo
     throw new Error("Organization selection required");
   }
 
-  if (!context.membership || !context.role) {
+  if (context.membership == null || context.role == null) {
     throw new Error("Role assignment required");
   }
 
@@ -241,8 +245,8 @@ export interface PaginationOptions {
 }
 
 export function getPaginationParams(options: PaginationOptions = {}) {
-  const page = Math.max(1, options.page || 1);
-  const limit = Math.min(100, Math.max(1, options.limit || 20));
+  const page = Math.max(1, options.page ?? 1);
+  const limit = Math.min(100, Math.max(1, options.limit ?? 20));
   const offset = (page - 1) * limit;
 
   return { limit, offset, page };

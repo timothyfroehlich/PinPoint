@@ -86,7 +86,7 @@ export const locationRouter = createTRPCRouter({
         .leftJoin(models, eq(models.id, machines.model_id))
         .leftJoin(issues, eq(issues.machine_id, machines.id))
         .leftJoin(issueStatuses, eq(issueStatuses.id, issues.status_id))
-        .where(eq(locations.organization_id, ctx.organization.id))
+        .where(eq(locations.organization_id, ctx.organizationId))
         .groupBy(
           locations.id,
           locations.name,

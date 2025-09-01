@@ -1,5 +1,9 @@
 # Repository Guidelines
 
+IMPORTANT: You must read and follow `docs/CORE/NON_NEGOTIABLES.md` before making changes. These rules are enforced in reviews and CI.
+
+**Documentation Review Requirement**: Any document in `docs/CORE/` that hasn't been reviewed within 5 days must be verified for consistency with the current codebase state before use.
+
 Read and follow @CLAUDE.md
 
 ## Project Structure & Modules

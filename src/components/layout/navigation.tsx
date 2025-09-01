@@ -17,7 +17,7 @@ interface NavigationProps {
 }
 
 export function Navigation({ organizationContext }: NavigationProps) {
-  if (!organizationContext || !organizationContext.user) {
+  if (!organizationContext?.user) {
     // Unauthenticated navigation - using Material 3 surface colors
     return (
       <nav className="border-b border-outline-variant bg-surface">

@@ -91,7 +91,7 @@ export function FilterPresets({
             key={preset.id}
             variant={isActive ? "default" : "outline"}
             size="sm"
-            onClick={() => onPresetClick(preset.filters)}
+            onClick={() => { onPresetClick(preset.filters); }}
             className={cn(
               "h-8 px-3",
               isActive && "bg-primary text-primary-foreground"
@@ -110,7 +110,7 @@ export function FilterPresets({
       <Button
         variant="ghost"
         size="sm"
-        onClick={() => onPresetClick({})}
+        onClick={() => { onPresetClick({}); }}
         className="h-8 px-3 text-muted-foreground"
         title="Clear all filters"
       >

@@ -24,11 +24,10 @@
 
 ### Essential
 
-- [`NON_NEGOTIABLES.md`](./NON_NEGOTIABLES.md) - Critical file patterns
-- [`latest-updates/`](./latest-updates/) - Post-training tech updates (August 2025)  
-- [`quick-reference/`](./quick-reference/) - Auto-loaded tactical patterns
+- [`CORE/`](./CORE/) - **Most critical documentation** (NON_NEGOTIABLES, TARGET_ARCHITECTURE, etc.)
 - [`developer-guides/`](./developer-guides/) - Implementation guides
 - [`testing/`](./testing/) - Test system reboot plan
+- [`quick-reference/`](./quick-reference/) - Auto-loaded tactical patterns
 
 ### Reference
 
@@ -54,6 +53,6 @@
 ## Usage
 
 1. Check [`CLAUDE.md`](../CLAUDE.md) for project context
-2. Use [`quick-reference/`](./quick-reference/) for immediate patterns
-3. Follow [`NON_NEGOTIABLES.md`](./NON_NEGOTIABLES.md) for critical requirements
+2. Start with [`CORE/`](./CORE/) for foundational documentation
+3. Use [`quick-reference/`](./quick-reference/) for immediate patterns
 4. Run tests before commits

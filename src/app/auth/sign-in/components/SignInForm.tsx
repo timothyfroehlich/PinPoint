@@ -117,7 +117,7 @@ export function SignInForm() {
         role,
         organizationId: selectedOrganizationId,
       };
-      const result = await authenticateDevUser(supabase as any, userData);
+      const result = await authenticateDevUser(supabase, userData);
 
       if (result.success) {
         console.log("Dev login successful:", result.method);
@@ -130,7 +130,7 @@ export function SignInForm() {
         if (selectedOrg?.subdomain) {
           const isDev = typeof window !== 'undefined' && window.location.hostname === 'localhost';
           if (isDev) {
-            window.location.href = `http://${selectedOrg.subdomain}.localhost:3000/dashboard`;
+            window.location.href = `https://${selectedOrg.subdomain}.localhost:3000/dashboard`;
             return;
           }
           // In production, use dynamic domain
@@ -199,7 +199,7 @@ export function SignInForm() {
 
         {/* Google OAuth */}
         <Button
-          onClick={() => handleOAuthSignIn("google")}
+          onClick={() => void handleOAuthSignIn("google")}
           disabled={isOAuthLoading || magicLinkPending || devAuthLoading}
           className="w-full"
           variant="outline"
@@ -328,7 +328,7 @@ export function SignInForm() {
               <div className="space-y-2">
                 <Button
                   onClick={() =>
-                    handleDevAuth("tim.froehlich@example.com", "Admin")
+                    void handleDevAuth("tim.froehlich@example.com", "Admin")
                   }
                   disabled={
                     devAuthLoading || magicLinkPending || isOAuthLoading
@@ -342,7 +342,7 @@ export function SignInForm() {
 
                 <Button
                   onClick={() =>
-                    handleDevAuth("harry.williams@example.com", "Member")
+                    void handleDevAuth("harry.williams@example.com", "Member")
                   }
                   disabled={
                     devAuthLoading || magicLinkPending || isOAuthLoading

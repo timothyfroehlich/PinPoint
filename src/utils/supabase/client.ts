@@ -13,11 +13,11 @@ import { env } from "~/env";
  */
 export function createClient(): TypedSupabaseClient {
   const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const supabaseAnonKey = env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error(
-      "Supabase environment variables (NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY) are required for client creation"
+      "Supabase environment variables (NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) are required for client creation"
     );
   }
 

@@ -30,14 +30,14 @@ export default async function UsersSettingsPage() {
   ]);
 
   // Group users by role for better organization
-  const usersByRole = users.reduce((acc, user) => {
+  const usersByRole = users.reduce<Record<string, typeof users>>((acc, user) => {
     const roleName = user.role.name;
     if (!acc[roleName]) {
       acc[roleName] = [];
     }
     acc[roleName].push(user);
     return acc;
-  }, {} as Record<string, typeof users>);
+  }, {});
 
   const totalUsers = users.length;
 

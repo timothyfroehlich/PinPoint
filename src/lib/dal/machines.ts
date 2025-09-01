@@ -14,9 +14,12 @@ import {
   sql,
   asc,
   inArray,
+  isNull,
+  type SQL,
 } from "drizzle-orm";
 import { machines, locations, models } from "~/server/db/schema";
-import { db, requireAuthContext } from "./shared";
+// No direct db access; use ensureOrgContextAndBindRLS to run under RLS-bound tx
+import { ensureOrgContextAndBindRLS } from "~/lib/organization-context";
 
 // ================================
 // TYPE DEFINITIONS
@@ -70,11 +73,15 @@ export const getMachinesWithFilters = cache(
     pagination: MachinePagination = { page: 1, limit: 20 },
     sorting: MachineSorting = { field: "created_at", order: "desc" },
   ) => {
-    const { organizationId } = await requireAuthContext();
-    const offset = (pagination.page - 1) * pagination.limit;
+    return ensureOrgContextAndBindRLS(async (tx, context) => {
+      const organizationId = context.organization.id;
+      const offset = (pagination.page - 1) * pagination.limit;
 
-    // Build where conditions
-    const whereConditions = [eq(machines.organization_id, organizationId)];
+      // Build where conditions
+      const whereConditions: SQL[] = [
+        eq(machines.organization_id, organizationId),
+        isNull(machines.deleted_at), // Exclude soft-deleted machines per §9.3
+      ];
 
     // Location filtering
     if (filters.locationIds?.length) {
@@ -152,42 +159,43 @@ export const getMachinesWithFilters = cache(
             : asc(machines.created_at);
     }
 
-    // Execute queries in parallel
-    const [machineResults, totalCountResult] = await Promise.all([
-      // Get machines with relations
-      db.query.machines.findMany({
-        where: and(...whereConditions),
-        with: {
-          location: {
-            columns: { id: true, name: true, city: true, state: true },
+      // Execute queries in parallel
+      const [machineResults, totalCountResult] = await Promise.all([
+        // Get machines with relations
+        tx.query.machines.findMany({
+          where: and(...whereConditions),
+          with: {
+            location: {
+              columns: { id: true, name: true, city: true, state: true },
+            },
+            model: {
+              columns: { id: true, name: true, manufacturer: true, year: true },
+            },
           },
-          model: {
-            columns: { id: true, name: true, manufacturer: true, year: true },
-          },
-        },
-        limit: pagination.limit + 1, // +1 to check if there's a next page
-        offset,
-        ...(orderBy ? { orderBy: [orderBy] } : {}),
-      }),
+          limit: pagination.limit + 1, // +1 to check if there's a next page
+          offset,
+          orderBy: [orderBy],
+        }),
 
-      // Get total count
-      db
-        .select({ count: count() })
-        .from(machines)
-        .where(and(...whereConditions))
-        .then((result) => result[0]?.count ?? 0),
-    ]);
+        // Get total count
+        tx
+          .select({ count: count() })
+          .from(machines)
+          .where(and(...whereConditions))
+          .then((result) => result[0]?.count ?? 0),
+      ]);
 
     const hasNextPage = machineResults.length > pagination.limit;
     const items = hasNextPage ? machineResults.slice(0, -1) : machineResults;
 
-    return {
-      items,
-      totalCount: totalCountResult,
-      hasNextPage,
-      currentPage: pagination.page,
-      totalPages: Math.ceil(totalCountResult / pagination.limit),
-    };
+      return {
+        items,
+        totalCount: totalCountResult,
+        hasNextPage,
+        currentPage: pagination.page,
+        totalPages: Math.ceil(totalCountResult / pagination.limit),
+      };
+    });
   },
 );
 
@@ -206,41 +214,44 @@ export const getMachinesForOrg = cache(async () => {
  * Uses React 19 cache() for request-level memoization per machineId
  */
 export const getMachineById = cache(async (machineId: string) => {
-  const { organizationId } = await requireAuthContext();
+  return ensureOrgContextAndBindRLS(async (tx, context) => {
+    const organizationId = context.organization.id;
 
-  const machine = await db.query.machines.findFirst({
-    where: and(
-      eq(machines.id, machineId),
-      eq(machines.organization_id, organizationId),
-    ),
-    with: {
-      location: {
-        columns: {
-          id: true,
-          name: true,
-          city: true,
-          state: true,
-          street: true,
+    const machine = await tx.query.machines.findFirst({
+      where: and(
+        eq(machines.id, machineId),
+        eq(machines.organization_id, organizationId),
+        isNull(machines.deleted_at), // Exclude soft-deleted machines per §9.3
+      ),
+      with: {
+        location: {
+          columns: {
+            id: true,
+            name: true,
+            city: true,
+            state: true,
+            street: true,
+          },
+        },
+        model: {
+          columns: {
+            id: true,
+            name: true,
+            manufacturer: true,
+            year: true,
+            machine_type: true,
+            machine_display: true,
+          },
         },
       },
-      model: {
-        columns: {
-          id: true,
-          name: true,
-          manufacturer: true,
-          year: true,
-          machine_type: true,
-          machine_display: true,
-        },
-      },
-    },
+    });
+
+    if (!machine) {
+      throw new Error("Machine not found or access denied");
+    }
+
+    return machine;
   });
-
-  if (!machine) {
-    throw new Error("Machine not found or access denied");
-  }
-
-  return machine;
 });
 
 /**
@@ -249,69 +260,71 @@ export const getMachineById = cache(async (machineId: string) => {
  * Uses React 19 cache() for request-level memoization
  */
 export const getMachineStats = cache(async (): Promise<MachineStats> => {
-  const { organizationId } = await requireAuthContext();
+  return ensureOrgContextAndBindRLS(async (tx, context) => {
+    const organizationId = context.organization.id;
 
-  // Get basic counts
-  const [totalMachines, machinesWithQR, byLocation, byModel] =
-    await Promise.all([
-      // Total machine count
-      db
-        .select({ count: count() })
-        .from(machines)
-        .where(eq(machines.organization_id, organizationId))
-        .then((result) => result[0]?.count ?? 0),
+    // Get basic counts
+    const [totalMachines, machinesWithQR, byLocation, byModel] =
+      await Promise.all([
+        // Total machine count
+        tx
+          .select({ count: count() })
+          .from(machines)
+          .where(eq(machines.organization_id, organizationId))
+          .then((result) => result[0]?.count ?? 0),
 
-      // Machines with QR codes
-      db
-        .select({ count: count() })
-        .from(machines)
-        .where(
-          and(
-            eq(machines.organization_id, organizationId),
-            sql`${machines.qr_code_url} IS NOT NULL`,
-          ),
-        )
-        .then((result) => result[0]?.count ?? 0),
+        // Machines with QR codes
+        tx
+          .select({ count: count() })
+          .from(machines)
+          .where(
+            and(
+              eq(machines.organization_id, organizationId),
+              sql`${machines.qr_code_url} IS NOT NULL`,
+            ),
+          )
+          .then((result) => result[0]?.count ?? 0),
 
-      // Machines by location
-      db
-        .select({
-          locationId: machines.location_id,
-          locationName: locations.name,
-          count: count(),
-        })
-        .from(machines)
-        .leftJoin(locations, eq(machines.location_id, locations.id))
-        .where(eq(machines.organization_id, organizationId))
-        .groupBy(machines.location_id, locations.name),
+        // Machines by location
+        tx
+          .select({
+            locationId: machines.location_id,
+            locationName: locations.name,
+            count: count(),
+          })
+          .from(machines)
+          .leftJoin(locations, eq(machines.location_id, locations.id))
+          .where(eq(machines.organization_id, organizationId))
+          .groupBy(machines.location_id, locations.name),
 
-      // Machines by model
-      db
-        .select({
-          modelId: machines.model_id,
-          modelName: models.name,
-          count: count(),
-        })
-        .from(machines)
-        .leftJoin(models, eq(machines.model_id, models.id))
-        .where(eq(machines.organization_id, organizationId))
-        .groupBy(machines.model_id, models.name),
-    ]);
+        // Machines by model
+        tx
+          .select({
+            modelId: machines.model_id,
+            modelName: models.name,
+            count: count(),
+          })
+          .from(machines)
+          .leftJoin(models, eq(machines.model_id, models.id))
+          .where(eq(machines.organization_id, organizationId))
+          .groupBy(machines.model_id, models.name),
+      ]);
 
-  return {
-    total: totalMachines,
-    withQR: machinesWithQR,
-    byLocation: byLocation.map((item) => ({
-      locationId: item.locationId,
-      locationName: item.locationName || "Unknown Location",
-      count: item.count,
-    })),
-    byModel: byModel.map((item) => ({
-      modelId: item.modelId,
-      modelName: item.modelName || "Unknown Model",
-      count: item.count,
-    })),
-  };
+    return {
+      total: totalMachines,
+      withQR: machinesWithQR,
+      byLocation: byLocation.map((item) => ({
+        locationId: item.locationId,
+        locationName: item.locationName ?? "Unknown Location",
+        count: item.count,
+      })),
+      byModel: byModel.map((item) => ({
+        modelId: item.modelId,
+        modelName: item.modelName ?? "Unknown Model",
+        count: item.count,
+      })),
+    };
+  });
 });
 
 /**
@@ -319,12 +332,13 @@ export const getMachineStats = cache(async (): Promise<MachineStats> => {
  * Uses React 19 cache() for request-level memoization
  */
 export const getLocationsForOrg = cache(async () => {
-  const { organizationId } = await requireAuthContext();
-
-  return await db.query.locations.findMany({
-    where: eq(locations.organization_id, organizationId),
-    columns: { id: true, name: true, city: true, state: true },
-    orderBy: [asc(locations.name)],
+  return ensureOrgContextAndBindRLS(async (tx, context) => {
+    const organizationId = context.organization.id;
+    return await tx.query.locations.findMany({
+      where: eq(locations.organization_id, organizationId),
+      columns: { id: true, name: true, city: true, state: true },
+      orderBy: [asc(locations.name)],
+    });
   });
 });
 
@@ -334,21 +348,22 @@ export const getLocationsForOrg = cache(async () => {
  * Uses React 19 cache() for request-level memoization
  */
 export const getModelsForOrg = cache(async () => {
-  const { organizationId } = await requireAuthContext();
-
-  return await db.query.models.findMany({
-    where: or(
-      sql`${models.organization_id} IS NULL`, // Global commercial models
-      eq(models.organization_id, organizationId), // Org-specific custom models
-    ),
-    columns: {
-      id: true,
-      name: true,
-      manufacturer: true,
-      year: true,
-      is_custom: true,
-    },
-    orderBy: [asc(models.manufacturer), asc(models.name)],
+  return ensureOrgContextAndBindRLS(async (tx, context) => {
+    const organizationId = context.organization.id;
+    return await tx.query.models.findMany({
+      where: or(
+        sql`${models.organization_id} IS NULL`, // Global commercial models
+        eq(models.organization_id, organizationId), // Org-specific custom models
+      ),
+      columns: {
+        id: true,
+        name: true,
+        manufacturer: true,
+        year: true,
+        is_custom: true,
+      },
+      orderBy: [asc(models.manufacturer), asc(models.name)],
+    });
   });
 });
 
@@ -357,7 +372,9 @@ export const getModelsForOrg = cache(async () => {
  * Useful for machine management dashboard
  * Benefits from getMachinesForOrg() React 19 cache()
  */
-export async function getMachinesWithIssueCounts() {
+export async function getMachinesWithIssueCounts(): Promise<
+  Awaited<ReturnType<typeof getMachinesForOrg>>
+> {
   // For now, return basic machines - can enhance with issue counts later
   return await getMachinesForOrg();
 }

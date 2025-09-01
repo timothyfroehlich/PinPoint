@@ -6,7 +6,7 @@
 import { cache } from "react";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { notifications } from "~/server/db/schema";
-import { db, requireAuthContext } from "./shared";
+import { ensureOrgContextAndBindRLS } from "~/lib/organization-context";
 
 /**
  * Get notifications for the current user with pagination
@@ -15,33 +15,37 @@ import { db, requireAuthContext } from "./shared";
  */
 export const getUserNotifications = cache(
   async (limit = 20, includeRead = true) => {
-    const { user, organizationId } = await requireAuthContext();
+    return ensureOrgContextAndBindRLS(async (tx, context) => {
+      if (!context.user) {
+        throw new Error("Authentication required");
+      }
+      const userId = context.user.id;
+      const organizationId = context.organization.id;
 
-    const whereConditions = [
-      eq(notifications.user_id, user.id),
-      eq(notifications.organization_id, organizationId),
-    ];
+      const whereConditions = [
+        eq(notifications.user_id, userId),
+        eq(notifications.organization_id, organizationId),
+      ];
 
-    // Filter out read notifications if requested
-    if (!includeRead) {
-      whereConditions.push(eq(notifications.read, false));
-    }
+      if (!includeRead) {
+        whereConditions.push(eq(notifications.read, false));
+      }
 
-    return await db.query.notifications.findMany({
-      where: and(...whereConditions),
-      orderBy: [desc(notifications.created_at)],
-      limit,
-      // Omit user relation since we're filtering by user_id already
-      columns: {
-        id: true,
-        message: true,
-        read: true,
-        created_at: true,
-        type: true,
-        entity_type: true,
-        entity_id: true,
-        action_url: true,
-      },
+      return await tx.query.notifications.findMany({
+        where: and(...whereConditions),
+        orderBy: [desc(notifications.created_at)],
+        limit,
+        columns: {
+          id: true,
+          message: true,
+          read: true,
+          created_at: true,
+          type: true,
+          entity_type: true,
+          entity_id: true,
+          action_url: true,
+        },
+      });
     });
   },
 );
@@ -51,20 +55,26 @@ export const getUserNotifications = cache(
  * Critical for notification bell badge display
  */
 export const getUnreadNotificationCount = cache(async () => {
-  const { user, organizationId } = await requireAuthContext();
+  return ensureOrgContextAndBindRLS(async (tx, context) => {
+    if (!context.user) {
+      throw new Error("Authentication required");
+    }
+    const userId = context.user.id;
+    const organizationId = context.organization.id;
 
-  const result = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(notifications)
-    .where(
-      and(
-        eq(notifications.user_id, user.id),
-        eq(notifications.organization_id, organizationId),
-        eq(notifications.read, false),
-      ),
-    );
+    const result = await tx
+      .select({ count: sql<number>`count(*)` })
+      .from(notifications)
+      .where(
+        and(
+          eq(notifications.user_id, userId),
+          eq(notifications.organization_id, organizationId),
+          eq(notifications.read, false),
+        ),
+      );
 
-  return result[0]?.count ?? 0;
+    return result[0]?.count ?? 0;
+  });
 });
 
 /**
@@ -72,25 +82,31 @@ export const getUnreadNotificationCount = cache(async () => {
  * Limited count to prevent performance issues
  */
 export const getRecentUnreadNotifications = cache(async (limit = 5) => {
-  const { user, organizationId } = await requireAuthContext();
+  return ensureOrgContextAndBindRLS(async (tx, context) => {
+    if (!context.user) {
+      throw new Error("Authentication required");
+    }
+    const userId = context.user.id;
+    const organizationId = context.organization.id;
 
-  return await db.query.notifications.findMany({
-    where: and(
-      eq(notifications.user_id, user.id),
-      eq(notifications.organization_id, organizationId),
-      eq(notifications.read, false),
-    ),
-    orderBy: [desc(notifications.created_at)],
-    limit,
-    columns: {
-      id: true,
-      message: true,
-      created_at: true,
-      type: true,
-      entity_type: true,
-      entity_id: true,
-      action_url: true,
-    },
+    return await tx.query.notifications.findMany({
+      where: and(
+        eq(notifications.user_id, userId),
+        eq(notifications.organization_id, organizationId),
+        eq(notifications.read, false),
+      ),
+      orderBy: [desc(notifications.created_at)],
+      limit,
+      columns: {
+        id: true,
+        message: true,
+        created_at: true,
+        type: true,
+        entity_type: true,
+        entity_id: true,
+        action_url: true,
+      },
+    });
   });
 });
 
@@ -103,16 +119,54 @@ export const getNotificationsByType = cache(
     notificationType: "ISSUE_CREATED" | "ISSUE_UPDATED" | "ISSUE_ASSIGNED" | "ISSUE_COMMENTED" | "MACHINE_ASSIGNED" | "SYSTEM_ANNOUNCEMENT",
     limit = 10,
   ) => {
-    const { user, organizationId } = await requireAuthContext();
+    return ensureOrgContextAndBindRLS(async (tx, context) => {
+      if (!context.user) {
+        throw new Error("Authentication required");
+      }
+      const userId = context.user.id;
+      const organizationId = context.organization.id;
 
-    return await db.query.notifications.findMany({
+      return await tx.query.notifications.findMany({
+        where: and(
+          eq(notifications.user_id, userId),
+          eq(notifications.organization_id, organizationId),
+          eq(notifications.type, notificationType),
+        ),
+        orderBy: [desc(notifications.created_at)],
+        limit,
+        columns: {
+          id: true,
+          message: true,
+          read: true,
+          created_at: true,
+          type: true,
+          entity_type: true,
+          entity_id: true,
+          action_url: true,
+        },
+      });
+    });
+  },
+);
+
+/**
+ * Get notification by ID with access control
+ * Ensures user can only access their own notifications
+ */
+export const getNotificationById = cache(async (notificationId: string) => {
+  return ensureOrgContextAndBindRLS(async (tx, context) => {
+    if (!context.user) {
+      throw new Error("Authentication required");
+    }
+    const userId = context.user.id;
+    const organizationId = context.organization.id;
+
+    return await tx.query.notifications.findFirst({
       where: and(
-        eq(notifications.user_id, user.id),
+        eq(notifications.id, notificationId),
+        eq(notifications.user_id, userId),
         eq(notifications.organization_id, organizationId),
-        eq(notifications.type, notificationType),
       ),
-      orderBy: [desc(notifications.created_at)],
-      limit,
       columns: {
         id: true,
         message: true,
@@ -124,32 +178,6 @@ export const getNotificationsByType = cache(
         action_url: true,
       },
     });
-  },
-);
-
-/**
- * Get notification by ID with access control
- * Ensures user can only access their own notifications
- */
-export const getNotificationById = cache(async (notificationId: string) => {
-  const { user, organizationId } = await requireAuthContext();
-
-  return await db.query.notifications.findFirst({
-    where: and(
-      eq(notifications.id, notificationId),
-      eq(notifications.user_id, user.id),
-      eq(notifications.organization_id, organizationId),
-    ),
-    columns: {
-      id: true,
-      message: true,
-      read: true,
-      created_at: true,
-      type: true,
-      entity_type: true,
-      entity_id: true,
-      action_url: true,
-    },
   });
 });
 
@@ -167,46 +195,52 @@ export const hasUnreadNotifications = cache(async () => {
  * Shows breakdown by type and read status
  */
 export const getNotificationStats = cache(async () => {
-  const { user, organizationId } = await requireAuthContext();
+  return ensureOrgContextAndBindRLS(async (tx, context) => {
+    if (!context.user) {
+      throw new Error("Authentication required");
+    }
+    const userId = context.user.id;
+    const organizationId = context.organization.id;
 
-  const totalResult = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(notifications)
-    .where(
-      and(
-        eq(notifications.user_id, user.id),
-        eq(notifications.organization_id, organizationId),
-      ),
-    );
+    const totalResult = await tx
+      .select({ count: sql<number>`count(*)` })
+      .from(notifications)
+      .where(
+        and(
+          eq(notifications.user_id, userId),
+          eq(notifications.organization_id, organizationId),
+        ),
+      );
 
-  const unreadResult = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(notifications)
-    .where(
-      and(
-        eq(notifications.user_id, user.id),
-        eq(notifications.organization_id, organizationId),
-        eq(notifications.read, false),
-      ),
-    );
+    const unreadResult = await tx
+      .select({ count: sql<number>`count(*)` })
+      .from(notifications)
+      .where(
+        and(
+          eq(notifications.user_id, userId),
+          eq(notifications.organization_id, organizationId),
+          eq(notifications.read, false),
+        ),
+      );
 
-  const todayResult = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(notifications)
-    .where(
-      and(
-        eq(notifications.user_id, user.id),
-        eq(notifications.organization_id, organizationId),
-        sql`DATE(created_at) = CURRENT_DATE`,
-      ),
-    );
+    const todayResult = await tx
+      .select({ count: sql<number>`count(*)` })
+      .from(notifications)
+      .where(
+        and(
+          eq(notifications.user_id, userId),
+          eq(notifications.organization_id, organizationId),
+          sql`DATE(created_at) = CURRENT_DATE`,
+        ),
+      );
 
-  return {
-    total: totalResult[0]?.count ?? 0,
-    unread: unreadResult[0]?.count ?? 0,
-    read: (totalResult[0]?.count ?? 0) - (unreadResult[0]?.count ?? 0),
-    today: todayResult[0]?.count ?? 0,
-  };
+    return {
+      total: totalResult[0]?.count ?? 0,
+      unread: unreadResult[0]?.count ?? 0,
+      read: (totalResult[0]?.count ?? 0) - (unreadResult[0]?.count ?? 0),
+      today: todayResult[0]?.count ?? 0,
+    };
+  });
 });
 
 /**

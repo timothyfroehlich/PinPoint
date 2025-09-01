@@ -14,7 +14,7 @@
  */
 export function getCookieDomain(host: string): string {
   // Remove port if present
-  const hostname = host.split(':')[0];
+  const hostname = host.split(':')[0]!;
   
   // Handle localhost (development)
   if (hostname === 'localhost') {
@@ -41,10 +41,10 @@ export function getCookieDomain(host: string): string {
  * Used for client-side redirects and absolute URLs
  */
 export function getProductionUrl(host: string): string {
-  const hostname = host.split(':')[0];
+  const hostname = host.split(':')[0]!;
   
   if (hostname === 'localhost') {
-    return `http://${host}`;
+    return `https://${host}`;
   }
   
   return `https://${hostname}`;
