@@ -77,10 +77,10 @@ export async function updateOrganizationProfileAction(
     // Update organization with validated data
     const updateData = {
       name: validation.data.name,
-      description: validation.data.description || null,
-      website: validation.data.website || null,
-      phone: validation.data.phone || null,
-      address: validation.data.address || null,
+      description: validation.data.description ?? null,
+      website: validation.data.website ?? null,
+      phone: validation.data.phone ?? null,
+      address: validation.data.address ?? null,
       updated_at: new Date(),
     };
 
@@ -149,7 +149,7 @@ export async function updateOrganizationLogoAction(
     const [updatedOrg] = await db
       .update(organizations)
       .set({
-        logo_url: validation.data.logoUrl || null,
+        logo_url: validation.data.logoUrl ?? null,
         updated_at: new Date(),
       })
       .where(eq(organizations.id, organizationId))
