@@ -80,7 +80,7 @@ export function IssueAssignmentClient({
 
       {state && !state.success && (
         <p className="text-error text-sm">
-          {state.error ?? "Failed to update assignment"}
+          {state.error}
         </p>
       )}
 
