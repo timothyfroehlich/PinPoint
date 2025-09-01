@@ -6,7 +6,8 @@
 import { cache } from "react";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { comments } from "~/server/db/schema";
-import { db, requireAuthContext, getServerAuthContext } from "./shared";
+// No direct db access; use ensureOrgContextAndBindRLS to run under RLS-bound tx
+import { ensureOrgContextAndBindRLS } from "~/lib/organization-context";
 
 /**
  * Get comments for a specific issue with author details
@@ -14,25 +15,27 @@ import { db, requireAuthContext, getServerAuthContext } from "./shared";
  * Uses React 19 cache() for request-level memoization
  */
 export const getCommentsForIssue = cache(async (issueId: string) => {
-  const { organizationId } = await requireAuthContext();
+  return ensureOrgContextAndBindRLS(async (tx, context) => {
+    const organizationId = context.organization.id;
 
-  return await db.query.comments.findMany({
-    where: and(
-      eq(comments.issue_id, issueId),
-      eq(comments.organization_id, organizationId),
-      isNull(comments.deleted_at), // Exclude soft-deleted comments
-    ),
-    with: {
-      author: {
-        columns: {
-          id: true,
-          name: true,
-          email: true,
-          profile_picture: true,
+    return await tx.query.comments.findMany({
+      where: and(
+        eq(comments.issue_id, issueId),
+        eq(comments.organization_id, organizationId),
+        isNull(comments.deleted_at), // Exclude soft-deleted comments
+      ),
+      with: {
+        author: {
+          columns: {
+            id: true,
+            name: true,
+            email: true,
+            profile_picture: true,
+          },
         },
       },
-    },
-    orderBy: [desc(comments.created_at)],
+      orderBy: [desc(comments.created_at)],
+    });
   });
 });
 
@@ -41,31 +44,33 @@ export const getCommentsForIssue = cache(async (issueId: string) => {
  * Returns null if comment doesn't exist or user doesn't have access
  */
 export const getCommentById = cache(async (commentId: string) => {
-  const { organizationId } = await requireAuthContext();
+  return ensureOrgContextAndBindRLS(async (tx, context) => {
+    const organizationId = context.organization.id;
 
-  return await db.query.comments.findFirst({
-    where: and(
-      eq(comments.id, commentId),
-      eq(comments.organization_id, organizationId),
-      isNull(comments.deleted_at), // Exclude soft-deleted comments
-    ),
-    with: {
-      author: {
-        columns: {
-          id: true,
-          name: true,
-          email: true,
-          profile_picture: true,
+    return await tx.query.comments.findFirst({
+      where: and(
+        eq(comments.id, commentId),
+        eq(comments.organization_id, organizationId),
+        isNull(comments.deleted_at), // Exclude soft-deleted comments
+      ),
+      with: {
+        author: {
+          columns: {
+            id: true,
+            name: true,
+            email: true,
+            profile_picture: true,
+          },
+        },
+        issue: {
+          columns: {
+            id: true,
+            title: true,
+            organization_id: true,
+          },
         },
       },
-      issue: {
-        columns: {
-          id: true,
-          title: true,
-          organization_id: true,
-        },
-      },
-    },
+    });
   });
 });
 
@@ -74,39 +79,41 @@ export const getCommentById = cache(async (commentId: string) => {
  * Limited to prevent performance issues
  */
 export const getRecentCommentsForOrg = cache(async (limit = 10) => {
-  const { organizationId } = await requireAuthContext();
+  return ensureOrgContextAndBindRLS(async (tx, context) => {
+    const organizationId = context.organization.id;
 
-  return await db.query.comments.findMany({
-    where: and(
-      eq(comments.organization_id, organizationId),
-      isNull(comments.deleted_at),
-    ),
-    with: {
-      author: {
-        columns: {
-          id: true,
-          name: true,
-          email: true,
-          profile_picture: true,
+    return await tx.query.comments.findMany({
+      where: and(
+        eq(comments.organization_id, organizationId),
+        isNull(comments.deleted_at),
+      ),
+      with: {
+        author: {
+          columns: {
+            id: true,
+            name: true,
+            email: true,
+            profile_picture: true,
+          },
         },
-      },
-      issue: {
-        columns: {
-          id: true,
-          title: true,
-        },
-        with: {
-          machine: {
-            columns: {
-              id: true,
-              name: true,
+        issue: {
+          columns: {
+            id: true,
+            title: true,
+          },
+          with: {
+            machine: {
+              columns: {
+                id: true,
+                name: true,
+              },
             },
           },
         },
       },
-    },
-    orderBy: [desc(comments.created_at)],
-    limit,
+      orderBy: [desc(comments.created_at)],
+      limit,
+    });
   });
 });
 
@@ -116,26 +123,21 @@ export const getRecentCommentsForOrg = cache(async (limit = 10) => {
  */
 export const canUserAccessComment = cache(
   async (commentId: string, userId: string) => {
-    const { organizationId } = await getServerAuthContext();
-
-    if (!organizationId) {
-      return false;
-    }
-
-    const comment = await db.query.comments.findFirst({
-      where: and(
-        eq(comments.id, commentId),
-        eq(comments.organization_id, organizationId),
-        isNull(comments.deleted_at),
-      ),
-      columns: {
-        id: true,
-        author_id: true,
-      },
+    return ensureOrgContextAndBindRLS(async (tx, context) => {
+      const organizationId = context.organization.id;
+      const comment = await tx.query.comments.findFirst({
+        where: and(
+          eq(comments.id, commentId),
+          eq(comments.organization_id, organizationId),
+          isNull(comments.deleted_at),
+        ),
+        columns: {
+          id: true,
+          author_id: true,
+        },
+      });
+      return comment !== undefined && comment.author_id === userId;
     });
-
-    // User can access if they authored the comment or if they're in the same org
-    return comment !== undefined && comment.author_id === userId;
   },
 );
 
@@ -143,20 +145,20 @@ export const canUserAccessComment = cache(
  * Get comment count for an issue (for display purposes)
  */
 export const getCommentCountForIssue = cache(async (issueId: string) => {
-  const { organizationId } = await requireAuthContext();
-
-  const result = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(comments)
-    .where(
-      and(
-        eq(comments.issue_id, issueId),
-        eq(comments.organization_id, organizationId),
-        isNull(comments.deleted_at),
-      ),
-    );
-
-  return result[0]?.count ?? 0;
+  return ensureOrgContextAndBindRLS(async (tx, context) => {
+    const organizationId = context.organization.id;
+    const result = await tx
+      .select({ count: sql<number>`count(*)` })
+      .from(comments)
+      .where(
+        and(
+          eq(comments.issue_id, issueId),
+          eq(comments.organization_id, organizationId),
+          isNull(comments.deleted_at),
+        ),
+      );
+    return result[0]?.count ?? 0;
+  });
 });
 
 /**

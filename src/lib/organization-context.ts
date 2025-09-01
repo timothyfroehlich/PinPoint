@@ -11,9 +11,11 @@ import { headers } from "next/headers";
 import { eq, and } from "drizzle-orm";
 import { db } from "~/lib/dal/shared";
 import { organizations, memberships } from "~/server/db/schema";
-import { createClient } from "~/utils/supabase/server";
+import { createClient } from "~/lib/supabase/server";
 import { isDevelopment } from "~/lib/environment";
 import { extractTrustedSubdomain } from "~/lib/subdomain-verification";
+import { withOrgRLS } from "~/server/db/utils/rls";
+import type { DrizzleClient } from "~/server/db/drizzle";
 
 export type AccessLevel = "anonymous" | "authenticated" | "member";
 
@@ -146,10 +148,12 @@ export const getOrganizationContext = cache(async (): Promise<OrganizationContex
     const { data: { user: authUser } } = await supabase.auth.getUser();
     
     if (authUser) {
+      const email = authUser.email ?? "";
+      const name = (authUser.user_metadata?.['name'] as string | undefined) ?? email;
       user = {
         id: authUser.id,
-        email: authUser.email!,
-        name: authUser.user_metadata?.['name'] || authUser.email!,
+        email,
+        name,
       };
       
       accessLevel = "authenticated";
@@ -209,7 +213,11 @@ export const requireMemberAccess = cache(async (): Promise<OrganizationContext &
     throw new Error("Member access required - user does not have membership in this organization");
   }
   
-  return context as any; // TypeScript assertion - we've validated the types above
+  return context as OrganizationContext & {
+    user: NonNullable<OrganizationContext["user"]>;
+    accessLevel: "member";
+    membership: NonNullable<OrganizationContext["membership"]>;
+  };
 });
 
 /**
@@ -241,3 +249,14 @@ export const setupOrganizationContext = cache(async (): Promise<OrganizationCont
   
   return context;
 });
+
+/**
+ * Ensure organization context exists and run a function inside an RLS-bound transaction.
+ * Returns the result of the function. Use for Server Components and Server Actions.
+ */
+export async function ensureOrgContextAndBindRLS<T>(
+  fn: (tx: DrizzleClient, context: OrganizationContext) => Promise<T>,
+): Promise<T> {
+  const context = await requireOrganizationContext();
+  return withOrgRLS(db, context.organization.id, async (tx) => fn(tx, context));
+}

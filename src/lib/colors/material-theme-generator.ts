@@ -5,11 +5,13 @@
  * using Google's official Material Color Utilities with the 2025 specification.
  */
 
+import type {
+  Scheme 
+} from '@material/material-color-utilities';
 import { 
   argbFromHex, 
   themeFromSourceColor, 
-  hexFromArgb,
-  Scheme 
+  hexFromArgb 
 } from '@material/material-color-utilities';
 
 export interface MaterialColors {

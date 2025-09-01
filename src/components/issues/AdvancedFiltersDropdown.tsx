@@ -162,7 +162,7 @@ export function AdvancedFiltersDropdown({
           </div>
 
           <div className="flex justify-end pt-2">
-            <Button size="sm" onClick={() => setOpen(false)}>
+            <Button size="sm" onClick={() => { setOpen(false); }}>
               Done
             </Button>
           </div>

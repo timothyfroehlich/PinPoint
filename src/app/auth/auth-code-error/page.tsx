@@ -30,7 +30,7 @@ export const metadata = {
 
 export default async function AuthCodeErrorPage({
   searchParams,
-}: AuthCodeErrorPageProps) {
+}: AuthCodeErrorPageProps): Promise<JSX.Element> {
   const resolvedSearchParams = await searchParams;
   return (
     <div className="min-h-screen flex items-center justify-center bg-surface-container-lowest py-12 px-4 sm:px-6 lg:px-8">
@@ -93,7 +93,7 @@ function ErrorDetails({
 }: {
   error?: string | undefined;
   description?: string | undefined;
-}) {
+}): JSX.Element {
   const getErrorMessage = (
     errorCode?: string,
   ): { title: string; message: string; suggestions: string[] } => {
@@ -137,7 +137,7 @@ function ErrorDetails({
         return {
           title: "Unexpected Error",
           message:
-            description ||
+            description ??
             "An unexpected error occurred during the authentication process.",
           suggestions: [
             "Try signing in again",
@@ -193,7 +193,7 @@ function ErrorDetails({
   );
 }
 
-function ErrorDetailsSkeleton() {
+function ErrorDetailsSkeleton(): JSX.Element {
   return (
     <div className="space-y-4">
       <div className="h-20 bg-error-container border border-error rounded-md animate-pulse" />

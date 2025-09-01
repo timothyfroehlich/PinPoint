@@ -6,6 +6,7 @@
 import { cache } from "react";
 import { desc, eq, and, between } from "drizzle-orm";
 import { db } from "./shared";
+import { withOrgRLS } from "~/server/db/utils/rls";
 import { activityLog } from "~/server/db/schema";
 import { generatePrefixedId } from "~/lib/utils/id-generation";
 
@@ -118,8 +119,8 @@ export const getActivityLog = cache(async (
     } = filters;
 
     // Support both old and new parameter names
-    const actualUserId = user_id || userId;
-    const actualEntity = entity_type || entity;
+    const actualUserId = user_id ?? userId;
+    const actualEntity = entity_type ?? entity;
 
     // Build where conditions
     const whereConditions = [
@@ -153,30 +154,31 @@ export const getActivityLog = cache(async (
       : whereConditions[0];
 
     // Get total count for pagination
-    const totalResult = await db
-      .select({ count: activityLog.id })
-      .from(activityLog)
-      .where(whereClause);
+    const totalResult = await withOrgRLS(db, organizationId, async (tx) =>
+      tx.select({ count: activityLog.id }).from(activityLog).where(whereClause),
+    );
 
     const totalCount = totalResult.length;
     const totalPages = Math.ceil(totalCount / limit);
     const offset = (page - 1) * limit;
 
     // Get activity log entries with user information
-    const entries = await db.query.activityLog.findMany({
-      where: whereClause,
-      with: {
-        user: {
-          columns: {
-            name: true,
-            email: true,
+    const entries = await withOrgRLS(db, organizationId, async (tx) =>
+      tx.query.activityLog.findMany({
+        where: whereClause,
+        with: {
+          user: {
+            columns: {
+              name: true,
+              email: true,
+            },
           },
         },
-      },
-      orderBy: [desc(activityLog.created_at)],
-      limit,
-      offset,
-    });
+        orderBy: [desc(activityLog.created_at)],
+        limit,
+        offset,
+      }),
+    );
 
     // Map to expected format
     const mappedEntries: ActivityLogEntry[] = entries.map(entry => ({
@@ -186,9 +188,9 @@ export const getActivityLog = cache(async (
       entity_type: entry.entity_type,
       entity_id: entry.entity_id,
       user_id: entry.user_id,
-      userName: entry.user?.name || 'Unknown User',
-      userEmail: entry.user?.email || 'unknown@example.com',
-      details: typeof entry.details === 'string' ? entry.details : JSON.stringify(entry.details || {}),
+      userName: entry.user?.name ?? 'Unknown User',
+      userEmail: entry.user?.email ?? 'unknown@example.com',
+      details: typeof entry.details === 'string' ? entry.details : JSON.stringify(entry.details ?? {}),
       ip_address: entry.ip_address,
       user_agent: entry.user_agent,
       severity: entry.severity as "info" | "warning" | "error",
@@ -241,7 +243,8 @@ export async function logActivity(params: {
       throw new Error("Required parameters missing for activity logging");
     }
 
-    await db.insert(activityLog).values({
+    await withOrgRLS(db, organizationId, async (tx) =>
+      tx.insert(activityLog).values({
       id: generatePrefixedId("activity"),
       organization_id: organizationId,
       user_id: userId,
@@ -253,7 +256,8 @@ export async function logActivity(params: {
       ip_address: ipAddress,
       user_agent: userAgent,
       created_at: new Date(),
-    });
+    }),
+    );
   } catch (error) {
     console.error("Error logging activity:", error);
     // Don't throw error to avoid breaking main functionality
@@ -275,13 +279,15 @@ export const getActivityStats = cache(async (organizationId: string): Promise<{
       throw new Error("Organization ID is required");
     }
 
-    const stats = await db.query.activityLog.findMany({
-      where: eq(activityLog.organization_id, organizationId),
-      columns: {
-        action: true,
-        severity: true,
-      },
-    });
+    const stats = await withOrgRLS(db, organizationId, async (tx) =>
+      tx.query.activityLog.findMany({
+        where: eq(activityLog.organization_id, organizationId),
+        columns: {
+          action: true,
+          severity: true,
+        },
+      }),
+    );
 
     const totalEvents = stats.length;
     
@@ -319,7 +325,7 @@ export const getActivityStats = cache(async (organizationId: string): Promise<{
  */
 export const getRecentActivity = cache(async (
   organizationId: string,
-  limit: number = 10
+  limit = 10
 ): Promise<ActivityLogEntry[]> => {
   try {
     if (!organizationId) {
@@ -347,7 +353,7 @@ export async function exportActivityLog(
     const csvHeader = "Timestamp,Action,Entity,Entity ID,User Name,User Email,Details,Severity,IP Address\n";
     
     const csvRows = result.entries.map(entry => 
-      `"${entry.created_at.toISOString()}","${entry.action}","${entry.entity_type}","${entry.entity_id || ''}","${entry.userName}","${entry.userEmail}","${entry.details}","${entry.severity}","${entry.ip_address || ''}"`
+      `"${entry.created_at.toISOString()}","${entry.action}","${entry.entity_type}","${entry.entity_id ?? ''}","${entry.userName}","${entry.userEmail}","${entry.details}","${entry.severity}","${entry.ip_address ?? ''}"`
     ).join("\n");
 
     return csvHeader + csvRows;

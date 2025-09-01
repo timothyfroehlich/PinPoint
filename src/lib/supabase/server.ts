@@ -24,12 +24,12 @@ export async function createClient() {
   // These environment variables are required in non-test environments
   // In test environment, Supabase client creation is mocked at the module level
   const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const supabaseAnonKey = env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
   if (!supabaseUrl || !supabaseAnonKey) {
     const missingVars = [];
     if (!supabaseUrl) missingVars.push("NEXT_PUBLIC_SUPABASE_URL");
-    if (!supabaseAnonKey) missingVars.push("NEXT_PUBLIC_SUPABASE_ANON_KEY");
+    if (!supabaseAnonKey) missingVars.push("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY");
     throw new Error(
       `Missing required Supabase environment variables: ${missingVars.join(", ")}`,
     );

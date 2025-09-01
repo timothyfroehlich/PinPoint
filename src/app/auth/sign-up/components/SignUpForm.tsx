@@ -47,19 +47,22 @@ const organizationSelectOptionsSchema = z.object({
 
 // Type guard for safe organization access
 function isValidOrganizationArray(data: unknown): data is OrganizationOption[] {
-  return Array.isArray(data) && data.every(item => 
-    typeof item === 'object' && 
-    item !== null && 
-    'id' in item && 
-    'name' in item && 
-    'subdomain' in item &&
-    typeof item.id === 'string' &&
-    typeof item.name === 'string' &&
-    typeof item.subdomain === 'string'
-  );
+  return Array.isArray(data) && data.every((item): item is OrganizationOption => {
+    if (typeof item !== 'object' || item === null) return false;
+    
+    const obj = item as Record<string, unknown>;
+    return (
+      'id' in obj && 
+      'name' in obj && 
+      'subdomain' in obj &&
+      typeof obj.id === 'string' &&
+      typeof obj.name === 'string' &&
+      typeof obj.subdomain === 'string'
+    );
+  });
 }
 
-export function SignUpForm() {
+export function SignUpForm(): JSX.Element {
   const [magicLinkState, magicLinkAction, magicLinkPending] = useActionState<
     ActionResult<{ message: string }> | null,
     FormData
@@ -74,7 +77,7 @@ export function SignUpForm() {
 
   // Load organizations on component mount
   useEffect(() => {
-    async function loadOrganizations() {
+    async function loadOrganizations(): Promise<void> {
       try {
         const response = await fetch("/api/organizations/public");
         if (!response.ok) {
@@ -82,7 +85,7 @@ export function SignUpForm() {
         }
         
         // Security: Validate API response to prevent injection attacks
-        const rawData = await response.json();
+        const rawData: unknown = await response.json();
         const validatedData = organizationSelectOptionsSchema.parse(rawData);
         
         const { organizations: orgs, defaultOrganizationId } = validatedData;
@@ -105,10 +108,10 @@ export function SignUpForm() {
       }
     }
     
-    loadOrganizations();
+    void loadOrganizations();
   }, []);
 
-  const handleOAuthSignUp = async (provider: "google") => {
+  const handleOAuthSignUp = async (provider: "google"): Promise<void> => {
     if (!selectedOrganizationId) {
       alert("Please select an organization");
       return;
@@ -169,7 +172,7 @@ export function SignUpForm() {
 
         {/* Google OAuth */}
         <Button
-          onClick={() => handleOAuthSignUp("google")}
+          onClick={() => void handleOAuthSignUp("google")}
           disabled={isOAuthLoading || magicLinkPending}
           className="w-full"
           variant="outline"

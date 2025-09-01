@@ -79,7 +79,12 @@ export {
  * Combines organization, user, and issue data for dashboard pages
  * Uses parallel queries for optimal performance
  */
-export async function getDashboardData() {
+export async function getDashboardData(): Promise<{
+  organization: Awaited<ReturnType<typeof (await import("./organizations")).getCurrentOrganization>>;
+  user: Awaited<ReturnType<typeof (await import("./users")).getCurrentUserProfile>>;
+  issueStats: Awaited<ReturnType<typeof (await import("./issues")).getIssueDashboardStats>>;
+  recentIssues: Awaited<ReturnType<typeof (await import("./issues")).getRecentIssues>>;
+}> {
   const { getCurrentOrganization } = await import("./organizations");
   const { getCurrentUserProfile } = await import("./users");
   const { getIssueDashboardStats, getRecentIssues } = await import("./issues");
@@ -104,7 +109,11 @@ export async function getDashboardData() {
  * Gets authentication context with role and organization info
  * Optimized for layout components needing user state
  */
-export async function getUserContextData() {
+export async function getUserContextData(): Promise<
+  (Awaited<ReturnType<typeof (await import("./shared")).getServerAuthContextWithRole>> & {
+    profile: Awaited<ReturnType<typeof (await import("./users")).getCurrentUserProfile>> | null;
+  })
+> {
   const { getServerAuthContextWithRole } = await import("./shared");
   const { getCurrentUserProfile } = await import("./users");
 
@@ -124,7 +133,12 @@ export async function getUserContextData() {
  * Combines organization info with key statistics
  * Useful for admin pages and organization management
  */
-export async function getOrganizationOverviewData() {
+export async function getOrganizationOverviewData(): Promise<{
+  organization: Awaited<ReturnType<typeof (await import("./organizations")).getCurrentOrganization>>;
+  stats: Awaited<ReturnType<typeof (await import("./organizations")).getOrganizationStats>>;
+  memberCount: Awaited<ReturnType<typeof (await import("./organizations")).getOrganizationMemberCount>>;
+  recentIssues: Awaited<ReturnType<typeof (await import("./issues")).getRecentIssues>>;
+}> {
   const {
     getCurrentOrganization,
     getOrganizationStats,
@@ -148,8 +162,8 @@ export async function getOrganizationOverviewData() {
 }
 
 // Utility type for DAL function return types
-export type DALFunction<T extends (...args: any[]) => any> = T extends (
-  ...args: any[]
+export type DALFunction<T extends (...args: unknown[]) => unknown> = T extends (
+  ...args: unknown[]
 ) => Promise<infer R>
   ? R
   : never;

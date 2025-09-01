@@ -87,7 +87,7 @@ export function FilterToolbar({
       <div className="mb-4">
         <FilterPresets
           currentUserId={currentUser?.id}
-          onPresetClick={(presetFilters) => handlePresetClick(presetFilters)}
+          onPresetClick={(presetFilters) => { handlePresetClick(presetFilters); }}
           activePresetId={activePresetId}
         />
       </div>

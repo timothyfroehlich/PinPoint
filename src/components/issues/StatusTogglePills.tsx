@@ -178,7 +178,7 @@ export function StatusTogglePills({
             key={category}
             variant="outline"
             size="sm"
-            onClick={() => handleCategoryToggle(category)}
+            onClick={() => { handleCategoryToggle(category); }}
             disabled={count === 0}
             className={cn(
               getStatusClasses(category, isActive),
