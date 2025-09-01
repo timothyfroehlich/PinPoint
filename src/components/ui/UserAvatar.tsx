@@ -88,7 +88,7 @@ export function UserAvatar({
         <AvatarImage
           src={avatarSrc}
           alt={`${displayName}'s profile picture`}
-          onError={() => setImageError(true)}
+          onError={() => { setImageError(true); }}
         />
       )}
       <AvatarFallback>{initials}</AvatarFallback>

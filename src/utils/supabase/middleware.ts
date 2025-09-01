@@ -2,13 +2,13 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { env } from "~/env";
 
-export async function updateSession(request: NextRequest) {
+export async function updateSession(request: NextRequest): Promise<NextResponse> {
   if (!env.NEXT_PUBLIC_SUPABASE_URL) {
     throw new Error("NEXT_PUBLIC_SUPABASE_URL is required");
   }
   
-  if (!env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    throw new Error("NEXT_PUBLIC_SUPABASE_ANON_KEY is required");
+  if (!env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) {
+    throw new Error("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY is required");
   }
 
   let supabaseResponse = NextResponse.next({
@@ -17,7 +17,7 @@ export async function updateSession(request: NextRequest) {
 
   const supabase = createServerClient(
     env.NEXT_PUBLIC_SUPABASE_URL,
-    env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
     {
       cookies: {
         getAll() {

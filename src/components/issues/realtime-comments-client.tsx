@@ -169,7 +169,7 @@ export function RealtimeCommentsClient({
 
     const cleanup = initializeRealtimeConnection();
     return () => {
-      cleanup.then(fn => fn?.());
+      cleanup.then(fn => { fn?.(); });
     };
   }, [issueId, currentUserId, existingCommentIds]);
 
