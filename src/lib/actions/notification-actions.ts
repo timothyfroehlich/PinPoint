@@ -25,7 +25,10 @@ const markAsReadSchema = z.object({
 });
 
 const bulkMarkAsReadSchema = z.object({
-  notificationIds: z.array(z.string().uuid()).min(1, "No notifications selected").max(50, "Cannot update more than 50 notifications at once"),
+  notificationIds: z
+    .array(z.string().uuid())
+    .min(1, "No notifications selected")
+    .max(50, "Cannot update more than 50 notifications at once"),
 });
 
 const markAllAsReadSchema = z.object({
@@ -74,17 +77,18 @@ export async function markNotificationAsReadAction(
 
     // Background processing
     runAfterResponse(async () => {
-      console.log(`Notification ${validation.data.notificationId} marked as read by ${user.email}`);
+      console.log(
+        `Notification ${validation.data.notificationId} marked as read by ${user.email}`,
+      );
     });
 
-    return actionSuccess(
-      { success: true },
-      "Notification marked as read",
-    );
+    return actionSuccess({ success: true }, "Notification marked as read");
   } catch (error) {
     console.error("Mark notification as read error:", error);
     return actionError(
-      error instanceof Error ? error.message : "Failed to mark notification as read",
+      error instanceof Error
+        ? error.message
+        : "Failed to mark notification as read",
     );
   }
 }
@@ -135,7 +139,9 @@ export async function bulkMarkNotificationsAsReadAction(
 
     // Background processing
     runAfterResponse(async () => {
-      console.log(`Bulk marked ${updatedNotifications.length} notifications as read by ${user.email}`);
+      console.log(
+        `Bulk marked ${updatedNotifications.length} notifications as read by ${user.email}`,
+      );
     });
 
     return actionSuccess(
@@ -145,7 +151,9 @@ export async function bulkMarkNotificationsAsReadAction(
   } catch (error) {
     console.error("Bulk mark notifications as read error:", error);
     return actionError(
-      error instanceof Error ? error.message : "Failed to bulk mark notifications as read",
+      error instanceof Error
+        ? error.message
+        : "Failed to bulk mark notifications as read",
     );
   }
 }
@@ -188,7 +196,9 @@ export async function markAllNotificationsAsReadAction(
 
     // Background processing
     runAfterResponse(async () => {
-      console.log(`All notifications marked as read by ${user.email} (${updatedNotifications.length} notifications)`);
+      console.log(
+        `All notifications marked as read by ${user.email} (${updatedNotifications.length} notifications)`,
+      );
     });
 
     return actionSuccess(
@@ -198,7 +208,9 @@ export async function markAllNotificationsAsReadAction(
   } catch (error) {
     console.error("Mark all notifications as read error:", error);
     return actionError(
-      error instanceof Error ? error.message : "Failed to mark all notifications as read",
+      error instanceof Error
+        ? error.message
+        : "Failed to mark all notifications as read",
     );
   }
 }
@@ -244,17 +256,18 @@ export async function markNotificationAsUnreadAction(
 
     // Background processing
     runAfterResponse(async () => {
-      console.log(`Notification ${validation.data.notificationId} marked as unread by ${user.email}`);
+      console.log(
+        `Notification ${validation.data.notificationId} marked as unread by ${user.email}`,
+      );
     });
 
-    return actionSuccess(
-      { success: true },
-      "Notification marked as unread",
-    );
+    return actionSuccess({ success: true }, "Notification marked as unread");
   } catch (error) {
     console.error("Mark notification as unread error:", error);
     return actionError(
-      error instanceof Error ? error.message : "Failed to mark notification as unread",
+      error instanceof Error
+        ? error.message
+        : "Failed to mark notification as unread",
     );
   }
 }

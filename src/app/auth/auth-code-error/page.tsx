@@ -3,7 +3,7 @@
  * Server Component for handling authentication failures
  */
 
-import { Suspense } from "react";
+import { Suspense, type JSX } from "react";
 import Link from "next/link";
 
 import { Button } from "~/components/ui/button";

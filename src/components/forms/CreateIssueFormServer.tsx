@@ -20,18 +20,10 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import type { ActionResult } from "~/lib/actions/shared";
+import type { MachineForIssues, UserResponse } from "~/lib/types";
 
-interface Machine {
-  id: string;
-  name: string;
-  model?: string;
-}
-
-interface User {
-  id: string;
-  name: string;
-  email: string;
-}
+type Machine = MachineForIssues;
+type User = Pick<UserResponse, "id" | "name" | "email">;
 
 interface CreateIssueFormServerProps {
   machines: Machine[];
@@ -108,7 +100,7 @@ export function CreateIssueFormServer({
               <SelectContent>
                 {machines.map((machine) => (
                   <SelectItem key={machine.id} value={machine.id}>
-                    {machine.name} {machine.model && `(${machine.model})`}
+                    {machine.name} ({machine.model.name})
                   </SelectItem>
                 ))}
               </SelectContent>

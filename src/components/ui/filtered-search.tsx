@@ -1,7 +1,7 @@
 /**
  * Filtered Search Component
  * Optimized for use within complex filtering systems like issue filters
- * 
+ *
  * Features:
  * - Controlled component pattern for predictable state management
  * - Debounced input to prevent excessive filter updates
@@ -77,17 +77,25 @@ export function FilteredSearch({
   const inputId = `filtered-search-${Math.random().toString(36).substr(2, 9)}`;
 
   return (
-    <div className={cn("w-full", size === "sm" ? "min-w-[160px]" : "min-w-[200px]", className)}>
+    <div
+      className={cn(
+        "w-full",
+        size === "sm" ? "min-w-[160px]" : "min-w-[200px]",
+        className,
+      )}
+    >
       {showLabel && label && (
         <Label htmlFor={inputId} className="text-sm font-medium mb-1 block">
           {label}
         </Label>
       )}
       <div className="relative">
-        <Search className={cn(
-          "absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground",
-          size === "sm" ? "h-3 w-3" : "h-4 w-4"
-        )} />
+        <Search
+          className={cn(
+            "absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground",
+            size === "sm" ? "h-3 w-3" : "h-4 w-4",
+          )}
+        />
         <Input
           id={inputId}
           type="text"
@@ -98,7 +106,7 @@ export function FilteredSearch({
           data-testid="filtered-search-input"
           className={cn(
             size === "sm" ? "pl-8 h-8" : "pl-9",
-            localValue && (size === "sm" ? "pr-8" : "pr-9")
+            localValue && (size === "sm" ? "pr-8" : "pr-9"),
           )}
         />
         {localValue && !disabled && (
@@ -109,14 +117,16 @@ export function FilteredSearch({
             onClick={handleClear}
             className={cn(
               "absolute top-1/2 -translate-y-1/2 p-0 hover:bg-transparent",
-              size === "sm" ? "right-1 h-5 w-5" : "right-1 h-6 w-6"
+              size === "sm" ? "right-1 h-5 w-5" : "right-1 h-6 w-6",
             )}
             aria-label="Clear search"
           >
-            <X className={cn(
-              "text-muted-foreground hover:text-foreground",
-              size === "sm" ? "h-3 w-3" : "h-4 w-4"
-            )} />
+            <X
+              className={cn(
+                "text-muted-foreground hover:text-foreground",
+                size === "sm" ? "h-3 w-3" : "h-4 w-4",
+              )}
+            />
           </Button>
         )}
       </div>
@@ -127,13 +137,17 @@ export function FilteredSearch({
 /**
  * Compact variant for use in dense filter toolbars
  */
-export function FilteredSearchCompact(props: Omit<FilteredSearchProps, "size" | "showLabel">) {
+export function FilteredSearchCompact(
+  props: Omit<FilteredSearchProps, "size" | "showLabel">,
+) {
   return <FilteredSearch {...props} size="sm" showLabel={false} />;
 }
 
 /**
  * Variant with visible label for standalone use
  */
-export function FilteredSearchWithLabel(props: Omit<FilteredSearchProps, "showLabel">) {
+export function FilteredSearchWithLabel(
+  props: Omit<FilteredSearchProps, "showLabel">,
+) {
   return <FilteredSearch {...props} showLabel={true} />;
 }

@@ -54,14 +54,23 @@ export const getServerAuthContext = getActionAuthContext;
  * Combined auth + permission helper for Server Actions.
  * Ensures user is authenticated, has org context and required permission.
  */
-export async function requireActionAuthContextWithPermission(permission: string) {
-  const { user, organizationId, membership } = await requireAuthContextWithRole();
+export async function requireActionAuthContextWithPermission(
+  permission: string,
+) {
+  const { user, organizationId, membership } =
+    await requireAuthContextWithRole();
   const db = getGlobalDatabaseProvider().getClient();
-  await baseRequirePermission({ roleId: membership?.role_id ?? null }, permission, db);
+  await baseRequirePermission(
+    { roleId: membership?.role_id ?? null },
+    permission,
+    db,
+  );
   return { user, organizationId, membership };
 }
 
-export type ActionAuthContextWithRole = Awaited<ReturnType<typeof requireAuthContextWithRole>>;
+export type ActionAuthContextWithRole = Awaited<
+  ReturnType<typeof requireAuthContextWithRole>
+>;
 
 /**
  * Safe FormData extraction with validation
@@ -200,7 +209,11 @@ export async function requirePermission(
   permission: string,
   db: Parameters<typeof baseRequirePermission>[2],
 ): Promise<void> {
-  await baseRequirePermission({ roleId: membership?.role_id ?? null }, permission, db);
+  await baseRequirePermission(
+    { roleId: membership?.role_id ?? null },
+    permission,
+    db,
+  );
 }
 
 /**

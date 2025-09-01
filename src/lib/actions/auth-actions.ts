@@ -9,24 +9,28 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "~/lib/supabase/server";
-import { validateOrganizationExists, getOrganizationSubdomainById } from "~/lib/dal/public-organizations";
+import {
+  validateOrganizationExists,
+  getOrganizationSubdomainById,
+} from "~/lib/dal/public-organizations";
 import { isDevelopment } from "~/lib/environment";
 import { extractFormFields } from "~/lib/utils/form-data";
 import { actionError, type ActionResult } from "./shared";
+import { env } from "~/env";
 
 // Re-export ActionResult for compatibility with existing components
 export type { ActionResult };
 
 // Validation schemas
 const magicLinkSchema = z.object({
-  email: z.string().email("Please enter a valid email address"),
+  email: z.email("Please enter a valid email address"),
   organizationId: z.string().min(1, "Organization is required"),
 });
 
 const oauthProviderSchema = z.object({
   provider: z.enum(["google"]),
   organizationId: z.string().min(1, "Organization is required"),
-  redirectTo: z.string().url().optional(),
+  redirectTo: z.url().optional(),
 });
 
 /**
@@ -42,11 +46,13 @@ export async function sendMagicLink(
     try {
       data = extractFormFields(formData, magicLinkSchema);
     } catch (error) {
-      return actionError(error instanceof Error ? error.message : "Form validation failed");
+      return actionError(
+        error instanceof Error ? error.message : "Form validation failed",
+      );
     }
 
     const { email, organizationId } = data;
-    
+
     // Validate organization exists
     const organizationValid = await validateOrganizationExists(organizationId);
     if (!organizationValid) {
@@ -55,7 +61,7 @@ export async function sendMagicLink(
       });
     }
     const supabase = await createClient();
-    
+
     // Get organization subdomain for redirect URL
     const subdomain = await getOrganizationSubdomainById(organizationId);
     if (!subdomain) {
@@ -63,10 +69,10 @@ export async function sendMagicLink(
     }
 
     // Build callback URL with organization subdomain
-    const baseUrl = process.env["NEXT_PUBLIC_SITE_URL"] ?? "http://localhost:3000";
-    const callbackUrl = isDevelopment() 
+    const baseUrl = env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+    const callbackUrl = isDevelopment()
       ? `https://${subdomain}.localhost:3000/auth/callback`
-      : `https://${subdomain}.${baseUrl.replace(/^https?:\/\//, '')}/auth/callback`;
+      : `https://${subdomain}.${baseUrl.replace(/^https?:\/\//, "")}/auth/callback`;
 
     // Send magic link with organization metadata
     const { error } = await supabase.auth.signInWithOtp({
@@ -107,11 +113,15 @@ export async function signInWithOAuth(
 ): Promise<never> {
   try {
     // Validate inputs
-    const validation = oauthProviderSchema.safeParse({ provider, organizationId, redirectTo });
+    const validation = oauthProviderSchema.safeParse({
+      provider,
+      organizationId,
+      redirectTo,
+    });
     if (!validation.success) {
       redirect("/auth/auth-code-error?error=invalid_input");
     }
-    
+
     // Validate organization exists
     const organizationValid = await validateOrganizationExists(organizationId);
     if (!organizationValid) {
@@ -119,7 +129,7 @@ export async function signInWithOAuth(
     }
 
     const supabase = await createClient();
-    
+
     // Get organization subdomain for redirect URL
     const subdomain = await getOrganizationSubdomainById(organizationId);
     if (!subdomain) {
@@ -127,15 +137,15 @@ export async function signInWithOAuth(
     }
 
     // Build callback URL with organization subdomain
-    const baseUrl = process.env["NEXT_PUBLIC_SITE_URL"] ?? "http://localhost:3000";
-    const callbackUrl = isDevelopment() 
+    const baseUrl = env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+    const callbackUrl = isDevelopment()
       ? `https://${subdomain}.localhost:3000/auth/callback`
-      : `https://${subdomain}.${baseUrl.replace(/^https?:\/\//, '')}/auth/callback`;
+      : `https://${subdomain}.${baseUrl.replace(/^https?:\/\//, "")}/auth/callback`;
 
     // Build query params for callback
     const queryParams = new URLSearchParams({ organizationId });
     if (redirectTo) {
-      queryParams.set('next', redirectTo);
+      queryParams.set("next", redirectTo);
     }
 
     // Initiate OAuth flow

@@ -3,7 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import { CalendarIcon, UserIcon, WrenchIcon, MapPinIcon } from "lucide-react";
 import { getIssueById } from "~/lib/dal/issues";
-import { getCommentsForIssue, getCommentCountForIssue } from "~/lib/dal/comments";
+import {
+  getCommentsForIssue,
+  getCommentCountForIssue,
+} from "~/lib/dal/comments";
 import { requireMemberAccess } from "~/lib/organization-context";
 import { formatDistanceToNow, format } from "date-fns";
 import { IssueStatusUpdateClient } from "./issue-status-update-client";
@@ -26,7 +29,8 @@ export async function IssueDetailServer({ issueId }: IssueDetailServerProps) {
   ]);
 
   // TODO: Status colors will be implemented when issue schema includes these fields
-  const statusColor = "bg-surface-container-low text-on-surface border-outline-variant";
+  const statusColor =
+    "bg-surface-container-low text-on-surface border-outline-variant";
 
   return (
     <div className="space-y-6">
@@ -101,7 +105,8 @@ export async function IssueDetailServer({ issueId }: IssueDetailServerProps) {
                             {comment.author?.name || "Unknown User"}
                           </span>
                           <span className="text-muted-foreground text-xs">
-                            {formatDistanceToNow(new Date(comment.created_at))} ago
+                            {formatDistanceToNow(new Date(comment.created_at))}{" "}
+                            ago
                           </span>
                           {comment.updated_at &&
                             new Date(comment.updated_at).getTime() !==
@@ -125,10 +130,10 @@ export async function IssueDetailServer({ issueId }: IssueDetailServerProps) {
               )}
 
               {/* Real-time comments from other users - Client Island */}
-              <RealtimeCommentsClient 
-                issueId={issue.id} 
+              <RealtimeCommentsClient
+                issueId={issue.id}
                 currentUserId={userId}
-                existingCommentIds={comments.map(c => c.id)}
+                existingCommentIds={comments.map((c) => c.id)}
               />
 
               {/* Comment Form - Client Island */}
@@ -188,7 +193,9 @@ export async function IssueDetailServer({ issueId }: IssueDetailServerProps) {
                     </AvatarFallback>
                   </Avatar>
                   <div>
-                    <p className="font-medium">{issue.assignedTo.name || issue.assignedTo.email}</p>
+                    <p className="font-medium">
+                      {issue.assignedTo.name || issue.assignedTo.email}
+                    </p>
                     <p className="text-sm text-muted-foreground">
                       {issue.assignedTo.email}
                     </p>
@@ -202,8 +209,12 @@ export async function IssueDetailServer({ issueId }: IssueDetailServerProps) {
               <div className="mt-4">
                 <IssueAssignmentClient
                   issueId={issue.id}
-                  {...(issue.assignedTo?.id && { currentAssigneeId: issue.assignedTo.id })}
-                  {...(issue.assignedTo?.name && { currentAssigneeName: issue.assignedTo.name })}
+                  {...(issue.assignedTo?.id && {
+                    currentAssigneeId: issue.assignedTo.id,
+                  })}
+                  {...(issue.assignedTo?.name && {
+                    currentAssigneeName: issue.assignedTo.name,
+                  })}
                 />
               </div>
             </CardContent>

@@ -19,7 +19,9 @@ interface NotificationBellWrapperProps {
  * Server wrapper that provides notification data to client islands
  * Fixed: Simplified to avoid server components in client children
  */
-export async function NotificationBellWrapper({ userId }: NotificationBellWrapperProps) {
+export async function NotificationBellWrapper({
+  userId,
+}: NotificationBellWrapperProps) {
   const unreadCount = await getUnreadNotificationCount();
 
   return (
@@ -32,4 +34,3 @@ export async function NotificationBellWrapper({ userId }: NotificationBellWrappe
     </div>
   );
 }
-

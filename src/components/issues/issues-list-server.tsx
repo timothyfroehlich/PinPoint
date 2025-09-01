@@ -76,7 +76,8 @@ const priorityColors = {
 // Status color mapping - based on status categories
 const statusColors = {
   NEW: "bg-tertiary-container text-on-tertiary-container border-tertiary",
-  IN_PROGRESS: "bg-secondary-container text-on-secondary-container border-secondary",
+  IN_PROGRESS:
+    "bg-secondary-container text-on-secondary-container border-secondary",
   RESOLVED: "bg-surface-container-low text-on-surface border-outline-variant",
 } as const;
 

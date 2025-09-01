@@ -21,11 +21,5 @@ interface SettingsErrorProps {
 export default function SettingsError({ error, reset }: SettingsErrorProps) {
   const config = errorConfigs.settings(reset);
 
-  return (
-    <ErrorBoundaryCard
-      error={error}
-      reset={reset}
-      config={config}
-    />
-  );
+  return <ErrorBoundaryCard error={error} reset={reset} config={config} />;
 }

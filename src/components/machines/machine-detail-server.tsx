@@ -5,12 +5,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
-import { 
-  Wrench, 
-  MapPin, 
-  Hash,
-  Clock
-} from "lucide-react";
+import { Wrench, MapPin, Hash, Clock } from "lucide-react";
 
 interface Machine {
   id: string;
@@ -55,45 +50,65 @@ export function MachineDetailServer({ machine }: MachineDetailServerProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-3">
               <div>
-                <label className="text-sm font-medium text-muted-foreground">Name</label>
+                <label className="text-sm font-medium text-muted-foreground">
+                  Name
+                </label>
                 <p className="text-base">{machine.name || "Not specified"}</p>
               </div>
-              
+
               <div>
-                <label className="text-sm font-medium text-muted-foreground">Manufacturer</label>
-                <p className="text-base">{machine.model?.manufacturer || "Not specified"}</p>
+                <label className="text-sm font-medium text-muted-foreground">
+                  Manufacturer
+                </label>
+                <p className="text-base">
+                  {machine.model?.manufacturer || "Not specified"}
+                </p>
               </div>
-              
+
               <div>
-                <label className="text-sm font-medium text-muted-foreground">Model</label>
-                <p className="text-base">{machine.model?.name || "Not specified"}</p>
+                <label className="text-sm font-medium text-muted-foreground">
+                  Model
+                </label>
+                <p className="text-base">
+                  {machine.model?.name || "Not specified"}
+                </p>
               </div>
-              
+
               {machine.model?.year && (
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground">Year</label>
+                  <label className="text-sm font-medium text-muted-foreground">
+                    Year
+                  </label>
                   <p className="text-base">{machine.model.year}</p>
                 </div>
               )}
             </div>
-            
+
             <div className="space-y-3">
               {machine.model?.machine_type && (
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground">Type</label>
-                  <Badge variant="secondary">{machine.model.machine_type}</Badge>
+                  <label className="text-sm font-medium text-muted-foreground">
+                    Type
+                  </label>
+                  <Badge variant="secondary">
+                    {machine.model.machine_type}
+                  </Badge>
                 </div>
               )}
-              
+
               {machine.model?.machine_display && (
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground">Display</label>
+                  <label className="text-sm font-medium text-muted-foreground">
+                    Display
+                  </label>
                   <p className="text-base">{machine.model.machine_display}</p>
                 </div>
               )}
-              
+
               <div>
-                <label className="text-sm font-medium text-muted-foreground">Machine ID</label>
+                <label className="text-sm font-medium text-muted-foreground">
+                  Machine ID
+                </label>
                 <p className="text-base font-mono text-sm">{machine.id}</p>
               </div>
             </div>
@@ -113,13 +128,17 @@ export function MachineDetailServer({ machine }: MachineDetailServerProps) {
           {machine.location ? (
             <div className="space-y-3">
               <div>
-                <label className="text-sm font-medium text-muted-foreground">Location Name</label>
+                <label className="text-sm font-medium text-muted-foreground">
+                  Location Name
+                </label>
                 <p className="text-base">{machine.location.name}</p>
               </div>
-              
+
               {machine.location.street && (
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground">Address</label>
+                  <label className="text-sm font-medium text-muted-foreground">
+                    Address
+                  </label>
                   <p className="text-base">
                     {machine.location.street}
                     {(machine.location.city || machine.location.state) && (
@@ -133,10 +152,14 @@ export function MachineDetailServer({ machine }: MachineDetailServerProps) {
                   </p>
                 </div>
               )}
-              
+
               <div>
-                <label className="text-sm font-medium text-muted-foreground">Location ID</label>
-                <p className="text-base font-mono text-sm">{machine.location.id}</p>
+                <label className="text-sm font-medium text-muted-foreground">
+                  Location ID
+                </label>
+                <p className="text-base font-mono text-sm">
+                  {machine.location.id}
+                </p>
               </div>
             </div>
           ) : (
@@ -161,7 +184,8 @@ export function MachineDetailServer({ machine }: MachineDetailServerProps) {
               </p>
               {machine.qr_code_generated_at && (
                 <p className="text-sm text-muted-foreground">
-                  Generated on {new Date(machine.qr_code_generated_at).toLocaleDateString()}
+                  Generated on{" "}
+                  {new Date(machine.qr_code_generated_at).toLocaleDateString()}
                 </p>
               )}
             </div>
@@ -183,15 +207,19 @@ export function MachineDetailServer({ machine }: MachineDetailServerProps) {
         <CardContent className="space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="text-sm font-medium text-muted-foreground">Created</label>
+              <label className="text-sm font-medium text-muted-foreground">
+                Created
+              </label>
               <p className="text-base">
                 {new Date(machine.created_at).toLocaleDateString()} at{" "}
                 {new Date(machine.created_at).toLocaleTimeString()}
               </p>
             </div>
-            
+
             <div>
-              <label className="text-sm font-medium text-muted-foreground">Last Updated</label>
+              <label className="text-sm font-medium text-muted-foreground">
+                Last Updated
+              </label>
               <p className="text-base">
                 {new Date(machine.updated_at).toLocaleDateString()} at{" "}
                 {new Date(machine.updated_at).toLocaleTimeString()}

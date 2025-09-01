@@ -26,7 +26,7 @@ interface UserAvatarProps {
 
 const SIZE_CLASSES = {
   small: "h-8 w-8 text-sm",
-  medium: "h-10 w-10 text-sm", 
+  medium: "h-10 w-10 text-sm",
   large: "h-16 w-16 text-lg",
 } as const;
 
@@ -88,7 +88,9 @@ export function UserAvatar({
         <AvatarImage
           src={avatarSrc}
           alt={`${displayName}'s profile picture`}
-          onError={() => { setImageError(true); }}
+          onError={() => {
+            setImageError(true);
+          }}
         />
       )}
       <AvatarFallback>{initials}</AvatarFallback>

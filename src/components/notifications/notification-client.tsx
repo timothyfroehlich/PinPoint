@@ -10,13 +10,13 @@ import { useState, useEffect } from "react";
 import { Alert, AlertDescription } from "~/components/ui/alert";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
-import { 
-  CheckCircleIcon, 
-  XCircleIcon, 
-  InfoIcon, 
+import {
+  CheckCircleIcon,
+  XCircleIcon,
+  InfoIcon,
   AlertCircleIcon,
   XIcon,
-  BellIcon
+  BellIcon,
 } from "lucide-react";
 
 interface Notification {
@@ -50,7 +50,8 @@ const NOTIFICATION_STYLES = {
   success: "border-tertiary bg-tertiary-container text-on-tertiary-container",
   error: "border-error bg-error-container text-on-error-container",
   info: "border-primary bg-primary-container text-on-primary-container",
-  warning: "border-secondary bg-secondary-container text-on-secondary-container",
+  warning:
+    "border-secondary bg-secondary-container text-on-secondary-container",
 };
 
 /**
@@ -93,7 +94,8 @@ export function NotificationClient({
         addNotification({
           type: "success",
           title: customEvent.detail.title || "Success",
-          message: customEvent.detail.message || "Operation completed successfully",
+          message:
+            customEvent.detail.message || "Operation completed successfully",
           autoHide: true,
         });
       } else {
@@ -149,7 +151,7 @@ export function NotificationClient({
                   autoHide: notification.auto_hide !== false,
                 });
               }
-            }
+            },
           )
           .subscribe();
 
@@ -166,18 +168,22 @@ export function NotificationClient({
 
     const cleanup = initializeNotificationStream();
     return () => {
-      cleanup.then(fn => { fn?.(); });
+      cleanup.then((fn) => {
+        fn?.();
+      });
     };
   }, [userId, organizationId]);
 
-  const addNotification = (notification: Omit<Notification, "id" | "timestamp">) => {
+  const addNotification = (
+    notification: Omit<Notification, "id" | "timestamp">,
+  ) => {
     const newNotification: Notification = {
       ...notification,
       id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
       timestamp: new Date(),
     };
 
-    setNotifications(prev => {
+    setNotifications((prev) => {
       const updated = [newNotification, ...prev].slice(0, maxNotifications);
       return updated;
     });
@@ -191,7 +197,7 @@ export function NotificationClient({
   };
 
   const removeNotification = (id: string) => {
-    setNotifications(prev => prev.filter(n => n.id !== id));
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
   };
 
   // Don't render if no notifications
@@ -230,10 +236,8 @@ export function NotificationClient({
                 <div className="font-medium text-sm mb-1">
                   {notification.title}
                 </div>
-                <div className="text-sm">
-                  {notification.message}
-                </div>
-                
+                <div className="text-sm">{notification.message}</div>
+
                 {/* Action buttons */}
                 {notification.actions && notification.actions.length > 0 && (
                   <div className="flex gap-2 mt-2">
@@ -251,11 +255,13 @@ export function NotificationClient({
                   </div>
                 )}
               </AlertDescription>
-              
+
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => { removeNotification(notification.id); }}
+                onClick={() => {
+                  removeNotification(notification.id);
+                }}
                 className="h-6 w-6 p-0 ml-2"
               >
                 <XIcon className="h-3 w-3" />

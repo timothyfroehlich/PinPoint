@@ -35,7 +35,9 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
           },
           setAll(cookiesToSet) {
             // Buffer cookies; we'll attach them to the final response later
-            cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+            cookiesToSet.forEach(({ name, value }) =>
+              request.cookies.set(name, value),
+            );
             cookiesToSet.forEach(({ name, value, options }) => {
               const cookieOptions = {
                 ...options,
@@ -62,7 +64,9 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
         userId: user?.id,
         authError: authError?.message,
         host: request.headers.get("host"),
-        cookies: request.cookies.getAll().map(c => ({ name: c.name, hasValue: !!c.value })),
+        cookies: request.cookies
+          .getAll()
+          .map((c) => ({ name: c.name, hasValue: !!c.value })),
       });
 
       // Instead of redirecting unauthenticated users, forward an error signal
@@ -86,13 +90,19 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   if (subdomain) {
     requestHeaders.set("x-subdomain", subdomain);
     requestHeaders.set(SUBDOMAIN_VERIFIED_HEADER, "1");
-    console.log(`[MIDDLEWARE] Forwarding verified subdomain headers: ${subdomain}`);
+    console.log(
+      `[MIDDLEWARE] Forwarding verified subdomain headers: ${subdomain}`,
+    );
   } else {
-    console.log(`[MIDDLEWARE] No subdomain detected, allowing root domain access`);
+    console.log(
+      `[MIDDLEWARE] No subdomain detected, allowing root domain access`,
+    );
   }
 
   // Create the final response with forwarded headers
-  const supabaseResponse = NextResponse.next({ request: { headers: requestHeaders } });
+  const supabaseResponse = NextResponse.next({
+    request: { headers: requestHeaders },
+  });
 
   // Mirror auth error to response header for client-side handling if present
   const authError = requestHeaders.get("x-auth-error");
@@ -136,7 +146,6 @@ function getSubdomain(host: string): string | null {
     return null;
   }
 }
-
 
 export const config = {
   matcher: [

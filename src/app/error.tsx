@@ -27,11 +27,7 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
   return (
     <html>
       <body>
-        <ErrorBoundaryCard
-          error={error}
-          reset={reset}
-          config={config}
-        />
+        <ErrorBoundaryCard error={error} reset={reset} config={config} />
       </body>
     </html>
   );

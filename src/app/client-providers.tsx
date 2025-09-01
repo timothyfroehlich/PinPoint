@@ -3,7 +3,11 @@
 import { TRPCReactProvider } from "~/trpc/react";
 import { ThemeProvider } from "next-themes";
 
-export function ClientProviders({ children }: { children: React.ReactNode }): JSX.Element {
+export function ClientProviders({
+  children,
+}: {
+  children: React.ReactNode;
+}): JSX.Element {
   return (
     <TRPCReactProvider>
       <ThemeProvider

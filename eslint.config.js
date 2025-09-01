@@ -196,15 +196,15 @@ export default tseslint.config(
     // Target app code files but explicitly exclude directories where exported
     // types/interfaces are allowed (negated globs are used for exclusions).
     files: [
-  "src/**/*.{ts,tsx}",
-  "!src/lib/types/**",
-  "!src/components/**",
-  "!src/**/__tests__/**",
-  "!e2e/**",
-  "!src/server/db/**",
-  "!supabase/**",
-  "!RSC_MIGRATION/**",
-  "!docs/**",
+      "src/**/*.{ts,tsx}",
+      "!src/lib/types/**",
+      "!src/components/**",
+      "!src/**/__tests__/**",
+      "!e2e/**",
+      "!src/server/db/**",
+      "!supabase/**",
+      "!RSC_MIGRATION/**",
+      "!docs/**",
     ],
     rules: {
       // App code must not depend directly on DB schema/types or low-level server modules
@@ -268,13 +268,15 @@ export default tseslint.config(
         "error",
         {
           // export interface Foo { ... }
-          selector: "ExportNamedDeclaration[declaration.type='TSInterfaceDeclaration']",
+          selector:
+            "ExportNamedDeclaration[declaration.type='TSInterfaceDeclaration']",
           message:
             "Exported interfaces must be declared under 'src/lib/types' (or an allowed exception). Move this interface to '~/lib/types' or keep it internal to a component/test.",
         },
         {
           // export type Foo = ...
-          selector: "ExportNamedDeclaration[declaration.type='TSTypeAliasDeclaration']",
+          selector:
+            "ExportNamedDeclaration[declaration.type='TSTypeAliasDeclaration']",
           message:
             "Exported type aliases must be declared under 'src/lib/types' (or an allowed exception). Move this type to '~/lib/types' or keep it internal to a component/test.",
         },

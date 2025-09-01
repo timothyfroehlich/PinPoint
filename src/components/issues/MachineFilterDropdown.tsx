@@ -23,34 +23,35 @@ interface MachineFilterDropdownProps {
   showCounts?: boolean;
 }
 
-export function MachineFilterDropdown({ 
-  onChange, 
-  value, 
+export function MachineFilterDropdown({
+  onChange,
+  value,
   disabled = false,
-  showCounts = true 
+  showCounts = true,
 }: MachineFilterDropdownProps) {
   // Fetch real machine data from API
-  const { data: machines, isLoading: machinesLoading } = api.machine.core.getAllForIssues.useQuery();
-  
+  const { data: machines, isLoading: machinesLoading } =
+    api.machine.core.getAllForIssues.useQuery();
+
   // Fetch issues for count calculation (optional for performance)
   const { data: issues } = api.issue.core.getAll.useQuery(undefined, {
     enabled: showCounts, // Only fetch if we want to show counts
   });
-  
+
   // Calculate issue counts per machine
   const machineIssueCounts = useMemo(() => {
     if (!issues || !showCounts) return {};
-    
+
     const counts: Record<string, number> = {};
     issues.forEach((issue: any) => {
       if (issue.machine?.id) {
         counts[issue.machine.id] = (counts[issue.machine.id] || 0) + 1;
       }
     });
-    
+
     return counts;
   }, [issues, showCounts]);
-  
+
   if (machinesLoading) {
     return (
       <div className="space-y-1 min-w-[150px]">
@@ -61,7 +62,7 @@ export function MachineFilterDropdown({
       </div>
     );
   }
-  
+
   if (!machines) {
     return (
       <div className="space-y-1 min-w-[150px]">
@@ -78,11 +79,7 @@ export function MachineFilterDropdown({
       <Label htmlFor="machine-filter" className="text-xs font-medium">
         Machine
       </Label>
-      <Select
-        value={value}
-        onValueChange={onChange}
-        disabled={disabled}
-      >
+      <Select value={value} onValueChange={onChange} disabled={disabled}>
         <SelectTrigger className="h-9">
           <SelectValue placeholder="All Machines" />
         </SelectTrigger>
@@ -95,8 +92,8 @@ export function MachineFilterDropdown({
                 <div className="flex items-center justify-between w-full">
                   <span>{machine.name}</span>
                   {showCounts && (
-                    <Badge 
-                      variant={issueCount > 0 ? "default" : "secondary"} 
+                    <Badge
+                      variant={issueCount > 0 ? "default" : "secondary"}
                       className="ml-2 h-5 px-1.5 text-xs"
                     >
                       {issueCount}

@@ -9,9 +9,15 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { cache } from "react"; // React 19 cache API
 import { z } from "zod";
+import { titleSchema, commentContentSchema, uuidSchema } from "~/lib/validation/schemas";
 import { and, eq, inArray } from "drizzle-orm";
 import { getGlobalDatabaseProvider } from "~/server/db/provider";
-import { issues, issueStatuses, priorities, comments } from "~/server/db/schema";
+import {
+  issues,
+  issueStatuses,
+  priorities,
+  comments,
+} from "~/server/db/schema";
 import { generatePrefixedId } from "~/lib/utils/id-generation";
 import { transformKeysToSnakeCase } from "~/lib/utils/case-transformers";
 import {
@@ -24,7 +30,7 @@ import {
 } from "./shared";
 import { requirePermission } from "./shared";
 import { PERMISSIONS } from "~/server/auth/permissions.constants";
-import { 
+import {
   generateIssueCreationNotifications,
   generateStatusChangeNotifications,
   generateAssignmentNotifications,
@@ -32,38 +38,28 @@ import {
 
 // Enhanced validation schemas with better error messages
 const createIssueSchema = z.object({
-  title: z
-    .string()
-    .min(1, "Issue title is required")
-    .max(200, "Title must be less than 200 characters")
-    .trim(),
+  title: titleSchema,
   description: z.string().optional(),
-  machineId: z
-    .string()
-    .min(1, "Please select a machine")
-    .uuid("Invalid machine selected"),
+  machineId: uuidSchema.or(z.string().min(1, "Please select a machine")),
   priority: z.enum(["low", "medium", "high"]).optional().default("medium"),
-  assigneeId: z.string().uuid().optional(),
+  assigneeId: uuidSchema.optional(),
 });
 
 const updateIssueStatusSchema = z.object({
   statusId: z.string().uuid("Invalid status selected"),
 });
 
-const addCommentSchema = z.object({
-  content: z
-    .string()
-    .min(1, "Comment cannot be empty")
-    .max(2000, "Comment must be less than 2000 characters")
-    .trim(),
-});
+const addCommentSchema = z.object({ content: commentContentSchema });
 
 const updateIssueAssignmentSchema = z.object({
   assigneeId: z.string().uuid("Invalid assignee selected").optional(),
 });
 
 const bulkUpdateIssuesSchema = z.object({
-  issueIds: z.array(z.string().uuid()).min(1, "No issues selected").max(50, "Cannot update more than 50 issues at once"),
+  issueIds: z
+    .array(z.string().uuid())
+    .min(1, "No issues selected")
+    .max(50, "Cannot update more than 50 issues at once"),
   statusId: z.string().uuid().optional(),
   assigneeId: z.string().uuid().optional(),
 });
@@ -98,7 +94,8 @@ export async function createIssueAction(
   formData: FormData,
 ): Promise<ActionResult<{ id: string }>> {
   try {
-    const { user, organizationId, membership } = await requireAuthContextWithRole();
+    const { user, organizationId, membership } =
+      await requireAuthContextWithRole();
 
     // Enhanced validation with Zod
     const validation = validateFormData(formData, createIssueSchema);
@@ -148,16 +145,20 @@ export async function createIssueAction(
     // Background processing (runs after response sent to user)
     runAfterResponse(async () => {
       console.log(`Issue ${issueData.id} created by ${user.email}`);
-      
+
       // Generate notifications for issue creation
       try {
         await generateIssueCreationNotifications(issueData.id, {
           organizationId,
           actorId: user.id,
-          actorName: user.user_metadata?.['name'] as string || user.email || 'Someone',
+          actorName:
+            (user.user_metadata?.["name"] as string) || user.email || "Someone",
         });
       } catch (error) {
-        console.error('Failed to generate issue creation notifications:', error);
+        console.error(
+          "Failed to generate issue creation notifications:",
+          error,
+        );
       }
     });
 
@@ -183,7 +184,8 @@ export async function updateIssueStatusAction(
   formData: FormData,
 ): Promise<ActionResult<{ statusId: string }>> {
   try {
-    const { user, organizationId, membership } = await requireAuthContextWithRole();
+    const { user, organizationId, membership } =
+      await requireAuthContextWithRole();
 
     // Enhanced validation
     const validation = validateFormData(formData, updateIssueStatusSchema);
@@ -216,7 +218,7 @@ export async function updateIssueStatusAction(
     // Background processing
     runAfterResponse(async () => {
       console.log(`Issue ${issueId} status updated by ${user.email}`);
-      
+
       // Generate notifications for status change
       try {
         // Get status name for notification message
@@ -224,16 +226,19 @@ export async function updateIssueStatusAction(
           where: eq(issueStatuses.id, validation.data.statusId),
           columns: { name: true },
         });
-        
+
         if (statusResult) {
           await generateStatusChangeNotifications(issueId, statusResult.name, {
             organizationId,
             actorId: user.id,
-            actorName: user.user_metadata?.['name'] as string || user.email || 'Someone',
+            actorName:
+              (user.user_metadata?.["name"] as string) ||
+              user.email ||
+              "Someone",
           });
         }
       } catch (error) {
-        console.error('Failed to generate status change notifications:', error);
+        console.error("Failed to generate status change notifications:", error);
       }
     });
 
@@ -258,7 +263,8 @@ export async function addCommentAction(
   formData: FormData,
 ): Promise<ActionResult<{ commentId: string }>> {
   try {
-    const { user, organizationId, membership } = await requireAuthContextWithRole();
+    const { user, organizationId, membership } =
+      await requireAuthContextWithRole();
 
     // Enhanced validation
     const validation = validateFormData(formData, addCommentSchema);
@@ -271,7 +277,10 @@ export async function addCommentAction(
 
     // Verify issue exists and user has access
     const issue = await db.query.issues.findFirst({
-      where: and(eq(issues.id, issueId), eq(issues.organization_id, organizationId)),
+      where: and(
+        eq(issues.id, issueId),
+        eq(issues.organization_id, organizationId),
+      ),
       columns: { id: true },
     });
 
@@ -321,7 +330,8 @@ export async function updateIssueAssignmentAction(
   formData: FormData,
 ): Promise<ActionResult<{ assigneeId: string | null }>> {
   try {
-    const { user, organizationId, membership } = await requireAuthContextWithRole();
+    const { user, organizationId, membership } =
+      await requireAuthContextWithRole();
 
     // Enhanced validation
     const validation = validateFormData(formData, updateIssueAssignmentSchema);
@@ -334,7 +344,10 @@ export async function updateIssueAssignmentAction(
 
     // Get current assignee for notification comparison
     const currentIssue = await db.query.issues.findFirst({
-      where: and(eq(issues.id, issueId), eq(issues.organization_id, organizationId)),
+      where: and(
+        eq(issues.id, issueId),
+        eq(issues.organization_id, organizationId),
+      ),
       columns: { assigned_to_id: true },
     });
 
@@ -362,21 +375,27 @@ export async function updateIssueAssignmentAction(
     // Background processing
     runAfterResponse(async () => {
       console.log(`Issue ${issueId} assignment updated by ${user.email}`);
-      
+
       // Generate notifications for assignment change
       try {
         await generateAssignmentNotifications(
-          issueId, 
-          validation.data.assigneeId || null, 
+          issueId,
+          validation.data.assigneeId || null,
           previousAssigneeId,
           {
             organizationId,
             actorId: user.id,
-            actorName: user.user_metadata?.['name'] as string || user.email || 'Someone',
-          }
+            actorName:
+              (user.user_metadata?.["name"] as string) ||
+              user.email ||
+              "Someone",
+          },
         );
       } catch (error) {
-        console.error('Failed to generate assignment change notifications:', error);
+        console.error(
+          "Failed to generate assignment change notifications:",
+          error,
+        );
       }
     });
 
@@ -400,7 +419,8 @@ export async function bulkUpdateIssuesAction(
   formData: FormData,
 ): Promise<ActionResult<{ updatedCount: number }>> {
   try {
-    const { user, organizationId, membership } = await requireAuthContextWithRole();
+    const { user, organizationId, membership } =
+      await requireAuthContextWithRole();
 
     // Parse JSON data from form
     const jsonData = formData.get("data") as string;
@@ -446,7 +466,9 @@ export async function bulkUpdateIssuesAction(
 
     // Background processing
     runAfterResponse(async () => {
-      console.log(`Bulk updated ${updatedIssues.length} issues by ${user.email}`);
+      console.log(
+        `Bulk updated ${updatedIssues.length} issues by ${user.email}`,
+      );
     });
 
     return actionSuccess(
