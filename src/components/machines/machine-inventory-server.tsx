@@ -71,7 +71,7 @@ interface MachineInventoryServerProps {
   searchParams?: Record<string, string | string[] | undefined>;
 }
 
-export async function MachineInventoryServer({
+export function MachineInventoryServer({
   machines,
   locations,
   viewMode,

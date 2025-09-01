@@ -185,8 +185,9 @@ export async function editCommentAction(
     revalidateTag(`recent-comments-${organizationId}`);
 
     // Background processing
-    runAfterResponse(async () => {
+    runAfterResponse(() => {
       console.log(`Comment ${commentId} edited by ${user.email}`);
+      return Promise.resolve();
     });
 
     return actionSuccess({ success: true }, "Comment updated successfully");
@@ -241,8 +242,9 @@ export async function deleteCommentAction(
     revalidateTag(`recent-comments-${organizationId}`);
 
     // Background processing
-    runAfterResponse(async () => {
+    runAfterResponse(() => {
       console.log(`Comment ${commentId} deleted by ${user.email}`);
+      return Promise.resolve();
     });
 
     return actionSuccess({ success: true }, "Comment deleted successfully");
@@ -297,8 +299,9 @@ export async function restoreCommentAction(
     revalidateTag(`recent-comments-${organizationId}`);
 
     // Background processing
-    runAfterResponse(async () => {
+    runAfterResponse(() => {
       console.log(`Comment ${commentId} restored by ${user.email}`);
+      return Promise.resolve();
     });
 
     return actionSuccess({ success: true }, "Comment restored successfully");

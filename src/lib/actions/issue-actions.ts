@@ -305,8 +305,9 @@ export async function addCommentAction(
     revalidateTag(`comments-${issueId}`);
 
     // Background processing
-    runAfterResponse(async () => {
+    runAfterResponse(() => {
       console.log(`Comment added to issue ${issueId} by ${user.email}`);
+      return Promise.resolve();
     });
 
     return actionSuccess(
@@ -465,10 +466,11 @@ export async function bulkUpdateIssuesAction(
     revalidateTag("issues");
 
     // Background processing
-    runAfterResponse(async () => {
+    runAfterResponse(() => {
       console.log(
         `Bulk updated ${updatedIssues.length} issues by ${user.email}`,
       );
+      return Promise.resolve();
     });
 
     return actionSuccess(
