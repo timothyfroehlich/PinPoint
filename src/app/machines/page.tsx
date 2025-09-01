@@ -39,14 +39,13 @@ export async function generateMetadata({ searchParams }: MachinesPageProps) {
   const rawParams = await searchParams;
   const parsedParams = parseMachineSearchParams(rawParams);
 
-  // Convert to legacy DAL format for now
-  const filters: MachineFilters = {
-    locationIds: parsedParams.location,
-    modelIds: parsedParams.model,
-    ownerIds: parsedParams.owner,
-    search: parsedParams.search,
-    hasQR: parsedParams.hasQR,
-  };
+  // Convert to legacy DAL format for now (avoid undefined assignment for exactOptionalPropertyTypes)
+  const filters: MachineFilters = {};
+  if (parsedParams.location) filters.locationIds = parsedParams.location;
+  if (parsedParams.model) filters.modelIds = parsedParams.model;
+  if (parsedParams.owner) filters.ownerIds = parsedParams.owner;
+  if (parsedParams.search) filters.search = parsedParams.search;
+  if (parsedParams.hasQR !== undefined) filters.hasQR = parsedParams.hasQR;
 
   const pagination: MachinePagination = {
     page: parsedParams.page,
@@ -101,14 +100,13 @@ export default async function MachinesPage({
   const rawParams = await searchParams;
   const parsedParams = parseMachineSearchParams(rawParams);
 
-  // Convert to legacy DAL format for now
-  const filters: MachineFilters = {
-    locationIds: parsedParams.location,
-    modelIds: parsedParams.model,
-    ownerIds: parsedParams.owner,
-    search: parsedParams.search,
-    hasQR: parsedParams.hasQR,
-  };
+  // Convert to legacy DAL format for now (avoid undefined assignment for exactOptionalPropertyTypes)
+  const filters: MachineFilters = {};
+  if (parsedParams.location) filters.locationIds = parsedParams.location;
+  if (parsedParams.model) filters.modelIds = parsedParams.model;
+  if (parsedParams.owner) filters.ownerIds = parsedParams.owner;
+  if (parsedParams.search) filters.search = parsedParams.search;
+  if (parsedParams.hasQR !== undefined) filters.hasQR = parsedParams.hasQR;
 
   const pagination: MachinePagination = {
     page: parsedParams.page,

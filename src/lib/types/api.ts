@@ -393,3 +393,59 @@ export type {
   UserMembership as UserMembershipDatabase,
   MachineWithRelations as MachineWithRelationsDatabase,
 };
+
+// ============================================================================
+// Service Layer Types (migrated from server/services/types.ts)
+// ============================================================================
+
+// Service infrastructure types
+export type { DrizzleClient } from "~/server/db/drizzle";
+
+// Database utility types
+export type DatabaseResult<T> = T;
+
+// Service layer enum re-exports
+export {
+  notificationTypeEnum,
+  notificationEntityEnum,
+} from "~/server/db/schema/collections";
+export { activityTypeEnum } from "~/server/db/schema/issues";
+
+// Type guard for database results
+export function isDatabaseResult(obj: unknown): obj is DatabaseResult<object> {
+  if (typeof obj !== "object" || obj === null) return false;
+  return Object.keys(obj).some((key) => key.includes("_"));
+}
+
+// ============================================================================
+// System & Infrastructure Types
+// ============================================================================
+
+// System health check result
+export interface HealthStatus {
+  status: "healthy" | "unhealthy";
+  timestamp: string;
+  database: "connected" | "disconnected";
+  version: string;
+  error?: string;
+}
+
+// QR Code resolution types
+export interface QRCodeResolution {
+  success: true;
+  reportUrl: string;
+  machine: {
+    id: string;
+    name: string;
+    organizationId: string;
+    locationId: string;
+  };
+}
+
+export interface QRCodeResolutionError {
+  success: false;
+  error: "not_found" | "invalid_id" | "server_error";
+  message: string;
+}
+
+export type QRCodeResolutionResult = QRCodeResolution | QRCodeResolutionError;

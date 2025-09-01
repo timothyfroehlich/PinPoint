@@ -10,8 +10,6 @@ import {
 import { useState } from "react";
 import { cn } from "~/lib/utils";
 
-import type { JSX } from "react";
-
 interface UserAvatarProps {
   user?: {
     id: string;
@@ -36,7 +34,7 @@ export function UserAvatar({
   clickable = false,
   showTooltip = true,
   onClick,
-}: UserAvatarProps): JSX.Element {
+}: UserAvatarProps): React.JSX.Element {
   const [imageError, setImageError] = useState(false);
 
   if (!user) {

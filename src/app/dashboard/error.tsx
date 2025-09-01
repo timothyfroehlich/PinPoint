@@ -21,7 +21,7 @@ interface DashboardErrorProps {
 export default function DashboardError({
   error,
   reset,
-}: DashboardErrorProps): JSX.Element {
+}: DashboardErrorProps): React.JSX.Element {
   const config = errorConfigs.dashboard(reset);
 
   return <ErrorBoundaryCard error={error} reset={reset} config={config} />;

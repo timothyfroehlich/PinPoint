@@ -34,13 +34,12 @@ export async function generateMetadata({ searchParams }: IssuesPageProps) {
   const rawParams = await searchParams;
   const parsedParams = parseIssueSearchParams(rawParams);
 
-  // Convert to legacy DAL format for now
-  const filters: IssueFilters = {
-    status: parsedParams.status,
-    priority: parsedParams.priority,
-    assigneeId: parsedParams.assignee,
-    search: parsedParams.search,
-  };
+  // Convert to legacy DAL format for now (avoid undefined assignment for exactOptionalPropertyTypes)
+  const filters: IssueFilters = {};
+  if (parsedParams.status) filters.status = parsedParams.status;
+  if (parsedParams.priority) filters.priority = parsedParams.priority;
+  if (parsedParams.assignee) filters.assigneeId = parsedParams.assignee;
+  if (parsedParams.search) filters.search = parsedParams.search;
 
   const pagination: IssuePagination = {
     page: parsedParams.page,
@@ -94,13 +93,12 @@ async function IssuesWithData({
   // Parse URL parameters using centralized utility
   const parsedParams = parseIssueSearchParams(rawParams);
 
-  // Convert to legacy DAL format for now
-  const filters: IssueFilters = {
-    status: parsedParams.status,
-    priority: parsedParams.priority,
-    assigneeId: parsedParams.assignee,
-    search: parsedParams.search,
-  };
+  // Convert to legacy DAL format for now (avoid undefined assignment for exactOptionalPropertyTypes)
+  const filters: IssueFilters = {};
+  if (parsedParams.status) filters.status = parsedParams.status;
+  if (parsedParams.priority) filters.priority = parsedParams.priority;
+  if (parsedParams.assignee) filters.assigneeId = parsedParams.assignee;
+  if (parsedParams.search) filters.search = parsedParams.search;
 
   const pagination: IssuePagination = {
     page: parsedParams.page,
