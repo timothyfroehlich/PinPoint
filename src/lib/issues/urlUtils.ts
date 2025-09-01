@@ -3,7 +3,8 @@
  * Extracted from IssueList component for proper unit testing
  */
 
-import type { IssueFilters } from "./filterUtils";
+import type { IssueFilters } from "~/lib/types";
+import { ISSUE_SORT_OPTIONS, type IssueSortBy } from "~/lib/types/filters";
 
 /**
  * Converts IssueFilters to URLSearchParams for shareable URLs
@@ -166,10 +167,10 @@ export function sanitizeUrlParams(params: URLSearchParams): URLSearchParams {
  */
 function isValidSortBy(
   value: string | null,
-): value is "created" | "updated" | "status" | "severity" | "game" {
+): value is IssueSortBy {
   return (
     typeof value === "string" &&
-    ["created", "updated", "status", "severity", "game"].includes(value)
+    ISSUE_SORT_OPTIONS.includes(value as typeof ISSUE_SORT_OPTIONS[number])
   );
 }
 

@@ -7,7 +7,7 @@ import { createTRPCRouter, machineEditProcedure } from "~/server/api/trpc";
 import { machines, locations, models, users } from "~/server/db/schema";
 
 export const machineLocationRouter = createTRPCRouter({
-  // Move a game instance to a different location
+  // Move a machine to a different location
   moveToLocation: machineEditProcedure
     .input(
       z.object({
@@ -16,7 +16,7 @@ export const machineLocationRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Verify the game instance exists and belongs to user's organization
+      // Verify the machine exists and belongs to user's organization
       const existingInstance = await ctx.db.query.machines.findFirst({
         where: and(
           eq(machines.id, input.machineId),
@@ -27,7 +27,7 @@ export const machineLocationRouter = createTRPCRouter({
       if (!existingInstance) {
         throw new TRPCError({
           code: "NOT_FOUND",
-          message: "Game instance not found",
+          message: "Machine not found",
         });
       }
 

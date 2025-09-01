@@ -3,8 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { asc, eq, sql } from "drizzle-orm";
 
 // Internal types (alphabetical)
-import { type MachineResponse } from "~/lib/types/api";
-import { type MachineForIssues } from "~/lib/utils/machine-response-transformers";
+import { type MachineResponse, type MachineForIssues } from "~/lib/types/api";
 
 // Internal utilities (alphabetical)
 import { generatePrefixedId } from "~/lib/utils/id-generation";
@@ -52,7 +51,7 @@ export const machineCoreRouter = createTRPCRouter({
       if (!model || !location) {
         throw new TRPCError({
           code: "NOT_FOUND",
-          message: "Invalid game title or location",
+          message: "Invalid model or location",
         });
       }
 
@@ -308,7 +307,7 @@ export const machineCoreRouter = createTRPCRouter({
       if (!machineWithRelations) {
         throw new TRPCError({
           code: "NOT_FOUND",
-          message: "Game instance not found",
+          message: "Machine not found",
         });
       }
 
@@ -318,7 +317,7 @@ export const machineCoreRouter = createTRPCRouter({
   update: machineEditProcedure
     .input(machineUpdateSchema)
     .mutation(async ({ ctx, input }): Promise<MachineResponse> => {
-      // First verify the game instance exists (RLS handles org scoping)
+      // First verify the machine exists (RLS handles org scoping)
       const [existingMachine] = await ctx.db
         .select()
         .from(machines)
@@ -343,7 +342,7 @@ export const machineCoreRouter = createTRPCRouter({
         if (!model) {
           throw new TRPCError({
             code: "NOT_FOUND",
-            message: "Game title not found",
+            message: "Model not found",
           });
         }
       }
@@ -457,7 +456,7 @@ export const machineCoreRouter = createTRPCRouter({
   delete: machineDeleteProcedure
     .input(machineIdSchema)
     .mutation(async ({ ctx, input }): Promise<MachineResponse> => {
-      // Verify the game instance exists (RLS handles org scoping)
+      // Verify the machine exists (RLS handles org scoping)
       const [existingMachine] = await ctx.db
         .select()
         .from(machines)
@@ -467,7 +466,7 @@ export const machineCoreRouter = createTRPCRouter({
       if (!existingMachine) {
         throw new TRPCError({
           code: "NOT_FOUND",
-          message: "Game instance not found",
+          message: "Machine not found",
         });
       }
 

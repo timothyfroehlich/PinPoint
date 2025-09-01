@@ -9,32 +9,38 @@
  */
 
 // API response types and related aliases
-export * from "./api";
+export type * from "./api";
 
-// Shared filter types
-export * from "./filters";
+// Shared filter types (avoid IssueSortBy conflict)
+export type { IssueFilters, MachineFilters } from "./filters";
 
-// Drizzle DB model types (snake_case)
-export type * as Db from "~/server/db/types";
+// Auth & org context types
+export type * from "./auth";
 
-// Supabase auth/session types
-export type {
-  SupabaseUser,
-  SupabaseSession,
-  PinPointSupabaseUser,
-  PinPointSupabaseSession,
-  SupabaseJWTPayload,
-  OrganizationContext as SupabaseOrganizationContext,
-  AuthErrorType,
-  AuthResult,
-  SupabaseClientConfig,
-  AdminOperationContext,
-} from "~/lib/supabase/types";
+// Supabase auth/session/admin types
+export type * from "./supabase";
+
+// DB model types (snake_case) under Db namespace
+export type * from "./db";
 
 // Search param types (Zod inferred)
-export type { IssueSearchParams } from "~/lib/search-params/issue-search-params";
-export type { MachineSearchParams } from "~/lib/search-params/machine-search-params";
+export type * from "./search";
+
+// Type-level utilities
+export type * from "./utils";
+
+// Guard/result helpers
+export type * from "./guards";
+
+// External service types (OPDB) - re-export for centralized access
+export type {
+  OPDBSearchResult,
+  OPDBMachine,
+  OPDBMachineDetails,
+  OPDBParsedId,
+  OPDBAPIResponse,
+  OPDBExportResponse,
+} from "~/lib/opdb/types";
 
 // Common DAL utility types
 export type { PaginationOptions } from "~/lib/dal/shared";
-

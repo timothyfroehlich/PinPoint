@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ISSUE_SORT_OPTIONS } from "~/lib/types/filters";
 
 /**
  * Issue Creation Schema
@@ -51,7 +52,7 @@ export const issueFilterSchema = z.object({
   limit: z.number().min(1).max(1000).optional(),
   offset: z.number().min(0).optional(),
   sortBy: z
-    .enum(["created", "updated", "status", "severity", "game"])
+    .enum(ISSUE_SORT_OPTIONS)
     .optional(),
   sortOrder: z.enum(["asc", "desc"]).optional(),
   statusCategory: z.string().optional(),

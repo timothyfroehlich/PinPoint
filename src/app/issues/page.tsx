@@ -8,10 +8,10 @@ import { AdvancedSearchForm, ISSUES_FILTER_FIELDS } from "~/components/search";
 import { requireMemberAccess } from "~/lib/organization-context";
 import {
   getIssuesWithFilters,
-  type IssueFilters,
   type IssuePagination,
   type IssueSorting,
 } from "~/lib/dal/issues";
+import type { IssueFilters } from "~/lib/types";
 import {
   parseIssueSearchParams,
   getIssueFilterDescription,

@@ -133,7 +133,7 @@ export const modelRouter = createTRPCRouter({
       if (!machineData) {
         throw new TRPCError({
           code: "NOT_FOUND",
-          message: "Game not found in OPDB",
+          message: "Model not found in OPDB",
         });
       }
 

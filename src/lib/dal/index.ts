@@ -4,6 +4,30 @@
  * All functions use React 19 cache() for request-level memoization
  */
 
+// Static type imports for function signatures
+import type {
+  OrganizationResponse,
+  UserProfileResponse,
+  IssueWithRelationsResponse,
+  PinPointSupabaseUser,
+} from "~/lib/types";
+
+// Issue stats and dashboard types
+interface IssueStats {
+  totalCount: number;
+  openCount: number;
+  closedCount: number;
+  urgentCount: number;
+}
+
+interface AuthContextWithRole {
+  user: PinPointSupabaseUser | null;
+  organizationId: string | null;
+  membership: any | null;
+  role: any | null;
+  permissions: string[];
+}
+
 // =================================
 // SHARED UTILITIES AND AUTH CONTEXT
 // =================================
@@ -80,10 +104,10 @@ export {
  * Uses parallel queries for optimal performance
  */
 export async function getDashboardData(): Promise<{
-  organization: Awaited<ReturnType<typeof (await import("./organizations")).getCurrentOrganization>>;
-  user: Awaited<ReturnType<typeof (await import("./users")).getCurrentUserProfile>>;
-  issueStats: Awaited<ReturnType<typeof (await import("./issues")).getIssueDashboardStats>>;
-  recentIssues: Awaited<ReturnType<typeof (await import("./issues")).getRecentIssues>>;
+  organization: OrganizationResponse;
+  user: UserProfileResponse;
+  issueStats: IssueStats;
+  recentIssues: IssueWithRelationsResponse[];
 }> {
   const { getCurrentOrganization } = await import("./organizations");
   const { getCurrentUserProfile } = await import("./users");
@@ -109,11 +133,9 @@ export async function getDashboardData(): Promise<{
  * Gets authentication context with role and organization info
  * Optimized for layout components needing user state
  */
-export async function getUserContextData(): Promise<
-  (Awaited<ReturnType<typeof (await import("./shared")).getServerAuthContextWithRole>> & {
-    profile: Awaited<ReturnType<typeof (await import("./users")).getCurrentUserProfile>> | null;
-  })
-> {
+export async function getUserContextData(): Promise<AuthContextWithRole & {
+  profile: UserProfileResponse | null;
+}> {
   const { getServerAuthContextWithRole } = await import("./shared");
   const { getCurrentUserProfile } = await import("./users");
 
@@ -134,10 +156,10 @@ export async function getUserContextData(): Promise<
  * Useful for admin pages and organization management
  */
 export async function getOrganizationOverviewData(): Promise<{
-  organization: Awaited<ReturnType<typeof (await import("./organizations")).getCurrentOrganization>>;
-  stats: Awaited<ReturnType<typeof (await import("./organizations")).getOrganizationStats>>;
-  memberCount: Awaited<ReturnType<typeof (await import("./organizations")).getOrganizationMemberCount>>;
-  recentIssues: Awaited<ReturnType<typeof (await import("./issues")).getRecentIssues>>;
+  organization: OrganizationResponse;
+  stats: IssueStats;
+  memberCount: number;
+  recentIssues: IssueWithRelationsResponse[];
 }> {
   const {
     getCurrentOrganization,
